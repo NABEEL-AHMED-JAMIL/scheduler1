@@ -1,0 +1,128 @@
+﻿﻿<ol class="breadcrumb">
+    <li><a routerLink="/home">Home</a></li>
+    <li><a routerLink="/setting">Setting</a></li>
+    <li class="active">Q Message</li>
+</ol>
+<!-- LookUp -->
+<div class="row" style="margin-right: 0px;margin-left: 0px;">
+    <div class="col-lg-12">
+        <div class="panel panel-success">
+            <div class="panel-heading">
+                <div class="row">
+                    <div class="col-lg-6" style="text-align: start;margin-top: 2px;">
+                        Search Q-Message
+                    </div>
+                </div>
+            </div>
+            <div class="panel-body">
+                <form *ngIf="qMessageSearcForm" [formGroup]="qMessageSearcForm" 
+                    (ngSubmit)="submitQMessageFilter()">
+                    <div class="row">
+                        <div class="col-lg-4">
+                            <div class="form-group">
+                                <label for="fromDate">From Date</label>
+                                <input type="date" class="form-control input-sm" formControlName="fromDate"
+                                    placeholder="Enter FromDate" />
+                            </div>
+                            <div class="form-group">
+                                <label for="toDate">To Date</label>
+                                <input type="date" class="form-control input-sm" formControlName="toDate"
+                                    placeholder="Enter ToDate" />
+                            </div>
+                            <div class="form-group">
+                                <label for="jobStatuses">Job Status</label>
+                                <select class="form-control input-sm" formControlName="jobStatuses">
+                                    <option value="" selected>Select JobStatus</option>
+                                    <option *ngFor="let jobStatuses of jobStatusList" [value]="jobStatuses">
+                                        {{jobStatuses}}
+                                    </option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-lg-5">
+                            <div class="form-group">
+                                <label for="jobId">Job Id</label>
+                                <textarea rows="3" class="form-control input-sm" formControlName="jobId"
+                                    placeholder="Enter JobId By ,"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label for="jobQId">Job Queue Id</label>
+                                <textarea rows="3" class="form-control input-sm" formControlName="jobQId"
+                                    placeholder="Enter JobQId By ,"></textarea>
+                            </div>
+                        </div>
+                        <div class="col-lg-3">
+                            <div id="sourceJobRunningStatistics"
+                                style="background-color: white;"
+                                class="demo-chart"
+                                echarts [options]="sourceJobRunningStatistics">
+                            </div>
+                        </div>
+                        <div class="col-lg-12">
+                            <button type="submit" class="btn btn-sm btn-danger" style="float: right;">Search</button>
+                            <button type="button" class="btn btn-sm btn-default" (click)="addQMessageFormInit()">Clear</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- table -->
+<div class="col-lg-4" *ngIf="queueDatas">
+    <div class="form-group">
+        <label for="searchQMessageForm" *ngIf="queueDatas">Total Queue Message ({{queueDatas.length}})</label>
+        <input type="text" id="searchQMessageForm" class="form-control input-sm"
+            placeholder="Search" [(ngModel)]="searchQMessageForm"/>
+    </div>
+</div>
+<div style="padding-left: 15px;padding-right: 15px;" *ngIf="queueDatas">
+    <table id="lookup" class="table table-responsive table table-striped
+        table-bordered table-sm" style="font-size: 12px;">
+        <thead>
+            <tr>
+                <th># QId</th>
+                <th># Job Id</th>
+                <th>Date Created</th>
+                <th>Start Time</th>
+                <th>End Time</th>
+                <th>Skip Time</th>
+                <th>Job Status</th>
+                <th>JobStatus Message</th>
+                <th style="width: 1px;">Action</th>
+            </tr>
+        </thead>
+        <tbody style="text-align: center;">
+            <tr *ngFor="let queueData of queueDatas | searchFilter: searchQMessageForm; let i = index">
+                <td>{{queueData.jobQueueId}}</td>
+                <td>{{queueData.jobId}}</td>
+                <td>{{queueData.dateCreated | date:'yyyy-MM-dd HH:mm:ss'}}</td>
+                <td>{{queueData.startTime | date:'yyyy-MM-dd HH:mm:ss'}}</td>
+                <td>{{queueData.endTime | date:'yyyy-MM-dd HH:mm:ss'}}</td>
+                <td>{{queueData.skipTime | date:'yyyy-MM-dd HH:mm:ss'}}</td>
+                <td style="text-align: center;">
+                    <span *ngIf="queueData.jobStatus" class="badge"
+                        [ngClass]="{
+                            'badge-primary' : queueData.jobStatus === 'InFlight', 
+                            'badge-info' : queueData.jobStatus === 'Queue',
+                            'badge-warning' : queueData.jobStatus === 'Running',
+                            'badge-danger' :  queueData.jobStatus === 'Failed',
+                            'badge-success' : queueData.jobStatus === 'Completed',
+                            'badge-pcomplate' : queueData.jobStatus === 'PartialComplete'
+                        }">
+                        {{ queueData.jobStatus }}
+                    </span>
+                </td>
+                <td>{{queueData.jobStatusMessage}}</td>
+                <td style="text-align: center;">
+                    <div class="btn-group btn-group-xs" role="group" style="text-align: center">
+                        <button type="button" class="btn btn-default" [disabled]="queueData.jobStatus !== 'Queue'"
+                            (click)="deleteQMessage(queueData, i)">
+                            <span class="glyphicon glyphicon-trash" style="color: black;"></span>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>

@@ -1,0 +1,234 @@
+﻿﻿<ol class="breadcrumb">
+    <li><a routerLink="/home">Home</a></li>
+    <li><a routerLink="/jobList">Job List</a></li>
+    <li class="active">{{currentTaskState}}</li>
+</ol>
+<div class="row" style="margin-right: 0px;margin-left: 0px;
+    padding-left: 15px; padding-right: 15px;">
+    <form *ngIf="sourceJobForm" [formGroup]="sourceJobForm"
+        (ngSubmit)="onSubmit()">
+        <div class="col-lg-12">
+            <h4>{{currentTaskState}}</h4>
+            <hr style="border-top: 3px solid #f3565d;">
+            <div class="card">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-lg-3">
+                            <div class="form-group">
+                                <label for="jobName">JobName</label>
+                                <input type="text" class="form-control input-sm" formControlName="jobName" 
+                                    [ngClass]="{ 'is-invalid': sourceJob.jobName.errors }" />
+                                <div *ngIf="submitted && sourceJob.jobName.errors" class="invalid-feedback">
+                                    <div *ngIf="sourceJob.jobName.errors.required" style="color: red;">
+                                        JobName is required
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-3">
+                            <div class="form-group">
+                                <label for="jobName">ExecutionType</label>
+                                <select class="form-control input-sm" formControlName="executionType"
+                                    (change)="onExecutionTypeChange($event.target.value)">
+                                    <option hidden value="" disabled selected>Select ExecutionType</option>
+                                    <option *ngFor="let executionType of executionTypes"
+                                        [value]="executionType">
+                                        {{executionType}}
+                                    </option>
+                                </select>
+                                <div *ngIf="submitted && sourceJob.executionType.errors"
+                                    class="invalid-feedback">
+                                    <div *ngIf="sourceJob.executionType.errors.required"
+                                        style="color: red;">ExecutionType is required
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-3" formGroupName="taskDetail">
+                            <div class="form-group">
+                                <label for="taskDetailId">Source Task</label>
+                                <select class="form-control input-sm" formControlName="taskDetailId"
+                                    (change)="onTaskDetailChange($event.target.value)">
+                                    <option hidden value="" disabled selected>Select Source Task</option>
+                                    <option *ngFor="let sourceTask of sourceTasks" [value]="sourceTask.taskDetailId">
+                                        {{sourceTask.taskDetailId}} ({{sourceTask.taskName}})
+                                    </option>
+                                </select>
+                                <div *ngIf="submitted && taskDetail.taskDetailId.errors" class="invalid-feedback">
+                                    <div *ngIf="taskDetail.taskDetailId.errors.required" style="color: red;">
+                                        Source Task is required
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-3">
+                            <div class="form-group">
+                                <label for="priority">Priority</label>
+                                <select class="form-control input-sm" formControlName="priority">
+                                    <option hidden value="" disabled selected>Select Priority</option>
+                                    <option *ngFor="let priority of prioritys"
+                                        [value]="priority">{{priority}}</option>
+                                </select>
+                                <div *ngIf="submitted && sourceJob.priority.errors" class="invalid-feedback">
+                                    <div *ngIf="sourceJob.priority.errors.required"
+                                        style="color: red;">Priority is required</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-12 panel-group">
+                            <div class="panel panel-default" *ngIf="sourceJobForm.get('scheduler')" formGroupName="scheduler">
+                                <div class="panel-body" id="scheduler-1">
+                                    <div class="row">
+                                        <div class="col-md-3">
+                                            <div class="form-group">
+                                                <label for="startDate">Start Date</label>
+                                                <input type="date" class="form-control input-sm" formControlName="startDate"/>
+                                                <!-- error handlign add later -->
+                                                <div *ngIf="submitted && scheduler.startDate?.errors" class="invalid-feedback">
+                                                    <div *ngIf="scheduler.startDate?.errors.required" style="color: red;">
+                                                        Required*
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="form-group">
+                                                <label for="endDate">End Date</label>
+                                                <input type="date" class="form-control input-sm" formControlName="endDate"/>
+                                                <!-- error handlign add later -->
+                                                <div *ngIf="submitted && scheduler.endDate?.errors" class="invalid-feedback">
+                                                    <div *ngIf="scheduler.endDate?.errors.required" style="color: red;">
+                                                        Required*
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <div class="form-group">
+                                                <label for="startTime">Time</label>
+                                                <select class="form-control input-sm" formControlName="startTime">
+                                                    <option hidden value="" disabled selected>Time</option>
+                                                    <option *ngFor="let startTime of times" [value]="startTime">{{startTime}}</option>
+                                                </select>
+                                                <!-- error handlign add later -->
+                                                <div *ngIf="submitted && scheduler.startTime?.errors" class="invalid-feedback">
+                                                    <div *ngIf="scheduler.startTime?.errors.required" style="color: red;">
+                                                        Required*
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <div class="form-group">
+                                                <label for="frequency">Frequency</label>
+                                                <select id="frequency" class="form-control input-sm" formControlName="frequency"
+                                                    (change)="onFrequencyChange($event.target.value)">
+                                                    <option hidden value="" disabled selected>Frequency</option>
+                                                    <option *ngFor="let frequency of frequencys" [value]="frequency">
+                                                        {{frequency}}
+                                                    </option>
+                                                </select>
+                                                <!-- error handlign add later -->
+                                                <div *ngIf="submitted && scheduler.frequency?.errors" class="invalid-feedback">
+                                                    <div *ngIf="scheduler.frequency?.errors.required" style="color: red;">
+                                                        Required*
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <div class="form-group">
+                                                <label for="recurrence">Recurrence</label>
+                                                <select class="form-control input-sm" formControlName="recurrence">
+                                                    <option hidden value="" disabled selected>Recurrence</option>
+                                                    <option *ngFor="let recurrence of recurrences" [value]="recurrence">
+                                                        {{recurrence}}
+                                                    </option>
+                                                </select>
+                                                <!-- error handlign add later -->
+                                                <div *ngIf="submitted && scheduler.recurrence?.errors" class="invalid-feedback">
+                                                    <div *ngIf="scheduler.recurrence?.errors.required" style="color: red;">
+                                                        Required*
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-12 panel-group" *ngIf="selectedSourceTask">
+                            <div class="panel panel-default">
+                                <div class="panel-body" id="sourceTaskType-1">
+                                    <div class="form-group" formGroupName="taskDetail">
+                                        <label for="serviceName">ServiceName</label>
+                                        <input type="text" class="form-control input-sm"
+                                            formControlName="serviceName"
+                                            [ngClass]="{ 'is-invalid': taskDetail.serviceName.errors }"
+                                            disabled/>
+                                        <div *ngIf="submitted && taskDetail.serviceName.errors" class="invalid-feedback">
+                                            <div *ngIf="taskDetail.serviceName.errors.required" style="color: red;">
+                                                ServiceName is required
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="form-group" formGroupName="taskDetail">
+                                        <label for="queueTopicPartition">QueueTopicPartition</label>
+                                        <input type="text" class="form-control input-sm" formControlName="queueTopicPartition"
+                                            [ngClass]="{ 'is-invalid': taskDetail.queueTopicPartition.errors }"
+                                            disabled/>
+                                        <div *ngIf="submitted && taskDetail.queueTopicPartition.errors" class="invalid-feedback">
+                                            <div *ngIf="taskDetail.queueTopicPartition.errors.required" style="color: red;">
+                                                QueueTopicPartition is required
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="form-group" formGroupName="taskDetail">
+                                        <label for="taskPayload">JobPayload</label>
+                                        <textarea class="form-control input-sm" formControlName="taskPayload"
+                                            rows="5" style="height: auto;" placeholder="Enter the task configuration detail"  
+                                            [ngClass]="{ 'is-invalid': taskDetail.taskPayload.errors }"
+                                            disabled></textarea>
+                                        <div *ngIf="submitted && taskDetail.taskPayload.errors" class="invalid-feedback">
+                                            <div *ngIf="taskDetail.taskPayload.errors.required" style="color: red;">
+                                                TaskPayload is required
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="form-group" *ngIf="isEditMode">
+                                        <label for="jobStatus">JobStatus</label>
+                                        <select class="form-control input-sm" formControlName="jobStatus" >
+                                            <option *ngFor="let jobStatus of sourceJobStatus"
+                                                [value]="jobStatus.value">{{jobStatus.key}}
+                                            </option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group form-check" style="margin-top: 30px;text-align: end;">
+                                        <!-- completeJob job email -->
+                                        <input type="checkbox" formControlName="completeJob" id="completeJob" class="form-check-input" />&nbsp;
+                                        <label for="completeJob" class="form-check-label">Email job complete</label>&nbsp;
+                                        <!-- fail job email -->
+                                        <input type="checkbox" formControlName="failJob" id="failJob" class="form-check-input" />&nbsp;
+                                        <label for="failJob" class="form-check-label">Email job fail</label>&nbsp;
+                                        <!-- skip job email -->
+                                        <input type="checkbox" formControlName="skipJob" id="skipJob" class="form-check-input" />&nbsp;
+                                        <label for="skipJob" class="form-check-label">Email job skip</label>&nbsp;
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-lg-12">
+                            <button type="submit" class="btn btn-sm btn-danger" style="float: right;">Save</button>
+                            &nbsp;&nbsp;
+                            <button type="reset" class="btn btn-sm btn-default"
+                                style="float: right;margin-right: 10px;" (click)="addSourceJobFormInit()">Clear</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+<br><br>

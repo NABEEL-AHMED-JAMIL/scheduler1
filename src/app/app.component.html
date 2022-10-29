@@ -1,0 +1,54 @@
+﻿﻿<nav class="navbar navbar-inverse" style="border-radius: 0px;margin-bottom: 0px;" >
+  <div class="container-fluid">
+    <div class="navbar-header">
+      <a class="navbar-brand" routerLink="/home">ETL</a>
+    </div>
+    <ul class="nav navbar-nav">
+      <li class="dropdown">
+        <a href="#" class="dropdown-toggle" data-toggle="dropdown"
+          role="button" aria-haspopup="true" aria-expanded="false">
+          Source Job <span class="caret"></span>
+        </a>
+        <ul class="dropdown-menu">
+          <li><a routerLink="/addJob">Add Job</a></li>
+          <li><a routerLink="/jobList">Job List</a></li>
+        </ul>
+      </li>
+      <li class="dropdown">
+        <a href="#" class="dropdown-toggle" data-toggle="dropdown"
+          role="button" aria-haspopup="true" aria-expanded="false">
+          Source Task<span class="caret"></span>
+        </a>
+        <ul class="dropdown-menu">
+          <li><a routerLink="/addTask">Add Task</a></li>
+          <li><a routerLink="/taskList">Task List</a></li>
+        </ul>
+      </li>
+      <!-- <li class="dropdown">
+        <a href="#" class="dropdown-toggle" data-toggle="dropdown"
+          role="button" aria-haspopup="true" aria-expanded="false">
+          User Config<span class="caret"></span>
+        </a>
+        <ul class="dropdown-menu">
+          <li><a routerLink="/setting/queueMessage">User List</a></li>
+          <li><a routerLink="/setting/queueMessage">Authority</a></li>
+          <li><a routerLink="/setting">Group User</a></li>
+        </ul>
+      </li> -->
+      <li class="dropdown">
+        <a href="#" class="dropdown-toggle" data-toggle="dropdown"
+          role="button" aria-haspopup="true" aria-expanded="false">
+          Setting<span class="caret"></span>
+        </a>
+        <ul class="dropdown-menu">
+          <!-- <li><a routerLink="/setting/lookpXml">Lookp Xml</a></li> -->
+          <li><a routerLink="/setting/queueMessage">QMessage</a></li>
+          <li><a routerLink="/setting">Lookup Setting</a></li>
+        </ul>
+      </li>
+    </ul>
+  </div>
+</nav>
+<!-- main app container -->
+<router-outlet></router-outlet>
+<spinner></spinner>

@@ -1,0 +1,48 @@
+﻿<div class="side-form">
+    <nav class="navbar navbar-inverse"
+        style="border-radius: 0px;margin-bottom: 0px;">
+        <div class="container-fluid">
+            <button type="button" (click)="backClicked()"
+                style="margin-top: 7px;" class="btn btn-sm btn-default">
+                <span class="glyphicon glyphicon-chevron-left"></span>Back
+            </button>
+        </div>
+    </nav>
+    <div class="row" style="margin-right: 0px;margin-left: 0px;">
+        <div class="col-lg-12" style="text-align: end;">
+            <br>
+            <input type="file" accept="application/vnd.ms-excel, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                style="display: none;" #inputUpload (change)="uploadBulk($event.target.files[0])" hidden>
+            <button type="button" class="btn btn-sm btn-default" (click)="inputUpload.click()">
+                <span class="glyphicon glyphicon-upload"></span> Upload {{buttonMessage}}
+            </button>
+            &nbsp;
+            <button type="button" class="btn btn-sm btn-default" (click)="downloadList()">
+                <span class="glyphicon glyphicon-download"></span> Downalod {{buttonMessage}}
+            </button>
+            &nbsp;
+            <button type="button" class="btn btn-sm btn-default" (click)="downloadSourceTemplate()">
+                <span class="glyphicon glyphicon-download"></span> Download Template
+            </button>
+            <hr style="border-top: 3px solid #f3565d;">
+        </div>
+    </div>
+    <div class="row" style="margin-right: 0px;margin-left: 0px;">
+        <div class="col-lg-12">
+            <table class="table table-bordered table-sm table-responsive table-striped" style="font-size: 10px;">
+                <thead>
+                    <tr>
+                        <th style="width: 1px;">No#</th>
+                        <th>Error</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr *ngFor="let error of errors; let i = index">
+                        <td>{{i+1}}</td>
+                        <td [innerHTML]="error"></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
