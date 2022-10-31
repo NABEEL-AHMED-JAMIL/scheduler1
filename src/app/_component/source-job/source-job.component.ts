@@ -3,6 +3,7 @@ import { Action, SourceJobDetail } from '@/_models/index';
 import { SpinnerService } from '@/_helpers';
 import { AlertService, SourceJobService } from '@/_services/index';  
 import { ApiCode } from '@/_models';
+import { Router } from '@angular/router';
 import { interval, Subscription } from 'rxjs';
 import { first } from 'rxjs/operators';
 
@@ -29,7 +30,9 @@ export class SourceJobComponent implements OnInit, OnDestroy  {
     public deleteViewSourceJob: SourceJobDetail;
     public deleteSelectedIndex: any
     
-    constructor(private alertService: AlertService,
+    constructor(
+        private router: Router,
+        private alertService: AlertService,
         private spinnerService: SpinnerService,
         private sourceJobService: SourceJobService){
 	}
@@ -163,6 +166,15 @@ export class SourceJobComponent implements OnInit, OnDestroy  {
             this.alertService.showError(error, this.ERROR);
         });
     }
+
+    public sourceJobHistoryByJobId(jobId: any): any {
+        this.router.navigate(['jobList/jobHistory'],
+        { 
+          queryParams: {
+            jobId: jobId
+          }
+        });
+      }
 
     ngOnDestroy() {
         this.subscription.unsubscribe();

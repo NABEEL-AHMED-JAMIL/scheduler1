@@ -35,4 +35,21 @@ export class HomeService {
         return this.http.get<ApiResponse>(`${config.apiUrl}/dashboard.json/viewRunningJobDateByTargetClickJobStatistics?targetDate=${targetDate}&targetHr=${targetHr}`);
     }
 
+    public weeklyHrRunningStatisticsDimensionDetail(targetDate:any, targetHr: any, jobStatus: any, jobId:any): Observable<ApiResponse> {
+        let params = '';
+        if (targetDate) {
+            params += `targetDate=${targetDate}&`;
+        }
+        if (targetHr) {
+            params += `targetHr=${targetHr}&`;
+        }
+        if (jobStatus && jobStatus != 'Total') {
+            params += `jobStatus=${jobStatus}&`;
+        }
+        if (jobId) {
+            params += `jobId=${jobId}`;
+        }
+        return this.http.get<ApiResponse>(`${config.apiUrl}/dashboard.json/weeklyHrRunningStatisticsDimensionDetail?`+params);
+    }
+
 }

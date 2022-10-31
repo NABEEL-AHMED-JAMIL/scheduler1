@@ -1,5 +1,6 @@
 ﻿import { Component, OnInit } from '@angular/core';
 import { ApiCode, NameValue } from '../../_models/index';
+import { Router } from '@angular/router';
 import { EChartOption } from 'echarts';
 import { first } from 'rxjs/operators';
 import { AlertService, HomeService } from '@/_services';
@@ -74,7 +75,8 @@ export class HomeComponent implements OnInit {
   constructor(public datepipe: DatePipe,
     private alertService: AlertService,
     private spinnerService: SpinnerService,
-    private homeService: HomeService) { }
+    private homeService: HomeService,
+    private router: Router) { }
 
   ngOnInit() {
     let todayDate = new Date();
@@ -461,19 +463,27 @@ export class HomeComponent implements OnInit {
     });
   }
 
+  private selectMap: any;
   public onChartEvent(event: any, type: string) {
     this.searchSourceJobDetails = '';
     // fine the data from the main data with the target event
-    let selectMap = this.heatMapData.find(data=> { 
+    this.selectMap = this.heatMapData.find(data=> { 
       return (data.hr == event?.data[0] && data.dayCode == event?.data[1]
         && data.count == event?.data[2]);
       });
-    this.weeklyHrRunningStatisticsDimension(selectMap?.date, selectMap?.hr);
+    this.weeklyHrRunningStatisticsDimension(this.selectMap?.date, this.selectMap?.hr);
   }
 
   public sourceJobCountAction(sourceJob: any, type: string): any {
-    console.log(sourceJob);
-    console.log(type);
+    this.router.navigate(['jobList/jobHistory'],
+    { 
+      queryParams: {
+        jobId: sourceJob?.jobId,
+        jobStatus: type,
+        targetDate: this.selectMap?.date,
+        targetHr: this.selectMap?.hr
+      }
+    });
   }
 
 }

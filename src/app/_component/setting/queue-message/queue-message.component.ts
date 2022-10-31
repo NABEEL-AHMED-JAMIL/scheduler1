@@ -58,7 +58,7 @@ export class QueueMessageComponent implements OnInit {
     ngOnInit() {
       let todayDate = new Date();
       this.today_date = this.datepipe.transform(todayDate, 'yyyy-MM-dd');
-      todayDate.setDate(todayDate.getDate() - 7);
+      todayDate.setDate(todayDate.getDate() - 6);
       this.last_7th_date = this.datepipe.transform(todayDate, 'yyyy-MM-dd');
       this.addQMessageFormInit();
     }

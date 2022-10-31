@@ -14,7 +14,7 @@
         <button type="button" id="download" routerLink="/jobList/jobBatchAction"
             class="btn btn-sm btn-default" style="margin-top: 25px;float: right;">
             <span class="glyphicon glyphicon-cog"></span>
-            Batch Action
+Batch Action
         </button>
         <button type="button" class="btn btn-sm btn-default" 
             style="margin-top: 25px;float: right;margin-right: 5px;"
@@ -38,8 +38,7 @@
                 <th>Last Run</th>
                 <th>Next Flight</th>
                 <th>R-Status</th>
-                <th style="width: 8%;">Action</th>
-                <th></th>
+                <th style="width: 9%;">Action</th>
             </tr>
         </thead>
         <tbody>
@@ -109,11 +108,6 @@
                                 style="color: purple;">
                             </span>
                         </button>
-                        <!-- <button type="button" class="btn btn-default">
-                            <span class="glyphicon glyphicon-eye-open btn_span"
-                                style="color: blueviolet;">
-                            </span>
-                        </button> -->
                         <button type="button" class="btn btn-default"
                             [disabled]="sourceJob.jobStatus === 'Delete' ||
                                 sourceJob.jobRunningStatus === 'Running'"
@@ -121,26 +115,9 @@
                             (click)="deleteSourceJob(sourceJob, i)">
                             <span class="glyphicon glyphicon-trash" style="color: black;"></span>
                         </button>
-                    </div>
-                </td>
-                <td style="text-align: center;">
-                    <div class="dropdown">
-                        <a data-toggle="dropdown"><span class="glyphicon glyphicon-option-vertical"></span></a>
-                        <ul class="dropdown-menu pull-right" style="min-width: auto;">
-                            <li>
-                                <a routerLink="/sourceFlight/{{sourceJob.jobId}}">
-                                    <span class="glyphicon glyphicon-tasks"></span> History
-                                </a>
-                            </li>
-                            <li>
-                                <a routerLink="/sourceStatistics/{{sourceJob.jobId}}">
-                                    <span class="glyphicon glyphicon-equalizer"></span> Statistics
-                                </a>
-                            </li>
-                            <li>
-                                <a [routerLink]=""><span class="glyphicon glyphicon-qrcode"></span> PDF Report</a>
-                            </li>
-                        </ul>
+                        <button type="button" class="btn btn-default" (click)="sourceJobHistoryByJobId(sourceJob.jobId)">
+                            <span class="glyphicon glyphicon-tasks" style="color: black;"></span>
+                        </button>
                     </div>
                 </td>
             </tr>

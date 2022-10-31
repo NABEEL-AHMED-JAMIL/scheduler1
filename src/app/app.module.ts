@@ -1,5 +1,6 @@
 ﻿import { NgModule } from '@angular/core';
 import { NgxEchartsModule } from 'ngx-echarts';
+import { NgxQrcodeStylingModule } from 'ngx-qrcode-styling';
 import { BrowserModule } from '@angular/platform-browser';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { ReactiveFormsModule, FormsModule  } from '@angular/forms';
@@ -16,6 +17,7 @@ import {
     SubLookupComponent, QueueMessageComponent,
     TaskComponent, ViewLinkTaskComponent,
     ViewLinkJobsComponent, SourceTaskComponent,
+    JobHistoryActionComponent
 } from './_component/index';
 import { ToastrModule } from 'ngx-toastr';
 
@@ -27,6 +29,7 @@ import { ToastrModule } from 'ngx-toastr';
             echarts: () => import('echarts'),
         }),
         FormsModule,
+        NgxQrcodeStylingModule,
         ReactiveFormsModule,
         HttpClientModule,
         BrowserAnimationsModule,
@@ -50,7 +53,8 @@ import { ToastrModule } from 'ngx-toastr';
         ViewLinkTaskComponent,
         ViewLinkJobsComponent,
         SourceTaskComponent,
-        SearchFilterPipe
+        SearchFilterPipe,
+        JobHistoryActionComponent
     ],
     providers: [
     ],

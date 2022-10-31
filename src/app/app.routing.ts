@@ -3,7 +3,8 @@ import {
     HomeComponent, SettingComponent, JobComponent,
     SourceJobComponent, TaskComponent, QueueMessageComponent,
     SourceTaskComponent, SourceBatchActionComponent,
-    XmlConfigurationComponent, SubLookupComponent
+    XmlConfigurationComponent, SubLookupComponent,
+    JobHistoryActionComponent
 } from './_component/index';
 
 const routes: Routes = [
@@ -33,7 +34,7 @@ const routes: Routes = [
         path: 'editTask/:taskDetailId',
         component: TaskComponent
     },
-    { 
+    {
         path: 'jobList',
         component: SourceJobComponent,
         children: [
@@ -46,6 +47,14 @@ const routes: Routes = [
                 }
             }
         ]
+    },
+    { 
+        path: 'jobList/jobHistory',
+        component: JobHistoryActionComponent,
+        data: {
+            router:  '/jobHistory',
+            action: 'sourceJob'
+        }
     },
     {
         path: 'addJob',

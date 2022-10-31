@@ -1,5 +1,6 @@
 // home 
 export * from './home/home.component';
+export * from './job-history-action/job-history-action.component';
 // setting
 export * from './setting/lookup/lookup.component';
 export * from './setting/sub-lookup/sub-lookup.component';
