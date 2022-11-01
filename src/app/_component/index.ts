@@ -12,6 +12,7 @@ export * from './setting/queue-message/queue-message.component';
 // source-job
 export * from './source-job/job/job.component';
 export * from './source-job/source-job.component';
+export * from './job-logs/job-logs.component';
 // source-task
 export * from './batch-action/batch-action.component';
 export * from './source-task/task/task.component';

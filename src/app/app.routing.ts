@@ -4,7 +4,7 @@ import {
     SourceJobComponent, TaskComponent, QueueMessageComponent,
     SourceTaskComponent, SourceBatchActionComponent,
     XmlConfigurationComponent, SubLookupComponent,
-    JobHistoryActionComponent
+    JobHistoryActionComponent, JobLogComponent
 } from './_component/index';
 
 const routes: Routes = [
@@ -50,11 +50,11 @@ const routes: Routes = [
     },
     { 
         path: 'jobList/jobHistory',
-        component: JobHistoryActionComponent,
-        data: {
-            router:  '/jobHistory',
-            action: 'sourceJob'
-        }
+        component: JobHistoryActionComponent
+    },
+    { 
+        path: 'jobList/jobLogs',
+        component: JobLogComponent
     },
     {
         path: 'addJob',

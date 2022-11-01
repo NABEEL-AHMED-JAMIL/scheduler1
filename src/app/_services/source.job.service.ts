@@ -46,6 +46,10 @@ export class SourceJobService {
         return this.http.post<ApiResponse>(`${config.apiUrl}/sourceJob.json/fetchRunningJobEvent`, payload);
     }
 
+    public findSourceJobAuditLog(jobQueueId:any, jobId:any): Observable<ApiResponse> {
+        return this.http.get<ApiResponse>(`${config.apiUrl}/sourceJob.json/findSourceJobAuditLog?jobQueueId=`+jobQueueId+`&jobId=`+jobId);
+    }
+
     public downloadSourceJobTemplateFile(): Observable<any> {
         return this.http.get(`${config.apiUrl}/sourceJob.json/downloadSourceJobTemplateFile`,
         {
