@@ -14,7 +14,7 @@
         <button type="button" id="download" routerLink="/jobList/jobBatchAction"
             class="btn btn-sm btn-default" style="margin-top: 25px;float: right;">
             <span class="glyphicon glyphicon-cog"></span>
-Batch Action
+            Batch Action
         </button>
         <button type="button" class="btn btn-sm btn-default" 
             style="margin-top: 25px;float: right;margin-right: 5px;"
@@ -33,6 +33,7 @@ Batch Action
                 <th>Execution</th>
                 <th>Status</th>
                 <th>Created Date</th>
+                <th>Recursion</th>
                 <th>Start Date</th>
                 <th>End Date</th>
                 <th>Last Run</th>
@@ -67,6 +68,7 @@ Batch Action
                     </span>
                 </td>
                 <td style="text-align: center;">{{sourceJob.dateCreated | date:'yyyy-MM-dd HH:mm:ss'}}</td>
+                <td style="text-align: center;">{{sourceJob?.scheduler ?  'Every ' + sourceJob?.scheduler?.recurrence : ''}} {{sourceJob?.scheduler ?  sourceJob?.scheduler?.frequency : ''}}</td>
                 <td style="text-align: center;">{{sourceJob?.scheduler?.startDate}} {{sourceJob?.scheduler?.startTime}}</td>
                 <td style="text-align: center;">{{sourceJob?.scheduler?.endDate ? sourceJob?.scheduler?.endDate : ''}}
                     {{sourceJob?.scheduler?.endDate ? sourceJob?.scheduler?.startTime : ''}}</td>

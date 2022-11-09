@@ -16,6 +16,7 @@ export class SourceJobComponent implements OnInit, OnDestroy  {
     @ViewChild('closebutton', {static: false})
 	public closebutton;
     public ERROR = 'Error';
+    public SUCESS = 'Sucess';
     public hide: any;
     public componenetType: any;
     public SOURCE_JOB_DETAIL_FETCH = 'SourceJob Fetch';
@@ -100,7 +101,7 @@ export class SourceJobComponent implements OnInit, OnDestroy  {
             this.spinnerService.hide();
             if(response.status === ApiCode.SUCCESS) {
                 this.listSourceJob();
-                //this.alertService.showSuccess(response.message, this.JOB_IN_QUEUE);
+                this.alertService.showSuccess(response.message, this.SUCESS);
                 return;
             }
             this.alertService.showError(response.message, this.ERROR);
@@ -115,7 +116,13 @@ export class SourceJobComponent implements OnInit, OnDestroy  {
         this.sourceJobService.skipNextSourceJob(sourceJob)
         .pipe(first())
         .subscribe((response) => {
-            console.log(response);
+            this.spinnerService.hide();
+            if(response.status === ApiCode.SUCCESS) {
+                this.listSourceJob();
+                this.alertService.showSuccess(response.message, this.SUCESS);
+                return;
+            }
+            this.alertService.showError(response.message, this.ERROR);
         }, (error) => {
             this.alertService.showError(error, this.ERROR);
             this.spinnerService.hide();

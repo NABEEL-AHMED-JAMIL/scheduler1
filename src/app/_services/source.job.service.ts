@@ -35,11 +35,17 @@ export class SourceJobService {
     }
 
     public runSourceJob(payload:any): Observable<ApiResponse> {
-        return this.http.post<ApiResponse>(`${config.apiUrl}/sourceJob.json/runSourceJob`, payload);
+        let modifyPayload = {
+            jobId: payload?.jobId
+        };
+        return this.http.post<ApiResponse>(`${config.apiUrl}/sourceJob.json/runSourceJob`, modifyPayload);
     }
 
     public skipNextSourceJob(payload:any): Observable<ApiResponse> {
-        return this.http.post<ApiResponse>(`${config.apiUrl}/sourceJob.json/skipNextSourceJob`, payload);
+        let modifyPayload = {
+            jobId: payload?.jobId
+        };
+        return this.http.post<ApiResponse>(`${config.apiUrl}/sourceJob.json/skipNextSourceJob`, modifyPayload);
     }
 
     public fetchRunningJobEvent(payload:any): Observable<ApiResponse> {
