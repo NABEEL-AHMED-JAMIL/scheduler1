@@ -125,8 +125,10 @@
                 <th># QId</th>
                 <th># Job Id</th>
                 <th>Date Created</th>
+                <th>Run Manual</th>
                 <th>Start Time</th>
                 <th>End Time</th>
+                <th>Skip Manual</th>
                 <th>Skip Time</th>
                 <th>Job Status</th>
                 <th>JobStatus Message</th>
@@ -138,8 +140,10 @@
                 <td>{{queueData.jobQueueId}}</td>
                 <td>{{queueData.jobId}}</td>
                 <td>{{queueData.dateCreated | date:'yyyy-MM-dd HH:mm:ss'}}</td>
+                <td>{{queueData.runManual == true ? 'Yes' : '' }}</td>
                 <td>{{queueData.startTime | date:'yyyy-MM-dd HH:mm:ss'}}</td>
                 <td>{{queueData.endTime | date:'yyyy-MM-dd HH:mm:ss'}}</td>
+                <td>{{queueData.skipManual == true ? 'Yes' : '' }}</td>
                 <td>{{queueData.skipTime | date:'yyyy-MM-dd HH:mm:ss'}}</td>
                 <td style="text-align: center;">
                     <span *ngIf="queueData.jobStatus" class="badge"

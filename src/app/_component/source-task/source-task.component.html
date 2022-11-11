@@ -43,10 +43,11 @@
                 <td>{{sourceTask.taskDetailId}}</td>
                 <td>{{sourceTask.taskName}}</td>
                 <td *ngIf="sourceTask.sourceTaskType">
-                    <a (click)="viewSourceTaskType(sourceTask.sourceTaskType)" data-toggle="modal" data-target="#sourceTaskTaype">
+                    <a (click)="viewSourceTaskType(sourceTask.sourceTaskType)"
+                        data-toggle="modal" data-target="#sourceTaskTaype">
                         {{sourceTask.sourceTaskType.sourceTaskTypeId}}
                     </a>
-                    [{{sourceTask.sourceTaskType.serviceName}}]
+                    [{{sourceTask.sourceTaskType.serviceName}}] [{{sourceTask.sourceTaskType.queueTopicPartition}}]
                 </td>
                 <td style="text-align: center;">
                     <a routerLink="" style="pointer-events: none">{{sourceTask.totalLinksJobs}}</a>
