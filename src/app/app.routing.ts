@@ -4,7 +4,8 @@ import {
     SourceJobComponent, TaskComponent, QueueMessageComponent,
     SourceTaskComponent, SourceBatchActionComponent,
     XmlConfigurationComponent, SubLookupComponent,
-    JobHistoryActionComponent, JobLogComponent
+    JobHistoryActionComponent, JobLogComponent,
+    SearchEngineComponent
 } from './_component/index';
 
 const routes: Routes = [
@@ -79,6 +80,10 @@ const routes: Routes = [
     { 
         path: 'setting/lookpXml',
         component: XmlConfigurationComponent
+    },
+    { 
+        path: 'searchEngine',
+        component: SearchEngineComponent
     },
     { 
         path: '**',

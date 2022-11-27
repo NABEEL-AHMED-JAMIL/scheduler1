@@ -17,7 +17,8 @@ import {
     SubLookupComponent, QueueMessageComponent,
     TaskComponent, ViewLinkTaskComponent,
     ViewLinkJobsComponent, SourceTaskComponent,
-    JobHistoryActionComponent, JobLogComponent
+    JobHistoryActionComponent, JobLogComponent,
+    SearchEngineComponent
 } from './_component/index';
 import { ToastrModule } from 'ngx-toastr';
 
@@ -55,7 +56,8 @@ import { ToastrModule } from 'ngx-toastr';
         SourceTaskComponent,
         SearchFilterPipe,
         JobHistoryActionComponent,
-        JobLogComponent
+        JobLogComponent,
+        SearchEngineComponent
     ],
     providers: [
     ],
