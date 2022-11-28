@@ -20,8 +20,13 @@ import {
     JobHistoryActionComponent, JobLogComponent,
     SearchEngineComponent
 } from './_component/index';
+import {
+    BarAnalyticComponent, CalendarAnalyticComponent,
+    GeoAnalyticComponent, HeatmapAnalyticComponent,
+    LineAnalyticComponent, MapAnalyticComponent,
+    PieAnalyticComponent, RadarAnalyticsComponent
+} from './gen-analytics/index'
 import { ToastrModule } from 'ngx-toastr';
-
 
 @NgModule({
     imports: [
@@ -57,7 +62,15 @@ import { ToastrModule } from 'ngx-toastr';
         SearchFilterPipe,
         JobHistoryActionComponent,
         JobLogComponent,
-        SearchEngineComponent
+        SearchEngineComponent,
+        BarAnalyticComponent,
+        CalendarAnalyticComponent,
+        GeoAnalyticComponent,
+        HeatmapAnalyticComponent,
+        LineAnalyticComponent,
+        MapAnalyticComponent,
+        PieAnalyticComponent,
+        RadarAnalyticsComponent
     ],
     providers: [
     ],
