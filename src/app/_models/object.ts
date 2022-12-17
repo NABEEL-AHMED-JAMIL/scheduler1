@@ -119,6 +119,7 @@ export interface SourceTask {
     taskName?: any;
     taskPayload?: any;
     taskStatus?: any;
+    taskHomePage?: any;
     sourceTaskType?: SourceTaskType;
     totalLinksJobs?: any;
 }

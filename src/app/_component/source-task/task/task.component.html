@@ -16,13 +16,23 @@
                 <div class="card-body">
                     <div class="row">
                         <div class="col-lg-5">
-                            <div class="form-group">
-                                <label for="taskName">TaskName</label>
-                                <input type="text" class="form-control input-sm" formControlName="taskName"
-                                    [ngClass]="{ 'is-invalid': sourceTask.taskName.errors }" placeholder="Enter TaskName" />
-                                <div *ngIf="submitted && sourceTask.taskName.errors" class="invalid-feedback">
-                                    <div *ngIf="sourceTask.taskName.errors.required" style="color: red;">
-                                        TaskName is required
+                            <div class="row">
+                                <div class="form-group" class="col-lg-6">
+                                    <label for="taskName">TaskName</label>
+                                    <input type="text" class="form-control input-sm" formControlName="taskName"
+                                        [ngClass]="{ 'is-invalid': sourceTask.taskName.errors }" placeholder="Enter TaskName" />
+                                    <div *ngIf="submitted && sourceTask.taskName.errors" class="invalid-feedback">
+                                        <div *ngIf="sourceTask.taskName.errors.required" style="color: red;">
+                                            TaskName is required
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-lg-6">
+                                    <div class="form-group">
+                                        <label for="taskHomePage">HomePage</label>
+                                        <select class="form-control input-sm" formControlName="taskHomePage" >
+                                            <option *ngFor="let piplineHomePage of piplineHomePageList" [value]="piplineHomePage.lookupValue">{{piplineHomePage.lookupType}}</option>
+                                        </select>
                                     </div>
                                 </div>
                             </div>
@@ -40,11 +50,23 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="form-group" *ngIf="isEditMode">
-                                <label for="taskStatus">TaskStatus</label>
-                                <select class="form-control input-sm" formControlName="taskStatus" >
-                                    <option *ngFor="let sourceTask of sourceTaskStatus" [value]="sourceTask.value">{{sourceTask.key}}</option>
-                                </select>
+                            <div class="row">
+                                <div class="col-lg-4" *ngIf="isEditMode">
+                                    <div class="form-group" >
+                                        <label for="taskStatus">TaskStatus</label>
+                                        <select class="form-control input-sm" formControlName="taskStatus" >
+                                            <option *ngFor="let sourceTask of sourceTaskStatus" [value]="sourceTask.value">{{sourceTask.key}}</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div [ngClass]="isEditMode ? 'col-lg-8' : 'col-lg-12' ">
+                                    <div class="form-group">
+                                        <label for="pipelineId">Pipeline TaskId</label>
+                                        <select class="form-control input-sm" formControlName="pipelineId" >
+                                            <option *ngFor="let pipelineId of pipelineIdList" [value]="pipelineId.lookupValue">{{pipelineId.lookupType}}</option>
+                                        </select>
+                                    </div>
+                                </div>
                             </div>
                             <div class="form-group">
                                 <label for="taskPayload">TaskPayload</label>

@@ -137,15 +137,12 @@ export class JobComponent implements OnInit {
           .pipe(first())
           .subscribe((response) => {
                 if(response.status === ApiCode.SUCCESS) {
-                    if (!this.isEditMode) {
-                        this.sourceTasks = response.data
-                        .filter((sourceTask: any) => {
-                            if (sourceTask.taskStatus === 'Active')
-                                return sourceTask;
-                        });
-                    } else {
-                        this.sourceTasks = response.data
-                    }
+                    this.sourceTasks = response.data
+                    .filter((sourceTask: any) => {
+                        if (sourceTask.taskStatus === 'Active')
+                            return sourceTask;
+                    });
+                    console.log(this.sourceTasks);
                     this.paging = response.paging;
                     this.spinnerService.hide();
               } else {
@@ -169,6 +166,7 @@ export class JobComponent implements OnInit {
             taskDetail: this.fb.group({
                 taskDetailId: ['', Validators.required],
                 serviceName: ['', Validators.required],
+                taskHomePage: [''],
                 queueTopicPartition: ['', Validators.required],
                 taskPayload: ['', Validators.required],
             }),
@@ -199,6 +197,7 @@ export class JobComponent implements OnInit {
                         taskDetail: this.fb.group({
                             taskDetailId: [response?.data?.taskDetail?.taskDetailId, Validators.required],
                             serviceName: [response?.data?.taskDetail?.sourceTaskType?.serviceName, Validators.required],
+                            taskHomePage: [response?.data?.taskDetail?.taskHomePage],
                             queueTopicPartition: [response?.data?.taskDetail?.sourceTaskType?.queueTopicPartition, Validators.required],
                             taskPayload: [response?.data?.taskDetail?.taskPayload, Validators.required],
                         }),
@@ -259,6 +258,7 @@ export class JobComponent implements OnInit {
         this.taskDetail.serviceName.setValue(this.selectedSourceTask?.sourceTaskType?.serviceName);
         this.taskDetail.queueTopicPartition.setValue(this.selectedSourceTask?.sourceTaskType?.queueTopicPartition);
         this.taskDetail.taskPayload.setValue(this.selectedSourceTask?.taskPayload);
+        this.taskDetail.taskHomePage.setValue(this.selectedSourceTask?.taskHomePage);
     }
 
     public onExecutionTypeChange(executionType: any): void {

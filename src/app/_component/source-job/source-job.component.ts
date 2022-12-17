@@ -157,13 +157,12 @@ export class SourceJobComponent implements OnInit, OnDestroy  {
         .pipe(first())
         .subscribe((response) => {
             if(response.status === ApiCode.SUCCESS) {
-                this.deleteViewSourceJob.jobStatus = 'Delete';
-                this.sourceJobDetails[this.deleteSelectedIndex] = this.deleteViewSourceJob;
+                this.listSourceJob();
+                this.deleteViewSourceJob = null;
+                this.deleteSelectedIndex = null;
                 this.spinnerService.hide();
                 this.alertService.showSuccess(response.message, this.DELETE_SOURCE_JOB);
                 this.closebutton.nativeElement.click();
-                this.deleteViewSourceJob = null;
-                this.deleteSelectedIndex = null;
                 return;
             }
             this.spinnerService.hide();

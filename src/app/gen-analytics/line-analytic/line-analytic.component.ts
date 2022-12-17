@@ -1,5 +1,5 @@
 ﻿import { Component } from '@angular/core';
-import './_content/app.less';
+import '../../_content/app.less';
 
 @Component({
     selector: 'line-analytic',
