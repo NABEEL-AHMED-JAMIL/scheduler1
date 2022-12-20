@@ -5,7 +5,8 @@ import {
     SourceTaskComponent, SourceBatchActionComponent,
     XmlConfigurationComponent, SubLookupComponent,
     JobHistoryActionComponent, JobLogComponent,
-    SearchEngineComponent
+    SearchEngineComponent, SegmentFolderComponent,
+    SegmentFileComponent,
 } from './_component/index';
 
 const routes: Routes = [
@@ -84,6 +85,14 @@ const routes: Routes = [
     { 
         path: 'searchEngine',
         component: SearchEngineComponent
+    },
+    {
+        path: 'seg/folder',
+        component: SegmentFolderComponent 
+    },
+    {
+        path: 'seg/folder/file',
+        component: SegmentFileComponent
     },
     { 
         path: '**',
