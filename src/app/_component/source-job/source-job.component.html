@@ -106,7 +106,7 @@
                                 sourceJob.jobStatus === 'Delete' ||
                                 sourceJob.jobStatus === 'Inactive'"
                             (click)="skipNextSourceJob(sourceJob, i)">
-                            <span class="glyphicon glyphicon-step-forward btn_span"
+                            <span class="glyphicon glyphicon-step-forward"
                                 style="color: purple;">
                             </span>
                         </button>
@@ -117,7 +117,9 @@
                             (click)="deleteSourceJob(sourceJob, i)">
                             <span class="glyphicon glyphicon-trash" style="color: black;"></span>
                         </button>
-                        <button type="button" class="btn btn-default" (click)="sourceJobHistoryByJobId(sourceJob.jobId)">
+                        <button type="button" class="btn btn-default"                         
+                            [disabled]="sourceJob.tabActive === false"
+                            (click)="sourceJobHistoryByJobId(sourceJob.jobId)">
                             <span class="glyphicon glyphicon-tasks" style="color: black;"></span>
                         </button>
                     </div>

@@ -1,124 +1,57 @@
 ﻿<!-- breadcrumb -->
 <ol class="breadcrumb">
     <li><a routerLink="/home">Home</a></li>
+    <li><a routerLink="/setting">Setting</a></li>
     <li class="active">Search Engine</li>
 </ol>
 <div class="row" style="margin-right: 0px;margin-left: 0px;">
     <div class="col-lg-12">
-        <ul class="nav nav-tabs">
-            <li class="active"><a data-toggle="tab" href="#tableQuery">Table Query</a></li>
-            <li><a data-toggle="tab" href="#analayticsQuery">Analytics Query</a></li>
-        </ul>
-        <!-- tab content -->
-        <div class="tab-content">
-            <div id="tableQuery" class="tab-pane fade in active">
-                <br>
-                <div class="row">
-                    <form *ngIf="tableQueryForm" [formGroup]="tableQueryForm"
-                        (ngSubmit)="dynamicQueryResponse()">
-                        <div class="col-lg-12 form-group">
-                            <textarea class="form-control input-sm" rows="5" style="height: auto;"
-                                formControlName="query"
-                                placeholder="Enter Select Query For Result" required></textarea>
-                            <br>
-                            <button type="reset" class="btn btn-sm btn-default" (click)="tableQueryFormInit()"
-                                style="color: #345; background-color:#fff;border-color: black;float: left;">Clear</button>
-                            <button type="submit" class="btn btn-sm btn-danger" style="float: right;">Save</button>
-                            <br><br>
-                        </div>
-                    </form>
-                    <div class="col-lg-8" *ngIf="jsonPayload">
-                        <h4>Query Result</h4>
-                    </div>
-                    <div class="col-lg-4" *ngIf="jsonPayload">
-                        <div class="form-group">
-                            <input type="text" id="searchDetails" class="form-control input-sm"
-                                placeholder="Search" [(ngModel)]="searchDetails"/>
-                        </div>
-                    </div>
+        <p style="color: red;">Plese enter the select statment</p>
+        <div class="row">
+            <form *ngIf="tableQueryForm" [formGroup]="tableQueryForm"
+                (ngSubmit)="dynamicQueryResponse()">
+                <div class="col-lg-12 form-group">
+                    <textarea class="form-control input-sm" rows="5" style="height: auto;"
+                        formControlName="query"
+                        placeholder="Enter Select Query For Result" required></textarea>
+                    <br>
+                    <button type="reset" class="btn btn-sm btn-default" (click)="tableQueryFormInit()"
+                        style="color: #345; background-color:#fff;border-color: black;float: left;">Clear</button>
+                    <button type="submit" class="btn btn-sm btn-danger" style="float: right;">Save</button>
+                    <br><br>
                 </div>
-                <hr style="margin-top: 0px;border-top: 3px solid #f3565d;" *ngIf="jsonPayload">
-                <div class="card" *ngIf="jsonPayload">
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-lg-12">
-                                <table class="table-responsive table table-striped table-bordered table-sm"
-                                    style="font-size: 12px;display: block;overflow-x: auto;white-space: nowrap;">
-                                    <thead>
-                                        <tr>
-                                            <th *ngFor = 'let key of jsonPayload.column'>{{key| uppercase}}</th>
-                                        <tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr *ngFor = 'let item of jsonPayload.data | searchFilter: searchDetails;let i = index;'>
-                                          <td *ngFor = 'let key of jsonPayload.column'>{{item[key]}}</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
+            </form>
+            <div class="col-lg-8" *ngIf="jsonPayload">
+                <h4>Query Result</h4>
+            </div>
+            <div class="col-lg-4" *ngIf="jsonPayload">
+                <div class="form-group">
+                    <input type="text" id="searchDetails" class="form-control input-sm"
+                        placeholder="Search" [(ngModel)]="searchDetails"/>
                 </div>
             </div>
-            <div id="analayticsQuery" class="tab-pane fade">
-                <div class="page-content page-cheatsheet">
-                    <div class="row" style="padding-left: 15px; padding-right: 15px;">
-                        <div class="col-lg-12" style="border: 1px solid;margin-top: 20px;border-color: #a32c2c;text-align: center;">
-                            <ul style="list-style: none; padding: 0;margin: 0;">
-                                <li class="cheat-chart-item graph">
-                                    <a href="option.html#series-bar" target="_blank">
-                                        <img src="https://echarts.apache.org/en/images/builder/chart/bar.svg?_v_=20200710_1" alt="">
-                                        <h5><div>Bar</div></h5>
-                                    </a>
-                                </li>
-                                <li class="cheat-chart-item graph">
-                                    <a href="option.html#series-line" target="_blank">
-                                        <img src="https://echarts.apache.org/en/images/builder/chart/line.svg?_v_=20200710_1" alt="">
-                                        <h5><div>Line</div></h5>
-                                    </a>
-                                </li>
-                                <li class="cheat-chart-item graph">
-                                    <a href="option.html#series-pie" target="_blank">
-                                        <img src="https://echarts.apache.org/en/images/builder/chart/pie.svg?_v_=20200710_1" alt="">
-                                        <h5><div>Pie</div></h5>
-                                    </a>
-                                </li>
-                                <li class="cheat-chart-item graph">
-                                    <a href="option.html#calendar" target="_blank">
-                                        <img src="https://echarts.apache.org/en/images/builder/component/calendar.svg?_v_=20200710_1" alt="">
-                                        <h5><div>Calendar</div></h5>
-                                    </a>
-                                </li>
-                                <li class="cheat-chart-item graph">
-                                    <a href="option.html#series-heatmap" target="_blank">
-                                        <img src="https://echarts.apache.org/en/images/builder/chart/heatmap.svg?_v_=20200710_1" alt="">
-                                        <h5><div>Heatmap</div></h5>
-                                    </a>
-                                </li>
-                                <li class="cheat-chart-item graph">
-                                    <a href="option.html#series-map" target="_blank">
-                                        <img src="https://echarts.apache.org/en/images/builder/chart/map.svg?_v_=20200710_1" alt="">
-                                        <h5><div>Map</div></h5>
-                                    </a>
-                                </li>
-                                <li class="cheat-chart-item graph">
-                                    <a href="option.html#geo" target="_blank">
-                                        <img src="https://echarts.apache.org/en/images/builder/component/geo.svg?_v_=20200710_1" alt="">
-                                        <h5><div>Geo</div></h5>
-                                    </a>
-                                </li>
-                                <li class="cheat-chart-item graph">
-                                    <a href="option.html#series-radar" target="_blank">
-                                        <img src="https://echarts.apache.org/en/images/builder/chart/radar.svg?_v_=20200710_1" alt="">
-                                        <h5><div>Radar</div></h5>
-                                    </a>
-                                </li>
-                            </ul>
-                        </div>
+        </div>
+        <hr style="margin-top: 0px;border-top: 3px solid #f3565d;" *ngIf="jsonPayload">
+        <div class="card" *ngIf="jsonPayload">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-lg-12">
+                        <table class="table-responsive table table-striped table-bordered table-sm"
+                            style="font-size: 12px;display: block;overflow-x: auto;white-space: nowrap;">
+                            <thead>
+                                <tr>
+                                    <th *ngFor = 'let key of jsonPayload.column'>{{key| uppercase}}</th>
+                                <tr>
+                            </thead>
+                            <tbody>
+                                <tr *ngFor = 'let item of jsonPayload.data | searchFilter: searchDetails;let i = index;'>
+                                    <td *ngFor = 'let key of jsonPayload.column'>{{item[key]}}</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
         </div>
-        <br>
     </div>
 </div>

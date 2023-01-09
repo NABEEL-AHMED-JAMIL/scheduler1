@@ -113,7 +113,7 @@ export class HomeComponent implements OnInit {
         top: '7px',
         feature: {
           myRefresh: {
-              show: true,
+              show: false,
               title: 'Refresh',
               top: '7px',
               icon: 'image://https://www.svgrepo.com/show/199951/refresh.svg',
@@ -190,7 +190,7 @@ export class HomeComponent implements OnInit {
         top: '7px',
         feature: {
           myRefresh: {
-              show: true,
+              show: false,
               title: 'Refresh',
               top: '7px',
               icon: 'image://https://www.svgrepo.com/show/199951/refresh.svg',
@@ -287,7 +287,7 @@ export class HomeComponent implements OnInit {
         top: '7px',
         feature: {
           myRefresh: {
-              show: true,
+              show: false,
               title: 'Refresh',
               top: '7px',
               icon: 'image://https://www.svgrepo.com/show/199951/refresh.svg',

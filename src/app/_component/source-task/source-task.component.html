@@ -33,9 +33,11 @@
                 <th style="width: 1px;"># No</th>
                 <th>Task Name</th>
                 <th>Source Type</th>
-                <th style="width: 8%;">Link Jobs</th>
-                <th style="width: 1%;">Status</th>
-                <th style="width: 8%;">Action</th>
+                <th>HomePage</th>
+                <th>PipelineId</th>
+                <th>Link Jobs</th>
+                <th>Status</th>
+                <th>Action</th>
             </tr>
         </thead>
         <tbody>
@@ -49,6 +51,8 @@
                     </a>
                     [{{sourceTask.sourceTaskType.serviceName}}] [{{sourceTask.sourceTaskType.queueTopicPartition}}]
                 </td>
+                <td>{{sourceTask.homePageId}}</td>
+                <td>{{sourceTask.pipelineId}}</td>
                 <td style="text-align: center;">
                     <a routerLink="" style="pointer-events: none">{{sourceTask.totalLinksJobs}}</a>
                 </td>

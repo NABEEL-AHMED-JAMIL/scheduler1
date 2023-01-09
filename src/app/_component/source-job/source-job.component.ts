@@ -180,9 +180,9 @@ export class SourceJobComponent implements OnInit, OnDestroy  {
             jobId: jobId
           }
         });
-      }
+    }
 
-    ngOnDestroy() {
+    public ngOnDestroy() {
         this.subscription.unsubscribe();
     }
 

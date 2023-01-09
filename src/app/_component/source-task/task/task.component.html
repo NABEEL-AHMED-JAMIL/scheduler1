@@ -29,9 +29,9 @@
                                 </div>
                                 <div class="col-lg-6">
                                     <div class="form-group">
-                                        <label for="taskHomePage">HomePage</label>
-                                        <select class="form-control input-sm" formControlName="taskHomePage" >
-                                            <option *ngFor="let piplineHomePage of piplineHomePageList" [value]="piplineHomePage.lookupValue">{{piplineHomePage.lookupType}}</option>
+                                        <label for="homePageId">HomePage</label>
+                                        <select class="form-control input-sm" formControlName="homePageId" >
+                                            <option *ngFor="let piplineHomePage of piplineHomePageList" [value]="piplineHomePage.lookupId">{{piplineHomePage.lookupType}}</option>
                                         </select>
                                     </div>
                                 </div>
@@ -63,7 +63,7 @@
                                     <div class="form-group">
                                         <label for="pipelineId">Pipeline TaskId</label>
                                         <select class="form-control input-sm" formControlName="pipelineId" >
-                                            <option *ngFor="let pipelineId of pipelineIdList" [value]="pipelineId.lookupValue">{{pipelineId.lookupType}}</option>
+                                            <option *ngFor="let pipelineId of pipelineIdList" [value]="pipelineId.lookupId">{{pipelineId.lookupType}}</option>
                                         </select>
                                     </div>
                                 </div>

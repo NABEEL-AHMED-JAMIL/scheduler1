@@ -117,9 +117,10 @@ export const LOOKUP_DATA: LookupData[] = [
 export interface SourceTask {
     taskDetailId?: any;
     taskName?: any;
+    pipelineId?: any;
     taskPayload?: any;
     taskStatus?: any;
-    taskHomePage?: any;
+    homePageId?: any;
     sourceTaskType?: SourceTaskType;
     totalLinksJobs?: any;
 }

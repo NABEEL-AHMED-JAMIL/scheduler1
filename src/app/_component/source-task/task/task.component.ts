@@ -88,6 +88,7 @@ export class TaskComponent implements OnInit {
                         if(response.status === ApiCode.SUCCESS) {
                             this.spinnerService.hide();
                             this.piplineHomePageList = response.data.lookupDatas;
+                            console.log(this.piplineHomePageList);
                         } else {
                             this.spinnerService.hide();
                             this.alertService.showError(response.message, this.ERROR);
@@ -119,13 +120,13 @@ export class TaskComponent implements OnInit {
                         sourceTaskTypeId: [response?.data?.sourceTaskType?.sourceTaskTypeId, Validators.required],
                         taskPayload: [response?.data?.taskPayload, Validators.required],
                         taskStatus: [response?.data?.taskStatus],
-                        taskHomePage: [response?.data?.taskHomePage],
+                        homePageId: [response?.data?.homePageId],
                         pipelineId: [response?.data?.pipelineId],
                         tagsInfo: this.formBuilder.array([]),
                     });
-                    if (response?.data?.sourceTaskPayload.length > 0) {
-                        for (let i = 0; i < response?.data?.sourceTaskPayload.length; i++) {
-                            this.tageFormsAddItemV1(response?.data?.sourceTaskPayload[i]);
+                    if (response?.data?.xmlTagsInfo.length > 0) {
+                        for (let i = 0; i < response?.data?.xmlTagsInfo.length; i++) {
+                            this.tageFormsAddItemV1(response?.data?.xmlTagsInfo[i]);
                         }
                     }
 				} else {
@@ -146,15 +147,13 @@ export class TaskComponent implements OnInit {
             sourceTaskTypeId: ['', Validators.required],
             taskPayload: ['', Validators.required],
             taskStatus: [],
-            taskHomePage: [],
+            homePageId: [],
             pipelineId: [],
             tagsInfo: this.formBuilder.array([
                 this.buildItem(),
                 this.buildItem(),
                 this.buildItem(),
                 this.buildItem(),
-                this.buildItem(),
-                this.buildItem()
             ]),
         });
 		this.spinnerService.hide();
@@ -206,7 +205,7 @@ export class TaskComponent implements OnInit {
             },
             taskPayload: this.sourceTaskForm.get('taskPayload').value,
             taskStatus: this.sourceTaskForm.get('taskStatus').value,
-            taskHomePage: this.sourceTaskForm.get('taskHomePage').value,
+            homePageId: this.sourceTaskForm.get('homePageId').value,
             pipelineId: this.sourceTaskForm.get('pipelineId').value,
             xmlTagsInfo: this.tageForms.value
         }

@@ -20,6 +20,3 @@ export * from './source-task/view-link-job/view-link-job.componenet';
 export * from './source-task/source-task.component';
 // search-engine
 export * from './search-engine/search-engine.component';
-// segment-pin
-export * from './segment-pin/segment-folder/segment-folder.component';
-export * from './segment-pin/segment-file/segment-file.component';

@@ -15,8 +15,9 @@ export class JobHistoryActionComponent implements OnInit {
   public sourceJobQueues:any;
   public sourceJobStatistics: any;
   public searchQMessageForm: any = '';
-  public ERROR = 'Error';
-  public pdfUrl: "";
+  public ERROR: any = 'Error';
+  public homePageId: any = '';
+  public pipelineId: any = '';  
 
   constructor(private router: Router,
     private _activatedRoute: ActivatedRoute,
@@ -40,7 +41,10 @@ export class JobHistoryActionComponent implements OnInit {
     .subscribe((response) => {
       if(response.status === ApiCode.SUCCESS) {
         this.sourceJob = response.data?.sourceJob;
-        this.pdfUrl = this.sourceJob?.pdfReportUrl
+        this.homePageId = this.sourceJob?.taskDetail?.homePageId;
+        if (this.sourceJob?.taskDetail?.pipelineId) {
+          this.pipelineId = '(Pipeline ID:' + this.sourceJob?.taskDetail?.pipelineId + ')';
+        }
         this.sourceJobQueues = response.data?.sourceJobQueues;
         this.sourceJobStatistics = response.data?.sourceJobStatistics;
         this.spinnerService.hide();

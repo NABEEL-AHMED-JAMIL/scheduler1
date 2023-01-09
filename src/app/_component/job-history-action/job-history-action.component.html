@@ -10,7 +10,7 @@
             <div class="panel-heading">
                 <div class="row">
                     <div class="col-lg-6" style="text-align: start;margin-top: 2px;">
-                        Job-Q-History
+                        Job-Q-History {{pipelineId}}
                     </div>
                 </div>
             </div>
@@ -35,9 +35,9 @@
                                 </span>
                             </label>
                         </div>
-                        <div class="form-group">
+                        <div class="form-group" *ngIf="sourceJob.jobRunningStatus">
                             <label>R-Status: 
-                                <span *ngIf="sourceJob.jobRunningStatus" class="badge"
+                                <span class="badge"
                                     [ngClass]="{
                                         'badge-primary' : sourceJob.jobRunningStatus === 'InFlight', 
                                         'badge-info' : sourceJob.jobRunningStatus === 'Queue',
@@ -80,30 +80,12 @@
                             </tbody>
                         </table>
                     </div>
-                    <div class="col-sm-2" style="text-align: center;">
-                        <ngx-qrcode-styling [data]="'ngx-qrcode-styling'"
-                            [width]="190" [height]="190" [template]="'bitcoin'"
-                            [frameOptions]="{
-                            style: 'FE_015',
-                            height: 110,
-                            width: 110,
-                            x: 55,
-                            y: 90, 
-                            containers: [{
-                                fill: '#F69223' 
-                            }],
-                            texts: [{
-                                textContent: 'Scan Me',
-                                fill: '#F69223',
-                                x: '27%',
-                                y: '17%',
-                                fontSize: '25pt',
-                                fontFamily: 'cursive',
-                                fontWeight: 'bold'  
-                            }
-                        ]}">
-                        </ngx-qrcode-styling>
-                        <p style="text-align: center;">Home</p>
+                    <div class="col-sm-2" style="text-align: center;" *ngIf="homePageId">
+                        <a href="{{homePageId}}" target="_blank">
+                            <ngx-qrcode-styling [data]="homePageId"
+                                [width]="110" [height]="110" [template]="default">
+                            </ngx-qrcode-styling>
+                        </a>
                     </div>
                 </div>
             </div>

@@ -9,13 +9,12 @@ import { appRoutingModule } from './app.routing';
 import { AppComponent } from './app.component';
 import { SearchFilterPipe } from './_helpers';
 import { SpinnerComponent } from '@/_modal';
-import { GoogleMapsModule } from '@angular/google-maps'
 import { HomeComponent, LookupComponent, SourceTaskTypeComponent,
     SettingComponent, XmlConfigurationComponent, JobComponent,
     SourceJobComponent, SourceBatchActionComponent, SubLookupComponent,
     QueueMessageComponent, TaskComponent, ViewLinkTaskComponent,
     ViewLinkJobsComponent, SourceTaskComponent, JobHistoryActionComponent,
-    JobLogComponent, SearchEngineComponent, SegmentFolderComponent, SegmentFileComponent
+    JobLogComponent, SearchEngineComponent
 } from './_component/index';
 import {
     BarAnalyticComponent, CalendarAnalyticComponent,
@@ -28,7 +27,6 @@ import { ToastrModule } from 'ngx-toastr';
 @NgModule({
     imports: [
         BrowserModule,
-        GoogleMapsModule,
         NgxEchartsModule.forRoot({
             echarts: () => import('echarts'),
         }),
@@ -61,8 +59,6 @@ import { ToastrModule } from 'ngx-toastr';
         JobHistoryActionComponent,
         JobLogComponent,
         SearchEngineComponent,
-        SegmentFolderComponent,
-        SegmentFileComponent,
         BarAnalyticComponent,
         CalendarAnalyticComponent,
         GeoAnalyticComponent,

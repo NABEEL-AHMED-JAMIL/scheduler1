@@ -166,7 +166,7 @@ export class JobComponent implements OnInit {
             taskDetail: this.fb.group({
                 taskDetailId: ['', Validators.required],
                 serviceName: ['', Validators.required],
-                taskHomePage: [''],
+                homePageId: [''],
                 queueTopicPartition: ['', Validators.required],
                 taskPayload: ['', Validators.required],
             }),
@@ -197,7 +197,7 @@ export class JobComponent implements OnInit {
                         taskDetail: this.fb.group({
                             taskDetailId: [response?.data?.taskDetail?.taskDetailId, Validators.required],
                             serviceName: [response?.data?.taskDetail?.sourceTaskType?.serviceName, Validators.required],
-                            taskHomePage: [response?.data?.taskDetail?.taskHomePage],
+                            homePageId: [response?.data?.taskDetail?.homePageId],
                             queueTopicPartition: [response?.data?.taskDetail?.sourceTaskType?.queueTopicPartition, Validators.required],
                             taskPayload: [response?.data?.taskDetail?.taskPayload, Validators.required],
                         }),
@@ -258,7 +258,7 @@ export class JobComponent implements OnInit {
         this.taskDetail.serviceName.setValue(this.selectedSourceTask?.sourceTaskType?.serviceName);
         this.taskDetail.queueTopicPartition.setValue(this.selectedSourceTask?.sourceTaskType?.queueTopicPartition);
         this.taskDetail.taskPayload.setValue(this.selectedSourceTask?.taskPayload);
-        this.taskDetail.taskHomePage.setValue(this.selectedSourceTask?.taskHomePage);
+        this.taskDetail.homePageId.setValue(this.selectedSourceTask?.homePageId);
     }
 
     public onExecutionTypeChange(executionType: any): void {
