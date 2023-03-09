@@ -108,11 +108,11 @@
                 <th># QId</th>
                 <th># Job Id</th>
                 <th>Date Created</th>
-                <th>Run Manual</th>
                 <th>Start Time</th>
                 <th>End Time</th>
-                <th>Skip Manual</th>
                 <th>Skip Time</th>
+                <th>Run Manual</th>
+                <th>Skip Manual</th>
                 <th>Job Status</th>
                 <th>JobStatus Message</th>
                 <th style="width: 1px;">Action</th>
@@ -123,11 +123,25 @@
                 <td>{{queueData.jobQueueId}}</td>
                 <td>{{queueData.jobId}}</td>
                 <td>{{queueData.dateCreated | date:'yyyy-MM-dd HH:mm:ss'}}</td>
-                <td>{{queueData.runManual == true ? 'Yes' : '' }}</td>
                 <td>{{queueData.startTime | date:'yyyy-MM-dd HH:mm:ss'}}</td>
                 <td>{{queueData.endTime | date:'yyyy-MM-dd HH:mm:ss'}}</td>
-                <td>{{queueData.skipManual == true ? 'Yes' : '' }}</td>
                 <td>{{queueData.skipTime | date:'yyyy-MM-dd HH:mm:ss'}}</td>
+                <td style="text-align: center;text-transform:capitalize;">
+                    <span *ngIf="queueData.runManual" class="badge"
+                        [ngClass]="{
+                            'badge-danger' : queueData.runManual === false,
+                            'badge-success' : queueData.runManual === true
+                        }">{{ queueData.runManual }}
+                     </span>
+                </td>
+                <td style="text-align: center;text-transform:capitalize;">
+                    <span *ngIf="queueData.skipManual" class="badge"
+                        [ngClass]="{
+                            'badge-danger' : queueData.skipManual === false,
+                            'badge-success' : queueData.skipManual === true
+                        }">{{ queueData.skipManual }}
+                     </span>
+                </td>
                 <td style="text-align: center;">
                     <span *ngIf="queueData.jobStatus" class="badge"
                         [ngClass]="{
@@ -137,8 +151,7 @@
                             'badge-danger' :  queueData.jobStatus === 'Failed',
                             'badge-success' : queueData.jobStatus === 'Completed',
                             'badge-pcomplate' : queueData.jobStatus === 'PartialComplete'
-                        }">
-                        {{ queueData.jobStatus }}
+                        }">{{ queueData.jobStatus }}
                     </span>
                 </td>
                 <td>{{queueData.jobStatusMessage}}</td>

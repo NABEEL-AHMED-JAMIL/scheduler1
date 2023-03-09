@@ -84,9 +84,12 @@
                 <th># QId</th>
                 <th># Job Id</th>
                 <th>Date Created</th>
-                <th>Start Time</th>
-                <th>End Time</th>
-                <th>Skip Time</th>
+                <th>StartTime</th>
+                <th>EndTime</th>
+                <th>SkipTime</th>
+                <th>Run Manual</th>
+                <th>Skip Manual</th>
+                <th>QSend</th>
                 <th>Job Status</th>
                 <th>JobStatus Message</th>
                 <th style="width: 1px;">Action</th>
@@ -100,6 +103,33 @@
                 <td>{{queueData.startTime | date:'yyyy-MM-dd HH:mm:ss'}}</td>
                 <td>{{queueData.endTime | date:'yyyy-MM-dd HH:mm:ss'}}</td>
                 <td>{{queueData.skipTime | date:'yyyy-MM-dd HH:mm:ss'}}</td>
+                <td style="text-align: center;text-transform:capitalize;">
+                    <span class="badge"
+                         [ngClass]="{
+                             'badge-danger' :  queueData.runManual === false || queueData.runManual === null,
+                             'badge-success' : queueData.runManual === true
+                         }">
+                         {{ queueData.runManual ? queueData.runManual : 'false' }}
+                     </span>
+                </td>
+                <td style="text-align: center;text-transform:capitalize;">
+                    <span class="badge"
+                         [ngClass]="{
+                             'badge-danger' :  queueData.skipManual === false || queueData.skipManual === null,
+                             'badge-success' : queueData.skipManual === true
+                         }">
+                         {{ queueData.skipManual ? queueData.skipManual : 'false' }}
+                     </span>
+                </td>
+                <td style="text-align: center;text-transform:capitalize;">
+                   <span class="badge"
+                        [ngClass]="{
+                            'badge-danger' :  queueData.jobSend === false,
+                            'badge-success' : queueData.jobSend === true
+                        }">
+                        {{ queueData.jobSend }}
+                    </span>
+                </td>
                 <td style="text-align: center;">
                     <span *ngIf="queueData.jobStatus" class="badge"
                         [ngClass]="{

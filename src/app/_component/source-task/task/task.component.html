@@ -30,7 +30,8 @@
                                 <div class="col-lg-6">
                                     <div class="form-group">
                                         <label for="homePageId">HomePage</label>
-                                        <select class="form-control input-sm" formControlName="homePageId" >
+                                        <select class="form-control input-sm" formControlName="homePageId">
+                                            <option value="" selected>Select Home Page</option>
                                             <option *ngFor="let piplineHomePage of piplineHomePageList" [value]="piplineHomePage.lookupId">{{piplineHomePage.lookupType}}</option>
                                         </select>
                                     </div>
@@ -62,7 +63,8 @@
                                 <div [ngClass]="isEditMode ? 'col-lg-8' : 'col-lg-12' ">
                                     <div class="form-group">
                                         <label for="pipelineId">Pipeline TaskId</label>
-                                        <select class="form-control input-sm" formControlName="pipelineId" >
+                                        <select class="form-control input-sm" formControlName="pipelineId">
+                                            <option value="" selected>Select Pipeline Id</option>
                                             <option *ngFor="let pipelineId of pipelineIdList" [value]="pipelineId.lookupId">{{pipelineId.lookupType}}</option>
                                         </select>
                                     </div>

@@ -56,7 +56,7 @@
                 <td style="text-align: center;">
                     <a routerLink="" style="pointer-events: none">{{sourceTaskTaype.totalTaskLink}}</a>
                 </td>
-                <td style="text-align: center;">
+                <td style="text-align: center;text-transform:capitalize;">
                     <span class="badge" 
                         [ngClass]="{
                             'badge-danger': sourceTaskTaype.schemaRegister === false, 
@@ -64,7 +64,7 @@
                         }">{{sourceTaskTaype.schemaRegister}}
                     </span>
                 </td>
-                <td>
+                <td style="text-align: center;">
                     <span class="badge" 
                         [ngClass]="{
                             'badge-danger': sourceTaskTaype.status === 'Delete', 

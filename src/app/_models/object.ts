@@ -35,6 +35,9 @@ export interface QMessage {
   jobName?: any;
   jobStatusMessage?: any;
   dateCreated?: any;
+  jobSend?: any;
+  runManual?: any;
+  skipManual?: any;
 }
 
 export const SOURCE_TASK_TYPE: SourceTaskType[] = [
