@@ -6,3 +6,5 @@ export * from './source.task.service';
 export * from './source.job.service';
 export * from './configuration.service';
 export * from './hom.service';
+export * from './authentication.service';
+export * from './app.user.service';

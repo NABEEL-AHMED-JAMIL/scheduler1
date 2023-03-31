@@ -1,0 +1,193 @@
+<style>
+    .card {
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, .1), 0 1px 2px 0 rgba(0, 0, 0, .06);
+    }
+
+    .card {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        word-wrap: break-word;
+        background-color: #fff;
+        background-clip: border-box;
+        border: 0 solid rgba(0, 0, 0, .125);
+        border-radius: .25rem;
+    }
+
+    .card-body {
+        flex: 1 1 auto;
+        min-height: 1px;
+        padding: 1rem;
+    }
+
+    .card-title {
+        margin-bottom: 0.75rem;
+    }
+
+    .gutters-sm {
+        margin-right: -8px;
+        margin-left: -8px;
+    }
+
+    .gutters-sm>.col,
+    .gutters-sm>[class*=col-] {
+        padding-right: 8px;
+        padding-left: 8px;
+    }
+
+    .mb-3 {
+        margin-bottom: 1rem !important;
+    }
+
+    .rounded-circle {
+        border-radius: 50%!important;
+    }
+    .mt-3 {
+        margin-top: 1rem!important;
+    }
+    .text-secondary {
+        color: #6c757d!important;
+    }
+    p {
+        margin-top: 0;
+        margin-bottom: 1rem;
+    }
+</style>
+
+<div class="row gutters-sm">
+    <div class="col-lg-3" style="padding-right: 2px;">
+        <!-- card -->
+        <div class="card">
+            <div class="card-body" style="margin-top: 10px;">
+                <div class="d-flex flex-column align-items-center text-center">
+                    <img src="https://bootdey.com/img/Content/avatar/avatar7.png"
+                        alt="Admin" class="rounded-circle" width="150">
+                    <div class="mt-3">
+                        <p class="text-secondary mb-1">Role (Super Admin)</p>
+                        <button class="form-control input-sm"
+                            style="background: #cb0f43;color: white;
+                                margin-top: 10px;margin-left: 30%;width: 38%;">
+                            Close Account
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="card" style="margin-top: 10px;">
+            <div class="card-body">
+                <h5 class="card-title" style="font-size: large;">TimeZone</h5>
+                <hr style="margin-bottom: 12px;margin-top: 0px;">
+                <div class="d-flex flex-column align-items-center text-center">
+                    <div class="form-group" >
+                        <label for="timeZone">10:23 PM 20-03-2023</label>
+                        <select class="form-control input-sm">
+                            <option>(GMT-5:00) America/New_York</option>
+                            <option>(GMT+5:00) Asia/Karachi</option>
+                            <option>(GMT-05:00) America/New_York</option>
+                            <option>(GMT-5:00) America/New_York</option>
+                        </select>
+                    </div>
+                    <div class="mt-3">
+                        <button class="form-control input-sm" style="background: black;
+                            color: white;margin-top: 10px;width: auto;float: right;">
+                            Change
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-9">
+        <!-- update user name -->
+        <div class="card mb-3">
+            <div class="card-body">
+                <h5 class="card-title" style="font-size: large;">AppUser Detail</h5>
+                <button class="form-control input-sm"
+                    style="background: #337ab7;color: white;
+                        margin-top: -36px;width: 12%;float: right;">
+                    Manage Users</button>
+                <hr style="margin-bottom: 12px;margin-top: 0px;">
+                <div class="row">
+                    <div class="col-sm-4 form-group">
+                        <label for="firstName">First Name</label>
+                        <input type="text" class="form-control input-sm"
+                            name="firstName" placeholder="Enter first name">
+                    </div>
+                    <div class="col-sm-4 form-group">
+                        <label for="lastName">Last Name</label>
+                        <input type="text" class="form-control input-sm"
+                            name="lastName" placeholder="Enter last name">
+                    </div>
+                    <div class="col-sm-4 form-group">
+                        <label for="username">Username</label>
+                        <input type="text" class="form-control input-sm" value="super_admin93"
+                            name="username" disabled>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-sm-4 form-group">
+                        <label for="email">Email</label>
+                        <input type="text" class="form-control input-sm"
+                            name="email" disabled value="nabeel.amd93@gmail.com">
+                    </div>
+                    <div class="col-sm-4 form-group">
+                        <label for="parentAppUser">Root User</label>
+                        <input type="text" class="form-control input-sm"
+                            name="parentAppUser" disabled value="Barco">
+                    </div>
+                    <div class="col-sm-4 form-group">
+                        <label for="dateCreated">Date Created</label>
+                        <input type="text" class="form-control input-sm" value="2023-01-01"
+                            name="dateCreated" disabled>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-12">
+                        <button class="form-control input-sm"
+                            style="background: #47b679;color: white;
+                            margin-top: 10px;width: 12%;float: right;">
+                            Update</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- update user password -->
+        <div class="card mb-3">
+            <div class="card-body">
+                <h5 class="card-title" style="font-size: large;">Update Password</h5>
+                <hr style="margin-bottom: 12px;margin-top: 0px;">
+                <div class="row">
+                    <div class="col-sm-4 form-group">
+                        <label for="oldPassword">Old Password</label>
+                        <input type="text" class="form-control input-sm"
+                            name="oldPassword" placeholder="Enter your old password">
+                    </div>
+                    <div class="col-sm-4 form-group">
+                        <label for="newPassword">New Password</label>
+                        <input type="text" class="form-control input-sm"
+                            name="newPassword" placeholder="Enter your new password">
+                    </div>
+                    <div class="col-sm-4 form-group">
+                        <label for="confirmPassword">Confirm Password</label>
+                        <input type="text" class="form-control input-sm"
+                            name="confirmPassword" placeholder="Enter your confirm password">
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-12">
+                        <button class="form-control input-sm"
+                            style="background: #47b679;color: white;
+                            margin-top: 10px;width: 12%;float: right;">
+                            Update</button>
+                        <button class="form-control input-sm"
+                            style="margin-right: 10px;background: darkgray;color: white;
+                            margin-top: 10px;width: 12%;float: right;">
+                            Clear</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<br>

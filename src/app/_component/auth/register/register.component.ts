@@ -1,0 +1,98 @@
+import { Component, OnInit } from '@angular/core';
+import { Router, ActivatedRoute } from '@angular/router';
+import { AbstractControl, FormBuilder, FormControl, FormGroup, Validators } from '@angular/forms';
+import { first } from 'rxjs/operators';
+import { AlertService, AuthenticationService } from '@/_services';
+import { Location } from '@angular/common';
+import { SpinnerService } from '@/_helpers';
+
+@Component({
+    templateUrl: 'register.component.html'
+})
+export class RegisterComponent implements OnInit {
+
+    public registerForm: FormGroup;
+    public loading = false;
+    public submitted = false;
+
+    public password = new FormControl(null, [
+        (c: AbstractControl) => Validators.required(c),
+        Validators.pattern(
+            /(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[@$!%*#?&^_-]).{8,}/
+        ),
+    ]);
+
+    constructor(
+        private formBuilder: FormBuilder,
+        private route: ActivatedRoute,
+        private router: Router,
+        private authenticationService: AuthenticationService,
+        private spinnerService: SpinnerService,
+        private alertService: AlertService,
+        private location: Location
+    ) {}
+
+    ngOnInit() {
+        this.registerForm = this.formBuilder.group({
+            username: ['', Validators.required],
+            email: ['', [Validators.required, Validators.email]],
+            password: this.password
+        });
+    }
+
+    // convenience getter for easy access to form fields
+    get f() {
+        return this.registerForm.controls;
+    }
+
+    public confirmedValidator(controlName: string, matchingControlName: string) {
+        return (formGroup: FormGroup) => {
+          const control = formGroup.controls[controlName];
+          const matchingControl = formGroup.controls[matchingControlName];
+          if (matchingControl.errors && !matchingControl.errors.confirmedValidator) {
+            return;
+          }
+          if (control.value !== matchingControl.value) {
+            matchingControl.setErrors({ confirmedValidator: true });
+          } else {
+            matchingControl.setErrors(null);
+          }
+        };
+    }
+
+    public onSubmit() {
+        this.spinnerService.show();
+        this.submitted = true;
+        // stop here if form is invalid
+        if (this.registerForm.invalid) {
+            this.spinnerService.hide();
+            return;
+        }
+        this.loading = true;
+        this.authenticationService.signupAppUser(this.registerForm.value)
+            .pipe(first())
+            .subscribe(
+                data => {
+                    this.loading = false;
+                    this.submitted = false;
+                    this.spinnerService.hide();
+                    if (data.status == 'ERROR') {
+                        this.alertService.showError(data.message, 'Error');
+                        return;
+                    }
+                    this.alertService.showSuccess(data.message, 'Register');
+                    this.router.navigate(['/login']);
+                },
+                error => {
+                    this.loading = false;
+                    this.submitted = false;
+                    this.spinnerService.hide();
+                    this.alertService.showError(error.message, 'Error');
+                });
+    }
+
+    public back() {
+        this.location.back();
+    }
+
+}

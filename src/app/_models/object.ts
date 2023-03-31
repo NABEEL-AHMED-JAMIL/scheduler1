@@ -1,3 +1,18 @@
+export interface Breadcrumb {
+  label: string;
+  url: string;
+}
+
+export interface AuthResponse {
+  appUserId: any;
+  token: any;
+  type: any;
+  refreshToken: any;
+  username: any;
+  email: any;
+  roles: any;
+}
+
 export interface NameValue {
   name?: any;
   value?: any;
@@ -250,15 +265,35 @@ export const SEARCH_TASK_LIST: String[] = [
 
 export const STATUS_LIST: any = [
   {
-    key: 'Active',
-    value: 'Active'
+    key: 'Inactive',
+    value: 0,
   },
   {
-    key: 'Inactive',
-    value: 'Inactive',
+    key: 'Active',
+    value: 1
   },
   {
     key: 'Delete',
-    value: 'Delete',
+    value: 2,
   }
 ];
+
+export interface AppUserResponse {
+  appUserId?: any;
+  firstName?: any;
+  lastName?: any;
+  timeZone?: any;
+  username?: any;
+  email?: any;
+  roleResponse?: RoleResponse[];
+  parentAppUser?: AppUserResponse;
+  status?: any;
+  dateCreated?: any;
+}
+
+export interface RoleResponse {
+  roleId?: any;
+  roleName?: any;
+  status?: any;
+  dateCreated?: any;
+}

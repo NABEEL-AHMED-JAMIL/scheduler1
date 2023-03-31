@@ -112,7 +112,6 @@ export class SourceBatchActionComponent implements OnInit {
     public downloadSourceTemplate(): void {
         this.spinnerService.show();
         if (this.action === 'sourceJob') {
-            debugger
             this.sourceJobService.downloadSourceJobTemplateFile()
             .pipe(first())
             .subscribe((response) => {
