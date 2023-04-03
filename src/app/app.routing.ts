@@ -6,19 +6,9 @@ import {
     ResetPassComponent,
     NotFoundComponent,
     SettingLayoutComponent,
+    LookupSettingComponent,
     ProfileComponent,
-    HomeComponent,
-    SettingComponent,
-    JobComponent,
-    SourceJobComponent,
-    TaskComponent,
-    QueueMessageComponent,
-    SourceTaskComponent,
-    SourceBatchActionComponent,
     XmlConfigurationComponent,
-    SubLookupComponent,
-    JobHistoryActionComponent,
-    JobLogComponent,
     SearchEngineComponent
 } from './_component/index';
 import { AuthGuard } from './_helpers';
@@ -65,7 +55,7 @@ const routes: Routes = [
             },
             { 
                 path: 'lookup',
-                component: SettingComponent,
+                component: LookupSettingComponent,
                 canActivate: [AuthGuard],
                 data:  {
                     breadcrumb: 'Lookup',
@@ -73,56 +63,42 @@ const routes: Routes = [
                         'ROLE_MASTER_ADMIN',
                         'ROLE_ADMIN'
                     ]
-                },
-                children: [
-                    { 
-                        path: 'sublookup',
-                        component: SubLookupComponent,
-                        canActivate: [AuthGuard],
-                        data:  {
-                            breadcrumb: 'Sub Lookup',
-                            role: [
-                                'ROLE_MASTER_ADMIN',
-                                'ROLE_ADMIN'
-                            ]
-                        }
-                    }
-                ]
-            },
-            { 
-                path: 'sourcetask',
-                component: SettingComponent,
-                canActivate: [AuthGuard],
-                data:  {
-                    breadcrumb: 'Sourcetask',
-                    role: [
-                        'ROLE_MASTER_ADMIN',
-                        'ROLE_ADMIN'
-                    ]
                 }
             },
+            // { 
+            //     path: 'sourcetask',
+            //     component: SettingComponent,
+            //     canActivate: [AuthGuard],
+            //     data:  {
+            //         breadcrumb: 'Sourcetask',
+            //         role: [
+            //             'ROLE_MASTER_ADMIN',
+            //             'ROLE_ADMIN'
+            //         ]
+            //     }
+            // },
             { 
                 path: 'searchengine',
                 component: SearchEngineComponent,
                 canActivate: [AuthGuard],
                 data:  {
                     breadcrumb: 'Search Engine',
-                    role: ['ROLE_MASTER_ADMIN']
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN']
                 }
             },
-            { 
-                path: 'queuemessage',
-                component: QueueMessageComponent,
-                canActivate: [AuthGuard],
-                data:  {
-                    breadcrumb: 'Queue Message',
-                    role: [
-                        'ROLE_MASTER_ADMIN',
-                        'ROLE_ADMIN',
-                        'ROLE_USER'
-                    ]
-                }
-            },
+            // { 
+            //     path: 'queuemessage',
+            //     component: QueueMessageComponent,
+            //     canActivate: [AuthGuard],
+            //     data:  {
+            //         breadcrumb: 'Queue Message',
+            //         role: [
+            //             'ROLE_MASTER_ADMIN',
+            //             'ROLE_ADMIN',
+            //             'ROLE_USER'
+            //         ]
+            //     }
+            // },
             { 
                 path: 'xml-config',
                 component: XmlConfigurationComponent,

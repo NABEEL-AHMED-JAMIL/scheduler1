@@ -64,10 +64,13 @@
                     <img src="https://bootdey.com/img/Content/avatar/avatar7.png"
                         alt="Admin" class="rounded-circle" width="150">
                     <div class="mt-3">
-                        <p class="text-secondary mb-1">Role (Super Admin)</p>
+                        <p class="text-secondary mb-1" *ngIf="appUserResponse">
+                            {{appUserResponse.firstName}} {{appUserResponse.lastName}}
+                        </p>
                         <button class="form-control input-sm"
                             style="background: #cb0f43;color: white;
-                                margin-top: 10px;margin-left: 30%;width: 38%;">
+                                margin-top: 10px;margin-left: 30%;width: 38%;"
+                                data-toggle="modal" data-target="#closeAccount">
                             Close Account
                         </button>
                     </div>
@@ -78,22 +81,27 @@
             <div class="card-body">
                 <h5 class="card-title" style="font-size: large;">TimeZone</h5>
                 <hr style="margin-bottom: 12px;margin-top: 0px;">
-                <div class="d-flex flex-column align-items-center text-center">
-                    <div class="form-group" >
-                        <label for="timeZone">10:23 PM 20-03-2023</label>
-                        <select class="form-control input-sm">
-                            <option>(GMT-5:00) America/New_York</option>
-                            <option>(GMT+5:00) Asia/Karachi</option>
-                            <option>(GMT-05:00) America/New_York</option>
-                            <option>(GMT-5:00) America/New_York</option>
-                        </select>
-                    </div>
-                    <div class="mt-3">
-                        <button class="form-control input-sm" style="background: black;
-                            color: white;margin-top: 10px;width: auto;float: right;">
-                            Change
-                        </button>
-                    </div>
+                <div class="d-flex flex-column align-items-center text-center" *ngIf="timeZoneList">
+                    <form [formGroup]="timeZoneForm" (ngSubmit)="updateAppUserTimeZone()">
+                        <div class="form-group" >
+                            <label for="timeZone">10:23 PM 20-03-2023</label>
+                            <select class="form-control input-sm" formControlName="timeZone">
+                                <option hidden value="" disabled selected>{{timeZoneList.parentLookupData.description}}</option>
+                                <option *ngFor="let timeZone of timeZoneList.lookupData"
+                                    [value]="timeZone.lookupType">
+                                    {{timeZone.description}}
+                                </option>
+                            </select>
+                        </div>
+                        <div class="mt-3">
+                            <button class="form-control input-sm"
+                                style="background: black;color: white;
+                                margin-top: 10px;width: auto;float: right;"
+                                type="submit" [disabled]="loading">
+                                Change
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
@@ -104,52 +112,92 @@
             <div class="card-body">
                 <h5 class="card-title" style="font-size: large;">AppUser Detail</h5>
                 <button class="form-control input-sm"
+                    *ngIf="hasAccess(['ROLE_ADMIN', 'ROLE_MASTER_ADMIN'])"
                     style="background: #337ab7;color: white;
                         margin-top: -36px;width: 12%;float: right;">
                     Manage Users</button>
                 <hr style="margin-bottom: 12px;margin-top: 0px;">
-                <div class="row">
-                    <div class="col-sm-4 form-group">
-                        <label for="firstName">First Name</label>
-                        <input type="text" class="form-control input-sm"
-                            name="firstName" placeholder="Enter first name">
+                <form [formGroup]="appUserForm" (ngSubmit)="updateAppUserProfile()">
+                    <div class="row">
+                        <div class="col-sm-4 form-group">
+                            <label for="firstName">First Name</label>
+                            <input type="text" formControlName="firstName" class="form-control input-sm"
+                                [ngClass]="{ 'is-invalid': submitted && appUserF.firstName.errors }"
+                                name="firstName" placeholder="Enter first name" maxlength="15">
+                            <div *ngIf="submitted && appUserF.firstName.errors" class="invalid-feedback">
+                                <div *ngIf="appUserF.firstName.errors.required" style="color: red;">
+                                    FirstName is required
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-sm-4 form-group">
+                            <label for="lastName">Last Name</label>
+                            <input type="text" formControlName="lastName" class="form-control input-sm"
+                                [ngClass]="{ 'is-invalid': submitted && appUserF.lastName.errors }"
+                                name="lastName" placeholder="Enter last name"  maxlength="15">
+                            <div *ngIf="submitted && appUserF.lastName.errors" class="invalid-feedback">
+                                <div *ngIf="appUserF.lastName.errors.required" style="color: red;">
+                                    LastName is required
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-sm-4 form-group">
+                            <label for="username">Username</label>
+                            <input type="text" formControlName="username" class="form-control input-sm"
+                                [ngClass]="{ 'is-invalid': submitted && appUserF.username.errors }"
+                                name="username" placeholder="Enter username" disabled>
+                            <div *ngIf="submitted && appUserF.username.errors" class="invalid-feedback">
+                                <div *ngIf="appUserF.username.errors.required" style="color: red;">
+                                    Username is required
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="col-sm-4 form-group">
-                        <label for="lastName">Last Name</label>
-                        <input type="text" class="form-control input-sm"
-                            name="lastName" placeholder="Enter last name">
+                    <div class="row">
+                        <div class="col-sm-4 form-group">
+                            <label for="email">Email</label>
+                            <input type="text" formControlName="email" class="form-control input-sm"
+                                [ngClass]="{ 'is-invalid': submitted && appUserF.email.errors }"
+                                name="email" placeholder="Enter email" disabled>
+                            <div *ngIf="submitted && appUserF.email.errors" class="invalid-feedback">
+                                <div *ngIf="appUserF.email.errors.required" style="color: red;">
+                                    Email is required
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-sm-4 form-group">
+                            <label for="parentAppUser">Root User</label>
+                            <input type="text" formControlName="parentAppUser" class="form-control input-sm"
+                                [ngClass]="{ 'is-invalid': submitted && appUserF.parentAppUser.errors }"
+                                name="parentAppUser" placeholder="Enter ParentAppUser" disabled>
+                            <div *ngIf="submitted && appUserF.parentAppUser.errors" class="invalid-feedback">
+                                <div *ngIf="appUserF.parentAppUser.errors.required" style="color: red;">
+                                    Parent User is required
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-sm-4 form-group">
+                            <label for="role">Role Name</label>
+                            <input type="text" formControlName="role" class="form-control input-sm"
+                                [ngClass]="{ 'is-invalid': submitted && appUserF.role.errors }"
+                                name="role" placeholder="Enter Role" disabled>
+                            <div *ngIf="submitted && appUserF.role.errors" class="invalid-feedback">
+                                <div *ngIf="appUserF.role.errors.required" style="color: red;">
+                                    Role is required
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="col-sm-4 form-group">
-                        <label for="username">Username</label>
-                        <input type="text" class="form-control input-sm" value="super_admin93"
-                            name="username" disabled>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <button type="submit" [disabled]="loading"
+                                class="form-control input-sm btn"
+                                style="background: #47b679;color: white;
+                                margin-top: 10px;width: 12%;float: right;">
+                                Update</button>&nbsp;
+                        </div>
                     </div>
-                </div>
-                <div class="row">
-                    <div class="col-sm-4 form-group">
-                        <label for="email">Email</label>
-                        <input type="text" class="form-control input-sm"
-                            name="email" disabled value="nabeel.amd93@gmail.com">
-                    </div>
-                    <div class="col-sm-4 form-group">
-                        <label for="parentAppUser">Root User</label>
-                        <input type="text" class="form-control input-sm"
-                            name="parentAppUser" disabled value="Barco">
-                    </div>
-                    <div class="col-sm-4 form-group">
-                        <label for="dateCreated">Date Created</label>
-                        <input type="text" class="form-control input-sm" value="2023-01-01"
-                            name="dateCreated" disabled>
-                    </div>
-                </div>
-                <div class="row">
-                    <div class="col-md-12">
-                        <button class="form-control input-sm"
-                            style="background: #47b679;color: white;
-                            margin-top: 10px;width: 12%;float: right;">
-                            Update</button>
-                    </div>
-                </div>
+                </form>
             </div>
         </div>
         <!-- update user password -->
@@ -157,36 +205,81 @@
             <div class="card-body">
                 <h5 class="card-title" style="font-size: large;">Update Password</h5>
                 <hr style="margin-bottom: 12px;margin-top: 0px;">
-                <div class="row">
-                    <div class="col-sm-4 form-group">
-                        <label for="oldPassword">Old Password</label>
-                        <input type="text" class="form-control input-sm"
-                            name="oldPassword" placeholder="Enter your old password">
+                <form [formGroup]="updatePassForm" (ngSubmit)="updateAppUserPassword()">
+                    <div class="row">
+                        <div class="col-sm-4 form-group">
+                            <label for="oldPassword">Old Password</label>
+                            <input type="text" formControlName="oldPassword" class="form-control input-sm"
+                                [ngClass]="{ 'is-invalid': submitted && updatePassF.oldPassword.errors }"
+                                name="oldPassword" placeholder="Enter your old password">
+                            <div *ngIf="oldPassword.invalid && (oldPassword.dirty || oldPassword.touched)"
+                                class="form-text text-danger">
+                                <div *ngIf="oldPassword.errors.required">OldPassword is required</div>
+                            </div>
+                        </div>
+                        <div class="col-sm-4 form-group">
+                            <label for="newPassword">New Password</label>
+                            <input type="text" formControlName="newPassword" class="form-control input-sm"
+                                name="newPassword" placeholder="Enter your new password">
+                            <div *ngIf="newPassword.invalid && (newPassword.dirty || newPassword.touched)"
+                                class="form-text text-danger">
+                                <div *ngIf="newPassword.errors.required">Field is required</div>
+                                <div *ngIf="newPassword.errors.pattern">
+                                    Password must contain at least one number, one uppercase and a
+                                    lowercase letter and at least 8 characters<br />Password cannot
+                                    contain whitespace
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-sm-4 form-group">
+                            <label for="confirmPassword">Confirm Password</label>
+                            <input type="text" formControlName="confirmPassword" class="form-control input-sm"
+                                name="confirmPassword" placeholder="Enter your confirm password">
+                            <div *ngIf="confirmPassword.invalid && (confirmPassword.dirty || confirmPassword.touched)"
+                                class="form-text text-danger">
+                                <div *ngIf="confirmPassword.errors.required">Field is required</div>
+                                <div *ngIf="confirmPassword.errors.pattern">
+                                  Password must contain at least one number, one uppercase and a
+                                  lowercase letter and at least 8 characters<br />Password cannot
+                                  contain whitespace
+                                </div>
+                                <div *ngIf="confirmPassword.errors.confirmedValidator">
+                                  Passwords did not match
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="col-sm-4 form-group">
-                        <label for="newPassword">New Password</label>
-                        <input type="text" class="form-control input-sm"
-                            name="newPassword" placeholder="Enter your new password">
+                    <div class="row">
+                        <div class="col-md-12">
+                            <button class="form-control input-sm" type="submit"
+                                [disabled]="loading" style="background: #47b679;color: white;
+                                margin-top: 10px;width: 12%;float: right;">
+                                Update</button>
+                        </div>
                     </div>
-                    <div class="col-sm-4 form-group">
-                        <label for="confirmPassword">Confirm Password</label>
-                        <input type="text" class="form-control input-sm"
-                            name="confirmPassword" placeholder="Enter your confirm password">
-                    </div>
-                </div>
-                <div class="row">
-                    <div class="col-md-12">
-                        <button class="form-control input-sm"
-                            style="background: #47b679;color: white;
-                            margin-top: 10px;width: 12%;float: right;">
-                            Update</button>
-                        <button class="form-control input-sm"
-                            style="margin-right: 10px;background: darkgray;color: white;
-                            margin-top: 10px;width: 12%;float: right;">
-                            Clear</button>
-                    </div>
-                </div>
+                </form>
             </div>
+        </div>
+    </div>
+</div>
+<!-- Close Account Modal -->
+<div class="modal fade" id="closeAccount" role="dialog" style="top: 85px;">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" #closebutton class="close" 
+                    data-dismiss="modal" style="opacity: 1.2;color: #fff;">&times;</button>
+                <h4 class="modal-title">Close Account</h4>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure to close account?
+                    <br>On press 'Yes' all the source job will delete state and will not run
+                </p> 
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger" id="closeModal" 
+                (click)="closeAppUserAccount()">Yes</button>
+            </div> 
         </div>
     </div>
 </div>

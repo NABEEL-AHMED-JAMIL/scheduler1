@@ -72,15 +72,15 @@ export class RegisterComponent implements OnInit {
         this.authenticationService.signupAppUser(this.registerForm.value)
             .pipe(first())
             .subscribe(
-                data => {
+                response => {
                     this.loading = false;
                     this.submitted = false;
                     this.spinnerService.hide();
-                    if (data.status == 'ERROR') {
-                        this.alertService.showError(data.message, 'Error');
+                    if (response.status == 'ERROR') {
+                        this.alertService.showError(response.message, 'Error');
                         return;
                     }
-                    this.alertService.showSuccess(data.message, 'Register');
+                    this.alertService.showSuccess(response.message, 'Register');
                     this.router.navigate(['/login']);
                 },
                 error => {

@@ -100,15 +100,15 @@ export class ResetPassComponent implements OnInit {
         this.authenticationService.resetPassword(this.resetPassForm.value)
             .pipe(first())
             .subscribe(
-                data => {
+                response => {
                     this.loading = false;
                     this.submitted = false;
                     this.spinnerService.hide();
-                    if (data.status == 'ERROR') {
-                        this.alertService.showError(data.message, 'Error');
+                    if (response.status == 'ERROR') {
+                        this.alertService.showError(response.message, 'Error');
                         return;
                     }
-                    this.alertService.showSuccess(data.message, 'Sucess');
+                    this.alertService.showSuccess(response.message, 'Sucess');
                     this.router.navigate(['/login']);
                 },
                 error => {

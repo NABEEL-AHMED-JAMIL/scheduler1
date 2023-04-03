@@ -14,8 +14,4 @@ export class ConfigurationMakerService {
         return this.http.post<ApiResponse>(`${config.apiUrl}/setting.json/xmlCreateChecker`, payload);
     }
 
-    public getJsonData(payload:any): Observable<ApiResponse> {
-        return this.http.post<ApiResponse>(`${config.apiUrl}/setting.json/jsonCreateChecker`, payload);
-    }
-
 }

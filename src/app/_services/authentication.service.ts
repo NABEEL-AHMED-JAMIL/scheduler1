@@ -19,12 +19,18 @@ export class AuthenticationService {
         return this.currentUserSubject.value;
     }
 
+    public get currentUserByProfile(): AuthResponse {
+        return JSON.parse(localStorage.getItem('currentUser'));
+    }
+
     public signInAppUser(username, password) {
         return this.http.post<any>(`${config.apiUrl}/auth.json/signInAppUser`, { username, password })
             .pipe(map(response => {
                 // store user details and jwt token in local storage to keep user logged in between page refreshes
                 if (response.data) {
                     localStorage.setItem('currentUser', JSON.stringify(response.data));
+                    // this can be change from drop down only from the admin else be same
+                    localStorage.setItem('profileUser', JSON.stringify(response.data));
                     this.currentUserSubject.next(response.data);
                 }
                 return response;

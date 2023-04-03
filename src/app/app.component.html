@@ -26,6 +26,14 @@
       </li>
     </ul>
     <ul class="nav navbar-nav navbar-right">
+      <li style="margin-right: 10px;" *ngIf="hasAccess(['ROLE_MASTER_ADMIN'])">
+        <select class="form-control input-sm" style="margin-top: 10px;">
+          <option>(GMT-5:00) America/New_York</option>
+          <option>(GMT+5:00) Asia/Karachi</option>
+          <option>(GMT-05:00) America/New_York</option>
+          <option>(GMT-5:00) America/New_York</option>
+        </select>
+      </li>
       <li class="dropdown">
         <a href="#" class="dropdown-toggle" data-toggle="dropdown"
           role="button" aria-haspopup="true" aria-expanded="false">
@@ -45,10 +53,11 @@
               SourceTask
             </a>
           </li>
+          <!-- for queueu logs each user have there access -->
           <li><a routerLink="/profile/queuemessage">Queue Logs</a></li>
           <li>
             <a routerLink="/profile/searchengine"
-              *ngIf="hasAccess(['ROLE_MASTER_ADMIN'])">
+              *ngIf="hasAccess(['ROLE_MASTER_ADMIN', 'ROLE_ADMIN'])">
               Query Result
             </a>
           </li>

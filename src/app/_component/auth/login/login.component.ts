@@ -16,8 +16,7 @@ export class LoginComponent implements OnInit {
     public returnUrl: string;
 
     constructor(private formBuilder: FormBuilder,
-        private route: ActivatedRoute,
-        private router: Router,
+        private route: ActivatedRoute, private router: Router,
         private authenticationService: AuthenticationService,
         private alertService: AlertService,
         private spinnerService: SpinnerService
@@ -55,12 +54,12 @@ export class LoginComponent implements OnInit {
         this.authenticationService.signInAppUser(this.f.username.value, this.f.password.value)
             .pipe(first())
             .subscribe(
-                data => {
+                response => {
                     this.loading = false;
                     this.submitted = false;
                     this.spinnerService.hide();
-                    if (data.status == 'ERROR') {
-                        this.alertService.showError(data.message, 'Error');
+                    if (response.status == 'ERROR') {
+                        this.alertService.showError(response.message, 'Error');
                         return;
                     }
                     this.router.navigate([this.returnUrl]);
