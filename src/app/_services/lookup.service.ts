@@ -36,4 +36,22 @@ export class LookupService {
         return this.http.put<ApiResponse>(`${config.apiUrl}/lookup.json/updateLookupData`, payload);
     }
 
+    public uploadLookup(payload:any): any {
+        return this.http.post(`${config.apiUrl}/lookup.json/uploadLookup`, payload);
+    }
+
+    public downloadLookup(payload: any): Observable<any> {
+        return this.http.post(`${config.apiUrl}/lookup.json/downloadLookup`, payload,
+        {
+            responseType: 'blob'
+        });
+    }
+
+    public downloadLookupTemplateFile(): Observable<any> {
+        return this.http.get(`${config.apiUrl}/lookup.json/downloadSourceJobTemplateFile`,
+        {
+            responseType: 'blob'
+        });
+    }
+
 }

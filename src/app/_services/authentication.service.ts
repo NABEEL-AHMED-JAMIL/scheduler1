@@ -23,7 +23,7 @@ export class AuthenticationService {
         return JSON.parse(localStorage.getItem('currentUser'));
     }
 
-    public signInAppUser(username, password) {
+    public signInAppUser(username: any, password: any) {
         return this.http.post<any>(`${config.apiUrl}/auth.json/signInAppUser`, { username, password })
             .pipe(map(response => {
                 // store user details and jwt token in local storage to keep user logged in between page refreshes
@@ -63,8 +63,9 @@ export class AuthenticationService {
         };
         return this.http.post<any>(`${config.apiUrl}/auth.json/logoutAppUser`, payload)
         .pipe(map(response => {
+            debugger
             // store user details and jwt token in local storage to keep user logged in between page refreshes
-            localStorage.removeItem('currentUser');
+            localStorage.clear();
             this.currentUserSubject.next(null);
             return response;
         }));

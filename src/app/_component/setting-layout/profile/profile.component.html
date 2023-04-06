@@ -69,9 +69,9 @@
                         </p>
                         <button class="form-control input-sm"
                             style="background: #cb0f43;color: white;
-                                margin-top: 10px;margin-left: 30%;width: 38%;"
+                                margin-top: 10px;margin-left: 30%;width: auto;"
                                 data-toggle="modal" data-target="#closeAccount">
-                            Close Account
+                            <span class="glyphicon glyphicon-lock"></span> Close Account
                         </button>
                     </div>
                 </div>
@@ -86,8 +86,10 @@
                         <div class="form-group" >
                             <label for="timeZone">10:23 PM 20-03-2023</label>
                             <select class="form-control input-sm" formControlName="timeZone">
-                                <option hidden value="" disabled selected>{{timeZoneList.parentLookupData.description}}</option>
-                                <option *ngFor="let timeZone of timeZoneList.lookupData"
+                                <option hidden value="" disabled selected>
+                                    {{timeZoneList.parentLookupData.description}}
+                                </option>
+                                <option *ngFor="let timeZone of timeZoneList.subLookupData"
                                     [value]="timeZone.lookupType">
                                     {{timeZone.description}}
                                 </option>
@@ -98,7 +100,7 @@
                                 style="background: black;color: white;
                                 margin-top: 10px;width: auto;float: right;"
                                 type="submit" [disabled]="loading">
-                                Change
+                                <span class="glyphicon glyphicon-time"></span> Change
                             </button>
                         </div>
                     </form>
@@ -114,8 +116,8 @@
                 <button class="form-control input-sm"
                     *ngIf="hasAccess(['ROLE_ADMIN', 'ROLE_MASTER_ADMIN'])"
                     style="background: #337ab7;color: white;
-                        margin-top: -36px;width: 12%;float: right;">
-                    Manage Users</button>
+                        margin-top: -36px;width: auto;float: right;">
+                    <samp class="glyphicon glyphicon-briefcase"></samp> Manage Users</button>
                 <hr style="margin-bottom: 12px;margin-top: 0px;">
                 <form [formGroup]="appUserForm" (ngSubmit)="updateAppUserProfile()">
                     <div class="row">
@@ -190,11 +192,10 @@
                     </div>
                     <div class="row">
                         <div class="col-md-12">
-                            <button type="submit" [disabled]="loading"
-                                class="form-control input-sm btn"
-                                style="background: #47b679;color: white;
-                                margin-top: 10px;width: 12%;float: right;">
-                                Update</button>&nbsp;
+                            <button class="form-control input-sm" type="submit"
+                                [disabled]="loading" style="background: #47b679;color: white;
+                                margin-top: 10px;width: auto;float: right;">
+                                Update</button>
                         </div>
                     </div>
                 </form>
@@ -253,7 +254,7 @@
                         <div class="col-md-12">
                             <button class="form-control input-sm" type="submit"
                                 [disabled]="loading" style="background: #47b679;color: white;
-                                margin-top: 10px;width: 12%;float: right;">
+                                margin-top: 10px;width: auto;float: right;">
                                 Update</button>
                         </div>
                     </div>

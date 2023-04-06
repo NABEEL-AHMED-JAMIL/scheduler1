@@ -1,7 +1,7 @@
 ﻿import { Component } from '@angular/core';
 import { Router } from '@angular/router';
 import { AlertService, AuthenticationService } from '@/_services';
-import { AuthResponse } from './_models';
+import { AuthResponse, ApiCode } from './_models';
 import './_content/app.less';
 import { first } from 'rxjs/operators';
 import { SpinnerService } from '@/_helpers';
@@ -20,7 +20,8 @@ export class AppComponent {
         private spinnerService: SpinnerService,
         private alertService: AlertService,
         private authenticationService: AuthenticationService) {
-            this.authenticationService.currentUser.subscribe(currentUser => {
+            this.authenticationService.currentUser
+            .subscribe(currentUser => {
                 this.currentUser = currentUser;
                 if (this.currentUser) {
                     this.userRole = currentUser.roles;
@@ -28,27 +29,28 @@ export class AppComponent {
             });
     }
 
-    public hasAccess(roleList: any) {
-        return this.userRole.some(r=> roleList.includes(r));
+    public hasAccess(roleList: any): any {
+        return this.userRole.some(
+            role => roleList.includes(role));
     }
 
-    public logout() {
+    public logout(): any {
         this.spinnerService.show();
         this.authenticationService.logout()
         .pipe(first())
         .subscribe(
             data => {
                 this.spinnerService.hide();
-                if (data.status == 'ERROR') {
-                    this.alertService.showError(data.message, 'Error');
+                if (data.status === ApiCode.ERROR) {
+                    this.alertService.showError(data.message, ApiCode.ERROR);
                     return;
                 }
-                this.alertService.showSuccess('Logout successfully', 'Sucess');
+                this.alertService.showSuccess(data.message, ApiCode.SUCCESS);
                 this.router.navigate(['/login']);
             },
             error => {
                 this.spinnerService.hide();
-                this.alertService.showError(error.message, 'Error');
+                this.alertService.showError(error.message, ApiCode.ERROR);
             });
     }
 

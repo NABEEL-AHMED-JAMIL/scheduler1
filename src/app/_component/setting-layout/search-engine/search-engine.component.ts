@@ -1,5 +1,5 @@
 ﻿import { Component, OnInit } from '@angular/core';
-import { FormBuilder, FormControl, FormGroup, Validators } from '@angular/forms';
+import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { AlertService, SettingService } from '@/_services';
 import { first } from 'rxjs/operators';
 import { SpinnerService } from '@/_helpers';

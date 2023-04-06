@@ -5,11 +5,13 @@ import {
     ForgotPassComponent,
     ResetPassComponent,
     NotFoundComponent,
+    BatchActionComponent,
     SettingLayoutComponent,
-    LookupSettingComponent,
+    LookupComponent,
     ProfileComponent,
     XmlConfigurationComponent,
-    SearchEngineComponent
+    SearchEngineComponent,
+    SubLookupComponent
 } from './_component/index';
 import { AuthGuard } from './_helpers';
 
@@ -46,23 +48,44 @@ const routes: Routes = [
                 canActivate: [AuthGuard],
                 data:  {
                     breadcrumb: 'Profile',
-                    role: [
-                        'ROLE_MASTER_ADMIN',
-                        'ROLE_ADMIN',
-                        'ROLE_USER'
-                    ]
+                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN', 'ROLE_USER' ]
                 }
             },
-            { 
+            {
                 path: 'lookup',
-                component: LookupSettingComponent,
+                component: LookupComponent,
                 canActivate: [AuthGuard],
                 data:  {
                     breadcrumb: 'Lookup',
-                    role: [
-                        'ROLE_MASTER_ADMIN',
-                        'ROLE_ADMIN'
-                    ]
+                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                }
+            },
+            { 
+                path: 'lookupBatch',
+                component: BatchActionComponent,
+                data: {
+                    action: 'Lookup',
+                    breadcrumb: 'Lookup Batch',
+                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                }
+            },
+            { 
+                path: 'sublookup',
+                component: SubLookupComponent,
+                canActivate: [AuthGuard],
+                data: {
+                    action: 'SubLookup',
+                    breadcrumb: 'Sub Lookup',
+                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                }
+            },
+            { 
+                path: 'sublookupBatch',
+                component: BatchActionComponent,
+                data: {
+                    action: 'SubLookup',
+                    breadcrumb: 'Sub Lookup Batch',
+                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
                 }
             },
             // { 
@@ -83,7 +106,7 @@ const routes: Routes = [
                 canActivate: [AuthGuard],
                 data:  {
                     breadcrumb: 'Search Engine',
-                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN']
+                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
                 }
             },
             // { 

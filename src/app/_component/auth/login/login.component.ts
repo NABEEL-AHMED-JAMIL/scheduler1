@@ -4,8 +4,10 @@ import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { first } from 'rxjs/operators';
 import { AlertService, AuthenticationService } from '@/_services';
 import { SpinnerService } from '@/_helpers';
+import { ApiCode } from '@/_models/index';
 
 @Component({
+    selector: 'login',
     templateUrl: 'login.component.html'
 })
 export class LoginComponent implements OnInit {
@@ -15,12 +17,13 @@ export class LoginComponent implements OnInit {
     public submitted = false;
     public returnUrl: string;
 
-    constructor(private formBuilder: FormBuilder,
-        private route: ActivatedRoute, private router: Router,
+    constructor(
+        private formBuilder: FormBuilder,
+        private route: ActivatedRoute,
+        private router: Router,
         private authenticationService: AuthenticationService,
         private alertService: AlertService,
-        private spinnerService: SpinnerService
-    ) {
+        private spinnerService: SpinnerService) {
         // redirect to home if already logged in
         if (this.authenticationService.currentUserValue) {
             this.router.navigate(['/']);
@@ -42,9 +45,9 @@ export class LoginComponent implements OnInit {
         return this.loginForm.controls;
     }
 
-    public onSubmit() {
-        this.spinnerService.show();
+    public onSubmit(): any {
         this.submitted = true;
+        this.spinnerService.show();
         // stop here if form is invalid
         if (this.loginForm.invalid) {
             this.spinnerService.hide();
@@ -58,8 +61,8 @@ export class LoginComponent implements OnInit {
                     this.loading = false;
                     this.submitted = false;
                     this.spinnerService.hide();
-                    if (response.status == 'ERROR') {
-                        this.alertService.showError(response.message, 'Error');
+                    if (response.status === ApiCode.ERROR) {
+                        this.alertService.showError(response.message, ApiCode.ERROR);
                         return;
                     }
                     this.router.navigate([this.returnUrl]);
@@ -68,11 +71,11 @@ export class LoginComponent implements OnInit {
                     this.loading = false;
                     this.submitted = false;
                     this.spinnerService.hide();
-                    this.alertService.showError(error.message, 'Error');
+                    this.alertService.showError(error.message, ApiCode.ERROR);
                 });
     }
 
-    public register() {
+    public register(): any {
         this.router.navigate(['/register']);
     }
 }

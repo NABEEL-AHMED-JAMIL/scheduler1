@@ -108,29 +108,13 @@ export const SOURCE_TASK_TYPE: SourceTaskType[] = [
 
 // LookupData
 export interface LookupData {
-    lookupId?: any;
-    dateCreated?: any;
-    description?: any;
-    lookupValue?: any;
-    lookupType?: any;
-    parent?: LookupData;
+  lookupId?: any;
+  lookupType?: any;
+  lookupValue?: any;
+  description?: any;
+  dateCreated?: any;
+  parent?: LookupData;
 }
-
-export const LOOKUP_DATA: LookupData[] = [
-    {
-        lookupId: 1001,
-        dateCreated: "2021-03-31 22:09:43",
-        description: "This Scheduler use for send the sourceJob into the queue",
-        lookupValue: "2022-06-13T22:36:36.530",
-        lookupType: "SCHEDULER_LAST_RUN_TIME"
-    }, {
-        lookupId: 1002,
-        dateCreated: "2021-03-31 23:06:48",
-        description: "This Queue fetch size use to fetch the limit of data from db",
-        lookupValue: "50",
-        lookupType: "QUEUE_FETCH_LIMIT"
-    }
-];
 
 export interface SourceTask {
     taskDetailId?: any;

@@ -1,12 +1,15 @@
 import { Component, OnInit } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
-import { AbstractControl, FormBuilder, FormControl, FormGroup, Validators } from '@angular/forms';
+import { AbstractControl, FormBuilder,
+    FormControl, FormGroup, Validators } from '@angular/forms';
 import { first } from 'rxjs/operators';
 import { AlertService, AuthenticationService } from '@/_services';
 import { SpinnerService } from '@/_helpers';
+import { ApiCode } from '@/_models';
 import jwt_decode from "jwt-decode";
 
 @Component({
+    selector: 'reset-pass',
     templateUrl: 'reset-pass.component.html'
 })
 export class ResetPassComponent implements OnInit {
@@ -73,7 +76,7 @@ export class ResetPassComponent implements OnInit {
         return this.resetPassForm.controls;
     }
 
-    public confirmedValidator(controlName: string, matchingControlName: string) {
+    public confirmedValidator(controlName: string, matchingControlName: string): any {
         return (formGroup: FormGroup) => {
           const control = formGroup.controls[controlName];
           const matchingControl = formGroup.controls[matchingControlName];
@@ -88,7 +91,7 @@ export class ResetPassComponent implements OnInit {
         };
     }
 
-    public onSubmit() {
+    public onSubmit(): any {
         this.spinnerService.show();
         this.submitted = true;
         // stop here if form is invalid
@@ -104,11 +107,11 @@ export class ResetPassComponent implements OnInit {
                     this.loading = false;
                     this.submitted = false;
                     this.spinnerService.hide();
-                    if (response.status == 'ERROR') {
-                        this.alertService.showError(response.message, 'Error');
+                    if (response.status === ApiCode.ERROR) {
+                        this.alertService.showError(response.message, ApiCode.ERROR);
                         return;
                     }
-                    this.alertService.showSuccess(response.message, 'Sucess');
+                    this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
                     this.router.navigate(['/login']);
                 },
                 error => {

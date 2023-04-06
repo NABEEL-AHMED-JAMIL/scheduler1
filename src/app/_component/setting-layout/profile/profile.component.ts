@@ -6,7 +6,7 @@ import { Router } from '@angular/router';
 import { AlertService, AuthenticationService,
     AppUserService, LookupService
 } from '@/_services';
-import { LOOKUP_TYPES }  from '@/_models'
+import { LOOKUP_TYPES, ApiCode }  from '@/_models'
 import { SpinnerService } from '@/_helpers';
 import { AuthResponse, AppUserResponse } from '@/_models/index';
 
@@ -99,15 +99,15 @@ export class ProfileComponent implements OnInit {
         .subscribe(
             response => {
                 this.spinnerService.hide();
-                if (response.data.status == 'ERROR') {
-                    this.alertService.showError(response.message, 'Error');
+                if (response.status === ApiCode.ERROR) {
+                    this.alertService.showError(response.message, ApiCode.ERROR);
                     return;
                 }
                 this.timeZoneList = response.data
             },
             error => {
                 this.spinnerService.hide();
-                this.alertService.showError(error.message, 'Error');
+                this.alertService.showError(error.message, ApiCode.ERROR);
             });
     }
 
@@ -118,8 +118,8 @@ export class ProfileComponent implements OnInit {
         .subscribe(
             response => {
                 this.spinnerService.hide();
-                if (response.data.status == 'ERROR') {
-                    this.alertService.showError(response.message, 'Error');
+                if (response.status === ApiCode.ERROR) {
+                    this.alertService.showError(response.message, ApiCode.ERROR);
                     return;
                 }
                 this.appUserResponse = response.data;
@@ -146,7 +146,7 @@ export class ProfileComponent implements OnInit {
             },
             error => {
                 this.spinnerService.hide();
-                this.alertService.showError(error.message, 'Error');
+                this.alertService.showError(error.message, ApiCode.ERROR);
             });        
     }
 
@@ -166,19 +166,19 @@ export class ProfileComponent implements OnInit {
                 this.loading = false;
                 this.submitted = false;
                 this.spinnerService.hide();
-                if (response.status == 'ERROR') {
-                    this.alertService.showError(response.message, 'Error');
+                if (response.status === ApiCode.ERROR) {
+                    this.alertService.showError(response.message, ApiCode.ERROR);
                     return;
                 }
                 this.appUserResponse.firstName = response.data.firstName;
                 this.appUserResponse.lastName = response.data.lastName;
-                this.alertService.showSuccess(response.message, 'Sucess');
+                this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
             },
             error => {
                 this.loading = false;
                 this.submitted = false;
                 this.spinnerService.hide();
-                this.alertService.showError(error.message, 'Error');
+                this.alertService.showError(error.message, ApiCode.ERROR);
             });
 
     }
@@ -197,17 +197,17 @@ export class ProfileComponent implements OnInit {
             response => {
                 this.loading = false;
                 this.spinnerService.hide();
-                if (response.status == 'ERROR') {
-                    this.alertService.showError(response.message, 'Error');
+                if (response.status === ApiCode.ERROR) {
+                    this.alertService.showError(response.message, ApiCode.ERROR);
                     return;
                 }
-                this.alertService.showSuccess(response.message, 'Sucess');
+                this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
                 this.logoutAppUser();
             },
             error => {
                 this.loading = false;
                 this.spinnerService.hide();
-                this.alertService.showError(error.message, 'Error');
+                this.alertService.showError(error.message, ApiCode.ERROR);
             });
     }
 
@@ -221,16 +221,16 @@ export class ProfileComponent implements OnInit {
 		.subscribe((response) => {
             this.spinnerService.hide();
             this.closebutton.nativeElement.click();
-			if(response.status == 'ERROR') {
-                this.alertService.showError(response.message, 'Error');
+			if(response.status === ApiCode.ERROR) {
+                this.alertService.showError(response.message, ApiCode.ERROR);
                 return;
 			}
-            this.alertService.showSuccess(response.message, 'Sucess');
+            this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
             // logout the account
             this.logoutAppUser();
 		}, (error) => {
 			this.spinnerService.hide();
-			this.alertService.showError(error, 'Error');
+			this.alertService.showError(error, ApiCode.ERROR);
 		});
     }
 
@@ -240,16 +240,16 @@ export class ProfileComponent implements OnInit {
         .subscribe(
             data => {
                 this.spinnerService.hide();
-                if (data.status == 'ERROR') {
-                    this.alertService.showError(data.message, 'Error');
+                if (data.status === ApiCode.ERROR) {
+                    this.alertService.showError(data.message, ApiCode.ERROR);
                     return;
                 }
-                this.alertService.showSuccess('Logout successfully', 'Sucess');
+                this.alertService.showSuccess('Logout successfully', ApiCode.SUCCESS);
                 this.router.navigate(['/login']);
             },
             error => {
                 this.spinnerService.hide();
-                this.alertService.showError(error.message, 'Error');
+                this.alertService.showError(error.message, ApiCode.ERROR);
             });
     }
 

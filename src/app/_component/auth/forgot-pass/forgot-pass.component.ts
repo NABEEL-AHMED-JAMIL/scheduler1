@@ -1,11 +1,13 @@
 import { Component, OnInit } from '@angular/core';
-import { Router, ActivatedRoute } from '@angular/router';
+import { Router } from '@angular/router';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { first } from 'rxjs/operators';
 import { AlertService, AuthenticationService } from '@/_services';
 import { SpinnerService } from '@/_helpers';
+import { ApiCode } from '@/_models'
 
 @Component({
+    selector: 'forgot-pass',
     templateUrl: 'forgot-pass.component.html'
 })
 export class ForgotPassComponent implements OnInit {
@@ -33,7 +35,7 @@ export class ForgotPassComponent implements OnInit {
         return this.forgotForm.controls;
     }
 
-    public onSubmit() {
+    public onSubmit(): any {
         this.spinnerService.show();
         this.submitted = true;
         // stop here if form is invalid
@@ -49,18 +51,18 @@ export class ForgotPassComponent implements OnInit {
                     this.loading = false;
                     this.submitted = false;
                     this.spinnerService.hide();
-                    if (response.status == 'ERROR') {
-                        this.alertService.showError(response.message, 'Error');
+                    if (response.status === ApiCode.ERROR) {
+                        this.alertService.showError(response.message, ApiCode.ERROR);
                         return;
                     }
-                    this.alertService.showSuccess(response.message, 'Sucess');
+                    this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
                     this.router.navigate(['/login']);
                 },
                 error => {
                     this.loading = false;
                     this.submitted = false;
                     this.spinnerService.hide();
-                    this.alertService.showError(error.message, 'Error');
+                    this.alertService.showError(error.message, ApiCode.ERROR);
                 });
     }
 

@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { Breadcrumb } from '../../_models/index';
-import { Router } from '@angular/router';
+import { Location } from '@angular/common';
 import { Observable } from 'rxjs';
 import { BreadcrumbService } from '@/_helpers/breadcrumb.service';
 
@@ -12,12 +12,16 @@ export class SettingLayoutComponent implements OnInit {
 
     public breadcrumbs: Observable<Breadcrumb[]>;
 
-    constructor(private readonly breadcrumbService: BreadcrumbService) {
+    constructor(private readonly breadcrumbService: BreadcrumbService,
+      private location: Location) {
       this.breadcrumbs = breadcrumbService.breadcrumbs$;
-      console.log(this.breadcrumbs);
     }
 
     ngOnInit() {
+    }
+
+    public back() {
+      this.location.back();
     }
 
 }
