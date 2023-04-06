@@ -24,13 +24,11 @@ module.exports = {
                 test: /\.less$/,
                 use: ['style-loader', 'css-loader', 'less-loader']
             },
+
+            // workaround for warning: System.import() is deprecated and will be removed soon. Use import() instead.
             {
                 test: /[\/\\]@angular[\/\\].+\.js$/,
                 parser: { system: true }
-            },
-            {
-                test: [/\.bmp$/, /\.gif$/, /\.jpe?g$/, /\.png$/],
-                use: 'url-loader'
             }
         ]
     },
@@ -39,8 +37,8 @@ module.exports = {
         new webpack.DefinePlugin({
             // global app config object
             config: JSON.stringify({
-                apiUrl: 'http://localhost:9098/api/v2',
-                webSocketUrl: 'http://localhost:9098/api/v2'
+                apiUrl: 'http://localhost:9098/api/v1',
+                webSocketUrl: 'http://localhost:9098/api/v1'
             })
         }),
 

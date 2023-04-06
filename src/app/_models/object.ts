@@ -1,18 +1,3 @@
-export interface Breadcrumb {
-  label: string;
-  url: string;
-}
-
-export interface AuthResponse {
-  appUserId: any;
-  token: any;
-  type: any;
-  refreshToken: any;
-  username: any;
-  email: any;
-  roles: any;
-}
-
 export interface NameValue {
   name?: any;
   value?: any;
@@ -108,13 +93,29 @@ export const SOURCE_TASK_TYPE: SourceTaskType[] = [
 
 // LookupData
 export interface LookupData {
-  lookupId?: any;
-  lookupType?: any;
-  lookupValue?: any;
-  description?: any;
-  dateCreated?: any;
-  parent?: LookupData;
+    lookupId?: any;
+    dateCreated?: any;
+    description?: any;
+    lookupValue?: any;
+    lookupType?: any;
+    parent?: LookupData;
 }
+
+export const LOOKUP_DATA: LookupData[] = [
+    {
+        lookupId: 1001,
+        dateCreated: "2021-03-31 22:09:43",
+        description: "This Scheduler use for send the sourceJob into the queue",
+        lookupValue: "2022-06-13T22:36:36.530",
+        lookupType: "SCHEDULER_LAST_RUN_TIME"
+    }, {
+        lookupId: 1002,
+        dateCreated: "2021-03-31 23:06:48",
+        description: "This Queue fetch size use to fetch the limit of data from db",
+        lookupValue: "50",
+        lookupType: "QUEUE_FETCH_LIMIT"
+    }
+];
 
 export interface SourceTask {
     taskDetailId?: any;
@@ -249,44 +250,15 @@ export const SEARCH_TASK_LIST: String[] = [
 
 export const STATUS_LIST: any = [
   {
-    key: 'Inactive',
-    value: 0,
+    key: 'Active',
+    value: 'Active'
   },
   {
-    key: 'Active',
-    value: 1
+    key: 'Inactive',
+    value: 'Inactive',
   },
   {
     key: 'Delete',
-    value: 2,
+    value: 'Delete',
   }
 ];
-
-export interface AppUserResponse {
-  appUserId?: any;
-  firstName?: any;
-  lastName?: any;
-  timeZone?: any;
-  username?: any;
-  email?: any;
-  roleResponse?: RoleResponse[];
-  parentAppUser?: AppUserResponse;
-  status?: any;
-  dateCreated?: any;
-}
-
-export interface RoleResponse {
-  roleId?: any;
-  roleName?: any;
-  status?: any;
-  dateCreated?: any;
-}
-
-export enum LOOKUP_TYPES {
-  QUEUE_FETCH_LIMIT = 'QUEUE_FETCH_LIMIT',
-  SCHEDULER_LAST_RUN_TIME = 'SCHEDULER_LAST_RUN_TIME',
-  EMAIL_SENDER = 'EMAIL_SENDER',
-  RESET_PASSWORD_LINK = 'RESET_PASSWORD_LINK',
-  SCHEDULER_TIMEZONE = 'SCHEDULER_TIMEZONE',
-  SUPER_ADMIN = 'SUPER_ADMIN'
-}

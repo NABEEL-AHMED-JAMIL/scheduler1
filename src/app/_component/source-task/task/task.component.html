@@ -1,0 +1,135 @@
+﻿<ol class="breadcrumb">
+    <li><a routerLink="/home">Home</a></li>
+    <li><a routerLink="/taskList">Task List</a></li>
+    <li class="active">{{currentTaskState}}</li> 
+</ol>
+<div class="row" style="margin-right: 0px;margin-left: 0px;
+    padding-left: 15px; padding-right: 15px;">
+    <form *ngIf="sourceTaskForm" [formGroup]="sourceTaskForm" (ngSubmit)="submitSourceTask()">
+        <div class="col-lg-12">
+            <h4>{{currentTaskState}}</h4>
+            <button type="button" class="btn btn-sm btn-default" style="float:right;margin-top:-35px;"
+                title="Add More" (click)="tageFormsAddItem()">
+                <span class="glyphicon glyphicon-plus-sign"></span> Add More</button>
+            <hr style="border-top: 3px solid #f3565d;">
+            <div class="card">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-lg-5">
+                            <div class="row">
+                                <div class="form-group" class="col-lg-6">
+                                    <label for="taskName">TaskName</label>
+                                    <input type="text" class="form-control input-sm" formControlName="taskName"
+                                        [ngClass]="{ 'is-invalid': sourceTask.taskName.errors }" placeholder="Enter TaskName" />
+                                    <div *ngIf="submitted && sourceTask.taskName.errors" class="invalid-feedback">
+                                        <div *ngIf="sourceTask.taskName.errors.required" style="color: red;">
+                                            TaskName is required
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-lg-6">
+                                    <div class="form-group">
+                                        <label for="homePageId">HomePage</label>
+                                        <select class="form-control input-sm" formControlName="homePageId">
+                                            <option value="" selected>Select Home Page</option>
+                                            <option *ngFor="let piplineHomePage of piplineHomePageList" [value]="piplineHomePage.lookupId">{{piplineHomePage.lookupType}}</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="sourceTaskTypeId">Source TaskType</label>
+                                <select class="form-control input-sm" formControlName="sourceTaskTypeId">
+                                    <option hidden value="" disabled selected>Select SourceType</option>
+                                    <option *ngFor="let sourceTaskType of sourceTaskTypes" [value]="sourceTaskType.sourceTaskTypeId">
+                                        {{sourceTaskType.serviceName}} ({{sourceTaskType.queueTopicPartition}})
+                                    </option>
+                                </select>
+                                <div *ngIf="submitted && sourceTask.sourceTaskTypeId.errors" class="invalid-feedback">
+                                    <div *ngIf="sourceTask.sourceTaskTypeId.errors.required" style="color: red;">
+                                        SourceTaskType is required
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-lg-4" *ngIf="isEditMode">
+                                    <div class="form-group" >
+                                        <label for="taskStatus">TaskStatus</label>
+                                        <select class="form-control input-sm" formControlName="taskStatus" >
+                                            <option *ngFor="let sourceTask of sourceTaskStatus" [value]="sourceTask.value">{{sourceTask.key}}</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div [ngClass]="isEditMode ? 'col-lg-8' : 'col-lg-12' ">
+                                    <div class="form-group">
+                                        <label for="pipelineId">Pipeline TaskId</label>
+                                        <select class="form-control input-sm" formControlName="pipelineId">
+                                            <option value="" selected>Select Pipeline Id</option>
+                                            <option *ngFor="let pipelineId of pipelineIdList" [value]="pipelineId.lookupId">{{pipelineId.lookupType}}</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="taskPayload">TaskPayload</label>
+                                <textarea class="form-control input-sm" formControlName="taskPayload"
+                                    id="jsonId" rows="10" style="height: auto;"
+                                    placeholder="Enter the task configuration detail"  
+                                    [ngClass]="{ 'is-invalid': sourceTask.taskPayload.errors }"></textarea>
+                                <div *ngIf="submitted && sourceTask.taskPayload.errors" class="invalid-feedback">
+                                    <div *ngIf="sourceTask.taskPayload.errors.required" style="color: red;">
+                                        TaskPayload is required
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-7" style="overflow-y: scroll;max-height: 350px;">
+                            <div id="main-form-content" formArrayName="tagsInfo">
+                                <table id="tbl-upload" class="table">
+                                   <tbody *ngFor="let tag of sourceTaskForm.get('tagsInfo')['controls']; let i = index;" [formGroup]="tag">
+                                      <tr *ngIf="i==0" class="active">
+                                         <th>TagKey</th>
+                                         <th>TagParent</th>
+                                         <th>TagValue</th>
+                                         <th style="text-align: center;">Action</th>
+                                      </tr>
+                                      <tr>
+                                         <td>
+                                            <input type="text" class="form-control input-sm" name="tagKey" formControlName="tagKey" placeholder="Enter TagKey">
+                                            <div *ngIf="submitted && tag.get('tagKey').errors" class="invalid-feedback">
+                                                <div *ngIf="tag.get('tagKey').errors.required" style="color: red;">
+                                                    TagKey is required
+                                                </div>
+                                            </div>
+                                         </td>
+                                         <td>
+                                            <input type="text" class="form-control input-sm" name="tagParent" formControlName="tagParent" placeholder="ParentTag If Any">
+                                         </td>
+                                         <td>
+                                            <input type="text" class="form-control input-sm" name="tagValue" formControlName="tagValue" placeholder="Enter TagValue">
+                                         </td>
+                                         <td>
+                                             <button type="button" class="button button5" (click)="tageFormAddItem(i)">+</button>
+                                             &nbsp;
+                                             <button type="button" class="button button5" (click)="tageFormRemoveItem(i)">-</button>
+                                         </td>
+                                      </tr>
+                                   </tbody>
+                                </table>
+                            </div>
+                            <input type="button" class="form-control input-sm" value="Show Xml OutPut" 
+                                [disabled]="sourceTaskForm.get('tagsInfo')?.invalid" (click)="submintTageForms(tageForms.value)">
+                            <br>
+                        </div>
+                        <div class="col-lg-12">
+                            <button type="reset" class="btn btn-sm btn-default" (click)="addSourceTaskFormInit()"
+                                style="color: #345; background-color:#fff;border-color: black;float: left;">Clear</button>
+                            <button type="submit" class="btn btn-sm btn-danger" style="float: right;">Save</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <br>
+        </div>
+    </form>
+</div>
