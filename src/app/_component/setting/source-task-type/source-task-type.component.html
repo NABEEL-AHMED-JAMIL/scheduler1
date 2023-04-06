@@ -1,0 +1,71 @@
+<!-- add sourceTasktype -->
+<div class="modal fade" id="sourceTaskTaype" role="dialog">
+    <div class="modal-dialog">
+      <!-- Modal content-->
+      <div class="modal-content" style="border: none">
+        <form *ngIf="sourceTaskTaypeForm" [formGroup]="sourceTaskTaypeForm" (ngSubmit)="submitSourceTaskType()">
+            <div class="modal-header">
+                <button type="button" class="close" #closeSourceTaskTaype data-dismiss="modal"
+                    (click)="coleseSourceTaskEvent(4)">&times;</button>
+                <h4 class="modal-title">{{SOURCEC_TASK_TYPE_TITLE}}</h4>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="serviceName">ServiceName</label>
+                    <input type="text" formControlName="serviceName" class="form-control input-sm"
+                        [ngClass]="{ 'is-invalid': sourceTaskTaype.serviceName.errors }" />
+                    <div *ngIf="submitted && sourceTaskTaype.serviceName.errors" class="invalid-feedback">
+                        <div *ngIf="sourceTaskTaype.serviceName.errors.required" style="color: red;">
+                            ServiceName is required
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="queueTopicPartition">TopicPartition</label>
+                    <input type="text" formControlName="queueTopicPartition" class="form-control input-sm"
+                        [ngClass]="{ 'is-invalid': sourceTaskTaype.queueTopicPartition.errors }" />
+                    <div *ngIf="submitted && sourceTaskTaype.queueTopicPartition.errors" class="invalid-feedback">
+                        <div *ngIf="sourceTaskTaype.queueTopicPartition.errors.required" style="color: red;">
+                            TopicPartition is required
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group" *ngIf="isEditMode">
+                    <label for="taskStatus">TaskStatus</label>
+                    <select class="form-control input-sm" formControlName="status" >
+                        <option *ngFor="let sourceTaskType of sourceTaskTypeStatus"
+                            [value]="sourceTaskType.value">
+                            {{sourceTaskType.key}}
+                        </option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="description">Description</label>
+                    <input type="text" formControlName="description" class="form-control input-sm"
+                        [ngClass]="{ 'is-invalid': sourceTaskTaype.description.errors }" />
+                    <div *ngIf="submitted && sourceTaskTaype.description.errors" class="invalid-feedback">
+                        <div *ngIf="sourceTaskTaype.description.errors.required" style="color: red;">
+                            Description is required
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="SchemaPayload">SchemaPayload</label>
+                    <textarea type="text" formControlName="schemaPayload" class="form-control input-sm"
+                        [ngClass]="{ 'is-invalid': sourceTaskTaype.schemaPayload.errors }"></textarea>
+                    <div *ngIf="submitted && sourceTaskTaype.schemaPayload.errors" class="invalid-feedback">
+                        <div *ngIf="sourceTaskTaype.schemaPayload.errors.required" style="color: red;">
+                            SchemaPayload is required
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" *ngIf="!isDisable">
+                <button type="reset" class="btn btn-default" data-dismiss="modal"
+                    (click)="coleseSourceTaskEvent(4)">Close</button>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+        </form>
+      </div>      
+    </div>
+</div>

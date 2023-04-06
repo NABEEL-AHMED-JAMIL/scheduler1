@@ -1,0 +1,153 @@
+﻿﻿<ol class="breadcrumb">
+    <li><a routerLink="/home">Home</a></li>
+    <li class="active">Job List</li>
+</ol>
+<div class="row" style="margin-right: 0px;margin-left: 0px;">
+    <div class="col-lg-4">
+        <div class="form-group">
+            <label for="searchSourceJobDetails">Total Jobs ({{sourceJobDetails.length}})</label>
+            <input type="text" id="searchSourceJobDetails" class="form-control input-sm"
+                placeholder="Search" [(ngModel)]="searchSourceJobDetails"/>
+        </div>
+    </div>
+    <div class="col-lg-8" style="text-align: end;">
+        <button type="button" id="download" routerLink="/jobList/jobBatchAction"
+            class="btn btn-sm btn-default" style="margin-top: 25px;float: right;">
+            <span class="glyphicon glyphicon-cog"></span>
+            Batch Action
+        </button>
+        <button type="button" class="btn btn-sm btn-default" 
+            style="margin-top: 25px;float: right;margin-right: 5px;"
+            (click)="refreshSourceJobs()">
+            <span id="loading" class="glyphicon glyphicon-refresh"></span>
+            Refresh
+        </button>
+    </div>
+</div>
+<div style="padding-left: 15px;padding-right: 15px;overflow: auto;">
+    <table class="table table-bordered table-sm table-responsive table-striped" style="font-size: 10px;">
+        <thead>
+            <tr>
+                <th>Job Name</th>
+                <th style="overflow-wrap: break-word;inline-size: 130px;">Task</th>
+                <th>Execution</th>
+                <th>Status</th>
+                <th>Created Date</th>
+                <th>Recursion</th>
+                <th>Start Date</th>
+                <th>End Date</th>
+                <th>Last Run</th>
+                <th>Next Flight</th>
+                <th>R-Status</th>
+                <th style="width: 9%;">Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr *ngFor="let sourceJob of sourceJobDetails?.reverse() | searchFilter: searchSourceJobDetails;let i = index;">
+                <td>
+                    <a routerLink="/editJob/{{sourceJob.jobId}}">{{sourceJob.jobId}}-{{sourceJob.jobName}}</a>
+                </td>
+                <td>
+                    <a routerLink="/editTask/{{sourceJob?.taskDetail?.taskDetailId}}">
+                        {{sourceJob?.taskDetail?.taskDetailId}}-[{{sourceJob?.taskDetail?.taskName}}]
+                    </a>
+                </td>
+                <td style="text-align: center;">
+                    <span class="badge" [ngClass]="sourceJob.execution == 'Manual' ? 
+                        'badge-success' : 'badge-warning'">{{sourceJob.execution}}
+                    </span>
+                </td>
+                <td style="text-align: center;">
+                    <span class="badge" 
+                        [ngClass]="{
+                            'badge-danger': sourceJob.jobStatus === 'Delete', 
+                            'badge-warning' : sourceJob.jobStatus === 'Inactive',
+                            'badge-success' : sourceJob.jobStatus === 'Active'
+                        }">
+                        {{sourceJob.jobStatus}}
+                    </span>
+                </td>
+                <td style="text-align: center;">{{sourceJob.dateCreated | date:'yyyy-MM-dd HH:mm:ss'}}</td>
+                <td style="text-align: center;">{{sourceJob?.scheduler ?  'Every ' + sourceJob?.scheduler?.recurrence : ''}} {{sourceJob?.scheduler ?  sourceJob?.scheduler?.frequency : ''}}</td>
+                <td style="text-align: center;">{{sourceJob?.scheduler?.startDate}} {{sourceJob?.scheduler?.startTime}}</td>
+                <td style="text-align: center;">{{sourceJob?.scheduler?.endDate ? sourceJob?.scheduler?.endDate : ''}}
+                    {{sourceJob?.scheduler?.endDate ? sourceJob?.scheduler?.startTime : ''}}</td>
+                <td style="text-align: center;">{{sourceJob.lastJobRun | date:'yyyy-MM-dd HH:mm:ss'}}</td>
+                <td style="text-align: center;">{{sourceJob?.scheduler?.recurrenceTime | date:'yyyy-MM-dd HH:mm:ss'}}</td>
+                <td style="text-align: center;">
+                    <span *ngIf="sourceJob.jobRunningStatus" class="badge"
+                        [ngClass]="{
+                            'badge-primary' : sourceJob.jobRunningStatus === 'InFlight', 
+                            'badge-info' : sourceJob.jobRunningStatus === 'Queue',
+                            'badge-warning' : sourceJob.jobRunningStatus === 'Running',
+                            'badge-danger' :  sourceJob.jobRunningStatus === 'Failed',
+                            'badge-success' : sourceJob.jobRunningStatus === 'Completed'
+                        }">
+                        {{ sourceJob.jobRunningStatus }}
+                    </span>
+                </td>
+                <td style="text-align: center;">
+                    <div class="btn-group btn-group-xs" role="group"
+                        style="text-align: center">
+                        <button type="button" class="btn btn-default"
+                            [disabled]="sourceJob.jobRunningStatus === 'Queue' || 
+                                sourceJob.jobRunningStatus === 'Running' ||
+                                sourceJob.jobStatus === 'Delete' ||
+                                sourceJob.jobStatus === 'Inactive'"
+                            (click)="runSourceJob(sourceJob, i)">
+                            <span class="glyphicon glyphicon-play-circle btn_span"
+                                style="color: green;">
+                            </span>
+                        </button>
+                        <button type="button" class="btn btn-default"
+                            [disabled]="sourceJob.jobRunningStatus === 'Queue' || 
+                                sourceJob.jobRunningStatus === 'Running' ||                                
+                                sourceJob.execution == 'Manual' ||
+                                sourceJob.jobStatus === 'Delete' ||
+                                sourceJob.jobStatus === 'Inactive'"
+                            (click)="skipNextSourceJob(sourceJob, i)">
+                            <span class="glyphicon glyphicon-step-forward"
+                                style="color: purple;">
+                            </span>
+                        </button>
+                        <button type="button" class="btn btn-default"
+                            [disabled]="sourceJob.jobStatus === 'Delete' ||
+                                sourceJob.jobRunningStatus === 'Running'"
+                            data-toggle="modal" data-target="#deleteSourceJob"
+                            (click)="deleteSourceJob(sourceJob, i)">
+                            <span class="glyphicon glyphicon-trash" style="color: black;"></span>
+                        </button>
+                        <button type="button" class="btn btn-default"                         
+                            [disabled]="sourceJob.tabActive === false"
+                            (click)="sourceJobHistoryByJobId(sourceJob.jobId)">
+                            <span class="glyphicon glyphicon-tasks" style="color: black;"></span>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+<div class="view-side-form">
+    <router-outlet></router-outlet>
+</div>
+<!-- Modal -->
+<div class="modal fade" id="deleteSourceJob" role="dialog" style="top: 85px;">
+    <div class="modal-dialog">
+        <!-- Modal content-->
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" #closebutton class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title">Delete Source Job</h4>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure to delete the source job?
+                    <br>On press 'Yes' the source job will delete state and will not run
+                </p> 
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger" id="closeModal" (click)="processDeleteSourceJob()">Yes</button>
+            </div>
+        </div>
+    </div>
+</div>

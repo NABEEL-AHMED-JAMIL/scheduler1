@@ -19,6 +19,6 @@ export class CommomService {
     
     public createFile(payload: any): any {
         const file = new Blob([JSON.stringify(payload, null, 4)], { type: 'application/json' });
-        saveAs(file, 'ETL ' + this.uuid() + '.json');
+        saveAs(file, 'Raad-Master-Data ' + this.uuid() + '.json');
     }
 }

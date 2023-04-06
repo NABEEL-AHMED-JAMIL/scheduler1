@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { ApiResponse } from '@/_models';
 
+
 @Injectable({
     providedIn: 'root'
 })
@@ -12,6 +13,10 @@ export class ConfigurationMakerService {
 
     public getXmlData(payload:any): Observable<ApiResponse> {
         return this.http.post<ApiResponse>(`${config.apiUrl}/setting.json/xmlCreateChecker`, payload);
+    }
+
+    public getJsonData(payload:any): Observable<ApiResponse> {
+        return this.http.post<ApiResponse>(`${config.apiUrl}/setting.json/jsonCreateChecker`, payload);
     }
 
 }

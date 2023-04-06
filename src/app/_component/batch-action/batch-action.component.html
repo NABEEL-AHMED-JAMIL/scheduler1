@@ -1,110 +1,48 @@
-<style>
-    .card {
-        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, .1), 0 1px 2px 0 rgba(0, 0, 0, .06);
-    }
-
-    .card {
-        position: relative;
-        display: flex;
-        flex-direction: column;
-        min-width: 0;
-        word-wrap: break-word;
-        background-color: #fff;
-        background-clip: border-box;
-        border: 0 solid rgba(0, 0, 0, .125);
-        border-radius: .25rem;
-    }
-
-    .card-body {
-        flex: 1 1 auto;
-        min-height: 1px;
-        padding: 1rem;
-    }
-
-    .card-title {
-        margin-bottom: 0.75rem;
-    }
-
-    .gutters-sm {
-        margin-right: -8px;
-        margin-left: -8px;
-    }
-
-    .gutters-sm>.col,
-    .gutters-sm>[class*=col-] {
-        padding-right: 8px;
-        padding-left: 8px;
-    }
-
-    .mb-3 {
-        margin-bottom: 1rem !important;
-    }
-
-    .rounded-circle {
-        border-radius: 50% !important;
-    }
-
-    .mt-3 {
-        margin-top: 1rem !important;
-    }
-
-    .text-secondary {
-        color: #6c757d !important;
-    }
-
-    p {
-        margin-top: 0;
-        margin-bottom: 1rem;
-    }
-</style>
-<!-- card detail -->
-<div class="row gutters-sm">
-    <div class="col-lg-12">
-        <div class="card mb-3">
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-lg-6">
-                        <h5 class="card-title" style="font-size: large;">{{title}}</h5>
-                    </div>
-                    <div class="col-lg-6" style="margin-top: 5px;text-align: end;">
-                        <input type="file" accept="application/vnd.ms-excel,
-                            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                            style="display: none;"
-                            #inputUpload (change)="uploadBulkData($event.target.files[0])" hidden>
-                        <button type="button" class="btn btn-sm btn-default" (click)="inputUpload.click()">
-                            <span class="glyphicon glyphicon-upload"></span> Upload
-                        </button>
-                        &nbsp;
-                        <button type="button" class="btn btn-sm btn-default"
-                            (click)="downloadData()">
-                            <span class="glyphicon glyphicon-download"></span> Downalod
-                        </button>
-                        &nbsp;
-                        <button type="button" class="btn btn-sm btn-default"
-                            (click)="downloadTemplate()">
-                            <span class="glyphicon glyphicon-download"></span> Template
-                        </button>
-                    </div>
-                    <div class="col-lg-12">
-                        <hr style="margin-top: 10px;">
-                    </div>
-                </div>
-                <table class="table table-bordered table-sm
-                    table-responsive table-striped" style="font-size: 10px;">
-                    <thead>
-                        <tr>
-                            <th style="width: 1px;">No#</th>
-                            <th>Error</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr *ngFor="let error of errors; let i = index">
-                            <td>{{i+1}}</td>
-                            <td [innerHTML]="error"></td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+﻿<div class="side-form">
+    <nav class="navbar navbar-inverse"
+        style="border-radius: 0px;margin-bottom: 0px;">
+        <div class="container-fluid">
+            <button type="button" (click)="backClicked()"
+                style="margin-top: 7px;" class="btn btn-sm btn-default">
+                <span class="glyphicon glyphicon-chevron-left"></span>Back
+            </button>
+        </div>
+    </nav>
+    <div class="row" style="margin-right: 0px;margin-left: 0px;">
+        <div class="col-lg-12" style="text-align: end;">
+            <br>
+            <input type="file" accept="application/vnd.ms-excel, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                style="display: none;" #inputUpload (change)="uploadBulk($event.target.files[0])" hidden>
+            <button type="button" class="btn btn-sm btn-default" (click)="inputUpload.click()">
+                <span class="glyphicon glyphicon-upload"></span> Upload {{buttonMessage}}
+            </button>
+            &nbsp;
+            <button type="button" class="btn btn-sm btn-default" (click)="downloadList()">
+                <span class="glyphicon glyphicon-download"></span> Downalod {{buttonMessage}}
+            </button>
+            &nbsp;
+            <button type="button" class="btn btn-sm btn-default" (click)="downloadSourceTemplate()">
+                <span class="glyphicon glyphicon-download"></span> Download Template
+            </button>
+            <hr style="border-top: 3px solid #f3565d;">
+        </div>
+    </div>
+    <div class="row" style="margin-right: 0px;margin-left: 0px;">
+        <div class="col-lg-12">
+            <table class="table table-bordered table-sm table-responsive table-striped" style="font-size: 10px;">
+                <thead>
+                    <tr>
+                        <th style="width: 1px;">No#</th>
+                        <th>Error</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr *ngFor="let error of errors; let i = index">
+                        <td>{{i+1}}</td>
+                        <td [innerHTML]="error"></td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
