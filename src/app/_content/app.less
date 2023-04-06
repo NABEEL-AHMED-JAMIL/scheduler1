@@ -1,4 +1,5 @@
 // global application styles
+
 a {
   cursor: pointer;
 }
@@ -122,7 +123,8 @@ body.jw-modal-open {
 body {
 	font-family: 'Montserrat', 'Lato', 'Open Sans', 'Helvetica Neue', Helvetica, Calibri, Arial, sans-serif;
 	color: @gray;
-	background: #f2f2f2;
+	// background: #f2f2f2;
+  background: #eee;
 }
 .jumbotron {
   background: @gray;
@@ -487,7 +489,7 @@ td {
 }
 
 .modal-header {
-  background: gray;
+  background: black;
   color: white;
 }
 
@@ -720,3 +722,132 @@ a {
 .graph:hover {
   background-color: white;
 }
+
+.login-form {
+  background-color: white;
+  width: 440px;
+  margin: 100px auto;
+}
+.login-form form {
+  padding: 15px;
+}
+.login-form h2 {
+  margin: 0 0 15px;
+}
+
+.breadcrumb {
+  border-radius: 0px;
+  background-color: rgba(255,255,255,0.9);
+  border: 1px solid;
+}
+
+
+#wrapper {
+  padding-left: 250px;
+  transition: all 0.4s ease 0s;
+}
+
+#wrapper.toggled {
+  padding-left: 180px;
+}
+
+#sidebar-wrapper {
+  background-color: #222;
+  border-color: #080808;
+  // z-index: 1000;
+  position: fixed;
+  left: 180px;
+  width: 0;
+  height: 100%;
+  margin-left: -180px;
+  overflow-y: auto;
+  transition: all 0.5s ease;
+}
+
+#page-content-wrapper {
+  width: 100%;
+  // padding: 15px;
+}
+
+#wrapper.toggled #page-content-wrapper {
+  position: absolute;
+  margin-right: -180px;
+}
+
+/* Sidebar Styles */
+
+.sidebar-nav {
+  position: absolute;
+  top: 0;
+  width: 180px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sidebar-nav li {
+  text-indent: 20px;
+  line-height: 40px;
+}
+
+.sidebar-nav li a {
+  display: block;
+  text-decoration: none;
+  color: #999999;
+}
+
+.sidebar-nav li a:hover {
+  text-decoration: none;
+  color: #fff;
+  background: rgba(255,255,255,0.2);
+}
+
+.sidebar-nav li a:active,
+.sidebar-nav li a:focus {
+  text-decoration: none;
+}
+
+.sidebar-nav > .sidebar-brand {
+  height: 65px;
+  font-size: 18px;
+  line-height: 60px;
+}
+
+.sidebar-nav > .sidebar-brand a {
+  color: #999999;
+}
+
+.sidebar-nav > .sidebar-brand a:hover {
+  color: #fff;
+  background: none;
+}
+
+@media(min-width:768px) {
+  #wrapper {
+      padding-left: 180px;
+  }
+
+  #wrapper.toggled {
+      padding-left: 0;
+  }
+
+  #sidebar-wrapper {
+      width: 180px;
+  }
+
+  #wrapper.toggled #sidebar-wrapper {
+      width: 0;
+  }
+
+  #page-content-wrapper {
+      // padding: 20px;
+      position: relative;
+  }
+
+  #wrapper.toggled #page-content-wrapper {
+      position: relative;
+      margin-right: 0;
+  }
+}
+
+

@@ -1,0 +1,178 @@
+<style>
+    .card {
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, .1), 0 1px 2px 0 rgba(0, 0, 0, .06);
+    }
+
+    .card {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        word-wrap: break-word;
+        background-color: #fff;
+        background-clip: border-box;
+        border: 0 solid rgba(0, 0, 0, .125);
+        border-radius: .25rem;
+    }
+
+    .card-body {
+        flex: 1 1 auto;
+        min-height: 1px;
+        padding: 1rem;
+    }
+
+    .card-title {
+        margin-bottom: 0.75rem;
+    }
+
+    .gutters-sm {
+        margin-right: -8px;
+        margin-left: -8px;
+    }
+
+    .gutters-sm>.col,
+    .gutters-sm>[class*=col-] {
+        padding-right: 8px;
+        padding-left: 8px;
+    }
+
+    .mb-3 {
+        margin-bottom: 1rem !important;
+    }
+
+    .rounded-circle {
+        border-radius: 50%!important;
+    }
+    .mt-3 {
+        margin-top: 1rem!important;
+    }
+    .text-secondary {
+        color: #6c757d!important;
+    }
+    p {
+        margin-top: 0;
+        margin-bottom: 1rem;
+    }
+</style>
+
+<div class="row gutters-sm">
+    <div class="col-lg-12">
+        <div class="panel">
+            <div class="panel-heading" style="border-bottom: 1px solid #eee;">
+                <div class="row">
+                    <div class="col-lg-6" 
+                        style="text-align: start;margin-top: 2px;font-size: large;">
+                        {{title}}
+                    </div>
+                    <div class="col-lg-6" style="text-align: end;">
+                        <button type="button" class="form-control input-sm"
+                            style="width: auto;float: right;margin-left: 5px;
+                            background: #337ab7;color: white;"
+                            id="download" (click)="subLookupBatch()">
+                            <span class="glyphicon glyphicon-cog"></span>
+                            Batch Action</button>
+                        <button type="button" class="form-control input-sm"
+                            style="width: auto;float: right;margin-left: 5px;
+                            background: #cb0f43;color: white;"
+                            data-toggle="modal" data-target="#lookupDatas"
+                            (click)="addLookupDatas()">
+                            <span class="glyphicon glyphicon-plus-sign"></span>
+                            Add Lookup</button>
+                        <button type="button" class="form-control input-sm"
+                            style="width: auto;float: right;margin-left: 5px;"
+                            (click)="fetchAllSubLookup()">
+                            <span id="loading" 
+                                class="glyphicon glyphicon-refresh"></span>
+                            Refresh</button>
+                    </div>
+                </div>
+            </div>
+            <div class="panel-body" *ngIf="parentLookupDate">
+                <div class="row" style="font-size: small;font-style: normal;">
+                    <div class="col-lg-3">
+                        <label for="html">LookupType</label><br>
+                        <label for="html">{{parentLookupDate?.lookupType}}</label><br>
+                    </div>
+                    <div class="col-lg-3">
+                        <label for="html">LookupValue</label><br>
+                        <label for="html">{{parentLookupDate?.lookupValue}}</label><br>
+                    </div>
+                    <div class="col-lg-4">
+                        <label for="html">Description</label><br>
+                        <label for="html">{{parentLookupDate?.description}}</label><br>
+                    </div>
+                    <div class="col-lg-2">
+                        <label for="html">DateCreated</label><br>
+                        <label for="html">{{parentLookupDate?.dateCreated | date: 'dd/MM/yyyy' }}</label><br>
+                    </div>
+                </div>                
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-12">
+        <div class="card mb-3">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-lg-12">
+                        <div class="form-group">
+                            <label for="searchSourceJobDetails" *ngIf="lookupDatas">
+                                Total Lookup ({{lookupDatas.length}})
+                            </label>
+                            <input type="text" id="searchSourceJobDetails" 
+                                class="form-control input-sm"
+                                style="width: 35%;" [(ngModel)]="searchLookup"
+                                placeholder="Search by any key" />
+                        </div>
+                    </div>
+                </div>
+                <table id="source-task-type" class="table table-responsive table table-striped
+                    table-bordered table-sm" style="font-size: 12px;">
+                    <thead>
+                        <tr>
+                            <th style="width: 4%;"># No</th>
+                            <th>Lookup Type</th>
+                            <th>Lookup Value</th>
+                            <th>Description</th>
+                            <th>Created Date</th>
+                            <th style="width: 6%;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr *ngFor="let lookupData of lookupDatas | searchFilter: searchLookup; let i = index">
+                            <td>{{lookupData.lookupId}}</td>
+                            <td>{{lookupData.lookupType}}</td>
+                            <td>{{lookupData.lookupValue}}</td>
+                            <td>{{lookupData.description}}</td>
+                            <td style="text-align: center;">
+                                {{lookupData.dateCreated | date: 'yyyy-MM-dd'}}
+                            </td>
+                            <td style="text-align: center;">
+                                <div class="btn-group btn-group-xs" role="group"
+                                    style="text-align: center">
+                                    <button type="button" class="btn btn-default"
+                                        data-toggle="modal" data-target="#lookupDatas"
+                                        (click)="editLookupData(lookupData)">
+                                        <span class="glyphicon glyphicon-edit"
+                                            style="color:blue"></span>
+                                    </button>
+                                    <button type="button" class="btn btn-default"
+                                        (click)="deleteLookupData(lookupData, i)"
+                                        data-toggle="modal" data-target="#sub-lookup">
+                                        <span class="glyphicon glyphicon-trash"
+                                            style="color: black;"></span>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- lookup detai -->
+<cu-lookup *ngIf="lookupAction"
+    [lookUpAction]="lookupAction"
+    [recivedLookupData]="lookupData"
+    (senderEvent) = "resetEvent($event)">
+</cu-lookup >

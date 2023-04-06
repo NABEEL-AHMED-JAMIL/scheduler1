@@ -4,24 +4,27 @@ import { NgxQrcodeStylingModule } from 'ngx-qrcode-styling';
 import { BrowserModule } from '@angular/platform-browser';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { ReactiveFormsModule, FormsModule  } from '@angular/forms';
-import { HttpClientModule } from '@angular/common/http';
+import { HttpClientModule, HTTP_INTERCEPTORS } from '@angular/common/http';
 import { appRoutingModule } from './app.routing';
 import { AppComponent } from './app.component';
+import { JwtInterceptor, ErrorInterceptor } from './_helpers';
 import { SearchFilterPipe } from './_helpers';
 import { SpinnerComponent } from '@/_modal';
-import { HomeComponent, LookupComponent, SourceTaskTypeComponent,
-    SettingComponent, XmlConfigurationComponent, JobComponent,
-    SourceJobComponent, SourceBatchActionComponent, SubLookupComponent,
-    QueueMessageComponent, TaskComponent, ViewLinkTaskComponent,
-    ViewLinkJobsComponent, SourceTaskComponent, JobHistoryActionComponent,
-    JobLogComponent, SearchEngineComponent
-} from './_component/index';
 import {
-    BarAnalyticComponent, CalendarAnalyticComponent,
-    GeoAnalyticComponent, HeatmapAnalyticComponent,
-    LineAnalyticComponent, MapAnalyticComponent,
-    PieAnalyticComponent, RadarAnalyticsComponent
-} from './gen-analytics/index'
+    LoginComponent,
+    RegisterComponent,
+    ForgotPassComponent,
+    ResetPassComponent,
+    NotFoundComponent,
+    BatchActionComponent,
+    SettingLayoutComponent,
+    ProfileComponent,
+    CULookupComponent,
+    LookupComponent,
+    SubLookupComponent,
+    XmlConfigurationComponent,
+    SearchEngineComponent
+} from './_component/index';
 import { ToastrModule } from 'ngx-toastr';
 
 @NgModule({
@@ -41,34 +44,32 @@ import { ToastrModule } from 'ngx-toastr';
     declarations: [
         AppComponent,
         SpinnerComponent,
-        HomeComponent,
-        SettingComponent,
+        LoginComponent,
+        RegisterComponent,
+        ForgotPassComponent,
+        ResetPassComponent,
+        NotFoundComponent,
+        BatchActionComponent,
+        SettingLayoutComponent,
+        ProfileComponent,
+        CULookupComponent,
         LookupComponent,
-        SourceTaskTypeComponent,
-        XmlConfigurationComponent,
-        SourceBatchActionComponent,
         SubLookupComponent,
-        QueueMessageComponent,
-        JobComponent,
-        SourceJobComponent,
-        TaskComponent,
-        ViewLinkTaskComponent,
-        ViewLinkJobsComponent,
-        SourceTaskComponent,
+        XmlConfigurationComponent,
         SearchFilterPipe,
-        JobHistoryActionComponent,
-        JobLogComponent,
-        SearchEngineComponent,
-        BarAnalyticComponent,
-        CalendarAnalyticComponent,
-        GeoAnalyticComponent,
-        HeatmapAnalyticComponent,
-        LineAnalyticComponent,
-        MapAnalyticComponent,
-        PieAnalyticComponent,
-        RadarAnalyticsComponent
+        SearchEngineComponent
     ],
     providers: [
+        { 
+            provide: HTTP_INTERCEPTORS,
+            useClass: JwtInterceptor,
+            multi: true
+        },
+        { 
+            provide: HTTP_INTERCEPTORS,
+            useClass: ErrorInterceptor,
+            multi: true
+        },
     ],
     bootstrap: [AppComponent]
 })

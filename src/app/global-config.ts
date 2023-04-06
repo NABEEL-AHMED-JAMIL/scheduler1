@@ -1,7 +1,3 @@
-export const GlobalConfig = {
-    defaultTimeZone: '(GMT-05:00) America/New_York'
-};
-
 export const PRIORITY = [ 1,2,3,4,5,6,7,8,9,99,100 ];
 
 export const Execution = [ 'Auto','Manual' ];

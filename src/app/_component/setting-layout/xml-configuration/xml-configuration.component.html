@@ -1,0 +1,85 @@
+<div class="panel">
+    <div class="panel-heading" style="font-size: 17px;padding-bottom: 0px;">
+        <div class="row">
+            <div class="col-lg-6" 
+				style="text-align: start;
+				margin-top: 5px;">
+                Xml Configuration
+            </div>
+			<div class="col-lg-6">
+				<button type="button" class="btn btn-sm btn-default" 
+					style="float: right;margin-right: 4px;"
+					title="Add More"
+					(click)="tageFormsAddItem()">
+					<span class="glyphicon glyphicon-plus-sign"></span> Add More
+				</button>
+			</div>
+        </div>
+    </div>
+    <div class="panel-body" style="padding-bottom: 10px;">
+		<form [formGroup]="xmlForm" (ngSubmit)="submintTageForms(xmlForm.value)" 
+			#uploadDocumentsForm="ngForm" ngNativeValidate>
+			<div class="row">
+				<div class="col-md-8">
+					<div id="main-form-content" formArrayName="tagsInfo">
+						<table id="tbl-upload" class="table">
+							<tbody>
+								<tr>
+									<th>#</th>
+									<th>TagKey</th>
+									<th>TagParent</th>
+									<th>TagValue</th>
+									<th>Action</th>
+								</tr>
+								<tr *ngFor="let tag of xmlForm.get('tagsInfo')['controls']; 
+									let i = index;" [formGroup]="tag">
+									<td><b>{{i}}</b></td>
+									<td>
+										<input type="text" class="form-control input-sm" name="tagKey"
+											formControlName="tagKey" placeholder="Enter Tag Key">
+									</td>
+									<td>
+										<input type="text" class="form-control input-sm" name="tagParent"
+											formControlName="tagParent" placeholder="Parent Tag If Any">
+									</td>
+									<td>
+										<input type="text" class="form-control input-sm" name="tagValue"
+											formControlName="tagValue" placeholder="Enter Tag Value">
+									</td>
+									<td style="text-align: center;">
+										<button type="button" class="button button5"
+											(click)="tageFormAddItem(i)">+</button>
+										&nbsp;
+										<button type="button" class="button button5"
+											(click)="tageFormRemoveItem(i)">-</button>
+									</td>
+								</tr>
+							</tbody>
+						</table>
+					</div>
+				</div>
+				<div class="col-md-4">
+					<textarea class="form-control input-sm" rows="14" 
+						style="font-size:12px;font-family:monospace;
+							white-space:pre;height: auto;
+							border-color: #ddd;background-color: #ddd;">
+							{{xmlString}}
+					</textarea>
+					<div class="row">
+						<div class="col-md-6">
+							<input type="submit" class="form-control input-sm"
+								style="background: black;color: white;margin-top: 10px;"
+								value="Show Output" [disabled]="xmlForm?.invalid">
+						</div>
+						<div class="col-md-6">
+							<button class="form-control input-sm"
+								style="background: #4750b6;color: white;margin-top: 10px;"
+								(click)="createFile()" [disabled]="xmlForm?.invalid">
+								Downalod XML File</button>
+						</div>
+					</div>
+				</div>
+			</div>
+		</form>
+	</div>
+</div>

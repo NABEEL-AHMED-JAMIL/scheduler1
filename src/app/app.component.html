@@ -1,4 +1,4 @@
-﻿﻿<nav class="navbar navbar-inverse" style="border-radius: 0px;margin-bottom: 0px;" >
+﻿﻿<nav class="navbar navbar-inverse" style="border-radius: 0px;margin-bottom: 0px;" *ngIf="currentUser">
   <div class="container-fluid">
     <div class="navbar-header">
       <a class="navbar-brand" routerLink="/home">ETL 2023</a>
@@ -24,18 +24,52 @@
           <li><a routerLink="/taskList">Task List</a></li>
         </ul>
       </li>
+    </ul>
+    <ul class="nav navbar-nav navbar-right">
+      <li style="margin-right: 10px;" *ngIf="hasAccess(['ROLE_MASTER_ADMIN'])">
+        <select class="form-control input-sm" style="margin-top: 10px;">
+          <option>(GMT-5:00) America/New_York</option>
+          <option>(GMT+5:00) Asia/Karachi</option>
+          <option>(GMT-05:00) America/New_York</option>
+          <option>(GMT-5:00) America/New_York</option>
+        </select>
+      </li>
       <li class="dropdown">
         <a href="#" class="dropdown-toggle" data-toggle="dropdown"
           role="button" aria-haspopup="true" aria-expanded="false">
-          Setting<span class="caret"></span>
+          <span class="glyphicon glyphicon-user"></span> Profile<span class="caret"></span>
         </a>
         <ul class="dropdown-menu">
-          <li><a routerLink="/setting">Lookup</a></li>
-          <li><a routerLink="/setting/searchEngine">Q-Result</a></li>
-          <!-- <li><a routerLink="/setting/lookpXml">Lookp XmlConfig</a></li> -->
-          <li><a routerLink="/setting/queueMessage">Q-Message</a></li>
+          <li>
+            <a routerLink="/profile">
+              My Profile
+            </a>
+          </li>
+          <li>
+            <a routerLink="/profile/lookup" 
+              *ngIf="hasAccess(['ROLE_ADMIN', 'ROLE_MASTER_ADMIN'])">
+              Lookup Data</a>
+          </li>
+          <li>
+            <a routerLink="/profile/sourcetask"
+              *ngIf="hasAccess(['ROLE_ADMIN', 'ROLE_MASTER_ADMIN'])">
+              SourceTask</a>
+          </li>
+          <!-- for queueu logs each user have there access -->
+          <li><a routerLink="/profile/queuemessage">Queue Logs</a></li>
+          <li>
+            <a routerLink="/profile/searchengine"
+              *ngIf="hasAccess(['ROLE_MASTER_ADMIN', 'ROLE_ADMIN'])">
+              Query Result</a>
+          </li>
+          <li>
+            <a routerLink="/profile/xml-config"
+              *ngIf="hasAccess(['ROLE_ADMIN', 'ROLE_MASTER_ADMIN'])">
+              Xml Config</a>
+          </li>
         </ul>
       </li>
+      <li><a (click)="logout()">Logout</a></li>
     </ul>
   </div>
 </nav>
