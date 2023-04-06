@@ -11,7 +11,7 @@ import { ApiCode } from '@/_models'
     templateUrl: 'forgot-pass.component.html'
 })
 export class ForgotPassComponent implements OnInit {
-
+ 
     public forgotForm: FormGroup;
     public loading = false;
     public submitted = false;
