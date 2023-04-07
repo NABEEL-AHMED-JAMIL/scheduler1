@@ -9,6 +9,7 @@ import {
     SettingLayoutComponent,
     LookupComponent,
     ProfileComponent,
+    TaskTypeSettingComponent,
     XmlConfigurationComponent,
     SearchEngineComponent,
     SubLookupComponent
@@ -88,18 +89,18 @@ const routes: Routes = [
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
                 }
             },
-            // { 
-            //     path: 'sourcetask',
-            //     component: SettingComponent,
-            //     canActivate: [AuthGuard],
-            //     data:  {
-            //         breadcrumb: 'Sourcetask',
-            //         role: [
-            //             'ROLE_MASTER_ADMIN',
-            //             'ROLE_ADMIN'
-            //         ]
-            //     }
-            // },
+            { 
+                path: 'sourcetask',
+                component: TaskTypeSettingComponent,
+                canActivate: [AuthGuard],
+                data:  {
+                    breadcrumb: 'Sourcetask',
+                    role: [
+                        'ROLE_MASTER_ADMIN',
+                        'ROLE_ADMIN'
+                    ]
+                }
+            },
             { 
                 path: 'searchengine',
                 component: SearchEngineComponent,

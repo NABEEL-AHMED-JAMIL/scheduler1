@@ -1,8 +1,8 @@
 import { Component, OnInit } from '@angular/core';
-import { Breadcrumb } from '../../_models/index';
+import { Breadcrumb } from '@/_models/index';
 import { Location } from '@angular/common';
 import { Observable } from 'rxjs';
-import { BreadcrumbService } from '@/_helpers/breadcrumb.service';
+import { BreadcrumbService } from '@/_helpers';
 
 
 @Component({

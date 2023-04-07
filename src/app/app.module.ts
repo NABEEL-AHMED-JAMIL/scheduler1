@@ -23,7 +23,13 @@ import {
     LookupComponent,
     SubLookupComponent,
     XmlConfigurationComponent,
-    SearchEngineComponent
+    SearchEngineComponent,
+    TaskTypeSettingComponent,
+    TaskHeaderComponent,
+    TaskTypeListComponent,
+    TaskFormListComponent,
+    TaskSectionListComponent,
+    TaskControlListComponent
 } from './_component/index';
 import { ToastrModule } from 'ngx-toastr';
 
@@ -55,6 +61,12 @@ import { ToastrModule } from 'ngx-toastr';
         CULookupComponent,
         LookupComponent,
         SubLookupComponent,
+        TaskTypeSettingComponent,
+        TaskHeaderComponent,
+        TaskTypeListComponent,
+        TaskFormListComponent,
+        TaskSectionListComponent,
+        TaskControlListComponent,
         XmlConfigurationComponent,
         SearchFilterPipe,
         SearchEngineComponent

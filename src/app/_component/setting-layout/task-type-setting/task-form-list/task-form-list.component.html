@@ -1,0 +1,81 @@
+<div class="form-group">
+    <label for="searchSourceJobDetails" *ngIf="lookupDatas">
+        Total Lookup ({{lookupDatas.length}})
+    </label>
+    <input type="text" id="searchSourceJobDetails" class="form-control input-sm"
+        style="width: 35%;" [(ngModel)]="searchLookup" placeholder="Search by any key" />
+</div>
+<table id="source-task-type" class="table table-responsive table
+    table-striped table-bordered table-sm" style="font-size: 12px;">
+    <thead>
+        <tr>
+            <th style="width: 4%;"># No</th>
+            <th>Form Name</th>
+            <!-- <th>Description</th> -->
+            <th>Created Date</th>
+            <th>Total STT</th>
+            <th>Total Section</th>
+            <th>Total Control</th>
+            <th>Status</th>
+            <th style="width: 12%;">Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr *ngFor="let sstForm of sstForms">
+            <td>
+                {{sstForm.formId}}
+            </td>
+            <td>
+                {{sstForm.formName}}
+            </td>
+            <!-- <td>
+                {{sstForm.description}}
+            </td> -->
+            <td style="text-align: center;">
+                {{sstForm.dateCreated}}
+            </td>
+            <td style="text-align: center;">
+                {{sstForm.totalStt}}
+            </td>
+            <td style="text-align: center;">
+                {{sstForm.totalSection}}
+            </td>
+            <td style="text-align: center;">
+                {{sstForm.totalControl}}
+            </td>
+            <td style="text-align: center;">
+                <span class="badge"
+                    [ngClass]="{
+                        'badge-danger': sstForm.status === 'Delete', 
+                        'badge-info' : sstForm.status === 'Inactive',
+                        'badge-success' : sstForm.status === 'Active'
+                    }">{{sstForm.status}}</span>
+            </td>
+            <td style="text-align: center;">
+                <div class="btn-group btn-group-xs" 
+                    role="group" style="text-align: center">
+                    <button type="button" class="btn btn-default"
+                        data-toggle="modal" data-target="#sourceTaskTaype">
+                        <span class="glyphicon glyphicon-edit"
+                            style="color:blue"></span>
+                    </button>
+                    <!-- download source tasktype -->
+                    <button type="button" class="btn btn-default">
+                        <span class="glyphicon glyphicon-download"
+                            style="color:#17a2b8">
+                        </span>
+                    </button>
+                    <!-- add the method for delete the queue detail -->
+                    <button type="button" class="btn btn-default">
+                        <span class="glyphicon glyphicon-trash"
+                            style="color: #dc3545;"></span>
+                    </button>
+                    <button type="button" class="btn btn-default">
+                        <span class="glyphicon glyphicon-cog"
+                            style="color: black;"></span>
+                    </button>
+                </div>
+            </td>
+        </tr>
+    </tbody>
+</table>

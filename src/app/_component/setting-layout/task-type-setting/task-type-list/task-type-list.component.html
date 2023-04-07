@@ -1,0 +1,97 @@
+<div class="form-group">
+    <label for="searchSourceJobDetails" *ngIf="lookupDatas">
+        Total TaskType ({{lookupDatas.length}})
+    </label>
+    <input type="text" id="searchSourceJobDetails" class="form-control input-sm"
+        style="width: 35%;" [(ngModel)]="searchLookup" placeholder="Search by any key" />
+</div>
+<table id="source-task-type"
+    class="table table-responsive table
+        table-striped table-bordered table-sm"
+        style="font-size: 12px;">
+    <thead>
+        <tr>
+            <th style="width: 4%;">-</th>
+            <th style="width: 4%;"># No</th>
+            <th>Service Name</th>
+            <!-- <th>Description</th> -->
+            <th>Created Date</th>
+            <th>Total User</th>
+            <th>Total Task</th>
+            <th>Total Form</th>
+            <th>Type</th>
+            <th>Status</th>
+            <th style="width: 12%;">Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr *ngFor="let sourceTaskType of sourceTaskTypes">
+            <td style="text-align: center;">
+                <div class="Yf">
+                    <div [ngClass]="sourceTaskType.isdefult ? 'Yg_no': 'Yg_yes'"></div>
+                </div>
+            </td>
+            <td>
+                {{sourceTaskType.sourceTaskTypeId}}
+            </td>
+            <td>
+                {{sourceTaskType.serviceName}}
+            </td>
+            <!-- <td>
+                {{sourceTaskType.description}}
+            </td> -->
+            <td style="text-align: center;">
+                {{sourceTaskType.dateCreated}}
+            </td>
+            <td style="text-align: center;">
+                {{sourceTaskType.totalUser}}
+            </td>
+            <td style="text-align: center;">
+                {{sourceTaskType.totalTask}}
+            </td>
+            <td style="text-align: center;">
+                {{sourceTaskType.totalForm}}
+            </td>
+            <td style="text-align: center;">
+                <span class="badge"
+                    [ngClass]="{
+                        'badge-aws': sourceTaskType.sttType === 'Aws', 
+                        'badge-kafka' : sourceTaskType.sttType === 'Kafka'
+                    }">{{sourceTaskType.sttType}}</span>
+            </td>
+            <td style="text-align: center;">
+                <span class="badge"
+                    [ngClass]="{
+                        'badge-danger': sourceTaskType.status === 'Delete', 
+                        'badge-info' : sourceTaskType.status === 'Inactive',
+                        'badge-success' : sourceTaskType.status === 'Active'
+                    }">{{sourceTaskType.status}}</span>
+            </td>
+            <td style="text-align: center;">
+                <div class="btn-group btn-group-xs" 
+                    role="group" style="text-align: center">
+                    <button type="button" class="btn btn-default"
+                        data-toggle="modal" data-target="#sourceTaskTaype">
+                        <span class="glyphicon glyphicon-edit"
+                            style="color:blue"></span>
+                    </button>
+                    <!-- download source tasktype -->
+                    <button type="button" class="btn btn-default">
+                        <span class="glyphicon glyphicon-download"
+                            style="color:#17a2b8">
+                        </span>
+                    </button>
+                    <!-- add the method for delete the queue detail -->
+                    <button type="button" class="btn btn-default">
+                        <span class="glyphicon glyphicon-trash"
+                            style="color: #dc3545;"></span>
+                    </button>
+                    <button type="button" class="btn btn-default">
+                        <span class="glyphicon glyphicon-cog"
+                        style="color: black;"></span>
+                    </button>
+                </div>
+            </td>
+        </tr>
+    </tbody>
+</table>

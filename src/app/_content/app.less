@@ -474,6 +474,16 @@ td {
   pointer-events: none;
 }
 
+.table>tbody>tr>td, 
+.table>tbody>tr>th,
+.table>tfoot>tr>td,
+.table>tfoot>tr>th,
+.table>thead>tr>td,
+.table>thead>tr>th {
+  padding: 4px;
+  line-height: 1.42857143;
+}
+
 #loading {
   display: inline-block;
   animation: rotation 2s infinite linear;
@@ -544,6 +554,26 @@ td {
   color: white;
 }
 
+.badge-no  {
+  color: #f50000;
+  background-color: #fff;
+}
+
+.badge-yes  {
+  color: orange;
+  background-color: #fff;
+}
+
+.badge-kafka  {
+  color: #fff;
+  background-color: #008063;
+}
+
+.badge-aws  {
+  color: #fff;
+  background-color: #a94442;
+}
+
 .badge-warning  {
   color: #fff;
   background-color: #dc3545;
@@ -592,6 +622,29 @@ td {
 .view-side-form {
   position: absolute;
   z-index: 100;
+}
+
+.Yf {
+  align-self: center;
+  display: inline-block;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+.Yg_no {
+  border: none;
+    border-radius: 50%;
+  background-color: red;
+  height: 12px;
+  width: 12px;
+}
+
+.Yg_yes {
+  border: none;
+    border-radius: 50%;
+  background-color: green;
+  height: 12px;
+  width: 12px;
 }
 
 /* MODAL STYLES

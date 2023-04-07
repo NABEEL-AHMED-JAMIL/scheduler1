@@ -14,4 +14,10 @@ export * from './setting-layout/search-engine/search-engine.component';
 export * from './setting-layout/lookup-setting/lookup/lookup.component';
 export * from './setting-layout/lookup-setting/sub-lookup/sub-lookup.component';
 export * from './setting-layout/lookup-setting/cu-lookup/cu-lookup.component';
-//
+// task-type
+export * from './setting-layout/task-type-setting/task-type-setting.component';
+export * from './setting-layout/task-type-setting/task-header/task-header.component';
+export * from './setting-layout/task-type-setting/task-type-list/task-type-list.component';
+export * from './setting-layout/task-type-setting/task-form-list/task-form-list.component';
+export * from './setting-layout/task-type-setting/task-section-list/task-section-list.component';
+export * from './setting-layout/task-type-setting/task-control-list/task-control-list.component';

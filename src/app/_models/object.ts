@@ -290,3 +290,61 @@ export enum LOOKUP_TYPES {
   SCHEDULER_TIMEZONE = 'SCHEDULER_TIMEZONE',
   SUPER_ADMIN = 'SUPER_ADMIN'
 }
+
+export interface TaskTypeSidebar {
+  title: any;
+  router: any;
+  active: any,
+  type: any;
+}
+
+export interface STTList {
+  sourceTaskTypeId: any;
+  serviceName: any;
+  description: any;
+  dateCreated: any;
+  status: any;
+  sttType: any;
+  totalTask: any;
+  totalUser: any;
+  totalForm: any;    
+  isdefult: any;
+}
+
+export interface SttFormList {
+  formId: any;
+  formName: any;
+  description: any;
+  dateCreated: any;
+  status: any;
+  totalStt?: any;
+  totalSection: any;
+  totalControl: any;
+}
+
+export interface STTSectionList {
+  sectionId: any;
+  sectionName: any;
+  description: any;
+  dateCreated: any;
+  status: any;
+  sectionOrder: any;
+  totalStt: any;
+  totalForm: any;
+  totalControl: any;
+}
+
+export interface STTControlList {
+  controlId: any;
+  controlOrder: any;
+  controlName: any;
+  filedName: any;
+  filedType: any;
+  description: any;
+  mandatory: any;
+  status: any;
+  dateCreated: any;
+  totalStt: any;
+  totalSection: any;
+  totalForm: any;
+}

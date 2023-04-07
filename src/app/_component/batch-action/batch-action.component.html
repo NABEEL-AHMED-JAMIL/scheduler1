@@ -71,17 +71,20 @@
                             application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                             style="display: none;"
                             #inputUpload (change)="uploadBulkData($event.target.files[0])" hidden>
-                        <button type="button" class="btn btn-sm btn-default" (click)="inputUpload.click()">
+                        <button type="button" class="btn btn-sm btn-default"
+                            (click)="inputUpload.click()">
                             <span class="glyphicon glyphicon-upload"></span> Upload
                         </button>
                         &nbsp;
                         <button type="button" class="btn btn-sm btn-default"
-                            (click)="downloadData()">
+                            (click)="downloadData()"
+                            style="background: #cb0f43;color: white;">
                             <span class="glyphicon glyphicon-download"></span> Downalod
                         </button>
                         &nbsp;
                         <button type="button" class="btn btn-sm btn-default"
-                            (click)="downloadTemplate()">
+                            (click)="downloadTemplate()"
+                            style="background: #337ab7;color: white;">
                             <span class="glyphicon glyphicon-download"></span> Template
                         </button>
                     </div>

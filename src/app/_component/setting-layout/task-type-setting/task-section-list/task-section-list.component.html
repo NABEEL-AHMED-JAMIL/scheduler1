@@ -1,0 +1,86 @@
+<div class="form-group">
+    <label for="searchSourceJobDetails" *ngIf="lookupDatas">
+        Total Section ({{lookupDatas.length}})
+    </label>
+    <input type="text" id="searchSourceJobDetails" class="form-control input-sm"
+        style="width: 35%;" [(ngModel)]="searchLookup" placeholder="Search by any key" />
+</div>
+<table id="source-task-type" class="table table-responsive table
+    table-striped table-bordered table-sm" style="font-size: 12px;">
+    <thead>
+        <tr>
+            <th style="width: 4%;"># No</th>
+            <th>Order</th>
+            <th>Section Name</th>
+            <!-- <th>Description</th> -->
+            <th>Created Date</th>
+            <th>Total Form</th>
+            <th>Total STT</th>
+            <th>Total Control</th>
+            <th>Status</th>
+            <th style="width: 12%;">Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr *ngFor="let sttSection of sttSections">
+            <td>
+                {{sttSection.sectionId}}
+            </td>
+            <td style="text-align: center;">
+                {{sttSection.sectionOrder}}
+            </td>
+            <td>
+                {{sttSection.sectionName}}
+            </td>
+            <!-- <td>
+                {{sttSection.description}}
+            </td> -->
+            <td style="text-align: center;">
+                {{sttSection.dateCreated}}
+            </td>
+            <td style="text-align: center;">
+                {{sttSection.totalForm}}
+            </td>
+            <td style="text-align: center;">
+                {{sttSection.totalStt}}
+            </td>
+            <td style="text-align: center;">
+                {{sttSection.totalControl}}
+            </td>
+            <td style="text-align: center;">
+                <span class="badge"
+                    [ngClass]="{
+                        'badge-danger': sttSection.status === 'Delete', 
+                        'badge-info' : sttSection.status === 'Inactive',
+                        'badge-success' : sttSection.status === 'Active'
+                    }">{{sttSection.status}}</span>
+            </td>
+            <td style="text-align: center;">
+                <div class="btn-group btn-group-xs" 
+                    role="group" style="text-align: center">
+                    <button type="button" class="btn btn-default"
+                        data-toggle="modal" data-target="#sourceTaskTaype">
+                        <span class="glyphicon glyphicon-edit"
+                            style="color:blue"></span>
+                    </button>
+                    <!-- download source tasktype -->
+                    <button type="button" class="btn btn-default">
+                        <span class="glyphicon glyphicon-download"
+                            style="color:#17a2b8">
+                    </span>
+                    </button>
+                    <!-- add the method for delete the queue detail -->
+                    <button type="button" class="btn btn-default">
+                        <span class="glyphicon glyphicon-trash"
+                            style="color: #dc3545;"></span>
+                    </button>
+                    <button type="button" class="btn btn-default">
+                        <span class="glyphicon glyphicon-cog"
+                            style="color: black;"></span>
+                    </button>
+                </div>
+            </td>
+        </tr>
+    </tbody>
+
+</table>
