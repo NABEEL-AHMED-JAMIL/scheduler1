@@ -37,12 +37,7 @@ export class TaskTypeSettingComponent implements OnInit {
     ];
 
     constructor() {
-        if (localStorage.getItem('selectedMenu')) {
-            this.selectedMenu = JSON.parse(localStorage.getItem('selectedMenu'));
-        } else {
-            this.selectedMenu = this.sttSidebar[0];
-            localStorage.setItem('selectedMenu', JSON.stringify(this.selectedMenu));
-        }
+        this.selectedMenu = this.sttSidebar[0];
     }
 
     ngOnInit() {
@@ -56,7 +51,6 @@ export class TaskTypeSettingComponent implements OnInit {
         changeTask.active = true;
         this.sttSidebar[index] = changeTask;
         this.selectedMenu = this.sttSidebar[index];
-        localStorage.setItem('selectedMenu', JSON.stringify(this.selectedMenu));
     }
 
 }

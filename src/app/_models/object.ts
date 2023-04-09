@@ -307,7 +307,7 @@ export interface STTList {
   sttType: any;
   totalTask: any;
   totalUser: any;
-  totalForm: any;    
+  totalForm: any;
   isdefult: any;
 }
 
@@ -320,6 +320,7 @@ export interface SttFormList {
   totalStt?: any;
   totalSection: any;
   totalControl: any;
+  isdefult?: any;
 }
 
 export interface STTSectionList {
@@ -332,6 +333,7 @@ export interface STTSectionList {
   totalStt: any;
   totalForm: any;
   totalControl: any;
+  isdefult?: any;
 }
 
 export interface STTControlList {
@@ -343,6 +345,7 @@ export interface STTControlList {
   description: any;
   mandatory: any;
   status: any;
+  isdefult?: any;
   dateCreated: any;
   totalStt: any;
   totalSection: any;

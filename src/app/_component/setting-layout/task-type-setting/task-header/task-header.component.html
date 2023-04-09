@@ -1,15 +1,15 @@
 <div class="row">
     <div class="col-lg-8">
         <h5 class="card-title" style="font-size: large;">
-            Form Control
+            {{selectedMenu.title}}
         </h5>
     </div>
     <div class="col-lg-4" style="margin-top: 5px;">
         <button id="download" type="button"
             class="form-control input-sm"
             style="width: auto;float: right;margin-left: 5px;
-                background: #337ab7;color: white;" 
-                routerLink="/profile/lookup/lookupBatch">
+                background: #4750b6;color: white;" 
+                [routerLink]="selectedMenu.router">
             <span class="glyphicon glyphicon-cog"></span>
             Batch Action
         </button>
@@ -19,7 +19,7 @@
             data-toggle="modal" data-target="#lookupDatas"
             (click)="addLookupDatas()">
             <span class="glyphicon glyphicon-plus-sign"></span>
-            Add Lookup
+            {{selectedMenu.title}}
         </button>
         <button type="button"
             class="form-control input-sm"

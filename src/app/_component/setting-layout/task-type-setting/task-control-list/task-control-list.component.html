@@ -11,8 +11,11 @@
     <label for="searchSourceJobDetails" *ngIf="lookupDatas">
         Total Lookup ({{lookupDatas.length}})
     </label>
-    <input type="text" id="searchSourceJobDetails" class="form-control input-sm" style="width: 35%;"
-        [(ngModel)]="searchLookup" placeholder="Search by any key" />
+    <input type="text" id="searchLookup" 
+        class="form-control input-sm"
+        style="width: 35%;"
+        [(ngModel)]="searchLookup"
+        placeholder="Search by any key" />
 </div>
 <div class="table-wrapper">
     <table id="source-task-type" class="table table-responsive table
@@ -25,20 +28,24 @@
             <th>Control Name</th>
             <th>Filed Name</th>
             <th>Filed Type</th>
-            <!-- <th>Description</th> -->
+            <th>Required</th>
             <th>Created Date</th>
             <th>Total STT</th>
             <th>Total Form</th>
             <th>Total Section</th>
-            <th>Status</th>
-            <th style="width: 12%;">Action</th>
+            <!-- <th>Status</th> -->
+            <th style="width: 9%;">Action</th>
         </tr>
     </thead>
     <tbody>
-        <tr *ngFor="let sttControl of sttControls">
+        <tr *ngFor="let sttControl of sttControls | searchFilter: searchLookup; let i = index">
             <td style="text-align: center;">
                 <div class="Yf">
-                    <div [ngClass]="sttControl.mandatory ? 'Yg_no': 'Yg_yes'"></div>
+                    <div [ngClass]="{
+                        'Yg_delete': sttControl.status === 'Delete', 
+                        'Yg_inactive' : sttControl.status === 'Inactive',
+                        'Yg_active' : sttControl.status === 'Active'
+                    }"></div>
                 </div>
             </td>
             <td>
@@ -56,9 +63,9 @@
             <td style="text-align: center;">
                 {{sttControl.filedType | uppercase}}
             </td>
-            <!-- <td>
-                {{sttControl.description}}
-            </td> -->
+            <td style="text-align: center;">
+                {{sttControl.mandatory ? 'Yes': 'No'}}
+            </td>
             <td style="text-align: center;">
                 {{sttControl.dateCreated}}
             </td>
@@ -71,13 +78,13 @@
             <td style="text-align: center;">
                 {{sttControl.totalSection}}
             </td>
-            <td style="text-align: center;">
+            <!-- <td style="text-align: center;">
                 <span class="badge" [ngClass]="{
                     'badge-danger': sttControl.status === 'Delete', 
                     'badge-info' : sttControl.status === 'Inactive',
                     'badge-success' : sttControl.status === 'Active'
                 }">{{sttControl.status}}</span>
-            </td>
+            </td> -->
             <td style="text-align: center;">
                 <div class="btn-group btn-group-xs" role="group" style="text-align: center">
                     <button type="button" class="btn btn-default" data-toggle="modal" data-target="#sourceTaskTaype">
@@ -92,9 +99,9 @@
                     <button type="button" class="btn btn-default">
                         <span class="glyphicon glyphicon-trash" style="color: #dc3545;"></span>
                     </button>
-                    <button type="button" class="btn btn-default">
+                    <!-- <button type="button" class="btn btn-default">
                         <span class="glyphicon glyphicon-cog" style="color: black;"></span>
-                    </button>
+                    </button> -->
                 </div>
             </td>
         </tr>

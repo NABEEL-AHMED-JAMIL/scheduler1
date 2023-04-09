@@ -2,13 +2,17 @@
     <label for="searchSourceJobDetails" *ngIf="lookupDatas">
         Total Section ({{lookupDatas.length}})
     </label>
-    <input type="text" id="searchSourceJobDetails" class="form-control input-sm"
-        style="width: 35%;" [(ngModel)]="searchLookup" placeholder="Search by any key" />
+    <input type="text" id="searchLookup" 
+        class="form-control input-sm"
+        style="width: 35%;"
+        [(ngModel)]="searchLookup"
+        placeholder="Search by any key" />
 </div>
 <table id="source-task-type" class="table table-responsive table
     table-striped table-bordered table-sm" style="font-size: 12px;">
     <thead>
         <tr>
+            <th style="width: 4%;">-</th>
             <th style="width: 4%;"># No</th>
             <th>Order</th>
             <th>Section Name</th>
@@ -17,12 +21,21 @@
             <th>Total Form</th>
             <th>Total STT</th>
             <th>Total Control</th>
-            <th>Status</th>
+            <!-- <th>Status</th> -->
             <th style="width: 12%;">Action</th>
         </tr>
     </thead>
     <tbody>
-        <tr *ngFor="let sttSection of sttSections">
+        <tr *ngFor="let sttSection of sttSections | searchFilter: searchLookup; let i = index">
+            <td style="text-align: center;">
+                <div class="Yf">
+                    <div [ngClass]="{
+                        'Yg_delete': sttSection.status === 'Delete', 
+                        'Yg_inactive' : sttSection.status === 'Inactive',
+                        'Yg_active' : sttSection.status === 'Active'
+                    }"></div>
+                </div>
+            </td>
             <td>
                 {{sttSection.sectionId}}
             </td>
@@ -47,14 +60,14 @@
             <td style="text-align: center;">
                 {{sttSection.totalControl}}
             </td>
-            <td style="text-align: center;">
+            <!-- <td style="text-align: center;">
                 <span class="badge"
                     [ngClass]="{
                         'badge-danger': sttSection.status === 'Delete', 
                         'badge-info' : sttSection.status === 'Inactive',
                         'badge-success' : sttSection.status === 'Active'
                     }">{{sttSection.status}}</span>
-            </td>
+            </td> -->
             <td style="text-align: center;">
                 <div class="btn-group btn-group-xs" 
                     role="group" style="text-align: center">

@@ -2,13 +2,17 @@
     <label for="searchSourceJobDetails" *ngIf="lookupDatas">
         Total Lookup ({{lookupDatas.length}})
     </label>
-    <input type="text" id="searchSourceJobDetails" class="form-control input-sm"
-        style="width: 35%;" [(ngModel)]="searchLookup" placeholder="Search by any key" />
+    <input type="text" id="searchLookup"
+        class="form-control input-sm"
+        style="width: 35%;"
+        [(ngModel)]="searchLookup"
+        placeholder="Search by any key" />
 </div>
 <table id="source-task-type" class="table table-responsive table
     table-striped table-bordered table-sm" style="font-size: 12px;">
     <thead>
         <tr>
+            <th style="width: 4%;">-</th>
             <th style="width: 4%;"># No</th>
             <th>Form Name</th>
             <!-- <th>Description</th> -->
@@ -16,12 +20,21 @@
             <th>Total STT</th>
             <th>Total Section</th>
             <th>Total Control</th>
-            <th>Status</th>
-            <th style="width: 12%;">Action</th>
+            <!-- <th>Status</th> -->
+            <th style="width: 14%;">Action</th>
         </tr>
     </thead>
     <tbody>
-        <tr *ngFor="let sstForm of sstForms">
+        <tr *ngFor="let sstForm of sstForms | searchFilter: searchLookup; let i = index">
+            <td style="text-align: center;">
+                <div class="Yf">
+                    <div [ngClass]="{
+                        'Yg_delete': sstForm.status === 'Delete', 
+                        'Yg_inactive' : sstForm.status === 'Inactive',
+                        'Yg_active' : sstForm.status === 'Active'
+                    }"></div>
+                </div>
+            </td>
             <td>
                 {{sstForm.formId}}
             </td>
@@ -43,14 +56,14 @@
             <td style="text-align: center;">
                 {{sstForm.totalControl}}
             </td>
-            <td style="text-align: center;">
+            <!-- <td style="text-align: center;">
                 <span class="badge"
                     [ngClass]="{
                         'badge-danger': sstForm.status === 'Delete', 
                         'badge-info' : sstForm.status === 'Inactive',
                         'badge-success' : sstForm.status === 'Active'
                     }">{{sstForm.status}}</span>
-            </td>
+            </td> -->
             <td style="text-align: center;">
                 <div class="btn-group btn-group-xs" 
                     role="group" style="text-align: center">
@@ -58,6 +71,11 @@
                         data-toggle="modal" data-target="#sourceTaskTaype">
                         <span class="glyphicon glyphicon-edit"
                             style="color:blue"></span>
+                    </button>
+                    <button type="button" class="btn btn-default"
+                        data-toggle="modal" data-target="#sourceTaskTaype">
+                        <span class="glyphicon glyphicon-eye-open"
+                            style="color:#008063"></span>
                     </button>
                     <!-- download source tasktype -->
                     <button type="button" class="btn btn-default">

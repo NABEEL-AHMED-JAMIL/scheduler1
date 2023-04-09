@@ -12,6 +12,7 @@ export class TaskHeaderComponent implements OnInit {
     public selectedMenu: TaskTypeSidebar;
 
     constructor() {
+        console.log(this.selectedMenu);
     }
 
     ngOnInit() {

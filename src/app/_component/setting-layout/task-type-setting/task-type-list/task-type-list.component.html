@@ -2,8 +2,11 @@
     <label for="searchSourceJobDetails" *ngIf="lookupDatas">
         Total TaskType ({{lookupDatas.length}})
     </label>
-    <input type="text" id="searchSourceJobDetails" class="form-control input-sm"
-        style="width: 35%;" [(ngModel)]="searchLookup" placeholder="Search by any key" />
+    <input type="text" id="searchLookup"
+        class="form-control input-sm"
+        style="width: 35%;" 
+        [(ngModel)]="searchLookup"
+        placeholder="Search by any key" />
 </div>
 <table id="source-task-type"
     class="table table-responsive table
@@ -14,21 +17,26 @@
             <th style="width: 4%;">-</th>
             <th style="width: 4%;"># No</th>
             <th>Service Name</th>
-            <!-- <th>Description</th> -->
+            <th>Defult</th>
             <th>Created Date</th>
             <th>Total User</th>
             <th>Total Task</th>
             <th>Total Form</th>
             <th>Type</th>
-            <th>Status</th>
-            <th style="width: 12%;">Action</th>
+            <!-- <th>Status</th> -->
+            <th style="width: 14%;">Action</th>
         </tr>
     </thead>
     <tbody>
-        <tr *ngFor="let sourceTaskType of sourceTaskTypes">
+        <tr *ngFor="let sourceTaskType of sourceTaskTypes | searchFilter: searchLookup; let i = index">
             <td style="text-align: center;">
                 <div class="Yf">
-                    <div [ngClass]="sourceTaskType.isdefult ? 'Yg_no': 'Yg_yes'"></div>
+                    <!-- [ngClass]="sourceTaskType.isdefult ? 'Yg_no': 'Yg_yes'" -->
+                    <div [ngClass]="{
+                        'Yg_delete': sourceTaskType.status === 'Delete', 
+                        'Yg_inactive' : sourceTaskType.status === 'Inactive',
+                        'Yg_active' : sourceTaskType.status === 'Active'
+                    }"></div>
                 </div>
             </td>
             <td>
@@ -37,9 +45,9 @@
             <td>
                 {{sourceTaskType.serviceName}}
             </td>
-            <!-- <td>
-                {{sourceTaskType.description}}
-            </td> -->
+            <td style="text-align: center;">
+                {{sourceTaskType.isdefult ? 'Yes' : 'No'}}
+            </td>
             <td style="text-align: center;">
                 {{sourceTaskType.dateCreated}}
             </td>
@@ -59,14 +67,14 @@
                         'badge-kafka' : sourceTaskType.sttType === 'Kafka'
                     }">{{sourceTaskType.sttType}}</span>
             </td>
-            <td style="text-align: center;">
+            <!-- <td style="text-align: center;">
                 <span class="badge"
                     [ngClass]="{
                         'badge-danger': sourceTaskType.status === 'Delete', 
                         'badge-info' : sourceTaskType.status === 'Inactive',
                         'badge-success' : sourceTaskType.status === 'Active'
                     }">{{sourceTaskType.status}}</span>
-            </td>
+            </td> -->
             <td style="text-align: center;">
                 <div class="btn-group btn-group-xs" 
                     role="group" style="text-align: center">
@@ -75,6 +83,11 @@
                         <span class="glyphicon glyphicon-edit"
                             style="color:blue"></span>
                     </button>
+                    <button type="button" class="btn btn-default"
+                        data-toggle="modal" data-target="#sourceTaskTaype">
+                        <span class="glyphicon glyphicon-eye-open"
+                            style="color:#008063"></span>
+                   </button>
                     <!-- download source tasktype -->
                     <button type="button" class="btn btn-default">
                         <span class="glyphicon glyphicon-download"
