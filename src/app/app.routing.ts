@@ -9,7 +9,7 @@ import {
     SettingLayoutComponent,
     LookupComponent,
     ProfileComponent,
-    TaskTypeSettingComponent,
+    SttSettingComponent,
     XmlConfigurationComponent,
     SearchEngineComponent,
     SubLookupComponent
@@ -91,7 +91,7 @@ const routes: Routes = [
             },
             { 
                 path: 'sourcetask',
-                component: TaskTypeSettingComponent,
+                component: SttSettingComponent,
                 canActivate: [AuthGuard],
                 data:  {
                     breadcrumb: 'Sourcetask',

@@ -291,7 +291,7 @@ export enum LOOKUP_TYPES {
   SUPER_ADMIN = 'SUPER_ADMIN'
 }
 
-export interface TaskTypeSidebar {
+export interface STTSidebar {
   title: any;
   router: any;
   active: any,
@@ -311,7 +311,7 @@ export interface STTList {
   isdefult: any;
 }
 
-export interface SttFormList {
+export interface STTFormList {
   formId: any;
   formName: any;
   description: any;

@@ -62,8 +62,7 @@
     <div class="col-lg-12">
         <div class="card mb-3">
             <div class="card-body">
-                <task-header [selectedMenu]="selectedMenu">
-                </task-header>
+                <stt-header [selectedMenu]="selectedMenu"></stt-header>
                 <div class="row">
                     <!-- sid -->
                     <div class="col-xs-3 col-sm-2 sidebar-offcanvas" id="sidebar" style="padding-right: inherit;">
@@ -80,10 +79,10 @@
                     <!-- main -->
                     <div class="col-xs-12 col-sm-10"
                         *ngIf="selectedMenu">
-                        <task-type-list *ngIf="selectedMenu.type === 1"></task-type-list>
-                        <task-form-list *ngIf="selectedMenu.type === 2"></task-form-list>
-                        <task-section-list *ngIf="selectedMenu.type === 3"></task-section-list>
-                        <task-control-list *ngIf="selectedMenu.type === 4"></task-control-list>
+                        <stt-list *ngIf="selectedMenu.type === 1"></stt-list>
+                        <sttf-list *ngIf="selectedMenu.type === 2"></sttf-list>
+                        <sttc-list *ngIf="selectedMenu.type === 3"></sttc-list>
+                        <sttc-list *ngIf="selectedMenu.type === 4"></sttc-list>
                     </div>
                 </div>
             </div>

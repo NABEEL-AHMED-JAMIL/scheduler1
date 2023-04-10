@@ -6,7 +6,8 @@ import { BreadcrumbService } from '@/_helpers';
 
 
 @Component({
-    templateUrl: 'setting-layout.component.html'
+  selector: 'setting-layout',
+  templateUrl: 'setting-layout.component.html'
 })
 export class SettingLayoutComponent implements OnInit {
 

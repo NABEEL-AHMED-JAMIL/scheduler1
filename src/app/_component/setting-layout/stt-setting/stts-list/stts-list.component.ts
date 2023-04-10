@@ -3,13 +3,12 @@ import { STTSectionList } from '@/_models/index'
 
 
 @Component({
-    selector: 'task-section-list',
-    templateUrl: 'task-section-list.component.html'
+    selector: 'stts-list',
+    templateUrl: 'stts-list.component.html'
 })
-export class TaskSectionListComponent implements OnInit {
+export class STTSListComponent implements OnInit {
 
     public searchLookup: any = '';
-
     public sttSections: STTSectionList[] = [
         {
             sectionId: 1000,

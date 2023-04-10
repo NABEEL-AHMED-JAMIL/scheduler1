@@ -14,10 +14,15 @@ export * from './setting-layout/search-engine/search-engine.component';
 export * from './setting-layout/lookup-setting/lookup/lookup.component';
 export * from './setting-layout/lookup-setting/sub-lookup/sub-lookup.component';
 export * from './setting-layout/lookup-setting/cu-lookup/cu-lookup.component';
-// task-type
-export * from './setting-layout/task-type-setting/task-type-setting.component';
-export * from './setting-layout/task-type-setting/task-header/task-header.component';
-export * from './setting-layout/task-type-setting/task-type-list/task-type-list.component';
-export * from './setting-layout/task-type-setting/task-form-list/task-form-list.component';
-export * from './setting-layout/task-type-setting/task-section-list/task-section-list.component';
-export * from './setting-layout/task-type-setting/task-control-list/task-control-list.component';
+// cu-stt
+export * from './setting-layout/stt-setting/stt-setting.component';
+export * from './setting-layout/stt-setting/stt-header/task-header.component';
+export * from './setting-layout/stt-setting/cu-stt/cu-stt.component';
+export * from './setting-layout/stt-setting/cu-sttf/cu-sttf.component';
+export * from './setting-layout/stt-setting/cu-stts/cu-stts.component';
+export * from './setting-layout/stt-setting/cu-sttc/cu-sttc.component';
+// list of all stt*
+export * from './setting-layout/stt-setting/stt-list/stt-list.component';
+export * from './setting-layout/stt-setting/sttf-list/sttf-list.component';
+export * from './setting-layout/stt-setting/stts-list/stts-list.component';
+export * from './setting-layout/stt-setting/sttc-list/sttc-list.component';

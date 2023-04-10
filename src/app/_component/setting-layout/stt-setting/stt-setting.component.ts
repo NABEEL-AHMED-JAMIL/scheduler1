@@ -1,15 +1,15 @@
 import { Component, OnInit } from '@angular/core';
-import { TaskTypeSidebar } from '@/_models';
+import { STTSidebar } from '@/_models';
 
 
 @Component({
-    selector: 'task-type-setting',
-    templateUrl: 'task-type-setting.component.html'
+    selector: 'stt-setting',
+    templateUrl: 'stt-setting.component.html'
 })
-export class TaskTypeSettingComponent implements OnInit {
+export class SttSettingComponent implements OnInit {
 
-    public selectedMenu: TaskTypeSidebar;
-    public sttSidebar: TaskTypeSidebar[] = [
+    public selectedMenu: STTSidebar;
+    public sttSidebar: STTSidebar[] = [
         {
             type: 1,
             title: 'Task Type',
@@ -43,7 +43,7 @@ export class TaskTypeSettingComponent implements OnInit {
     ngOnInit() {
     }
 
-    public changeTask(changeTask: TaskTypeSidebar, index: any) {
+    public changeTask(changeTask: STTSidebar, index: any) {
         this.sttSidebar = this.sttSidebar.map(stt => {
             stt.active = false;
             return stt;
