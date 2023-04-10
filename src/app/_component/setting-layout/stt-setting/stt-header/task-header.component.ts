@@ -1,5 +1,6 @@
 import { Component, Input, OnInit } from '@angular/core';
 import { STTSidebar } from '@/_models';
+import { Router } from '@angular/router';
 
 
 @Component({
@@ -11,11 +12,18 @@ export class STTHeaderComponent implements OnInit {
     @Input()
     public selectedMenu: STTSidebar;
 
-    constructor() {
-        console.log(this.selectedMenu);
+    constructor(private router: Router) {
     }
 
     ngOnInit() {
+    }
+
+    public addAction(): void {
+        this.router.navigate([this.selectedMenu.subLink.router]);
+    }
+
+    public refreshAction(): void {
+        this.router.navigate([this.selectedMenu.router]);
     }
 
 }

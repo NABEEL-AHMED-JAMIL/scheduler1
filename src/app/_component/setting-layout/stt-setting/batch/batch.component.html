@@ -1,0 +1,16 @@
+<!-- card detail -->
+<table class="table table-bordered table-sm
+    table-responsive table-striped" style="font-size: 10px;">
+    <thead>
+        <tr>
+            <th style="width: 1px;">No#</th>
+            <th>Message</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr *ngFor="let error of errors; let i = index">
+            <td>{{i+1}}</td>
+            <td [innerHTML]="error"></td>
+        </tr>
+    </tbody>
+</table>

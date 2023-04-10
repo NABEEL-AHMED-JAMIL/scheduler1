@@ -7,8 +7,8 @@ import { ReactiveFormsModule, FormsModule  } from '@angular/forms';
 import { HttpClientModule, HTTP_INTERCEPTORS } from '@angular/common/http';
 import { appRoutingModule } from './app.routing';
 import { AppComponent } from './app.component';
-import { JwtInterceptor, ErrorInterceptor } from './_helpers';
-import { SearchFilterPipe } from './_helpers';
+import { JwtInterceptor, ErrorInterceptor } from '@/_helpers';
+import { SearchFilterPipe } from '@/_helpers';
 import { SpinnerComponent } from '@/_modal';
 import {
     LoginComponent,
@@ -33,8 +33,9 @@ import {
     CUSTTComponent,
     CUSTTFComponent,
     CUSTTSComponent,
-    CUSTTCComponent
-} from './_component/index';
+    CUSTTCComponent,
+    BatchComponent
+} from '@/_component/index';
 import { ToastrModule } from 'ngx-toastr';
 
 @NgModule({
@@ -66,6 +67,7 @@ import { ToastrModule } from 'ngx-toastr';
         LookupComponent,
         SubLookupComponent,
         SttSettingComponent,
+        BatchComponent,
         STTHeaderComponent,
         STTListComponent,
         STTFListComponent,

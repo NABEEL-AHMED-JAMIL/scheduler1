@@ -1,32 +1,44 @@
 <div class="row">
-    <div class="col-lg-8">
+    <div class="col-lg-7">
         <h5 class="card-title" style="font-size: large;">
             {{selectedMenu.title}}
         </h5>
     </div>
-    <div class="col-lg-4" style="margin-top: 5px;">
-        <button id="download" type="button"
-            class="form-control input-sm"
-            style="width: auto;float: right;margin-left: 5px;
-                background: #4750b6;color: white;" 
-                [routerLink]="selectedMenu.router">
-            <span class="glyphicon glyphicon-cog"></span>
-            Batch Action
-        </button>
+    <div class="col-lg-5" style="margin-top: 5px;text-align: end;">
         <button type="button" class="form-control input-sm"
-            style="width: auto;float: right;margin-left: 5px;
-            background: #cb0f43;color: white;" 
-            data-toggle="modal" data-target="#lookupDatas"
-            (click)="addLookupDatas()">
-            <span class="glyphicon glyphicon-plus-sign"></span>
-            {{selectedMenu.title}}
-        </button>
-        <button type="button"
-            class="form-control input-sm"
-            style="width: auto;float: right;margin-left: 5px;"
-            (click)="fetchAllLookup()">
+            style="width: auto;display: inline;margin-right: 7px;"
+            (click)="refreshAction()">
             <span id="loading" class="glyphicon glyphicon-refresh"></span>
             Refresh</button>
+        <button type="button" class="form-control input-sm"
+            style="width: auto; background: #cb0f43;color: white;
+                display: inline;margin-right: 7px;" 
+            (click)="addAction()">
+            <span class="glyphicon glyphicon-plus-sign"></span>
+            {{selectedMenu.subLink.title}}
+        </button>
+        <input type="file" accept="application/vnd.ms-excel,
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            style="display: none;"
+            #inputUpload (change)="uploadBulkData($event.target.files[0])" hidden>
+        <button type="button" class="form-control input-sm"
+            style="width: auto;display: inline;margin-right: 7px;
+                width: auto;background: #17a2b8;color: white"
+            (click)="inputUpload.click()">
+            <span class="glyphicon glyphicon-upload"></span> Upload
+        </button>
+        <button type="button" class="form-control input-sm"
+            (click)="downloadData()"
+            style="width: auto;background: #000;color: white;
+                display: inline;margin-right: 7px;">
+            <span class="glyphicon glyphicon-download"></span> Downalod
+        </button>
+        <button type="button" class="form-control input-sm"
+            (click)="downloadTemplate()"
+            style="width: auto;background: #337ab7;color: white;
+                display: inline;margin-right: 7px;">
+            <span class="glyphicon glyphicon-download"></span> Template
+        </button>
     </div>
 </div>
 <hr style="margin-top: 10px;">

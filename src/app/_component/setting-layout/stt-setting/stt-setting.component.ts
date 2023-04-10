@@ -12,27 +12,51 @@ export class SttSettingComponent implements OnInit {
     public sttSidebar: STTSidebar[] = [
         {
             type: 1,
-            title: 'Task Type',
-            router: 'apple',
-            active: true
+            title: 'STT',
+            router: '/profile/sourcetask/sstList',
+            active: true,
+            subLink: {
+                type: 1,
+                title: 'Add STT',
+                router: '/profile/sourcetask/addStt',
+                active: true
+            }
         },
         {
             type: 2,
-            title: 'Task Form',
-            router: 'apple',
-            active: false
+            title: 'STT Form',
+            router: '/profile/sourcetask/sstfList',
+            active: false,
+            subLink: {
+                type: 1,
+                title: 'Add STTF',
+                router: '/profile/sourcetask/addSttf',
+                active: true
+            }
         },
         {
             type: 3,
-            router: 'apple',
-            title: 'Form Section',
-            active: false
+            title: 'STT Section',
+            router: '/profile/sourcetask/sstsList',
+            active: false,
+            subLink: {
+                type: 1,
+                title: 'Add STTS',
+                router: '/profile/sourcetask/addStts',
+                active: true
+            }
         },
         {
             type: 4,
-            router: 'apple',
-            title: 'Form Control',
-            active: false
+            router: '/profile/sourcetask/sstcList',
+            title: 'STT Control',
+            active: false,
+            subLink: {
+                type: 1,
+                title: 'Add STTC',
+                router: '/profile/sourcetask/addSttc',
+                active: true
+            }
         }
     ];
 

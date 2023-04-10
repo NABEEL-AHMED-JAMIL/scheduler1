@@ -10,11 +10,20 @@ import {
     LookupComponent,
     ProfileComponent,
     SttSettingComponent,
+    CUSTTComponent,
+    CUSTTFComponent,
+    CUSTTSComponent,
+    CUSTTCComponent,
     XmlConfigurationComponent,
     SearchEngineComponent,
-    SubLookupComponent
-} from './_component/index';
-import { AuthGuard } from './_helpers';
+    SubLookupComponent,
+    BatchComponent,
+    STTListComponent,
+    STTFListComponent,
+    STTSListComponent,
+    STTCListComponent
+} from '@/_component/index';
+import { AuthGuard } from '@/_helpers';
 
 const routes: Routes = [
 
@@ -94,12 +103,128 @@ const routes: Routes = [
                 component: SttSettingComponent,
                 canActivate: [AuthGuard],
                 data:  {
-                    breadcrumb: 'Sourcetask',
-                    role: [
-                        'ROLE_MASTER_ADMIN',
-                        'ROLE_ADMIN'
-                    ]
-                }
+                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                },
+                children: [
+                    {
+                        path: 'sstList',
+                        component: STTListComponent,
+                        canActivate: [AuthGuard],
+                        data:  {
+                            breadcrumb: 'Stt List',
+                            role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                        }
+                    },
+                    {
+                        path: 'sstfList',
+                        component: STTFListComponent,
+                        canActivate: [AuthGuard],
+                        data:  {
+                            breadcrumb: 'Sttf List',
+                            role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                        }
+                    },
+                    {
+                        path: 'sstsList',
+                        component: STTSListComponent,
+                        canActivate: [AuthGuard],
+                        data:  {
+                            breadcrumb: 'Stts List',
+                            role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                        }
+                    },
+                    {
+                        path: 'sstcList',
+                        component: STTCListComponent,
+                        canActivate: [AuthGuard],
+                        data:  {
+                            breadcrumb: 'Sttc List',
+                            role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                        }
+                    },
+                    {
+                        path: 'addStt',
+                        component: CUSTTComponent,
+                        canActivate: [AuthGuard],
+                        data:  {
+                            breadcrumb: 'Add Stt',
+                            role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                        }
+                    },
+                    {
+                        path: 'editStt',
+                        component: CUSTTComponent,
+                        canActivate: [AuthGuard],
+                        data:  {
+                            breadcrumb: 'Edit Stt',
+                            role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                        }
+                    },
+                    {
+                        path: 'addSttf',
+                        component: CUSTTFComponent,
+                        canActivate: [AuthGuard],
+                        data:  {
+                            breadcrumb: 'Add Sttf',
+                            role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                        }
+                    },
+                    {
+                        path: 'editSttf',
+                        component: CUSTTFComponent,
+                        canActivate: [AuthGuard],
+                        data:  {
+                            breadcrumb: 'Edit Sttf',
+                            role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                        }
+                    },
+                    {
+                        path: 'addStts',
+                        component: CUSTTSComponent,
+                        canActivate: [AuthGuard],
+                        data:  {
+                            breadcrumb: 'Add Stts',
+                            role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                        }
+                    },
+                    {
+                        path: 'editStts',
+                        component: CUSTTSComponent,
+                        canActivate: [AuthGuard],
+                        data:  {
+                            breadcrumb: 'Edit Stts',
+                            role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                        }
+                    },
+                    {
+                        path: 'addSttc',
+                        component: CUSTTCComponent,
+                        canActivate: [AuthGuard],
+                        data:  {
+                            breadcrumb: 'Add Sttc',
+                            role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                        }
+                    },
+                    {
+                        path: 'editSttc',
+                        component: CUSTTCComponent,
+                        canActivate: [AuthGuard],
+                        data:  {
+                            breadcrumb: 'Edit Sttc',
+                            role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                        }
+                    },
+                    {
+                        path: 'batch',
+                        component: BatchComponent,
+                        canActivate: [AuthGuard],
+                        data: {
+                            action: 'batch',
+                            breadcrumb: 'Batch',
+                            role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                        }
+                    },
+                ]
             },
             { 
                 path: 'searchengine',

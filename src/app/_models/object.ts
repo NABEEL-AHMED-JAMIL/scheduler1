@@ -292,10 +292,11 @@ export enum LOOKUP_TYPES {
 }
 
 export interface STTSidebar {
-  title: any;
-  router: any;
-  active: any,
-  type: any;
+  title?: any;
+  router?: any;
+  active?: any,
+  type?: any;
+  subLink?: any;
 }
 
 export interface STTList {

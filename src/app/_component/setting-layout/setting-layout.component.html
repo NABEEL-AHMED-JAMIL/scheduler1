@@ -3,7 +3,7 @@
     <li *ngFor="let breadcrumb of (breadcrumbs | async)">
         <a [routerLink]="breadcrumb.url">{{ breadcrumb.label }}</a>
     </li>
-    <a (click)="back()" style="float: right;">Back</a>
+    <!-- <a (click)="back()" style="float: right;">Back</a> -->
 </ol>
 <div class="container-fluid">
     <div class="row" style="margin-top: 25px;">

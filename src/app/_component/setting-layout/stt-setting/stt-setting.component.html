@@ -70,6 +70,7 @@
                             <a *ngFor="let taskType of sttSidebar; let i = index" [id]="taskType.type"
                                 class="list-group-item"
                                 [ngClass]="taskType.active === true ? 'active': ''"
+                                [routerLink]="taskType.router"
                                 (click)="changeTask(taskType, i)"
                                 style="padding: 5px 10px;">
                                 <span class="glyphicon glyphicon-edit"></span> {{taskType.title}}
@@ -77,12 +78,8 @@
                         </div>
                     </div>
                     <!-- main -->
-                    <div class="col-xs-12 col-sm-10"
-                        *ngIf="selectedMenu">
-                        <stt-list *ngIf="selectedMenu.type === 1"></stt-list>
-                        <sttf-list *ngIf="selectedMenu.type === 2"></sttf-list>
-                        <sttc-list *ngIf="selectedMenu.type === 3"></sttc-list>
-                        <sttc-list *ngIf="selectedMenu.type === 4"></sttc-list>
+                    <div class="col-xs-12 col-sm-10">
+                        <router-outlet></router-outlet>
                     </div>
                 </div>
             </div>
