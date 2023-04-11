@@ -46,24 +46,24 @@
             </a>
           </li>
           <li>
-            <a routerLink="/profile/lookup" 
+            <a routerLink="/lookup" 
               *ngIf="hasAccess(['ROLE_ADMIN', 'ROLE_MASTER_ADMIN'])">
               Lookup Data</a>
           </li>
           <li>
-            <a routerLink="/profile/sourcetask/sstList"
+            <a routerLink="/stt"
               *ngIf="hasAccess(['ROLE_ADMIN', 'ROLE_MASTER_ADMIN'])">
               SourceTask</a>
           </li>
           <!-- for queueu logs each user have there access -->
           <li><a routerLink="/profile/queuemessage">Queue Logs</a></li>
           <li>
-            <a routerLink="/profile/searchengine"
+            <a routerLink="/searchengine"
               *ngIf="hasAccess(['ROLE_MASTER_ADMIN', 'ROLE_ADMIN'])">
               Query Result</a>
           </li>
           <li>
-            <a routerLink="/profile/xml-config"
+            <a routerLink="/xmlconfig"
               *ngIf="hasAccess(['ROLE_ADMIN', 'ROLE_MASTER_ADMIN'])">
               Xml Config</a>
           </li>
@@ -74,5 +74,12 @@
   </div>
 </nav>
 <!-- main app container -->
+<ol class="breadcrumb" style="margin-bottom: 0px">
+  <li><a routerLink="/home">Home</a></li>
+  <li *ngFor="let breadcrumb of (breadcrumbs | async)">
+      <a [routerLink]="breadcrumb.url">{{ breadcrumb.label }}</a>
+  </li>
+  <a (click)="back()" style="float: right;">Back</a>
+</ol>
 <router-outlet></router-outlet>
 <spinner></spinner>

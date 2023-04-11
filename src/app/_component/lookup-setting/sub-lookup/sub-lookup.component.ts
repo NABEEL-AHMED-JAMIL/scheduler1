@@ -41,7 +41,7 @@ export class SubLookupComponent implements OnInit {
     }
 
 	public subLookupBatch(): void {
-		this.router.navigate(['/profile/sublookupBatch'],
+		this.router.navigate(['/sublookup/sublookupbatch'],
             {
                 queryParams: {
                     lookupId: this.lookupId

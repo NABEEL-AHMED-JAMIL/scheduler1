@@ -1,4 +1,5 @@
 import { Component, OnInit } from '@angular/core';
+import { Router, ActivatedRoute } from '@angular/router';
 import { STTSidebar } from '@/_models';
 
 
@@ -13,55 +14,56 @@ export class SttSettingComponent implements OnInit {
         {
             type: 1,
             title: 'STT',
-            router: '/profile/sourcetask/sstList',
-            active: true,
+            router: '/stt',
+            active: false,
             subLink: {
                 type: 1,
                 title: 'Add STT',
-                router: '/profile/sourcetask/addStt',
-                active: true
+                router: '/stt/addStt',
+                active: false
             }
         },
         {
             type: 2,
             title: 'STT Form',
-            router: '/profile/sourcetask/sstfList',
+            router: '/sstf',
             active: false,
             subLink: {
                 type: 1,
                 title: 'Add STTF',
-                router: '/profile/sourcetask/addSttf',
-                active: true
+                router: '/sstf/addSttf',
+                active: false
             }
         },
         {
             type: 3,
             title: 'STT Section',
-            router: '/profile/sourcetask/sstsList',
+            router: '/ssts',
             active: false,
             subLink: {
                 type: 1,
                 title: 'Add STTS',
-                router: '/profile/sourcetask/addStts',
-                active: true
+                router: '/ssts/addStts',
+                active: false
             }
         },
         {
             type: 4,
-            router: '/profile/sourcetask/sstcList',
+            router: '/sstc',
             title: 'STT Control',
             active: false,
             subLink: {
                 type: 1,
                 title: 'Add STTC',
-                router: '/profile/sourcetask/addSttc',
-                active: true
+                router: '/sstc/addSttc',
+                active: false
             }
         }
     ];
 
-    constructor() {
-        this.selectedMenu = this.sttSidebar[0];
+    constructor(private route:ActivatedRoute,
+        private router:Router) {
+        this.selectedMenu = route.snapshot.data['selectedMenu'];
     }
 
     ngOnInit() {

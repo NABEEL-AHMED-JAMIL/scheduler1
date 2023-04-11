@@ -70,7 +70,7 @@ export class LookupComponent implements OnInit {
 	}
 
     public editSubLookupData(lookupData: LookupData): void {
-		this.router.navigate(['/profile/sublookup'],
+		this.router.navigate(['/sublookup'],
             {
                 queryParams: {
                     lookupId: lookupData.lookupId

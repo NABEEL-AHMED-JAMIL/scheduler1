@@ -1,0 +1,33 @@
+<div class="row">
+    <div class="col-lg-7">
+        <h5 class="card-title" style="font-size: large;">
+            {{selectedMenu.title}}
+        </h5>
+    </div>
+    <div class="col-lg-5" style="margin-top: 5px;text-align: end;">
+        <button type="button" class="form-control input-sm"
+            style="width: auto;display: inline;margin-right: 7px;"
+            (click)="refreshAction()">
+            <span id="loading" class="glyphicon glyphicon-refresh"></span>
+            Refresh</button>
+        <button type="button" class="form-control input-sm"
+            style="width: auto; background: #cb0f43;color: white;
+                display: inline;margin-right: 7px;" 
+            (click)="addAction()">
+            <span class="glyphicon glyphicon-plus-sign"></span>
+            {{selectedMenu.subLink.title}}
+        </button>
+        <div class="dropdown" style="display: inline;">
+            <button class="btn btn-primary dropdown-toggle"
+                style="padding: 4px 5px;border-radius: 3px;"
+                type="button" data-toggle="dropdown">Dropdown Example
+                <span class="caret"></span></button>
+            <ul class="dropdown-menu">
+                <li><a  routerLink="{{selectedMenu.router}}/batch">Upload File</a></li>
+                <li><a href="#">Downalod File</a></li>
+                <li><a href="#">Downalod Template</a></li>
+            </ul>
+        </div>
+    </div>
+</div>
+<hr style="margin-top: 10px;">

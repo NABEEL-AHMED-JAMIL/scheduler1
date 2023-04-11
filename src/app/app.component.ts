@@ -5,6 +5,11 @@ import { AuthResponse, ApiCode } from './_models';
 import './_content/app.less';
 import { first } from 'rxjs/operators';
 import { SpinnerService } from '@/_helpers';
+import { Observable } from 'rxjs';
+import { BreadcrumbService } from '@/_helpers';
+import { Breadcrumb } from '@/_models/index';
+import { Location } from '@angular/common';
+
 
 @Component({
     selector: 'app',
@@ -13,13 +18,18 @@ import { SpinnerService } from '@/_helpers';
 export class AppComponent {
 
     public currentUser: AuthResponse;
+    public breadcrumbs: Observable<Breadcrumb[]>;
     public userRole: any;
 
-    constructor(
+    constructor(        
         private router: Router,
+        private location: Location,
         private spinnerService: SpinnerService,
         private alertService: AlertService,
-        private authenticationService: AuthenticationService) {
+        private authenticationService: AuthenticationService,
+        private readonly breadcrumbService: BreadcrumbService) {
+            this.breadcrumbs = breadcrumbService.breadcrumbs$;
+            console.log(this.breadcrumbs);
             this.authenticationService.currentUser
             .subscribe(currentUser => {
                 this.currentUser = currentUser;
@@ -30,8 +40,7 @@ export class AppComponent {
     }
 
     public hasAccess(roleList: any): any {
-        return this.userRole.some(
-            role => roleList.includes(role));
+        return this.userRole.some(role => roleList.includes(role));
     }
 
     public logout(): any {
@@ -52,6 +61,10 @@ export class AppComponent {
                 this.spinnerService.hide();
                 this.alertService.showError(error.message, ApiCode.ERROR);
             });
+    }
+
+    public back() : any {
+        this.location.back();
     }
 
 }
