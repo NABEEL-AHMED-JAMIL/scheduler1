@@ -1,1 +1,200 @@
-cs=sstc
+<style>
+    .card {
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, .1), 0 1px 2px 0 rgba(0, 0, 0, .06);
+    }
+
+    .card {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        word-wrap: break-word;
+        background-color: #fff;
+        background-clip: border-box;
+        border: 0 solid rgba(0, 0, 0, .125);
+        border-radius: .25rem;
+    }
+
+    .card-body {
+        flex: 1 1 auto;
+        min-height: 1px;
+        padding: 1rem;
+    }
+
+    .card-title {
+        margin-bottom: 0.75rem;
+    }
+
+    .gutters-sm {
+        margin-right: -8px;
+        margin-left: -8px;
+    }
+
+    .gutters-sm>.col,
+    .gutters-sm>[class*=col-] {
+        padding-right: 8px;
+        padding-left: 8px;
+    }
+
+    .mb-3 {
+        margin-bottom: 1rem !important;
+    }
+
+    .rounded-circle {
+        border-radius: 50%!important;
+    }
+    .mt-3 {
+        margin-top: 1rem!important;
+    }
+    .text-secondary {
+        color: #6c757d!important;
+    }
+    p {
+        margin-top: 0;
+        margin-bottom: 1rem;
+    }
+    .panel {
+        margin-bottom: 20px;
+        background-color: #fff;
+        border: none;
+        border-radius: 0;
+        -webkit-box-shadow: none;
+        box-shadow: none;
+    }
+</style>
+
+<div class="row gutters-sm">
+    <div class="col-lg-12">
+        <div id="basic" class="borderd-content">
+            <div class="title" style="color: #cb0f43;">{{title}} Basic</div>
+            <div class="content" style="margin-top: 10px;">
+                <div class="row">
+                    <div class="col-lg-4">
+                        <div class="form-group">
+                            <label for="serviceName">Service Name</label>
+                            <input type="text" id="serviceName"
+                                maxlength="40"
+                                class="form-control input-sm"
+                                placeholder="Enter service name" />
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="form-group">
+                            <label for="description">Description</label>
+                            <input type="text" id="description" 
+                                maxlength="40"
+                                class="form-control input-sm"
+                                placeholder="Enter description" />
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="form-group">
+                            <label for="taskType">TaskType</label>
+                            <select class="form-control input-sm" id="taskType">
+                                <option value="">Select TaskType</option>
+                                <option *ngFor="let taskType of taskTypeOption"
+                                    [value]="taskType.value">
+                                    {{taskType.key}}
+                                </option>
+                            </select>
+                        </div>
+                    </div>
+                </div>    
+            </div>
+        </div>
+        <!-- aws -->
+        <div id="aws" class="borderd-content" style="margin-top: 20px;">
+            <div class="title" style="color: #cb0f43;">{{title}} AWS</div>
+            <div class="content" style="margin-top: 10px;">
+                <div class="row">
+                    <div class="col-lg-12">
+                        <div class="form-group">
+                            <label for="apiUrl">ApiUrl</label>
+                            <input type="text" id="apiUrl" 
+                                maxlength="255"
+                                class="form-control input-sm"
+                                placeholder="Enter api url"/>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="form-group">
+                            <label for="httpMethod">Http Method</label>
+                            <select class="form-control input-sm" id="httpMethod">
+                                <option value="">Select HttpMethod</option>
+                                <option *ngFor="let http of httpMethod"
+                                    [value]="http.value">
+                                    {{http.key}}
+                                </option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="form-group">
+                            <label for="apiSecurityIdMlu">Security Mlu</label>
+                            <select class="form-control input-sm" id="apiSecurityIdMlu">
+                                <option value="">Select HttpMethod</option>
+                                <option *ngFor="let http of httpMethod"
+                                    [value]="http.value">
+                                    {{http.key}}
+                                </option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="form-group">
+                            <label for="apiSecurityIdSlu">Security Slu</label>
+                            <select class="form-control input-sm" id="apiSecurityIdSlu">
+                                <option value="">Select HttpMethod</option>
+                                <option *ngFor="let http of httpMethod"
+                                    [value]="http.value">
+                                    {{http.key}}
+                                </option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- kafka -->
+        <div class="borderd-content" style="margin-top: 20px;">
+            <div class="title" style="color: #cb0f43;">{{title}} Kafka</div>
+            <div class="content" style="margin-top: 10px;">
+                <div class="row">
+                    <div class="col-lg-4">
+                        <div class="form-group">
+                            <label for="numPartitions">Partitions</label>
+                            <input type="number" id="numPartitions" 
+                                min="1" max="5"
+                                class="form-control input-sm"
+                                placeholder="Enter partitions"/>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="form-group">
+                            <label for="topicName">Topic Name</label>
+                            <input type="text" id="topicName" 
+                                maxlength="40"
+                                class="form-control input-sm"
+                                placeholder="Enter topic name" />
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="form-group">
+                            <label for="topicPattern">Topic Pattern</label>
+                            <input type="text" id="topicPattern" 
+                                maxlength="40"
+                                class="form-control input-sm"
+                                placeholder="Enter topic pattern"
+                                disabled/>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-12" style="margin-top: 15px;margin-bottom: 5px;">
+        <button class="btn btn-sm btn-default" (click)="back()">Clear</button>
+        <button  type="submit" [disabled]="loading" class="btn btn-sm btn-danger" style="float:right" >Register</button>
+    </div>
+</div>
+

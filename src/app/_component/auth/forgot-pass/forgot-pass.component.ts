@@ -13,8 +13,8 @@ import { ApiCode } from '@/_models'
 export class ForgotPassComponent implements OnInit {
 
     public forgotForm: FormGroup;
-    public loading = false;
-    public submitted = false;
+    public loading: any = false;
+    public submitted: any = false;
 
     constructor(private formBuilder: FormBuilder,
         private router: Router,

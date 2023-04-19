@@ -236,7 +236,14 @@ export interface SearchText {
   itemValue?: string;
 };
 
-export enum Action { NON, VIEW, EDIT, ADD, CLEAR };
+export enum Action { 
+  NON,
+  VIEW,
+  EDIT,
+  ADD,
+  CLEAR,
+  STT
+};
 
 export const SEARCH_TASK_LIST: String[] = [
   'taskDetailId',
@@ -288,7 +295,12 @@ export enum LOOKUP_TYPES {
   EMAIL_SENDER = 'EMAIL_SENDER',
   RESET_PASSWORD_LINK = 'RESET_PASSWORD_LINK',
   SCHEDULER_TIMEZONE = 'SCHEDULER_TIMEZONE',
-  SUPER_ADMIN = 'SUPER_ADMIN'
+  SUPER_ADMIN = 'SUPER_ADMIN',
+  APPLICATION_STATUS = 'APPLICATION_STATUS',
+  TASKTYPE_OPTION = 'TASKTYPE_OPTION',
+  STT_SIDEBAR = 'STT_SIDEBAR',
+  REQUEST_METHOD = 'REQUEST_METHOD',
+  ISDEFAULT = 'ISDEFAULT'
 }
 
 export interface STTSidebar {
@@ -296,7 +308,7 @@ export interface STTSidebar {
   router?: any;
   active?: any,
   type?: any;
-  subLink?: any;
+  topHeader?: any;
 }
 
 export interface STTList {
@@ -305,11 +317,11 @@ export interface STTList {
   description: any;
   dateCreated: any;
   status: any;
-  sttType: any;
+  taskType: any;
   totalTask: any;
   totalUser: any;
   totalForm: any;
-  isdefult: any;
+  default: any;
 }
 
 export interface STTFormList {
@@ -321,7 +333,7 @@ export interface STTFormList {
   totalStt?: any;
   totalSection: any;
   totalControl: any;
-  isdefult?: any;
+  default?: any;
 }
 
 export interface STTSectionList {
@@ -334,7 +346,7 @@ export interface STTSectionList {
   totalStt: any;
   totalForm: any;
   totalControl: any;
-  isdefult?: any;
+  default?: any;
 }
 
 export interface STTControlList {
@@ -346,7 +358,7 @@ export interface STTControlList {
   description: any;
   mandatory: any;
   status: any;
-  isdefult?: any;
+  default?: any;
   dateCreated: any;
   totalStt: any;
   totalSection: any;

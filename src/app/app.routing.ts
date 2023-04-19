@@ -23,6 +23,7 @@ import {
     STTSListComponent,
     STTCListComponent
 } from '@/_component/index';
+import { Action } from '@/_models';
 import { AuthGuard } from '@/_helpers';
 
 const routes: Routes = [
@@ -137,12 +138,41 @@ const routes: Routes = [
                 type: 1,
                 title: 'STT',
                 router: '/stt',
-                active: true,
-                subLink: {
-                    title: 'Add STT',
-                    router: '/stt/addStt'
+                active: true
+            },
+            topHeader: [
+                {
+                    type: "refresh",
+                    title: "Refresh",
+                    active: true
+                },
+                {
+                    type: "add",
+                    title: "Add STT",
+                    router: "/stt/addStt",
+                    active: true
+                },
+                {
+                    type: "menus",
+                    title: "Batch Operation",
+                    active: true,
+                    menus: [
+                        {
+                            title: "Upload File",
+                            router: "/stt/addStt",
+                            active: true
+                        }, {
+                            title: "Downalod File",
+                            router: "/stt/addStt",
+                            active: true
+                        }, {
+                            title: "Downalod Template",
+                            router: "/stt/addStt",
+                            active: true
+                        }
+                    ]
                 }
-            }
+            ]
         },
         children: [
             {
@@ -159,7 +189,10 @@ const routes: Routes = [
                 component: CUSTTComponent,
                 canActivate: [AuthGuard],
                 data:  {
+                    title: 'Add',
+                    action: Action.ADD,
                     breadcrumb: 'Add Stt',
+                    topHeader: [],
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
                 }
             },
@@ -168,7 +201,10 @@ const routes: Routes = [
                 component: CUSTTComponent,
                 canActivate: [AuthGuard],
                 data:  {
+                    title: 'Edit',
+                    action: Action.EDIT,
                     breadcrumb: 'Edit Stt',
+                    topHeader: [],
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
                 }
             },
@@ -176,8 +212,10 @@ const routes: Routes = [
                 path: 'batch',
                 component: BatchComponent,
                 data: {
-                    action: 'STT',
-                    breadcrumb: 'Batch',
+                    title: 'Batch',
+                    action: Action.STT,
+                    breadcrumb: 'Batch Stt',
+                    topHeader: [],
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
                 }
             }
@@ -194,12 +232,41 @@ const routes: Routes = [
                 type: 2,
                 title: 'STT Form',
                 router: '/sstf',
-                active: true,
-                subLink: {
+                active: true
+            },
+            topHeader: [
+                {
+                    type: "refresh",
+                    title: "Refresh",
+                    active: true
+                },
+                {
+                    type: "add",
                     title: 'Add STTF',
-                    router: '/sstf/addSttf'
+                    router: '/sstf/addSttf',
+                    active: true
+                },
+                {
+                    type: "menus",
+                    title: "Batch Operation ",
+                    active: true,
+                    menus: [
+                        {
+                            title: "Upload File",
+                            router: "/stt/addSttf",
+                            active: true
+                        }, {
+                            title: "Downalod File",
+                            router: "/stt/addSttf",
+                            active: true
+                        }, {
+                            title: "Downalod Template",
+                            router: "/stt/addSttf",
+                            active: true
+                        }
+                    ]
                 }
-            }
+            ]
         },
         children: [
             {
@@ -216,7 +283,10 @@ const routes: Routes = [
                 component: CUSTTFComponent,
                 canActivate: [AuthGuard],
                 data:  {
+                    title: 'Add',
+                    action: Action.ADD,
                     breadcrumb: 'Add Sttf',
+                    topHeader: [],
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
                 }
             },
@@ -225,7 +295,10 @@ const routes: Routes = [
                 component: CUSTTFComponent,
                 canActivate: [AuthGuard],
                 data:  {
+                    title: 'Edit',
+                    action: Action.EDIT,
                     breadcrumb: 'Edit Sttf',
+                    topHeader: [],
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
                 }
             },
@@ -234,7 +307,8 @@ const routes: Routes = [
                 component: BatchComponent,
                 data: {
                     action: 'STTF',
-                    breadcrumb: 'Batch',
+                    breadcrumb: 'Batch Sttf',
+                    topHeader: [],
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
                 }
             }
@@ -251,12 +325,42 @@ const routes: Routes = [
                 type: 3,
                 title: 'STT Section',
                 router: '/ssts',
-                active: true,
-                subLink: {
-                    title: 'Add STTS',
-                    router: '/ssts/addStts'
+                active: true
+            },
+            topHeader: [
+                {
+                    type: "add",
+                    title: 'Add STTF',
+                    router: '/sstf/addSttf',
+                    active: true
+                },
+                {
+                    type: "refresh",
+                    title: "Refresh",
+                    router: "/stt/addStt",
+                    active: true
+                },
+                {
+                    type: "menus",
+                    title: "Batch Operation ",
+                    active: true,
+                    menus: [
+                        {
+                            title: "Refresh",
+                            router: "/stt/addStt",
+                            active: true
+                        }, {
+                            title: "Refresh",
+                            router: "/stt/addStt",
+                            active: true
+                        }, {
+                            title: "Refresh",
+                            router: "/stt/addStt",
+                            active: true
+                        }
+                    ]
                 }
-            }
+            ]
         },
         children: [
             {
@@ -273,7 +377,10 @@ const routes: Routes = [
                 component: CUSTTSComponent,
                 canActivate: [AuthGuard],
                 data:  {
+                    title: 'Add',
+                    action: Action.ADD,
                     breadcrumb: 'Add Stts',
+                    topHeader: [],
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
                 }
             },
@@ -282,7 +389,10 @@ const routes: Routes = [
                 component: CUSTTSComponent,
                 canActivate: [AuthGuard],
                 data:  {
+                    title: 'Edit',
+                    action: Action.EDIT,
                     breadcrumb: 'Edit Stts',
+                    topHeader: [],
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
                 }
             },
@@ -291,7 +401,8 @@ const routes: Routes = [
                 component: BatchComponent,
                 data: {
                     action: 'STTS',
-                    breadcrumb: 'Batch',
+                    breadcrumb: 'Batch Stts',
+                    topHeader: [],
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
                 }
             }
@@ -308,12 +419,42 @@ const routes: Routes = [
                 type: 4,
                 router: '/sstc',
                 title: 'STT Control',
-                active: true,
-                subLink: {
-                    title: 'Add STTC',
-                    router: '/sstc/addSttc'
+                active: true
+            },
+            topHeader: [
+                {
+                    type: "add",
+                    title: 'Add STTF',
+                    router: '/sstf/addSttc',
+                    active: true
+                },
+                {
+                    type: "refresh",
+                    title: "Refresh",
+                    router: "/stt/addStt",
+                    active: true
+                },
+                {
+                    type: "menus",
+                    title: "Batch Operation ",
+                    active: true,
+                    menus: [
+                        {
+                            title: "Refresh",
+                            router: "/stt/addStt",
+                            active: true
+                        }, {
+                            title: "Refresh",
+                            router: "/stt/addStt",
+                            active: true
+                        }, {
+                            title: "Refresh",
+                            router: "/stt/addStt",
+                            active: true
+                        }
+                    ]
                 }
-            }
+            ]
         },
         children: [
             {
@@ -330,7 +471,10 @@ const routes: Routes = [
                 component: CUSTTCComponent,
                 canActivate: [AuthGuard],
                 data:  {
+                    title: 'Add',
+                    action: Action.ADD,
                     breadcrumb: 'Add Sttc',
+                    topHeader: [],
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
                 }
             },
@@ -339,7 +483,10 @@ const routes: Routes = [
                 component: CUSTTCComponent,
                 canActivate: [AuthGuard],
                 data:  {
+                    title: 'Edit',
+                    action: Action.EDIT,
                     breadcrumb: 'Edit Sttc',
+                    topHeader: [],
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
                 }
             },
@@ -348,7 +495,8 @@ const routes: Routes = [
                 component: BatchComponent,
                 data: {
                     action: 'STTC',
-                    breadcrumb: 'Batch',
+                    breadcrumb: 'Batch Sttc',
+                    topHeader: [],
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
                 }
             }

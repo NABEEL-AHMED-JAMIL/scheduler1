@@ -15,8 +15,8 @@ import { ApiCode } from '@/_models';
 export class RegisterComponent implements OnInit {
 
     public registerForm: FormGroup;
-    public loading = false;
-    public submitted = false;
+    public loading: any = false;
+    public submitted: any = false;
 
     public password = new FormControl(null, [
         (c: AbstractControl) => Validators.required(c),

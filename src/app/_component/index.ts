@@ -17,7 +17,7 @@ export * from './lookup-setting/cu-lookup/cu-lookup.component';
 // cu-stt
 export * from './stt-setting/stt-setting.component';
 export * from './stt-setting/batch/batch.component';
-export * from './stt-setting/stt-header/task-header.component';
+export * from './stt-setting/stt-header/stt-header.component';
 export * from './stt-setting/cu-stt/cu-stt.component';
 export * from './stt-setting/cu-sttf/cu-sttf.component';
 export * from './stt-setting/cu-stts/cu-stts.component';

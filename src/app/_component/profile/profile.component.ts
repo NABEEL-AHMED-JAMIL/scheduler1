@@ -17,8 +17,8 @@ export class ProfileComponent implements OnInit {
 
     @ViewChild('closebutton', { static: false })
 	public closebutton: any;
-    public submitted:any = false;
-    public loading:any = false;
+    public loading: any = false;
+    public submitted: any = false;
     public appUserForm: FormGroup;
     public updatePassForm: FormGroup;
     public timeZoneForm: FormGroup;
@@ -82,10 +82,10 @@ export class ProfileComponent implements OnInit {
             timeZone: ['', Validators.required]
         });
         this.getAppUserProfile();
-        this.getTimeZoneByByLookupType();
+        this.getTimeZoneByLookupType();
     }
 
-    public getTimeZoneByByLookupType() {
+    public getTimeZoneByLookupType() {
         this.spinnerService.show();
         let payload = {
             lookupType: this.SCHEDULER_TIMEZONE,

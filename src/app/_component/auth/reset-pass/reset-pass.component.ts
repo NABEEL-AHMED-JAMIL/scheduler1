@@ -15,8 +15,8 @@ import jwt_decode from "jwt-decode";
 export class ResetPassComponent implements OnInit {
 
     public resetPassForm: FormGroup;
-    public loading = false;
-    public submitted = false;
+    public loading: any = false;
+    public submitted: any = false;
     public tokenPayload: any;
 
     public newPassword = new FormControl(null, [

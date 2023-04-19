@@ -1,27 +1,57 @@
-<div class="form-group">
-    <label for="searchSourceJobDetails" *ngIf="lookupDatas">
-        Total Lookup ({{lookupDatas.length}})
-    </label>
-    <input type="text" id="searchLookup"
-        class="form-control input-sm"
-        style="width: 35%;"
-        [(ngModel)]="searchLookup"
-        placeholder="Search by any key" />
+<div class="row">
+    <div class="col-lg-6">
+        <label *ngIf="sstForms">
+            Total STTF ({{sstForms.length}})
+        </label>
+        <input type="text" id="searchValue"
+            class="form-control input-sm" 
+            style="width: 60%;"
+            [(ngModel)]="searchValue"
+            placeholder="Search by any key" />
+    </div>
+    <div class="col-lg-6" style="text-align: end;margin-top: 25px;">
+        <!-- working -->
+        <button *ngIf="refreshButton && refreshButton.active" type="button"
+            class="form-control input-sm"
+            style="width: auto;display: inline;margin-right: 7px;"
+            (click)="refreshAction()">
+            <span id="loading" class="glyphicon glyphicon-refresh"></span>
+            {{refreshButton.title}}
+        </button>
+        <!-- working -->
+        <button *ngIf="addButton && addButton.active" type="button"
+            class="form-control input-sm"
+            style="width: auto; background: #cb0f43;color: white;
+            display: inline;margin-right: 7px;" 
+            (click)="addAction()">
+            <span class="glyphicon glyphicon-plus-sign"></span>
+            {{addButton.title}}
+        </button>
+        <div *ngIf="dropdownButton && dropdownButton.active" class="dropdown" style="display: inline;">
+            <button class="btn btn-primary dropdown-toggle"
+                style="padding: 4px 5px;border-radius: 3px;background: #4750b6;"                
+                type="button" data-toggle="dropdown">{{dropdownButton.title}}
+                <span class="caret"></span></button>
+            <ul class="dropdown-menu" style="left: -38px;">
+                <li *ngFor="let menu of dropdownButton.menus">
+                    <a href="#">{{menu.title}}</a></li>
+            </ul>
+        </div>
+    </div>
 </div>
-<table id="source-task-type" class="table table-responsive table
-    table-striped table-bordered table-sm" style="font-size: 12px;">
+<table id="source-task-type" style="font-size: 12px;margin-top: 10px;"
+    class="table table-responsive table table-striped table-bordered table-sm">
     <thead>
         <tr>
             <th style="width: 4%;">-</th>
             <th style="width: 4%;"># No</th>
             <th>Form Name</th>
-            <!-- <th>Description</th> -->
+            <th>Defult</th>
             <th>Created Date</th>
             <th>Total STT</th>
             <th>Total Section</th>
             <th>Total Control</th>
-            <!-- <th>Status</th> -->
-            <th style="width: 14%;">Action</th>
+            <th style="width: 10%;">Action</th>
         </tr>
     </thead>
     <tbody>
@@ -29,23 +59,19 @@
             <td style="text-align: center;">
                 <div class="Yf">
                     <div [ngClass]="{
-                        'Yg_delete': sstForm.status === 'Delete', 
-                        'Yg_inactive' : sstForm.status === 'Inactive',
-                        'Yg_active' : sstForm.status === 'Active'
+                        'Yg_inactive' : sstForm.status.lookupValue === 0,
+                        'Yg_active' : sstForm.status.lookupValue === 1,
+                        'Yg_delete': sstForm.status.lookupValue === 2
                     }"></div>
                 </div>
             </td>
-            <td>
-                {{sstForm.formId}}
-            </td>
-            <td>
-                {{sstForm.formName}}
-            </td>
-            <!-- <td>
-                {{sstForm.description}}
-            </td> -->
+            <td>{{sstForm.sttFId}}</td>
+            <td>{{sstForm.sttFName}}</td>
             <td style="text-align: center;">
-                {{sstForm.dateCreated}}
+                {{sstForm.default ? 'Yes' : 'No'}}
+            </td>
+            <td style="text-align: center;">
+                {{sstForm.dateCreated | date:'dd-MM-yyyy'}}
             </td>
             <td style="text-align: center;">
                 {{sstForm.totalStt}}
@@ -56,42 +82,29 @@
             <td style="text-align: center;">
                 {{sstForm.totalControl}}
             </td>
-            <!-- <td style="text-align: center;">
-                <span class="badge"
-                    [ngClass]="{
-                        'badge-danger': sstForm.status === 'Delete', 
-                        'badge-info' : sstForm.status === 'Inactive',
-                        'badge-success' : sstForm.status === 'Active'
-                    }">{{sstForm.status}}</span>
-            </td> -->
             <td style="text-align: center;">
                 <div class="btn-group btn-group-xs" 
                     role="group" style="text-align: center">
                     <button type="button" class="btn btn-default"
-                        data-toggle="modal" data-target="#sourceTaskTaype">
+                        (click)="editAction(sstForm)">
                         <span class="glyphicon glyphicon-edit"
-                            style="color:blue"></span>
-                    </button>
-                    <button type="button" class="btn btn-default"
-                        data-toggle="modal" data-target="#sourceTaskTaype">
-                        <span class="glyphicon glyphicon-eye-open"
-                            style="color:#008063"></span>
-                    </button>
-                    <!-- download source tasktype -->
-                    <button type="button" class="btn btn-default">
-                        <span class="glyphicon glyphicon-download"
-                            style="color:#17a2b8">
-                        </span>
+                        style="color:blue"></span>
                     </button>
                     <!-- add the method for delete the queue detail -->
                     <button type="button" class="btn btn-default">
-                        <span class="glyphicon glyphicon-trash"
-                            style="color: #dc3545;"></span>
+                        <span class="glyphicon glyphicon-trash" style="color: #dc3545;"></span>
                     </button>
-                    <button type="button" class="btn btn-default">
-                        <span class="glyphicon glyphicon-cog"
-                            style="color: black;"></span>
+                    <!--  -->
+                    <button type="button"
+                        class="btn btn-default dropdown-toggle" 
+                        data-toggle="dropdown">
+                        <span class="glyphicon glyphicon-cog" 
+                        style="color: black;"></span>
                     </button>
+                    <ul class="dropdown-menu" style="left: -90px;">
+                        <li *ngFor="let menu of dropdownButton.menus">
+                            <a href="#">{{menu.title}}</a></li>
+                    </ul>
                 </div>
             </td>
         </tr>

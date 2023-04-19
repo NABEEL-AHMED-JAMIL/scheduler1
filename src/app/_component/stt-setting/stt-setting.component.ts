@@ -1,6 +1,9 @@
 import { Component, OnInit } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
-import { STTSidebar } from '@/_models';
+import { first } from 'rxjs/operators';
+import { AuthenticationService, AlertService, LookupService } from '@/_services';
+import { SpinnerService } from '@/_helpers';
+import { STTSidebar, ApiCode, AuthResponse, LOOKUP_TYPES } from '@/_models';
 
 
 @Component({
@@ -9,67 +12,59 @@ import { STTSidebar } from '@/_models';
 })
 export class SttSettingComponent implements OnInit {
 
+    public currentActiveProfile: AuthResponse;
+    public STT_SIDEBAR: LOOKUP_TYPES;
+
     public selectedMenu: STTSidebar;
-    public sttSidebar: STTSidebar[] = [
-        {
-            type: 1,
-            title: 'STT',
-            router: '/stt',
-            active: false,
-            subLink: {
-                type: 1,
-                title: 'Add STT',
-                router: '/stt/addStt',
-                active: false
-            }
-        },
-        {
-            type: 2,
-            title: 'STT Form',
-            router: '/sstf',
-            active: false,
-            subLink: {
-                type: 1,
-                title: 'Add STTF',
-                router: '/sstf/addSttf',
-                active: false
-            }
-        },
-        {
-            type: 3,
-            title: 'STT Section',
-            router: '/ssts',
-            active: false,
-            subLink: {
-                type: 1,
-                title: 'Add STTS',
-                router: '/ssts/addStts',
-                active: false
-            }
-        },
-        {
-            type: 4,
-            router: '/sstc',
-            title: 'STT Control',
-            active: false,
-            subLink: {
-                type: 1,
-                title: 'Add STTC',
-                router: '/sstc/addSttc',
-                active: false
-            }
-        }
-    ];
+    public sttSidebar: STTSidebar[] = [];
 
     constructor(private route:ActivatedRoute,
-        private router:Router) {
-        this.selectedMenu = route.snapshot.data['selectedMenu'];
+        private router:Router,
+        private lookupService: LookupService,
+        private alertService: AlertService,
+        private spinnerService: SpinnerService,
+        private authenticationService: AuthenticationService) {
+        this.STT_SIDEBAR = LOOKUP_TYPES.STT_SIDEBAR;
+        this.currentActiveProfile = authenticationService.currentUserByProfile;
+        this.getSttSidebarByLookupType();
+        this.route.data.subscribe((data: any) => {
+            this.selectedMenu = data.selectedMenu;
+        });
     }
 
     ngOnInit() {
     }
 
-    public changeTask(changeTask: STTSidebar, index: any) {
+    public getSttSidebarByLookupType(): any {
+        this.spinnerService.show();
+        let payload = {
+            lookupType: this.STT_SIDEBAR,
+            validate: false,
+            accessUserDetail: {
+                appUserId: this.currentActiveProfile.appUserId,
+                username: this.currentActiveProfile.username
+           }
+        }
+        this.lookupService.fetchLookupByLookupType(payload)
+        .pipe(first())
+        .subscribe(
+            response => {
+                this.spinnerService.hide();
+                if (response.status === ApiCode.ERROR) {
+                    this.alertService.showError(response.message, ApiCode.ERROR);
+                    return;
+                }
+                let parentLookupData = response.data?.parentLookupData;
+                let lookupValue = parentLookupData?.lookupValue;
+                this.sttSidebar = JSON.parse(lookupValue);
+            },
+            error => {
+                this.spinnerService.hide();
+                this.alertService.showError(error.message, ApiCode.ERROR);
+            });
+    }
+
+    public changeTask(changeTask: STTSidebar, index: any): any{
         this.sttSidebar = this.sttSidebar.map(stt => {
             stt.active = false;
             return stt;

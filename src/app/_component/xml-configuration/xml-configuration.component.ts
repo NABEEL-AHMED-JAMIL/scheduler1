@@ -26,9 +26,8 @@ export class XmlConfigurationComponent implements OnInit {
         this.xmlForm = this.fb.group({
             tagsInfo: this.fb.array([
                 this.buildItem(), this.buildItem(), this.buildItem(),
-                // this.buildItem(), this.buildItem(), this.buildItem(),
-                // this.buildItem(), this.buildItem(), this.buildItem(),
-                // this.buildItem(), this.buildItem(), this.buildItem()
+                this.buildItem(), this.buildItem(), this.buildItem(),
+                this.buildItem(), this.buildItem()
             ]),
         });
     }

@@ -13,8 +13,8 @@ import { ApiCode } from '@/_models/index';
 export class LoginComponent implements OnInit {
 
     public loginForm: FormGroup;
-    public loading = false;
-    public submitted = false;
+    public loading: any = false;
+    public submitted: any = false;
     public returnUrl: string;
 
     constructor(
