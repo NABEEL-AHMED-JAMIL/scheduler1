@@ -63,40 +63,43 @@ export class TaskComponent implements OnInit {
                     // only the active task can be show
 					this.sourceTaskTypes = response.data.sourceTaskTaypes.filter(sourceTask => sourceTask.status == 'Active');
                     // PIPELINE_IDS
-                    this.settingService.fetchSubLookupByParentId(
-                        response.data.lookupDatas.find(el => el.lookupType === this.PIPELINE_IDS).lookupId)
-                    .pipe(first())
-                    .subscribe((response) => {
-                        if(response.status === ApiCode.SUCCESS) {
+                    if (response.data.lookupDatas.find(el => el.lookupType === this.PIPELINE_IDS)) {
+                        this.settingService.fetchSubLookupByParentId(
+                            response.data.lookupDatas.find(el => el.lookupType === this.PIPELINE_IDS).lookupId)
+                        .pipe(first())
+                        .subscribe((response) => {
+                            if(response.status === ApiCode.SUCCESS) {
+                                this.spinnerService.hide();
+                                this.pipelineIdList = response.data.lookupDatas;
+                                console.log(this.pipelineIdList);
+                            } else {
+                                this.spinnerService.hide();
+                                this.alertService.showError(response.message, this.ERROR);
+                            }
+                        }, (error) => {
                             this.spinnerService.hide();
-                            this.pipelineIdList = response.data.lookupDatas;
-                            console.log(this.pipelineIdList);
-                        } else {
-                            this.spinnerService.hide();
-                            this.alertService.showError(response.message, this.ERROR);
-                        }
-                    }, (error) => {
-                        this.spinnerService.hide();
-                        this.alertService.showError(error, this.ERROR);
-                    });
-
+                            this.alertService.showError(error, this.ERROR);
+                        });
+                    }
                     // PIPLINE_HOME_PAGES
-                    this.settingService.fetchSubLookupByParentId(
-                        response.data.lookupDatas.find(el => el.lookupType === this.PIPLINE_HOME_PAGES).lookupId)
-                    .pipe(first())
-                    .subscribe((response) => {
-                        if(response.status === ApiCode.SUCCESS) {
+                    if (response.data.lookupDatas.find(el => el.lookupType === this.PIPLINE_HOME_PAGES)) {
+                        this.settingService.fetchSubLookupByParentId(
+                            response.data.lookupDatas.find(el => el.lookupType === this.PIPLINE_HOME_PAGES).lookupId)
+                        .pipe(first())
+                        .subscribe((response) => {
+                            if(response.status === ApiCode.SUCCESS) {
+                                this.spinnerService.hide();
+                                this.piplineHomePageList = response.data.lookupDatas;
+                                console.log(this.piplineHomePageList);
+                            } else {
+                                this.spinnerService.hide();
+                                this.alertService.showError(response.message, this.ERROR);
+                            }
+                        }, (error) => {
                             this.spinnerService.hide();
-                            this.piplineHomePageList = response.data.lookupDatas;
-                            console.log(this.piplineHomePageList);
-                        } else {
-                            this.spinnerService.hide();
-                            this.alertService.showError(response.message, this.ERROR);
-                        }
-                    }, (error) => {
-                        this.spinnerService.hide();
-                        this.alertService.showError(error, this.ERROR);
-                    });
+                            this.alertService.showError(error, this.ERROR);
+                        });
+                    }
 				} else {
 					this.spinnerService.hide();
 					this.alertService.showError(response.message, this.ERROR);
