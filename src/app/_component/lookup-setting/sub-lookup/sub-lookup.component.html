@@ -124,10 +124,10 @@
                 <div class="row">
                     <div class="col-lg-12">
                         <div class="form-group">
-                            <label for="searchSourceJobDetails" *ngIf="lookupDatas">
+                            <label for="lookupDatas" *ngIf="lookupDatas">
                                 Total Lookup ({{lookupDatas.length}})
                             </label>
-                            <input type="text" id="searchSourceJobDetails" 
+                            <input type="text" id="lookupDatasSearch" 
                                 class="form-control input-sm"
                                 style="width: 30%;" [(ngModel)]="searchLookup"
                                 placeholder="Search by any key" />

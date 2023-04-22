@@ -2,7 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { first } from 'rxjs/operators';
 import { AuthenticationService, AlertService,
-    LookupService, STTService, AppUserService
+    LookupService, STTService
 } from '@/_services';
 import { Location } from '@angular/common';
 import { SpinnerService } from '@/_helpers';
@@ -53,7 +53,6 @@ export class CUSTTComponent implements OnInit {
         private alertService: AlertService,
         private lookupService: LookupService,
         private spinnerService: SpinnerService,
-        private appUserService: AppUserService,
         private authenticationService: AuthenticationService) {
             this.currentActiveProfile = authenticationService.currentUserValue;
             this.ISDEFAULT = LOOKUP_TYPES.ISDEFAULT;
@@ -76,7 +75,6 @@ export class CUSTTComponent implements OnInit {
     ngOnInit() {
         this.getTaskTypeByLookupType();
         this.getHttpMethodByLookupType();
-        this.getSubAppUserAccount();
         if (this.action === Action.ADD) {
             this.sttForm = this.formBuilder.group({
                 description: ['', [Validators.required]],
@@ -191,26 +189,6 @@ export class CUSTTComponent implements OnInit {
                     return;
                 }
                 this.httpMethodOption = response.data;
-            },
-            error => {
-                this.spinnerService.hide();
-                this.alertService.showError(error.message, ApiCode.ERROR);
-            });
-    }
-
-    public getSubAppUserAccount(): any {
-        this.spinnerService.show();
-        this.appUserService.getSubAppUserAccount(this.currentActiveProfile.username)
-        .pipe(first())
-        .subscribe(
-            response => {
-                this.spinnerService.hide();
-                if (response.status === ApiCode.ERROR) {
-                    this.alertService.showError(response.message, ApiCode.ERROR);
-                    return;
-                }
-                this.appUsers = response.data;
-                console.log(this.appUsers);
             },
             error => {
                 this.spinnerService.hide();

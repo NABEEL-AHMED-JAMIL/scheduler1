@@ -127,69 +127,6 @@ export interface SourceTask {
     totalLinksJobs?: any;
 }
 
-export const SOURCE_TASK_DETAIL: SourceTask[] = [
-    {
-      taskDetailId: 1001,
-      taskName: "Test Source 2",
-      taskStatus: "Active",
-      sourceTaskType: {
-        sourceTaskTypeId: "1000",
-        serviceName: "Test",
-        description: "[consumer test]",
-        queueTopicPartition: "topic=test-topic&partitions=[*]"
-      },
-      totalLinksJobs: 0
-    },
-    {
-      taskDetailId: 1006,
-      taskName: "Test Source 12",
-      taskStatus: "Active",
-      sourceTaskType: {
-        sourceTaskTypeId: "1000",
-        serviceName: "Test",
-        description: "[consumer test]",
-        queueTopicPartition: "topic=test-topic&partitions=[*]"
-      },
-      totalLinksJobs: 0
-    },
-    {
-      taskDetailId: 1005,
-      taskName: "Test Source 12",
-      taskStatus: "Active",
-      sourceTaskType: {
-        sourceTaskTypeId: "1000",
-        serviceName: "Test",
-        description: "[consumer test]",
-        queueTopicPartition: "topic=test-topic&partitions=[*]"
-      },
-      totalLinksJobs: 0
-    },
-    {
-      taskDetailId: 1007,
-      taskName: "Test 19",
-      taskStatus: "Active",
-      sourceTaskType: {
-        sourceTaskTypeId: "1001",
-        serviceName: "Web Scrapping",
-        description: "[only for file type (non of image)]",
-        queueTopicPartition: "topic=scrapping-topic&partitions=[0]"
-      },
-      totalLinksJobs: 0
-    },
-    {
-      taskDetailId: 1000,
-      taskName: "Test Source 1",
-      taskStatus: "Active",
-      sourceTaskType: {
-        sourceTaskTypeId: "1000",
-        serviceName: "Test",
-        description: "[consumer test]",
-        queueTopicPartition: "topic=test-topic&partitions=[*]"
-      },
-      totalLinksJobs: 5
-    }
-];
-
 export interface SourceJobDetail {
   jobId?: any;
   jobName?: any;
@@ -245,29 +182,6 @@ export enum Action {
   STT
 };
 
-export const SEARCH_TASK_LIST: String[] = [
-  'taskDetailId',
-  'taskName',
-  'taskStatus',
-  'totalLinksJobs',
-  'sourceTaskTypeId',
-  'serviceName'
-];
-
-export const STATUS_LIST: any = [
-  {
-    key: 'Inactive',
-    value: 0,
-  },
-  {
-    key: 'Active',
-    value: 1
-  },
-  {
-    key: 'Delete',
-    value: 2,
-  }
-];
 
 export interface AppUserResponse {
   appUserId?: any;
@@ -300,7 +214,8 @@ export enum LOOKUP_TYPES {
   TASKTYPE_OPTION = 'TASKTYPE_OPTION',
   STT_SIDEBAR = 'STT_SIDEBAR',
   REQUEST_METHOD = 'REQUEST_METHOD',
-  ISDEFAULT = 'ISDEFAULT'
+  ISDEFAULT = 'ISDEFAULT',
+  FORM_CONTROL_TYPE = 'FORM_CONTROL_TYPE'
 }
 
 export interface STTSidebar {
