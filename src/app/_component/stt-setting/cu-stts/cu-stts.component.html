@@ -63,7 +63,7 @@
     }
 </style>
 
-<div class="row gutters-sm">
+<div class="row gutters-sm" style="margin-top: 15px;" *ngIf="sttsForm">
     <form [formGroup]="sttsForm" (ngSubmit)="onSubmit()">
         <div class="col-lg-12">
             <div id="basic" class="borderd-content">
@@ -73,8 +73,11 @@
                         <div class="col-lg-4">
                             <div class="form-group">
                                 <label for="sttsName">Section Name</label>
-                                <input type="text" id="sttsName" maxlength="40" formControlName="sttsName"
-                                    class="form-control input-sm" placeholder="Enter section name"
+                                <input type="text" id="sttsName" maxlength="40"
+                                    formControlName="sttsName"
+                                    class="form-control input-sm"
+                                    placeholder="Enter section name"
+                                    oninput="this.value = this.value.toUpperCase()"
                                     [ngClass]="{ 'is-invalid': submitted && f.sttsName.errors }" />
                                 <div *ngIf="submitted && f.sttsName.errors" class="invalid-feedback">
                                     <div *ngIf="f.sttsName.errors.required" style="color: red;">
@@ -85,9 +88,26 @@
                         </div>
                         <div class="col-lg-4">
                             <div class="form-group">
+                                <label for="description">Description</label>
+                                <input id="description" maxlength="40"
+                                    formControlName="description"
+                                    class="form-control input-sm"
+                                    placeholder="Enter description"
+                                    [ngClass]="{ 'is-invalid': submitted && f.description.errors }"/>
+                                <div *ngIf="submitted && f.description.errors" class="invalid-feedback">
+                                    <div *ngIf="f.description.errors.required" style="color: red;">
+                                        Description is required
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-4">
+                            <div class="form-group">
                                 <label for="sttsOrder">Section Order</label>
-                                <input type="number" id="sttsOrder" min="0" max="10" formControlName="sttsOrder"
-                                    class="form-control input-sm" placeholder="Enter sttsOrder" />
+                                <input type="number" id="sttsOrder" min="0" max="10"
+                                    formControlName="sttsOrder"
+                                    class="form-control input-sm"
+                                    placeholder="Enter section order" />
                                 <div *ngIf="submitted && f.sttsOrder.errors" class="invalid-feedback">
                                     <div *ngIf="f.sttsOrder.errors.required" style="color: red;">
                                         Order is required
@@ -95,17 +115,18 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="col-lg-4" *ngIf="statusList">
-                            <div class="form-group">
+                        <div class="col-lg-4" *ngIf="action === 2">
+                            <div class="form-group" *ngIf="statusList">
                                 <label for="status">Status</label>
-                                <select id="status" class="form-control input-sm" formControlName="status"
+                                <select id="status" class="form-control input-sm"
+                                    formControlName="status"
+                                    [attr.disabled]="f.status.value === 2 ? true : null"
                                     [ngClass]="{ 'is-invalid': submitted && f.status.errors }">
                                     <option hidden value="" disabled selected>
                                         {{statusList.parentLookupData.description}}
                                     </option>
                                     <option *ngFor="let status of statusList.subLookupData"
-                                        [value]="status.lookupValue">
-                                        {{status.description}}
+                                        [value]="status.lookupValue">{{status.description}}
                                     </option>
                                 </select>
                                 <div *ngIf="submitted && f.status.errors" class="invalid-feedback">
@@ -115,15 +136,22 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="col-lg-12">
-                            <div class="form-group">
-                                <label for="description">Description</label>
-                                <textarea id="description" maxlength="40" formControlName="description"
-                                    class="form-control input-sm" placeholder="Enter description"
-                                    [ngClass]="{ 'is-invalid': submitted && f.description.errors }"></textarea>
-                                <div *ngIf="submitted && f.description.errors" class="invalid-feedback">
-                                    <div *ngIf="f.description.errors.required" style="color: red;">
-                                        Description is required
+                        <div class="col-lg-4" *ngIf="action === 2">
+                            <div class="form-group" *ngIf="defultOption">
+                                <label for="defaultStts">Default</label>
+                                <select id="defaultStts" class="form-control input-sm"
+                                    formControlName="defaultStts"
+                                    [ngClass]="{ 'is-invalid': submitted && f.defaultStts.errors }">
+                                    <option hidden value="" disabled selected>
+                                        {{defultOption.parentLookupData.description}}
+                                    </option>
+                                    <option *ngFor="let defultOpt of defultOption.subLookupData"
+                                        [value]="defultOpt.lookupValue">{{defultOpt.description}}
+                                    </option>
+                                </select>
+                                <div *ngIf="submitted && f.defaultStts.errors" class="invalid-feedback">
+                                    <div *ngIf="f.defaultStts.errors.required" style="color: red;">
+                                        Default is required
                                     </div>
                                 </div>
                             </div>
@@ -133,8 +161,14 @@
             </div>
         </div>
         <div class="col-lg-12" style="margin-top: 15px;margin-bottom: 5px;">
-            <button class="btn btn-sm btn-default" (click)="back()">Clear</button>
-            <button  type="submit" [disabled]="loading" class="btn btn-sm btn-danger" style="float:right" >Register</button>
+            <button type="reset" 
+                [attr.disabled]="f?.status?.value === 2 ? true : null"
+                class="btn btn-sm btn-default">CLEAR</button>
+            <button type="submit" [disabled]="loading"
+                [attr.disabled]="f?.status?.value === 2 ? true : null"
+                class="btn btn-sm btn-danger"
+                style="float:right">{{breadcrumb | uppercase}}
+            </button>
         </div>
     </form>
 </div>

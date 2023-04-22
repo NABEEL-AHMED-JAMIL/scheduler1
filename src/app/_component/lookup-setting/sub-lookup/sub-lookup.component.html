@@ -65,25 +65,34 @@
                         {{title}}
                     </div>
                     <div class="col-lg-6" style="text-align: end;">
-                        <button type="button" class="form-control input-sm"
-                            style="width: auto;float: right;margin-left: 5px;
-                            background: #4750b6;color: white;"
-                            id="download" (click)="subLookupBatch()">
-                            <span class="glyphicon glyphicon-cog"></span>
-                            Batch Action</button>
-                        <button type="button" class="form-control input-sm"
-                            style="width: auto;float: right;margin-left: 5px;
-                            background: #cb0f43;color: white;"
-                            data-toggle="modal" data-target="#lookupDatas"
+                        <button *ngIf="refreshButton && refreshButton.active" type="button"
+                            class="form-control input-sm" 
+                            style="width: auto;display: inline;margin-right: 7px;"
+                            (click)="refreshAction()">
+                            <span class="glyphicon glyphicon-refresh"></span>
+                            {{refreshButton.title}}
+                        </button>
+                        <button *ngIf="addButton && addButton.active" type="button"
+                            class="form-control input-sm"
+                            style="width: auto; background: #cb0f43; color: white;
+                                display: inline;margin-right: 7px;" 
+                             data-toggle="modal" data-target="#lookupDatas"
                             (click)="addLookupDatas()">
                             <span class="glyphicon glyphicon-plus-sign"></span>
-                            Add Lookup</button>
-                        <button type="button" class="form-control input-sm"
-                            style="width: auto;float: right;margin-left: 5px;"
-                            (click)="fetchAllSubLookup()">
-                            <span id="loading" 
-                                class="glyphicon glyphicon-refresh"></span>
-                            Refresh</button>
+                            {{addButton.title}}
+                        </button>
+                        <div *ngIf="dropdownButton && dropdownButton.active" 
+                            class="dropdown" style="display: inline;">
+                            <button class="btn btn-primary dropdown-toggle"
+                                style="padding: 4px 5px;border-radius: 3px;background: #4750b6;"                
+                                type="button" data-toggle="dropdown">{{dropdownButton.title}}
+                                <span class="caret"></span></button>
+                            <ul class="dropdown-menu" style="left: -38px;">
+                                <li *ngFor="let menu of dropdownButton.menus">
+                                    <a (click)="menuAction(menu)">{{menu.title}}</a>
+                                </li>
+                            </ul>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -133,7 +142,7 @@
                             <th>Lookup Type</th>
                             <th>Lookup Value</th>
                             <th>Description</th>
-                            <th>Created Date</th>
+                            <th style="width: 8%;">Created Date</th>
                             <th style="width: 6%;">Action</th>
                         </tr>
                     </thead>
@@ -156,10 +165,10 @@
                                             style="color:blue"></span>
                                     </button>
                                     <button type="button" class="btn btn-default"
-                                        (click)="deleteLookupData(lookupData, i)"
-                                        data-toggle="modal" data-target="#sub-lookup">
+                                    data-toggle="modal" data-target="#deleteAction"
+                                        (click)="deleteLookupData(lookupData, i)">
                                         <span class="glyphicon glyphicon-trash"
-                                            style="color: black;"></span>
+                                            style="color: #dc3545;"></span>
                                     </button>
                                 </div>
                             </td>
@@ -176,3 +185,12 @@
     [recivedLookupData]="lookupData"
     (senderEvent) = "resetEvent($event)">
 </cu-lookup >
+
+<div class="modal fade" id="deleteAction"
+    role="dialog" style="top: 85px;">
+    <del-box
+        [title]="title"
+        [subTitle]="subTitle"
+        (deleteEvent)="deleteActionTriger()">
+    </del-box>
+</div>

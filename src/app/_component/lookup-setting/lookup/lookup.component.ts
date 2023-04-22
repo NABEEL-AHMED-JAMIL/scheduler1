@@ -1,8 +1,8 @@
 import { Component, Input, OnInit } from '@angular/core';
 import { first } from 'rxjs/operators';
-import { AuthenticationService, AlertService, LookupService } from '@/_services';
+import { AuthenticationService, AlertService, LookupService, CommomService } from '@/_services';
 import { SpinnerService } from '@/_helpers';
-import { Router } from '@angular/router';
+import { Router, ActivatedRoute } from '@angular/router';
 import { ApiCode, Action } from '@/_models';
 import { AuthResponse, LookupData } from '@/_models/index';
 
@@ -21,16 +21,44 @@ export class LookupComponent implements OnInit {
     public lookupData: LookupData;
     public lookupDatas: LookupData[];
 
-    constructor(
-        private router: Router,
+    public addButton: any;
+    public refreshButton: any;
+    public dropdownButton: any;
+    public topHeader: any = [];
+
+    constructor(private router: Router,
+        private route: ActivatedRoute,
         private lookupService: LookupService,
         private alertService: AlertService,
         private spinnerService: SpinnerService,
+        private commomService: CommomService,
         private authenticationService: AuthenticationService) {
-        this.currentActiveProfile = authenticationService.currentUserByProfile;
+        this.currentActiveProfile = authenticationService.currentUserValue;
+        this.route.data.subscribe((data: any) => {
+            this.topHeader = data.topHeader;
+            if (this.topHeader) {
+                this.topHeader.forEach(header => {
+                    if (header.type === 'add') {
+                        this.addButton = header;
+                    } else if (header.type === 'refresh') {
+                        this.refreshButton = header;
+                    } else if (header.type === 'menus') {
+                        this.dropdownButton = header;
+                        this.dropdownButton.menus = this.dropdownButton.menus
+                        .filter(menu => {
+                            return menu.active;
+                        });
+                    }
+                });
+            }
+        });
     }
 
     ngOnInit() {
+        this.fetchAllLookup();
+    }
+
+    public refreshAction(): void {
         this.fetchAllLookup();
     }
 
@@ -60,20 +88,64 @@ export class LookupComponent implements OnInit {
             });
     }
 
+    public menuAction(payload: any): any {
+        if (payload.router) {
+            this.router.navigate([payload.router]);
+        } else if (payload.targetEvent) {
+            if (payload.targetEvent === 'downloadData') {
+                this.downloadData();
+            } else if (payload.targetEvent === 'downloadTemplate') {
+                this.downloadTemplate();
+            }
+        }
+    }
+
+    public downloadData(): void {
+        this.spinnerService.show();
+        let payload = {
+            accessUserDetail: {
+                appUserId: this.currentActiveProfile.appUserId,
+                username: this.currentActiveProfile.username
+           }
+        }
+        this.lookupService.downloadLookup(payload)
+        .pipe(first())
+        .subscribe((response) => {
+            this.commomService.downLoadFile(response);
+            this.spinnerService.hide();
+        }, (error) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error, ApiCode.ERROR);
+        });
+    }
+
+    public downloadTemplate(): void {
+        this.spinnerService.show();
+        this.lookupService.downloadLookupTemplateFile()
+        .pipe(first())
+        .subscribe((response) => {
+            this.commomService.downLoadFile(response);
+            this.spinnerService.hide();
+        }, (error) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error, ApiCode.ERROR);
+        });
+    }
+
     public addLookupDatas(): void {
 		this.lookupAction = Action.ADD;
 	}
 
-    public editLookupData(lookupData: LookupData): void {
+    public editLookupData(payload: LookupData): void {
 		this.lookupAction = Action.EDIT;
-		this.lookupData = lookupData;
+		this.lookupData = payload;
 	}
 
-    public editSubLookupData(lookupData: LookupData): void {
+    public editSubLookupData(payload: LookupData): void {
 		this.router.navigate(['/sublookup'],
             {
                 queryParams: {
-                    lookupId: lookupData.lookupId
+                    lookupId: payload.lookupId
                 }
             });
 	}

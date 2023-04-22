@@ -312,7 +312,7 @@ export interface STTSidebar {
 }
 
 export interface STTList {
-  sourceTaskTypeId: any;
+  sttId: any;
   serviceName: any;
   description: any;
   dateCreated: any;
@@ -325,8 +325,8 @@ export interface STTList {
 }
 
 export interface STTFormList {
-  formId: any;
-  formName: any;
+  sttFId: any;
+  sttFName: any;
   description: any;
   dateCreated: any;
   status: any;
@@ -337,12 +337,12 @@ export interface STTFormList {
 }
 
 export interface STTSectionList {
-  sectionId: any;
-  sectionName: any;
+  sttSId: any;
+  sttSName: any;
   description: any;
   dateCreated: any;
   status: any;
-  sectionOrder: any;
+  sttSOrder: any;
   totalStt: any;
   totalForm: any;
   totalControl: any;
@@ -350,9 +350,9 @@ export interface STTSectionList {
 }
 
 export interface STTControlList {
-  controlId: any;
-  controlOrder: any;
-  controlName: any;
+  sstCId: any;
+  sstCOrder: any;
+  sstCName: any;
   filedName: any;
   filedType: any;
   description: any;

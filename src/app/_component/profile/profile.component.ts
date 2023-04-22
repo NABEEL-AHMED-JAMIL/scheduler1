@@ -47,7 +47,7 @@ export class ProfileComponent implements OnInit {
         private appUserService: AppUserService,
         private spinnerService: SpinnerService,
         private lookupService: LookupService) {
-        this.currentActiveProfile = authenticationService.currentUserByProfile;
+        this.currentActiveProfile = authenticationService.currentUserValue;
         this.SCHEDULER_TIMEZONE = LOOKUP_TYPES.SCHEDULER_TIMEZONE;
     }
 

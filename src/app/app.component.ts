@@ -29,7 +29,6 @@ export class AppComponent {
         private authenticationService: AuthenticationService,
         private readonly breadcrumbService: BreadcrumbService) {
             this.breadcrumbs = breadcrumbService.breadcrumbs$;
-            console.log(this.breadcrumbs);
             this.authenticationService.currentUser
             .subscribe(currentUser => {
                 this.currentUser = currentUser;

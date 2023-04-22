@@ -19,7 +19,6 @@ export class CUSTTFComponent implements OnInit {
     public loading: any = false;
     public submitted: any = false;
 
-
     public title: any;
     public breadcrumb: any;
     public topHeader: any;
@@ -42,7 +41,7 @@ export class CUSTTFComponent implements OnInit {
         private alertService: AlertService,
         private spinnerService: SpinnerService,
         private authenticationService: AuthenticationService) {
-            this.currentActiveProfile = authenticationService.currentUserByProfile;
+            this.currentActiveProfile = authenticationService.currentUserValue;
             this.ISDEFAULT = LOOKUP_TYPES.ISDEFAULT;
             this.APPLICATION_STATUS = LOOKUP_TYPES.APPLICATION_STATUS;
             this.route.data.subscribe((data: any) => {
@@ -95,6 +94,10 @@ export class CUSTTFComponent implements OnInit {
                     return;
                 }
                 this.statusList = response.data;
+                this.statusList.subLookupData = this.statusList.subLookupData
+                .filter(lookup => {
+                    return lookup.lookupValue != '2';
+                });
             },
             error => {
                 this.spinnerService.hide();

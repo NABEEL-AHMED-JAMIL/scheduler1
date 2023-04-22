@@ -3,10 +3,14 @@
     <div class="modal-dialog">
       <!-- Modal content-->
       <div class="modal-content" style="border: none">
-        <form *ngIf="lookupDataForm" [formGroup]="lookupDataForm" (ngSubmit)="submitLookupData()">
-            <div class="modal-header">
-                <button type="button" class="close" #closeLookupData data-dismiss="modal"
-                    (click)="resetEvent(4)" style="color: white;">&times;
+        <form *ngIf="lookupDataForm"
+            [formGroup]="lookupDataForm"
+            (ngSubmit)="submitLookupData()">
+            <div class="modal-header" style="background: #555;">
+                <button type="button" class="close"
+                    #closeLookupData data-dismiss="modal"
+                    (click)="resetEvent(4)"
+                    style="color: white;">&times;
                 </button>
                 <h4 class="modal-title">{{LOOKUP_DATA_TITLE}}</h4>
             </div>
@@ -28,8 +32,10 @@
                 </div>
                 <div class="form-group">
                     <label for="lookupValue">LookupValue</label>
-                        <textarea formControlName="lookupValue" class="form-control input-sm"
-                        [ngClass]="{ 'is-invalid': lookupData.lookupValue.errors }" rows="3"></textarea>
+                    <textarea formControlName="lookupValue" 
+                        class="form-control input-sm"
+                        [ngClass]="{ 'is-invalid': lookupData.lookupValue.errors }" rows="3">
+                    </textarea>
                     <div *ngIf="submitted && lookupData.lookupValue.errors" class="invalid-feedback">
                         <div *ngIf="lookupData.lookupValue.errors.required" style="color: red;">
                             LookupValue is required
@@ -38,10 +44,12 @@
                 </div>
                 <div class="form-group">
                     <label for="description">Description</label>
-                    <textarea type="text" formControlName="description" class="form-control input-sm"
-                        [ngClass]="{ 'is-invalid': lookupData.description.errors }" rows="3"></textarea>
-                    <div *ngIf="submitted && lookupData.description.errors" class="invalid-feedback" style="color: red;">
-                        <div *ngIf="lookupData.description.errors.required">
+                    <textarea formControlName="description" 
+                        class="form-control input-sm"
+                        [ngClass]="{ 'is-invalid': lookupData.description.errors }" rows="3">
+                    </textarea>
+                    <div *ngIf="submitted && lookupData.description.errors" class="invalid-feedback">
+                        <div *ngIf="lookupData.description.errors.required" style="color: red;">
                             Description is required
                         </div>
                     </div>

@@ -1,4 +1,6 @@
-﻿﻿<nav class="navbar navbar-inverse" style="border-radius: 0px;margin-bottom: 0px;" *ngIf="currentUser">
+﻿﻿<nav class="navbar navbar-inverse" 
+  style="border-radius: 0px;margin-bottom: 0px;" 
+  *ngIf="currentUser">
   <div class="container-fluid">
     <div class="navbar-header">
       <a class="navbar-brand" routerLink="/home">ETL 2023</a>
@@ -26,14 +28,6 @@
       </li>
     </ul>
     <ul class="nav navbar-nav navbar-right">
-      <li style="margin-right: 10px;" *ngIf="hasAccess(['ROLE_MASTER_ADMIN'])">
-        <select class="form-control input-sm" style="margin-top: 10px;">
-          <option>(GMT-5:00) America/New_York</option>
-          <option>(GMT+5:00) Asia/Karachi</option>
-          <option>(GMT-05:00) America/New_York</option>
-          <option>(GMT-5:00) America/New_York</option>
-        </select>
-      </li>
       <li class="dropdown">
         <a href="#" class="dropdown-toggle" data-toggle="dropdown"
           role="button" aria-haspopup="true" aria-expanded="false">
@@ -74,12 +68,16 @@
   </div>
 </nav>
 <!-- main app container -->
-<ol class="breadcrumb" style="margin-bottom: 0px">
+<ol class="breadcrumb" 
+  style="margin-bottom: 0px"
+  *ngIf="currentUser">
   <li><a routerLink="/home">Home</a></li>
   <li *ngFor="let breadcrumb of (breadcrumbs | async)">
-      <a [routerLink]="breadcrumb.url">{{ breadcrumb.label }}</a>
+    <a [routerLink]="breadcrumb.url">{{ breadcrumb.label }}</a>
   </li>
-  <a (click)="back()" style="float: right;">Back</a>
+  <a (click)="back()" style="float: right;">
+    <span class="glyphicon glyphicon-arrow-left"></span>
+  </a>
 </ol>
 <router-outlet></router-outlet>
 <spinner></spinner>

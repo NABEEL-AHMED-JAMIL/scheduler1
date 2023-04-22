@@ -1,13 +1,12 @@
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { first } from 'rxjs/operators';
-import { AuthenticationService,
-    AlertService, LookupService, STTService 
+import { AuthenticationService, AlertService,
+    LookupService, STTService, AppUserService
 } from '@/_services';
-import { SpinnerService } from '@/_helpers';
-import { ApiCode, Action } from '@/_models';
-import { AuthResponse, LOOKUP_TYPES } from '@/_models/index';
 import { Location } from '@angular/common';
+import { SpinnerService } from '@/_helpers';
+import { ApiCode, Action, AuthResponse, LOOKUP_TYPES } from '@/_models/index';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 
 
@@ -32,6 +31,7 @@ export class CUSTTComponent implements OnInit {
     public topicName: any = '%s';
     public topicPattern: any = `topic=${this.topicName}&partitions=[*]`;
 
+    public appUsers: any;
     public statusList: any;
     public httpMethodOption: any;
     public taskTypeOption: any;
@@ -53,8 +53,9 @@ export class CUSTTComponent implements OnInit {
         private alertService: AlertService,
         private lookupService: LookupService,
         private spinnerService: SpinnerService,
+        private appUserService: AppUserService,
         private authenticationService: AuthenticationService) {
-            this.currentActiveProfile = authenticationService.currentUserByProfile;
+            this.currentActiveProfile = authenticationService.currentUserValue;
             this.ISDEFAULT = LOOKUP_TYPES.ISDEFAULT;
             this.REQUEST_METHOD = LOOKUP_TYPES.REQUEST_METHOD;
             this.TASKTYPE_OPTION = LOOKUP_TYPES.TASKTYPE_OPTION;
@@ -75,6 +76,7 @@ export class CUSTTComponent implements OnInit {
     ngOnInit() {
         this.getTaskTypeByLookupType();
         this.getHttpMethodByLookupType();
+        this.getSubAppUserAccount();
         if (this.action === Action.ADD) {
             this.sttForm = this.formBuilder.group({
                 description: ['', [Validators.required]],
@@ -196,6 +198,26 @@ export class CUSTTComponent implements OnInit {
             });
     }
 
+    public getSubAppUserAccount(): any {
+        this.spinnerService.show();
+        this.appUserService.getSubAppUserAccount(this.currentActiveProfile.username)
+        .pipe(first())
+        .subscribe(
+            response => {
+                this.spinnerService.hide();
+                if (response.status === ApiCode.ERROR) {
+                    this.alertService.showError(response.message, ApiCode.ERROR);
+                    return;
+                }
+                this.appUsers = response.data;
+                console.log(this.appUsers);
+            },
+            error => {
+                this.spinnerService.hide();
+                this.alertService.showError(error.message, ApiCode.ERROR);
+            });
+    }
+
     public getApplicationStatusByLookupType(): any {
         this.spinnerService.show();
         let payload = {
@@ -216,6 +238,10 @@ export class CUSTTComponent implements OnInit {
                     return;
                 }
                 this.statusList = response.data;
+                this.statusList.subLookupData = this.statusList.subLookupData
+                .filter(lookup => {
+                    return lookup.lookupValue != '2';
+                });
             },
             error => {
                 this.spinnerService.hide();
@@ -312,6 +338,7 @@ export class CUSTTComponent implements OnInit {
      }
 
     public editKafkaTaskType(payload: any): void {
+        this.changeOnTopicNameValue(payload.topicName);
         this.sttForm.addControl('kafkaTaskType',
             this.formBuilder.group({
                 numPartitions: [payload.numPartitions, [Validators.required, Validators.min(1), Validators.max(5)]],

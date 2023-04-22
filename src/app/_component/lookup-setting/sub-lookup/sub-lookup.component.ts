@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { first } from 'rxjs/operators';
-import { AuthenticationService, AlertService, LookupService } from '@/_services';
+import { AuthenticationService, AlertService,
+	LookupService, CommomService } from '@/_services';
 import { SpinnerService } from '@/_helpers';
 import { Router, ActivatedRoute } from '@angular/router';
 import { ApiCode, Action } from '@/_models';
@@ -23,14 +24,38 @@ export class SubLookupComponent implements OnInit {
 	public parentLookupDate: LookupData;
 	public lookupDatas: LookupData[] = [];
 
+	public addButton: any;
+    public refreshButton: any;
+    public dropdownButton: any;
+    public topHeader: any = [];
+
     constructor(private router: Router,
-		private activatedRoute: ActivatedRoute,
+		private route: ActivatedRoute,
 		private alertService: AlertService,
 		private spinnerService: SpinnerService,
 		private lookupService: LookupService,
+		private commomService: CommomService,
         private authenticationService: AuthenticationService) {
-        this.currentActiveProfile = authenticationService.currentUserByProfile;
-		this.activatedRoute.queryParams
+        this.currentActiveProfile = authenticationService.currentUserValue;
+		this.route.data.subscribe((data: any) => {
+            this.topHeader = data.topHeader;
+            if (this.topHeader) {
+                this.topHeader.forEach(header => {
+                    if (header.type === 'add') {
+                        this.addButton = header;
+                    } else if (header.type === 'refresh') {
+                        this.refreshButton = header;
+                    } else if (header.type === 'menus') {
+                        this.dropdownButton = header;
+                        this.dropdownButton.menus = this.dropdownButton.menus
+                        .filter(menu => {
+                            return menu.active;
+                        });
+                    }
+                });
+            }
+        });
+		this.route.queryParams
 		.subscribe(params => {
 			this.lookupId = params['lookupId'];
 			this.fetchSubLookupByParentId(this.lookupId);
@@ -39,15 +64,6 @@ export class SubLookupComponent implements OnInit {
 
     ngOnInit() {
     }
-
-	public subLookupBatch(): void {
-		this.router.navigate(['/sublookup/sublookupbatch'],
-            {
-                queryParams: {
-                    lookupId: this.lookupId
-                }
-            });
-	}
 
 	public addLookupDatas(): void {
 		this.lookupAction = Action.ADD;
@@ -60,10 +76,26 @@ export class SubLookupComponent implements OnInit {
 		this.lookupData = lookupData;
 	}
 
-	public fetchAllSubLookup(): void {
+	public refreshAction(): void {
 		this.fetchSubLookupByParentId(this.lookupId);
 	}
 
+	public menuAction(payload: any): any {
+        if (payload.router) {
+            this.router.navigate([payload.router],
+				{
+					queryParams: {
+						lookupId: this.lookupId
+					}
+			});
+        } else if (payload.targetEvent) {
+            if (payload.targetEvent === 'downloadData') {
+                this.downloadData();
+            } else if (payload.targetEvent === 'downloadTemplate') {
+                this.downloadTemplate();
+            }
+        }
+    }
 
     public fetchSubLookupByParentId(parentLookUpId: any): void {
 		this.spinnerService.show();
@@ -88,6 +120,39 @@ export class SubLookupComponent implements OnInit {
 			this.spinnerService.hide();
 			this.alertService.showError(error, ApiCode.ERROR);
 		});
+    }
+
+	public downloadData(): void {
+        this.spinnerService.show();
+        let payload = {
+			parentLookupId: this.lookupId,
+            accessUserDetail: {
+                appUserId: this.currentActiveProfile.appUserId,
+                username: this.currentActiveProfile.username
+           }
+        }
+        this.lookupService.downloadLookup(payload)
+        .pipe(first())
+        .subscribe((response) => {
+            this.commomService.downLoadFile(response);
+            this.spinnerService.hide();
+        }, (error) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error, ApiCode.ERROR);
+        });
+    }
+
+    public downloadTemplate(): void {
+        this.spinnerService.show();
+        this.lookupService.downloadLookupTemplateFile()
+        .pipe(first())
+        .subscribe((response) => {
+            this.commomService.downLoadFile(response);
+            this.spinnerService.hide();
+        }, (error) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error, ApiCode.ERROR);
+        });
     }
 
     public deleteLookupData(lookupData: LookupData, index: any): void {

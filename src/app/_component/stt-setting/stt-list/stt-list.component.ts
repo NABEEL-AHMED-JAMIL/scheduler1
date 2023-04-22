@@ -4,8 +4,7 @@ import { STTList } from '@/_models';
 import { first } from 'rxjs/operators';
 import { AuthenticationService, AlertService, STTService } from '@/_services';
 import { SpinnerService } from '@/_helpers';
-import { ApiCode, Action } from '@/_models';
-import { AuthResponse } from '@/_models/index';
+import { AuthResponse, ApiCode } from '@/_models/index';
 
 
 @Component({
@@ -15,13 +14,18 @@ import { AuthResponse } from '@/_models/index';
 })
 export class STTListComponent implements OnInit {
 
+    public title: any = 'Delete STT';
+    public subTitle: any = 'Note :- Action may stop linked process';
+
     public searchValue: any = '';
+    public sourceTaskType: STTList;
     public sourceTaskTypes: STTList[] = [];
 
     public addButton: any;
     public refreshButton: any;
     public dropdownButton: any;
     public topHeader: any = [];
+    public actionMenu: any = [];
 
     public currentActiveProfile: AuthResponse;
 
@@ -31,9 +35,10 @@ export class STTListComponent implements OnInit {
         private spinnerService: SpinnerService,
         private sttService: STTService,
         private authenticationService: AuthenticationService) {
-        this.currentActiveProfile = authenticationService.currentUserByProfile;
+        this.currentActiveProfile = authenticationService.currentUserValue;
         this.route.data.subscribe((data: any) => {
             this.topHeader = data.topHeader;
+            this.actionMenu = data.action;
             if (this.topHeader) {
                 this.topHeader.forEach(header => {
                     if (header.type === 'add') {
@@ -42,6 +47,10 @@ export class STTListComponent implements OnInit {
                         this.refreshButton = header;
                     } else if (header.type === 'menus') {
                         this.dropdownButton = header;
+                        this.dropdownButton.menus = this.dropdownButton.menus
+                        .filter(menu => {
+                            return menu.active;
+                        });
                     }
                 });
             }
@@ -92,8 +101,39 @@ export class STTListComponent implements OnInit {
             });
     }
 
+    public deleteAction(payload: any): void {
+        this.sourceTaskType = payload;
+    }
+
     public refreshAction(): void {
         this.fetchSTT();
+    }
+
+    public deleteActionTriger(): void {
+        this.spinnerService.show();
+        let payload = {
+            accessUserDetail: {
+                appUserId: this.currentActiveProfile.appUserId,
+                username: this.currentActiveProfile.username
+           },
+           sttId: this.sourceTaskType.sttId
+        }
+        this.sttService.deleteSTT(payload)
+        .pipe(first())
+        .subscribe(
+            response => {
+                this.spinnerService.hide();
+                if (response.status === ApiCode.ERROR) {
+                    this.alertService.showError(response.message, ApiCode.ERROR);
+                    return;
+                }
+                this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
+                this.refreshAction();
+            },
+            error => {
+                this.spinnerService.hide();
+                this.alertService.showError(error.message, ApiCode.ERROR);
+            });
     }
 
 }

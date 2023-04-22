@@ -53,6 +53,14 @@
         margin-top: 0;
         margin-bottom: 1rem;
     }
+
+    table {
+        table-layout: fixed;
+    }
+    
+    .scrollable {
+        overflow: scroll; overflow-y:hidden;
+    } 
 </style>
 
 <div class="row gutters-sm">
@@ -63,34 +71,43 @@
                     <div class="col-lg-8">
                         <h5 class="card-title" style="font-size: large;">{{title}}</h5>
                     </div>
-                    <div class="col-lg-4" style="margin-top: 5px;">
-                        <button type="button" class="form-control input-sm"
-                            style="width: auto;float: right;margin-left: 5px;
-                            background: #4750b6;color: white;"
-                            id="download" routerLink="/lookup/lookupbatch">
-                            <span class="glyphicon glyphicon-cog"></span>
-                            Batch Action</button>
-                        <button type="button" class="form-control input-sm"
-                            style="width: auto;float: right;margin-left: 5px;
-                            background: #cb0f43;color: white;"
-                            data-toggle="modal" data-target="#lookupDatas"
+                    <div class="col-lg-4" style="text-align: end;margin-top: 5px;">
+                        <button *ngIf="refreshButton && refreshButton.active" type="button"
+                            class="form-control input-sm" 
+                            style="width: auto;display: inline;margin-right: 7px;"
+                            (click)="refreshAction()">
+                            <span class="glyphicon glyphicon-refresh"></span>
+                            {{refreshButton.title}}
+                        </button>
+                        <button *ngIf="addButton && addButton.active" type="button"
+                            class="form-control input-sm"
+                            style="width: auto; background: #cb0f43; color: white;
+                                display: inline;margin-right: 7px;" 
+                             data-toggle="modal" data-target="#lookupDatas"
                             (click)="addLookupDatas()">
                             <span class="glyphicon glyphicon-plus-sign"></span>
-                            Add Lookup</button>
-                        <button type="button" class="form-control input-sm"
-                            style="width: auto;float: right;margin-left: 5px;"
-                            (click)="fetchAllLookup()">
-                            <span id="loading" 
-                                class="glyphicon glyphicon-refresh"></span>
-                            Refresh</button>
+                            {{addButton.title}}
+                        </button>
+                        <div *ngIf="dropdownButton && dropdownButton.active" 
+                            class="dropdown" style="display: inline;">
+                            <button class="btn btn-primary dropdown-toggle"
+                                style="padding: 4px 5px;border-radius: 3px;background: #4750b6;"                
+                                type="button" data-toggle="dropdown">{{dropdownButton.title}}
+                                <span class="caret"></span></button>
+                            <ul class="dropdown-menu" style="left: -38px;">
+                                <li *ngFor="let menu of dropdownButton.menus">
+                                    <a (click)="menuAction(menu)">{{menu.title}}</a>
+                                </li>
+                            </ul>
+                        </div>
                     </div>
                     <div class="col-lg-12">
                         <hr style="margin-top: 10px;">
                         <div class="form-group">
-                            <label for="searchSourceJobDetails" *ngIf="lookupDatas">
+                            <label for="lookupDatasLength" *ngIf="lookupDatas">
                                 Total Lookup ({{lookupDatas.length}})
                             </label>
-                            <input type="text" id="searchSourceJobDetails" 
+                            <input type="text" id="searchLookup" 
                                 class="form-control input-sm"
                                 style="width: 30%;"
                                 [(ngModel)]="searchLookup"
@@ -106,7 +123,7 @@
                             <th>Lookup Type</th>
                             <th>Lookup Value</th>
                             <th>Description</th>
-                            <th>Created Date</th>
+                            <th style="width: 8%;">Created Date</th>
                             <th style="width: 6%;">Action</th>
                         </tr>
                     </thead>
@@ -143,8 +160,7 @@
     </div>
 </div>
 <!-- lookup detai -->
-<cu-lookup 
-    *ngIf="lookupAction"
+<cu-lookup *ngIf="lookupAction"
     [lookUpAction]="lookupAction"
     [recivedLookupData]="lookupData"
     (senderEvent) = "receiverEvent($event)">

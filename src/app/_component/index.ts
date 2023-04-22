@@ -27,3 +27,5 @@ export * from './stt-setting/stt-list/stt-list.component';
 export * from './stt-setting/sttf-list/sttf-list.component';
 export * from './stt-setting/stts-list/stts-list.component';
 export * from './stt-setting/sttc-list/sttc-list.component';
+// del-box
+export * from './del-box/del-box.component';

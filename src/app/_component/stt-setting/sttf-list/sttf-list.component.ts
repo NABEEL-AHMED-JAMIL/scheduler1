@@ -1,11 +1,9 @@
 import { Component, OnInit } from '@angular/core';
-import { STTFormList } from '@/_models';
 import { Router, ActivatedRoute } from '@angular/router';
 import { first } from 'rxjs/operators';
 import { AuthenticationService, AlertService, STTService } from '@/_services';
 import { SpinnerService } from '@/_helpers';
-import { ApiCode, Action } from '@/_models';
-import { AuthResponse } from '@/_models/index';
+import { AuthResponse, ApiCode, STTFormList } from '@/_models/index';
 
 
 @Component({
@@ -14,16 +12,20 @@ import { AuthResponse } from '@/_models/index';
 })
 export class STTFListComponent implements OnInit {
 
+    public title: any = 'Delete STTF';
+    public subTitle: any = 'Note :- All STT Form unattached with STT(Source Task Type)';
+
     public searchValue: any = '';
+    public sstForm: STTFormList;
     public sstForms: STTFormList[] = [];
 
     public addButton: any;
     public refreshButton: any;
     public dropdownButton: any;
     public topHeader: any = [];
+    public actionMenu: any = [];
 
     public currentActiveProfile: AuthResponse;
-
 
     constructor(private router:Router,
         private route:ActivatedRoute,
@@ -31,9 +33,10 @@ export class STTFListComponent implements OnInit {
         private spinnerService: SpinnerService,
         private authenticationService: AuthenticationService,
         private sttService: STTService) {
-        this.currentActiveProfile = authenticationService.currentUserByProfile;
+        this.currentActiveProfile = authenticationService.currentUserValue;
         this.route.data.subscribe((data: any) => {
             this.topHeader = data.topHeader;
+            this.actionMenu = data.action;
             if (this.topHeader) {
                 this.topHeader.forEach(header => {
                     if (header.type === 'add') {
@@ -42,6 +45,10 @@ export class STTFListComponent implements OnInit {
                         this.refreshButton = header;
                     } else if (header.type === 'menus') {
                         this.dropdownButton = header;
+                        this.dropdownButton.menus = this.dropdownButton.menus
+                        .filter(menu => {
+                            return menu.active;
+                        });
                     }
                 });
             }
@@ -93,6 +100,37 @@ export class STTFListComponent implements OnInit {
 
     public refreshAction(): void {
         this.fetchSTTF();
+    }
+
+    public deleteAction(payload: any): void {
+        this.sstForm = payload;
+    }
+
+    public deleteActionTriger(): void {
+        this.spinnerService.show();
+        let payload = {
+            accessUserDetail: {
+                appUserId: this.currentActiveProfile.appUserId,
+                username: this.currentActiveProfile.username
+           },
+           sttfId: this.sstForm.sttFId
+        }
+        this.sttService.deleteSTTF(payload)
+        .pipe(first())
+        .subscribe(
+            response => {
+                this.spinnerService.hide();
+                if (response.status === ApiCode.ERROR) {
+                    this.alertService.showError(response.message, ApiCode.ERROR);
+                    return;
+                }
+                this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
+                this.refreshAction();
+            },
+            error => {
+                this.spinnerService.hide();
+                this.alertService.showError(error.message, ApiCode.ERROR);
+            });
     }
 
 }

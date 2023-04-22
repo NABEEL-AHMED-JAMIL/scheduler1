@@ -74,7 +74,41 @@ const routes: Routes = [
         canActivate: [AuthGuard],
         data:  {
             breadcrumb: 'Lookup',
-            role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+            role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ],
+            topHeader: [
+                {
+                    type: 'refresh',
+                    title: 'Refresh',
+                    active: true
+                },
+                {
+                    type: 'add',
+                    title: 'Add Lookup',
+                    active: true
+                },
+                {
+                    type: 'menus',
+                    title: 'Batch Operation',
+                    active: true,
+                    menus: [
+                        {
+                            title: 'Upload File',
+                            router: '/lookup/batch',
+                            active: true
+                        },
+                        {
+                            title: 'Downalod File',
+                            targetEvent: 'downloadData',
+                            active: true
+                        },
+                        {
+                            title: 'Downalod Template',
+                            targetEvent: 'downloadTemplate',
+                            active: true
+                        }
+                    ]
+                }
+            ]
         },
         children: [
             {
@@ -87,7 +121,7 @@ const routes: Routes = [
                 }
             },
             {
-                path: 'lookupbatch',
+                path: 'batch',
                 component: BatchActionComponent,
                 canActivate: [AuthGuard],
                 data: {
@@ -104,7 +138,41 @@ const routes: Routes = [
         canActivate: [AuthGuard],
         data:  {
             breadcrumb: 'Sub Lookup',
-            role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+            role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ],
+            topHeader: [
+                {
+                    type: 'refresh',
+                    title: 'Refresh',
+                    active: true
+                },
+                {
+                    type: 'add',
+                    title: 'Add Lookup',
+                    active: true
+                },
+                {
+                    type: 'menus',
+                    title: 'Batch Operation',
+                    active: true,
+                    menus: [
+                        {
+                            title: 'Upload File',
+                            router: '/sublookup/batch',
+                            active: true
+                        },
+                        {
+                            title: 'Downalod File',
+                            targetEvent: 'downloadData',
+                            active: true
+                        },
+                        {
+                            title: 'Downalod Template',
+                            targetEvent: 'downloadTemplate',
+                            active: true
+                        }
+                    ]
+                }
+            ]
         },
         children: [
             { 
@@ -117,8 +185,9 @@ const routes: Routes = [
                 }
             },
             { 
-                path: 'sublookupbatch',
+                path: 'batch',
                 component: BatchActionComponent,
+                canActivate: [AuthGuard],
                 data: {
                     action: 'SubLookup',
                     breadcrumb: 'Batch',
@@ -142,32 +211,32 @@ const routes: Routes = [
             },
             topHeader: [
                 {
-                    type: "refresh",
-                    title: "Refresh",
+                    type: 'refresh',
+                    title: 'Refresh',
                     active: true
                 },
                 {
-                    type: "add",
-                    title: "Add STT",
-                    router: "/stt/addStt",
+                    type: 'add',
+                    title: 'Add STT',
+                    router: '/stt/addStt',
                     active: true
                 },
                 {
-                    type: "menus",
-                    title: "Batch Operation",
+                    type: 'menus',
+                    title: 'Batch Operation',
                     active: true,
                     menus: [
                         {
-                            title: "Upload File",
-                            router: "/stt/addStt",
+                            title: 'Upload File',
+                            router: '/stt/addStt',
                             active: true
                         }, {
-                            title: "Downalod File",
-                            router: "/stt/addStt",
+                            title: 'Downalod File',
+                            router: '/stt/addStt',
                             active: true
                         }, {
-                            title: "Downalod Template",
-                            router: "/stt/addStt",
+                            title: 'Downalod Template',
+                            router: '/stt/addStt',
                             active: true
                         }
                     ]
@@ -181,6 +250,13 @@ const routes: Routes = [
                 canActivate: [AuthGuard],
                 data:  {
                     breadcrumb: '',
+                    action: [
+                        {
+                            title: 'Link STT With User',
+                            router: '/stt/addStt',
+                            active: true
+                        }
+                    ],
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
                 }
             },
@@ -236,32 +312,32 @@ const routes: Routes = [
             },
             topHeader: [
                 {
-                    type: "refresh",
-                    title: "Refresh",
+                    type: 'refresh',
+                    title: 'Refresh',
                     active: true
                 },
                 {
-                    type: "add",
+                    type: 'add',
                     title: 'Add STTF',
                     router: '/sstf/addSttf',
                     active: true
                 },
                 {
-                    type: "menus",
-                    title: "Batch Operation ",
+                    type: 'menus',
+                    title: 'Batch Operation',
                     active: true,
                     menus: [
                         {
-                            title: "Upload File",
-                            router: "/stt/addSttf",
+                            title: 'Upload File',
+                            router: '/stt/addSttf',
                             active: true
                         }, {
-                            title: "Downalod File",
-                            router: "/stt/addSttf",
+                            title: 'Downalod File',
+                            router: '/stt/addSttf',
                             active: true
                         }, {
-                            title: "Downalod Template",
-                            router: "/stt/addSttf",
+                            title: 'Downalod Template',
+                            router: '/stt/addSttf',
                             active: true
                         }
                     ]
@@ -275,6 +351,13 @@ const routes: Routes = [
                 canActivate: [AuthGuard],
                 data:  {
                     breadcrumb: '',
+                    action: [
+                        {
+                            title: 'Link STTF With STT',
+                            router: '/stt/addStt',
+                            active: true
+                        }
+                    ],
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
                 }
             },
@@ -305,6 +388,7 @@ const routes: Routes = [
             { 
                 path: 'batch',
                 component: BatchComponent,
+                canActivate: [AuthGuard],
                 data: {
                     action: 'STTF',
                     breadcrumb: 'Batch Sttf',
@@ -329,33 +413,32 @@ const routes: Routes = [
             },
             topHeader: [
                 {
-                    type: "add",
-                    title: 'Add STTF',
-                    router: '/sstf/addSttf',
+                    type: 'refresh',
+                    title: 'Refresh',
                     active: true
                 },
                 {
-                    type: "refresh",
-                    title: "Refresh",
-                    router: "/stt/addStt",
+                    type: 'add',
+                    title: 'Add STTS',
+                    router: '/ssts/addStts',
                     active: true
                 },
                 {
-                    type: "menus",
-                    title: "Batch Operation ",
+                    type: 'menus',
+                    title: 'Batch Operation',
                     active: true,
                     menus: [
                         {
-                            title: "Refresh",
-                            router: "/stt/addStt",
+                            title: 'Upload File',
+                            router: '/stt/addStts',
                             active: true
                         }, {
-                            title: "Refresh",
-                            router: "/stt/addStt",
+                            title: 'Downalod File',
+                            router: '/stt/addStts',
                             active: true
                         }, {
-                            title: "Refresh",
-                            router: "/stt/addStt",
+                            title: 'Downalod Template',
+                            router: '/stt/addStts',
                             active: true
                         }
                     ]
@@ -369,6 +452,13 @@ const routes: Routes = [
                 canActivate: [AuthGuard],
                 data:  {
                     breadcrumb: '',
+                    action: [
+                        {
+                            title: 'Link STTF With STT',
+                            router: '/stt/addStt',
+                            active: true
+                        }
+                    ],
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
                 }
             },
@@ -399,6 +489,7 @@ const routes: Routes = [
             { 
                 path: 'batch',
                 component: BatchComponent,
+                canActivate: [AuthGuard],
                 data: {
                     action: 'STTS',
                     breadcrumb: 'Batch Stts',
@@ -423,33 +514,32 @@ const routes: Routes = [
             },
             topHeader: [
                 {
-                    type: "add",
-                    title: 'Add STTF',
-                    router: '/sstf/addSttc',
+                    type: 'refresh',
+                    title: 'Refresh',
                     active: true
                 },
                 {
-                    type: "refresh",
-                    title: "Refresh",
-                    router: "/stt/addStt",
+                    type: 'add',
+                    title: 'Add STTC',
+                    router: '/sstc/addSttc',
                     active: true
                 },
                 {
-                    type: "menus",
-                    title: "Batch Operation ",
+                    type: 'menus',
+                    title: 'Batch Operation',
                     active: true,
                     menus: [
                         {
-                            title: "Refresh",
-                            router: "/stt/addStt",
+                            title: 'Upload File',
+                            router: '/sstc/addSttc',
                             active: true
                         }, {
-                            title: "Refresh",
-                            router: "/stt/addStt",
+                            title: 'Downalod File',
+                            router: '/sstc/addSttc',
                             active: true
                         }, {
-                            title: "Refresh",
-                            router: "/stt/addStt",
+                            title: 'Downalod Template',
+                            router: '/sstc/addSttc',
                             active: true
                         }
                     ]
@@ -463,6 +553,13 @@ const routes: Routes = [
                 canActivate: [AuthGuard],
                 data:  {
                     breadcrumb: '',
+                    action: [
+                        {
+                            title: 'Link STTC With STTS',
+                            router: '/stt/addStt',
+                            active: true
+                        }
+                    ],
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
                 }
             },
@@ -493,6 +590,7 @@ const routes: Routes = [
             { 
                 path: 'batch',
                 component: BatchComponent,
+                canActivate: [AuthGuard],
                 data: {
                     action: 'STTC',
                     breadcrumb: 'Batch Sttc',

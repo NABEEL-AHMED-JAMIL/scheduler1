@@ -15,7 +15,7 @@
             class="form-control input-sm"
             style="width: auto;display: inline;margin-right: 7px;"
             (click)="refreshAction()">
-            <span id="loading" class="glyphicon glyphicon-refresh"></span>
+            <span class="glyphicon glyphicon-refresh"></span>
             {{refreshButton.title}}
         </button>
         <!-- working -->
@@ -39,7 +39,7 @@
         </div>
     </div>
 </div>
-<table id="source-task-type" style="font-size: 12px;margin-top: 10px;"
+<table id="stt" style="font-size: 12px;margin-top: 10px;"
     class="table table-responsive table table-striped table-bordered table-sm">
     <thead>
         <tr>
@@ -52,7 +52,7 @@
             <th>Total Task</th>
             <th>Total Form</th>
             <th>Type</th>
-            <th style="width: 10%;">Action</th>
+            <th style="width: 12%;">Action</th>
         </tr>
     </thead>
     <tbody>
@@ -100,23 +100,41 @@
                         <span class="glyphicon glyphicon-edit"
                         style="color:blue"></span>
                     </button>
+                    <button type="button" class="btn btn-default"
+                        (click)="editAction(sourceTaskType)">
+                        <span class="glyphicon glyphicon-tree-deciduous"
+                        style="color:#c4478b"></span>
+                    </button>
                     <!-- add the method for delete the queue detail -->
-                    <button type="button" class="btn btn-default">
+                    <button type="button" class="btn btn-default"
+                        data-toggle="modal" data-target="#deleteAction"
+                        [disabled]="sourceTaskType.status.lookupValue === 2"
+                        (click)="deleteAction(sourceTaskType)">
                         <span class="glyphicon glyphicon-trash" style="color: #dc3545;"></span>
                     </button>
                     <!--  -->
                     <button type="button"
                         class="btn btn-default dropdown-toggle" 
-                        data-toggle="dropdown">
+                        data-toggle="dropdown"
+                        [disabled]="sourceTaskType.status.lookupValue === 2">
                         <span class="glyphicon glyphicon-cog" 
                         style="color: black;"></span>
                     </button>
-                    <ul class="dropdown-menu" style="left: -90px;">
-                        <li *ngFor="let menu of dropdownButton.menus">
-                            <a href="#">{{menu.title}}</a></li>
+                    <ul class="dropdown-menu" style="left: -65px;">
+                        <li *ngFor="let menu of actionMenu">
+                            <a href="#">{{menu.title}}</a>
+                        </li>
                     </ul>
                 </div>
             </td>
         </tr>
     </tbody>
 </table>
+<div class="modal fade" id="deleteAction"
+    role="dialog" style="top: 85px;">
+    <del-box
+        [title]="title"
+        [subTitle]="subTitle"
+        (deleteEvent)="deleteActionTriger()">
+    </del-box>
+</div>

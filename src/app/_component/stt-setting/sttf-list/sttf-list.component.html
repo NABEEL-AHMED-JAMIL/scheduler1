@@ -39,7 +39,7 @@
         </div>
     </div>
 </div>
-<table id="source-task-type" style="font-size: 12px;margin-top: 10px;"
+<table id="sttf" style="font-size: 12px;margin-top: 10px;"
     class="table table-responsive table table-striped table-bordered table-sm">
     <thead>
         <tr>
@@ -50,8 +50,7 @@
             <th>Created Date</th>
             <th>Total STT</th>
             <th>Total Section</th>
-            <th>Total Control</th>
-            <th style="width: 10%;">Action</th>
+            <th style="width: 12%;">Action</th>
         </tr>
     </thead>
     <tbody>
@@ -80,9 +79,6 @@
                 {{sstForm.totalSection}}
             </td>
             <td style="text-align: center;">
-                {{sstForm.totalControl}}
-            </td>
-            <td style="text-align: center;">
                 <div class="btn-group btn-group-xs" 
                     role="group" style="text-align: center">
                     <button type="button" class="btn btn-default"
@@ -90,19 +86,29 @@
                         <span class="glyphicon glyphicon-edit"
                         style="color:blue"></span>
                     </button>
+                    <button type="button" class="btn btn-default"
+                        (click)="editAction(sstForm)">
+                        <span class="glyphicon glyphicon-tree-deciduous"
+                        style="color:#c4478b"></span>
+                    </button>
                     <!-- add the method for delete the queue detail -->
-                    <button type="button" class="btn btn-default">
-                        <span class="glyphicon glyphicon-trash" style="color: #dc3545;"></span>
+                    <button type="button" class="btn btn-default"
+                       data-toggle="modal" data-target="#deleteAction"
+                       [disabled]="sstForm.status.lookupValue === 2"
+                       (click)="deleteAction(sstForm)">
+                        <span class="glyphicon glyphicon-trash"
+                            style="color: #dc3545;"></span>
                     </button>
                     <!--  -->
                     <button type="button"
                         class="btn btn-default dropdown-toggle" 
-                        data-toggle="dropdown">
+                        data-toggle="dropdown"
+                        [disabled]="sstForm.status.lookupValue === 2">
                         <span class="glyphicon glyphicon-cog" 
                         style="color: black;"></span>
                     </button>
-                    <ul class="dropdown-menu" style="left: -90px;">
-                        <li *ngFor="let menu of dropdownButton.menus">
+                    <ul class="dropdown-menu" style="left: -65px;">
+                        <li *ngFor="let menu of actionMenu">
                             <a href="#">{{menu.title}}</a></li>
                     </ul>
                 </div>
@@ -110,3 +116,11 @@
         </tr>
     </tbody>
 </table>
+<div class="modal fade" id="deleteAction"
+    role="dialog" style="top: 85px;">
+    <del-box
+        [title]="title"
+        [subTitle]="subTitle"
+        (deleteEvent)="deleteActionTriger()">
+    </del-box>
+</div>

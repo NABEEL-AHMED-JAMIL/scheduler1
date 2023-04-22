@@ -13,6 +13,10 @@ export class AppUserService {
         return this.http.get<any>(`${config.apiUrl}/appUser.json/getAppUserProfile?username=`+username);
     }
 
+    public getSubAppUserAccount(username: any): any {
+        return this.http.get<any>(`${config.apiUrl}/appUser.json/getSubAppUserAccount?username=`+username);
+    }
+
     public updateAppUserProfile(payload: any): any {
         return this.http.post<any>(`${config.apiUrl}/appUser.json/updateAppUserProfile`, payload);
     }

@@ -30,7 +30,7 @@ export class BatchComponent implements OnInit {
         private spinnerService: SpinnerService,
         private lookupService: LookupService,
         private authenticationService: AuthenticationService) {
-        this.currentActiveProfile = authenticationService.currentUserByProfile;
+        this.currentActiveProfile = authenticationService.currentUserValue;
         this._activatedRoute.data
         .subscribe((data: any) => {
             this.title = data.breadcrumb;

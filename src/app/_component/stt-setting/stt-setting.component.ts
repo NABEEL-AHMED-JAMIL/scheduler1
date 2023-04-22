@@ -25,7 +25,7 @@ export class SttSettingComponent implements OnInit {
         private spinnerService: SpinnerService,
         private authenticationService: AuthenticationService) {
         this.STT_SIDEBAR = LOOKUP_TYPES.STT_SIDEBAR;
-        this.currentActiveProfile = authenticationService.currentUserByProfile;
+        this.currentActiveProfile = authenticationService.currentUserValue;
         this.getSttSidebarByLookupType();
         this.route.data.subscribe((data: any) => {
             this.selectedMenu = data.selectedMenu;

@@ -59,22 +59,19 @@
 					</div>
 				</div>
 				<div class="col-md-5">
-					<textarea class="form-control input-sm" rows="14" 
-						style="font-size:12px;font-family:monospace;
-							white-space:pre;height: auto;
-							border-color: #ddd;background-color: #ddd;">
-							{{xmlString}}
-					</textarea>
+					<textarea class="form-control input-sm" rows="16" 
+						style="font-size:12px;font-family:monospace;white-space:pre;height: auto;
+							border-color: #ddd;background-color: #ddd;">{{xmlString}}</textarea>
 					<div class="row">
 						<div class="col-md-6">
 							<input type="submit" class="form-control input-sm"
 								style="background: black;color: white;margin-top: 10px;"
-								value="Show Output" [disabled]="xmlForm?.invalid">
+								[disabled]="xmlForm?.invalid" value="Show Output">
 						</div>
 						<div class="col-md-6">
 							<button class="form-control input-sm"
 								style="background: #4750b6;color: white;margin-top: 10px;"
-								(click)="createFile()" [disabled]="xmlForm?.invalid">
+								[disabled]="xmlForm?.invalid" (click)="createFile()">
 								Downalod XML File</button>
 						</div>
 					</div>

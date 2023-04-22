@@ -96,8 +96,8 @@ export class STTService {
         return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/fetchSTTSBySttsId`, payload);
     }
 
-    public fetchSTTS(): Observable<ApiResponse> {
-        return null;
+    public fetchSTTS(payload: any): Observable<ApiResponse> {
+        return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/fetchSTTS`, payload);
     }
 
     public downloadSTTSTree(): Observable<ApiResponse> {
@@ -121,8 +121,12 @@ export class STTService {
         return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/deleteSTTC`, payload);
     }
 
-    public fetchSTTC(): Observable<ApiResponse> {
-        return null;
+    public fetchSTTCBySttcId(payload: any): Observable<ApiResponse> {
+        return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/fetchSTTCBySttcId`, payload);
+    }
+
+    public fetchSTTC(payload: any): Observable<ApiResponse> {
+        return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/fetchSTTC`, payload);
     }
 
     public downloadSTTCTree(): any {

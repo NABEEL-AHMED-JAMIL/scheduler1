@@ -41,7 +41,7 @@ export class CUSTTSComponent implements OnInit {
         private spinnerService: SpinnerService,
         private authenticationService: AuthenticationService,
         private sttService: STTService) {
-            this.currentActiveProfile = authenticationService.currentUserByProfile;
+            this.currentActiveProfile = authenticationService.currentUserValue;
             this.ISDEFAULT = LOOKUP_TYPES.ISDEFAULT;
             this.APPLICATION_STATUS = LOOKUP_TYPES.APPLICATION_STATUS;
             this.route.data.subscribe((data: any) => {
@@ -51,7 +51,7 @@ export class CUSTTSComponent implements OnInit {
                 this.topHeader = data.topHeader;
                 if (this.action === Action.EDIT) {
                     this.route.queryParams.subscribe((params: any) => {
-                        this.editSttsId = params.sttFId;
+                        this.editSttsId = params.sttSId;
                     });
                 }
             });
@@ -68,6 +68,7 @@ export class CUSTTSComponent implements OnInit {
         } else if (this.action === Action.EDIT) {
             this.getDefultOptionByLookuptype();
             this.getApplicationStatusByLookupType();
+            this.fetchSTTSBySttsId(this.editSttsId);
         }
     }
 
@@ -96,6 +97,7 @@ export class CUSTTSComponent implements OnInit {
                     return;
                 }
                 this.defultOption = response.data;
+                debugger
             },
             error => {
                 this.spinnerService.hide();
@@ -122,6 +124,10 @@ export class CUSTTSComponent implements OnInit {
                     return;
                 }
                 this.statusList = response.data;
+                this.statusList.subLookupData = this.statusList.subLookupData
+                .filter(lookup => {
+                    return lookup.lookupValue != '2';
+                });
             },
             error => {
                 this.spinnerService.hide();
@@ -129,10 +135,10 @@ export class CUSTTSComponent implements OnInit {
             });
     }
 
-    public fetchSTTSBySttsId(sttfId: any) {
+    public fetchSTTSBySttsId(sttsId: any) {
         this.spinnerService.show();
         let payload = {
-            sttfId: sttfId,
+            sttsId: sttsId,
             accessUserDetail: {
                 appUserId: this.currentActiveProfile.appUserId,
                 username: this.currentActiveProfile.username
@@ -148,19 +154,12 @@ export class CUSTTSComponent implements OnInit {
                     return;
                 }
                 this.sttsForm = this.formBuilder.group({
-                    sttsId: [1000],
-                    sttsName: ['nabeel', Validators.required],
-                    description: ['nabeel', [Validators.required]],
-                    status: ['1', [Validators.required]],
-                    sttsOrder: [1, [Validators.required]],
-                    defaultStts: [response.data.defaultSttf.lookupValue, [Validators.required]]
-                });
-                this.sttsForm = this.formBuilder.group({
-                    sttfId: [response.data.sttFId, [Validators.required]],
-                    sttfName: [response.data.sttFName, Validators.required],
+                    sttsId: [response.data.sttSId],
+                    sttsName: [response.data.sttSName, Validators.required],
                     description: [response.data.description, [Validators.required]],
                     status: [response.data.status.lookupValue, [Validators.required]],
-                    defaultSttf: [response.data.defaultSttf.lookupValue, [Validators.required]]
+                    sttsOrder: [response.data.sttSOrder, [Validators.required]],
+                    defaultStts: [response.data.defaultStts.lookupValue, [Validators.required]]
                 });
             },
             error => {

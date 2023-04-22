@@ -32,12 +32,11 @@ export class CULookupComponent implements OnInit {
 		private spinnerService: SpinnerService,
 		private lookupService: LookupService,
 		private authenticationService: AuthenticationService) {
-			this.currentActiveProfile = authenticationService.currentUserByProfile;
+			this.currentActiveProfile = authenticationService.currentUserValue;
 	}
 
     ngOnInit() {
 		if (this.lookUpAction) {
-			debugger
 			if ((this.lookUpAction as Action) === Action.ADD) {
 				this.LOOKUP_DATA_TITLE = 'New LookupData';
 				this.addSourceTaskTaypeForm();
