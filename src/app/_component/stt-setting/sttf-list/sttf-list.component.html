@@ -34,7 +34,7 @@
                 <span class="caret"></span></button>
             <ul class="dropdown-menu" style="left: -38px;">
                 <li *ngFor="let menu of dropdownButton.menus">
-                    <a href="#">{{menu.title}}</a></li>
+                    <a (click)="menuAction(menu)">{{menu.title}}</a></li>
             </ul>
         </div>
     </div>
@@ -67,7 +67,7 @@
             <td>{{sstForm.sttFId}}</td>
             <td>{{sstForm.sttFName}}</td>
             <td style="text-align: center;">
-                {{sstForm.default ? 'Yes' : 'No'}}
+                {{sstForm.sttfDefault.description}}
             </td>
             <td style="text-align: center;">
                 {{sstForm.dateCreated | date:'dd-MM-yyyy'}}
@@ -84,12 +84,12 @@
                     <button type="button" class="btn btn-default"
                         (click)="editAction(sstForm)">
                         <span class="glyphicon glyphicon-edit"
-                        style="color:blue"></span>
+                            style="color:blue"></span>
                     </button>
                     <button type="button" class="btn btn-default"
                         (click)="editAction(sstForm)">
                         <span class="glyphicon glyphicon-tree-deciduous"
-                        style="color:#c4478b"></span>
+                            style="color:#c4478b"></span>
                     </button>
                     <!-- add the method for delete the queue detail -->
                     <button type="button" class="btn btn-default"
@@ -109,7 +109,8 @@
                     </button>
                     <ul class="dropdown-menu" style="left: -65px;">
                         <li *ngFor="let menu of actionMenu">
-                            <a href="#">{{menu.title}}</a></li>
+                            <a (click)="menuAction(menu)">{{menu.title}}</a>
+                        </li>
                     </ul>
                 </div>
             </td>

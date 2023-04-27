@@ -228,15 +228,17 @@ const routes: Routes = [
                     menus: [
                         {
                             title: 'Upload File',
-                            router: '/stt/addStt',
+                            router: '/stt/batch',
                             active: true
-                        }, {
+                        },
+                        {
                             title: 'Downalod File',
-                            router: '/stt/addStt',
+                            targetEvent: 'downloadData',
                             active: true
-                        }, {
+                        },
+                        {
                             title: 'Downalod Template',
-                            router: '/stt/addStt',
+                            targetEvent: 'downloadTemplate',
                             active: true
                         }
                     ]
@@ -329,15 +331,17 @@ const routes: Routes = [
                     menus: [
                         {
                             title: 'Upload File',
-                            router: '/stt/addSttf',
+                            router: '/sstf/batch',
                             active: true
-                        }, {
+                        },
+                        {
                             title: 'Downalod File',
-                            router: '/stt/addSttf',
+                            targetEvent: 'downloadData',
                             active: true
-                        }, {
+                        },
+                        {
                             title: 'Downalod Template',
-                            router: '/stt/addSttf',
+                            targetEvent: 'downloadTemplate',
                             active: true
                         }
                     ]
@@ -430,15 +434,17 @@ const routes: Routes = [
                     menus: [
                         {
                             title: 'Upload File',
-                            router: '/stt/addStts',
+                            router: '/ssts/batch',
                             active: true
-                        }, {
+                        },
+                        {
                             title: 'Downalod File',
-                            router: '/stt/addStts',
+                            targetEvent: 'downloadData',
                             active: true
-                        }, {
+                        },
+                        {
                             title: 'Downalod Template',
-                            router: '/stt/addStts',
+                            targetEvent: 'downloadTemplate',
                             active: true
                         }
                     ]
@@ -531,15 +537,17 @@ const routes: Routes = [
                     menus: [
                         {
                             title: 'Upload File',
-                            router: '/sstc/addSttc',
+                            router: '/sstc/batch',
                             active: true
-                        }, {
+                        },
+                        {
                             title: 'Downalod File',
-                            router: '/sstc/addSttc',
+                            targetEvent: 'downloadData',
                             active: true
-                        }, {
+                        },
+                        {
                             title: 'Downalod Template',
-                            router: '/sstc/addSttc',
+                            targetEvent: 'downloadTemplate',
                             active: true
                         }
                     ]

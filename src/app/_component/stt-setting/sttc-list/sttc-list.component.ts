@@ -12,8 +12,8 @@ import { AuthResponse, ApiCode, STTControlList } from '@/_models/index';
 })
 export class STTCListComponent implements OnInit {
 
-    public title: any = 'Delete STT';
-    public subTitle: any = 'Note :- All link job will be disable link with current source task';
+    public title: any = 'Delete STTC';
+    public subTitle: any = 'Note :- Delete opertaion may case problem for job';
 
     public searchLookup: any = '';
     public sttControl: STTControlList;
@@ -84,13 +84,25 @@ export class STTCListComponent implements OnInit {
             });
     }
 
+    public menuAction(payload: any): any {
+        if (payload.router) {
+            this.router.navigate([payload.router]);
+        } else if (payload.targetEvent) {
+            if (payload.targetEvent === 'downloadData') {
+                //this.downloadData();
+            } else if (payload.targetEvent === 'downloadTemplate') {
+                //this.downloadTemplate();
+            }
+        }
+    }
+
     public addAction(): void {
         this.router.navigate([this.addButton.router]);
     }
 
     public editAction(payload: any): void {
         this.router.navigate(
-            ['/sstf/editSttc'],
+            ['/sstc/editSttc'],
             { 
                 queryParams: {
                     sttCId: payload.sttCId
@@ -113,6 +125,7 @@ export class STTCListComponent implements OnInit {
                 appUserId: this.currentActiveProfile.appUserId,
                 username: this.currentActiveProfile.username
            },
+           sttCId: this.sttControl.sttCId
         }
         this.sttService.deleteSTTC(payload)
         .pipe(first())

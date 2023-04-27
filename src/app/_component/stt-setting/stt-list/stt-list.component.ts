@@ -15,7 +15,7 @@ import { AuthResponse, ApiCode } from '@/_models/index';
 export class STTListComponent implements OnInit {
 
     public title: any = 'Delete STT';
-    public subTitle: any = 'Note :- Action may stop linked process';
+    public subTitle: any = 'Note :- Delete opertaion may case problem for job';
 
     public searchValue: any = '';
     public sourceTaskType: STTList;
@@ -84,6 +84,19 @@ export class STTListComponent implements OnInit {
                 this.spinnerService.hide();
                 this.alertService.showError(error.message, ApiCode.ERROR);
             });
+    }
+
+    public menuAction(payload: any): any {
+        debugger
+        if (payload.router) {
+            this.router.navigate([payload.router]);
+        } else if (payload.targetEvent) {
+            if (payload.targetEvent === 'downloadData') {
+                //this.downloadData();
+            } else if (payload.targetEvent === 'downloadTemplate') {
+                //this.downloadTemplate();
+            }
+        }
     }
 
     public addAction(): void {

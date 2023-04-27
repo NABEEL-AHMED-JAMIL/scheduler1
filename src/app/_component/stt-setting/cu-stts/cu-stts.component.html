@@ -107,10 +107,11 @@
                                 <input type="number" id="sttsOrder" min="0" max="10"
                                     formControlName="sttsOrder"
                                     class="form-control input-sm"
-                                    placeholder="Enter section order" />
+                                    placeholder="Enter section order" 
+                                    onKeyDown="return false"/>
                                 <div *ngIf="submitted && f.sttsOrder.errors" class="invalid-feedback">
                                     <div *ngIf="f.sttsOrder.errors.required" style="color: red;">
-                                        Order is required
+                                        Section Order is required
                                     </div>
                                 </div>
                             </div>

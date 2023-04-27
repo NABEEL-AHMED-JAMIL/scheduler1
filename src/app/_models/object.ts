@@ -265,15 +265,15 @@ export interface STTSectionList {
 }
 
 export interface STTControlList {
-  sstCId: any;
-  sstCOrder: any;
-  sstCName: any;
+  sttCId: any;
+  sttCOrder: any;
+  sttCName: any;
   filedName: any;
   filedType: any;
   description: any;
   mandatory: any;
   status: any;
-  default?: any;
+  sttcDefault?: any;
   dateCreated: any;
   totalStt: any;
   totalSection: any;

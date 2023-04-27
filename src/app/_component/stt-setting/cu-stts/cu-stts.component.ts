@@ -57,13 +57,13 @@ export class CUSTTSComponent implements OnInit {
             });
     }
 
-
     ngOnInit() {
         if (this.action === Action.ADD) {
             this.sttsForm = this.formBuilder.group({
                 sttsName: ['', Validators.required],
                 description: ['', [Validators.required]],
-                sttsOrder: [null, [Validators.required]]
+                sttsOrder: [null, [Validators.required,
+                    Validators.max(100), Validators.min(0)]]
             });
         } else if (this.action === Action.EDIT) {
             this.getDefultOptionByLookuptype();
@@ -97,7 +97,6 @@ export class CUSTTSComponent implements OnInit {
                     return;
                 }
                 this.defultOption = response.data;
-                debugger
             },
             error => {
                 this.spinnerService.hide();

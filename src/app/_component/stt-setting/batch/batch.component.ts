@@ -38,12 +38,6 @@ export class BatchComponent implements OnInit {
             this.action = data.action;
             this.buttonMessage = data.action;
         });
-        this._activatedRoute.queryParams
-		.subscribe(params => {
-            if (this.action === 'SubLookup') {
-                this.parentLookupId = params['lookupId'];
-            }
-		});
     }
 
     ngOnInit() {
@@ -52,70 +46,7 @@ export class BatchComponent implements OnInit {
     public uploadBulkData(fileToUpload: File): void {
         this.spinnerService.show();
         this.errors = [];
-        if (this.action === 'Lookup' || this.action === 'SubLookup') {
-            let payload = {
-                parentLookupId: this.parentLookupId,
-                accessUserDetail: {
-                    appUserId: this.currentActiveProfile.appUserId,
-                    username: this.currentActiveProfile.username
-               }
-            }
-            const formData = new FormData();
-            formData.append("file", fileToUpload);
-            formData.append("data", JSON.stringify(payload));
-            this.lookupService.uploadLookup(formData)
-            .pipe(first())
-            .subscribe((response: any) => {
-                this.spinnerService.hide();
-                this.inputUpload.nativeElement.value = '';
-                if (response?.status === ApiCode.ERROR) {
-                    this.errors = response.data;
-                    this.alertService.showError(response.message, ApiCode.ERROR);
-                    return;
-                }
-                this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
-            }, (error) => {
-                this.spinnerService.hide();
-                this.alertService.showError(error, ApiCode.ERROR);
-            });
-        }
-    }
 
-    public downloadData(): void {
-        this.spinnerService.show();
-        if (this.action === 'Lookup' || this.action === 'SubLookup') {
-            let payload = {
-                parentLookupId: this.parentLookupId,
-                accessUserDetail: {
-                    appUserId: this.currentActiveProfile.appUserId,
-                    username: this.currentActiveProfile.username
-               }
-            }
-            this.lookupService.downloadLookup(payload)
-            .pipe(first())
-            .subscribe((response) => {
-                this.downLoadFile(response);
-                this.spinnerService.hide();
-            }, (error) => {
-                this.spinnerService.hide();
-                this.alertService.showError(error, ApiCode.ERROR);
-            });
-        }
-    }
-
-    public downloadTemplate(): void {
-        this.spinnerService.show();
-        if (this.action === 'Lookup' || this.action === 'SubLookup') {
-            this.lookupService.downloadLookupTemplateFile()
-            .pipe(first())
-            .subscribe((response) => {
-                this.downLoadFile(response);
-                this.spinnerService.hide();
-            }, (error) => {
-                this.spinnerService.hide();
-                this.alertService.showError(error, ApiCode.ERROR);
-            });
-        }
     }
 
     public backClicked(): void {

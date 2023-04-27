@@ -15,7 +15,7 @@ import { AuthResponse } from '@/_models/index';
 export class STTSListComponent implements OnInit {
 
     public title: any = 'Delete STTS';
-    public subTitle: any = 'Note :- All STTF will delink the Section';
+    public subTitle: any = 'Note :- Delete opertaion may case problem for job';
 
     public searchLookup: any = '';
     public sttSection: STTSectionList;
@@ -85,6 +85,18 @@ export class STTSListComponent implements OnInit {
                 this.spinnerService.hide();
                 this.alertService.showError(error.message, ApiCode.ERROR);
             });
+    }
+
+    public menuAction(payload: any): any {
+        if (payload.router) {
+            this.router.navigate([payload.router]);
+        } else if (payload.targetEvent) {
+            if (payload.targetEvent === 'downloadData') {
+                //this.downloadData();
+            } else if (payload.targetEvent === 'downloadTemplate') {
+                //this.downloadTemplate();
+            }
+        }
     }
 
     public addAction(): void {

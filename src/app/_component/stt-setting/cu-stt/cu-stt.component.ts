@@ -276,7 +276,7 @@ export class CUSTTComponent implements OnInit {
         this.topicPattern = `topic=${this.topicName}&partitions=[*]`;
      }
 
-    public changeOnSecurityLkValue(value: any): void {
+    public onChangeSecurityLkValue(value: any): void {
         this.hasKey = false;
         this.spinnerService.show();
         let payload = {
@@ -349,7 +349,7 @@ export class CUSTTComponent implements OnInit {
             }
         ));
         if (payload.apiSecurityLkValue) {
-            this.changeOnSecurityLkValue(payload.apiSecurityLkValue);
+            this.onChangeSecurityLkValue(payload.apiSecurityLkValue);
         }
     }
 

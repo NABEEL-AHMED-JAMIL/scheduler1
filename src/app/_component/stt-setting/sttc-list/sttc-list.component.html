@@ -34,7 +34,7 @@
                 <span class="caret"></span></button>
             <ul class="dropdown-menu" style="left: -38px;">
                 <li *ngFor="let menu of dropdownButton.menus">
-                    <a href="#">{{menu.title}}</a></li>
+                    <a (click)="menuAction(menu)">{{menu.title}}</a></li>
             </ul>
         </div>
     </div>
@@ -50,6 +50,7 @@
             <th>Filed Name</th>
             <th>Filed Type</th>
             <th>Required</th>
+            <th>Default</th>
             <th>Created Date</th>
             <th>Total STT</th>
             <th>Total Form</th>
@@ -63,32 +64,35 @@
             <td style="text-align: center;">
                 <div class="Yf">
                     <div [ngClass]="{
-                    'Yg_delete': sttControl.status === 'Delete', 
-                    'Yg_inactive' : sttControl.status === 'Inactive',
-                    'Yg_active' : sttControl.status === 'Active'
-                }"></div>
+                    'Yg_inactive' : sttControl.status.lookupValue === 0,
+                    'Yg_active' : sttControl.status.lookupValue === 1,
+                    'Yg_delete': sttControl.status.lookupValue === 2
+                    }"></div>
                 </div>
             </td>
             <td>
-                {{sttControl.controlId}}
+                {{sttControl.sttCId}}
             </td>
             <td style="text-align: center;">
-                {{sttControl.controlOrder}}
+                {{sttControl.sttCOrder}}
             </td>
-            <td>
-                {{sttControl.controlName}}
+            <td style="text-align: center;">
+                {{sttControl.sttCName}}
             </td>
-            <td>
+            <td style="text-align: center;">
                 {{sttControl.filedName}}
             </td>
             <td style="text-align: center;">
-                {{sttControl.filedType | uppercase}}
+                {{sttControl.filedType?.description | uppercase}}
             </td>
             <td style="text-align: center;">
-                {{sttControl.mandatory ? 'Yes': 'No'}}
+                {{sttControl.mandatory?.description}}
             </td>
             <td style="text-align: center;">
-                {{sttControl.dateCreated}}
+                {{sttControl.sttcDefault?.description}}
+            </td>
+            <td style="text-align: center;">
+                {{sttControl.dateCreated | date:'dd-MM-yyyy'}}
             </td>
             <td style="text-align: center;">
                 {{sttControl.totalStt}}
@@ -99,33 +103,43 @@
             <td style="text-align: center;">
                 {{sttControl.totalSection}}
             </td>
-            <!-- <td style="text-align: center;">
-            <span class="badge" [ngClass]="{
-                'badge-danger': sttControl.status === 'Delete', 
-                'badge-info' : sttControl.status === 'Inactive',
-                'badge-success' : sttControl.status === 'Active'
-            }">{{sttControl.status}}</span>
-        </td> -->
             <td style="text-align: center;">
                 <div class="btn-group btn-group-xs" role="group" style="text-align: center">
-                    <button type="button" class="btn btn-default" data-toggle="modal"
-                        data-target="#sourceTaskTaype">
-                        <span class="glyphicon glyphicon-edit" style="color:blue"></span>
-                    </button>
-                    <!-- download source tasktype -->
-                    <button type="button" class="btn btn-default">
-                        <span class="glyphicon glyphicon-download" style="color:#17a2b8">
-                        </span>
+                    <button type="button" class="btn btn-default"
+                        (click)="editAction(sttControl)">
+                        <span class="glyphicon glyphicon-edit"
+                            style="color:blue"></span>
                     </button>
                     <!-- add the method for delete the queue detail -->
-                    <button type="button" class="btn btn-default">
-                        <span class="glyphicon glyphicon-trash" style="color: #dc3545;"></span>
+                    <button type="button" class="btn btn-default"
+                        data-toggle="modal" data-target="#deleteAction"
+                        [disabled]="sttControl.status.lookupValue === 2"
+                        (click)="deleteAction(sttControl)">
+                         <span class="glyphicon glyphicon-trash"
+                         style="color: #dc3545;"></span>
+                     </button>
+                    <!--  -->
+                    <button type="button"
+                        class="btn btn-default dropdown-toggle" 
+                        data-toggle="dropdown"
+                        [disabled]="sttControl.status.lookupValue === 2">
+                        <span class="glyphicon glyphicon-cog" style="color: black;"></span>
                     </button>
-                    <!-- <button type="button" class="btn btn-default">
-                    <span class="glyphicon glyphicon-cog" style="color: black;"></span>
-                </button> -->
+                    <ul class="dropdown-menu" style="left: -65px;">
+                        <li *ngFor="let menu of actionMenu">
+                            <a (click)="menuAction(menu)">{{menu.title}}</a>
+                        </li>
+                    </ul>
                 </div>
             </td>
         </tr>
     </tbody>
 </table>
+<div class="modal fade" id="deleteAction"
+    role="dialog" style="top: 85px;">
+    <del-box
+        [title]="title"
+        [subTitle]="subTitle"
+        (deleteEvent)="deleteActionTriger()">
+    </del-box>
+</div>

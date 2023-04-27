@@ -13,7 +13,7 @@ import { AuthResponse, ApiCode, STTFormList } from '@/_models/index';
 export class STTFListComponent implements OnInit {
 
     public title: any = 'Delete STTF';
-    public subTitle: any = 'Note :- All STT Form unattached with STT(Source Task Type)';
+    public subTitle: any = 'Note :- Delete opertaion may case problem for job';
 
     public searchValue: any = '';
     public sstForm: STTFormList;
@@ -82,6 +82,18 @@ export class STTFListComponent implements OnInit {
                 this.spinnerService.hide();
                 this.alertService.showError(error.message, ApiCode.ERROR);
             });
+    }
+
+    public menuAction(payload: any): any {
+        if (payload.router) {
+            this.router.navigate([payload.router]);
+        } else if (payload.targetEvent) {
+            if (payload.targetEvent === 'downloadData') {
+                //this.downloadData();
+            } else if (payload.targetEvent === 'downloadTemplate') {
+                //this.downloadTemplate();
+            }
+        }
     }
 
     public addAction(): void {
