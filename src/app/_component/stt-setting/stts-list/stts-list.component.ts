@@ -2,7 +2,8 @@ import { Component, OnInit } from '@angular/core';
 import { STTSectionList } from '@/_models/index'
 import { Router, ActivatedRoute } from '@angular/router';
 import { first } from 'rxjs/operators';
-import { AuthenticationService, AlertService, STTService } from '@/_services';
+import { AuthenticationService, AlertService,
+    STTService, CommomService } from '@/_services';
 import { SpinnerService } from '@/_helpers';
 import { ApiCode } from '@/_models';
 import { AuthResponse } from '@/_models/index';
@@ -33,6 +34,7 @@ export class STTSListComponent implements OnInit {
     constructor(private router:Router,
         private route:ActivatedRoute,
         private alertService: AlertService,
+        private commomService: CommomService,
         private spinnerService: SpinnerService,
         private authenticationService: AuthenticationService,
         private sttService: STTService) {
@@ -92,9 +94,9 @@ export class STTSListComponent implements OnInit {
             this.router.navigate([payload.router]);
         } else if (payload.targetEvent) {
             if (payload.targetEvent === 'downloadData') {
-                //this.downloadData();
+                this.downloadData();
             } else if (payload.targetEvent === 'downloadTemplate') {
-                //this.downloadTemplate();
+                this.downloadTemplate();
             }
         }
     }
@@ -119,7 +121,6 @@ export class STTSListComponent implements OnInit {
 
     public deleteAction(payload: any): void {
         this.sttSection = payload;
-        console.log(this.sttSection);
     }
 
     public deleteActionTriger(): void {
@@ -147,6 +148,46 @@ export class STTSListComponent implements OnInit {
                 this.spinnerService.hide();
                 this.alertService.showError(error.message, ApiCode.ERROR);
             });
+    }
+
+    public downloadData(): void {
+        this.spinnerService.show();
+        let payload = {
+            accessUserDetail: {
+                appUserId: this.currentActiveProfile.appUserId,
+                username: this.currentActiveProfile.username
+           },
+           downloadType: 'SourceTaskTypeSection'
+        }
+        this.sttService.downloadSTTCommon(payload)
+        .pipe(first())
+        .subscribe((response) => {
+            this.commomService.downLoadFile(response);
+            this.spinnerService.hide();
+        }, (error) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error, ApiCode.ERROR);
+        });
+    }
+
+    public downloadTemplate(): void {
+        this.spinnerService.show();
+        let payload = {
+            accessUserDetail: {
+                appUserId: this.currentActiveProfile.appUserId,
+                username: this.currentActiveProfile.username
+           },
+           downloadType: 'SourceTaskTypeSection'
+        }
+        this.sttService.downloadSTTCommonTemplateFile(payload)
+        .pipe(first())
+        .subscribe((response) => {
+            this.commomService.downLoadFile(response);
+            this.spinnerService.hide();
+        }, (error) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error, ApiCode.ERROR);
+        });
     }
 
 

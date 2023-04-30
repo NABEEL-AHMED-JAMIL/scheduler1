@@ -48,7 +48,7 @@ export class LookupService {
     }
 
     public downloadLookupTemplateFile(): Observable<any> {
-        return this.http.get(`${config.apiUrl}/lookup.json/downloadSourceJobTemplateFile`,
+        return this.http.get(`${config.apiUrl}/lookup.json/downloadLookupTemplateFile`,
         {
             responseType: 'blob'
         });

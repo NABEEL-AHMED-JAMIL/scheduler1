@@ -22,10 +22,6 @@ export class STTService {
         return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/deleteSTT`, payload);
     }
 
-    public viewSTT(): Observable<ApiResponse> {
-        return null;
-    }
-
     public fetchSTTBySttId(payload: any): Observable<ApiResponse> {
         return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/fetchSTTBySttId`, payload);
     }
@@ -34,15 +30,6 @@ export class STTService {
         return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/fetchSTT`, payload);
     }
 
-    public downloadSTTTree(): Observable<ApiResponse> {
-        return null;
-    }
-
-    public linkSTTWithFrom(): Observable<ApiResponse> {
-        return null;
-    }
-
-    // STTF
     public addSTTF(payload: any): Observable<ApiResponse> {
         return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/addSTTF`, payload);
     }
@@ -55,10 +42,6 @@ export class STTService {
         return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/deleteSTTF`, payload);
     }
 
-    public viewSTTF(): Observable<ApiResponse> {
-        return null;
-    }
-
     public fetchSTTFBySttfId(payload: any): Observable<ApiResponse> {
         return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/fetchSTTFBySttfId`, payload);
     }
@@ -67,15 +50,6 @@ export class STTService {
         return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/fetchSTTF`, payload);
     }
 
-    public downloadSTTFTree(): Observable<ApiResponse> {
-        return null;
-    }
-
-    public linkSTTFWithFrom(): Observable<ApiResponse> {
-        return null;
-    }
-
-    // STTS
     public addSTTS(payload: any): Observable<ApiResponse> {
         return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/addSTTS`, payload);
     }
@@ -88,10 +62,6 @@ export class STTService {
         return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/deleteSTTS`, payload);
     }
 
-    public viewSTTS(): Observable<ApiResponse> {
-        return null;
-    }
-
     public fetchSTTSBySttsId(payload: any): Observable<ApiResponse> {
         return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/fetchSTTSBySttsId`, payload);
     }
@@ -100,15 +70,6 @@ export class STTService {
         return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/fetchSTTS`, payload);
     }
 
-    public downloadSTTSTree(): Observable<ApiResponse> {
-        return null;
-    }
-
-    public linkSTTSWithFrom(): Observable<ApiResponse> {
-        return null;
-    }
-
-    // STTC
     public addSTTC(payload: any): Observable<ApiResponse> {
         return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/addSTTC`, payload);
     }
@@ -129,13 +90,19 @@ export class STTService {
         return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/fetchSTTC`, payload);
     }
 
-    public downloadSTTCTree(): any {
-        return null;
-    };
+    public downloadSTTCommon(payload: any): Observable<any> {
+        return this.http.post(`${config.apiUrl}/sourceTaskType.json/downloadSTTCommon`, payload,
+        {
+            responseType: 'blob'
+        });
+    }
 
-    public linkSTTCWithFrom(): any {
-        return null;
-    };
+    public downloadSTTCommonTemplateFile(payload: any): Observable<any> {
+        return this.http.post(`${config.apiUrl}/sourceTaskType.json/downloadSTTCommonTemplateFile`, payload,
+        {
+            responseType: 'blob'
+        });
+    }
 
 
 }
