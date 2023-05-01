@@ -107,7 +107,8 @@
                                 <select class="form-control input-sm" id="taskType" formControlName="taskType"
                                     [ngClass]="{ 'is-invalid': submitted && f.taskType.errors }"
                                     (change)='onTaskTypeSelected($event)'
-                                    [attr.disabled]="action === 2 ? true : null">
+                                    [attr.disabled]="action === 2 ? true : true">
+                                    <!-- true -> null for 2nd value -->
                                     <option hidden value="" disabled selected>
                                         {{taskTypeOption.parentLookupData.description}}
                                     </option>
@@ -242,7 +243,7 @@
                         <div class="col-lg-4">
                             <div class="form-group">
                                 <label for="numPartitions">Partitions</label>
-                                <input type="number" id="numPartitions" min="1" max="5"
+                                <input type="number" id="numPartitions" min="1" max="10"
                                     formControlName="numPartitions"
                                     class="form-control input-sm"
                                     placeholder="Enter partitions"
@@ -255,7 +256,7 @@
                                         style="color: red;">Num Partitions min 1
                                     </div>
                                     <div *ngIf="kafkaTaskType.get('numPartitions').errors.max"
-                                        style="color: red;">Num Partitions max 5
+                                        style="color: red;">Num Partitions max 10
                                     </div>
                                 </div>
                             </div>

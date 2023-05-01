@@ -308,7 +308,7 @@ export class CUSTTComponent implements OnInit {
     public addKafkaTaskType(): void {
         this.sttForm.addControl('kafkaTaskType', 
             this.formBuilder.group({
-                numPartitions: ['', [Validators.required, Validators.min(1), Validators.max(5)]],
+                numPartitions: ['', [Validators.required, Validators.min(1), Validators.max(10)]],
                 topicName: ['', [Validators.required, Validators.pattern('^[-a-zA-Z0-9@\.+_]+$')]],
                 topicPattern: [this.topicPattern]
             }
