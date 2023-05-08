@@ -1,5 +1,4 @@
 ﻿import { NgModule } from '@angular/core';
-import { NgxEchartsModule } from 'ngx-echarts';
 import { NgxQrcodeStylingModule } from 'ngx-qrcode-styling';
 import { BrowserModule } from '@angular/platform-browser';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
@@ -26,7 +25,6 @@ import {
     SearchEngineComponent,
     DeleteBoxComponent,
     SttSettingComponent,
-    STTHeaderComponent,
     STTListComponent,
     STTFListComponent,
     STTSListComponent,
@@ -35,6 +33,13 @@ import {
     CUSTTFComponent,
     CUSTTSComponent,
     CUSTTCComponent,
+    STTFLinkSTTSComponent,
+    STTFLinkSTTComponent,
+    STTLinkUserComponent,
+    STTLinkSTTFComponent,
+    STTSLinkSTTFComponent,
+    STTSLinkSTTCComponent,
+    STTCLinkSTTSComponent,
     BatchComponent
 } from '@/_component/index';
 import { ToastrModule } from 'ngx-toastr';
@@ -42,9 +47,6 @@ import { ToastrModule } from 'ngx-toastr';
 @NgModule({
     imports: [
         BrowserModule,
-        NgxEchartsModule.forRoot({
-            echarts: () => import('echarts'),
-        }),
         FormsModule,
         NgxQrcodeStylingModule,
         ReactiveFormsModule,
@@ -70,7 +72,6 @@ import { ToastrModule } from 'ngx-toastr';
         DeleteBoxComponent,
         SttSettingComponent,
         BatchComponent,
-        STTHeaderComponent,
         STTListComponent,
         STTFListComponent,
         STTSListComponent,
@@ -79,6 +80,13 @@ import { ToastrModule } from 'ngx-toastr';
         CUSTTFComponent,
         CUSTTSComponent,
         CUSTTCComponent,
+        STTFLinkSTTSComponent,
+        STTFLinkSTTComponent,
+        STTLinkUserComponent,
+        STTLinkSTTFComponent,
+        STTSLinkSTTFComponent,
+        STTSLinkSTTCComponent,
+        STTCLinkSTTSComponent,
         XmlConfigurationComponent,
         SearchFilterPipe,
         SearchEngineComponent

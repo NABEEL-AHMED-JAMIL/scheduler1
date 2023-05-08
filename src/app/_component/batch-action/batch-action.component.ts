@@ -33,7 +33,6 @@ export class BatchActionComponent implements OnInit {
         this.route.data.subscribe((data: any) => {
             this.title = data.breadcrumb;
             this.action = data.action;
-            console.log(data);
         });
         this.route.queryParams.subscribe(params => {
             if (this.action === 'SubLookup') {
@@ -70,7 +69,7 @@ export class BatchActionComponent implements OnInit {
                     return;
                 }
                 this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
-            }, (error) => {
+            }, (error: any) => {
                 this.spinnerService.hide();
                 this.alertService.showError(error, ApiCode.ERROR);
             });

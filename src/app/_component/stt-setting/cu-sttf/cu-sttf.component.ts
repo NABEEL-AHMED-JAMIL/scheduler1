@@ -86,23 +86,21 @@ export class CUSTTFComponent implements OnInit {
         }
         this.lookupService.fetchLookupByLookupType(payload)
         .pipe(first())
-        .subscribe(
-            response => {
-                this.spinnerService.hide();
-                if (response.status === ApiCode.ERROR) {
-                    this.alertService.showError(response.message, ApiCode.ERROR);
-                    return;
-                }
-                this.statusList = response.data;
-                this.statusList.subLookupData = this.statusList.subLookupData
-                .filter(lookup => {
-                    return lookup.lookupValue != '2';
-                });
-            },
-            error => {
-                this.spinnerService.hide();
-                this.alertService.showError(error.message, ApiCode.ERROR);
+        .subscribe((response: any) => {
+            this.spinnerService.hide();
+            if (response.status === ApiCode.ERROR) {
+                this.alertService.showError(response.message, ApiCode.ERROR);
+                return;
+            }
+            this.statusList = response.data;
+            this.statusList.subLookupData = this.statusList.subLookupData
+            .filter(lookup => {
+                return lookup.lookupValue != '2';
             });
+        }, (error: any) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error.message, ApiCode.ERROR);
+        });
     }
 
     public getDefultOptionByLookuptype(): any {
@@ -117,19 +115,17 @@ export class CUSTTFComponent implements OnInit {
         }
         this.lookupService.fetchLookupByLookupType(payload)
         .pipe(first())
-        .subscribe(
-            response => {
-                this.spinnerService.hide();
-                if (response.status === ApiCode.ERROR) {
-                    this.alertService.showError(response.message, ApiCode.ERROR);
-                    return;
-                }
-                this.defultOption = response.data;
-            },
-            error => {
-                this.spinnerService.hide();
-                this.alertService.showError(error.message, ApiCode.ERROR);
-            });
+        .subscribe((response: any) => {
+            this.spinnerService.hide();
+            if (response.status === ApiCode.ERROR) {
+                this.alertService.showError(response.message, ApiCode.ERROR);
+                return;
+            }
+            this.defultOption = response.data;
+        }, (error: any) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error.message, ApiCode.ERROR);
+        });
     }
 
     public fetchSTTFBySttfId(sttfId: any) {
@@ -143,25 +139,23 @@ export class CUSTTFComponent implements OnInit {
         }
         this.sttService.fetchSTTFBySttfId(payload)
         .pipe(first())
-        .subscribe(
-            response => {
-                this.spinnerService.hide();
-                if (response.status === ApiCode.ERROR) {
-                    this.alertService.showError(response.message, ApiCode.ERROR);
-                    return;
-                }
-                this.sttfForm = this.formBuilder.group({
-                    sttfId: [response.data.sttFId, [Validators.required]],
-                    sttfName: [response.data.sttFName, Validators.required],
-                    description: [response.data.description, [Validators.required]],
-                    status: [response.data.status.lookupValue, [Validators.required]],
-                    defaultSttf: [response.data.defaultSttf.lookupValue, [Validators.required]]
-                });
-            },
-            error => {
-                this.spinnerService.hide();
-                this.alertService.showError(error.message, ApiCode.ERROR);
+        .subscribe((response: any) => {
+            this.spinnerService.hide();
+            if (response.status === ApiCode.ERROR) {
+                this.alertService.showError(response.message, ApiCode.ERROR);
+                return;
+            }
+            this.sttfForm = this.formBuilder.group({
+                sttfId: [response.data.sttFId, [Validators.required]],
+                sttfName: [response.data.sttFName, Validators.required],
+                description: [response.data.description, [Validators.required]],
+                status: [response.data.status.lookupValue, [Validators.required]],
+                defaultSttf: [response.data.defaultSttf.lookupValue, [Validators.required]]
             });
+        }, (error: any) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error.message, ApiCode.ERROR);
+        });
     }
 
     public onSubmit(): any {
@@ -184,45 +178,41 @@ export class CUSTTFComponent implements OnInit {
         if (this.action === Action.ADD) {
             this.sttService.addSTTF(payload)
             .pipe(first())
-            .subscribe(
-                response => {
-                    this.loading = false;
-                    this.submitted = false;
-                    this.spinnerService.hide();
-                    if (response.status === ApiCode.ERROR) {
-                        this.alertService.showError(response.message, ApiCode.ERROR);
-                        return;
-                    }
-                    this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
-                    this.back();
-                },
-                error => {
-                    this.loading = false;
-                    this.submitted = false;
-                    this.spinnerService.hide();
-                    this.alertService.showError(error.message, ApiCode.ERROR);
-                });
+            .subscribe((response: any) => {
+                this.loading = false;
+                this.submitted = false;
+                this.spinnerService.hide();
+                if (response.status === ApiCode.ERROR) {
+                    this.alertService.showError(response.message, ApiCode.ERROR);
+                    return;
+                }
+                this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
+                this.back();
+            }, (error: any) => {
+                this.loading = false;
+                this.submitted = false;
+                this.spinnerService.hide();
+                this.alertService.showError(error.message, ApiCode.ERROR);
+            });
         } else if (this.action === Action.EDIT) {
             this.sttService.editSTTF(payload)
             .pipe(first())
-            .subscribe(
-                response => {
-                    this.loading = false;
-                    this.submitted = false;
-                    this.spinnerService.hide();
-                    if (response.status === ApiCode.ERROR) {
-                        this.alertService.showError(response.message, ApiCode.ERROR);
-                        return;
-                    }
-                    this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
-                    this.back();
-                },
-                error => {
-                    this.loading = false;
-                    this.submitted = false;
-                    this.spinnerService.hide();
-                    this.alertService.showError(error.message, ApiCode.ERROR);
-                });
+            .subscribe((response: any) => {
+                this.loading = false;
+                this.submitted = false;
+                this.spinnerService.hide();
+                if (response.status === ApiCode.ERROR) {
+                    this.alertService.showError(response.message, ApiCode.ERROR);
+                    return;
+                }
+                this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
+                this.back();
+            }, (error: any) => {
+                this.loading = false;
+                this.submitted = false;
+                this.spinnerService.hide();
+                this.alertService.showError(error.message, ApiCode.ERROR);
+            });
         }
     }
 

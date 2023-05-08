@@ -10,6 +10,7 @@ import { LOOKUP_TYPES, ApiCode }  from '@/_models'
 import { SpinnerService } from '@/_helpers';
 import { AuthResponse, AppUserResponse } from '@/_models/index';
 
+
 @Component({
     templateUrl: 'profile.component.html', 
 })
@@ -96,58 +97,54 @@ export class ProfileComponent implements OnInit {
         }
         this.lookupService.fetchLookupByLookupType(payload)
         .pipe(first())
-        .subscribe(
-            response => {
-                this.spinnerService.hide();
-                if (response.status === ApiCode.ERROR) {
-                    this.alertService.showError(response.message, ApiCode.ERROR);
-                    return;
-                }
-                this.timeZoneList = response.data
-            },
-            error => {
-                this.spinnerService.hide();
-                this.alertService.showError(error.message, ApiCode.ERROR);
-            });
+        .subscribe((response: any) => {
+            this.spinnerService.hide();
+            if (response.status === ApiCode.ERROR) {
+                this.alertService.showError(response.message, ApiCode.ERROR);
+                return;
+            }
+            this.timeZoneList = response.data
+        }, (error: any) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error.message, ApiCode.ERROR);
+        });
     }
 
     public getAppUserProfile() {
         this.spinnerService.show();
         this.appUserService.getAppUserProfile(this.currentActiveProfile.username)
         .pipe(first())
-        .subscribe(
-            response => {
-                this.spinnerService.hide();
-                if (response.status === ApiCode.ERROR) {
-                    this.alertService.showError(response.message, ApiCode.ERROR);
-                    return;
-                }
-                this.appUserResponse = response.data;
-                this.appUserForm.patchValue({
-                    appUserId: this.appUserResponse.appUserId,
-                    firstName: this.appUserResponse.firstName,
-                    lastName: this.appUserResponse.lastName,
-                    username: this.appUserResponse.username,
-                    email: this.appUserResponse.email,
-                    parentAppUser: this.appUserResponse?.parentAppUser?.username,
-                    role: this.appUserResponse.roleResponse?.[0].roleName
-                });
-                this.updatePassForm.patchValue({
-                    appUserId: this.appUserResponse.appUserId,
-                    username: this.appUserResponse.username,
-                    email: this.appUserResponse.email
-                });
-                this.timeZoneForm.patchValue({
-                    appUserId: this.appUserResponse.appUserId,
-                    username: this.appUserResponse.username,
-                    email: this.appUserResponse.email,
-                    timeZone: this.appUserResponse.timeZone
-                });
-            },
-            error => {
-                this.spinnerService.hide();
-                this.alertService.showError(error.message, ApiCode.ERROR);
-            });        
+        .subscribe((response: any) => {
+            this.spinnerService.hide();
+            if (response.status === ApiCode.ERROR) {
+                this.alertService.showError(response.message, ApiCode.ERROR);
+                return;
+            }
+            this.appUserResponse = response.data;
+            this.appUserForm.patchValue({
+                appUserId: this.appUserResponse.appUserId,
+                firstName: this.appUserResponse.firstName,
+                lastName: this.appUserResponse.lastName,
+                username: this.appUserResponse.username,
+                email: this.appUserResponse.email,
+                parentAppUser: this.appUserResponse?.parentAppUser?.username,
+                role: this.appUserResponse.roleResponse?.[0].roleName
+            });
+            this.updatePassForm.patchValue({
+                appUserId: this.appUserResponse.appUserId,
+                username: this.appUserResponse.username,
+                email: this.appUserResponse.email
+            });
+            this.timeZoneForm.patchValue({
+                appUserId: this.appUserResponse.appUserId,
+                username: this.appUserResponse.username,
+                email: this.appUserResponse.email,
+                timeZone: this.appUserResponse.timeZone
+            });
+        }, (error: any) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error.message, ApiCode.ERROR);
+        });
     }
 
     public updateAppUserProfile() {
@@ -161,25 +158,23 @@ export class ProfileComponent implements OnInit {
         this.loading = true;
         this.appUserService.updateAppUserProfile(this.appUserForm.value)
         .pipe(first())
-        .subscribe(
-            response => {
-                this.loading = false;
-                this.submitted = false;
-                this.spinnerService.hide();
-                if (response.status === ApiCode.ERROR) {
-                    this.alertService.showError(response.message, ApiCode.ERROR);
-                    return;
-                }
-                this.appUserResponse.firstName = response.data.firstName;
-                this.appUserResponse.lastName = response.data.lastName;
-                this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
-            },
-            error => {
-                this.loading = false;
-                this.submitted = false;
-                this.spinnerService.hide();
-                this.alertService.showError(error.message, ApiCode.ERROR);
-            });
+        .subscribe((response: any) => {
+            this.loading = false;
+            this.submitted = false;
+            this.spinnerService.hide();
+            if (response.status === ApiCode.ERROR) {
+                this.alertService.showError(response.message, ApiCode.ERROR);
+                return;
+            }
+            this.appUserResponse.firstName = response.data.firstName;
+            this.appUserResponse.lastName = response.data.lastName;
+            this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
+        }, (error: any) => {
+            this.loading = false;
+            this.submitted = false;
+            this.spinnerService.hide();
+            this.alertService.showError(error.message, ApiCode.ERROR);
+        });
 
     }
 
@@ -193,22 +188,20 @@ export class ProfileComponent implements OnInit {
         this.loading = true;
         this.appUserService.updateAppUserPassword(this.updatePassForm.value)
         .pipe(first())
-        .subscribe(
-            response => {
-                this.loading = false;
-                this.spinnerService.hide();
-                if (response.status === ApiCode.ERROR) {
-                    this.alertService.showError(response.message, ApiCode.ERROR);
-                    return;
-                }
-                this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
-                this.logoutAppUser();
-            },
-            error => {
-                this.loading = false;
-                this.spinnerService.hide();
-                this.alertService.showError(error.message, ApiCode.ERROR);
-            });
+        .subscribe((response: any) => {
+            this.loading = false;
+            this.spinnerService.hide();
+            if (response.status === ApiCode.ERROR) {
+                this.alertService.showError(response.message, ApiCode.ERROR);
+                return;
+            }
+            this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
+            this.logoutAppUser();
+        }, (error: any) => {
+            this.loading = false;
+            this.spinnerService.hide();
+            this.alertService.showError(error.message, ApiCode.ERROR);
+        });
     }
 
     public updateAppUserTimeZone() {
@@ -218,7 +211,7 @@ export class ProfileComponent implements OnInit {
 		this.spinnerService.show();
 		this.appUserService.closeAppUserAccount(this.appUserResponse)
 		.pipe(first())
-		.subscribe((response) => {
+		.subscribe((response: any) => {
             this.spinnerService.hide();
             this.closebutton.nativeElement.click();
 			if(response.status === ApiCode.ERROR) {
@@ -228,7 +221,7 @@ export class ProfileComponent implements OnInit {
             this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
             // logout the account
             this.logoutAppUser();
-		}, (error) => {
+		}, (error: any) => {
 			this.spinnerService.hide();
 			this.alertService.showError(error, ApiCode.ERROR);
 		});
@@ -237,20 +230,18 @@ export class ProfileComponent implements OnInit {
     public logoutAppUser() {
         this.authenticationService.logout()
         .pipe(first())
-        .subscribe(
-            data => {
-                this.spinnerService.hide();
-                if (data.status === ApiCode.ERROR) {
-                    this.alertService.showError(data.message, ApiCode.ERROR);
-                    return;
-                }
-                this.alertService.showSuccess('Logout successfully', ApiCode.SUCCESS);
-                this.router.navigate(['/login']);
-            },
-            error => {
-                this.spinnerService.hide();
-                this.alertService.showError(error.message, ApiCode.ERROR);
-            });
+        .subscribe((data: any) => {
+            this.spinnerService.hide();
+            if (data.status === ApiCode.ERROR) {
+                this.alertService.showError(data.message, ApiCode.ERROR);
+                return;
+            }
+            this.alertService.showSuccess('Logout successfully', ApiCode.SUCCESS);
+            this.router.navigate(['/login']);
+        }, (error: any) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error.message, ApiCode.ERROR);
+        });
     }
 
     // convenience getter for easy access to form fields
@@ -272,8 +263,7 @@ export class ProfileComponent implements OnInit {
           const matchingControl = formGroup.controls[matchingControlName];
           if (matchingControl.errors && !matchingControl.errors.confirmedValidator) {
             return;
-          }
-          if (control.value !== matchingControl.value) {
+          } else if (control.value !== matchingControl.value) {
             matchingControl.setErrors({ confirmedValidator: true });
           } else {
             matchingControl.setErrors(null);

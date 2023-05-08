@@ -56,23 +56,21 @@ export class LoginComponent implements OnInit {
         this.loading = true;
         this.authenticationService.signInAppUser(this.f.username.value, this.f.password.value)
             .pipe(first())
-            .subscribe(
-                response => {
-                    this.loading = false;
-                    this.submitted = false;
-                    this.spinnerService.hide();
-                    if (response.status === ApiCode.ERROR) {
-                        this.alertService.showError(response.message, ApiCode.ERROR);
-                        return;
-                    }
-                    this.router.navigate([this.returnUrl]);
-                },
-                error => {
-                    this.loading = false;
-                    this.submitted = false;
-                    this.spinnerService.hide();
-                    this.alertService.showError(error.message, ApiCode.ERROR);
-                });
+            .subscribe((response: any) => {
+                this.loading = false;
+                this.submitted = false;
+                this.spinnerService.hide();
+                if (response.status === ApiCode.ERROR) {
+                    this.alertService.showError(response.message, ApiCode.ERROR);
+                    return;
+                }
+                this.router.navigate([this.returnUrl]);
+            }, (error: any) => {
+                this.loading = false;
+                this.submitted = false;
+                this.spinnerService.hide();
+                this.alertService.showError(error.message, ApiCode.ERROR);
+            });
     }
 
     public register(): any {

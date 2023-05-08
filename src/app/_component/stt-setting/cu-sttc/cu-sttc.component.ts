@@ -78,7 +78,7 @@ export class CUSTTCComponent implements OnInit {
                 filedTitle: ['', [Validators.required]],
                 placeHolder: [''],
                 pattern: [''],
-                filedLkValue: [''],
+                filedLookUp: [''],
                 filedLkDetail: [''],
                 filedWidth: ['', [Validators.required]],
                 minLength: [''],
@@ -107,37 +107,43 @@ export class CUSTTCComponent implements OnInit {
         }
         this.sttService.fetchSTTCBySttcId(payload)
         .pipe(first())
-        .subscribe(
-            response => {
-                this.spinnerService.hide();
-                if (response.status === ApiCode.ERROR) {
-                    this.alertService.showError(response.message, ApiCode.ERROR);
-                    return;
-                }
-                this.sttcForm = this.formBuilder.group({
-                    sttCId: [response.data.sttCId, [Validators.required]],
-                    filedType: [response.data.filedType.lookupValue, [Validators.required]],
-                    sttCName: [response.data.sttCName, [Validators.required]],
-                    sttCOrder: [response.data.sttCOrder, [Validators.required]],
-                    description: [response.data.description, [Validators.required]],
-                    filedName: [response.data.filedName, [Validators.required]],
-                    filedTitle: [response.data.filedTitle, [Validators.required]],
-                    placeHolder: [response.data.placeHolder],
-                    pattern: [response.data.pattern],
-                    filedLkValue: [response.data.filedLookUp],
-                    filedLkDetail: [],
-                    filedWidth: [response.data.filedWidth, [Validators.required]],
-                    minLength: [response.data.minLength],
-                    maxLength: [response.data.maxLength],
-                    mandatory: [response.data.mandatory.lookupValue, [Validators.required]],
-                    status: [response.data.status.lookupValue, [Validators.required]],
-                    defaultSttc: [response.data.defaultSttc.lookupValue, [Validators.required]]
-                });
-            },
-            error => {
-                this.spinnerService.hide();
-                this.alertService.showError(error.message, ApiCode.ERROR);
+        .subscribe((response: any) => {
+            this.spinnerService.hide();
+            if (response.status === ApiCode.ERROR) {
+                this.alertService.showError(response.message, ApiCode.ERROR);
+                return;
+            }
+            this.sttcForm = this.formBuilder.group({
+                sttCId: [response.data.sttCId, [Validators.required]],
+                filedType: [response.data.filedType.lookupValue, [Validators.required]],
+                sttCName: [response.data.sttCName, [Validators.required]],
+                sttCOrder: [response.data.sttCOrder, [Validators.required]],
+                description: [response.data.description, [Validators.required]],
+                filedName: [response.data.filedName, [Validators.required]],
+                filedTitle: [response.data.filedTitle, [Validators.required]],
+                placeHolder: [response.data.placeHolder],
+                pattern: [response.data.pattern],
+                filedLookUp: [response.data.filedLookUp],
+                filedLkDetail: [],
+                filedWidth: [response.data.filedWidth, [Validators.required]],
+                minLength: [response.data.minLength],
+                maxLength: [response.data.maxLength],
+                mandatory: [response.data.mandatory.lookupValue, [Validators.required]],
+                status: [response.data.status.lookupValue, [Validators.required]],
+                defaultSttc: [response.data.defaultSttc.lookupValue, [Validators.required]]
             });
+            if (response.data.filedType.lookupValue === 'radio' ||
+                response.data.filedType.lookupValue === 'checkbox' ||
+                response.data.filedType.lookupValue === 'select' ||
+                response.data.filedType.lookupValue === 'multi-select') {
+                this.filedTypeForLkValue = true;
+                this.onChangeFiledLkValue(response.data.filedLookUp);
+                return;
+            }
+        }, (error: any) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error.message, ApiCode.ERROR);
+        });
     }
 
     public getFormControlTypeByLookupType(): any {
@@ -152,19 +158,17 @@ export class CUSTTCComponent implements OnInit {
         }
         this.lookupService.fetchLookupByLookupType(payload)
         .pipe(first())
-        .subscribe(
-            response => {
-                this.spinnerService.hide();
-                if (response.status === ApiCode.ERROR) {
-                    this.alertService.showError(response.message, ApiCode.ERROR);
-                    return;
-                }
-                this.formControlType = response.data;
-            },
-            error => {
-                this.spinnerService.hide();
-                this.alertService.showError(error.message, ApiCode.ERROR);
-            });
+        .subscribe((response: any) => {
+            this.spinnerService.hide();
+            if (response.status === ApiCode.ERROR) {
+                this.alertService.showError(response.message, ApiCode.ERROR);
+                return;
+            }
+            this.formControlType = response.data;
+        }, (error: any) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error.message, ApiCode.ERROR);
+        });
     }
 
     public getApplicationStatusByLookupType(): any {
@@ -179,23 +183,21 @@ export class CUSTTCComponent implements OnInit {
         }
         this.lookupService.fetchLookupByLookupType(payload)
         .pipe(first())
-        .subscribe(
-            response => {
-                this.spinnerService.hide();
-                if (response.status === ApiCode.ERROR) {
-                    this.alertService.showError(response.message, ApiCode.ERROR);
-                    return;
-                }
-                this.statusList = response.data;
-                this.statusList.subLookupData = this.statusList.subLookupData
-                .filter(lookup => {
-                    return lookup.lookupValue != '2';
-                });
-            },
-            error => {
-                this.spinnerService.hide();
-                this.alertService.showError(error.message, ApiCode.ERROR);
+        .subscribe((response: any) => {
+            this.spinnerService.hide();
+            if (response.status === ApiCode.ERROR) {
+                this.alertService.showError(response.message, ApiCode.ERROR);
+                return;
+            }
+            this.statusList = response.data;
+            this.statusList.subLookupData = this.statusList.subLookupData
+            .filter(lookup => {
+                return lookup.lookupValue != '2';
             });
+        }, (error: any) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error.message, ApiCode.ERROR);
+        });
     }
 
     public getDefultOptionByLookuptype(): any {
@@ -210,20 +212,18 @@ export class CUSTTCComponent implements OnInit {
         }
         this.lookupService.fetchLookupByLookupType(payload)
         .pipe(first())
-        .subscribe(
-            response => {
-                this.spinnerService.hide();
-                if (response.status === ApiCode.ERROR) {
-                    this.alertService.showError(response.message, ApiCode.ERROR);
-                    return;
-                }
-                this.defultOption = response.data;
-                this.mandatoryOption = response.data;
-            },
-            error => {
-                this.spinnerService.hide();
-                this.alertService.showError(error.message, ApiCode.ERROR);
-            });
+        .subscribe((response: any) => {
+            this.spinnerService.hide();
+            if (response.status === ApiCode.ERROR) {
+                this.alertService.showError(response.message, ApiCode.ERROR);
+                return;
+            }
+            this.defultOption = response.data;
+            this.mandatoryOption = response.data;
+        }, (error: any) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error.message, ApiCode.ERROR);
+        });
     }
 
     public onFiledType(payload: any): void {
@@ -235,7 +235,7 @@ export class CUSTTCComponent implements OnInit {
         this.hasKey = false;
         this.filedTypeForLkValue = false;
         this.filedLkValueOption = undefined;
-        this.sttcForm.controls['filedLkValue'].setValue(undefined);
+        this.sttcForm.controls['filedLookUp'].setValue(undefined);
         this.sttcForm.controls['filedLkDetail'].setValue(undefined);
     }
 
@@ -252,20 +252,21 @@ export class CUSTTCComponent implements OnInit {
         }
         this.lookupService.fetchLookupByLookupType(payload)
         .pipe(first())
-        .subscribe(
-            response => {
-                this.spinnerService.hide();
-                if (response.status === ApiCode.ERROR) {
-                    this.alertService.showError('No lookup found', ApiCode.ERROR);
-                    return;
-                }
-                this.hasKey = true;
-                this.filedLkValueOption = response.data
-            },
-            error => {
-                this.spinnerService.hide();
-                this.alertService.showError(error.message, ApiCode.ERROR);
-            });
+        .subscribe((response: any) => {
+            this.spinnerService.hide();
+            if (response.status === ApiCode.ERROR) {
+                this.alertService.showError('No lookup found', ApiCode.ERROR);
+                return;
+            } else if (response.data?.subLookupData.length === 0) {
+                this.alertService.showError('Lookup not valid', ApiCode.ERROR);
+                return;
+            }
+            this.hasKey = true;
+            this.filedLkValueOption = response.data;
+        }, (error: any) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error.message, ApiCode.ERROR);
+        });
     }
 
     public onSubmit(): any {
@@ -287,7 +288,7 @@ export class CUSTTCComponent implements OnInit {
         if (this.action === Action.ADD) {
             this.sttService.addSTTC(payload)
             .pipe(first())
-            .subscribe(response => {
+            .subscribe((response: any) => {
                 this.loading = false;
                 this.submitted = false;
                 this.spinnerService.hide();
@@ -297,7 +298,7 @@ export class CUSTTCComponent implements OnInit {
                 }
                 this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
                 this.back();
-                },error => {
+                }, (error: any) => {
                     this.loading = false;
                     this.submitted = false;
                     this.spinnerService.hide();
@@ -306,24 +307,22 @@ export class CUSTTCComponent implements OnInit {
         } else if (this.action === Action.EDIT) {
             this.sttService.editSTTC(payload)
             .pipe(first())
-            .subscribe(
-                response => {
-                    this.loading = false;
-                    this.submitted = false;
-                    this.spinnerService.hide();
-                    if (response.status === ApiCode.ERROR) {
-                        this.alertService.showError(response.message, ApiCode.ERROR);
-                        return;
-                    }
-                    this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
-                    this.back();
-                },
-                error => {
-                    this.loading = false;
-                    this.submitted = false;
-                    this.spinnerService.hide();
-                    this.alertService.showError(error.message, ApiCode.ERROR);
-                });
+            .subscribe((response: any) => {
+                this.loading = false;
+                this.submitted = false;
+                this.spinnerService.hide();
+                if (response.status === ApiCode.ERROR) {
+                    this.alertService.showError(response.message, ApiCode.ERROR);
+                    return;
+                }
+                this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
+                this.back();
+            }, (error: any) => {
+                this.loading = false;
+                this.submitted = false;
+                this.spinnerService.hide();
+                this.alertService.showError(error.message, ApiCode.ERROR);
+            });
         }
     }
 

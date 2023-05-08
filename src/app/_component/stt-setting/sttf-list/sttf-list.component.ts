@@ -25,7 +25,6 @@ export class STTFListComponent implements OnInit {
     public dropdownButton: any;
     public topHeader: any = [];
     public actionMenu: any = [];
-
     public currentActiveProfile: AuthResponse;
 
     constructor(private router:Router,
@@ -71,19 +70,18 @@ export class STTFListComponent implements OnInit {
         }
         this.sttService.fetchSTTF(payload)
         .pipe(first())
-        .subscribe(
-            response => {
-                this.spinnerService.hide();
-                if (response.status === ApiCode.ERROR) {
-                    this.alertService.showError(response.message, ApiCode.ERROR);
-                    return;
-                }
-                this.sstForms = response.data;
-            },
-            error => {
-                this.spinnerService.hide();
-                this.alertService.showError(error.message, ApiCode.ERROR);
-            });
+        .subscribe((response: any) => {
+            this.spinnerService.hide();
+            if (response.status === ApiCode.ERROR) {
+                this.alertService.showError(response.message, ApiCode.ERROR);
+                return;
+            }
+            this.sstForms = response.data;
+        },
+        (error: any) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error.message, ApiCode.ERROR);
+        });
     }
 
     public menuAction(payload: any): any {
@@ -104,7 +102,7 @@ export class STTFListComponent implements OnInit {
 
     public editAction(payload: any): void {
         this.router.navigate(
-            ['/sstf/editSttf'],
+            ['/sttf/editSttf'],
             { 
                 queryParams: {
                     sttFId: payload.sttFId
@@ -131,20 +129,19 @@ export class STTFListComponent implements OnInit {
         }
         this.sttService.deleteSTTF(payload)
         .pipe(first())
-        .subscribe(
-            response => {
-                this.spinnerService.hide();
-                if (response.status === ApiCode.ERROR) {
-                    this.alertService.showError(response.message, ApiCode.ERROR);
-                    return;
-                }
-                this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
-                this.refreshAction();
-            },
-            error => {
-                this.spinnerService.hide();
-                this.alertService.showError(error.message, ApiCode.ERROR);
-            });
+        .subscribe((response: any) => {
+            this.spinnerService.hide();
+            if (response.status === ApiCode.ERROR) {
+                this.alertService.showError(response.message, ApiCode.ERROR);
+                return;
+            }
+            this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
+            this.refreshAction();
+        },
+        (error: any) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error.message, ApiCode.ERROR);
+        });
     }
 
     public downloadData(): void {

@@ -1,6 +1,8 @@
 import { Component, Input, OnInit } from '@angular/core';
 import { first } from 'rxjs/operators';
-import { AuthenticationService, AlertService, LookupService, CommomService } from '@/_services';
+import { AuthenticationService, AlertService,
+    LookupService, CommomService
+} from '@/_services';
 import { SpinnerService } from '@/_helpers';
 import { Router, ActivatedRoute } from '@angular/router';
 import { ApiCode, Action } from '@/_models';
@@ -73,19 +75,17 @@ export class LookupComponent implements OnInit {
         }
         this.lookupService.fetchAllLookup(payload)
         .pipe(first())
-        .subscribe(
-            response => {
-                this.spinnerService.hide();
-                if (response.status === ApiCode.ERROR) {
-                    this.alertService.showError(response.message, ApiCode.ERROR);
-                    return;
-                }
-                this.lookupDatas = response.data;
-            },
-            error => {
-                this.spinnerService.hide();
-                this.alertService.showError(error.message, ApiCode.ERROR);
-            });
+        .subscribe((response: any) => {
+            this.spinnerService.hide();
+            if (response.status === ApiCode.ERROR) {
+                this.alertService.showError(response.message, ApiCode.ERROR);
+                return;
+            }
+            this.lookupDatas = response.data;
+        }, (error: any) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error.message, ApiCode.ERROR);
+        });
     }
 
     public menuAction(payload: any): any {
@@ -110,10 +110,10 @@ export class LookupComponent implements OnInit {
         }
         this.lookupService.downloadLookup(payload)
         .pipe(first())
-        .subscribe((response) => {
+        .subscribe((response: any) => {
             this.commomService.downLoadFile(response);
             this.spinnerService.hide();
-        }, (error) => {
+        }, (error: any) => {
             this.spinnerService.hide();
             this.alertService.showError(error, ApiCode.ERROR);
         });
@@ -123,10 +123,10 @@ export class LookupComponent implements OnInit {
         this.spinnerService.show();
         this.lookupService.downloadLookupTemplateFile()
         .pipe(first())
-        .subscribe((response) => {
+        .subscribe((response: any) => {
             this.commomService.downLoadFile(response);
             this.spinnerService.hide();
-        }, (error) => {
+        }, (error: any) => {
             this.spinnerService.hide();
             this.alertService.showError(error, ApiCode.ERROR);
         });

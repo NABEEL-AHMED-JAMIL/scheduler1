@@ -165,7 +165,7 @@
                                             style="color:blue"></span>
                                     </button>
                                     <button type="button" class="btn btn-default"
-                                    data-toggle="modal" data-target="#deleteAction"
+                                        data-toggle="modal" data-target="#deleteAction"
                                         (click)="deleteLookupData(lookupData, i)">
                                         <span class="glyphicon glyphicon-trash"
                                             style="color: #dc3545;"></span>
@@ -185,7 +185,7 @@
     [recivedLookupData]="lookupData"
     (senderEvent) = "resetEvent($event)">
 </cu-lookup >
-
+<!-- data-toggle="modal" data-target="#deleteAction" -->
 <div class="modal fade" id="deleteAction"
     role="dialog" style="top: 85px;">
     <del-box

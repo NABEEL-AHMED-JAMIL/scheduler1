@@ -27,7 +27,6 @@ export class STTListComponent implements OnInit {
     public dropdownButton: any;
     public topHeader: any = [];
     public actionMenu: any = [];
-
     public currentActiveProfile: AuthResponse;
 
     constructor(private router: Router,
@@ -73,19 +72,17 @@ export class STTListComponent implements OnInit {
         }
         this.sttService.fetchSTT(payload)
         .pipe(first())
-        .subscribe(
-            response => {
-                this.spinnerService.hide();
-                if (response.status === ApiCode.ERROR) {
-                    this.alertService.showError(response.message, ApiCode.ERROR);
-                    return;
-                }
-                this.sourceTaskTypes = response.data;
-            },
-            error => {
-                this.spinnerService.hide();
-                this.alertService.showError(error.message, ApiCode.ERROR);
-            });
+        .subscribe((response: any) => {
+            this.spinnerService.hide();
+            if (response.status === ApiCode.ERROR) {
+                this.alertService.showError(response.message, ApiCode.ERROR);
+                return;
+            }
+            this.sourceTaskTypes = response.data;
+        }, (error: any) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error.message, ApiCode.ERROR);
+        });
     }
 
     public menuAction(payload: any): any {
@@ -134,20 +131,18 @@ export class STTListComponent implements OnInit {
         }
         this.sttService.deleteSTT(payload)
         .pipe(first())
-        .subscribe(
-            response => {
-                this.spinnerService.hide();
-                if (response.status === ApiCode.ERROR) {
-                    this.alertService.showError(response.message, ApiCode.ERROR);
-                    return;
-                }
-                this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
-                this.refreshAction();
-            },
-            error => {
-                this.spinnerService.hide();
-                this.alertService.showError(error.message, ApiCode.ERROR);
-            });
+        .subscribe((response: any) => {
+            this.spinnerService.hide();
+            if (response.status === ApiCode.ERROR) {
+                this.alertService.showError(response.message, ApiCode.ERROR);
+                return;
+            }
+            this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
+            this.refreshAction();
+        }, (error: any) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error.message, ApiCode.ERROR);
+        });
     }
 
     public downloadData(): void {
@@ -161,10 +156,10 @@ export class STTListComponent implements OnInit {
         }
         this.sttService.downloadSTTCommon(payload)
         .pipe(first())
-        .subscribe((response) => {
+        .subscribe((response: any) => {
             this.commomService.downLoadFile(response);
             this.spinnerService.hide();
-        }, (error) => {
+        }, (error: any) => {
             this.spinnerService.hide();
             this.alertService.showError(error, ApiCode.ERROR);
         });
@@ -181,10 +176,10 @@ export class STTListComponent implements OnInit {
         }
         this.sttService.downloadSTTCommonTemplateFile(payload)
         .pipe(first())
-        .subscribe((response) => {
+        .subscribe((response: any) => {
             this.commomService.downLoadFile(response);
             this.spinnerService.hide();
-        }, (error) => {
+        }, (error: any) => {
             this.spinnerService.hide();
             this.alertService.showError(error, ApiCode.ERROR);
         });

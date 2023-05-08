@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { Router, ActivatedRoute } from '@angular/router';
+import { Router } from '@angular/router';
 import { AbstractControl, FormBuilder, 
     FormControl, FormGroup, Validators } from '@angular/forms';
 import { first } from 'rxjs/operators';
@@ -7,6 +7,7 @@ import { AlertService, AuthenticationService } from '@/_services';
 import { Location } from '@angular/common';
 import { SpinnerService } from '@/_helpers';
 import { ApiCode } from '@/_models';
+
 
 @Component({
     selector: 'register',
@@ -27,7 +28,6 @@ export class RegisterComponent implements OnInit {
 
     constructor(
         private formBuilder: FormBuilder,
-        private route: ActivatedRoute,
         private router: Router,
         private authenticationService: AuthenticationService,
         private spinnerService: SpinnerService,
@@ -74,24 +74,22 @@ export class RegisterComponent implements OnInit {
         this.loading = true;
         this.authenticationService.signupAppUser(this.registerForm.value)
             .pipe(first())
-            .subscribe(
-                response => {
-                    this.loading = false;
-                    this.submitted = false;
-                    this.spinnerService.hide();
-                    if (response.status === ApiCode.ERROR) {
-                        this.alertService.showError(response.message, ApiCode.ERROR);
-                        return;
-                    }
-                    this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
-                    this.router.navigate(['/login']);
-                },
-                error => {
-                    this.loading = false;
-                    this.submitted = false;
-                    this.spinnerService.hide();
-                    this.alertService.showError(error.message, ApiCode.ERROR);
-                });
+            .subscribe((response: any) => {
+                this.loading = false;
+                this.submitted = false;
+                this.spinnerService.hide();
+                if (response.status === ApiCode.ERROR) {
+                    this.alertService.showError(response.message, ApiCode.ERROR);
+                    return;
+                }
+                this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
+                this.router.navigate(['/login']);
+            }, (error: any) => {
+                this.loading = false;
+                this.submitted = false;
+                this.spinnerService.hide();
+                this.alertService.showError(error.message, ApiCode.ERROR);
+            });
     }
 
     public back(): any {

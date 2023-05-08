@@ -197,8 +197,7 @@
                                     formControlName="filedType"
                                     class="form-control input-sm"
                                     [ngClass]="{ 'is-invalid': submitted && f.filedType.errors }"
-                                    (change)="onFiledType($event.target.value)"
-                                    disabled>
+                                    (change)="onFiledType($event.target.value)">
                                     <option hidden value="" disabled selected>
                                         {{formControlType.parentLookupData.description}}
                                     </option>
@@ -213,12 +212,12 @@
                                 </div>
                             </div>
                             <div class="form-group" *ngIf="filedTypeForLkValue">
-                                <label for="filedLkValue">Filed Value</label>
-                                <input type="text" id="filedLkValue"
-                                    formControlName="filedLkValue"
+                                <label for="filedLookUp">Filed Value</label>
+                                <input type="text" id="filedLookUp"
+                                    formControlName="filedLookUp"
                                     class="form-control input-sm"
                                     placeholder="Enter lookup value"
-                                    [ngClass]="{ 'is-invalid': submitted && f.filedLkValue.errors }"
+                                    [ngClass]="{ 'is-invalid': submitted && f.filedLookUp.errors }"
                                     (input)="onChangeFiledLkValue($event.target.value)"/>
                             </div>
                         </div>

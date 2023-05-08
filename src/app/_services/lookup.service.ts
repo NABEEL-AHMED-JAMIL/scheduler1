@@ -36,7 +36,7 @@ export class LookupService {
         return this.http.put<ApiResponse>(`${config.apiUrl}/lookup.json/updateLookupData`, payload);
     }
 
-    public uploadLookup(payload:any): any {
+    public uploadLookup(payload:any): Observable<any> {
         return this.http.post(`${config.apiUrl}/lookup.json/uploadLookup`, payload);
     }
 

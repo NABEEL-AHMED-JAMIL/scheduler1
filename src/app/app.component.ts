@@ -46,20 +46,18 @@ export class AppComponent {
         this.spinnerService.show();
         this.authenticationService.logout()
         .pipe(first())
-        .subscribe(
-            data => {
-                this.spinnerService.hide();
-                if (data.status === ApiCode.ERROR) {
-                    this.alertService.showError(data.message, ApiCode.ERROR);
-                    return;
-                }
-                this.alertService.showSuccess(data.message, ApiCode.SUCCESS);
-                this.router.navigate(['/login']);
-            },
-            error => {
-                this.spinnerService.hide();
-                this.alertService.showError(error.message, ApiCode.ERROR);
-            });
+        .subscribe((data: any) => {
+            this.spinnerService.hide();
+            if (data.status === ApiCode.ERROR) {
+                this.alertService.showError(data.message, ApiCode.ERROR);
+                return;
+            }
+            this.alertService.showSuccess(data.message, ApiCode.SUCCESS);
+            this.router.navigate(['/login']);
+        },(error: any) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error.message, ApiCode.ERROR);
+        });
     }
 
     public back() : any {

@@ -113,33 +113,31 @@ export class CUSTTComponent implements OnInit {
         }
         this.sttService.fetchSTTBySttId(payload)
         .pipe(first())
-        .subscribe(
-            response => {
-                this.spinnerService.hide();
-                if (response.status === ApiCode.ERROR) {
-                    this.alertService.showError(response.message, ApiCode.ERROR);
-                    return;
-                }
-                this.selectedTaskType = response.data.taskType.lookupValue+'';
-                this.sttForm = this.formBuilder.group({
-                    sttId: [response.data.sttId, [Validators.required]],
-                    serviceName: [response.data.serviceName, [Validators.required]],
-                    description: [response.data.description, [Validators.required]],
-                    status: [response.data.status.lookupValue, [Validators.required]],
-                    taskType: [response.data.taskType.lookupValue, [Validators.required] ],
-                    defaultStt: [response.data.defaultStt.lookupValue, [Validators.required]]
-                });
-                // edit case no need to enable
-                if (this.selectedTaskType === '3') {
-                    this.editKafkaTaskType(response.data?.kafkaTaskType);
-                    return;
-                }
-                this.editApiTaskType(response.data?.apiTaskType);
-            },
-            error => {
-                this.spinnerService.hide();
-                this.alertService.showError(error.message, ApiCode.ERROR);
+        .subscribe((response: any) => {
+            this.spinnerService.hide();
+            if (response.status === ApiCode.ERROR) {
+                this.alertService.showError(response.message, ApiCode.ERROR);
+                return;
+            }
+            this.selectedTaskType = response.data.taskType.lookupValue+'';
+            this.sttForm = this.formBuilder.group({
+                sttId: [response.data.sttId, [Validators.required]],
+                serviceName: [response.data.serviceName, [Validators.required]],
+                description: [response.data.description, [Validators.required]],
+                status: [response.data.status.lookupValue, [Validators.required]],
+                taskType: [response.data.taskType.lookupValue, [Validators.required] ],
+                defaultStt: [response.data.defaultStt.lookupValue, [Validators.required]]
             });
+            // edit case no need to enable
+            if (this.selectedTaskType === '3') {
+                this.editKafkaTaskType(response.data?.kafkaTaskType);
+                return;
+            }
+            this.editApiTaskType(response.data?.apiTaskType);
+        }, (error: any) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error.message, ApiCode.ERROR);
+        });
     }
 
     public getTaskTypeByLookupType(): any {
@@ -154,19 +152,17 @@ export class CUSTTComponent implements OnInit {
         }
         this.lookupService.fetchLookupByLookupType(payload)
         .pipe(first())
-        .subscribe(
-            response => {
-                this.spinnerService.hide();
-                if (response.status === ApiCode.ERROR) {
-                    this.alertService.showError(response.message, ApiCode.ERROR);
-                    return;
-                }
-                this.taskTypeOption = response.data;
-            },
-            error => {
-                this.spinnerService.hide();
-                this.alertService.showError(error.message, ApiCode.ERROR);
-            });
+        .subscribe((response: any) => {
+            this.spinnerService.hide();
+            if (response.status === ApiCode.ERROR) {
+                this.alertService.showError(response.message, ApiCode.ERROR);
+                return;
+            }
+            this.taskTypeOption = response.data;
+        }, (error: any) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error.message, ApiCode.ERROR);
+        });
     }
 
     public getHttpMethodByLookupType(): any {
@@ -181,19 +177,18 @@ export class CUSTTComponent implements OnInit {
         }
         this.lookupService.fetchLookupByLookupType(payload)
         .pipe(first())
-        .subscribe(
-            response => {
-                this.spinnerService.hide();
-                if (response.status === ApiCode.ERROR) {
-                    this.alertService.showError(response.message, ApiCode.ERROR);
-                    return;
-                }
-                this.httpMethodOption = response.data;
-            },
-            error => {
-                this.spinnerService.hide();
-                this.alertService.showError(error.message, ApiCode.ERROR);
-            });
+        .subscribe((response: any) => {
+            this.spinnerService.hide();
+            if (response.status === ApiCode.ERROR) {
+                this.alertService.showError(response.message, ApiCode.ERROR);
+                return;
+            }
+            this.httpMethodOption = response.data;
+        },
+        (error: any) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error.message, ApiCode.ERROR);
+        });
     }
 
     public getApplicationStatusByLookupType(): any {
@@ -208,23 +203,21 @@ export class CUSTTComponent implements OnInit {
         }
         this.lookupService.fetchLookupByLookupType(payload)
         .pipe(first())
-        .subscribe(
-            response => {
-                this.spinnerService.hide();
-                if (response.status === ApiCode.ERROR) {
-                    this.alertService.showError(response.message, ApiCode.ERROR);
-                    return;
-                }
-                this.statusList = response.data;
-                this.statusList.subLookupData = this.statusList.subLookupData
-                .filter(lookup => {
-                    return lookup.lookupValue != '2';
-                });
-            },
-            error => {
-                this.spinnerService.hide();
-                this.alertService.showError(error.message, ApiCode.ERROR);
+        .subscribe((response: any) => {
+            this.spinnerService.hide();
+            if (response.status === ApiCode.ERROR) {
+                this.alertService.showError(response.message, ApiCode.ERROR);
+                return;
+            }
+            this.statusList = response.data;
+            this.statusList.subLookupData = this.statusList.subLookupData
+            .filter(lookup => {
+                return lookup.lookupValue != '2';
             });
+        }, (error: any) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error.message, ApiCode.ERROR);
+        });
     }
 
     public getDefultOptionByLookuptype(): any {
@@ -239,19 +232,17 @@ export class CUSTTComponent implements OnInit {
         }
         this.lookupService.fetchLookupByLookupType(payload)
         .pipe(first())
-        .subscribe(
-            response => {
-                this.spinnerService.hide();
-                if (response.status === ApiCode.ERROR) {
-                    this.alertService.showError(response.message, ApiCode.ERROR);
-                    return;
-                }
-                this.defultOption = response.data;
-            },
-            error => {
-                this.spinnerService.hide();
-                this.alertService.showError(error.message, ApiCode.ERROR);
-            });
+        .subscribe((response: any) => {
+            this.spinnerService.hide();
+            if (response.status === ApiCode.ERROR) {
+                this.alertService.showError(response.message, ApiCode.ERROR);
+                return;
+            }
+            this.defultOption = response.data;
+        }, (error: any) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error.message, ApiCode.ERROR);
+        });
     }
 
     public onTaskTypeSelected(event: any): void {
@@ -289,20 +280,18 @@ export class CUSTTComponent implements OnInit {
         }
         this.lookupService.fetchLookupByLookupType(payload)
         .pipe(first())
-        .subscribe(
-            response => {
-                this.spinnerService.hide();
-                if (response.status === ApiCode.ERROR) {
-                    this.alertService.showError('No lookup found', ApiCode.ERROR);
-                    return;
-                }
-                this.hasKey = true;
-                this.securityLkDetail = response.data
-            },
-            error => {
-                this.spinnerService.hide();
-                this.alertService.showError(error.message, ApiCode.ERROR);
-            });
+        .subscribe((response: any) => {
+            this.spinnerService.hide();
+            if (response.status === ApiCode.ERROR) {
+                this.alertService.showError('No lookup found', ApiCode.ERROR);
+                return;
+            }
+            this.hasKey = true;
+            this.securityLkDetail = response.data
+        }, (error: any) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error.message, ApiCode.ERROR);
+        });
     }
 
     public addKafkaTaskType(): void {
@@ -372,7 +361,7 @@ export class CUSTTComponent implements OnInit {
         if (this.action === Action.ADD) {
             this.sttService.addSTT(payload)
             .pipe(first())
-            .subscribe(response => {
+            .subscribe((response: any) => {
                 this.loading = false;
                 this.submitted = false;
                 this.spinnerService.hide();
@@ -382,7 +371,7 @@ export class CUSTTComponent implements OnInit {
                 }
                 this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
                 this.back();
-                },error => {
+                }, (error: any) => {
                     this.loading = false;
                     this.submitted = false;
                     this.spinnerService.hide();
@@ -391,24 +380,22 @@ export class CUSTTComponent implements OnInit {
         } else if (this.action === Action.EDIT) {
             this.sttService.editSTT(payload)
             .pipe(first())
-            .subscribe(
-                response => {
-                    this.loading = false;
-                    this.submitted = false;
-                    this.spinnerService.hide();
-                    if (response.status === ApiCode.ERROR) {
-                        this.alertService.showError(response.message, ApiCode.ERROR);
-                        return;
-                    }
-                    this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
-                    this.back();
-                },
-                error => {
-                    this.loading = false;
-                    this.submitted = false;
-                    this.spinnerService.hide();
-                    this.alertService.showError(error.message, ApiCode.ERROR);
-                });
+            .subscribe((response: any) => {
+                this.loading = false;
+                this.submitted = false;
+                this.spinnerService.hide();
+                if (response.status === ApiCode.ERROR) {
+                    this.alertService.showError(response.message, ApiCode.ERROR);
+                    return;
+                }
+                this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
+                this.back();
+            }, (error: any) => {
+                this.loading = false;
+                this.submitted = false;
+                this.spinnerService.hide();
+                this.alertService.showError(error.message, ApiCode.ERROR);
+            });
         }
     }
 

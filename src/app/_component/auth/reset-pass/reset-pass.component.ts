@@ -8,6 +8,7 @@ import { SpinnerService } from '@/_helpers';
 import { ApiCode } from '@/_models';
 import jwt_decode from "jwt-decode";
 
+
 @Component({
     selector: 'reset-pass',
     templateUrl: 'reset-pass.component.html'
@@ -102,24 +103,22 @@ export class ResetPassComponent implements OnInit {
         this.loading = true;
         this.authenticationService.resetPassword(this.resetPassForm.value)
             .pipe(first())
-            .subscribe(
-                response => {
-                    this.loading = false;
-                    this.submitted = false;
-                    this.spinnerService.hide();
-                    if (response.status === ApiCode.ERROR) {
-                        this.alertService.showError(response.message, ApiCode.ERROR);
-                        return;
-                    }
-                    this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
-                    this.router.navigate(['/login']);
-                },
-                error => {
-                    this.loading = false;
-                    this.submitted = false;
-                    this.spinnerService.hide();
-                    this.alertService.showError(error.message, 'Error');
-                });
+            .subscribe((response: any) => {
+                this.loading = false;
+                this.submitted = false;
+                this.spinnerService.hide();
+                if (response.status === ApiCode.ERROR) {
+                    this.alertService.showError(response.message, ApiCode.ERROR);
+                    return;
+                }
+                this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
+                this.router.navigate(['/login']);
+            }, (error: any) => {
+                this.loading = false;
+                this.submitted = false;
+                this.spinnerService.hide();
+                this.alertService.showError(error.message, 'Error');
+            });
     }
 
 }

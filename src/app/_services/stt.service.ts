@@ -104,5 +104,8 @@ export class STTService {
         });
     }
 
+    public uploadSTTCommon(payload:any): Observable<any> {
+        return this.http.post(`${config.apiUrl}/sourceTaskType.json/uploadSTTCommon`, payload);
+    }
 
 }

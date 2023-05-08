@@ -83,7 +83,7 @@ export class XmlConfigurationComponent implements OnInit {
                 this.spinnerService.hide();
                 this.alertService.showError(response.message, 'Error');
             }
-        }, error => {
+        }, (error: any) => {
             this.spinnerService.hide();
             this.alertService.showError(error, 'Error');
         });

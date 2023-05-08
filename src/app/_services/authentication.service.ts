@@ -11,7 +11,8 @@ export class AuthenticationService {
     public currentUser: Observable<AuthResponse>;
 
     constructor(private http: HttpClient) {
-        this.currentUserSubject = new BehaviorSubject<AuthResponse>(JSON.parse(localStorage.getItem('currentUser')));
+        this.currentUserSubject = new BehaviorSubject<AuthResponse>(
+            JSON.parse(localStorage.getItem('currentUser')));
         this.currentUser = this.currentUserSubject.asObservable();
     }
 
@@ -19,7 +20,7 @@ export class AuthenticationService {
         return this.currentUserSubject.value;
     }
 
-    public signInAppUser(username: any, password: any) {
+    public signInAppUser(username: any, password: any): Observable<any> {
         return this.http.post<any>(`${config.apiUrl}/auth.json/signInAppUser`, { username, password })
             .pipe(map(response => {
                 // store user details and jwt token in local storage to keep user logged in between page refreshes
@@ -31,19 +32,19 @@ export class AuthenticationService {
             }));
     }
 
-    public signupAppUser(payload: any) {
+    public signupAppUser(payload: any): Observable<any> {
         return this.http.post<any>(`${config.apiUrl}/auth.json/signupAppUser`, payload);
     }
 
-    public forgotPassword(payload: any) {
+    public forgotPassword(payload: any): Observable<any> {
         return this.http.post<any>(`${config.apiUrl}/auth.json/forgotPassword`, payload);
     }
 
-    public resetPassword(payload: any) {
+    public resetPassword(payload: any): Observable<any> {
         return this.http.post<any>(`${config.apiUrl}/auth.json/resetPassword`, payload);
     }
 
-    public tokenVerify(token: any) {
+    public tokenVerify(token: any): Observable<any> {
         return this.http.get<any>(`${config.apiUrl}/appUser.json/tokenVerify`, {
             headers: {'Authorization': token}
          });

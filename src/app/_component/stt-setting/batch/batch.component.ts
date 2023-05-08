@@ -1,10 +1,11 @@
 import { Component, OnInit, ViewChild } from '@angular/core';
-import { LookupService, AlertService, AuthenticationService } from '@/_services/index';
-import { Router, ActivatedRoute } from '@angular/router';
+import { STTService, AlertService, AuthenticationService } from '@/_services/index';
+import { ActivatedRoute } from '@angular/router';
 import { ApiCode } from '@/_models/index';
 import { SpinnerService } from '@/_helpers';
 import { first } from 'rxjs/operators';
 import { AuthResponse } from '@/_models/index';
+
 
 @Component({
     selector: 'batch',
@@ -24,11 +25,11 @@ export class BatchComponent implements OnInit {
     public currentActiveProfile: AuthResponse;
     public parentLookupId: any;
 
-    constructor(private _router: Router,
+    constructor(
         private _activatedRoute: ActivatedRoute,
+        private sttService: STTService,
         private alertService: AlertService,
         private spinnerService: SpinnerService,
-        private lookupService: LookupService,
         private authenticationService: AuthenticationService) {
         this.currentActiveProfile = authenticationService.currentUserValue;
         this._activatedRoute.data
@@ -46,26 +47,31 @@ export class BatchComponent implements OnInit {
     public uploadBulkData(fileToUpload: File): void {
         this.spinnerService.show();
         this.errors = [];
-
-    }
-
-    public backClicked(): void {
-        this._router.navigateByUrl(this.router);
-    }
-
-    /**
-     * Method is use to download file.
-     * @param data - Array Buffer data
-     */
-    public downLoadFile(data: any): void {
-        let blob = new Blob([data], { 
-            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        });
-        let url = window.URL.createObjectURL(blob);
-        let pwa = window.open(url);
-        if (!pwa || pwa.closed || typeof pwa.closed == 'undefined') {
-            alert( 'Please disable your Pop-up blocker and try again.');
+        let payload = {
+            uploadType: this.action,
+            accessUserDetail: {
+                appUserId: this.currentActiveProfile.appUserId,
+                username: this.currentActiveProfile.username
+           }
         }
+        const formData = new FormData();
+        formData.append("file", fileToUpload);
+        formData.append("data", JSON.stringify(payload));
+        this.sttService.uploadSTTCommon(formData)
+        .pipe(first())
+        .subscribe((response: any) => {
+            this.spinnerService.hide();
+            this.inputUpload.nativeElement.value = '';
+            if (response?.status === ApiCode.ERROR) {
+                this.errors = response.data;
+                this.alertService.showError(response.message, ApiCode.ERROR);
+                return;
+            }
+            this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
+        }, (error: any) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error, ApiCode.ERROR);
+        });
     }
 
 }

@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { Router, ActivatedRoute } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 import { first } from 'rxjs/operators';
 import { AuthenticationService, AlertService, LookupService } from '@/_services';
 import { SpinnerService } from '@/_helpers';
@@ -19,7 +19,6 @@ export class SttSettingComponent implements OnInit {
     public sttSidebar: STTSidebar[] = [];
 
     constructor(private route:ActivatedRoute,
-        private router:Router,
         private lookupService: LookupService,
         private alertService: AlertService,
         private spinnerService: SpinnerService,
@@ -47,21 +46,19 @@ export class SttSettingComponent implements OnInit {
         }
         this.lookupService.fetchLookupByLookupType(payload)
         .pipe(first())
-        .subscribe(
-            response => {
-                this.spinnerService.hide();
-                if (response.status === ApiCode.ERROR) {
-                    this.alertService.showError(response.message, ApiCode.ERROR);
-                    return;
-                }
-                let parentLookupData = response.data?.parentLookupData;
-                let lookupValue = parentLookupData?.lookupValue;
-                this.sttSidebar = JSON.parse(lookupValue);
-            },
-            error => {
-                this.spinnerService.hide();
-                this.alertService.showError(error.message, ApiCode.ERROR);
-            });
+        .subscribe((response: any) => {
+            this.spinnerService.hide();
+            if (response.status === ApiCode.ERROR) {
+                this.alertService.showError(response.message, ApiCode.ERROR);
+                return;
+            }
+            let parentLookupData = response.data?.parentLookupData;
+            let lookupValue = parentLookupData?.lookupValue;
+            this.sttSidebar = JSON.parse(lookupValue);
+        }, (error: any) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error.message, ApiCode.ERROR);
+        });
     }
 
     public changeTask(changeTask: STTSidebar, index: any): any{

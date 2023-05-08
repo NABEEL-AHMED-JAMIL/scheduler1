@@ -56,7 +56,7 @@
             <th>Total Form</th>
             <th>Total Section</th>
             <!-- <th>Status</th> -->
-            <th style="width: 9%;">Action</th>
+            <th style="width: 10%;">Action</th>
         </tr>
     </thead>
     <tbody>
@@ -125,9 +125,12 @@
                         [disabled]="sttControl.status.lookupValue === 2">
                         <span class="glyphicon glyphicon-cog" style="color: black;"></span>
                     </button>
-                    <ul class="dropdown-menu" style="left: -65px;">
+                    <ul class="dropdown-menu" style="left: -100px;">
                         <li *ngFor="let menu of actionMenu">
-                            <a (click)="menuAction(menu)">{{menu.title}}</a>
+                            <a (click)="menuAction(menu)">
+                                <samp [ngClass]="menu.icon"></samp>
+                                {{menu.title}}
+                            </a>
                         </li>
                     </ul>
                 </div>

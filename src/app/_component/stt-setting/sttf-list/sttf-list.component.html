@@ -50,7 +50,7 @@
             <th>Created Date</th>
             <th>Total STT</th>
             <th>Total Section</th>
-            <th style="width: 12%;">Action</th>
+            <th style="width: 10%;">Action</th>
         </tr>
     </thead>
     <tbody>
@@ -86,11 +86,6 @@
                         <span class="glyphicon glyphicon-edit"
                             style="color:blue"></span>
                     </button>
-                    <button type="button" class="btn btn-default"
-                        (click)="editAction(sstForm)">
-                        <span class="glyphicon glyphicon-tree-deciduous"
-                            style="color:#c4478b"></span>
-                    </button>
                     <!-- add the method for delete the queue detail -->
                     <button type="button" class="btn btn-default"
                        data-toggle="modal" data-target="#deleteAction"
@@ -107,9 +102,12 @@
                         <span class="glyphicon glyphicon-cog" 
                         style="color: black;"></span>
                     </button>
-                    <ul class="dropdown-menu" style="left: -65px;">
+                    <ul class="dropdown-menu" style="left: -100px;">
                         <li *ngFor="let menu of actionMenu">
-                            <a (click)="menuAction(menu)">{{menu.title}}</a>
+                            <a (click)="menuAction(menu)">
+                                <samp [ngClass]="menu.icon"></samp> 
+                                {{menu.title}}
+                            </a>
                         </li>
                     </ul>
                 </div>

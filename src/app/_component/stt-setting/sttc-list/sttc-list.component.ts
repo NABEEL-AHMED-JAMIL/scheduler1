@@ -25,7 +25,6 @@ export class STTCListComponent implements OnInit {
     public dropdownButton: any;
     public topHeader: any = [];
     public actionMenu: any = [];
-
     public currentActiveProfile: AuthResponse;
 
     constructor(private router:Router,
@@ -104,7 +103,7 @@ export class STTCListComponent implements OnInit {
 
     public editAction(payload: any): void {
         this.router.navigate(
-            ['/sstc/editSttc'],
+            ['/sttc/editSttc'],
             { 
                 queryParams: {
                     sttCId: payload.sttCId
@@ -131,20 +130,18 @@ export class STTCListComponent implements OnInit {
         }
         this.sttService.deleteSTTC(payload)
         .pipe(first())
-        .subscribe(
-            response => {
-                this.spinnerService.hide();
-                if (response.status === ApiCode.ERROR) {
-                    this.alertService.showError(response.message, ApiCode.ERROR);
-                    return;
-                }
-                this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
-                this.refreshAction();
-            },
-            error => {
-                this.spinnerService.hide();
-                this.alertService.showError(error.message, ApiCode.ERROR);
-            });
+        .subscribe((response: any) => {
+            this.spinnerService.hide();
+            if (response.status === ApiCode.ERROR) {
+                this.alertService.showError(response.message, ApiCode.ERROR);
+                return;
+            }
+            this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
+            this.refreshAction();
+        }, (error: any) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error.message, ApiCode.ERROR);
+        });
     }
 
     public downloadData(): void {
@@ -158,10 +155,10 @@ export class STTCListComponent implements OnInit {
         }
         this.sttService.downloadSTTCommon(payload)
         .pipe(first())
-        .subscribe((response) => {
+        .subscribe((response: any) => {
             this.commomService.downLoadFile(response);
             this.spinnerService.hide();
-        }, (error) => {
+        }, (error: any) => {
             this.spinnerService.hide();
             this.alertService.showError(error, ApiCode.ERROR);
         });
@@ -178,10 +175,10 @@ export class STTCListComponent implements OnInit {
         }
         this.sttService.downloadSTTCommonTemplateFile(payload)
         .pipe(first())
-        .subscribe((response) => {
+        .subscribe((response: any) => {
             this.commomService.downLoadFile(response);
             this.spinnerService.hide();
-        }, (error) => {
+        }, (error: any) => {
             this.spinnerService.hide();
             this.alertService.showError(error, ApiCode.ERROR);
         });

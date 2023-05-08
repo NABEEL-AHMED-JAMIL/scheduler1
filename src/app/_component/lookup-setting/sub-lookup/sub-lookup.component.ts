@@ -23,6 +23,7 @@ export class SubLookupComponent implements OnInit {
 	public lookupData: LookupData;
 	public parentLookupDate: LookupData;
 	public lookupDatas: LookupData[] = [];
+    public selectedLookup: LookupData;
 
 	public addButton: any;
     public refreshButton: any;
@@ -87,7 +88,7 @@ export class SubLookupComponent implements OnInit {
 					queryParams: {
 						lookupId: this.lookupId
 					}
-			});
+                });
         } else if (payload.targetEvent) {
             if (payload.targetEvent === 'downloadData') {
                 this.downloadData();
@@ -108,7 +109,7 @@ export class SubLookupComponent implements OnInit {
         }
 		this.lookupService.fetchSubLookupByParentId(payload)
 		.pipe(first())
-		.subscribe((response) => {
+		.subscribe((response: any) => {
             this.spinnerService.hide();
 			if(response.status === ApiCode.ERROR) {
 				this.alertService.showError(response?.message, ApiCode.ERROR);
@@ -116,7 +117,7 @@ export class SubLookupComponent implements OnInit {
 			}
             this.parentLookupDate = response?.data?.parentLookupData;
             this.lookupDatas = response.data?.subLookupData;
-		}, (error) => {
+		}, (error: any) => {
 			this.spinnerService.hide();
 			this.alertService.showError(error, ApiCode.ERROR);
 		});
@@ -133,10 +134,10 @@ export class SubLookupComponent implements OnInit {
         }
         this.lookupService.downloadLookup(payload)
         .pipe(first())
-        .subscribe((response) => {
+        .subscribe((response: any) => {
             this.commomService.downLoadFile(response);
             this.spinnerService.hide();
-        }, (error) => {
+        }, (error: any) => {
             this.spinnerService.hide();
             this.alertService.showError(error, ApiCode.ERROR);
         });
@@ -146,19 +147,23 @@ export class SubLookupComponent implements OnInit {
         this.spinnerService.show();
         this.lookupService.downloadLookupTemplateFile()
         .pipe(first())
-        .subscribe((response) => {
+        .subscribe((response: any) => {
             this.commomService.downLoadFile(response);
             this.spinnerService.hide();
-        }, (error) => {
+        }, (error: any) => {
             this.spinnerService.hide();
             this.alertService.showError(error, ApiCode.ERROR);
         });
     }
 
     public deleteLookupData(lookupData: LookupData, index: any): void {
-		this.spinnerService.show();
+        this.selectedLookup = lookupData;
+    }
+
+    public deleteActionTriger(): void {
+        this.spinnerService.show();
 		let payload = {
-			lookupId: lookupData.lookupId,
+			lookupId: this.selectedLookup.lookupId,
             accessUserDetail: {
                 appUserId: this.currentActiveProfile.appUserId,
                 username: this.currentActiveProfile.username
@@ -166,15 +171,15 @@ export class SubLookupComponent implements OnInit {
         }
 		this.lookupService.deleteLookupData(payload)
 		.pipe(first())
-		.subscribe((response) => {
+		.subscribe((response: any) => {
 			this.spinnerService.hide();
 			if(response.status === ApiCode.ERROR) {
 				this.alertService.showError(response.message, ApiCode.ERROR);
 				return;
 			}
-			this.lookupDatas.splice(index, 1); 
+            this.refreshAction();
 			this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
-		}, (error) => {
+		}, (error: any) => {
 			this.spinnerService.hide();
 			this.alertService.showError(error, ApiCode.ERROR);
 		});

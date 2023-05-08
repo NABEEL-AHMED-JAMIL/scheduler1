@@ -85,7 +85,7 @@ export class CULookupComponent implements OnInit {
         }
         this.lookupService.addLookupData(payload)
             .pipe(first())
-			.subscribe((response) => {
+			.subscribe((response: any) => {
 				this.submitted = false;
                 this.spinnerService.hide();
 				if(response.status === ApiCode.ERROR) {
@@ -95,7 +95,7 @@ export class CULookupComponent implements OnInit {
                 this.closeLookupData.nativeElement.click();
                 this.resetEvent(Action.ADD);
                 this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
-			}, (error) => {
+			}, (error: any) => {
 				this.submitted = false;
 				this.spinnerService.hide();
 				this.alertService.showError(error, ApiCode.ERROR);
@@ -130,7 +130,7 @@ export class CULookupComponent implements OnInit {
         }
         this.lookupService.updateLookupData(payload)
             .pipe(first())
-			.subscribe((response) => {
+			.subscribe((response: any) => {
 				this.submitted = false;
                 this.spinnerService.hide();
 				if(response.status === ApiCode.ERROR) {
@@ -140,7 +140,7 @@ export class CULookupComponent implements OnInit {
                 this.closeLookupData.nativeElement.click();
                 this.resetEvent(Action.EDIT);
                 this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
-			}, (error) => {
+			}, (error: any) => {
 				this.submitted = false;
 				this.spinnerService.hide();
 				this.alertService.showError(error, ApiCode.ERROR);

@@ -21,7 +21,14 @@ import {
     STTListComponent,
     STTFListComponent,
     STTSListComponent,
-    STTCListComponent
+    STTCListComponent,
+    STTLinkUserComponent,
+    STTLinkSTTFComponent,
+    STTFLinkSTTComponent,
+    STTFLinkSTTSComponent,
+    STTSLinkSTTFComponent,
+    STTSLinkSTTCComponent,
+    STTCLinkSTTSComponent,
 } from '@/_component/index';
 import { Action } from '@/_models';
 import { AuthGuard } from '@/_helpers';
@@ -254,8 +261,15 @@ const routes: Routes = [
                     breadcrumb: '',
                     action: [
                         {
-                            title: 'Link STT With User',
-                            router: '/stt/addStt',
+                            title: 'View Linked Users',
+                            icon: 'glyphicon glyphicon-tasks',
+                            router: '/stt/sttLinkUser',
+                            active: true
+                        },
+                        {
+                            title: 'View Linked Forms',
+                            icon: 'glyphicon glyphicon-tasks',
+                            router: '/stt/sttLinkSttf',
                             active: true
                         }
                     ],
@@ -286,12 +300,32 @@ const routes: Routes = [
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
                 }
             },
+            {
+                path: 'sttLinkUser',
+                component: STTLinkUserComponent,
+                canActivate: [AuthGuard],
+                data:  {
+                    breadcrumb: 'STT Link User',
+                    topHeader: [],
+                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                }
+            },
+            {
+                path: 'sttLinkSttf',
+                component: STTLinkSTTFComponent,
+                canActivate: [AuthGuard],
+                data:  {
+                    breadcrumb: 'STT Link STTF',
+                    topHeader: [],
+                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                }
+            },
             { 
                 path: 'batch',
                 component: BatchComponent,
                 data: {
                     title: 'Batch',
-                    action: Action.STT,
+                    action: 'SourceTaskType',
                     breadcrumb: 'Batch Stt',
                     topHeader: [],
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
@@ -300,7 +334,7 @@ const routes: Routes = [
         ]
     },
     {
-        path: 'sstf',
+        path: 'sttf',
         component: SttSettingComponent,
         canActivate: [AuthGuard],
         data:  {
@@ -309,7 +343,7 @@ const routes: Routes = [
             selectedMenu: {
                 type: 2,
                 title: 'STT Form',
-                router: '/sstf',
+                router: '/sttf',
                 active: true
             },
             topHeader: [
@@ -321,7 +355,7 @@ const routes: Routes = [
                 {
                     type: 'add',
                     title: 'Add STTF',
-                    router: '/sstf/addSttf',
+                    router: '/sttf/addSttf',
                     active: true
                 },
                 {
@@ -331,7 +365,7 @@ const routes: Routes = [
                     menus: [
                         {
                             title: 'Upload File',
-                            router: '/sstf/batch',
+                            router: '/sttf/batch',
                             active: true
                         },
                         {
@@ -357,8 +391,15 @@ const routes: Routes = [
                     breadcrumb: '',
                     action: [
                         {
-                            title: 'Link STTF With STT',
-                            router: '/stt/addStt',
+                            title: 'View Linked STT',
+                            icon: 'glyphicon glyphicon-tasks',
+                            router: '/sttf/sttfLinkStt',
+                            active: true
+                        },
+                        {
+                            title: 'View Linked STTS',
+                            icon: 'glyphicon glyphicon-tasks',
+                            router: '/sttf/sttfLinkStts',
                             active: true
                         }
                     ],
@@ -389,12 +430,32 @@ const routes: Routes = [
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
                 }
             },
+            {
+                path: 'sttfLinkStt',
+                component: STTFLinkSTTComponent,
+                canActivate: [AuthGuard],
+                data:  {
+                    breadcrumb: 'STTF Link STT',
+                    topHeader: [],
+                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                }
+            },
+            {
+                path: 'sttfLinkStts',
+                component: STTFLinkSTTSComponent,
+                canActivate: [AuthGuard],
+                data:  {
+                    breadcrumb: 'STTF Link STTS',
+                    topHeader: [],
+                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                }
+            },
             { 
                 path: 'batch',
                 component: BatchComponent,
                 canActivate: [AuthGuard],
                 data: {
-                    action: 'STTF',
+                    action: 'SourceTaskTypeForm',
                     breadcrumb: 'Batch Sttf',
                     topHeader: [],
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
@@ -403,7 +464,7 @@ const routes: Routes = [
         ]
     },
     {
-        path: 'ssts',
+        path: 'stts',
         component: SttSettingComponent,
         canActivate: [AuthGuard],
         data:  {
@@ -412,7 +473,7 @@ const routes: Routes = [
             selectedMenu: {
                 type: 3,
                 title: 'STT Section',
-                router: '/ssts',
+                router: '/stts',
                 active: true
             },
             topHeader: [
@@ -424,7 +485,7 @@ const routes: Routes = [
                 {
                     type: 'add',
                     title: 'Add STTS',
-                    router: '/ssts/addStts',
+                    router: '/stts/addStts',
                     active: true
                 },
                 {
@@ -434,7 +495,7 @@ const routes: Routes = [
                     menus: [
                         {
                             title: 'Upload File',
-                            router: '/ssts/batch',
+                            router: '/stts/batch',
                             active: true
                         },
                         {
@@ -460,8 +521,15 @@ const routes: Routes = [
                     breadcrumb: '',
                     action: [
                         {
-                            title: 'Link STTF With STT',
-                            router: '/stt/addStt',
+                            title: 'View Linked STTF',
+                            icon: 'glyphicon glyphicon-tasks',
+                            router: '/stts/sttsLinkSttf',
+                            active: true
+                        },
+                        {
+                            title: 'View Linked STTC',
+                            icon: 'glyphicon glyphicon-tasks',
+                            router: '/stts/sttsLinkSttc',
                             active: true
                         }
                     ],
@@ -492,12 +560,32 @@ const routes: Routes = [
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
                 }
             },
+            {
+                path: 'sttsLinkSttf',
+                component: STTSLinkSTTFComponent,
+                canActivate: [AuthGuard],
+                data:  {
+                    breadcrumb: 'STTS Link STTF',
+                    topHeader: [],
+                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                }
+            },
+            {
+                path: 'sttsLinkSttc',
+                component: STTSLinkSTTCComponent,
+                canActivate: [AuthGuard],
+                data:  {
+                    breadcrumb: 'STTS Link STTC',
+                    topHeader: [],
+                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                }
+            },
             { 
                 path: 'batch',
                 component: BatchComponent,
                 canActivate: [AuthGuard],
                 data: {
-                    action: 'STTS',
+                    action: 'SourceTaskTypeSection',
                     breadcrumb: 'Batch Stts',
                     topHeader: [],
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
@@ -506,7 +594,7 @@ const routes: Routes = [
         ]
     },
     { 
-        path: 'sstc',
+        path: 'sttc',
         component: SttSettingComponent,
         canActivate: [AuthGuard],
         data:  {
@@ -514,7 +602,7 @@ const routes: Routes = [
             role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ],
             selectedMenu: {
                 type: 4,
-                router: '/sstc',
+                router: '/sttc',
                 title: 'STT Control',
                 active: true
             },
@@ -527,7 +615,7 @@ const routes: Routes = [
                 {
                     type: 'add',
                     title: 'Add STTC',
-                    router: '/sstc/addSttc',
+                    router: '/sttc/addSttc',
                     active: true
                 },
                 {
@@ -537,7 +625,7 @@ const routes: Routes = [
                     menus: [
                         {
                             title: 'Upload File',
-                            router: '/sstc/batch',
+                            router: '/sttc/batch',
                             active: true
                         },
                         {
@@ -563,8 +651,9 @@ const routes: Routes = [
                     breadcrumb: '',
                     action: [
                         {
-                            title: 'Link STTC With STTS',
-                            router: '/stt/addStt',
+                            title: 'View Linked STTS',
+                            icon: 'glyphicon glyphicon-tasks',
+                            router: '/sttc/sttcLinkStts',
                             active: true
                         }
                     ],
@@ -595,12 +684,22 @@ const routes: Routes = [
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
                 }
             },
+            {
+                path: 'sttcLinkStts',
+                component: STTCLinkSTTSComponent,
+                canActivate: [AuthGuard],
+                data:  {
+                    breadcrumb: 'STTC Link STTS',
+                    topHeader: [],
+                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                }
+            },
             { 
                 path: 'batch',
                 component: BatchComponent,
                 canActivate: [AuthGuard],
                 data: {
-                    action: 'STTC',
+                    action: 'SourceTaskTypeControl',
                     breadcrumb: 'Batch Sttc',
                     topHeader: [],
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]

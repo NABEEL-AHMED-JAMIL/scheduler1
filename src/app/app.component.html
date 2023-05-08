@@ -13,6 +13,7 @@
         </a>
         <ul class="dropdown-menu">
           <li><a routerLink="/addJob">Add Job</a></li>
+          <li><a routerLink="/messageQueue">Queue Log</a></li>
           <li><a routerLink="/jobList">Job List</a></li>
         </ul>
       </li>
@@ -35,9 +36,7 @@
         </a>
         <ul class="dropdown-menu">
           <li>
-            <a routerLink="/profile">
-              My Profile
-            </a>
+            <a routerLink="/profile">My Profile</a>
           </li>
           <li>
             <a routerLink="/lookup" 
@@ -49,8 +48,6 @@
               *ngIf="hasAccess(['ROLE_ADMIN', 'ROLE_MASTER_ADMIN'])">
               SourceTask</a>
           </li>
-          <!-- for queueu logs each user have there access -->
-          <li><a routerLink="/profile/queuemessage">Queue Logs</a></li>
           <li>
             <a routerLink="/searchengine"
               *ngIf="hasAccess(['ROLE_MASTER_ADMIN', 'ROLE_ADMIN'])">

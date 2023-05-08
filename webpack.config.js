@@ -13,6 +13,11 @@ module.exports = {
     module: {
         rules: [
             {
+                test: /\.jsx?$/,
+                exclude: /node_modules/,
+                loader: 'babel'
+            },
+            {
                 test: /\.ts$/,
                 use: ['ts-loader', 'angular2-template-loader']
             },
@@ -25,12 +30,16 @@ module.exports = {
                 use: ['style-loader', 'css-loader', 'less-loader']
             },
             {
+                test: /\.css$/,
+                loader: "style-loader!css-loader"
+            },
+            {
                 test: /[\/\\]@angular[\/\\].+\.js$/,
                 parser: { system: true }
             },
-            {
-                test: [/\.bmp$/, /\.gif$/, /\.jpe?g$/, /\.png$/],
-                use: 'url-loader'
+            { 
+                test: /\.(png|svg|jpe?g|gif|woff2?|ttf|eot)$/,
+                use: [ 'file-loader' ]
             }
         ]
     },
