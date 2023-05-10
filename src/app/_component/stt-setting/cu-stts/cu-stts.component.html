@@ -81,7 +81,7 @@
                                     [ngClass]="{ 'is-invalid': submitted && f.sttsName.errors }" />
                                 <div *ngIf="submitted && f.sttsName.errors" class="invalid-feedback">
                                     <div *ngIf="f.sttsName.errors.required" style="color: red;">
-                                        Order is required
+                                        Stts name is required
                                     </div>
                                 </div>
                             </div>
@@ -104,7 +104,7 @@
                         <div class="col-lg-4">
                             <div class="form-group">
                                 <label for="sttsOrder">Section Order</label>
-                                <input type="number" id="sttsOrder" min="0" max="10"
+                                <input type="number" id="sttsOrder" min="0" max="15"
                                     formControlName="sttsOrder"
                                     class="form-control input-sm"
                                     placeholder="Enter section order" 
