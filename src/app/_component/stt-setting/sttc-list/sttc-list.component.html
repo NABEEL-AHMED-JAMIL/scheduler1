@@ -46,9 +46,9 @@
             <th>-</th>
             <th style="width: 4%;"># No</th>
             <th>Order</th>
+            <th>Filed Type</th>
             <th>Control Name</th>
             <th>Filed Name</th>
-            <th>Filed Type</th>
             <th>Required</th>
             <th>Default</th>
             <th>Created Date</th>
@@ -77,13 +77,13 @@
                 {{sttControl.sttCOrder}}
             </td>
             <td style="text-align: center;">
+                {{sttControl.filedType?.description | uppercase}}
+            </td>
+            <td style="text-align: center;">
                 {{sttControl.sttCName}}
             </td>
             <td style="text-align: center;">
                 {{sttControl.filedName}}
-            </td>
-            <td style="text-align: center;">
-                {{sttControl.filedType?.description | uppercase}}
             </td>
             <td style="text-align: center;">
                 {{sttControl.mandatory?.description}}

@@ -26,8 +26,10 @@ export class CUSTTFComponent implements OnInit {
 
     public editSttfId: any;
     public statusList: any;
+    public formTypeList: any;
     public defultOption: any;
     public APPLICATION_STATUS: LOOKUP_TYPES;
+    public FORM_TYPE: LOOKUP_TYPES;
     public ISDEFAULT: LOOKUP_TYPES;
     public sttfForm: FormGroup;
     public currentActiveProfile: AuthResponse;
@@ -44,6 +46,7 @@ export class CUSTTFComponent implements OnInit {
             this.currentActiveProfile = authenticationService.currentUserValue;
             this.ISDEFAULT = LOOKUP_TYPES.ISDEFAULT;
             this.APPLICATION_STATUS = LOOKUP_TYPES.APPLICATION_STATUS;
+            this.FORM_TYPE = LOOKUP_TYPES.FORM_TYPE;
             this.route.data.subscribe((data: any) => {
                 this.title = data.title;
                 this.action = data.action;
@@ -58,10 +61,12 @@ export class CUSTTFComponent implements OnInit {
     }
 
     ngOnInit() {
+        this.getApplicationFormTypeByLookupType();
         if (this.action === Action.ADD) {
             this.sttfForm = this.formBuilder.group({
                 sttfName: ['', Validators.required],
                 description: ['', [Validators.required]],
+                formType: ['', [Validators.required]],
             });
         } else if (this.action === Action.EDIT) {
             this.getDefultOptionByLookuptype();
@@ -97,6 +102,30 @@ export class CUSTTFComponent implements OnInit {
             .filter(lookup => {
                 return lookup.lookupValue != '2';
             });
+        }, (error: any) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error.message, ApiCode.ERROR);
+        });
+    }
+
+    public getApplicationFormTypeByLookupType(): any {
+        this.spinnerService.show();
+        let payload = {
+            lookupType: this.FORM_TYPE,
+            accessUserDetail: {
+                appUserId: this.currentActiveProfile.appUserId,
+                username: this.currentActiveProfile.username
+           }
+        }
+        this.lookupService.fetchLookupByLookupType(payload)
+        .pipe(first())
+        .subscribe((response: any) => {
+            this.spinnerService.hide();
+            if (response.status === ApiCode.ERROR) {
+                this.alertService.showError(response.message, ApiCode.ERROR);
+                return;
+            }
+            this.formTypeList = response.data;
         }, (error: any) => {
             this.spinnerService.hide();
             this.alertService.showError(error.message, ApiCode.ERROR);
@@ -145,12 +174,14 @@ export class CUSTTFComponent implements OnInit {
                 this.alertService.showError(response.message, ApiCode.ERROR);
                 return;
             }
+            response = response.data;
             this.sttfForm = this.formBuilder.group({
-                sttfId: [response.data.sttFId, [Validators.required]],
-                sttfName: [response.data.sttFName, Validators.required],
-                description: [response.data.description, [Validators.required]],
-                status: [response.data.status.lookupValue, [Validators.required]],
-                defaultSttf: [response.data.defaultSttf.lookupValue, [Validators.required]]
+                sttfId: [response.sttFId, [Validators.required]],
+                sttfName: [response.sttFName, Validators.required],
+                description: [response.description, [Validators.required]],
+                status: [response.status.lookupValue, [Validators.required]],
+                formType: [response.formType.lookupValue, [Validators.required]],
+                defaultSttf: [response.defaultSttf.lookupValue, [Validators.required]]
             });
         }, (error: any) => {
             this.spinnerService.hide();

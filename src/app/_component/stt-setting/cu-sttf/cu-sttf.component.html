@@ -103,6 +103,26 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="col-lg-4">
+                            <div class="form-group" *ngIf="formTypeList">
+                                <label for="formType">Status</label>
+                                <select id="formType" class="form-control input-sm" formControlName="formType"
+                                    [attr.disabled]="f.formType.value === 2 ? true : null"
+                                    [ngClass]="{ 'is-invalid': submitted && f.formType.errors }">
+                                    <option hidden value="" disabled selected>
+                                        {{formTypeList.parentLookupData.description}}
+                                    </option>
+                                    <option *ngFor="let formType of formTypeList.subLookupData"
+                                        [value]="formType.lookupValue">{{formType.description}}
+                                    </option>
+                                </select>
+                                <div *ngIf="submitted && f.formType.errors" class="invalid-feedback">
+                                    <div *ngIf="f.formType.errors.required" style="color: red;">
+                                        FormType is required
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                         <div class="col-lg-4" *ngIf="action === 2">
                             <div class="form-group" *ngIf="statusList">
                                 <label for="status">Status</label>

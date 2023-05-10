@@ -45,6 +45,7 @@
         <tr>
             <th style="width: 4%;">-</th>
             <th style="width: 4%;"># No</th>
+            <th>Form Type</th>
             <th>Form Name</th>
             <th>Defult</th>
             <th>Created Date</th>
@@ -65,6 +66,15 @@
                 </div>
             </td>
             <td>{{sstForm.sttFId}}</td>
+            <td style="text-align: center;">
+                {{sstForm.formType.description}}
+                <!-- <span class="badge"
+                    [ngClass]="{
+                        'badge-query-form' : sstForm.formType.lookupValue === 0,
+                        'badge-service-form' : sstForm.formType.lookupValue === 1
+                    }">
+                </span> -->
+            </td>
             <td>{{sstForm.sttFName}}</td>
             <td style="text-align: center;">
                 {{sstForm.sttfDefault.description}}

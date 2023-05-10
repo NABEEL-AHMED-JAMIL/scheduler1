@@ -45,13 +45,13 @@
         <tr>
             <th style="width: 4%;">-</th>
             <th style="width: 4%;"># No</th>
+            <th>STT Type</th>
             <th>Service Name</th>
             <th>Defult</th>
             <th>Created Date</th>
             <th>Total User</th>
             <th>Total Task</th>
             <th>Total Form</th>
-            <th>Type</th>
             <th style="width: 10%;">Action</th>
         </tr>
     </thead>
@@ -67,6 +67,16 @@
                 </div>
             </td>
             <td>{{sourceTaskType.sttId}}</td>
+            <td style="text-align: center;">
+                {{sourceTaskType.taskType.description}}
+                <!-- <span class="badge"
+                    [ngClass]="{
+                        'badge-api': sourceTaskType.taskType.lookupValue === 0, 
+                        'badge-aws': sourceTaskType.taskType.lookupValue === 1, 
+                        'badge-websocket': sourceTaskType.taskType.lookupValue === 2, 
+                        'badge-kafka' : sourceTaskType.taskType.lookupValue === 3
+                    }"></span> -->
+            </td>
             <td>{{sourceTaskType.serviceName}}</td>
             <td style="text-align: center;">
                 {{sourceTaskType.sttDefault.description}}
@@ -82,15 +92,6 @@
             </td>
             <td style="text-align: center;">
                 {{sourceTaskType.totalForm}}
-            </td>
-            <td style="text-align: center;">
-                <span class="badge"
-                    [ngClass]="{
-                        'badge-api': sourceTaskType.taskType.lookupValue === 0, 
-                        'badge-aws': sourceTaskType.taskType.lookupValue === 1, 
-                        'badge-websocket': sourceTaskType.taskType.lookupValue === 2, 
-                        'badge-kafka' : sourceTaskType.taskType.lookupValue === 3
-                    }">{{sourceTaskType.taskType.description}}</span>
             </td>
             <td style="text-align: center;">
                 <div class="btn-group btn-group-xs" 

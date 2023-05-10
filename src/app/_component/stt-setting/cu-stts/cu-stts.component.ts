@@ -147,13 +147,14 @@ export class CUSTTSComponent implements OnInit {
                 this.alertService.showError(response.message, ApiCode.ERROR);
                 return;
             }
+            response = response.data;
             this.sttsForm = this.formBuilder.group({
-                sttsId: [response.data.sttSId],
-                sttsName: [response.data.sttSName, Validators.required],
-                description: [response.data.description, [Validators.required]],
-                status: [response.data.status.lookupValue, [Validators.required]],
-                sttsOrder: [response.data.sttSOrder, [Validators.required]],
-                defaultStts: [response.data.defaultStts.lookupValue, [Validators.required]]
+                sttsId: [response.sttSId],
+                sttsName: [response.sttSName, Validators.required],
+                description: [response.description, [Validators.required]],
+                status: [response.status.lookupValue, [Validators.required]],
+                sttsOrder: [response.sttSOrder, [Validators.required]],
+                defaultStts: [response.defaultStts.lookupValue, [Validators.required]]
             });
         }, (error: any) => {
             this.spinnerService.hide();

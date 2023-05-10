@@ -113,31 +113,32 @@ export class CUSTTCComponent implements OnInit {
                 this.alertService.showError(response.message, ApiCode.ERROR);
                 return;
             }
+            response = response.data;
             this.sttcForm = this.formBuilder.group({
-                sttCId: [response.data.sttCId, [Validators.required]],
-                filedType: [response.data.filedType.lookupValue, [Validators.required]],
-                sttCName: [response.data.sttCName, [Validators.required]],
-                sttCOrder: [response.data.sttCOrder, [Validators.required]],
-                description: [response.data.description, [Validators.required]],
-                filedName: [response.data.filedName, [Validators.required]],
-                filedTitle: [response.data.filedTitle, [Validators.required]],
-                placeHolder: [response.data.placeHolder],
-                pattern: [response.data.pattern],
-                filedLookUp: [response.data.filedLookUp],
+                sttCId: [response.sttCId, [Validators.required]],
+                filedType: [response.filedType.lookupValue, [Validators.required]],
+                sttCName: [response.sttCName, [Validators.required]],
+                sttCOrder: [response.sttCOrder, [Validators.required]],
+                description: [response.description, [Validators.required]],
+                filedName: [response.filedName, [Validators.required]],
+                filedTitle: [response.filedTitle, [Validators.required]],
+                placeHolder: [response.placeHolder],
+                pattern: [response.pattern],
+                filedLookUp: [response.filedLookUp],
                 filedLkDetail: [],
-                filedWidth: [response.data.filedWidth, [Validators.required]],
-                minLength: [response.data.minLength],
-                maxLength: [response.data.maxLength],
-                mandatory: [response.data.mandatory.lookupValue, [Validators.required]],
-                status: [response.data.status.lookupValue, [Validators.required]],
-                defaultSttc: [response.data.defaultSttc.lookupValue, [Validators.required]]
+                filedWidth: [response.filedWidth, [Validators.required]],
+                minLength: [response.minLength],
+                maxLength: [response.maxLength],
+                mandatory: [response.mandatory.lookupValue, [Validators.required]],
+                status: [response.status.lookupValue, [Validators.required]],
+                defaultSttc: [response.defaultSttc.lookupValue, [Validators.required]]
             });
-            if (response.data.filedType.lookupValue === 'radio' ||
-                response.data.filedType.lookupValue === 'checkbox' ||
-                response.data.filedType.lookupValue === 'select' ||
-                response.data.filedType.lookupValue === 'multi-select') {
+            if (response.filedType.lookupValue === 'radio' ||
+                response.filedType.lookupValue === 'checkbox' ||
+                response.filedType.lookupValue === 'select' ||
+                response.filedType.lookupValue === 'multi-select') {
                 this.filedTypeForLkValue = true;
-                this.onChangeFiledLkValue(response.data.filedLookUp);
+                this.onChangeFiledLkValue(response.filedLookUp);
                 return;
             }
         }, (error: any) => {

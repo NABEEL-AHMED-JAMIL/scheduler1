@@ -119,21 +119,22 @@ export class CUSTTComponent implements OnInit {
                 this.alertService.showError(response.message, ApiCode.ERROR);
                 return;
             }
-            this.selectedTaskType = response.data.taskType.lookupValue+'';
+            response = response.data
+            this.selectedTaskType = response.taskType.lookupValue+'';
             this.sttForm = this.formBuilder.group({
-                sttId: [response.data.sttId, [Validators.required]],
-                serviceName: [response.data.serviceName, [Validators.required]],
-                description: [response.data.description, [Validators.required]],
-                status: [response.data.status.lookupValue, [Validators.required]],
-                taskType: [response.data.taskType.lookupValue, [Validators.required] ],
-                defaultStt: [response.data.defaultStt.lookupValue, [Validators.required]]
+                sttId: [response.sttId, [Validators.required]],
+                serviceName: [response.serviceName, [Validators.required]],
+                description: [response.description, [Validators.required]],
+                status: [response.status.lookupValue, [Validators.required]],
+                taskType: [response.taskType.lookupValue, [Validators.required] ],
+                defaultStt: [response.defaultStt.lookupValue, [Validators.required]]
             });
             // edit case no need to enable
             if (this.selectedTaskType === '3') {
-                this.editKafkaTaskType(response.data?.kafkaTaskType);
+                this.editKafkaTaskType(response?.kafkaTaskType);
                 return;
             }
-            this.editApiTaskType(response.data?.apiTaskType);
+            this.editApiTaskType(response?.apiTaskType);
         }, (error: any) => {
             this.spinnerService.hide();
             this.alertService.showError(error.message, ApiCode.ERROR);
