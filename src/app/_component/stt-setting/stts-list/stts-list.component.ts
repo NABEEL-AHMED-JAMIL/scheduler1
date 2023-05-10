@@ -86,13 +86,19 @@ export class STTSListComponent implements OnInit {
         });
     }
 
-    public menuAction(payload: any): any {
-        if (payload.router) {
-            this.router.navigate([payload.router]);
-        } else if (payload.targetEvent) {
-            if (payload.targetEvent === 'downloadData') {
+    public menuAction(menu: any, payload: any): any {
+        if (menu.router) {
+            this.router.navigate(
+                [menu.router],
+                { 
+                    queryParams: {
+                        sttsId: payload.sttSId
+                    }
+                });
+        } else if (menu.targetEvent) {
+            if (menu.targetEvent === 'downloadData') {
                 this.downloadData();
-            } else if (payload.targetEvent === 'downloadTemplate') {
+            } else if (menu.targetEvent === 'downloadTemplate') {
                 this.downloadTemplate();
             }
         }

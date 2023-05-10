@@ -19,8 +19,8 @@ export class STTListComponent implements OnInit {
     public subTitle: any = 'Note :- Delete opertaion may case problem for job';
 
     public searchValue: any = '';
-    public sourceTaskType: STTList;
-    public sourceTaskTypes: STTList[] = [];
+    public stt: STTList;
+    public sttLists: STTList[] = [];
 
     public addButton: any;
     public refreshButton: any;
@@ -78,20 +78,26 @@ export class STTListComponent implements OnInit {
                 this.alertService.showError(response.message, ApiCode.ERROR);
                 return;
             }
-            this.sourceTaskTypes = response.data;
+            this.sttLists = response.data;
         }, (error: any) => {
             this.spinnerService.hide();
             this.alertService.showError(error.message, ApiCode.ERROR);
         });
     }
 
-    public menuAction(payload: any): any {
-        if (payload.router) {
-            this.router.navigate([payload.router]);
-        } else if (payload.targetEvent) {
-            if (payload.targetEvent === 'downloadData') {
+    public menuAction(menu: any, payload: any): any {
+        if (menu.router) {
+            this.router.navigate(
+                [menu.router],
+                { 
+                    queryParams: {
+                        sttId: payload.sttId
+                    }
+                });
+        } else if (menu.targetEvent) {
+            if (menu.targetEvent === 'downloadData') {
                 this.downloadData();
-            } else if (payload.targetEvent === 'downloadTemplate') {
+            } else if (menu.targetEvent === 'downloadTemplate') {
                 this.downloadTemplate();
             }
         }
@@ -102,7 +108,6 @@ export class STTListComponent implements OnInit {
     }
 
     public editAction(payload: any): void {
-        console.log(payload);
         this.router.navigate(
             ['/stt/editStt'],
             { 
@@ -113,7 +118,7 @@ export class STTListComponent implements OnInit {
     }
 
     public deleteAction(payload: any): void {
-        this.sourceTaskType = payload;
+        this.stt = payload;
     }
 
     public refreshAction(): void {
@@ -127,7 +132,7 @@ export class STTListComponent implements OnInit {
                 appUserId: this.currentActiveProfile.appUserId,
                 username: this.currentActiveProfile.username
            },
-           sttId: this.sourceTaskType.sttId
+           sttId: this.stt.sttId
         }
         this.sttService.deleteSTT(payload)
         .pipe(first())

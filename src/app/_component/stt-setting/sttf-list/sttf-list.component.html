@@ -114,7 +114,7 @@
                     </button>
                     <ul class="dropdown-menu" style="left: -100px;">
                         <li *ngFor="let menu of actionMenu">
-                            <a (click)="menuAction(menu)">
+                            <a (click)="menuAction(menu, sstForm)">
                                 <samp [ngClass]="menu.icon"></samp> 
                                 {{menu.title}}
                             </a>

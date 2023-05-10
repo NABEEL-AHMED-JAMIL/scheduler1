@@ -1,7 +1,7 @@
 <div class="row">
     <div class="col-lg-6">
-        <label *ngIf="sourceTaskTypes">
-            Total STT ({{sourceTaskTypes.length}})
+        <label *ngIf="sttLists">
+            Total STT ({{sttLists.length}})
         </label>
         <input type="text" id="searchValue"
             class="form-control input-sm" 
@@ -56,19 +56,19 @@
         </tr>
     </thead>
     <tbody>
-        <tr *ngFor="let sourceTaskType of sourceTaskTypes | searchFilter: searchLookup; let i = index">
+        <tr *ngFor="let stt of sttLists | searchFilter: searchLookup; let i = index">
             <td style="text-align: center;">
                 <div class="Yf">
                     <div [ngClass]="{
-                        'Yg_inactive' : sourceTaskType.status.lookupValue === 0,
-                        'Yg_active' : sourceTaskType.status.lookupValue === 1,
-                        'Yg_delete': sourceTaskType.status.lookupValue === 2
+                        'Yg_inactive' : stt.status.lookupValue === 0,
+                        'Yg_active' : stt.status.lookupValue === 1,
+                        'Yg_delete': stt.status.lookupValue === 2
                     }"></div>
                 </div>
             </td>
-            <td>{{sourceTaskType.sttId}}</td>
+            <td>{{stt.sttId}}</td>
             <td style="text-align: center;">
-                {{sourceTaskType.taskType.description}}
+                {{stt.taskType.description}}
                 <!-- <span class="badge"
                     [ngClass]="{
                         'badge-api': sourceTaskType.taskType.lookupValue === 0, 
@@ -77,48 +77,48 @@
                         'badge-kafka' : sourceTaskType.taskType.lookupValue === 3
                     }"></span> -->
             </td>
-            <td>{{sourceTaskType.serviceName}}</td>
+            <td>{{stt.serviceName}}</td>
             <td style="text-align: center;">
-                {{sourceTaskType.sttDefault.description}}
+                {{stt.sttDefault.description}}
             </td>
             <td style="text-align: center;">
-                {{sourceTaskType.dateCreated | date:'dd-MM-yyyy'}}
+                {{stt.dateCreated | date:'dd-MM-yyyy'}}
             </td>
             <td style="text-align: center;">
-                {{sourceTaskType.totalUser}}
+                {{stt.totalUser}}
             </td>
             <td style="text-align: center;">
-                {{sourceTaskType.totalTask}}
+                {{stt.totalTask}}
             </td>
             <td style="text-align: center;">
-                {{sourceTaskType.totalForm}}
+                {{stt.totalForm}}
             </td>
             <td style="text-align: center;">
                 <div class="btn-group btn-group-xs" 
                     role="group" style="text-align: center">
                     <button type="button" class="btn btn-default"
-                        (click)="editAction(sourceTaskType)">
+                        (click)="editAction(stt)">
                         <span class="glyphicon glyphicon-edit"
                         style="color:blue"></span>
                     </button>
                     <!-- add the method for delete the queue detail -->
                     <button type="button" class="btn btn-default"
                         data-toggle="modal" data-target="#deleteAction"
-                        [disabled]="sourceTaskType.status.lookupValue === 2"
-                        (click)="deleteAction(sourceTaskType)">
+                        [disabled]="stt.status.lookupValue === 2"
+                        (click)="deleteAction(stt)">
                         <span class="glyphicon glyphicon-trash" style="color: #dc3545;"></span>
                     </button>
                     <!--  -->
                     <button type="button"
                         class="btn btn-default dropdown-toggle" 
                         data-toggle="dropdown"
-                        [disabled]="sourceTaskType.status.lookupValue === 2">
+                        [disabled]="stt.status.lookupValue === 2">
                         <span class="glyphicon glyphicon-cog" 
                         style="color: black;"></span>
                     </button>
                     <ul class="dropdown-menu" style="left: -100px;">
                         <li *ngFor="let menu of actionMenu">
-                            <a (click)="menuAction(menu)">
+                            <a (click)="menuAction(menu, stt)">
                                 <samp [ngClass]="menu.icon"></samp> 
                                 {{menu.title}}
                             </a>

@@ -306,7 +306,19 @@ const routes: Routes = [
                 canActivate: [AuthGuard],
                 data:  {
                     breadcrumb: 'STT Link User',
-                    topHeader: [],
+                    topHeader: [
+                        {
+                            type: 'refresh',
+                            title: 'Refresh',
+                            active: true
+                        },
+                        {
+                            type: 'add',
+                            title: 'Link STT To User',
+                            router: '/stt/addStt',
+                            active: true
+                        }
+                    ],
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
                 }
             },
@@ -316,7 +328,19 @@ const routes: Routes = [
                 canActivate: [AuthGuard],
                 data:  {
                     breadcrumb: 'STT Link STTF',
-                    topHeader: [],
+                    topHeader: [
+                        {
+                            type: 'refresh',
+                            title: 'Refresh',
+                            active: true
+                        },
+                        {
+                            type: 'add',
+                            title: 'Link STT To STTF',
+                            router: '/stt/addStt',
+                            active: true
+                        }
+                    ],
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
                 }
             },
@@ -436,7 +460,19 @@ const routes: Routes = [
                 canActivate: [AuthGuard],
                 data:  {
                     breadcrumb: 'STTF Link STT',
-                    topHeader: [],
+                    topHeader: [
+                        {
+                            type: 'refresh',
+                            title: 'Refresh',
+                            active: true
+                        },
+                        {
+                            type: 'add',
+                            title: 'Link STTF To STT',
+                            router: '/stt/addStt',
+                            active: true
+                        }
+                    ],
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
                 }
             },
@@ -446,7 +482,19 @@ const routes: Routes = [
                 canActivate: [AuthGuard],
                 data:  {
                     breadcrumb: 'STTF Link STTS',
-                    topHeader: [],
+                    topHeader: [
+                        {
+                            type: 'refresh',
+                            title: 'Refresh',
+                            active: true
+                        },
+                        {
+                            type: 'add',
+                            title: 'Link STTF To STTS',
+                            router: '/stt/addStt',
+                            active: true
+                        }
+                    ],
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
                 }
             },
@@ -566,7 +614,19 @@ const routes: Routes = [
                 canActivate: [AuthGuard],
                 data:  {
                     breadcrumb: 'STTS Link STTF',
-                    topHeader: [],
+                    topHeader: [
+                        {
+                            type: 'refresh',
+                            title: 'Refresh',
+                            active: true
+                        },
+                        {
+                            type: 'add',
+                            title: 'Link STTS To STTF',
+                            router: '/stt/addStt',
+                            active: true
+                        }
+                    ],
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
                 }
             },
@@ -576,7 +636,19 @@ const routes: Routes = [
                 canActivate: [AuthGuard],
                 data:  {
                     breadcrumb: 'STTS Link STTC',
-                    topHeader: [],
+                    topHeader: [
+                        {
+                            type: 'refresh',
+                            title: 'Refresh',
+                            active: true
+                        },
+                        {
+                            type: 'add',
+                            title: 'Link STTS To STTC',
+                            router: '/stt/addStt',
+                            active: true
+                        }
+                    ],
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
                 }
             },
@@ -690,7 +762,19 @@ const routes: Routes = [
                 canActivate: [AuthGuard],
                 data:  {
                     breadcrumb: 'STTC Link STTS',
-                    topHeader: [],
+                    topHeader: [
+                        {
+                            type: 'refresh',
+                            title: 'Refresh',
+                            active: true
+                        },
+                        {
+                            type: 'add',
+                            title: 'Link STTC To STTS',
+                            router: '/stt/addStt',
+                            active: true
+                        }
+                    ],
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
                 }
             },
