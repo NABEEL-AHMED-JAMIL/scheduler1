@@ -67,7 +67,7 @@
     }
 </style>
 
-<div class="row gutters-sm" style="margin-top: 15px;" *ngIf="sttfForm">
+<div class="row gutters-sm" style="margin-top: 5px;" *ngIf="sttfForm">
     <form [formGroup]="sttfForm" (ngSubmit)="onSubmit()">
         <div class="col-lg-12">
             <div id="basic" class="borderd-content">
@@ -105,7 +105,7 @@
                         </div>
                         <div class="col-lg-4">
                             <div class="form-group" *ngIf="formTypeList">
-                                <label for="formType">Status</label>
+                                <label for="formType">FormType</label>
                                 <select id="formType" class="form-control input-sm" formControlName="formType"
                                     [attr.disabled]="f.formType.value === 2 ? true : null"
                                     [ngClass]="{ 'is-invalid': submitted && f.formType.errors }">

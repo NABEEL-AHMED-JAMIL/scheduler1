@@ -14,13 +14,18 @@ export * from './search-engine/search-engine.component';
 export * from './lookup-setting/lookup/lookup.component';
 export * from './lookup-setting/sub-lookup/sub-lookup.component';
 export * from './lookup-setting/cu-lookup/cu-lookup.component';
-// cu-stt
+// cu-stt*
 export * from './stt-setting/stt-setting.component';
 export * from './stt-setting/batch/batch.component';
 export * from './stt-setting/cu-stt/cu-stt.component';
 export * from './stt-setting/cu-sttf/cu-sttf.component';
 export * from './stt-setting/cu-stts/cu-stts.component';
 export * from './stt-setting/cu-sttc/cu-sttc.component';
+// view-stt*
+export * from './stt-setting/view-stt/view-stt.component';
+export * from './stt-setting/view-sttf/view-sttf.component';
+export * from './stt-setting/view-stts/view-stts.component';
+export * from './stt-setting/view-sttc/view-sttc.component';
 // list of all stt*
 export * from './stt-setting/stt-list/stt-list.component';
 export * from './stt-setting/sttf-list/sttf-list.component';
@@ -28,7 +33,7 @@ export * from './stt-setting/stts-list/stts-list.component';
 export * from './stt-setting/sttc-list/sttc-list.component';
 // del-box
 export * from './del-box/del-box.component';
-// link
+// link stt*
 export * from './stt-setting/stt-link-user/stt-link-user.component';
 export * from './stt-setting/stt-link-sttf/stt-link-sttf.component';
 export * from './stt-setting/sttf-link-stt/sttf-link-stt.component';

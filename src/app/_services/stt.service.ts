@@ -30,6 +30,30 @@ export class STTService {
         return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/fetchSTT`, payload);
     }
 
+    public addSTTLinkUser(payload: any) {
+        return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/addSTTLinkUser`, payload);
+    }
+
+    public deleteSTTLinkUser(payload: any) {
+        return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/deleteSTTLinkUser`, payload);
+    }
+
+    public fetchSTTLinkUser(payload: any) {
+        return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/fetchSTTLinkUser`, payload);
+    }
+
+    public addSTTLinkSTTF(payload: any) {
+        return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/addSTTLinkSTTF`, payload);
+    }
+
+    public deleteSTTLinkSTTF(payload: any) {
+        return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/deleteSTTLinkSTTF`, payload);
+    }
+
+    public fetchSTTLinkSTTF(payload: any) {
+        return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/fetchSTTLinkSTTF`, payload);
+    }
+
     public addSTTF(payload: any): Observable<ApiResponse> {
         return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/addSTTF`, payload);
     }
@@ -48,6 +72,30 @@ export class STTService {
 
     public fetchSTTF(payload: any): Observable<ApiResponse> {
         return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/fetchSTTF`, payload);
+    }
+
+    public addSTTFLinkSTT(payload: any) {
+        return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/addSTTFLinkSTT`, payload);
+    }
+
+    public deleteSTTFLinkSTT(payload: any) {
+        return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/deleteSTTFLinkSTT`, payload);
+    }
+
+    public fetchSTTFLinkSTT(payload: any) {
+        return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/fetchSTTFLinkSTT`, payload);
+    }
+
+    public addSTTFLinkSTTS(payload: any) {
+        return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/addSTTFLinkSTTS`, payload);
+    }
+
+    public deleteSTTFLinkSTTS(payload: any) {
+        return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/deleteSTTFLinkSTTS`, payload);
+    }
+
+    public fetchSTTFLinkSTTS(payload: any) {
+        return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/fetchSTTFLinkSTTS`, payload);
     }
 
     public addSTTS(payload: any): Observable<ApiResponse> {
@@ -70,6 +118,30 @@ export class STTService {
         return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/fetchSTTS`, payload);
     }
 
+    public addSTTSLinkSTTF(payload: any) {
+        return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/addSTTSLinkSTTF`, payload);
+    }
+
+    public deleteSTTSLinkSTTF(payload: any) {
+        return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/deleteSTTSLinkSTTF`, payload);
+    }
+
+    public fetchSTTSLinkSTTF(payload: any) {
+        return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/fetchSTTSLinkSTTF`, payload);
+    }
+
+    public addSTTSLinkSTTC(payload: any) {
+        return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/addSTTSLinkSTTC`, payload);
+    }
+
+    public deleteSTTSLinkSTTC(payload: any) {
+        return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/deleteSTTSLinkSTTC`, payload);
+    }
+
+    public fetchSTTSLinkSTTC(payload: any) {
+        return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/fetchSTTSLinkSTTC`, payload);
+    }
+
     public addSTTC(payload: any): Observable<ApiResponse> {
         return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/addSTTC`, payload);
     }
@@ -88,6 +160,18 @@ export class STTService {
 
     public fetchSTTC(payload: any): Observable<ApiResponse> {
         return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/fetchSTTC`, payload);
+    }
+
+    public addSTTCLinkSTTS(payload: any) {
+        return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/addSTTCLinkSTTS`, payload);
+    }
+
+    public deleteSTTCLinkSTTS(payload: any) {
+        return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/deleteSTTCLinkSTTS`, payload);
+    }
+
+    public fetchSTTCLinkSTTS(payload: any) {
+        return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/fetchSTTCLinkSTTS`, payload);
     }
 
     public downloadSTTCommon(payload: any): Observable<any> {

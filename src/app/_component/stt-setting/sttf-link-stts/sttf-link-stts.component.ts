@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
 import { first } from 'rxjs/operators';
-import { AuthResponse, ApiCode } from '@/_models/index';
+import { AuthResponse } from '@/_models/index';
 import { SpinnerService } from '@/_helpers';
 import { AuthenticationService, AlertService,
     STTService } from '@/_services';
@@ -19,6 +19,7 @@ export class STTFLinkSTTSComponent implements OnInit {
     public searchValue: any = '';
 
     public querySttfid: any;
+    public formTitle: any;
     public addButton: any;
     public refreshButton: any;
     public topHeader: any = [];
@@ -32,6 +33,7 @@ export class STTFLinkSTTSComponent implements OnInit {
         private authenticationService: AuthenticationService) {
         this.currentActiveProfile = authenticationService.currentUserValue;
         this.route.data.subscribe((data: any) => {
+            this.formTitle = data.breadcrumb;
             this.topHeader = data.topHeader;
             if (this.topHeader) {
                 this.topHeader.forEach(header => {
@@ -51,8 +53,5 @@ export class STTFLinkSTTSComponent implements OnInit {
     ngOnInit() {
 
     }
-
-
-
 
 }

@@ -19,6 +19,7 @@ export class STTLinkSTTFComponent implements OnInit {
     public searchValue: any = '';
 
     public querySttid: any;
+    public formTitle: any;
     public addButton: any;
     public refreshButton: any;
     public topHeader: any = [];
@@ -32,6 +33,7 @@ export class STTLinkSTTFComponent implements OnInit {
         private authenticationService: AuthenticationService) {
         this.currentActiveProfile = authenticationService.currentUserValue;
         this.route.data.subscribe((data: any) => {
+            this.formTitle = data.breadcrumb;
             this.topHeader = data.topHeader;
             if (this.topHeader) {
                 this.topHeader.forEach(header => {
@@ -50,6 +52,12 @@ export class STTLinkSTTFComponent implements OnInit {
 
     ngOnInit() {
 
+    }
+
+    public addAction(): void {
+    }
+
+    public refreshAction(): void {
     }
 
 

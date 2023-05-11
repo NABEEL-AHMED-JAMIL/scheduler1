@@ -1,1 +1,51 @@
-pakaistan form
+<view-stt 
+    [searchSttId]="querySttid"
+    [formTitle]="formTitle">
+</view-stt>
+<div class="row" style="margin-top: 20px;">
+    <div class="col-lg-6">
+        <label>
+            Total {{formTitle}} (100)
+        </label>
+        <input type="text" id="searchValue"
+            class="form-control input-sm" 
+            style="width: 60%;"
+            [(ngModel)]="searchValue"
+            placeholder="Search by any key" />
+    </div>
+    <div class="col-lg-6" style="text-align: end;margin-top: 25px;">
+        <!-- working -->
+        <button *ngIf="refreshButton && refreshButton.active" type="button"
+            class="form-control input-sm"
+            style="width: auto;display: inline;margin-right: 7px;"
+            (click)="refreshAction()">
+            <span class="glyphicon glyphicon-refresh"></span>
+            {{refreshButton.title}}
+        </button>
+        <!-- working -->
+        <button *ngIf="addButton && addButton.active" type="button"
+            class="form-control input-sm"
+            style="width: auto; background: #cb0f43;color: white;
+            display: inline;margin-right: 7px;" 
+            (click)="addAction()">
+            <span class="glyphicon glyphicon-plus-sign"></span>
+            {{addButton.title}}
+        </button>
+    </div>
+</div>
+<table id="stt" style="font-size: 12px;margin-top: 10px;"
+    class="table table-responsive table table-striped table-bordered table-sm">
+    <thead>
+        <tr>
+            <th style="width: 4%;">-</th>
+            <th style="width: 4%;"># No</th>
+            <th>Form Type</th>
+            <th>Form Name</th>
+            <th>Defult</th>
+            <th>Created Date</th>
+            <th style="width: 10%;">Action</th>
+        </tr>
+    </thead>
+    <tbody>
+    </tbody>
+</table>
