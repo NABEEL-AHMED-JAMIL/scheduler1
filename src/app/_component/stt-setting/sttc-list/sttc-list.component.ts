@@ -16,7 +16,7 @@ export class STTCListComponent implements OnInit {
     public title: any = 'Delete STTC';
     public subTitle: any = 'Note :- Delete opertaion may case problem for job';
 
-    public searchLookup: any = '';
+    public searchSttc: any = '';
     public sttControl: STTControlList;
     public sttControls: STTControlList[] = [];
 
@@ -70,16 +70,14 @@ export class STTCListComponent implements OnInit {
         }
         this.sttService.fetchSTTC(payload)
         .pipe(first())
-        .subscribe(
-            response => {
+        .subscribe((response: any) => {
                 this.spinnerService.hide();
                 if (response.status === ApiCode.ERROR) {
                     this.alertService.showError(response.message, ApiCode.ERROR);
                     return;
                 }
                 this.sttControls = response.data;
-            },
-            error => {
+            }, (error: any) => {
                 this.spinnerService.hide();
                 this.alertService.showError(error.message, ApiCode.ERROR);
             });
@@ -87,13 +85,17 @@ export class STTCListComponent implements OnInit {
 
     public menuAction(menu: any, payload: any): any {
         if (menu.router) {
-            this.router.navigate(
-                [menu.router],
-                { 
-                    queryParams: {
-                        sttcId: payload.sttCId
-                    }
-                });
+            if (payload) {
+                this.router.navigate(
+                    [menu.router],
+                    { 
+                        queryParams: {
+                            sttcId: payload.sttCId
+                        }
+                    });
+            } else {
+                this.router.navigate([menu.router]);
+            }
         } else if (menu.targetEvent) {
             if (menu.targetEvent === 'downloadData') {
                 this.downloadData();

@@ -3,10 +3,10 @@
         <label *ngIf="sstForms">
             Total STTF ({{sstForms.length}})
         </label>
-        <input type="text" id="searchValue"
+        <input type="text" id="searchSTTF"
             class="form-control input-sm" 
             style="width: 60%;"
-            [(ngModel)]="searchValue"
+            [(ngModel)]="searchSTTF"
             placeholder="Search by any key" />
     </div>
     <div class="col-lg-6" style="text-align: end;margin-top: 25px;">
@@ -55,7 +55,7 @@
         </tr>
     </thead>
     <tbody>
-        <tr *ngFor="let sstForm of sstForms | searchFilter: searchLookup; let i = index">
+        <tr *ngFor="let sstForm of sstForms | searchFilter: searchSTTF; let i = index">
             <td style="text-align: center;">
                 <div class="Yf">
                     <div [ngClass]="{

@@ -18,7 +18,7 @@ export class STTSListComponent implements OnInit {
     public title: any = 'Delete STTS';
     public subTitle: any = 'Note :- Delete opertaion may case problem for job';
 
-    public searchLookup: any = '';
+    public searchSTTS: any = '';
     public sttSection: STTSectionList;
     public sttSections: STTSectionList[] = [];
 
@@ -88,13 +88,17 @@ export class STTSListComponent implements OnInit {
 
     public menuAction(menu: any, payload: any): any {
         if (menu.router) {
-            this.router.navigate(
-                [menu.router],
-                { 
-                    queryParams: {
-                        sttsId: payload.sttSId
-                    }
-                });
+            if (payload) {
+                this.router.navigate(
+                    [menu.router],
+                    { 
+                        queryParams: {
+                            sttsId: payload.sttSId
+                        }
+                    });
+            } else {
+                this.router.navigate([menu.router]);
+            }
         } else if (menu.targetEvent) {
             if (menu.targetEvent === 'downloadData') {
                 this.downloadData();

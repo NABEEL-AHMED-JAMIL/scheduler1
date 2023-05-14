@@ -1,9 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { first } from 'rxjs/operators';
-import { AuthenticationService, AlertService,
-    LookupService, STTService
-} from '@/_services';
+import { AuthenticationService, AlertService, LookupService, STTService } from '@/_services';
 import { Location } from '@angular/common';
 import { SpinnerService } from '@/_helpers';
 import { ApiCode, Action, AuthResponse, LOOKUP_TYPES } from '@/_models/index';
@@ -119,7 +117,7 @@ export class CUSTTComponent implements OnInit {
                 this.alertService.showError(response.message, ApiCode.ERROR);
                 return;
             }
-            response = response.data
+            response = response.data;
             this.selectedTaskType = response.taskType.lookupValue+'';
             this.sttForm = this.formBuilder.group({
                 sttId: [response.sttId, [Validators.required]],
@@ -185,8 +183,7 @@ export class CUSTTComponent implements OnInit {
                 return;
             }
             this.httpMethodOption = response.data;
-        },
-        (error: any) => {
+        },(error: any) => {
             this.spinnerService.hide();
             this.alertService.showError(error.message, ApiCode.ERROR);
         });

@@ -1,10 +1,11 @@
 import { Component, OnInit } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
 import { first } from 'rxjs/operators';
-import { AuthResponse, ApiCode } from '@/_models/index';
+import { AuthResponse, ApiCode,
+    STTSectionList, AppUserList } from '@/_models/index';
 import { SpinnerService } from '@/_helpers';
 import { AuthenticationService, AlertService,
-    STTService } from '@/_services';
+    AppUserService, STTService } from '@/_services';
 
 
 @Component({
@@ -18,6 +19,9 @@ export class STTCLinkSTTSComponent implements OnInit {
 
     public searchValue: any = '';
 
+    public appUserList: AppUserList[] = [];
+    public sttSections: STTSectionList[] = [];
+
     public querySttcid: any;
     public formTitle: any;
     public addButton: any;
@@ -30,6 +34,7 @@ export class STTCLinkSTTSComponent implements OnInit {
         private sttService: STTService,
         private alertService: AlertService,
         private spinnerService: SpinnerService,
+        private appUserService: AppUserService,
         private authenticationService: AuthenticationService) {
         this.currentActiveProfile = authenticationService.currentUserValue;
         this.route.data.subscribe((data: any) => {
@@ -51,10 +56,61 @@ export class STTCLinkSTTSComponent implements OnInit {
     }
 
     ngOnInit() {
-
+        this.fetchSTTS();
+        this.getSubAppUserAccount(this.currentActiveProfile.username);
     }
 
+    public fetchSTTS(): void {
+        this.spinnerService.show();
+        let payload = {
+            accessUserDetail: {
+                appUserId: this.currentActiveProfile.appUserId,
+                username: this.currentActiveProfile.username
+           }
+        }
+        this.sttService.fetchSTTS(payload)
+        .pipe(first())
+        .subscribe((response: any) => {
+            this.spinnerService.hide();
+            if (response.status === ApiCode.ERROR) {
+                this.alertService.showError(response.message, ApiCode.ERROR);
+                return;
+            }
+            this.sttSections = response.data;
+        }, (error: any) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error.message, ApiCode.ERROR);
+        });
+    }
 
-
+    public getSubAppUserAccount(payload: any): void {
+        this.spinnerService.show();
+        this.appUserService.getSubAppUserAccount(payload)
+        .pipe(first())
+        .subscribe((response: any) => {
+            this.spinnerService.hide();
+            if (response.status === ApiCode.ERROR) {
+                this.alertService.showError(response.message, ApiCode.ERROR);
+                return;
+            }
+            let tempAppUserList = response.data.subAppUser;
+            this.appUserList = tempAppUserList
+            .map((appUser: any) => {
+                return {
+                    appUserId: appUser.appUserId,
+                    username: appUser.username,
+                    email: appUser.email
+                }
+            })
+            this.appUserList.push({
+                appUserId: response.data.appUserId,
+                username: response.data.username,
+                email: response.data.email
+            });
+        }, (error: any) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error.message, ApiCode.ERROR);
+        });
+    }
 
 }

@@ -314,8 +314,7 @@ const routes: Routes = [
                         },
                         {
                             type: 'add',
-                            title: 'Link STT To User',
-                            router: '/stt/addStt',
+                            title: 'Link User',
                             active: true
                         }
                     ],
@@ -336,8 +335,7 @@ const routes: Routes = [
                         },
                         {
                             type: 'add',
-                            title: 'Link STT To STTF',
-                            router: '/stt/addStt',
+                            title: 'Link STTF',
                             active: true
                         }
                     ],
@@ -468,8 +466,7 @@ const routes: Routes = [
                         },
                         {
                             type: 'add',
-                            title: 'Link STTF To STT',
-                            router: '/stt/addStt',
+                            title: 'Link STT',
                             active: true
                         }
                     ],
@@ -490,8 +487,7 @@ const routes: Routes = [
                         },
                         {
                             type: 'add',
-                            title: 'Link STTF To STTS',
-                            router: '/stt/addStt',
+                            title: 'Link STTS',
                             active: true
                         }
                     ],

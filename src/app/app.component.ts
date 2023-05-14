@@ -52,7 +52,6 @@ export class AppComponent {
                 this.alertService.showError(data.message, ApiCode.ERROR);
                 return;
             }
-            this.alertService.showSuccess(data.message, ApiCode.SUCCESS);
             this.router.navigate(['/login']);
         },(error: any) => {
             this.spinnerService.hide();

@@ -16,7 +16,7 @@ export class STTFListComponent implements OnInit {
     public title: any = 'Delete STTF';
     public subTitle: any = 'Note :- Delete opertaion may case problem for job';
 
-    public searchValue: any = '';
+    public searchSTTF: any = '';
     public sstForm: STTFormList;
     public sstForms: STTFormList[] = [];
 
@@ -77,8 +77,7 @@ export class STTFListComponent implements OnInit {
                 return;
             }
             this.sstForms = response.data;
-        },
-        (error: any) => {
+        }, (error: any) => {
             this.spinnerService.hide();
             this.alertService.showError(error.message, ApiCode.ERROR);
         });
@@ -86,13 +85,17 @@ export class STTFListComponent implements OnInit {
 
     public menuAction(menu: any, payload: any): any {
         if (menu.router) {
-            this.router.navigate(
-                [menu.router],
-                { 
-                    queryParams: {
-                        sttfId: payload.sttFId
-                    }
-                });
+            if (payload) {
+                this.router.navigate(
+                    [menu.router],
+                    { 
+                        queryParams: {
+                            sttfId: payload.sttFId
+                        }
+                    });
+            } else {
+                this.router.navigate([menu.router]);
+            }
         } else if (menu.targetEvent) {
             if (menu.targetEvent === 'downloadData') {
                 this.downloadData();
@@ -143,8 +146,7 @@ export class STTFListComponent implements OnInit {
             }
             this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
             this.refreshAction();
-        },
-        (error: any) => {
+        }, (error: any) => {
             this.spinnerService.hide();
             this.alertService.showError(error.message, ApiCode.ERROR);
         });
@@ -161,10 +163,10 @@ export class STTFListComponent implements OnInit {
         }
         this.sttService.downloadSTTCommon(payload)
         .pipe(first())
-        .subscribe((response) => {
+        .subscribe((response: any) => {
             this.commomService.downLoadFile(response);
             this.spinnerService.hide();
-        }, (error) => {
+        }, (error: any) => {
             this.spinnerService.hide();
             this.alertService.showError(error, ApiCode.ERROR);
         });
@@ -181,10 +183,10 @@ export class STTFListComponent implements OnInit {
         }
         this.sttService.downloadSTTCommonTemplateFile(payload)
         .pipe(first())
-        .subscribe((response) => {
+        .subscribe((response: any) => {
             this.commomService.downLoadFile(response);
             this.spinnerService.hide();
-        }, (error) => {
+        }, (error: any) => {
             this.spinnerService.hide();
             this.alertService.showError(error, ApiCode.ERROR);
         });

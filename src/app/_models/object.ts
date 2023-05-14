@@ -280,3 +280,31 @@ export interface STTControlList {
   totalSection: any;
   totalForm: any;
 }
+
+export interface STTLinkUserList {
+  sttLinkUserId: any;
+  dateCreated: any;
+  appUserid: any;
+  username: any;
+  email: any;
+  status: any;
+}
+
+export interface AppUserList {
+  appUserId: any;
+  email: any;
+  username: any;
+}
+
+export interface STTLinkSTTFList {
+  sttLinkSttfId: any;
+  dateCreated: any;
+  status: any;
+  formId: any;
+  formName: any;
+  formType: any;
+  formDefault?: any;
+  appUserid: any;
+  username: any;
+  email: any;
+}

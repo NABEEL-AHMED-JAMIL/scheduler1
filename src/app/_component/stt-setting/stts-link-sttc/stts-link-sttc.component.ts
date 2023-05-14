@@ -1,10 +1,10 @@
 import { Component, OnInit } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
 import { first } from 'rxjs/operators';
-import { AuthResponse, ApiCode } from '@/_models/index';
+import { AuthResponse, ApiCode, AppUserList, STTControlList } from '@/_models/index';
 import { SpinnerService } from '@/_helpers';
 import { AuthenticationService, AlertService,
-    STTService } from '@/_services';
+    STTService, AppUserService } from '@/_services';
 
 
 @Component({
@@ -18,6 +18,9 @@ export class STTSLinkSTTCComponent implements OnInit {
 
     public searchValue: any = '';
 
+    public appUserList: AppUserList[] = [];
+    public sttControls: STTControlList[] = [];
+
     public querySttsid: any;
     public formTitle: any;
     public addButton: any;
@@ -30,6 +33,7 @@ export class STTSLinkSTTCComponent implements OnInit {
         private sttService: STTService,
         private alertService: AlertService,
         private spinnerService: SpinnerService,
+        private appUserService: AppUserService,
         private authenticationService: AuthenticationService) {
         this.currentActiveProfile = authenticationService.currentUserValue;
         this.route.data.subscribe((data: any) => {
@@ -49,8 +53,63 @@ export class STTSLinkSTTCComponent implements OnInit {
             });
         });
     }
-    ngOnInit() {
 
+    ngOnInit() {
+        this.fetchSTTC();
+        this.getSubAppUserAccount(this.currentActiveProfile.username);
+    }
+
+    public getSubAppUserAccount(payload: any): void {
+        this.spinnerService.show();
+        this.appUserService.getSubAppUserAccount(payload)
+        .pipe(first())
+        .subscribe((response: any) => {
+            this.spinnerService.hide();
+            if (response.status === ApiCode.ERROR) {
+                this.alertService.showError(response.message, ApiCode.ERROR);
+                return;
+            }
+            let tempAppUserList = response.data.subAppUser;
+            this.appUserList = tempAppUserList
+            .map((appUser: any) => {
+                return {
+                    appUserId: appUser.appUserId,
+                    username: appUser.username,
+                    email: appUser.email
+                }
+            })
+            this.appUserList.push({
+                appUserId: response.data.appUserId,
+                username: response.data.username,
+                email: response.data.email
+            });
+        }, (error: any) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error.message, ApiCode.ERROR);
+        });
+    }
+
+    public fetchSTTC(): void {
+        this.spinnerService.show();
+        let payload = {
+            accessUserDetail: {
+                appUserId: this.currentActiveProfile.appUserId,
+                username: this.currentActiveProfile.username
+           }
+        }
+        this.sttService.fetchSTTC(payload)
+        .pipe(first())
+        .subscribe((response: any) => {
+            this.spinnerService.hide();
+            if (response.status === ApiCode.ERROR) {
+                this.alertService.showError(response.message, ApiCode.ERROR);
+                return;
+            }
+            this.sttControls = response.data;
+        }, (error: any) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error.message, ApiCode.ERROR);
+        });
     }
 
 

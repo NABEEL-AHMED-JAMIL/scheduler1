@@ -1,11 +1,10 @@
 import { Component, OnInit } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
-import { STTList } from '@/_models';
 import { first } from 'rxjs/operators';
 import { AuthenticationService, AlertService,
     STTService, CommomService } from '@/_services';
 import { SpinnerService } from '@/_helpers';
-import { AuthResponse, ApiCode } from '@/_models/index';
+import { AuthResponse, ApiCode, STTList } from '@/_models/index';
 
 
 @Component({
@@ -18,7 +17,7 @@ export class STTListComponent implements OnInit {
     public title: any = 'Delete STT';
     public subTitle: any = 'Note :- Delete opertaion may case problem for job';
 
-    public searchValue: any = '';
+    public searchStt: any = '';
     public stt: STTList;
     public sttLists: STTList[] = [];
 
@@ -87,13 +86,17 @@ export class STTListComponent implements OnInit {
 
     public menuAction(menu: any, payload: any): any {
         if (menu.router) {
-            this.router.navigate(
-                [menu.router],
-                { 
-                    queryParams: {
-                        sttId: payload.sttId
-                    }
-                });
+            if (payload) {
+                this.router.navigate(
+                    [menu.router],
+                    { 
+                        queryParams: {
+                            sttId: payload.sttId
+                        }
+                    });
+            } else {
+                this.router.navigate([menu.router]);
+            }
         } else if (menu.targetEvent) {
             if (menu.targetEvent === 'downloadData') {
                 this.downloadData();

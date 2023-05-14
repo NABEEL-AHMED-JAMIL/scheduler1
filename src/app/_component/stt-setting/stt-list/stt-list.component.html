@@ -3,10 +3,10 @@
         <label *ngIf="sttLists">
             Total STT ({{sttLists.length}})
         </label>
-        <input type="text" id="searchValue"
+        <input type="text" id="searchStt"
             class="form-control input-sm" 
             style="width: 60%;"
-            [(ngModel)]="searchValue"
+            [(ngModel)]="searchStt"
             placeholder="Search by any key" />
     </div>
     <div class="col-lg-6" style="text-align: end;margin-top: 25px;">
@@ -56,7 +56,7 @@
         </tr>
     </thead>
     <tbody>
-        <tr *ngFor="let stt of sttLists | searchFilter: searchLookup; let i = index">
+        <tr *ngFor="let stt of sttLists | searchFilter: searchStt; let i = index">
             <td style="text-align: center;">
                 <div class="Yf">
                     <div [ngClass]="{
@@ -69,13 +69,6 @@
             <td>{{stt.sttId}}</td>
             <td style="text-align: center;">
                 {{stt.taskType.description}}
-                <!-- <span class="badge"
-                    [ngClass]="{
-                        'badge-api': sourceTaskType.taskType.lookupValue === 0, 
-                        'badge-aws': sourceTaskType.taskType.lookupValue === 1, 
-                        'badge-websocket': sourceTaskType.taskType.lookupValue === 2, 
-                        'badge-kafka' : sourceTaskType.taskType.lookupValue === 3
-                    }"></span> -->
             </td>
             <td>{{stt.serviceName}}</td>
             <td style="text-align: center;">
