@@ -90,7 +90,7 @@ export class STTFListComponent implements OnInit {
                     [menu.router],
                     { 
                         queryParams: {
-                            sttfId: payload.sttFId
+                            sttfId: payload.sttfId
                         }
                     });
             } else {
@@ -114,7 +114,7 @@ export class STTFListComponent implements OnInit {
             ['/sttf/editSttf'],
             { 
                 queryParams: {
-                    sttFId: payload.sttFId
+                    sttfId: payload.sttfId
                 }
             });
     }
@@ -134,7 +134,7 @@ export class STTFListComponent implements OnInit {
                 appUserId: this.currentActiveProfile.appUserId,
                 username: this.currentActiveProfile.username
            },
-           sttfId: this.sstForm.sttFId
+           sttfId: this.sstForm.sttfId
         }
         this.sttService.deleteSTTF(payload)
         .pipe(first())

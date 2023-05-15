@@ -99,7 +99,7 @@
             <div class="modal-body">
                 <form [formGroup]="sttLinkUserForm" (ngSubmit)="onSubmit()">
                     <div class="row">
-                        <div class="col-lg-8" *ngIf="appUserList">
+                        <div class="col-lg-10" *ngIf="appUserList">
                             <div class="form-group">
                                 <select class="form-control input-sm" id="appUserId"
                                     formControlName="appUserId"
@@ -120,7 +120,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="col-lg-4">
+                        <div class="col-lg-2">
                             <button type="submit" [disabled]="loading"
                                 style="float: right;"
                                 class="btn btn-sm btn-danger">Save

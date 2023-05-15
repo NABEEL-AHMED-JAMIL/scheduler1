@@ -5,7 +5,7 @@
 <div class="row" style="margin-top: 20px;">
     <div class="col-lg-6">
         <label>
-            Total {{formTitle}} (-)
+            Total {{formTitle}}  ({{sttfLinkSTTList.length}})
         </label>
         <input type="text" id="searchValue"
             class="form-control input-sm" 
@@ -32,5 +32,108 @@
             <span class="glyphicon glyphicon-plus-sign"></span>
             {{addButton.title}}
         </button>
+    </div>
+</div>
+
+
+<table id="stt" style="font-size: 12px;margin-top: 10px;"
+    class="table table-responsive table table-striped table-bordered table-sm">
+    <thead>
+        <tr>
+            <th style="width: 4%;">-</th>
+            <th style="width: 4%;"># No</th>
+            <th style="width: 5%;">Stt Id</th>
+            <th>Service Name</th>
+            <th>TaskType</th>
+            <th>Defult</th>
+            <th>Created Date</th>
+            <th style="width: 4%;">Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr *ngFor="let sttfLinkSTT of sttfLinkSTTList | searchFilter: searchValue; let i = index">
+            <td style="text-align: center;">
+                <div class="Yf">
+                    <div [ngClass]="{
+                        'Yg_inactive' : sttfLinkSTT.status.lookupValue === 0,
+                        'Yg_active' : sttfLinkSTT.status.lookupValue === 1,
+                        'Yg_delete': sttfLinkSTT.status.lookupValue === 2
+                    }"></div>
+                </div>
+            </td>
+            <td style="text-align: center;">{{sttfLinkSTT.sttfLinkSttId}}</td>
+            <td style="text-align: center;">{{sttfLinkSTT.sttId}}</td>
+            <td style="text-align: center;">{{sttfLinkSTT.serviceName}}</td>
+            <td style="text-align: center;">{{sttfLinkSTT.taskType.description}}</td>
+            <td style="text-align: center;">{{sttfLinkSTT.sttDefault.description}}</td>
+            <td style="text-align: center;">{{sttfLinkSTT.dateCreated | date:'dd-MM-yyyy'}}</td>
+            <td style="text-align: center;">
+                <div class="btn-group btn-group-xs" 
+                    role="group" style="text-align: center">
+                    <button type="button" class="btn btn-default"
+                        data-toggle="modal" data-target="#deleteAction"
+                        (click)="deleteAction(sttfLinkSTT)">
+                        <span class="glyphicon glyphicon-trash" 
+                            style="color: #dc3545;"></span>
+                    </button>
+                </div>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<!-- for link action -->
+<div class="modal fade" id="deleteAction"
+    role="dialog" style="top: 85px;">
+    <del-box
+        [title]="title"
+        [subTitle]="subTitle"
+        (deleteEvent)="deleteActionTriger()">
+    </del-box>
+</div>
+
+<!-- link user -->
+<div class="modal fade" id="addAction" role="dialog" style="top: 85px;">
+    <div class="modal-dialog" style="width: 550px;">
+        <div class="modal-content">
+            <div class="modal-header" style="background: #555;">
+                <button type="button" #closeSttfLinkStt class="close"
+                    data-dismiss="modal">&times;</button>
+                <h4 class="modal-title">{{formTitle}}</h4>
+            </div>
+            <div class="modal-body">
+                <form [formGroup]="sttfLinkSttForm" (ngSubmit)="onSubmit()">
+                    <div class="row">
+                        <div class="col-lg-10" *ngIf="sttList">
+                            <div class="form-group">
+                                <select class="form-control input-sm" id="sttId"
+                                    formControlName="sttId"
+                                    [ngClass]="{ 'is-invalid': submitted && f.sttId.errors }">
+                                    <option hidden value="" disabled selected>
+                                        Select STT
+                                    </option>
+                                    <option *ngFor="let stt of sttList.reverse()"
+                                        [value]="stt.sttId">
+                                        {{stt.serviceName}}
+                                    </option>
+                                </select>
+                                <div *ngIf="submitted && f.sttId.errors"
+                                    class="invalid-feedback">
+                                    <div *ngIf="f.sttId.errors.required"
+                                        style="color: red;">STTId is required
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-2">
+                            <button type="submit" [disabled]="loading"
+                                style="float: right;"
+                                class="btn btn-sm btn-danger">Save
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 </div>

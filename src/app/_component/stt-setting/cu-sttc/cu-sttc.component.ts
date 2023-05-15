@@ -25,7 +25,7 @@ export class CUSTTCComponent implements OnInit {
     public breadcrumb: any;
     public topHeader: any;
 
-    public editSttCId: any;
+    public editSttcId: any;
     public statusList: any;
     public defultOption: any;
     public mandatoryOption: any;
@@ -59,7 +59,7 @@ export class CUSTTCComponent implements OnInit {
             this.topHeader = data.topHeader;
             if (this.action === Action.EDIT) {
                 this.route.queryParams.subscribe((params: any) => {
-                    this.editSttCId = params.sttCId;
+                    this.editSttcId = params.sttcId;
                 });
             }
         });
@@ -71,8 +71,8 @@ export class CUSTTCComponent implements OnInit {
         if (this.action === Action.ADD) {
             this.sttcForm = this.formBuilder.group({
                 filedType: ['text', [Validators.required]],
-                sttCName: ['', [Validators.required]],
-                sttCOrder: ['', [Validators.required]],
+                sttcName: ['', [Validators.required]],
+                sttcOrder: ['', [Validators.required]],
                 description: ['', [Validators.required]],
                 filedName: ['', [Validators.required]],
                 filedTitle: ['', [Validators.required]],
@@ -87,7 +87,7 @@ export class CUSTTCComponent implements OnInit {
             });
         } else if (this.action === Action.EDIT) {
             this.getApplicationStatusByLookupType();
-            this.fetchSTTCBySttcId(this.editSttCId);
+            this.fetchSTTCBySttcId(this.editSttcId);
         }
     }
 
@@ -96,10 +96,10 @@ export class CUSTTCComponent implements OnInit {
         return this.sttcForm.controls;
     }
 
-    public fetchSTTCBySttcId(sttCId: any): any {
+    public fetchSTTCBySttcId(sttcId: any): any {
         this.spinnerService.show();
         let payload = {
-            sttCId: sttCId,
+            sttcId: sttcId,
             accessUserDetail: {
                 appUserId: this.currentActiveProfile.appUserId,
                 username: this.currentActiveProfile.username
@@ -115,10 +115,10 @@ export class CUSTTCComponent implements OnInit {
             }
             response = response.data;
             this.sttcForm = this.formBuilder.group({
-                sttCId: [response.sttCId, [Validators.required]],
+                sttcId: [response.sttcId, [Validators.required]],
                 filedType: [response.filedType.lookupValue, [Validators.required]],
-                sttCName: [response.sttCName, [Validators.required]],
-                sttCOrder: [response.sttCOrder, [Validators.required]],
+                sttcName: [response.sttcName, [Validators.required]],
+                sttcOrder: [response.sttcOrder, [Validators.required]],
                 description: [response.description, [Validators.required]],
                 filedName: [response.filedName, [Validators.required]],
                 filedTitle: [response.filedTitle, [Validators.required]],

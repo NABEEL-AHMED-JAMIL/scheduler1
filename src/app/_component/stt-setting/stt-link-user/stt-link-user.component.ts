@@ -26,8 +26,9 @@ export class STTLinkUserComponent implements OnInit {
     public searchValue: any = '';
     public sttLinkUser: STTLinkUserList;
     public sttLinkUserLists: STTLinkUserList[] = [];
-    public appUserList: AppUserList[] = [];
 
+    public tempAppUserList: AppUserList[] = [];
+    public appUserList: AppUserList[] = [];
     public sttLinkUserForm: FormGroup;
 
     public querySttid: any;
@@ -72,6 +73,7 @@ export class STTLinkUserComponent implements OnInit {
 
     public formInit(): void {
         this.sttLinkUserForm = this.formBuilder.group({
+            sttId: [ this.querySttid, [Validators.required]],
             appUserId: [ '', [Validators.required]],
         });
     }
@@ -91,8 +93,9 @@ export class STTLinkUserComponent implements OnInit {
                 this.alertService.showError(response.message, ApiCode.ERROR);
                 return;
             }
-            let tempAppUserList = response.data.subAppUser;
-            this.appUserList = tempAppUserList
+            this.appUserList = [];
+            this.tempAppUserList = response.data.subAppUser;
+            this.appUserList = this.tempAppUserList
             .map((appUser: any) => {
                 return {
                     appUserId: appUser.appUserId,
@@ -105,6 +108,7 @@ export class STTLinkUserComponent implements OnInit {
                 username: response.data.username,
                 email: response.data.email
             });
+            this.tempAppUserList = this.appUserList;
         }, (error: any) => {
             this.spinnerService.hide();
             this.alertService.showError(error.message, ApiCode.ERROR);
@@ -142,7 +146,6 @@ export class STTLinkUserComponent implements OnInit {
     public deleteActionTriger(): void {
         this.spinnerService.show();
         let payload = {
-            sttId: this.querySttid,
             auSttId: this.sttLinkUser.sttLinkUserId,
             appUserId: this.sttLinkUser.appUserid,
             accessUserDetail: {
@@ -169,7 +172,8 @@ export class STTLinkUserComponent implements OnInit {
     /**
      * Get only those user which are not in the link list
      */
-    public addAction(): void {
+    public addAction(): any {
+        this.appUserList = this.tempAppUserList;
         this.appUserList = this.appUserList.filter((appUser: AppUserList) => {
             return !this.sttLinkUserLists.find((sttLinkUser: STTLinkUserList) => {
                 return sttLinkUser.appUserid === appUser.appUserId;
@@ -190,7 +194,6 @@ export class STTLinkUserComponent implements OnInit {
                 appUserId: this.currentActiveProfile.appUserId,
                 username: this.currentActiveProfile.username
            },
-           sttId: this.querySttid,
            ...this.sttLinkUserForm.value
         }
         this.sttService.addSTTLinkUser(payload)

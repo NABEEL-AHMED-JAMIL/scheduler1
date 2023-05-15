@@ -113,11 +113,12 @@ export class STTSListComponent implements OnInit {
     }
 
     public editAction(payload: any): void {
+        debugger
         this.router.navigate(
             ['/stts/editStts'],
             { 
                 queryParams: {
-                    sttSId: payload.sttSId
+                    sttsId: payload.sttsId
                 }
             });
     }
@@ -137,7 +138,7 @@ export class STTSListComponent implements OnInit {
                 appUserId: this.currentActiveProfile.appUserId,
                 username: this.currentActiveProfile.username
            },
-           sttsId: this.sttSection.sttSId
+           sttsId: this.sttSection.sttsId
         }
         this.sttService.deleteSTTS(payload)
         .pipe(first())

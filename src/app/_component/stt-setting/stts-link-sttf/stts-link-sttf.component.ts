@@ -1,11 +1,10 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ViewChild } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { first } from 'rxjs/operators';
-import { AuthResponse, ApiCode,
-    AppUserList, STTFormList } from '@/_models/index';
+import { AuthResponse, ApiCode, STTFormList, STTSLinkSTTFList } from '@/_models/index';
 import { SpinnerService } from '@/_helpers';
-import { AuthenticationService, AlertService,
-    AppUserService, STTService } from '@/_services';
+import { AuthenticationService, AlertService, STTService } from '@/_services';
+import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 
 
 @Component({
@@ -14,13 +13,20 @@ import { AuthenticationService, AlertService,
 })
 export class STTSLinkSTTFComponent implements OnInit {
 
+    public loading: any = false;
+    public submitted: any = false;
+    @ViewChild('closeSttsLinkSttf', {static: false})
+	public closeSttsLinkSttf: any;
+
     public title: any = 'Delete STTS Link STTF';
     public subTitle: any = 'Note :- Delete opertaion may case problem for job';
 
     public searchValue: any = '';
-
-    public appUserList: AppUserList[] = [];
+    public sttsLinkSTTF: STTSLinkSTTFList;
+    public sttsLinkSTTFList: STTSLinkSTTFList[] = [];
     public sstFormList: STTFormList[] = [];
+
+    public sttsLinkSttfForm: FormGroup;
 
     public querySttsid: any;
     public formTitle: any;
@@ -31,10 +37,10 @@ export class STTSLinkSTTFComponent implements OnInit {
 
     constructor(
         private route:ActivatedRoute,
+        private formBuilder: FormBuilder,
         private sttService: STTService,
         private alertService: AlertService,
         private spinnerService: SpinnerService,
-        private appUserService: AppUserService,
         private authenticationService: AuthenticationService) {
         this.currentActiveProfile = authenticationService.currentUserValue;
         this.route.data.subscribe((data: any) => {
@@ -52,12 +58,25 @@ export class STTSLinkSTTFComponent implements OnInit {
             this.route.queryParams.subscribe((params: any) => {
                 this.querySttsid = params.sttsId;
             });
+            this.formInit();
         });
     }
 
     ngOnInit() {
         this.fetchSTTF();
-        this.getSubAppUserAccount(this.currentActiveProfile.username);
+        this.fetchSTTSLinkSTTF(this.querySttsid);
+    }
+
+    public formInit(): void {
+        this.sttsLinkSttfForm = this.formBuilder.group({
+            sttsId: [this.querySttsid, [Validators.required]],
+            sttfId: ['', [Validators.required]]
+        });
+    }
+
+    // convenience getter for easy access to form fields
+    get f() {
+        return this.sttsLinkSttfForm.controls;
     }
 
     public fetchSTTF(): void {
@@ -83,9 +102,16 @@ export class STTSLinkSTTFComponent implements OnInit {
         });
     }
 
-    public getSubAppUserAccount(payload: any): void {
+    public fetchSTTSLinkSTTF(sttsId: any): void {
         this.spinnerService.show();
-        this.appUserService.getSubAppUserAccount(payload)
+        let payload = {
+            sttsId: sttsId,
+            accessUserDetail: {
+                appUserId: this.currentActiveProfile.appUserId,
+                username: this.currentActiveProfile.username
+           }
+        }
+        this.sttService.fetchSTTSLinkSTTF(payload)
         .pipe(first())
         .subscribe((response: any) => {
             this.spinnerService.hide();
@@ -93,27 +119,84 @@ export class STTSLinkSTTFComponent implements OnInit {
                 this.alertService.showError(response.message, ApiCode.ERROR);
                 return;
             }
-            let tempAppUserList = response.data.subAppUser;
-            this.appUserList = tempAppUserList
-            .map((appUser: any) => {
-                return {
-                    appUserId: appUser.appUserId,
-                    username: appUser.username,
-                    email: appUser.email
-                }
-            })
-            this.appUserList.push({
-                appUserId: response.data.appUserId,
-                username: response.data.username,
-                email: response.data.email
-            });
+            this.sttsLinkSTTFList = response.data;
         }, (error: any) => {
             this.spinnerService.hide();
             this.alertService.showError(error.message, ApiCode.ERROR);
         });
     }
 
+    public deleteAction(sttsLinkSTTF: STTSLinkSTTFList): void {
+        this.sttsLinkSTTF = sttsLinkSTTF;
+    }
 
+    public deleteActionTriger(): void {
+        this.spinnerService.show();
+        let payload = {
+            sttsId: this.querySttsid,
+            sttfId: this.sttsLinkSTTF.formId,
+            appUserId: this.sttsLinkSTTF.appUserid,
+            auSttsId: this.sttsLinkSTTF.sttsLinkSttfId,
+            accessUserDetail: {
+                appUserId: this.currentActiveProfile.appUserId,
+                username: this.currentActiveProfile.username
+           }
+        }
+        this.sttService.deleteSTTFLinkSTTS(payload)
+        .pipe(first())
+        .subscribe((response: any) => {
+            this.spinnerService.hide();
+            if (response.status === ApiCode.ERROR) {
+                this.alertService.showError(response.message, ApiCode.ERROR);
+                return;
+            }
+            this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
+            this.fetchSTTSLinkSTTF(this.querySttsid);
+        }, (error: any) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error.message, ApiCode.ERROR);
+        });
+    }
 
+    public onSubmit(): void {
+        this.spinnerService.show();
+        this.submitted = true;
+        if (this.sttsLinkSttfForm.invalid) {
+            this.spinnerService.hide();
+            return;
+        }
+        this.loading = true;
+        let payload = {
+            accessUserDetail: {
+                appUserId: this.currentActiveProfile.appUserId,
+                username: this.currentActiveProfile.username
+           },
+           ...this.sttsLinkSttfForm.value
+        }
+        this.sttService.addSTTFLinkSTTS(payload)
+        .pipe(first())
+        .subscribe((response: any) => {
+            this.loading = false;
+            this.submitted = false;
+            this.spinnerService.hide();
+            if (response.status === ApiCode.ERROR) {
+                this.alertService.showError(response.message, ApiCode.ERROR);
+                return;
+            }
+            this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
+            this.closeSttsLinkSttf.nativeElement.click();
+            this.formInit();
+            this.fetchSTTSLinkSTTF(this.querySttsid);
+            }, (error: any) => {
+                this.loading = false;
+                this.submitted = false;
+                this.spinnerService.hide();
+                this.alertService.showError(error.message, ApiCode.ERROR);
+            });
+    }
+
+    public refreshAction(): void {
+        this.fetchSTTSLinkSTTF(this.querySttsid);
+    }
 
 }

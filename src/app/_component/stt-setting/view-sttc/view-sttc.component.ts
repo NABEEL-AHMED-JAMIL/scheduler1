@@ -75,10 +75,10 @@ export class ViewSTTCComponent implements OnInit {
         });
     }
 
-    public fetchSTTCBySttcId(sttCId: any): any {
+    public fetchSTTCBySttcId(sttcId: any): any {
         this.spinnerService.show();
         let payload = {
-            sttCId: sttCId,
+            sttcId: sttcId,
             accessUserDetail: {
                 appUserId: this.currentActiveProfile.appUserId,
                 username: this.currentActiveProfile.username

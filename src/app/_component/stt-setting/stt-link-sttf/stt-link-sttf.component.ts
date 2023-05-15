@@ -3,9 +3,8 @@ import { ActivatedRoute } from '@angular/router';
 import { first } from 'rxjs/operators';
 import { AuthResponse, ApiCode } from '@/_models/index';
 import { SpinnerService } from '@/_helpers';
-import { AuthenticationService, AlertService,
-    STTService, AppUserService } from '@/_services';
-import { STTLinkSTTFList, STTFormList, AppUserList } from '@/_models';
+import { AuthenticationService, AlertService, STTService } from '@/_services';
+import { STTLinkSTTFList, STTFormList } from '@/_models';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
     
 
@@ -26,9 +25,9 @@ export class STTLinkSTTFComponent implements OnInit {
     public searchValue: any = '';
     public sttLinkSTTF: STTLinkSTTFList;
     public sttLinkSTTFLists: STTLinkSTTFList[] = [];
-    public sttFormList: STTFormList[] = [];
-    public appUserList: AppUserList[] = [];
 
+    public tempSttFormList: STTFormList[] = [];
+    public sttFormList: STTFormList[] = [];
     public sttLinkSTTFForm: FormGroup;
 
     public querySttid: any;
@@ -44,7 +43,6 @@ export class STTLinkSTTFComponent implements OnInit {
         private alertService: AlertService,
         private spinnerService: SpinnerService,
         private sttService: STTService,
-        private appUserService: AppUserService,
         private authenticationService: AuthenticationService) {
         this.currentActiveProfile = authenticationService.currentUserValue;
         this.route.data.subscribe((data: any) => {
@@ -69,13 +67,11 @@ export class STTLinkSTTFComponent implements OnInit {
     ngOnInit() {
         this.fetchSTTF();
         this.fetchSTTLinkSTTF(this.querySttid);
-        this.getSubAppUserAccount(this.currentActiveProfile.username);
     }
 
     public formInit(): void {
         this.sttLinkSTTFForm = this.formBuilder.group({
             sttId: [this.querySttid, [Validators.required]],
-            appUserId: [ '', [Validators.required]],
             sttfId: [ '', [Validators.required]]
         });
     }
@@ -102,6 +98,7 @@ export class STTLinkSTTFComponent implements OnInit {
                 return;
             }
             this.sttFormList = response.data;
+            this.tempSttFormList = this.sttFormList;
         }, (error: any) => {
             this.spinnerService.hide();
             this.alertService.showError(error.message, ApiCode.ERROR);
@@ -132,36 +129,6 @@ export class STTLinkSTTFComponent implements OnInit {
         });
     }
 
-    public getSubAppUserAccount(payload: any): void {
-        this.spinnerService.show();
-        this.appUserService.getSubAppUserAccount(payload)
-        .pipe(first())
-        .subscribe((response: any) => {
-            this.spinnerService.hide();
-            if (response.status === ApiCode.ERROR) {
-                this.alertService.showError(response.message, ApiCode.ERROR);
-                return;
-            }
-            let tempAppUserList = response.data.subAppUser;
-            this.appUserList = tempAppUserList
-            .map((appUser: any) => {
-                return {
-                    appUserId: appUser.appUserId,
-                    username: appUser.username,
-                    email: appUser.email
-                }
-            })
-            this.appUserList.push({
-                appUserId: response.data.appUserId,
-                username: response.data.username,
-                email: response.data.email
-            });
-        }, (error: any) => {
-            this.spinnerService.hide();
-            this.alertService.showError(error.message, ApiCode.ERROR);
-        });
-    }
-
     public deleteAction(sttLinkSTTF: STTLinkSTTFList): void {
         this.sttLinkSTTF = sttLinkSTTF;
     }
@@ -171,7 +138,6 @@ export class STTLinkSTTFComponent implements OnInit {
         let payload = {
             sttId: this.querySttid,
             sttfId: this.sttLinkSTTF.formId,
-            appUserId: this.sttLinkSTTF.appUserid,
             auSttfId: this.sttLinkSTTF.sttLinkSttfId,
             accessUserDetail: {
                 appUserId: this.currentActiveProfile.appUserId,
@@ -191,6 +157,18 @@ export class STTLinkSTTFComponent implements OnInit {
         }, (error: any) => {
             this.spinnerService.hide();
             this.alertService.showError(error.message, ApiCode.ERROR);
+        });
+    }
+
+    /**
+     * Get only those user which are not in the link list
+    */
+    public addAction(): any {
+        this.sttFormList = this.tempSttFormList;
+        this.sttFormList = this.sttFormList.filter((sttForm: STTFormList) => {
+            return !this.sttLinkSTTFLists.find((sttLinkSTTF: STTLinkSTTFList) => {
+                return sttForm.sttfId === sttLinkSTTF.formId;
+            });
         });
     }
 
@@ -234,8 +212,5 @@ export class STTLinkSTTFComponent implements OnInit {
     public refreshAction(): void {
         this.fetchSTTLinkSTTF(this.querySttid);
     }
-
-
-
 
 }

@@ -27,7 +27,8 @@
             class="form-control input-sm"
             style="width: auto; background: #cb0f43;color: white;
             display: inline;margin-right: 7px;" 
-            data-toggle="modal" data-target="#addAction">
+            data-toggle="modal" data-target="#addAction"
+            (click)="addAction()">
             <span class="glyphicon glyphicon-plus-sign"></span>
             {{addButton.title}}
         </button>
@@ -39,9 +40,6 @@
         <tr>
             <th style="width: 4%;">-</th>
             <th style="width: 4%;"># No</th>
-            <th>UserId</th>
-            <th>Username</th>
-            <th>Email</th>
             <th>FormId</th>
             <th>Form Name</th>
             <th>Form Type</th>
@@ -62,9 +60,6 @@
                 </div>
             </td>
             <td style="text-align: center;">{{sttLinkSTTF.sttLinkSttfId}}</td>
-            <td style="text-align: center;">{{sttLinkSTTF.appUserid}}</td>
-            <td style="text-align: center;">{{sttLinkSTTF.username}}</td>
-            <td style="text-align: center;">{{sttLinkSTTF.email}}</td>
             <td style="text-align: center;">{{sttLinkSTTF.formId}}</td>
             <td style="text-align: center;">{{sttLinkSTTF.formName}}</td>
             <td style="text-align: center;">{{sttLinkSTTF.formType.description}}</td>
@@ -102,33 +97,12 @@
             <div class="modal-header" style="background: #555;">
                 <button type="button" #closeSttLinkSTTF class="close"
                     data-dismiss="modal">&times;</button>
-                <h4 class="modal-title">{{formTitle}}</h4>
+                <h4 class="modal-title">Add STTF</h4>
             </div>
             <div class="modal-body">
                 <form [formGroup]="sttLinkSTTFForm" (ngSubmit)="onSubmit()">
                     <div class="row">
-                        <div class="col-lg-5" *ngIf="appUserList">
-                            <div class="form-group">
-                                <select class="form-control input-sm" id="appUserId"
-                                    formControlName="appUserId"
-                                    [ngClass]="{ 'is-invalid': submitted && f.appUserId.errors }">
-                                    <option hidden value="" disabled selected>
-                                        Select User
-                                    </option>
-                                    <option *ngFor="let appUser of appUserList.reverse()"
-                                        [value]="appUser.appUserId">
-                                        {{appUser.username}}
-                                    </option>
-                                </select>
-                                <div *ngIf="submitted && f.appUserId.errors"
-                                    class="invalid-feedback">
-                                    <div *ngIf="f.appUserId.errors.required"
-                                        style="color: red;">AppUserId is required
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-lg-5" *ngIf="sttFormList">
+                        <div class="col-lg-10" *ngIf="sttFormList">
                             <div class="form-group">
                                 <select class="form-control input-sm" id="sttfId"
                                     formControlName="sttfId"
@@ -137,8 +111,8 @@
                                         Select STTF
                                     </option>
                                     <option *ngFor="let sttForm of sttFormList.reverse()"
-                                        [value]="sttForm.sttFId">
-                                        {{sttForm.sttFName}}
+                                        [value]="sttForm.sttfId">
+                                        {{sttForm.sttfName}}
                                     </option>
                                 </select>
                                 <div *ngIf="submitted && f.sttfId.errors"

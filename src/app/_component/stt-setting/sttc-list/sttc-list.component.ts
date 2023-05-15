@@ -114,7 +114,7 @@ export class STTCListComponent implements OnInit {
             ['/sttc/editSttc'],
             { 
                 queryParams: {
-                    sttCId: payload.sttCId
+                    sttcId: payload.sttcId
                 }
             });
     }
@@ -134,7 +134,7 @@ export class STTCListComponent implements OnInit {
                 appUserId: this.currentActiveProfile.appUserId,
                 username: this.currentActiveProfile.username
            },
-           sttCId: this.sttControl.sttCId
+           sttcId: this.sttControl.sttcId
         }
         this.sttService.deleteSTTC(payload)
         .pipe(first())

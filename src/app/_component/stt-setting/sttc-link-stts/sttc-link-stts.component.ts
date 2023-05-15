@@ -1,12 +1,11 @@
-import { Component, OnInit } from '@angular/core';
-import { Router, ActivatedRoute } from '@angular/router';
+import { Component, OnInit, ViewChild } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { first } from 'rxjs/operators';
 import { AuthResponse, ApiCode,
-    STTSectionList, AppUserList } from '@/_models/index';
+    STTSectionList, STTCLinkSTTSList } from '@/_models/index';
 import { SpinnerService } from '@/_helpers';
-import { AuthenticationService, AlertService,
-    AppUserService, STTService } from '@/_services';
-
+import { AuthenticationService, AlertService, STTService } from '@/_services';
+import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 
 @Component({
     selector: 'sttc-link-stts',
@@ -14,13 +13,20 @@ import { AuthenticationService, AlertService,
 })
 export class STTCLinkSTTSComponent implements OnInit {
 
+    public loading: any = false;
+    public submitted: any = false;
+    @ViewChild('closeSttcLinkStts', {static: false})
+	public closeSttcLinkStts: any;
+
     public title: any = 'Delete STTC Link STTS';
     public subTitle: any = 'Note :- Delete opertaion may case problem for job';
 
     public searchValue: any = '';
-
-    public appUserList: AppUserList[] = [];
+    public sttcLinkSTTS: STTCLinkSTTSList;
+    public sttcLinkSTTSList: STTCLinkSTTSList[] = [];
     public sttSections: STTSectionList[] = [];
+
+    public sttcLinkSttsForm: FormGroup;
 
     public querySttcid: any;
     public formTitle: any;
@@ -29,12 +35,12 @@ export class STTCLinkSTTSComponent implements OnInit {
     public topHeader: any = [];
     public currentActiveProfile: AuthResponse;
 
-    constructor(private router: Router,
+    constructor(
         private route:ActivatedRoute,
+        private formBuilder: FormBuilder,
         private sttService: STTService,
         private alertService: AlertService,
         private spinnerService: SpinnerService,
-        private appUserService: AppUserService,
         private authenticationService: AuthenticationService) {
         this.currentActiveProfile = authenticationService.currentUserValue;
         this.route.data.subscribe((data: any) => {
@@ -52,12 +58,25 @@ export class STTCLinkSTTSComponent implements OnInit {
             this.route.queryParams.subscribe((params: any) => {
                 this.querySttcid = params.sttcId;
             });
+            this.formInit();
         });
     }
 
     ngOnInit() {
         this.fetchSTTS();
-        this.getSubAppUserAccount(this.currentActiveProfile.username);
+        this.fetchSTTCLinkSTTS(this.querySttcid);
+    }
+
+    public formInit(): void {
+        this.sttcLinkSttsForm = this.formBuilder.group({
+            sttsId: ['', [Validators.required]],
+            sttcId: [this.querySttcid, [Validators.required]]
+        });
+    }
+
+    // convenience getter for easy access to form fields
+    get f() {
+        return this.sttcLinkSttsForm.controls;
     }
 
     public fetchSTTS(): void {
@@ -83,9 +102,16 @@ export class STTCLinkSTTSComponent implements OnInit {
         });
     }
 
-    public getSubAppUserAccount(payload: any): void {
+    public fetchSTTCLinkSTTS(sttcId: any): void {
         this.spinnerService.show();
-        this.appUserService.getSubAppUserAccount(payload)
+        let payload = {
+            sttcId: sttcId,
+            accessUserDetail: {
+                appUserId: this.currentActiveProfile.appUserId,
+                username: this.currentActiveProfile.username
+           }
+        }
+        this.sttService.fetchSTTCLinkSTTS(payload)
         .pipe(first())
         .subscribe((response: any) => {
             this.spinnerService.hide();
@@ -93,24 +119,84 @@ export class STTCLinkSTTSComponent implements OnInit {
                 this.alertService.showError(response.message, ApiCode.ERROR);
                 return;
             }
-            let tempAppUserList = response.data.subAppUser;
-            this.appUserList = tempAppUserList
-            .map((appUser: any) => {
-                return {
-                    appUserId: appUser.appUserId,
-                    username: appUser.username,
-                    email: appUser.email
-                }
-            })
-            this.appUserList.push({
-                appUserId: response.data.appUserId,
-                username: response.data.username,
-                email: response.data.email
-            });
+            this.sttcLinkSTTSList = response.data;
         }, (error: any) => {
             this.spinnerService.hide();
             this.alertService.showError(error.message, ApiCode.ERROR);
         });
+    }
+
+    public deleteAction(sttcLinkSTTS: STTCLinkSTTSList): void {
+        this.sttcLinkSTTS = sttcLinkSTTS;
+    }
+
+    public deleteActionTriger(): void {
+        this.spinnerService.show();
+        let payload = {
+            sttcId: this.querySttcid,
+            sttsId: this.sttcLinkSTTS.sttsId,
+            appUserId: this.sttcLinkSTTS.appUserid,
+            auSttcId: this.sttcLinkSTTS.sttcLinkSttsId,
+            accessUserDetail: {
+                appUserId: this.currentActiveProfile.appUserId,
+                username: this.currentActiveProfile.username
+           }
+        }
+        this.sttService.deleteSTTFLinkSTTS(payload)
+        .pipe(first())
+        .subscribe((response: any) => {
+            this.spinnerService.hide();
+            if (response.status === ApiCode.ERROR) {
+                this.alertService.showError(response.message, ApiCode.ERROR);
+                return;
+            }
+            this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
+            this.fetchSTTCLinkSTTS(this.querySttcid);
+        }, (error: any) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error.message, ApiCode.ERROR);
+        });
+    }
+
+    public onSubmit(): void {
+        this.spinnerService.show();
+        this.submitted = true;
+        if (this.sttcLinkSttsForm.invalid) {
+            this.spinnerService.hide();
+            return;
+        }
+        this.loading = true;
+        let payload = {
+            accessUserDetail: {
+                appUserId: this.currentActiveProfile.appUserId,
+                username: this.currentActiveProfile.username
+           },
+           ...this.sttcLinkSttsForm.value
+        }
+        this.sttService.addSTTCLinkSTTS(payload)
+        .pipe(first())
+        .subscribe((response: any) => {
+            this.loading = false;
+            this.submitted = false;
+            this.spinnerService.hide();
+            if (response.status === ApiCode.ERROR) {
+                this.alertService.showError(response.message, ApiCode.ERROR);
+                return;
+            }
+            this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
+            this.closeSttcLinkStts.nativeElement.click();
+            this.formInit();
+            this.fetchSTTCLinkSTTS(this.querySttcid);
+            }, (error: any) => {
+                this.loading = false;
+                this.submitted = false;
+                this.spinnerService.hide();
+                this.alertService.showError(error.message, ApiCode.ERROR);
+            });
+    }
+
+    public refreshAction(): void {
+        this.fetchSTTCLinkSTTS(this.querySttcid);
     }
 
 }

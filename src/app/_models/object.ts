@@ -241,8 +241,8 @@ export interface STTList {
 }
 
 export interface STTFormList {
-  sttFId: any;
-  sttFName: any;
+  sttfId: any;
+  sttfName: any;
   description: any;
   dateCreated: any;
   status: any;
@@ -253,12 +253,12 @@ export interface STTFormList {
 }
 
 export interface STTSectionList {
-  sttSId: any;
-  sttSName: any;
+  sttsId: any;
+  sttsName: any;
   description: any;
   dateCreated: any;
   status: any;
-  sttSOrder: any;
+  sttsOrder: any;
   totalStt: any;
   totalForm: any;
   totalControl: any;
@@ -266,9 +266,9 @@ export interface STTSectionList {
 }
 
 export interface STTControlList {
-  sttCId: any;
-  sttCOrder: any;
-  sttCName: any;
+  sttcId: any;
+  sttcOrder: any;
+  sttcName: any;
   filedName: any;
   filedType: any;
   description: any;
@@ -307,4 +307,56 @@ export interface STTLinkSTTFList {
   appUserid: any;
   username: any;
   email: any;
+}
+
+export interface STTFLinkSTTList {
+  sttfLinkSttId: any;
+  appUserid: any;
+  username: any;
+  email: any;
+  sttId: any;
+  serviceName: any;
+  taskType: any;
+  sttDefault: any;
+  status: any;
+  dateCreated: any;
+}
+
+export interface STTFLinkSTTSList {
+  sttfLinkSttsId: any;
+  appUserid: any;
+  username: any;
+  email: any;
+  sttsId: any;
+  sttsName: any;
+  sttsOrder: any;
+  sttsDefault: any;
+  status: any;
+  dateCreated: any;
+}
+
+export interface STTSLinkSTTFList {
+  sttsLinkSttfId: any;
+  appUserid: any;
+  username: any;
+  email: any;
+  formId: any;
+  formName: any;
+  formType: any;
+  formDefault?: any;
+  status: any;
+  dateCreated: any;
+}
+
+export interface STTCLinkSTTSList {
+  sttcLinkSttsId: any;
+  appUserid: any;
+  username: any;
+  email: any;
+  sttsId: any;
+  sttsName: any;
+  sttsOrder: any;
+  sttsDefault: any;
+  status: any;
+  dateCreated: any;
 }

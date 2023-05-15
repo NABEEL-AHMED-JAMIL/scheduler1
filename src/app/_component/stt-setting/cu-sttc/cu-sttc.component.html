@@ -70,17 +70,17 @@
                 <div class="title" style="color: #cb0f43;">{{title}} Control</div>
                 <div class="content" style="margin-top: 10px;">
                     <div class="row">
-                        <!-- sttCOrder -->
+                        <!-- sttcOrder -->
                         <div class="col-lg-4">
                             <div class="form-group">
-                                <label for="sttCOrder">Control Order</label>
-                                <input type="number" id="sttCOrder"
+                                <label for="sttcOrder">Control Order</label>
+                                <input type="number" id="sttcOrder"
                                     min="0" max="150"
-                                    formControlName="sttCOrder"
+                                    formControlName="sttcOrder"
                                     class="form-control input-sm"
                                     placeholder="Enter control order"/>
-                                <div *ngIf="submitted && f.sttCOrder.errors" class="invalid-feedback">
-                                    <div *ngIf="f.sttCOrder.errors.required" style="color: red;">
+                                <div *ngIf="submitted && f.sttcOrder.errors" class="invalid-feedback">
+                                    <div *ngIf="f.sttcOrder.errors.required" style="color: red;">
                                         Order is required
                                     </div>
                                 </div>
@@ -113,18 +113,18 @@
                                     placeholder="Enter min length"/>
                             </div>
                         </div>
-                        <!-- sttCName -->
+                        <!-- sttcName -->
                         <div class="col-lg-4">
                             <div class="form-group">
-                                <label for="sttCName">Control Name</label>
-                                <input type="text" id="sttCName"
-                                    formControlName="sttCName"
+                                <label for="sttcName">Control Name</label>
+                                <input type="text" id="sttcName"
+                                    formControlName="sttcName"
                                     class="form-control input-sm"
                                     placeholder="Enter control name"
                                     oninput="this.value = this.value.toUpperCase()" 
-                                    [ngClass]="{ 'is-invalid': submitted && f.sttCName.errors }" />
-                                <div *ngIf="submitted && f.sttCName.errors" class="invalid-feedback">
-                                    <div *ngIf="f.sttCName.errors.required"
+                                    [ngClass]="{ 'is-invalid': submitted && f.sttcName.errors }" />
+                                <div *ngIf="submitted && f.sttcName.errors" class="invalid-feedback">
+                                    <div *ngIf="f.sttcName.errors.required"
                                         style="color: red;">Control Name is required
                                     </div>
                                 </div>

@@ -51,7 +51,7 @@ export class CUSTTSComponent implements OnInit {
                 this.topHeader = data.topHeader;
                 if (this.action === Action.EDIT) {
                     this.route.queryParams.subscribe((params: any) => {
-                        this.editSttsId = params.sttSId;
+                        this.editSttsId = params.sttsId;
                     });
                 }
             });
@@ -149,11 +149,11 @@ export class CUSTTSComponent implements OnInit {
             }
             response = response.data;
             this.sttsForm = this.formBuilder.group({
-                sttsId: [response.sttSId],
-                sttsName: [response.sttSName, Validators.required],
+                sttsId: [response.sttsId],
+                sttsName: [response.sttsName, Validators.required],
                 description: [response.description, [Validators.required]],
                 status: [response.status.lookupValue, [Validators.required]],
-                sttsOrder: [response.sttSOrder, [Validators.required]],
+                sttsOrder: [response.sttsOrder, [Validators.required]],
                 defaultStts: [response.defaultStts.lookupValue, [Validators.required]]
             });
         }, (error: any) => {

@@ -54,7 +54,7 @@ export class CUSTTFComponent implements OnInit {
                 this.topHeader = data.topHeader;
                 if (this.action === Action.EDIT) {
                     this.route.queryParams.subscribe((params: any) => {
-                        this.editSttfId = params.sttFId;
+                        this.editSttfId = params.sttfId;
                     });
                 }
             });
@@ -176,8 +176,8 @@ export class CUSTTFComponent implements OnInit {
             }
             response = response.data;
             this.sttfForm = this.formBuilder.group({
-                sttfId: [response.sttFId, [Validators.required]],
-                sttfName: [response.sttFName, Validators.required],
+                sttfId: [response.sttfId, [Validators.required]],
+                sttfName: [response.sttfName, Validators.required],
                 description: [response.description, [Validators.required]],
                 status: [response.status.lookupValue, [Validators.required]],
                 formType: [response.formType.lookupValue, [Validators.required]],
