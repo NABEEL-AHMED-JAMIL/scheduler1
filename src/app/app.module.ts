@@ -38,11 +38,8 @@ import {
     ViewSTTSComponent,
     ViewSTTCComponent,
     STTLinkUserComponent,
-    STTLinkSTTFComponent,
     STTFLinkSTTSComponent,
-    STTFLinkSTTComponent,
     STTSLinkSTTFComponent,
-    STTSLinkSTTCComponent,
     STTCLinkSTTSComponent,
     BatchComponent
 } from '@/_component/index';
@@ -89,11 +86,8 @@ import { ToastrModule } from 'ngx-toastr';
         ViewSTTSComponent,
         ViewSTTCComponent,
         STTFLinkSTTSComponent,
-        STTFLinkSTTComponent,
         STTLinkUserComponent,
-        STTLinkSTTFComponent,
         STTSLinkSTTFComponent,
-        STTSLinkSTTCComponent,
         STTCLinkSTTSComponent,
         XmlConfigurationComponent,
         SearchFilterPipe,

@@ -23,11 +23,8 @@ import {
     STTSListComponent,
     STTCListComponent,
     STTLinkUserComponent,
-    STTLinkSTTFComponent,
-    STTFLinkSTTComponent,
     STTFLinkSTTSComponent,
     STTSLinkSTTFComponent,
-    STTSLinkSTTCComponent,
     STTCLinkSTTSComponent,
 } from '@/_component/index';
 import { Action } from '@/_models';
@@ -265,12 +262,6 @@ const routes: Routes = [
                             icon: 'glyphicon glyphicon-tasks',
                             router: '/stt/sttLinkUser',
                             active: true
-                        },
-                        {
-                            title: 'View Linked Forms',
-                            icon: 'glyphicon glyphicon-tasks',
-                            router: '/stt/sttLinkSttf',
-                            active: true
                         }
                     ],
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
@@ -315,27 +306,6 @@ const routes: Routes = [
                         {
                             type: 'add',
                             title: 'Link User',
-                            active: true
-                        }
-                    ],
-                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
-                }
-            },
-            {
-                path: 'sttLinkSttf',
-                component: STTLinkSTTFComponent,
-                canActivate: [AuthGuard],
-                data:  {
-                    breadcrumb: 'STT Link STTF',
-                    topHeader: [
-                        {
-                            type: 'refresh',
-                            title: 'Refresh',
-                            active: true
-                        },
-                        {
-                            type: 'add',
-                            title: 'Link STTF',
                             active: true
                         }
                     ],
@@ -413,12 +383,6 @@ const routes: Routes = [
                     breadcrumb: '',
                     action: [
                         {
-                            title: 'View Linked STT',
-                            icon: 'glyphicon glyphicon-tasks',
-                            router: '/sttf/sttfLinkStt',
-                            active: true
-                        },
-                        {
                             title: 'View Linked STTS',
                             icon: 'glyphicon glyphicon-tasks',
                             router: '/sttf/sttfLinkStts',
@@ -449,27 +413,6 @@ const routes: Routes = [
                     action: Action.EDIT,
                     breadcrumb: 'Edit Sttf',
                     topHeader: [],
-                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
-                }
-            },
-            {
-                path: 'sttfLinkStt',
-                component: STTFLinkSTTComponent,
-                canActivate: [AuthGuard],
-                data:  {
-                    breadcrumb: 'STTF Link STT',
-                    topHeader: [
-                        {
-                            type: 'refresh',
-                            title: 'Refresh',
-                            active: true
-                        },
-                        {
-                            type: 'add',
-                            title: 'Link STT',
-                            active: true
-                        }
-                    ],
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
                 }
             },
@@ -569,12 +512,6 @@ const routes: Routes = [
                             icon: 'glyphicon glyphicon-tasks',
                             router: '/stts/sttsLinkSttf',
                             active: true
-                        },
-                        {
-                            title: 'View Linked STTC',
-                            icon: 'glyphicon glyphicon-tasks',
-                            router: '/stts/sttsLinkSttc',
-                            active: true
                         }
                     ],
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
@@ -619,28 +556,6 @@ const routes: Routes = [
                         {
                             type: 'add',
                             title: 'Link STTS To STTF',
-                            router: '/stt/addStt',
-                            active: true
-                        }
-                    ],
-                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
-                }
-            },
-            {
-                path: 'sttsLinkSttc',
-                component: STTSLinkSTTCComponent,
-                canActivate: [AuthGuard],
-                data:  {
-                    breadcrumb: 'STTS Link STTC',
-                    topHeader: [
-                        {
-                            type: 'refresh',
-                            title: 'Refresh',
-                            active: true
-                        },
-                        {
-                            type: 'add',
-                            title: 'Link STTS To STTC',
                             router: '/stt/addStt',
                             active: true
                         }

@@ -35,9 +35,6 @@ export * from './stt-setting/sttc-list/sttc-list.component';
 export * from './del-box/del-box.component';
 // link stt*
 export * from './stt-setting/stt-link-user/stt-link-user.component';
-export * from './stt-setting/stt-link-sttf/stt-link-sttf.component';
-export * from './stt-setting/sttf-link-stt/sttf-link-stt.component';
 export * from './stt-setting/sttf-link-stts/sttf-link-stts.component';
 export * from './stt-setting/stts-link-sttf/stts-link-sttf.component';
-export * from './stt-setting/stts-link-sttc/stts-link-sttc.component';
 export * from './stt-setting/sttc-link-stts/sttc-link-stts.component';
