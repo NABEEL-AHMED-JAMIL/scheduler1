@@ -24,7 +24,9 @@ export class STTSLinkSTTFComponent implements OnInit {
     public searchValue: any = '';
     public sttsLinkSTTF: STTSLinkSTTFList;
     public sttsLinkSTTFList: STTSLinkSTTFList[] = [];
-    public sstFormList: STTFormList[] = [];
+
+    public tempSttFormList: STTFormList[] = [];
+    public sttFormList: STTFormList[] = [];
 
     public sttsLinkSttfForm: FormGroup;
 
@@ -95,7 +97,8 @@ export class STTSLinkSTTFComponent implements OnInit {
                 this.alertService.showError(response.message, ApiCode.ERROR);
                 return;
             }
-            this.sstFormList = response.data;
+            this.sttFormList = response.data;
+            this.tempSttFormList = this.sttFormList;
         }, (error: any) => {
             this.spinnerService.hide();
             this.alertService.showError(error.message, ApiCode.ERROR);
@@ -142,7 +145,7 @@ export class STTSLinkSTTFComponent implements OnInit {
                 username: this.currentActiveProfile.username
            }
         }
-        this.sttService.deleteSTTFLinkSTTS(payload)
+        this.sttService.deleteSTTSLinkSTTF(payload)
         .pipe(first())
         .subscribe((response: any) => {
             this.spinnerService.hide();
@@ -155,6 +158,18 @@ export class STTSLinkSTTFComponent implements OnInit {
         }, (error: any) => {
             this.spinnerService.hide();
             this.alertService.showError(error.message, ApiCode.ERROR);
+        });
+    }
+
+    /**
+     * Get only those user which are not in the link list
+     */
+    public addAction(): any {
+        this.sttFormList =  this.tempSttFormList;
+        this.sttFormList = this.sttFormList.filter((sttFrom: STTFormList) => {
+            return !this.sttsLinkSTTFList.find((sttsLinkSTTF: STTSLinkSTTFList) => {
+                return sttsLinkSTTF.formId === sttFrom.sttfId;
+            });
         });
     }
 
@@ -173,7 +188,7 @@ export class STTSLinkSTTFComponent implements OnInit {
            },
            ...this.sttsLinkSttfForm.value
         }
-        this.sttService.addSTTFLinkSTTS(payload)
+        this.sttService.addSTTSLinkSTTF(payload)
         .pipe(first())
         .subscribe((response: any) => {
             this.loading = false;

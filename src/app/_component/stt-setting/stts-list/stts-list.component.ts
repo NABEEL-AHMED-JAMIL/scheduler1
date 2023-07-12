@@ -20,7 +20,8 @@ export class STTSListComponent implements OnInit {
 
     public searchSTTS: any = '';
     public sttSection: STTSectionList;
-    public sttSections: STTSectionList[] = [];
+    public sttSectionList: STTSectionList[] = [];
+    public pageOfSttSections: Array<STTSectionList>;
 
     public addButton: any;
     public refreshButton: any;
@@ -79,7 +80,7 @@ export class STTSListComponent implements OnInit {
                 this.alertService.showError(response.message, ApiCode.ERROR);
                 return;
             }
-            this.sttSections = response.data;
+            this.sttSectionList = response.data;
         }, (error: any) => {
             this.spinnerService.hide();
             this.alertService.showError(error.message, ApiCode.ERROR);
@@ -93,7 +94,7 @@ export class STTSListComponent implements OnInit {
                     [menu.router],
                     { 
                         queryParams: {
-                            sttsId: payload.sttSId
+                            sttsId: payload.sttsId
                         }
                     });
             } else {
@@ -113,7 +114,6 @@ export class STTSListComponent implements OnInit {
     }
 
     public editAction(payload: any): void {
-        debugger
         this.router.navigate(
             ['/stts/editStts'],
             { 
@@ -194,6 +194,11 @@ export class STTSListComponent implements OnInit {
             this.spinnerService.hide();
             this.alertService.showError(error, ApiCode.ERROR);
         });
+    }
+
+    public onChangePage(pageOfSttSections: Array<any>) {
+        // update current page of items
+        this.pageOfSttSections = pageOfSttSections;
     }
 
 

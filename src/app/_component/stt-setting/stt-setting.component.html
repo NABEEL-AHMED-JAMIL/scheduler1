@@ -66,13 +66,19 @@
                         <div class="card-body">
                             <div class="row">
                                 <!-- sid -->
-                                <div class="col-xs-3 col-sm-2 sidebar-offcanvas" id="sidebar" style="padding-right: inherit;">
+                                <div class="col-xs-3 col-sm-2 sidebar-offcanvas"
+                                    id="sidebar" style="padding-right: inherit;">
                                     <div class="list-group" style="margin-bottom: 0px;">
-                                        <a *ngFor="let taskType of sttSidebar; let i = index" [id]="taskType.type" class="list-group-item"
-                                            [ngClass]="taskType.type === selectedMenu.type && selectedMenu.active === true ? 'active': ''"
-                                            [routerLink]="taskType.router" (click)="changeTask(taskType, i)"
+                                        <a *ngFor="let taskType of sttSidebar; let i = index"
+                                            [id]="taskType.type" class="list-group-item"
+                                            [attr.disabled]="taskType?.disabled ? true : null"
+                                            [ngClass]="taskType.type === selectedMenu.type 
+                                                && selectedMenu.active === true ? 'active': ''"
+                                            [routerLink]="taskType.router"
+                                            (click)="changeTask(taskType, i)"
                                             style="padding: 5px 10px;">
-                                            <span class="glyphicon glyphicon-edit"></span> {{taskType.title}}
+                                            <span class="glyphicon glyphicon-edit">
+                                            </span> {{taskType.title}}
                                         </a>
                                     </div>
                                 </div>

@@ -22,6 +22,7 @@ export class LookupComponent implements OnInit {
     public lookupAction: Action;
     public lookupData: LookupData;
     public lookupDatas: LookupData[];
+    public pageOfLookupData: Array<LookupData>;
 
     public addButton: any;
     public refreshButton: any;
@@ -157,5 +158,10 @@ export class LookupComponent implements OnInit {
             this.fetchAllLookup();
 		}
 	}
+
+    public onChangePage(pageOfLookupData: Array<any>) {
+        // update current page of items
+        this.pageOfLookupData = pageOfLookupData;
+    }
     
 }

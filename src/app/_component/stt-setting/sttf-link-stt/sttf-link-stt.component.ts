@@ -1,35 +1,32 @@
 import { Component, OnInit, ViewChild } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { first } from 'rxjs/operators';
-import { AuthResponse, ApiCode,
-    STTFLinkSTTSList, STTSectionList } from '@/_models/index';
+import { AuthResponse, ApiCode, STTList, STTFLinkSTTList } from '@/_models/index';
 import { SpinnerService } from '@/_helpers';
 import { AuthenticationService, AlertService, STTService } from '@/_services';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 
-
 @Component({
-    selector: 'sttf-link-stts',
-    templateUrl: 'sttf-link-stts.component.html'
+    selector: 'sttf-link-stt',
+    templateUrl: 'sttf-link-stt.component.html'
 })
-export class STTFLinkSTTSComponent implements OnInit {
+export class STTFLinkSTTComponent implements OnInit {
 
     public loading: any = false;
     public submitted: any = false;
-    @ViewChild('closeSttfLinkStts', {static: false})
-	public closeSttfLinkStts: any;
+    @ViewChild('closeSttfLinkStt', {static: false})
+	public closeSttfLinkStt: any;
 
-    public title: any = 'Delete STTF Link STTS';
+    public title: any = 'Delete STTF Link STT';
     public subTitle: any = 'Note :- Delete opertaion may case problem for job';
 
     public searchValue: any = '';
-    public sttfLinkSTTS: STTFLinkSTTSList;
-    public sttfLinkSTTSList: STTFLinkSTTSList[] = [];
+    public sttfLinkSTT: STTFLinkSTTList;
+    public sttfLinkSTTList: STTFLinkSTTList[] = [];
+    public tempSttList: STTList[] = [];
+    public sttList: STTList[] = [];
 
-    public tempSTTSectionList: STTSectionList[] = [];
-    public sttSectionList: STTSectionList[] = [];
-
-    public sttfLinkSttsForm: FormGroup;
+    public sttfLinkSttForm: FormGroup;
 
     public querySttfid: any;
     public formTitle: any;
@@ -66,23 +63,23 @@ export class STTFLinkSTTSComponent implements OnInit {
     }
 
     ngOnInit() {
-        this.fetchSTTS();
-        this.fetchSTTFLinkSTTS(this.querySttfid);
+        this.fetchSTT();
+        this.fetchSTTFLinkSTT(this.querySttfid);
     }
 
     public formInit(): void {
-        this.sttfLinkSttsForm = this.formBuilder.group({
-            sttsId: ['', [Validators.required]],
+        this.sttfLinkSttForm = this.formBuilder.group({
+            sttId: ['', [Validators.required]],
             sttfId: [this.querySttfid, [Validators.required]]
         });
     }
 
     // convenience getter for easy access to form fields
     get f() {
-        return this.sttfLinkSttsForm.controls;
+        return this.sttfLinkSttForm.controls;
     }
 
-    public fetchSTTS(): void {
+    public fetchSTT(): void {
         this.spinnerService.show();
         let payload = {
             accessUserDetail: {
@@ -90,7 +87,7 @@ export class STTFLinkSTTSComponent implements OnInit {
                 username: this.currentActiveProfile.username
            }
         }
-        this.sttService.fetchSTTS(payload)
+        this.sttService.fetchSTT(payload)
         .pipe(first())
         .subscribe((response: any) => {
             this.spinnerService.hide();
@@ -98,15 +95,15 @@ export class STTFLinkSTTSComponent implements OnInit {
                 this.alertService.showError(response.message, ApiCode.ERROR);
                 return;
             }
-            this.sttSectionList = response.data;
-            this.tempSTTSectionList = this.sttSectionList;
+            this.sttList = response.data;
+            this.tempSttList = response.data;
         }, (error: any) => {
             this.spinnerService.hide();
             this.alertService.showError(error.message, ApiCode.ERROR);
         });
     }
 
-    public fetchSTTFLinkSTTS(sttfId: any): void {
+    public fetchSTTFLinkSTT(sttfId: any): void {
         this.spinnerService.show();
         let payload = {
             sttfId: sttfId,
@@ -115,7 +112,7 @@ export class STTFLinkSTTSComponent implements OnInit {
                 username: this.currentActiveProfile.username
            }
         }
-        this.sttService.fetchSTTFLinkSTTS(payload)
+        this.sttService.fetchSTTFLinkSTT(payload)
         .pipe(first())
         .subscribe((response: any) => {
             this.spinnerService.hide();
@@ -123,30 +120,30 @@ export class STTFLinkSTTSComponent implements OnInit {
                 this.alertService.showError(response.message, ApiCode.ERROR);
                 return;
             }
-            this.sttfLinkSTTSList = response.data;
+            this.sttfLinkSTTList = response.data;
         }, (error: any) => {
             this.spinnerService.hide();
             this.alertService.showError(error.message, ApiCode.ERROR);
         });
     }
 
-    public deleteAction(sttfLinkSTTS: STTFLinkSTTSList): void {
-        this.sttfLinkSTTS = sttfLinkSTTS;
+    public deleteAction(sttfLinkSTT: STTFLinkSTTList): void {
+        this.sttfLinkSTT = sttfLinkSTT;
     }
 
     public deleteActionTriger(): void {
         this.spinnerService.show();
         let payload = {
             sttfId: this.querySttfid,
-            sttsId: this.sttfLinkSTTS.sttsId,
-            appUserId: this.sttfLinkSTTS.appUserid,
-            auSttsId: this.sttfLinkSTTS.sttfLinkSttsId,
+            sttId: this.sttfLinkSTT.sttId,
+            appUserId: this.sttfLinkSTT.appUserid,
+            auSttfId: this.sttfLinkSTT.sttfLinkSttId,
             accessUserDetail: {
                 appUserId: this.currentActiveProfile.appUserId,
                 username: this.currentActiveProfile.username
            }
         }
-        this.sttService.deleteSTTFLinkSTTS(payload)
+        this.sttService.deleteSTTFLinkSTT(payload)
         .pipe(first())
         .subscribe((response: any) => {
             this.spinnerService.hide();
@@ -155,7 +152,7 @@ export class STTFLinkSTTSComponent implements OnInit {
                 return;
             }
             this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
-            this.fetchSTTFLinkSTTS(this.querySttfid);
+            this.fetchSTTFLinkSTT(this.querySttfid);
         }, (error: any) => {
             this.spinnerService.hide();
             this.alertService.showError(error.message, ApiCode.ERROR);
@@ -166,10 +163,10 @@ export class STTFLinkSTTSComponent implements OnInit {
      * Get only those user which are not in the link list
      */
     public addAction(): any {
-        this.sttSectionList =  this.tempSTTSectionList;
-        this.sttSectionList = this.sttSectionList.filter((sttSection: STTSectionList) => {
-            return !this.sttfLinkSTTSList.find((sttfLinkSTTS: STTFLinkSTTSList) => {
-                return sttfLinkSTTS.sttsId === sttSection.sttsId;
+        this.sttList =  this.tempSttList;
+        this.sttList = this.sttList.filter((stt: STTList) => {
+            return !this.sttfLinkSTTList.find((sttfLinkSTT: STTFLinkSTTList) => {
+                return sttfLinkSTT.sttId === stt.sttId;
             });
         });
     }
@@ -177,7 +174,7 @@ export class STTFLinkSTTSComponent implements OnInit {
     public onSubmit(): void {
         this.spinnerService.show();
         this.submitted = true;
-        if (this.sttfLinkSttsForm.invalid) {
+        if (this.sttfLinkSttForm.invalid) {
             this.spinnerService.hide();
             return;
         }
@@ -187,9 +184,9 @@ export class STTFLinkSTTSComponent implements OnInit {
                 appUserId: this.currentActiveProfile.appUserId,
                 username: this.currentActiveProfile.username
            },
-           ...this.sttfLinkSttsForm.value
+           ...this.sttfLinkSttForm.value
         }
-        this.sttService.addSTTFLinkSTTS(payload)
+        this.sttService.addSTTFLinkSTT(payload)
         .pipe(first())
         .subscribe((response: any) => {
             this.loading = false;
@@ -200,9 +197,9 @@ export class STTFLinkSTTSComponent implements OnInit {
                 return;
             }
             this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
-            this.closeSttfLinkStts.nativeElement.click();
+            this.closeSttfLinkStt.nativeElement.click();
             this.formInit();
-            this.fetchSTTFLinkSTTS(this.querySttfid);
+            this.fetchSTTFLinkSTT(this.querySttfid);
             }, (error: any) => {
                 this.loading = false;
                 this.submitted = false;
@@ -212,8 +209,7 @@ export class STTFLinkSTTSComponent implements OnInit {
     }
 
     public refreshAction(): void {
-        this.fetchSTTFLinkSTTS(this.querySttfid);
+        this.fetchSTTFLinkSTT(this.querySttfid);
     }
-
 
 }

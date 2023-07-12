@@ -19,7 +19,8 @@ export class STTListComponent implements OnInit {
 
     public searchStt: any = '';
     public stt: STTList;
-    public sttLists: STTList[] = [];
+    public sttList: STTList[] = [];
+    public pageOfStts: Array<STTList>;
 
     public addButton: any;
     public refreshButton: any;
@@ -77,7 +78,7 @@ export class STTListComponent implements OnInit {
                 this.alertService.showError(response.message, ApiCode.ERROR);
                 return;
             }
-            this.sttLists = response.data;
+            this.sttList = response.data;
         }, (error: any) => {
             this.spinnerService.hide();
             this.alertService.showError(error.message, ApiCode.ERROR);
@@ -191,6 +192,11 @@ export class STTListComponent implements OnInit {
             this.spinnerService.hide();
             this.alertService.showError(error, ApiCode.ERROR);
         });
+    }
+
+    public onChangePage(pageOfStts: Array<any>) {
+        // update current page of items
+        this.pageOfStts = pageOfStts;
     }
 
 }

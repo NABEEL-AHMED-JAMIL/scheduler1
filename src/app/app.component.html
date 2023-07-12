@@ -13,8 +13,8 @@
         </a>
         <ul class="dropdown-menu">
           <li><a routerLink="/addJob">Add Job</a></li>
-          <li><a routerLink="/messageQueue">Queue Log</a></li>
           <li><a routerLink="/jobList">Job List</a></li>
+          <li><a routerLink="/messageQueue">Queue Log</a></li>
         </ul>
       </li>
       <li class="dropdown">
@@ -28,7 +28,41 @@
         </ul>
       </li>
     </ul>
-    <ul class="nav navbar-nav navbar-right">
+    <ul class="nav navbar-nav navbar-right" >
+      <li class="dropdown"
+        *ngIf="hasAccess(['ROLE_ADMIN', 'ROLE_MASTER_ADMIN'])">
+        <a href="#" class="dropdown-toggle" data-toggle="dropdown"
+          role="button" aria-haspopup="true" aria-expanded="false">
+          <span class="glyphicon glyphicon-cog"></span>
+            Setting<span class="caret"></span>
+        </a>
+        <ul class="dropdown-menu">
+          <li>
+            <a routerLink="/stt"
+              *ngIf="hasAccess(['ROLE_ADMIN', 'ROLE_MASTER_ADMIN'])">
+              <span class="glyphicon glyphicon-briefcase"></span>
+              Service Setting</a>
+          </li>
+          <li>
+            <a routerLink="/credential"
+              *ngIf="hasAccess(['ROLE_ADMIN', 'ROLE_MASTER_ADMIN'])">
+              <span class="glyphicon glyphicon-credit-card"></span>
+              Credential Setting</a>
+          </li>
+          <li>
+            <a routerLink="/searchengine"
+              *ngIf="hasAccess(['ROLE_MASTER_ADMIN', 'ROLE_ADMIN'])">
+              <span class="glyphicon glyphicon-random"></span>
+              Query Result</a>
+          </li>
+          <li>
+            <a routerLink="/xmlconfig"
+              *ngIf="hasAccess(['ROLE_ADMIN', 'ROLE_MASTER_ADMIN'])">
+              <span class="glyphicon glyphicon-flash"></span>
+              XML Configuration</a>
+          </li>
+        </ul>
+      </li>
       <li class="dropdown">
         <a href="#" class="dropdown-toggle" data-toggle="dropdown"
           role="button" aria-haspopup="true" aria-expanded="false">
@@ -36,31 +70,23 @@
         </a>
         <ul class="dropdown-menu">
           <li>
-            <a routerLink="/profile">My Profile</a>
+            <a routerLink="/profile">
+              <span class="glyphicon glyphicon-user"></span>
+              My Profile</a>
           </li>
           <li>
             <a routerLink="/lookup" 
               *ngIf="hasAccess(['ROLE_ADMIN', 'ROLE_MASTER_ADMIN'])">
-              Lookup Data</a>
-          </li>
-          <li>
-            <a routerLink="/stt"
-              *ngIf="hasAccess(['ROLE_ADMIN', 'ROLE_MASTER_ADMIN'])">
-              SourceTask</a>
-          </li>
-          <li>
-            <a routerLink="/searchengine"
-              *ngIf="hasAccess(['ROLE_MASTER_ADMIN', 'ROLE_ADMIN'])">
-              Query Result</a>
-          </li>
-          <li>
-            <a routerLink="/xmlconfig"
-              *ngIf="hasAccess(['ROLE_ADMIN', 'ROLE_MASTER_ADMIN'])">
-              Xml Config</a>
+              <span class="glyphicon glyphicon-list-alt"></span>
+              My Lookup Data</a>
           </li>
         </ul>
       </li>
-      <li><a (click)="logout()">Logout</a></li>
+      <li>
+        <a (click)="logout()">
+        <span class="glyphicon glyphicon-log-out">
+        </span> Logout</a>
+      </li>
     </ul>
   </div>
 </nav>

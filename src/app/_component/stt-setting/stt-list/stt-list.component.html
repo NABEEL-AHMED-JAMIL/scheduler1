@@ -1,7 +1,7 @@
 <div class="row">
     <div class="col-lg-6">
-        <label *ngIf="sttLists">
-            Total STT ({{sttLists.length}})
+        <label *ngIf="sttList">
+            Total STT ({{sttList.length}})
         </label>
         <input type="text" id="searchStt"
             class="form-control input-sm" 
@@ -45,18 +45,21 @@
         <tr>
             <th style="width: 4%;">-</th>
             <th style="width: 4%;"># No</th>
-            <th>STT Type</th>
             <th>Service Name</th>
+            <th>STT Type</th>
+            <th>HomePage</th>
+            <th>Service Id</th>
+            <th>Credential</th>
             <th>Defult</th>
             <th>Created Date</th>
-            <th>Total User</th>
-            <th>Total Task</th>
-            <th>Total Form</th>
+            <th>Users</th>
+            <th>Tasks</th>
+            <th>Forms</th>
             <th style="width: 10%;">Action</th>
         </tr>
     </thead>
     <tbody>
-        <tr *ngFor="let stt of sttLists | searchFilter: searchStt; let i = index">
+        <tr *ngFor="let stt of pageOfStts | searchFilter: searchStt; let i = index">
             <td style="text-align: center;">
                 <div class="Yf">
                     <div [ngClass]="{
@@ -67,10 +70,19 @@
                 </div>
             </td>
             <td>{{stt.sttId}}</td>
+            <td>{{stt.serviceName}}</td>
             <td style="text-align: center;">
                 {{stt.taskType.description}}
             </td>
-            <td>{{stt.serviceName}}</td>
+            <td style="text-align: center;">
+                {{stt?.homePage?.description}}
+            </td>
+            <td style="text-align: center;">
+                {{stt.serviceId}}
+            </td>
+            <td style="text-align: center;">
+                {{stt?.credential?.credentialName}}
+            </td>
             <td style="text-align: center;">
                 {{stt.sttDefault.description}}
             </td>
@@ -97,17 +109,18 @@
                     <!-- add the method for delete the queue detail -->
                     <button type="button" class="btn btn-default"
                         data-toggle="modal" data-target="#deleteAction"
-                        [disabled]="stt.status.lookupValue === 2"
+                        [disabled]="stt.status.lookupValue === 0"
                         (click)="deleteAction(stt)">
-                        <span class="glyphicon glyphicon-trash" style="color: #dc3545;"></span>
+                        <span class="glyphicon glyphicon-trash" 
+                            style="color: #dc3545;"></span>
                     </button>
                     <!--  -->
                     <button type="button"
                         class="btn btn-default dropdown-toggle" 
                         data-toggle="dropdown"
-                        [disabled]="stt.status.lookupValue === 2">
-                        <span class="glyphicon glyphicon-cog" 
-                        style="color: black;"></span>
+                        [disabled]="stt.status.lookupValue === 0">
+                        <span class="glyphicon glyphicon-hand-right" 
+                            style="color:#a94442"></span>
                     </button>
                     <ul class="dropdown-menu" style="left: -100px;">
                         <li *ngFor="let menu of actionMenu">
@@ -121,6 +134,14 @@
             </td>
         </tr>
     </tbody>
+    <tfoot>
+        <tr>
+            <td colspan="12" style="text-align: center;padding-bottom: 0px;">
+                <jw-pagination [items]="sttList" [pageSize]="25" 
+                    (changePage)="onChangePage($event)"></jw-pagination>
+            </td>
+        </tr>
+    </tfoot>
 </table>
 <div class="modal fade" id="deleteAction"
     role="dialog" style="top: 85px;">

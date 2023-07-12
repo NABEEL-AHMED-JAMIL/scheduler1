@@ -2,13 +2,46 @@
     [searchSttsId]="querySttsid"
     [formTitle]="formTitle">
 </view-stts>
+<div class="row" style="margin-top: 20px;">
+    <div class="col-lg-6">
+        <label>
+            Total {{formTitle}}  ({{sttsLinkSTTFList.length}})
+        </label>
+        <input type="text" id="searchValue"
+            class="form-control input-sm" 
+            style="width: 60%;"
+            [(ngModel)]="searchValue"
+            placeholder="Search by any key" />
+    </div>
+    <div class="col-lg-6" style="text-align: end;margin-top: 25px;">
+        <!-- working -->
+        <button *ngIf="refreshButton && refreshButton.active"
+            type="button" class="form-control input-sm"
+            style="width: auto;display: inline;margin-right: 7px;"
+            (click)="refreshAction()">
+            <span class="glyphicon glyphicon-refresh"></span>
+            {{refreshButton.title}}
+        </button>
+        <!-- working -->
+        <button *ngIf="addButton && addButton.active" type="button"
+            class="form-control input-sm"
+            style="width: auto; background: #cb0f43;color: white;
+            display: inline;margin-right: 7px;"
+            data-toggle="modal" data-target="#addAction"
+            (click)="addAction()">
+            <span class="glyphicon glyphicon-plus-sign"></span>
+            {{addButton.title}}
+        </button>
+    </div>
+</div>
+
 <table id="stt" style="font-size: 12px;margin-top: 10px;"
     class="table table-responsive table table-striped table-bordered table-sm">
     <thead>
         <tr>
             <th style="width: 4%;">-</th>
             <th style="width: 4%;"># No</th>
-            <th style="width: 5%;">Form Id</th>
+            <th>Form Id</th>
             <th>Form Type</th>
             <th>Form Name</th>
             <th>Default</th>
@@ -50,6 +83,7 @@
                     role="group" style="text-align: center">
                     <button type="button" class="btn btn-default"
                         data-toggle="modal" data-target="#deleteAction"
+                        [disabled]="sttsLinkSTTF.status.lookupValue === 0"
                         (click)="deleteAction(sttsLinkSTTF)">
                         <span class="glyphicon glyphicon-trash" 
                             style="color: #dc3545;"></span>
@@ -75,14 +109,14 @@
     <div class="modal-dialog" style="width: 550px;">
         <div class="modal-content">
             <div class="modal-header" style="background: #555;">
-                <button type="button" #closeSttfLinkStt class="close"
+                <button type="button" #closeSttsLinkSttf class="close"
                     data-dismiss="modal">&times;</button>
                 <h4 class="modal-title">{{formTitle}}</h4>
             </div>
             <div class="modal-body">
                 <form [formGroup]="sttsLinkSttfForm" (ngSubmit)="onSubmit()">
                     <div class="row">
-                        <div class="col-lg-10" *ngIf="sstFormList">
+                        <div class="col-lg-10" *ngIf="sttFormList">
                             <div class="form-group">
                                 <select class="form-control input-sm" id="sttfId"
                                     formControlName="sttfId"
@@ -90,8 +124,8 @@
                                     <option hidden value="" disabled selected>
                                         Select STTF
                                     </option>
-                                    <option *ngFor="let sstForm of sstFormList.reverse()"
-                                        [value]="sstForm.sttfId">{{sstForm.sttfName}}
+                                    <option *ngFor="let sttForm of sttFormList.reverse()"
+                                        [value]="sttForm.sttfId">{{sttForm.sttfName}}
                                     </option>
                                 </select>
                                 <div *ngIf="submitted && f.sttfId.errors" class="invalid-feedback">

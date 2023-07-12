@@ -7,3 +7,4 @@ export * from './app.user.service';
 export * from './lookup.service';
 export * from './stt.service';
 export * from './datashare.service';
+export * from './credential.service';

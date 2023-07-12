@@ -68,6 +68,7 @@
                     role="group" style="text-align: center">
                     <button type="button" class="btn btn-default"
                         data-toggle="modal" data-target="#deleteAction"
+                        [disabled]="sttLinkUser.status.lookupValue === 0"
                         (click)="deleteAction(sttLinkUser)">
                         <span class="glyphicon glyphicon-trash" 
                             style="color: #dc3545;"></span>

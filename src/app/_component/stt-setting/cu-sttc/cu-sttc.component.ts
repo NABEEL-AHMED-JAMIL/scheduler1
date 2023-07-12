@@ -79,11 +79,11 @@ export class CUSTTCComponent implements OnInit {
                 placeHolder: [''],
                 pattern: [''],
                 filedLookUp: [''],
-                filedLkDetail: [''],
                 filedWidth: ['', [Validators.required]],
                 minLength: [''],
                 maxLength: [''],
-                mandatory: ['true', [Validators.required]]
+                mandatory: ['true', [Validators.required]],
+                sttcDisabled: ['false', [Validators.required]]
             });
         } else if (this.action === Action.EDIT) {
             this.getApplicationStatusByLookupType();
@@ -125,13 +125,13 @@ export class CUSTTCComponent implements OnInit {
                 placeHolder: [response.placeHolder],
                 pattern: [response.pattern],
                 filedLookUp: [response.filedLookUp],
-                filedLkDetail: [],
                 filedWidth: [response.filedWidth, [Validators.required]],
                 minLength: [response.minLength],
                 maxLength: [response.maxLength],
                 mandatory: [response.mandatory.lookupValue, [Validators.required]],
                 status: [response.status.lookupValue, [Validators.required]],
-                defaultSttc: [response.defaultSttc.lookupValue, [Validators.required]]
+                sttcDefault: [response.sttcDefault.lookupValue, [Validators.required]],
+                sttcDisabled: [response.sttcDisabled.lookupValue, [Validators.required]]
             });
             if (response.filedType.lookupValue === 'radio' ||
                 response.filedType.lookupValue === 'checkbox' ||
@@ -233,41 +233,46 @@ export class CUSTTCComponent implements OnInit {
                 this.filedTypeForLkValue = true;
                 return;
         }
+        console.log(payload);
         this.hasKey = false;
         this.filedTypeForLkValue = false;
-        this.filedLkValueOption = undefined;
-        this.sttcForm.controls['filedLookUp'].setValue(undefined);
-        this.sttcForm.controls['filedLkDetail'].setValue(undefined);
+        this.filedLkValueOption = [];
+        this.sttcForm.controls['filedLookUp'].setValue(null);
     }
 
     public onChangeFiledLkValue(value: any): void {
-        this.hasKey = false;
-        this.spinnerService.show();
-        let payload = {
-            lookupType: value,
-            validate: true, // auth process required so we send true
-            accessUserDetail: {
-                appUserId: this.currentActiveProfile.appUserId,
-                username: this.currentActiveProfile.username
-           }
-        }
-        this.lookupService.fetchLookupByLookupType(payload)
-        .pipe(first())
-        .subscribe((response: any) => {
-            this.spinnerService.hide();
-            if (response.status === ApiCode.ERROR) {
-                this.alertService.showError('No lookup found', ApiCode.ERROR);
-                return;
-            } else if (response.data?.subLookupData.length === 0) {
-                this.alertService.showError('Lookup not valid', ApiCode.ERROR);
-                return;
+        if (value!= null && value != '') {
+            this.hasKey = false;
+            this.spinnerService.show();
+            let payload = {
+                lookupType: value,
+                validate: true, // auth process required so we send true
+                accessUserDetail: {
+                    appUserId: this.currentActiveProfile.appUserId,
+                    username: this.currentActiveProfile.username
+               }
             }
-            this.hasKey = true;
-            this.filedLkValueOption = response.data;
-        }, (error: any) => {
-            this.spinnerService.hide();
-            this.alertService.showError(error.message, ApiCode.ERROR);
-        });
+            this.lookupService.fetchLookupByLookupType(payload)
+            .pipe(first())
+            .subscribe((response: any) => {
+                this.spinnerService.hide();
+                if (response.status === ApiCode.ERROR) {
+                    this.alertService.showError('No lookup found', ApiCode.ERROR);
+                    return;
+                } else if (response.data?.subLookupData.length === 0) {
+                    this.alertService.showError('Lookup not valid', ApiCode.ERROR);
+                    return;
+                }
+                this.hasKey = true;
+                this.filedLkValueOption = response.data;
+            }, (error: any) => {
+                this.spinnerService.hide();
+                this.alertService.showError(error.message, ApiCode.ERROR);
+            });   
+        } else {
+            this.hasKey = false;
+            this.filedLkValueOption = [];
+        }
     }
 
     public onSubmit(): any {

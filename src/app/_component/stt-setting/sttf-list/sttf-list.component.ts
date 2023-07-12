@@ -18,7 +18,8 @@ export class STTFListComponent implements OnInit {
 
     public searchSTTF: any = '';
     public sstForm: STTFormList;
-    public sstForms: STTFormList[] = [];
+    public sstFormList: STTFormList[] = [];
+    public pageOfSSTs: Array<STTFormList>;
 
     public addButton: any;
     public refreshButton: any;
@@ -76,7 +77,7 @@ export class STTFListComponent implements OnInit {
                 this.alertService.showError(response.message, ApiCode.ERROR);
                 return;
             }
-            this.sstForms = response.data;
+            this.sstFormList = response.data;
         }, (error: any) => {
             this.spinnerService.hide();
             this.alertService.showError(error.message, ApiCode.ERROR);
@@ -190,6 +191,11 @@ export class STTFListComponent implements OnInit {
             this.spinnerService.hide();
             this.alertService.showError(error, ApiCode.ERROR);
         });
+    }
+
+    public onChangePage(pageOfSSTs: Array<any>) {
+        // update current page of items
+        this.pageOfSSTs = pageOfSSTs;
     }
 
 }

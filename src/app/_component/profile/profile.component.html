@@ -77,7 +77,7 @@
                 </div>
             </div>
         </div>
-        <div class="card" style="margin-top: 10px;">
+        <!-- <div class="card" style="margin-top: 10px;">
             <div class="card-body">
                 <h5 class="card-title" style="font-size: large;">TimeZone</h5>
                 <hr style="margin-bottom: 12px;margin-top: 0px;">
@@ -106,7 +106,7 @@
                     </form>
                 </div>
             </div>
-        </div>
+        </div> -->
     </div>
     <div class="col-lg-9">
         <!-- update user name -->
@@ -116,8 +116,11 @@
                 <button class="form-control input-sm"
                     *ngIf="hasAccess(['ROLE_ADMIN', 'ROLE_MASTER_ADMIN'])"
                     style="background: #337ab7;color: white;
-                        margin-top: -36px;width: auto;float: right;">
-                    <samp class="glyphicon glyphicon-briefcase"></samp> Manage Users</button>
+                        margin-top: -36px;width: auto;float: right;"
+                    (click)="manageUser()">
+                    <samp class="glyphicon glyphicon-briefcase"></samp>
+                    Manage Users
+                </button>
                 <hr style="margin-bottom: 12px;margin-top: 0px;">
                 <form [formGroup]="appUserForm" (ngSubmit)="updateAppUserProfile()">
                     <div class="row">
@@ -202,7 +205,7 @@
             </div>
         </div>
         <!-- update user password -->
-        <div class="card mb-3">
+        <!-- <div class="card mb-3">
             <div class="card-body">
                 <h5 class="card-title" style="font-size: large;">Update Password</h5>
                 <hr style="margin-bottom: 12px;margin-top: 0px;">
@@ -260,7 +263,7 @@
                     </div>
                 </form>
             </div>
-        </div>
+        </div> -->
     </div>
 </div>
 <!-- Close Account Modal -->

@@ -2,7 +2,7 @@ import { Component, OnInit, ViewChild } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { first } from 'rxjs/operators';
 import { AuthResponse, ApiCode,
-    STTSectionList, STTCLinkSTTSList } from '@/_models/index';
+    STTSectionList, STTCLinkSTTSList, STTSLinkSTTFList } from '@/_models/index';
 import { SpinnerService } from '@/_helpers';
 import { AuthenticationService, AlertService, STTService } from '@/_services';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
@@ -24,7 +24,8 @@ export class STTCLinkSTTSComponent implements OnInit {
     public searchValue: any = '';
     public sttcLinkSTTS: STTCLinkSTTSList;
     public sttcLinkSTTSList: STTCLinkSTTSList[] = [];
-    public sttSections: STTSectionList[] = [];
+    public tempSttSectionList: STTSectionList[] = [];
+    public sttSectionList: STTSectionList[] = [];
 
     public sttcLinkSttsForm: FormGroup;
 
@@ -95,7 +96,8 @@ export class STTCLinkSTTSComponent implements OnInit {
                 this.alertService.showError(response.message, ApiCode.ERROR);
                 return;
             }
-            this.sttSections = response.data;
+            this.sttSectionList = response.data;
+            this.tempSttSectionList = this.sttSectionList;
         }, (error: any) => {
             this.spinnerService.hide();
             this.alertService.showError(error.message, ApiCode.ERROR);
@@ -142,7 +144,7 @@ export class STTCLinkSTTSComponent implements OnInit {
                 username: this.currentActiveProfile.username
            }
         }
-        this.sttService.deleteSTTFLinkSTTS(payload)
+        this.sttService.deleteSTTCLinkSTTS(payload)
         .pipe(first())
         .subscribe((response: any) => {
             this.spinnerService.hide();
@@ -155,6 +157,18 @@ export class STTCLinkSTTSComponent implements OnInit {
         }, (error: any) => {
             this.spinnerService.hide();
             this.alertService.showError(error.message, ApiCode.ERROR);
+        });
+    }
+
+    /**
+     * Get only those user which are not in the link list
+     */
+    public addAction(): any {
+        this.sttSectionList = this.tempSttSectionList;
+        this.sttSectionList = this.sttSectionList.filter((sttSection: STTSectionList) => {
+            return !this.sttcLinkSTTSList.find((sttcLinkSTTS: STTCLinkSTTSList) => {
+                return sttcLinkSTTS.sttsId === sttSection.sttsId;
+            });
         });
     }
 

@@ -9,6 +9,7 @@ import { AppComponent } from './app.component';
 import { JwtInterceptor, ErrorInterceptor } from '@/_helpers';
 import { SearchFilterPipe } from '@/_helpers';
 import { SpinnerComponent } from '@/_modal';
+import { JwPaginationComponent } from 'jw-angular-pagination';
 import {
     LoginComponent,
     RegisterComponent,
@@ -38,10 +39,13 @@ import {
     ViewSTTSComponent,
     ViewSTTCComponent,
     STTLinkUserComponent,
-    STTFLinkSTTSComponent,
+    STTFLinkSTTComponent,
     STTSLinkSTTFComponent,
     STTCLinkSTTSComponent,
-    BatchComponent
+    BatchComponent,
+    CuCredentialComponent,
+    CredentialListComponent,
+    ManageUserComponent
 } from '@/_component/index';
 import { ToastrModule } from 'ngx-toastr';
 
@@ -85,13 +89,17 @@ import { ToastrModule } from 'ngx-toastr';
         ViewSTTFComponent,
         ViewSTTSComponent,
         ViewSTTCComponent,
-        STTFLinkSTTSComponent,
+        STTFLinkSTTComponent,
         STTLinkUserComponent,
         STTSLinkSTTFComponent,
         STTCLinkSTTSComponent,
         XmlConfigurationComponent,
         SearchFilterPipe,
-        SearchEngineComponent
+        SearchEngineComponent,
+        CuCredentialComponent,
+        CredentialListComponent,
+        ManageUserComponent,
+        JwPaginationComponent
     ],
     providers: [
         { 

@@ -6,8 +6,9 @@ export * from './auth/reset-pass/reset-pass.component';
 export * from './pagenotfound/pagenotfound.component';
 export * from './batch-action/batch-action.component'
 // setting
-export * from './setting-layout/setting-layout.component';
 export * from './profile/profile.component';
+export * from './manage-user/manage-user.component';
+export * from './setting-layout/setting-layout.component';
 export * from './xml-configuration/xml-configuration.component';
 export * from './search-engine/search-engine.component';
 // lookup
@@ -35,6 +36,9 @@ export * from './stt-setting/sttc-list/sttc-list.component';
 export * from './del-box/del-box.component';
 // link stt*
 export * from './stt-setting/stt-link-user/stt-link-user.component';
-export * from './stt-setting/sttf-link-stts/sttf-link-stts.component';
+export * from './stt-setting/sttf-link-stt/sttf-link-stt.component';
 export * from './stt-setting/stts-link-sttf/stts-link-sttf.component';
 export * from './stt-setting/sttc-link-stts/sttc-link-stts.component';
+// credentail
+export * from './credential/cu-credential/cu-credential.component';
+export * from './credential/credential-list/credential-list.component';

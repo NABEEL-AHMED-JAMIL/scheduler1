@@ -86,7 +86,11 @@ export class ProfileComponent implements OnInit {
         this.getTimeZoneByLookupType();
     }
 
-    public getTimeZoneByLookupType() {
+    public manageUser(): void {
+        this.router.navigate(['/profile/manageUser']);
+    }
+
+    public getTimeZoneByLookupType(): void {
         this.spinnerService.show();
         let payload = {
             lookupType: this.SCHEDULER_TIMEZONE,
@@ -110,7 +114,7 @@ export class ProfileComponent implements OnInit {
         });
     }
 
-    public getAppUserProfile() {
+    public getAppUserProfile(): void {
         this.spinnerService.show();
         this.appUserService.getAppUserProfile(this.currentActiveProfile.username)
         .pipe(first())
@@ -147,7 +151,7 @@ export class ProfileComponent implements OnInit {
         });
     }
 
-    public updateAppUserProfile() {
+    public updateAppUserProfile(): void {
         this.spinnerService.show();
         this.submitted = true;
         // stop here if form is invalid
@@ -175,10 +179,9 @@ export class ProfileComponent implements OnInit {
             this.spinnerService.hide();
             this.alertService.showError(error.message, ApiCode.ERROR);
         });
-
     }
 
-    public updateAppUserPassword() {
+    public updateAppUserPassword(): void {
         this.spinnerService.show();
         // stop here if form is invalid
         if (this.updatePassForm.invalid) {
@@ -204,10 +207,7 @@ export class ProfileComponent implements OnInit {
         });
     }
 
-    public updateAppUserTimeZone() {
-    }
-
-    public closeAppUserAccount() {
+    public closeAppUserAccount(): void {
 		this.spinnerService.show();
 		this.appUserService.closeAppUserAccount(this.appUserResponse)
 		.pipe(first())
@@ -227,7 +227,7 @@ export class ProfileComponent implements OnInit {
 		});
     }
 
-    public logoutAppUser() {
+    public logoutAppUser(): void {
         this.authenticationService.logout()
         .pipe(first())
         .subscribe((data: any) => {
@@ -253,11 +253,11 @@ export class ProfileComponent implements OnInit {
         return this.updatePassForm.controls;
     }
 
-    public hasAccess(roleList: any) {
+    public hasAccess(roleList: any): void {
         return this.currentActiveProfile.roles.some(r=> roleList.includes(r));
     }
 
-    public confirmedValidator(controlName: string, matchingControlName: string) {
+    public confirmedValidator(controlName: string, matchingControlName: string){
         return (formGroup: FormGroup) => {
           const control = formGroup.controls[controlName];
           const matchingControl = formGroup.controls[matchingControlName];

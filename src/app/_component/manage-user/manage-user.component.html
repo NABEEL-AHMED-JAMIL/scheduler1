@@ -1,0 +1,161 @@
+<style>
+    .card {
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, .1), 0 1px 2px 0 rgba(0, 0, 0, .06);
+    }
+
+    .card {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        word-wrap: break-word;
+        background-color: #fff;
+        background-clip: border-box;
+        border: 0 solid rgba(0, 0, 0, .125);
+        border-radius: .25rem;
+    }
+
+    .card-body {
+        flex: 1 1 auto;
+        min-height: 1px;
+        padding: 1rem;
+    }
+
+    .card-title {
+        margin-bottom: 0.75rem;
+    }
+
+    .gutters-sm {
+        margin-right: -8px;
+        margin-left: -8px;
+    }
+
+    .gutters-sm>.col,
+    .gutters-sm>[class*=col-] {
+        padding-right: 8px;
+        padding-left: 8px;
+    }
+
+    .mb-3 {
+        margin-bottom: 1rem !important;
+    }
+
+    .rounded-circle {
+        border-radius: 50%!important;
+    }
+    .mt-3 {
+        margin-top: 1rem!important;
+    }
+    .text-secondary {
+        color: #6c757d!important;
+    }
+    p {
+        margin-top: 0;
+        margin-bottom: 1rem;
+    }
+
+    table {
+        table-layout: fixed;
+    }
+    
+    .scrollable {
+        overflow: scroll; overflow-y:hidden;
+    } 
+</style>
+<div class="row gutters-sm">
+    <div class="col-lg-12">
+        <div class="card mb-3">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-lg-8">
+                        <h5 class="card-title" style="font-size: large;">{{title}}</h5>
+                    </div>
+                    <div class="col-lg-4" style="text-align: end;margin-top: 5px;">
+                    </div>
+                    <div class="col-lg-12">
+                        <hr style="margin-top: 5px;margin-bottom: 5px;">
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="form-group">
+                            <label for="appUserLength" *ngIf="appUserList">
+                                Total Users ({{appUserList.length}})
+                            </label>
+                            <input type="text" id="searchUser" style="width: 50%;"
+                                class="form-control input-sm" [(ngModel)]="searchUser"
+                                placeholder="Search by any key" />
+                        </div>
+                    </div>
+                    <div class="col-lg-6" style="text-align: end;margin-top: 25px;">
+                        <!-- working -->
+                        <button *ngIf="refreshButton && refreshButton.active" 
+                            type="button" class="form-control input-sm"
+                            style="width: auto;display: inline;margin-right: 7px;" (click)="refreshAction()">
+                            <span class="glyphicon glyphicon-refresh"></span>
+                            {{refreshButton.title}}
+                        </button>
+                    </div>
+                </div>
+                <table id="source-task-type" class="table table-responsive table table-striped
+                    table-bordered table-sm" style="font-size: 12px;">
+                    <thead>
+                        <tr>
+                            <th style="width: 4%;">-</th>
+                            <th style="width: 4%;"># No</th>
+                            <th>FirstName</th>
+                            <th>LastName</th>
+                            <th>Email</th>
+                            <th>Username</th>
+                            <th>TimeZone</th>
+                            <th style="width: 8%;">Created Date</th>
+                            <th style="width: 4%;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr *ngFor="let appUser of appUserList | searchFilter: searchUser; let i = index">
+                            <td style="text-align: center;">
+                                <div class="Yf">
+                                    <div [ngClass]="{
+                                        'Yg_inactive' : appUser.status.lookupValue === 0,
+                                        'Yg_active' : appUser.status.lookupValue === 1,
+                                        'Yg_delete': appUser.status.lookupValue === 2
+                                    }"></div>
+                                </div>
+                            </td>
+                            <td>{{appUser.appUserId}}</td>
+                            <td>{{appUser.firstName}}</td>
+                            <td>{{appUser.lastName}}</td>
+                            <td>{{appUser.email}}</td>
+                            <td>{{appUser.username}}</td>
+                            <td style="text-align: center;">
+                                {{appUser.timeZone}}
+                            </td>
+                            <td style="text-align: center;">
+                                {{appUser.dateCreated | date:'dd-MM-yyyy'}}
+                            </td>
+                            <td style="text-align: center;">
+                                <div class="btn-group btn-group-xs" role="group" style="text-align: center">
+                                    <button type="button" class="btn btn-default"
+                                        data-toggle="modal" data-target="#deleteAction"
+                                        [disabled]="appUser.status.lookupValue === 0"
+                                        (click)="deleteAction(appUser)">
+                                        <span class="glyphicon glyphicon-trash"
+                                            style="color: #dc3545;"></span>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="deleteAction"
+    role="dialog" style="top: 85px;">
+    <del-box
+        [title]="title"
+        [subTitle]="subTitle"
+        (deleteEvent)="deleteActionTriger()">
+    </del-box>
+</div>

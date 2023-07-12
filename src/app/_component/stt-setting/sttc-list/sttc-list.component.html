@@ -1,7 +1,7 @@
 <div class="row">
     <div class="col-lg-6">
-        <label *ngIf="sttControls">
-            Total STTC ({{sttControls.length}})
+        <label *ngIf="sttControlList">
+            Total STTC ({{sttControlList.length}})
         </label>
         <input type="text" id="searchSttc"
             class="form-control input-sm" 
@@ -34,7 +34,8 @@
                 <span class="caret"></span></button>
             <ul class="dropdown-menu" style="left: -38px;">
                 <li *ngFor="let menu of dropdownButton.menus">
-                    <a (click)="menuAction(menu)">{{menu.title}}</a></li>
+                    <a (click)="menuAction(menu)">{{menu.title}}</a>
+                </li>
             </ul>
         </div>
     </div>
@@ -45,22 +46,19 @@
         <tr>
             <th>-</th>
             <th style="width: 4%;"># No</th>
-            <th>Order</th>
-            <th>Filed Type</th>
             <th>Control Name</th>
             <th>Filed Name</th>
+            <th>Filed Type</th>
+            <th>Order</th>
             <th>Required</th>
             <th>Default</th>
             <th>Created Date</th>
-            <th>Total STT</th>
-            <th>Total Form</th>
-            <th>Total Section</th>
-            <!-- <th>Status</th> -->
+            <th>Sections</th>
             <th style="width: 10%;">Action</th>
         </tr>
     </thead>
     <tbody>
-        <tr *ngFor="let sttControl of sttControls | searchFilter: searchSttc; let i = index">
+        <tr *ngFor="let sttControl of pageOfSttControls | searchFilter: searchSttc; let i = index">
             <td style="text-align: center;">
                 <div class="Yf">
                     <div [ngClass]="{
@@ -73,17 +71,17 @@
             <td>
                 {{sttControl.sttcId}}
             </td>
+            <td>
+                {{sttControl.sttcName}}
+            </td>
             <td style="text-align: center;">
-                {{sttControl.sttcOrder}}
+                {{sttControl.filedName}}
             </td>
             <td style="text-align: center;">
                 {{sttControl.filedType?.description | uppercase}}
             </td>
             <td style="text-align: center;">
-                {{sttControl.sttcName}}
-            </td>
-            <td style="text-align: center;">
-                {{sttControl.filedName}}
+                {{sttControl.sttcOrder}}
             </td>
             <td style="text-align: center;">
                 {{sttControl.mandatory?.description}}
@@ -93,12 +91,6 @@
             </td>
             <td style="text-align: center;">
                 {{sttControl.dateCreated | date:'dd-MM-yyyy'}}
-            </td>
-            <td style="text-align: center;">
-                {{sttControl.totalStt}}
-            </td>
-            <td style="text-align: center;">
-                {{sttControl.totalForm}}
             </td>
             <td style="text-align: center;">
                 {{sttControl.totalSection}}
@@ -113,7 +105,7 @@
                     <!-- add the method for delete the queue detail -->
                     <button type="button" class="btn btn-default"
                         data-toggle="modal" data-target="#deleteAction"
-                        [disabled]="sttControl.status.lookupValue === 2"
+                        [disabled]="sttControl.status.lookupValue === 0"
                         (click)="deleteAction(sttControl)">
                          <span class="glyphicon glyphicon-trash"
                          style="color: #dc3545;"></span>
@@ -122,8 +114,9 @@
                     <button type="button"
                         class="btn btn-default dropdown-toggle" 
                         data-toggle="dropdown"
-                        [disabled]="sttControl.status.lookupValue === 2">
-                        <span class="glyphicon glyphicon-cog" style="color: black;"></span>
+                        [disabled]="sttControl.status.lookupValue === 0">
+                        <span class="glyphicon glyphicon-hand-right"
+                            style="color:#a94442"></span>
                     </button>
                     <ul class="dropdown-menu" style="left: -100px;">
                         <li *ngFor="let menu of actionMenu">
@@ -137,6 +130,14 @@
             </td>
         </tr>
     </tbody>
+    <tfoot>
+        <tr>
+            <td colspan="12" style="text-align: center;padding-bottom: 0px;">
+                <jw-pagination [items]="sttControlList" [pageSize]="25" 
+                    (changePage)="onChangePage($event)"></jw-pagination>
+            </td>
+        </tr>
+    </tfoot>
 </table>
 <div class="modal fade" id="deleteAction"
     role="dialog" style="top: 85px;">

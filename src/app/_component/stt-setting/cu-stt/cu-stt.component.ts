@@ -1,7 +1,8 @@
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { first } from 'rxjs/operators';
-import { AuthenticationService, AlertService, LookupService, STTService } from '@/_services';
+import { AuthenticationService, AlertService,
+    LookupService, STTService, CredentailService } from '@/_services';
 import { Location } from '@angular/common';
 import { SpinnerService } from '@/_helpers';
 import { ApiCode, Action, AuthResponse, LOOKUP_TYPES } from '@/_models/index';
@@ -23,8 +24,6 @@ export class CUSTTComponent implements OnInit {
     public topHeader: any;
 
     public editSttId: any;
-    public hasKey: any = false;
-    public securityLkDetail: any;
     public selectedTaskType: any = '3';
     public topicName: any = '%s';
     public topicPattern: any = `topic=${this.topicName}&partitions=[*]`;
@@ -33,12 +32,15 @@ export class CUSTTComponent implements OnInit {
     public statusList: any;
     public httpMethodOption: any;
     public taskTypeOption: any;
+    public homePageOption: any;
     public defultOption: any;
+    public credentailOption: any;
 
     public ISDEFAULT: LOOKUP_TYPES;
     public APPLICATION_STATUS: LOOKUP_TYPES;
     public TASKTYPE_OPTION: LOOKUP_TYPES;
     public REQUEST_METHOD: LOOKUP_TYPES;
+    public HOME_PAGE: LOOKUP_TYPES;
 
     public sttForm: FormGroup;
     public currentActiveProfile: AuthResponse;
@@ -51,12 +53,14 @@ export class CUSTTComponent implements OnInit {
         private alertService: AlertService,
         private lookupService: LookupService,
         private spinnerService: SpinnerService,
+        private credentailService: CredentailService,
         private authenticationService: AuthenticationService) {
             this.currentActiveProfile = authenticationService.currentUserValue;
             this.ISDEFAULT = LOOKUP_TYPES.ISDEFAULT;
             this.REQUEST_METHOD = LOOKUP_TYPES.REQUEST_METHOD;
             this.TASKTYPE_OPTION = LOOKUP_TYPES.TASKTYPE_OPTION;
             this.APPLICATION_STATUS = LOOKUP_TYPES.APPLICATION_STATUS;
+            this.HOME_PAGE = LOOKUP_TYPES.HOME_PAGE;
             this.route.data.subscribe((data: any) => {
                 this.title = data.title;
                 this.action = data.action;
@@ -71,13 +75,18 @@ export class CUSTTComponent implements OnInit {
     }
 
     ngOnInit() {
+        this.fetchAllCredential();
         this.getTaskTypeByLookupType();
         this.getHttpMethodByLookupType();
+        this.getHomePageByLookupType();
         if (this.action === Action.ADD) {
             this.sttForm = this.formBuilder.group({
                 description: ['', [Validators.required]],
                 serviceName: ['', [Validators.required]],
-                taskType: [this.selectedTaskType, [Validators.required]]
+                taskType: [this.selectedTaskType, [Validators.required]],
+                homePage: [''],
+                serviceId: [''],
+                credentialId: ['']
             });
             this.addKafkaTaskType();
         } else if (this.action === Action.EDIT) {
@@ -125,7 +134,10 @@ export class CUSTTComponent implements OnInit {
                 description: [response.description, [Validators.required]],
                 status: [response.status.lookupValue, [Validators.required]],
                 taskType: [response.taskType.lookupValue, [Validators.required] ],
-                defaultStt: [response.defaultStt.lookupValue, [Validators.required]]
+                homePage: [response.homePage ? response.homePage.lookupType : ''],
+                serviceId: [response.serviceId],
+                defaultStt: [response.defaultStt.lookupValue, [Validators.required]],
+                credentialId: [response.credentialId ? response.credentialId : '']
             });
             // edit case no need to enable
             if (this.selectedTaskType === '3') {
@@ -133,6 +145,53 @@ export class CUSTTComponent implements OnInit {
                 return;
             }
             this.editApiTaskType(response?.apiTaskType);
+        }, (error: any) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error.message, ApiCode.ERROR);
+        });
+    }
+
+    public getHomePageByLookupType(): any {
+        this.spinnerService.show();
+        let payload = {
+            lookupType: this.HOME_PAGE,
+            accessUserDetail: {
+                appUserId: this.currentActiveProfile.appUserId,
+                username: this.currentActiveProfile.username
+           }
+        }
+        this.lookupService.fetchLookupByLookupType(payload)
+        .pipe(first())
+        .subscribe((response: any) => {
+            this.spinnerService.hide();
+            if (response.status === ApiCode.ERROR) {
+                this.alertService.showError(response.message, ApiCode.ERROR);
+                return;
+            }
+            this.homePageOption = response.data;
+        }, (error: any) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error.message, ApiCode.ERROR);
+        });
+    }
+
+    public fetchAllCredential(): any {
+        this.spinnerService.show();
+        let payload = {
+            accessUserDetail: {
+                appUserId: this.currentActiveProfile.appUserId,
+                username: this.currentActiveProfile.username
+           }
+        }
+        this.credentailService.fetchAllCredential(payload)
+        .pipe(first())
+        .subscribe((response: any) => {
+            this.spinnerService.hide();
+            if (response.status === ApiCode.ERROR) {
+                this.alertService.showError(response.message, ApiCode.ERROR);
+                return;
+            }
+            this.credentailOption = response.data;
         }, (error: any) => {
             this.spinnerService.hide();
             this.alertService.showError(error.message, ApiCode.ERROR);
@@ -263,33 +322,6 @@ export class CUSTTComponent implements OnInit {
     public changeOnTopicNameValue(value: any): void {
         this.topicName = value;
         this.topicPattern = `topic=${this.topicName}&partitions=[*]`;
-     }
-
-    public onChangeSecurityLkValue(value: any): void {
-        this.hasKey = false;
-        this.spinnerService.show();
-        let payload = {
-            lookupType: value,
-            validate: true, // auth process required so we send true
-            accessUserDetail: {
-                appUserId: this.currentActiveProfile.appUserId,
-                username: this.currentActiveProfile.username
-           }
-        }
-        this.lookupService.fetchLookupByLookupType(payload)
-        .pipe(first())
-        .subscribe((response: any) => {
-            this.spinnerService.hide();
-            if (response.status === ApiCode.ERROR) {
-                this.alertService.showError('No lookup found', ApiCode.ERROR);
-                return;
-            }
-            this.hasKey = true;
-            this.securityLkDetail = response.data
-        }, (error: any) => {
-            this.spinnerService.hide();
-            this.alertService.showError(error.message, ApiCode.ERROR);
-        });
     }
 
     public addKafkaTaskType(): void {
@@ -318,9 +350,7 @@ export class CUSTTComponent implements OnInit {
             this.formBuilder.group({
                 apiUrl: ['', [Validators.required, 
                     Validators.pattern('(https?://)?([\\da-z.-]+)\\.([a-z.]{2,6})[/\\w .-]*/?')]],
-                httpMethod: ['2', [Validators.required]],
-                apiSecurityLkValue: [],
-                apiSecurityLkDetail: []
+                httpMethod: ['2', [Validators.required]]
             }
         ));
     }
@@ -330,14 +360,9 @@ export class CUSTTComponent implements OnInit {
             this.formBuilder.group({
                 apiUrl: [payload.apiUrl, [Validators.required, 
                     Validators.pattern('(https?://)?([\\da-z.-]+)\\.([a-z.]{2,6})[/\\w .-]*/?')]],
-                httpMethod: [payload.httpMethod.lookupValue, [Validators.required]],
-                apiSecurityLkValue: [payload.apiSecurityLkValue],
-                apiSecurityLkDetail: []
+                httpMethod: [payload.httpMethod.lookupValue, [Validators.required]]
             }
         ));
-        if (payload.apiSecurityLkValue) {
-            this.onChangeSecurityLkValue(payload.apiSecurityLkValue);
-        }
     }
 
     public onSubmit(): any {

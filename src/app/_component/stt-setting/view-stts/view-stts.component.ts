@@ -67,13 +67,13 @@ export class ViewSTTSComponent implements OnInit {
             this.sttsForm = this.formBuilder.group({
                 sttsId: [
                     {
-                        value: response.sttSId,
+                        value: response.sttsId,
                         disabled: true
                     }
                 ],
                 sttsName: [
                     {
-                        value: response.sttSName,
+                        value: response.sttsName,
                         disabled: true
                     },
                     [Validators.required]
@@ -87,7 +87,7 @@ export class ViewSTTSComponent implements OnInit {
                 ],
                 sttsOrder: [
                     {
-                        value: response.sttSOrder,
+                        value: response.sttsOrder,
                         disabled: true
                     },
                     [Validators.required]

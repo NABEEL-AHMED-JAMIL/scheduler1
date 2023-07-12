@@ -45,7 +45,7 @@ export class SearchEngineComponent implements OnInit {
         this.jsonPayload = null;
         this.settingService.dynamicQueryResponse(this.tableQueryForm.value)
             .pipe(first())
-            .subscribe((response) => {
+            .subscribe((response: any) => {
                 if(response.status === ApiCode.SUCCESS) {
                     this.jsonPayload = response.data;
                     this.spinnerService.hide();
@@ -53,7 +53,7 @@ export class SearchEngineComponent implements OnInit {
                     this.spinnerService.hide();
                     this.alertService.showError(response.message, 'Error');
                 }
-            }, (error) => {
+            }, (error: any) => {
                 this.spinnerService.hide();
                 this.alertService.showError(error, 'Error');
             });

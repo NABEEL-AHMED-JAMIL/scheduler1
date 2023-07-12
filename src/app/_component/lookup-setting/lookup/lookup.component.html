@@ -128,7 +128,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr *ngFor="let lookupData of lookupDatas | searchFilter: searchLookup; let i = index">
+                        <tr *ngFor="let lookupData of pageOfLookupData | searchFilter: searchLookup; let i = index">
                             <td>{{lookupData.lookupId}}</td>
                             <td>{{lookupData.lookupType}}</td>
                             <td>{{lookupData.lookupValue}}</td>
@@ -154,6 +154,14 @@
                             </td>
                         </tr>
                     </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="6" style="text-align: center;padding-bottom: 0px;">
+                                <jw-pagination [items]="lookupDatas" [pageSize]="20" 
+                                    (changePage)="onChangePage($event)"></jw-pagination>
+                            </td>
+                          </tr>
+                    </tfoot>
                 </table>
             </div>
         </div>

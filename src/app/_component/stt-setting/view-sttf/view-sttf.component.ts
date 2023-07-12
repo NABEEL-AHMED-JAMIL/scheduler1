@@ -96,14 +96,14 @@ export class ViewSTTFComponent implements OnInit {
             this.sttfForm = this.formBuilder.group({
                 sttfId: [
                     {
-                        value: response.sttFId,
+                        value: response.sttfId,
                         disabled: true
                     },
                     [Validators.required]
                 ],
                 sttfName: [
                     {
-                        value: response.sttFName,
+                        value: response.sttfName,
                         disabled: true
                     },
                     [Validators.required]

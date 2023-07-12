@@ -174,12 +174,8 @@ export interface SearchText {
 };
 
 export enum Action { 
-  NON,
-  VIEW,
-  EDIT,
-  ADD,
-  CLEAR,
-  STT
+  NON, VIEW, EDIT,
+  ADD, CLEAR, STT
 };
 
 
@@ -203,6 +199,15 @@ export interface RoleResponse {
   dateCreated?: any;
 }
 
+export interface Credential {
+  credentialId?: any;
+  credentialName?: any;
+  credentialType?: any;
+  status?: any;
+  dateCreated?: any;
+  credentialContent?: any;
+}
+
 export enum LOOKUP_TYPES {
   QUEUE_FETCH_LIMIT = 'QUEUE_FETCH_LIMIT',
   SCHEDULER_LAST_RUN_TIME = 'SCHEDULER_LAST_RUN_TIME',
@@ -217,6 +222,8 @@ export enum LOOKUP_TYPES {
   ISDEFAULT = 'ISDEFAULT',
   FORM_CONTROL_TYPE = 'FORM_CONTROL_TYPE',
   FORM_TYPE = 'FORM_TYPE',
+  HOME_PAGE = 'HOME_PAGE',
+  CREDENTIAL_TYPE = 'CREDENTIAL_TYPE'
 }
 
 export interface STTSidebar {
@@ -232,6 +239,9 @@ export interface STTList {
   serviceName: any;
   description: any;
   dateCreated: any;
+  homePage?: any;
+  serviceId: any;
+  credential: any;
   status: any;
   taskType: any;
   totalTask: any;
@@ -291,9 +301,15 @@ export interface STTLinkUserList {
 }
 
 export interface AppUserList {
-  appUserId: any;
-  email: any;
-  username: any;
+  appUserId?: any;
+  email?: any;
+  username?: any;
+  dateCreated?: any;
+  firstName?: any;
+  lastName?: any;
+  roleResponse?: any;
+  status?: any;
+  timeZone?: any;
 }
 
 export interface STTLinkSTTFList {

@@ -18,7 +18,8 @@ export class STTCListComponent implements OnInit {
 
     public searchSttc: any = '';
     public sttControl: STTControlList;
-    public sttControls: STTControlList[] = [];
+    public sttControlList: STTControlList[] = [];
+    public pageOfSttControls: Array<STTControlList>;
 
     public addButton: any;
     public refreshButton: any;
@@ -76,7 +77,7 @@ export class STTCListComponent implements OnInit {
                     this.alertService.showError(response.message, ApiCode.ERROR);
                     return;
                 }
-                this.sttControls = response.data;
+                this.sttControlList = response.data;
             }, (error: any) => {
                 this.spinnerService.hide();
                 this.alertService.showError(error.message, ApiCode.ERROR);
@@ -90,7 +91,7 @@ export class STTCListComponent implements OnInit {
                     [menu.router],
                     { 
                         queryParams: {
-                            sttcId: payload.sttCId
+                            sttcId: payload.sttcId
                         }
                     });
             } else {
@@ -190,6 +191,11 @@ export class STTCListComponent implements OnInit {
             this.spinnerService.hide();
             this.alertService.showError(error, ApiCode.ERROR);
         });
+    }
+
+    public onChangePage(pageOfStts: Array<any>) {
+        // update current page of items
+        this.pageOfSttControls = pageOfStts;
     }
 
 }

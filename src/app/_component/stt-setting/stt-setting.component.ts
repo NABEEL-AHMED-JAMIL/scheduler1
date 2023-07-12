@@ -23,8 +23,8 @@ export class SttSettingComponent implements OnInit {
         private alertService: AlertService,
         private spinnerService: SpinnerService,
         private authenticationService: AuthenticationService) {
-        this.STT_SIDEBAR = LOOKUP_TYPES.STT_SIDEBAR;
         this.currentActiveProfile = authenticationService.currentUserValue;
+        this.STT_SIDEBAR = LOOKUP_TYPES.STT_SIDEBAR
         this.getSttSidebarByLookupType();
         this.route.data.subscribe((data: any) => {
             this.selectedMenu = data.selectedMenu;
@@ -55,6 +55,14 @@ export class SttSettingComponent implements OnInit {
             let parentLookupData = response.data?.parentLookupData;
             let lookupValue = parentLookupData?.lookupValue;
             this.sttSidebar = JSON.parse(lookupValue);
+            this.sttSidebar.map((sttSide: any) => {
+                if (this.currentActiveProfile.roles[0] === 'ROLE_USER') {
+                    sttSide.disable = true;
+                }
+                return sttSide;
+            });
+            console.log(this.sttSidebar);
+            // check the type and map it wit with as
         }, (error: any) => {
             this.spinnerService.hide();
             this.alertService.showError(error.message, ApiCode.ERROR);

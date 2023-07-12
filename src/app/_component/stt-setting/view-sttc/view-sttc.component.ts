@@ -96,7 +96,7 @@ export class ViewSTTCComponent implements OnInit {
             this.sttcForm = this.formBuilder.group({
                 sttCId: [
                     {
-                        value: response.sttCId,
+                        value: response.sttcId,
                         disabled: true
                     },
                     [Validators.required]
@@ -108,9 +108,9 @@ export class ViewSTTCComponent implements OnInit {
                     },
                     [Validators.required]
                 ],
-                sttCName: [
+                sttcName: [
                     {
-                        value: response.sttCName,
+                        value: response.sttcName,
                         disabled: true
                     },
                     [Validators.required]

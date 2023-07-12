@@ -23,9 +23,12 @@ import {
     STTSListComponent,
     STTCListComponent,
     STTLinkUserComponent,
-    STTFLinkSTTSComponent,
+    STTFLinkSTTComponent,
     STTSLinkSTTFComponent,
     STTCLinkSTTSComponent,
+    CuCredentialComponent,
+    CredentialListComponent,
+    ManageUserComponent
 } from '@/_component/index';
 import { Action } from '@/_models';
 import { AuthGuard } from '@/_helpers';
@@ -58,6 +61,7 @@ const routes: Routes = [
         component: SettingLayoutComponent,
         canActivate: [AuthGuard],
         data:  {
+            breadcrumb: 'Profile',
             role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN', 'ROLE_USER' ]
         },
         children: [
@@ -66,8 +70,24 @@ const routes: Routes = [
                 component: ProfileComponent,
                 canActivate: [AuthGuard],
                 data:  {
-                    breadcrumb: 'Profile',
+                    breadcrumb: '',
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN', 'ROLE_USER' ]
+                }
+            },
+            { 
+                path: 'manageUser',
+                component: ManageUserComponent,
+                canActivate: [AuthGuard],
+                data:  {
+                    breadcrumb: 'ManageUser',
+                    topHeader: [
+                        {
+                            type: 'refresh',
+                            title: 'Refresh',
+                            active: true
+                        }
+                    ],
+                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
                 }
             }
         ]
@@ -258,7 +278,7 @@ const routes: Routes = [
                     breadcrumb: '',
                     action: [
                         {
-                            title: 'View Linked Users',
+                            title: 'Linked Users',
                             icon: 'glyphicon glyphicon-tasks',
                             router: '/stt/sttLinkUser',
                             active: true
@@ -383,11 +403,11 @@ const routes: Routes = [
                     breadcrumb: '',
                     action: [
                         {
-                            title: 'View Linked STTS',
+                            title: 'Linked STT',
                             icon: 'glyphicon glyphicon-tasks',
-                            router: '/sttf/sttfLinkStts',
+                            router: '/sttf/sttfLinkStt',
                             active: true
-                        }
+                        },
                     ],
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
                 }
@@ -417,11 +437,11 @@ const routes: Routes = [
                 }
             },
             {
-                path: 'sttfLinkStts',
-                component: STTFLinkSTTSComponent,
+                path: 'sttfLinkStt',
+                component: STTFLinkSTTComponent,
                 canActivate: [AuthGuard],
                 data:  {
-                    breadcrumb: 'STTF Link STTS',
+                    breadcrumb: 'STTF Link STT',
                     topHeader: [
                         {
                             type: 'refresh',
@@ -430,7 +450,7 @@ const routes: Routes = [
                         },
                         {
                             type: 'add',
-                            title: 'Link STTS',
+                            title: 'Link STT',
                             active: true
                         }
                     ],
@@ -508,7 +528,7 @@ const routes: Routes = [
                     breadcrumb: '',
                     action: [
                         {
-                            title: 'View Linked STTF',
+                            title: 'Linked STTF',
                             icon: 'glyphicon glyphicon-tasks',
                             router: '/stts/sttsLinkSttf',
                             active: true
@@ -555,7 +575,7 @@ const routes: Routes = [
                         },
                         {
                             type: 'add',
-                            title: 'Link STTS To STTF',
+                            title: 'Link STTF',
                             router: '/stt/addStt',
                             active: true
                         }
@@ -634,7 +654,7 @@ const routes: Routes = [
                     breadcrumb: '',
                     action: [
                         {
-                            title: 'View Linked STTS',
+                            title: 'Linked STTS',
                             icon: 'glyphicon glyphicon-tasks',
                             router: '/sttc/sttcLinkStts',
                             active: true
@@ -681,7 +701,7 @@ const routes: Routes = [
                         },
                         {
                             type: 'add',
-                            title: 'Link STTC To STTS',
+                            title: 'Link STTS',
                             router: '/stt/addStt',
                             active: true
                         }
@@ -697,6 +717,61 @@ const routes: Routes = [
                     action: 'SourceTaskTypeControl',
                     breadcrumb: 'Batch Sttc',
                     topHeader: [],
+                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                }
+            }
+        ]
+    },
+    {
+        path: 'credential',
+        component: SettingLayoutComponent,
+        canActivate: [AuthGuard],
+        data:  {
+            breadcrumb: 'Credential',
+            role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ],
+            topHeader: [
+                {
+                    type: 'refresh',
+                    title: 'Refresh',
+                    active: true
+                },
+                {
+                    type: 'add',
+                    title: 'Add Credential',
+                    router: '/credential/addCred',
+                    active: true
+                }
+            ]
+        },
+        children: [
+            {
+                path: '',
+                component: CredentialListComponent,
+                canActivate: [AuthGuard],
+                data:  {
+                    breadcrumb: '',
+                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                }
+            },
+			{
+                path: 'addCred',
+                component: CuCredentialComponent,
+                canActivate: [AuthGuard],
+                data:  {
+                    title: 'Add Credential',
+                    action: Action.ADD,
+                    breadcrumb: 'Add Credential',
+                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                }
+            },
+            {
+                path: 'editCred',
+                component: CuCredentialComponent,
+                canActivate: [AuthGuard],
+                data:  {
+                    title: 'Edit Credential',
+                    action: Action.EDIT,
+                    breadcrumb: 'Edit Credential',
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
                 }
             }

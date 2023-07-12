@@ -22,8 +22,9 @@ export class SubLookupComponent implements OnInit {
 	public lookupAction: Action;
 	public lookupData: LookupData;
 	public parentLookupDate: LookupData;
-	public lookupDatas: LookupData[] = [];
     public selectedLookup: LookupData;
+	public lookupDatas: LookupData[] = [];
+    public pageOfLookupData: Array<LookupData>;
 
 	public addButton: any;
     public refreshButton: any;
@@ -192,5 +193,10 @@ export class SubLookupComponent implements OnInit {
 			this.fetchSubLookupByParentId(this.lookupId);
 		}
 	}
+
+    public onChangePage(pageOfLookupData: Array<any>) {
+        // update current page of items
+        this.pageOfLookupData = pageOfLookupData;
+    }
     
 }
