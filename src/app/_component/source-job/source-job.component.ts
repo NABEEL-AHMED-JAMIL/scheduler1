@@ -1,11 +1,11 @@
 ﻿import { Component, OnInit, OnDestroy, ViewChild } from '@angular/core';
 import { Action, SourceJobDetail } from '@/_models/index';
 import { SpinnerService } from '@/_helpers';
-import { AlertService, SourceJobService } from '@/_services/index';  
+import { AlertService, SourceJobService, WebSocketAPI, WebSocketShareService } from '@/_services/index';  
 import { ApiCode } from '@/_models';
 import { Router } from '@angular/router';
-import { interval, Subscription } from 'rxjs';
 import { first } from 'rxjs/operators';
+
 
 @Component({
     selector: 'source-job',
@@ -22,56 +22,46 @@ export class SourceJobComponent implements OnInit, OnDestroy  {
     public SOURCE_JOB_DETAIL_FETCH = 'SourceJob Fetch';
     public DELETE_SOURCE_JOB = "SourceJob Delete";
     public JOB_IN_QUEUE  = "SourceJob In Queue";
-    public subscription !: Subscription;
     // search detail
     public searchSourceJobDetails: any = ''; 
     // source list
     public sourceJobDetails: SourceJobDetail[] = [];
-    public jobIds: any[];
     public deleteViewSourceJob: SourceJobDetail;
     public deleteSelectedIndex: any
+    
     
     constructor(
         private router: Router,
         private alertService: AlertService,
         private spinnerService: SpinnerService,
-        private sourceJobService: SourceJobService){
-	}
+        private sourceJobService: SourceJobService,
+        private webSocketAPI: WebSocketAPI,
+        private webSocketShareService: WebSocketShareService) {
+        this.webSocketAPI.connect();
+        this.webSocketShareService.getNewValue()
+            .subscribe({
+                next: (data) => {
+                    if (data) {
+                        var jsonPayload = JSON.parse(data);
+                        this.sourceJobDetails = this.sourceJobDetails
+                            .map(sourceJobDetail => {
+                                if (jsonPayload?.jobId === sourceJobDetail?.jobId) {
+                                    sourceJobDetail.jobRunningStatus = jsonPayload?.jobRunningStatus;
+                                    sourceJobDetail.jobStatus = jsonPayload?.jobStatus;
+                                    sourceJobDetail.lastJobRun = jsonPayload?.lastJobRun;
+                                    if (jsonPayload.execution == 'Auto') {
+                                        sourceJobDetail.scheduler.recurrenceTime = jsonPayload?.recurrenceTime;
+                                    }
+                                }
+                                return sourceJobDetail;
+                            });
+                    }
+                }
+            });
+    }
 
     ngOnInit() {
         this.listSourceJob();
-        this.subscription = interval(30000).subscribe((x => {
-            this.sourceJobService.fetchRunningJobEvent(
-                {
-                    'jobIds': this.jobIds
-                }
-            ).pipe(first())
-            .subscribe((response) => {
-                if(response.status === ApiCode.SUCCESS) {
-                    let responseSourceJobDetails = response.data;
-                    this.sourceJobDetails = this.sourceJobDetails
-                    .map(sourceJobDetail => {
-                        let findJobDetail = responseSourceJobDetails
-                        .find(responseSourceJobDetail => responseSourceJobDetail?.jobId === sourceJobDetail?.jobId);
-                        if (findJobDetail) {
-                            sourceJobDetail.jobRunningStatus = findJobDetail?.jobRunningStatus;
-                            sourceJobDetail.jobStatus = findJobDetail?.jobStatus;
-                            sourceJobDetail.lastJobRun = findJobDetail?.lastJobRun;
-                            if (findJobDetail.execution == 'Auto') {
-                                sourceJobDetail.scheduler.recurrenceTime = findJobDetail?.recurrenceTime;                                
-                            }
-                        }
-                        return sourceJobDetail;
-                    });
-                    return
-                }
-                this.spinnerService.hide();
-                this.alertService.showError(response.message, this.ERROR);
-            }, (error) => {
-                this.spinnerService.hide();
-                this.alertService.showError(error, this.ERROR);
-            });
-        }));
     }
 
     public refreshSourceJobs(): void {
@@ -100,7 +90,6 @@ export class SourceJobComponent implements OnInit, OnDestroy  {
         .subscribe((response) => {
             this.spinnerService.hide();
             if(response.status === ApiCode.SUCCESS) {
-                this.listSourceJob();
                 this.alertService.showSuccess(response.message, this.SUCESS);
                 return;
             }
@@ -118,7 +107,6 @@ export class SourceJobComponent implements OnInit, OnDestroy  {
         .subscribe((response) => {
             this.spinnerService.hide();
             if(response.status === ApiCode.SUCCESS) {
-                this.listSourceJob();
                 this.alertService.showSuccess(response.message, this.SUCESS);
                 return;
             }
@@ -136,9 +124,6 @@ export class SourceJobComponent implements OnInit, OnDestroy  {
         .subscribe((response) => {
             if(response.status === ApiCode.SUCCESS) {
                 this.sourceJobDetails = response.data;
-                this.jobIds = this.sourceJobDetails
-                //.filter(sourceJobDetail => sourceJobDetail.jobStatus !== 'Delete')
-                .map(sourceJobDetail => sourceJobDetail.jobId);
                 this.spinnerService.hide();
                 return;
             }
@@ -182,8 +167,8 @@ export class SourceJobComponent implements OnInit, OnDestroy  {
         });
     }
 
-    public ngOnDestroy() {
-        this.subscription.unsubscribe();
+    public ngOnDestroy(): void {
+        this.webSocketAPI.disconnect();
     }
 
 }
