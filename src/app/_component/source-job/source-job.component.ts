@@ -65,7 +65,8 @@ export class SourceJobComponent implements OnInit, OnDestroy  {
     }
 
     public refreshSourceJobs(): void {
-      this.listSourceJob();
+        this.webSocketAPI.connect();
+        this.listSourceJob();
     }
 
     public batchAction(): void {

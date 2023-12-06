@@ -11,7 +11,7 @@
             <form *ngIf="tableQueryForm" [formGroup]="tableQueryForm"
                 (ngSubmit)="dynamicQueryResponse()">
                 <div class="col-lg-12 form-group">
-                    <textarea class="form-control input-sm" rows="5" style="height: auto;"
+                    <textarea class="form-control input-sm" rows="15" style="height: auto;"
                         formControlName="query"
                         placeholder="Enter Select Query For Result" required></textarea>
                     <br>

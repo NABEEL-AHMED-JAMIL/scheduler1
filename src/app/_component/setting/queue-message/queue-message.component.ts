@@ -20,7 +20,7 @@ export class QueueMessageComponent implements OnInit {
     public searchQMessageForm: any = '';
     public qMessageSearcForm: FormGroup;
     public sourceJobRunningStatistics: EChartOption;
-    public jobStatusList: any = ['Queue', 'Running', 'Failed', 'Completed', 'Skip'];
+    public jobStatusList: any = ['Queue', 'Running', 'Failed', 'Completed', 'Skip', 'Interrupt'];
     public jobRunningData: NameValue[] = [
       {
         value: 0,
@@ -41,6 +41,10 @@ export class QueueMessageComponent implements OnInit {
       {
         value: 0,
         name: 'Skip'
+      },
+      {
+        value: 0,
+        name: 'Interrupt'
       }
     ];
   public queueDatas: QMessage[] = [];
@@ -118,6 +122,24 @@ export class QueueMessageComponent implements OnInit {
     public deleteQMessage(queueData: any, index: any) {
       this.spinnerService.show();
       this.settingService.failJobLogs(queueData?.jobQueueId)
+      .pipe(first())
+      .subscribe((response) => {
+        if(response.status === ApiCode.SUCCESS) {
+          this.submitQMessageFilter();
+          this.spinnerService.hide();
+        } else {
+          this.spinnerService.hide();
+          this.alertService.showError(response.message, this.ERROR);
+        }
+      }, (error) => {
+        this.spinnerService.hide();
+        this.alertService.showError(error, this.ERROR);
+      });
+    }
+
+    public interruptQMessage(queueData: any, index: any) {
+      this.spinnerService.show();
+      this.settingService.interruptJobLogs(queueData?.jobQueueId)
       .pipe(first())
       .subscribe((response) => {
         if(response.status === ApiCode.SUCCESS) {

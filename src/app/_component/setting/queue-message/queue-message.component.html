@@ -92,7 +92,7 @@
                 <th>QSend</th>
                 <th>Job Status</th>
                 <th>JobStatus Message</th>
-                <th style="width: 1px;">Action</th>
+                <th>Action</th>
             </tr>
         </thead>
         <tbody style="text-align: center;">
@@ -138,7 +138,7 @@
                             'badge-warning' : queueData.jobStatus === 'Running',
                             'badge-danger' :  queueData.jobStatus === 'Failed',
                             'badge-success' : queueData.jobStatus === 'Completed',
-                            'badge-pcomplate' : queueData.jobStatus === 'PartialComplete'
+                            'badge-interrupt' : queueData.jobStatus === 'Interrupt'
                         }">
                         {{ queueData.jobStatus }}
                     </span>
@@ -149,6 +149,10 @@
                         <button type="button" class="btn btn-default" [disabled]="queueData.jobStatus !== 'Queue'"
                             (click)="deleteQMessage(queueData, i)">
                             <span class="glyphicon glyphicon-trash" style="color: black;"></span>
+                        </button>
+                        <button type="button" class="btn btn-default" [disabled]="queueData.jobStatus !== 'Running'"
+                            (click)="interruptQMessage(queueData, i)">
+                             <span class="glyphicon glyphicon-trash" style="color: black;"></span>
                         </button>
                     </div>
                 </td>

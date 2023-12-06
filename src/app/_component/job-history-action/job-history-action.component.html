@@ -43,7 +43,8 @@
                                         'badge-info' : sourceJob.jobRunningStatus === 'Queue',
                                         'badge-warning' : sourceJob.jobRunningStatus === 'Running',
                                         'badge-danger' :  sourceJob.jobRunningStatus === 'Failed',
-                                        'badge-success' : sourceJob.jobRunningStatus === 'Completed'
+                                        'badge-success' : sourceJob.jobRunningStatus === 'Completed',
+                                        'badge-interrupt' : sourceJob.jobRunningStatus === 'Interrupt'
                                     }">
                                     {{ sourceJob.jobRunningStatus }}
                                 </span>
@@ -65,6 +66,7 @@
                                     <th>Failed</th>
                                     <th>Completed</th>
                                     <th>Skip</th>
+                                    <th>Interrupt</th>
                                     <th>Total</th>
                                 </tr>
                             </thead>
@@ -75,6 +77,7 @@
                                     <th>{{sourceJobStatistics.failed}}</th>
                                     <th>{{sourceJobStatistics.completed}}</th>
                                     <th>{{sourceJobStatistics.skip}}</th>
+                                    <th>{{sourceJobStatistics.interrupt}}</th>
                                     <th>{{sourceJobStatistics.total}}</th>
                                 </tr>
                             </tbody>

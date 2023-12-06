@@ -58,6 +58,7 @@
                             <th>Failed</th>
                             <th>Completed</th>
                             <th>Skip</th>
+                            <th>Interrupt</th>
                             <th>Total</th>
                         </tr>
                     </thead>
@@ -84,6 +85,10 @@
                             <td style="text-align: center;"
                                 (click)="sourceJobCountAction(sourceJob, 'Skip')">
                                 {{sourceJob.skip}}
+                            </td>
+                            <td style="text-align: center;"
+                                (click)="sourceJobCountAction(sourceJob, 'Interrupt')">
+                                {{sourceJob.interrupt}}
                             </td>
                             <td style="text-align: center;"
                                 (click)="sourceJobCountAction(sourceJob, 'Total')">
