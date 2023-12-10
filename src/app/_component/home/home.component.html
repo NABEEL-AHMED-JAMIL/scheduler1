@@ -54,6 +54,7 @@
                             <th>Job Id</th>
                             <th>Job Name</th>
                             <th>Queue</th>
+                            <th>Start</th>
                             <th>Running</th>
                             <th>Failed</th>
                             <th>Completed</th>
@@ -69,6 +70,10 @@
                             <td style="text-align: center;"
                                 (click)="sourceJobCountAction(sourceJob, 'Queue')">
                                 {{sourceJob.queue}}
+                            </td>
+                            <td style="text-align: center;" 
+                                (click)="sourceJobCountAction(sourceJob, 'Start')">
+                                {{sourceJob.running}}
                             </td>
                             <td style="text-align: center;"
                                 (click)="sourceJobCountAction(sourceJob, 'Running')">

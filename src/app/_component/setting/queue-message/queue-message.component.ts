@@ -20,11 +20,15 @@ export class QueueMessageComponent implements OnInit {
     public searchQMessageForm: any = '';
     public qMessageSearcForm: FormGroup;
     public sourceJobRunningStatistics: EChartOption;
-    public jobStatusList: any = ['Queue', 'Running', 'Failed', 'Completed', 'Skip', 'Interrupt'];
+    public jobStatusList: any = ['Queue', 'Start', 'Running', 'Failed', 'Completed', 'Skip', 'Interrupt'];
     public jobRunningData: NameValue[] = [
       {
         value: 0,
         name: 'Queue'
+      },
+      {
+        value: 0,
+        name: 'Start'
       },
       {
         value: 0,

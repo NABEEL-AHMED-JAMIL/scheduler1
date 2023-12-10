@@ -91,7 +91,7 @@ export class SourceJobComponent implements OnInit, OnDestroy  {
         .subscribe((response) => {
             this.spinnerService.hide();
             if(response.status === ApiCode.SUCCESS) {
-                this.alertService.showSuccess(response.message, this.SUCESS);
+                //this.alertService.showSuccess(response.message, this.SUCESS);
                 return;
             }
             this.alertService.showError(response.message, this.ERROR);
@@ -108,6 +108,7 @@ export class SourceJobComponent implements OnInit, OnDestroy  {
         .subscribe((response) => {
             this.spinnerService.hide();
             if(response.status === ApiCode.SUCCESS) {
+                this.listSourceJob();
                 this.alertService.showSuccess(response.message, this.SUCESS);
                 return;
             }

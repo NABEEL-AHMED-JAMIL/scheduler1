@@ -79,9 +79,11 @@
                         [ngClass]="{
                             'badge-primary' : sourceJob.jobRunningStatus === 'InFlight', 
                             'badge-info' : sourceJob.jobRunningStatus === 'Queue',
+                            'badge-start' : sourceJob.jobRunningStatus === 'Start',
                             'badge-warning' : sourceJob.jobRunningStatus === 'Running',
                             'badge-danger' :  sourceJob.jobRunningStatus === 'Failed',
-                            'badge-success' : sourceJob.jobRunningStatus === 'Completed'
+                            'badge-success' : sourceJob.jobRunningStatus === 'Completed',
+                            'badge-interrupt' : sourceJob.jobRunningStatus === 'Interrupt'
                         }">
                         {{ sourceJob.jobRunningStatus }}
                     </span>
@@ -92,6 +94,7 @@
                         <button type="button" class="btn btn-default"
                             [disabled]="sourceJob.jobRunningStatus === 'Queue' || 
                                 sourceJob.jobRunningStatus === 'Running' ||
+                                sourceJob.jobRunningStatus === 'Start' || 
                                 sourceJob.jobStatus === 'Delete' ||
                                 sourceJob.jobStatus === 'Inactive'"
                             (click)="runSourceJob(sourceJob, i)">
@@ -101,7 +104,8 @@
                         </button>
                         <button type="button" class="btn btn-default"
                             [disabled]="sourceJob.jobRunningStatus === 'Queue' || 
-                                sourceJob.jobRunningStatus === 'Running' ||                                
+                                sourceJob.jobRunningStatus === 'Running' ||
+                                sourceJob.jobRunningStatus === 'Start' || 
                                 sourceJob.execution == 'Manual' ||
                                 sourceJob.jobStatus === 'Delete' ||
                                 sourceJob.jobStatus === 'Inactive'"
@@ -112,6 +116,7 @@
                         </button>
                         <button type="button" class="btn btn-default"
                             [disabled]="sourceJob.jobStatus === 'Delete' ||
+                                sourceJob.jobRunningStatus === 'Start' || 
                                 sourceJob.jobRunningStatus === 'Running'"
                             data-toggle="modal" data-target="#deleteSourceJob"
                             (click)="deleteSourceJob(sourceJob, i)">

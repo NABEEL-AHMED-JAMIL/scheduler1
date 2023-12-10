@@ -135,6 +135,7 @@
                         [ngClass]="{
                             'badge-primary' : queueData.jobStatus === 'InFlight', 
                             'badge-info' : queueData.jobStatus === 'Queue',
+                            'badge-start' : queueData?.jobStatus === 'Start',
                             'badge-warning' : queueData.jobStatus === 'Running',
                             'badge-danger' :  queueData.jobStatus === 'Failed',
                             'badge-success' : queueData.jobStatus === 'Completed',
@@ -150,9 +151,10 @@
                             (click)="deleteQMessage(queueData, i)">
                             <span class="glyphicon glyphicon-trash" style="color: black;"></span>
                         </button>
-                        <button type="button" class="btn btn-default" [disabled]="queueData.jobStatus !== 'Running'"
+                        <button type="button" class="btn btn-default" 
+                            [disabled]="queueData.jobStatus !== 'Running' && queueData?.jobStatus !== 'Start'"
                             (click)="interruptQMessage(queueData, i)">
-                             <span class="glyphicon glyphicon-trash" style="color: black;"></span>
+                             <span class="glyphicon glyphicon-stop" style="color: black;"></span>
                         </button>
                     </div>
                 </td>

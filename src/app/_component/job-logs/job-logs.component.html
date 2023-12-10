@@ -40,11 +40,12 @@
                             <label>R-Status: 
                                 <span *ngIf="sourceJob?.jobRunningStatus" class="badge"
                                     [ngClass]="{
-                                        'badge-primary' : sourceJob?.jobRunningStatus === 'InFlight', 
                                         'badge-info' : sourceJob?.jobRunningStatus === 'Queue',
+                                        'badge-start' : sourceJob?.jobRunningStatus === 'Start',
                                         'badge-warning' : sourceJob?.jobRunningStatus === 'Running',
                                         'badge-danger' :  sourceJob?.jobRunningStatus === 'Failed',
-                                        'badge-success' : sourceJob?.jobRunningStatus === 'Completed'
+                                        'badge-success' : sourceJob?.jobRunningStatus === 'Completed',
+                                        'badge-interrupt' : sourceJob.jobRunningStatus === 'Interrupt'
                                     }">
                                     {{ sourceJob?.jobRunningStatus }}
                                 </span>
@@ -94,9 +95,11 @@
                                     [ngClass]="{
                                         'badge-primary' : sourceJobQueue?.jobStatus === 'InFlight', 
                                         'badge-info' : sourceJobQueue?.jobStatus === 'Queue',
+                                        'badge-start' : sourceJobQueue?.jobStatus === 'Start',
                                         'badge-warning' : sourceJobQueue?.jobStatus === 'Running',
                                         'badge-danger' :  sourceJobQueue?.jobStatus === 'Failed',
-                                        'badge-success' : sourceJobQueue?.jobStatus === 'Completed'
+                                        'badge-success' : sourceJobQueue?.jobStatus === 'Completed',
+                                        'badge-interrupt' : sourceJob.jobRunningStatus === 'Interrupt'
                                     }">
                                     {{ sourceJobQueue?.jobStatus }}
                                 </span>

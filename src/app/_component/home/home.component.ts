@@ -41,6 +41,10 @@ export class HomeComponent implements OnInit {
     },
     {
       value: 0,
+      name: 'Start'
+    },
+    {
+      value: 0,
       name: 'Running'
     },
     {

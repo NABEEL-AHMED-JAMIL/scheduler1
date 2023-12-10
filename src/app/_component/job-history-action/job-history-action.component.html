@@ -41,6 +41,7 @@
                                     [ngClass]="{
                                         'badge-primary' : sourceJob.jobRunningStatus === 'InFlight', 
                                         'badge-info' : sourceJob.jobRunningStatus === 'Queue',
+                                        'badge-start' : sourceJob.jobRunningStatus === 'Start',
                                         'badge-warning' : sourceJob.jobRunningStatus === 'Running',
                                         'badge-danger' :  sourceJob.jobRunningStatus === 'Failed',
                                         'badge-success' : sourceJob.jobRunningStatus === 'Completed',
@@ -118,7 +119,7 @@
                 <th>Skip Manual</th>
                 <th>Job Status</th>
                 <th>JobStatus Message</th>
-                <th style="width: 1px;">Action</th>
+                <th style="width: 10px;">Action</th>
             </tr>
         </thead>
         <tbody style="text-align: center;">
@@ -150,10 +151,11 @@
                         [ngClass]="{
                             'badge-primary' : queueData.jobStatus === 'InFlight', 
                             'badge-info' : queueData.jobStatus === 'Queue',
+                            'badge-start' : queueData.jobStatus === 'Start',
                             'badge-warning' : queueData.jobStatus === 'Running',
                             'badge-danger' :  queueData.jobStatus === 'Failed',
                             'badge-success' : queueData.jobStatus === 'Completed',
-                            'badge-pcomplate' : queueData.jobStatus === 'PartialComplete'
+                            'badge-interrupt' : queueData.jobStatus === 'Interrupt'
                         }">{{ queueData.jobStatus }}
                     </span>
                 </td>
