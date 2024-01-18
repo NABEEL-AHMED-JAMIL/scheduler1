@@ -323,6 +323,7 @@ export class CuCredentialComponent implements OnInit {
                 return;
             }
             response = response.data;
+            console.log(response?.status?.lookupValue);
             this.credentailForm = this.formBuilder.group({
                 credentialId: [response?.credentialId, Validators.required],
                 credentialName: [response?.credentialName, Validators.required],

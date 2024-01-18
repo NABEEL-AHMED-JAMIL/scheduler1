@@ -2,7 +2,8 @@
     <form [formGroup]="loginForm"
         (ngSubmit)="onSubmit()"
         style="padding-bottom: 0px;">
-        <h2 class="text-center">Log in</h2>       
+        <h2 class="text-center">Log in</h2>
+        <hr>
         <div class="form-group">
             <label for="username">Username</label>
             <input type="text" pInputText formControlName="username" class="form-control input-sm"
@@ -24,7 +25,8 @@
             </div>
         </div>
         <div class="form-group">
-            <button class="btn btn-sm btn-primary" (click)="register()">Register</button>&nbsp;
+            <button class="btn btn-sm btn-primary" type="button" 
+                (click)="register()">Register</button>&nbsp;
             <button type="submit" [disabled]="loading" 
                 style="float:right" class="btn btn-sm btn-danger">
                 Login</button>

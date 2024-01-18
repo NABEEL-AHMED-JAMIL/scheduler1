@@ -18,7 +18,7 @@ export class SttSettingComponent implements OnInit {
     public selectedMenu: STTSidebar;
     public sttSidebar: STTSidebar[] = [];
 
-    constructor(private route:ActivatedRoute,
+    constructor(private route: ActivatedRoute,
         private lookupService: LookupService,
         private alertService: AlertService,
         private spinnerService: SpinnerService,
@@ -42,34 +42,34 @@ export class SttSettingComponent implements OnInit {
             accessUserDetail: {
                 appUserId: this.currentActiveProfile.appUserId,
                 username: this.currentActiveProfile.username
-           }
+            }
         }
         this.lookupService.fetchLookupByLookupType(payload)
-        .pipe(first())
-        .subscribe((response: any) => {
-            this.spinnerService.hide();
-            if (response.status === ApiCode.ERROR) {
-                this.alertService.showError(response.message, ApiCode.ERROR);
-                return;
-            }
-            let parentLookupData = response.data?.parentLookupData;
-            let lookupValue = parentLookupData?.lookupValue;
-            this.sttSidebar = JSON.parse(lookupValue);
-            this.sttSidebar.map((sttSide: any) => {
-                if (this.currentActiveProfile.roles[0] === 'ROLE_USER') {
-                    sttSide.disable = true;
+            .pipe(first())
+            .subscribe((response: any) => {
+                this.spinnerService.hide();
+                if (response.status === ApiCode.ERROR) {
+                    this.alertService.showError(response.message, ApiCode.ERROR);
+                    return;
                 }
-                return sttSide;
+                let parentLookupData = response.data?.parentLookupData;
+                let lookupValue = parentLookupData?.lookupValue;
+                this.sttSidebar = JSON.parse(lookupValue);
+                this.sttSidebar.map((sttSide: any) => {
+                    if (this.currentActiveProfile.roles[0] === 'ROLE_USER') {
+                        sttSide.disable = true;
+                    }
+                    return sttSide;
+                });
+                console.log(this.sttSidebar);
+                // check the type and map it wit with as
+            }, (error: any) => {
+                this.spinnerService.hide();
+                this.alertService.showError(error.message, ApiCode.ERROR);
             });
-            console.log(this.sttSidebar);
-            // check the type and map it wit with as
-        }, (error: any) => {
-            this.spinnerService.hide();
-            this.alertService.showError(error.message, ApiCode.ERROR);
-        });
     }
 
-    public changeTask(changeTask: STTSidebar, index: any): any{
+    public changeTask(changeTask: STTSidebar, index: any): any {
         this.sttSidebar = this.sttSidebar.map(stt => {
             stt.active = false;
             return stt;

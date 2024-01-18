@@ -30,7 +30,7 @@
     </ul>
     <ul class="nav navbar-nav navbar-right" >
       <li class="dropdown"
-        *ngIf="hasAccess(['ROLE_ADMIN', 'ROLE_MASTER_ADMIN'])">
+        *ngIf="hasAccess(['ROLE_ADMIN', 'ROLE_MASTER_ADMIN', 'ROLE_USER'])">
         <a href="#" class="dropdown-toggle" data-toggle="dropdown"
           role="button" aria-haspopup="true" aria-expanded="false">
           <span class="glyphicon glyphicon-cog"></span>
@@ -51,13 +51,13 @@
           </li>
           <li>
             <a routerLink="/searchengine"
-              *ngIf="hasAccess(['ROLE_MASTER_ADMIN', 'ROLE_ADMIN'])">
+              *ngIf="hasAccess(['ROLE_MASTER_ADMIN'])">
               <span class="glyphicon glyphicon-random"></span>
               Query Result</a>
           </li>
           <li>
             <a routerLink="/xmlconfig"
-              *ngIf="hasAccess(['ROLE_ADMIN', 'ROLE_MASTER_ADMIN'])">
+              *ngIf="hasAccess(['ROLE_ADMIN', 'ROLE_MASTER_ADMIN', 'ROLE_USER'])">
               <span class="glyphicon glyphicon-flash"></span>
               XML Configuration</a>
           </li>

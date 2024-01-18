@@ -1,11 +1,12 @@
 import { Component, Input, OnInit } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
-import { AppUserList } from '@/_models';
+import { ActivatedRoute, Router } from '@angular/router';
+import { Action, AppUserList } from '@/_models';
 import { first } from 'rxjs/operators';
 import { AuthResponse, ApiCode } from '@/_models/index';
 import { SpinnerService } from '@/_helpers';
 import { AuthenticationService, AlertService,
-    AppUserService } from '@/_services';
+    AppUserService, CommomService} from '@/_services';
+
 
 @Component({
     selector: 'manage-user',
@@ -16,16 +17,24 @@ export class ManageUserComponent implements OnInit {
     @Input()
     public title: any = 'Main User';
     public searchUser: any = '';
+
+    public userAction: Action;
     public appUser: AppUserList;
     public appUserList: AppUserList[] = [];
+    public pageOfAppUserData: Array<AppUserList>;
     public currentActiveProfile: AuthResponse;
 
     public refreshButton: any;
+    public addButton: any;
+    public dropdownButton: any;
     public topHeader: any = [];
 
-    constructor(private route:ActivatedRoute,
+    constructor(
+        private router: Router,
+        private route:ActivatedRoute,
         private spinnerService: SpinnerService,
         private appUserService: AppUserService,
+        private commomService: CommomService,
         private alertService: AlertService,
         private authenticationService: AuthenticationService) {
             this.currentActiveProfile = authenticationService.currentUserValue;
@@ -35,6 +44,14 @@ export class ManageUserComponent implements OnInit {
                     this.topHeader.forEach(header => {
                         if (header.type === 'refresh') {
                             this.refreshButton = header;
+                        } else if (header.type === 'add') {
+                            this.addButton = header;
+                        } else if (header.type === 'menus') {
+                            this.dropdownButton = header;
+                            this.dropdownButton.menus = this.dropdownButton.menus
+                            .filter((menu: any) => {
+                                return menu.active;
+                            });
                         }
                     });
                 }
@@ -42,16 +59,16 @@ export class ManageUserComponent implements OnInit {
     }
 
     ngOnInit() {
-        this.getSubAppUserAccount(this.currentActiveProfile.username);
+        this.getSubAppUserAccount();
     }
 
     public refreshAction(): void {
-        this.getSubAppUserAccount(this.currentActiveProfile.username);
+        this.getSubAppUserAccount();
     }
 
-    public getSubAppUserAccount(payload: any): void {
+    public getSubAppUserAccount(): void {
         this.spinnerService.show();
-        this.appUserService.getSubAppUserAccount(payload)
+        this.appUserService.getSubAppUserAccount(this.currentActiveProfile.username)
         .pipe(first())
         .subscribe((response: any) => {
             this.spinnerService.hide();
@@ -65,6 +82,72 @@ export class ManageUserComponent implements OnInit {
             this.alertService.showError(error.message, ApiCode.ERROR);
         });
     }
+
+    public onChangePage(pageOfAppUserData: Array<any>) {
+        // update current page of items
+        this.pageOfAppUserData = pageOfAppUserData;
+    }
+
+    public menuAction(payload: any): any {
+        if (payload.router) {
+            this.router.navigate([payload.router]);
+        } else if (payload.targetEvent) {
+            if (payload.targetEvent === 'downloadData') {
+                this.downloadData();
+            } else if (payload.targetEvent === 'downloadTemplate') {
+                this.downloadTemplate();
+            }
+        }
+    }
+
+    public downloadData(): void {
+        this.spinnerService.show();
+        let payload = {
+            accessUserDetail: {
+                appUserId: this.currentActiveProfile.appUserId,
+                username: this.currentActiveProfile.username
+           }
+        }
+        this.appUserService.downloadAppUser(payload)
+        .pipe(first())
+        .subscribe((response: any) => {
+            this.commomService.downLoadFile(response);
+            this.spinnerService.hide();
+        }, (error: any) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error, ApiCode.ERROR);
+        });
+    }
+
+    public downloadTemplate(): void {
+        this.spinnerService.show();
+        this.appUserService.downloadAppUserTemplateFile()
+        .pipe(first())
+        .subscribe((response: any) => {
+            this.commomService.downLoadFile(response);
+            this.spinnerService.hide();
+        }, (error: any) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error, ApiCode.ERROR);
+        });
+    }
+    
+    public addUser(): void {
+        this.userAction = Action.ADD;
+	}
+
+    public editUser(payload: any): void {
+        this.userAction = Action.EDIT;
+        this.appUser = payload;
+	}
+
+    public receiverEvent(action: Action): void {
+		this.userAction = null;
+		this.appUser = null;
+		if (action == Action.ADD || action == Action.EDIT) {
+            this.getSubAppUserAccount();
+		}
+	}
 
     public deleteAction(payload: any): void {
         this.appUser = payload;

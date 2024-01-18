@@ -3,10 +3,10 @@ import { Router } from '@angular/router';
 import { AbstractControl, FormBuilder, 
     FormControl, FormGroup, Validators } from '@angular/forms';
 import { first } from 'rxjs/operators';
-import { AlertService, AuthenticationService } from '@/_services';
+import { AlertService, AuthenticationService, LookupService } from '@/_services';
 import { Location } from '@angular/common';
 import { SpinnerService } from '@/_helpers';
-import { ApiCode } from '@/_models';
+import { ApiCode, LOOKUP_TYPES } from '@/_models';
 
 
 @Component({
@@ -18,6 +18,8 @@ export class RegisterComponent implements OnInit {
     public registerForm: FormGroup;
     public loading: any = false;
     public submitted: any = false;
+    public SCHEDULER_TIMEZONE: LOOKUP_TYPES;
+    public schedulerTimezoneList: any;
 
     public password = new FormControl(null, [
         (c: AbstractControl) => Validators.required(c),
@@ -32,14 +34,41 @@ export class RegisterComponent implements OnInit {
         private authenticationService: AuthenticationService,
         private spinnerService: SpinnerService,
         private alertService: AlertService,
-        private location: Location
-    ) {}
+        private lookupService: LookupService,
+        private location: Location) {
+        this.SCHEDULER_TIMEZONE = LOOKUP_TYPES.SCHEDULER_TIMEZONE;
+        this.getSchedulerTimeZone();
+    }
 
     ngOnInit() {
         this.registerForm = this.formBuilder.group({
+            firstname: ['', Validators.required],
+            lastname: ['', Validators.required],
             username: ['', Validators.required],
             email: ['', [Validators.required, Validators.email]],
+            timeZone: ['', Validators.required],
             password: this.password
+        });
+    }
+
+    // SCHEDULER_TIMEZONE
+    public getSchedulerTimeZone(): void {
+        this.spinnerService.show();
+        let payload = {
+            lookupType: this.SCHEDULER_TIMEZONE
+        }
+        this.lookupService.fetchLookupByLookupType(payload)
+        .pipe(first())
+        .subscribe((response: any) => {
+            this.spinnerService.hide();
+            if (response.status === ApiCode.ERROR) {
+                this.alertService.showError(response.message, ApiCode.ERROR);
+                return;
+            }
+            this.schedulerTimezoneList = response.data
+        }, (error: any) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error.message, ApiCode.ERROR);
         });
     }
 

@@ -1,0 +1,128 @@
+<div class="row">
+    <div class="col-lg-6">
+        <label *ngIf="sstFormList">
+            Total STTF ({{sstFormList.length}})
+        </label>
+        <input type="text" id="searchSTTF" class="form-control input-sm" style="width: 60%;" [(ngModel)]="searchSTTF"
+            placeholder="Search by any key" />
+    </div>
+    <div class="col-lg-6" style="text-align: end;margin-top: 25px;">
+        <!-- working -->
+        <button *ngIf="refreshButton && refreshButton.active" type="button" class="form-control input-sm"
+            style="width: auto;display: inline;margin-right: 7px;" (click)="refreshAction()">
+            <span id="loading" class="glyphicon glyphicon-refresh"></span>
+            {{refreshButton.title}}
+        </button>
+        <!-- working -->
+        <button *ngIf="addButton && addButton.active" type="button" class="form-control input-sm" style="width: auto; background: #cb0f43;color: white;
+            display: inline;margin-right: 7px;" (click)="addAction()">
+            <span class="glyphicon glyphicon-plus-sign"></span>
+            {{addButton.title}}
+        </button>
+        <div *ngIf="dropdownButton && dropdownButton.active" class="dropdown" style="display: inline;">
+            <button class="btn btn-primary dropdown-toggle"
+                style="padding: 4px 5px;border-radius: 3px;background: #4750b6;" type="button"
+                data-toggle="dropdown">{{dropdownButton.title}}
+                <span class="caret"></span></button>
+            <ul class="dropdown-menu" style="left: -38px;">
+                <li *ngFor="let menu of dropdownButton.menus">
+                    <a (click)="menuAction(menu)">{{menu.title}}</a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</div>
+<table id="sttf" style="font-size: 12px;margin-top: 10px;"
+    class="table table-responsive table table-striped table-bordered table-sm">
+    <thead>
+        <tr>
+            <th style="width: 4%;">-</th>
+            <th style="width: 4%;"># No</th>
+            <th>Form Name</th>
+            <th>Form Type</th>
+            <th>HomePage</th>
+            <th>Service Id</th>
+            <th>Defult</th>
+            <th>Created Date</th>
+            <th>STT</th>
+            <th>Sections</th>
+            <th style="width: 10%;">Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr *ngFor="let sstForm of pageOfSSTs | searchFilter: searchSTTF; let i = index">
+            <td style="text-align: center;">
+                <div class="Yf">
+                    <div [ngClass]="{
+                        'Yg_inactive' : sstForm.status.lookupValue === 0,
+                        'Yg_active' : sstForm.status.lookupValue === 1,
+                        'Yg_delete': sstForm.status.lookupValue === 2
+                    }"></div>
+                </div>
+            </td>
+            <td>{{sstForm.sttfId}}</td>
+            <td>{{sstForm.sttfName}}</td>
+            <td style="text-align: center;">
+                {{sstForm.formType.description}}
+            </td>
+            <td style="text-align: center;">
+                {{sstForm?.homePage?.description}}
+            </td>
+            <td style="text-align: center;">
+                {{sstForm.serviceId}}
+            </td>
+            <td style="text-align: center;">
+                {{sstForm.sttfDefault.description}}
+            </td>
+            <td style="text-align: center;">
+                {{sstForm.dateCreated | date:'dd-MM-yyyy'}}
+            </td>
+            <td style="text-align: center;">
+                {{sstForm.totalStt}}
+            </td>
+            <td style="text-align: center;">
+                {{sstForm.totalSection}}
+            </td>
+            <td style="text-align: center;">
+                <div class="btn-group btn-group-xs" role="group" style="text-align: center">
+                    <button type="button" class="btn btn-default" [disabled]="sstForm.status.lookupValue === 0">
+                        <span class="glyphicon glyphicon-eye-open" style="color: #000000"></span>
+                    </button>
+                    <button type="button" class="btn btn-default" (click)="editAction(sstForm)">
+                        <span class="glyphicon glyphicon-edit" style="color:blue"></span>
+                    </button>
+                    <!-- add the method for delete the queue detail -->
+                    <button type="button" class="btn btn-default" data-toggle="modal" data-target="#deleteAction"
+                        [disabled]="sstForm.status.lookupValue === 0" (click)="deleteAction(sstForm)">
+                        <span class="glyphicon glyphicon-trash" style="color: #dc3545;"></span>
+                    </button>
+                    <!--  -->
+                    <button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown"
+                        [disabled]="sstForm.status.lookupValue === 0">
+                        <span class="glyphicon glyphicon-option-vertical" style="color:green"></span>
+                    </button>
+                    <ul class="dropdown-menu" style="left: -100px;">
+                        <li *ngFor="let menu of actionMenu">
+                            <a (click)="menuAction(menu, sstForm)">
+                                <samp [ngClass]="menu.icon"></samp>
+                                {{menu.title}}
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </td>
+        </tr>
+    </tbody>
+    <tfoot>
+        <tr>
+            <td colspan="9" style="text-align: center;padding-bottom: 0px;">
+                <jw-pagination [items]="sstFormList" [pageSize]="25"
+                    (changePage)="onChangePage($event)"></jw-pagination>
+            </td>
+        </tr>
+    </tfoot>
+</table>
+<div class="modal fade" id="deleteAction" role="dialog" style="top: 85px;">
+    <del-box [title]="title" [subTitle]="subTitle" (deleteEvent)="deleteActionTriger()">
+    </del-box>
+</div>

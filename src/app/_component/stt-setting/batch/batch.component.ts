@@ -20,7 +20,7 @@ export class BatchComponent implements OnInit {
 
     public currentTaskState: any = 'Batch Action';
     public buttonMessage: any;
-    @ViewChild('inputUpload', {static: false})
+    @ViewChild('inputUpload', { static: false })
     public inputUpload: any;
     public currentActiveProfile: AuthResponse;
     public parentLookupId: any;
@@ -33,12 +33,12 @@ export class BatchComponent implements OnInit {
         private authenticationService: AuthenticationService) {
         this.currentActiveProfile = authenticationService.currentUserValue;
         this._activatedRoute.data
-        .subscribe((data: any) => {
-            this.title = data.breadcrumb;
-            this.router = data.router;
-            this.action = data.action;
-            this.buttonMessage = data.action;
-        });
+            .subscribe((data: any) => {
+                this.title = data.breadcrumb;
+                this.router = data.router;
+                this.action = data.action;
+                this.buttonMessage = data.action;
+            });
     }
 
     ngOnInit() {
@@ -52,26 +52,26 @@ export class BatchComponent implements OnInit {
             accessUserDetail: {
                 appUserId: this.currentActiveProfile.appUserId,
                 username: this.currentActiveProfile.username
-           }
+            }
         }
         const formData = new FormData();
         formData.append("file", fileToUpload);
         formData.append("data", JSON.stringify(payload));
         this.sttService.uploadSTTCommon(formData)
-        .pipe(first())
-        .subscribe((response: any) => {
-            this.spinnerService.hide();
-            this.inputUpload.nativeElement.value = '';
-            if (response?.status === ApiCode.ERROR) {
-                this.errors = response.data;
-                this.alertService.showError(response.message, ApiCode.ERROR);
-                return;
-            }
-            this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
-        }, (error: any) => {
-            this.spinnerService.hide();
-            this.alertService.showError(error, ApiCode.ERROR);
-        });
+            .pipe(first())
+            .subscribe((response: any) => {
+                this.spinnerService.hide();
+                this.inputUpload.nativeElement.value = '';
+                if (response?.status === ApiCode.ERROR) {
+                    this.errors = response.data;
+                    this.alertService.showError(response.message, ApiCode.ERROR);
+                    return;
+                }
+                this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
+            }, (error: any) => {
+                this.spinnerService.hide();
+                this.alertService.showError(error, ApiCode.ERROR);
+            });
     }
 
 }

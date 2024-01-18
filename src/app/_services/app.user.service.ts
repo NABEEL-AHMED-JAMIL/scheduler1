@@ -34,4 +34,26 @@ export class AppUserService {
         return this.http.post<any>(`${config.apiUrl}/appUser.json/closeAppUserAccount`, payload);
     }
 
+    public addEditAppUserAccount(payload: any): Observable<any> {
+        return this.http.post<any>(`${config.apiUrl}/appUser.json/addEditAppUserAccount`, payload);
+    }    
+
+    public downloadAppUser(payload: any): Observable<any> {
+        return this.http.post(`${config.apiUrl}/appUser.json/downloadAppUser`, payload,
+        {
+            responseType: 'blob'
+        });
+    }
+
+    public downloadAppUserTemplateFile(): Observable<any> {
+        return this.http.get(`${config.apiUrl}/appUser.json/downloadAppUserTemplateFile`,
+        {
+            responseType: 'blob'
+        });
+    }
+
+    public uploadAppUser(payload: any): Observable<any> {
+        return this.http.post<any>(`${config.apiUrl}/appUser.json/uploadAppUser`, payload);
+    }
+
 }

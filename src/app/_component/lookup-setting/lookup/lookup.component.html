@@ -60,7 +60,7 @@
     
     .scrollable {
         overflow: scroll; overflow-y:hidden;
-    } 
+    }
 </style>
 
 <div class="row gutters-sm">
@@ -69,9 +69,19 @@
             <div class="card-body">
                 <div class="row">
                     <div class="col-lg-8">
-                        <h5 class="card-title" style="font-size: large;">{{title}}</h5>
+                        <div class="form-group">
+                            <label for="lookupDatasLength" *ngIf="lookupDatas">
+                                Total Lookup ({{lookupDatas.length}})
+                            </label>
+                            <input type="text" id="searchLookup" 
+                                class="form-control input-sm"
+                                style="width: 30%;"
+                                [(ngModel)]="searchLookup"
+                                placeholder="Search by any key" />
+                        </div>
                     </div>
-                    <div class="col-lg-4" style="text-align: end;margin-top: 5px;">
+                    <div class="col-lg-4" style="text-align: end;">
+                        <br>
                         <button *ngIf="refreshButton && refreshButton.active" type="button"
                             class="form-control input-sm" 
                             style="width: auto;display: inline;margin-right: 7px;"
@@ -101,28 +111,15 @@
                             </ul>
                         </div>
                     </div>
-                    <div class="col-lg-12">
-                        <hr style="margin-top: 10px;">
-                        <div class="form-group">
-                            <label for="lookupDatasLength" *ngIf="lookupDatas">
-                                Total Lookup ({{lookupDatas.length}})
-                            </label>
-                            <input type="text" id="searchLookup" 
-                                class="form-control input-sm"
-                                style="width: 30%;"
-                                [(ngModel)]="searchLookup"
-                                placeholder="Search by any key" />
-                        </div>
-                    </div>
                 </div>
                 <table id="source-task-type" class="table table-responsive table table-striped
                     table-bordered table-sm" style="font-size: 12px;">
                     <thead>
                         <tr>
                             <th style="width: 4%;"># No</th>
-                            <th>Lookup Type</th>
+                            <th style="width: 18%;">Lookup Type</th>
                             <th>Lookup Value</th>
-                            <th>Description</th>
+                            <th style="width: 20%;">Description</th>
                             <th style="width: 8%;">Created Date</th>
                             <th style="width: 6%;">Action</th>
                         </tr>

@@ -1,0 +1,140 @@
+<view-stt [searchSttId]="querySttid" [formTitle]="formTitle">
+</view-stt>
+<div class="row" style="margin-top: 20px;">
+    <div class="col-lg-6">
+        <label>
+            Total {{formTitle}} ({{sttLinkSTTFLists.length}})
+        </label>
+        <input type="text" id="searchValue" class="form-control input-sm" style="width: 60%;" [(ngModel)]="searchValue"
+            placeholder="Search by any key" />
+    </div>
+    <div class="col-lg-6" style="text-align: end;margin-top: 25px;">
+        <!-- working -->
+        <button *ngIf="refreshButton && refreshButton.active" type="button" class="form-control input-sm"
+            style="width: auto;display: inline;margin-right: 7px;" (click)="refreshAction()">
+            <span class="glyphicon glyphicon-refresh"></span>
+            {{refreshButton.title}}
+        </button>
+        <!-- working -->
+        <button *ngIf="addButton && addButton.active" type="button" class="form-control input-sm" style="width: auto; background: #cb0f43;color: white;
+            display: inline;margin-right: 7px;" data-toggle="modal" data-target="#addAction" (click)="addAction()">
+            <span class="glyphicon glyphicon-plus-sign"></span>
+            {{addButton.title}}
+        </button>
+    </div>
+</div>
+<table id="stt" style="font-size: 12px;margin-top: 10px;"
+    class="table table-responsive table table-striped table-bordered table-sm">
+    <thead>
+        <tr>
+            <th style="width: 4%;">-</th>
+            <th style="width: 5%;"># No</th>
+            <th style="width: 4%;">Form ID</th>
+            <th>Form Name</th>
+            <th>Form Type</th>
+            <th>HomePage</th>
+            <th>Service Id</th>
+            <th>Defult</th>
+            <th>Sttf Order</th>
+            <th>Created Date</th>
+            <th>Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr *ngFor="let sttLinkSTTF of pageOfSttLinkSTTF | searchFilter: searchValue; let i = index">
+            <td style="text-align: center;">
+                <div class="Yf">
+                    <div [ngClass]="{
+                        'Yg_inactive' : sttLinkSTTF.status.lookupValue === 0,
+                        'Yg_active' : sttLinkSTTF.status.lookupValue === 1,
+                        'Yg_delete': sttLinkSTTF.status.lookupValue === 2
+                    }"></div>
+                </div>
+            </td>
+            <td style="text-align: center;">{{sttLinkSTTF.sttfLinkSttId}}</td>
+            <td style="text-align: center;">{{sttLinkSTTF.sttfId}}</td>
+            <td style="text-align: center;">{{sttLinkSTTF.sttfName}}</td>
+            <td style="text-align: center;">{{sttLinkSTTF?.formType.description}}</td>
+            <td style="text-align: center;">{{sttLinkSTTF?.homePage?.description}}</td>
+            <td style="text-align: center;">{{sttLinkSTTF?.serviceId}}</td>
+            <td style="text-align: center;">{{sttLinkSTTF?.defaultSttf.description}}</td>
+            <td style="text-align: center;">{{sttLinkSTTF.sttfOrder}}</td>
+            <td style="text-align: center;">{{sttLinkSTTF.dateCreated | date:'dd-MM-yyyy'}}</td>
+            <td style="text-align: center;">
+                <div class="btn-group btn-group-xs" role="group" style="text-align: center">
+                    <button type="button" class="btn btn-default">
+                        <span class="glyphicon glyphicon-eye-open" style="color: #000000"></span>
+                    </button>
+                    <button type="button" class="btn btn-default" data-toggle="modal" data-target="#deleteAction"
+                        [disabled]="sttLinkSTTF.status.lookupValue === 0" (click)="deleteAction(sttLinkSTTF)">
+                        <span class="glyphicon glyphicon-trash" style="color: #dc3545;"></span>
+                    </button>
+                </div>
+            </td>
+        </tr>
+    </tbody>
+    <tfoot>
+        <tr>
+            <td colspan="13" style="text-align: center;padding-bottom: 0px;">
+                <jw-pagination [items]="sttLinkSTTFLists" [pageSize]="25"
+                    (changePage)="onChangePage($event)"></jw-pagination>
+            </td>
+        </tr>
+    </tfoot>
+</table>
+
+<!-- for link action -->
+<div class="modal fade" id="deleteAction" role="dialog" style="top: 85px;">
+    <del-box [title]="title" [subTitle]="subTitle" (deleteEvent)="deleteActionTriger()">
+    </del-box>
+</div>
+<!-- link user -->
+<div class="modal fade" id="addAction" role="dialog" style="top: 85px;">
+    <div class="modal-dialog" style="width: 550px;">
+        <div class="modal-content">
+            <div class="modal-header" style="background: #555;">
+                <button type="button" #closeSttLinkForm class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title">Add Form</h4>
+            </div>
+            <div class="modal-body">
+                <form [formGroup]="sttLinkSTTFForm" (ngSubmit)="onSubmit()">
+                    <div class="row">
+                        <div class="col-lg-6 form-group" *ngIf="sttFormList">
+                            <label for="sttfId">Form</label>
+                            <select class="form-control input-sm" id="sttfId" formControlName="sttfId"
+                                [ngClass]="{ 'is-invalid': submitted && f.sttfId.errors }">
+                                <option hidden value="" disabled selected>
+                                    Select User
+                                </option>
+                                <option *ngFor="let sttForm of sttFormList" [value]="sttForm.sttfId">
+                                    {{sttForm.sttfName}}
+                                </option>
+                            </select>
+                            <div *ngIf="submitted && f.sttfId.errors" class="invalid-feedback">
+                                <div *ngIf="f.sttfId.errors.required" style="color: red;">
+                                    Form is required
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-6 form-group">
+                            <label for="sttfOrder">Order</label>
+                            <input type="number" id="sttfOrder" min="0" max="10" formControlName="sttfOrder"
+                                class="form-control input-sm" placeholder="Select Section Order" />
+                            <div *ngIf="submitted && f.sttfOrder.errors" class="invalid-feedback">
+                                <div *ngIf="f.sttfOrder.errors.required" style="color: red;">
+                                    Order is required
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-12">
+                            <button type="submit" [disabled]="loading" style="float: right;"
+                                class="btn btn-sm btn-danger">
+                                Save
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

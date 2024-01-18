@@ -1,0 +1,91 @@
+<!-- new lookupData -->
+<div class="modal fade" id="userAction" role="dialog">
+    <div class="modal-dialog">
+        <!-- Modal content-->
+        <div class="modal-content" style="border: none">
+            <form *ngIf="appUserForm" [formGroup]="appUserForm" (ngSubmit)="submit()">
+                <div class="modal-header" style="background: #555;">
+                    <button type="button" class="close" #closeAppUser 
+                        data-dismiss="modal" (click)="resetEvent(4)"
+                        style="color: white;">&times;
+                    </button>
+                    <h4 class="modal-title">{{USER_TITLE}}</h4>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-lg-6 form-group">
+                            <label for="firstname">Firstname</label>
+                            <input type="text" id="firstname" formControlName="firstname" class="form-control input-sm"
+                                [ngClass]="{ 'is-invalid': submitted && f.firstname.errors }" />
+                            <div *ngIf="submitted && f.firstname.errors" class="invalid-feedback">
+                                <div *ngIf="f.firstname.errors.required" style="color: red;">Firstname is required</div>
+                            </div>
+                        </div>
+                        <div class="col-lg-6 form-group">
+                            <label for="lastname">Lastname</label>
+                            <input type="text" id="lastname" formControlName="lastname" class="form-control input-sm"
+                                [ngClass]="{ 'is-invalid': submitted && f.lastname.errors }" />
+                            <div *ngIf="submitted && f.lastname.errors" class="invalid-feedback">
+                                <div *ngIf="f.lastname.errors.required" style="color: red;">Lastnme is required</div>
+                            </div>
+                        </div>
+                        <div class="col-lg-6 form-group">
+                            <label for="username">Username</label>
+                            <input type="text" id="username" formControlName="username" class="form-control input-sm"
+                                [ngClass]="{ 'is-invalid': submitted && f.username.errors }" />
+                            <div *ngIf="submitted && f.username.errors" class="invalid-feedback">
+                                <div *ngIf="f.username.errors.required" style="color: red;">Username is required</div>
+                            </div>
+                        </div>
+                        <div class="col-lg-6 form-group">
+                            <label for="email">Email</label>
+                            <input type="text" id="email" formControlName="email" class="form-control input-sm"
+                                [ngClass]="{ 'is-invalid': submitted && f.email.errors }" />
+                            <div *ngIf="submitted && f.email.errors" class="invalid-feedback">
+                                <div *ngIf="f.email.errors.required" style="color: red;">Email is required</div>
+                                <div *ngIf="f.email.errors.email" style="color: red;">Email not valid</div>
+                            </div>
+                        </div>
+                        <div class="col-lg-12 form-group" *ngIf="schedulerTimezoneList">
+                            <label for="timeZone">TimeZone</label>
+                            <select id="timeZone"  formControlName="timeZone" class="form-control input-sm"
+                                [ngClass]="{ 'is-invalid': submitted && f.timeZone.errors }">
+                                <!-- true -> null for 2nd value -->
+                                <option hidden value="" disabled selected>
+                                    {{schedulerTimezoneList.parentLookupData.description}}
+                                </option>
+                                <option *ngFor="let schedulerTimezone of schedulerTimezoneList.subLookupData"
+                                    [value]="schedulerTimezone.lookupType">
+                                    {{schedulerTimezone.lookupValue}}
+                                </option>
+                            </select>
+                            <div *ngIf="submitted && f.timeZone.errors" class="invalid-feedback">
+                                <div *ngIf="f.timeZone.errors.required" style="color: red;">
+                                    Scheduler TimeZone is required
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-12 form-group" *ngIf="userAction === 3">
+                            <label for="password">Password</label>
+                            <input id="password" type="password" formControlName="password" class="form-control input-sm"
+                                [ngClass]="{ 'is-invalid': submitted && f.password.errors }" />
+                            <div *ngIf="submitted && f.password.errors" class="form-text text-danger">
+                                <div *ngIf="password.errors.required" style="color: red;">Field is required</div>
+                                <div *ngIf="password.errors.pattern" style="color: red;">
+                                    Password must contain at least one number, one uppercase and a
+                                    lowercase letter and at least 8 characters<br />Password cannot
+                                    contain whitespace
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="reset" class="btn btn-default" data-dismiss="modal"
+                        (click)="resetEvent(4)">Close</button>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

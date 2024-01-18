@@ -1,0 +1,135 @@
+<div class="row">
+    <div class="col-lg-6">
+        <label *ngIf="sttList">
+            Total STT ({{sttList.length}})
+        </label>
+        <input type="text" id="searchStt" class="form-control input-sm" style="width: 60%;" [(ngModel)]="searchStt"
+            placeholder="Search by any key" />
+    </div>
+    <div class="col-lg-6" style="text-align: end;margin-top: 25px;">
+        <!-- working -->
+        <button *ngIf="refreshButton && refreshButton.active" type="button" class="form-control input-sm"
+            style="width: auto;display: inline;margin-right: 7px;" (click)="refreshAction()">
+            <span class="glyphicon glyphicon-refresh"></span>
+            {{refreshButton.title}}
+        </button>
+        <!-- working -->
+        <button *ngIf="addButton && addButton.active" type="button" class="form-control input-sm" style="width: auto; background: #cb0f43;color: white;
+            display: inline;margin-right: 7px;" (click)="addAction()">
+            <span class="glyphicon glyphicon-plus-sign"></span>
+            {{addButton.title}}
+        </button>
+        <div *ngIf="dropdownButton && dropdownButton.active" class="dropdown" style="display: inline;">
+            <button class="btn btn-primary dropdown-toggle"
+                style="padding: 4px 5px;border-radius: 3px;background: #4750b6;" type="button"
+                data-toggle="dropdown">{{dropdownButton.title}}
+                <span class="caret"></span></button>
+            <ul class="dropdown-menu" style="left: -38px;">
+                <li *ngFor="let menu of dropdownButton.menus">
+                    <a (click)="menuAction(menu)">{{menu.title}}</a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</div>
+<table id="stt" style="font-size: 12px;margin-top: 10px;"
+    class="table table-responsive table table-striped table-bordered table-sm">
+    <thead>
+        <tr>
+            <th style="width: 4%;">-</th>
+            <th style="width: 4%;"># No</th>
+            <th>Service Name</th>
+            <th>STT Type</th>
+            <th>Credential</th>
+            <th>Defult</th>
+            <th>Created Date</th>
+            <th>Users</th>
+            <th>Tasks</th>
+            <th>Forms</th>
+            <th style="width: 10%;">Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr *ngFor="let stt of pageOfStts | searchFilter: searchStt; let i = index">
+            <td style="text-align: center;">
+                <div class="Yf">
+                    <div [ngClass]="{
+                        'Yg_inactive' : stt.status.lookupValue === 0,
+                        'Yg_active' : stt.status.lookupValue === 1,
+                        'Yg_delete': stt.status.lookupValue === 2
+                    }"></div>
+                </div>
+            </td>
+            <td>{{stt.sttId}}</td>
+            <td>{{stt.serviceName}}</td>
+            <td style="text-align: center;">
+                {{stt.taskType.description}}
+            </td>
+            <td style="text-align: center;">
+                {{stt?.credential?.credentialName}}
+            </td>
+            <td style="text-align: center;">
+                {{stt.sttDefault.description}}
+            </td>
+            <td style="text-align: center;">
+                {{stt.dateCreated | date:'dd-MM-yyyy'}}
+            </td>
+            <td style="text-align: center;">
+                {{stt.totalUser}}
+            </td>
+            <td style="text-align: center;">
+                {{stt.totalTask}}
+            </td>
+            <td style="text-align: center;">
+                {{stt.totalForm}}
+            </td>
+            <td style="text-align: center;">
+                <div class="btn-group btn-group-xs" role="group" style="text-align: center">
+                    <button type="button" class="btn btn-default" (click)="editAction(stt)">
+                        <span class="glyphicon glyphicon-edit" style="color:blue"></span>
+                    </button>
+                    <!-- add the method for delete the queue detail -->
+                    <button type="button" class="btn btn-default" data-toggle="modal" data-target="#deleteAction"
+                        [disabled]="stt.status.lookupValue === 0" (click)="deleteAction(stt)">
+                        <span class="glyphicon glyphicon-trash" style="color: #dc3545;"></span>
+                    </button>
+                    <!--  -->
+                    <button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown"
+                        [disabled]="stt.status.lookupValue === 0">
+                        <span class="glyphicon glyphicon-option-vertical" style="color:green"></span>
+                    </button>
+                    <ul class="dropdown-menu" style="left: -100px;">
+                        <li *ngFor="let menu of actionMenu">
+                            <a (click)="menuAction(menu, stt)">
+                                <samp [ngClass]="menu.icon"></samp>
+                                {{menu.title}}
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </td>
+        </tr>
+    </tbody>
+    <tfoot>
+        <tr>
+            <td colspan="13" style="text-align: center;padding-bottom: 0px;">
+                <jw-pagination [items]="sttList" [pageSize]="25" (changePage)="onChangePage($event)"></jw-pagination>
+            </td>
+        </tr>
+    </tfoot>
+</table>
+<div class="modal fade" id="deleteAction" role="dialog" style="top: 85px;">
+    <del-box [title]="title" [subTitle]="subTitle" (deleteEvent)="deleteActionTriger()">
+    </del-box>
+</div>
+
+<!-- for link action -->
+<div class="modal fade" id="linkUserAction" role="dialog" style="top: 85px;">
+    <del-box [title]="title" [subTitle]="subTitle" (deleteEvent)="deleteActionTriger()">
+    </del-box>
+</div>
+<!-- for link action -->
+<div class="modal fade" id="linkFormAction" role="dialog" style="top: 85px;">
+    <del-box [title]="title" [subTitle]="subTitle" (deleteEvent)="deleteActionTriger()">
+    </del-box>
+</div>

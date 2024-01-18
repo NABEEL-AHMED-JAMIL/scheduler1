@@ -1,7 +1,24 @@
 <div class="login-form">
     <form [formGroup]="registerForm" (ngSubmit)="onSubmit()" style="padding-bottom: 0px;">
-        <h2 class="text-center">Register</h2>       
-        <div class="form-group">
+        <h2 class="text-center">New Account</h2>
+        <hr>
+        <div class="col-lg-6 form-group">
+            <label for="firstname">Firstname</label>
+            <input type="text" formControlName="firstname" class="form-control input-sm"
+                [ngClass]="{ 'is-invalid': submitted && f.firstname.errors }" />
+            <div *ngIf="submitted && f.firstname.errors" class="invalid-feedback">
+                <div *ngIf="f.firstname.errors.required" style="color: red;">Firstname is required</div>
+            </div>
+        </div>
+        <div class="col-lg-6 form-group">
+            <label for="lastname">Lastname</label>
+            <input type="text" formControlName="lastname" class="form-control input-sm"
+                [ngClass]="{ 'is-invalid': submitted && f.lastname.errors }" />
+            <div *ngIf="submitted && f.lastname.errors" class="invalid-feedback">
+                <div *ngIf="f.lastname.errors.required" style="color: red;">Lastnme is required</div>
+            </div>
+        </div>
+        <div class="col-lg-6 form-group">
             <label for="username">Username</label>
             <input type="text" formControlName="username" class="form-control input-sm"
                 [ngClass]="{ 'is-invalid': submitted && f.username.errors }" />
@@ -9,7 +26,7 @@
                 <div *ngIf="f.username.errors.required" style="color: red;">Username is required</div>
             </div>
         </div>
-        <div class="form-group">
+        <div class="col-lg-6 form-group">
             <label for="email">Email</label>
             <input type="text" formControlName="email" class="form-control input-sm"
                 [ngClass]="{ 'is-invalid': submitted && f.email.errors }" />
@@ -18,25 +35,52 @@
                 <div *ngIf="f.email.errors.email" style="color: red;">Email not valid</div>
             </div>
         </div>
-        <div class="form-group">
+        <div class="col-lg-12  form-group" *ngIf="schedulerTimezoneList">
+            <label for="timeZone">TimeZone</label>
+            <select formControlName="timeZone" class="form-control input-sm" id="timeZone"
+                [ngClass]="{ 'is-invalid': submitted && f.timeZone.errors }">
+                <!-- true -> null for 2nd value -->
+                <option hidden value="" disabled selected>
+                    {{schedulerTimezoneList.parentLookupData.description}}
+                </option>
+                <option *ngFor="let schedulerTimezone of schedulerTimezoneList.subLookupData"
+                    [value]="schedulerTimezone.lookupType">
+                    {{schedulerTimezone.lookupValue}}
+                </option>
+            </select>
+            <div *ngIf="submitted && f.timeZone.errors" class="invalid-feedback">
+                <div *ngIf="f.timeZone.errors.required" style="color: red;">
+                    Scheduler TimeZone is required
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-12 form-group">
             <label for="password">Password</label>
             <input type="password" formControlName="password" class="form-control input-sm"
                 [ngClass]="{ 'is-invalid': submitted && f.password.errors }" />
-            <div *ngIf="password.invalid && (password.dirty || password.touched)"
-            class="form-text text-danger">
-            <div *ngIf="password.errors.required">Field is required</div>
-            <div *ngIf="password.errors.pattern">
-                Password must contain at least one number, one uppercase and a
-                lowercase letter and at least 8 characters<br />Password cannot
-                contain whitespace
+            <div *ngIf="submitted && f.password.errors" class="form-text text-danger">
+                <div *ngIf="password.errors.required" style="color: red;">Field is required</div>
+                <div *ngIf="password.errors.pattern" style="color: red;">
+                    Password must contain at least one number, one uppercase and a
+                    lowercase letter and at least 8 characters<br />Password cannot
+                    contain whitespace
+                </div>
             </div>
         </div>
-        </div>
-        <div class="form-group">
-            <button class="btn btn-sm btn-primary" (click)="back()">Back</button>
-            <button  type="submit" [disabled]="loading" class="btn btn-sm btn-danger" style="float:right" >Register</button>
+        <div class="row">
+            <div class="col-lg-6">
+                <button class="btn btn-sm btn-primary"
+                    style="margin-left: 15px;"
+                    (click)="back()">Back</button>
+            </div>
+            <div class="col-lg-6">
+                <button type="submit" [disabled]="loading" 
+                    class="btn btn-sm btn-danger"
+                    style="float:right;margin-right: 15px">Register</button>
+            </div>
         </div>
     </form>
+    <br>
     <div style="border-radius: 0 0 calc(0.25rem - 1px) calc(0.25rem - 1px);
         padding-top: 1rem!important;padding-bottom: 1rem!important;border-width: 0!important;
         padding: 0.5rem 1rem;background-color: #d4d4d4d4;">

@@ -1,6 +1,7 @@
 <div class="login-form">
     <form [formGroup]="resetPassForm" (ngSubmit)="onSubmit()" style="padding-bottom: 0px;">
         <h3 class="text-center">Reset Passwrod</h3>
+        <hr>
         <div class="form-group">
             <label for="newPassword">New Password</label>
             <input type="newPassword" formControlName="newPassword" class="form-control input-sm"
@@ -21,8 +22,8 @@
                 [ngClass]="{ 'is-invalid': submitted && f.confirmPassword.errors }" />
             <div *ngIf="confirmPassword.invalid && (confirmPassword.dirty || confirmPassword.touched)"
                 class="form-text text-danger">
-                <div *ngIf="confirmPassword.errors.required">Field is required</div>
-                <div *ngIf="confirmPassword.errors.pattern">
+                <div *ngIf="confirmPassword.errors.required" style="color: red;">Field is required</div>
+                <div *ngIf="confirmPassword.errors.pattern" style="color: red;">
                   Password must contain at least one number, one uppercase and a
                   lowercase letter and at least 8 characters<br />Password cannot
                   contain whitespace

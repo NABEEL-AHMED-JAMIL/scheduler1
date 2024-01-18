@@ -25,10 +25,13 @@ import {
     STTLinkUserComponent,
     STTFLinkSTTComponent,
     STTSLinkSTTFComponent,
+    STTSLinkSTTCComponent,
     STTCLinkSTTSComponent,
     CuCredentialComponent,
     CredentialListComponent,
-    ManageUserComponent
+    ManageUserComponent,
+    STTFLinkSTTSComponent,
+    STTLinkSTTFComponent
 } from '@/_component/index';
 import { Action } from '@/_models';
 import { AuthGuard } from '@/_helpers';
@@ -74,6 +77,16 @@ const routes: Routes = [
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN', 'ROLE_USER' ]
                 }
             },
+            {
+                path: 'batch',
+                component: BatchActionComponent,
+                canActivate: [AuthGuard],
+                data: {
+                    action: 'AppUser',
+                    breadcrumb: 'Batch',
+                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                }
+            },
             { 
                 path: 'manageUser',
                 component: ManageUserComponent,
@@ -85,7 +98,34 @@ const routes: Routes = [
                             type: 'refresh',
                             title: 'Refresh',
                             active: true
-                        }
+                        },
+                        {
+                            type: 'add',
+                            title: 'New Account',
+                            active: true
+                        },
+                        {
+                            type: 'menus',
+                            title: 'Batch Operation',
+                            active: true,
+                            menus: [
+                                {
+                                    title: 'Upload File',
+                                    router: '/profile/batch',
+                                    active: true
+                                },
+                                {
+                                    title: 'Downalod File',
+                                    targetEvent: 'downloadData',
+                                    active: true
+                                },
+                                {
+                                    title: 'Downalod Template',
+                                    targetEvent: 'downloadTemplate',
+                                    active: true
+                                }
+                            ]
+                        }      
                     ],
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
                 }
@@ -279,8 +319,14 @@ const routes: Routes = [
                     action: [
                         {
                             title: 'Linked Users',
-                            icon: 'glyphicon glyphicon-tasks',
+                            icon: 'glyphicon glyphicon-user',
                             router: '/stt/sttLinkUser',
+                            active: true
+                        },
+                        {
+                            title: 'Linked Form',
+                            icon: 'glyphicon glyphicon-link',
+                            router: '/stt/sttLinkForm',
                             active: true
                         }
                     ],
@@ -326,6 +372,27 @@ const routes: Routes = [
                         {
                             type: 'add',
                             title: 'Link User',
+                            active: true
+                        }
+                    ],
+                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                }
+            },
+            {
+                path: 'sttLinkForm',
+                component: STTLinkSTTFComponent,
+                canActivate: [AuthGuard],
+                data:  {
+                    breadcrumb: 'STT Link STTF',
+                    topHeader: [
+                        {
+                            type: 'refresh',
+                            title: 'Refresh',
+                            active: true
+                        },
+                        {
+                            type: 'add',
+                            title: 'Link STTF',
                             active: true
                         }
                     ],
@@ -404,10 +471,22 @@ const routes: Routes = [
                     action: [
                         {
                             title: 'Linked STT',
-                            icon: 'glyphicon glyphicon-tasks',
+                            icon: 'glyphicon glyphicon-link',
                             router: '/sttf/sttfLinkStt',
                             active: true
                         },
+                        {
+                            title: 'Linked Section',
+                            icon: 'glyphicon glyphicon-link',
+                            router: '/sttf/sttfLinkStts',
+                            active: true
+                        },
+                        {
+                            title: 'Linked Logic',
+                            icon: 'glyphicon glyphicon-link',
+                            router: '/stt/sttLinkFormLogic',
+                            active: true
+                        }
                     ],
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
                 }
@@ -451,6 +530,27 @@ const routes: Routes = [
                         {
                             type: 'add',
                             title: 'Link STT',
+                            active: true
+                        }
+                    ],
+                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                }
+            },
+            {
+                path: 'sttfLinkStts',
+                component: STTFLinkSTTSComponent,
+                canActivate: [AuthGuard],
+                data:  {
+                    breadcrumb: 'STTF Link STTS',
+                    topHeader: [
+                        {
+                            type: 'refresh',
+                            title: 'Refresh',
+                            active: true
+                        },
+                        {
+                            type: 'add',
+                            title: 'Link STTS',
                             active: true
                         }
                     ],
@@ -529,10 +629,17 @@ const routes: Routes = [
                     action: [
                         {
                             title: 'Linked STTF',
-                            icon: 'glyphicon glyphicon-tasks',
+                            icon: 'glyphicon glyphicon-link',
                             router: '/stts/sttsLinkSttf',
                             active: true
+                        },
+                        {
+                            title: 'Linked Control',
+                            icon: 'glyphicon glyphicon-link',
+                            router: '/stts/sttLinkControl',
+                            active: true
                         }
+
                     ],
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
                 }
@@ -576,7 +683,27 @@ const routes: Routes = [
                         {
                             type: 'add',
                             title: 'Link STTF',
-                            router: '/stt/addStt',
+                            active: true
+                        }
+                    ],
+                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                }
+            },
+            {
+                path: 'sttLinkControl',
+                component: STTSLinkSTTCComponent,
+                canActivate: [AuthGuard],
+                data:  {
+                    breadcrumb: 'STTS Link STTC',
+                    topHeader: [
+                        {
+                            type: 'refresh',
+                            title: 'Refresh',
+                            active: true
+                        },
+                        {
+                            type: 'add',
+                            title: 'Link STTC',
                             active: true
                         }
                     ],
@@ -655,7 +782,7 @@ const routes: Routes = [
                     action: [
                         {
                             title: 'Linked STTS',
-                            icon: 'glyphicon glyphicon-tasks',
+                            icon: 'glyphicon glyphicon-link',
                             router: '/sttc/sttcLinkStts',
                             active: true
                         }
@@ -702,7 +829,6 @@ const routes: Routes = [
                         {
                             type: 'add',
                             title: 'Link STTS',
-                            router: '/stt/addStt',
                             active: true
                         }
                     ],
@@ -782,7 +908,7 @@ const routes: Routes = [
         component: SettingLayoutComponent,
         canActivate: [AuthGuard],
         data:  {
-            role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+            role: [ 'ROLE_MASTER_ADMIN' ]
         },
         children: [
             { 
@@ -791,7 +917,7 @@ const routes: Routes = [
                 canActivate: [AuthGuard],
                 data:  {
                     breadcrumb: 'Search Engine',
-                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                    role: [ 'ROLE_MASTER_ADMIN' ]
                 }
             }
         ]

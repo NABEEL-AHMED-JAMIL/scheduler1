@@ -48,7 +48,7 @@ export class LookupComponent implements OnInit {
                     } else if (header.type === 'menus') {
                         this.dropdownButton = header;
                         this.dropdownButton.menus = this.dropdownButton.menus
-                        .filter(menu => {
+                        .filter((menu: any) => {
                             return menu.active;
                         });
                     }

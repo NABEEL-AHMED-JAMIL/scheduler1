@@ -181,6 +181,28 @@ export class ProfileComponent implements OnInit {
         });
     }
 
+    public updateAppUserTimeZone(): void {
+        this.spinnerService.show();
+        // stop here if form is invalid
+        if (this.timeZoneForm.invalid) {
+            this.spinnerService.hide();
+            return;
+        }
+        this.appUserService.updateAppUserTimeZone(this.timeZoneForm.value)
+        .pipe(first())
+        .subscribe((response: any) => {
+            this.spinnerService.hide();
+            if (response.status === ApiCode.ERROR) {
+                this.alertService.showError(response.message, ApiCode.ERROR);
+                return;
+            }
+            this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
+        }, (error: any) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error.message, ApiCode.ERROR);
+        });
+    }
+
     public updateAppUserPassword(): void {
         this.spinnerService.show();
         // stop here if form is invalid

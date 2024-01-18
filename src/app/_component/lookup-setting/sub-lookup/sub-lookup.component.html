@@ -41,14 +41,17 @@
     }
 
     .rounded-circle {
-        border-radius: 50%!important;
+        border-radius: 50% !important;
     }
+
     .mt-3 {
-        margin-top: 1rem!important;
+        margin-top: 1rem !important;
     }
+
     .text-secondary {
-        color: #6c757d!important;
+        color: #6c757d !important;
     }
+
     p {
         margin-top: 0;
         margin-bottom: 1rem;
@@ -65,13 +68,6 @@
                         {{title}}
                     </div>
                     <div class="col-lg-6" style="text-align: end;">
-                        <button *ngIf="refreshButton && refreshButton.active" type="button"
-                            class="form-control input-sm" 
-                            style="width: auto;display: inline;margin-right: 7px;"
-                            (click)="refreshAction()">
-                            <span class="glyphicon glyphicon-refresh"></span>
-                            {{refreshButton.title}}
-                        </button>
                         <button *ngIf="addButton && addButton.active" type="button"
                             class="form-control input-sm"
                             style="width: auto; background: #cb0f43; color: white;
@@ -114,91 +110,85 @@
                         <label for="html">DateCreated</label><br>
                         <label for="html">{{parentLookupDate?.dateCreated | date: 'dd/MM/yyyy' }}</label><br>
                     </div>
-                </div>                
-            </div>
-        </div>
-    </div>
-    <div class="col-lg-12">
-        <div class="card mb-3">
-            <div class="card-body">
-                <div class="row">
                     <div class="col-lg-12">
+                        <hr style="margin-top: 10px;margin-bottom: 10px;">
+                    </div>
+                    <div class="col-lg-8">
                         <div class="form-group">
                             <label for="lookupDatas" *ngIf="lookupDatas">
                                 Total Lookup ({{lookupDatas.length}})
                             </label>
-                            <input type="text" id="lookupDatasSearch" 
-                                class="form-control input-sm"
-                                style="width: 30%;" [(ngModel)]="searchLookup"
-                                placeholder="Search by any key" />
+                            <input type="text" id="lookupDatasSearch" class="form-control input-sm" style="width: 30%;"
+                                [(ngModel)]="searchLookup" placeholder="Search by any key" />
                         </div>
                     </div>
+                    <div class="col-lg-4" style="text-align: end;">
+                        <br>
+                        <button *ngIf="refreshButton && refreshButton.active" type="button"
+                            class="form-control input-sm" style="width: auto;display: inline;margin-right: 7px;"
+                            (click)="refreshAction()">
+                            <span class="glyphicon glyphicon-refresh"></span>
+                            {{refreshButton.title}}
+                        </button>
+                    </div>
+                    <div class="col-lg-12">
+                        <table id="source-task-type" class="table table-responsive table table-striped
+                        table-bordered table-sm" style="font-size: 12px;">
+                            <thead>
+                                <tr>
+                                    <th style="width: 4%;"># No</th>
+                                    <th>Lookup Type</th>
+                                    <th>Lookup Value</th>
+                                    <th>Description</th>
+                                    <th style="width: 8%;">Created Date</th>
+                                    <th style="width: 6%;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr
+                                    *ngFor="let lookupData of pageOfLookupData | searchFilter: searchLookup; let i = index">
+                                    <td>{{lookupData.lookupId}}</td>
+                                    <td>{{lookupData.lookupType}}</td>
+                                    <td>{{lookupData.lookupValue}}</td>
+                                    <td>{{lookupData.description}}</td>
+                                    <td style="text-align: center;">
+                                        {{lookupData.dateCreated | date: 'yyyy-MM-dd'}}
+                                    </td>
+                                    <td style="text-align: center;">
+                                        <div class="btn-group btn-group-xs" role="group" style="text-align: center">
+                                            <button type="button" class="btn btn-default" data-toggle="modal"
+                                                data-target="#lookupDatas" (click)="editLookupData(lookupData)">
+                                                <span class="glyphicon glyphicon-edit" style="color:blue"></span>
+                                            </button>
+                                            <button type="button" class="btn btn-default" data-toggle="modal"
+                                                data-target="#deleteAction" (click)="deleteLookupData(lookupData, i)">
+                                                <span class="glyphicon glyphicon-trash" style="color: #dc3545;"></span>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="6" style="text-align: center;padding-bottom: 0px;">
+                                        <jw-pagination [items]="lookupDatas" [pageSize]="10"
+                                            (changePage)="onChangePage($event)"></jw-pagination>
+                                    </td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
                 </div>
-                <table id="source-task-type" class="table table-responsive table table-striped
-                    table-bordered table-sm" style="font-size: 12px;">
-                    <thead>
-                        <tr>
-                            <th style="width: 4%;"># No</th>
-                            <th>Lookup Type</th>
-                            <th>Lookup Value</th>
-                            <th>Description</th>
-                            <th style="width: 8%;">Created Date</th>
-                            <th style="width: 6%;">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr *ngFor="let lookupData of pageOfLookupData | searchFilter: searchLookup; let i = index">
-                            <td>{{lookupData.lookupId}}</td>
-                            <td>{{lookupData.lookupType}}</td>
-                            <td>{{lookupData.lookupValue}}</td>
-                            <td>{{lookupData.description}}</td>
-                            <td style="text-align: center;">
-                                {{lookupData.dateCreated | date: 'yyyy-MM-dd'}}
-                            </td>
-                            <td style="text-align: center;">
-                                <div class="btn-group btn-group-xs" role="group"
-                                    style="text-align: center">
-                                    <button type="button" class="btn btn-default"
-                                        data-toggle="modal" data-target="#lookupDatas"
-                                        (click)="editLookupData(lookupData)">
-                                        <span class="glyphicon glyphicon-edit"
-                                            style="color:blue"></span>
-                                    </button>
-                                    <button type="button" class="btn btn-default"
-                                        data-toggle="modal" data-target="#deleteAction"
-                                        (click)="deleteLookupData(lookupData, i)">
-                                        <span class="glyphicon glyphicon-trash"
-                                            style="color: #dc3545;"></span>
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                    </tbody>
-                    <tfoot>
-                        <tr>
-                            <td colspan="6" style="text-align: center;padding-bottom: 0px;">
-                                <jw-pagination [items]="lookupDatas" [pageSize]="10" 
-                                    (changePage)="onChangePage($event)"></jw-pagination>
-                            </td>
-                        </tr>
-                    </tfoot>
-                </table>
             </div>
         </div>
     </div>
 </div>
 <!-- lookup detai -->
-<cu-lookup *ngIf="lookupAction"
-    [lookUpAction]="lookupAction"
-    [recivedLookupData]="lookupData"
-    (senderEvent) = "resetEvent($event)">
-</cu-lookup >
+<cu-lookup *ngIf="lookupAction" [lookUpAction]="lookupAction" [recivedLookupData]="lookupData"
+    (senderEvent)="resetEvent($event)">
+</cu-lookup>
 <!-- data-toggle="modal" data-target="#deleteAction" -->
-<div class="modal fade" id="deleteAction"
-    role="dialog" style="top: 85px;">
-    <del-box
-        [title]="title"
-        [subTitle]="subTitle"
-        (deleteEvent)="deleteActionTriger()">
+<div class="modal fade" id="deleteAction" role="dialog" style="top: 85px;">
+    <del-box [title]="title" [subTitle]="subTitle" (deleteEvent)="deleteActionTriger()">
     </del-box>
 </div>
