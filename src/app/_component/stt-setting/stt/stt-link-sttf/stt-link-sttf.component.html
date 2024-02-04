@@ -29,13 +29,13 @@
         <tr>
             <th style="width: 4%;">-</th>
             <th style="width: 5%;"># No</th>
-            <th style="width: 4%;">Form ID</th>
+            <th>Form ID</th>
+            <th>Sttf Order</th>
             <th>Form Name</th>
             <th>Form Type</th>
             <th>HomePage</th>
             <th>Service Id</th>
             <th>Defult</th>
-            <th>Sttf Order</th>
             <th>Created Date</th>
             <th>Action</th>
         </tr>
@@ -53,18 +53,15 @@
             </td>
             <td style="text-align: center;">{{sttLinkSTTF.sttfLinkSttId}}</td>
             <td style="text-align: center;">{{sttLinkSTTF.sttfId}}</td>
+            <td style="text-align: center;">{{sttLinkSTTF.sttfOrder}}</td>
             <td style="text-align: center;">{{sttLinkSTTF.sttfName}}</td>
             <td style="text-align: center;">{{sttLinkSTTF?.formType.description}}</td>
             <td style="text-align: center;">{{sttLinkSTTF?.homePage?.description}}</td>
             <td style="text-align: center;">{{sttLinkSTTF?.serviceId}}</td>
             <td style="text-align: center;">{{sttLinkSTTF?.defaultSttf.description}}</td>
-            <td style="text-align: center;">{{sttLinkSTTF.sttfOrder}}</td>
             <td style="text-align: center;">{{sttLinkSTTF.dateCreated | date:'dd-MM-yyyy'}}</td>
             <td style="text-align: center;">
                 <div class="btn-group btn-group-xs" role="group" style="text-align: center">
-                    <button type="button" class="btn btn-default">
-                        <span class="glyphicon glyphicon-eye-open" style="color: #000000"></span>
-                    </button>
                     <button type="button" class="btn btn-default" data-toggle="modal" data-target="#deleteAction"
                         [disabled]="sttLinkSTTF.status.lookupValue === 0" (click)="deleteAction(sttLinkSTTF)">
                         <span class="glyphicon glyphicon-trash" style="color: #dc3545;"></span>
@@ -76,7 +73,7 @@
     <tfoot>
         <tr>
             <td colspan="13" style="text-align: center;padding-bottom: 0px;">
-                <jw-pagination [items]="sttLinkSTTFLists" [pageSize]="25"
+                <jw-pagination [items]="sttLinkSTTFLists" [pageSize]="10"
                     (changePage)="onChangePage($event)"></jw-pagination>
             </td>
         </tr>

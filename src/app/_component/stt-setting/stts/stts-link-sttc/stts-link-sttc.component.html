@@ -31,12 +31,12 @@
             <th style="width: 4%;">-</th>
             <th style="width: 4%;"># No</th>
             <th>Sttc Id</th>
+            <th>Sttc Order</th>
             <th>Sttc Name</th>
             <th>Sttc FiledName</th>
             <th>Sttc FiledType</th>
             <th>Sttc Required</th>
             <th>Sttc Default</th>
-            <th>Sttc Order</th>
             <th>Created Date</th>
             <th style="width: 4%;">Action</th>
         </tr>
@@ -59,6 +59,9 @@
                 {{sttsLinkSTTC.sttcId}}
             </td>
             <td style="text-align: center;">
+                {{sttsLinkSTTC.sttcOrder}}
+            </td>
+            <td style="text-align: center;">
                 {{sttsLinkSTTC.sttcName}}
             </td>
             <td style="text-align: center;">
@@ -72,9 +75,6 @@
             </td>
             <td style="text-align: center;">
                 {{sttsLinkSTTC.sttcDefault?.description}}
-            </td>
-            <td style="text-align: center;">
-                {{sttsLinkSTTC.sttcOrder}}
             </td>
             <td style="text-align: center;">
                 {{sttsLinkSTTC.dateCreated | date:'dd-MM-yyyy'}}
@@ -92,7 +92,7 @@
     <tfoot>
         <tr>
             <td colspan="12" style="text-align: center;padding-bottom: 0px;">
-                <jw-pagination [items]="sttsLinkSTTCList" [pageSize]="25"
+                <jw-pagination [items]="sttsLinkSTTCList" [pageSize]="10"
                     (changePage)="onChangePage($event)"></jw-pagination>
             </td>
         </tr>

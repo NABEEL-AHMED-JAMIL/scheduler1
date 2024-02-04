@@ -1,12 +1,14 @@
 import { Component, OnInit } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
 import { first } from 'rxjs/operators';
+import { saveAs } from 'file-saver';
 import {
     AuthenticationService, AlertService,
     STTService, CommomService
 } from '@/_services';
 import { SpinnerService } from '@/_helpers';
 import { AuthResponse, ApiCode, STTFormList } from '@/_models/index';
+import { FormArray, FormBuilder, FormControl, FormGroup } from '@angular/forms';
 
 
 @Component({
@@ -22,6 +24,7 @@ export class STTFListComponent implements OnInit {
     public sstForm: STTFormList;
     public sstFormList: STTFormList[] = [];
     public pageOfSSTs: Array<STTFormList>;
+    public sttfJsonDetail: any;
 
     public addButton: any;
     public refreshButton: any;
@@ -29,8 +32,11 @@ export class STTFListComponent implements OnInit {
     public topHeader: any = [];
     public actionMenu: any = [];
     public currentActiveProfile: AuthResponse;
+    public sttcInteractonForm: FormGroup;
 
-    constructor(private router: Router,
+    constructor(
+        public fb: FormBuilder,
+        private router: Router,
         private route: ActivatedRoute,
         private alertService: AlertService,
         private commomService: CommomService,
@@ -122,6 +128,54 @@ export class STTFListComponent implements OnInit {
             });
     }
 
+    public viewAction(payload: any ): void {
+        this.spinnerService.show();
+        this.sttService.fetchSTTFormDetail(payload.sttfId)
+            .pipe(first())
+            .subscribe((response: any) => {
+                this.sttfJsonDetail = response.data;
+                this.sttcInteractonForm = this.fb.group({
+                    sttfId: new FormControl(this.sttfJsonDetail.formDetail.sttfId),
+                    groups: this.fb.array([])
+                });
+                this.sttfJsonDetail.formSection.forEach((sectionPayload: any) => {
+                    const groupForm = this.fb.group({
+                        auSttsId: sectionPayload.auSttsId,
+                        groupName: sectionPayload.section.sttsName,
+                        filedItem: this.fb.array([])
+                    });
+                    if (sectionPayload?.controlFiled) {
+                        const filedItemFormArray = groupForm.get('filedItem') as FormArray;
+                        sectionPayload?.controlFiled.forEach(filedControl => {
+                            filedItemFormArray.push(this.buildItem(filedControl));
+                        });
+                    }
+                    (this.sttcInteractonForm.get('groups') as FormArray).push(groupForm);
+                });
+                this.spinnerService.hide();
+            }, (error: any) => {
+                this.spinnerService.hide();
+                this.alertService.showError(error, ApiCode.ERROR);
+            });
+    }
+    
+    public buildItem(filedControl: any): any {
+        return new FormGroup({
+            sttcId: new FormControl(filedControl?.sttcId),
+            sttcName: new FormControl(filedControl?.sttcName),
+            filedTitle: new FormControl(filedControl?.filedTitle),
+            filedType: new FormControl(filedControl?.filedType?.description),
+            interactionsId: new FormControl(filedControl?.interaction?.interactionsId),
+            visiblePattern: new FormControl(filedControl?.interaction?.visiblePattern),
+            disabledPattern: new FormControl(filedControl?.interaction?.disabledPattern)
+        });
+    }
+
+    public get filedItemFormArray() {
+        return (this.sttcInteractonForm.get('groups') as FormArray)
+            .controls.map(group => group.get('filedItem') as FormArray);
+    }
+
     public refreshAction(): void {
         this.fetchSTTF();
     }
@@ -195,9 +249,73 @@ export class STTFListComponent implements OnInit {
             });
     }
 
+    public downloadJson(): void {
+        const file = new Blob([JSON.stringify(this.sttfJsonDetail)], { type: 'text/json' });
+        saveAs(file, 'Form-Json-Config ' + this.uuid() + '.json');
+    }
+
     public onChangePage(pageOfSSTs: Array<any>) {
         // update current page of items
         this.pageOfSSTs = pageOfSSTs;
+    }
+
+    public uuid(): string {
+        return 'xxxxx-xxxxxx'.replace(/[xy]/g, (char) => {
+          let random = Math.random() * 16 | 0;
+          let value = char === "x" ? random : (random % 4 + 8);
+          return value.toString(16);
+        });
+    }
+
+    public addSTTCInteractions(auSttsId: any, interactions: any): any {
+        this.spinnerService.show();
+        let payload = {
+            auSttsId: auSttsId,
+            ...interactions,
+            accessUserDetail: {
+                appUserId: this.currentActiveProfile.appUserId,
+                username: this.currentActiveProfile.username
+            },
+        };
+        this.sttService.addSTTCInteractions(payload)
+            .pipe(first())
+            .subscribe((response: any) => {
+                let payload = {
+                    sttfId: this.sttfJsonDetail.formDetail.sttfId
+                }
+                debugger
+                this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
+                this.viewAction(payload);
+                this.spinnerService.hide();
+            }, (error: any) => {
+                this.spinnerService.hide();
+                this.alertService.showError(error, ApiCode.ERROR);
+            });
+    }
+
+    public deleteSTTCInteractions(auSttsId: any, interactions: any): any {
+        this.spinnerService.show();
+        let payload = {
+            auSttsId: auSttsId,
+            ...interactions,
+            accessUserDetail: {
+                appUserId: this.currentActiveProfile.appUserId,
+                username: this.currentActiveProfile.username
+            },
+        };
+        this.sttService.deleteSTTCInteractions(payload)
+            .pipe(first())
+            .subscribe((response: any) => {
+                let payload = {
+                    sttfId: this.sttfJsonDetail.formDetail.sttfId
+                }
+                this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
+                this.viewAction(payload);
+                this.spinnerService.hide();
+            }, (error: any) => {
+                this.spinnerService.hide();
+                this.alertService.showError(error, ApiCode.ERROR);
+            });
     }
 
 }

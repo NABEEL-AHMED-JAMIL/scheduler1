@@ -20,7 +20,7 @@ import { LoginComponent, RegisterComponent, ForgotPassComponent, ResetPassCompon
     STTLinkUserComponent, STTFLinkSTTComponent, STTSLinkSTTFComponent, STTCLinkSTTSComponent,
     STTFLinkSTTSComponent, STTLinkSTTFComponent, STTSLinkSTTCComponent, BatchComponent,
     CuCredentialComponent, CredentialListComponent, ManageUserComponent, CUUserComponent,
-    STTCommonTableComponent
+    STTCommonTableComponent, NotifactionComponent, SttpGroundComponent
 } from '@/_component/index';
 import { ToastrModule } from 'ngx-toastr';
 
@@ -79,7 +79,9 @@ import { ToastrModule } from 'ngx-toastr';
         CredentialListComponent,
         CUUserComponent,
         ManageUserComponent,
-        JwPaginationComponent
+        JwPaginationComponent,
+        NotifactionComponent,
+        SttpGroundComponent
     ],
     providers: [
         { 

@@ -174,6 +174,18 @@ export class STTService {
         return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/fetchSTTCLinkSTTS`, payload);
     }
 
+    public fetchSTTFormDetail(formId: any) {
+        return this.http.get<any>(`${config.apiUrl}/sourceTaskType.json/fetchSTTFormDetail?formId=`+formId);
+    }
+
+    public addSTTCInteractions(payload: any) {
+        return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/addSTTCInteractions`, payload);
+    }
+
+    public deleteSTTCInteractions(payload: any) {
+        return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTaskType.json/deleteSTTCInteractions`, payload);
+    }
+
     public downloadSTTCommon(payload: any): Observable<any> {
         return this.http.post(`${config.apiUrl}/sourceTaskType.json/downloadSTTCommon`, payload,
         {

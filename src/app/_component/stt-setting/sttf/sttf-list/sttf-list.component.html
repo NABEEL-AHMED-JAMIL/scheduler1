@@ -3,27 +3,28 @@
         <label *ngIf="sstFormList">
             Total STTF ({{sstFormList.length}})
         </label>
-        <input type="text" id="searchSTTF" class="form-control input-sm" style="width: 60%;" [(ngModel)]="searchSTTF"
+        <input type="text" id="searchSTTF" class="form-control input-sm" 
+            style="width: 60%;" [(ngModel)]="searchSTTF"
             placeholder="Search by any key" />
     </div>
     <div class="col-lg-6" style="text-align: end;margin-top: 25px;">
         <!-- working -->
         <button *ngIf="refreshButton && refreshButton.active" type="button" class="form-control input-sm"
             style="width: auto;display: inline;margin-right: 7px;" (click)="refreshAction()">
-            <span id="loading" class="glyphicon glyphicon-refresh"></span>
-            {{refreshButton.title}}
+            <span id="loading" class="glyphicon glyphicon-refresh"></span>{{refreshButton.title}}
         </button>
         <!-- working -->
-        <button *ngIf="addButton && addButton.active" type="button" class="form-control input-sm" style="width: auto; background: #cb0f43;color: white;
+        <button *ngIf="addButton && addButton.active" type="button" 
+            class="form-control input-sm" style="width: auto; background: #cb0f43;color: white;
             display: inline;margin-right: 7px;" (click)="addAction()">
-            <span class="glyphicon glyphicon-plus-sign"></span>
-            {{addButton.title}}
+            <span class="glyphicon glyphicon-plus-sign"></span>{{addButton.title}}
         </button>
         <div *ngIf="dropdownButton && dropdownButton.active" class="dropdown" style="display: inline;">
             <button class="btn btn-primary dropdown-toggle"
                 style="padding: 4px 5px;border-radius: 3px;background: #4750b6;" type="button"
                 data-toggle="dropdown">{{dropdownButton.title}}
-                <span class="caret"></span></button>
+                <span class="caret"></span>
+            </button>
             <ul class="dropdown-menu" style="left: -38px;">
                 <li *ngFor="let menu of dropdownButton.menus">
                     <a (click)="menuAction(menu)">{{menu.title}}</a>
@@ -32,8 +33,8 @@
         </div>
     </div>
 </div>
-<table id="sttf" style="font-size: 12px;margin-top: 10px;"
-    class="table table-responsive table table-striped table-bordered table-sm">
+<table id="sttf" class="table table-responsive table table-striped table-bordered table-sm"
+    style="font-size: 12px;margin-top: 10px;">
     <thead>
         <tr>
             <th style="width: 4%;">-</th>
@@ -85,7 +86,8 @@
             </td>
             <td style="text-align: center;">
                 <div class="btn-group btn-group-xs" role="group" style="text-align: center">
-                    <button type="button" class="btn btn-default" [disabled]="sstForm.status.lookupValue === 0">
+                    <button type="button" class="btn btn-default" (click)="viewAction(sstForm)"
+                        [disabled]="sstForm.status.lookupValue === 0 || sstForm.totalSection === 0">
                         <span class="glyphicon glyphicon-eye-open" style="color: #000000"></span>
                     </button>
                     <button type="button" class="btn btn-default" (click)="editAction(sstForm)">
@@ -115,14 +117,82 @@
     </tbody>
     <tfoot>
         <tr>
-            <td colspan="9" style="text-align: center;padding-bottom: 0px;">
-                <jw-pagination [items]="sstFormList" [pageSize]="25"
+            <td colspan="11" style="text-align: center;padding-bottom: 0px;">
+                <jw-pagination [items]="sstFormList" [pageSize]="10"
                     (changePage)="onChangePage($event)"></jw-pagination>
             </td>
         </tr>
     </tfoot>
 </table>
+<!-- section detail -->
+<div class="panel panel-default" *ngIf="sttfJsonDetail">
+    <div class="panel-heading">Form Control Interactions</div>
+    <div class="panel-body">
+        <div class="row">
+            <div class="col-lg-8 col-sm-8" style="overflow-y: scroll; height:500px;">
+                <form [formGroup]="sttcInteractonForm">
+                    <div formArrayName="groups">
+                        <div class="borderd-content" 
+                            *ngFor="let group of sttcInteractonForm.get('groups').controls; let i = index" 
+                            [formGroup]="group" id="group-{{i}}" style="margin-top: 15px">
+                            <div class="title" style="color: #cb0f43;">
+                                ({{group.value.groupName}}) 
+                            </div>
+                            <div class="content" style="margin-top: 10px;">
+                                <table id="sttf" class="table table-responsive table table-striped table-bordered table-sm"
+                                    style="font-size: 12px;margin-bottom: 0px !important;">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Name</th>
+                                            <th>Type</th>
+                                            <th>Title</th>
+                                            <th style="width: 1px">Hid/Show</th>
+                                            <th style="width: 1px">Disabled</th>
+                                            <th style="width: 70px">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody formArrayName="filedItem">
+                                        <tr *ngFor="let filed of group.get('filedItem').controls; let j = index" 
+                                            [formGroup]="filed" id="filed-{{j}}">
+                                            <td>{{filed.value.sttcId}}</td>
+                                            <td>{{filed.value.sttcName}}</td>
+                                            <td>{{filed.value.filedType}}</td>
+                                            <td>{{filed.value.filedTitle}}</td>
+                                            <td><input type="text" [formControl]="filed.controls.visiblePattern"
+                                                style="float: right;"></td>
+                                            <td><input type="text" [formControl]="filed.controls.disabledPattern"
+                                                style="float: right;"></td>
+                                            <td>
+                                                <button type="button" [disabled]="(filed.get('visiblePattern').value === null || filed.get('visiblePattern').value === '') 
+                                                    && (filed.get('disabledPattern').value === null || filed.get('disabledPattern').value === '')"
+                                                    (click)="addSTTCInteractions(group.value.auSttsId, filed.value)">
+                                                    <span class="glyphicon glyphicon-ok-circle" style="color:#4750b6"></span>
+                                                </button>&nbsp;
+                                                <button type="button" [disabled]="filed.get('interactionsId').value === null"
+                                                    (click)="deleteSTTCInteractions(group.value.auSttsId, filed.value)">
+                                                    <span class="glyphicon glyphicon-remove-circle" style="color:rgb(128, 19, 0)"></span>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="col-lg-4 col-sm-4">
+                <button class="form-control input-sm"
+                    style="background: #4750b6;color: white;"
+                    (click)="downloadJson()">Downalod File</button>
+                <pre style="overflow-y: scroll; height:500px;">{{sttfJsonDetail | json}}</pre>
+            </div>
+        </div>
+    </div>
+</div>
 <div class="modal fade" id="deleteAction" role="dialog" style="top: 85px;">
-    <del-box [title]="title" [subTitle]="subTitle" (deleteEvent)="deleteActionTriger()">
+    <del-box [title]="title" [subTitle]="subTitle" 
+        (deleteEvent)="deleteActionTriger()">
     </del-box>
 </div>

@@ -30,10 +30,10 @@
             <th style="width: 4%;">-</th>
             <th style="width: 4%;"># No</th>
             <th style="width: 5%;">Stts Id</th>
+            <th>Sttc Order</th>
             <th>Stts Name</th>
             <th>Stts Description</th>
             <th>Default</th>
-            <th>Sttc Order</th>
             <th>Created Date</th>
             <th style="width: 4%;">Action</th>
         </tr>
@@ -56,6 +56,9 @@
                 {{sttcLinkSTTS.sttsId}}
             </td>
             <td style="text-align: center;">
+                {{sttcLinkSTTS.sttcOrder}}
+            </td>
+            <td style="text-align: center;">
                 {{sttcLinkSTTS.sttsName}}
             </td>
             <td style="text-align: center;">
@@ -63,9 +66,6 @@
             </td>
             <td style="text-align: center;">
                 {{sttcLinkSTTS.sttsDefault.description}}
-            </td>
-            <td style="text-align: center;">
-                {{sttcLinkSTTS.sttcOrder}}
             </td>
             <td style="text-align: center;">
                 {{sttcLinkSTTS.dateCreated | date:'dd-MM-yyyy'}}
@@ -83,7 +83,7 @@
     <tfoot>
         <tr>
             <td colspan="12" style="text-align: center;padding-bottom: 0px;">
-                <jw-pagination [items]="sttcLinkSTTSList" [pageSize]="25"
+                <jw-pagination [items]="sttcLinkSTTSList" [pageSize]="10"
                     (changePage)="onChangePage($event)"></jw-pagination>
             </td>
         </tr>

@@ -1,8 +1,6 @@
 import { Component, Input, OnInit } from '@angular/core';
 import { first } from 'rxjs/operators';
-import { AuthenticationService, AlertService,
-    LookupService, CommomService, CredentailService
-} from '@/_services';
+import { AuthenticationService, AlertService, CredentailService } from '@/_services';
 import { SpinnerService } from '@/_helpers';
 import { Router, ActivatedRoute } from '@angular/router';
 import { ApiCode, Action } from '@/_models';
@@ -33,11 +31,9 @@ export class CredentialListComponent implements OnInit {
 
     constructor(private router: Router,
         private route: ActivatedRoute,
-        private lookupService: LookupService,
         private credentailService: CredentailService,
         private alertService: AlertService,
         private spinnerService: SpinnerService,
-        private commomService: CommomService,
         private authenticationService: AuthenticationService) {
         this.currentActiveProfile = authenticationService.currentUserValue;
         this.route.data.subscribe((data: any) => {

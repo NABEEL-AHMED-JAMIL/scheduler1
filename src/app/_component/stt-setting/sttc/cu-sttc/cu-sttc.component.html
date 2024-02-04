@@ -128,20 +128,13 @@
                                 </div>
                             </div>
                             <div class="form-group">
-                                <label for="filedTitle">Filed Title</label>
-                                <input type="text" id="filedTitle" minlength="2" maxlength="150"
-                                    formControlName="filedTitle" class="form-control input-sm"
-                                    placeholder="Enter filed title"
-                                    [ngClass]="{ 'is-invalid': submitted && f.filedTitle.errors }" />
-                                <div *ngIf="submitted && f.filedTitle.errors" class="invalid-feedback">
-                                    <div *ngIf="f.filedTitle.errors.required" style="color: red;">Filed Title is
+                                <label for="description">Description</label>
+                                <input type="text" id="description" formControlName="description"
+                                    class="form-control input-sm" placeholder="Enter description"
+                                    [ngClass]="{ 'is-invalid': submitted && f.description.errors }" />
+                                <div *ngIf="submitted && f.description.errors" class="invalid-feedback">
+                                    <div *ngIf="f.description.errors.required" style="color: red;">Description is
                                         required
-                                    </div>
-                                    <div *ngIf="f.filedTitle.errors.minlength" style="color: red;">Filed Title is
-                                        maxlength 0
-                                    </div>
-                                    <div *ngIf="f.filedTitle.errors.maxlength" style="color: red;">Filed Title is
-                                        maxlength 150
                                     </div>
                                 </div>
                             </div>
@@ -159,13 +152,20 @@
                         <!-- description -->
                         <div class="col-lg-4">
                             <div class="form-group">
-                                <label for="description">Description</label>
-                                <input type="text" id="description" formControlName="description"
-                                    class="form-control input-sm" placeholder="Enter description"
-                                    [ngClass]="{ 'is-invalid': submitted && f.description.errors }" />
-                                <div *ngIf="submitted && f.description.errors" class="invalid-feedback">
-                                    <div *ngIf="f.description.errors.required" style="color: red;">Description is
+                                <label for="filedTitle">Filed Title</label>
+                                <input type="text" id="filedTitle" minlength="2" maxlength="150"
+                                    formControlName="filedTitle" class="form-control input-sm"
+                                    placeholder="Enter filed title"
+                                    [ngClass]="{ 'is-invalid': submitted && f.filedTitle.errors }" />
+                                <div *ngIf="submitted && f.filedTitle.errors" class="invalid-feedback">
+                                    <div *ngIf="f.filedTitle.errors.required" style="color: red;">Filed Title is
                                         required
+                                    </div>
+                                    <div *ngIf="f.filedTitle.errors.minlength" style="color: red;">Filed Title is
+                                        maxlength 0
+                                    </div>
+                                    <div *ngIf="f.filedTitle.errors.maxlength" style="color: red;">Filed Title is
+                                        maxlength 150
                                     </div>
                                 </div>
                             </div>

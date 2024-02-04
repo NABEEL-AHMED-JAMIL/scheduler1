@@ -30,9 +30,9 @@
             <th style="width: 4%;">-</th>
             <th style="width: 4%;"># No</th>
             <th style="width: 5%;">Stts Id</th>
+            <th>Stts Order</th>
             <th>Stts Name</th>
             <th>Default</th>
-            <th>Stts Order</th>
             <th>Created Date</th>
             <th style="width: 4%;">Action</th>
         </tr>
@@ -50,9 +50,9 @@
             </td>
             <td style="text-align: center;">{{sttfLinkSTTS.sttfLinkSttsId}}</td>
             <td style="text-align: center;">{{sttfLinkSTTS.sttsId}}</td>
+            <td style="text-align: center;">{{sttfLinkSTTS.sttsOrder}}</td>
             <td style="text-align: center;">{{sttfLinkSTTS.sttsName}}</td>
             <td style="text-align: center;">{{sttfLinkSTTS.sttsDefault.description}}</td>
-            <td style="text-align: center;">{{sttfLinkSTTS.sttsOrder}}</td>
             <td style="text-align: center;">{{sttfLinkSTTS.dateCreated | date:'dd-MM-yyyy'}}</td>
             <td style="text-align: center;">
                 <div class="btn-group btn-group-xs" role="group" style="text-align: center">
@@ -67,7 +67,7 @@
     <tfoot>
         <tr>
             <td colspan="9" style="text-align: center;padding-bottom: 0px;">
-                <jw-pagination [items]="sttfLinkSTTSList" [pageSize]="25"
+                <jw-pagination [items]="sttfLinkSTTSList" [pageSize]="10"
                     (changePage)="onChangePage($event)"></jw-pagination>
             </td>
         </tr>

@@ -31,7 +31,9 @@ import {
     CredentialListComponent,
     ManageUserComponent,
     STTFLinkSTTSComponent,
-    STTLinkSTTFComponent
+    STTLinkSTTFComponent,
+    NotifactionComponent,
+    SttpGroundComponent
 } from '@/_component/index';
 import { Action } from '@/_models';
 import { AuthGuard } from '@/_helpers';
@@ -128,6 +130,33 @@ const routes: Routes = [
                         }      
                     ],
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                }
+            }
+        ]
+    },
+    {
+        path: 'notifaction',
+        component: SettingLayoutComponent,
+        canActivate: [AuthGuard],
+        data:  {
+            breadcrumb: 'Notifaction',
+            role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN', 'ROLE_USER' ],
+            topHeader: [
+                {
+                    type: 'refresh',
+                    title: 'Refresh',
+                    active: true
+                }
+            ]
+        },
+        children: [
+            { 
+                path: '',
+                component: NotifactionComponent,
+                canActivate: [AuthGuard],
+                data:  {
+                    breadcrumb: '',
+                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN', 'ROLE_USER' ]
                 }
             }
         ]
@@ -479,12 +508,6 @@ const routes: Routes = [
                             title: 'Linked Section',
                             icon: 'glyphicon glyphicon-link',
                             router: '/sttf/sttfLinkStts',
-                            active: true
-                        },
-                        {
-                            title: 'Linked Logic',
-                            icon: 'glyphicon glyphicon-link',
-                            router: '/stt/sttLinkFormLogic',
                             active: true
                         }
                     ],
@@ -899,6 +922,26 @@ const routes: Routes = [
                     action: Action.EDIT,
                     breadcrumb: 'Edit Credential',
                     role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                }
+            }
+        ]
+    },
+    {
+        path: 'sttp',
+        component: SettingLayoutComponent,
+        canActivate: [AuthGuard],
+        data:  {
+            breadcrumb: 'PlayGround',
+            role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN', 'ROLE_USER' ]
+        },
+        children: [
+            { 
+                path: '',
+                component: SttpGroundComponent,
+                canActivate: [AuthGuard],
+                data:  {
+                    breadcrumb: '',
+                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN', 'ROLE_USER' ]
                 }
             }
         ]

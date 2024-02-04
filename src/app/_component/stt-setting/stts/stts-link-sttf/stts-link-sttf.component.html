@@ -31,10 +31,10 @@
             <th style="width: 4%;">-</th>
             <th style="width: 4%;"># No</th>
             <th>Form Id</th>
+            <th>Stts Order</th>
             <th>Form Type</th>
             <th>Form Name</th>
             <th>Default</th>
-            <th>Stts Order</th>
             <th>Created Date</th>
             <th style="width: 4%;">Action</th>
         </tr>
@@ -57,6 +57,9 @@
                 {{sttsLinkSTTF.formId}}
             </td>
             <td style="text-align: center;">
+                {{sttsLinkSTTF.sttsOrder}}
+            </td>
+            <td style="text-align: center;">
                 {{sttsLinkSTTF.formType.description}}
             </td>
             <td style="text-align: center;">
@@ -64,9 +67,6 @@
             </td>
             <td style="text-align: center;">
                 {{sttsLinkSTTF.formDefault.description}}
-            </td>
-            <td style="text-align: center;">
-                {{sttsLinkSTTF.sttsOrder}}
             </td>
             <td style="text-align: center;">
                 {{sttsLinkSTTF.dateCreated | date:'dd-MM-yyyy'}}
@@ -84,7 +84,7 @@
     <tfoot>
         <tr>
             <td colspan="12" style="text-align: center;padding-bottom: 0px;">
-                <jw-pagination [items]="sttsLinkSTTFList" [pageSize]="25"
+                <jw-pagination [items]="sttsLinkSTTFList" [pageSize]="10"
                     (changePage)="onChangePage($event)"></jw-pagination>
             </td>
         </tr>

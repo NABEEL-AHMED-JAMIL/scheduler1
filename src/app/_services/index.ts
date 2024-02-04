@@ -8,3 +8,6 @@ export * from './lookup.service';
 export * from './stt.service';
 export * from './datashare.service';
 export * from './credential.service';
+export * from './notifaction.service';
+export * from './websocketapi.service';
+export * from './websocketshare.service';

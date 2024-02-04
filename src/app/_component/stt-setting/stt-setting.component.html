@@ -66,7 +66,7 @@
                         <div class="card-body">
                             <div class="row">
                                 <!-- sid -->
-                                <div class="col-xs-3 col-sm-2 sidebar-offcanvas" id="sidebar"
+                                <div class="col-xs-2 col-sm-2 sidebar-offcanvas" id="sidebar"
                                     style="padding-right: inherit;">
                                     <div class="list-group" style="margin-bottom: 0px;">
                                         <a *ngFor="let taskType of sttSidebar; let i = index" [id]="taskType.type"
@@ -78,6 +78,66 @@
                                             <span class="glyphicon glyphicon-edit"></span>
                                             {{taskType.title}}
                                         </a>
+                                    </div>
+                                    <div class="row" style="margin-top: 10px;">
+                                        <div class="col-xs-6 col-sm-6">
+                                            <button type="button" class="form-control input-sm" 
+                                                style="background: #4750b6;color: white;"
+                                                data-toggle="collapse" data-target="#interaction">
+                                                Interaction
+                                            </button>
+                                        </div>
+                                        <div class="col-xs-6 col-sm-6">
+                                            <button type="button" class="form-control input-sm"
+                                                style="background: #4750b6;color: white;"
+                                                data-toggle="collapse" data-target="#evn">
+                                                Environment
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <br>
+                                    <div id="interaction" class="collapse" style="overflow-y: scroll;max-height: 200px;">
+                                        <p>Exmple For Interactions</p>
+                                        <ul style="padding-inline-start: 20px;">
+                                            <li>'form => form.name && form.name.length > 0'</li>
+                                            <li>'true'</li>
+                                            <li>'form => form.name && form.name === 'XYZ''</li>
+                                        </ul>
+                                    </div>
+                                    <div id="evn" style="overflow-y: scroll;max-height: 200px;" 
+                                        class="collapse"  *ngIf="envVarForm">
+                                        <form [formGroup]="envVarForm">
+                                            <div formArrayName="envVaraibles">
+                                                <table id="evnId" style="font-size: 12px;margin-top: 5px;"
+                                                    class="table table-responsive table table-striped table-bordered table-sm">
+                                                    <thead>
+                                                        <tr>
+                                                            <td colspan="3">
+                                                                Environment Varaible
+                                                            </td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td>Key</td>
+                                                            <td>Value</td>
+                                                            <td>-</td>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <tr *ngFor="let envVaraible of envVarForm.get('envVaraibles').controls; let j = index"
+                                                            [formGroup]="envVaraible" id="envVaraible-{{j}}">
+                                                            <td>{{envVaraible.value.envKey}}</td>
+                                                            <td><input type="text" [formControl]="envVaraible.controls.envValue" style="float: right;"></td>
+                                                            <td>
+                                                                <button type="button"
+                                                                    (click)="updateAppUserEnvWithUserId(envVaraible.value)">
+                                                                    <span class="glyphicon glyphicon-ok-circle" style="color:#4750b6"></span>
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </form>
                                     </div>
                                 </div>
                                 <!-- main -->

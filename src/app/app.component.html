@@ -75,6 +75,11 @@
               My Profile</a>
           </li>
           <li>
+            <a routerLink="/notifaction">
+              <span class="glyphicon glyphicon-bullhorn"></span>
+              My Notification</a>
+          </li>
+          <li>
             <a routerLink="/lookup" 
               *ngIf="hasAccess(['ROLE_ADMIN', 'ROLE_MASTER_ADMIN'])">
               <span class="glyphicon glyphicon-list-alt"></span>

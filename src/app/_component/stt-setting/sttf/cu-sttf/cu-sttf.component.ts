@@ -10,6 +10,7 @@ import { ApiCode, Action } from '@/_models';
 import { AuthResponse, LOOKUP_TYPES } from '@/_models/index';
 import { Location } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
+import { EnvVarService } from '@/_services/env-var.service';
 
 
 @Component({
@@ -17,6 +18,8 @@ import { ActivatedRoute } from '@angular/router';
     templateUrl: 'cu-sttf.component.html'
 })
 export class CUSTTFComponent implements OnInit {
+
+    public ENV_HOME_PAGE = 'HOME_PAGE';
 
     public loading: any = false;
     public submitted: any = false;
@@ -47,6 +50,7 @@ export class CUSTTFComponent implements OnInit {
         private lookupService: LookupService,
         private alertService: AlertService,
         private spinnerService: SpinnerService,
+        private envVarService: EnvVarService,
         private authenticationService: AuthenticationService) {
         this.currentActiveProfile = authenticationService.currentUserValue;
         this.ISDEFAULT = LOOKUP_TYPES.ISDEFAULT;
@@ -68,7 +72,7 @@ export class CUSTTFComponent implements OnInit {
 
     ngOnInit() {
         this.getApplicationFormTypeByLookupType();
-        this.getHomePageByLookupType();
+        this.fetchUserEnvByEnvKey();
         this.getDefultOptionByLookuptype();
         if (this.action === Action.ADD) {
             this.sttfForm = this.formBuilder.group({
@@ -90,10 +94,10 @@ export class CUSTTFComponent implements OnInit {
         return this.sttfForm.controls;
     }
 
-    public getHomePageByLookupType(): any {
+    public getHomePageByLookupType(envValue: any): any {
         this.spinnerService.show();
         let payload = {
-            lookupType: this.HOME_PAGE,
+            lookupType: envValue,
             accessUserDetail: {
                 appUserId: this.currentActiveProfile.appUserId,
                 username: this.currentActiveProfile.username
@@ -109,8 +113,29 @@ export class CUSTTFComponent implements OnInit {
                 }
                 this.homePageOption = response.data;
             }, (error: any) => {
+                this.homePageOption = [];
                 this.spinnerService.hide();
                 this.alertService.showError(error.message, ApiCode.ERROR);
+            });
+    }
+
+    public fetchUserEnvByEnvKey(): any {
+        this.spinnerService.show();
+        let payload = {
+            envKey: this.ENV_HOME_PAGE,
+            accessUserDetail: {
+                appUserId: this.currentActiveProfile.appUserId,
+                username: this.currentActiveProfile.username
+            },
+        };
+        this.envVarService.fetchUserEnvByEnvKey(payload)
+            .pipe(first())
+            .subscribe((response: any) => {
+                this.getHomePageByLookupType(response.data.envValue);
+                this.spinnerService.hide();
+            }, (error: any) => {
+                this.spinnerService.hide();
+                this.alertService.showError(error, ApiCode.ERROR);
             });
     }
 

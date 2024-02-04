@@ -1,8 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { first } from 'rxjs/operators';
-import {
-    AuthenticationService, AlertService,
+import { AuthenticationService, AlertService,
     LookupService, STTService, CredentailService
 } from '@/_services';
 import { Location } from '@angular/common';

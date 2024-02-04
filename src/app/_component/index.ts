@@ -16,6 +16,8 @@ export * from './search-engine/search-engine.component';
 export * from './lookup-setting/lookup/lookup.component';
 export * from './lookup-setting/sub-lookup/sub-lookup.component';
 export * from './lookup-setting/cu-lookup/cu-lookup.component';
+// notifaction
+export * from './notifaction/notifaction.component';
 // root-stt*
 export * from './stt-setting/stt-setting.component';
 export * from './stt-setting/batch/batch.component';
@@ -44,6 +46,8 @@ export * from './stt-setting/sttc/view-sttc/view-sttc.component';
 export * from './stt-setting/sttc/sttc-list/sttc-list.component';
 export * from './stt-setting/sttc/sttc-link-stts/sttc-link-stts.component';
 export * from './stt-setting/sttc/sttc-link-stts/sttc-link-stts.component';
+// sttp-ground
+export * from './stt-setting/sttp-ground/sttp-ground.component';
 // del-box
 export * from './del-box/del-box.component';
 // credentail

@@ -30,10 +30,10 @@
             <th style="width: 4%;">-</th>
             <th style="width: 4%;"># No</th>
             <th style="width: 5%;">Stt Id</th>
+            <th>Sttf Order</th>
             <th>Service Name</th>
             <th>TaskType</th>
             <th>Defult</th>
-            <th>Sttf Order</th>
             <th>Created Date</th>
             <th style="width: 4%;">Action</th>
         </tr>
@@ -51,10 +51,10 @@
             </td>
             <td style="text-align: center;">{{sttfLinkSTT.sttfLinkSttId}}</td>
             <td style="text-align: center;">{{sttfLinkSTT.sttId}}</td>
+            <td style="text-align: center;">{{sttfLinkSTT.sttfOrder}}</td>
             <td style="text-align: center;">{{sttfLinkSTT.serviceName}}</td>
             <td style="text-align: center;">{{sttfLinkSTT.taskType.description}}</td>
             <td style="text-align: center;">{{sttfLinkSTT.sttDefault.description}}</td>
-            <td style="text-align: center;">{{sttfLinkSTT.sttfOrder}}</td>
             <td style="text-align: center;">{{sttfLinkSTT.dateCreated | date:'dd-MM-yyyy'}}</td>
             <td style="text-align: center;">
                 <div class="btn-group btn-group-xs" role="group" style="text-align: center">
@@ -69,7 +69,7 @@
     <tfoot>
         <tr>
             <td colspan="9" style="text-align: center;padding-bottom: 0px;">
-                <jw-pagination [items]="sttfLinkSTTList" [pageSize]="25"
+                <jw-pagination [items]="sttfLinkSTTList" [pageSize]="10"
                     (changePage)="onChangePage($event)"></jw-pagination>
             </td>
         </tr>

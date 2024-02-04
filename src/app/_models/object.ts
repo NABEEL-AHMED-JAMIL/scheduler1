@@ -116,6 +116,16 @@ export interface LookupData {
   parent?: LookupData;
 }
 
+export interface Notifaction {
+  notifyId?: any;
+  body?: any;
+  notifyType?: any;
+  messageStatus?: any;
+  expireTime?: any;
+  createDate?: any;
+  sendTo?: any;
+}
+
 export interface SourceTask {
     taskDetailId?: any;
     taskName?: any;
@@ -382,7 +392,6 @@ export interface STTCLinkSTTSList {
   dateCreated: any;
 }
 
-
 export interface STTSLinkSTTCList {
   sttsLinkSttcId: any;
   appUserid: any;
@@ -398,4 +407,39 @@ export interface STTSLinkSTTCList {
   status: any;
   dateCreated: any;
   sttcOrder: any;
+}
+
+export interface STTCInteractions {
+  interactionsId: any;
+  auSttsId: any;
+  sttcId: any;
+  disabledPattern: any;
+  visiblePattern: any;
+}
+
+export interface ISection {
+  sectionOder?: any;
+  sttsId?: any;
+  sttsName?: any;
+  fileds?: IControlFiled[];
+}
+
+export interface IControlFiled {
+  controlId?: any;
+  controlOrder?: any;
+  filedType?: any;
+  filedTitle?: any;
+  filedName?: any;
+  placeHolder?: any;
+  filedWidth?: any;
+  defaultValue?: any;
+  visible?: any;
+  filedDisabled?: any;
+  validations?: IValidations[];
+}
+
+export interface IValidations {
+  name?: any;
+  validator?: any;
+  message?: any;
 }

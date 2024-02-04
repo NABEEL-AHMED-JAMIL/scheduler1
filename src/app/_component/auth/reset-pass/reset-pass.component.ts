@@ -38,8 +38,7 @@ export class ResetPassComponent implements OnInit {
         private router: Router,
         private authenticationService: AuthenticationService,
         private alertService: AlertService,
-        private spinnerService: SpinnerService
-    ) {
+        private spinnerService: SpinnerService) {
         this._activatedRoute.queryParamMap
         .subscribe(params => {
             try {

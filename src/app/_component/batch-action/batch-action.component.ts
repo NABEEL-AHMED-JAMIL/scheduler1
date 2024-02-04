@@ -1,5 +1,6 @@
 import { Component, OnInit, ViewChild } from '@angular/core';
-import { LookupService, AlertService, AuthenticationService, AppUserService } from '@/_services/index';
+import { LookupService, AlertService, 
+    AuthenticationService, AppUserService } from '@/_services/index';
 import { ActivatedRoute } from '@angular/router';
 import { ApiCode } from '@/_models/index';
 import { SpinnerService, } from '@/_helpers';
@@ -40,7 +41,6 @@ export class BatchActionComponent implements OnInit {
                 this.parentId = params['adminId'];
             }
 		});
-        console.log(this.currentActiveProfile.roles.con);
     }
 
     ngOnInit() {
