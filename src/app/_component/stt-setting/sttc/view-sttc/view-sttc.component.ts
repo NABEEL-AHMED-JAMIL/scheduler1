@@ -103,9 +103,9 @@ export class ViewSTTCComponent implements OnInit {
                         },
                         [Validators.required]
                     ],
-                    filedType: [
+                    fieldType: [
                         {
-                            value: response.filedType.lookupValue,
+                            value: response.fieldType.lookupValue,
                             disabled: true
                         },
                         [Validators.required]

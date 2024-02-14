@@ -142,12 +142,12 @@ export class STTFListComponent implements OnInit {
                     const groupForm = this.fb.group({
                         auSttsId: sectionPayload.auSttsId,
                         groupName: sectionPayload.section.sttsName,
-                        filedItem: this.fb.array([])
+                        fieldItem: this.fb.array([])
                     });
-                    if (sectionPayload?.controlFiled) {
-                        const filedItemFormArray = groupForm.get('filedItem') as FormArray;
-                        sectionPayload?.controlFiled.forEach(filedControl => {
-                            filedItemFormArray.push(this.buildItem(filedControl));
+                    if (sectionPayload?.controlField) {
+                        const fieldItemFormArray = groupForm.get('fieldItem') as FormArray;
+                        sectionPayload?.controlField.forEach(fieldControl => {
+                            fieldItemFormArray.push(this.buildItem(fieldControl));
                         });
                     }
                     (this.sttcInteractonForm.get('groups') as FormArray).push(groupForm);
@@ -159,21 +159,21 @@ export class STTFListComponent implements OnInit {
             });
     }
     
-    public buildItem(filedControl: any): any {
+    public buildItem(fieldControl: any): any {
         return new FormGroup({
-            sttcId: new FormControl(filedControl?.sttcId),
-            sttcName: new FormControl(filedControl?.sttcName),
-            filedTitle: new FormControl(filedControl?.filedTitle),
-            filedType: new FormControl(filedControl?.filedType?.description),
-            interactionsId: new FormControl(filedControl?.interaction?.interactionsId),
-            visiblePattern: new FormControl(filedControl?.interaction?.visiblePattern),
-            disabledPattern: new FormControl(filedControl?.interaction?.disabledPattern)
+            sttcId: new FormControl(fieldControl?.sttcId),
+            sttcName: new FormControl(fieldControl?.sttcName),
+            fieldTitle: new FormControl(fieldControl?.fieldTitle),
+            fieldType: new FormControl(fieldControl?.fieldType?.description),
+            interactionsId: new FormControl(fieldControl?.interaction?.interactionsId),
+            visiblePattern: new FormControl(fieldControl?.interaction?.visiblePattern),
+            disabledPattern: new FormControl(fieldControl?.interaction?.disabledPattern)
         });
     }
 
-    public get filedItemFormArray() {
+    public get fieldItemFormArray() {
         return (this.sttcInteractonForm.get('groups') as FormArray)
-            .controls.map(group => group.get('filedItem') as FormArray);
+            .controls.map(group => group.get('fieldItem') as FormArray);
     }
 
     public refreshAction(): void {
@@ -283,7 +283,6 @@ export class STTFListComponent implements OnInit {
                 let payload = {
                     sttfId: this.sttfJsonDetail.formDetail.sttfId
                 }
-                debugger
                 this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
                 this.viewAction(payload);
                 this.spinnerService.hide();

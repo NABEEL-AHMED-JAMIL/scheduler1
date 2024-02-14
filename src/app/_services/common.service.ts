@@ -9,7 +9,7 @@ export class CommomService {
     constructor() {
     }
 
-    private uuid(): string {
+    public uuid(): string {
         return 'xxxxxxxx-xxxxxxxx'.replace(/[xy]/g, (char) => {
           let random = Math.random() * 16 | 0;
           let value = char === "x" ? random : (random % 4 + 8);

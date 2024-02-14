@@ -20,7 +20,10 @@ export class CUSTTCComponent implements OnInit {
     public loading: any = false;
     public submitted: any = false;
     public hasKey: any = false;
-    public filedTypeForLkValue: any = false;
+    public fieldTypeForLkValue: any = false;
+    public isMinAllow: any = true;
+    public isMaxAllow: any = true;
+    public isPatternAllow: any = false;
 
     public title: any;
     public action: Action;
@@ -32,7 +35,7 @@ export class CUSTTCComponent implements OnInit {
     public defultOption: any;
     public mandatoryOption: any;
     public formControlType: any;
-    public filedLkValueOption: any;
+    public fieldLkValueOption: any;
 
     public ISDEFAULT: LOOKUP_TYPES;
     public APPLICATION_STATUS: LOOKUP_TYPES;
@@ -72,15 +75,15 @@ export class CUSTTCComponent implements OnInit {
         this.getDefultOptionByLookuptype();
         if (this.action === Action.ADD) {
             this.sttcForm = this.formBuilder.group({
-                filedType: ['text', [Validators.required]],
+                fieldType: ['text', [Validators.required]],
                 sttcName: ['', [Validators.required]],
                 description: ['', [Validators.required]],
-                filedName: ['', [Validators.required]],
-                filedTitle: ['', [Validators.required]],
+                fieldName: ['', [Validators.required]],
+                fieldTitle: ['', [Validators.required]],
                 placeHolder: [''],
                 pattern: [''],
-                filedLookUp: [''],
-                filedWidth: ['', [Validators.required]],
+                fieldLookUp: [''],
+                fieldWidth: ['', [Validators.required]],
                 minLength: [''],
                 maxLength: [''],
                 mandatory: ['true', [Validators.required]],
@@ -119,15 +122,15 @@ export class CUSTTCComponent implements OnInit {
                 response = response.data;
                 this.sttcForm = this.formBuilder.group({
                     sttcId: [response.sttcId, [Validators.required]],
-                    filedType: [response.filedType.lookupValue, [Validators.required]],
+                    fieldType: [response.fieldType.lookupValue, [Validators.required]],
                     sttcName: [response.sttcName, [Validators.required]],
                     description: [response.description, [Validators.required]],
-                    filedName: [response.filedName, [Validators.required]],
-                    filedTitle: [response.filedTitle, [Validators.required]],
+                    fieldName: [response.fieldName, [Validators.required]],
+                    fieldTitle: [response.fieldTitle, [Validators.required]],
                     placeHolder: [response.placeHolder],
                     pattern: [response.pattern],
-                    filedLookUp: [response.filedLookUp],
-                    filedWidth: [response.filedWidth, [Validators.required]],
+                    fieldLookUp: [response.fieldLookUp],
+                    fieldWidth: [response.fieldWidth, [Validators.required]],
                     minLength: [response.minLength],
                     maxLength: [response.maxLength],
                     mandatory: [response.mandatory.lookupValue, [Validators.required]],
@@ -136,12 +139,39 @@ export class CUSTTCComponent implements OnInit {
                     sttcDisabled: [response.sttcDisabled.lookupValue, [Validators.required]],
                     defaultValue: [response.defaultValue],
                 });
-                if (response.filedType.lookupValue === 'radio' ||
-                    response.filedType.lookupValue === 'checkbox' ||
-                    response.filedType.lookupValue === 'select' ||
-                    response.filedType.lookupValue === 'multi-select') {
-                    this.filedTypeForLkValue = true;
-                    this.onChangeFiledLkValue(response.filedLookUp);
+                if (response.fieldType.lookupValue === 'radio' ||
+                    response.fieldType.lookupValue === 'checkbox' ||
+                    response.fieldType.lookupValue === 'select' ||
+                    response.fieldType.lookupValue === 'multi-select' ||
+                    response.fieldType.lookupValue === 'color' ||
+                    response.fieldType.lookupValue === 'date' ||
+                    response.fieldType.lookupValue === 'time' ||
+                    response.fieldType.lookupValue === 'month') {
+                    if (response.fieldType.lookupValue !== 'color'
+                        && response.fieldType.lookupValue !== 'date'
+                        && response.fieldType.lookupValue !== 'time'
+                        && response.fieldType.lookupValue !== 'month') {
+                        this.fieldTypeForLkValue = true;
+                    }
+                    this.isMinAllow = false;
+                    this.isMaxAllow = false;
+                    this.isPatternAllow = false;
+                    this.onChangefieldLkValue(response.fieldLookUp);
+                    return;
+                } else if (response.fieldType.lookupValue === 'url' ||
+                    response.fieldType.lookupValue === 'email' || 
+                    response.fieldType.lookupValue === 'password' || 
+                    response.fieldType.lookupValue === 'tel' ||
+                    response.fieldType.lookupValue === 'text' ||
+                    response.fieldType.lookupValue === 'textarea') {
+                    if (response.fieldType.lookupValue === 'text' ||
+                        response.fieldType.lookupValue === 'textarea') {
+                        this.isPatternAllow = false;
+                    } else {
+                        this.isPatternAllow = true;
+                    }
+                    this.isMinAllow = true;
+                    this.isMaxAllow = true;
                     return;
                 }
             }, (error: any) => {
@@ -230,19 +260,42 @@ export class CUSTTCComponent implements OnInit {
             });
     }
 
-    public onFiledType(payload: any): void {
+    public onfieldType(payload: any): void {
         if (payload === 'radio' || payload === 'checkbox' ||
-            payload === 'select' || payload === 'multi-select') {
-            this.filedTypeForLkValue = true;
+            payload === 'select' || payload === 'multi-select' || payload === 'color') {
+            if (payload !== 'color') {
+                this.fieldTypeForLkValue = true;
+            }
+            this.isMinAllow = false;
+            this.isMaxAllow = false;
+            this.isPatternAllow = false;
             return;
+        } else if (payload === 'url' || payload === 'email' || payload === 'password'
+            || payload === 'tel' || payload === 'text' || payload === 'textarea'
+            || payload === 'number') {
+            if (payload === 'text' || payload === 'textarea') {
+                this.isPatternAllow = false;
+            } else {
+                this.isPatternAllow = true;
+            }
+            this.isMinAllow = true;
+            this.isMaxAllow = true;
+        } else {
+            this.isMinAllow = false;
+            this.isMaxAllow = false;
+            this.isPatternAllow = false;
         }
         this.hasKey = false;
-        this.filedTypeForLkValue = false;
-        this.filedLkValueOption = [];
-        this.sttcForm.controls['filedLookUp'].setValue(null);
+        this.fieldTypeForLkValue = false;
+        this.fieldLkValueOption = [];
+        this.sttcForm.controls['fieldLookUp'].setValue(null);
     }
 
-    public onChangeFiledLkValue(value: any): void {
+    public patternfieldHidShow(payload: any): boolean {
+        return false;
+    }
+
+    public onChangefieldLkValue(value: any): void {
         if (value != null && value != '') {
             this.hasKey = false;
             this.spinnerService.show();
@@ -266,14 +319,14 @@ export class CUSTTCComponent implements OnInit {
                         return;
                     }
                     this.hasKey = true;
-                    this.filedLkValueOption = response.data;
+                    this.fieldLkValueOption = response.data;
                 }, (error: any) => {
                     this.spinnerService.hide();
                     this.alertService.showError(error.message, ApiCode.ERROR);
                 });
         } else {
             this.hasKey = false;
-            this.filedLkValueOption = [];
+            this.fieldLkValueOption = [];
         }
     }
 

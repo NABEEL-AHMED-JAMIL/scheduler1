@@ -93,8 +93,8 @@
                         <!-- description -->
                         <div class="col-lg-4">
                             <div class="form-group" *ngIf="formControlType">
-                                <label for="filedType">FiledType</label>
-                                <select id="filedType" formControlName="filedType" class="form-control input-sm">
+                                <label for="fieldType">FieldType</label>
+                                <select id="fieldType" formControlName="fieldType" class="form-control input-sm">
                                     <option *ngFor="let controlType of formControlType.subLookupData"
                                         [value]="controlType.lookupValue">{{controlType.description}}
                                     </option>

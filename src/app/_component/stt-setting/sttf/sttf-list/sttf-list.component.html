@@ -152,25 +152,29 @@
                                             <th style="width: 70px">Action</th>
                                         </tr>
                                     </thead>
-                                    <tbody formArrayName="filedItem">
-                                        <tr *ngFor="let filed of group.get('filedItem').controls; let j = index" 
-                                            [formGroup]="filed" id="filed-{{j}}">
-                                            <td>{{filed.value.sttcId}}</td>
-                                            <td>{{filed.value.sttcName}}</td>
-                                            <td>{{filed.value.filedType}}</td>
-                                            <td>{{filed.value.filedTitle}}</td>
-                                            <td><input type="text" [formControl]="filed.controls.visiblePattern"
-                                                style="float: right;"></td>
-                                            <td><input type="text" [formControl]="filed.controls.disabledPattern"
-                                                style="float: right;"></td>
+                                    <tbody formArrayName="fieldItem">
+                                        <tr *ngFor="let field of group.get('fieldItem').controls; let j = index" 
+                                            [formGroup]="field" id="field-{{j}}">
+                                            <td>{{field.value.sttcId}}</td>
+                                            <td>{{field.value.sttcName}}</td>
+                                            <td>{{field.value.fieldType}}</td>
+                                            <td>{{field.value.fieldTitle}}</td>
+                                            <td><input type="text" placeholder="Enter Json Only"
+                                                [formControl]="field.controls.visiblePattern"
+                                                style="float: right;">
+                                            </td>
+                                            <td><input type="text" placeholder="Enter Json Only"
+                                                [formControl]="field.controls.disabledPattern"
+                                                style="float: right;">
+                                            </td>
                                             <td>
-                                                <button type="button" [disabled]="(filed.get('visiblePattern').value === null || filed.get('visiblePattern').value === '') 
-                                                    && (filed.get('disabledPattern').value === null || filed.get('disabledPattern').value === '')"
-                                                    (click)="addSTTCInteractions(group.value.auSttsId, filed.value)">
+                                                <button type="button" [disabled]="(field.get('visiblePattern').value === null || field.get('visiblePattern').value === '') 
+                                                    && (field.get('disabledPattern').value === null || field.get('disabledPattern').value === '')"
+                                                    (click)="addSTTCInteractions(group.value.auSttsId, field.value)">
                                                     <span class="glyphicon glyphicon-ok-circle" style="color:#4750b6"></span>
                                                 </button>&nbsp;
-                                                <button type="button" [disabled]="filed.get('interactionsId').value === null"
-                                                    (click)="deleteSTTCInteractions(group.value.auSttsId, filed.value)">
+                                                <button type="button" [disabled]="field.get('interactionsId').value === null"
+                                                    (click)="deleteSTTCInteractions(group.value.auSttsId, field.value)">
                                                     <span class="glyphicon glyphicon-remove-circle" style="color:rgb(128, 19, 0)"></span>
                                                 </button>
                                             </td>

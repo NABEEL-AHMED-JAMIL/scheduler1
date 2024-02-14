@@ -272,7 +272,6 @@ export class CuCredentialComponent implements OnInit {
     }
 
     public editFirebase(payload: any): void {
-        debugger
         this.credentailForm.addControl('credentialContent', 
             this.formBuilder.group({
                 firePayload: [payload?.firePayload, [Validators.required]]

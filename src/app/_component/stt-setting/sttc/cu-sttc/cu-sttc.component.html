@@ -87,12 +87,74 @@
                                     </div>
                                 </div>
                             </div>
+                        </div>
+                        <div class="col-lg-4">
+                            <div class="form-group">
+                                <label for="fieldTitle">Field Title</label>
+                                <input type="text" id="fieldTitle" minlength="2" maxlength="150"
+                                    formControlName="fieldTitle" class="form-control input-sm"
+                                    placeholder="Enter Field title"
+                                    [ngClass]="{ 'is-invalid': submitted && f.fieldTitle.errors }" />
+                                <div *ngIf="submitted && f.fieldTitle.errors" class="invalid-feedback">
+                                    <div *ngIf="f.fieldTitle.errors.required" style="color: red;">Field Title is
+                                        required
+                                    </div>
+                                    <div *ngIf="f.fieldTitle.errors.minlength" style="color: red;">Field Title is
+                                        maxlength 0
+                                    </div>
+                                    <div *ngIf="f.fieldTitle.errors.maxlength" style="color: red;">Field Title is
+                                        maxlength 150
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- sttcName -->
+                        <div class="col-lg-4">
+                            <div class="form-group">
+                                <label for="fieldName">Field Name</label>
+                                <input type="text" id="fieldName" formControlName="fieldName"
+                                    class="form-control input-sm" placeholder="Enter Field name"
+                                    [ngClass]="{ 'is-invalid': submitted && f.fieldName.errors }" />
+                                <div *ngIf="submitted && f.fieldName.errors" class="invalid-feedback">
+                                    <div *ngIf="f.fieldName.errors.required" style="color: red;">Field Name is required
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-4">
+                            <div class="form-group">
+                                <label for="description">Description</label>
+                                <input type="text" id="description" formControlName="description"
+                                    class="form-control input-sm" placeholder="Enter description"
+                                    [ngClass]="{ 'is-invalid': submitted && f.description.errors }" />
+                                <div *ngIf="submitted && f.description.errors" class="invalid-feedback">
+                                    <div *ngIf="f.description.errors.required" style="color: red;">Description is
+                                        required
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-4">
+                            <div class="form-group">
+                                <label for="fieldWidth">Field Width</label>
+                                <input type="number" id="fieldWidth" min="0" max="12" formControlName="fieldWidth"
+                                    class="form-control input-sm" placeholder="Enter Field width" />
+                                <div *ngIf="submitted && f.fieldWidth.errors" class="invalid-feedback">
+                                    <div *ngIf="f.fieldWidth.errors.required" style="color: red;">
+                                        Field Width is required
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-4">
                             <div class="form-group">
                                 <label for="placeHolder">PlaceHolder</label>
                                 <input type="text" id="placeHolder" formControlName="placeHolder"
                                     class="form-control input-sm" placeholder="Enter placeholder if any" />
                             </div>
-                            <div class="form-group" *ngIf="mandatoryOption">
+                        </div>
+                        <div class="col-lg-4" *ngIf="mandatoryOption">
+                            <div class="form-group">
                                 <label for="mandatory">Required</label>
                                 <select id="mandatory" formControlName="mandatory" class="form-control input-sm"
                                     [ngClass]="{ 'is-invalid': submitted && f.mandatory.errors }">
@@ -109,143 +171,9 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="form-group">
-                                <label for="minLength">Min Length</label>
-                                <input type="number" id="minLength" min="0" max="10" formControlName="minLength"
-                                    class="form-control input-sm" placeholder="Enter min length" />
-                            </div>
                         </div>
-                        <!-- sttcName -->
-                        <div class="col-lg-4">
+                        <div class="col-lg-4" *ngIf="defultOption">
                             <div class="form-group">
-                                <label for="filedName">Filed Name</label>
-                                <input type="text" id="filedName" formControlName="filedName"
-                                    class="form-control input-sm" placeholder="Enter filed name"
-                                    [ngClass]="{ 'is-invalid': submitted && f.filedName.errors }" />
-                                <div *ngIf="submitted && f.filedName.errors" class="invalid-feedback">
-                                    <div *ngIf="f.filedName.errors.required" style="color: red;">Filed Name is required
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label for="description">Description</label>
-                                <input type="text" id="description" formControlName="description"
-                                    class="form-control input-sm" placeholder="Enter description"
-                                    [ngClass]="{ 'is-invalid': submitted && f.description.errors }" />
-                                <div *ngIf="submitted && f.description.errors" class="invalid-feedback">
-                                    <div *ngIf="f.description.errors.required" style="color: red;">Description is
-                                        required
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label for="pattern">Pattern</label>
-                                <input type="text" id="pattern" formControlName="pattern" class="form-control input-sm"
-                                    placeholder="Enter pattern if any" />
-                            </div>
-                            <div class="form-group">
-                                <label for="maxLength">Max Length</label>
-                                <input type="number" id="maxLength" min="0" max="10" formControlName="maxLength"
-                                    class="form-control input-sm" placeholder="Enter max length" />
-                            </div>
-                        </div>
-                        <!-- description -->
-                        <div class="col-lg-4">
-                            <div class="form-group">
-                                <label for="filedTitle">Filed Title</label>
-                                <input type="text" id="filedTitle" minlength="2" maxlength="150"
-                                    formControlName="filedTitle" class="form-control input-sm"
-                                    placeholder="Enter filed title"
-                                    [ngClass]="{ 'is-invalid': submitted && f.filedTitle.errors }" />
-                                <div *ngIf="submitted && f.filedTitle.errors" class="invalid-feedback">
-                                    <div *ngIf="f.filedTitle.errors.required" style="color: red;">Filed Title is
-                                        required
-                                    </div>
-                                    <div *ngIf="f.filedTitle.errors.minlength" style="color: red;">Filed Title is
-                                        maxlength 0
-                                    </div>
-                                    <div *ngIf="f.filedTitle.errors.maxlength" style="color: red;">Filed Title is
-                                        maxlength 150
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label for="filedWidth">Filed Width</label>
-                                <input type="number" id="filedWidth" min="0" max="12" formControlName="filedWidth"
-                                    class="form-control input-sm" placeholder="Enter filed width" />
-                                <div *ngIf="submitted && f.filedWidth.errors" class="invalid-feedback">
-                                    <div *ngIf="f.filedWidth.errors.required" style="color: red;">
-                                        Filed Width is required
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="form-group" *ngIf="formControlType">
-                                <label for="filedType">FiledType</label>
-                                <select id="filedType" formControlName="filedType" class="form-control input-sm"
-                                    [ngClass]="{ 'is-invalid': submitted && f.filedType.errors }"
-                                    (change)="onFiledType($event.target.value)">
-                                    <option hidden value="" disabled selected>
-                                        {{formControlType.parentLookupData.description}}
-                                    </option>
-                                    <option *ngFor="let controlType of formControlType.subLookupData"
-                                        [value]="controlType.lookupValue">{{controlType.description}}
-                                    </option>
-                                </select>
-                                <div *ngIf="submitted && f.filedType.errors" class="invalid-feedback">
-                                    <div *ngIf="f.filedType.errors.required" style="color: red;">Request method is
-                                        required
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="form-group" *ngIf="filedTypeForLkValue">
-                                <label for="filedLookUp">Filed Value</label>
-                                <input type="text" id="filedLookUp" formControlName="filedLookUp"
-                                    class="form-control input-sm" placeholder="Enter lookup type"
-                                    [ngClass]="{ 'is-invalid': submitted && f.filedLookUp.errors }"
-                                    (input)="onChangeFiledLkValue($event.target.value)" />
-                            </div>
-                        </div>
-                        <!-- disabled -->
-                        <div class="col-lg-4">
-                            <div class="form-group" *ngIf="defultOption">
-                                <label for="sttcDisabled">Disabled</label>
-                                <select id="sttcDisabled" formControlName="sttcDisabled" class="form-control input-sm"
-                                    [ngClass]="{ 'is-invalid': submitted && f.sttcDisabled.errors }">
-                                    <option hidden value="" disabled selected>
-                                        {{defultOption.parentLookupData.description}}
-                                    </option>
-                                    <option *ngFor="let defultOpt of defultOption.subLookupData"
-                                        [value]="defultOpt.lookupValue">{{defultOpt.description}}
-                                    </option>
-                                </select>
-                                <div *ngIf="submitted && f.sttcDisabled.errors" class="invalid-feedback">
-                                    <div *ngIf="f.sttcDisabled.errors.required" style="color: red;">
-                                        Disabled is required</div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-lg-4" *ngIf="action === 2">
-                            <div class="form-group" *ngIf="statusList">
-                                <label for="status">Status</label>
-                                <select id="status" class="form-control input-sm" formControlName="status"
-                                    [ngClass]="{ 'is-invalid': submitted && f.status.errors }"
-                                    [attr.disabled]="f.status.value === 2 ? true : null">
-                                    <option hidden value="" disabled selected>
-                                        {{statusList.parentLookupData.description}}
-                                    </option>
-                                    <option *ngFor="let status of statusList.subLookupData"
-                                        [value]="status.lookupValue">{{status.description}}
-                                    </option>
-                                </select>
-                                <div *ngIf="submitted && f.status.errors" class="invalid-feedback">
-                                    <div *ngIf="f.status.errors.required" style="color: red;">
-                                        Status is required
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-lg-4">
-                            <div class="form-group" *ngIf="defultOption">
                                 <label for="sttcDefault">Default</label>
                                 <select id="sttcDefault" class="form-control input-sm" formControlName="sttcDefault"
                                     [ngClass]="{ 'is-invalid': submitted && f.sttcDefault.errors }">
@@ -270,13 +198,101 @@
                                     [ngClass]="{ 'is-invalid': submitted && f.defaultValue.errors }" />
                             </div>
                         </div>
-                        <div class="col-lg-12">
-                            <div class="form-group" *ngIf="hasKey">
-                                <label style="color: #cb0f43;">*Filed LK-Value</label>
-                                <ul class="list-group" *ngIf="filedLkValueOption">
+                        <div class="col-lg-4" *ngIf="defultOption">
+                            <div class="form-group">
+                                <label for="sttcDisabled">Disabled</label>
+                                <select id="sttcDisabled" formControlName="sttcDisabled" class="form-control input-sm"
+                                    [ngClass]="{ 'is-invalid': submitted && f.sttcDisabled.errors }">
+                                    <option hidden value="" disabled selected>
+                                        {{defultOption.parentLookupData.description}}
+                                    </option>
+                                    <option *ngFor="let defultOpt of defultOption.subLookupData"
+                                        [value]="defultOpt.lookupValue">{{defultOpt.description}}
+                                    </option>
+                                </select>
+                                <div *ngIf="submitted && f.sttcDisabled.errors" class="invalid-feedback">
+                                    <div *ngIf="f.sttcDisabled.errors.required" style="color: red;">
+                                        Disabled is required</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-4" *ngIf="formControlType">
+                            <div class="form-group">
+                                <label for="fieldType">FieldType</label>
+                                <select id="fieldType" formControlName="fieldType" class="form-control input-sm"
+                                    [ngClass]="{ 'is-invalid': submitted && f.fieldType.errors }"
+                                    (change)="onfieldType($event.target.value);">
+                                    <option hidden value="" disabled selected>
+                                        {{formControlType.parentLookupData.description}}
+                                    </option>
+                                    <option *ngFor="let controlType of formControlType.subLookupData"
+                                        [value]="controlType.lookupValue">{{controlType.description}}
+                                    </option>
+                                </select>
+                                <div *ngIf="submitted && f.fieldType.errors" class="invalid-feedback">
+                                    <div *ngIf="f.fieldType.errors.required" style="color: red;">Request method is
+                                        required
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-4" *ngIf="fieldTypeForLkValue">
+                            <div class="form-group">
+                                <label for="fieldLookUp">Field Value</label>
+                                <input type="text" id="fieldLookUp" formControlName="fieldLookUp"
+                                    class="form-control input-sm" placeholder="Enter lookup type"
+                                    [ngClass]="{ 'is-invalid': submitted && f.fieldLookUp.errors }"
+                                    (input)="onChangefieldLkValue($event.target.value)" />
+                            </div>
+                        </div>
+                        <div class="col-lg-4" *ngIf="isMinAllow">
+                            <div class="form-group">
+                                <label for="minLength">Min Length</label>
+                                <input type="number" id="minLength" min="0" max="10" formControlName="minLength"
+                                    class="form-control input-sm" placeholder="Enter min length" />
+                            </div>
+                        </div>
+                        <div class="col-lg-4" *ngIf="isMaxAllow">
+                            <div class="form-group">
+                                <label for="maxLength">Max Length</label>
+                                <input type="number" id="maxLength" min="0" max="10" formControlName="maxLength"
+                                    class="form-control input-sm" placeholder="Enter max length" />
+                            </div>
+                        </div>
+                        <div class="col-lg-4" *ngIf="isPatternAllow">
+                            <div class="form-group">
+                                <label for="pattern">Pattern</label>
+                                <input type="text" id="pattern" formControlName="pattern" class="form-control input-sm"
+                                    placeholder="Enter pattern if any" />
+                            </div>
+                        </div>
+                        <div class="col-lg-4" *ngIf="action === 2">
+                            <div class="form-group" *ngIf="statusList">
+                                <label for="status">Status</label>
+                                <select id="status" class="form-control input-sm" formControlName="status"
+                                    [ngClass]="{ 'is-invalid': submitted && f.status.errors }"
+                                    [attr.disabled]="f.status.value === 2 ? true : null">
+                                    <option hidden value="" disabled selected>
+                                        {{statusList.parentLookupData.description}}
+                                    </option>
+                                    <option *ngFor="let status of statusList.subLookupData"
+                                        [value]="status.lookupValue">{{status.description}}
+                                    </option>
+                                </select>
+                                <div *ngIf="submitted && f.status.errors" class="invalid-feedback">
+                                    <div *ngIf="f.status.errors.required" style="color: red;">
+                                        Status is required
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-12" *ngIf="hasKey">
+                            <div class="form-group">
+                                <label style="color: #cb0f43;">*Field LK-Value</label>
+                                <ul class="list-group" *ngIf="fieldLkValueOption">
                                     <li class="list-group-item" style="padding: 5px 15px;"
-                                        *ngFor="let filedLkValue of filedLkValueOption.subLookupData">
-                                        {{filedLkValue.description}}
+                                        *ngFor="let fieldLkValue of fieldLkValueOption.subLookupData">
+                                        {{fieldLkValue.description}}
                                     </li>
                                 </ul>
                             </div>

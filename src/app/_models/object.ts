@@ -287,8 +287,8 @@ export interface STTSectionList {
 export interface STTControlList {
   sttcId: any;
   sttcName: any;
-  filedName: any;
-  filedType: any;
+  fieldName: any;
+  fieldType: any;
   description: any;
   mandatory: any;
   status: any;
@@ -399,8 +399,8 @@ export interface STTSLinkSTTCList {
   email: any;
   sttcId: any;
   sttcName: any;
-  filedName: any;
-  filedType: any;
+  fieldName: any;
+  fieldType: any;
   mandatory: any;
   sttcDefault: any;
   sttcDisabled: any;
@@ -410,36 +410,49 @@ export interface STTSLinkSTTCList {
 }
 
 export interface STTCInteractions {
-  interactionsId: any;
-  auSttsId: any;
-  sttcId: any;
-  disabledPattern: any;
-  visiblePattern: any;
+  interactionsId?: any;
+  auSttsId?: any;
+  sttcId?: any;
+  disabledPattern?: any;
+  visiblePattern?: any;
+}
+
+export interface IForm {
+  sttfId: any;
+  sttfName: any;
+  description?: IControlField,
+  homePage?: IControlField,
+  serviceId?: IControlField,
+  sections?: ISection[]
 }
 
 export interface ISection {
   sectionOder?: any;
+  auSttsId?: any;
   sttsId?: any;
   sttsName?: any;
-  fileds?: IControlFiled[];
+  fields?: IControlField[];
 }
 
-export interface IControlFiled {
+export interface IControlField {
   controlId?: any;
   controlOrder?: any;
-  filedType?: any;
-  filedTitle?: any;
-  filedName?: any;
+  fieldType?: any;
+  fieldTitle?: any;
+  fieldName?: any;
   placeHolder?: any;
-  filedWidth?: any;
+  fieldWidth?: any;
   defaultValue?: any;
-  visible?: any;
-  filedDisabled?: any;
+  fieldDisabled?: any;
+  fieldLookUp?: any; // dropdown
+  options?: any;
   validations?: IValidations[];
+  interaction?: STTCInteractions;
 }
 
 export interface IValidations {
   name?: any;
   validator?: any;
   message?: any;
+  value?: any;
 }

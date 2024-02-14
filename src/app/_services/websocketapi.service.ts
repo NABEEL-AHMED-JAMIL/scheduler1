@@ -35,12 +35,10 @@ export class WebSocketAPI {
             this.unregister(this.sessionId, this.transactionId);
             this.stompClient.disconnect();
         }
-        console.log("Disconnected");
     }
 
     // on error, schedule a reconnection attempt
     public errorCallBack(error: any): any {
-        console.log("errorCallBack -> " + error)
         setTimeout(() => {
             this.connect();
         }, 5000);
@@ -51,7 +49,6 @@ export class WebSocketAPI {
      * @param {*} message 
      */
     public register(sessionId: any, transactionId: any): any {
-        console.log("calling api to register");
         var message = {
             "sessionId" : sessionId,
             "transactionId" : transactionId
@@ -60,7 +57,6 @@ export class WebSocketAPI {
     }
 
     public unregister(sessionId: any, transactionId: any): any {
-        console.log("calling api to unregister");
         var message = {
             "sessionId" : sessionId,
             "transactionId" : transactionId
@@ -69,7 +65,6 @@ export class WebSocketAPI {
     }
 
     public onMessageReceived(message: any): any {
-        console.log("Message Recieved from Server :: " + message);
         this.websocketShare.onNewValueReceive(message.body);
     }
 
