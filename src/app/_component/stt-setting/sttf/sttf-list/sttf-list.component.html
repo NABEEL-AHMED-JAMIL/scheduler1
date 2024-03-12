@@ -3,8 +3,7 @@
         <label *ngIf="sstFormList">
             Total STTF ({{sstFormList.length}})
         </label>
-        <input type="text" id="searchSTTF" class="form-control input-sm" 
-            style="width: 60%;" [(ngModel)]="searchSTTF"
+        <input type="text" id="searchSTTF" class="form-control input-sm" style="width: 60%;" [(ngModel)]="searchSTTF"
             placeholder="Search by any key" />
     </div>
     <div class="col-lg-6" style="text-align: end;margin-top: 25px;">
@@ -14,8 +13,7 @@
             <span id="loading" class="glyphicon glyphicon-refresh"></span>{{refreshButton.title}}
         </button>
         <!-- working -->
-        <button *ngIf="addButton && addButton.active" type="button" 
-            class="form-control input-sm" style="width: auto; background: #cb0f43;color: white;
+        <button *ngIf="addButton && addButton.active" type="button" class="form-control input-sm" style="width: auto; background: #cb0f43;color: white;
             display: inline;margin-right: 7px;" (click)="addAction()">
             <span class="glyphicon glyphicon-plus-sign"></span>{{addButton.title}}
         </button>
@@ -118,7 +116,7 @@
     <tfoot>
         <tr>
             <td colspan="11" style="text-align: center;padding-bottom: 0px;">
-                <jw-pagination [items]="sstFormList" [pageSize]="10"
+                <jw-pagination [items]="sstFormList" [pageSize]="25"
                     (changePage)="onChangePage($event)"></jw-pagination>
             </td>
         </tr>
@@ -132,14 +130,15 @@
             <div class="col-lg-8 col-sm-8" style="overflow-y: scroll; height:500px;">
                 <form [formGroup]="sttcInteractonForm">
                     <div formArrayName="groups">
-                        <div class="borderd-content" 
-                            *ngFor="let group of sttcInteractonForm.get('groups').controls; let i = index" 
+                        <div class="borderd-content"
+                            *ngFor="let group of sttcInteractonForm.get('groups').controls; let i = index"
                             [formGroup]="group" id="group-{{i}}" style="margin-top: 15px">
                             <div class="title" style="color: #cb0f43;">
-                                ({{group.value.groupName}}) 
+                                ({{group.value.groupName}})
                             </div>
                             <div class="content" style="margin-top: 10px;">
-                                <table id="sttf" class="table table-responsive table table-striped table-bordered table-sm"
+                                <table id="sttf"
+                                    class="table table-responsive table table-striped table-bordered table-sm"
                                     style="font-size: 12px;margin-bottom: 0px !important;">
                                     <thead>
                                         <tr>
@@ -153,29 +152,32 @@
                                         </tr>
                                     </thead>
                                     <tbody formArrayName="fieldItem">
-                                        <tr *ngFor="let field of group.get('fieldItem').controls; let j = index" 
+                                        <tr *ngFor="let field of group.get('fieldItem').controls; let j = index"
                                             [formGroup]="field" id="field-{{j}}">
                                             <td>{{field.value.sttcId}}</td>
                                             <td>{{field.value.sttcName}}</td>
                                             <td>{{field.value.fieldType}}</td>
                                             <td>{{field.value.fieldTitle}}</td>
                                             <td><input type="text" placeholder="Enter Json Only"
-                                                [formControl]="field.controls.visiblePattern"
-                                                style="float: right;">
+                                                    [formControl]="field.controls.visiblePattern" style="float: right;">
                                             </td>
                                             <td><input type="text" placeholder="Enter Json Only"
-                                                [formControl]="field.controls.disabledPattern"
-                                                style="float: right;">
+                                                    [formControl]="field.controls.disabledPattern"
+                                                    style="float: right;">
                                             </td>
                                             <td>
-                                                <button type="button" [disabled]="(field.get('visiblePattern').value === null || field.get('visiblePattern').value === '') 
+                                                <button type="button"
+                                                    [disabled]="(field.get('visiblePattern').value === null || field.get('visiblePattern').value === '') 
                                                     && (field.get('disabledPattern').value === null || field.get('disabledPattern').value === '')"
                                                     (click)="addSTTCInteractions(group.value.auSttsId, field.value)">
-                                                    <span class="glyphicon glyphicon-ok-circle" style="color:#4750b6"></span>
+                                                    <span class="glyphicon glyphicon-ok-circle"
+                                                        style="color:#4750b6"></span>
                                                 </button>&nbsp;
-                                                <button type="button" [disabled]="field.get('interactionsId').value === null"
+                                                <button type="button"
+                                                    [disabled]="field.get('interactionsId').value === null"
                                                     (click)="deleteSTTCInteractions(group.value.auSttsId, field.value)">
-                                                    <span class="glyphicon glyphicon-remove-circle" style="color:rgb(128, 19, 0)"></span>
+                                                    <span class="glyphicon glyphicon-remove-circle"
+                                                        style="color:rgb(128, 19, 0)"></span>
                                                 </button>
                                             </td>
                                         </tr>
@@ -187,8 +189,7 @@
                 </form>
             </div>
             <div class="col-lg-4 col-sm-4">
-                <button class="form-control input-sm"
-                    style="background: #4750b6;color: white;"
+                <button class="form-control input-sm" style="background: #4750b6;color: white;"
                     (click)="downloadJson()">Downalod File</button>
                 <pre style="overflow-y: scroll; height:500px;">{{sttfJsonDetail | json}}</pre>
             </div>
@@ -196,7 +197,6 @@
     </div>
 </div>
 <div class="modal fade" id="deleteAction" role="dialog" style="top: 85px;">
-    <del-box [title]="title" [subTitle]="subTitle" 
-        (deleteEvent)="deleteActionTriger()">
+    <del-box [title]="title" [subTitle]="subTitle" (deleteEvent)="deleteActionTriger()">
     </del-box>
 </div>

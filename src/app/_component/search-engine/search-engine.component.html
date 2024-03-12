@@ -8,21 +8,17 @@
     </div>
     <div class="panel-body" style="padding-bottom: 0px;padding-top: 0px;">
         <div class="row">
-            <form *ngIf="tableQueryForm"
-                [formGroup]="tableQueryForm"
-                (ngSubmit)="dynamicQueryResponse()">
+            <form *ngIf="tableQueryForm" [formGroup]="tableQueryForm" (ngSubmit)="dynamicQueryResponse()">
                 <div class="col-lg-12 form-group">
                     <textarea class="form-control input-sm" rows="10"
-                        style="height: auto;background-color:#ccc;color: black;"
-                        formControlName="query"
+                        style="height: auto;background-color: #ddd;color: black;" formControlName="query"
                         placeholder="Enter Select Query For Result" required></textarea>
                     <br>
                     <button type="reset" class="btn btn-sm btn-default" (click)="tableQueryFormInit()"
                         style="color: #345; background-color:#fff;border-color: black;float: left;">
                         Clear
                     </button>
-                    <button type="submit" class="btn btn-sm btn-danger"
-                        style="float: right;">Search</button>
+                    <button type="submit" class="btn btn-sm btn-danger" style="float: right;">Search</button>
                     <br><br>
                 </div>
             </form>
@@ -37,8 +33,7 @@
                 <div class="row">
                     <div class="col-lg-4" *ngIf="jsonPayload" style="float: right;">
                         <div class="form-group">
-                            <input type="text" id="searchDetails"
-                                class="form-control input-sm" placeholder="Search"
+                            <input type="text" id="searchDetails" class="form-control input-sm" placeholder="Search"
                                 [(ngModel)]="searchDetails" />
                         </div>
                     </div>

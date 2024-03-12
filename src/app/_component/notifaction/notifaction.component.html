@@ -41,14 +41,17 @@
     }
 
     .rounded-circle {
-        border-radius: 50%!important;
+        border-radius: 50% !important;
     }
+
     .mt-3 {
-        margin-top: 1rem!important;
+        margin-top: 1rem !important;
     }
+
     .text-secondary {
-        color: #6c757d!important;
+        color: #6c757d !important;
     }
+
     p {
         margin-top: 0;
         margin-bottom: 1rem;
@@ -57,9 +60,10 @@
     table {
         table-layout: fixed;
     }
-    
+
     .scrollable {
-        overflow: scroll; overflow-y:hidden;
+        overflow: scroll;
+        overflow-y: hidden;
     }
 </style>
 <div class="row gutters-sm">
@@ -69,17 +73,13 @@
                 <div class="row">
                     <div class="col-lg-8 form-group">
                         <label>Notifaction</label>
-                        <input type="text" id="searchNotifaction" 
-                            class="form-control input-sm"
-                            style="width: 30%;"
-                            [(ngModel)]="searchNotifaction"
-                            placeholder="Search by any key" />
+                        <input type="text" id="searchNotifaction" class="form-control input-sm" style="width: 30%;"
+                            [(ngModel)]="searchNotifaction" placeholder="Search by any key" />
                     </div>
                     <div class="col-lg-4" style="text-align: end;">
                         <br>
                         <button *ngIf="refreshButton && refreshButton.active" type="button"
-                            class="form-control input-sm" 
-                            style="width: auto;display: inline;margin-right: 7px;"
+                            class="form-control input-sm" style="width: auto;display: inline;margin-right: 7px;"
                             (click)="refreshAction()">
                             <span class="glyphicon glyphicon-refresh"></span>
                             {{refreshButton.title}}
@@ -100,7 +100,8 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr *ngFor="let notifaction of pageOfNotifactions | searchFilter: searchNotifaction; let i = index">
+                        <tr
+                            *ngFor="let notifaction of pageOfNotifactions | searchFilter: searchNotifaction; let i = index">
                             <td style="text-align: center;">
                                 <div class="Yf">
                                     <div [ngClass]="{
@@ -115,8 +116,8 @@
                             <td>{{notifaction.body}}</td>
                             <td>{{notifaction.createDate | date: 'yyyy-MM-dd'}}</td>
                             <td style="text-align: center;">
-                                <div *ngIf="notifaction.messageStatus.lookupValue === 0"
-                                    class="btn-group btn-group-xs" role="group" style="text-align: center">
+                                <div *ngIf="notifaction.messageStatus.lookupValue === 0" class="btn-group btn-group-xs"
+                                    role="group" style="text-align: center">
                                     <button type="button" class="btn btn-default" (click)="readAction(notifaction)">
                                         <span class="glyphicon glyphicon-eye-open" style="color:#dc3545;"></span>
                                     </button>
@@ -127,10 +128,10 @@
                     <tfoot>
                         <tr>
                             <td colspan="7" style="text-align: center;padding-bottom: 0px;">
-                                <jw-pagination [items]="notifactions" [pageSize]="10" 
+                                <jw-pagination [items]="notifactions" [pageSize]="25"
                                     (changePage)="onChangePage($event)"></jw-pagination>
                             </td>
-                          </tr>
+                        </tr>
                     </tfoot>
                 </table>
             </div>

@@ -1,0 +1,181 @@
+<style>
+    .card {
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, .1), 0 1px 2px 0 rgba(0, 0, 0, .06);
+    }
+
+    .card {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        word-wrap: break-word;
+        background-color: #fff;
+        background-clip: border-box;
+        border: 0 solid rgba(0, 0, 0, .125);
+        border-radius: .25rem;
+    }
+
+    .card-body {
+        flex: 1 1 auto;
+        min-height: 1px;
+        padding: 1rem;
+    }
+
+    .card-title {
+        margin-bottom: 0.75rem;
+    }
+
+    .gutters-sm {
+        margin-right: -8px;
+        margin-left: -8px;
+    }
+
+    .gutters-sm>.col,
+    .gutters-sm>[class*=col-] {
+        padding-right: 8px;
+        padding-left: 8px;
+    }
+
+    .mb-3 {
+        margin-bottom: 1rem !important;
+    }
+
+    .rounded-circle {
+        border-radius: 50% !important;
+    }
+
+    .mt-3 {
+        margin-top: 1rem !important;
+    }
+
+    .text-secondary {
+        color: #6c757d !important;
+    }
+
+    p {
+        margin-top: 0;
+        margin-bottom: 1rem;
+    }
+</style>
+
+<div class="row gutters-sm">
+    <div class="col-lg-12">
+        <div class="panel">
+            <div class="panel-heading" style="border-bottom: 1px solid #eee;">
+                <div class="row" *ngIf="envVaraible">
+                    <div class="col-lg-6" 
+                        style="text-align: start;margin-top: 2px;font-size: large;">
+                        {{title}} ({{envVaraible.envKey}})
+                    </div>
+                    <div class="col-lg-6" style="text-align: end;">
+                        <button *ngIf="refreshButton && refreshButton.active" type="button" class="form-control input-sm"
+                            style="width: auto;display: inline;margin-right: 7px;" (click)="refreshAction()">
+                            <span class="glyphicon glyphicon-refresh"></span>
+                            {{refreshButton.title}}
+                        </button>
+                        <button *ngIf="addButton && addButton.active" type="button" class="form-control input-sm"
+                            style="width: auto; background: #cb0f43; color: white;display: inline;margin-right: 7px;" 
+                            data-toggle="modal" data-target="#envVaraible" (click)="addAction()">
+                            <span class="glyphicon glyphicon-plus-sign"></span>
+                            {{addButton.title}}
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="panel-body">
+                <table id="source-task-type" class="table table-responsive table table-striped
+                    table-bordered table-sm" style="font-size: 12px;">
+                    <thead>
+                        <tr>
+                            <th style="width: 4%;"># No</th>
+                            <th>Link EnvId</th>
+                            <th>EnvKey</th>
+                            <th>EnvValue</th>
+                            <th>User</th>
+                            <th style="width: 3%;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr *ngFor="let envUser of pageOfEnvVaraible | searchFilter: searchEnvUser; let i = index">
+                            <td style="text-align: center;">{{envUser.envKeyId}}</td>
+                            <td style="text-align: center;">
+                                {{envUser.auEnvId}}
+                            </td>
+                            <td style="text-align: center;">
+                                {{envUser.envKey}}
+                            </td>
+                            <td style="text-align: center;">
+                                {{envUser.envValue}}
+                            </td>
+                            <td style="text-align: center;">
+                                {{envUser.appUser?.username}}
+                            </td>
+                            <td  style="text-align: center;">
+                                <div class="btn-group btn-group-xs" role="group" style="text-align: center">
+                                    <button type="button" class="btn btn-default" data-toggle="modal"
+                                        data-target="#deleteAction" (click)="deleteEnvUser(envUser)">
+                                        <span class="glyphicon glyphicon-trash" style="color: #dc3545;"></span>
+                                    </button>                                
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="6" style="text-align: center;padding-bottom: 0px;">
+                                <jw-pagination [items]="envVaraibles" [pageSize]="25"
+                                    (changePage)="onChangePage($event)"></jw-pagination>
+                            </td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- data-toggle="modal" data-target="#deleteAction" -->
+<div class="modal fade" id="deleteAction" role="dialog" style="top: 85px;">
+    <del-box [title]="title" (deleteEvent)="deleteEnvWithUserId()">
+    </del-box>
+</div>
+<!-- link user -->
+<div class="modal fade" id="envVaraible" role="dialog" style="top: 85px;">
+    <div class="modal-dialog" style="width: 550px;">
+        <div class="modal-content">
+            <div class="modal-header" style="background: #555;">
+                <button type="button" #closeEnvLinkUser class="close"
+                    data-dismiss="modal">&times;</button>
+                <h4 class="modal-title">Add User</h4>
+            </div>
+            <div class="modal-body">
+                <form [formGroup]="envLinkUserForm" (ngSubmit)="onSubmit()">
+                    <div class="row">
+                        <div class="col-lg-10" *ngIf="appUserList">
+                            <div class="form-group">
+                                <select class="form-control input-sm" id="username" formControlName="username"
+                                    [ngClass]="{ 'is-invalid': submitted && f.username.errors }">
+                                    <option hidden value="" disabled selected>
+                                        Select User
+                                    </option>
+                                    <option *ngFor="let appUser of appUserList" [value]="appUser.username">
+                                        {{appUser.username}}
+                                    </option>
+                                </select>
+                                <div *ngIf="submitted && f.username.errors" class="invalid-feedback">
+                                    <div *ngIf="f.username.errors.required" style="color: red;">
+                                        Username is required
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-2">
+                            <button type="submit" [disabled]="loading" style="float: right;"
+                                class="btn btn-sm btn-danger">Save
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

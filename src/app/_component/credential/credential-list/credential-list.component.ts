@@ -9,12 +9,13 @@ import { AuthResponse, Credential } from '@/_models/index';
 
 @Component({
     selector: 'credential-list',
-    templateUrl: 'credential-list.component.html',    
+    templateUrl: 'credential-list.component.html',
 })
 export class CredentialListComponent implements OnInit {
 
     @Input()
     public title: any = 'Delete Credentials'
+    @Input()
     public subTitle: any = 'Note :- Delete opertaion may case problem for job';
     public searchCredentail: any = '';
     public currentActiveProfile: AuthResponse;
@@ -60,12 +61,12 @@ export class CredentialListComponent implements OnInit {
 
     public addCredentail(): void {
         this.router.navigate([this.addButton.router]);
-	}
+    }
 
     public editAction(payload: any): void {
         this.router.navigate(
             ['/credential/editCred'],
-            { 
+            {
                 queryParams: {
                     credentialId: payload.credentialId
                 }
@@ -82,18 +83,18 @@ export class CredentialListComponent implements OnInit {
             }
         }
         this.credentailService.fetchAllCredential(payload)
-        .pipe(first())
-        .subscribe((response: any) => {
-            this.spinnerService.hide();
-            if (response.status === ApiCode.ERROR) {
-                this.alertService.showError(response.message, ApiCode.ERROR);
-                return;
-            }
-            this.credentialDatas = response.data;
-        }, (error: any) => {
-            this.spinnerService.hide();
-            this.alertService.showError(error.message, ApiCode.ERROR);
-        });
+            .pipe(first())
+            .subscribe((response: any) => {
+                this.spinnerService.hide();
+                if (response.status === ApiCode.ERROR) {
+                    this.alertService.showError(response.message, ApiCode.ERROR);
+                    return;
+                }
+                this.credentialDatas = response.data;
+            }, (error: any) => {
+                this.spinnerService.hide();
+                this.alertService.showError(error.message, ApiCode.ERROR);
+            });
     }
 
     public deleteCredentail(credentialData: Credential, index: any): void {
@@ -102,27 +103,27 @@ export class CredentialListComponent implements OnInit {
 
     public deleteActionTriger(): void {
         this.spinnerService.show();
-		let payload = {
-			credentialId: this.credentialData.credentialId,
+        let payload = {
+            credentialId: this.credentialData.credentialId,
             accessUserDetail: {
                 appUserId: this.currentActiveProfile.appUserId,
                 username: this.currentActiveProfile.username
-           }
+            }
         }
-		this.credentailService.deleteCredential(payload)
-		.pipe(first())
-		.subscribe((response: any) => {
-			this.spinnerService.hide();
-			if(response.status === ApiCode.ERROR) {
-				this.alertService.showError(response.message, ApiCode.ERROR);
-				return;
-			}
-            this.refreshAction();
-			this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
-		}, (error: any) => {
-			this.spinnerService.hide();
-			this.alertService.showError(error, ApiCode.ERROR);
-		});
+        this.credentailService.deleteCredential(payload)
+            .pipe(first())
+            .subscribe((response: any) => {
+                this.spinnerService.hide();
+                if (response.status === ApiCode.ERROR) {
+                    this.alertService.showError(response.message, ApiCode.ERROR);
+                    return;
+                }
+                this.refreshAction();
+                this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
+            }, (error: any) => {
+                this.spinnerService.hide();
+                this.alertService.showError(error, ApiCode.ERROR);
+            });
     }
 
     public onChangePage(pageOfCredentials: Array<any>) {

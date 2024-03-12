@@ -1,12 +1,13 @@
 import { Component, Input, OnInit } from '@angular/core';
 import { first } from 'rxjs/operators';
 import { AuthenticationService, AlertService,
-    LookupService, CommomService
+    LookupService, CommomService, EnvVarService
 } from '@/_services';
 import { SpinnerService } from '@/_helpers';
 import { Router, ActivatedRoute } from '@angular/router';
 import { ApiCode, Action } from '@/_models';
-import { AuthResponse, LookupData } from '@/_models/index';
+import { AuthResponse, LookupData, EnvVaraible } from '@/_models/index';
+
 
 @Component({
     selector: 'lookup',
@@ -17,12 +18,18 @@ export class LookupComponent implements OnInit {
     @Input()
     public title: any = 'Main Lookup';
     public searchLookup: any = '';
+    public searchEvn: any = '';
     public currentActiveProfile: AuthResponse;
     // lookup
     public lookupAction: Action;
     public lookupData: LookupData;
     public lookupDatas: LookupData[];
     public pageOfLookupData: Array<LookupData>;
+    // env
+    public envAction: Action;
+    public envVaraibleData: EnvVaraible;
+    public envVaraibleDatas: EnvVaraible[];
+    public pageOfEnvVaraibleData: Array<EnvVaraible>;
 
     public addButton: any;
     public refreshButton: any;
@@ -32,6 +39,7 @@ export class LookupComponent implements OnInit {
     constructor(private router: Router,
         private route: ActivatedRoute,
         private lookupService: LookupService,
+        private envVarService: EnvVarService,
         private alertService: AlertService,
         private spinnerService: SpinnerService,
         private commomService: CommomService,
@@ -58,11 +66,14 @@ export class LookupComponent implements OnInit {
     }
 
     ngOnInit() {
-        this.fetchAllLookup();
+        this.refreshAction();
     }
 
     public refreshAction(): void {
         this.fetchAllLookup();
+        if (this.hasAccess(this.currentActiveProfile.roles, ['ROLE_MASTER_ADMIN'])) {
+            this.fetchAllEvn();
+        }
     }
 
     // fetch all lookup
@@ -83,6 +94,23 @@ export class LookupComponent implements OnInit {
                 return;
             }
             this.lookupDatas = response.data;
+        }, (error: any) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error.message, ApiCode.ERROR);
+        });
+    }
+
+    public fetchAllEvn(): any {
+        this.spinnerService.show();
+        this.envVarService.fetchAllEvn()
+        .pipe(first())
+        .subscribe((response: any) => {
+            this.spinnerService.hide();
+            if (response.status === ApiCode.ERROR) {
+                this.alertService.showError(response.message, ApiCode.ERROR);
+                return;
+            }
+            this.envVaraibleDatas = response.data;
         }, (error: any) => {
             this.spinnerService.hide();
             this.alertService.showError(error.message, ApiCode.ERROR);
@@ -142,7 +170,45 @@ export class LookupComponent implements OnInit {
 		this.lookupData = payload;
 	}
 
-    public editSubLookupData(payload: LookupData): void {
+    public addEnvVaraible(): void {
+		this.envAction = Action.ADD;
+	}
+
+    public editEnvVaraible(payload: EnvVaraible): void {
+		this.envAction = Action.EDIT;
+		this.envVaraibleData = payload;
+	}
+
+    public deleteEnvVaraible(payload: EnvVaraible): void {
+		this.envVaraibleData = payload;
+	}
+
+    public deleteActionTriger(): void {
+        this.spinnerService.show();
+		let payload = {
+			envKeyId: this.envVaraibleData.envKeyId,
+            accessUserDetail: {
+                appUserId: this.currentActiveProfile.appUserId,
+                username: this.currentActiveProfile.username
+           }
+        }
+		this.envVarService.deleteEnv(payload)
+		.pipe(first())
+		.subscribe((response: any) => {
+			this.spinnerService.hide();
+			if(response.status === ApiCode.ERROR) {
+				this.alertService.showError(response.message, ApiCode.ERROR);
+				return;
+			}
+            this.refreshAction();
+			this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
+		}, (error: any) => {
+			this.spinnerService.hide();
+			this.alertService.showError(error, ApiCode.ERROR);
+		});
+    }
+
+    public addSubLookupData(payload: LookupData): void {
 		this.router.navigate(['/sublookup'],
             {
                 queryParams: {
@@ -151,7 +217,16 @@ export class LookupComponent implements OnInit {
             });
 	}
 
-    public receiverEvent(action: Action): void {
+    public assignEvnToUser(payload: EnvVaraible): void {
+        this.router.navigate(['/envUsers'],
+        {
+            queryParams: {
+                envKeyId: payload.envKeyId
+            }
+        });
+	}
+
+    public receiveLookupEvent(action: Action): void {
 		this.lookupAction = null;
 		this.lookupData = null;
 		if (action == Action.ADD || action == Action.EDIT) {
@@ -159,9 +234,26 @@ export class LookupComponent implements OnInit {
 		}
 	}
 
+    public receiveEnvEvent(action: Action): void {
+		this.envAction = null;
+		this.envVaraibleData = null;
+		if (action == Action.ADD || action == Action.EDIT) {
+            this.fetchAllEvn();
+		}
+	}
+
     public onChangePage(pageOfLookupData: Array<any>) {
         // update current page of items
         this.pageOfLookupData = pageOfLookupData;
+    }
+
+    public onEnvPageChange(pageOfEnvVaraibleData: Array<any>) {
+        // update current page of items
+        this.pageOfEnvVaraibleData = pageOfEnvVaraibleData;
+    }
+
+    public hasAccess(userRoles: any, routeRoles: any) {
+        return userRoles.some((role:any)=> routeRoles.includes(role));
     }
     
 }

@@ -96,13 +96,13 @@ export class SttSettingComponent implements OnInit {
                     envVaraibles: this.fb.array([])
                 });
                 response.data
-                .forEach((env: any) => {
-                    this.envVarFormList.push(new FormGroup({
-                        auEnvId: new FormControl(env.auEnvId),
-                        envKey: new FormControl(env.envKey),
-                        envValue: new FormControl(env.envValue)
-                    }));
-                });
+                    .forEach((env: any) => {
+                        this.envVarFormList.push(new FormGroup({
+                            auEnvId: new FormControl(env.auEnvId),
+                            envKey: new FormControl(env.envKey),
+                            envValue: new FormControl(env.envValue)
+                        }));
+                    });
                 // check the type and map it wit with as
             }, (error: any) => {
                 this.spinnerService.hide();

@@ -3,11 +3,12 @@ import { HttpClient } from '@angular/common/http';
 import { ApiResponse } from '@/_models';
 import { Observable } from 'rxjs';
 
+
 @Injectable({
     providedIn: 'root'
 })
 export class STTService {
-    
+
     constructor(private http: HttpClient) { }
 
     public addSTT(payload: any): Observable<ApiResponse> {
@@ -175,7 +176,7 @@ export class STTService {
     }
 
     public fetchSTTFormDetail(formId: any) {
-        return this.http.get<any>(`${config.apiUrl}/sourceTaskType.json/fetchSTTFormDetail?formId=`+formId);
+        return this.http.get<any>(`${config.apiUrl}/sourceTaskType.json/fetchSTTFormDetail?formId=` + formId);
     }
 
     public addSTTCInteractions(payload: any) {
@@ -188,19 +189,19 @@ export class STTService {
 
     public downloadSTTCommon(payload: any): Observable<any> {
         return this.http.post(`${config.apiUrl}/sourceTaskType.json/downloadSTTCommon`, payload,
-        {
-            responseType: 'blob'
-        });
+            {
+                responseType: 'blob'
+            });
     }
 
     public downloadSTTCommonTemplateFile(payload: any): Observable<any> {
         return this.http.post(`${config.apiUrl}/sourceTaskType.json/downloadSTTCommonTemplateFile`, payload,
-        {
-            responseType: 'blob'
-        });
+            {
+                responseType: 'blob'
+            });
     }
 
-    public uploadSTTCommon(payload:any): Observable<any> {
+    public uploadSTTCommon(payload: any): Observable<any> {
         return this.http.post(`${config.apiUrl}/sourceTaskType.json/uploadSTTCommon`, payload);
     }
 

@@ -3,6 +3,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { ApiResponse } from '@/_models';
 import { Observable } from 'rxjs';
 
+
 @Injectable({
     providedIn: 'root'
 })
@@ -11,9 +12,9 @@ export class NotificationService {
     constructor(private http: HttpClient,) {
     }
 
-    public updateNotification(payload:any): Observable<ApiResponse> {
+    public updateNotification(payload: any): Observable<ApiResponse> {
         let request = {
-           'notifyId': payload.notifyId
+            'notifyId': payload.notifyId
         }
         return this.http.post<ApiResponse>(`${config.apiUrl}/notification.json/updateNotification`, request);
     }

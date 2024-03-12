@@ -3,11 +3,12 @@ import { HttpClient } from '@angular/common/http';
 import { ApiResponse } from '@/_models';
 import { Observable } from 'rxjs';
 
+
 @Injectable({
     providedIn: 'root'
 })
 export class EnvVarService {
-    
+
     constructor(private http: HttpClient) { }
 
     public addEnv(payload: any) {

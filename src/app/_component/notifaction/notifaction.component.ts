@@ -51,28 +51,28 @@ export class NotifactionComponent implements OnInit {
     public fetchAllNotification(): any {
         this.spinnerService.show();
         this.notificationService.fetchAllNotification(this.currentActiveProfile.username)
-        .pipe(first())
-        .subscribe((response: any) => {
-            this.spinnerService.hide();
-            this.notifactions = response.data;
-        }, (error: any) => {
-            this.spinnerService.hide();
-            this.alertService.showError(error, ApiCode.ERROR);
-        });
+            .pipe(first())
+            .subscribe((response: any) => {
+                this.spinnerService.hide();
+                this.notifactions = response.data;
+            }, (error: any) => {
+                this.spinnerService.hide();
+                this.alertService.showError(error, ApiCode.ERROR);
+            });
     }
 
     public readAction(payload: any): void {
         this.spinnerService.show();
         this.notificationService.updateNotification(payload)
-        .pipe(first())
-        .subscribe((response: any) => {
-            this.spinnerService.hide();
-            this.alertService.showSuccess(response.message, ApiCode.ERROR);
-            this.fetchAllNotification();
-        }, (error: any) => {
-            this.spinnerService.hide();
-            this.alertService.showError(error, ApiCode.ERROR);
-        });
+            .pipe(first())
+            .subscribe((response: any) => {
+                this.spinnerService.hide();
+                this.alertService.showSuccess(response.message, ApiCode.ERROR);
+                this.fetchAllNotification();
+            }, (error: any) => {
+                this.spinnerService.hide();
+                this.alertService.showError(error, ApiCode.ERROR);
+            });
 
     }
 

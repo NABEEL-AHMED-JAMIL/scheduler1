@@ -1,24 +1,21 @@
 <div class="panel">
-    <div class="panel-heading" style="font-size: 17px;padding-bottom: 0px;">
-        <div class="row">
-            <div class="col-lg-6" 
-				style="text-align: start;
+	<div class="panel-heading" style="font-size: 17px;padding-bottom: 0px;">
+		<div class="row">
+			<div class="col-lg-6" style="text-align: start;
 				margin-top: 5px;">
-                Xml Configuration
-            </div>
+				Xml Configuration
+			</div>
 			<div class="col-lg-6">
-				<button type="button" class="btn btn-sm btn-default" 
-					style="float: right;margin-right: 4px;"
-					title="Add More"
-					(click)="tageFormsAddItem()">
+				<button type="button" class="btn btn-sm btn-default" style="float: right;margin-right: 4px;"
+					title="Add More" (click)="tageFormsAddItem()">
 					<span class="glyphicon glyphicon-plus-sign"></span> Add More
 				</button>
 			</div>
-        </div>
-    </div>
-    <div class="panel-body" style="padding-bottom: 10px;">
-		<form [formGroup]="xmlForm" (ngSubmit)="submintTageForms(xmlForm.value)" 
-			#uploadDocumentsForm="ngForm" ngNativeValidate>
+		</div>
+	</div>
+	<div class="panel-body" style="padding-bottom: 10px;">
+		<form [formGroup]="xmlForm" (ngSubmit)="submintTageForms(xmlForm.value)" #uploadDocumentsForm="ngForm"
+			ngNativeValidate>
 			<div class="row">
 				<div class="col-md-7">
 					<div id="main-form-content" formArrayName="tagsInfo">
@@ -59,19 +56,18 @@
 					</div>
 				</div>
 				<div class="col-md-5">
-					<textarea class="form-control input-sm" rows="16" 
-						style="font-size:12px;font-family:monospace;white-space:pre;height: auto;
+					<textarea class="form-control input-sm" rows="16" style="font-size:12px;font-family:monospace;white-space:pre;height: auto;
 							border-color: #ddd;background-color: #ddd;">{{xmlString}}</textarea>
 					<div class="row">
 						<div class="col-md-6">
 							<input type="submit" class="form-control input-sm"
-								style="background: black;color: white;margin-top: 10px;"
-								[disabled]="xmlForm?.invalid" value="Show Output">
+								style="background: black;color: white;margin-top: 10px;" [disabled]="xmlForm?.invalid"
+								value="Show Output">
 						</div>
 						<div class="col-md-6">
 							<button class="form-control input-sm"
-								style="background: #4750b6;color: white;margin-top: 10px;"
-								[disabled]="xmlForm?.invalid" (click)="createFile()">
+								style="background: #4750b6;color: white;margin-top: 10px;" [disabled]="xmlForm?.invalid"
+								(click)="createFile()">
 								Downalod XML File</button>
 						</div>
 					</div>

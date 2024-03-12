@@ -21,15 +21,15 @@ export class AppComponent {
     public breadcrumbs: Observable<Breadcrumb[]>;
     public userRole: any;
 
-    constructor(        
+    constructor(
         private router: Router,
         private location: Location,
         private spinnerService: SpinnerService,
         private alertService: AlertService,
         private authenticationService: AuthenticationService,
         private readonly breadcrumbService: BreadcrumbService) {
-            this.breadcrumbs = breadcrumbService.breadcrumbs$;
-            this.authenticationService.currentUser
+        this.breadcrumbs = breadcrumbService.breadcrumbs$;
+        this.authenticationService.currentUser
             .subscribe(currentUser => {
                 this.currentUser = currentUser;
                 if (this.currentUser) {
@@ -39,27 +39,27 @@ export class AppComponent {
     }
 
     public hasAccess(roleList: any): any {
-        return this.userRole.some(role => roleList.includes(role));
+        return this.userRole.some((role: any) => roleList.includes(role));
     }
 
     public logout(): any {
         this.spinnerService.show();
         this.authenticationService.logout()
-        .pipe(first())
-        .subscribe((data: any) => {
-            this.spinnerService.hide();
-            if (data.status === ApiCode.ERROR) {
-                this.alertService.showError(data.message, ApiCode.ERROR);
-                return;
-            }
-            this.router.navigate(['/login']);
-        },(error: any) => {
-            this.spinnerService.hide();
-            this.alertService.showError(error.message, ApiCode.ERROR);
-        });
+            .pipe(first())
+            .subscribe((data: any) => {
+                this.spinnerService.hide();
+                if (data.status === ApiCode.ERROR) {
+                    this.alertService.showError(data.message, ApiCode.ERROR);
+                    return;
+                }
+                this.router.navigate(['/login']);
+            }, (error: any) => {
+                this.spinnerService.hide();
+                this.alertService.showError(error.message, ApiCode.ERROR);
+            });
     }
 
-    public back() : any {
+    public back(): any {
         this.location.back();
     }
 

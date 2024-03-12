@@ -1,9 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { first } from 'rxjs/operators';
-import { AuthenticationService, AlertService,
-    LookupService, STTService, CredentailService
-} from '@/_services';
+import { AuthenticationService, AlertService, LookupService, STTService, CredentailService } from '@/_services';
 import { Location } from '@angular/common';
 import { SpinnerService } from '@/_helpers';
 import { ApiCode, Action, AuthResponse, LOOKUP_TYPES } from '@/_models/index';
@@ -299,7 +297,8 @@ export class CUSTTComponent implements OnInit {
             this.formBuilder.group({
                 numPartitions: ['', [Validators.required, Validators.min(1), Validators.max(10)]],
                 topicName: ['', [Validators.required, Validators.pattern('^[-a-zA-Z0-9@\.+_]+$')]],
-                topicPattern: [this.topicPattern]
+                topicPattern: [this.topicPattern],
+                serviceUrl: ['', [Validators.required]]
             }
             ));
     }
@@ -310,15 +309,15 @@ export class CUSTTComponent implements OnInit {
             this.formBuilder.group({
                 numPartitions: [payload.numPartitions, [Validators.required, Validators.min(1), Validators.max(5)]],
                 topicName: [payload.topicName, [Validators.required, Validators.pattern('^[-a-zA-Z0-9@\.+_]+$')]],
-                topicPattern: [payload.topicPattern]
+                topicPattern: [payload.topicPattern],
+                serviceUrl: [payload.serviceUrl, [Validators.required]]
             }));
     }
 
     public addApiTaskType(): void {
         this.sttForm.addControl('apiTaskType',
             this.formBuilder.group({
-                apiUrl: ['', [Validators.required,
-                Validators.pattern('(https?://)?([\\da-z.-]+)\\.([a-z.]{2,6})[/\\w .-]*/?')]],
+                apiUrl: ['', [Validators.required]],
                 httpMethod: ['2', [Validators.required]]
             }));
     }
@@ -326,8 +325,7 @@ export class CUSTTComponent implements OnInit {
     public editApiTaskType(payload: any): void {
         this.sttForm.addControl('apiTaskType',
             this.formBuilder.group({
-                apiUrl: [payload.apiUrl, [Validators.required,
-                Validators.pattern('(https?://)?([\\da-z.-]+)\\.([a-z.]{2,6})[/\\w .-]*/?')]],
+                apiUrl: [payload.apiUrl, [Validators.required]],
                 httpMethod: [payload.httpMethod.lookupValue, [Validators.required]]
             }));
     }

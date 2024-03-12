@@ -4,12 +4,12 @@ import { AuthenticationService } from '@/_services';
 
 @Injectable({ providedIn: 'root' })
 export class AuthGuard implements CanActivate {
-    
+
 
     constructor(
         private router: Router,
         private authenticationService: AuthenticationService
-    ) {}
+    ) { }
 
     public canActivate(route: ActivatedRouteSnapshot, state: RouterStateSnapshot) {
         const currentUser = this.authenticationService.currentUserValue;
@@ -27,6 +27,6 @@ export class AuthGuard implements CanActivate {
     }
 
     public hasAccess(userRoles: any, routeRoles: any) {
-        return userRoles.some(role=> routeRoles.includes(role));
+        return userRoles.some(role => routeRoles.includes(role));
     }
 }

@@ -4,7 +4,9 @@ export * from './auth/register/register.component';
 export * from './auth/forgot-pass/forgot-pass.component';
 export * from './auth/reset-pass/reset-pass.component';
 export * from './pagenotfound/pagenotfound.component';
-export * from './batch-action/batch-action.component'
+export * from './batch-action/batch-action.component';
+// home
+export * from './home/home.component';
 // setting
 export * from './profile/profile.component';
 export * from './manage-user/cu-user/cu-user.component';
@@ -16,12 +18,13 @@ export * from './search-engine/search-engine.component';
 export * from './lookup-setting/lookup/lookup.component';
 export * from './lookup-setting/sub-lookup/sub-lookup.component';
 export * from './lookup-setting/cu-lookup/cu-lookup.component';
+export * from './lookup-setting/cu-env/cu-env.component';
+export * from './lookup-setting/env-users/env-users.component';
 // notifaction
 export * from './notifaction/notifaction.component';
 // root-stt*
 export * from './stt-setting/stt-setting.component';
 export * from './stt-setting/batch/batch.component';
-export * from './stt-setting/stt-common-table/stt-common-table.component'
 // stt
 export * from './stt-setting/stt/cu-stt/cu-stt.component';
 export * from './stt-setting/stt/view-stt/view-stt.component';
@@ -48,6 +51,17 @@ export * from './stt-setting/sttc/sttc-link-stts/sttc-link-stts.component';
 export * from './stt-setting/sttc/sttc-link-stts/sttc-link-stts.component';
 // sttp-ground
 export * from './stt-setting/sttp-ground/sttp-ground.component';
+// source-task
+export * from './source-task/cu-source-task/cu-source-task.component';
+export * from './source-task/list-source-task/list-source-task.component';
+export * from './source-task/link-source-job/link-source-job.component';
+// source-job
+export * from './source-job/cu-source-job/cu-source-job.component';
+export * from './source-job/list-source-job/list-source-job.component';
+export * from './source-job/link-source-task/link-source-task.component';
+// job-repot
+export * from './job-report/job-report.component';
+export * from './job-queue/job-queue.component';
 // del-box
 export * from './del-box/del-box.component';
 // credentail

@@ -1,11 +1,14 @@
 import { Component, OnInit, ViewChild } from '@angular/core';
-import { LookupService, AlertService, 
-    AuthenticationService, AppUserService } from '@/_services/index';
+import {
+    LookupService, AlertService,
+    AuthenticationService, AppUserService
+} from '@/_services/index';
 import { ActivatedRoute } from '@angular/router';
 import { ApiCode } from '@/_models/index';
 import { SpinnerService, } from '@/_helpers';
 import { first } from 'rxjs/operators';
 import { AuthResponse } from '@/_models/index';
+
 
 @Component({
     selector: 'batch-action',
@@ -17,7 +20,7 @@ export class BatchActionComponent implements OnInit {
     public errors: any;
 
     public currentTaskState: any = 'Batch Action';
-    @ViewChild('inputUpload', {static: false})
+    @ViewChild('inputUpload', { static: false })
     public inputUpload: any;
     public parentId: any;
     // current user
@@ -40,7 +43,7 @@ export class BatchActionComponent implements OnInit {
             } else if (this.action = "AppUser") {
                 this.parentId = params['adminId'];
             }
-		});
+        });
     }
 
     ngOnInit() {
@@ -51,61 +54,61 @@ export class BatchActionComponent implements OnInit {
         this.errors = [];
         if (this.action === 'Lookup' || this.action === 'SubLookup') {
             let payload = {
-                parentLookupId: this.action === 'SubLookup' ? this.parentId: null,
+                parentLookupId: this.action === 'SubLookup' ? this.parentId : null,
                 accessUserDetail: {
                     appUserId: this.currentActiveProfile.appUserId,
                     username: this.currentActiveProfile.username
-               }
+                }
             }
             const formData = new FormData();
             formData.append("file", fileToUpload);
             formData.append("data", JSON.stringify(payload));
             this.lookupService.uploadLookup(formData)
-            .pipe(first())
-            .subscribe((response: any) => {
-                this.spinnerService.hide();
-                this.inputUpload.nativeElement.value = '';
-                if (response?.status === ApiCode.ERROR) {
-                    this.errors = response.data;
-                    this.alertService.showError(response.message, ApiCode.ERROR);
-                    return;
-                }
-                this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
-            }, (error: any) => {
-                this.spinnerService.hide();
-                this.alertService.showError(error, ApiCode.ERROR);
-            });
+                .pipe(first())
+                .subscribe((response: any) => {
+                    this.spinnerService.hide();
+                    this.inputUpload.nativeElement.value = '';
+                    if (response?.status === ApiCode.ERROR) {
+                        this.errors = response.data;
+                        this.alertService.showError(response.message, ApiCode.ERROR);
+                        return;
+                    }
+                    this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
+                }, (error: any) => {
+                    this.spinnerService.hide();
+                    this.alertService.showError(error, ApiCode.ERROR);
+                });
         } else if (this.action === 'AppUser') {
             let payload = {
                 accessUserDetail: {
                     rootUser: this.hasAccess(['ROLE_MASTER_ADMIN']),
                     appUserId: this.currentActiveProfile.appUserId,
                     username: this.currentActiveProfile.username
-               }
+                }
             }
             const formData = new FormData();
             formData.append("file", fileToUpload);
             formData.append("data", JSON.stringify(payload));
             this.appUserService.uploadAppUser(formData)
-            .pipe(first())
-            .subscribe((response: any) => {
-                this.spinnerService.hide();
-                this.inputUpload.nativeElement.value = '';
-                if (response?.status === ApiCode.ERROR) {
-                    this.errors = response.data;
-                    this.alertService.showError(response.message, ApiCode.ERROR);
-                    return;
-                }
-                this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
-            }, (error: any) => {
-                this.spinnerService.hide();
-                this.alertService.showError(error, ApiCode.ERROR);
-            });
+                .pipe(first())
+                .subscribe((response: any) => {
+                    this.spinnerService.hide();
+                    this.inputUpload.nativeElement.value = '';
+                    if (response?.status === ApiCode.ERROR) {
+                        this.errors = response.data;
+                        this.alertService.showError(response.message, ApiCode.ERROR);
+                        return;
+                    }
+                    this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
+                }, (error: any) => {
+                    this.spinnerService.hide();
+                    this.alertService.showError(error, ApiCode.ERROR);
+                });
         }
     }
 
     public hasAccess(roleList: any): void {
-        return this.currentActiveProfile.roles.some(r=> roleList.includes(r));
+        return this.currentActiveProfile.roles.some(r => roleList.includes(r));
     }
 
 }

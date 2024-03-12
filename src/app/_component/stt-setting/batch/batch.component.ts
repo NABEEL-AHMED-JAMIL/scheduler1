@@ -26,13 +26,13 @@ export class BatchComponent implements OnInit {
     public parentLookupId: any;
 
     constructor(
-        private _activatedRoute: ActivatedRoute,
+        private activatedRoute: ActivatedRoute,
         private sttService: STTService,
         private alertService: AlertService,
         private spinnerService: SpinnerService,
         private authenticationService: AuthenticationService) {
         this.currentActiveProfile = authenticationService.currentUserValue;
-        this._activatedRoute.data
+        this.activatedRoute.data
             .subscribe((data: any) => {
                 this.title = data.breadcrumb;
                 this.router = data.router;

@@ -143,7 +143,7 @@
                                             style="color:blue"></span>
                                     </button>
                                     <button type="button" class="btn btn-default"
-                                        (click)="editSubLookupData(lookupData)">
+                                        (click)="addSubLookupData(lookupData)">
                                         <span class="glyphicon glyphicon-hand-right"
                                             style="color:#a94442"></span>
                                     </button>
@@ -164,9 +164,113 @@
         </div>
     </div>
 </div>
+<!-- env only can view by the super-admin -->
+<div class="row gutters-sm" *ngIf="hasAccess(this.currentActiveProfile.roles, ['ROLE_MASTER_ADMIN'])">
+    <div class="col-lg-12">
+        <div class="card mb-3">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-lg-8">
+                        <div class="form-group">
+                            <label for="envVaraibleDatas" *ngIf="envVaraibleDatas">
+                                Total Env ({{envVaraibleDatas.length}})
+                            </label>
+                            <input type="text" id="searchEvn" class="form-control input-sm"
+                                style="width: 30%;" [(ngModel)]="searchEvn" 
+                                placeholder="Search by any key" />
+                        </div>
+                    </div>
+                    <div class="col-lg-4" style="text-align: end;">
+                        <br>
+                        <button *ngIf="refreshButton && refreshButton.active" type="button"
+                            class="form-control input-sm" style="width: auto;display: inline;margin-right: 7px;"
+                            (click)="refreshAction()">
+                            <span class="glyphicon glyphicon-refresh"></span>
+                            {{refreshButton.title}}
+                        </button>
+                        <button *ngIf="addButton && addButton.active" type="button" class="form-control input-sm"
+                            style="width: auto; background: #cb0f43; color: white;display: inline;margin-right: 7px;" 
+                            data-toggle="modal" data-target="#envVaraible"
+                            (click)="addEnvVaraible()">
+                            <span class="glyphicon glyphicon-plus-sign"></span>
+                            {{addButton.title}}
+                        </button>
+                    </div>
+                </div>
+                <table id="source-task-type" class="table table-responsive table table-striped
+                    table-bordered table-sm" style="font-size: 12px;">
+                    <thead>
+                        <tr>
+                            <th style="width: 2%;">-</th>
+                            <th style="width: 3%;"># No</th>
+                            <th>Env Key</th>
+                            <th style="width: 8%;">Created Date</th>
+                            <th style="width: 7%;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr *ngFor="let envVariable of pageOfEnvVaraibleData | searchFilter: searchEvn; let i = index">
+                            <td style="text-align: center;">
+                                <div class="Yf">
+                                    <div [ngClass]="{
+                                        'Yg_inactive' : envVariable.status.lookupValue === 0,
+                                        'Yg_active' : envVariable.status.lookupValue === 1
+                                    }"></div>
+                                </div>
+                            </td>
+                            <td>{{envVariable.envKeyId}}</td>
+                            <td>{{envVariable.envKey}}</td>
+                            <td style="text-align: center;">{{envVariable.dateCreated  | date: 'yyyy-MM-dd'}}</td>
+                            <td style="text-align: center;">
+                                <div class="btn-group btn-group-xs" role="group"
+                                    style="text-align: center">
+                                    <button type="button" class="btn btn-default"
+                                        data-toggle="modal" data-target="#envVaraible"
+                                        (click)="editEnvVaraible(envVariable)">
+                                        <span class="glyphicon glyphicon-edit"
+                                            style="color:blue"></span>
+                                    </button>
+                                    <button type="button" class="btn btn-default" data-toggle="modal"
+                                        data-target="#deleteAction" (click)="deleteEnvVaraible(envVariable)">
+                                        <span class="glyphicon glyphicon-trash" style="color: #dc3545;"></span>
+                                    </button>
+                                    <button type="button" class="btn btn-default" (click)="assignEvnToUser(envVariable)">
+                                        <span class="glyphicon glyphicon-user" style="color:#a94442"></span>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="5" style="text-align: center;padding-bottom: 0px;">
+                                <jw-pagination [items]="envVaraibleDatas" [pageSize]="10" 
+                                    (changePage)="onEnvPageChange($event)"></jw-pagination>
+                            </td>
+                          </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
 <!-- lookup detai -->
 <cu-lookup *ngIf="lookupAction"
     [lookUpAction]="lookupAction"
     [recivedLookupData]="lookupData"
-    (senderEvent) = "receiverEvent($event)">
+    (senderEvent)="receiveLookupEvent($event)">
 </cu-lookup>
+
+<!-- cu-env -->
+<cu-env *ngIf="envAction"
+    [envVaraibleAction]="envAction"
+    [recivedEnvVaraible]="envVaraibleData"
+    (senderEvent)="receiveEnvEvent($event)">
+</cu-env>
+
+<div class="modal fade" id="deleteAction"
+    role="dialog" style="top: 85px;">
+    <del-box [title]="'Env Varaible'"
+        (deleteEvent)="deleteActionTriger()">
+    </del-box>
+</div>

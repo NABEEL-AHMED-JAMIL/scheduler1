@@ -49,7 +49,7 @@ module.exports = {
             // global app config object
             config: JSON.stringify({
                 apiUrl: 'http://localhost:9098/api/v2',
-                webSocketUrl: 'http://localhost:9098/api/v2'
+                webSocketUrl: 'http://localhost:9098/api/v1/ws'
             })
         }),
 

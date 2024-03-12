@@ -159,8 +159,8 @@ export class CUSTTCComponent implements OnInit {
                     this.onChangefieldLkValue(response.fieldLookUp);
                     return;
                 } else if (response.fieldType.lookupValue === 'url' ||
-                    response.fieldType.lookupValue === 'email' || 
-                    response.fieldType.lookupValue === 'password' || 
+                    response.fieldType.lookupValue === 'email' ||
+                    response.fieldType.lookupValue === 'password' ||
                     response.fieldType.lookupValue === 'tel' ||
                     response.fieldType.lookupValue === 'text' ||
                     response.fieldType.lookupValue === 'textarea') {

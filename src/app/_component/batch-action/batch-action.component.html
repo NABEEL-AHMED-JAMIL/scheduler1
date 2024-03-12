@@ -69,8 +69,8 @@
                     <div class="col-lg-6" style="margin-top: 5px;text-align: end;">
                         <input type="file" accept="application/vnd.ms-excel,
                             application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                            style="display: none;"
-                            #inputUpload (change)="uploadBulkData($event.target.files[0])" hidden>
+                            style="display: none;" #inputUpload
+                            (change)="uploadBulkData($event.target.files[0])" hidden>
                         <button type="button" class="btn btn-sm btn-default" (click)="inputUpload.click()">
                             <span class="glyphicon glyphicon-upload"></span> Upload
                         </button>

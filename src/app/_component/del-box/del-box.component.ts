@@ -1,5 +1,8 @@
-import { Component, OnInit, Input,
-    Output, EventEmitter, ViewChild } from '@angular/core';
+import {
+    Component, OnInit, Input,
+    Output, EventEmitter, ViewChild
+} from '@angular/core';
+
 
 @Component({
     selector: 'del-box',
@@ -10,11 +13,11 @@ export class DeleteBoxComponent implements OnInit {
     @Input()
     public title: any;
     @Input()
-    public subTitle: any;
+    public subTitle: any = 'Note :- Delete opertaion may case problem for job';
     @Output()
     public deleteEvent = new EventEmitter<void>();
-    @ViewChild('closebutton', {static: false})
-	public closeButton: any;
+    @ViewChild('closebutton', { static: false })
+    public closeButton: any;
 
     constructor() {
     }

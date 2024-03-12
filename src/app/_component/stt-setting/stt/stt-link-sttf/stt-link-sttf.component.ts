@@ -1,6 +1,6 @@
 import { Component, OnInit, ViewChild } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
-import { STTLinkUserList, AppUserList, STTLinkSTTFList, STTFormList } from '@/_models';
+import { STTLinkSTTFList, STTFormList } from '@/_models';
 import { first } from 'rxjs/operators';
 import { AuthResponse, ApiCode } from '@/_models/index';
 import { SpinnerService } from '@/_helpers';

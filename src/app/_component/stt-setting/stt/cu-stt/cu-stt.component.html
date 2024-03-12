@@ -74,90 +74,104 @@
                 <div class="title" style="color: #cb0f43;">{{title}} Basic Detail</div>
                 <div class="content" style="margin-top: 10px;">
                     <div class="row">
-                        <div class="col-lg-4 form-group">
-                            <label for="serviceName">Service Name</label>
-                            <input type="text" id="serviceName" maxlength="40" formControlName="serviceName"
-                                class="form-control input-sm" placeholder="Enter service name"
-                                oninput="this.value = this.value.toUpperCase()"
-                                [ngClass]="{ 'is-invalid': submitted && f.serviceName.errors }" />
-                            <div *ngIf="submitted && f.serviceName.errors" class="invalid-feedback">
-                                <div *ngIf="f.serviceName.errors.required" style="color: red;">ServiceName is
-                                    required
+                        <div class="col-lg-4">
+                            <div class="form-group">
+                                <label for="serviceName">Service Name</label>
+                                <input type="text" id="serviceName" maxlength="40" formControlName="serviceName"
+                                    class="form-control input-sm" placeholder="Enter service name"
+                                    oninput="this.value = this.value.toUpperCase()"
+                                    [ngClass]="{ 'is-invalid': submitted && f.serviceName.errors }" />
+                                <div *ngIf="submitted && f.serviceName.errors" class="invalid-feedback">
+                                    <div *ngIf="f.serviceName.errors.required" style="color: red;">ServiceName is
+                                        required
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-lg-4 form-group">
-                            <label for="description">Description</label>
-                            <input type="text" id="description" maxlength="40" formControlName="description"
-                                class="form-control input-sm" placeholder="Enter description"
-                                [ngClass]="{ 'is-invalid': submitted && f.description.errors }" />
-                            <div *ngIf="submitted && f.description.errors" class="invalid-feedback">
-                                <div *ngIf="f.description.errors.required" style="color: red;">Description is
-                                    required
+                        <div class="col-lg-4">
+                            <div class="form-group">
+                                <label for="description">Description</label>
+                                <input type="text" id="description" maxlength="40" formControlName="description"
+                                    class="form-control input-sm" placeholder="Enter description"
+                                    [ngClass]="{ 'is-invalid': submitted && f.description.errors }" />
+                                <div *ngIf="submitted && f.description.errors" class="invalid-feedback">
+                                    <div *ngIf="f.description.errors.required" style="color: red;">Description is
+                                        required
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-lg-4 form-group" *ngIf="taskTypeOption">
-                            <label for="taskType">TaskType</label>
-                            <select class="form-control input-sm" id="taskType" formControlName="taskType"
-                                [ngClass]="{ 'is-invalid': submitted && f.taskType.errors }"
-                                [attr.disabled]="action === 2 ? true : null" (change)='onTaskTypeSelected($event)'>
-                                <!-- true -> null for 2nd value -->
-                                <option hidden value="" disabled selected>
-                                    {{taskTypeOption.parentLookupData.description}}
-                                </option>
-                                <option *ngFor="let taskType of taskTypeOption.subLookupData"
-                                    [value]="taskType.lookupValue">{{taskType.description}}
-                                </option>
-                            </select>
-                            <div *ngIf="submitted && f.taskType.errors" class="invalid-feedback">
-                                <div *ngIf="f.taskType.errors.required" style="color: red;">TaskType is required
+                        <div class="col-lg-4" *ngIf="taskTypeOption">
+                            <div class="form-group">
+                                <label for="taskType">TaskType</label>
+                                <select class="form-control input-sm" id="taskType" formControlName="taskType"
+                                    [ngClass]="{ 'is-invalid': submitted && f.taskType.errors }"
+                                    [attr.disabled]="action === 2 ? true : null" (change)='onTaskTypeSelected($event)'>
+                                    <!-- true -> null for 2nd value -->
+                                    <option hidden value="" disabled selected>
+                                        {{taskTypeOption.parentLookupData.description}}
+                                    </option>
+                                    <option *ngFor="let taskType of taskTypeOption.subLookupData"
+                                        [value]="taskType.lookupValue">{{taskType.description}}
+                                    </option>
+                                </select>
+                                <div *ngIf="submitted && f.taskType.errors" class="invalid-feedback">
+                                    <div *ngIf="f.taskType.errors.required" style="color: red;">TaskType is required
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-lg-4 form-group" *ngIf="defultOption">
-                            <label for="defaultStt">Default</label>
-                            <select class="form-control input-sm" id="defaultStt" formControlName="defaultStt"
-                                [ngClass]="{ 'is-invalid': submitted && f.defaultStt.errors }">
-                                <option hidden value="" disabled selected>
-                                    {{defultOption.parentLookupData.description}}
-                                </option>
-                                <option *ngFor="let defultOpt of defultOption.subLookupData"
-                                    [value]="defultOpt.lookupValue">{{defultOpt.description}}
-                                </option>
-                            </select>
-                            <div *ngIf="submitted && f.defaultStt.errors" class="invalid-feedback">
-                                <div *ngIf="f.defaultStt.errors.required" style="color: red;">
-                                    Default is required
+                    </div>
+                    <div class="row">
+                        <div class="col-lg-4" *ngIf="defultOption">
+                            <div class="form-group">
+                                <label for="defaultStt">Default</label>
+                                <select class="form-control input-sm" id="defaultStt" formControlName="defaultStt"
+                                    [ngClass]="{ 'is-invalid': submitted && f.defaultStt.errors }">
+                                    <option hidden value="" disabled selected>
+                                        {{defultOption.parentLookupData.description}}
+                                    </option>
+                                    <option *ngFor="let defultOpt of defultOption.subLookupData"
+                                        [value]="defultOpt.lookupValue">{{defultOpt.description}}
+                                    </option>
+                                </select>
+                                <div *ngIf="submitted && f.defaultStt.errors" class="invalid-feedback">
+                                    <div *ngIf="f.defaultStt.errors.required" style="color: red;">
+                                        Default is required
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-lg-4 form-group" *ngIf="credentailOption">
-                            <label for="credentialId">Credential</label>
-                            <select class="form-control input-sm" id="credentialId" formControlName="credentialId">
-                                <option hidden value="" disabled selected>
-                                    Select Credentail
-                                </option>
-                                <option *ngFor="let credential of credentailOption"
-                                    [value]="credential.credentialId">{{credential.credentialName}}
-                                </option>
-                            </select>
+                        <div class="col-lg-4" *ngIf="credentailOption">
+                            <div class="form-group">
+                                <label for="credentialId">Credential</label>
+                                <select class="form-control input-sm" id="credentialId" formControlName="credentialId">
+                                    <option hidden value="" disabled selected>
+                                        Select Credentail
+                                    </option>
+                                    <option *ngFor="let credential of credentailOption"
+                                        [value]="credential.credentialId">{{credential.credentialName}}
+                                    </option>
+                                </select>
+                            </div>
                         </div>
-                        <div class="col-lg-4 form-group" *ngIf="statusList && action === 2">
-                            <label for="status">Status</label>
-                            <select id="status" class="form-control input-sm" formControlName="status"
-                                [ngClass]="{ 'is-invalid': submitted && f.status.errors }"
-                                [attr.disabled]="f.status.value === 2 ? true : null">
-                                <option hidden value="" disabled selected>
-                                    {{statusList.parentLookupData.description}}
-                                </option>
-                                <option *ngFor="let status of statusList.subLookupData"
-                                    [value]="status.lookupValue">{{status.description}}
-                                </option>
-                            </select>
-                            <div *ngIf="submitted && f.status.errors" class="invalid-feedback">
-                                <div *ngIf="f.status.errors.required" style="color: red;">
-                                    Status is required
+                        <div class="col-lg-4" *ngIf="statusList && action === 2">
+                            <div class="form-group">
+                                <label for="status">Status</label>
+                                <select id="status" class="form-control input-sm" formControlName="status"
+                                    [ngClass]="{ 'is-invalid': submitted && f.status.errors }"
+                                    [attr.disabled]="f.status.value === 2 ? true : null">
+                                    <option hidden value="" disabled selected>
+                                        {{statusList.parentLookupData.description}}
+                                    </option>
+                                    <option *ngFor="let status of statusList.subLookupData"
+                                        [value]="status.lookupValue">{{status.description}}
+                                    </option>
+                                </select>
+                                <div *ngIf="submitted && f.status.errors" class="invalid-feedback">
+                                    <div *ngIf="f.status.errors.required" style="color: red;">
+                                        Status is required
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -175,7 +189,7 @@
                         <div class="col-lg-8 form-group">
                             <label for="apiUrl">Endpoint</label>
                             <input formControlName="apiUrl" type="text" id="apiUrl" maxlength="255"
-                                class="form-control input-sm" placeholder="Enter queue endpoint"
+                                class="form-control input-sm" placeholder="Enter endpoint"
                                 [ngClass]="{ 'is-invalid': submitted && apiTaskType.get('apiUrl').errors }" />
                             <div *ngIf="submitted && apiTaskType.get('apiUrl').errors" class="invalid-feedback">
                                 <div *ngIf="apiTaskType.get('apiUrl').errors.required" style="color: red;">ApiUrl is
@@ -212,6 +226,17 @@
                 <div class="content" style="margin-top: 10px;" formGroupName="kafkaTaskType">
                     <div class="row">
                         <div class="col-lg-4 form-group">
+                            <label for="serviceUrl">Kafka Url</label>
+                            <input type="text" id="serviceUrl" maxlength="40" formControlName="serviceUrl"
+                                class="form-control input-sm" placeholder="Enter service url"
+                                [ngClass]="{ 'is-invalid': submitted && kafkaTaskType.get('serviceUrl').errors }" />
+                            <div *ngIf="submitted && kafkaTaskType.get('serviceUrl').errors" class="invalid-feedback">
+                                <div *ngIf="kafkaTaskType.get('serviceUrl').errors.required" style="color: red;">Kafka
+                                    Url is required
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-2 form-group">
                             <label for="numPartitions">Partitions</label>
                             <input type="number" id="numPartitions" min="1" max="10" formControlName="numPartitions"
                                 class="form-control input-sm" placeholder="Enter partitions"
@@ -229,14 +254,13 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="col-lg-4 form-group">
+                        <div class="col-lg-3 form-group">
                             <label for="topicName">Topic Name</label>
                             <input type="text" id="topicName" maxlength="40" formControlName="topicName"
                                 class="form-control input-sm" placeholder="Enter topic name"
                                 (input)="changeOnTopicNameValue($event.target.value)"
                                 [ngClass]="{ 'is-invalid': submitted && kafkaTaskType.get('topicName').errors }" />
-                            <div *ngIf="submitted && kafkaTaskType.get('topicName').errors"
-                                class="invalid-feedback">
+                            <div *ngIf="submitted && kafkaTaskType.get('topicName').errors" class="invalid-feedback">
                                 <div *ngIf="kafkaTaskType.get('topicName').errors.required" style="color: red;">
                                     TopicName is required
                                 </div>
@@ -245,7 +269,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="col-lg-4 form-group">
+                        <div class="col-lg-3 form-group">
                             <label for="topicPattern">Topic Pattern</label>
                             <input type="text" id="topicPattern" maxlength="40" formControlName="topicPattern"
                                 [(ngModel)]="topicPattern" class="form-control input-sm"

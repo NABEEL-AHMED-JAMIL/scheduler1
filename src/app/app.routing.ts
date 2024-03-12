@@ -4,6 +4,7 @@ import {
     RegisterComponent,
     ForgotPassComponent,
     ResetPassComponent,
+    HomeComponent,
     NotFoundComponent,
     BatchActionComponent,
     SettingLayoutComponent,
@@ -15,6 +16,8 @@ import {
     CUSTTSComponent,
     CUSTTCComponent,
     XmlConfigurationComponent,
+    JobReportComponent,
+    JobQueueComponent,
     SearchEngineComponent,
     SubLookupComponent,
     BatchComponent,
@@ -33,17 +36,22 @@ import {
     STTFLinkSTTSComponent,
     STTLinkSTTFComponent,
     NotifactionComponent,
-    SttpGroundComponent
+    SttpGroundComponent,
+    ListSourceTaskComponent,
+    CuSourceTaskComponent,
+    CuSourceJobComponent,
+    ListSourceJobComponent,
+    EnvUsersComponent,
 } from '@/_component/index';
 import { Action } from '@/_models';
 import { AuthGuard } from '@/_helpers';
 
 const routes: Routes = [
 
-    { 
+    {
         path: '',
         pathMatch: 'full',
-        redirectTo: 'profile'
+        redirectTo: 'home'
     },
     {
         path: 'login',
@@ -62,21 +70,41 @@ const routes: Routes = [
         component: ResetPassComponent
     },
     {
+        path: 'home',
+        component: SettingLayoutComponent,
+        canActivate: [AuthGuard],
+        data: {
+            breadcrumb: '',
+            role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN', 'ROLE_USER']
+        },
+        children: [
+            {
+                path: '',
+                component: HomeComponent,
+                canActivate: [AuthGuard],
+                data: {
+                    breadcrumb: '',
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN', 'ROLE_USER']
+                }
+            }
+        ]
+    },
+    {
         path: 'profile',
         component: SettingLayoutComponent,
         canActivate: [AuthGuard],
-        data:  {
+        data: {
             breadcrumb: 'Profile',
-            role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN', 'ROLE_USER' ]
+            role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN', 'ROLE_USER']
         },
         children: [
-            { 
+            {
                 path: '',
                 component: ProfileComponent,
                 canActivate: [AuthGuard],
-                data:  {
+                data: {
                     breadcrumb: '',
-                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN', 'ROLE_USER' ]
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN', 'ROLE_USER']
                 }
             },
             {
@@ -86,14 +114,14 @@ const routes: Routes = [
                 data: {
                     action: 'AppUser',
                     breadcrumb: 'Batch',
-                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN']
                 }
             },
-            { 
+            {
                 path: 'manageUser',
                 component: ManageUserComponent,
                 canActivate: [AuthGuard],
-                data:  {
+                data: {
                     breadcrumb: 'ManageUser',
                     topHeader: [
                         {
@@ -127,9 +155,9 @@ const routes: Routes = [
                                     active: true
                                 }
                             ]
-                        }      
+                        }
                     ],
-                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN']
                 }
             }
         ]
@@ -138,9 +166,9 @@ const routes: Routes = [
         path: 'notifaction',
         component: SettingLayoutComponent,
         canActivate: [AuthGuard],
-        data:  {
+        data: {
             breadcrumb: 'Notifaction',
-            role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN', 'ROLE_USER' ],
+            role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN', 'ROLE_USER'],
             topHeader: [
                 {
                     type: 'refresh',
@@ -150,13 +178,13 @@ const routes: Routes = [
             ]
         },
         children: [
-            { 
+            {
                 path: '',
                 component: NotifactionComponent,
                 canActivate: [AuthGuard],
-                data:  {
+                data: {
                     breadcrumb: '',
-                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN', 'ROLE_USER' ]
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN', 'ROLE_USER']
                 }
             }
         ]
@@ -165,9 +193,9 @@ const routes: Routes = [
         path: 'lookup',
         component: SettingLayoutComponent,
         canActivate: [AuthGuard],
-        data:  {
+        data: {
             breadcrumb: 'Lookup',
-            role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ],
+            role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN'],
             topHeader: [
                 {
                     type: 'refresh',
@@ -208,9 +236,9 @@ const routes: Routes = [
                 path: '',
                 component: LookupComponent,
                 canActivate: [AuthGuard],
-                data:  {
+                data: {
                     breadcrumb: '',
-                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN']
                 }
             },
             {
@@ -220,7 +248,7 @@ const routes: Routes = [
                 data: {
                     action: 'Lookup',
                     breadcrumb: 'Batch',
-                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN']
                 }
             }
         ]
@@ -229,9 +257,9 @@ const routes: Routes = [
         path: 'sublookup',
         component: SettingLayoutComponent,
         canActivate: [AuthGuard],
-        data:  {
+        data: {
             breadcrumb: 'Sub Lookup',
-            role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ],
+            role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN'],
             topHeader: [
                 {
                     type: 'refresh',
@@ -268,34 +296,66 @@ const routes: Routes = [
             ]
         },
         children: [
-            { 
+            {
                 path: '',
                 component: SubLookupComponent,
                 canActivate: [AuthGuard],
                 data: {
                     breadcrumb: '',
-                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN']
                 }
             },
-            { 
+            {
                 path: 'batch',
                 component: BatchActionComponent,
                 canActivate: [AuthGuard],
                 data: {
                     action: 'SubLookup',
                     breadcrumb: 'Batch',
-                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN']
                 }
             },
+        ]
+    },
+    {
+        path: 'envUsers',
+        component: SettingLayoutComponent,
+        canActivate: [AuthGuard],
+        data: {
+            breadcrumb: 'Env Users',
+            role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN'],
+            topHeader: [
+                {
+                    type: 'refresh',
+                    title: 'Refresh',
+                    active: true
+                },
+                {
+                    type: 'add',
+                    title: 'Link User',
+                    active: true
+                }
+            ]
+        },
+        children: [
+            {
+                path: '',
+                component: EnvUsersComponent,
+                canActivate: [AuthGuard],
+                data: {
+                    breadcrumb: '',
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN']
+                }
+            }
         ]
     },
     {
         path: 'stt',
         component: SttSettingComponent,
         canActivate: [AuthGuard],
-        data:  {
+        data: {
             breadcrumb: 'Stt List',
-            role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ],
+            role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN'],
             selectedMenu: {
                 type: 1,
                 title: 'STT',
@@ -343,7 +403,7 @@ const routes: Routes = [
                 path: '',
                 component: STTListComponent,
                 canActivate: [AuthGuard],
-                data:  {
+                data: {
                     breadcrumb: '',
                     action: [
                         {
@@ -359,38 +419,38 @@ const routes: Routes = [
                             active: true
                         }
                     ],
-                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN']
                 }
             },
             {
                 path: 'addStt',
                 component: CUSTTComponent,
                 canActivate: [AuthGuard],
-                data:  {
+                data: {
                     title: 'Add',
                     action: Action.ADD,
                     breadcrumb: 'Add Stt',
                     topHeader: [],
-                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN']
                 }
             },
             {
                 path: 'editStt',
                 component: CUSTTComponent,
                 canActivate: [AuthGuard],
-                data:  {
+                data: {
                     title: 'Edit',
                     action: Action.EDIT,
                     breadcrumb: 'Edit Stt',
                     topHeader: [],
-                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN']
                 }
             },
             {
                 path: 'sttLinkUser',
                 component: STTLinkUserComponent,
                 canActivate: [AuthGuard],
-                data:  {
+                data: {
                     breadcrumb: 'STT Link User',
                     topHeader: [
                         {
@@ -404,14 +464,14 @@ const routes: Routes = [
                             active: true
                         }
                     ],
-                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN']
                 }
             },
             {
                 path: 'sttLinkForm',
                 component: STTLinkSTTFComponent,
                 canActivate: [AuthGuard],
-                data:  {
+                data: {
                     breadcrumb: 'STT Link STTF',
                     topHeader: [
                         {
@@ -425,10 +485,10 @@ const routes: Routes = [
                             active: true
                         }
                     ],
-                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN']
                 }
             },
-            { 
+            {
                 path: 'batch',
                 component: BatchComponent,
                 data: {
@@ -436,7 +496,7 @@ const routes: Routes = [
                     action: 'SourceTaskType',
                     breadcrumb: 'Batch Stt',
                     topHeader: [],
-                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN']
                 }
             }
         ]
@@ -445,9 +505,9 @@ const routes: Routes = [
         path: 'sttf',
         component: SttSettingComponent,
         canActivate: [AuthGuard],
-        data:  {
+        data: {
             breadcrumb: 'Sttf List',
-            role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ],
+            role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN'],
             selectedMenu: {
                 type: 2,
                 title: 'STT Form',
@@ -495,7 +555,7 @@ const routes: Routes = [
                 path: '',
                 component: STTFListComponent,
                 canActivate: [AuthGuard],
-                data:  {
+                data: {
                     breadcrumb: '',
                     action: [
                         {
@@ -511,38 +571,38 @@ const routes: Routes = [
                             active: true
                         }
                     ],
-                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN']
                 }
             },
             {
                 path: 'addSttf',
                 component: CUSTTFComponent,
                 canActivate: [AuthGuard],
-                data:  {
+                data: {
                     title: 'Add',
                     action: Action.ADD,
                     breadcrumb: 'Add Sttf',
                     topHeader: [],
-                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN']
                 }
             },
             {
                 path: 'editSttf',
                 component: CUSTTFComponent,
                 canActivate: [AuthGuard],
-                data:  {
+                data: {
                     title: 'Edit',
                     action: Action.EDIT,
                     breadcrumb: 'Edit Sttf',
                     topHeader: [],
-                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN']
                 }
             },
             {
                 path: 'sttfLinkStt',
                 component: STTFLinkSTTComponent,
                 canActivate: [AuthGuard],
-                data:  {
+                data: {
                     breadcrumb: 'STTF Link STT',
                     topHeader: [
                         {
@@ -556,14 +616,14 @@ const routes: Routes = [
                             active: true
                         }
                     ],
-                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN']
                 }
             },
             {
                 path: 'sttfLinkStts',
                 component: STTFLinkSTTSComponent,
                 canActivate: [AuthGuard],
-                data:  {
+                data: {
                     breadcrumb: 'STTF Link STTS',
                     topHeader: [
                         {
@@ -577,10 +637,10 @@ const routes: Routes = [
                             active: true
                         }
                     ],
-                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN']
                 }
             },
-            { 
+            {
                 path: 'batch',
                 component: BatchComponent,
                 canActivate: [AuthGuard],
@@ -588,7 +648,7 @@ const routes: Routes = [
                     action: 'SourceTaskTypeForm',
                     breadcrumb: 'Batch Sttf',
                     topHeader: [],
-                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN']
                 }
             }
         ]
@@ -597,9 +657,9 @@ const routes: Routes = [
         path: 'stts',
         component: SttSettingComponent,
         canActivate: [AuthGuard],
-        data:  {
-		    breadcrumb: 'Sttf List',
-            role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ],
+        data: {
+            breadcrumb: 'Sttf List',
+            role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN'],
             selectedMenu: {
                 type: 3,
                 title: 'STT Section',
@@ -647,7 +707,7 @@ const routes: Routes = [
                 path: '',
                 component: STTSListComponent,
                 canActivate: [AuthGuard],
-                data:  {
+                data: {
                     breadcrumb: '',
                     action: [
                         {
@@ -664,38 +724,38 @@ const routes: Routes = [
                         }
 
                     ],
-                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN']
                 }
             },
-			{
+            {
                 path: 'addStts',
                 component: CUSTTSComponent,
                 canActivate: [AuthGuard],
-                data:  {
+                data: {
                     title: 'Add',
                     action: Action.ADD,
                     breadcrumb: 'Add Stts',
                     topHeader: [],
-                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN']
                 }
             },
             {
                 path: 'editStts',
                 component: CUSTTSComponent,
                 canActivate: [AuthGuard],
-                data:  {
+                data: {
                     title: 'Edit',
                     action: Action.EDIT,
                     breadcrumb: 'Edit Stts',
                     topHeader: [],
-                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN']
                 }
             },
             {
                 path: 'sttsLinkSttf',
                 component: STTSLinkSTTFComponent,
                 canActivate: [AuthGuard],
-                data:  {
+                data: {
                     breadcrumb: 'STTS Link STTF',
                     topHeader: [
                         {
@@ -709,14 +769,14 @@ const routes: Routes = [
                             active: true
                         }
                     ],
-                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN']
                 }
             },
             {
                 path: 'sttLinkControl',
                 component: STTSLinkSTTCComponent,
                 canActivate: [AuthGuard],
-                data:  {
+                data: {
                     breadcrumb: 'STTS Link STTC',
                     topHeader: [
                         {
@@ -730,10 +790,10 @@ const routes: Routes = [
                             active: true
                         }
                     ],
-                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN']
                 }
             },
-            { 
+            {
                 path: 'batch',
                 component: BatchComponent,
                 canActivate: [AuthGuard],
@@ -741,18 +801,18 @@ const routes: Routes = [
                     action: 'SourceTaskTypeSection',
                     breadcrumb: 'Batch Stts',
                     topHeader: [],
-                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN']
                 }
             }
         ]
     },
-    { 
+    {
         path: 'sttc',
         component: SttSettingComponent,
         canActivate: [AuthGuard],
-        data:  {
-		    breadcrumb: 'Sttc List',
-            role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ],
+        data: {
+            breadcrumb: 'Sttc List',
+            role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN'],
             selectedMenu: {
                 type: 4,
                 router: '/sttc',
@@ -800,7 +860,7 @@ const routes: Routes = [
                 path: '',
                 component: STTCListComponent,
                 canActivate: [AuthGuard],
-                data:  {
+                data: {
                     breadcrumb: '',
                     action: [
                         {
@@ -810,38 +870,38 @@ const routes: Routes = [
                             active: true
                         }
                     ],
-                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN']
                 }
             },
             {
                 path: 'addSttc',
                 component: CUSTTCComponent,
                 canActivate: [AuthGuard],
-                data:  {
+                data: {
                     title: 'Add',
                     action: Action.ADD,
                     breadcrumb: 'Add Sttc',
                     topHeader: [],
-                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN']
                 }
             },
             {
                 path: 'editSttc',
                 component: CUSTTCComponent,
                 canActivate: [AuthGuard],
-                data:  {
+                data: {
                     title: 'Edit',
                     action: Action.EDIT,
                     breadcrumb: 'Edit Sttc',
                     topHeader: [],
-                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN']
                 }
             },
             {
                 path: 'sttcLinkStts',
                 component: STTCLinkSTTSComponent,
                 canActivate: [AuthGuard],
-                data:  {
+                data: {
                     breadcrumb: 'STTC Link STTS',
                     topHeader: [
                         {
@@ -855,10 +915,10 @@ const routes: Routes = [
                             active: true
                         }
                     ],
-                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN']
                 }
             },
-            { 
+            {
                 path: 'batch',
                 component: BatchComponent,
                 canActivate: [AuthGuard],
@@ -866,7 +926,137 @@ const routes: Routes = [
                     action: 'SourceTaskTypeControl',
                     breadcrumb: 'Batch Sttc',
                     topHeader: [],
-                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN']
+                }
+            }
+        ]
+    },
+    {
+        path: 'sttp',
+        component: SettingLayoutComponent,
+        canActivate: [AuthGuard],
+        data: {
+            breadcrumb: 'PlayGround',
+            role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN', 'ROLE_USER']
+        },
+        children: [
+            {
+                path: '',
+                component: SttpGroundComponent,
+                canActivate: [AuthGuard],
+                data: {
+                    breadcrumb: '',
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN', 'ROLE_USER']
+                }
+            }
+        ]
+    },
+    {
+        path: 'sourceJob',
+        component: SettingLayoutComponent,
+        canActivate: [AuthGuard],
+        data: {
+            breadcrumb: 'Source Job',
+            role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN', 'ROLE_USER'],
+            topHeader: [
+                {
+                    type: 'refresh',
+                    title: 'Refresh',
+                    active: true
+                },
+                {
+                    type: 'add',
+                    title: 'Add Source Job',
+                    router: '/sourceJob/addSourceJob',
+                    active: true
+                }
+            ]
+        },
+        children: [
+            {
+                path: '',
+                component: ListSourceJobComponent,
+                canActivate: [AuthGuard],
+                data: {
+                    breadcrumb: '',
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN', 'ROLE_USER']
+                }
+            },
+            {
+                path: 'addSourceJob',
+                component: CuSourceJobComponent,
+                canActivate: [AuthGuard],
+                data: {
+                    title: 'Add',
+                    action: Action.ADD,
+                    breadcrumb: 'Add SourceJob',
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN', 'ROLE_USER']
+                }
+            },
+            {
+                path: 'editSourceJob',
+                component: CuSourceJobComponent,
+                canActivate: [AuthGuard],
+                data: {
+                    title: 'Edit',
+                    action: Action.EDIT,
+                    breadcrumb: 'Edit SourceJob',
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN', 'ROLE_USER']
+                }
+            }
+        ]
+    },
+    {
+        path: 'sourceTask',
+        component: SettingLayoutComponent,
+        canActivate: [AuthGuard],
+        data: {
+            breadcrumb: 'Source Task',
+            role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN', 'ROLE_USER'],
+            topHeader: [
+                {
+                    type: 'refresh',
+                    title: 'Refresh',
+                    active: true
+                },
+                {
+                    type: 'add',
+                    title: 'Add Source Task',
+                    router: '/sourceTask/addSourceTask',
+                    active: true
+                }
+            ]
+        },
+        children: [
+            {
+                path: '',
+                component: ListSourceTaskComponent,
+                canActivate: [AuthGuard],
+                data: {
+                    breadcrumb: '',
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN', 'ROLE_USER']
+                }
+            },
+            {
+                path: 'addSourceTask',
+                component: CuSourceTaskComponent,
+                canActivate: [AuthGuard],
+                data: {
+                    title: 'Add',
+                    action: Action.ADD,
+                    breadcrumb: 'Add SourceTask',
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN', 'ROLE_USER']
+                }
+            },
+            {
+                path: 'editSourceTask',
+                component: CuSourceTaskComponent,
+                canActivate: [AuthGuard],
+                data: {
+                    title: 'Edit',
+                    action: Action.EDIT,
+                    breadcrumb: 'Edit SourceTask',
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN', 'ROLE_USER']
                 }
             }
         ]
@@ -875,9 +1065,9 @@ const routes: Routes = [
         path: 'credential',
         component: SettingLayoutComponent,
         canActivate: [AuthGuard],
-        data:  {
+        data: {
             breadcrumb: 'Credential',
-            role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ],
+            role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN'],
             topHeader: [
                 {
                     type: 'refresh',
@@ -897,89 +1087,107 @@ const routes: Routes = [
                 path: '',
                 component: CredentialListComponent,
                 canActivate: [AuthGuard],
-                data:  {
+                data: {
                     breadcrumb: '',
-                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN']
                 }
             },
-			{
+            {
                 path: 'addCred',
                 component: CuCredentialComponent,
                 canActivate: [AuthGuard],
-                data:  {
+                data: {
                     title: 'Add Credential',
                     action: Action.ADD,
                     breadcrumb: 'Add Credential',
-                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN']
                 }
             },
             {
                 path: 'editCred',
                 component: CuCredentialComponent,
                 canActivate: [AuthGuard],
-                data:  {
+                data: {
                     title: 'Edit Credential',
                     action: Action.EDIT,
                     breadcrumb: 'Edit Credential',
-                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN' ]
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN']
                 }
             }
         ]
     },
     {
-        path: 'sttp',
-        component: SettingLayoutComponent,
-        canActivate: [AuthGuard],
-        data:  {
-            breadcrumb: 'PlayGround',
-            role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN', 'ROLE_USER' ]
-        },
-        children: [
-            { 
-                path: '',
-                component: SttpGroundComponent,
-                canActivate: [AuthGuard],
-                data:  {
-                    breadcrumb: '',
-                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN', 'ROLE_USER' ]
-                }
-            }
-        ]
-    },
-    { 
         path: 'searchengine',
         component: SettingLayoutComponent,
         canActivate: [AuthGuard],
-        data:  {
-            role: [ 'ROLE_MASTER_ADMIN' ]
+        data: {
+            role: ['ROLE_MASTER_ADMIN']
         },
         children: [
-            { 
+            {
                 path: '',
                 component: SearchEngineComponent,
                 canActivate: [AuthGuard],
-                data:  {
+                data: {
                     breadcrumb: 'Search Engine',
-                    role: [ 'ROLE_MASTER_ADMIN' ]
+                    role: ['ROLE_MASTER_ADMIN']
                 }
             }
         ]
     },
-    { 
+    {
         path: 'xmlconfig',
         component: SettingLayoutComponent,
         canActivate: [AuthGuard],
-        data:  {
-            role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN', 'ROLE_USER' ]
+        data: {
+            role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN', 'ROLE_USER']
         },
         children: [
-            { 
+            {
                 path: '',
                 component: XmlConfigurationComponent,
                 canActivate: [AuthGuard],
-                data:  {
+                data: {
                     breadcrumb: 'XML Config',
-                    role: [ 'ROLE_MASTER_ADMIN', 'ROLE_ADMIN', 'ROLE_USER' ]
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN', 'ROLE_USER']
+                }
+            }
+        ]
+    },
+    {
+        path: 'jobReport',
+        component: SettingLayoutComponent,
+        canActivate: [AuthGuard],
+        data: {
+            role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN', 'ROLE_USER']
+        },
+        children: [
+            {
+                path: '',
+                component: JobReportComponent,
+                canActivate: [AuthGuard],
+                data: {
+                    breadcrumb: 'Job Report',
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN', 'ROLE_USER']
+                }
+            }
+        ]
+    },
+    {
+        path: 'jobQueue',
+        component: SettingLayoutComponent,
+        canActivate: [AuthGuard],
+        data: {
+            role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN', 'ROLE_USER']
+        },
+        children: [
+            {
+                path: '',
+                component: JobQueueComponent,
+                canActivate: [AuthGuard],
+                data: {
+                    breadcrumb: 'View Queue',
+                    role: ['ROLE_MASTER_ADMIN', 'ROLE_ADMIN', 'ROLE_USER']
                 }
             }
         ]

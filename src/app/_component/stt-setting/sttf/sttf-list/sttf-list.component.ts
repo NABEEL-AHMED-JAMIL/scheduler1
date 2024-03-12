@@ -128,7 +128,7 @@ export class STTFListComponent implements OnInit {
             });
     }
 
-    public viewAction(payload: any ): void {
+    public viewAction(payload: any): void {
         this.spinnerService.show();
         this.sttService.fetchSTTFormDetail(payload.sttfId)
             .pipe(first())
@@ -158,7 +158,7 @@ export class STTFListComponent implements OnInit {
                 this.alertService.showError(error, ApiCode.ERROR);
             });
     }
-    
+
     public buildItem(fieldControl: any): any {
         return new FormGroup({
             sttcId: new FormControl(fieldControl?.sttcId),
@@ -261,9 +261,9 @@ export class STTFListComponent implements OnInit {
 
     public uuid(): string {
         return 'xxxxx-xxxxxx'.replace(/[xy]/g, (char) => {
-          let random = Math.random() * 16 | 0;
-          let value = char === "x" ? random : (random % 4 + 8);
-          return value.toString(16);
+            let random = Math.random() * 16 | 0;
+            let value = char === "x" ? random : (random % 4 + 8);
+            return value.toString(16);
         });
     }
 

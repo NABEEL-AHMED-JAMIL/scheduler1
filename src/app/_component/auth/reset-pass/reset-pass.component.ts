@@ -22,25 +22,21 @@ export class ResetPassComponent implements OnInit {
 
     public newPassword = new FormControl(null, [
         (c: AbstractControl) => Validators.required(c),
-        Validators.pattern(
-            /(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[@$!%*#?&^_-]).{8,}/
-        ),
-      ]);
-    public confirmPassword = new FormControl(null, [
-        (c: AbstractControl) => Validators.required(c),
-        Validators.pattern(
-          /(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[@$!%*#?&^_-]).{8,}/
-        ),
+        Validators.pattern(/(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[@$!%*#?&^_-]).{8,}/),
     ]);
 
-    constructor(private formBuilder: FormBuilder,
+    public confirmPassword = new FormControl(null, [
+        (c: AbstractControl) => Validators.required(c),
+        Validators.pattern(/(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[@$!%*#?&^_-]).{8,}/),
+    ]);
+
+    constructor(private router: Router,
+        private formBuilder: FormBuilder,
         private _activatedRoute: ActivatedRoute,
-        private router: Router,
         private authenticationService: AuthenticationService,
         private alertService: AlertService,
         private spinnerService: SpinnerService) {
-        this._activatedRoute.queryParamMap
-        .subscribe(params => {
+        this._activatedRoute.queryParamMap.subscribe(params => {
             try {
                 if (!params?.get('token')) {
                     // redirect to forgot password with message token not there

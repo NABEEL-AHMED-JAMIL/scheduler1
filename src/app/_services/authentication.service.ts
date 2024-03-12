@@ -4,6 +4,7 @@ import { BehaviorSubject, Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { AuthResponse } from '@/_models';
 
+
 @Injectable({ providedIn: 'root' })
 export class AuthenticationService {
 
@@ -46,8 +47,8 @@ export class AuthenticationService {
 
     public tokenVerify(token: any): Observable<any> {
         return this.http.get<any>(`${config.apiUrl}/appUser.json/tokenVerify`, {
-            headers: {'Authorization': token}
-         });
+            headers: { 'Authorization': token }
+        });
     }
 
     public logout() {
@@ -56,11 +57,11 @@ export class AuthenticationService {
             refreshToken: refreshToken
         };
         return this.http.post<any>(`${config.apiUrl}/auth.json/logoutAppUser`, payload)
-        .pipe(map(response => {
-            // store user details and jwt token in local storage to keep user logged in between page refreshes
-            localStorage.clear();
-            this.currentUserSubject.next(null);
-            return response;
-        }));
+            .pipe(map(response => {
+                // store user details and jwt token in local storage to keep user logged in between page refreshes
+                localStorage.clear();
+                this.currentUserSubject.next(null);
+                return response;
+            }));
     }
 }

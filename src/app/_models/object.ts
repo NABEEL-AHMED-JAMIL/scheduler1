@@ -34,7 +34,7 @@ export interface SourceTaskType {
   description?: any;
   queueTopicPartition?: any;
   serviceName?: any;
-  totalTaskLink?:any;
+  totalTaskLink?: any;
   status?: any;
   schemaRegister?: any;
   schemaPayload?: any;
@@ -57,53 +57,53 @@ export interface QMessage {
 
 export const SOURCE_TASK_TYPE: SourceTaskType[] = [
   {
-		sourceTaskTypeId: 1000,
-		description: "[consumer test]",
-		queueTopicPartition: "topic=test-topic&partitions=[*]",
-		serviceName: "Test"
-	},
-	{
-		sourceTaskTypeId: 1001,
-		description: "[only for file type (non of image)]",
-		queueTopicPartition: "topic=scrapping-topic&partitions=[0]",
-		serviceName: "Web Scrapping"
-	},
-	{
-		sourceTaskTypeId: 1002,
-		description: "[only html data to other format (xml|css|xlsx|json)]",
-		queueTopicPartition: "topic=scrapping-topic&partitions=[1]",
-		serviceName: "Data Scrapping"
-	},
-	{
-		sourceTaskTypeId: 1003,
-		description: "[only image scrapping diff type of image]",
-		queueTopicPartition: "topic=scrapping-topic&partitions=[2]",
-		serviceName: "Image Scraping"
-	},
-	{
-		sourceTaskTypeId: 1004,
-		description: "[only for monitoring]",
-		queueTopicPartition: "topic=comparison-topic&partitions=[0]",
-		serviceName: "Image Comparison"
-	},
-	{
-		sourceTaskTypeId: 1005,
-		description: "[only for monitoring]",
-		queueTopicPartition: "topic=comparison-topic&partitions=[1]",
-		serviceName: "Data Comparison"
-	},
-	{
-		sourceTaskTypeId: 1006,
-		description: "[only for monitoring]",
-		queueTopicPartition: "topic=comparison-topic&partitions=[2]",
-		serviceName: "Web Comparison"
-	},
-	{
-		sourceTaskTypeId: 1007,
-		description: "[user uplaod file xlsx|css and extract the data as per the requirement and reportment (json|xlsx|css|xlsx)]",
-		queueTopicPartition: "topic=extraction-topic&partitions=[*]",
-		serviceName: "Data Extraction"
-	}
+    sourceTaskTypeId: 1000,
+    description: "[consumer test]",
+    queueTopicPartition: "topic=test-topic&partitions=[*]",
+    serviceName: "Test"
+  },
+  {
+    sourceTaskTypeId: 1001,
+    description: "[only for file type (non of image)]",
+    queueTopicPartition: "topic=scrapping-topic&partitions=[0]",
+    serviceName: "Web Scrapping"
+  },
+  {
+    sourceTaskTypeId: 1002,
+    description: "[only html data to other format (xml|css|xlsx|json)]",
+    queueTopicPartition: "topic=scrapping-topic&partitions=[1]",
+    serviceName: "Data Scrapping"
+  },
+  {
+    sourceTaskTypeId: 1003,
+    description: "[only image scrapping diff type of image]",
+    queueTopicPartition: "topic=scrapping-topic&partitions=[2]",
+    serviceName: "Image Scraping"
+  },
+  {
+    sourceTaskTypeId: 1004,
+    description: "[only for monitoring]",
+    queueTopicPartition: "topic=comparison-topic&partitions=[0]",
+    serviceName: "Image Comparison"
+  },
+  {
+    sourceTaskTypeId: 1005,
+    description: "[only for monitoring]",
+    queueTopicPartition: "topic=comparison-topic&partitions=[1]",
+    serviceName: "Data Comparison"
+  },
+  {
+    sourceTaskTypeId: 1006,
+    description: "[only for monitoring]",
+    queueTopicPartition: "topic=comparison-topic&partitions=[2]",
+    serviceName: "Web Comparison"
+  },
+  {
+    sourceTaskTypeId: 1007,
+    description: "[user uplaod file xlsx|css and extract the data as per the requirement and reportment (json|xlsx|css|xlsx)]",
+    queueTopicPartition: "topic=extraction-topic&partitions=[*]",
+    serviceName: "Data Extraction"
+  }
 ];
 
 // LookupData
@@ -114,6 +114,17 @@ export interface LookupData {
   description?: any;
   dateCreated?: any;
   parent?: LookupData;
+}
+
+export interface EnvVaraible {
+  auEnvId?: any;
+  envKeyId?: any;
+  envKey?: any;
+  envValue?: any;
+  status?: any;
+  dateCreated?: any;
+  createdBy?: any;
+  appUser?: any;
 }
 
 export interface Notifaction {
@@ -127,38 +138,12 @@ export interface Notifaction {
 }
 
 export interface SourceTask {
-    taskDetailId?: any;
-    taskName?: any;
-    pipelineId?: any;
-    taskPayload?: any;
-    taskStatus?: any;
-    homePageId?: any;
-    sourceTaskType?: SourceTaskType;
-    totalLinksJobs?: any;
+  taskDetailId?: any;
+  taskName?: any;
+  taskStatus?: any;
+  sttRequest?: any;
+  totalLinksJobs?: any;
 }
-
-export interface SourceJobDetail {
-  jobId?: any;
-  jobName?: any;
-  jobStatus?: any;
-  jobRunningStatus?: any;
-  lastJobRun?: any;
-  execution?: any;
-  priority?: any;
-  dateCreated?: any;
-  taskDetail?: SourceTask;
-  scheduler?: Scheduler;
-};
-
-export interface Scheduler {
-  schedulerId?: any;
-  startDate?: any;
-  endDate?: any;
-  startTime?: any;
-  frequency?: any;
-  recurrence?: any;
-  recurrenceTime?: any;
-};
 
 export interface Paging {
   totalRecord?: number;
@@ -183,11 +168,10 @@ export interface SearchText {
   itemValue?: string;
 };
 
-export enum Action { 
+export enum Action {
   NON, VIEW, EDIT,
   ADD, CLEAR, STT
 };
-
 
 export interface AppUserResponse {
   appUserId?: any;

@@ -2,13 +2,10 @@
     <div style="border-radius: 0 0 calc(0.25rem - 1px) calc(0.25rem - 1px);
         padding-top: 1rem!important;padding-bottom: 1rem!important;border-width: 0!important;
         padding: 0.5rem 1rem;background-color: #d4d4d4d4;">
-        <div class="text-center">
-            ETL 2023
-        </div>
+        <div class="text-center">New Account</div>
     </div>
-    <form [formGroup]="registerForm" (ngSubmit)="onSubmit()" style="padding-bottom: 0px;">
-        <h2 class="text-center">New Account</h2>
-        <hr>
+    <form [formGroup]="registerForm" (ngSubmit)="onSubmit()"
+        style="padding-bottom: 0px;padding-left: 0px;padding-right: 0px;">
         <div class="col-lg-6 form-group">
             <label for="firstname">Firstname</label>
             <input type="text" formControlName="firstname" class="form-control input-sm"
@@ -51,8 +48,8 @@
                     {{schedulerTimezoneList.parentLookupData.description}}
                 </option>
                 <option *ngFor="let schedulerTimezone of schedulerTimezoneList.subLookupData"
-                    [value]="schedulerTimezone.lookupType">
-                    {{schedulerTimezone.lookupValue}}
+                    [value]="schedulerTimezone.lookupValue">
+                    {{schedulerTimezone.description}}
                 </option>
             </select>
             <div *ngIf="submitted && f.timeZone.errors" class="invalid-feedback">
@@ -76,13 +73,11 @@
         </div>
         <div class="row">
             <div class="col-lg-6">
-                <button class="btn btn-sm btn-primary"
-                    style="margin-left: 15px;"
+                <button class="btn btn-sm btn-primary" style="margin-left: 15px;"
                     (click)="back()">Back</button>
             </div>
             <div class="col-lg-6">
-                <button type="submit" [disabled]="loading" 
-                    class="btn btn-sm btn-danger"
+                <button type="submit" [disabled]="loading" class="btn btn-sm btn-danger"
                     style="float:right;margin-right: 15px">Register</button>
             </div>
         </div>

@@ -11,3 +11,4 @@ export * from './credential.service';
 export * from './notifaction.service';
 export * from './websocketapi.service';
 export * from './websocketshare.service';
+export * from './env-var.service';

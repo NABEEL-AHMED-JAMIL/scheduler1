@@ -1,9 +1,9 @@
 import { Component, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
-import { AbstractControl, FormBuilder, 
-    FormControl, FormGroup, Validators } from '@angular/forms';
 import { first } from 'rxjs/operators';
 import { AlertService, AuthenticationService, LookupService } from '@/_services';
+import { AbstractControl, FormBuilder, 
+    FormControl, FormGroup, Validators } from '@angular/forms';
 import { Location } from '@angular/common';
 import { SpinnerService } from '@/_helpers';
 import { ApiCode, LOOKUP_TYPES } from '@/_models';
@@ -23,14 +23,12 @@ export class RegisterComponent implements OnInit {
 
     public password = new FormControl(null, [
         (c: AbstractControl) => Validators.required(c),
-        Validators.pattern(
-            /(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[@$!%*#?&^_-]).{8,}/
-        ),
+        Validators.pattern(/(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[@$!%*#?&^_-]).{8,}/),
     ]);
 
     constructor(
-        private formBuilder: FormBuilder,
         private router: Router,
+        private formBuilder: FormBuilder,
         private authenticationService: AuthenticationService,
         private spinnerService: SpinnerService,
         private alertService: AlertService,
@@ -49,6 +47,11 @@ export class RegisterComponent implements OnInit {
             timeZone: ['', Validators.required],
             password: this.password
         });
+    }
+
+    // convenience getter for easy access to form fields
+    get f() {
+        return this.registerForm.controls;
     }
 
     // SCHEDULER_TIMEZONE
@@ -70,11 +73,6 @@ export class RegisterComponent implements OnInit {
             this.spinnerService.hide();
             this.alertService.showError(error.message, ApiCode.ERROR);
         });
-    }
-
-    // convenience getter for easy access to form fields
-    get f() {
-        return this.registerForm.controls;
     }
 
     public confirmedValidator(controlName: string, matchingControlName: string): any {

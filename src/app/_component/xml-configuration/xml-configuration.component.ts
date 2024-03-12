@@ -9,7 +9,7 @@ import { ApiCode } from '@/_models';
     selector: 'xml-configuration',
     templateUrl: 'xml-configuration.component.html'
 })
-export class XmlConfigurationComponent implements OnInit {	
+export class XmlConfigurationComponent implements OnInit {
 
     public xmlForm: FormGroup;
     public xmlString: string = '';
@@ -47,20 +47,20 @@ export class XmlConfigurationComponent implements OnInit {
 
     public uuid(): string {
         return 'xxxxxxxx-xxxxxx'.replace(/[xy]/g, (char) => {
-          let random = Math.random() * 16 | 0;
-          let value = char === "x" ? random : (random % 4 + 8);
-          return value.toString(16);
+            let random = Math.random() * 16 | 0;
+            let value = char === "x" ? random : (random % 4 + 8);
+            return value.toString(16);
         });
     }
 
     public get tageForms(): FormArray {
         return this.xmlForm.get('tagsInfo') as FormArray;
     }
-    
+
     public tageFormsAddItem(): void {
         this.tageForms.push(this.buildItem());
     }
-    
+
     public tageFormAddItem(index: number): void {
         this.tageForms.insert(index, this.buildItem());
     }
@@ -75,22 +75,22 @@ export class XmlConfigurationComponent implements OnInit {
             xmlTagsInfo: xmlInfo?.tagsInfo
         }
         this.xmlService.getXmlData(this.xmlInfo)
-        .subscribe((response: any) => {
-            if(response.status === ApiCode.SUCCESS) {
-                this.xmlString = response.message;
+            .subscribe((response: any) => {
+                if (response.status === ApiCode.SUCCESS) {
+                    this.xmlString = response.message;
+                    this.spinnerService.hide();
+                } else {
+                    this.spinnerService.hide();
+                    this.alertService.showError(response.message, 'Error');
+                }
+            }, (error: any) => {
                 this.spinnerService.hide();
-            } else {
-                this.spinnerService.hide();
-                this.alertService.showError(response.message, 'Error');
-            }
-        }, (error: any) => {
-            this.spinnerService.hide();
-            this.alertService.showError(error, 'Error');
-        });
+                this.alertService.showError(error, 'Error');
+            });
     }
 
     public addFile(file: File): void {
         this.file = file;
     }
-    
+
 }

@@ -40,7 +40,7 @@ export class SttpGroundComponent implements OnInit {
         private spinnerService: SpinnerService,
         private lookupService: LookupService,
         private authenticationService: AuthenticationService) {
-            this.currentActiveProfile = authenticationService.currentUserValue;
+        this.currentActiveProfile = authenticationService.currentUserValue;
     }
 
     ngOnInit() {
@@ -124,16 +124,15 @@ export class SttpGroundComponent implements OnInit {
                             sectionOder: sectionPayload.sectionOder,
                             sttsId: sectionPayload.section.sttsId,
                             sttsName: sectionPayload.section.sttsName,
-                            fields: (!sectionPayload?.controlField ? [] : 
+                            fields: (!sectionPayload?.controlField ? [] :
                                 sectionPayload?.controlField
-                                .map((field: any) => {
-                                    return this.parseRawControl(field);
-                                }))
+                                    .map((field: any) => {
+                                        return this.parseRawControl(field);
+                                    }))
                         };
                     })
                 };
                 this.initailZForm();
-                console.log(this.dynamicForm.value);
                 this.spinnerService.hide();
             }, (error: any) => {
                 this.spinnerService.hide();
@@ -239,11 +238,11 @@ export class SttpGroundComponent implements OnInit {
             section.fields.forEach((field: any) => {
                 if (field.fieldLookUp && (field.fieldType === 'radio' || field.fieldType === 'checkbox')) {
                     this.fetchLookupTypeDetail(field);
-                    for (let i=0; i<field.options.length; i++) {
-                        if (field.defaultValue ===  field.options[i].lookupValue) {
-                            fieldsControls.addControl(field.fieldName+"-"+i, new FormControl(field.defaultValue));
+                    for (let i = 0; i < field.options.length; i++) {
+                        if (field.defaultValue === field.options[i].lookupValue) {
+                            fieldsControls.addControl(field.fieldName + "-" + i, new FormControl(field.defaultValue));
                         } else {
-                            fieldsControls.addControl(field.fieldName+"-"+i, new FormControl());
+                            fieldsControls.addControl(field.fieldName + "-" + i, new FormControl());
                         }
                     }
                 } else if (field.fieldLookUp && (field.fieldType === 'multi-select' || field.fieldType === 'select')) {
@@ -257,7 +256,7 @@ export class SttpGroundComponent implements OnInit {
                 }
             });
             sectionGroup.addControl("fields", fieldsControls);
-            this.dynamicForm.addControl("section-"+section.auSttsId, sectionGroup);
+            this.dynamicForm.addControl("section-" + section.auSttsId, sectionGroup);
         });
     }
 
@@ -319,21 +318,20 @@ export class SttpGroundComponent implements OnInit {
     }
 
     public getSectionFiled(sectionId: any, field: any): FormControl {
-        debugger
         return this.getFormSectionFiledGroup(sectionId).get(field.fieldName) as FormControl;
     }
 
     public getErrorMessage(sectionId: any, field: any): any {
         for (let validation of field.validations) {
-          if (this.getSectionFiled(sectionId, field).hasError(validation.validator)) {
-            return validation.message;
-          }
+            if (this.getSectionFiled(sectionId, field).hasError(validation.validator)) {
+                return validation.message;
+            }
         }
         return '';
     }
 
     public onSubmit(): any {
-        console.log(this.dynamicForm.value);
+        console.log(this.dynamicForm);
     }
 
 }

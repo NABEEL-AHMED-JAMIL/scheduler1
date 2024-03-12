@@ -8,7 +8,7 @@ import { Observable } from 'rxjs';
     providedIn: 'root'
 })
 export class CredentailService {
-    
+
     constructor(private http: HttpClient) { }
 
     public addCredential(payload: any): Observable<ApiResponse> {

@@ -7,22 +7,22 @@ import { ApiCode } from '@/_models';
 
 
 @Component({
-  selector: 'search-engine',
-  templateUrl: 'search-engine.component.html'
+    selector: 'search-engine',
+    templateUrl: 'search-engine.component.html'
 })
 export class SearchEngineComponent implements OnInit {
-    
-    public searchDetails: any = ''; 
+
+    public searchDetails: any = '';
     public jsonPayload: any;
     public tableQueryForm: FormGroup;
-    
+
     constructor(
         private fb: FormBuilder,
         private alertService: AlertService,
         private spinnerService: SpinnerService,
         private settingService: SettingService) {
     }
-    
+
     ngOnInit() {
         this.tableQueryFormInit();
     }
@@ -34,7 +34,7 @@ export class SearchEngineComponent implements OnInit {
             query: ['', Validators.required],
         });
         this.spinnerService.hide();
-	}
+    }
 
     public dynamicQueryResponse(): void {
         this.spinnerService.show();
@@ -46,7 +46,7 @@ export class SearchEngineComponent implements OnInit {
         this.settingService.dynamicQueryResponse(this.tableQueryForm.value)
             .pipe(first())
             .subscribe((response: any) => {
-                if(response.status === ApiCode.SUCCESS) {
+                if (response.status === ApiCode.SUCCESS) {
                     this.jsonPayload = response.data;
                     this.spinnerService.hide();
                 } else {

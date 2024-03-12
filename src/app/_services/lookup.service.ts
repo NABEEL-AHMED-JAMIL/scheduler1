@@ -30,28 +30,28 @@ export class LookupService {
 
     public fetchLookupByLookupType(payload: any): Observable<ApiResponse> {
         return this.http.post<ApiResponse>(`${config.apiUrl}/lookup.json/fetchLookupByLookupType`, payload);
-    }    
+    }
 
     public updateLookupData(payload: any): Observable<ApiResponse> {
         return this.http.put<ApiResponse>(`${config.apiUrl}/lookup.json/updateLookupData`, payload);
     }
 
-    public uploadLookup(payload:any): Observable<any> {
+    public uploadLookup(payload: any): Observable<any> {
         return this.http.post(`${config.apiUrl}/lookup.json/uploadLookup`, payload);
     }
 
     public downloadLookup(payload: any): Observable<any> {
         return this.http.post(`${config.apiUrl}/lookup.json/downloadLookup`, payload,
-        {
-            responseType: 'blob'
-        });
+            {
+                responseType: 'blob'
+            });
     }
 
     public downloadLookupTemplateFile(): Observable<any> {
         return this.http.get(`${config.apiUrl}/lookup.json/downloadLookupTemplateFile`,
-        {
-            responseType: 'blob'
-        });
+            {
+                responseType: 'blob'
+            });
     }
 
 }

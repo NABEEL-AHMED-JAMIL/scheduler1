@@ -7,24 +7,24 @@ import { ApiCode, AppUserList, AuthResponse, Action, LOOKUP_TYPES } from '@/_mod
 
 
 @Component({
-    selector: 'cu-user',
-    templateUrl: 'cu-user.component.html'
+	selector: 'cu-user',
+	templateUrl: 'cu-user.component.html'
 })
-export class CUUserComponent implements OnInit {	
+export class CUUserComponent implements OnInit {
 
-    public USER_TITLE: any = 'New User';
+	public USER_TITLE: any = 'New User';
 	public appUserForm: FormGroup;
 	public currentActiveProfile: AuthResponse;
 	public submitted: boolean = false;
 	public SCHEDULER_TIMEZONE: LOOKUP_TYPES;
-    public schedulerTimezoneList: any;
+	public schedulerTimezoneList: any;
 
 	public password = new FormControl(null, [
-        (c: AbstractControl) => Validators.required(c),
-        Validators.pattern(
-            /(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[@$!%*#?&^_-]).{8,}/
-        ),
-    ]);
+		(c: AbstractControl) => Validators.required(c),
+		Validators.pattern(
+			/(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[@$!%*#?&^_-]).{8,}/
+		),
+	]);
 
 	@Input()
 	public userAction: Action;
@@ -32,7 +32,7 @@ export class CUUserComponent implements OnInit {
 	public recivedAppUser: AppUserList;
 	@Output()
 	public senderEvent: EventEmitter<Action> = new EventEmitter();
-	@ViewChild('closeAppUser', {static: false})
+	@ViewChild('closeAppUser', { static: false })
 	public closeAppUser: any;
 
 	constructor(private formBuilder: FormBuilder,
@@ -41,12 +41,12 @@ export class CUUserComponent implements OnInit {
 		private lookupService: LookupService,
 		private appUserService: AppUserService,
 		private authenticationService: AuthenticationService) {
-			this.currentActiveProfile = authenticationService.currentUserValue;
-			this.SCHEDULER_TIMEZONE = LOOKUP_TYPES.SCHEDULER_TIMEZONE;
-			this.getSchedulerTimeZone();
+		this.currentActiveProfile = authenticationService.currentUserValue;
+		this.SCHEDULER_TIMEZONE = LOOKUP_TYPES.SCHEDULER_TIMEZONE;
+		this.getSchedulerTimeZone();
 	}
 
-    ngOnInit() {
+	ngOnInit() {
 		if (this.userAction) {
 			if ((this.userAction as Action) === Action.ADD) {
 				this.USER_TITLE = 'New User';
@@ -56,18 +56,18 @@ export class CUUserComponent implements OnInit {
 				this.editUser(this.recivedAppUser);
 			}
 		}
-    }
+	}
 
 	public addUser(): any {
 		this.spinnerService.show();
 		this.appUserForm = this.formBuilder.group({
 			firstname: ['', Validators.required],
-            lastname: ['', Validators.required],
-            username: ['', Validators.required],
-            email: ['', [Validators.required, Validators.email]],
-            timeZone: ['', Validators.required],
-            password: this.password
-        });
+			lastname: ['', Validators.required],
+			username: ['', Validators.required],
+			email: ['', [Validators.required, Validators.email]],
+			timeZone: ['', Validators.required],
+			password: this.password
+		});
 		this.spinnerService.hide();
 	}
 
@@ -76,53 +76,53 @@ export class CUUserComponent implements OnInit {
 		this.appUserForm = this.formBuilder.group({
 			appUserId: [appUser.appUserId, Validators.required],
 			firstname: [appUser.firstName, Validators.required],
-            lastname: [appUser.lastName, Validators.required],
-            username: [appUser.username, Validators.required],
-            email: [appUser.email, [Validators.required, Validators.email]],
-            timeZone: [appUser.timeZone, Validators.required]
-        });
+			lastname: [appUser.lastName, Validators.required],
+			username: [appUser.username, Validators.required],
+			email: [appUser.email, [Validators.required, Validators.email]],
+			timeZone: [appUser.timeZone.lookupValue, Validators.required]
+		});
 		this.f.username.disable();
 		this.f.email.disable();
 		this.spinnerService.hide();
 	}
 
 	public confirmedValidator(controlName: string, matchingControlName: string): any {
-        return (formGroup: FormGroup) => {
-          const control = formGroup.controls[controlName];
-          const matchingControl = formGroup.controls[matchingControlName];
-          if (matchingControl.errors && !matchingControl.errors.confirmedValidator) {
-            return;
-          }
-          if (control.value !== matchingControl.value) {
-            matchingControl.setErrors({ confirmedValidator: true });
-          } else {
-            matchingControl.setErrors(null);
-          }
-        };
-    }
+		return (formGroup: FormGroup) => {
+			const control = formGroup.controls[controlName];
+			const matchingControl = formGroup.controls[matchingControlName];
+			if (matchingControl.errors && !matchingControl.errors.confirmedValidator) {
+				return;
+			}
+			if (control.value !== matchingControl.value) {
+				matchingControl.setErrors({ confirmedValidator: true });
+			} else {
+				matchingControl.setErrors(null);
+			}
+		};
+	}
 
 	// SCHEDULER_TIMEZONE
-    public getSchedulerTimeZone(): void {
-        this.spinnerService.show();
-        let payload = {
-            lookupType: this.SCHEDULER_TIMEZONE
-        }
-        this.lookupService.fetchLookupByLookupType(payload)
-        .pipe(first())
-        .subscribe((response: any) => {
-            this.spinnerService.hide();
-            if (response.status === ApiCode.ERROR) {
-                this.alertService.showError(response.message, ApiCode.ERROR);
-                return;
-            }
-            this.schedulerTimezoneList = response.data
-        }, (error: any) => {
-            this.spinnerService.hide();
-            this.alertService.showError(error.message, ApiCode.ERROR);
-        });
-    }
+	public getSchedulerTimeZone(): void {
+		this.spinnerService.show();
+		let payload = {
+			lookupType: this.SCHEDULER_TIMEZONE
+		}
+		this.lookupService.fetchLookupByLookupType(payload)
+			.pipe(first())
+			.subscribe((response: any) => {
+				this.spinnerService.hide();
+				if (response.status === ApiCode.ERROR) {
+					this.alertService.showError(response.message, ApiCode.ERROR);
+					return;
+				}
+				this.schedulerTimezoneList = response.data
+			}, (error: any) => {
+				this.spinnerService.hide();
+				this.alertService.showError(error.message, ApiCode.ERROR);
+			});
+	}
 
-    public submit(): void {
+	public submit(): void {
 		this.submitted = true;
 		this.spinnerService.show();
 		if (this.appUserForm.invalid) {
@@ -130,31 +130,31 @@ export class CUUserComponent implements OnInit {
 			return;
 		}
 		let payload = {
-            accessUserDetail: {
+			accessUserDetail: {
 				rootUser: this.hasAccess(['ROLE_MASTER_ADMIN']),
-                appUserId: this.currentActiveProfile.appUserId,
-                username: this.currentActiveProfile.username
-           },
-		   ...this.appUserForm.getRawValue()
-        }
-        this.appUserService.addEditAppUserAccount(payload)
-            .pipe(first())
+				appUserId: this.currentActiveProfile.appUserId,
+				username: this.currentActiveProfile.username
+			},
+			...this.appUserForm.getRawValue()
+		}
+		this.appUserService.addEditAppUserAccount(payload)
+			.pipe(first())
 			.subscribe((response: any) => {
 				this.submitted = false;
-                this.spinnerService.hide();
-				if(response.status === ApiCode.ERROR) {
-                    this.alertService.showError(response.message, ApiCode.ERROR);
-                    return;
+				this.spinnerService.hide();
+				if (response.status === ApiCode.ERROR) {
+					this.alertService.showError(response.message, ApiCode.ERROR);
+					return;
 				}
-                this.closeAppUser.nativeElement.click();
-                this.resetEvent(Action.EDIT);
-                this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
+				this.closeAppUser.nativeElement.click();
+				this.resetEvent(Action.EDIT);
+				this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
 			}, (error: any) => {
 				this.submitted = false;
 				this.spinnerService.hide();
 				this.alertService.showError(error, ApiCode.ERROR);
 			});
-    }
+	}
 
 	// convenience getter for easy access to form fields
 	get f() {
@@ -166,7 +166,7 @@ export class CUUserComponent implements OnInit {
 	}
 
 	public hasAccess(roleList: any): void {
-        return this.currentActiveProfile.roles.some(r=> roleList.includes(r));
-    }
-    
+		return this.currentActiveProfile.roles.some(r => roleList.includes(r));
+	}
+
 }

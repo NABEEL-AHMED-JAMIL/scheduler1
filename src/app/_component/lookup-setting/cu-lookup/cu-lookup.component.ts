@@ -39,7 +39,7 @@ export class CULookupComponent implements OnInit {
 		if (this.lookUpAction) {
 			if ((this.lookUpAction as Action) === Action.ADD) {
 				this.LOOKUP_DATA_TITLE = 'New LookupData';
-				this.addSourceTaskTaypeForm();
+				this.addLookupDataForm();
 			} else if ((this.lookUpAction as Action) === Action.EDIT) {
 				this.LOOKUP_DATA_TITLE = 'Edit LookupData';
 				this.editLookupData(this.recivedLookupData);
@@ -58,7 +58,7 @@ export class CULookupComponent implements OnInit {
 		}
     }
 
-	public addSourceTaskTaypeForm(): any {
+	public addLookupDataForm(): any {
 		this.spinnerService.show();
 		this.lookupDataForm = this.formBuilder.group({
 			description: ['', Validators.required],

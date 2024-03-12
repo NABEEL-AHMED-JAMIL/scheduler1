@@ -19,7 +19,7 @@ import { EnvVarService } from '@/_services/env-var.service';
 })
 export class CUSTTFComponent implements OnInit {
 
-    public ENV_HOME_PAGE = 'HOME_PAGE';
+    public ENV_HOME_PAGE = 'ENV_HOME_PAGE';
 
     public loading: any = false;
     public submitted: any = false;
