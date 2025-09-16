@@ -30,9 +30,6 @@ export class SourceTaskService {
             this.searchText = payload.searchText;
         }
         let params = new HttpParams();
-        if (payload.appUserId) {
-            params = params.append('appUserId', payload.appUserId);
-        }
         if (payload.startDate) {
             params = params.append('startDate', payload.startDate);
         }
@@ -81,9 +78,6 @@ export class SourceTaskService {
             this.searchText = payload.searchText;
         }
         let params = new HttpParams();
-        if (payload.appUserId) {
-            params = params.append('appUserId', payload.appUserId);
-        }
         if (payload.taskDetailId) {
             params = params.append('sourceTaskId', payload.taskDetailId);
         }

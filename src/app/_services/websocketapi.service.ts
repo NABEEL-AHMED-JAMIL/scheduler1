@@ -27,13 +27,11 @@ export class WebSocketAPI {
             function (sdkEvent) {
                 _this.onMessageReceived(sdkEvent);
             });
-            _this.register(_this.sessionId, _this.transactionId);
         }, this.errorCallBack);
     };
 
     public disconnect(): any {
         if (this.stompClient !== null) {
-            this.unregister(this.sessionId, this.transactionId);
             this.stompClient.disconnect();
         }
         console.log("Disconnected");
@@ -47,33 +45,10 @@ export class WebSocketAPI {
         }, 5000);
     }
 
-    /**
-     * Send message to sever via web socket
-     * @param {*} message 
-     */
-    public register(sessionId: any, transactionId: any): any {
-        console.log("calling api to register");
-        var message = {
-            "sessionId" : sessionId,
-            "transactionId" : transactionId
-        };
-        this.stompClient.send("/api/v1/register", {}, JSON.stringify(message));
-    }
-
-    public unregister(sessionId: any, transactionId: any): any {
-        console.log("calling api to unregister");
-        var message = {
-            "sessionId" : sessionId,
-            "transactionId" : transactionId
-        };
-        this.stompClient.send("/api/v1/unregister", {}, JSON.stringify(message));
-    }
-
     public onMessageReceived(message: any): any {
         console.log("Message Recieved from Server :: " + message);
         this.websocketShare.onNewValueReceive(message.body);
     }
-
 
     public guid(): string {
         return this.s4() + '-' + this.s4() +

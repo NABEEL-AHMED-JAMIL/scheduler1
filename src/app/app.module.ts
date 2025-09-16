@@ -9,19 +9,25 @@ import { appRoutingModule } from './app.routing';
 import { AppComponent } from './app.component';
 import { SearchFilterPipe } from './_helpers';
 import { SpinnerComponent } from '@/_modal';
-import { HomeComponent, LookupComponent, SourceTaskTypeComponent,
-    SettingComponent, XmlConfigurationComponent, JobComponent,
-    SourceJobComponent, SourceBatchActionComponent, SubLookupComponent,
-    QueueMessageComponent, TaskComponent, ViewLinkTaskComponent,
-    ViewLinkJobsComponent, SourceTaskComponent, JobHistoryActionComponent,
-    JobLogComponent, SearchEngineComponent
-} from './_component/index';
 import {
-    BarAnalyticComponent, CalendarAnalyticComponent,
-    GeoAnalyticComponent, HeatmapAnalyticComponent,
-    LineAnalyticComponent, MapAnalyticComponent,
-    PieAnalyticComponent, RadarAnalyticsComponent
-} from './gen-analytics/index'
+    HomeComponent,
+    LookupComponent,
+    SourceTaskTypeComponent,
+    SettingComponent,
+    XmlConfigurationComponent,
+    JobComponent,
+    SourceJobComponent,
+    SourceBatchActionComponent,
+    SubLookupComponent,
+    QueueMessageComponent,
+    TaskComponent,
+    ViewLinkTaskComponent,
+    ViewLinkJobsComponent,
+    SourceTaskComponent,
+    JobHistoryActionComponent,
+    JobLogComponent,
+    SearchEngineComponent
+} from './_component/index';
 import { ToastrModule } from 'ngx-toastr';
 
 @NgModule({
@@ -58,18 +64,9 @@ import { ToastrModule } from 'ngx-toastr';
         SearchFilterPipe,
         JobHistoryActionComponent,
         JobLogComponent,
-        SearchEngineComponent,
-        BarAnalyticComponent,
-        CalendarAnalyticComponent,
-        GeoAnalyticComponent,
-        HeatmapAnalyticComponent,
-        LineAnalyticComponent,
-        MapAnalyticComponent,
-        PieAnalyticComponent,
-        RadarAnalyticsComponent
+        SearchEngineComponent
     ],
-    providers: [
-    ],
+    providers: [],
     bootstrap: [AppComponent]
 })
 export class AppModule { };

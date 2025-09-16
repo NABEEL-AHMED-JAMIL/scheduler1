@@ -1,10 +1,17 @@
 ﻿import { Routes, RouterModule } from '@angular/router';
 import {
-    HomeComponent, SettingComponent, JobComponent,
-    SourceJobComponent, TaskComponent, QueueMessageComponent,
-    SourceTaskComponent, SourceBatchActionComponent,
-    XmlConfigurationComponent, SubLookupComponent,
-    JobHistoryActionComponent, JobLogComponent,
+    HomeComponent,
+    SettingComponent,
+    JobComponent,
+    SourceJobComponent,
+    TaskComponent,
+    QueueMessageComponent,
+    SourceTaskComponent,
+    SourceBatchActionComponent,
+    XmlConfigurationComponent,
+    SubLookupComponent,
+    JobHistoryActionComponent,
+    JobLogComponent,
     SearchEngineComponent
 } from './_component/index';
 
