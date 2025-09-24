@@ -4,6 +4,9 @@ import { ApiResponse } from '@/_models';
 import { Observable } from 'rxjs';
 
 
+/**
+ * @author Nabeel Ahmed
+ */
 @Injectable({
     providedIn: 'root'
 })
@@ -16,7 +19,7 @@ export class SourceJobService {
     }
 
     public listSourceJob(): Observable<ApiResponse> {
-        return this.http.post<ApiResponse>(`${config.apiUrl}/sourceJob.json/listSourceJob`, null);
+        return this.http.get<ApiResponse>(`${config.apiUrl}/sourceJob.json/listSourceJob`);
     }
 
     public addSourceJob(payload:any): Observable<ApiResponse> {
@@ -46,10 +49,6 @@ export class SourceJobService {
             jobId: payload?.jobId
         };
         return this.http.post<ApiResponse>(`${config.apiUrl}/sourceJob.json/skipNextSourceJob`, modifyPayload);
-    }
-
-    public fetchRunningJobEvent(payload:any): Observable<ApiResponse> {
-        return this.http.post<ApiResponse>(`${config.apiUrl}/sourceJob.json/fetchRunningJobEvent`, payload);
     }
 
     public findSourceJobAuditLog(jobQueueId:any, jobId:any): Observable<ApiResponse> {

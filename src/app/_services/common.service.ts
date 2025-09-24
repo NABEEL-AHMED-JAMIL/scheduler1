@@ -2,6 +2,9 @@ import { Injectable } from '@angular/core';
 import { saveAs } from 'file-saver';
 
 
+/**
+ * @author Nabeel Ahmed
+ */
 @Injectable({
     providedIn: 'root'
 })

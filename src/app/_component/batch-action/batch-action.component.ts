@@ -1,10 +1,21 @@
 ﻿import { Component, OnInit, ViewChild } from '@angular/core';
+import {
+    Router,
+    ActivatedRoute
+} from '@angular/router';
 import { slideInOutAnimation } from '../../_content/slide-in-out.animation';
-import { SourceJobService, SourceTaskService, AlertService } from '@/_services/index';
-import { Router, ActivatedRoute } from '@angular/router';
 import { SpinnerService } from '@/_helpers';
+import {
+    SourceJobService,
+    SourceTaskService,
+    AlertService
+} from '@/_services/index';
 import { first } from 'rxjs/operators';
 
+
+/**
+ * @author Nabeel Ahmed
+ */
 @Component({
     selector: 'batch-action',
     templateUrl: 'batch-action.component.html',

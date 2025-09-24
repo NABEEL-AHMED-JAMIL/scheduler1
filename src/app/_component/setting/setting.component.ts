@@ -24,7 +24,7 @@ export class SettingComponent implements OnInit {
 	public sourceTaskTypeAction: Action;
 	public sourceTaskType: SourceTaskType;
 	// source task type
-	public sourceTaskTaypes: SourceTaskType[] = [];
+	public sourceTaskTypes: SourceTaskType[] = [];
     // lookup
 	public lookupAction: Action;
 	public lookupData: LookupData;
@@ -51,7 +51,7 @@ export class SettingComponent implements OnInit {
 			.subscribe((response) => {
 				if(response.status === ApiCode.SUCCESS) {
 					this.spinnerService.hide();
-					this.sourceTaskTaypes = response.data.sourceTaskTaypes;
+					this.sourceTaskTypes = response.data.sourceTaskTypes;
 					this.lookupDatas = response.data.lookupDatas;
 				} else {
 					this.spinnerService.hide();
@@ -63,7 +63,7 @@ export class SettingComponent implements OnInit {
 			});
     }
 
-	public addSourceTaskTaype(): void {
+	public addSourceTaskType(): void {
 		this.sourceTaskTypeAction = Action.ADD;
 	}
 
@@ -123,9 +123,9 @@ export class SettingComponent implements OnInit {
 	}
 
 	public showUpdatedSourceTask(selectedIndex: any): void {
-		let selectedObject: SourceTaskType = this.sourceTaskTaypes[selectedIndex];
+		let selectedObject: SourceTaskType = this.sourceTaskTypes[selectedIndex];
 		selectedObject.status = 'Delete';
-		this.sourceTaskTaypes[selectedIndex] = selectedObject;
+		this.sourceTaskTypes[selectedIndex] = selectedObject;
 	}
 
 	public receiverEvent(action: Action): void {

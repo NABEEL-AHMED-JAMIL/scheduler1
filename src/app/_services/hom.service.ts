@@ -4,6 +4,9 @@ import { ApiResponse } from '@/_models';
 import { Observable } from 'rxjs';
 
 
+/**
+ * @author Nabeel Ahmed
+ */
 @Injectable({
     providedIn: 'root'
 })
@@ -29,10 +32,6 @@ export class HomeService {
 
     public weeklyHrRunningStatisticsDimension(targetDate:any, targetHr: any): Observable<ApiResponse> {        
         return this.http.get<ApiResponse>(`${config.apiUrl}/dashboard.json/weeklyHrRunningStatisticsDimension?targetDate=${targetDate}&targetHr=${targetHr}`);
-    }
-
-    public viewRunningJobDateByTargetClickJobStatistics(targetDate:any, targetHr: any): Observable<ApiResponse> {
-        return this.http.get<ApiResponse>(`${config.apiUrl}/dashboard.json/viewRunningJobDateByTargetClickJobStatistics?targetDate=${targetDate}&targetHr=${targetHr}`);
     }
 
     public weeklyHrRunningStatisticsDimensionDetail(targetDate:any, targetHr: any, jobStatus: any, jobId:any): Observable<ApiResponse> {

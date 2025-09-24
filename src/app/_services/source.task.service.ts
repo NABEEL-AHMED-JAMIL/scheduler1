@@ -4,6 +4,10 @@ import { ApiResponse } from '@/_models';
 import { Observable } from 'rxjs';
 import { QueryCriteria, SearchText  } from '@/_models/index';
 
+
+/**
+ * @author Nabeel Ahmed
+ */
 @Injectable({
     providedIn: 'root'
 })

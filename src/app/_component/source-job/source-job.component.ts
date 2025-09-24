@@ -1,7 +1,12 @@
 ﻿import { Component, OnInit, OnDestroy, ViewChild } from '@angular/core';
 import { Action, SourceJobDetail } from '@/_models/index';
 import { SpinnerService } from '@/_helpers';
-import { AlertService, SourceJobService, WebSocketAPI, WebSocketShareService } from '@/_services/index';  
+import {
+    AlertService,
+    SourceJobService,
+    WebSocketAPI,
+    WebSocketShareService
+} from '@/_services/index';  
 import { ApiCode } from '@/_models';
 import { Router } from '@angular/router';
 import { first } from 'rxjs/operators';

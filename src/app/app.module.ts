@@ -1,13 +1,16 @@
 ﻿import { NgModule } from '@angular/core';
+import {
+    FormsModule,
+    ReactiveFormsModule
+} from '@angular/forms';
 import { NgxEchartsModule } from 'ngx-echarts';
 import { NgxQrcodeStylingModule } from 'ngx-qrcode-styling';
 import { BrowserModule } from '@angular/platform-browser';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
-import { ReactiveFormsModule, FormsModule  } from '@angular/forms';
 import { HttpClientModule } from '@angular/common/http';
-import { appRoutingModule } from './app.routing';
+import { AppRoutingModule } from './app.routing';
 import { AppComponent } from './app.component';
-import { SearchFilterPipe } from './_helpers';
+import { SearchFilterPipe } from '@/_helpers';
 import { SpinnerComponent } from '@/_modal';
 import {
     HomeComponent,
@@ -21,8 +24,6 @@ import {
     SubLookupComponent,
     QueueMessageComponent,
     TaskComponent,
-    ViewLinkTaskComponent,
-    ViewLinkJobsComponent,
     SourceTaskComponent,
     JobHistoryActionComponent,
     JobLogComponent,
@@ -30,6 +31,10 @@ import {
 } from './_component/index';
 import { ToastrModule } from 'ngx-toastr';
 
+
+/**
+ * @author Nabeel Ahmed
+ */
 @NgModule({
     imports: [
         BrowserModule,
@@ -41,7 +46,7 @@ import { ToastrModule } from 'ngx-toastr';
         ReactiveFormsModule,
         HttpClientModule,
         BrowserAnimationsModule,
-        appRoutingModule,
+        AppRoutingModule,
         ToastrModule.forRoot()
     ],
     declarations: [
@@ -58,8 +63,6 @@ import { ToastrModule } from 'ngx-toastr';
         JobComponent,
         SourceJobComponent,
         TaskComponent,
-        ViewLinkTaskComponent,
-        ViewLinkJobsComponent,
         SourceTaskComponent,
         SearchFilterPipe,
         JobHistoryActionComponent,

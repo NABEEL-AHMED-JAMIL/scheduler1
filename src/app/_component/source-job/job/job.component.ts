@@ -1,12 +1,32 @@
 ﻿import { Component, OnInit } from '@angular/core';
 import { Router, ActivatedRoute, ParamMap } from '@angular/router';
-import { SourceTask, Paging, QueryCriteria, STATUS_LIST } from '@/_models/index';
-import { FormBuilder, FormControl, FormGroup, Validators } from '@angular/forms';
-import { AlertService, SourceJobService, SourceTaskService } from '@/_services';
 import { first } from 'rxjs/operators';
 import { SpinnerService } from '@/_helpers';
 import { ApiCode } from '@/_models';
-import { Execution, TIMES, FREQUENCY, FREQUENCY_DETAIL, PRIORITY } from '../../../global-config';
+import {
+    Paging,
+    STATUS_LIST,
+    SourceTask,
+    QueryCriteria,
+} from '@/_models/index';
+import {
+    FormBuilder,
+    FormControl,
+    FormGroup,
+    Validators
+} from '@angular/forms';
+import {
+    AlertService,
+    SourceJobService,
+    SourceTaskService
+} from '@/_services';
+import {
+    Execution,
+    TIMES,
+    FREQUENCY,
+    FREQUENCY_DETAIL,
+    PRIORITY
+} from '../../../global-config';
 
 
 @Component({

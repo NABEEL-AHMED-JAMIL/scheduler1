@@ -75,14 +75,14 @@ export class QueueMessageComponent implements OnInit {
         this.fetchLogs({
             'fromDate': this.last_7th_date,
             'toDate': this.today_date,
-            'jobStatuses': []
+            'jobStatuses': ['Queue']
         });
         this.spinnerService.show();
         this.qMessageSearcForm = this.fb.group({
             jobQId: [],
             fromDate: [this.last_7th_date],
             toDate: [this.today_date],
-            jobStatuses: [],
+            jobStatuses: ['Queue'],
             jobId: []
         });
         this.spinnerService.hide();

@@ -2,9 +2,21 @@
 import { SpinnerService } from '@/_helpers';
 import { first } from 'rxjs/operators';
 import { ApiCode, Action } from '@/_models';
-import { Paging, QueryCriteria, SourceTaskType, SourceTask } from '@/_models/index';
-import { SourceTaskService, AlertService, CommomService } from '@/_services/index';
+import {
+  Paging,
+  QueryCriteria,
+  SourceTaskType,
+  SourceTask
+} from '@/_models/index';
+import {
+  SourceTaskService,
+  AlertService,
+  CommomService
+} from '@/_services/index';
 
+/**
+ * @author Nabeel Ahmed
+ */
 @Component({
   selector: 'source-task',
   templateUrl: 'source-task.component.html',

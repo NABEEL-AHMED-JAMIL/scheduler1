@@ -1,12 +1,37 @@
 ﻿import { Component, OnInit } from '@angular/core';
-import { SpinnerService } from '@/_helpers';
-import { ActivatedRoute, ParamMap, Router } from '@angular/router'
+import {
+    ActivatedRoute,
+    ParamMap,
+    Router
+} from '@angular/router'
 import { first } from 'rxjs/operators';
-import { ApiCode, STATUS_LIST } from '@/_models';
-import { SourceTaskType, LookupData } from '@/_models/index';
-import { FormArray, FormBuilder, FormControl, FormGroup, Validators } from '@angular/forms';
-import { AlertService, SettingService, SourceTaskService, ConfigurationMakerService } from '@/_services';
+import { SpinnerService } from '@/_helpers';
+import {
+    ApiCode,
+    STATUS_LIST
+} from '@/_models';
+import {
+    SourceTaskType,
+    LookupData
+} from '@/_models/index';
+import {
+    FormArray,
+    FormBuilder,
+    FormControl,
+    FormGroup,
+    Validators
+} from '@angular/forms';
+import {
+    AlertService,
+    SettingService,
+    SourceTaskService,
+    ConfigurationMakerService
+} from '@/_services';
 
+
+/**
+ * @author Nabeel Ahmed
+ */
 @Component({
     selector: 'task',
     templateUrl: 'task.component.html',
@@ -24,7 +49,7 @@ export class TaskComponent implements OnInit {
     public sourceTaskForm: FormGroup;
     public currentTaskState = 'Add Task';
     public PIPELINE_IDS = 'PIPELINE_IDS';
-    public PIPLINE_HOME_PAGES = 'PIPLINE_HOME_PAGES';
+    public PIPELINE_HOME_PAGES = 'PIPELINE_HOME_PAGES';
     public pipelineIdList: any;
     public piplineHomePageList: any;
 
@@ -61,7 +86,7 @@ export class TaskComponent implements OnInit {
 				if(response.status === ApiCode.SUCCESS) {
 					this.spinnerService.hide();
                     // only the active task can be show
-					this.sourceTaskTypes = response.data.sourceTaskTaypes.filter(sourceTask => sourceTask.status == 'Active');
+					this.sourceTaskTypes = response.data.sourceTaskTypes.filter(sourceTask => sourceTask.status == 'Active');
                     // PIPELINE_IDS
                     if (response.data.lookupDatas.find(el => el.lookupType === this.PIPELINE_IDS)) {
                         this.settingService.fetchSubLookupByParentId(
@@ -81,10 +106,10 @@ export class TaskComponent implements OnInit {
                             this.alertService.showError(error, this.ERROR);
                         });
                     }
-                    // PIPLINE_HOME_PAGES
-                    if (response.data.lookupDatas.find(el => el.lookupType === this.PIPLINE_HOME_PAGES)) {
+                    // PIPELINE_HOME_PAGES
+                    if (response.data.lookupDatas.find(el => el.lookupType === this.PIPELINE_HOME_PAGES)) {
                         this.settingService.fetchSubLookupByParentId(
-                            response.data.lookupDatas.find(el => el.lookupType === this.PIPLINE_HOME_PAGES).lookupId)
+                            response.data.lookupDatas.find(el => el.lookupType === this.PIPELINE_HOME_PAGES).lookupId)
                         .pipe(first())
                         .subscribe((response) => {
                             if(response.status === ApiCode.SUCCESS) {

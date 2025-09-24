@@ -2,6 +2,9 @@
 import { ToastrService } from 'ngx-toastr';
 
 
+/**
+ * @author Nabeel Ahmed
+ */
 @Injectable({
     providedIn: 'root'
 })

@@ -1,5 +1,12 @@
-import { Pipe, PipeTransform } from '@angular/core';
+import {
+    Pipe,
+    PipeTransform
+} from '@angular/core';
 
+
+/**
+ * @author Nabeel Ahmed
+ */
 @Pipe({
   name: 'searchFilter'
 })

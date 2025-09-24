@@ -15,30 +15,34 @@ import {
     SearchEngineComponent
 } from './_component/index';
 
+
+/**
+ * @author Nabeel Ahmed
+ */
 const routes: Routes = [
-    { 
+    {
         path: 'home',
         component: HomeComponent
     },
-    { 
+    {
         path: 'taskList',
         component: SourceTaskComponent,
         children: [
-            { 
+            {
                 path: 'taskBatchAction',
                 component: SourceBatchActionComponent,
                 data: {
-                    router:  '/taskList',
+                    router: '/taskList',
                     action: 'sourceTask'
                 }
             }
         ]
     },
-    { 
+    {
         path: 'addTask',
         component: TaskComponent
     },
-    { 
+    {
         path: 'editTask/:taskDetailId',
         component: TaskComponent
     },
@@ -46,21 +50,21 @@ const routes: Routes = [
         path: 'jobList',
         component: SourceJobComponent,
         children: [
-            { 
+            {
                 path: 'jobBatchAction',
                 component: SourceBatchActionComponent,
                 data: {
-                    router:  '/jobList',
+                    router: '/jobList',
                     action: 'sourceJob'
                 }
             }
         ]
     },
-    { 
+    {
         path: 'jobList/jobHistory',
         component: JobHistoryActionComponent
     },
-    { 
+    {
         path: 'jobList/jobLogs',
         component: JobLogComponent
     },
@@ -72,30 +76,30 @@ const routes: Routes = [
         path: 'editJob/:jobId',
         component: JobComponent
     },
-    { 
+    {
         path: 'setting',
         component: SettingComponent
     },
-    { 
+    {
         path: 'setting/subLookup',
         component: SubLookupComponent
     },
-    { 
+    {
         path: 'setting/queueMessage',
         component: QueueMessageComponent
     },
-    { 
+    {
         path: 'setting/lookpXml',
         component: XmlConfigurationComponent
     },
-    { 
+    {
         path: 'setting/searchEngine',
         component: SearchEngineComponent
     },
-    { 
+    {
         path: '**',
         redirectTo: 'home'
     }
 ];
 
-export const appRoutingModule = RouterModule.forRoot(routes);
+export const AppRoutingModule = RouterModule.forRoot(routes);

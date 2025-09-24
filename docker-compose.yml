@@ -1,0 +1,9 @@
+version: '3.7'
+
+services:
+
+  angular:
+      build: .
+      container_name: scheduler1
+      ports:
+        - "8080:80"

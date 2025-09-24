@@ -37,8 +37,10 @@ module.exports = {
         new webpack.DefinePlugin({
             // global app config object
             config: JSON.stringify({
+                sessionId: '0hw0dz34',
+                transactionId: '40ef-dd1d-bd9f-1d7f',
                 apiUrl: 'http://localhost:9098/api/v1',
-                webSocketUrl: 'http://localhost:9098/api/v1'
+                webSocketUrl: 'http://localhost:9098/api/v1/ws'
             })
         }),
 

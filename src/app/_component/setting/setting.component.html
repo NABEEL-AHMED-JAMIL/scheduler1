@@ -17,13 +17,13 @@
     </div>
     <div class="col-lg-5" style="text-align: end;">
         <button type="button" class="btn btn-sm btn-default"
-            data-toggle="modal" data-target="#sourceTaskTaype"
+            data-toggle="modal" data-target="#sourceTaskType"
             (click)="appSetting()">
             <span class="glyphicon glyphicon-refresh"></span> Refresh 
         </button>&nbsp;
         <button type="button" class="btn btn-sm btn-default"
-            data-toggle="modal" data-target="#sourceTaskTaype"
-            (click)="addSourceTaskTaype()">
+            data-toggle="modal" data-target="#sourceTaskType"
+            (click)="addSourceTaskType()">
             <span class="glyphicon glyphicon-plus-sign"></span>
             Add Source TaskType
         </button>
@@ -47,48 +47,48 @@
             </tr>
         </thead>
         <tbody>
-            <tr *ngFor="let sourceTaskTaype of sourceTaskTaypes; let i = index;">
+            <tr *ngFor="let sourceTaskType of sourceTaskTypes; let i = index;">
                 <!-- we will add the link when we click on the link it will update -->
-                <td>{{sourceTaskTaype.sourceTaskTypeId}}</td>
-                <td>{{sourceTaskTaype.serviceName}}</td>
-                <td>{{sourceTaskTaype.queueTopicPartition}}</td>
-                <td>{{sourceTaskTaype.description}}</td>
+                <td>{{sourceTaskType.sourceTaskTypeId}}</td>
+                <td>{{sourceTaskType.serviceName}}</td>
+                <td>{{sourceTaskType.queueTopicPartition}}</td>
+                <td>{{sourceTaskType.description}}</td>
                 <td style="text-align: center;">
-                    <a routerLink="" style="pointer-events: none">{{sourceTaskTaype.totalTaskLink}}</a>
+                    <a routerLink="" style="pointer-events: none">{{sourceTaskType.totalTaskLink}}</a>
                 </td>
                 <td style="text-align: center;text-transform:capitalize;">
                     <span class="badge" 
                         [ngClass]="{
-                            'badge-danger': sourceTaskTaype.schemaRegister === false, 
-                            'badge-success' : sourceTaskTaype.schemaRegister === true
-                        }">{{sourceTaskTaype.schemaRegister}}
+                            'badge-danger': sourceTaskType.schemaRegister === false, 
+                            'badge-success' : sourceTaskType.schemaRegister === true
+                        }">{{sourceTaskType.schemaRegister}}
                     </span>
                 </td>
                 <td style="text-align: center;">
                     <span class="badge" 
                         [ngClass]="{
-                            'badge-danger': sourceTaskTaype.status === 'Delete', 
-                            'badge-warning' : sourceTaskTaype.status === 'Inactive',
-                            'badge-success' : sourceTaskTaype.status === 'Active'
-                        }">{{sourceTaskTaype.status}}
+                            'badge-danger': sourceTaskType.status === 'Delete', 
+                            'badge-warning' : sourceTaskType.status === 'Inactive',
+                            'badge-success' : sourceTaskType.status === 'Active'
+                        }">{{sourceTaskType.status}}
                     </span>
                 </td>
                 <td style="text-align: center;">
                     <div class="btn-group btn-group-xs" role="group" style="text-align: center">
-                        <button type="button" class="btn btn-default" data-toggle="modal" data-target="#sourceTaskTaype"
-                            (click)="editSourceTaskTaype(sourceTaskTaype)">
+                        <button type="button" class="btn btn-default" data-toggle="modal" data-target="#sourceTaskType"
+                            (click)="editsourceTaskType(sourceTaskType)">
                             <span class="glyphicon glyphicon-edit" style="color:blue"></span>
                         </button>
                         <!-- download source tasktype -->
                         <button type="button" class="btn btn-default"
-                            (click)="downloadSourceTaskType(sourceTaskTaype)">
+                            (click)="downloadSourceTaskType(sourceTaskType)">
                             <span class="glyphicon glyphicon-download" style="color:brown">
                             </span>
                         </button>
                         <!-- add the method for delete the queue detail -->
                         <button type="button" class="btn btn-default" 
-                            (click)="deleteSourceTaskType(sourceTaskTaype.sourceTaskTypeId, i)"
-                            [disabled]="sourceTaskTaype.status === 'Delete'"
+                            (click)="deleteSourceTaskType(sourceTaskType.sourceTaskTypeId, i)"
+                            [disabled]="sourceTaskType.status === 'Delete'"
                             data-toggle="modal" data-target="#deleteSetting">
                             <span class="glyphicon glyphicon-trash" style="color: black;"></span>
                         </button>
