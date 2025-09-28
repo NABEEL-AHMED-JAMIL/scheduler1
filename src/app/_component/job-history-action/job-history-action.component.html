@@ -5,38 +5,37 @@
     <li class="active">Job History</li>
 </ol>
 <div class="row" style="margin-right: 0px;margin-left: 0px;" *ngIf="sourceJob">
-    <div class="col-lg-12">
+    <!-- source job -->
+    <div class="col-lg-6">
         <div class="panel panel-success">
             <div class="panel-heading">
-                <div class="row">
-                    <div class="col-lg-6" style="text-align: start;margin-top: 2px;">
-                        Job-Q-History {{pipelineId}}
-                    </div>
-                </div>
+                Job: {{sourceJob.jobId}} - {{sourceJob.jobName}}
             </div>
-            <div class="panel-body" style="padding-left: 25px;">
+            <div class="panel-body" style="padding-bottom: 0px;">
                 <div class="row">
-                    <div class="col-sm-3">
+                    <div class="col-sm-4">
                         <div class="form-group">
-                            <label>JobName: {{sourceJob.jobId}} - {{sourceJob.jobName}}</label>
+                            <label id="taskStatus">
+                                Status: 
+                                 <span class="badge"
+                                    [ngClass]="{
+                                        'badge-danger': sourceJob.jobStatus === 'Delete', 
+                                        'badge-warning' : sourceJob.jobStatus === 'Inactive',
+                                        'badge-success' : sourceJob.jobStatus === 'Active'
+                                    }">{{sourceJob.jobStatus}}
+                                </span>
+                            </label>
                         </div>
                         <div class="form-group">
-                            <label>TaskName: {{sourceJob?.taskDetail?.taskDetailId}} - {{sourceJob?.taskDetail?.taskName}}</label>
-                        </div>
-                        <div class="form-group">
-                            <label style="color: rgb(139, 34, 34);">LastRun: {{sourceJob.lastJobRun | date:'yyyy-MM-dd HH:mm:ss'}}</label>
-                        </div>
-                    </div>
-                    <div class="col-sm-3">
-                        <div class="form-group">
-                            <label>Execution:
+                            <label id="execution">
+                                Execution:
                                 <span class="badge" [ngClass]="sourceJob.execution == 'Manual' ? 
                                     'badge-success' : 'badge-warning'">{{sourceJob.execution}}
                                 </span>
                             </label>
                         </div>
                         <div class="form-group" *ngIf="sourceJob.jobRunningStatus">
-                            <label>R-Status: 
+                            <label id="runningStatus">R-Status: 
                                 <span class="badge"
                                     [ngClass]="{
                                         'badge-primary' : sourceJob.jobRunningStatus === 'InFlight', 
@@ -46,9 +45,20 @@
                                         'badge-danger' :  sourceJob.jobRunningStatus === 'Failed',
                                         'badge-success' : sourceJob.jobRunningStatus === 'Completed',
                                         'badge-interrupt' : sourceJob.jobRunningStatus === 'Interrupt'
-                                    }">
-                                    {{ sourceJob.jobRunningStatus }}
+                                    }">{{ sourceJob.jobRunningStatus }}
                                 </span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="form-group">
+                            <label id="lastJobRun" style="color: rgb(139, 34, 34);">
+                                Created: {{sourceJob.dateCreated | date:'yyyy-MM-dd HH:mm:ss'}}
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label id="lastJobRun" style="color: rgb(139, 34, 34);">
+                                LastRun: {{sourceJob.lastJobRun | date:'yyyy-MM-dd HH:mm:ss'}}
                             </label>
                         </div>
                         <div class="form-group">
@@ -57,45 +67,116 @@
                             </label>
                         </div>
                     </div>
-                    <div class="col-sm-4" *ngIf="sourceJobStatistics">
-                        <label style="margin-left: 35%;">Total Job Detail</label>
-                        <table class="table table-bordered " style="font-size: 10px;">
-                            <thead>
-                                <tr>
-                                    <th>Queue</th>
-                                    <th>Running</th>
-                                    <th>Failed</th>
-                                    <th>Completed</th>
-                                    <th>Skip</th>
-                                    <th>Interrupt</th>
-                                    <th>Total</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <th>{{sourceJobStatistics.queue}}</th>
-                                    <th>{{sourceJobStatistics.running}}</th>
-                                    <th>{{sourceJobStatistics.failed}}</th>
-                                    <th>{{sourceJobStatistics.completed}}</th>
-                                    <th>{{sourceJobStatistics.skip}}</th>
-                                    <th>{{sourceJobStatistics.interrupt}}</th>
-                                    <th>{{sourceJobStatistics.total}}</th>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <div class="col-sm-2" style="text-align: center;" *ngIf="homePageId">
-                        <a href="{{homePageId}}" target="_blank">
-                            <ngx-qrcode-styling [data]="homePageId"
-                                [width]="110" [height]="110" [template]="default">
-                            </ngx-qrcode-styling>
-                        </a>
+                    <div class="col-sm-4">
+                         <div class="form-group">
+                            <label id="completed">
+                                <span class="glyphicon glyphicon-envelope"></span>
+                                Complete: 
+                                <span class="badge" [ngClass]="sourceJob.completeJob == true ? 
+                                    'badge-success' : 'badge-warning'">{{sourceJob.completeJob}}
+                                </span>
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label id="skip">
+                                <span class="glyphicon glyphicon-envelope"></span> 
+                                Skip:
+                                <span class="badge" [ngClass]="sourceJob.skipJob == true ? 
+                                    'badge-success' : 'badge-warning'">{{sourceJob.skipJob}}
+                                </span>
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label id="failed">
+                                <span class="glyphicon glyphicon-envelope"></span> 
+                                Failed:
+                                <span class="badge" [ngClass]="sourceJob.failJob == true ? 
+                                    'badge-success' : 'badge-warning'">{{sourceJob.failJob}}
+                                </span>
+                            </label>
+                        </div>
                     </div>
                 </div>
+            </div>
+            <div class="panel-footer">
+                <label id="scheduler">Scheduler:</label>
+                <span *ngIf="sourceJob.scheduler?.startDate">
+                    [Start: {{sourceJob.scheduler?.startDate}} {{sourceJob.scheduler?.startTime}}]
+                </span>
+                    <span *ngIf="sourceJob.scheduler?.recurrence">
+                    [Every: {{sourceJob.scheduler?.recurrence}} {{sourceJob.scheduler?.frequency}}]
+                </span>
+                <span *ngIf="sourceJob.scheduler?.endDate">
+                    [End: {{sourceJob.scheduler?.endDate}} {{sourceJob.scheduler?.startTime}}]
+                </span>
+            </div>
+        </div>
+    </div>
+    <!-- task -->
+    <div class="col-lg-6">
+        <div class="panel panel-success">
+            <div class="panel-heading">
+                <div class="row">
+                    <div class="col-sm-6">
+                        Task: {{sourceJob?.taskDetail?.taskDetailId}} - {{sourceJob?.taskDetail?.taskName}}
+                    </div>
+                    <div class="col-sm-6" style="text-align: end;">
+                        Topic: {{sourceJob?.taskDetail?.sourceTaskType?.queueTopicPartition}}  
+                    </div>
+                </div>
+            </div>
+            <div class="panel-body" style="padding-bottom: 0px;">
+                <div class="row">
+                    <div class="col-sm-3">
+                        <div class="form-group">
+                            <label id="pipelineId">
+                                Pipeline Id: {{sourceJob?.taskDetail?.pipelineId}}
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label id="homePageId">
+                                Home Page:
+                                <a *ngIf="sourceJob?.taskDetail?.homePageId" [href]="sourceJob.taskDetail.homePageId" target="_blank"
+                                    rel="noopener noreferrer"> Click Me
+                                </a>
+                                <span *ngIf="!sourceJob?.taskDetail?.homePageId">N/A</span>
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label id="taskStatus">
+                                Status: 
+                                 <span class="badge"
+                                    [ngClass]="{
+                                        'badge-danger': sourceJob.taskDetail.taskStatus === 'Delete', 
+                                        'badge-warning' : sourceJob.taskDetail.taskStatus === 'Inactive',
+                                        'badge-success' : sourceJob.taskDetail.taskStatus === 'Active'
+                                    }">{{sourceJob.taskDetail.taskStatus}}
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-sm-9">
+                        <textarea rows="5" cols="70" 
+                            style="width: 528px;height: 112px;">{{sourceJob.taskDetail.taskPayload}}</textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="panel-footer">
+                 <label id="sourceJobStatistics">Job Statistics: </label>
+                [
+                    Queue: {{sourceJobStatistics.queue}},
+                    Running: {{sourceJobStatistics.running}},
+                    Failed: {{sourceJobStatistics.failed}},
+                    Completed: {{sourceJobStatistics.completed}},
+                    Skip: {{sourceJobStatistics.skip}},
+                    Interrupt: {{sourceJobStatistics.interrupt}}
+                ] =
+                [Total: {{sourceJobStatistics.total}}]
             </div>
         </div>
     </div>
 </div>
+
 <!-- table -->
 <div class="col-lg-4" *ngIf="sourceJobQueues">
     <div class="form-group">
