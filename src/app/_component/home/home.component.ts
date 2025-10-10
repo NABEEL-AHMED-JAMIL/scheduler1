@@ -259,24 +259,10 @@ export class HomeComponent implements OnInit {
         if (response.status === ApiCode.SUCCESS) {
           this.spinnerService.hide();
           this.weeklyRunningJobData = response.data;
-          let dayIndex = [0, 0, 0, 0, 0, 0, 0];
-          this.weeklyRunningJobData.forEach((element) => {
-            if (element.name === 'Mon') {
-              dayIndex[0] = element.value;
-            } else if (element.name === 'Tue') {
-              dayIndex[1] = element.value;
-            } else if (element.name === 'Wed') {
-              dayIndex[2] = element.value;
-            } else if (element.name === 'Thu') {
-              dayIndex[3] = element.value;
-            } else if (element.name === 'Fri') {
-              dayIndex[4] = element.value;
-            } else if (element.name === 'Sat') {
-              dayIndex[5] = element.value;
-            } else if (element.name === 'Sun') {
-              dayIndex[6] = element.value;
-            }
-          });
+            const dayOrder = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+            const dayIndex = dayOrder.map(day =>
+            this.weeklyRunningJobData.find((element) => element.name === day)?.value || 0
+            );
           this.drawSourceJobWeeklyRunningStatistics(dayIndex);
         } else {
           this.drawSourceJobWeeklyRunningStatistics([0, 0, 0, 0, 0, 0, 0]);

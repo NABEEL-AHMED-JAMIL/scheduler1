@@ -20,11 +20,9 @@ export class XmlConfigurationComponent implements OnInit {
 
     ngOnInit() {
         this.xmlForm = this.fb.group({
-            tagsInfo: this.fb.array([this.buildItem(),
-                this.buildItem(), this.buildItem(),
-                this.buildItem(), this.buildItem(),
-                this.buildItem()
-            ]),
+            tagsInfo: this.fb.array(
+            Array.from({ length: 6 }, () => this.buildItem())
+            ),
         });
     }
 

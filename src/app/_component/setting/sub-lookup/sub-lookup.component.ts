@@ -4,7 +4,7 @@ import { SpinnerService } from '@/_helpers';
 import { ApiCode, Action } from '@/_models';
 import { first } from 'rxjs/operators';
 import { LookupData } from '@/_models/index';
-import { Router, ActivatedRoute } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 
 @Component({
     selector: 'sub-lookup',
@@ -23,7 +23,7 @@ export class SubLookupComponent implements OnInit {
 	@Output()
 	public senderEvent: EventEmitter<Action> = new EventEmitter();
 
-	constructor(private router: Router,
+	constructor(
 		private activatedRoute: ActivatedRoute,
 		private alertService: AlertService,
 		private spinnerService: SpinnerService,

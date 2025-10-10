@@ -169,20 +169,15 @@ export class TaskComponent implements OnInit {
 
     public addSourceTaskFormInit(): any {
 		this.spinnerService.show();
-		this.sourceTaskForm = this.formBuilder.group({
-			taskDetailId: [],
-			taskName: ['', Validators.required],
+        this.sourceTaskForm = this.formBuilder.group({
+            taskDetailId: [],
+            taskName: ['', Validators.required],
             sourceTaskTypeId: ['', Validators.required],
             taskPayload: ['', Validators.required],
             taskStatus: [],
             homePageId: [],
             pipelineId: [],
-            tagsInfo: this.formBuilder.array([
-                this.buildItem(),
-                this.buildItem(),
-                this.buildItem(),
-                this.buildItem(),
-            ]),
+            tagsInfo: this.formBuilder.array(Array(4).fill(null).map(() => this.buildItem())),
         });
 		this.spinnerService.hide();
 	}
