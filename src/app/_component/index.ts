@@ -18,3 +18,5 @@ export * from './source-task/task/task.component';
 export * from './source-task/source-task.component';
 // search-engine
 export * from './search-engine/search-engine.component';
+// login
+export * from './login/login.component';

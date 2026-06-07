@@ -24,6 +24,10 @@ module.exports = {
                 test: /\.less$/,
                 use: ['style-loader', 'css-loader', 'less-loader']
             },
+            {
+                test: /\.css$/,
+                use: ['style-loader', 'css-loader', 'postcss-loader']
+            },
 
             // workaround for warning: System.import() is deprecated and will be removed soon. Use import() instead.
             {

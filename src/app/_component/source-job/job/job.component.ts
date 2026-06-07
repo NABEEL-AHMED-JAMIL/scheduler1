@@ -37,11 +37,11 @@ export class JobComponent implements OnInit {
 
     public ERROR = 'Error';
     public SUCESS = 'Sucess';
-    public jobId: any;
-    public sourceJobForm: FormGroup;
+    public jobId: number | null = null;
+    public sourceJobForm!: FormGroup;
     public currentTaskState = 'Add Source Job';
-    public submitted: boolean = false;
-    public isEditMode: boolean = false;
+    public submitted = false;
+    public isEditMode = false;
     public executionTypes: any = Execution;
     public frequencys: any = FREQUENCY;
     public recurrences: any;
@@ -51,11 +51,11 @@ export class JobComponent implements OnInit {
     public times: any = TIMES;
 
     // pagint
-    public paging: Paging;
-    public sourceTaskQueryCriteria: QueryCriteria;
+    public paging!: Paging;
+    public sourceTaskQueryCriteria!: QueryCriteria;
     // source list
     public sourceTasks: SourceTask[] = [];
-    public selectedSourceTask: SourceTask;
+    public selectedSourceTask: SourceTask | null = null;
     
     constructor(private _router: Router,
         private _activatedRoute: ActivatedRoute,
@@ -69,7 +69,8 @@ export class JobComponent implements OnInit {
     ngOnInit() {
         this._activatedRoute.paramMap
         .subscribe((params: ParamMap) => {
-            this.jobId = +params.get('jobId');
+            const id = params.get('jobId');
+            this.jobId = id !== null ? Number(id) : null;
         });
         this.sourceTaskQueryCriteria = {
             page: 1,
@@ -98,23 +99,22 @@ export class JobComponent implements OnInit {
             this.spinnerService.hide();
             return;
         }
-        let sourceJob: any = {
-            jobId: this.sourceJobForm.get('jobId').value,
-            jobName: this.sourceJobForm.get('jobName').value,
+        const sourceJob: any = {
+            jobId: this.sourceJobForm.get('jobId')?.value,
+            jobName: this.sourceJobForm.get('jobName')?.value,
             taskDetail: {
-                taskDetailId: this.sourceJobForm.get('taskDetail').value?.taskDetailId
+                taskDetailId: this.sourceJobForm.get('taskDetail')?.value?.taskDetailId
             },
-            execution: this.sourceJobForm.get('executionType').value,
-            priority:  this.sourceJobForm.get('priority').value,
-            jobStatus: this.sourceJobForm.get('jobStatus').value,
-            completeJob: this.sourceJobForm.get('completeJob').value,
-            failJob: this.sourceJobForm.get('failJob').value,
-            skipJob: this.sourceJobForm.get('skipJob').value,
-        }
-        if (this.sourceJobForm.get('scheduler')) {
-            sourceJob.schedulers = [
-                this.sourceJobForm.get('scheduler').value
-            ]
+            execution: this.sourceJobForm.get('executionType')?.value,
+            priority: this.sourceJobForm.get('priority')?.value,
+            jobStatus: this.sourceJobForm.get('jobStatus')?.value,
+            completeJob: this.sourceJobForm.get('completeJob')?.value,
+            failJob: this.sourceJobForm.get('failJob')?.value,
+            skipJob: this.sourceJobForm.get('skipJob')?.value,
+        };
+        const schedulerControl = this.sourceJobForm.get('scheduler');
+        if (schedulerControl) {
+            sourceJob.schedulers = [schedulerControl.value];
         }
         if (this.jobId) {
             this.sourceJobService.updateSourceJob(sourceJob)
@@ -271,10 +271,10 @@ export class JobComponent implements OnInit {
     }
 
     public onTaskDetailChange(taskDetailId: any): void {
-        this.selectedSourceTask = this.sourceTasks
-        .find(taskDetail => {
+        const selectedTask = this.sourceTasks.find(taskDetail => {
             return taskDetail?.taskDetailId === Number(taskDetailId);
         });
+        this.selectedSourceTask = selectedTask ?? null;
         this.taskDetail.serviceName.setValue(this.selectedSourceTask?.sourceTaskType?.serviceName);
         this.taskDetail.queueTopicPartition.setValue(this.selectedSourceTask?.sourceTaskType?.queueTopicPartition);
         this.taskDetail.taskPayload.setValue(this.selectedSourceTask?.taskPayload);
@@ -295,7 +295,7 @@ export class JobComponent implements OnInit {
 
     public onFrequencyChange(selectFrequency: string): void {
         this.recurrences = this.frequencyDetails
-        .find(frequency => {
+        .find((frequency: any) => {
             return frequency.key === selectFrequency;
         })?.value;
     }

@@ -3,7 +3,6 @@ import {
     Router,
     ActivatedRoute
 } from '@angular/router';
-import { slideInOutAnimation } from '../../_content/slide-in-out.animation';
 import { SpinnerService } from '@/_helpers';
 import {
     SourceJobService,
@@ -18,23 +17,19 @@ import { first } from 'rxjs/operators';
  */
 @Component({
     selector: 'batch-action',
-    templateUrl: 'batch-action.component.html',
-    animations: [slideInOutAnimation],
-    host: {
-        '[@slideInOutAnimation]': ''
-    }
+    templateUrl: 'batch-action.component.html'
 })
 export class SourceBatchActionComponent implements OnInit {
 
     public SUCCESS = 'SUCCESS';
     public ERROR = 'Error';
-    public currentTaskState: any = 'Batch Action';
-    public buttonMessage: any;
+    public currentTaskState = 'Batch Action';
+    public buttonMessage = '';
     @ViewChild('inputUpload', {static: false})
-    public inputUpload;
-    public router: any;
-    public action: any;
-    public errors: any;
+    public inputUpload!: { nativeElement: { value: string } };
+    public router = '';
+    public action = '';
+    public errors: any[] = [];
 
     constructor(private _router: Router,
         private _activatedRoute: ActivatedRoute,
@@ -72,7 +67,7 @@ export class SourceBatchActionComponent implements OnInit {
                     this.alertService.showError(response.message, this.ERROR);
                 }
                 this.inputUpload.nativeElement.value = '';
-            }, (error) => {
+            }, (error: any) => {
                 this.spinnerService.hide();
                 this.alertService.showError(error, this.ERROR);
             });
@@ -88,7 +83,7 @@ export class SourceBatchActionComponent implements OnInit {
                     this.alertService.showError(response.message, this.ERROR);
                 }
                 this.inputUpload.nativeElement.value = '';
-            }, (error) => {
+            }, (error: any) => {
                 this.spinnerService.hide();
                 this.alertService.showError(error, this.ERROR);
             });
@@ -103,7 +98,7 @@ export class SourceBatchActionComponent implements OnInit {
             .subscribe((response) => {
                 this.downLoadFile(response);
                 this.spinnerService.hide();
-            }, (error) => {
+            }, (error: any) => {
                 this.spinnerService.hide();
                 this.alertService.showError(error, this.ERROR);
             });
@@ -113,7 +108,7 @@ export class SourceBatchActionComponent implements OnInit {
             .subscribe((response) => {
                 this.downLoadFile(response);
                 this.spinnerService.hide();
-            }, (error) => {
+            }, (error: any) => {
                 this.spinnerService.hide();
                 this.alertService.showError(error, this.ERROR);
             });
@@ -123,13 +118,12 @@ export class SourceBatchActionComponent implements OnInit {
     public downloadSourceTemplate(): void {
         this.spinnerService.show();
         if (this.action === 'sourceJob') {
-            debugger
             this.sourceJobService.downloadSourceJobTemplateFile()
             .pipe(first())
             .subscribe((response) => {
                 this.downLoadFile(response);
                 this.spinnerService.hide();
-            }, (error) => {
+            }, (error: any) => {
                 this.spinnerService.hide();
                 this.alertService.showError(error, this.ERROR);
             });
@@ -139,7 +133,7 @@ export class SourceBatchActionComponent implements OnInit {
             .subscribe((response) => {
                 this.downLoadFile(response);
                 this.spinnerService.hide();
-            }, (error) => {
+            }, (error: any) => {
                 this.spinnerService.hide();
                 this.alertService.showError(error, this.ERROR);
             });

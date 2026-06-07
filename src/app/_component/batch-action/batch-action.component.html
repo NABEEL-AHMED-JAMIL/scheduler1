@@ -1,48 +1,45 @@
-﻿<div class="side-form">
-    <nav class="navbar navbar-inverse"
-        style="border-radius: 0px;margin-bottom: 0px;">
-        <div class="container-fluid">
-            <button type="button" (click)="backClicked()"
-                style="margin-top: 7px;" class="btn btn-sm btn-default">
-                <span class="glyphicon glyphicon-chevron-left"></span>Back
-            </button>
-        </div>
-    </nav>
-    <div class="row" style="margin-right: 0px;margin-left: 0px;">
-        <div class="col-lg-12" style="text-align: end;">
-            <br>
-            <input type="file" accept="application/vnd.ms-excel, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                style="display: none;" #inputUpload (change)="uploadBulk($event.target.files[0])" hidden>
-            <button type="button" class="btn btn-sm btn-default" (click)="inputUpload.click()">
-                <span class="glyphicon glyphicon-upload"></span> Upload {{buttonMessage}}
-            </button>
-            &nbsp;
-            <button type="button" class="btn btn-sm btn-default" (click)="downloadList()">
-                <span class="glyphicon glyphicon-download"></span> Downalod {{buttonMessage}}
-            </button>
-            &nbsp;
-            <button type="button" class="btn btn-sm btn-default" (click)="downloadSourceTemplate()">
-                <span class="glyphicon glyphicon-download"></span> Download Template
-            </button>
-            <hr style="border-top: 3px solid #f3565d;">
-        </div>
-    </div>
-    <div class="row" style="margin-right: 0px;margin-left: 0px;">
-        <div class="col-lg-12">
-            <table class="table table-bordered table-sm table-responsive table-striped" style="font-size: 10px;">
-                <thead>
-                    <tr>
-                        <th style="width: 1px;">No#</th>
-                        <th>Error</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr *ngFor="let error of errors; let i = index">
-                        <td>{{i+1}}</td>
-                        <td [innerHTML]="error"></td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
+<!-- Breadcrumb -->
+<nav class="breadcrumb-bar">
+    <a routerLink="/home">Home</a>
+    <span class="crumb-sep">/</span>
+    <a href="javascript:void(0)" (click)="backClicked()">List</a>
+    <span class="crumb-sep">/</span>
+    <span class="crumb-current">Batch Action</span>
+</nav>
+
+<!-- Upload / Download / Template -->
+<input type="file" accept="application/vnd.ms-excel, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    style="display: none;" #inputUpload (change)="uploadBulk($event.target.files[0])" hidden>
+
+<div class="toolbar" style="justify-content: flex-end;">
+    <button type="button" class="btn btn-sm btn-teal" (click)="inputUpload.click()">
+        <span class="glyphicon glyphicon-upload"></span> Upload {{buttonMessage}}
+    </button>
+    <button type="button" class="btn btn-sm btn-default" (click)="downloadList()">
+        <span class="glyphicon glyphicon-download"></span> Download {{buttonMessage}}
+    </button>
+    <button type="button" class="btn btn-sm btn-default" (click)="downloadSourceTemplate()">
+        <span class="glyphicon glyphicon-cog"></span> Template
+    </button>
+</div>
+
+<!-- Results / Errors -->
+<div class="card-panel">
+    <h4 class="card-panel-title">Results</h4>
+    <div class="table-responsive">
+        <table class="table table-striped table-bordered table-hover table-modern">
+            <thead>
+                <tr>
+                    <th>No#</th>
+                    <th>Error</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr *ngFor="let error of errors; let i = index">
+                    <td>{{i+1}}</td>
+                    <td><div class="cell-message" [innerHTML]="error"></div></td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 </div>

@@ -15,6 +15,7 @@ export class JobHistoryActionComponent implements OnInit {
   public sourceJobQueues: any;
   public sourceJobStatistics: any;
   public searchQMessageForm: any = '';
+  public selectedQMessage: any = '';
   public ERROR: any = 'Error';
   public homePageId: any = '';
   public pipelineId: any = '';
@@ -56,6 +57,44 @@ export class JobHistoryActionComponent implements OnInit {
         this.spinnerService.hide();
         this.alertService.showError(error, this.ERROR);
       });
+  }
+
+  public get taskTopic(): string {
+    return this.parseTopicPartition().topic;
+  }
+
+  public get taskPartitions(): string {
+    return this.parseTopicPartition().partitions;
+  }
+
+  // queueTopicPartition is stored as "topic=<name>&partitions=[<list>]" — parse it for display
+  private parseTopicPartition(): { topic: string; partitions: string } {
+    const raw = String(this.sourceJob?.taskDetail?.sourceTaskType?.queueTopicPartition || '');
+    const match = raw.match(/topic=([^&]*)&partitions=\[(.*?)\]/);
+    if (match) {
+      return { topic: match[1] || '-', partitions: match[2] || '-' };
+    }
+    return { topic: raw || '-', partitions: '-' };
+  }
+
+  public showQMessageDetail(queueData: any): void {
+    this.selectedQMessage = this.prettyPrint(queueData?.jobStatusMessage);
+  }
+
+  private prettyPrint(message: any): string {
+    if (message === null || message === undefined || message === '') {
+      return '';
+    }
+    // If the value is already an object, stringify it directly
+    if (typeof message === 'object') {
+      return JSON.stringify(message, null, 2);
+    }
+    // If the value is a JSON string, parse then re-stringify with indentation
+    try {
+      return JSON.stringify(JSON.parse(message), null, 2);
+    } catch {
+      return String(message);
+    }
   }
 
   public logsDeatilQMessage(queueData: any, index: any): any {

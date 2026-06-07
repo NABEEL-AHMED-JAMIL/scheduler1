@@ -24,8 +24,8 @@ import {
 export class SourceTaskComponent implements OnInit {
 
 	@ViewChild('closebutton', {static: false})
-	public closebutton;
-  public file: File;
+	public closebutton!: any;
+  public file: File | null = null;
   public ERROR = 'Error';
   public SOURCE_TASK_DETAIL_FETCH = 'SourceTask Fetch';
   public DELETE_SOURCE_TASK = "Source Task Delete";
@@ -34,16 +34,16 @@ export class SourceTaskComponent implements OnInit {
   // source list
   public sourceTasks: SourceTask[] = [];
   // pagint
-  public paging: Paging;
-  public queryCriteria: QueryCriteria;
+  public paging!: Paging;
+  public queryCriteria!: QueryCriteria;
   // source tasktype
-	public sourceTaskAction: Action;
-	public sourceTaskType: SourceTaskType;
+	public sourceTaskAction: Action | null = null;
+	public sourceTaskType: SourceTaskType | null = null;
   // taskDetail
-  public viewSourceTask: SourceTask;
+  public viewSourceTask: SourceTask | null = null;
 
-  public deleteViewSourceTask: SourceTask;
-  public deleteSelectedIndex: any
+  public deleteViewSourceTask: SourceTask | null = null;
+  public deleteSelectedIndex: any = null;
   
   constructor(private commomService: CommomService,
     private alertService: AlertService,
@@ -116,8 +116,12 @@ export class SourceTaskComponent implements OnInit {
     .subscribe((response) => {
       if(response.status === ApiCode.SUCCESS) {
         this.spinnerService.hide();
-        this.deleteViewSourceTask.taskStatus = 'Delete';
-        this.sourceTasks[this.deleteSelectedIndex] = this.deleteViewSourceTask;
+        if (this.deleteViewSourceTask !== null) {
+          this.deleteViewSourceTask.taskStatus = 'Delete';
+          if (this.deleteSelectedIndex !== null) {
+            this.sourceTasks[this.deleteSelectedIndex] = this.deleteViewSourceTask;
+          }
+        }
         this.alertService.showSuccess(response.message, this.DELETE_SOURCE_TASK);
         this.closebutton.nativeElement.click();
         this.deleteViewSourceTask = null;

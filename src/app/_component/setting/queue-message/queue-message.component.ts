@@ -18,8 +18,9 @@ export class QueueMessageComponent implements OnInit {
 
     public ERROR: string = 'Error';
     public searchQMessageForm: any = '';
-    public qMessageSearcForm: FormGroup;
-    public sourceJobRunningStatistics: EChartOption;
+    public selectedQMessage: any = '';
+    public qMessageSearcForm!: FormGroup;
+    public sourceJobRunningStatistics!: EChartOption;
     public jobStatusList: any = ['Queue', 'Start', 'Running', 'Failed', 'Completed', 'Skip', 'Interrupt'];
     public jobRunningData: NameValue[] = [
       {
@@ -90,12 +91,17 @@ export class QueueMessageComponent implements OnInit {
 
    
     public submitQMessageFilter(): void {
+      const jobQIdControl = this.qMessageSearcForm.get('jobQId');
+      const fromDateControl = this.qMessageSearcForm.get('fromDate');
+      const toDateControl = this.qMessageSearcForm.get('toDate');
+      const jobStatusesControl = this.qMessageSearcForm.get('jobStatuses');
+      const jobIdControl = this.qMessageSearcForm.get('jobId');
       let payload = {
-        jobQId: this.qMessageSearcForm.get('jobQId').value ? this.qMessageSearcForm.get('jobQId').value.split(',').map(Number) : null,
-        fromDate: this.qMessageSearcForm.get('fromDate').value,
-        toDate: this.qMessageSearcForm.get('toDate').value,
-        jobStatuses: this.qMessageSearcForm.get('jobStatuses').value ? [this.qMessageSearcForm.get('jobStatuses').value] : null,
-        jobId: this.qMessageSearcForm.get('jobId').value ? this.qMessageSearcForm.get('jobId').value.split(',').map(Number) : null
+        jobQId: jobQIdControl?.value ? jobQIdControl.value.split(',').map(Number) : null,
+        fromDate: fromDateControl?.value,
+        toDate: toDateControl?.value,
+        jobStatuses: jobStatusesControl?.value ? [jobStatusesControl.value] : null,
+        jobId: jobIdControl?.value ? jobIdControl.value.split(',').map(Number) : null
       }
       this.fetchLogs(payload);
     }
@@ -121,6 +127,24 @@ export class QueueMessageComponent implements OnInit {
         this.spinnerService.hide();
         this.alertService.showError(error, this.ERROR);
       });
+    }
+
+    public showQMessageDetail(queueData: any): void {
+      this.selectedQMessage = this.prettyPrint(queueData?.jobStatusMessage);
+    }
+
+    private prettyPrint(message: any): string {
+      if (message === null || message === undefined || message === '') {
+        return '';
+      }
+      if (typeof message === 'object') {
+        return JSON.stringify(message, null, 2);
+      }
+      try {
+        return JSON.stringify(JSON.parse(message), null, 2);
+      } catch {
+        return String(message);
+      }
     }
 
     public deleteQMessage(queueData: any, index: any) {
@@ -160,46 +184,66 @@ export class QueueMessageComponent implements OnInit {
     }
 
     public drawJobRunningStatistics(dataPaload: any): void {
+      // keyed lowercase so the color matches regardless of the casing the API returns
+      const colorByStatus: { [key: string]: string } = {
+        'queue': '#0c7c8c',
+        'start': '#4f46e5',
+        'running': '#b5730a',
+        'failed': '#c0392b',
+        'completed': '#1d7a3f',
+        'skip': '#1c6ea4',
+        'interrupt': '#6a3bbf',
+        'inflight': '#0c7c8c'
+      };
+      const categories = (dataPaload || []).map((d: any) => d.name);
+      const values = (dataPaload || []).map((d: any) => ({
+        value: d.value,
+        itemStyle: { color: colorByStatus[String(d.name || '').trim().toLowerCase()] || '#4f46e5' }
+      }));
       this.sourceJobRunningStatistics = {
-        toolbox: {
-          top: '7px',
-          feature: {}
-        },
         title: {
-          text: 'Running Job',
+          text: 'Queue Status',
           left: 'center',
-          top: '5px'
+          top: '5px',
+          textStyle: {
+            fontSize: 14,
+            color: '#36424d'
+          }
         },
         tooltip: {
-          trigger: 'item'
+          trigger: 'axis',
+          axisPointer: { type: 'shadow' }
+        },
+        grid: {
+          left: '3%',
+          right: '10%',
+          bottom: '3%',
+          top: '40px',
+          containLabel: true
+        },
+        xAxis: {
+          type: 'value',
+          minInterval: 1,
+          splitLine: { lineStyle: { color: '#eef2f4' } }
+        },
+        yAxis: {
+          type: 'category',
+          data: categories,
+          axisTick: { show: false }
         },
         series: [
           {
-            name: 'Job Statistics',
-            type: 'pie',
-            top: '30px',
-            radius: ['0%', '90%'],
-            avoidLabelOverlap: false,
-            itemStyle: {
-              borderRadius: 10,
-              borderColor: '#fff',
-              borderWidth: 1
-            },
+            name: 'Queue Status',
+            type: 'bar',
+            barWidth: '55%',
+            itemStyle: { borderRadius: [0, 4, 4, 0] },
             label: {
-              show: false,
-              position: 'center'
+              show: true,
+              position: 'right',
+              fontWeight: 'bold',
+              color: '#36424d'
             },
-            emphasis: {
-              label: {
-                show: false,
-                fontSize: 40,
-                fontWeight: 'bold'
-              }
-            },
-            labelLine: {
-              show: true
-            },
-            data: dataPaload
+            data: values
           }
         ]
       };

@@ -55,7 +55,7 @@ export class HomeComponent implements OnInit {
       name: 'Running'
     }
   ];
-  private weeklyRunningJobData: NameValue[];
+  private weeklyRunningJobData: NameValue[] = [];
   // hours
   private hours: string[] = [
     '12AM', '1AM', '2AM', '3AM', '4AM', '5AM',
@@ -72,10 +72,10 @@ export class HomeComponent implements OnInit {
     });
 
   public subscription!: Subscription;
-  public sourceJobStatusStatistics: EChartOption;
-  public sourceJobRunningStatistics: EChartOption;
-  public sourceJobWeeklyRunningStatistics: EChartOption;
-  public sourceJobWeeklyHrsRunningStatistics: EChartOption;
+  public sourceJobStatusStatistics!: EChartOption;
+  public sourceJobRunningStatistics!: EChartOption;
+  public sourceJobWeeklyRunningStatistics!: EChartOption;
+  public sourceJobWeeklyHrsRunningStatistics!: EChartOption;
   public today_date: any;
   public last_7th_date: any;
 
@@ -115,6 +115,19 @@ export class HomeComponent implements OnInit {
   }
 
   public drawJobStatusStatistics(dataPaload: any): void {
+    // Map colors based on status name for consistent coloring
+    const colorMap = {
+      'Active': '#27ae60',      // Green  (matches pill-success)
+      'Inactive': '#f39c12',    // Amber  (matches pill-warning)
+      'Delete': '#e74c3c'       // Red    (matches pill-danger)
+    };
+    
+    const itemStyle = {
+      color: (params: any) => {
+        return colorMap[params.name as keyof typeof colorMap] || '#999';
+      }
+    };
+    
     this.sourceJobStatusStatistics = {
       toolbox: {
         top: '7px',
@@ -167,7 +180,12 @@ export class HomeComponent implements OnInit {
           labelLine: {
             show: false
           },
-          data: dataPaload
+          data: dataPaload.map((item: any) => ({
+            ...item,
+            itemStyle: {
+              color: colorMap[item.name as keyof typeof colorMap] || '#999'
+            }
+          }))
         }
       ]
     }
@@ -219,12 +237,12 @@ export class HomeComponent implements OnInit {
         left: 'center',
         bottom: '2%'
       },
+      color: ['#27ae60', '#f39c12', '#e74c3c'],
       series: [
         {
           name: 'Job Statistics',
           type: 'pie',
           radius: ['0%', '60%'],
-          // color: ['#00b04f', '#ff0000', '#ffbf00'],
           avoidLabelOverlap: false,
           itemStyle: {
             borderRadius: 10,
@@ -304,6 +322,7 @@ export class HomeComponent implements OnInit {
         bottom: '3%',
         containLabel: true
       },
+      color: ['#4f46e5'],
       xAxis: [
         {
           type: 'category',
@@ -442,13 +461,17 @@ export class HomeComponent implements OnInit {
   public onChartEvent(event: any, type: string) {
     this.searchSourceJobDetails = '';
     // fine the data from the main data with the target event
-    this.selectMap = this.heatMapData.find(data => {
+    this.selectMap = this.heatMapData.find((data: any) => {
       return (data.hr == event?.data[0] && data.dayCode == event?.data[1] && data.count == event?.data[2]);
     });
     this.weeklyHrRunningStatisticsDimension(this.selectMap?.date, this.selectMap?.hr);
   }
 
-  public sourceJobCountAction(sourceJob: any, type: string): any {
+  public sourceJobCountAction(sourceJob: any, type: string, count: any): any {
+    if (!count || Number(count) === 0) {
+      this.alertService.showError('No ' + type + ' records available to view.', this.ERROR);
+      return;
+    }
     this.router.navigate(['jobList/jobHistory'],
       {
         queryParams: {

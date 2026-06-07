@@ -1,97 +1,91 @@
 <!-- breadcrumb -->
-<ol class="breadcrumb" *ngIf="!isParent">
-    <li><a routerLink="/home">Home</a></li>
-    <li><a routerLink="/setting">Setting</a></li>
-    <li class="active">Sub Lookup</li>
-</ol>
+<nav class="breadcrumb-bar" *ngIf="!isParent">
+    <a routerLink="/home">Home</a>
+    <span class="crumb-sep">/</span>
+    <a routerLink="/setting">Setting</a>
+    <span class="crumb-sep">/</span>
+    <span class="crumb-current">Sub Lookup</span>
+</nav>
+
 <!-- lookup action -->
 <look-up *ngIf="lookupAction"
     [lookUpAction]="lookupAction"
     [recivedLookupData]="lookupData"
     (senderEvent) = "resetEvent($event)">
 </look-up>
-<!-- LookUp -->
-<div class="row" style="margin-right: 0px;margin-left: 0px;">
-    <div class="col-lg-12">
-        <div class="panel panel-success">
-            <div class="panel-heading">
-                <div class="row">
-                    <div class="col-lg-6" style="text-align: start;margin-top: 2px;">
-                        Parent Lookup detail
-                    </div>
-                    <div class="col-lg-6" style="text-align: end;">
-                        <button type="button" class="btn btn-sm btn-default"
-                            data-toggle="modal" data-target="#lookupDatas"
-                            (click)="addLookupDatas()">
-                            <span class="glyphicon glyphicon-plus-sign"></span> Add Lookup
-                        </button>
-                    </div>
-                </div>
-            </div>
-            <div class="panel-body" *ngIf="parentLookupDate">
-                <div class="row" style="font-size: small;font-style: normal;">
-                    <div class="col-lg-2">
-                        <label for="html">LookupType</label><br>
-                        <label for="html">{{parentLookupDate?.lookupType}}</label><br>
-                    </div>
-                    <div class="col-lg-4">
-                        <label for="html">LookupValue</label><br>
-                        <label for="html">{{parentLookupDate?.lookupValue}}</label><br>
-                    </div>
-                    <div class="col-lg-4">
-                        <label for="html">Description</label><br>
-                        <label for="html">{{parentLookupDate?.description}}</label><br>
-                    </div>
-                    <div class="col-lg-2">
-                        <label for="html">DateCreated</label><br>
-                        <label for="html">{{parentLookupDate?.dateCreated | date: 'dd/MM/yyyy' }}</label><br>
-                    </div>
-                </div>                
-            </div>
+
+<!-- Parent Lookup detail -->
+<div class="card-panel">
+    <h4 class="card-panel-title panel-banner has-action">
+        <span>Parent Lookup Detail</span>
+        <button type="button" class="banner-link" data-toggle="modal" data-target="#lookupDatas"
+            (click)="addLookupDatas()" title="Add Lookup">
+            <span class="glyphicon glyphicon-plus-sign"></span> Add Lookup
+        </button>
+    </h4>
+    <div class="meta-grid" *ngIf="parentLookupDate">
+        <div class="detail-item">
+            <span class="detail-label">Lookup Type</span>
+            <span class="detail-value">{{parentLookupDate?.lookupType}}</span>
+        </div>
+        <div class="detail-item">
+            <span class="detail-label">Lookup Value</span>
+            <span class="detail-value">{{parentLookupDate?.lookupValue}}</span>
+        </div>
+        <div class="detail-item">
+            <span class="detail-label">Description</span>
+            <span class="detail-value">{{parentLookupDate?.description}}</span>
+        </div>
+        <div class="detail-item">
+            <span class="detail-label">Date Created</span>
+            <span class="detail-value">{{parentLookupDate?.dateCreated | date: 'dd/MM/yyyy' }}</span>
         </div>
     </div>
 </div>
-<!-- table -->
-<div class="col-lg-4">
-    <div class="form-group">
-        <label for="searchLookupDataForm">Total Lookups ({{lookupDatas.length}})</label>
-        <input type="text" id="searchLookupDataForm" class="form-control input-sm"
-            placeholder="Search" [(ngModel)]="searchLookupDataForm"/>
+
+<!-- Sub Lookups -->
+<div class="card-panel">
+    <div class="toolbar">
+        <div class="form-group" style="margin-bottom: 0;">
+            <label for="searchLookupDataForm" class="control-label">Total Lookups ({{lookupDatas.length}})</label>
+            <input type="text" id="searchLookupDataForm" class="form-control" style="width: 280px;"
+                placeholder="Search" [(ngModel)]="searchLookupDataForm"/>
+        </div>
     </div>
-</div>
-<div style="padding-left: 15px;padding-right: 15px;">
-    <table id="lookup" class="table table-responsive table table-striped
-        table-bordered table-sm" style="font-size: 12px;">
-        <thead>
-            <tr>
-                <th style="width: 4%;"># No</th>
-                <th>Lookup Type</th>
-                <th>Lookup Value</th>
-                <th>Description</th>
-                <th style="width: 9%;">Action</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr *ngFor="let lookupData of lookupDatas | searchFilter: searchLookupDataForm; let i = index">
-                <td>{{lookupData.lookupId}}</td>
-                <td>{{lookupData.lookupType}}</td>
-                <td>{{lookupData.lookupValue}}</td>
-                <td>{{lookupData.description}}</td>
-                <td style="text-align: center;">
-                    <div class="btn-group btn-group-xs" role="group" style="text-align: center">
-                        <button type="button" class="btn btn-default"
-                            data-toggle="modal" data-target="#lookupDatas"
-                            (click)="editLookupData(lookupData)">
-                            <span class="glyphicon glyphicon-edit" style="color:blue"></span>
-                        </button>
-                        <button type="button" class="btn btn-default"
-                            (click)="deleteLookupData(lookupData, i)"
-                            data-toggle="modal" data-target="#sub-lookup">
-                            <span class="glyphicon glyphicon-trash" style="color: black;"></span>
-                        </button>
-                    </div>
-                </td>
-            </tr>
-        </tbody>
-    </table>
+
+    <div class="table-responsive">
+        <table id="lookup" class="table table-striped table-bordered table-hover table-modern" style="font-size: 12px;">
+            <thead>
+                <tr>
+                    <th style="width: 4%;"># No</th>
+                    <th>Lookup Type</th>
+                    <th>Lookup Value</th>
+                    <th>Description</th>
+                    <th class="text-center">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr *ngFor="let lookupData of lookupDatas | searchFilter: searchLookupDataForm; let i = index">
+                    <td>{{lookupData.lookupId}}</td>
+                    <td>{{lookupData.lookupType}}</td>
+                    <td>{{lookupData.lookupValue}}</td>
+                    <td>{{lookupData.description}}</td>
+                    <td class="text-center">
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button type="button" class="btn btn-default btn-icon ic-edit"
+                                data-toggle="modal" data-target="#lookupDatas"
+                                (click)="editLookupData(lookupData)" title="Edit">
+                                <span class="glyphicon glyphicon-edit"></span>
+                            </button>
+                            <button type="button" class="btn btn-default btn-icon ic-delete"
+                                (click)="deleteLookupData(lookupData, i)"
+                                data-toggle="modal" data-target="#sub-lookup" title="Delete">
+                                <span class="glyphicon glyphicon-trash"></span>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
 </div>

@@ -1,4 +1,6 @@
-﻿import { Component } from '@angular/core';
+import { Component } from '@angular/core';
+import { Router } from '@angular/router';
+import { AuthService } from '@/_services';
 import './_content/app.less';
 
 
@@ -11,7 +13,15 @@ import './_content/app.less';
 })
 export class AppComponent {
 
-    constructor() {
+    constructor(public router: Router, public authService: AuthService) {
+    }
+
+    public get showNav(): boolean {
+        return this.authService.isLoggedIn() && !this.router.url.startsWith('/login');
+    }
+
+    public logout(): void {
+        this.authService.logout();
     }
 
 }

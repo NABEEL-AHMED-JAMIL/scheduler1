@@ -177,7 +177,7 @@ export class TaskComponent implements OnInit {
             taskStatus: [],
             homePageId: [],
             pipelineId: [],
-            tagsInfo: this.formBuilder.array(Array(4).fill(null).map(() => this.buildItem())),
+            tagsInfo: this.formBuilder.array(Array(10).fill(null).map(() => this.buildItem())),
         });
 		this.spinnerService.hide();
 	}

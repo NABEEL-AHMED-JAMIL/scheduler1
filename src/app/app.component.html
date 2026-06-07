@@ -1,54 +1,70 @@
-﻿﻿<nav class="navbar navbar-inverse"
-    style="border-radius: 0px;margin-bottom: 0px;">
+﻿<!-- Navbar -->
+<nav class="navbar navbar-inverse" *ngIf="showNav">
     <div class="container-fluid">
         <!-- Brand -->
         <div class="navbar-header">
-            <a class="navbar-brand" routerLink="/home">ETL 2023</a>
+            <a routerLink="/home" class="navbar-brand">
+                ETL 2023
+            </a>
         </div>
-        <!-- Left: Menu Items -->
+
+        <!-- Menu Items -->
         <ul class="nav navbar-nav">
-            <li class="dropdown">
-                <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button"
-                   aria-haspopup="true" aria-expanded="false">
-                    Source Job <span class="caret"></span>
+            <li routerLinkActive="active">
+                <a routerLink="/jobList">
+                    Source Job
                 </a>
-                <ul class="dropdown-menu">
-                    <li><a routerLink="/addJob">Add Job</a></li>
-                    <li><a routerLink="/jobList">Job List</a></li>
-                </ul>
             </li>
-            <li class="dropdown">
-                <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button"
-                   aria-haspopup="true" aria-expanded="false">
-                    Source Task <span class="caret"></span>
+            <li routerLinkActive="active">
+                <a routerLink="/taskList">
+                    Source Task
                 </a>
-                <ul class="dropdown-menu">
-                    <li><a routerLink="/addTask">Add Task</a></li>
-                    <li><a routerLink="/taskList">Task List</a></li>
-                </ul>
             </li>
-            <li class="dropdown">
-                <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button"
-                   aria-haspopup="true" aria-expanded="false">
-                    Setting <span class="caret"></span>
+            <li routerLinkActive="active">
+                <a routerLink="/setting/searchEngine">
+                    Q-Result
                 </a>
-                <ul class="dropdown-menu">
-                    <li><a routerLink="/setting">Lookup</a></li>
-                    <li><a routerLink="/setting/searchEngine">Q-Result</a></li>
-                    <li><a routerLink="/setting/queueMessage">Q-Message</a></li>
-                </ul>
+            </li>
+            <li routerLinkActive="active">
+                <a routerLink="/setting/queueMessage">
+                    Q-Message
+                </a>
+            </li>
+            <li routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">
+                <a routerLink="/setting">
+                    Setting
+                </a>
             </li>
         </ul>
-        <!-- Right: User Profile -->
+
+        <!-- User Profile -->
         <ul class="nav navbar-nav navbar-right">
-            <li>
-                <a href="javascript:void(0);">
-                    <span class="glyphicon glyphicon-user"></span> NAJ
+            <li class="dropdown">
+                <a href="javascript:void(0);" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">
+                    <img src="https://avatars.githubusercontent.com/u/24192325?v=4" class="nav-avatar" alt="avatar"> Nabeel Ahmed <span class="caret"></span>
                 </a>
+                <ul class="dropdown-menu dropdown-menu-right user-menu">
+                    <li class="user-card">
+                        <img src="https://avatars.githubusercontent.com/u/24192325?v=4" class="user-card-avatar" alt="avatar">
+                        <div class="user-card-info">
+                            <div class="user-card-name">Nabeel Ahmed</div>
+                            <div class="user-card-role">ETL Administrator</div>
+                            <div class="user-card-email">nabeel.amd93&#64;gmail.com</div>
+                        </div>
+                    </li>
+                    <!-- <li class="dropdown-header">ETL Overview</li>
+                    <li><a href="javascript:void(0);"><span class="glyphicon glyphicon-briefcase"></span> Total Jobs <span class="badge">128</span></a></li>
+                    <li><a href="javascript:void(0);"><span class="glyphicon glyphicon-ok-circle"></span> Completed Today <span class="badge">96</span></a></li>
+                    <li><a href="javascript:void(0);"><span class="glyphicon glyphicon-refresh"></span> Running Now <span class="badge">5</span></a></li> -->
+                    <li><a href="javascript:void(0);" (click)="logout()"><span class="glyphicon glyphicon-log-out"></span> Logout</a></li>
+                </ul>
             </li>
         </ul>
     </div>
 </nav>
+
 <!-- main app container -->
-<router-outlet></router-outlet>
+<div class="app-content">
+    <router-outlet></router-outlet>
+</div>
 <spinner></spinner>

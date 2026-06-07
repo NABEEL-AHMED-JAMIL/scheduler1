@@ -4,7 +4,6 @@ import {
     ReactiveFormsModule
 } from '@angular/forms';
 import { NgxEchartsModule } from 'ngx-echarts';
-import { NgxQrcodeStylingModule } from 'ngx-qrcode-styling';
 import { BrowserModule } from '@angular/platform-browser';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { HttpClientModule } from '@angular/common/http';
@@ -27,7 +26,8 @@ import {
     SourceTaskComponent,
     JobHistoryActionComponent,
     JobLogComponent,
-    SearchEngineComponent
+    SearchEngineComponent,
+    LoginComponent
 } from './_component/index';
 import { ToastrModule } from 'ngx-toastr';
 
@@ -42,7 +42,6 @@ import { ToastrModule } from 'ngx-toastr';
             echarts: () => import('echarts'),
         }),
         FormsModule,
-        NgxQrcodeStylingModule,
         ReactiveFormsModule,
         HttpClientModule,
         BrowserAnimationsModule,
@@ -67,7 +66,8 @@ import { ToastrModule } from 'ngx-toastr';
         SearchFilterPipe,
         JobHistoryActionComponent,
         JobLogComponent,
-        SearchEngineComponent
+        SearchEngineComponent,
+        LoginComponent
     ],
     providers: [],
     bootstrap: [AppComponent]

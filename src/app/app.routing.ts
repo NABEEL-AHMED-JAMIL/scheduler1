@@ -1,4 +1,5 @@
 ﻿import { Routes, RouterModule } from '@angular/router';
+import { AuthGuard } from './_helpers';
 import {
     HomeComponent,
     SettingComponent,
@@ -12,7 +13,8 @@ import {
     SubLookupComponent,
     JobHistoryActionComponent,
     JobLogComponent,
-    SearchEngineComponent
+    SearchEngineComponent,
+    LoginComponent
 } from './_component/index';
 
 
@@ -21,80 +23,96 @@ import {
  */
 const routes: Routes = [
     {
+        path: 'login',
+        component: LoginComponent
+    },
+    {
         path: 'home',
-        component: HomeComponent
+        component: HomeComponent,
+        canActivate: [AuthGuard]
     },
     {
         path: 'taskList',
         component: SourceTaskComponent,
-        children: [
-            {
-                path: 'taskBatchAction',
-                component: SourceBatchActionComponent,
-                data: {
-                    router: '/taskList',
-                    action: 'sourceTask'
-                }
-            }
-        ]
+        canActivate: [AuthGuard]
+    },
+    {
+        path: 'taskList/taskBatchAction',
+        component: SourceBatchActionComponent,
+        canActivate: [AuthGuard],
+        data: {
+            router: '/taskList',
+            action: 'sourceTask'
+        }
     },
     {
         path: 'addTask',
-        component: TaskComponent
+        component: TaskComponent,
+        canActivate: [AuthGuard]
     },
     {
         path: 'editTask/:taskDetailId',
-        component: TaskComponent
+        component: TaskComponent,
+        canActivate: [AuthGuard]
     },
     {
         path: 'jobList',
         component: SourceJobComponent,
-        children: [
-            {
-                path: 'jobBatchAction',
-                component: SourceBatchActionComponent,
-                data: {
-                    router: '/jobList',
-                    action: 'sourceJob'
-                }
-            }
-        ]
+        canActivate: [AuthGuard]
+    },
+    {
+        path: 'jobList/jobBatchAction',
+        component: SourceBatchActionComponent,
+        canActivate: [AuthGuard],
+        data: {
+            router: '/jobList',
+            action: 'sourceJob'
+        }
     },
     {
         path: 'jobList/jobHistory',
-        component: JobHistoryActionComponent
+        component: JobHistoryActionComponent,
+        canActivate: [AuthGuard]
     },
     {
         path: 'jobList/jobLogs',
-        component: JobLogComponent
+        component: JobLogComponent,
+        canActivate: [AuthGuard]
     },
     {
         path: 'addJob',
-        component: JobComponent
+        component: JobComponent,
+        canActivate: [AuthGuard]
     },
     {
         path: 'editJob/:jobId',
-        component: JobComponent
+        component: JobComponent,
+        canActivate: [AuthGuard]
     },
     {
         path: 'setting',
-        component: SettingComponent
+        component: SettingComponent,
+        canActivate: [AuthGuard]
     },
     {
         path: 'setting/subLookup',
-        component: SubLookupComponent
+        component: SubLookupComponent,
+        canActivate: [AuthGuard]
     },
     {
         path: 'setting/queueMessage',
-        component: QueueMessageComponent
+        component: QueueMessageComponent,
+        canActivate: [AuthGuard]
     },
     {
         path: 'setting/lookpXml',
-        component: XmlConfigurationComponent
+        component: XmlConfigurationComponent,
+        canActivate: [AuthGuard]
     },
     {
         path: 'setting/searchEngine',
-        component: SearchEngineComponent
+        component: SearchEngineComponent,
+        canActivate: [AuthGuard]
     },
     {
         path: '**',

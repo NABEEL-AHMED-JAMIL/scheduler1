@@ -1,35 +1,43 @@
-﻿﻿<ol class="breadcrumb">
-    <li><a routerLink="/home">Home</a></li>
-    <li class="active">Job List</li>
-</ol>
-<div class="row" style="margin-right: 0px;margin-left: 0px;">
-    <div class="col-lg-4">
-        <div class="form-group">
-            <label for="searchSourceJobDetails">Total Jobs ({{sourceJobDetails.length}})</label>
-            <input type="text" id="searchSourceJobDetails" class="form-control input-sm"
-                placeholder="Search" [(ngModel)]="searchSourceJobDetails"/>
-        </div>
+<!-- Breadcrumb -->
+<nav class="breadcrumb-bar">
+    <a routerLink="/home">Home</a>
+    <span class="crumb-sep">/</span>
+    <span class="crumb-current">Job List</span>
+</nav>
+
+<div class="toolbar">
+    <!-- Search Section -->
+    <div class="form-group" style="margin-bottom: 0;">
+        <label for="searchSourceJobDetails" class="control-label">Total Jobs ({{sourceJobDetails.length}})</label>
+        <input type="text"
+            id="searchSourceJobDetails"
+            class="form-control"
+            style="width: 280px;"
+            placeholder="Search"
+            [(ngModel)]="searchSourceJobDetails"/>
     </div>
-    <div class="col-lg-8" style="text-align: end;">
-        <button type="button" id="download" routerLink="/jobList/jobBatchAction"
-            class="btn btn-sm btn-default" style="margin-top: 25px;float: right;">
-            <span class="glyphicon glyphicon-cog"></span>
-            Batch Action
-        </button>
-        <button type="button" class="btn btn-sm btn-default" 
-            style="margin-top: 25px;float: right;margin-right: 5px;"
-            (click)="refreshSourceJobs()">
-            <span id="loading" class="glyphicon glyphicon-refresh"></span>
-            Refresh
-        </button>
-    </div>
+
+    <span class="toolbar-spacer"></span>
+
+    <!-- Action Buttons -->
+    <button type="button" routerLink="/addJob" class="btn btn-sm btn-teal">
+        <span class="glyphicon glyphicon-plus"></span> Add Job
+    </button>
+    <button type="button" id="download" routerLink="/jobList/jobBatchAction" class="btn btn-sm btn-default">
+        <span class="glyphicon glyphicon-cog"></span> Batch Action
+    </button>
+    <button type="button" class="btn btn-sm btn-default" (click)="refreshSourceJobs()">
+        <span id="loading" class="glyphicon glyphicon-refresh"></span> Refresh
+    </button>
 </div>
-<div style="padding-left: 15px;padding-right: 15px;overflow: auto;">
-    <table class="table table-bordered table-sm table-responsive table-striped" style="font-size: 10px;">
+
+<!-- Jobs Table -->
+<div class="table-responsive">
+    <table class="table table-bordered table-hover table-modern">
         <thead>
             <tr>
                 <th>Job Name</th>
-                <th style="overflow-wrap: break-word;inline-size: 130px;">Task</th>
+                <th>Task</th>
                 <th>Execution</th>
                 <th>Status</th>
                 <th>Created Date</th>
@@ -39,93 +47,86 @@
                 <th>Last Run</th>
                 <th>Next Flight</th>
                 <th>R-Status</th>
-                <th style="width: 9%;">Action</th>
+                <th class="text-center">Action</th>
             </tr>
         </thead>
         <tbody>
-            <tr *ngFor="let sourceJob of sourceJobDetails?.reverse() | searchFilter: searchSourceJobDetails;let i = index;">
+            <tr *ngFor="let sourceJob of sourceJobDetails?.reverse() | searchFilter: searchSourceJobDetails; let i = index;">
                 <td>
-                    <a routerLink="/editJob/{{sourceJob.jobId}}">{{sourceJob.jobId}}-{{sourceJob.jobName}}</a>
+                    <a routerLink="/editJob/{{sourceJob.jobId}}">
+                        {{sourceJob.jobId}}-{{sourceJob.jobName}}
+                    </a>
                 </td>
                 <td>
                     <a routerLink="/editTask/{{sourceJob?.taskDetail?.taskDetailId}}">
                         {{sourceJob?.taskDetail?.taskDetailId}}-[{{sourceJob?.taskDetail?.taskName}}]
                     </a>
                 </td>
-                <td style="text-align: center;">
-                    <span class="badge" [ngClass]="sourceJob.execution == 'Manual' ? 
-                        'badge-success' : 'badge-warning'">{{sourceJob.execution}}
+                <td class="text-center">
+                    <span class="pill"
+                        [ngClass]="sourceJob.execution == 'Manual' ? 'pill-success' : 'pill-warning'">
+                        {{sourceJob.execution}}
                     </span>
                 </td>
-                <td style="text-align: center;">
-                    <span class="badge" 
+                <td class="text-center">
+                    <span class="pill"
                         [ngClass]="{
-                            'badge-danger': sourceJob.jobStatus === 'Delete', 
-                            'badge-warning' : sourceJob.jobStatus === 'Inactive',
-                            'badge-success' : sourceJob.jobStatus === 'Active'
+                            'pill-danger': sourceJob.jobStatus === 'Delete',
+                            'pill-warning': sourceJob.jobStatus === 'Inactive',
+                            'pill-success': sourceJob.jobStatus === 'Active'
                         }">
                         {{sourceJob.jobStatus}}
                     </span>
                 </td>
-                <td style="text-align: center;">{{sourceJob.dateCreated | date:'yyyy-MM-dd HH:mm:ss'}}</td>
-                <td style="text-align: center;">{{sourceJob?.scheduler ?  'Every ' + sourceJob?.scheduler?.recurrence : ''}} {{sourceJob?.scheduler ?  sourceJob?.scheduler?.frequency : ''}}</td>
-                <td style="text-align: center;">{{sourceJob?.scheduler?.startDate}} {{sourceJob?.scheduler?.startTime}}</td>
-                <td style="text-align: center;">{{sourceJob?.scheduler?.endDate ? sourceJob?.scheduler?.endDate : ''}}
-                    {{sourceJob?.scheduler?.endDate ? sourceJob?.scheduler?.startTime : ''}}</td>
-                <td style="text-align: center;">{{sourceJob.lastJobRun | date:'yyyy-MM-dd HH:mm:ss'}}</td>
-                <td style="text-align: center;">{{sourceJob?.scheduler?.recurrenceTime | date:'yyyy-MM-dd HH:mm:ss'}}</td>
-                <td style="text-align: center;">
-                    <span *ngIf="sourceJob.jobRunningStatus" class="badge"
-                        [ngClass]="{
-                            'badge-primary' : sourceJob.jobRunningStatus === 'InFlight', 
-                            'badge-info' : sourceJob.jobRunningStatus === 'Queue',
-                            'badge-start' : sourceJob.jobRunningStatus === 'Start',
-                            'badge-warning' : sourceJob.jobRunningStatus === 'Running',
-                            'badge-danger' :  sourceJob.jobRunningStatus === 'Failed',
-                            'badge-success' : sourceJob.jobRunningStatus === 'Completed',
-                            'badge-interrupt' : sourceJob.jobRunningStatus === 'Interrupt'
-                        }">
+                <td class="text-center">{{sourceJob.dateCreated | date:'yyyy-MM-dd HH:mm:ss'}}</td>
+                <td class="text-center">{{sourceJob?.scheduler ? 'Every ' + sourceJob?.scheduler?.recurrence : ''}} {{sourceJob?.scheduler ? sourceJob?.scheduler?.frequency : ''}}</td>
+                <td class="text-center">{{sourceJob?.scheduler?.startDate}} {{sourceJob?.scheduler?.startTime}}</td>
+                <td class="text-center">{{sourceJob?.scheduler?.endDate ? sourceJob?.scheduler?.endDate : ''}} {{sourceJob?.scheduler?.endDate ? sourceJob?.scheduler?.startTime : ''}}</td>
+                <td class="text-center">{{sourceJob.lastJobRun | date:'yyyy-MM-dd HH:mm:ss'}}</td>
+                <td class="text-center">{{sourceJob?.scheduler?.recurrenceTime | date:'yyyy-MM-dd HH:mm:ss'}}</td>
+                <td class="text-center">
+                    <span *ngIf="sourceJob.jobRunningStatus" class="pill"
+                        [ngClass]="'status-' + sourceJob.jobRunningStatus">
                         {{ sourceJob.jobRunningStatus }}
                     </span>
                 </td>
-                <td style="text-align: center;">
-                    <div class="btn-group btn-group-xs" role="group"
-                        style="text-align: center">
-                        <button type="button" class="btn btn-default"
-                            [disabled]="sourceJob.jobRunningStatus === 'Queue' || 
+                <td class="text-center">
+                    <div class="btn-group btn-group-sm">
+                        <button type="button" class="btn btn-default btn-icon ic-run"
+                            [disabled]="sourceJob.jobRunningStatus === 'Queue' ||
                                 sourceJob.jobRunningStatus === 'Running' ||
-                                sourceJob.jobRunningStatus === 'Start' || 
+                                sourceJob.jobRunningStatus === 'Start' ||
                                 sourceJob.jobStatus === 'Delete' ||
                                 sourceJob.jobStatus === 'Inactive'"
-                            (click)="runSourceJob(sourceJob, i)">
-                            <span class="glyphicon glyphicon-play-circle btn_span"
-                                style="color: green;">
-                            </span>
+                            (click)="runSourceJob(sourceJob, i)"
+                            title="Run Job">
+                            <span class="glyphicon glyphicon-play-circle"></span>
                         </button>
-                        <button type="button" class="btn btn-default"
-                            [disabled]="sourceJob.jobRunningStatus === 'Queue' || 
+                        <button type="button" class="btn btn-default btn-icon ic-skip"
+                            [disabled]="sourceJob.jobRunningStatus === 'Queue' ||
                                 sourceJob.jobRunningStatus === 'Running' ||
-                                sourceJob.jobRunningStatus === 'Start' || 
+                                sourceJob.jobRunningStatus === 'Start' ||
                                 sourceJob.execution == 'Manual' ||
                                 sourceJob.jobStatus === 'Delete' ||
                                 sourceJob.jobStatus === 'Inactive'"
-                            (click)="skipNextSourceJob(sourceJob, i)">
-                            <span class="glyphicon glyphicon-step-forward"
-                                style="color: purple;">
-                            </span>
+                            (click)="skipNextSourceJob(sourceJob, i)"
+                            title="Skip Next">
+                            <span class="glyphicon glyphicon-step-forward"></span>
                         </button>
-                        <button type="button" class="btn btn-default"
+                        <button type="button" class="btn btn-default btn-icon ic-delete"
                             [disabled]="sourceJob.jobStatus === 'Delete' ||
-                                sourceJob.jobRunningStatus === 'Start' || 
+                                sourceJob.jobRunningStatus === 'Start' ||
                                 sourceJob.jobRunningStatus === 'Running'"
                             data-toggle="modal" data-target="#deleteSourceJob"
-                            (click)="deleteSourceJob(sourceJob, i)">
-                            <span class="glyphicon glyphicon-trash" style="color: black;"></span>
+                            (click)="deleteSourceJob(sourceJob, i)"
+                            title="Delete">
+                            <span class="glyphicon glyphicon-trash"></span>
                         </button>
-                        <button type="button" class="btn btn-default"                         
+                        <button type="button" class="btn btn-default btn-icon ic-history"
                             [disabled]="sourceJob.tabActive === false"
-                            (click)="sourceJobHistoryByJobId(sourceJob.jobId)">
-                            <span class="glyphicon glyphicon-tasks" style="color: black;"></span>
+                            (click)="sourceJobHistoryByJobId(sourceJob.jobId)"
+                            title="History">
+                            <span class="glyphicon glyphicon-tasks"></span>
                         </button>
                     </div>
                 </td>
@@ -133,6 +134,7 @@
         </tbody>
     </table>
 </div>
+
 <div class="view-side-form">
     <router-outlet></router-outlet>
 </div>
@@ -148,7 +150,7 @@
             <div class="modal-body">
                 <p>Are you sure to delete the source job?
                     <br>On press 'Yes' the source job will delete state and will not run
-                </p> 
+                </p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-danger" id="closeModal" (click)="processDeleteSourceJob()">Yes</button>

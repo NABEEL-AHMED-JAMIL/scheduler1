@@ -18,16 +18,17 @@ export class SettingComponent implements OnInit {
 	public ERROR: string = 'Error';
 	public submitted: boolean = false;
 	public searchSourceTaskTaype: any = '';
+	public searchLookupDataForm: any = '';
 	public APPSETTING_FETCH: string = 'AppSetting Fetch';
 	public DELETE_SOURCE_TASK_TYPE = "Source TaskType Delete";
 	// source tasktype
-	public sourceTaskTypeAction: Action;
-	public sourceTaskType: SourceTaskType;
+	public sourceTaskTypeAction: Action | null = null;
+	public sourceTaskType: SourceTaskType | null = null;
 	// source task type
 	public sourceTaskTypes: SourceTaskType[] = [];
     // lookup
-	public lookupAction: Action;
-	public lookupData: LookupData;
+	public lookupAction: Action | null = null;
+	public lookupData: LookupData | null = null;
 	public lookupDatas: LookupData[] = [];
 	public deleteSourceTaskTypeId:any;
 	public deleteSelectedIndex:any;
@@ -67,9 +68,9 @@ export class SettingComponent implements OnInit {
 		this.sourceTaskTypeAction = Action.ADD;
 	}
 
-	public editSourceTaskTaype(sourceTaskTaype: SourceTaskType): void {
+	public editSourceTaskType(sourceTaskType: SourceTaskType): void {
 		this.sourceTaskTypeAction = Action.EDIT;
-		this.sourceTaskType = sourceTaskTaype;
+		this.sourceTaskType = sourceTaskType;
 	}
 
 	public addLookupDatas(): void {

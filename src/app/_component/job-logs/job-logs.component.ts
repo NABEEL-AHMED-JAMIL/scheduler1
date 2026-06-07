@@ -18,6 +18,7 @@ export class JobLogComponent implements OnInit {
   public sourceJob: any;
   public sourceJobQueue: any;
   public searchAuditLogsForm: any = '';
+  public selectedLog: any = '';
 
   constructor(private alertService: AlertService,
     private spinnerService: SpinnerService,
@@ -51,6 +52,10 @@ export class JobLogComponent implements OnInit {
       this.spinnerService.hide();
       this.alertService.showError(error, this.ERROR);
     });
+  }
+
+  public showLogDetail(audit: any): void {
+    this.selectedLog = audit?.logsDetail;
   }
 
   public backClicked(): void {

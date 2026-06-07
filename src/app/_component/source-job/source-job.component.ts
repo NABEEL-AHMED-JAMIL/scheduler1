@@ -19,7 +19,7 @@ import { first } from 'rxjs/operators';
 export class SourceJobComponent implements OnInit, OnDestroy  {
 
     @ViewChild('closebutton', {static: false})
-	public closebutton;
+	public closebutton!: any;
     public ERROR = 'Error';
     public SUCESS = 'Sucess';
     public hide: any;
@@ -31,8 +31,8 @@ export class SourceJobComponent implements OnInit, OnDestroy  {
     public searchSourceJobDetails: any = ''; 
     // source list
     public sourceJobDetails: SourceJobDetail[] = [];
-    public deleteViewSourceJob: SourceJobDetail;
-    public deleteSelectedIndex: any
+    public deleteViewSourceJob: SourceJobDetail | null = null;
+    public deleteSelectedIndex: any = null;
     
     
     constructor(
@@ -54,7 +54,7 @@ export class SourceJobComponent implements OnInit, OnDestroy  {
                                     sourceJobDetail.jobRunningStatus = jsonPayload?.jobRunningStatus;
                                     sourceJobDetail.jobStatus = jsonPayload?.jobStatus;
                                     sourceJobDetail.lastJobRun = jsonPayload?.lastJobRun;
-                                    if (jsonPayload.execution == 'Auto') {
+                                    if (jsonPayload.execution == 'Auto' && sourceJobDetail.scheduler) {
                                         sourceJobDetail.scheduler.recurrenceTime = jsonPayload?.recurrenceTime;
                                     }
                                 }

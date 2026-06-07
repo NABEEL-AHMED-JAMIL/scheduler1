@@ -104,7 +104,7 @@ body.jw-modal-open {
 
 
 // Colors
-@brand-primary: #29b5a8;
+@brand-primary: #4f46e5;
 @brand-secondary: #ff8300;
 @gray: #6b7381;
 @gray-light: lighten(@gray, 15%);
@@ -763,4 +763,834 @@ a {
 
 .graph:hover {
   background-color: white;
+}
+
+/* =========================================================
+   App theme layer (Bootstrap 3 enhancement)
+   One cohesive teal / slate theme shared by every screen.
+   Simple, clean, and consistent.
+   ========================================================= */
+@brand-teal: #4f46e5;       // indigo (primary)
+@brand-teal-dark: #3730a3;  // deep indigo
+@brand-accent: #7c3aed;     // violet accent
+@brand-slate: #2f3a45;
+@ink: #36424d;
+@muted: #7b8794;
+@line: #e6eaee;
+@surface: #ffffff;
+@page-bg: #f4f6f8;
+
+/* Base */
+body {
+  background: @page-bg;
+  color: @ink;
+}
+
+/* Page content padding (wrapper around <router-outlet>) */
+.app-content {
+  padding: 20px 24px;
+}
+
+/* ---------- Navbar ---------- */
+.navbar-inverse {
+  background: @brand-slate;
+  border: none;
+  border-radius: 0;
+  margin-bottom: 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.10);
+}
+
+.navbar-inverse .navbar-brand {
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+}
+
+.navbar-inverse .navbar-brand:hover {
+  color: @brand-teal;
+}
+
+.navbar-inverse .navbar-nav > li > a {
+  color: #cdd6df;
+  transition: all 0.15s ease-in-out;
+}
+
+.navbar-inverse .navbar-nav > li > a:hover,
+.navbar-inverse .navbar-nav > li > a:focus {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.navbar-inverse .navbar-nav > .active > a,
+.navbar-inverse .navbar-nav > .active > a:hover,
+.navbar-inverse .navbar-nav > .active > a:focus {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 -3px 0 @brand-teal;
+}
+
+.navbar-inverse .navbar-nav > .open > a,
+.navbar-inverse .navbar-nav > .open > a:hover,
+.navbar-inverse .navbar-nav > .open > a:focus {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* ---------- Breadcrumb bar ---------- */
+.breadcrumb-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  background: @surface;
+  border: 1px solid @line;
+  border-radius: 6px;
+  padding: 10px 16px;
+  margin-bottom: 18px;
+  font-size: 13px;
+
+  a {
+    color: @brand-teal-dark;
+    text-decoration: none;
+  }
+
+  a:hover {
+    color: @brand-teal;
+    text-decoration: underline;
+  }
+
+  .crumb-current {
+    color: @ink;
+    font-weight: 600;
+  }
+
+  .crumb-sep {
+    color: #b7c0c8;
+    margin: 0 8px;
+  }
+}
+
+/* ---------- Toolbar: action button row ---------- */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  margin-bottom: 16px;
+}
+
+.toolbar > * {
+  margin-left: 8px;
+  margin-bottom: 4px;
+}
+
+.toolbar > *:first-child {
+  margin-left: 0;
+}
+
+.toolbar-spacer {
+  flex: 1 1 auto;
+}
+
+.toolbar .toolbar-spacer {
+  margin-left: 0;
+}
+
+/* ---------- Data table (simple & clean) ---------- */
+.table-modern {
+  background: @surface;
+  border: 1px solid @line;
+  font-size: 13px;
+  margin-bottom: 18px;
+}
+
+/* horizontal lines only — keep it simple even with .table-bordered */
+.table-modern > thead > tr > th,
+.table-modern > tbody > tr > td,
+.table-modern > tfoot > tr > td {
+  border-left: 0;
+  border-right: 0;
+}
+
+.table-modern > thead > tr > th {
+  background: #eef0fb;
+  color: @brand-teal-dark;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  border-bottom: 2px solid @brand-teal;
+  padding: 11px 12px;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.table-modern > tbody > tr > td {
+  padding: 9px 12px;
+  border-top: 1px solid @line;
+  vertical-align: middle;
+  color: @ink;
+}
+
+.table-modern > tbody > tr:nth-child(even) {
+  background: #fafbfc;
+}
+
+.table-modern > tbody > tr:hover {
+  background: #f1f0fd;
+}
+
+.table-modern a {
+  color: @brand-teal-dark;
+}
+
+.table-modern a:hover {
+  color: @brand-teal;
+}
+
+/* Long message / payload cells: keep the table tidy and readable */
+.cell-message {
+  max-width: 320px;
+  max-height: 110px;
+  overflow: auto;
+  text-align: left;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 11px;
+  line-height: 1.4;
+  font-weight: 600;
+  color: #111;
+  background: #f7f9fa;
+  border: 1px solid @line;
+  border-radius: 4px;
+  padding: 6px 8px;
+}
+
+/* Full-width message cell (e.g. logs table where the message column owns the row) */
+.cell-message.cell-message-wide {
+  max-width: none;
+}
+
+/* ---------- Detail / info layouts (for redesigned detail pages) ---------- */
+.detail-item {
+  margin-bottom: 12px;
+}
+
+.detail-item .detail-label {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: @muted;
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+
+.detail-item .detail-value {
+  font-weight: 600;
+  color: @ink;
+  font-size: 13px;
+}
+
+/* Inline entity header: title + status pills on one line (saves vertical space) */
+.entity-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.entity-head .entity-title {
+  margin: 0 auto 0 0; /* push the status pills to the right side of the row */
+  font-size: 14px;
+  font-weight: 700;
+  color: @ink;
+}
+
+/* Horizontal meta row: detail-items flow side by side and wrap */
+.meta-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 36px;
+}
+
+.meta-grid .detail-item {
+  margin-bottom: 10px;
+}
+
+/* Compact inline flags (label + pill), replaces stacked detail-items */
+.flag-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  align-items: center;
+}
+
+.flag-group .flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: @muted;
+}
+
+/* Read-only code / payload box */
+.code-box {
+  display: block;
+  width: 100%;
+  max-height: 170px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  font-weight: 600;
+  color: #111;
+  background: #f7f9fa;
+  border: 1px solid @line;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin: 0;
+}
+
+/* Equal-height columns: child .card-panel of each column stretches to the tallest */
+.row-equal {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.row-equal > [class*="col-"] {
+  display: flex;
+}
+
+.row-equal > [class*="col-"] > .card-panel {
+  width: 100%;
+}
+
+/* Panel whose body fills the available height (e.g. equal-height config-tags panel) */
+.panel-fill {
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-fill > #main-form-content {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.panel-fill > #main-form-content > .scroll-table {
+  flex: 1 1 auto;
+  max-height: none; /* fill the panel instead of a fixed cap */
+  min-height: 0;
+}
+
+/* Vertically scrollable table area (e.g. growing config-tag rows) with sticky header */
+.scroll-table {
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.scroll-table > .table-modern {
+  margin-bottom: 0;
+}
+
+.scroll-table > .table-modern > thead > tr > th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+/* Bold black cell text — for logs / query result tables */
+.table-strong > tbody > tr > td {
+  font-weight: 600;
+  color: #111;
+}
+
+/* Compact table — tighter cells for dense input grids (e.g. config tags) */
+.table-compact {
+  font-size: 12px;
+}
+
+.table-compact > thead > tr > th {
+  padding: 6px 8px;
+}
+
+.table-compact > tbody > tr > td {
+  padding: 5px 8px;
+  vertical-align: middle;
+}
+
+.table-compact .form-control.input-sm {
+  height: 30px;
+  font-size: 12px;
+}
+
+/* Login page */
+.login-page {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  overflow: auto;
+  background:
+    linear-gradient(135deg, rgba(55, 48, 163, 0.88) 0%, rgba(79, 70, 229, 0.82) 45%, rgba(124, 58, 237, 0.80) 100%),
+    url('https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=1600&q=80') center / cover no-repeat fixed;
+}
+
+.login-page .login-card {
+  width: 100%;
+  max-width: 380px;
+  margin-bottom: 0;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+}
+
+.login-page .btn-block {
+  width: 100%;
+}
+
+/* Navbar user avatar + profile dropdown */
+.nav-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-right: 6px;
+  vertical-align: middle;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+.user-menu {
+  min-width: 270px;
+  padding: 0 0 6px;
+  overflow: hidden;
+}
+
+.user-menu .user-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: @brand-teal;
+  color: #fff;
+}
+
+.user-menu .user-card-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #fff;
+}
+
+.user-menu .user-card-name {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.user-menu .user-card-role {
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.user-menu .user-card-email {
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.user-menu .dropdown-header {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  font-weight: 700;
+  color: @muted;
+  padding: 8px 16px 4px;
+}
+
+.user-menu > li > a {
+  padding: 6px 16px;
+}
+
+.user-menu > li > a .glyphicon {
+  width: 18px;
+  margin-right: 6px;
+  color: @brand-teal-dark;
+}
+
+.user-menu > li > a .badge {
+  float: right;
+  background: @brand-teal;
+}
+
+/* Small helper / hint text under inputs */
+.help-text {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: @muted;
+}
+
+/* Editable code / payload textarea (matches the read-only code-box look) */
+.code-input {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  font-weight: 600;
+  color: #111;
+  background: #f7f9fa;
+}
+
+/* Stat chips strip (e.g. job statistics) */
+.stat-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.stat-strip .stat-chip {
+  display: inline-flex;
+  align-items: center;
+  background: #f3f6f7;
+  border: 1px solid @line;
+  border-radius: 14px;
+  padding: 3px 12px;
+  margin: 4px 8px 0 0;
+  font-size: 12px;
+  color: @ink;
+}
+
+.stat-strip .stat-chip .stat-num {
+  font-weight: 700;
+  color: @brand-teal-dark;
+  margin-left: 6px;
+}
+
+.stat-strip .stat-chip.stat-total {
+  background: @brand-teal;
+  border-color: @brand-teal-dark;
+  color: #fff;
+}
+
+.stat-strip .stat-chip.stat-total .stat-num {
+  color: #fff;
+}
+
+/* Status-coloured chips — full tint (bg + border + text) matching the pill palette */
+.chip-tint(@bg; @fg) {
+  background: @bg;
+  border-color: fade(@fg, 28%);
+  color: @fg;
+  .stat-num { color: @fg; }
+}
+
+.stat-strip .stat-chip.chip-queue     { .chip-tint(#e0f7fa; #0c7c8c); }
+.stat-strip .stat-chip.chip-running   { .chip-tint(#fff4e0; #b5730a); }
+.stat-strip .stat-chip.chip-failed    { .chip-tint(#fde4e4; #c0392b); }
+.stat-strip .stat-chip.chip-completed { .chip-tint(#e3f6e9; #1d7a3f); }
+.stat-strip .stat-chip.chip-skip      { .chip-tint(#e1f0fb; #1c6ea4); }
+.stat-strip .stat-chip.chip-interrupt { .chip-tint(#efe6fb; #6a3bbf); }
+
+/* Scheduler chips — soft teal tint so the strip reads as one cohesive group */
+.stat-strip .stat-chip.chip-schedule {
+  background: #e6f6f4;
+  border-color: fade(@brand-teal-dark, 28%);
+  color: @brand-teal-dark;
+}
+
+.stat-strip .stat-chip.chip-schedule .stat-num {
+  color: @brand-teal-dark;
+}
+
+/* Section divider inside a card */
+.card-divider {
+  border-top: 1px solid #eceff1;
+  padding-top: 12px;
+  margin-top: 4px;
+}
+
+/* ---------- Pills / status badges ---------- */
+.pill {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  text-transform: capitalize;
+}
+
+.pill-success { background: #e3f6e9; color: #1d7a3f; }
+.pill-warning { background: #fff4e0; color: #b5730a; }
+.pill-danger  { background: #fde4e4; color: #c0392b; }
+.pill-info    { background: #e1f0fb; color: #1c6ea4; }
+.pill-default { background: #eceff1; color: #566573; }
+.pill-purple  { background: #efe6fb; color: #6a3bbf; }
+.pill-cyan    { background: #e0f7fa; color: #0c7c8c; }
+
+/* Job running-status pills (used as: class="pill" [ngClass]="'status-'+value") */
+.status-InFlight  { .pill-info; }
+.status-Queue     { .pill-cyan; }
+.status-Start     { .pill-success; }
+.status-Running   { .pill-warning; }
+.status-Failed    { .pill-danger; }
+.status-Completed { .pill-success; }
+.status-Interrupt { .pill-purple; }
+
+/* ---------- Buttons (consistent palette) ---------- */
+.btn {
+  border-radius: 5px;
+  font-weight: 500;
+  transition: all 0.15s ease-in-out;
+}
+
+.btn-default {
+  background: #fff;
+  border: 1px solid #d3dade;
+  color: #4a5560;
+}
+
+.btn-default:hover,
+.btn-default:focus,
+.btn-default:active {
+  background: #f2f5f6;
+  border-color: #c3ccd1;
+  color: #2c3e50;
+}
+
+.btn-primary,
+.btn-teal {
+  background: @brand-teal;
+  border-color: @brand-teal-dark;
+  color: #fff;
+}
+
+.btn-primary:hover, .btn-primary:focus, .btn-primary:active,
+.btn-teal:hover, .btn-teal:focus, .btn-teal:active {
+  background: @brand-teal-dark;
+  border-color: @brand-teal-dark;
+  color: #fff;
+}
+
+.btn-success {
+  background: #27ae60;
+  border-color: #229954;
+  color: #fff;
+}
+
+.btn-success:hover, .btn-success:focus, .btn-success:active {
+  background: #229954;
+  border-color: #1e8449;
+  color: #fff;
+}
+
+.btn-danger {
+  background: #e74c3c;
+  border-color: #cf4436;
+  color: #fff;
+}
+
+.btn-danger:hover, .btn-danger:focus, .btn-danger:active {
+  background: #cf4436;
+  border-color: #b03a2e;
+  color: #fff;
+}
+
+.btn-info {
+  background: #3498db;
+  border-color: #2c87c9;
+  color: #fff;
+}
+
+.btn-info:hover, .btn-info:focus, .btn-info:active {
+  background: #2c87c9;
+  border-color: #2676b3;
+  color: #fff;
+}
+
+.btn-warning {
+  background: #f39c12;
+  border-color: #e08e0b;
+  color: #fff;
+}
+
+.btn-warning:hover, .btn-warning:focus, .btn-warning:active {
+  background: #e08e0b;
+  border-color: #c87f0a;
+  color: #fff;
+}
+
+/* Compact icon action button (table rows) */
+.btn-icon {
+  padding: 4px 9px;
+  font-size: 13px;
+  line-height: 1.4;
+  background: #fff;
+  border: 1px solid #d3dade;
+  color: #4a5560;
+}
+
+.btn-icon:hover,
+.btn-icon:focus {
+  background: #f1f0fd;
+  border-color: #c3c0ef;
+}
+
+/* Consistent action-icon colour scheme across every table.
+   Apply one ic-* class per action button; the colour is the single source of truth. */
+.btn-icon .glyphicon        { color: #566573; }          /* default / neutral */
+.btn-icon.ic-view .glyphicon     { color: #4f46e5; }     /* indigo  */
+.btn-icon.ic-edit .glyphicon     { color: #2563eb; }     /* blue    */
+.btn-icon.ic-delete .glyphicon   { color: #c0392b; }     /* red     */
+.btn-icon.ic-run .glyphicon      { color: #1d7a3f; }     /* green   */
+.btn-icon.ic-skip .glyphicon     { color: #0c7c8c; }     /* cyan    */
+.btn-icon.ic-download .glyphicon { color: #b5730a; }     /* amber   */
+.btn-icon.ic-history .glyphicon  { color: #566573; }     /* slate   */
+.btn-icon.ic-logs .glyphicon     { color: #566573; }     /* slate   */
+.btn-icon.ic-interrupt .glyphicon{ color: #6a3bbf; }     /* purple  */
+.btn-icon.ic-add .glyphicon      { color: #1d7a3f; }     /* green   */
+
+.btn-icon[disabled] .glyphicon,
+.btn-icon.disabled .glyphicon {
+  color: #b8c0c7 !important;
+}
+
+/* ---------- Card panel for forms / content sections ---------- */
+.card-panel {
+  background: @surface;
+  border: 1px solid @line;
+  border-radius: 8px;
+  padding: 18px;
+  margin-bottom: 18px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.card-panel-title {
+  margin-top: 0;
+  margin-bottom: 14px;
+  font-size: 16px;
+  font-weight: 600;
+  color: @ink;
+  border-bottom: 1px solid #eceff1;
+  padding-bottom: 10px;
+}
+
+/* Filled teal banner header (matches the modal-header / panel-heading theme) */
+.card-panel-title.panel-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  background: @brand-teal;
+  color: #fff;
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  margin: -18px -18px 16px -18px;
+  padding: 10px 18px;
+}
+
+.card-panel-title.panel-banner .pull-right {
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+
+/* Banner with a right-aligned action (e.g. Add More button) — keep it tidy on one line */
+.card-panel-title.panel-banner.has-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.card-panel-title.panel-banner.has-action .pull-right {
+  float: none !important;
+  margin: 0;
+}
+
+.card-panel-title.panel-banner .banner-link {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #fff;
+  background: transparent;
+  text-transform: none;
+  padding: 3px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 5px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.card-panel-title.panel-banner .banner-link:hover,
+.card-panel-title.panel-banner .banner-link:focus {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  text-decoration: none;
+}
+
+/* Borderless sub-section inside a card-panel (avoids nested double borders) */
+.form-section {
+  margin-top: 18px;
+}
+
+/* ---------- Forms ---------- */
+.control-label {
+  font-weight: 600;
+  color: @ink;
+}
+
+.form-control:focus {
+  border-color: @brand-teal;
+  box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.18);
+}
+
+/* ---------- Modals & panels (match the theme) ---------- */
+.modal-content {
+  border: none;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+}
+
+.modal-header {
+  background: @brand-teal;
+  color: #fff;
+  border-bottom: none;
+}
+
+.modal-header .modal-title {
+  color: #fff;
+}
+
+.modal-header .close {
+  color: #fff;
+  opacity: 0.9;
+  text-shadow: none;
+}
+
+.modal-body,
+.modal-footer {
+  background: #fff;
+  color: @ink;
+}
+
+.modal-footer {
+  border-top: 1px solid @line;
+}
+
+.panel-default > .panel-heading {
+  background: @brand-teal;
+  color: #fff;
+  border-color: @brand-teal;
 }

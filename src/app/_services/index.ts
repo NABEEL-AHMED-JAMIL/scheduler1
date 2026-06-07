@@ -8,3 +8,4 @@ export * from './configuration.service';
 export * from './hom.service';
 export * from './websocketapi.service';
 export * from './websocketshare.service';
+export * from './auth.service';

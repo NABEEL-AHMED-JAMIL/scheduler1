@@ -1,131 +1,131 @@
-﻿<!-- breadcrumb -->
-<ol class="breadcrumb">
-    <li><a routerLink="/home">Home</a></li>
-    <li><a routerLink="/jobList">Job List</a></li>
-    <li><a [href]="" (click)="backClicked()">Job History</a></li>
-    <li class="active">Job Logs</li>
-</ol>
-<div class="row" style="margin-right: 0px;margin-left: 0px;">
-    <div class="col-lg-6" *ngIf="sourceJob">
-        <div class="panel panel-success">
-            <div class="panel-heading">
-                Job Detail
-            </div>
-            <div class="panel-body" style="padding-bottom: 0px;">
-                <div class="row">
-                    <div class="col-sm-8">
-                        <div class="form-group">
-                            <label>JobName: {{sourceJob?.jobId}} - {{sourceJob?.jobName}}</label>
-                        </div>
-                        <div class="form-group">
-                            <label>TaskName: {{sourceJob?.taskDetail?.taskDetailId}} - {{sourceJob?.taskDetail?.taskName}}</label>
-                        </div>
-                        <div class="form-group">
-                            <label style="color: rgb(139, 34, 34);">LastRun: {{sourceJob?.lastJobRun | date:'yyyy-MM-dd HH:mm:ss'}}</label>
-                        </div>
-                    </div>
-                    <div class="col-sm-4">
-                        <div class="form-group">
-                            <label>Execution:
-                                <span class="badge" [ngClass]="sourceJob?.execution == 'Manual' ? 
-                                    'badge-success' : 'badge-warning'">{{sourceJob?.execution}}
-                                </span>
-                            </label>
-                        </div>
-                        <div class="form-group">
-                            <label>R-Status: 
-                                <span *ngIf="sourceJob?.jobRunningStatus" class="badge"
-                                    [ngClass]="{
-                                        'badge-info' : sourceJob?.jobRunningStatus === 'Queue',
-                                        'badge-start' : sourceJob?.jobRunningStatus === 'Start',
-                                        'badge-warning' : sourceJob?.jobRunningStatus === 'Running',
-                                        'badge-danger' :  sourceJob?.jobRunningStatus === 'Failed',
-                                        'badge-success' : sourceJob?.jobRunningStatus === 'Completed',
-                                        'badge-interrupt' : sourceJob.jobRunningStatus === 'Interrupt'
-                                    }">
-                                    {{ sourceJob?.jobRunningStatus }}
-                                </span>
-                            </label>
-                        </div>
-                        <div class="form-group">
-                            <label style="color: rgb(139, 34, 34);">NextFlight: {{sourceJob?.scheduler?.recurrenceTime | date:'yyyy-MM-dd HH:mm:ss'}}</label>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-lg-6" *ngIf="sourceJobQueue">
-        <div class="panel panel-success">
-            <div class="panel-heading">
-                Queue Detail
-            </div>
-            <div class="panel-body" style="padding-bottom: 0px;">
-                <div class="row">
-                    <div class="col-sm-8">
-                        <div class="form-group">
-                            <label>QueueId: {{sourceJobQueue?.jobQueueId}}</label>
-                        </div>
-                        <div class="form-group">
-                            <label>R-Status: 
-                                <span *ngIf="sourceJobQueue?.jobStatus" class="badge"
-                                    [ngClass]="{
-                                        'badge-primary' : sourceJobQueue?.jobStatus === 'InFlight', 
-                                        'badge-info' : sourceJobQueue?.jobStatus === 'Queue',
-                                        'badge-start' : sourceJobQueue?.jobStatus === 'Start',
-                                        'badge-warning' : sourceJobQueue?.jobStatus === 'Running',
-                                        'badge-danger' :  sourceJobQueue?.jobStatus === 'Failed',
-                                        'badge-success' : sourceJobQueue?.jobStatus === 'Completed',
-                                        'badge-interrupt' : sourceJob.jobRunningStatus === 'Interrupt'
-                                    }">
-                                    {{ sourceJobQueue?.jobStatus }}
-                                </span>
-                            </label>
-                        </div>
-                        <div class="form-group">
-                            <label>QMessage: {{sourceJobQueue?.jobStatusMessage}}</label>
-                        </div>
-                    </div>
-                    <div class="col-sm-4">
-                        <div class="form-group">
-                            <label style="color: rgb(139, 34, 34);">Skip: {{sourceJobQueue?.skipTime | date:'yyyy-MM-dd HH:mm:ss'}}</label>
-                        </div>
-                        <div class="form-group">
-                            <label style="color: rgb(139, 34, 34);">StartTime: {{sourceJobQueue?.startTime | date:'yyyy-MM-dd HH:mm:ss'}}</label>
-                        </div>
-                        <div class="form-group">
-                            <label style="color: rgb(139, 34, 34);">Endtime: {{sourceJobQueue?.endTime | date:'yyyy-MM-dd HH:mm:ss'}}</label>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-<div class="col-lg-4" *ngIf="auditLogs">
-    <div class="form-group">
-        <label for="searchAuditLogsForm" *ngIf="auditLogs">Total Logs : ({{auditLogs.length}})</label>
-        <input type="text" id="searchAuditLogsForm" class="form-control input-sm"
-            placeholder="Search" [(ngModel)]="searchAuditLogsForm"/>
-    </div>
-</div>
-<div class="row" style="margin-right: 0px;margin-left: 0px;">
+<!-- breadcrumb -->
+<nav class="breadcrumb-bar">
+    <a routerLink="/home">Home</a>
+    <span class="crumb-sep">/</span>
+    <a routerLink="/jobList">Job List</a>
+    <span class="crumb-sep">/</span>
+    <a [href]="" (click)="backClicked()">Job History</a>
+    <span class="crumb-sep">/</span>
+    <span class="crumb-current">Job Logs</span>
+</nav>
+
+<div class="row" *ngIf="sourceJob || sourceJobQueue">
     <div class="col-lg-12">
-        <table class="table table-bordered table-sm table-responsive table-striped" style="font-size: 10px;">
+        <div class="card-panel">
+            <h4 class="card-panel-title panel-banner has-action">
+                <span>Job &amp; Queue Detail</span>
+                <a routerLink="/home" class="banner-link" title="Go to Home">
+                    <span class="glyphicon glyphicon-home"></span> Home
+                </a>
+            </h4>
+
+            <!-- job -->
+            <div class="entity-head" *ngIf="sourceJob">
+                <h5 class="entity-title">Job: {{sourceJob?.jobId}} - {{sourceJob?.jobName}}</h5>
+                <span class="flag">Execution
+                    <span class="pill" [ngClass]="sourceJob?.execution == 'Manual' ? 'pill-success' : 'pill-warning'">{{sourceJob?.execution}}</span>
+                </span>
+                <span class="flag" *ngIf="sourceJob?.jobRunningStatus">Job Status
+                    <span class="pill" [ngClass]="'status-' + sourceJob?.jobRunningStatus">{{ sourceJob?.jobRunningStatus }}</span>
+                </span>
+            </div>
+            <div class="meta-grid" *ngIf="sourceJob">
+                <div class="detail-item">
+                    <span class="detail-label">Task</span>
+                    <span class="detail-value">{{sourceJob?.taskDetail?.taskDetailId}} - {{sourceJob?.taskDetail?.taskName}}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Last Run</span>
+                    <span class="detail-value">{{sourceJob?.lastJobRun | date:'yyyy-MM-dd HH:mm:ss'}}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Next Flight</span>
+                    <span class="detail-value">{{sourceJob?.scheduler?.recurrenceTime | date:'yyyy-MM-dd HH:mm:ss'}}</span>
+                </div>
+            </div>
+
+            <!-- queue -->
+            <div class="card-divider entity-head" *ngIf="sourceJobQueue">
+                <h5 class="entity-title">Queue: {{sourceJobQueue?.jobQueueId}}</h5>
+                <span class="flag" *ngIf="sourceJobQueue?.jobStatus">Queue Status
+                    <span class="pill" [ngClass]="'status-' + sourceJobQueue?.jobStatus">{{ sourceJobQueue?.jobStatus }}</span>
+                </span>
+            </div>
+            <div class="meta-grid" *ngIf="sourceJobQueue">
+                <div class="detail-item">
+                    <span class="detail-label">Start Time</span>
+                    <span class="detail-value">{{sourceJobQueue?.startTime | date:'yyyy-MM-dd HH:mm:ss'}}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">End Time</span>
+                    <span class="detail-value">{{sourceJobQueue?.endTime | date:'yyyy-MM-dd HH:mm:ss'}}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Skip Time</span>
+                    <span class="detail-value">{{sourceJobQueue?.skipTime | date:'yyyy-MM-dd HH:mm:ss'}}</span>
+                </div>
+            </div>
+            <div class="detail-item" *ngIf="sourceJobQueue?.jobStatusMessage" style="margin-bottom: 0;">
+                <span class="detail-label">Message</span>
+                <pre class="code-box">{{sourceJobQueue?.jobStatusMessage}}</pre>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- audit logs -->
+<div class="card-panel" *ngIf="auditLogs">
+    <div class="toolbar">
+        <div class="form-group" style="margin-bottom: 0;">
+            <label for="searchAuditLogsForm" class="control-label">Total Logs ({{auditLogs.length}})</label>
+            <input type="text" id="searchAuditLogsForm" class="form-control" style="width: 280px;"
+                placeholder="Search" [(ngModel)]="searchAuditLogsForm"/>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table id="lookup" class="table table-striped table-bordered table-hover table-modern" style="font-size: 12px;">
             <thead>
                 <tr>
                     <th style="width: 1px;">No#</th>
-                    <th>Date</th>
-                    <th>Message Detail</th>
+                    <th style="width: 160px;">Date</th>
+                    <th>Message</th>
+                    <th class="text-center" style="width: 70px;">Action</th>
                 </tr>
             </thead>
             <tbody>
-                <tr *ngFor="let audit of auditLogs | searchFilter: searchAuditLogsForm;  let i = index">
+                <tr *ngFor="let audit of auditLogs | searchFilter: searchAuditLogsForm; let i = index">
                     <td>{{i+1}}</td>
-                    <th>{{audit?.dateCreated}}</th>
-                    <td [innerHTML]="audit.logsDetail"></td>
+                    <td style="white-space: nowrap;">{{audit?.dateCreated | date:'yyyy-MM-dd HH:mm:ss'}}</td>
+                    <td><div class="cell-message cell-message-wide" [innerHTML]="audit.logsDetail"></div></td>
+                    <td class="text-center">
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button type="button" class="btn btn-default btn-icon ic-view"
+                                data-toggle="modal" data-target="#logMessageModal"
+                                (click)="showLogDetail(audit)" title="View Message">
+                                <span class="glyphicon glyphicon-eye-open"></span>
+                            </button>
+                        </div>
+                    </td>
                 </tr>
             </tbody>
         </table>
+    </div>
+</div>
+
+<!-- Message modal -->
+<div class="modal fade" id="logMessageModal" role="dialog">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title">Message</h4>
+            </div>
+            <div class="modal-body">
+                <div class="code-box" style="max-height: 420px;" [innerHTML]="selectedLog"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+            </div>
+        </div>
     </div>
 </div>
