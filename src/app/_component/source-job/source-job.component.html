@@ -3,6 +3,8 @@
     <a routerLink="/home">Home</a>
     <span class="crumb-sep">/</span>
     <span class="crumb-current">Job List</span>
+    <span class="breadcrumb-spacer"></span>
+    <div class="selected-count">Selected: {{selectedSourceJobIds.size}}</div>
 </nav>
 
 <div class="toolbar">
@@ -23,6 +25,12 @@
     <button type="button" routerLink="/addJob" class="btn btn-sm btn-teal">
         <span class="glyphicon glyphicon-plus"></span> Add Job
     </button>
+    <button type="button" class="btn btn-sm btn-default" [disabled]="selectedSourceJobIds.size === 0" (click)="runSelectedSourceJobs()">
+        <span class="glyphicon glyphicon-play"></span> Run Selected
+    </button>
+    <button type="button" class="btn btn-sm btn-default" [disabled]="selectedSourceJobIds.size === 0" (click)="deleteSelectedSourceJobs()">
+        <span class="glyphicon glyphicon-trash"></span> Delete Selected
+    </button>
     <button type="button" id="download" routerLink="/jobList/jobBatchAction" class="btn btn-sm btn-default">
         <span class="glyphicon glyphicon-cog"></span> Batch Action
     </button>
@@ -36,6 +44,7 @@
     <table class="table table-bordered table-hover table-modern">
         <thead>
             <tr>
+                <th class="text-center"><input type="checkbox" [checked]="selectAllSourceJobs" (change)="toggleSelectAllSourceJobs($event.target.checked)" /></th>
                 <th>Job Name</th>
                 <th>Task</th>
                 <th>Execution</th>
@@ -51,7 +60,14 @@
             </tr>
         </thead>
         <tbody>
-            <tr *ngFor="let sourceJob of sourceJobDetails?.reverse() | searchFilter: searchSourceJobDetails; let i = index;">
+            <tr *ngFor="let sourceJob of sourceJobDetails?.reverse() | searchFilter: searchSourceJobDetails; let i = index;" [class.disabled-row]="sourceJob.jobStatus === 'Delete'">
+                <td class="text-center">
+                    <input type="checkbox"
+                        [checked]="selectedSourceJobIds.has(sourceJob.jobId)"
+                        [disabled]="sourceJob.jobStatus === 'Delete' || sourceJob.jobRunningStatus === 'Queue' || sourceJob.jobRunningStatus === 'Start' || sourceJob.jobRunningStatus === 'Running'"
+                        title="Cannot select jobs that are already queued, starting, or running"
+                        (change)="toggleSelectedSourceJob(sourceJob.jobId, $event.target.checked)" />
+                </td>
                 <td>
                     <a routerLink="/editJob/{{sourceJob.jobId}}">
                         {{sourceJob.jobId}}-{{sourceJob.jobName}}
@@ -102,6 +118,12 @@
                             title="Run Job">
                             <span class="glyphicon glyphicon-play-circle"></span>
                         </button>
+                        <button type="button" class="btn btn-default btn-icon ic-clone"
+                            [disabled]="sourceJob.jobStatus === 'Delete'"
+                            (click)="cloneSourceJob(sourceJob, i)"
+                            title="Clone Job">
+                            <span class="glyphicon glyphicon-duplicate"></span>
+                        </button>
                         <button type="button" class="btn btn-default btn-icon ic-skip"
                             [disabled]="sourceJob.jobRunningStatus === 'Queue' ||
                                 sourceJob.jobRunningStatus === 'Running' ||
@@ -113,6 +135,12 @@
                             title="Skip Next">
                             <span class="glyphicon glyphicon-step-forward"></span>
                         </button>
+                        <button type="button" class="btn btn-default btn-icon ic-history"
+                            [disabled]="sourceJob.tabActive === false"
+                            (click)="sourceJobHistoryByJobId(sourceJob.jobId)"
+                            title="History">
+                            <span class="glyphicon glyphicon-tasks"></span>
+                        </button>
                         <button type="button" class="btn btn-default btn-icon ic-delete"
                             [disabled]="sourceJob.jobStatus === 'Delete' ||
                                 sourceJob.jobRunningStatus === 'Start' ||
@@ -121,12 +149,6 @@
                             (click)="deleteSourceJob(sourceJob, i)"
                             title="Delete">
                             <span class="glyphicon glyphicon-trash"></span>
-                        </button>
-                        <button type="button" class="btn btn-default btn-icon ic-history"
-                            [disabled]="sourceJob.tabActive === false"
-                            (click)="sourceJobHistoryByJobId(sourceJob.jobId)"
-                            title="History">
-                            <span class="glyphicon glyphicon-tasks"></span>
                         </button>
                     </div>
                 </td>

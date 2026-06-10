@@ -9,7 +9,7 @@ module.exports = {
         path: path.resolve(__dirname, 'dist'),
         filename: '[name].[contenthash].js',
         chunkFilename: '[name].[contenthash].js',
-        publicPath: '/'
+        publicPath: '/scheduler/'
     },
     resolve: {
         extensions: ['.ts', '.js'],
@@ -46,12 +46,8 @@ module.exports = {
     plugins: [
         new HtmlWebpackPlugin({ template: './src/index.html' }),
 
-        // Copy static assets and ng2-toastr CSS to dist/ so they are served correctly
+        // Copy static assets to dist/ so they are served correctly
         new CopyWebpackPlugin([
-            {
-                from: path.resolve(__dirname, 'node_modules/ng2-toastr/bundles/ng2-toastr.min.css'),
-                to: 'ng2-toastr.min.css'
-            },
             {
                 from: path.resolve(__dirname, 'src/assets'),
                 to: 'assets'
@@ -80,6 +76,7 @@ module.exports = {
         runtimeChunk: true
     },
     devServer: {
+        publicPath: '/scheduler/',
         historyApiFallback: true
     }
 }

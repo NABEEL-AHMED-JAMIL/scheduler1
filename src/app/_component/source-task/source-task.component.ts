@@ -108,6 +108,50 @@ export class SourceTaskComponent implements OnInit {
     this.deleteSelectedIndex = selectedIndex;
   }
 
+  public cloneSourceTask(sourceTask: SourceTask, selectedIndex: any): void {
+    this.spinnerService.show();
+    this.sourceTaskService.fetchSourceTaskWithSourceTaskId(sourceTask.taskDetailId)
+      .pipe(first())
+      .subscribe((response) => {
+        if (response.status !== ApiCode.SUCCESS) {
+          this.spinnerService.hide();
+          this.alertService.showError(response.message, this.ERROR);
+          return;
+        }
+
+        const task = response.data;
+        const payload: any = {
+          taskName: task.taskName,
+          sourceTaskType: {
+            sourceTaskTypeId: task?.sourceTaskType?.sourceTaskTypeId
+          },
+          taskPayload: task.taskPayload,
+          taskStatus: task.taskStatus,
+          homePageId: task.homePageId,
+          pipelineId: task.pipelineId,
+          xmlTagsInfo: task.xmlTagsInfo
+        };
+
+        this.sourceTaskService.addSourceTask(payload)
+          .pipe(first())
+          .subscribe((addResponse) => {
+            this.spinnerService.hide();
+            if (addResponse.status === ApiCode.SUCCESS) {
+              this.alertService.showSuccess(addResponse.message, 'Clone Task');
+              this.listSourceTask(this.queryCriteria);
+              return;
+            }
+            this.alertService.showError(addResponse.message, this.ERROR);
+          }, (error) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error, this.ERROR);
+          });
+      }, (error) => {
+        this.spinnerService.hide();
+        this.alertService.showError(error, this.ERROR);
+      });
+  }
+
   public processDeleteSourceTask(): void {
     this.spinnerService.show();
     this.sourceTaskService
@@ -116,11 +160,8 @@ export class SourceTaskComponent implements OnInit {
     .subscribe((response) => {
       if(response.status === ApiCode.SUCCESS) {
         this.spinnerService.hide();
-        if (this.deleteViewSourceTask !== null) {
-          this.deleteViewSourceTask.taskStatus = 'Delete';
-          if (this.deleteSelectedIndex !== null) {
-            this.sourceTasks[this.deleteSelectedIndex] = this.deleteViewSourceTask;
-          }
+        if (this.deleteSelectedIndex !== null) {
+          this.sourceTasks.splice(this.deleteSelectedIndex, 1);
         }
         this.alertService.showSuccess(response.message, this.DELETE_SOURCE_TASK);
         this.closebutton.nativeElement.click();
