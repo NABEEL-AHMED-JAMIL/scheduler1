@@ -53,20 +53,20 @@
                 </div>
 
                 <div class="row">
-                    <div class="col-md-4" *ngIf="isEditMode">
-                        <div class="form-group">
-                            <label class="control-label" for="taskStatus">Task Status</label>
-                            <select class="form-control" formControlName="taskStatus">
-                                <option *ngFor="let sourceTask of sourceTaskStatus" [value]="sourceTask.value">{{sourceTask.key}}</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div [ngClass]="isEditMode ? 'col-md-8' : 'col-md-12' ">
+                    <div [ngClass]="isEditMode ? 'col-md-6' : 'col-md-12' ">
                         <div class="form-group">
                             <label class="control-label" for="pipelineId">Pipeline TaskId</label>
                             <select class="form-control" formControlName="pipelineId">
                                 <option value="" selected>Select Pipeline Id</option>
                                 <option *ngFor="let pipelineId of pipelineIdList" [value]="pipelineId.lookupId">{{pipelineId.lookupType}}</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-6" *ngIf="isEditMode">
+                        <div class="form-group">
+                            <label class="control-label" for="taskStatus">Task Status</label>
+                            <select class="form-control" formControlName="taskStatus">
+                                <option *ngFor="let sourceTask of sourceTaskStatus" [value]="sourceTask.value">{{sourceTask.key}}</option>
                             </select>
                         </div>
                     </div>

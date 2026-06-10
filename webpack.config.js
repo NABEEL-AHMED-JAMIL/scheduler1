@@ -1,9 +1,16 @@
-﻿const webpack = require('webpack');
+const webpack = require('webpack');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
+const CopyWebpackPlugin = require('copy-webpack-plugin');
 const path = require('path');
 
 module.exports = {
     entry: './src/main.ts',
+    output: {
+        path: path.resolve(__dirname, 'dist'),
+        filename: '[name].[contenthash].js',
+        chunkFilename: '[name].[contenthash].js',
+        publicPath: '/'
+    },
     resolve: {
         extensions: ['.ts', '.js'],
         alias: {
@@ -25,11 +32,11 @@ module.exports = {
                 use: ['style-loader', 'css-loader', 'less-loader']
             },
             {
+                // Removed postcss-loader — not in package.json
                 test: /\.css$/,
-                use: ['style-loader', 'css-loader', 'postcss-loader']
+                use: ['style-loader', 'css-loader']
             },
-
-            // workaround for warning: System.import() is deprecated and will be removed soon. Use import() instead.
+            // workaround for warning: System.import() is deprecated
             {
                 test: /[\/\\]@angular[\/\\].+\.js$/,
                 parser: { system: true }
@@ -38,8 +45,20 @@ module.exports = {
     },
     plugins: [
         new HtmlWebpackPlugin({ template: './src/index.html' }),
+
+        // Copy static assets and ng2-toastr CSS to dist/ so they are served correctly
+        new CopyWebpackPlugin([
+            {
+                from: path.resolve(__dirname, 'node_modules/ng2-toastr/bundles/ng2-toastr.min.css'),
+                to: 'ng2-toastr.min.css'
+            },
+            {
+                from: path.resolve(__dirname, 'src/assets'),
+                to: 'assets'
+            }
+        ]),
+
         new webpack.DefinePlugin({
-            // global app config object
             config: JSON.stringify({
                 sessionId: '0hw0dz34',
                 transactionId: '40ef-dd1d-bd9f-1d7f',
@@ -48,7 +67,7 @@ module.exports = {
             })
         }),
 
-        // workaround for warning: Critical dependency: the request of a dependency is an expression
+        // workaround for warning: Critical dependency
         new webpack.ContextReplacementPlugin(
             /\@angular(\\|\/)core(\\|\/)fesm5/,
             path.resolve(__dirname, 'src')

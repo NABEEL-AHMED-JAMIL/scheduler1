@@ -1,9 +1,18 @@
-version: '3.7'
-
 services:
 
-  angular:
-      build: .
-      container_name: scheduler1
-      ports:
-        - "8080:80"
+  angular-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    image: scheduler1-app
+    container_name: scheduler1-app
+    ports:
+      - "80:80"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

@@ -1,18 +1,49 @@
-# Step 1: Build Angular app
-FROM node:16 AS build
+# ─────────────────────────────────────────────
+# Stage 1: Build
+# Angular 8 + Webpack 4 — Node 14 Bullseye
+# ─────────────────────────────────────────────
+FROM node:14-bullseye-slim AS builder
+
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm install
+# Required for native module compilation
+RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
+
+COPY package.json package-lock.json ./
+
+# Install deps + copy-webpack-plugin v5 (compatible with Webpack 4)
+RUN npm install --legacy-peer-deps && \
+    npm install --legacy-peer-deps copy-webpack-plugin@5
 
 COPY . .
 
-# Important: use legacy provider for webpack build
-RUN node --openssl-legacy-provider ./node_modules/.bin/webpack --mode production
+# Remove any dist files copied from the host workspace to avoid stale bundles.
+RUN rm -rf dist
 
-# Step 2: Serve with Nginx
-FROM nginx:alpine
-COPY --from=build /app/dist/scheduler1 /usr/share/nginx/html
+# Patch sockjs-client broken unicode regex (if present)
+RUN node patch.js || true
 
-EXPOSE 4200
+# Build
+RUN ./node_modules/.bin/webpack --mode production
+
+# Post-build: fix regex character classes in emitted bundles to avoid
+# 'Range out of order in character class' due to literal Unicode characters
+RUN node patch_dist.js || true
+
+# ─────────────────────────────────────────────
+# Stage 2: Serve with Nginx
+# ─────────────────────────────────────────────
+FROM nginx:1.27-alpine AS production
+
+RUN rm -rf /usr/share/nginx/html/*
+
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget -qO- http://localhost/health || exit 1
+
 CMD ["nginx", "-g", "daemon off;"]

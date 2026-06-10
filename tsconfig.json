@@ -1,4 +1,4 @@
-﻿{
+{
     "compilerOptions": {
         "emitDecoratorMetadata": true,
         "experimentalDecorators": true,
@@ -9,5 +9,6 @@
                 "app/*"
             ]
         },
+        "skipLibCheck": true
     }
 }
