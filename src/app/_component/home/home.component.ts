@@ -22,6 +22,8 @@ import {
 })
 export class HomeComponent implements OnInit {
 
+  private readonly chicagoTimeZone = 'America/Chicago';
+
   public ERROR = 'Error';
   // search detail
   public searchSourceJobDetails: any = '';
@@ -87,9 +89,9 @@ export class HomeComponent implements OnInit {
 
   ngOnInit() {
     let todayDate = new Date();
-    this.today_date = this.datepipe.transform(todayDate, 'yyyy-MM-dd');
+    this.today_date = this.datepipe.transform(todayDate, 'yyyy-MM-dd', this.chicagoTimeZone) || '';
     todayDate.setDate(todayDate.getDate() - 6);
-    this.last_7th_date = this.datepipe.transform(todayDate, 'yyyy-MM-dd');
+    this.last_7th_date = this.datepipe.transform(todayDate, 'yyyy-MM-dd', this.chicagoTimeZone) || '';
     this.jobStatusStatistics();
     this.jobRunningStatistics();
     this.weeklyRunningJobStatistics();
