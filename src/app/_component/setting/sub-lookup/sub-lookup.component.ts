@@ -4,7 +4,7 @@ import { SpinnerService } from '@/_helpers';
 import { ApiCode, Action } from '@/_models';
 import { first } from 'rxjs/operators';
 import { LookupData } from '@/_models/index';
-import { Router, ActivatedRoute } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 
 @Component({
     selector: 'sub-lookup',
@@ -16,14 +16,14 @@ export class SubLookupComponent implements OnInit {
     public searchLookupDataForm: any = '';
     // source lookup
 	public lookupId: any;
-	public lookupAction: Action;
-	public lookupData: LookupData;
-	public parentLookupDate: LookupData;
+	public lookupAction: Action | null = null;
+	public lookupData: LookupData | null = null;
+	public parentLookupDate: LookupData | null = null;
 	public lookupDatas: LookupData[] = [];
 	@Output()
 	public senderEvent: EventEmitter<Action> = new EventEmitter();
 
-	constructor(private router: Router,
+	constructor(
 		private activatedRoute: ActivatedRoute,
 		private alertService: AlertService,
 		private spinnerService: SpinnerService,
@@ -45,7 +45,9 @@ export class SubLookupComponent implements OnInit {
 
 	public editLookupData(lookupData: LookupData): void {
 		this.lookupAction = Action.EDIT;
-		lookupData.parent = this.parentLookupDate;
+		if (this.parentLookupDate) {
+			lookupData.parent = this.parentLookupDate;
+		}
 		this.lookupData = lookupData;
 	}
 
@@ -87,7 +89,7 @@ export class SubLookupComponent implements OnInit {
 		});
     }
 
-	public resetEvent(action:Action): void {
+	public resetEvent(action: Action): void {
 		this.lookupAction = null;
 		this.lookupData = null;
 		if (action === Action.ADD || action === Action.EDIT) {

@@ -1,5 +1,5 @@
 <!-- add sourceTasktype -->
-<div class="modal fade" id="sourceTaskTaype" role="dialog">
+<div class="modal fade" id="sourceTaskType" role="dialog">
     <div class="modal-dialog">
       <!-- Modal content-->
       <div class="modal-content" style="border: none">
@@ -21,15 +21,31 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="queueTopicPartition">TopicPartition</label>
-                    <input type="text" formControlName="queueTopicPartition" class="form-control input-sm"
-                        [ngClass]="{ 'is-invalid': sourceTaskTaype.queueTopicPartition.errors }" />
-                    <div *ngIf="submitted && sourceTaskTaype.queueTopicPartition.errors" class="invalid-feedback">
-                        <div *ngIf="sourceTaskTaype.queueTopicPartition.errors.required" style="color: red;">
-                            TopicPartition is required
+                    <label for="topicName">Topic Name</label>
+                    <input type="text" formControlName="topicName" class="form-control input-sm"
+                        placeholder="Enter topic name only"
+                        [ngClass]="{ 'is-invalid': sourceTaskTaype.topicName.errors }" />
+                    <div *ngIf="submitted && sourceTaskTaype.topicName.errors" class="invalid-feedback">
+                        <div *ngIf="sourceTaskTaype.topicName.errors.required" style="color: red;">
+                            Topic Name is required
                         </div>
                     </div>
                 </div>
+                <div class="form-group">
+                    <label for="partitions">Partitions</label>
+                    <input type="text" formControlName="partitions" class="form-control input-sm"
+                        placeholder="Enter partition count or start"
+                        [ngClass]="{ 'is-invalid': sourceTaskTaype.partitions.errors }" />
+                    <div *ngIf="submitted && sourceTaskTaype.partitions.errors" class="invalid-feedback">
+                        <div *ngIf="sourceTaskTaype.partitions.errors.required" style="color: red;">
+                            Partitions is required
+                        </div>
+                    </div>
+                    <small class="form-text text-muted">
+                        Final value will be generated as: <code>topic=&lt;topic-name&gt;&amp;partitions=[&lt;value&gt;]</code>
+                    </small>
+                </div>
+                <input type="hidden" formControlName="queueTopicPartition" />
                 <div class="form-group" *ngIf="isEditMode">
                     <label for="taskStatus">TaskStatus</label>
                     <select class="form-control input-sm" formControlName="status" >

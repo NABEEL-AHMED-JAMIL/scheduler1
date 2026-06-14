@@ -3,11 +3,18 @@ import { ApiCode, NameValue } from '../../_models/index';
 import { Router } from '@angular/router';
 import { EChartOption } from 'echarts';
 import { first } from 'rxjs/operators';
-import { AlertService, HomeService } from '@/_services';
 import { SpinnerService } from '@/_helpers';
 import { Subscription } from 'rxjs';
 import { DatePipe } from '@angular/common'
+import {
+  AlertService,
+  HomeService
+} from '@/_services';
 
+
+/**
+ * @author Nabeel Ahmed
+ */
 @Component({
   selector: 'home',
   templateUrl: 'home.component.html',
@@ -15,9 +22,11 @@ import { DatePipe } from '@angular/common'
 })
 export class HomeComponent implements OnInit {
 
+  private readonly chicagoTimeZone = 'America/Chicago';
+
   public ERROR = 'Error';
   // search detail
-  public searchSourceJobDetails: any = ''; 
+  public searchSourceJobDetails: any = '';
   public sourceJobWeeklyRunningStatisticsDimensionData: any;
   public viewRunningJobDate: any;
   public jobStatusData: NameValue[] = [
@@ -37,38 +46,38 @@ export class HomeComponent implements OnInit {
   public jobRunningData: NameValue[] = [
     {
       value: 0,
-      name: 'Completed'
+      name: 'Queue'
+    },
+    {
+      value: 0,
+      name: 'Start'
     },
     {
       value: 0,
       name: 'Running'
-    },
-    {
-      value: 0,
-      name: 'Failed'
     }
   ];
-  private weeklyRunningJobData: NameValue[];
+  private weeklyRunningJobData: NameValue[] = [];
   // hours
   private hours: string[] = [
     '12AM', '1AM', '2AM', '3AM', '4AM', '5AM',
-    '6AM', '7AM', '8AM', '9AM','10AM','11AM',
+    '6AM', '7AM', '8AM', '9AM', '10AM', '11AM',
     '12PM', '1PM', '2PM', '3PM', '4PM', '5PM',
     '6PM', '7PM', '8PM', '9PM', '10PM', '11PM'
   ];
 
   // data pattern -> day|hr|total count
   private heatMapData: any = [[0, 0, 0]]
-  .map(function (item) {
-    // day|hr|total count
-    return [item[1], item[0], item[2] || '-'];
-  });
+    .map(function (item) {
+      // day|hr|total count
+      return [item[1], item[0], item[2] || '-'];
+    });
 
   public subscription!: Subscription;
-  public sourceJobStatusStatistics: EChartOption;
-  public sourceJobRunningStatistics: EChartOption;
-  public sourceJobWeeklyRunningStatistics: EChartOption;
-  public sourceJobWeeklyHrsRunningStatistics: EChartOption;
+  public sourceJobStatusStatistics!: EChartOption;
+  public sourceJobRunningStatistics!: EChartOption;
+  public sourceJobWeeklyRunningStatistics!: EChartOption;
+  public sourceJobWeeklyHrsRunningStatistics!: EChartOption;
   public today_date: any;
   public last_7th_date: any;
 
@@ -80,9 +89,9 @@ export class HomeComponent implements OnInit {
 
   ngOnInit() {
     let todayDate = new Date();
-    this.today_date = this.datepipe.transform(todayDate, 'yyyy-MM-dd');
+    this.today_date = this.datepipe.transform(todayDate, 'yyyy-MM-dd', this.chicagoTimeZone) || '';
     todayDate.setDate(todayDate.getDate() - 6);
-    this.last_7th_date = this.datepipe.transform(todayDate, 'yyyy-MM-dd');
+    this.last_7th_date = this.datepipe.transform(todayDate, 'yyyy-MM-dd', this.chicagoTimeZone) || '';
     this.jobStatusStatistics();
     this.jobRunningStatistics();
     this.weeklyRunningJobStatistics();
@@ -93,7 +102,7 @@ export class HomeComponent implements OnInit {
     this.homeService.jobStatusStatistics()
       .pipe(first())
       .subscribe((response) => {
-        if(response.status === ApiCode.SUCCESS) {
+        if (response.status === ApiCode.SUCCESS) {
           this.spinnerService.hide();
           this.jobStatusData = response.data;
           this.drawJobStatusStatistics(this.jobStatusData);
@@ -101,25 +110,38 @@ export class HomeComponent implements OnInit {
           this.drawJobStatusStatistics(this.jobStatusData);
           this.spinnerService.hide();
         }
-    }, (error) => {
-      this.alertService.showError(error, this.ERROR);
-      this.spinnerService.hide();
-    });
+      }, (error) => {
+        this.alertService.showError(error, this.ERROR);
+        this.spinnerService.hide();
+      });
   }
 
   public drawJobStatusStatistics(dataPaload: any): void {
+    // Map colors based on status name for consistent coloring
+    const colorMap = {
+      'Active': '#27ae60',      // Green  (matches pill-success)
+      'Inactive': '#f39c12',    // Amber  (matches pill-warning)
+      'Delete': '#e74c3c'       // Red    (matches pill-danger)
+    };
+    
+    const itemStyle = {
+      color: (params: any) => {
+        return colorMap[params.name as keyof typeof colorMap] || '#999';
+      }
+    };
+    
     this.sourceJobStatusStatistics = {
       toolbox: {
         top: '7px',
         feature: {
           myRefresh: {
-              show: false,
-              title: 'Refresh',
-              top: '7px',
-              icon: 'image://https://www.svgrepo.com/show/199951/refresh.svg',
-              onclick: () => {
-                this.jobStatusStatistics();
-              }
+            show: false,
+            title: 'Refresh',
+            top: '7px',
+            icon: 'image://https://www.svgrepo.com/show/199951/refresh.svg',
+            onclick: () => {
+              this.jobStatusStatistics();
+            }
           }
         }
       },
@@ -160,7 +182,12 @@ export class HomeComponent implements OnInit {
           labelLine: {
             show: false
           },
-          data: dataPaload
+          data: dataPaload.map((item: any) => ({
+            ...item,
+            itemStyle: {
+              color: colorMap[item.name as keyof typeof colorMap] || '#999'
+            }
+          }))
         }
       ]
     }
@@ -170,7 +197,7 @@ export class HomeComponent implements OnInit {
     this.homeService.jobRunningStatistics()
       .pipe(first())
       .subscribe((response) => {
-        if(response.status === ApiCode.SUCCESS) {
+        if (response.status === ApiCode.SUCCESS) {
           this.spinnerService.hide();
           this.jobRunningData = response.data;
           this.drawJobRunningStatistics(this.jobRunningData);
@@ -178,10 +205,10 @@ export class HomeComponent implements OnInit {
           this.drawJobRunningStatistics(this.jobRunningData);
           this.spinnerService.hide();
         }
-    }, (error) => {
-      this.alertService.showError(error, this.ERROR);
-      this.spinnerService.hide();
-    });
+      }, (error) => {
+        this.alertService.showError(error, this.ERROR);
+        this.spinnerService.hide();
+      });
   }
 
   public drawJobRunningStatistics(dataPaload: any): void {
@@ -190,13 +217,13 @@ export class HomeComponent implements OnInit {
         top: '7px',
         feature: {
           myRefresh: {
-              show: false,
-              title: 'Refresh',
-              top: '7px',
-              icon: 'image://https://www.svgrepo.com/show/199951/refresh.svg',
-              onclick: () => {
-                this.jobRunningStatistics();
-              }
+            show: false,
+            title: 'Refresh',
+            top: '7px',
+            icon: 'image://https://www.svgrepo.com/show/199951/refresh.svg',
+            onclick: () => {
+              this.jobRunningStatistics();
+            }
           }
         }
       },
@@ -212,12 +239,12 @@ export class HomeComponent implements OnInit {
         left: 'center',
         bottom: '2%'
       },
+      color: ['#27ae60', '#f39c12', '#e74c3c'],
       series: [
         {
           name: 'Job Statistics',
           type: 'pie',
           radius: ['0%', '60%'],
-          // color: ['#00b04f', '#ff0000', '#ffbf00'],
           avoidLabelOverlap: false,
           itemStyle: {
             borderRadius: 10,
@@ -247,38 +274,24 @@ export class HomeComponent implements OnInit {
   public weeklyRunningJobStatistics(): void {
     //this.spinnerService.show();
     this.homeService.weeklyRunningJobStatistics(this.last_7th_date, this.today_date)
-    .pipe(first())
-    .subscribe((response) => {
-      if(response.status === ApiCode.SUCCESS) {
+      .pipe(first())
+      .subscribe((response) => {
+        if (response.status === ApiCode.SUCCESS) {
+          this.spinnerService.hide();
+          this.weeklyRunningJobData = response.data;
+            const dayOrder = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+            const dayIndex = dayOrder.map(day =>
+            this.weeklyRunningJobData.find((element) => element.name === day)?.value || 0
+            );
+          this.drawSourceJobWeeklyRunningStatistics(dayIndex);
+        } else {
+          this.drawSourceJobWeeklyRunningStatistics([0, 0, 0, 0, 0, 0, 0]);
+          this.spinnerService.hide();
+        }
+      }, (error) => {
+        this.alertService.showError(error, this.ERROR);
         this.spinnerService.hide();
-        this.weeklyRunningJobData = response.data;
-        let dayIndex = [0,0,0,0,0,0,0];
-        this.weeklyRunningJobData.forEach( (element) => {
-          if (element.name === 'Mon') {
-            dayIndex[0] = element.value;
-          } else if (element.name === 'Tue'){
-            dayIndex[1] = element.value;
-          } else if (element.name === 'Wed'){
-            dayIndex[2] = element.value;
-          } else if (element.name === 'Thu'){
-            dayIndex[3] = element.value;
-          } else if (element.name === 'Fri'){
-            dayIndex[4] = element.value;
-          } else if (element.name === 'Sat'){
-            dayIndex[5] = element.value;
-          } else if (element.name === 'Sun'){
-            dayIndex[6] = element.value;            
-          }
-        });
-        this.drawSourceJobWeeklyRunningStatistics(dayIndex);
-      } else {
-        this.drawSourceJobWeeklyRunningStatistics([0,0,0,0,0,0,0]);
-        this.spinnerService.hide();
-      }
-    }, (error) => {
-    this.alertService.showError(error, this.ERROR);
-    this.spinnerService.hide();
-    });
+      });
   }
 
   public drawSourceJobWeeklyRunningStatistics(dataPaload: any): void {
@@ -287,13 +300,13 @@ export class HomeComponent implements OnInit {
         top: '7px',
         feature: {
           myRefresh: {
-              show: false,
-              title: 'Refresh',
-              top: '7px',
-              icon: 'image://https://www.svgrepo.com/show/199951/refresh.svg',
-              onclick: () => {
-                this.weeklyRunningJobStatistics();
-              }
+            show: false,
+            title: 'Refresh',
+            top: '7px',
+            icon: 'image://https://www.svgrepo.com/show/199951/refresh.svg',
+            onclick: () => {
+              this.weeklyRunningJobStatistics();
+            }
           }
         }
       },
@@ -311,6 +324,7 @@ export class HomeComponent implements OnInit {
         bottom: '3%',
         containLabel: true
       },
+      color: ['#4f46e5'],
       xAxis: [
         {
           type: 'category',
@@ -335,24 +349,24 @@ export class HomeComponent implements OnInit {
       ]
     };
   }
-  
+
   public weeklyHrsRunningJobStatistics(): void {
     this.homeService.weeklyHrsRunningJobStatistics(this.last_7th_date, this.today_date)
       .pipe(first())
       .subscribe((response) => {
-        if(response.status === ApiCode.SUCCESS) {
+        if (response.status === ApiCode.SUCCESS) {
           this.spinnerService.hide();
           this.heatMapData = response.data;
           this.drawWeeklyHrsRunningJobStatistics(
             this.heatMapData.map(function (item: any) {
               return [item.hr, item.dayCode, item.count || '-'];
-          }));
+            }));
           return;
         }
         this.alertService.showError(response.message, this.ERROR);
-    }, (error) => {
-      this.alertService.showError(error, this.ERROR);
-    });
+      }, (error) => {
+        this.alertService.showError(error, this.ERROR);
+      });
   }
 
   public drawWeeklyHrsRunningJobStatistics(dataPaload: any): void {
@@ -361,13 +375,13 @@ export class HomeComponent implements OnInit {
         top: '7px',
         feature: {
           myRefresh: {
-              show: true,
-              title: 'Refresh',
-              top: '7px',
-              icon: 'image://https://www.svgrepo.com/show/199951/refresh.svg',
-              onclick: () => {
-                this.weeklyHrsRunningJobStatistics();
-              }
+            show: true,
+            title: 'Refresh',
+            top: '7px',
+            icon: 'image://https://www.svgrepo.com/show/199951/refresh.svg',
+            onclick: () => {
+              this.weeklyHrsRunningJobStatistics();
+            }
           }
         }
       },
@@ -405,7 +419,7 @@ export class HomeComponent implements OnInit {
           orient: 'vertical',
           left: '97%',
           top: '40',
-          color: ['green', 'black' , '#8a6d3b', 'darkred'],
+          color: ['green', 'black', '#8a6d3b', 'darkred'],
         }
       ],
       series: [
@@ -427,63 +441,48 @@ export class HomeComponent implements OnInit {
     };
   }
 
-  public weeklyHrRunningStatisticsDimension(targetDate:any, targetHr: any): void {
+  public weeklyHrRunningStatisticsDimension(targetDate: any, targetHr: any): void {
     this.spinnerService.show();
     this.homeService.weeklyHrRunningStatisticsDimension(targetDate, targetHr)
       .pipe(first())
       .subscribe((response) => {
-        if(response.status === ApiCode.SUCCESS) {
+        if (response.status === ApiCode.SUCCESS) {
           this.sourceJobWeeklyRunningStatisticsDimensionData = response.data;
           this.spinnerService.hide();
         } else {
           this.alertService.showError(response.message, this.ERROR);
           this.spinnerService.hide();
         }
-    }, (error) => {
-      this.alertService.showError(error, this.ERROR);
-      this.spinnerService.hide();
-    });
-  }
-
-  public viewRunningJobDateByTargetClickJobStatistics(targetDate:any, targetHr: any): void {
-    this.spinnerService.show();
-    this.homeService.viewRunningJobDateByTargetClickJobStatistics(targetDate, targetHr)
-      .pipe(first())
-      .subscribe((response) => {
-        if(response.status === ApiCode.SUCCESS) {
-          this.viewRunningJobDate = response.data;
-          this.spinnerService.hide();
-        } else {
-          this.alertService.showError(response.message, this.ERROR);
-          this.spinnerService.hide();
-        }
-    }, (error) => {
-      this.alertService.showError(error, this.ERROR);
-      this.spinnerService.hide();
-    });
+      }, (error) => {
+        this.alertService.showError(error, this.ERROR);
+        this.spinnerService.hide();
+      });
   }
 
   private selectMap: any;
   public onChartEvent(event: any, type: string) {
     this.searchSourceJobDetails = '';
     // fine the data from the main data with the target event
-    this.selectMap = this.heatMapData.find(data=> { 
-      return (data.hr == event?.data[0] && data.dayCode == event?.data[1]
-        && data.count == event?.data[2]);
-      });
+    this.selectMap = this.heatMapData.find((data: any) => {
+      return (data.hr == event?.data[0] && data.dayCode == event?.data[1] && data.count == event?.data[2]);
+    });
     this.weeklyHrRunningStatisticsDimension(this.selectMap?.date, this.selectMap?.hr);
   }
 
-  public sourceJobCountAction(sourceJob: any, type: string): any {
+  public sourceJobCountAction(sourceJob: any, type: string, count: any): any {
+    if (!count || Number(count) === 0) {
+      this.alertService.showError('No ' + type + ' records available to view.', this.ERROR);
+      return;
+    }
     this.router.navigate(['jobList/jobHistory'],
-    { 
-      queryParams: {
-        jobId: sourceJob?.jobId,
-        jobStatus: type,
-        targetDate: this.selectMap?.date,
-        targetHr: this.selectMap?.hr
-      }
-    });
+      {
+        queryParams: {
+          jobId: sourceJob?.jobId,
+          jobStatus: type,
+          targetDate: this.selectMap?.date,
+          targetHr: this.selectMap?.hr
+        }
+      });
   }
 
 }

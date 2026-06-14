@@ -1,57 +1,72 @@
-﻿<!-- breadcrumb -->
-<ol class="breadcrumb">
-    <li><a routerLink="/home">Home</a></li>
-    <li><a routerLink="/setting">Setting</a></li>
-    <li class="active">Search Engine</li>
-</ol>
-<div class="row" style="margin-right: 0px;margin-left: 0px;">
-    <div class="col-lg-12">
-        <p style="color: red;">Plese enter the select statment</p>
-        <div class="row">
-            <form *ngIf="tableQueryForm" [formGroup]="tableQueryForm"
-                (ngSubmit)="dynamicQueryResponse()">
-                <div class="col-lg-12 form-group">
-                    <textarea class="form-control input-sm" rows="5" style="height: auto;"
-                        formControlName="query"
-                        placeholder="Enter Select Query For Result" required></textarea>
-                    <br>
-                    <button type="reset" class="btn btn-sm btn-default" (click)="tableQueryFormInit()"
-                        style="color: #345; background-color:#fff;border-color: black;float: left;">Clear</button>
-                    <button type="submit" class="btn btn-sm btn-danger" style="float: right;">Save</button>
-                    <br><br>
-                </div>
-            </form>
-            <div class="col-lg-8" *ngIf="jsonPayload">
-                <h4>Query Result</h4>
-            </div>
-            <div class="col-lg-4" *ngIf="jsonPayload">
-                <div class="form-group">
-                    <input type="text" id="searchDetails" class="form-control input-sm"
-                        placeholder="Search" [(ngModel)]="searchDetails"/>
-                </div>
-            </div>
+<!-- breadcrumb -->
+<nav class="breadcrumb-bar">
+    <a routerLink="/home">Home</a>
+    <span class="crumb-sep">/</span>
+    <span class="crumb-current">Q-Result</span>
+</nav>
+
+<!-- Query console -->
+<form *ngIf="tableQueryForm" [formGroup]="tableQueryForm" (ngSubmit)="dynamicQueryResponse()">
+    <div class="card-panel">
+        <h4 class="card-panel-title panel-banner">
+            <span class="glyphicon glyphicon-search"></span> Search Engine
+        </h4>
+
+        <div class="form-group" style="margin-bottom: 14px;">
+            <label class="control-label" for="query">SQL Query</label>
+            <textarea id="query" class="form-control code-input" rows="12"
+                formControlName="query"
+                placeholder="Enter a SELECT query to run, e.g.  SELECT * FROM source_job LIMIT 100"
+                required></textarea>
+            <span class="help-text">
+                <span class="glyphicon glyphicon-info-sign"></span>
+                Only SELECT statements are supported.
+            </span>
         </div>
-        <hr style="margin-top: 0px;border-top: 3px solid #f3565d;" *ngIf="jsonPayload">
-        <div class="card" *ngIf="jsonPayload">
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-lg-12">
-                        <table class="table-responsive table table-striped table-bordered table-sm"
-                            style="font-size: 12px;display: block;overflow-x: auto;white-space: nowrap;">
-                            <thead>
-                                <tr>
-                                    <th *ngFor = 'let key of jsonPayload.column'>{{key| uppercase}}</th>
-                                <tr>
-                            </thead>
-                            <tbody>
-                                <tr *ngFor = 'let item of jsonPayload.data | searchFilter: searchDetails;let i = index;'>
-                                    <td *ngFor = 'let key of jsonPayload.column'>{{item[key]}}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
+
+        <div class="toolbar" style="margin-bottom: 0;">
+            <span class="toolbar-spacer"></span>
+            <button type="reset" class="btn btn-sm btn-default" (click)="tableQueryFormInit()">
+                <span class="glyphicon glyphicon-erase"></span> Clear
+            </button>
+            <button type="submit" class="btn btn-sm btn-teal" [disabled]="tableQueryForm.invalid">
+                <span class="glyphicon glyphicon-play"></span> Run Query
+            </button>
         </div>
+    </div>
+</form>
+
+<!-- Result -->
+<div class="card-panel" *ngIf="jsonPayload">
+    <div class="toolbar">
+        <div class="form-group" style="margin-bottom: 0;">
+            <input type="text" id="searchDetails" class="form-control" style="width: 280px;"
+                placeholder="Search" [(ngModel)]="searchDetails"/>
+        </div>
+        <span class="toolbar-spacer"></span>
+        <label class="control-label" style="margin-bottom: 0;">
+            Query Result ({{ (jsonPayload.data || []).length }})
+        </label>
+    </div>
+
+    <div class="table-responsive scroll-table">
+        <table class="table table-striped table-bordered table-hover table-modern table-strong"
+            style="font-size: 12px; white-space: nowrap;">
+            <thead>
+                <tr>
+                    <th *ngFor="let key of jsonPayload.column">{{key | uppercase}}</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr *ngFor="let item of jsonPayload.data | searchFilter: searchDetails; let i = index;">
+                    <td *ngFor="let key of jsonPayload.column">
+                        <ng-container *ngIf="(item[key] === null || item[key] === undefined ? '' : item[key].toString()).length > 60; else plainCell">
+                            <div class="cell-message">{{item[key]}}</div>
+                        </ng-container>
+                        <ng-template #plainCell>{{item[key]}}</ng-template>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 </div>

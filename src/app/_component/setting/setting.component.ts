@@ -18,16 +18,17 @@ export class SettingComponent implements OnInit {
 	public ERROR: string = 'Error';
 	public submitted: boolean = false;
 	public searchSourceTaskTaype: any = '';
+	public searchLookupDataForm: any = '';
 	public APPSETTING_FETCH: string = 'AppSetting Fetch';
 	public DELETE_SOURCE_TASK_TYPE = "Source TaskType Delete";
 	// source tasktype
-	public sourceTaskTypeAction: Action;
-	public sourceTaskType: SourceTaskType;
+	public sourceTaskTypeAction: Action | null = null;
+	public sourceTaskType: SourceTaskType | null = null;
 	// source task type
-	public sourceTaskTaypes: SourceTaskType[] = [];
+	public sourceTaskTypes: SourceTaskType[] = [];
     // lookup
-	public lookupAction: Action;
-	public lookupData: LookupData;
+	public lookupAction: Action | null = null;
+	public lookupData: LookupData | null = null;
 	public lookupDatas: LookupData[] = [];
 	public deleteSourceTaskTypeId:any;
 	public deleteSelectedIndex:any;
@@ -51,7 +52,7 @@ export class SettingComponent implements OnInit {
 			.subscribe((response) => {
 				if(response.status === ApiCode.SUCCESS) {
 					this.spinnerService.hide();
-					this.sourceTaskTaypes = response.data.sourceTaskTaypes;
+					this.sourceTaskTypes = response.data.sourceTaskTypes;
 					this.lookupDatas = response.data.lookupDatas;
 				} else {
 					this.spinnerService.hide();
@@ -63,13 +64,13 @@ export class SettingComponent implements OnInit {
 			});
     }
 
-	public addSourceTaskTaype(): void {
+	public addSourceTaskType(): void {
 		this.sourceTaskTypeAction = Action.ADD;
 	}
 
-	public editSourceTaskTaype(sourceTaskTaype: SourceTaskType): void {
+	public editSourceTaskType(sourceTaskType: SourceTaskType): void {
 		this.sourceTaskTypeAction = Action.EDIT;
-		this.sourceTaskType = sourceTaskTaype;
+		this.sourceTaskType = sourceTaskType;
 	}
 
 	public addLookupDatas(): void {
@@ -123,9 +124,9 @@ export class SettingComponent implements OnInit {
 	}
 
 	public showUpdatedSourceTask(selectedIndex: any): void {
-		let selectedObject: SourceTaskType = this.sourceTaskTaypes[selectedIndex];
+		let selectedObject: SourceTaskType = this.sourceTaskTypes[selectedIndex];
 		selectedObject.status = 'Delete';
-		this.sourceTaskTaypes[selectedIndex] = selectedObject;
+		this.sourceTaskTypes[selectedIndex] = selectedObject;
 	}
 
 	public receiverEvent(action: Action): void {

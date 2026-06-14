@@ -1,12 +1,37 @@
 ﻿import { Component, OnInit } from '@angular/core';
-import { SpinnerService } from '@/_helpers';
-import { ActivatedRoute, ParamMap, Router } from '@angular/router'
+import {
+    ActivatedRoute,
+    ParamMap,
+    Router
+} from '@angular/router'
 import { first } from 'rxjs/operators';
-import { ApiCode, STATUS_LIST } from '@/_models';
-import { SourceTaskType, LookupData } from '@/_models/index';
-import { FormArray, FormBuilder, FormControl, FormGroup, Validators } from '@angular/forms';
-import { AlertService, SettingService, SourceTaskService, ConfigurationMakerService } from '@/_services';
+import { SpinnerService } from '@/_helpers';
+import {
+    ApiCode,
+    STATUS_LIST
+} from '@/_models';
+import {
+    SourceTaskType,
+    LookupData
+} from '@/_models/index';
+import {
+    FormArray,
+    FormBuilder,
+    FormControl,
+    FormGroup,
+    Validators
+} from '@angular/forms';
+import {
+    AlertService,
+    SettingService,
+    SourceTaskService,
+    ConfigurationMakerService
+} from '@/_services';
 
+
+/**
+ * @author Nabeel Ahmed
+ */
 @Component({
     selector: 'task',
     templateUrl: 'task.component.html',
@@ -24,7 +49,7 @@ export class TaskComponent implements OnInit {
     public sourceTaskForm: FormGroup;
     public currentTaskState = 'Add Task';
     public PIPELINE_IDS = 'PIPELINE_IDS';
-    public PIPLINE_HOME_PAGES = 'PIPLINE_HOME_PAGES';
+    public PIPELINE_HOME_PAGES = 'PIPELINE_HOME_PAGES';
     public pipelineIdList: any;
     public piplineHomePageList: any;
 
@@ -61,42 +86,45 @@ export class TaskComponent implements OnInit {
 				if(response.status === ApiCode.SUCCESS) {
 					this.spinnerService.hide();
                     // only the active task can be show
-					this.sourceTaskTypes = response.data.sourceTaskTaypes.filter(sourceTask => sourceTask.status == 'Active');
+					this.sourceTaskTypes = response.data.sourceTaskTypes.filter(sourceTask => sourceTask.status == 'Active');
                     // PIPELINE_IDS
-                    this.settingService.fetchSubLookupByParentId(
-                        response.data.lookupDatas.find(el => el.lookupType === this.PIPELINE_IDS).lookupId)
-                    .pipe(first())
-                    .subscribe((response) => {
-                        if(response.status === ApiCode.SUCCESS) {
+                    if (response.data.lookupDatas.find(el => el.lookupType === this.PIPELINE_IDS)) {
+                        this.settingService.fetchSubLookupByParentId(
+                            response.data.lookupDatas.find(el => el.lookupType === this.PIPELINE_IDS).lookupId)
+                        .pipe(first())
+                        .subscribe((response) => {
+                            if(response.status === ApiCode.SUCCESS) {
+                                this.spinnerService.hide();
+                                this.pipelineIdList = response.data.lookupDatas;
+                                console.log(this.pipelineIdList);
+                            } else {
+                                this.spinnerService.hide();
+                                this.alertService.showError(response.message, this.ERROR);
+                            }
+                        }, (error) => {
                             this.spinnerService.hide();
-                            this.pipelineIdList = response.data.lookupDatas;
-                            console.log(this.pipelineIdList);
-                        } else {
+                            this.alertService.showError(error, this.ERROR);
+                        });
+                    }
+                    // PIPELINE_HOME_PAGES
+                    if (response.data.lookupDatas.find(el => el.lookupType === this.PIPELINE_HOME_PAGES)) {
+                        this.settingService.fetchSubLookupByParentId(
+                            response.data.lookupDatas.find(el => el.lookupType === this.PIPELINE_HOME_PAGES).lookupId)
+                        .pipe(first())
+                        .subscribe((response) => {
+                            if(response.status === ApiCode.SUCCESS) {
+                                this.spinnerService.hide();
+                                this.piplineHomePageList = response.data.lookupDatas;
+                                console.log(this.piplineHomePageList);
+                            } else {
+                                this.spinnerService.hide();
+                                this.alertService.showError(response.message, this.ERROR);
+                            }
+                        }, (error) => {
                             this.spinnerService.hide();
-                            this.alertService.showError(response.message, this.ERROR);
-                        }
-                    }, (error) => {
-                        this.spinnerService.hide();
-                        this.alertService.showError(error, this.ERROR);
-                    });
-
-                    // PIPLINE_HOME_PAGES
-                    this.settingService.fetchSubLookupByParentId(
-                        response.data.lookupDatas.find(el => el.lookupType === this.PIPLINE_HOME_PAGES).lookupId)
-                    .pipe(first())
-                    .subscribe((response) => {
-                        if(response.status === ApiCode.SUCCESS) {
-                            this.spinnerService.hide();
-                            this.piplineHomePageList = response.data.lookupDatas;
-                            console.log(this.piplineHomePageList);
-                        } else {
-                            this.spinnerService.hide();
-                            this.alertService.showError(response.message, this.ERROR);
-                        }
-                    }, (error) => {
-                        this.spinnerService.hide();
-                        this.alertService.showError(error, this.ERROR);
-                    });
+                            this.alertService.showError(error, this.ERROR);
+                        });
+                    }
 				} else {
 					this.spinnerService.hide();
 					this.alertService.showError(response.message, this.ERROR);
@@ -141,20 +169,15 @@ export class TaskComponent implements OnInit {
 
     public addSourceTaskFormInit(): any {
 		this.spinnerService.show();
-		this.sourceTaskForm = this.formBuilder.group({
-			taskDetailId: [],
-			taskName: ['', Validators.required],
+        this.sourceTaskForm = this.formBuilder.group({
+            taskDetailId: [],
+            taskName: ['', Validators.required],
             sourceTaskTypeId: ['', Validators.required],
             taskPayload: ['', Validators.required],
             taskStatus: [],
             homePageId: [],
             pipelineId: [],
-            tagsInfo: this.formBuilder.array([
-                this.buildItem(),
-                this.buildItem(),
-                this.buildItem(),
-                this.buildItem(),
-            ]),
+            tagsInfo: this.formBuilder.array(Array(10).fill(null).map(() => this.buildItem())),
         });
 		this.spinnerService.hide();
 	}

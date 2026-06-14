@@ -1,82 +1,103 @@
-﻿﻿<ol class="breadcrumb">
-    <li><a routerLink="/home">Home</a></li>
-    <li class="active">Task List</li>
-</ol>
-<div class="row" style="margin-right: 0px;margin-left: 0px;">
-    <div class="col-lg-3">
-        <div class="form-group">
-            <label for="searchSourceTaskDetails">Search Source Task</label>
-            <input type="text" id="searchSourceTaskDetails"
-                class="form-control input-sm" placeholder="Search"
-                [(ngModel)]="searchSourceTaskDetails"/>
-        </div>
+﻿<!-- Breadcrumb -->
+<nav class="breadcrumb-bar">
+    <a routerLink="/home">Home</a>
+    <span class="crumb-sep">/</span>
+    <span class="crumb-current">Task List</span>
+</nav>
+
+<div class="toolbar">
+    <!-- Search Section -->
+    <div class="form-group" style="margin-bottom: 0;">
+        <label for="searchSourceTaskDetails" class="control-label">Total Source Task ({{sourceTasks.length}})</label>
+        <input type="text"
+            id="searchSourceTaskDetails"
+            class="form-control"
+            style="width: 280px;"
+            placeholder="Search"
+            [(ngModel)]="searchSourceTaskDetails"/>
     </div>
-    <div class="col-lg-9">
-        <button type="button" id="download" routerLink="/taskList/taskBatchAction"
-            class="btn btn-sm btn-default" style="margin-top: 25px;float: right;">
-            <span class="glyphicon glyphicon-cog"></span>
-            Batch Action
-        </button>
-        <button type="button" class="btn btn-sm btn-default" 
-            style="margin-top: 25px;float: right;margin-right: 5px;"
-            (click)="refreshSourceTask()">
-            <span id="loading" class="glyphicon glyphicon-refresh"></span>
-            Refresh
-        </button>
-    </div>
+
+    <span class="toolbar-spacer"></span>
+
+    <!-- Action Buttons -->
+    <button type="button" routerLink="/addTask" class="btn btn-sm btn-teal">
+        <span class="glyphicon glyphicon-plus"></span> Add Task
+    </button>
+    <button type="button" id="download" routerLink="/taskList/taskBatchAction" class="btn btn-sm btn-default">
+        <span class="glyphicon glyphicon-cog"></span> Batch Action
+    </button>
+    <button type="button" class="btn btn-sm btn-default" (click)="refreshSourceTask()">
+        <span id="loading" class="glyphicon glyphicon-refresh"></span> Refresh
+    </button>
 </div>
-<div style="padding-left: 15px;padding-right: 15px;">
-    <table class="table-responsive table table-striped table-bordered table-sm"
-        style="font-size: 12px;">
+
+<!-- Tasks Table -->
+<div class="table-responsive scroll-table">
+    <table class="table table-bordered table-hover table-modern">
         <thead>
             <tr>
-                <th style="width: 1px;"># No</th>
+                <th># No</th>
                 <th>Task Name</th>
                 <th>Source Type</th>
                 <th>HomePage</th>
                 <th>PipelineId</th>
                 <th>Link Jobs</th>
                 <th>Status</th>
-                <th>Action</th>
+                <th class="text-center">Action</th>
             </tr>
         </thead>
         <tbody>
-            <tr *ngFor="let sourceTask of sourceTasks | searchFilter: searchSourceTaskDetails; let i = index;" >
+            <tr *ngFor="let sourceTask of sourceTasks | searchFilter: searchSourceTaskDetails; let i = index;">
                 <td>{{sourceTask.taskDetailId}}</td>
                 <td>{{sourceTask.taskName}}</td>
-                <td *ngIf="sourceTask.sourceTaskType">
-                    <a (click)="viewSourceTaskType(sourceTask.sourceTaskType)"
-                        data-toggle="modal" data-target="#sourceTaskTaype">
-                        {{sourceTask.sourceTaskType.sourceTaskTypeId}}
-                    </a>
-                    [{{sourceTask.sourceTaskType.serviceName}}] [{{sourceTask.sourceTaskType.queueTopicPartition}}]
+                <td>
+                    <span *ngIf="sourceTask.sourceTaskType">
+                        <a (click)="viewSourceTaskType(sourceTask.sourceTaskType)"
+                            data-toggle="modal" data-target="#sourceTaskTaype">
+                            {{sourceTask.sourceTaskType.sourceTaskTypeId}}
+                        </a>
+                        <span>[{{sourceTask.sourceTaskType.serviceName}}] [{{sourceTask.sourceTaskType.queueTopicPartition}}]</span>
+                    </span>
                 </td>
                 <td>{{sourceTask.homePageId}}</td>
                 <td>{{sourceTask.pipelineId}}</td>
-                <td style="text-align: center;">
-                    <a routerLink="" style="pointer-events: none">{{sourceTask.totalLinksJobs}}</a>
+                <td class="text-center">
+                    <span>{{sourceTask.totalLinksJobs}}</span>
                 </td>
-                <td>
-                    <span class="badge" 
+                <td class="text-center">
+                    <span class="pill"
                         [ngClass]="{
-                            'badge-danger': sourceTask.taskStatus === 'Delete', 
-                            'badge-warning' : sourceTask.taskStatus === 'Inactive',
-                            'badge-success' : sourceTask.taskStatus === 'Active'
+                            'pill-danger': sourceTask.taskStatus === 'Delete',
+                            'pill-warning': sourceTask.taskStatus === 'Inactive',
+                            'pill-success': sourceTask.taskStatus === 'Active'
                         }">
                         {{sourceTask.taskStatus}}
                     </span>
                 </td>
-                <td style="text-align: center;">
-                    <div class="btn-group btn-group-xs" role="group" style="text-align: center">
-                        <button type="button" class="btn btn-default" [routerLink]="['/editTask', sourceTask.taskDetailId]">
-                            <span class="glyphicon glyphicon-edit" style="color:blue"></span>
+                <td class="text-center">
+                    <div class="btn-group btn-group-sm">
+                        <button type="button" class="btn btn-default btn-icon ic-edit"
+                            [routerLink]="['/editTask', sourceTask.taskDetailId]"
+                            title="Edit">
+                            <span class="glyphicon glyphicon-pencil"></span>
                         </button>
-                        <button type="button" class="btn btn-default" (click)="downloadSourceTask(sourceTask)">
-                            <span class="glyphicon glyphicon-download" style="color:brown"></span>
+                        <button type="button" class="btn btn-default btn-icon ic-clone"
+                            [disabled]="sourceTask.taskStatus === 'Delete'"
+                            (click)="cloneSourceTask(sourceTask, i)"
+                            title="Clone">
+                            <span class="glyphicon glyphicon-duplicate"></span>
                         </button>
-                        <button type="button" class="btn btn-default" [disabled]="sourceTask.taskStatus === 'Delete'"
-                            data-toggle="modal" data-target="#deleteTask" (click)="deleteSourceTask(sourceTask, i)">
-                            <span class="glyphicon glyphicon-trash" style="color: black;"></span>
+                        <button type="button" class="btn btn-default btn-icon ic-download"
+                            (click)="downloadSourceTask(sourceTask)"
+                            title="Download">
+                            <span class="glyphicon glyphicon-download-alt"></span>
+                        </button>
+                        <button type="button" class="btn btn-default btn-icon ic-delete"
+                            [disabled]="sourceTask.taskStatus === 'Delete'"
+                            data-toggle="modal" data-target="#deleteTask"
+                            (click)="deleteSourceTask(sourceTask, i)"
+                            title="Delete">
+                            <span class="glyphicon glyphicon-trash"></span>
                         </button>
                     </div>
                 </td>
@@ -84,6 +105,7 @@
         </tbody>
     </table>
 </div>
+
 <div class="view-side-form">
     <router-outlet></router-outlet>
 </div>
@@ -100,11 +122,11 @@
             <div class="modal-body">
                 <p>Are you sure to delete the source task?
                     <br>On press 'Yes' all the source job will delete state and will not run
-                </p> 
+                </p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-danger" id="closeModal" (click)="processDeleteSourceTask()">Yes</button>
-            </div> 
+            </div>
         </div>
     </div>
 </div>

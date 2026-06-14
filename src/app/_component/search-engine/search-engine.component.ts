@@ -1,9 +1,10 @@
 ﻿import { Component, OnInit } from '@angular/core';
-import { FormBuilder, FormControl, FormGroup, Validators } from '@angular/forms';
+import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { AlertService, SettingService } from '@/_services';
 import { first } from 'rxjs/operators';
 import { SpinnerService } from '@/_helpers';
 import { ApiCode } from '@/_models';
+
 
 @Component({
   selector: 'search-engine',
@@ -49,7 +50,6 @@ export class SearchEngineComponent implements OnInit {
             .subscribe((response) => {
                 if(response.status === ApiCode.SUCCESS) {
                     this.jsonPayload = response.data;
-                    console.log(this.jsonPayload);
                     this.spinnerService.hide();
                 } else {
                     this.spinnerService.hide();

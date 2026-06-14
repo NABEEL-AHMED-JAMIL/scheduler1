@@ -72,7 +72,9 @@ export class SourceTaskTypeComponent implements OnInit {
 		this.spinnerService.show();
 		this.sourceTaskTaypeForm = this.formBuilder.group({
 			description: ['', Validators.required],
-			queueTopicPartition: ['', Validators.required],
+			topicName: ['', Validators.required],
+			partitions: ['', Validators.required],
+			queueTopicPartition: ['topic=&partitions=[]', Validators.required],
 			serviceName: ['', Validators.required],
 			schemaPayload: []
         });
@@ -81,6 +83,7 @@ export class SourceTaskTypeComponent implements OnInit {
 
 	public addSourceTaskType(): void {
 		this.submitted = true;
+		this.updateQueueTopicPartition();
         this.spinnerService.show();
 		if (this.sourceTaskTaypeForm.invalid) {
 			this.spinnerService.hide();
@@ -108,9 +111,12 @@ export class SourceTaskTypeComponent implements OnInit {
 
     public editSourceTaskTaypeForm(sourceTaskTaype: SourceTaskType): any {
 		this.spinnerService.show();
+		const topicParts = this.parseQueueTopicPartition(sourceTaskTaype.queueTopicPartition);
 		this.sourceTaskTaypeForm = this.formBuilder.group({
 			sourceTaskTypeId: [sourceTaskTaype.sourceTaskTypeId, Validators.required],
 			description: [sourceTaskTaype.description, Validators.required],
+			topicName: [topicParts.topicName, Validators.required],
+			partitions: [topicParts.partitions, Validators.required],
 			queueTopicPartition: [sourceTaskTaype.queueTopicPartition, Validators.required],
 			serviceName: [sourceTaskTaype.serviceName, Validators.required],
 			schemaPayload: [sourceTaskTaype.schemaPayload],
@@ -120,6 +126,7 @@ export class SourceTaskTypeComponent implements OnInit {
 	}
 
 	public updateSourceTaskType(): void {
+		this.updateQueueTopicPartition();
         this.spinnerService.show();
 		if (this.sourceTaskTaypeForm.invalid) {
 			this.spinnerService.hide();
@@ -146,14 +153,39 @@ export class SourceTaskTypeComponent implements OnInit {
 	public viewSourceTaskTaypeForm(sourceTaskTaype: SourceTaskType): any {
 		this.spinnerService.show();
 		this.submitted = true;
+		const topicParts = this.parseQueueTopicPartition(sourceTaskTaype.queueTopicPartition);
 		this.sourceTaskTaypeForm = this.formBuilder.group({
 			sourceTaskTypeId: [sourceTaskTaype.sourceTaskTypeId, Validators.required],
 			description: [sourceTaskTaype.description, Validators.required],
+			topicName: [topicParts.topicName, Validators.required],
+			partitions: [topicParts.partitions, Validators.required],
 			queueTopicPartition: [sourceTaskTaype.queueTopicPartition, Validators.required],
 			serviceName: [sourceTaskTaype.serviceName, Validators.required],
 			schemaPayload: [sourceTaskTaype.schemaPayload]
         });
 		this.spinnerService.hide();
+	}
+
+	private parseQueueTopicPartition(queueTopicPartition: string): { topicName: string; partitions: string } {
+		const result = { topicName: '', partitions: '' };
+		if (!queueTopicPartition) {
+			return result;
+		}
+		const match = queueTopicPartition.match(/topic=([^&]+)&partitions=\[(.+?)\]/);
+		if (match) {
+			result.topicName = match[1];
+			result.partitions = match[2];
+		}
+		return result;
+	}
+
+	private updateQueueTopicPartition(): void {
+		if (!this.sourceTaskTaypeForm) {
+			return;
+		}
+		const topicName = this.sourceTaskTaypeForm.get('topicName')?.value || '';
+		const partitions = this.sourceTaskTaypeForm.get('partitions')?.value || '';
+		this.sourceTaskTaypeForm.patchValue({ queueTopicPartition: `topic=${topicName}&partitions=[${partitions}]` }, { emitEvent: false });
 	}
 
 	public resetSourceTaskEvent(action: Action): void {

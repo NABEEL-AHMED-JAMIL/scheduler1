@@ -4,6 +4,9 @@ import { ApiResponse } from '@/_models';
 import { Observable } from 'rxjs';
 
 
+/**
+ * @author Nabeel Ahmed
+ */
 @Injectable({
     providedIn: 'root'
 })
@@ -49,6 +52,10 @@ export class SettingService {
 
     public failJobLogs(jobQId: any): Observable<ApiResponse> {
         return this.http.delete<ApiResponse>(`${config.apiUrl}/message.json/failJobLogs?jobQId=`+jobQId);
+    }
+
+    public interruptJobLogs(jobQId: any): Observable<ApiResponse> {
+        return this.http.delete<ApiResponse>(`${config.apiUrl}/message.json/interruptJobLogs?jobQId=`+jobQId);
     }
 
     public dynamicQueryResponse(payload: any): Observable<ApiResponse> {

@@ -1,96 +1,89 @@
-﻿﻿<!-- breadcrumb -->
-<ol class="breadcrumb">
-    <li><a routerLink="/home">Home</a></li>
-    <li class="active">Setting</li>
-</ol>
-<source-task-type *ngIf="sourceTaskTypeAction" 
+<!-- breadcrumb -->
+<nav class="breadcrumb-bar">
+    <a routerLink="/home">Home</a>
+    <span class="crumb-sep">/</span>
+    <span class="crumb-current">Setting</span>
+</nav>
+
+<source-task-type *ngIf="sourceTaskTypeAction"
     [sourceTaskTypeAction]="sourceTaskTypeAction"
     [sourceTaskType]="sourceTaskType"
     (senderEvent) = "receiverEvent($event)">
 </source-task-type>
-<div class="row" style="margin-right: 0px;margin-left: 0px;">
-    <div class="col-lg-7">
-        <p style="color: red;">
-            *Note: Source TaskType help to configuraiton with kafka.
-            Its help the land the request to the valid kakfa consumer.<br>
-        </p>
+
+<!-- Source TaskType -->
+<div class="toolbar">
+    <div class="form-group" style="margin-bottom: 0;">
+        <label for="searchSourceTaskTaype" class="control-label">Total Source TaskType ({{sourceTaskTypes.length}})</label>
+        <input type="text" id="searchSourceTaskTaype" class="form-control" style="width: 280px;"
+            placeholder="Search" [(ngModel)]="searchSourceTaskTaype"/>
     </div>
-    <div class="col-lg-5" style="text-align: end;">
-        <button type="button" class="btn btn-sm btn-default"
-            data-toggle="modal" data-target="#sourceTaskTaype"
-            (click)="appSetting()">
-            <span class="glyphicon glyphicon-refresh"></span> Refresh 
-        </button>&nbsp;
-        <button type="button" class="btn btn-sm btn-default"
-            data-toggle="modal" data-target="#sourceTaskTaype"
-            (click)="addSourceTaskTaype()">
-            <span class="glyphicon glyphicon-plus-sign"></span>
-            Add Source TaskType
-        </button>
-    </div>
+    <span class="toolbar-spacer"></span>
+    <button type="button" class="btn btn-sm btn-default" (click)="appSetting()">
+        <span class="glyphicon glyphicon-refresh"></span> Refresh
+    </button>
+    <button type="button" class="btn btn-sm btn-teal"
+        data-toggle="modal" data-target="#sourceTaskType"
+        (click)="addSourceTaskType()">
+        <span class="glyphicon glyphicon-plus"></span> Add Source TaskType
+    </button>
 </div>
-<br>
-<!-- table -->
-<div style="padding-left: 15px;padding-right: 15px;">
-    <table id="source-task-type" class="table table-responsive table table-striped
-        table-bordered table-sm" style="font-size: 12px;">
+<span class="help-text" style="margin-bottom: 10px;">
+    <span class="glyphicon glyphicon-info-sign"></span>
+    Source TaskType helps to configure with Kafka — it lands the request to the valid Kafka consumer.
+</span>
+
+<div class="table-responsive scroll-table">
+    <table id="source-task-type" class="table table-striped table-bordered table-hover table-modern" style="font-size: 12px;">
         <thead>
             <tr>
                 <th style="width: 4%;"># No</th>
                 <th>Service Name</th>
                 <th>Queue Topic Partition</th>
                 <th>Description</th>
-                <th>Link Task</th>
-                <th>Schema</th>
-                <th style="text-align: center;">Status</th>
-                <th style="width: 9%;">Action</th>
+                <th class="text-center">Link Task</th>
+                <th class="text-center">Schema</th>
+                <th class="text-center">Status</th>
+                <th class="text-center">Action</th>
             </tr>
         </thead>
         <tbody>
-            <tr *ngFor="let sourceTaskTaype of sourceTaskTaypes; let i = index;">
-                <!-- we will add the link when we click on the link it will update -->
-                <td>{{sourceTaskTaype.sourceTaskTypeId}}</td>
-                <td>{{sourceTaskTaype.serviceName}}</td>
-                <td>{{sourceTaskTaype.queueTopicPartition}}</td>
-                <td>{{sourceTaskTaype.description}}</td>
-                <td style="text-align: center;">
-                    <a routerLink="" style="pointer-events: none">{{sourceTaskTaype.totalTaskLink}}</a>
+            <tr *ngFor="let sourceTaskType of sourceTaskTypes | searchFilter: searchSourceTaskTaype; let i = index;">
+                <td>{{sourceTaskType.sourceTaskTypeId}}</td>
+                <td>{{sourceTaskType.serviceName}}</td>
+                <td>{{sourceTaskType.queueTopicPartition}}</td>
+                <td>{{sourceTaskType.description}}</td>
+                <td class="text-center">
+                    <a routerLink="" style="pointer-events: none">{{sourceTaskType.totalTaskLink}}</a>
                 </td>
-                <td style="text-align: center;text-transform:capitalize;">
-                    <span class="badge" 
-                        [ngClass]="{
-                            'badge-danger': sourceTaskTaype.schemaRegister === false, 
-                            'badge-success' : sourceTaskTaype.schemaRegister === true
-                        }">{{sourceTaskTaype.schemaRegister}}
-                    </span>
+                <td class="text-center">
+                    <span class="pill" [ngClass]="{
+                        'pill-danger': sourceTaskType.schemaRegister === false,
+                        'pill-success': sourceTaskType.schemaRegister === true
+                    }">{{sourceTaskType.schemaRegister}}</span>
                 </td>
-                <td style="text-align: center;">
-                    <span class="badge" 
-                        [ngClass]="{
-                            'badge-danger': sourceTaskTaype.status === 'Delete', 
-                            'badge-warning' : sourceTaskTaype.status === 'Inactive',
-                            'badge-success' : sourceTaskTaype.status === 'Active'
-                        }">{{sourceTaskTaype.status}}
-                    </span>
+                <td class="text-center">
+                    <span class="pill" [ngClass]="{
+                        'pill-danger': sourceTaskType.status === 'Delete',
+                        'pill-warning': sourceTaskType.status === 'Inactive',
+                        'pill-success': sourceTaskType.status === 'Active'
+                    }">{{sourceTaskType.status}}</span>
                 </td>
-                <td style="text-align: center;">
-                    <div class="btn-group btn-group-xs" role="group" style="text-align: center">
-                        <button type="button" class="btn btn-default" data-toggle="modal" data-target="#sourceTaskTaype"
-                            (click)="editSourceTaskTaype(sourceTaskTaype)">
-                            <span class="glyphicon glyphicon-edit" style="color:blue"></span>
+                <td class="text-center">
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button type="button" class="btn btn-default btn-icon ic-edit" data-toggle="modal" data-target="#sourceTaskType"
+                            (click)="editSourceTaskType(sourceTaskType)" title="Edit">
+                            <span class="glyphicon glyphicon-edit"></span>
                         </button>
-                        <!-- download source tasktype -->
-                        <button type="button" class="btn btn-default"
-                            (click)="downloadSourceTaskType(sourceTaskTaype)">
-                            <span class="glyphicon glyphicon-download" style="color:brown">
-                            </span>
+                        <button type="button" class="btn btn-default btn-icon ic-download"
+                            (click)="downloadSourceTaskType(sourceTaskType)" title="Download">
+                            <span class="glyphicon glyphicon-download"></span>
                         </button>
-                        <!-- add the method for delete the queue detail -->
-                        <button type="button" class="btn btn-default" 
-                            (click)="deleteSourceTaskType(sourceTaskTaype.sourceTaskTypeId, i)"
-                            [disabled]="sourceTaskTaype.status === 'Delete'"
-                            data-toggle="modal" data-target="#deleteSetting">
-                            <span class="glyphicon glyphicon-trash" style="color: black;"></span>
+                        <button type="button" class="btn btn-default btn-icon ic-delete"
+                            (click)="deleteSourceTaskType(sourceTaskType.sourceTaskTypeId, i)"
+                            [disabled]="sourceTaskType.status === 'Delete'"
+                            data-toggle="modal" data-target="#deleteSetting" title="Delete">
+                            <span class="glyphicon glyphicon-trash"></span>
                         </button>
                     </div>
                 </td>
@@ -98,10 +91,10 @@
         </tbody>
     </table>
 </div>
-<!-- Task type Modal -->
+
+<!-- Delete Source TaskType Modal -->
 <div class="modal fade" id="deleteSetting" role="dialog" style="top: 85px;">
     <div class="modal-dialog">
-        <!-- Modal content-->
         <div class="modal-content">
             <div class="modal-header">
                 <button type="button" #closebutton class="close" data-dismiss="modal">&times;</button>
@@ -110,48 +103,50 @@
             <div class="modal-body">
                 <p>Are you sure to delete the source tasktype?
                     <br>On press 'Yes' all the source job will delete state and will not run
-                </p> 
+                </p>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-danger" id="closeModal" 
+                <button type="button" class="btn btn-danger" id="closeModal"
                     (click)="processDeleteSourceTaskType()">Yes</button>
-            </div> 
+            </div>
         </div>
     </div>
 </div>
+
 <look-up *ngIf="lookupAction"
     [lookUpAction]="lookupAction"
     [recivedLookupData]="lookupData"
     (senderEvent) = "receiverEvent($event)">
 </look-up>
-<div class="row"
-    style="margin-right: 0px;margin-left: 0px;">
-    <div class="col-lg-7">
-        <p style="color: red;">
-            *Note: Lookup help to configure the system setting like 
-            (thread per pool & scheduler last run & scheduler daily ect.)
-        </p>
+
+<!-- Lookup -->
+<div class="toolbar" style="margin-top: 25px;">
+    <div class="form-group" style="margin-bottom: 15px;">
+        <label for="searchLookupDataForm" class="control-label">Total Lookup ({{lookupDatas.length}})</label>
+        <input type="text" id="searchLookupDataForm" class="form-control" style="width: 280px;"
+            placeholder="Search" [(ngModel)]="searchLookupDataForm"/>
     </div>
-    <div class="col-lg-5" style="text-align: end;">
-        <button type="button" class="btn btn-sm btn-default"
-            data-toggle="modal" data-target="#lookupDatas"
-            (click)="addLookupDatas()">
-            <span class="glyphicon glyphicon-plus-sign"></span> Add Lookup
-        </button>
-    </div>
+    <span class="toolbar-spacer"></span>
+    <button type="button" class="btn btn-sm btn-teal"
+        data-toggle="modal" data-target="#lookupDatas"
+        (click)="addLookupDatas()">
+        <span class="glyphicon glyphicon-plus"></span> Add Lookup
+    </button>
 </div>
-<br>
-<!-- lookup commpoent added -->
-<div style="padding-left: 15px;padding-right: 15px;">
-    <table id="lookup" class="table table-responsive table table-striped
-        table-bordered table-sm" style="font-size: 12px;">
+<span class="help-text" style="margin-bottom: 10px;">
+    <span class="glyphicon glyphicon-info-sign"></span>
+    Lookup helps to configure system settings like (thread per pool &amp; scheduler last run &amp; scheduler daily etc.)
+</span>
+
+<div class="table-responsive scroll-table">
+    <table id="lookup" class="table table-striped table-bordered table-hover table-modern" style="font-size: 12px;">
         <thead>
             <tr>
                 <th style="width: 4%;"># No</th>
                 <th>Lookup Type</th>
                 <th>Lookup Value</th>
                 <th>Description</th>
-                <th style="width: 9%;">Action</th>
+                <th class="text-center">Action</th>
             </tr>
         </thead>
         <tbody>
@@ -160,16 +155,16 @@
                 <td>{{lookupData.lookupType}}</td>
                 <td>{{lookupData.lookupValue}}</td>
                 <td>{{lookupData.description}}</td>
-                <td style="text-align: center;">
-                    <div class="btn-group btn-group-xs" role="group" style="text-align: center">
-                        <button type="button" class="btn btn-default"
+                <td class="text-center">
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button type="button" class="btn btn-default btn-icon ic-edit"
                             data-toggle="modal" data-target="#lookupDatas"
-                            (click)="editLookupData(lookupData)">
-                            <span class="glyphicon glyphicon-edit" style="color:blue"></span>
+                            (click)="editLookupData(lookupData)" title="Edit">
+                            <span class="glyphicon glyphicon-edit"></span>
                         </button>
-                        <button type="button" class="btn btn-default"
-                            (click)="editSubLookupData(lookupData)">
-                            <span class="glyphicon glyphicon-plus" style="color:green"></span>
+                        <button type="button" class="btn btn-default btn-icon ic-add"
+                            (click)="editSubLookupData(lookupData)" title="Sub Lookup">
+                            <span class="glyphicon glyphicon-plus"></span>
                         </button>
                     </div>
                 </td>

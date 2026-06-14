@@ -1,9 +1,16 @@
-﻿const webpack = require('webpack');
+const webpack = require('webpack');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
+const CopyWebpackPlugin = require('copy-webpack-plugin');
 const path = require('path');
 
 module.exports = {
     entry: './src/main.ts',
+    output: {
+        path: path.resolve(__dirname, 'dist'),
+        filename: '[name].[contenthash].js',
+        chunkFilename: '[name].[contenthash].js',
+        publicPath: '/scheduler/'
+    },
     resolve: {
         extensions: ['.ts', '.js'],
         alias: {
@@ -24,8 +31,12 @@ module.exports = {
                 test: /\.less$/,
                 use: ['style-loader', 'css-loader', 'less-loader']
             },
-
-            // workaround for warning: System.import() is deprecated and will be removed soon. Use import() instead.
+            {
+                // Removed postcss-loader — not in package.json
+                test: /\.css$/,
+                use: ['style-loader', 'css-loader']
+            },
+            // workaround for warning: System.import() is deprecated
             {
                 test: /[\/\\]@angular[\/\\].+\.js$/,
                 parser: { system: true }
@@ -34,15 +45,25 @@ module.exports = {
     },
     plugins: [
         new HtmlWebpackPlugin({ template: './src/index.html' }),
+
+        // Copy static assets to dist/ so they are served correctly
+        new CopyWebpackPlugin([
+            {
+                from: path.resolve(__dirname, 'src/assets'),
+                to: 'assets'
+            }
+        ]),
+
         new webpack.DefinePlugin({
-            // global app config object
             config: JSON.stringify({
+                sessionId: '0hw0dz34',
+                transactionId: '40ef-dd1d-bd9f-1d7f',
                 apiUrl: 'http://localhost:9098/api/v1',
-                webSocketUrl: 'http://localhost:9098/api/v1'
+                webSocketUrl: 'http://localhost:9098/api/v1/ws'
             })
         }),
 
-        // workaround for warning: Critical dependency: the request of a dependency is an expression
+        // workaround for warning: Critical dependency
         new webpack.ContextReplacementPlugin(
             /\@angular(\\|\/)core(\\|\/)fesm5/,
             path.resolve(__dirname, 'src')
@@ -55,6 +76,7 @@ module.exports = {
         runtimeChunk: true
     },
     devServer: {
+        publicPath: '/scheduler/',
         historyApiFallback: true
     }
 }

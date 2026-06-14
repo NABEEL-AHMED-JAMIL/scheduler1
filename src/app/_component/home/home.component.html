@@ -1,92 +1,117 @@
-﻿﻿<!-- breadcrumb -->
-<ol class="breadcrumb">
-    <li class="active">Home</li>
-    <b style="float: right;">Date Range: {{last_7th_date}} - {{today_date}}</b>
-</ol>
-<style>
-    .card-background {
-        border-radius: 3px;
-        background: #FFF;
-        border: 1px solid #DCDFE6;
-    }
-</style>
-<div class="row" style="margin-right: 0px;margin-left: 0px;">
-    <div class="col-lg-3">
-        <div id="sourceJobStatusStatistics"
-            style="background-color: white;"
-            class="demo-chart"
-            echarts [options]="sourceJobStatusStatistics">
+﻿<!-- breadcrumb -->
+<nav class="breadcrumb-bar">
+    <span class="crumb-current">Home</span>
+    <span class="breadcrumb-spacer"></span>
+    <strong style="color: #36424d;">Date Range: {{last_7th_date}} - {{today_date}}</strong>
+</nav>
+
+<div class="row">
+    <!-- Job Status Chart -->
+    <div class="col-md-3">
+        <div class="card-panel">
+            <div id="sourceJobStatusStatistics"
+                class="demo-chart"
+                echarts [options]="sourceJobStatusStatistics">
+            </div>
         </div>
     </div>
-    <div class="col-lg-3">
-        <div id="sourceJobRunningStatistics"
-            style="background-color: white;"
-            class="demo-chart"
-            echarts [options]="sourceJobRunningStatistics">
+
+    <!-- Running Job Chart -->
+    <div class="col-md-3">
+        <div class="card-panel">
+            <div id="sourceJobRunningStatistics"
+                class="demo-chart"
+                echarts [options]="sourceJobRunningStatistics">
+            </div>
         </div>
     </div>
-    <div class="col-lg-6">
-        <div id="sourceJobWeeklyRunningStatistics"
-            style="background-color: white;"
-            class="demo-chart"
-            echarts [options]="sourceJobWeeklyRunningStatistics">
+
+    <!-- Weekly Running Chart -->
+    <div class="col-md-6">
+        <div class="card-panel">
+            <div id="sourceJobWeeklyRunningStatistics"
+                class="demo-chart"
+                echarts [options]="sourceJobWeeklyRunningStatistics">
+            </div>
         </div>
     </div>
 </div>
-<div class="row" style="margin-right: 0px;margin-left: 0px;margin-top: 10px;">
-    <div class="col-lg-12" >
-        <div id="sourceJobWeeklyHrsRunningStatistics"
-            style="background-color: white;"
-            class="demo-chart"
-            echarts [options]="sourceJobWeeklyHrsRunningStatistics"
-            (chartClick)="onChartEvent($event, 'sourceJobWeeklyHrsRunningStatistics')">
+
+<div class="row">
+    <!-- Heatmap Chart -->
+    <div class="col-md-12">
+        <div class="card-panel">
+            <div id="sourceJobWeeklyHrsRunningStatistics"
+                class="demo-chart"
+                echarts [options]="sourceJobWeeklyHrsRunningStatistics"
+                (chartClick)="onChartEvent($event, 'sourceJobWeeklyHrsRunningStatistics')">
+            </div>
         </div>
     </div>
-    <div class="col-lg-12" style="margin-top: 10px;" *ngIf="sourceJobWeeklyRunningStatisticsDimensionData">
-        <div class="card"  style="background-color: white;">
-            <div class="card-body">
-                <input type="text" id="searchSourceJobDetails" class="form-control input-sm"
-                placeholder="Search" [(ngModel)]="searchSourceJobDetails"/>
-                <table class="table table-bordered table-sm table-responsive table-striped"
-                    style="font-size: 10px;" id="sourceJobWeeklyRunningStatisticsDimensionData">
+
+    <!-- Data Table -->
+    <div class="col-md-12" *ngIf="sourceJobWeeklyRunningStatisticsDimensionData">
+        <div class="card-panel">
+            <!-- Search Input -->
+            <div class="form-group">
+                <input type="text"
+                    id="searchSourceJobDetails"
+                    class="form-control"
+                    placeholder="Search"
+                    [(ngModel)]="searchSourceJobDetails"/>
+            </div>
+
+            <!-- Table -->
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover table-modern" id="sourceJobWeeklyRunningStatisticsDimensionData">
                     <thead>
                         <tr>
                             <th>Job Id</th>
                             <th>Job Name</th>
                             <th>Queue</th>
+                            <th>Start</th>
                             <th>Running</th>
                             <th>Failed</th>
                             <th>Completed</th>
                             <th>Skip</th>
+                            <th>Interrupt</th>
                             <th>Total</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr *ngFor="let sourceJob of sourceJobWeeklyRunningStatisticsDimensionData | searchFilter: searchSourceJobDetails;">
+                        <tr *ngFor="let sourceJob of sourceJobWeeklyRunningStatisticsDimensionData | searchFilter: searchSourceJobDetails; let i = index;">
                             <td>{{sourceJob.jobId}}</td>
                             <td>{{sourceJob.jobName}}</td>
-                            <td style="text-align: center;"
-                                (click)="sourceJobCountAction(sourceJob, 'Queue')">
+                            <td class="text-center"
+                                (click)="sourceJobCountAction(sourceJob, 'Queue', sourceJob.queue)">
                                 {{sourceJob.queue}}
                             </td>
-                            <td style="text-align: center;"
-                                (click)="sourceJobCountAction(sourceJob, 'Running')">
+                            <td class="text-center"
+                                (click)="sourceJobCountAction(sourceJob, 'Start', sourceJob.start)">
+                                {{sourceJob.start}}
+                            </td>
+                            <td class="text-center"
+                                (click)="sourceJobCountAction(sourceJob, 'Running', sourceJob.running)">
                                 {{sourceJob.running}}
                             </td>
-                            <td style="text-align: center;"
-                                (click)="sourceJobCountAction(sourceJob, 'Failed')">
+                            <td class="text-center"
+                                (click)="sourceJobCountAction(sourceJob, 'Failed', sourceJob.failed)">
                                 {{sourceJob.failed}}
                             </td>
-                            <td style="text-align: center;"
-                                (click)="sourceJobCountAction(sourceJob, 'Completed')">
+                            <td class="text-center"
+                                (click)="sourceJobCountAction(sourceJob, 'Completed', sourceJob.completed)">
                                 {{sourceJob.completed}}
                             </td>
-                            <td style="text-align: center;"
-                                (click)="sourceJobCountAction(sourceJob, 'Skip')">
+                            <td class="text-center"
+                                (click)="sourceJobCountAction(sourceJob, 'Skip', sourceJob.skip)">
                                 {{sourceJob.skip}}
                             </td>
-                            <td style="text-align: center;"
-                                (click)="sourceJobCountAction(sourceJob, 'Total')">
+                            <td class="text-center"
+                                (click)="sourceJobCountAction(sourceJob, 'Interrupt', sourceJob.interrupt)">
+                                {{sourceJob.interrupt}}
+                            </td>
+                            <td class="text-center"
+                                (click)="sourceJobCountAction(sourceJob, 'Total', sourceJob.total)">
                                 {{sourceJob.total}}
                             </td>
                         </tr>

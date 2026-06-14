@@ -1,4 +1,4 @@
-import { Component, OnInit, Input, Output, ViewChild, EventEmitter } from '@angular/core';
+import { Component, OnInit, Input, Output, ViewChild, EventEmitter, ElementRef } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { AlertService, SettingService } from '@/_services';
 import { SpinnerService } from '@/_helpers';
@@ -13,20 +13,20 @@ import { LookupData, Action } from '@/_models/index';
 export class LookupComponent implements OnInit {	
 
 	public ERROR: string = 'Error';
-    public submitted: boolean = false;
+    public submitted = false;
 	public LOOKUP_DATE_ADDED: any = 'LookupData Added';
 	public LOOKUP_DATE_UPDATE: any = 'LookupData Update';
     public LOOKUP_DATA_TITLE: any = 'New LookupData';
-	public lookupDataForm: FormGroup;
+	public lookupDataForm!: FormGroup;
 
 	@Input()
-	public lookUpAction: Action;
+	public lookUpAction!: Action;
 	@Input()
-	public recivedLookupData: LookupData;
+	public recivedLookupData!: LookupData;
 	@Output()
 	public senderEvent: EventEmitter<Action> = new EventEmitter();
 	@ViewChild('closeLookupData', {static: false})
-	public closeLookupData;
+	public closeLookupData!: ElementRef;
 
 	constructor(private formBuilder: FormBuilder,
 		private alertService: AlertService,

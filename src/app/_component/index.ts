@@ -6,7 +6,6 @@ export * from './setting/lookup/lookup.component';
 export * from './setting/sub-lookup/sub-lookup.component';
 export * from './setting/source-task-type/source-task-type.component';
 export * from './setting/xml-configuration/xml-configuration.component';
-export * from './setting/view-link-task/view-link-task.component';
 export * from './setting/setting.component';
 export * from './setting/queue-message/queue-message.component';
 // source-job
@@ -16,7 +15,8 @@ export * from './job-logs/job-logs.component';
 // source-task
 export * from './batch-action/batch-action.component';
 export * from './source-task/task/task.component';
-export * from './source-task/view-link-job/view-link-job.componenet';
 export * from './source-task/source-task.component';
 // search-engine
 export * from './search-engine/search-engine.component';
+// login
+export * from './login/login.component';

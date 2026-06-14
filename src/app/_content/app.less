@@ -1,3 +1,5 @@
+@import "~ngx-toastr/toastr.css";
+
 // global application styles
 a {
   cursor: pointer;
@@ -14,14 +16,16 @@ a {
   border-top-right-radius: 0px;
 }
 
- /* Remove the navbar's default margin-bottom and rounded borders */ 
- .navbar {
+/* Remove the navbar's default margin-bottom and rounded borders */
+.navbar {
   margin-bottom: 0;
   border-radius: 0;
 }
 
 /* Set height of the grid so .sidenav can be 100% (adjust as needed) */
-.row.content {height: 450px}
+.row.content {
+  height: 450px
+}
 
 /* Set gray background color and 100% height */
 .sidenav {
@@ -52,46 +56,46 @@ jw-modal {
   display: none;
 
   .jw-modal {
-      /* modal container fixed across whole screen */
-      position: fixed;
-      top: 0;
-      right: 0;
-      bottom: 0;
-      left: 0;
+    /* modal container fixed across whole screen */
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
 
-      /* z-index must be higher than .jw-modal-background */
-      z-index: 1000;
-      
-      /* enables scrolling for tall modals */
-      overflow: auto;
+    /* z-index must be higher than .jw-modal-background */
+    z-index: 1000;
 
-      .jw-modal-body {
-          padding: 20px;
-          background: #fff;
+    /* enables scrolling for tall modals */
+    overflow: auto;
 
-          /* margin exposes part of the modal background */
-          margin: 40px;
-          margin-right: 12%;
-          margin-left: 15%;
-          border-radius: 10px;
-          border: 1px solid #090909
-      }
+    .jw-modal-body {
+      padding: 20px;
+      background: #fff;
+
+      /* margin exposes part of the modal background */
+      margin: 40px;
+      margin-right: 12%;
+      margin-left: 15%;
+      border-radius: 10px;
+      border: 1px solid #090909
+    }
   }
 
   .jw-modal-background {
-      /* modal background fixed across whole screen */
-      position: fixed;
-      top: 0;
-      right: 0;
-      bottom: 0;
-      left: 0;
+    /* modal background fixed across whole screen */
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
 
-      /* semi-transparent black  */
-      background-color: #000;
-      opacity: 0.75;
-      
-      /* z-index must be below .jw-modal and above everything else  */
-      z-index: 900;
+    /* semi-transparent black  */
+    background-color: #000;
+    opacity: 0.75;
+
+    /* z-index must be below .jw-modal and above everything else  */
+    z-index: 900;
   }
 }
 
@@ -102,11 +106,12 @@ body.jw-modal-open {
 
 
 // Colors
-@brand-primary: #29b5a8;
+@brand-primary: #4f46e5;
 @brand-secondary: #ff8300;
 @gray: #6b7381;
 @gray-light: lighten(@gray, 15%);
-@gray-lighter: lighten(@gray, 30%);;
+@gray-lighter: lighten(@gray, 30%);
+;
 
 // Button Colors
 @btn-default-color: @gray;
@@ -120,39 +125,47 @@ body.jw-modal-open {
 
 // General Styles for Demo
 body {
-	font-family: 'Montserrat', 'Lato', 'Open Sans', 'Helvetica Neue', Helvetica, Calibri, Arial, sans-serif;
-	color: @gray;
-	background: #f2f2f2;
+  font-family: 'Montserrat', 'Lato', 'Open Sans', 'Helvetica Neue', Helvetica, Calibri, Arial, sans-serif;
+  color: @gray;
+  background: #f2f2f2;
 }
+
 .jumbotron {
   background: @gray;
   color: @gray-lighter;
+
   h1 {
     color: #fff;
   }
 }
+
 .example {
   margin: 4rem auto;
-  > .row {
+
+  >.row {
     margin-top: 2rem;
     height: 5rem;
     vertical-align: middle;
     text-align: center;
-    border: 1px solid fade(@gray-lighter,50%);
+    border: 1px solid fade(@gray-lighter, 50%);
+
     &:first-of-type {
-      border:none;
+      border: none;
       height: auto;
       text-align: left;
     }
   }
+
   h3 {
     font-weight: 400;
-    > small {
+
+    >small {
       font-weight: 200;
       font-size: .75em;
       color: @gray-light;
     }
   }
+
   h6 {
     font-weight: 700;
     font-size: .65rem;
@@ -160,8 +173,9 @@ body {
     text-transform: uppercase;
     color: @gray-lighter;
     margin: 0;
-    line-height:5rem;
+    line-height: 5rem;
   }
+
   .btn-toggle {
     top: 50%;
     transform: translateY(-50%);
@@ -172,13 +186,15 @@ body {
 
 // Mixin for Switch Colors
 // Variables: @color, @bg, @active-bg
-.toggle-color(@color: @btn-default-color; @bg: @btn-default-bg; @active-bg: @brand-primary;) {
+.toggle-color(@color: @btn-default-color; @bg: @btn-default-bg; @active-bg: @brand-primary; ) {
   color: @color;
   background: @bg;
+
   &:before,
   &:after {
     color: @color;
   }
+
   &.active {
     background-color: @active-bg;
   }
@@ -186,7 +202,7 @@ body {
 
 // Mixin for Default Switch Styles
 // Variables: @size, @margin, @color, @bg, @active-bg, @font-size
-.toggle-mixin(@size: @toggle-default-size; @margin: @toggle-default-label-width; @font-size: @toggle-default-font-size;) {
+.toggle-mixin(@size: @toggle-default-size; @margin: @toggle-default-label-width; @font-size: @toggle-default-font-size; ) {
   // color: @color;
   // background: @bg;
   margin: 0 @margin;
@@ -196,15 +212,16 @@ body {
   height: @size;
   width: @size * 2;
   border-radius: @size;
-  
+
   &:focus,
   &.focus {
+
     &,
     &.active {
       outline: none;
     }
   }
-  
+
   &:before,
   &:after {
     line-height: @size;
@@ -218,17 +235,19 @@ body {
     bottom: 0;
     transition: opacity .25s;
   }
+
   &:before {
     content: 'Off';
     left: -@margin;
   }
+
   &:after {
     content: 'On';
     right: -@margin;
     opacity: .5;
   }
-  
-  > .handle {
+
+  >.handle {
     position: absolute;
     top: (@size * .25) / 2;
     left: (@size * .25) / 2;
@@ -238,21 +257,26 @@ body {
     background: #fff;
     transition: left .25s;
   }
+
   &.active {
     transition: background-color .25s;
-    > .handle {
+
+    >.handle {
       left: @size + ((@size * .25) / 2);
       transition: left .25s;
     }
+
     &:before {
       opacity: .5;
     }
+
     &:after {
       opacity: 1;
     }
   }
-  
+
   &.btn-sm {
+
     &:before,
     &:after {
       line-height: @size - 2px;
@@ -261,24 +285,29 @@ body {
       left: @size * .275;
       width: @size * 1.55;
     }
+
     &:before {
       text-align: right;
     }
+
     &:after {
       text-align: left;
       opacity: 0;
     }
+
     &.active {
       &:before {
         opacity: 0;
       }
+
       &:after {
         opacity: 1;
       }
     }
   }
-  
+
   &.btn-xs {
+
     &:before,
     &:after {
       display: none;
@@ -290,24 +319,24 @@ body {
 
 // Apply Mixin to different sizes & colors
 .btn-toggle {
-  
+
   .toggle-mixin;
   .toggle-color;
-  
+
   &.btn-lg {
-    .toggle-mixin(@size: 2.5rem; @font-size: 1rem; @margin: 5rem;);
+    .toggle-mixin(@size: 2.5rem; @font-size: 1rem; @margin: 5rem; );
   }
-  
+
   &.btn-sm {
-    .toggle-mixin(@font-size: .55rem; @margin: .5rem;);
+    .toggle-mixin(@font-size: .55rem; @margin: .5rem; );
   }
-  
+
   &.btn-xs {
-    .toggle-mixin(@size:1rem;@margin:0;)
+    .toggle-mixin(@size: 1rem; @margin: 0; )
   }
-  
+
   &.btn-secondary {
-    .toggle-color(@active-bg:@brand-secondary);
+    .toggle-color(@active-bg: @brand-secondary);
   }
 }
 
@@ -319,9 +348,11 @@ body {
   0% {
     opacity: 1;
   }
+
   50% {
     opacity: 0;
   }
+
   100% {
     opacity: 1;
   }
@@ -351,7 +382,7 @@ body {
   display: inline-block;
 }
 
-.dot_green{
+.dot_green {
   height: 15px;
   width: 15px;
   background-color: green;
@@ -359,11 +390,10 @@ body {
   display: inline-block;
 }
 
-.btn_span
-{
-    border: none;
-    cursor: pointer;
-    text-decoration: none;
+.btn_span {
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
 
 }
 
@@ -373,36 +403,43 @@ body {
 
 .stepwizard-step p {
   margin-top: 0px;
-  color:#666;
+  color: #666;
 }
+
 .stepwizard-row {
   display: table-row;
 }
+
 .stepwizard {
   display: table;
   width: 100%;
   position: relative;
 }
 
-.stepwizard .btn.disabled, .stepwizard .btn[disabled], .stepwizard fieldset[disabled] .btn {
-  opacity:1 !important;
-  color:#bbb;
+.stepwizard .btn.disabled,
+.stepwizard .btn[disabled],
+.stepwizard fieldset[disabled] .btn {
+  opacity: 1 !important;
+  color: #bbb;
 }
+
 .stepwizard-row:before {
   top: 14px;
   bottom: 0;
   position: absolute;
-  content:" ";
+  content: " ";
   width: 100%;
   height: 1px;
   background-color: #ccc;
   z-index: 0;
 }
+
 .stepwizard-step {
   display: table-cell;
   text-align: center;
   position: relative;
 }
+
 .btn-circle {
   width: 30px;
   height: 30px;
@@ -421,23 +458,23 @@ body {
 }
 
 .addLookupDataBtn {
-	background: black;
-	color: white;
-	width: 65px;
-	text-align: center;
-	float: right;
-	margin-right: 34px;
-	margin-bottom: 10px;
+  background: black;
+  color: white;
+  width: 65px;
+  text-align: center;
+  float: right;
+  margin-right: 34px;
+  margin-bottom: 10px;
 }
 
 .addSourceTaskTypBtn {
-	background: black;
-	color: white;
-	width: 65px;
-	text-align: center;
-	float: right;
-	margin-right: 22px;
-	margin-bottom: 10px;
+  background: black;
+  color: white;
+  width: 65px;
+  text-align: center;
+  float: right;
+  margin-right: 22px;
+  margin-bottom: 10px;
 }
 
 .progress {
@@ -481,6 +518,7 @@ td {
   50% {
     transform: rotate(360deg);
   }
+
   100% {
     transform: rotate(0deg);
   }
@@ -518,10 +556,10 @@ td {
   background: #f2f2f2;
 }
 
-.panel-default > .panel-heading {
-	background: gray;
-    color: white;
-    border-color: gray;
+.panel-default>.panel-heading {
+  background: gray;
+  color: white;
+  border-color: gray;
 }
 
 .task-status-Inactive {
@@ -542,7 +580,7 @@ td {
   color: white;
 }
 
-.badge-warning  {
+.badge-warning {
   color: #fff;
   background-color: #dc3545;
 }
@@ -552,9 +590,14 @@ td {
   background-color: green;
 }
 
-.badge-pcomplate {
+.badge-start {
   color: #fff;
-  background-color: greenyellow;
+  background-color: rgb(102, 20, 210);
+}
+
+.badge-interrupt {
+  color: #fff;
+  background-color: orange;
 }
 
 .badge-primary {
@@ -599,42 +642,42 @@ jw-modal {
   display: none;
 
   .jw-modal {
-      /* modal container fixed across whole screen */
-      position: fixed;
-      top: 0;
-      right: 0;
-      bottom: 0;
-      left: 0;
+    /* modal container fixed across whole screen */
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
 
-      /* z-index must be higher than .jw-modal-background */
-      z-index: 1000;
-      
-      /* enables scrolling for tall modals */
-      overflow: auto;
+    /* z-index must be higher than .jw-modal-background */
+    z-index: 1000;
 
-      .jw-modal-body {
-          padding: 20px;
-          background: #fff;
+    /* enables scrolling for tall modals */
+    overflow: auto;
 
-          /* margin exposes part of the modal background */
-          margin: 40px;
-      }
+    .jw-modal-body {
+      padding: 20px;
+      background: #fff;
+
+      /* margin exposes part of the modal background */
+      margin: 40px;
+    }
   }
 
   .jw-modal-background {
-      /* modal background fixed across whole screen */
-      position: fixed;
-      top: 0;
-      right: 0;
-      bottom: 0;
-      left: 0;
+    /* modal background fixed across whole screen */
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
 
-      /* semi-transparent black  */
-      background-color: #000;
-      opacity: 0.75;
-      
-      /* z-index must be below .jw-modal and above everything else  */
-      z-index: 900;
+    /* semi-transparent black  */
+    background-color: #000;
+    opacity: 0.75;
+
+    /* z-index must be below .jw-modal and above everything else  */
+    z-index: 900;
   }
 }
 
@@ -648,7 +691,8 @@ body.jw-modal-open {
 }
 
 #sourceJobWeeklyRunningStatisticsDimensionData td:hover {
-  background-color:  #dff0d8;;
+  background-color: #dff0d8;
+  ;
   color: black;
 }
 
@@ -680,7 +724,7 @@ body.jw-modal-open {
   vertical-align: top;
   text-align: center;
   width: 120.5px;
-  border: 2px solid rgba(0,0,0,0);
+  border: 2px solid rgba(0, 0, 0, 0);
   cursor: pointer;
   transition: all 0.4s;
 }
@@ -692,9 +736,11 @@ body.jw-modal-open {
 a {
   color: #337ab7;
 }
+
 a {
   background-color: transparent;
 }
+
 * {
   -webkit-box-sizing: border-box;
   -moz-box-sizing: border-box;
@@ -719,4 +765,875 @@ a {
 
 .graph:hover {
   background-color: white;
+}
+
+/* =========================================================
+   App theme layer (Bootstrap 3 enhancement)
+   One cohesive teal / slate theme shared by every screen.
+   Simple, clean, and consistent.
+   ========================================================= */
+@brand-teal: #4f46e5;       // indigo (primary)
+@brand-teal-dark: #3730a3;  // deep indigo
+@brand-accent: #7c3aed;     // violet accent
+@brand-slate: #2f3a45;
+@ink: #36424d;
+@muted: #7b8794;
+@line: #e6eaee;
+@surface: #ffffff;
+@page-bg: #f4f6f8;
+
+/* Base */
+body {
+  background: @page-bg;
+  color: @ink;
+}
+
+/* Page content padding (wrapper around <router-outlet>) */
+.app-content {
+  padding: 20px 24px;
+}
+
+/* ---------- Navbar ---------- */
+.navbar-inverse {
+  background: @brand-slate;
+  border: none;
+  border-radius: 0;
+  margin-bottom: 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.10);
+}
+
+.navbar-inverse .navbar-brand {
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+}
+
+.navbar-inverse .navbar-brand:hover {
+  color: @brand-teal;
+}
+
+.navbar-inverse .navbar-nav > li > a {
+  color: #cdd6df;
+  transition: all 0.15s ease-in-out;
+}
+
+.navbar-inverse .navbar-nav > li > a:hover,
+.navbar-inverse .navbar-nav > li > a:focus {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.navbar-inverse .navbar-nav > .active > a,
+.navbar-inverse .navbar-nav > .active > a:hover,
+.navbar-inverse .navbar-nav > .active > a:focus {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 -3px 0 @brand-teal;
+}
+
+.navbar-inverse .navbar-nav > .open > a,
+.navbar-inverse .navbar-nav > .open > a:hover,
+.navbar-inverse .navbar-nav > .open > a:focus {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* ---------- Breadcrumb bar ---------- */
+.breadcrumb-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  background: @surface;
+  border: 1px solid @line;
+  border-radius: 6px;
+  padding: 10px 16px;
+  margin-bottom: 18px;
+  font-size: 13px;
+
+  a {
+    color: @brand-teal-dark;
+    text-decoration: none;
+  }
+
+  a:hover {
+    color: @brand-teal;
+    text-decoration: underline;
+  }
+
+  .crumb-current {
+    color: @ink;
+    font-weight: 600;
+  }
+
+  .crumb-sep {
+    color: #b7c0c8;
+    margin: 0 8px;
+  }
+
+  .breadcrumb-spacer {
+    flex: 1 1 auto;
+  }
+
+  .selected-count {
+    font-size: 13px;
+    color: @gray;
+    font-weight: 600;
+  }
+}
+
+/* ---------- Toolbar: action button row ---------- */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  margin-bottom: 16px;
+}
+
+.toolbar > * {
+  margin-left: 8px;
+  margin-bottom: 4px;
+}
+
+.toolbar > *:first-child {
+  margin-left: 0;
+}
+
+.toolbar-spacer {
+  flex: 1 1 auto;
+}
+
+.toolbar .toolbar-spacer {
+  margin-left: 0;
+}
+
+/* ---------- Data table (simple & clean) ---------- */
+.table-modern {
+  background: @surface;
+  border: 1px solid @line;
+  font-size: 13px;
+  margin-bottom: 18px;
+}
+
+/* horizontal lines only — keep it simple even with .table-bordered */
+.table-modern > thead > tr > th,
+.table-modern > tbody > tr > td,
+.table-modern > tfoot > tr > td {
+  border-left: 0;
+  border-right: 0;
+}
+
+.table-modern > thead > tr > th {
+  background: #eef0fb;
+  color: @brand-teal-dark;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  border-bottom: 2px solid @brand-teal;
+  padding: 11px 12px;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.table-modern > tbody > tr > td {
+  padding: 9px 12px;
+  border-top: 1px solid @line;
+  vertical-align: middle;
+  color: @ink;
+}
+
+.table-modern > tbody > tr:nth-child(even) {
+  background: #fafbfc;
+}
+
+.table-modern > tbody > tr:hover {
+  background: #f1f0fd;
+}
+
+.table-modern > tbody > tr.disabled-row {
+  opacity: 0.6;
+}
+
+.table-modern a {
+  color: @brand-teal-dark;
+}
+
+.table-modern a:hover {
+  color: @brand-teal;
+}
+
+/* Zoom out tables by reducing density globally while keeping full container width */
+.table-responsive .table {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  font-size: 12px;
+}
+
+.table-modern {
+  font-size: 12px;
+}
+
+.table-modern > thead > tr > th {
+  font-size: 10px;
+  padding: 8px 10px;
+}
+
+.table-modern > tbody > tr > td {
+  padding: 7px 10px;
+}
+
+/* Long message / payload cells: keep the table tidy and readable */
+.cell-message {
+  max-width: 320px;
+  max-height: 110px;
+  overflow: auto;
+  text-align: left;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 11px;
+  line-height: 1.4;
+  font-weight: 600;
+  color: #111;
+  background: #f7f9fa;
+  border: 1px solid @line;
+  border-radius: 4px;
+  padding: 6px 8px;
+}
+
+/* Full-width message cell (e.g. logs table where the message column owns the row) */
+.cell-message.cell-message-wide {
+  max-width: none;
+}
+
+/* ---------- Detail / info layouts (for redesigned detail pages) ---------- */
+.detail-item {
+  margin-bottom: 12px;
+}
+
+.detail-item .detail-label {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: @muted;
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+
+.detail-item .detail-value {
+  font-weight: 600;
+  color: @ink;
+  font-size: 13px;
+}
+
+/* Inline entity header: title + status pills on one line (saves vertical space) */
+.entity-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.entity-head .entity-title {
+  margin: 0 auto 0 0; /* push the status pills to the right side of the row */
+  font-size: 14px;
+  font-weight: 700;
+  color: @ink;
+}
+
+/* Horizontal meta row: detail-items flow side by side and wrap */
+.meta-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 36px;
+}
+
+.meta-grid .detail-item {
+  margin-bottom: 10px;
+}
+
+/* Compact inline flags (label + pill), replaces stacked detail-items */
+.flag-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  align-items: center;
+}
+
+.flag-group .flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: @muted;
+}
+
+/* Read-only code / payload box */
+.code-box {
+  display: block;
+  width: 100%;
+  max-height: 170px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  font-weight: 600;
+  color: #111;
+  background: #f7f9fa;
+  border: 1px solid @line;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin: 0;
+}
+
+/* Equal-height columns: child .card-panel of each column stretches to the tallest */
+.row-equal {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.row-equal > [class*="col-"] {
+  display: flex;
+}
+
+.row-equal > [class*="col-"] > .card-panel {
+  width: 100%;
+}
+
+/* Panel whose body fills the available height (e.g. equal-height config-tags panel) */
+.panel-fill {
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-fill > #main-form-content {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.panel-fill > #main-form-content > .scroll-table {
+  flex: 1 1 auto;
+  max-height: none; /* fill the panel instead of a fixed cap */
+  min-height: 0;
+}
+
+/* Vertically scrollable table area (e.g. growing config-tag rows) with sticky header */
+.scroll-table {
+  max-height: 850px;
+  overflow-y: auto;
+}
+
+.scroll-table > .table-modern {
+  margin-bottom: 0;
+}
+
+.scroll-table > .table-modern > thead > tr > th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+/* Bold black cell text — for logs / query result tables */
+.table-strong > tbody > tr > td {
+  font-weight: 600;
+  color: #111;
+}
+
+/* Compact table — tighter cells for dense input grids (e.g. config tags) */
+.table-compact {
+  font-size: 12px;
+}
+
+.table-compact > thead > tr > th {
+  padding: 6px 8px;
+}
+
+.table-compact > tbody > tr > td {
+  padding: 5px 8px;
+  vertical-align: middle;
+}
+
+.table-compact .form-control.input-sm {
+  height: 30px;
+  font-size: 12px;
+}
+
+/* Login page */
+.login-page {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  overflow: auto;
+  background:
+    linear-gradient(135deg, rgba(55, 48, 163, 0.88) 0%, rgba(79, 70, 229, 0.82) 45%, rgba(124, 58, 237, 0.80) 100%),
+    url('https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=1600&q=80') center / cover no-repeat fixed;
+}
+
+.login-page .login-card {
+  width: 100%;
+  max-width: 380px;
+  margin-bottom: 0;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+}
+
+.login-page .btn-block {
+  width: 100%;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+/* Navbar user avatar + profile dropdown */
+.nav-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-right: 6px;
+  vertical-align: middle;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+.user-menu {
+  min-width: 270px;
+  padding: 0 0 6px;
+  overflow: hidden;
+}
+
+.user-menu .user-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: @brand-teal;
+  color: #fff;
+}
+
+.user-menu .user-card-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #fff;
+}
+
+.user-menu .user-card-name {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.user-menu .user-card-role {
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.user-menu .user-card-email {
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.user-menu .dropdown-header {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  font-weight: 700;
+  color: @muted;
+  padding: 8px 16px 4px;
+}
+
+.user-menu > li > a {
+  padding: 6px 16px;
+}
+
+.user-menu > li > a .glyphicon {
+  width: 18px;
+  margin-right: 6px;
+  color: @brand-teal-dark;
+}
+
+.user-menu > li > a .badge {
+  float: right;
+  background: @brand-teal;
+}
+
+/* Small helper / hint text under inputs */
+.help-text {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: @muted;
+}
+
+/* Editable code / payload textarea (matches the read-only code-box look) */
+.code-input {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  font-weight: 600;
+  color: #111;
+  background: #f7f9fa;
+}
+
+/* Stat chips strip (e.g. job statistics) */
+.stat-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.stat-strip .stat-chip {
+  display: inline-flex;
+  align-items: center;
+  background: #f3f6f7;
+  border: 1px solid @line;
+  border-radius: 14px;
+  padding: 3px 12px;
+  margin: 4px 8px 0 0;
+  font-size: 12px;
+  color: @ink;
+}
+
+.stat-strip .stat-chip .stat-num {
+  font-weight: 700;
+  color: @brand-teal-dark;
+  margin-left: 6px;
+}
+
+.stat-strip .stat-chip.stat-total {
+  background: @brand-teal;
+  border-color: @brand-teal-dark;
+  color: #fff;
+}
+
+.stat-strip .stat-chip.stat-total .stat-num {
+  color: #fff;
+}
+
+/* Status-coloured chips — full tint (bg + border + text) matching the pill palette */
+.chip-tint(@bg; @fg) {
+  background: @bg;
+  border-color: fade(@fg, 28%);
+  color: @fg;
+  .stat-num { color: @fg; }
+}
+
+.stat-strip .stat-chip.chip-queue     { .chip-tint(#e0f7fa; #0c7c8c); }
+.stat-strip .stat-chip.chip-start     { .chip-tint(#e8eaf6; #283593); }
+.stat-strip .stat-chip.chip-running   { .chip-tint(#fff4e0; #b5730a); }
+.stat-strip .stat-chip.chip-failed    { .chip-tint(#fde4e4; #c0392b); }
+.stat-strip .stat-chip.chip-completed { .chip-tint(#e3f6e9; #1d7a3f); }
+.stat-strip .stat-chip.chip-skip      { .chip-tint(#e1f0fb; #1c6ea4); }
+.stat-strip .stat-chip.chip-interrupt { .chip-tint(#efe6fb; #6a3bbf); }
+
+/* Scheduler chips — soft teal tint so the strip reads as one cohesive group */
+.stat-strip .stat-chip.chip-schedule {
+  background: #e6f6f4;
+  border-color: fade(@brand-teal-dark, 28%);
+  color: @brand-teal-dark;
+}
+
+.stat-strip .stat-chip.chip-schedule .stat-num {
+  color: @brand-teal-dark;
+}
+
+/* Section divider inside a card */
+.card-divider {
+  border-top: 1px solid #eceff1;
+  padding-top: 12px;
+  margin-top: 4px;
+}
+
+/* ---------- Pills / status badges ---------- */
+.pill {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  text-transform: capitalize;
+}
+
+.pill-success { background: #e3f6e9; color: #1d7a3f; }
+.pill-warning { background: #fff4e0; color: #b5730a; }
+.pill-danger  { background: #fde4e4; color: #c0392b; }
+.pill-info    { background: #e1f0fb; color: #1c6ea4; }
+.pill-indigo  { background: #e8eaf6; color: #283593; }
+.pill-default { background: #eceff1; color: #566573; }
+.pill-purple  { background: #efe6fb; color: #6a3bbf; }
+.pill-cyan    { background: #e0f7fa; color: #0c7c8c; }
+
+/* Job running-status pills (used as: class="pill" [ngClass]="'status-'+value") */
+.status-InFlight  { .pill-info; }
+.status-Queue     { .pill-cyan; }
+.status-Start     { .pill-indigo; }
+.status-Running   { .pill-warning; }
+.status-Failed    { .pill-danger; }
+.status-Completed { .pill-success; }
+.status-Interrupt { .pill-purple; }
+
+/* ---------- Buttons (consistent palette) ---------- */
+.btn {
+  border-radius: 5px;
+  font-weight: 500;
+  transition: all 0.15s ease-in-out;
+}
+
+.btn-default {
+  background: #fff;
+  border: 1px solid #d3dade;
+  color: #4a5560;
+}
+
+.btn-default:hover,
+.btn-default:focus,
+.btn-default:active {
+  background: #f2f5f6;
+  border-color: #c3ccd1;
+  color: #2c3e50;
+}
+
+.btn-primary,
+.btn-teal {
+  background: @brand-teal;
+  border-color: @brand-teal-dark;
+  color: #fff;
+}
+
+.btn-primary:hover, .btn-primary:focus, .btn-primary:active,
+.btn-teal:hover, .btn-teal:focus, .btn-teal:active {
+  background: @brand-teal-dark;
+  border-color: @brand-teal-dark;
+  color: #fff;
+}
+
+.btn-success {
+  background: #27ae60;
+  border-color: #229954;
+  color: #fff;
+}
+
+.btn-success:hover, .btn-success:focus, .btn-success:active {
+  background: #229954;
+  border-color: #1e8449;
+  color: #fff;
+}
+
+.btn-danger {
+  background: #e74c3c;
+  border-color: #cf4436;
+  color: #fff;
+}
+
+.btn-danger:hover, .btn-danger:focus, .btn-danger:active {
+  background: #cf4436;
+  border-color: #b03a2e;
+  color: #fff;
+}
+
+.btn-info {
+  background: #3498db;
+  border-color: #2c87c9;
+  color: #fff;
+}
+
+.btn-info:hover, .btn-info:focus, .btn-info:active {
+  background: #2c87c9;
+  border-color: #2676b3;
+  color: #fff;
+}
+
+.btn-warning {
+  background: #f39c12;
+  border-color: #e08e0b;
+  color: #fff;
+}
+
+.btn-warning:hover, .btn-warning:focus, .btn-warning:active {
+  background: #e08e0b;
+  border-color: #c87f0a;
+  color: #fff;
+}
+
+/* Compact icon action button (table rows) */
+.btn-icon {
+  padding: 4px 9px;
+  font-size: 13px;
+  line-height: 1.4;
+  background: #fff;
+  border: 1px solid #d3dade;
+  color: #4a5560;
+}
+
+.btn-icon:hover,
+.btn-icon:focus {
+  background: #f1f0fd;
+  border-color: #c3c0ef;
+}
+
+/* Consistent action-icon colour scheme across every table.
+   Apply one ic-* class per action button; the colour is the single source of truth. */
+.btn-icon .glyphicon        { color: #566573; }          /* default / neutral */
+.btn-icon.ic-view .glyphicon     { color: #4f46e5; }     /* indigo  */
+.btn-icon.ic-edit .glyphicon     { color: #2563eb; }     /* blue    */
+.btn-icon.ic-delete .glyphicon   { color: #c0392b; }     /* red     */
+.btn-icon.ic-run .glyphicon      { color: #1d7a3f; }     /* green   */
+.btn-icon.ic-skip .glyphicon     { color: #0c7c8c; }     /* cyan    */
+.btn-icon.ic-download .glyphicon { color: #b5730a; }     /* amber   */
+.btn-icon.ic-history .glyphicon  { color: #566573; }     /* slate   */
+.btn-icon.ic-logs .glyphicon     { color: #566573; }     /* slate   */
+.btn-icon.ic-interrupt .glyphicon{ color: #6a3bbf; }     /* purple  */
+.btn-icon.ic-add .glyphicon      { color: #1d7a3f; }     /* green   */
+
+.btn-icon[disabled] .glyphicon,
+.btn-icon.disabled .glyphicon {
+  color: #b8c0c7 !important;
+}
+
+/* ---------- Card panel for forms / content sections ---------- */
+.card-panel {
+  background: @surface;
+  border: 1px solid @line;
+  border-radius: 8px;
+  padding: 18px;
+  margin-bottom: 18px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.card-panel-title {
+  margin-top: 0;
+  margin-bottom: 14px;
+  font-size: 16px;
+  font-weight: 600;
+  color: @ink;
+  border-bottom: 1px solid #eceff1;
+  padding-bottom: 10px;
+}
+
+/* Filled teal banner header (matches the modal-header / panel-heading theme) */
+.card-panel-title.panel-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  background: @brand-teal;
+  color: #fff;
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  margin: -18px -18px 16px -18px;
+  padding: 10px 18px;
+}
+
+.card-panel-title.panel-banner .pull-right {
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+
+/* Banner with a right-aligned action (e.g. Add More button) — keep it tidy on one line */
+.card-panel-title.panel-banner.has-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.card-panel-title.panel-banner.has-action .pull-right {
+  float: none !important;
+  margin: 0;
+}
+
+.card-panel-title.panel-banner .banner-link {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #fff;
+  background: transparent;
+  text-transform: none;
+  padding: 3px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 5px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.card-panel-title.panel-banner .banner-link:hover,
+.card-panel-title.panel-banner .banner-link:focus {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  text-decoration: none;
+}
+
+/* Borderless sub-section inside a card-panel (avoids nested double borders) */
+.form-section {
+  margin-top: 18px;
+}
+
+/* ---------- Forms ---------- */
+.control-label {
+  font-weight: 600;
+  color: @ink;
+}
+
+.form-control:focus {
+  border-color: @brand-teal;
+  box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.18);
+}
+
+/* ---------- Modals & panels (match the theme) ---------- */
+.modal-content {
+  border: none;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+}
+
+.modal-header {
+  background: @brand-teal;
+  color: #fff;
+  border-bottom: none;
+}
+
+.modal-header .modal-title {
+  color: #fff;
+}
+
+.modal-header .close {
+  color: #fff;
+  opacity: 0.9;
+  text-shadow: none;
+}
+
+.modal-body,
+.modal-footer {
+  background: #fff;
+  color: @ink;
+}
+
+.modal-footer {
+  border-top: 1px solid @line;
+}
+
+.panel-default > .panel-heading {
+  background: @brand-teal;
+  color: #fff;
+  border-color: @brand-teal;
 }
