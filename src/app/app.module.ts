@@ -27,7 +27,8 @@ import {
     JobHistoryActionComponent,
     JobLogComponent,
     SearchEngineComponent,
-    LoginComponent
+    LoginComponent,
+    BucketBrowserComponent
 } from './_component/index';
 import { ToastrModule } from 'ngx-toastr';
 
@@ -78,7 +79,8 @@ import { ToastrModule } from 'ngx-toastr';
         JobHistoryActionComponent,
         JobLogComponent,
         SearchEngineComponent,
-        LoginComponent
+        LoginComponent,
+        BucketBrowserComponent
     ],
     providers: [],
     bootstrap: [AppComponent]

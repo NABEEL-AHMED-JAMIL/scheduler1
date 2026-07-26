@@ -47,6 +47,7 @@ export interface LookupData {
     description?: any;
     lookupValue?: any;
     lookupType?: any;
+    encrypted?: any;
     parent?: LookupData;
 }
 
@@ -122,3 +123,33 @@ export const STATUS_LIST: any = [
         value: 'Delete',
     }
 ];
+
+// Bucket Browser
+export interface BucketSummary {
+    label?: any;
+    bucket?: any;
+    provider?: any;
+}
+
+export interface ObjectSummary {
+    name?: any;
+    key?: any;
+    folder?: any;
+    size?: any;
+    lastModified?: any;
+}
+
+export interface ObjectMetadata {
+    name?: any;
+    key?: any;
+    size?: any;
+    lastModified?: any;
+    etag?: any;
+    contentType?: any;
+    previewable?: any;
+}
+
+export interface BrowseObjectsResponse {
+    objects?: ObjectSummary[];
+    nextContinuationToken?: any;
+}

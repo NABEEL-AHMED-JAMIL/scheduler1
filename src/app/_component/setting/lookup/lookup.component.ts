@@ -63,6 +63,7 @@ export class LookupComponent implements OnInit {
 			description: ['', Validators.required],
 			lookupValue: ['', Validators.required],
 			lookupType: ['', Validators.required],
+			encrypted: [false],
 			parentLookupId: [this.recivedLookupData ? this.recivedLookupData.lookupId: null]
         });
 		this.spinnerService.hide();
@@ -94,11 +95,16 @@ export class LookupComponent implements OnInit {
 
 	public editLookupData(lookupData:LookupData): void {
 		this.spinnerService.show();
+		// Encrypted lookups never get their real value back from the API (masked server-side),
+		// so leave the field blank here rather than resubmit the mask as the new value.
+		// Blank + encrypted is handled server-side as "keep the existing encrypted value".
+		const isEncrypted = !!lookupData.encrypted;
 		this.lookupDataForm = this.formBuilder.group({
 			lookupId: [lookupData.lookupId, Validators.required],
 			description: [lookupData.description, Validators.required],
-			lookupValue: [lookupData.lookupValue, Validators.required],
+			lookupValue: [isEncrypted ? '' : lookupData.lookupValue, isEncrypted ? [] : Validators.required],
 			lookupType: [lookupData.lookupType, Validators.required],
+			encrypted: [isEncrypted],
 			parentLookupId: [lookupData?.parent?.lookupId ? lookupData?.parent?.lookupId: null]
         });
 		this.spinnerService.hide();

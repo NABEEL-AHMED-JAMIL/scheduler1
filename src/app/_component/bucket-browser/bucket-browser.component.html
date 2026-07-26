@@ -1,0 +1,280 @@
+<!-- breadcrumb -->
+<nav class="breadcrumb-bar">
+    <a routerLink="/home">Home</a>
+    <span class="crumb-sep">/</span>
+    <span class="crumb-current">Bucket Browser</span>
+</nav>
+
+<div class="card-panel">
+    <h4 class="card-panel-title panel-banner">
+        <span class="glyphicon glyphicon-hdd"></span> Bucket Browser
+    </h4>
+
+    <div class="form-group" style="max-width: 320px; margin-bottom: 0;">
+        <label class="control-label" for="bucketSelect">Bucket</label>
+        <select id="bucketSelect" class="form-control" [(ngModel)]="selectedBucket"
+            (ngModelChange)="onBucketChange()" [disabled]="loadingBuckets">
+            <option [ngValue]="null" disabled>{{ loadingBuckets ? 'Loading buckets...' : 'Select a bucket' }}</option>
+            <option *ngFor="let b of buckets" [ngValue]="b.bucket">{{ b.label }} ({{ b.provider }})</option>
+        </select>
+        <span class="help-text" *ngIf="!loadingBuckets && !buckets.length">
+            <span class="glyphicon glyphicon-info-sign"></span>
+            No buckets configured yet -- add entries under the BUCKET_LIST lookup in Setting.
+        </span>
+    </div>
+</div>
+
+<div class="card-panel bucket-panel" *ngIf="selectedBucket">
+    <!-- current path -->
+    <nav class="breadcrumb-bar bucket-path">
+        <a href="javascript:void(0);" (click)="goToBreadcrumb(-1)">{{ selectedBucket }}</a>
+        <ng-container *ngFor="let crumb of breadcrumbs; let i = index">
+            <span class="crumb-sep">/</span>
+            <a href="javascript:void(0);" *ngIf="i < breadcrumbs.length - 1" (click)="goToBreadcrumb(i)">{{ crumb.name }}</a>
+            <span class="crumb-current" *ngIf="i === breadcrumbs.length - 1">{{ crumb.name }}</span>
+        </ng-container>
+        <span class="breadcrumb-spacer"></span>
+        <span class="selected-count" *ngIf="selectedKeys.size">{{ selectedKeys.size }} selected</span>
+    </nav>
+
+    <!-- toolbar: search + actions -->
+    <div class="toolbar bucket-toolbar">
+        <div class="form-group">
+            <label class="control-label" for="searchName">Name</label>
+            <input type="text" id="searchName" class="form-control input-sm" style="width: 200px;"
+                placeholder="Search by name" [(ngModel)]="searchName" />
+        </div>
+        <div class="form-group">
+            <label class="control-label" for="searchDateFrom">Modified from</label>
+            <input type="date" id="searchDateFrom" class="form-control input-sm" [(ngModel)]="searchDateFrom" />
+        </div>
+        <div class="form-group">
+            <label class="control-label" for="searchDateTo">to</label>
+            <input type="date" id="searchDateTo" class="form-control input-sm" [(ngModel)]="searchDateTo" />
+        </div>
+        <button type="button" class="btn btn-default btn-sm" (click)="resetSearch()" *ngIf="isFiltering" title="Clear filters">
+            <span class="glyphicon glyphicon-remove"></span> Clear
+        </button>
+
+        <span class="toolbar-spacer"></span>
+
+        <button type="button" class="btn btn-default btn-sm" data-toggle="modal" data-target="#newFolderModal"
+            (click)="newFolderName = ''" title="Create a new folder here">
+            <span class="glyphicon glyphicon-folder-close"></span> New Folder
+        </button>
+        <button type="button" class="btn btn-teal btn-sm" (click)="triggerUpload()" [disabled]="uploading" title="Upload file(s) here">
+            <span class="glyphicon" [ngClass]="uploading ? 'glyphicon-refresh spin' : 'glyphicon-upload'"></span>
+            {{ uploading ? 'Uploading...' : 'Upload' }}
+        </button>
+        <input #fileInput type="file" multiple class="visually-hidden-input" (change)="onFilesSelected($event)" />
+    </div>
+
+    <!-- bulk action bar (multi-select) -->
+    <div class="bulk-action-bar" *ngIf="selectedKeys.size">
+        <span><strong>{{ selectedKeys.size }}</strong> item(s) selected</span>
+        <span class="toolbar-spacer"></span>
+        <button type="button" class="btn btn-default btn-sm" (click)="downloadSelectedBulk()"
+            title="Downloads any selected files -- selected folders are skipped (not zipped)">
+            <span class="glyphicon glyphicon-download-alt"></span> Download
+        </button>
+        <button type="button" class="btn btn-danger btn-sm" data-toggle="modal" data-target="#deleteConfirmModal"
+            (click)="requestDeleteBulk()">
+            <span class="glyphicon glyphicon-trash"></span> Delete
+        </button>
+        <button type="button" class="btn btn-link btn-sm" (click)="clearSelection()">Clear selection</button>
+    </div>
+
+    <div class="row row-equal">
+        <div class="bucket-table-col" [ngClass]="selectedObject ? 'col-md-8' : 'col-md-12'">
+            <div class="table-responsive scroll-table bucket-scroll" (scroll)="onTableScroll($event)">
+                <table class="table table-striped table-bordered table-hover table-modern" style="font-size: 12px;">
+                    <thead>
+                        <tr>
+                            <th style="width: 34px;">
+                                <input type="checkbox" [checked]="allVisibleSelected"
+                                    [disabled]="!selectableVisibleCount" (click)="toggleSelectAll($event)" />
+                            </th>
+                            <th>Name</th>
+                            <th style="width: 200px;">Last Modified</th>
+                            <th class="text-right" style="width: 100px;">Size</th>
+                            <th class="text-center" style="width: 132px;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr *ngFor="let entry of filteredObjects" class="bucket-row" (click)="openEntry(entry)"
+                            [class.active]="selectedObject && selectedObject.key === entry.key">
+                            <td (click)="$event.stopPropagation()">
+                                <input type="checkbox" [checked]="isSelected(entry)" (click)="toggleSelect(entry, $event)" />
+                            </td>
+                            <td>
+                                <span class="glyphicon"
+                                    [ngClass]="entry.folder ? 'glyphicon-folder-open folder-icon' : 'glyphicon-file file-icon'"></span>
+                                {{ entry.name }}
+                            </td>
+                            <td>{{ entry.lastModified ? (entry.lastModified | date: 'medium') : '-' }}</td>
+                            <td class="text-right">{{ entry.folder ? '-' : formatSize(entry.size) }}</td>
+                            <td class="text-center row-actions">
+                                <button type="button" class="btn btn-default btn-icon ic-copy"
+                                    (click)="copyPath(entry, $event)" title="Copy path">
+                                    <span class="glyphicon glyphicon-duplicate"></span>
+                                </button>
+                                <button type="button" class="btn btn-default btn-icon ic-edit" *ngIf="entry.folder"
+                                    data-toggle="modal" data-target="#renameFolderModal"
+                                    (click)="requestRenameFolder(entry, $event)" title="Rename">
+                                    <span class="glyphicon glyphicon-pencil"></span>
+                                </button>
+                                <button type="button" class="btn btn-default btn-icon ic-delete"
+                                    data-toggle="modal" data-target="#deleteConfirmModal"
+                                    (click)="requestDeleteEntry(entry, $event)" title="Delete">
+                                    <span class="glyphicon glyphicon-trash"></span>
+                                </button>
+                            </td>
+                        </tr>
+                        <tr *ngIf="!filteredObjects.length && !loadingObjects">
+                            <td colspan="5" class="text-center text-muted">
+                                {{ isFiltering ? 'No files match your search.' : 'This folder is empty.' }}
+                            </td>
+                        </tr>
+                        <tr *ngIf="loadingObjects">
+                            <td colspan="5" class="text-center text-muted">Loading...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="help-text" *ngIf="isFiltering">
+                <span class="glyphicon glyphicon-info-sign"></span>
+                Search applies to files loaded so far -- scroll down first to load more, then search.
+            </p>
+        </div>
+
+        <!-- side panel -->
+        <div class="col-md-4 bucket-panel-col" *ngIf="selectedObject">
+            <div class="side-panel">
+                <div class="side-panel-header">
+                    <span class="side-panel-title" [title]="selectedObject.name">
+                        <span class="glyphicon glyphicon-file file-icon"></span>{{ selectedObject.name }}
+                    </span>
+                    <button type="button" class="close" (click)="closePanel()">&times;</button>
+                </div>
+
+                <div *ngIf="loadingMetadata" class="text-muted">Loading details...</div>
+
+                <div *ngIf="selectedObjectMetadata && !loadingMetadata">
+                    <dl class="dl-horizontal object-meta">
+                        <dt>Size</dt>
+                        <dd>{{ formatSize(selectedObjectMetadata.size) }}</dd>
+                        <dt>Last Modified</dt>
+                        <dd>{{ selectedObjectMetadata.lastModified ? (selectedObjectMetadata.lastModified | date: 'medium') : '-' }}</dd>
+                        <dt>ETag</dt>
+                        <dd class="etag-value">{{ selectedObjectMetadata.etag || '-' }}</dd>
+                        <dt>Content Type</dt>
+                        <dd>{{ selectedObjectMetadata.contentType || '-' }}</dd>
+                    </dl>
+
+                    <div class="side-panel-actions">
+                        <button type="button" class="btn btn-sm btn-teal" (click)="downloadSelected()">
+                            <span class="glyphicon glyphicon-download-alt"></span> Download
+                        </button>
+                        <button type="button" class="btn btn-sm btn-danger" data-toggle="modal" data-target="#deleteConfirmModal"
+                            (click)="requestDeleteSelected()">
+                            <span class="glyphicon glyphicon-trash"></span> Delete
+                        </button>
+                    </div>
+
+                    <hr/>
+
+                    <div *ngIf="!previewKind" class="preview-unavailable">
+                        <span class="glyphicon glyphicon-info-sign"></span>
+                        Preview isn't available for this file type -- use Download above.
+                    </div>
+
+                    <div *ngIf="previewLoading" class="text-muted">Loading preview...</div>
+                    <div *ngIf="previewError" class="error-text">{{ previewError }}</div>
+
+                    <pre *ngIf="previewKind === 'json' && previewJson" class="preview-text">{{ previewJson }}</pre>
+
+                    <pre *ngIf="previewKind === 'csv' && previewText" class="preview-text">{{ previewText }}</pre>
+
+                    <iframe *ngIf="previewKind === 'pdf' && previewPdfUrl" [src]="previewPdfUrl" class="preview-pdf"></iframe>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- new folder -->
+<div class="modal fade" id="newFolderModal" role="dialog">
+    <div class="modal-dialog">
+        <div class="modal-content" style="border: none">
+            <form (ngSubmit)="confirmCreateFolder()">
+                <div class="modal-header">
+                    <button type="button" class="close" #closeNewFolderModal data-dismiss="modal">&times;</button>
+                    <h4 class="modal-title">
+                        <span class="glyphicon glyphicon-folder-close"></span> New Folder
+                    </h4>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="newFolderName">Folder name</label>
+                        <input type="text" id="newFolderName" class="form-control input-sm" autofocus
+                            [(ngModel)]="newFolderName" [ngModelOptions]="{ standalone: true }" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-primary" [disabled]="!newFolderName || !newFolderName.trim()">Create</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- rename folder -->
+<div class="modal fade" id="renameFolderModal" role="dialog">
+    <div class="modal-dialog">
+        <div class="modal-content" style="border: none">
+            <form (ngSubmit)="confirmRenameFolder()">
+                <div class="modal-header">
+                    <button type="button" class="close" #closeRenameModal data-dismiss="modal">&times;</button>
+                    <h4 class="modal-title">
+                        <span class="glyphicon glyphicon-pencil"></span> Rename Folder
+                    </h4>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="renameFolderNewName">Folder name</label>
+                        <input type="text" id="renameFolderNewName" class="form-control input-sm" autofocus
+                            [(ngModel)]="renameFolderNewName" [ngModelOptions]="{ standalone: true }" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-primary" [disabled]="!renameFolderNewName || !renameFolderNewName.trim()">Rename</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- delete confirm (shared by row delete, side-panel delete, and bulk delete) -->
+<div class="modal fade" id="deleteConfirmModal" role="dialog">
+    <div class="modal-dialog">
+        <div class="modal-content" style="border: none">
+            <div class="modal-header">
+                <button type="button" class="close" #closeDeleteModal data-dismiss="modal">&times;</button>
+                <h4 class="modal-title">
+                    <span class="glyphicon glyphicon-trash"></span> Delete
+                </h4>
+            </div>
+            <div class="modal-body">
+                <p>Delete {{ pendingDeleteLabel }}? This can't be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-danger" (click)="confirmDelete()">
+                    <span class="glyphicon glyphicon-trash"></span> Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

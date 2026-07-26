@@ -1503,6 +1503,7 @@ body {
 .btn-icon.ic-logs .glyphicon     { color: #566573; }     /* slate   */
 .btn-icon.ic-interrupt .glyphicon{ color: #6a3bbf; }     /* purple  */
 .btn-icon.ic-add .glyphicon      { color: #1d7a3f; }     /* green   */
+.btn-icon.ic-copy .glyphicon     { color: #566573; }     /* slate   */
 
 .btn-icon[disabled] .glyphicon,
 .btn-icon.disabled .glyphicon {
@@ -1636,4 +1637,210 @@ body {
   background: @brand-teal;
   color: #fff;
   border-color: @brand-teal;
+}
+
+/* ---------- Bucket Browser ---------- */
+.bucket-panel {
+  padding-bottom: 8px;
+}
+
+.bucket-path {
+  margin-bottom: 14px;
+}
+
+.bucket-toolbar {
+  align-items: flex-end;
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid @line;
+}
+
+.bucket-toolbar .form-group {
+  margin-bottom: 0;
+}
+
+.bucket-toolbar .control-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: @muted;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin-bottom: 4px;
+}
+
+.bulk-action-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 8px 14px;
+  background: rgba(79, 70, 229, 0.07);
+  border: 1px solid rgba(79, 70, 229, 0.25);
+  border-radius: 6px;
+  font-size: 13px;
+  color: @ink;
+}
+
+.bucket-table-col,
+.bucket-panel-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.bucket-table-col .bucket-scroll {
+  flex: 1 1 auto;
+  min-height: 320px;
+}
+
+.bucket-panel-col .side-panel {
+  flex: 1 1 auto;
+}
+
+.bucket-scroll {
+  max-height: 620px;
+  overflow-y: auto;
+}
+
+.bucket-row {
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+
+.bucket-row.active {
+  background: rgba(79, 70, 229, 0.08) !important;
+}
+
+.row-actions .ic-delete,
+.row-actions .ic-edit,
+.row-actions .ic-copy {
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.bucket-row:hover .row-actions .ic-delete,
+.bucket-row:hover .row-actions .ic-edit,
+.bucket-row:hover .row-actions .ic-copy {
+  opacity: 1;
+}
+
+.folder-icon {
+  color: #e0a63e;
+  margin-right: 6px;
+}
+
+.file-icon {
+  color: @muted;
+  margin-right: 6px;
+}
+
+.side-panel {
+  background: @surface;
+  border: 1px solid @line;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.side-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid @line;
+}
+
+.side-panel-title {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  color: @ink;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.side-panel-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.object-meta {
+  font-size: 12px;
+  margin-bottom: 14px;
+}
+
+.object-meta dt {
+  width: 110px;
+  color: @muted;
+  font-weight: 600;
+}
+
+.object-meta dd {
+  margin-left: 120px;
+  word-break: break-word;
+}
+
+.etag-value {
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.preview-unavailable {
+  padding: 10px 12px;
+  background: #f7f9fa;
+  border: 1px dashed @line;
+  border-radius: 6px;
+  color: @muted;
+  font-size: 12px;
+}
+
+.preview-text {
+  max-height: 360px;
+  overflow: auto;
+  background: #f7f9fa;
+  border: 1px solid @line;
+  border-radius: 6px;
+  padding: 10px;
+  font-size: 11px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.preview-pdf {
+  width: 100%;
+  height: 480px;
+  border: 1px solid @line;
+  border-radius: 6px;
+}
+
+.spin {
+  animation: bucket-spin 1s linear infinite;
+  display: inline-block;
+}
+
+/* The real file input stays off-screen -- the styled Upload button triggers it via .click().
+   input[hidden] alone isn't reliable enough here (this app's global input rules can win out),
+   so hide it explicitly. */
+.visually-hidden-input {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  border: 0 !important;
+}
+
+@keyframes bucket-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.error-text {
+  color: #c0392b;
+  font-size: 12px;
 }

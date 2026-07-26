@@ -24,12 +24,24 @@
                 <div class="form-group">
                     <label for="lookupValue">LookupValue</label>
                         <textarea formControlName="lookupValue" class="form-control input-sm"
-                        [ngClass]="{ 'is-invalid': lookupData.lookupValue.errors }" ></textarea>
+                        [ngClass]="{ 'is-invalid': lookupData.lookupValue.errors }"
+                        [placeholder]="lookupData.encrypted.value ? 'Leave blank to keep the existing encrypted value' : ''"></textarea>
                     <div *ngIf="submitted && lookupData.lookupValue.errors" class="invalid-feedback">
                         <div *ngIf="lookupData.lookupValue.errors.required" style="color: red;">
                             LookupValue is required
                         </div>
                     </div>
+                </div>
+                <div class="form-group">
+                    <div class="checkbox">
+                        <label>
+                            <input type="checkbox" formControlName="encrypted" /> Encrypt this value
+                        </label>
+                    </div>
+                    <small class="help-block" *ngIf="lookupData.encrypted.value">
+                        Stored encrypted (AES-256-GCM). Its value is never shown again once saved — leave
+                        LookupValue blank to keep it unchanged, or enter a new value to replace it.
+                    </small>
                 </div>
                 <div class="form-group">
                     <label for="description">Description</label>

@@ -9,3 +9,4 @@ export * from './hom.service';
 export * from './websocketapi.service';
 export * from './websocketshare.service';
 export * from './auth.service';
+export * from './storage.service';
