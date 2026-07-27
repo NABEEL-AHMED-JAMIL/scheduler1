@@ -15,7 +15,7 @@ import {
     JobLogComponent,
     SearchEngineComponent,
     LoginComponent,
-    BucketBrowserComponent
+    ObjectBrowserComponent
 } from './_component/index';
 
 
@@ -116,8 +116,8 @@ const routes: Routes = [
         canActivate: [AuthGuard]
     },
     {
-        path: 'bucketBrowser',
-        component: BucketBrowserComponent,
+        path: 'objectBrowser',
+        component: ObjectBrowserComponent,
         canActivate: [AuthGuard]
     },
     {

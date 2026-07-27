@@ -124,7 +124,7 @@ export const STATUS_LIST: any = [
     }
 ];
 
-// Bucket Browser
+// Object Browser
 export interface BucketSummary {
     label?: any;
     bucket?: any;
@@ -137,6 +137,8 @@ export interface ObjectSummary {
     folder?: any;
     size?: any;
     lastModified?: any;
+    etag?: any;
+    contentType?: any;
 }
 
 export interface ObjectMetadata {

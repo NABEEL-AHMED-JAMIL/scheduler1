@@ -20,5 +20,5 @@ export * from './source-task/source-task.component';
 export * from './search-engine/search-engine.component';
 // login
 export * from './login/login.component';
-// bucket-browser
-export * from './bucket-browser/bucket-browser.component';
+// object-browser
+export * from './object-browser/object-browser.component';

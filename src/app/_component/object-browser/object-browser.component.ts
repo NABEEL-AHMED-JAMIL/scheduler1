@@ -5,7 +5,8 @@ import { first } from 'rxjs/operators';
 import { forkJoin, Observable } from 'rxjs';
 import { ApiCode, ApiResponse, BucketSummary, ObjectSummary, ObjectMetadata } from '@/_models';
 
-const PREVIEWABLE_EXTENSIONS = ['json', 'csv', 'pdf'];
+const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'];
+const PREVIEWABLE_EXTENSIONS = ['json', 'csv', 'txt', 'pdf', 'mp3', 'm4a', 'mp4'].concat(IMAGE_EXTENSIONS);
 const PAGE_SIZE = 50;
 // Load the next page once the scroll container is within this many pixels of the bottom.
 const SCROLL_FETCH_THRESHOLD_PX = 120;
@@ -21,10 +22,10 @@ interface Breadcrumb {
  * @author Nabeel Ahmed
  */
 @Component({
-    selector: 'bucket-browser',
-    templateUrl: 'bucket-browser.component.html'
+    selector: 'object-browser',
+    templateUrl: 'object-browser.component.html'
 })
-export class BucketBrowserComponent implements OnInit {
+export class ObjectBrowserComponent implements OnInit {
 
     public ERROR = 'Error';
     public SUCCESS = 'Success';
@@ -51,12 +52,14 @@ export class BucketBrowserComponent implements OnInit {
     public selectedObjectMetadata: ObjectMetadata | null = null;
     public loadingMetadata = false;
 
-    public previewKind: 'json' | 'csv' | 'pdf' | null = null;
+    public previewKind: 'json' | 'csv' | 'txt' | 'pdf' | 'mp3' | 'm4a' | 'mp4' | 'image' | null = null;
     public previewLoading = false;
     public previewError: string | null = null;
     public previewJson: string | null = null;
     public previewText: string | null = null;
-    public previewPdfUrl: SafeResourceUrl | null = null;
+    // Streamed source URL, shared by pdf (iframe), mp3/m4a (audio), mp4 (video), and
+    // any image format (img) -- all of them just need a src to point their tag at.
+    public previewMediaUrl: SafeResourceUrl | null = null;
 
     public uploading = false;
 
@@ -159,7 +162,17 @@ export class BucketBrowserComponent implements OnInit {
         }
     }
 
-    public openEntry(entry: ObjectSummary): void {
+    /**
+     * Row click handler. Ignores clicks that originated from the row-actions cell instead
+     * of calling stopPropagation() on those buttons -- Rename/Delete rely on Bootstrap's
+     * data-toggle="modal" data-api, which listens on `document` and only fires if the click
+     * actually bubbles that far; stopPropagation() on the button itself would silently kill
+     * the modal before it ever opens.
+     */
+    public openEntry(entry: ObjectSummary, event: Event): void {
+        if ((event.target as HTMLElement).closest('.row-actions')) {
+            return;
+        }
         if (entry.folder) {
             this.openFolder(entry);
         } else {
@@ -320,9 +333,15 @@ export class BucketBrowserComponent implements OnInit {
             this.previewKind = null;
             return;
         }
-        this.previewKind = extension as 'json' | 'csv' | 'pdf';
-        if (extension === 'pdf') {
-            this.previewPdfUrl = this.sanitizer.bypassSecurityTrustResourceUrl(
+        if (IMAGE_EXTENSIONS.indexOf(extension) !== -1) {
+            this.previewKind = 'image';
+            this.previewMediaUrl = this.sanitizer.bypassSecurityTrustResourceUrl(
+                this.storageService.previewObjectUrl(this.selectedBucket, entry.key));
+            return;
+        }
+        this.previewKind = extension as 'json' | 'csv' | 'txt' | 'pdf' | 'mp3' | 'm4a' | 'mp4';
+        if (extension === 'pdf' || extension === 'mp3' || extension === 'm4a' || extension === 'mp4') {
+            this.previewMediaUrl = this.sanitizer.bypassSecurityTrustResourceUrl(
                 this.storageService.previewObjectUrl(this.selectedBucket, entry.key));
             return;
         }
@@ -337,8 +356,8 @@ export class BucketBrowserComponent implements OnInit {
                     } catch (e) {
                         this.previewJson = text;
                     }
-                } else if (extension === 'csv') {
-                    // Shown as plain text (like a .txt file), not parsed into a table.
+                } else if (extension === 'csv' || extension === 'txt') {
+                    // CSV shown as plain text (not parsed into a table), same as .txt.
                     this.previewText = text;
                 }
             }, () => {
@@ -353,7 +372,7 @@ export class BucketBrowserComponent implements OnInit {
         this.previewError = null;
         this.previewJson = null;
         this.previewText = null;
-        this.previewPdfUrl = null;
+        this.previewMediaUrl = null;
     }
 
     public closePanel(): void {
@@ -362,25 +381,13 @@ export class BucketBrowserComponent implements OnInit {
         this.resetPreview();
     }
 
-    public downloadSelected(): void {
-        if (!this.selectedObject) {
-            return;
-        }
-        this.triggerDownload(this.selectedObject.key);
-    }
-
-    /** Opens the shared delete-confirm modal for the currently open side-panel object. */
-    public requestDeleteSelected(): void {
-        if (!this.selectedObject) {
-            return;
-        }
-        this.pendingDeleteEntries = [this.selectedObject];
-        this.pendingDeleteLabel = `"${this.selectedObject.name}"`;
+    /** Downloads a single row's file (row action icon, files only). */
+    public downloadEntry(entry: ObjectSummary, event: Event): void {
+        this.triggerDownload(entry.key);
     }
 
     /** Copies a row's full bucket path (file or folder key) to the clipboard. */
     public copyPath(entry: ObjectSummary, event: Event): void {
-        event.stopPropagation();
         this.copyToClipboard(entry.key);
     }
 
@@ -411,7 +418,6 @@ export class BucketBrowserComponent implements OnInit {
 
     /** Opens the shared delete-confirm modal for a single row's delete icon (file or folder). */
     public requestDeleteEntry(entry: ObjectSummary, event: Event): void {
-        event.stopPropagation();
         this.pendingDeleteEntries = [entry];
         this.pendingDeleteLabel = entry.folder
             ? `"${entry.name}" and everything inside it`
@@ -507,7 +513,6 @@ export class BucketBrowserComponent implements OnInit {
 
     /** Opens the rename modal (data-toggle on the triggering button) for a folder row. */
     public requestRenameFolder(entry: ObjectSummary, event: Event): void {
-        event.stopPropagation();
         this.renameFolderEntry = entry;
         this.renameFolderNewName = entry.name;
     }
