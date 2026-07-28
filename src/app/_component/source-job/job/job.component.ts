@@ -187,6 +187,7 @@ export class JobComponent implements OnInit {
                 taskDetailId: ['', Validators.required],
                 serviceName: ['', Validators.required],
                 homePageId: [''],
+                pipelineId: [''],
                 queueTopicPartition: ['', Validators.required],
                 taskPayload: ['', Validators.required],
             }),
@@ -218,6 +219,7 @@ export class JobComponent implements OnInit {
                             taskDetailId: [response?.data?.taskDetail?.taskDetailId, Validators.required],
                             serviceName: [response?.data?.taskDetail?.sourceTaskType?.serviceName, Validators.required],
                             homePageId: [response?.data?.taskDetail?.homePageId],
+                            pipelineId: [response?.data?.taskDetail?.pipelineId],
                             queueTopicPartition: [response?.data?.taskDetail?.sourceTaskType?.queueTopicPartition, Validators.required],
                             taskPayload: [response?.data?.taskDetail?.taskPayload, Validators.required],
                         }),
@@ -279,6 +281,7 @@ export class JobComponent implements OnInit {
         this.taskDetail.queueTopicPartition.setValue(this.selectedSourceTask?.sourceTaskType?.queueTopicPartition);
         this.taskDetail.taskPayload.setValue(this.selectedSourceTask?.taskPayload);
         this.taskDetail.homePageId.setValue(this.selectedSourceTask?.homePageId);
+        this.taskDetail.pipelineId.setValue(this.selectedSourceTask?.pipelineId);
     }
 
     public onExecutionTypeChange(executionType: any): void {
