@@ -388,15 +388,24 @@ export class ObjectBrowserComponent implements OnInit {
 
     /** Copies a row's full bucket path (file or folder key) to the clipboard. */
     public copyPath(entry: ObjectSummary, event: Event): void {
-        this.copyToClipboard(entry.key);
+        this.copyToClipboard(entry.key, 'Path copied to clipboard.');
     }
 
-    private copyToClipboard(text: string): void {
+    /** Copies the currently previewed json/csv/txt file's full content to the clipboard. */
+    public copyPreviewContent(): void {
+        const content = this.previewKind === 'json' ? this.previewJson : this.previewText;
+        if (!content) {
+            return;
+        }
+        this.copyToClipboard(content, 'Content copied to clipboard.');
+    }
+
+    private copyToClipboard(text: string, successMessage: string): void {
         if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard.writeText(text).then(() => {
-                this.alertService.showSuccess('Path copied to clipboard.', this.SUCCESS);
+                this.alertService.showSuccess(successMessage, this.SUCCESS);
             }, () => {
-                this.alertService.showError('Could not copy path to clipboard.', this.ERROR);
+                this.alertService.showError('Could not copy to clipboard.', this.ERROR);
             });
             return;
         }
@@ -408,9 +417,9 @@ export class ObjectBrowserComponent implements OnInit {
         textarea.select();
         try {
             document.execCommand('copy');
-            this.alertService.showSuccess('Path copied to clipboard.', this.SUCCESS);
+            this.alertService.showSuccess(successMessage, this.SUCCESS);
         } catch (e) {
-            this.alertService.showError('Could not copy path to clipboard.', this.ERROR);
+            this.alertService.showError('Could not copy to clipboard.', this.ERROR);
         } finally {
             document.body.removeChild(textarea);
         }

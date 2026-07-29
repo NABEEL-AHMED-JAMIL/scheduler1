@@ -176,6 +176,13 @@
                     <div *ngIf="previewLoading" class="text-muted">Loading preview...</div>
                     <div *ngIf="previewError" class="error-text">{{ previewError }}</div>
 
+                    <div *ngIf="(previewKind === 'json' && previewJson) || ((previewKind === 'csv' || previewKind === 'txt') && previewText)"
+                        class="preview-toolbar">
+                        <button type="button" class="btn btn-default btn-sm" (click)="copyPreviewContent()" title="Copy all content">
+                            <span class="glyphicon glyphicon-duplicate"></span> Copy
+                        </button>
+                    </div>
+
                     <pre *ngIf="previewKind === 'json' && previewJson" class="preview-text">{{ previewJson }}</pre>
 
                     <pre *ngIf="(previewKind === 'csv' || previewKind === 'txt') && previewText" class="preview-text">{{ previewText }}</pre>
