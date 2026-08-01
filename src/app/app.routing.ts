@@ -15,7 +15,14 @@ import {
     JobLogComponent,
     SearchEngineComponent,
     LoginComponent,
-    ObjectBrowserComponent
+    ObjectBrowserComponent,
+    PdfHighlighterComponent,
+    PdfHighlighterDetailComponent,
+    DynamicFormListComponent,
+    CUDynamicFormComponent,
+    FillDynamicFormComponent,
+    DynamicFormSubmissionsComponent,
+    ViewDynamicFormSubmissionComponent
 } from './_component/index';
 
 
@@ -118,6 +125,56 @@ const routes: Routes = [
     {
         path: 'objectBrowser',
         component: ObjectBrowserComponent,
+        canActivate: [AuthGuard]
+    },
+    {
+        path: 'pdfHighlighter',
+        component: PdfHighlighterComponent,
+        canActivate: [AuthGuard]
+    },
+    {
+        path: 'pdfHighlighter/new',
+        component: PdfHighlighterDetailComponent,
+        canActivate: [AuthGuard]
+    },
+    {
+        path: 'pdfHighlighter/:pdfHighlighterTaskId',
+        component: PdfHighlighterDetailComponent,
+        canActivate: [AuthGuard]
+    },
+    {
+        path: 'dynamicForm',
+        component: DynamicFormListComponent,
+        canActivate: [AuthGuard]
+    },
+    {
+        path: 'dynamicForm/new',
+        component: CUDynamicFormComponent,
+        canActivate: [AuthGuard]
+    },
+    {
+        path: 'dynamicForm/edit/:dynamicFormId',
+        component: CUDynamicFormComponent,
+        canActivate: [AuthGuard]
+    },
+    {
+        path: 'dynamicForm/fill/:dynamicFormId',
+        component: FillDynamicFormComponent,
+        canActivate: [AuthGuard]
+    },
+    {
+        path: 'dynamicForm/fill/:dynamicFormId/edit/:submissionId',
+        component: FillDynamicFormComponent,
+        canActivate: [AuthGuard]
+    },
+    {
+        path: 'dynamicForm/submissions/:dynamicFormId',
+        component: DynamicFormSubmissionsComponent,
+        canActivate: [AuthGuard]
+    },
+    {
+        path: 'dynamicForm/submissions/:dynamicFormId/:submissionId',
+        component: ViewDynamicFormSubmissionComponent,
         canActivate: [AuthGuard]
     },
     {

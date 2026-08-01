@@ -58,8 +58,13 @@ export class SubLookupComponent implements OnInit {
 		.subscribe((response) => {
 			if(response.status === ApiCode.SUCCESS) {
 				this.spinnerService.hide();
-				// remove the target index
-				this.lookupDatas.splice(index, 1); 
+				// look up the real index by id -- the *ngFor index passed in is into the
+				// searchFilter-filtered view, not this.lookupDatas itself, so it pointed at
+				// the wrong row whenever a search term was active
+				const realIndex = this.lookupDatas.findIndex((data) => data.lookupId === lookupData.lookupId);
+				if (realIndex > -1) {
+					this.lookupDatas.splice(realIndex, 1);
+				}
 			} else {
 				this.spinnerService.hide();
 				this.alertService.showError(response.message, this.ERROR);

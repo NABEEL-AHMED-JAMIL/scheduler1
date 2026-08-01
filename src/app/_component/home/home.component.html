@@ -1,14 +1,74 @@
 ﻿<!-- breadcrumb -->
 <nav class="breadcrumb-bar">
     <span class="crumb-current">Home</span>
-    <span class="breadcrumb-spacer"></span>
-    <strong style="color: #36424d;">Date Range: {{last_7th_date}} - {{today_date}}</strong>
 </nav>
 
-<div class="row">
+<!-- Date-range filter -->
+<div class="toolbar bucket-toolbar">
+    <div class="form-group">
+        <label class="control-label" for="filterStartDate">From</label>
+        <input type="date" id="filterStartDate" class="form-control input-sm"
+            [(ngModel)]="filterStartDate" [max]="filterEndDate" />
+    </div>
+    <div class="form-group">
+        <label class="control-label" for="filterEndDate">To</label>
+        <input type="date" id="filterEndDate" class="form-control input-sm"
+            [(ngModel)]="filterEndDate" [min]="filterStartDate" [max]="today_date" />
+    </div>
+    <button type="button" class="btn btn-teal btn-sm" (click)="applyFilter()">
+        <span class="glyphicon glyphicon-filter"></span> Apply
+    </button>
+    <button type="button" class="btn btn-default btn-sm" (click)="resetFilter()" *ngIf="isCustomRange" title="Back to last 7 days">
+        <span class="glyphicon glyphicon-remove"></span> Reset
+    </button>
+    <span class="toolbar-spacer"></span>
+    <span class="help-text" style="margin: 0;">Showing {{filterStartDate}} &ndash; {{filterEndDate}}</span>
+</div>
+
+<!-- KPI stat tiles -->
+<div class="kpi-row">
+    <div class="kpi-tile kpi-total">
+        <span class="kpi-icon"><span class="glyphicon glyphicon-briefcase"></span></span>
+        <span>
+            <span class="kpi-value">{{totalJobsCount}}</span>
+            <span class="kpi-label">Total Jobs</span>
+        </span>
+    </div>
+    <div class="kpi-tile kpi-active">
+        <span class="kpi-icon"><span class="glyphicon glyphicon-ok-circle"></span></span>
+        <span>
+            <span class="kpi-value">{{activeJobsCount}}</span>
+            <span class="kpi-label">Active Jobs</span>
+        </span>
+    </div>
+    <div class="kpi-tile kpi-running">
+        <span class="kpi-icon"><span class="glyphicon glyphicon-refresh"></span></span>
+        <span>
+            <span class="kpi-value">{{runningNowCount}}</span>
+            <span class="kpi-label">Running Now</span>
+        </span>
+    </div>
+    <div class="kpi-tile kpi-completed">
+        <span class="kpi-icon"><span class="glyphicon glyphicon-ok"></span></span>
+        <span>
+            <span class="kpi-value">{{completedCount}}</span>
+            <span class="kpi-label">Completed</span>
+        </span>
+    </div>
+    <div class="kpi-tile kpi-failed">
+        <span class="kpi-icon"><span class="glyphicon glyphicon-exclamation-sign"></span></span>
+        <span>
+            <span class="kpi-value">{{failedCount}}</span>
+            <span class="kpi-label">Failed</span>
+        </span>
+    </div>
+</div>
+
+<div class="row row-equal">
     <!-- Job Status Chart -->
     <div class="col-md-3">
         <div class="card-panel">
+            <h4 class="card-panel-title"><span class="glyphicon glyphicon-briefcase"></span> Job Status</h4>
             <div id="sourceJobStatusStatistics"
                 class="demo-chart"
                 echarts [options]="sourceJobStatusStatistics">
@@ -19,6 +79,7 @@
     <!-- Running Job Chart -->
     <div class="col-md-3">
         <div class="card-panel">
+            <h4 class="card-panel-title"><span class="glyphicon glyphicon-refresh"></span> Running Job</h4>
             <div id="sourceJobRunningStatistics"
                 class="demo-chart"
                 echarts [options]="sourceJobRunningStatistics">
@@ -29,6 +90,7 @@
     <!-- Weekly Running Chart -->
     <div class="col-md-6">
         <div class="card-panel">
+            <h4 class="card-panel-title"><span class="glyphicon glyphicon-stats"></span> Queue Job Statistics</h4>
             <div id="sourceJobWeeklyRunningStatistics"
                 class="demo-chart"
                 echarts [options]="sourceJobWeeklyRunningStatistics">
@@ -41,8 +103,12 @@
     <!-- Heatmap Chart -->
     <div class="col-md-12">
         <div class="card-panel">
+            <h4 class="card-panel-title">
+                <span class="glyphicon glyphicon-th"></span> Weekday Hrs Queue Job Statistics
+                <span class="help-text" style="display: inline; margin-left: 8px; font-weight: 400;">click a cell to drill down</span>
+            </h4>
             <div id="sourceJobWeeklyHrsRunningStatistics"
-                class="demo-chart"
+                class="demo-chart home-chart-tall"
                 echarts [options]="sourceJobWeeklyHrsRunningStatistics"
                 (chartClick)="onChartEvent($event, 'sourceJobWeeklyHrsRunningStatistics')">
             </div>
@@ -52,12 +118,13 @@
     <!-- Data Table -->
     <div class="col-md-12" *ngIf="sourceJobWeeklyRunningStatisticsDimensionData">
         <div class="card-panel">
+            <h4 class="card-panel-title"><span class="glyphicon glyphicon-list-alt"></span> Job Breakdown</h4>
             <!-- Search Input -->
             <div class="form-group">
                 <input type="text"
                     id="searchSourceJobDetails"
                     class="form-control"
-                    placeholder="Search"
+                    placeholder="Search by job id or name"
                     [(ngModel)]="searchSourceJobDetails"/>
             </div>
 

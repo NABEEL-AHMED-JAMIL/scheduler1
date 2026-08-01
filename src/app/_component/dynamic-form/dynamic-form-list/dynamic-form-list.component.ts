@@ -1,0 +1,98 @@
+import { Component, OnInit, ViewChild } from '@angular/core';
+import { Router } from '@angular/router';
+import { AlertService, DynamicFormService } from '@/_services';
+import { SpinnerService } from '@/_helpers';
+import { first } from 'rxjs/operators';
+import { ApiCode } from '@/_models';
+import { DynamicForm } from '@/_models/dynamic-form.model';
+
+/**
+ * Lists dynamic forms -- create a new one, edit its fields, fill it in, or delete it.
+ * @author Nabeel Ahmed
+ */
+@Component({
+    selector: 'dynamic-form-list',
+    templateUrl: 'dynamic-form-list.component.html'
+})
+export class DynamicFormListComponent implements OnInit {
+
+    @ViewChild('closebutton', {static: false})
+    public closebutton: any;
+
+    public ERROR: string = 'Error';
+    public searchDynamicForm: any = '';
+    public dynamicForms: DynamicForm[] = [];
+    public deleteDynamicFormId: any;
+    public deleteSelectedIndex: any;
+
+    constructor(
+        private router: Router,
+        private alertService: AlertService,
+        private spinnerService: SpinnerService,
+        private dynamicFormService: DynamicFormService) {
+    }
+
+    ngOnInit() {
+        this.fetchAllForms();
+    }
+
+    public fetchAllForms(): void {
+        this.spinnerService.show();
+        this.dynamicFormService.fetchAllForms()
+            .pipe(first())
+            .subscribe((response) => {
+                this.spinnerService.hide();
+                if (response.status === ApiCode.SUCCESS) {
+                    this.dynamicForms = response.data;
+                } else {
+                    this.alertService.showError(response.message, this.ERROR);
+                }
+            }, (error) => {
+                this.spinnerService.hide();
+                this.alertService.showError(error, this.ERROR);
+            });
+    }
+
+    public addDynamicForm(): void {
+        this.router.navigate(['/dynamicForm/new']);
+    }
+
+    public editDynamicForm(dynamicForm: DynamicForm): void {
+        this.router.navigate(['/dynamicForm/edit', dynamicForm.dynamicFormId]);
+    }
+
+    public fillDynamicForm(dynamicForm: DynamicForm): void {
+        this.router.navigate(['/dynamicForm/fill', dynamicForm.dynamicFormId]);
+    }
+
+    public viewSubmissions(dynamicForm: DynamicForm): void {
+        this.router.navigate(['/dynamicForm/submissions', dynamicForm.dynamicFormId]);
+    }
+
+    public deleteDynamicForm(dynamicFormId: any, selectedIndex: any): void {
+        this.deleteDynamicFormId = dynamicFormId;
+        this.deleteSelectedIndex = selectedIndex;
+    }
+
+    public processDeleteDynamicForm(): void {
+        this.spinnerService.show();
+        this.dynamicFormService.deleteForm(this.deleteDynamicFormId)
+            .pipe(first())
+            .subscribe((response) => {
+                this.spinnerService.hide();
+                if (response.status === ApiCode.SUCCESS) {
+                    this.alertService.showSuccess(response.message, 'Form Delete');
+                    this.dynamicForms.splice(this.deleteSelectedIndex, 1);
+                    this.closebutton.nativeElement.click();
+                    this.deleteDynamicFormId = null;
+                    this.deleteSelectedIndex = null;
+                } else {
+                    this.alertService.showError(response.message, this.ERROR);
+                }
+            }, (error) => {
+                this.spinnerService.hide();
+                this.alertService.showError(error, this.ERROR);
+            });
+    }
+
+}

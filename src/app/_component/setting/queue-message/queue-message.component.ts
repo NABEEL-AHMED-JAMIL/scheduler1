@@ -1,7 +1,7 @@
 ﻿import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup } from '@angular/forms';
 import { AlertService, SettingService } from '@/_services';
-import { SpinnerService } from '@/_helpers';
+import { SpinnerService, prettyPrint } from '@/_helpers';
 import { QMessage } from '@/_models/index';
 import { first } from 'rxjs/operators';
 import { EChartOption } from 'echarts';
@@ -130,21 +130,7 @@ export class QueueMessageComponent implements OnInit {
     }
 
     public showQMessageDetail(queueData: any): void {
-      this.selectedQMessage = this.prettyPrint(queueData?.jobStatusMessage);
-    }
-
-    private prettyPrint(message: any): string {
-      if (message === null || message === undefined || message === '') {
-        return '';
-      }
-      if (typeof message === 'object') {
-        return JSON.stringify(message, null, 2);
-      }
-      try {
-        return JSON.stringify(JSON.parse(message), null, 2);
-      } catch {
-        return String(message);
-      }
+      this.selectedQMessage = prettyPrint(queueData?.jobStatusMessage);
     }
 
     public deleteQMessage(queueData: any, index: any) {

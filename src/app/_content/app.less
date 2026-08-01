@@ -962,6 +962,58 @@ body {
   color: @brand-teal;
 }
 
+/* Row-opening link (e.g. submission #id -> detail panel) -- reads as clearly clickable */
+.submission-id-link {
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.submission-id-link:hover {
+  text-decoration: underline;
+}
+
+/* "Other Submissions" sidebar rows on the submission detail page */
+.submission-list-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 10px;
+  border-bottom: 1px solid @line;
+  border-left: 3px solid transparent;
+  color: @ink;
+  text-decoration: none;
+}
+
+.submission-list-item:last-child {
+  border-bottom: none;
+}
+
+.submission-list-item:hover {
+  background: #f1f0fd;
+  text-decoration: none;
+  color: @ink;
+}
+
+.submission-list-item.active {
+  background: rgba(79, 70, 229, 0.08);
+  border-left-color: @brand-teal;
+}
+
+.submission-list-item strong {
+  color: @brand-teal-dark;
+  margin-right: 8px;
+}
+
+.submission-list-item .submission-list-preview {
+  font-size: 12px;
+  color: @muted;
+}
+
+.submission-list-item .submission-list-date {
+  font-size: 11px;
+  color: @muted;
+}
+
 /* Zoom out tables by reducing density globally while keeping full container width */
 .table-responsive .table {
   width: 100%;
@@ -1005,6 +1057,16 @@ body {
 /* Full-width message cell (e.g. logs table where the message column owns the row) */
 .cell-message.cell-message-wide {
   max-width: none;
+}
+
+/* Single-line truncated cell (e.g. dynamic-form submission values) -- caps runaway
+   pasted text to one line with an ellipsis instead of ballooning the row height;
+   the full value is available via [title] and the row's View action. */
+.cell-truncate {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ---------- Detail / info layouts (for redesigned detail pages) ---------- */
@@ -1352,6 +1414,65 @@ body {
 
 .stat-strip .stat-chip.chip-schedule .stat-num {
   color: @brand-teal-dark;
+}
+
+/* ---------- Dashboard KPI tiles (Home) ---------- */
+.kpi-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.kpi-tile {
+  flex: 1 1 180px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: @surface;
+  border: 1px solid @line;
+  border-radius: 8px;
+  padding: 16px 18px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.kpi-tile .kpi-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.kpi-tile .kpi-value {
+  display: block;
+  font-size: 24px;
+  font-weight: 700;
+  color: @ink;
+  line-height: 1.2;
+}
+
+.kpi-tile .kpi-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #7a8892;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.kpi-tile.kpi-total     .kpi-icon { background: #e6f6f4; color: @brand-teal-dark; }
+.kpi-tile.kpi-active    .kpi-icon { background: #e3f6e9; color: #1d7a3f; }
+.kpi-tile.kpi-running   .kpi-icon { background: #fff4e0; color: #b5730a; }
+.kpi-tile.kpi-completed .kpi-icon { background: #e3f6e9; color: #1d7a3f; }
+.kpi-tile.kpi-failed    .kpi-icon { background: #fde4e4; color: #c0392b; }
+
+/* ---------- Dashboard charts (Home) ---------- */
+.home-chart-tall {
+  height: 240px;
 }
 
 /* Section divider inside a card */
@@ -1728,6 +1849,30 @@ body {
   max-width: none;
 }
 
+/* Same override for the dynamic-form tables' Action column -- a fixed-count icon
+   button group must not be allowed to wrap onto a second line when other columns
+   (Description, Preview) squeeze it; overrides the app-wide ".table-responsive .table"
+   width cap so the table can genuinely overflow into horizontal scroll instead.
+   table-layout: fixed is required too -- with the default auto layout, a floated
+   .btn-group's min-content width isn't measured the way plain inline content is,
+   so auto-layout still starves the Action column below its declared width even
+   once the table itself is free to grow; fixed layout makes each <th>'s width
+   authoritative regardless of what's floated inside its cells.
+   width is intentionally NOT set here (each table declares its own inline
+   min-width matching the sum of its column widths) -- with table-layout: fixed,
+   a table 'width' of auto falls back to shrinking to the container regardless
+   of the declared column widths, so a real width/min-width value is required
+   for the summed column widths to actually take effect. */
+.table-responsive .table.dynamic-form-table {
+  table-layout: fixed;
+  max-width: none;
+}
+
+.dynamic-form-table td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .bucket-object-table .etag-value,
 .bucket-object-table .content-type-value {
   overflow: hidden;
@@ -1895,7 +2040,310 @@ body {
   to { transform: rotate(360deg); }
 }
 
+/* PDF Highlighter detail (upload + canvas box-drawing + field list) */
+.dropzone {
+  border: 2px dashed @line;
+  border-radius: 6px;
+  padding: 40px 20px;
+  text-align: center;
+  position: relative;
+  cursor: pointer;
+}
+.dropzone input[type="file"] {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.dropzone-icon {
+  font-size: 36px;
+  color: @brand-primary;
+  display: block;
+  margin-bottom: 8px;
+}
+.dropzone-title {
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+.dropzone-hint {
+  color: #7f8c8d;
+  font-size: 12px;
+  margin-bottom: 0;
+}
+
+.viewer-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.viewer-toolbar .file-name {
+  font-weight: 600;
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.viewer-toolbar .toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.page-indicator {
+  min-width: 90px;
+}
+
+.viewer-scroll {
+  max-height: 720px;
+  overflow: auto;
+  border: 1px solid @line;
+  border-radius: 6px;
+  background: #eceff1;
+  padding: 24px;
+}
+.viewer-box {
+  position: relative;
+  display: inline-block;
+}
+.viewer-box.rendering {
+  opacity: 0.6;
+}
+.viewer-box canvas {
+  display: block;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+.overlay {
+  position: absolute;
+  top: 0; left: 0;
+  cursor: crosshair;
+}
+.overlay.readonly {
+  cursor: default;
+}
+.field-box {
+  position: absolute;
+  border: 2px solid @brand-primary;
+  background: rgba(38, 82, 214, 0.12);
+  pointer-events: none;
+}
+.field-box-label {
+  position: absolute;
+  top: -20px;
+  left: 0;
+  background: @brand-primary;
+  color: #fff;
+  font-size: 11px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+.draft-box {
+  position: absolute;
+  border: 2px dashed @brand-primary;
+  background: rgba(38, 82, 214, 0.08);
+  pointer-events: none;
+}
+
+.field-list-scroll {
+  max-height: 620px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.field-row {
+  border-bottom: 1px solid @line;
+  padding: 10px 0;
+}
+.field-row:last-child {
+  border-bottom: none;
+}
+.field-row-main {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.field-row-main input {
+  flex: 1 1 auto;
+}
+.field-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.field-row-meta .meta-page {
+  font-size: 11px;
+  color: #7f8c8d;
+}
+.field-row-meta .meta-field {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: normal;
+  margin-bottom: 0;
+}
+.field-row-meta .meta-field input {
+  width: 64px;
+}
+.field-row-strategy {
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+.field-row-selector {
+  font-size: 11px;
+  color: #566573;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.field-row-selector .selector-path {
+  background: #eceff1;
+  padding: 1px 5px;
+  border-radius: 3px;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.json-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.json-panel-actions {
+  display: flex;
+  gap: 6px;
+}
+.json-preview {
+  background: #2b2f36;
+  color: #d7dde3;
+  padding: 12px;
+  border-radius: 6px;
+  max-height: 320px;
+  overflow: auto;
+  font-size: 12px;
+}
+.no-selector {
+  font-size: 11px;
+  color: #b5730a;
+  margin-bottom: 0;
+}
+.btn-group-xs > .btn {
+  padding: 1px 5px;
+  font-size: 12px;
+  line-height: 1.5;
+  border-radius: 3px;
+}
+
+/* The up/down field-reorder buttons stack vertically -- this codebase's .btn-group has no
+   float/layout rules of its own (unlike Bootstrap), so the two buttons only stacked at all
+   because they're nested two levels inside a flex container (.field-row-main), which silently
+   "blockifies" their display even though they aren't direct flex items. flex-direction: column
+   (even with identical explicit widths/heights on both buttons) still let the two rows land
+   1px apart horizontally -- a sub-pixel rounding difference in how the flex algorithm
+   distributes/snaps each row's box that no amount of explicit sizing removed. Absolute
+   positioning sidesteps the flex layout algorithm entirely: both buttons get the literal same
+   `left: 0`, so there's no per-row computation left that could disagree between them. */
+.field-order-buttons {
+  position: relative;
+  flex-shrink: 0;
+  width: 24px;
+  height: 40px;
+  border: 1px solid #d3dade;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.field-order-buttons > .btn {
+  position: absolute;
+  left: 0;
+  width: 24px;
+  height: 20px;
+  padding: 0;
+  line-height: 18px;
+  border: none;
+  border-radius: 0;
+}
+.field-order-buttons > .btn:first-child {
+  top: 0;
+}
+.field-order-buttons > .btn:last-child {
+  top: 20px;
+  border-top: 1px solid #d3dade;
+}
+
+/* A "Section" field renders as a plain heading/divider in the fill form -- it's not an
+   input, just a visual break between groups of fields. */
+.form-section-heading {
+  margin: 4px 0 14px;
+}
+.form-section-heading h4 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+.form-section-heading hr {
+  margin: 0;
+  border-top: 1px solid @line;
+}
+
+.file-path {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 260px;
+}
+.file-path code {
+  background: #eceff1;
+  padding: 1px 5px;
+  border-radius: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1 1 auto;
+}
+
 .error-text {
   color: #c0392b;
+  font-size: 12px;
+}
+
+/* Shareable API link box (e.g. submission detail's fetch-by-uuid link) */
+.share-link-box {
+  background: #f7f9fa;
+  border: 1px solid @line;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 18px;
+}
+
+.share-link-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: @ink;
+  margin-bottom: 6px;
+}
+
+.share-link-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.share-link-row code {
+  flex: 1 1 auto;
+  background: #eceff1;
+  padding: 4px 8px;
+  border-radius: 3px;
+  overflow-x: auto;
+  white-space: nowrap;
   font-size: 12px;
 }

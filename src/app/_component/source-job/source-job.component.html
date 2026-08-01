@@ -60,7 +60,7 @@
             </tr>
         </thead>
         <tbody>
-            <tr *ngFor="let sourceJob of sourceJobDetails?.reverse() | searchFilter: searchSourceJobDetails; let i = index;" [class.disabled-row]="sourceJob.jobStatus === 'Delete'">
+            <tr *ngFor="let sourceJob of sourceJobDetails | searchFilter: searchSourceJobDetails; let i = index;" [class.disabled-row]="sourceJob.jobStatus === 'Delete'">
                 <td class="text-center">
                     <input type="checkbox"
                         [checked]="selectedSourceJobIds.has(sourceJob.jobId)"

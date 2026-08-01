@@ -11,7 +11,10 @@ services:
       - "80:80"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost/health"]
+      # nginx here only binds IPv4 ("listen 80;", no "[::]:80") -- "localhost" inside the
+      # container can resolve to ::1 first and get a connection refused even though the IPv4
+      # listener is fine. 127.0.0.1 sidesteps the DNS ambiguity entirely.
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/health"]
       interval: 30s
       timeout: 5s
       retries: 3

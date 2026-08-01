@@ -28,7 +28,6 @@ export class HomeComponent implements OnInit {
   // search detail
   public searchSourceJobDetails: any = '';
   public sourceJobWeeklyRunningStatisticsDimensionData: any;
-  public viewRunningJobDate: any;
   public jobStatusData: NameValue[] = [
     {
       value: 0,
@@ -67,11 +66,7 @@ export class HomeComponent implements OnInit {
   ];
 
   // data pattern -> day|hr|total count
-  private heatMapData: any = [[0, 0, 0]]
-    .map(function (item) {
-      // day|hr|total count
-      return [item[1], item[0], item[2] || '-'];
-    });
+  private heatMapData: any = [[0, 0, '-']];
 
   public subscription!: Subscription;
   public sourceJobStatusStatistics!: EChartOption;
@@ -80,6 +75,9 @@ export class HomeComponent implements OnInit {
   public sourceJobWeeklyHrsRunningStatistics!: EChartOption;
   public today_date: any;
   public last_7th_date: any;
+  // date-range filter -- defaults to the last 7 days, editable from the toolbar
+  public filterStartDate: any;
+  public filterEndDate: any;
 
   constructor(public datepipe: DatePipe,
     private alertService: AlertService,
@@ -92,14 +90,90 @@ export class HomeComponent implements OnInit {
     this.today_date = this.datepipe.transform(todayDate, 'yyyy-MM-dd', this.chicagoTimeZone) || '';
     todayDate.setDate(todayDate.getDate() - 6);
     this.last_7th_date = this.datepipe.transform(todayDate, 'yyyy-MM-dd', this.chicagoTimeZone) || '';
+    this.filterStartDate = this.last_7th_date;
+    this.filterEndDate = this.today_date;
+    this.loadDashboard();
+  }
+
+  /** Whether the filter has been moved away from the default last-7-days window. */
+  get isCustomRange(): boolean {
+    return this.filterStartDate !== this.last_7th_date || this.filterEndDate !== this.today_date;
+  }
+
+  public applyFilter(): void {
+    if (!this.filterStartDate || !this.filterEndDate) {
+      this.alertService.showError('Please select both a start and end date.', this.ERROR);
+      return;
+    }
+    if (this.filterStartDate > this.filterEndDate) {
+      this.alertService.showError('Start date must be on or before the end date.', this.ERROR);
+      return;
+    }
+    this.loadDashboard();
+  }
+
+  public resetFilter(): void {
+    this.filterStartDate = this.last_7th_date;
+    this.filterEndDate = this.today_date;
+    this.loadDashboard();
+  }
+
+  private loadDashboard(): void {
+    this.searchSourceJobDetails = '';
+    this.sourceJobWeeklyRunningStatisticsDimensionData = undefined;
     this.jobStatusStatistics();
     this.jobRunningStatistics();
     this.weeklyRunningJobStatistics();
     this.weeklyHrsRunningJobStatistics();
   }
 
+  // --- Stat tiles (derived from the same jobStatusData/jobRunningData the pie charts already use) ---
+
+  get totalJobsCount(): number {
+    return this.statValue(this.jobStatusData, 'All');
+  }
+
+  get activeJobsCount(): number {
+    return this.statValue(this.jobStatusData, 'Active');
+  }
+
+  get runningNowCount(): number {
+    return this.statValue(this.jobRunningData, 'Running');
+  }
+
+  get failedCount(): number {
+    return this.statValue(this.jobRunningData, 'Failed');
+  }
+
+  get completedCount(): number {
+    return this.statValue(this.jobRunningData, 'Completed');
+  }
+
+  /** Case-insensitive lookup -- the API returns UPPERCASE status names, the pre-load defaults use Title Case. */
+  private statValue(data: NameValue[], name: string): number {
+    const match = data.find((d) => (d.name || '').toUpperCase() === name.toUpperCase());
+    return match ? Number(match.value) || 0 : 0;
+  }
+
+  /** Shared toolbox config for every chart's refresh button -- only the click handler and visibility differ per chart. */
+  private refreshToolbox(onclick: () => void, show = false): any {
+    return {
+      top: '7px',
+      feature: {
+        myRefresh: {
+          show,
+          title: 'Refresh',
+          top: '7px',
+          icon: 'image://https://www.svgrepo.com/show/199951/refresh.svg',
+          onclick
+        }
+      }
+    };
+  }
+
   public jobStatusStatistics(): void {
-    this.homeService.jobStatusStatistics()
+    this.spinnerService.show();
+    this.homeService.jobStatusStatistics(this.filterStartDate, this.filterEndDate)
       .pipe(first())
       .subscribe((response) => {
         if (response.status === ApiCode.SUCCESS) {
@@ -131,25 +205,7 @@ export class HomeComponent implements OnInit {
     };
     
     this.sourceJobStatusStatistics = {
-      toolbox: {
-        top: '7px',
-        feature: {
-          myRefresh: {
-            show: false,
-            title: 'Refresh',
-            top: '7px',
-            icon: 'image://https://www.svgrepo.com/show/199951/refresh.svg',
-            onclick: () => {
-              this.jobStatusStatistics();
-            }
-          }
-        }
-      },
-      title: {
-        text: 'Job Status',
-        left: 'center',
-        top: '7px'
-      },
+      toolbox: this.refreshToolbox(() => this.jobStatusStatistics()),
       tooltip: {
         trigger: 'item'
       },
@@ -182,19 +238,25 @@ export class HomeComponent implements OnInit {
           labelLine: {
             show: false
           },
-          data: dataPaload.map((item: any) => ({
-            ...item,
-            itemStyle: {
-              color: colorMap[item.name as keyof typeof colorMap] || '#999'
-            }
-          }))
+          // 'All' is a synthetic Active+Inactive row the backend adds only for the
+          // totalJobsCount KPI tile (see statValue) -- including it here doubled the pie's
+          // total and skewed every slice's percentage.
+          data: dataPaload
+            .filter((item: any) => (item.name || '').toUpperCase() !== 'ALL')
+            .map((item: any) => ({
+              ...item,
+              itemStyle: {
+                color: colorMap[item.name as keyof typeof colorMap] || '#999'
+              }
+            }))
         }
       ]
     }
   }
 
   public jobRunningStatistics(): void {
-    this.homeService.jobRunningStatistics()
+    this.spinnerService.show();
+    this.homeService.jobRunningStatistics(this.filterStartDate, this.filterEndDate)
       .pipe(first())
       .subscribe((response) => {
         if (response.status === ApiCode.SUCCESS) {
@@ -213,25 +275,7 @@ export class HomeComponent implements OnInit {
 
   public drawJobRunningStatistics(dataPaload: any): void {
     this.sourceJobRunningStatistics = {
-      toolbox: {
-        top: '7px',
-        feature: {
-          myRefresh: {
-            show: false,
-            title: 'Refresh',
-            top: '7px',
-            icon: 'image://https://www.svgrepo.com/show/199951/refresh.svg',
-            onclick: () => {
-              this.jobRunningStatistics();
-            }
-          }
-        }
-      },
-      title: {
-        text: 'Running Job',
-        left: 'center',
-        top: '5px'
-      },
+      toolbox: this.refreshToolbox(() => this.jobRunningStatistics()),
       tooltip: {
         trigger: 'item'
       },
@@ -272,17 +316,17 @@ export class HomeComponent implements OnInit {
   }
 
   public weeklyRunningJobStatistics(): void {
-    //this.spinnerService.show();
-    this.homeService.weeklyRunningJobStatistics(this.last_7th_date, this.today_date)
+    this.spinnerService.show();
+    this.homeService.weeklyRunningJobStatistics(this.filterStartDate, this.filterEndDate)
       .pipe(first())
       .subscribe((response) => {
         if (response.status === ApiCode.SUCCESS) {
           this.spinnerService.hide();
           this.weeklyRunningJobData = response.data;
-            const dayOrder = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-            const dayIndex = dayOrder.map(day =>
+          const dayOrder = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+          const dayIndex = dayOrder.map(day =>
             this.weeklyRunningJobData.find((element) => element.name === day)?.value || 0
-            );
+          );
           this.drawSourceJobWeeklyRunningStatistics(dayIndex);
         } else {
           this.drawSourceJobWeeklyRunningStatistics([0, 0, 0, 0, 0, 0, 0]);
@@ -296,31 +340,14 @@ export class HomeComponent implements OnInit {
 
   public drawSourceJobWeeklyRunningStatistics(dataPaload: any): void {
     this.sourceJobWeeklyRunningStatistics = {
-      toolbox: {
-        top: '7px',
-        feature: {
-          myRefresh: {
-            show: false,
-            title: 'Refresh',
-            top: '7px',
-            icon: 'image://https://www.svgrepo.com/show/199951/refresh.svg',
-            onclick: () => {
-              this.weeklyRunningJobStatistics();
-            }
-          }
-        }
-      },
-      title: {
-        text: 'Weekly Queue Job Statistics',
-        left: 'center',
-        top: '5px'
-      },
+      toolbox: this.refreshToolbox(() => this.weeklyRunningJobStatistics()),
       tooltip: {
         trigger: 'axis',
       },
       grid: {
         left: '3%',
         right: '4%',
+        top: '4%',
         bottom: '3%',
         containLabel: true
       },
@@ -351,11 +378,12 @@ export class HomeComponent implements OnInit {
   }
 
   public weeklyHrsRunningJobStatistics(): void {
-    this.homeService.weeklyHrsRunningJobStatistics(this.last_7th_date, this.today_date)
+    this.spinnerService.show();
+    this.homeService.weeklyHrsRunningJobStatistics(this.filterStartDate, this.filterEndDate)
       .pipe(first())
       .subscribe((response) => {
+        this.spinnerService.hide();
         if (response.status === ApiCode.SUCCESS) {
-          this.spinnerService.hide();
           this.heatMapData = response.data;
           this.drawWeeklyHrsRunningJobStatistics(
             this.heatMapData.map(function (item: any) {
@@ -365,37 +393,23 @@ export class HomeComponent implements OnInit {
         }
         this.alertService.showError(response.message, this.ERROR);
       }, (error) => {
+        this.spinnerService.hide();
         this.alertService.showError(error, this.ERROR);
       });
   }
 
   public drawWeeklyHrsRunningJobStatistics(dataPaload: any): void {
     this.sourceJobWeeklyHrsRunningStatistics = {
-      toolbox: {
-        top: '7px',
-        feature: {
-          myRefresh: {
-            show: true,
-            title: 'Refresh',
-            top: '7px',
-            icon: 'image://https://www.svgrepo.com/show/199951/refresh.svg',
-            onclick: () => {
-              this.weeklyHrsRunningJobStatistics();
-            }
-          }
-        }
-      },
-      title: {
-        text: 'Weekday Hrs Queue Job Statistics',
-        left: 'center',
-        top: '5px'
-      },
+      toolbox: this.refreshToolbox(() => this.weeklyHrsRunningJobStatistics(), true),
       tooltip: {
         position: 'top'
       },
       grid: {
-        height: '60%',
-        top: '25%'
+        left: '1%',
+        right: '13%',
+        top: '3%',
+        height: '80%',
+        containLabel: true
       },
       xAxis: {
         type: 'category',

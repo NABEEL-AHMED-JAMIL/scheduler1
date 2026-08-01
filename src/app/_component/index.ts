@@ -22,3 +22,12 @@ export * from './search-engine/search-engine.component';
 export * from './login/login.component';
 // object-browser
 export * from './object-browser/object-browser.component';
+// pdf-highlighter
+export * from './pdf-highlighter/pdf-highlighter-detail/pdf-highlighter-detail.component';
+export * from './pdf-highlighter/pdf-highlighter.component';
+// dynamic-form
+export * from './dynamic-form/dynamic-form-list/dynamic-form-list.component';
+export * from './dynamic-form/cu-dynamic-form/cu-dynamic-form.component';
+export * from './dynamic-form/fill-dynamic-form/fill-dynamic-form.component';
+export * from './dynamic-form/dynamic-form-submissions/dynamic-form-submissions.component';
+export * from './dynamic-form/view-dynamic-form-submission/view-dynamic-form-submission.component';

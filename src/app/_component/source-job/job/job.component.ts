@@ -234,7 +234,7 @@ export class JobComponent implements OnInit {
                             schedulerId: new FormControl(response?.data?.scheduler?.schedulerId),
                             startDate: new FormControl(response?.data?.scheduler?.startDate, [Validators.required]),
                             endDate: new FormControl(response?.data?.scheduler?.endDate),
-                            startTime: new FormControl(response?.data?.scheduler?.startTime.substring(0,5), [Validators.required]),
+                            startTime: new FormControl(response?.data?.scheduler?.startTime?.substring(0,5), [Validators.required]),
                             frequency: new FormControl(response?.data?.scheduler?.frequency, [Validators.required]),
                             recurrence: new FormControl(response?.data?.scheduler?.recurrence, [Validators.required]),
                         }));

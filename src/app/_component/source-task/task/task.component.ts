@@ -96,7 +96,6 @@ export class TaskComponent implements OnInit {
                             if(response.status === ApiCode.SUCCESS) {
                                 this.spinnerService.hide();
                                 this.pipelineIdList = response.data.lookupDatas;
-                                console.log(this.pipelineIdList);
                             } else {
                                 this.spinnerService.hide();
                                 this.alertService.showError(response.message, this.ERROR);
@@ -115,7 +114,6 @@ export class TaskComponent implements OnInit {
                             if(response.status === ApiCode.SUCCESS) {
                                 this.spinnerService.hide();
                                 this.piplineHomePageList = response.data.lookupDatas;
-                                console.log(this.piplineHomePageList);
                             } else {
                                 this.spinnerService.hide();
                                 this.alertService.showError(response.message, this.ERROR);
@@ -152,7 +150,7 @@ export class TaskComponent implements OnInit {
                         pipelineId: [response?.data?.pipelineId],
                         tagsInfo: this.formBuilder.array([]),
                     });
-                    if (response?.data?.xmlTagsInfo.length > 0) {
+                    if (response?.data?.xmlTagsInfo?.length > 0) {
                         for (let i = 0; i < response?.data?.xmlTagsInfo.length; i++) {
                             this.tageFormsAddItemV1(response?.data?.xmlTagsInfo[i]);
                         }

@@ -1,0 +1,102 @@
+<nav class="breadcrumb-bar">
+    <a routerLink="/home">Home</a>
+    <span class="crumb-sep">/</span>
+    <a routerLink="/dynamicForm">Dynamic Forms</a>
+    <span class="crumb-sep">/</span>
+    <a [routerLink]="['/dynamicForm/submissions', dynamicFormId]">{{dynamicForm?.formName || 'Submissions'}}</a>
+    <span class="crumb-sep">/</span>
+    <span class="crumb-current">Submission #{{submissionId}}</span>
+</nav>
+
+<div class="row row-equal" *ngIf="dynamicForm">
+    <div class="col-md-8">
+        <div class="card-panel" *ngIf="submission">
+            <h4 class="card-panel-title panel-banner has-action">
+                <span><span class="glyphicon glyphicon-eye-open"></span> {{dynamicForm.formName}}</span>
+                <a class="banner-link" (click)="back()">
+                    <span class="glyphicon glyphicon-list-alt"></span> All Submissions
+                </a>
+            </h4>
+            <p class="help-text" *ngIf="dynamicForm.description" style="margin-top: -8px;">{{dynamicForm.description}}</p>
+
+            <div class="share-link-box" *ngIf="shareUrl">
+                <div class="share-link-label">
+                    <span class="glyphicon glyphicon-link"></span> Shareable API link
+                    <span class="help-text" style="display: inline; margin-left: 4px;">-- fetch this submission's data from Postman, a source task, or anywhere else</span>
+                </div>
+                <div class="share-link-row">
+                    <code>{{shareUrl}}</code>
+                    <button type="button" class="btn btn-icon ic-copy" title="Copy API link" (click)="copyShareUrl()">
+                        <span class="glyphicon glyphicon-copy"></span>
+                    </button>
+                </div>
+            </div>
+
+            <ng-container *ngFor="let field of dynamicForm.fields">
+                <div class="detail-item" *ngIf="field.fieldType !== 'section'">
+                    <span class="detail-label">{{field.fieldLabel}}</span>
+                    <span class="detail-value" *ngIf="!isTruncated(field, submission)">
+                        {{displayValue(field, submission)}}
+                    </span>
+                    <pre class="code-box" *ngIf="isTruncated(field, submission)">{{displayValue(field, submission)}}</pre>
+                </div>
+            </ng-container>
+
+            <div class="detail-item">
+                <span class="detail-label">Submitted</span>
+                <span class="detail-value">{{submission.dateCreated | date: 'yyyy-MM-dd HH:mm'}}</span>
+            </div>
+
+            <div class="toolbar">
+                <span class="toolbar-spacer"></span>
+                <button type="button" class="btn btn-sm btn-default" (click)="back()">Back</button>
+                <button type="button" class="btn btn-sm btn-default" (click)="confirmDelete()"
+                    data-toggle="modal" data-target="#deleteSubmissionModal">
+                    <span class="glyphicon glyphicon-trash"></span> Delete
+                </button>
+                <button type="button" class="btn btn-sm btn-teal" (click)="editSubmission()">
+                    <span class="glyphicon glyphicon-edit"></span> Edit
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Other submissions -->
+    <div class="col-md-4">
+        <div class="card-panel">
+            <h4 class="card-panel-title">
+                <span class="glyphicon glyphicon-th-list"></span> Other Submissions ({{otherSubmissions.length}})
+            </h4>
+            <span class="help-text" *ngIf="!otherSubmissions.length">No other submissions for this form.</span>
+            <div class="scroll-table" style="max-height: 620px;" *ngIf="otherSubmissions.length">
+                <a href="javascript:void(0);" *ngFor="let sibling of otherSubmissions"
+                    class="submission-list-item" [class.active]="sibling.dynamicFormSubmissionId == submissionId"
+                    (click)="selectSubmission(sibling)">
+                    <span>
+                        <strong>#{{sibling.dynamicFormSubmissionId}}</strong>
+                        <span class="submission-list-preview">{{previewValue(sibling)}}</span>
+                    </span>
+                    <span class="submission-list-date">{{sibling.dateCreated | date: 'yyyy-MM-dd HH:mm'}}</span>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Submission Modal -->
+<div class="modal fade" id="deleteSubmissionModal" role="dialog" style="top: 85px;">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" #closeDeleteSubmissionModal class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title">Delete Submission</h4>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete this submission? This cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger" (click)="processDelete()">Yes</button>
+            </div>
+        </div>
+    </div>
+</div>

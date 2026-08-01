@@ -1,0 +1,149 @@
+<nav class="breadcrumb-bar">
+    <a routerLink="/home">Home</a>
+    <span class="crumb-sep">/</span>
+    <a routerLink="/dynamicForm">Dynamic Forms</a>
+    <span class="crumb-sep">/</span>
+    <span class="crumb-current">{{editingSubmissionId ? 'Edit Submission' : 'Fill Form'}}</span>
+</nav>
+
+<div *ngIf="dynamicForm">
+    <form [formGroup]="fillForm" (ngSubmit)="onSubmit()" *ngIf="fillForm">
+        <div class="card-panel">
+            <h4 class="card-panel-title panel-banner has-action">
+                <span><span class="glyphicon glyphicon-pencil"></span> {{dynamicForm.formName}}</span>
+                <a class="banner-link" (click)="viewSubmissions()">
+                    <span class="glyphicon glyphicon-list-alt"></span> View Submissions
+                </a>
+            </h4>
+            <p class="help-text" *ngIf="dynamicForm.description" style="margin-top: -8px;">{{dynamicForm.description}}</p>
+
+            <div class="bulk-action-bar" *ngIf="editingSubmissionId">
+                <span class="glyphicon glyphicon-edit"></span>
+                <span>Editing submission #{{editingSubmissionId}}</span>
+                <span class="toolbar-spacer"></span>
+                <button type="button" class="btn btn-default btn-sm" (click)="viewSubmissions()">
+                    <span class="glyphicon glyphicon-remove"></span> Cancel Edit
+                </button>
+            </div>
+
+            <span class="help-text" *ngIf="!dynamicForm.fields?.length">
+                <span class="glyphicon glyphicon-info-sign"></span>
+                This form has no fields yet.
+            </span>
+
+            <div class="row">
+                <ng-container *ngFor="let field of dynamicForm.fields">
+                    <div [ngClass]="'col-md-' + (field.fieldWidth || 12)">
+
+                        <!-- section heading/divider -->
+                        <div class="form-section-heading" *ngIf="field.fieldType === DynamicFormFieldType.SECTION">
+                            <h4>{{field.fieldLabel}}</h4>
+                            <hr />
+                        </div>
+
+                        <!-- checkbox group -->
+                        <div class="form-group" *ngIf="field.fieldType === DynamicFormFieldType.CHECKBOX">
+                            <label class="control-label" style="display: block;">
+                                {{field.fieldLabel}} <span class="text-danger" *ngIf="field.mandatory">*</span>
+                            </label>
+                            <label style="display: block; font-weight: normal;" *ngFor="let opt of field.options">
+                                <input type="checkbox" style="margin-right: 6px;"
+                                    [checked]="isChecked(field.fieldName, opt.value)"
+                                    (change)="onCheckboxToggle(field.fieldName, opt.value, $event.target.checked)" />
+                                {{opt.label}}
+                            </label>
+                        </div>
+
+                        <!-- radio group -->
+                        <div class="form-group" *ngIf="field.fieldType === DynamicFormFieldType.RADIO"
+                            [ngClass]="{ 'has-error': submitted && getControl(field.fieldName)?.errors }">
+                            <label class="control-label" style="display: block;">
+                                {{field.fieldLabel}} <span class="text-danger" *ngIf="field.mandatory">*</span>
+                            </label>
+                            <label style="display: block; font-weight: normal;" *ngFor="let opt of field.options">
+                                <input type="radio" style="margin-right: 6px;"
+                                    [formControlName]="field.fieldName" [value]="opt.value" />
+                                {{opt.label}}
+                            </label>
+                            <div class="text-danger" *ngIf="submitted && getControl(field.fieldName)?.errors">
+                                {{getErrorMessage(field)}}
+                            </div>
+                        </div>
+
+                        <!-- select (single) -->
+                        <div class="form-group" *ngIf="field.fieldType === DynamicFormFieldType.SELECT"
+                            [ngClass]="{ 'has-error': submitted && getControl(field.fieldName)?.errors }">
+                            <label class="control-label">{{field.fieldLabel}} <span class="text-danger" *ngIf="field.mandatory">*</span></label>
+                            <select class="form-control" [formControlName]="field.fieldName">
+                                <option value="" *ngIf="!field.mandatory">-- none --</option>
+                                <option *ngFor="let opt of field.options" [value]="opt.value">{{opt.label}}</option>
+                            </select>
+                            <div class="text-danger" *ngIf="submitted && getControl(field.fieldName)?.errors">
+                                {{getErrorMessage(field)}}
+                            </div>
+                        </div>
+
+                        <!-- select (multiple) -->
+                        <div class="form-group" *ngIf="field.fieldType === DynamicFormFieldType.MULTI_SELECT"
+                            [ngClass]="{ 'has-error': submitted && getControl(field.fieldName)?.errors }">
+                            <label class="control-label">{{field.fieldLabel}} <span class="text-danger" *ngIf="field.mandatory">*</span></label>
+                            <select class="form-control" multiple
+                                (change)="onMultiSelectChange(field, $event)">
+                                <option *ngFor="let opt of field.options" [value]="opt.value"
+                                    [selected]="(getControl(field.fieldName)?.value || []).indexOf(opt.value) > -1">{{opt.label}}</option>
+                            </select>
+                            <div class="text-danger" *ngIf="submitted && getControl(field.fieldName)?.errors">
+                                {{getErrorMessage(field)}}
+                            </div>
+                        </div>
+
+                        <!-- textarea -->
+                        <div class="form-group" *ngIf="field.fieldType === DynamicFormFieldType.TEXTAREA"
+                            [ngClass]="{ 'has-error': submitted && getControl(field.fieldName)?.errors }">
+                            <label class="control-label">{{field.fieldLabel}} <span class="text-danger" *ngIf="field.mandatory">*</span></label>
+                            <textarea class="form-control" rows="3" [formControlName]="field.fieldName"
+                                [placeholder]="field.placeHolder || ''"></textarea>
+                            <div class="text-danger" *ngIf="submitted && getControl(field.fieldName)?.errors">
+                                {{getErrorMessage(field)}}
+                            </div>
+                        </div>
+
+                        <!-- toggle -->
+                        <div class="form-group" *ngIf="field.fieldType === DynamicFormFieldType.TOGGLE">
+                            <label class="control-label" style="display: block; font-weight: normal;">
+                                <input type="checkbox" style="margin-right: 6px;" [formControlName]="field.fieldName" />
+                                {{field.fieldLabel}}
+                            </label>
+                        </div>
+
+                        <!-- everything else -> plain input with the matching HTML5 type -->
+                        <div class="form-group" *ngIf="[
+                                DynamicFormFieldType.TEXT, DynamicFormFieldType.NUMBER, DynamicFormFieldType.EMAIL,
+                                DynamicFormFieldType.PASSWORD, DynamicFormFieldType.URL, DynamicFormFieldType.TEL,
+                                DynamicFormFieldType.DATE, DynamicFormFieldType.TIME, DynamicFormFieldType.MONTH,
+                                DynamicFormFieldType.COLOR
+                            ].indexOf(field.fieldType) > -1"
+                            [ngClass]="{ 'has-error': submitted && getControl(field.fieldName)?.errors }">
+                            <label class="control-label">{{field.fieldLabel}} <span class="text-danger" *ngIf="field.mandatory">*</span></label>
+                            <input [type]="field.fieldType" class="form-control" [formControlName]="field.fieldName"
+                                [placeholder]="field.placeHolder || ''" />
+                            <div class="text-danger" *ngIf="submitted && getControl(field.fieldName)?.errors">
+                                {{getErrorMessage(field)}}
+                            </div>
+                        </div>
+
+                    </div>
+                </ng-container>
+            </div>
+
+            <div class="toolbar">
+                <span class="toolbar-spacer"></span>
+                <button type="button" class="btn btn-sm btn-default" (click)="back()">Back</button>
+                <button type="submit" class="btn btn-sm btn-teal" [disabled]="loading || !dynamicForm.fields?.length">
+                    <span *ngIf="loading" class="glyphicon glyphicon-refresh spin"></span>
+                    {{editingSubmissionId ? 'Update Submission' : 'Submit'}}
+                </button>
+            </div>
+        </div>
+    </form>
+</div>

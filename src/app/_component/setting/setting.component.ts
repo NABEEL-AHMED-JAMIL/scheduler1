@@ -103,7 +103,7 @@ export class SettingComponent implements OnInit {
 			if(response.status === ApiCode.SUCCESS) {
 				this.spinnerService.hide();
 				this.alertService.showSuccess(response.message, this.DELETE_SOURCE_TASK_TYPE);
-				this.showUpdatedSourceTask(this.deleteSelectedIndex);
+				this.showUpdatedSourceTask(this.deleteSourceTaskTypeId);
 				this.closebutton.nativeElement.click();
 				this.deleteSourceTaskTypeId = null;
 				this.deleteSelectedIndex = null;
@@ -123,10 +123,15 @@ export class SettingComponent implements OnInit {
 		this.spinnerService.hide();
 	}
 
-	public showUpdatedSourceTask(selectedIndex: any): void {
-		let selectedObject: SourceTaskType = this.sourceTaskTypes[selectedIndex];
-		selectedObject.status = 'Delete';
-		this.sourceTaskTypes[selectedIndex] = selectedObject;
+	public showUpdatedSourceTask(sourceTaskTypeId: any): void {
+		// look up by id, not by the *ngFor index that was passed in from deleteSourceTaskType --
+		// that index is into the searchFilter-filtered view, not this.sourceTaskTypes itself,
+		// so it pointed at the wrong row whenever a search term was active
+		let selectedObject: SourceTaskType = this.sourceTaskTypes.find(
+			(taskType) => taskType.sourceTaskTypeId === sourceTaskTypeId);
+		if (selectedObject) {
+			selectedObject.status = 'Delete';
+		}
 	}
 
 	public receiverEvent(action: Action): void {

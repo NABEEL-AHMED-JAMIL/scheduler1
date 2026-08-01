@@ -2,7 +2,7 @@
 import { ApiCode } from '../../_models/index';
 import { Router, ActivatedRoute } from '@angular/router';
 import { AlertService, HomeService } from '@/_services';
-import { SpinnerService } from '@/_helpers';
+import { SpinnerService, prettyPrint } from '@/_helpers';
 import { first } from 'rxjs/operators';
 
 @Component({
@@ -78,27 +78,10 @@ export class JobHistoryActionComponent implements OnInit {
   }
 
   public showQMessageDetail(queueData: any): void {
-    this.selectedQMessage = this.prettyPrint(queueData?.jobStatusMessage);
-  }
-
-  private prettyPrint(message: any): string {
-    if (message === null || message === undefined || message === '') {
-      return '';
-    }
-    // If the value is already an object, stringify it directly
-    if (typeof message === 'object') {
-      return JSON.stringify(message, null, 2);
-    }
-    // If the value is a JSON string, parse then re-stringify with indentation
-    try {
-      return JSON.stringify(JSON.parse(message), null, 2);
-    } catch {
-      return String(message);
-    }
+    this.selectedQMessage = prettyPrint(queueData?.jobStatusMessage);
   }
 
   public logsDeatilQMessage(queueData: any, index: any): any {
-    console.log(queueData);
     this.router.navigate(['jobList/jobLogs'],
       {
         queryParams: {

@@ -160,8 +160,13 @@ export class SourceTaskComponent implements OnInit {
     .subscribe((response) => {
       if(response.status === ApiCode.SUCCESS) {
         this.spinnerService.hide();
-        if (this.deleteSelectedIndex !== null) {
-          this.sourceTasks.splice(this.deleteSelectedIndex, 1);
+        // look up the real index in the unfiltered backing array by id -- deleteSelectedIndex
+        // was captured from the *ngFor over the filtered (searchFilter) view, so it doesn't
+        // line up with this.sourceTasks whenever a search term is active
+        const realIndex = this.sourceTasks.findIndex(
+          (task) => task.taskDetailId === this.deleteViewSourceTask?.taskDetailId);
+        if (realIndex > -1) {
+          this.sourceTasks.splice(realIndex, 1);
         }
         this.alertService.showSuccess(response.message, this.DELETE_SOURCE_TASK);
         this.closebutton.nativeElement.click();

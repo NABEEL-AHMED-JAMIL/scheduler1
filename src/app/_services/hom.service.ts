@@ -14,12 +14,14 @@ export class HomeService {
     
     constructor(private http: HttpClient) { }
 
-    public jobStatusStatistics(): Observable<ApiResponse> {
-        return this.http.get<ApiResponse>(`${config.apiUrl}/dashboard.json/jobStatusStatistics`);
+    public jobStatusStatistics(startDate?: any, endDate?: any): Observable<ApiResponse> {
+        const params = (startDate && endDate) ? `?startDate=${startDate}&endDate=${endDate}` : '';
+        return this.http.get<ApiResponse>(`${config.apiUrl}/dashboard.json/jobStatusStatistics${params}`);
     }
 
-    public jobRunningStatistics(): Observable<ApiResponse> {
-        return this.http.get<ApiResponse>(`${config.apiUrl}/dashboard.json/jobRunningStatistics`);
+    public jobRunningStatistics(startDate?: any, endDate?: any): Observable<ApiResponse> {
+        const params = (startDate && endDate) ? `?startDate=${startDate}&endDate=${endDate}` : '';
+        return this.http.get<ApiResponse>(`${config.apiUrl}/dashboard.json/jobRunningStatistics${params}`);
     }
 
     public weeklyRunningJobStatistics(startDate:any, endDate:any): Observable<ApiResponse> {

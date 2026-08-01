@@ -1,0 +1,212 @@
+<!-- breadcrumb -->
+<nav class="breadcrumb-bar">
+    <a routerLink="/pdfHighlighter">PDF Highlighter</a>
+    <span class="crumb-sep">/</span>
+    <span class="crumb-current">{{ readOnly ? 'View' : (pdfHighlighterTaskId ? 'Edit' : 'New') }}</span>
+</nav>
+
+<div class="card-panel">
+    <h4 class="card-panel-title panel-banner">
+        <span class="glyphicon glyphicon-picture"></span> PDF Highlighter Task
+    </h4>
+
+    <!-- Task metadata -->
+    <div class="row">
+        <div class="col-lg-3 col-md-4">
+            <div class="form-group">
+                <label for="taskName">Task Name</label>
+                <input type="text" id="taskName" class="form-control input-sm"
+                    [(ngModel)]="taskName" [ngModelOptions]="{ standalone: true }"
+                    [disabled]="readOnly" placeholder="e.g. Invoice Template" />
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-4">
+            <div class="form-group">
+                <label for="highlighterStatus">Highlighter Status</label>
+                <select id="highlighterStatus" class="form-control input-sm"
+                    [(ngModel)]="highlighterStatus" [ngModelOptions]="{ standalone: true }" [disabled]="readOnly">
+                    <option *ngFor="let s of highlighterStatusList" [value]="s.value">{{s.key}}</option>
+                </select>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-4" *ngIf="pdfHighlighterTaskId">
+            <div class="form-group">
+                <label for="taskStatus">Status</label>
+                <select id="taskStatus" class="form-control input-sm"
+                    [(ngModel)]="status" [ngModelOptions]="{ standalone: true }" [disabled]="readOnly">
+                    <option *ngFor="let s of statusList" [value]="s.value">{{s.key}}</option>
+                </select>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-12">
+            <div class="form-group">
+                <label for="description">Description</label>
+                <input type="text" id="description" class="form-control input-sm"
+                    [(ngModel)]="description" [ngModelOptions]="{ standalone: true }" [disabled]="readOnly" />
+            </div>
+        </div>
+    </div>
+
+    <div class="toolbar" style="margin-top: 4px;">
+        <span class="toolbar-spacer"></span>
+        <button type="button" class="btn btn-sm btn-default" (click)="cancel()" [disabled]="saving">
+            <span class="glyphicon glyphicon-arrow-left"></span> {{ readOnly ? 'Back' : 'Cancel' }}
+        </button>
+        <button *ngIf="!readOnly" type="button" class="btn btn-sm btn-teal" (click)="saveTask()" [disabled]="saving">
+            <span class="glyphicon" [ngClass]="saving ? 'glyphicon-refresh spin' : 'glyphicon-ok'"></span>
+            {{ pdfHighlighterTaskId ? 'Save Changes' : 'Create Task' }}
+        </button>
+    </div>
+</div>
+
+<p class="text-danger" *ngIf="errorMessage" style="margin-top: 10px;">{{errorMessage}}</p>
+
+<!-- Upload state -->
+<div class="card-panel" style="margin-top: 15px;" *ngIf="!fileName && !readOnly">
+    <div class="dropzone" (drop)="onDrop($event)" (dragover)="onDragOver($event)">
+        <span class="glyphicon glyphicon-cloud-upload dropzone-icon"></span>
+        <p class="dropzone-title">Click to upload or drag a PDF here</p>
+        <p class="dropzone-hint">Only .pdf files are supported</p>
+        <input type="file" accept="application/pdf" (change)="onFileSelected($event)" />
+    </div>
+</div>
+
+<div class="card-panel" style="margin-top: 15px;" *ngIf="!fileName && readOnly">
+    <p class="help-text"><span class="glyphicon glyphicon-info-sign"></span> No PDF has been uploaded for this task yet.</p>
+</div>
+
+<!-- Viewer + field mapping -->
+<div class="row" *ngIf="fileName" style="margin-top: 15px;">
+    <div class="col-lg-8">
+        <div class="card-panel">
+            <div class="viewer-toolbar">
+                <span class="file-name" [title]="fileName">
+                    <span class="glyphicon glyphicon-file"></span> {{fileName}}
+                </span>
+                <div class="toolbar-actions">
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button type="button" class="btn btn-default" (click)="prevPage()" [disabled]="currentPage <= 1">
+                            <span class="glyphicon glyphicon-chevron-left"></span>
+                        </button>
+                        <button type="button" class="btn btn-default page-indicator" disabled>Page {{currentPage}} / {{totalPages}}</button>
+                        <button type="button" class="btn btn-default" (click)="nextPage()" [disabled]="currentPage >= totalPages">
+                            <span class="glyphicon glyphicon-chevron-right"></span>
+                        </button>
+                    </div>
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button type="button" class="btn btn-default" (click)="zoomOut()" [disabled]="zoom <= minZoom">
+                            <span class="glyphicon glyphicon-zoom-out"></span>
+                        </button>
+                        <button type="button" class="btn btn-default page-indicator" (click)="resetZoom()" title="Reset zoom">{{zoom * 100 | number: '1.0-0'}}%</button>
+                        <button type="button" class="btn btn-default" (click)="zoomIn()" [disabled]="zoom >= maxZoom">
+                            <span class="glyphicon glyphicon-zoom-in"></span>
+                        </button>
+                    </div>
+                    <button *ngIf="!readOnly" type="button" class="btn btn-sm btn-danger" (click)="removeFile()">
+                        <span class="glyphicon glyphicon-trash"></span> Remove
+                    </button>
+                </div>
+            </div>
+
+            <p class="help-text" *ngIf="!readOnly" style="margin: 6px 0 10px;">
+                <span class="glyphicon glyphicon-info-sign"></span>
+                Click and drag on the page to draw a box around a field &mdash; draw as many as you need.
+            </p>
+
+            <div class="viewer-scroll" #viewerScroll>
+                <div class="viewer-box" [class.rendering]="rendering">
+                    <canvas #pdfCanvas></canvas>
+                    <div #overlay class="overlay" [class.readonly]="readOnly"
+                        (mousedown)="onOverlayMouseDown($event)"
+                        (mousemove)="onOverlayMouseMove($event)"
+                        (mouseup)="onOverlayMouseUp()"
+                        (mouseleave)="onOverlayMouseUp()">
+                        <div class="field-box" *ngFor="let field of fieldsOnCurrentPage()" [ngStyle]="fieldStyle(field)">
+                            <span class="field-box-label">{{field.label}}</span>
+                        </div>
+                        <div class="draft-box" *ngIf="draftRect"
+                            [ngStyle]="{ left: draftRect.left + 'px', top: draftRect.top + 'px', width: draftRect.width + 'px', height: draftRect.height + 'px' }"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card-panel">
+            <h4 class="card-panel-title">Field mapping ({{fields.length}})</h4>
+            <p class="help-text" style="margin-bottom: 10px;">
+                <span class="glyphicon glyphicon-info-sign"></span>
+                Coordinates are in PDF points, top-left origin. Each box also gets an auto-generated text selector so it can still be
+                located by content if the PDF is regenerated and coordinates drift.
+            </p>
+
+            <p class="text-muted" *ngIf="!fields.length">No fields yet. Draw a box on the PDF to add one.</p>
+
+            <div class="field-list-scroll" *ngIf="fields.length">
+            <div class="field-row" *ngFor="let field of fields; let i = index">
+                <div class="field-row-main">
+                    <div class="btn-group btn-group-xs field-order-buttons" *ngIf="!readOnly">
+                        <button type="button" class="btn btn-default" (click)="moveFieldUp(i)" [disabled]="i === 0">
+                            <span class="glyphicon glyphicon-chevron-up"></span>
+                        </button>
+                        <button type="button" class="btn btn-default" (click)="moveFieldDown(i)" [disabled]="i === fields.length - 1">
+                            <span class="glyphicon glyphicon-chevron-down"></span>
+                        </button>
+                    </div>
+                    <input type="text" class="form-control input-sm" [(ngModel)]="field.label" [ngModelOptions]="{ standalone: true }" [disabled]="readOnly" />
+                    <button *ngIf="!readOnly" type="button" class="btn btn-sm btn-default btn-icon ic-delete" (click)="removeField(field.id)">
+                        <span class="glyphicon glyphicon-trash"></span>
+                    </button>
+                </div>
+                <div class="field-row-meta">
+                    <span class="meta-page">p{{field.page}}</span>
+                    <label class="meta-field">x <input type="number" class="form-control input-sm" [(ngModel)]="field.x" [ngModelOptions]="{ standalone: true }" [disabled]="readOnly" /></label>
+                    <label class="meta-field">y <input type="number" class="form-control input-sm" [(ngModel)]="field.y" [ngModelOptions]="{ standalone: true }" [disabled]="readOnly" /></label>
+                    <label class="meta-field">w <input type="number" class="form-control input-sm" [(ngModel)]="field.width" [ngModelOptions]="{ standalone: true }" [disabled]="readOnly" /></label>
+                    <label class="meta-field">h <input type="number" class="form-control input-sm" [(ngModel)]="field.height" [ngModelOptions]="{ standalone: true }" [disabled]="readOnly" /></label>
+                </div>
+                <div class="field-row-strategy">
+                    <label class="checkbox-inline" [title]="field.selector ? 'On: resolve this field by its text selector first, falling back to coordinates. Off: coordinates only.' : 'No text selector available for this box -- coordinates only.'">
+                        <input type="checkbox" [(ngModel)]="field.useXpathFirst" [ngModelOptions]="{ standalone: true }" [disabled]="readOnly || !field.selector" />
+                        {{ field.useXpathFirst ? 'Text selector first' : 'Coordinates only' }}
+                    </label>
+                </div>
+                <div class="field-row-selector" *ngIf="field.selector; else noSelector">
+                    <span class="glyphicon glyphicon-tag"></span>
+                    <code class="selector-path" [title]="'Matched text: “' + field.selector.text + '”'">{{field.selector.path}}</code>
+                    <button type="button" class="btn btn-icon ic-copy" title="Copy selector path" (click)="copySelector(field)">
+                        <span class="glyphicon glyphicon-copy"></span>
+                    </button>
+                </div>
+                <ng-template #noSelector>
+                    <p class="no-selector" *ngIf="!readOnly">No text detected under this box &mdash; coordinates only.</p>
+                </ng-template>
+            </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JSON payload -->
+<div class="row" *ngIf="fileName && fields.length" style="margin-top: 15px;">
+    <div class="col-lg-12">
+        <div class="card-panel">
+            <div class="json-panel-header">
+                <h4 class="card-panel-title" style="margin-bottom: 0;">
+                    <span class="glyphicon glyphicon-file"></span> JSON Payload
+                </h4>
+                <div class="json-panel-actions">
+                    <button type="button" class="btn btn-sm btn-default" title="Copy JSON" (click)="copyMapping()">
+                        <span class="glyphicon glyphicon-copy"></span> Copy
+                    </button>
+                    <button type="button" class="btn btn-sm btn-default" title="Download JSON" (click)="downloadMapping()">
+                        <span class="glyphicon glyphicon-download-alt"></span> Download
+                    </button>
+                </div>
+            </div>
+            <p class="help-text" style="margin: 6px 0 10px;">This is what gets saved to the backend for extraction, including each field's text selector.</p>
+            <pre class="json-preview">{{mappingJson}}</pre>
+        </div>
+    </div>
+</div>

@@ -10,6 +10,7 @@ import {
 import { ApiCode } from '@/_models';
 import { Router } from '@angular/router';
 import { first } from 'rxjs/operators';
+import { Subscription } from 'rxjs';
 
 
 @Component({
@@ -35,7 +36,8 @@ export class SourceJobComponent implements OnInit, OnDestroy  {
     public selectAllSourceJobs = false;
     public deleteViewSourceJob: SourceJobDetail | null = null;
     public deleteSelectedIndex: any = null;
-    
+    private webSocketShareSubscription: Subscription;
+
     
     constructor(
         private router: Router,
@@ -45,7 +47,11 @@ export class SourceJobComponent implements OnInit, OnDestroy  {
         private webSocketAPI: WebSocketAPI,
         private webSocketShareService: WebSocketShareService) {
         this.webSocketAPI.connect();
-        this.webSocketShareService.getNewValue()
+        // webSocketShareService is a root-provided singleton -- without unsubscribing in
+        // ngOnDestroy, navigating away from and back to this page piles up a new subscriber
+        // on every visit, each stale one still firing (and referencing a destroyed component)
+        // on every future websocket message.
+        this.webSocketShareSubscription = this.webSocketShareService.getNewValue()
             .subscribe({
                 next: (data) => {
                     if (data) {
@@ -310,7 +316,10 @@ export class SourceJobComponent implements OnInit, OnDestroy  {
         .pipe(first())
         .subscribe((response) => {
             if(response.status === ApiCode.SUCCESS) {
-                this.sourceJobDetails = response.data;
+                // reverse once here (not in the template's *ngFor) -- Array.reverse() mutates
+                // in place, so calling it inside a template expression re-ran it on every
+                // change-detection tick, flipping the row order continuously
+                this.sourceJobDetails = (response.data || []).reverse();
                 this.spinnerService.hide();
                 return;
             }
@@ -356,6 +365,9 @@ export class SourceJobComponent implements OnInit, OnDestroy  {
 
     public ngOnDestroy(): void {
         this.webSocketAPI.disconnect();
+        if (this.webSocketShareSubscription) {
+            this.webSocketShareSubscription.unsubscribe();
+        }
     }
 
 }

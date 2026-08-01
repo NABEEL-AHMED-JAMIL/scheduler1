@@ -28,7 +28,14 @@ import {
     JobLogComponent,
     SearchEngineComponent,
     LoginComponent,
-    ObjectBrowserComponent
+    ObjectBrowserComponent,
+    PdfHighlighterComponent,
+    PdfHighlighterDetailComponent,
+    DynamicFormListComponent,
+    CUDynamicFormComponent,
+    FillDynamicFormComponent,
+    DynamicFormSubmissionsComponent,
+    ViewDynamicFormSubmissionComponent
 } from './_component/index';
 import { ToastrModule } from 'ngx-toastr';
 
@@ -80,7 +87,14 @@ import { ToastrModule } from 'ngx-toastr';
         JobLogComponent,
         SearchEngineComponent,
         LoginComponent,
-        ObjectBrowserComponent
+        ObjectBrowserComponent,
+        PdfHighlighterComponent,
+        PdfHighlighterDetailComponent,
+        DynamicFormListComponent,
+        CUDynamicFormComponent,
+        FillDynamicFormComponent,
+        DynamicFormSubmissionsComponent,
+        ViewDynamicFormSubmissionComponent
     ],
     providers: [],
     bootstrap: [AppComponent]
