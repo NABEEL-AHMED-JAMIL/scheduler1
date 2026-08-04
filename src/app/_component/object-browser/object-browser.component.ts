@@ -1,12 +1,18 @@
 import { Component, OnInit, ViewChild, ElementRef } from '@angular/core';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
-import { AlertService, StorageService } from '@/_services';
+import { AlertService, StorageService, AiAgentService } from '@/_services';
 import { first } from 'rxjs/operators';
 import { forkJoin, Observable } from 'rxjs';
 import { ApiCode, ApiResponse, BucketSummary, ObjectSummary, ObjectMetadata } from '@/_models';
+import { AiAgent, agentsForFile, fileExtension } from '@/_models/ai-agent.model';
+import { extractPdfText } from '@/_helpers/pdf-text-extractor';
+
+/** Any single file's extracted text is capped here before being sent to processText --
+ * mirrors the backend's own MAX_TEXT_CHARS cap so the UI doesn't send more than the server will use. */
+const MAX_AI_TEXT_CHARS = 60000;
 
 const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'];
-const PREVIEWABLE_EXTENSIONS = ['json', 'csv', 'txt', 'pdf', 'mp3', 'm4a', 'mp4'].concat(IMAGE_EXTENSIONS);
+const PREVIEWABLE_EXTENSIONS = ['json', 'csv', 'txt', 'xml', 'pdf', 'mp3', 'm4a', 'mp4'].concat(IMAGE_EXTENSIONS);
 const PAGE_SIZE = 50;
 // Load the next page once the scroll container is within this many pixels of the bottom.
 const SCROLL_FETCH_THRESHOLD_PX = 120;
@@ -52,7 +58,7 @@ export class ObjectBrowserComponent implements OnInit {
     public selectedObjectMetadata: ObjectMetadata | null = null;
     public loadingMetadata = false;
 
-    public previewKind: 'json' | 'csv' | 'txt' | 'pdf' | 'mp3' | 'm4a' | 'mp4' | 'image' | null = null;
+    public previewKind: 'json' | 'csv' | 'txt' | 'xml' | 'pdf' | 'mp3' | 'm4a' | 'mp4' | 'image' | null = null;
     public previewLoading = false;
     public previewError: string | null = null;
     public previewJson: string | null = null;
@@ -62,6 +68,20 @@ export class ObjectBrowserComponent implements OnInit {
     public previewMediaUrl: SafeResourceUrl | null = null;
 
     public uploading = false;
+
+    // AI agent processing
+    public agents: AiAgent[] = [];
+    public selectedAiAgentId: any = null;
+    public aiProcessing = false;
+    public aiResult: string | null = null;
+    public aiError: string | null = null;
+    /** The file text actually extracted and sent as the user prompt -- shown alongside the
+     * agent's instructions so you can see exactly what the model was given. */
+    public aiExtractedText: string | null = null;
+    /** When enabled, aiCustomPrompt is prepended to the extracted file content for this run
+     * only -- lets you give one-off instructions without editing the agent's saved system prompt. */
+    public useCustomPrompt = false;
+    public aiCustomPrompt = '';
 
     // new-folder modal
     public newFolderName = '';
@@ -86,11 +106,131 @@ export class ObjectBrowserComponent implements OnInit {
     constructor(
         private alertService: AlertService,
         private storageService: StorageService,
+        private aiAgentService: AiAgentService,
         private sanitizer: DomSanitizer) {
     }
 
     ngOnInit() {
         this.loadBuckets();
+        this.loadAgents();
+    }
+
+    // --- AI agent processing ---
+
+    private loadAgents(): void {
+        this.aiAgentService.fetchAllAgents()
+            .pipe(first())
+            .subscribe((response) => {
+                if (response.status === ApiCode.SUCCESS) {
+                    this.agents = response.data || [];
+                }
+            }, () => { /* non-blocking -- the "Process with AI" action just won't show without agents */ });
+    }
+
+    /** Active agents scoped to the currently selected file's extension. */
+    public get agentsForSelectedObject(): AiAgent[] {
+        if (!this.selectedObject) {
+            return [];
+        }
+        return agentsForFile(this.agents, this.selectedObject.name);
+    }
+
+    /** The agent currently picked in the "Process with AI" modal -- used to show its
+     * instructions (system prompt) alongside the extracted file content and the result.
+     * Compared as strings: a plain (non-ngValue) <select> always emits the changed value
+     * as a string, while agent.aiAgentId is a number, so a strict === here would go stale
+     * (stick on the initial default) the moment the user picks a different agent. */
+    public get selectedAiAgent(): AiAgent | null {
+        return this.agents.find((agent) => String(agent.aiAgentId) === String(this.selectedAiAgentId)) || null;
+    }
+
+    /** Called when the "Process with AI" modal is opened -- defaults to the first matching agent. */
+    public openAiModal(): void {
+        this.aiResult = null;
+        this.aiError = null;
+        this.aiExtractedText = null;
+        this.useCustomPrompt = false;
+        this.aiCustomPrompt = '';
+        const matches = this.agentsForSelectedObject;
+        this.selectedAiAgentId = matches.length ? matches[0].aiAgentId : null;
+    }
+
+    /** Called when the agent dropdown selection changes -- clears the previous run's extracted
+     * content/result so the modal doesn't keep showing another agent's stale prompt/output. */
+    public onAiAgentChanged(): void {
+        this.aiResult = null;
+        this.aiError = null;
+        this.aiExtractedText = null;
+    }
+
+    /** Runs the selected agent against the selected file. This is fire-and-forget from the
+     * user's point of view -- a local model can take anywhere from ~30s (warm) to a few
+     * minutes (cold reload), and there's no way to make that generation itself faster from
+     * here, so instead of forcing the user to sit on the modal we let them close it and keep
+     * browsing: the request keeps running against the file/agent captured at click time
+     * (not whatever "this.selectedObject"/"this.selectedAiAgentId" happen to be by the time
+     * it resolves), and a toast fires on completion either way so they're not left guessing. */
+    public runAiAgent(): void {
+        if (!this.selectedObject || !this.selectedAiAgentId || !this.selectedBucket) {
+            return;
+        }
+        const targetEntry = this.selectedObject;
+        const targetAgentId = this.selectedAiAgentId;
+        const targetAgentName = (this.selectedAiAgent && this.selectedAiAgent.agentName) || 'Agent';
+        const targetCustomPrompt = this.useCustomPrompt ? (this.aiCustomPrompt || '').trim() : '';
+        this.aiResult = null;
+        this.aiError = null;
+        this.aiExtractedText = null;
+        this.aiProcessing = true;
+        this.extractTextForAi(targetEntry)
+            .then((text) => {
+                if (!text || !text.trim()) {
+                    this.aiProcessing = false;
+                    this.aiError = 'No text could be extracted from this file.';
+                    return;
+                }
+                if (text.length > MAX_AI_TEXT_CHARS) {
+                    text = text.substring(0, MAX_AI_TEXT_CHARS);
+                }
+                this.aiExtractedText = text;
+                // A custom prompt is prepended for this run only -- the file content stays
+                // exactly what's shown/copied under "Extracted File Content".
+                const textToSend = targetCustomPrompt ? `${targetCustomPrompt}\n\n---\n\n${text}` : text;
+                this.aiAgentService.processText(targetAgentId, targetEntry.name, textToSend)
+                    .pipe(first())
+                    .subscribe((response) => {
+                        this.aiProcessing = false;
+                        if (response.status === ApiCode.SUCCESS) {
+                            this.aiResult = response.data;
+                            this.alertService.showSuccess(
+                                `${targetAgentName} finished processing "${targetEntry.name}".`, this.SUCCESS);
+                        } else {
+                            this.aiError = response.message;
+                            this.alertService.showError(
+                                `${targetAgentName} failed on "${targetEntry.name}": ${response.message}`, this.ERROR);
+                        }
+                    }, (error) => {
+                        this.aiProcessing = false;
+                        this.aiError = error;
+                        this.alertService.showError(`${targetAgentName} failed on "${targetEntry.name}".`, this.ERROR);
+                    });
+            })
+            .catch((error) => {
+                this.aiProcessing = false;
+                this.aiError = 'Could not read this file: ' + (error && error.message ? error.message : error);
+            });
+    }
+
+    /** Extracts plain text from a file ahead of sending it to an AI agent -- PDFs are parsed
+     * client-side with pdf.js (same as PDF Highlighter); everything else is read as raw text,
+     * which works for csv/txt/json/xml but not for genuinely binary formats like xlsx. */
+    private extractTextForAi(entry: ObjectSummary): Promise<string> {
+        const extension = fileExtension(entry.name);
+        if (extension === 'pdf') {
+            return this.storageService.previewObjectArrayBuffer(this.selectedBucket, entry.key)
+                .toPromise().then((buffer) => extractPdfText(buffer));
+        }
+        return this.storageService.previewObjectText(this.selectedBucket, entry.key).toPromise();
     }
 
     // --- Buckets ---
@@ -339,7 +479,7 @@ export class ObjectBrowserComponent implements OnInit {
                 this.storageService.previewObjectUrl(this.selectedBucket, entry.key));
             return;
         }
-        this.previewKind = extension as 'json' | 'csv' | 'txt' | 'pdf' | 'mp3' | 'm4a' | 'mp4';
+        this.previewKind = extension as 'json' | 'csv' | 'txt' | 'xml' | 'pdf' | 'mp3' | 'm4a' | 'mp4';
         if (extension === 'pdf' || extension === 'mp3' || extension === 'm4a' || extension === 'mp4') {
             this.previewMediaUrl = this.sanitizer.bypassSecurityTrustResourceUrl(
                 this.storageService.previewObjectUrl(this.selectedBucket, entry.key));
@@ -356,8 +496,8 @@ export class ObjectBrowserComponent implements OnInit {
                     } catch (e) {
                         this.previewJson = text;
                     }
-                } else if (extension === 'csv' || extension === 'txt') {
-                    // CSV shown as plain text (not parsed into a table), same as .txt.
+                } else if (extension === 'csv' || extension === 'txt' || extension === 'xml') {
+                    // CSV/XML shown as plain text (not parsed), same as .txt.
                     this.previewText = text;
                 }
             }, () => {
@@ -398,6 +538,22 @@ export class ObjectBrowserComponent implements OnInit {
             return;
         }
         this.copyToClipboard(content, 'Content copied to clipboard.');
+    }
+
+    /** Copies the AI agent's result from the "Process with AI" modal to the clipboard. */
+    public copyAiResult(): void {
+        if (!this.aiResult) {
+            return;
+        }
+        this.copyToClipboard(this.aiResult, 'Result copied to clipboard.');
+    }
+
+    /** Copies the raw extracted file content (not including any custom prompt) to the clipboard. */
+    public copyExtractedText(): void {
+        if (!this.aiExtractedText) {
+            return;
+        }
+        this.copyToClipboard(this.aiExtractedText, 'Extracted content copied to clipboard.');
     }
 
     private copyToClipboard(text: string, successMessage: string): void {

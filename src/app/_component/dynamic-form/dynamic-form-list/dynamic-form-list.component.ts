@@ -4,7 +4,7 @@ import { AlertService, DynamicFormService } from '@/_services';
 import { SpinnerService } from '@/_helpers';
 import { first } from 'rxjs/operators';
 import { ApiCode } from '@/_models';
-import { DynamicForm } from '@/_models/dynamic-form.model';
+import { DynamicForm, formShareUrl } from '@/_models/dynamic-form.model';
 
 /**
  * Lists dynamic forms -- create a new one, edit its fields, fill it in, or delete it.
@@ -67,6 +67,21 @@ export class DynamicFormListComponent implements OnInit {
 
     public viewSubmissions(dynamicForm: DynamicForm): void {
         this.router.navigate(['/dynamicForm/submissions', dynamicForm.dynamicFormId]);
+    }
+
+    /** Same "Copy API link" idea already used for a single submission (see
+     * dynamic-form-submissions.component.ts#copyShareUrl), but for the whole form definition --
+     * meant to be pasted into Postman, a source task config, etc. */
+    public copyShareUrl(dynamicForm: DynamicForm): void {
+        let url = formShareUrl(dynamicForm);
+        if (!url) {
+            return;
+        }
+        navigator.clipboard.writeText(url).then(() => {
+            this.alertService.showSuccess('API link copied to clipboard', 'Copied');
+        }, () => {
+            this.alertService.showError('Could not copy to clipboard', this.ERROR);
+        });
     }
 
     public deleteDynamicForm(dynamicFormId: any, selectedIndex: any): void {

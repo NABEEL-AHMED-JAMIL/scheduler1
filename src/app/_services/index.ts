@@ -12,3 +12,8 @@ export * from './auth.service';
 export * from './storage.service';
 export * from './pdf-highlighter.service';
 export * from './dynamic-form.service';
+export * from './ai-agent.service';
+export * from './ollama.service';
+export * from './text-cleaner.service';
+export * from './audio-transcript.service';
+export * from './image-text.service';

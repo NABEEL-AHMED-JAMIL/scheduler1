@@ -51,7 +51,7 @@
                     }">{{dynamicForm.status}}</span>
                 </td>
                 <td class="text-center">{{dynamicForm.dateCreated | date: 'yyyy-MM-dd HH:mm'}}</td>
-                <td class="text-center" style="width: 150px; white-space: nowrap;">
+                <td class="text-center" style="width: 186px; white-space: nowrap;">
                     <div class="btn-group btn-group-sm" role="group">
                         <button type="button" class="btn btn-default btn-icon ic-run"
                             (click)="fillDynamicForm(dynamicForm)" title="Fill in">
@@ -64,6 +64,10 @@
                         <button type="button" class="btn btn-default btn-icon ic-edit"
                             (click)="editDynamicForm(dynamicForm)" title="Edit fields">
                             <span class="glyphicon glyphicon-list-alt"></span>
+                        </button>
+                        <button type="button" class="btn btn-default btn-icon ic-copy" title="Copy API link"
+                            (click)="copyShareUrl(dynamicForm)">
+                            <span class="glyphicon glyphicon-copy"></span>
                         </button>
                         <button type="button" class="btn btn-default btn-icon ic-delete"
                             (click)="deleteDynamicForm(dynamicForm.dynamicFormId, i)"

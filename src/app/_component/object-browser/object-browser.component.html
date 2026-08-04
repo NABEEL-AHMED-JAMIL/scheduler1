@@ -168,6 +168,13 @@
                 <div *ngIf="loadingMetadata" class="text-muted">Loading details...</div>
 
                 <div *ngIf="selectedObjectMetadata && !loadingMetadata" class="side-panel-body">
+                    <div *ngIf="agentsForSelectedObject.length" class="preview-toolbar" style="justify-content: flex-start;">
+                        <button type="button" class="btn btn-sm btn-teal"
+                            (click)="openAiModal()" data-toggle="modal" data-target="#aiAgentModal">
+                            <span class="glyphicon glyphicon-flash"></span> Process with AI
+                        </button>
+                    </div>
+
                     <div *ngIf="!previewKind" class="preview-unavailable">
                         <span class="glyphicon glyphicon-info-sign"></span>
                         Preview isn't available for this file type -- use the Download action in the table row.
@@ -176,7 +183,7 @@
                     <div *ngIf="previewLoading" class="text-muted">Loading preview...</div>
                     <div *ngIf="previewError" class="error-text">{{ previewError }}</div>
 
-                    <div *ngIf="(previewKind === 'json' && previewJson) || ((previewKind === 'csv' || previewKind === 'txt') && previewText)"
+                    <div *ngIf="(previewKind === 'json' && previewJson) || ((previewKind === 'csv' || previewKind === 'txt' || previewKind === 'xml') && previewText)"
                         class="preview-toolbar">
                         <button type="button" class="btn btn-default btn-sm" (click)="copyPreviewContent()" title="Copy all content">
                             <span class="glyphicon glyphicon-duplicate"></span> Copy
@@ -185,7 +192,7 @@
 
                     <pre *ngIf="previewKind === 'json' && previewJson" class="preview-text">{{ previewJson }}</pre>
 
-                    <pre *ngIf="(previewKind === 'csv' || previewKind === 'txt') && previewText" class="preview-text">{{ previewText }}</pre>
+                    <pre *ngIf="(previewKind === 'csv' || previewKind === 'txt' || previewKind === 'xml') && previewText" class="preview-text">{{ previewText }}</pre>
 
                     <iframe *ngIf="previewKind === 'pdf' && previewMediaUrl" [src]="previewMediaUrl" class="preview-pdf"></iframe>
 
@@ -250,6 +257,102 @@
                     <button type="submit" class="btn btn-primary" [disabled]="!renameFolderNewName || !renameFolderNewName.trim()">Rename</button>
                 </div>
             </form>
+        </div>
+    </div>
+</div>
+
+<!-- process with AI -->
+<div class="modal fade" id="aiAgentModal" role="dialog">
+    <div class="modal-dialog modal-lg" style="width: 900px;">
+        <div class="modal-content" style="border: none">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title">
+                    <span class="glyphicon glyphicon-flash"></span> Process with AI
+                </h4>
+            </div>
+            <div class="modal-body">
+                <p class="help-text" *ngIf="selectedObject">Running an agent against <strong>{{ selectedObject.name }}</strong>.</p>
+                <div class="form-group">
+                    <label for="aiAgentSelect">Agent</label>
+                    <select id="aiAgentSelect" class="form-control input-sm" [(ngModel)]="selectedAiAgentId" [ngModelOptions]="{ standalone: true }"
+                        [disabled]="aiProcessing" (change)="onAiAgentChanged()">
+                        <option *ngFor="let agent of agentsForSelectedObject" [value]="agent.aiAgentId">{{ agent.agentName }} ({{ agent.provider }})</option>
+                    </select>
+                    <span class="help-text" *ngIf="aiProcessing" style="display: block; margin-top: 4px;">
+                        <span class="glyphicon glyphicon-lock"></span> Locked while the current run finishes.
+                    </span>
+                </div>
+
+                <div *ngIf="aiProcessing" class="text-muted">
+                    <span class="glyphicon glyphicon-refresh spin"></span> Extracting content and calling the agent...
+                    <span class="help-text" style="display: block; margin-top: 4px;">
+                        <span class="glyphicon glyphicon-info-sign"></span>
+                        Local models can take a while (cold start especially) -- feel free to close this and keep
+                        working, you'll get a notification here once it's done.
+                    </span>
+                </div>
+                <div *ngIf="aiError" class="error-text">{{ aiError }}</div>
+
+                <div class="row" *ngIf="selectedAiAgent || aiResult">
+                    <div class="col-md-6">
+                        <div class="preview-toolbar">
+                            <span class="help-text" style="display: inline;">Prompt</span>
+                        </div>
+                        <div class="ai-prompt-block" *ngIf="selectedAiAgent">
+                            <label class="control-label ai-prompt-sublabel">Instructions (system prompt)</label>
+                            <pre class="preview-text ai-prompt-instructions">{{ selectedAiAgent.instructions }}</pre>
+                        </div>
+
+                        <div class="ai-prompt-block">
+                            <label class="checkbox-inline" style="font-weight: normal;">
+                                <input type="checkbox" style="margin-right: 4px;" [(ngModel)]="useCustomPrompt"
+                                    [ngModelOptions]="{ standalone: true }" [disabled]="aiProcessing" />
+                                Add your own prompt for this run
+                            </label>
+                            <span class="help-text" style="display: block; margin-top: 2px;">
+                                <span class="glyphicon glyphicon-info-sign"></span>
+                                One-off instructions prepended to the file content below -- doesn't change the agent's saved instructions.
+                            </span>
+                            <textarea *ngIf="useCustomPrompt" class="form-control" rows="3" style="margin-top: 6px;"
+                                [(ngModel)]="aiCustomPrompt" [ngModelOptions]="{ standalone: true }" [disabled]="aiProcessing"
+                                placeholder="e.g. Focus only on the skills section and list them as a comma-separated line."></textarea>
+                        </div>
+
+                        <div class="ai-prompt-block" *ngIf="aiExtractedText">
+                            <div class="preview-toolbar preview-toolbar-spread">
+                                <label class="control-label ai-prompt-sublabel" style="margin: 0;">Extracted File Content (sent as user message)</label>
+                                <button type="button" class="btn btn-default btn-sm" (click)="copyExtractedText()" title="Copy extracted content">
+                                    <span class="glyphicon glyphicon-duplicate"></span> Copy
+                                </button>
+                            </div>
+                            <pre class="preview-text ai-prompt-content">{{ aiExtractedText }}</pre>
+                        </div>
+                        <p class="help-text" *ngIf="!aiExtractedText && !aiProcessing">
+                            <span class="glyphicon glyphicon-info-sign"></span> Click Run to extract this file's content and see it here.
+                        </p>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="preview-toolbar" *ngIf="aiResult">
+                            <span class="help-text" style="display: inline;">Result</span>
+                            <button type="button" class="btn btn-default btn-sm" (click)="copyAiResult()" title="Copy result">
+                                <span class="glyphicon glyphicon-duplicate"></span> Copy
+                            </button>
+                        </div>
+                        <pre *ngIf="aiResult" class="preview-text ai-result-text">{{ aiResult }}</pre>
+                        <p class="help-text" *ngIf="!aiResult && !aiProcessing">
+                            <span class="glyphicon glyphicon-info-sign"></span> The agent's output will appear here once it finishes.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-teal" [disabled]="aiProcessing || !selectedAiAgentId" (click)="runAiAgent()">
+                    <span class="glyphicon" [ngClass]="aiProcessing ? 'glyphicon-refresh spin' : 'glyphicon-flash'"></span>
+                    {{ aiProcessing ? 'Running...' : 'Run' }}
+                </button>
+            </div>
         </div>
     </div>
 </div>

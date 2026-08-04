@@ -83,6 +83,8 @@ export interface DynamicForm {
     dateCreated?: any;
     totalFields?: any;
     fields?: DynamicFormField[];
+    /** Opaque id for the shareable fetch-by-uuid API -- safe to copy/share since it can't be enumerated. */
+    uuid?: any;
 }
 
 export interface DynamicFormSubmission {
@@ -173,5 +175,17 @@ export function isSubmissionFieldTruncated(field: DynamicFormField, submission: 
 export function submissionShareUrl(submission: DynamicFormSubmission): string {
     return submission && submission.uuid
         ? `${config.apiUrl}/dynamicForm.json/fetchSubmissionByUuid?uuid=${submission.uuid}`
+        : '';
+}
+
+/**
+ * Direct, shareable API link for a whole form definition (its fields, not any one submission) --
+ * keyed by uuid (not the sequential id) so a copied/shared link can't be used to enumerate other
+ * forms. Empty until the form has a uuid (older rows created before this field existed need a
+ * one-time backfill, which happens automatically the first time that form is listed/opened).
+ * */
+export function formShareUrl(dynamicForm: DynamicForm): string {
+    return dynamicForm && dynamicForm.uuid
+        ? `${config.apiUrl}/dynamicForm.json/fetchFormByUuid?uuid=${dynamicForm.uuid}`
         : '';
 }

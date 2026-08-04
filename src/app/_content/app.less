@@ -1970,6 +1970,14 @@ body {
   margin-bottom: 6px;
 }
 
+/* Use alongside .preview-toolbar when the label is long (e.g. "Extracted File Content
+   (sent as user message)") -- flex-end alone crams a long label right up against the
+   button instead of spreading label-left/button-right. */
+.preview-toolbar-spread {
+  justify-content: space-between;
+  align-items: center;
+}
+
 .preview-text {
   flex: 1 1 auto;
   min-height: 0;
@@ -2014,6 +2022,32 @@ body {
   border-radius: 6px;
   background: #f7f9fa;
   object-fit: contain;
+}
+
+/* "Process with AI" modal -- prompt (instructions + extracted content) on the left,
+   result on the right, each independently scrollable so a long file/response doesn't
+   blow out the modal height. */
+.ai-prompt-block {
+  margin-bottom: 12px;
+}
+
+.ai-prompt-sublabel {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: @muted;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin-bottom: 4px;
+}
+
+.ai-prompt-instructions,
+.ai-prompt-content {
+  max-height: 180px;
+}
+
+.ai-result-text {
+  max-height: 380px;
 }
 
 .spin {

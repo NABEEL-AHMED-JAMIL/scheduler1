@@ -31,3 +31,20 @@ export * from './dynamic-form/cu-dynamic-form/cu-dynamic-form.component';
 export * from './dynamic-form/fill-dynamic-form/fill-dynamic-form.component';
 export * from './dynamic-form/dynamic-form-submissions/dynamic-form-submissions.component';
 export * from './dynamic-form/view-dynamic-form-submission/view-dynamic-form-submission.component';
+// ai-agent
+export * from './ai-agent/ai-agent.component';
+
+// ollama-models
+export * from './ollama-models/ollama-models.component';
+
+// content-cleaner
+export * from './content-cleaner/content-cleaner.component';
+
+// audio-transcript-extractor
+export * from './audio-transcript-extractor/audio-transcript-extractor.component';
+
+// image-text-extractor
+export * from './image-text-extractor/image-text-extractor.component';
+
+// ai-chat
+export * from './ai-chat/ai-chat.component';

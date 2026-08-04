@@ -35,7 +35,13 @@ import {
     CUDynamicFormComponent,
     FillDynamicFormComponent,
     DynamicFormSubmissionsComponent,
-    ViewDynamicFormSubmissionComponent
+    ViewDynamicFormSubmissionComponent,
+    AiAgentComponent,
+    OllamaModelsComponent,
+    ContentCleanerComponent,
+    AudioTranscriptExtractorComponent,
+    ImageTextExtractorComponent,
+    AiChatComponent
 } from './_component/index';
 import { ToastrModule } from 'ngx-toastr';
 
@@ -94,7 +100,13 @@ import { ToastrModule } from 'ngx-toastr';
         CUDynamicFormComponent,
         FillDynamicFormComponent,
         DynamicFormSubmissionsComponent,
-        ViewDynamicFormSubmissionComponent
+        ViewDynamicFormSubmissionComponent,
+        AiAgentComponent,
+        OllamaModelsComponent,
+        ContentCleanerComponent,
+        AudioTranscriptExtractorComponent,
+        ImageTextExtractorComponent,
+        AiChatComponent
     ],
     providers: [],
     bootstrap: [AppComponent]

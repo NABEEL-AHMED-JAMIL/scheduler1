@@ -1,0 +1,237 @@
+<!-- breadcrumb -->
+<nav class="breadcrumb-bar">
+    <a routerLink="/home">Home</a>
+    <span class="crumb-sep">/</span>
+    <span class="crumb-current">AI Agents</span>
+</nav>
+
+<div class="toolbar">
+    <div class="form-group" style="margin-bottom: 0;">
+        <label for="searchAgent" class="control-label">Total AI Agents ({{agents.length}})</label>
+        <input type="text" id="searchAgent" class="form-control" style="width: 280px;"
+            placeholder="Search" [(ngModel)]="searchAgent"/>
+    </div>
+    <span class="toolbar-spacer"></span>
+    <button type="button" class="btn btn-sm btn-default" (click)="fetchAllAgents()">
+        <span class="glyphicon glyphicon-refresh"></span> Refresh
+    </button>
+    <button type="button" class="btn btn-sm btn-teal" (click)="openAddAgent()" data-toggle="modal" data-target="#agentModal">
+        <span class="glyphicon glyphicon-plus"></span> Add Agent
+    </button>
+</div>
+<span class="help-text" style="margin-bottom: 10px;">
+    <span class="glyphicon glyphicon-info-sign"></span>
+    Configure an AI agent (provider, model, target file types, instructions) -- run it against a file from Object Browser to extract, summarize, or answer questions about its content.
+</span>
+
+<span class="help-text" *ngIf="!agents.length">
+    <span class="glyphicon glyphicon-info-sign"></span>
+    No agents yet -- add one to start processing files with AI.
+</span>
+
+<div class="table-responsive scroll-table" *ngIf="agents.length">
+    <table class="table table-striped table-bordered table-hover table-modern" style="font-size: 12px;">
+        <thead>
+            <tr>
+                <th style="width: 4%;"># No</th>
+                <th>Agent Name</th>
+                <th>Provider</th>
+                <th>Model</th>
+                <th>Target File Types</th>
+                <th class="text-center">API Key</th>
+                <th class="text-center">Status</th>
+                <th class="text-center" style="width: 200px; white-space: nowrap;">Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr *ngFor="let agent of agents | searchFilter: searchAgent; let i = index;">
+                <td>{{agent.aiAgentId}}</td>
+                <td>
+                    {{agent.agentName}}
+                    <div class="help-text" *ngIf="agent.description" style="margin: 0;">{{agent.description}}</div>
+                </td>
+                <td>{{agent.provider}}</td>
+                <td>
+                    <code>{{agent.model}}</code>
+                    <span class="pill pill-success" *ngIf="agent.jsonMode" title="Ollama's format=json is enabled -- output is guaranteed valid JSON">JSON</span>
+                </td>
+                <td>{{agent.targetFileTypes}}</td>
+                <td class="text-center">
+                    <span class="pill" [ngClass]="agent.apiKeyConfigured ? 'pill-success' : 'pill-warning'">
+                        {{agent.apiKeyConfigured ? 'Configured' : 'Not set'}}
+                    </span>
+                </td>
+                <td class="text-center">
+                    <span class="pill" [ngClass]="{
+                        'pill-danger': agent.status === 'Delete',
+                        'pill-warning': agent.status === 'Inactive',
+                        'pill-success': agent.status === 'Active'
+                    }">{{agent.status}}</span>
+                </td>
+                <td class="text-center">
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button type="button" class="btn btn-default btn-icon ic-edit" title="Edit"
+                            (click)="openEditAgent(agent)" data-toggle="modal" data-target="#agentModal">
+                            <span class="glyphicon glyphicon-edit"></span>
+                        </button>
+                        <button type="button" class="btn btn-default btn-icon ic-clone" title="Clone"
+                            (click)="openCloneAgent(agent)" data-toggle="modal" data-target="#agentModal">
+                            <span class="glyphicon glyphicon-duplicate"></span>
+                        </button>
+                        <button type="button" class="btn btn-default btn-icon ic-copy" title="Copy Tool URL -- paste into a Source Task's XML to call this agent from an external consumer"
+                            (click)="copyToolUrl(agent)">
+                            <span class="glyphicon glyphicon-link"></span>
+                        </button>
+                        <button type="button" class="btn btn-default btn-icon ic-delete" title="Delete"
+                            [disabled]="agent.status === 'Delete'"
+                            (click)="confirmDeleteAgent(agent, i)"
+                            data-toggle="modal" data-target="#deleteAgentModal">
+                            <span class="glyphicon glyphicon-trash"></span>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- Add/Edit Agent Modal -->
+<div class="modal fade" id="agentModal" role="dialog" style="top: 40px;">
+    <div class="modal-dialog" style="width: 640px;">
+        <div class="modal-content" *ngIf="agentForm">
+            <div class="modal-header">
+                <button type="button" #closeAgentModal class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title">{{editingAgent ? 'Edit Agent' : (cloningFrom ? 'Clone Agent' : 'Add Agent')}}</h4>
+            </div>
+            <form [formGroup]="agentForm" (ngSubmit)="saveAgent()">
+                <div class="modal-body">
+                    <span class="help-text" *ngIf="cloningFrom" style="display: block; margin-bottom: 12px;">
+                        <span class="glyphicon glyphicon-duplicate"></span>
+                        Cloned from "{{cloningFrom.agentName}}" -- review the fields and set an API key before saving.
+                    </span>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group" [ngClass]="{ 'has-error': submitted && f.agentName.errors }">
+                                <label class="control-label" for="agentName">Agent Name</label>
+                                <input type="text" class="form-control" formControlName="agentName" placeholder="e.g. Invoice Extractor" />
+                                <div *ngIf="submitted && f.agentName.errors">
+                                    <div class="text-danger">Agent Name is required</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group" [ngClass]="{ 'has-error': submitted && f.model.errors }">
+                                <label class="control-label" for="model">Model</label>
+                                <input type="text" class="form-control" formControlName="model" placeholder="e.g. gpt-4o-mini, claude-3-5-sonnet-20241022" />
+                                <div *ngIf="submitted && f.model.errors">
+                                    <div class="text-danger">Model is required</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="control-label" for="description">Description</label>
+                        <input type="text" class="form-control" formControlName="description" placeholder="What this agent is for" />
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="control-label" for="provider">Provider</label>
+                                <select class="form-control" formControlName="provider">
+                                    <option value="" disabled>Select a provider</option>
+                                    <option *ngFor="let p of providerList" [value]="p.value">{{p.key}}</option>
+                                </select>
+                                <span class="help-text" *ngIf="!loadingProviders && !providerList.length" style="display: block; margin-top: 4px;">
+                                    <span class="glyphicon glyphicon-info-sign"></span>
+                                    No providers configured yet -- add them under Settings &gt; Lookup with type <code>AI_PROVIDER</code> (e.g. "OpenAI", "Anthropic").
+                                </span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="control-label" for="apiEndpoint">API Endpoint</label>
+                                <input type="text" class="form-control" formControlName="apiEndpoint" [placeholder]="apiEndpointPlaceholder(f.provider.value)" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row" *ngIf="editingAgent">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="control-label" for="status">Status</label>
+                                <select class="form-control" formControlName="status">
+                                    <option *ngFor="let s of statusList" [value]="s.value">{{s.key}}</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="control-label" for="apiKey">API Key</label>
+                        <input type="password" class="form-control" formControlName="apiKey"
+                            [placeholder]="isNoKeyProvider(f.provider.value) ? 'Not needed for Ollama (local, unauthenticated)' : (editingAgent ? 'Leave blank to keep the existing key' : 'Paste the provider API key')"
+                            autocomplete="new-password" />
+                        <span class="help-text" *ngIf="editingAgent && editingAgent.apiKeyConfigured" style="display: block; margin-top: 4px;">
+                            <span class="glyphicon glyphicon-ok"></span> A key is already configured -- only fill this in to replace it.
+                        </span>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="control-label" style="display: block; margin-bottom: 6px;">Target File Types</label>
+                        <label class="checkbox-inline" style="margin-right: 14px; font-weight: normal;" *ngFor="let fileType of fileTypeList">
+                            <input type="checkbox" style="margin-right: 4px;"
+                                [checked]="isFileTypeChecked(fileType)"
+                                (change)="toggleFileType(fileType, $event.target.checked)" />
+                            .{{fileType}}
+                        </label>
+                    </div>
+
+                    <div class="form-group" [ngClass]="{ 'has-error': submitted && f.instructions.errors }">
+                        <label class="control-label" for="instructions">Instructions (system prompt)</label>
+                        <textarea class="form-control" formControlName="instructions" rows="4"
+                            placeholder="e.g. Extract the invoice number, total, and due date as JSON. Or: Summarize this document in 3 bullet points."></textarea>
+                        <div *ngIf="submitted && f.instructions.errors">
+                            <div class="text-danger">Instructions are required</div>
+                        </div>
+                    </div>
+
+                    <div class="form-group" *ngIf="f.provider.value === 'Ollama'">
+                        <label class="checkbox-inline" style="font-weight: normal;">
+                            <input type="checkbox" style="margin-right: 4px;" formControlName="jsonMode" />
+                            Force JSON output
+                        </label>
+                        <span class="help-text" style="display: block; margin-top: 4px;">
+                            <span class="glyphicon glyphicon-info-sign"></span>
+                            Recommended if your instructions ask for JSON -- constrains Ollama's output so it's always
+                            valid JSON, instead of relying on the model to reliably follow that instruction on its own
+                            (smaller/weaker local models often don't, and reply with a prose summary instead).
+                        </span>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-teal" [disabled]="loading">{{editingAgent ? 'Save Agent' : 'Add Agent'}}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Agent Modal -->
+<div class="modal fade" id="deleteAgentModal" role="dialog" style="top: 85px;">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" #closeDeleteAgentModal class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title">Delete Agent</h4>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete this agent?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger" (click)="processDeleteAgent()">Yes</button>
+            </div>
+        </div>
+    </div>
+</div>

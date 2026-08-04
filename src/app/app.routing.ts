@@ -22,7 +22,13 @@ import {
     CUDynamicFormComponent,
     FillDynamicFormComponent,
     DynamicFormSubmissionsComponent,
-    ViewDynamicFormSubmissionComponent
+    ViewDynamicFormSubmissionComponent,
+    AiAgentComponent,
+    OllamaModelsComponent,
+    ContentCleanerComponent,
+    AudioTranscriptExtractorComponent,
+    ImageTextExtractorComponent,
+    AiChatComponent
 } from './_component/index';
 
 
@@ -175,6 +181,36 @@ const routes: Routes = [
     {
         path: 'dynamicForm/submissions/:dynamicFormId/:submissionId',
         component: ViewDynamicFormSubmissionComponent,
+        canActivate: [AuthGuard]
+    },
+    {
+        path: 'aiAgent',
+        component: AiAgentComponent,
+        canActivate: [AuthGuard]
+    },
+    {
+        path: 'ollamaModels',
+        component: OllamaModelsComponent,
+        canActivate: [AuthGuard]
+    },
+    {
+        path: 'contentCleaner',
+        component: ContentCleanerComponent,
+        canActivate: [AuthGuard]
+    },
+    {
+        path: 'audioTranscriptExtractor',
+        component: AudioTranscriptExtractorComponent,
+        canActivate: [AuthGuard]
+    },
+    {
+        path: 'imageTextExtractor',
+        component: ImageTextExtractorComponent,
+        canActivate: [AuthGuard]
+    },
+    {
+        path: 'aiChat',
+        component: AiChatComponent,
         canActivate: [AuthGuard]
     },
     {

@@ -1,0 +1,104 @@
+<!-- breadcrumb -->
+<nav class="breadcrumb-bar">
+    <a routerLink="/home">Home</a>
+    <span class="crumb-sep">/</span>
+    <span class="crumb-current">Ollama Models</span>
+</nav>
+
+<span class="help-text" style="margin-bottom: 10px;">
+    <span class="glyphicon glyphicon-info-sign"></span>
+    Models pulled here run locally in your Ollama Docker container -- free, no API key, no per-token cost.
+    Use a model's name below as the "Model" field on an AI Agent with provider <code>Ollama</code>.
+</span>
+
+<div class="toolbar">
+    <label class="control-label" style="margin: 0;">Installed Models ({{models.length}})</label>
+    <span class="toolbar-spacer"></span>
+    <button type="button" class="btn btn-sm btn-default" (click)="fetchModels()">
+        <span class="glyphicon glyphicon-refresh"></span> Refresh
+    </button>
+</div>
+
+<span class="help-text" *ngIf="!loadingModels && !models.length">
+    <span class="glyphicon glyphicon-info-sign"></span>
+    No models pulled yet -- pull one below to get started.
+</span>
+
+<div class="table-responsive scroll-table" *ngIf="models.length" style="margin-bottom: 20px;">
+    <table class="table table-striped table-bordered table-hover table-modern" style="font-size: 12px;">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Family</th>
+                <th>Parameters</th>
+                <th>Quantization</th>
+                <th>Size</th>
+                <th class="text-center" style="width: 70px;">Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr *ngFor="let model of models">
+                <td><code>{{model.name}}</code></td>
+                <td>{{model.family || '-'}}</td>
+                <td>{{model.parameterSize || '-'}}</td>
+                <td>{{model.quantizationLevel || '-'}}</td>
+                <td>{{formatBytes(model.size)}}</td>
+                <td class="text-center">
+                    <button type="button" class="btn btn-default btn-icon ic-delete" title="Delete"
+                        (click)="confirmDeleteModel(model)"
+                        data-toggle="modal" data-target="#deleteModelModal">
+                        <span class="glyphicon glyphicon-trash"></span>
+                    </button>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="panel" style="border: 1px solid #e2e2e2; border-radius: 4px; padding: 16px; max-width: 640px;">
+    <label class="control-label" style="display: block; margin-bottom: 10px;">Pull a New Model</label>
+    <div class="row">
+        <div class="col-md-6">
+            <div class="form-group">
+                <label class="control-label" for="popularTag">From the popular list</label>
+                <select class="form-control" id="popularTag" [(ngModel)]="selectedPopularTag" [disabled]="pulling">
+                    <option value="">Select a model</option>
+                    <option *ngFor="let entry of popularModels" [value]="entry.tag">{{entry.label}} ({{entry.approxSize}})</option>
+                </select>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="form-group">
+                <label class="control-label" for="customTag">Or type any Ollama tag</label>
+                <input type="text" class="form-control" id="customTag" [(ngModel)]="customTag"
+                    placeholder="e.g. llama3.1:70b" [disabled]="pulling" />
+            </div>
+        </div>
+    </div>
+    <button type="button" class="btn btn-teal" [disabled]="pulling || !tagToPull" (click)="pullModel()">
+        <span class="glyphicon" [ngClass]="pulling ? 'glyphicon-refresh' : 'glyphicon-download-alt'"></span>
+        {{pulling ? 'Pulling... this can take a few minutes' : 'Pull Model'}}
+    </button>
+    <span class="help-text" style="display: block; margin-top: 8px;" *ngIf="pulling">
+        <span class="glyphicon glyphicon-info-sign"></span>
+        Downloading -- large models can take several minutes depending on size and your connection. Don't navigate away.
+    </span>
+</div>
+
+<!-- Delete Model Modal -->
+<div class="modal fade" id="deleteModelModal" role="dialog" style="top: 85px;">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" #closeDeleteModelModal class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title">Delete Model</h4>
+            </div>
+            <div class="modal-body">
+                <p>Delete <code>{{deleteModelName}}</code>? This frees its disk space -- you'll need to pull it again to use it.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger" (click)="processDeleteModel()">Yes</button>
+            </div>
+        </div>
+    </div>
+</div>
