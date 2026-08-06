@@ -207,7 +207,7 @@ export class TaskComponent implements OnInit {
         .subscribe((response: any) => {
             this.sourceTaskForm.controls['taskPayload'].setValue(response.message);
         }, error => {
-            console.log('Error :- ' + JSON.stringify(error));
+            this.alertService.showError(error, this.ERROR);
         });
     }
 

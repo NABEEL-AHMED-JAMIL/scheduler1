@@ -48,3 +48,9 @@ export * from './image-text-extractor/image-text-extractor.component';
 
 // ai-chat
 export * from './ai-chat/ai-chat.component';
+
+// cv-tailor
+export * from './cv-tailor/cv-tailor.component';
+
+// ai-suite-home
+export * from './ai-suite-home/ai-suite-home.component';

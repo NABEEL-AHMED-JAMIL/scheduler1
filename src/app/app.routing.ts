@@ -28,7 +28,9 @@ import {
     ContentCleanerComponent,
     AudioTranscriptExtractorComponent,
     ImageTextExtractorComponent,
-    AiChatComponent
+    AiChatComponent,
+    CvTailorComponent,
+    AiSuiteHomeComponent
 } from './_component/index';
 
 
@@ -211,6 +213,16 @@ const routes: Routes = [
     {
         path: 'aiChat',
         component: AiChatComponent,
+        canActivate: [AuthGuard]
+    },
+    {
+        path: 'cvTailor',
+        component: CvTailorComponent,
+        canActivate: [AuthGuard]
+    },
+    {
+        path: 'aiSuite',
+        component: AiSuiteHomeComponent,
         canActivate: [AuthGuard]
     },
     {

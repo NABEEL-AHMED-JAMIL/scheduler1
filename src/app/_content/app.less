@@ -1019,20 +1019,20 @@ body {
   width: 100%;
   max-width: 100%;
   margin: 0;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .table-modern {
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .table-modern > thead > tr > th {
-  font-size: 10px;
-  padding: 8px 10px;
+  font-size: 9px;
+  padding: 6px 8px;
 }
 
 .table-modern > tbody > tr > td {
-  padding: 7px 10px;
+  padding: 6px 8px;
 }
 
 /* Long message / payload cells: keep the table tidy and readable */
@@ -2380,4 +2380,517 @@ body {
   overflow-x: auto;
   white-space: nowrap;
   font-size: 12px;
+}
+
+/* ---------- CV Tailor rendered Markdown preview ---------- */
+.md-preview {
+  max-height: 520px;
+  overflow-y: auto;
+  border: 1px solid #e2e2e2;
+  border-radius: 4px;
+  padding: 24px 28px;
+  background: #fff;
+  font-size: 14px;
+  line-height: 1.6;
+  color: @ink;
+}
+
+.md-preview h1 {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0 0 4px;
+  border-bottom: 2px solid @line;
+  padding-bottom: 8px;
+}
+
+.md-preview h2 {
+  font-size: 15px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: @brand-teal;
+  margin: 20px 0 8px;
+  border-bottom: 1px solid @line;
+  padding-bottom: 4px;
+}
+
+.md-preview h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 12px 0 4px;
+}
+
+.md-preview p {
+  margin: 0 0 10px;
+}
+
+.md-preview ul {
+  margin: 0 0 10px;
+  padding-left: 20px;
+}
+
+.md-preview li {
+  margin-bottom: 4px;
+}
+
+.md-preview strong {
+  color: @ink;
+}
+
+.md-preview hr {
+  border: none;
+  border-top: 1px solid @line;
+  margin: 16px 0;
+}
+
+/* ---------- Pipeline stage tracker (Job Logs) — a CI/DAG-style run stepper reusing the
+   same status palette as .stat-strip .chip-* so a job's lifecycle reads consistently
+   everywhere it's shown ---------- */
+.pipeline-stages {
+  display: flex;
+  align-items: center;
+  margin: 4px 0 20px;
+  overflow-x: auto;
+  // A little breathing room so the last dot never sits flush against the scroll edge, and so
+  // partial-pixel flex rounding can't clip it.
+  padding: 2px 6px 2px 2px;
+}
+
+.pipeline-stage {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  // Never let a stage (dot + label) get squeezed smaller than its content -- without this,
+  // narrow viewports would shrink stages unevenly instead of cleanly overflowing into a
+  // horizontal scroll, which is what was clipping the last dot/label on mobile.
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.pipeline-stage-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.pipeline-stage-dot {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  background: #eceff1;
+  color: #9aa5ac;
+  border: 2px solid #dde3e7;
+  flex-shrink: 0;
+}
+
+.pipeline-stage-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #9aa5ac;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.pipeline-stage-connector {
+  flex: 1 1 auto;
+  height: 2px;
+  background: #dde3e7;
+  margin: 0 8px 22px;
+  min-width: 24px;
+}
+
+.pipeline-stage.is-done .pipeline-stage-connector {
+  background: @brand-teal;
+}
+
+.pipeline-stage.is-done .pipeline-stage-label,
+.pipeline-stage.is-current .pipeline-stage-label {
+  color: @ink;
+}
+
+.pipeline-stage.is-current .pipeline-stage-dot {
+  box-shadow: 0 0 0 4px fade(@brand-teal, 15%);
+}
+
+// Per-status dot coloring, same source colors as .stat-strip .chip-* (see chip-tint above)
+.pipeline-stage.stage-queue.is-done .pipeline-stage-dot,
+.pipeline-stage.stage-queue.is-current .pipeline-stage-dot     { .chip-tint(#e0f7fa; #0c7c8c); border-color: fade(#0c7c8c, 40%); }
+.pipeline-stage.stage-start.is-done .pipeline-stage-dot,
+.pipeline-stage.stage-start.is-current .pipeline-stage-dot     { .chip-tint(#e8eaf6; #283593); border-color: fade(#283593, 40%); }
+.pipeline-stage.stage-running.is-done .pipeline-stage-dot,
+.pipeline-stage.stage-running.is-current .pipeline-stage-dot   { .chip-tint(#fff4e0; #b5730a); border-color: fade(#b5730a, 40%); }
+.pipeline-stage.stage-failed.is-done .pipeline-stage-dot,
+.pipeline-stage.stage-failed.is-current .pipeline-stage-dot    { .chip-tint(#fde4e4; #c0392b); border-color: fade(#c0392b, 40%); }
+.pipeline-stage.stage-completed.is-done .pipeline-stage-dot,
+.pipeline-stage.stage-completed.is-current .pipeline-stage-dot { .chip-tint(#e3f6e9; #1d7a3f); border-color: fade(#1d7a3f, 40%); }
+.pipeline-stage.stage-skip.is-done .pipeline-stage-dot,
+.pipeline-stage.stage-skip.is-current .pipeline-stage-dot      { .chip-tint(#e1f0fb; #1c6ea4); border-color: fade(#1c6ea4, 40%); }
+.pipeline-stage.stage-interrupt.is-done .pipeline-stage-dot,
+.pipeline-stage.stage-interrupt.is-current .pipeline-stage-dot { .chip-tint(#efe6fb; #6a3bbf); border-color: fade(#6a3bbf, 40%); }
+
+// Smaller dots/labels/connectors below phone width so all 4 stages fit without needing to
+// scroll -- at 375px (the narrowest common phone) the full-size tracker was ~35px too wide,
+// which combined with browser scroll-anchoring made the last dot land clipped/cut off on
+// first render instead of cleanly scrollable.
+@media (max-width: 480px) {
+  .pipeline-stage-dot {
+    width: 24px;
+    height: 24px;
+    font-size: 11px;
+  }
+
+  .pipeline-stage-label {
+    font-size: 9px;
+  }
+
+  .pipeline-stage-connector {
+    margin: 0 4px 18px;
+    min-width: 12px;
+  }
+}
+
+/* ---------- Log timeline (Job Logs) — vertical connected-node view, alternative to the
+   plain table for scanning a run's audit trail as a pipeline rather than a data grid ---------- */
+.log-timeline {
+  position: relative;
+  padding-left: 4px;
+}
+
+// Bounded scroll -- a long-running job (hundreds of log lines) would otherwise turn the whole
+// page into a mile-long scroll instead of scrolling inside a fixed-height panel.
+.log-timeline-scroll {
+  max-height: 520px;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.log-timeline-item {
+  position: relative;
+  display: flex;
+  gap: 14px;
+  padding-bottom: 18px;
+}
+
+.log-timeline-item:last-child {
+  padding-bottom: 0;
+}
+
+.log-timeline-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.log-timeline-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: @brand-teal;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 2px fade(@brand-teal, 30%);
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+
+.log-timeline-connector {
+  flex: 1 1 auto;
+  width: 2px;
+  background: @line;
+  margin-top: 4px;
+}
+
+.log-timeline-content {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.log-timeline-time {
+  font-size: 11px;
+  font-weight: 600;
+  color: @muted;
+  margin-bottom: 2px;
+}
+
+.log-timeline-message {
+  font-size: 13px;
+  color: @ink;
+  word-break: break-word;
+}
+
+/* ---------- AI Suite hub — card grid launcher ---------- */
+.tool-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+  margin-top: 4px;
+}
+
+.tool-card {
+  display: flex;
+  flex-direction: column;
+  background: @surface;
+  border: 1px solid @line;
+  border-radius: 10px;
+  padding: 20px;
+  cursor: pointer;
+  transition: box-shadow 0.15s ease-in-out, border-color 0.15s ease-in-out, transform 0.1s ease-in-out;
+  text-decoration: none;
+}
+
+.tool-card:hover,
+.tool-card:focus {
+  border-color: @brand-teal;
+  box-shadow: 0 6px 16px rgba(79, 70, 229, 0.12);
+  transform: translateY(-2px);
+  text-decoration: none;
+}
+
+.tool-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: #e6f6f4;
+  color: @brand-teal-dark;
+  font-size: 20px;
+  margin-bottom: 14px;
+}
+
+.tool-card-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: @ink;
+  margin-bottom: 6px;
+}
+
+.tool-card-description {
+  font-size: 12.5px;
+  color: @muted;
+  line-height: 1.5;
+  flex: 1 1 auto;
+}
+
+.tool-card-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: @brand-teal;
+  margin-top: 14px;
+}
+
+/* ---------- Entity cards -- Card/Table view toggle for list screens (Source Job, Source
+   Task, AI Agents) ---------- */
+.entity-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+  margin-top: 4px;
+}
+
+// Fixed 4-per-row layout (AI Agents) -- falls back to fewer columns as the
+// viewport narrows instead of squeezing cards below a usable width.
+.entity-card-grid-4up {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+@media (max-width: 1400px) {
+  .entity-card-grid-4up {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1000px) {
+  .entity-card-grid-4up {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .entity-card-grid-4up {
+    grid-template-columns: 1fr;
+  }
+}
+
+.entity-card {
+  display: flex;
+  flex-direction: column;
+  background: @surface;
+  border: 1px solid @line;
+  border-left: 4px solid @line;
+  border-radius: 8px;
+  padding: 16px 18px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.entity-card:hover {
+  box-shadow: 0 6px 18px rgba(54, 66, 77, 0.1);
+  transform: translateY(-2px);
+}
+
+.entity-card.is-disabled-row {
+  opacity: 0.6;
+}
+
+// Accent colors -- Active/Inactive/Delete status (Source Task, AI Agent)
+.entity-card-accent-active    { border-left-color: #1d7a3f; }
+.entity-card-accent-inactive  { border-left-color: #b5730a; }
+.entity-card-accent-delete    { border-left-color: #c0392b; }
+
+// Accent colors -- JobStatus running state (Source Job), same source colors as
+// .stat-strip .chip-* / pipeline stage dots above
+.entity-card-accent-queue     { border-left-color: #0c7c8c; }
+.entity-card-accent-start     { border-left-color: #283593; }
+.entity-card-accent-running   { border-left-color: #b5730a; }
+.entity-card-accent-failed    { border-left-color: #c0392b; }
+.entity-card-accent-completed { border-left-color: #1d7a3f; }
+.entity-card-accent-skip      { border-left-color: #1c6ea4; }
+.entity-card-accent-interrupt { border-left-color: #6a3bbf; }
+
+.entity-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.entity-card-header-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.entity-card-icon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #eef0fb;
+  color: @brand-teal;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+.entity-card-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: @ink;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.entity-card-title a {
+  color: inherit;
+}
+
+.entity-card-subtitle {
+  font-size: 12px;
+  color: @muted;
+  margin-top: 3px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.entity-card-subtitle a {
+  color: @brand-teal;
+}
+
+.entity-card-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 10px 0 0;
+}
+
+.entity-card-description {
+  font-size: 12px;
+  color: @muted;
+  line-height: 1.5;
+  margin: 8px 0 0;
+}
+
+.entity-card-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #f0f2f4;
+  flex: 1 1 auto;
+}
+
+.entity-card-stat {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  font-size: 12px;
+  color: @ink;
+  white-space: nowrap;
+}
+
+.entity-card-stat .glyphicon {
+  font-size: 10px;
+  color: @muted;
+  top: 0;
+}
+
+.entity-card-stat-label {
+  color: @muted;
+}
+
+.entity-card-footer {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #eceff1;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ---------- Table row expand (Source Job List) -- linked task + queue list ---------- */
+.btn-expand-row {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  color: @muted;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-expand-row:hover {
+  background: #eef0fb;
+  color: @brand-teal;
+}
+
+tr.expand-row td {
+  background: @page-bg;
+  padding: 14px 18px;
+}
+
+.expand-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.expand-panel-heading {
+  font-size: 11px;
+  font-weight: 700;
+  color: @muted;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 8px;
 }

@@ -1,0 +1,185 @@
+<!-- breadcrumb -->
+<nav class="breadcrumb-bar">
+    <a routerLink="/home">Home</a>
+    <span class="crumb-sep">/</span>
+    <span class="crumb-current">CV Tailor</span>
+</nav>
+
+<div class="panel-box" style="background: #fff; border: 1px solid #e2e2e2; border-radius: 6px; padding: 16px; margin-bottom: 16px;">
+    <h4 style="margin-top: 0;"><span class="glyphicon glyphicon-briefcase"></span> CV Tailor</h4>
+    <span class="help-text" style="display: block;">
+        <span class="glyphicon glyphicon-info-sign"></span>
+        Paste a job description, upload (or pick from a bucket) a PDF resume, and an AI agent
+        rewrites it as a clean Markdown resume tailored to the job -- view it rendered or as raw
+        Markdown, download the .md file, or save the job description and/or the new resume to a
+        bucket. Re-run any time with a new resume or job description for a fresh result.
+    </span>
+</div>
+
+<div class="form-group">
+    <label class="control-label">Job Description</label>
+    <textarea class="form-control" rows="6" [(ngModel)]="jobDescription"
+        placeholder="Paste the job description here."></textarea>
+    <div class="toolbar" style="margin-top: 6px; margin-bottom: 0;" *ngIf="jobDescription">
+        <button type="button" class="btn btn-default btn-sm" (click)="copyJobDescription()" title="Copy job description to clipboard">
+            <span class="glyphicon glyphicon-duplicate"></span> Copy
+        </button>
+        <button type="button" class="btn btn-default btn-sm" (click)="cleanJobDescription()" [disabled]="cleaningJd" style="margin-left: 6px;"
+            title="Tidy up stray whitespace, smart quotes, and copy-paste artifacts from the job board">
+            <span class="glyphicon" [ngClass]="cleaningJd ? 'glyphicon-refresh spin' : 'glyphicon-magnet'"></span>
+            {{ cleaningJd ? 'Cleaning...' : 'Content Clean' }}
+        </button>
+    </div>
+    <div class="error-text" style="margin-top: 4px;" *ngIf="cleanJdError">{{ cleanJdError }}</div>
+</div>
+
+<div class="toolbar" style="margin-bottom: 12px;">
+    <button type="button" class="btn btn-sm" [ngClass]="mode === 'upload' ? 'btn-teal' : 'btn-default'" (click)="setMode('upload')">
+        <span class="glyphicon glyphicon-upload"></span> Upload Resume PDF
+    </button>
+    <button type="button" class="btn btn-sm" [ngClass]="mode === 'browse' ? 'btn-teal' : 'btn-default'" (click)="setMode('browse')" style="margin-left: 6px;">
+        <span class="glyphicon glyphicon-folder-open"></span> Browse Bucket
+    </button>
+    <span class="toolbar-spacer"></span>
+    <button type="button" class="btn btn-sm btn-default" (click)="clearAll()">
+        <span class="glyphicon glyphicon-refresh"></span> Clear
+    </button>
+</div>
+
+<!-- Upload mode -->
+<div *ngIf="mode === 'upload'" class="form-group">
+    <label class="control-label">Resume PDF</label>
+    <input type="file" class="form-control" accept="application/pdf" (change)="onFileSelected($event)" />
+    <span class="help-text" style="display: block; margin-top: 4px;">
+        Supported: {{ supportedExtensions.join(', ') }}
+    </span>
+</div>
+
+<!-- Browse mode -->
+<div *ngIf="mode === 'browse'">
+    <div class="form-group">
+        <label class="control-label">Bucket</label>
+        <select class="form-control" [(ngModel)]="selectedBucket" (ngModelChange)="onBucketChange()">
+            <option value="">Select a bucket</option>
+            <option *ngFor="let b of buckets" [value]="b.bucket">{{ b.label }} ({{ b.provider }})</option>
+        </select>
+    </div>
+
+    <nav class="breadcrumb-bar" *ngIf="selectedBucket">
+        <a href="javascript:void(0);" (click)="goToBreadcrumb(-1)">{{ selectedBucket }}</a>
+        <ng-container *ngFor="let bc of breadcrumbs; let i = index;">
+            <span class="crumb-sep">/</span>
+            <a href="javascript:void(0);" (click)="goToBreadcrumb(i)">{{ bc.name }}</a>
+        </ng-container>
+    </nav>
+
+    <div class="text-muted" *ngIf="loadingObjects">Loading...</div>
+    <div class="table-responsive scroll-table" *ngIf="selectedBucket && !loadingObjects" style="max-height: 300px; overflow-y: auto;">
+        <table class="table table-striped table-hover" style="font-size: 12px;">
+            <tbody>
+                <tr *ngFor="let entry of objects" class="bucket-row" (click)="openEntry(entry)">
+                    <td style="width: 24px;">
+                        <span class="glyphicon folder-icon" [ngClass]="entry.folder ? 'glyphicon-folder-close' : 'glyphicon-file'"></span>
+                    </td>
+                    <td>{{ entry.name }}</td>
+                </tr>
+                <tr *ngIf="!objects.length">
+                    <td class="text-muted">This folder is empty.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Resume source status -->
+<div style="margin-top: 12px;">
+    <div class="text-muted" *ngIf="extractingCv">
+        <span class="glyphicon glyphicon-refresh spin"></span> Reading resume text from {{ cvSourceLabel }}...
+    </div>
+    <div class="error-text" *ngIf="extractError">{{ extractError }}</div>
+    <div class="help-text" style="display: block; color: #3c763d;" *ngIf="originalCvText && !extractingCv">
+        <span class="glyphicon glyphicon-ok"></span> Resume text ready from <strong>{{ cvSourceLabel }}</strong> ({{ originalCvText.length }} chars).
+    </div>
+</div>
+
+<!-- AI Agent + Tailor -->
+<div class="panel-box" style="background: #fff; border: 1px solid #e2e2e2; border-radius: 6px; padding: 16px; margin-top: 16px;" *ngIf="originalCvText">
+    <div class="row">
+        <div class="col-md-4">
+            <div class="form-group">
+                <label class="control-label">AI Agent</label>
+                <select class="form-control" [(ngModel)]="selectedAgentId">
+                    <option value="" disabled>Select an AI Agent</option>
+                    <option *ngFor="let a of agents" [value]="a.aiAgentId">{{ a.agentName }} ({{ a.provider }})</option>
+                </select>
+                <span class="help-text" *ngIf="!loadingAgents && !agents.length" style="display: block; margin-top: 4px;">
+                    No active agents yet -- add one under AI Suite &gt; AI Agents.
+                </span>
+            </div>
+        </div>
+    </div>
+    <button type="button" class="btn btn-teal" (click)="tailorCv()" [disabled]="tailoring">
+        <span class="glyphicon" [ngClass]="tailoring ? 'glyphicon-refresh spin' : 'glyphicon-magnet'"></span>
+        {{ tailoring ? 'Tailoring...' : 'Tailor My CV' }}
+    </button>
+    <div class="error-text" style="margin-top: 8px;" *ngIf="tailorError">{{ tailorError }}</div>
+</div>
+
+<!-- Tailored resume result -->
+<div class="panel-box" style="background: #fff; border: 1px solid #e2e2e2; border-radius: 6px; padding: 16px; margin-top: 16px;" *ngIf="newCvMarkdown">
+    <div class="preview-toolbar preview-toolbar-spread">
+        <div class="btn-group btn-group-sm" role="group">
+            <button type="button" class="btn" [ngClass]="viewMode === 'preview' ? 'btn-teal' : 'btn-default'" (click)="setViewMode('preview')">
+                <span class="glyphicon glyphicon-eye-open"></span> Preview
+            </button>
+            <button type="button" class="btn" [ngClass]="viewMode === 'markdown' ? 'btn-teal' : 'btn-default'" (click)="setViewMode('markdown')">
+                <span class="glyphicon glyphicon-console"></span> Markdown
+            </button>
+        </div>
+        <span>
+            <button type="button" class="btn btn-default btn-sm" (click)="copyNewCv()" title="Copy the Markdown source to clipboard">
+                <span class="glyphicon glyphicon-duplicate"></span> Copy
+            </button>
+            <button type="button" class="btn btn-default btn-sm" (click)="downloadMarkdown()" style="margin-left: 6px;" title="Download as a .md file (ready to convert to PDF)">
+                <span class="glyphicon glyphicon-download-alt"></span> Download .md
+            </button>
+        </span>
+    </div>
+
+    <div class="md-preview" *ngIf="viewMode === 'preview'" [innerHTML]="previewHtml"></div>
+    <pre class="preview-text" style="max-height: 480px;" *ngIf="viewMode === 'markdown'">{{ newCvMarkdown }}</pre>
+
+    <!-- Save to Bucket -->
+    <div style="margin-top: 12px; padding: 12px; background: #f7f7f9; border: 1px solid #e2e2e2; border-radius: 6px;">
+        <label class="control-label" style="display: block; margin-bottom: 6px;">Save to Bucket</label>
+        <div class="row">
+            <div class="col-md-5">
+                <select class="form-control" [(ngModel)]="saveBucket">
+                    <option value="">Select a bucket</option>
+                    <option *ngFor="let b of buckets" [value]="b.bucket">{{ b.label }} ({{ b.provider }})</option>
+                </select>
+            </div>
+            <div class="col-md-7">
+                <input type="text" class="form-control" [(ngModel)]="saveFolderName" placeholder="Folder name" />
+            </div>
+        </div>
+        <div style="margin-top: 8px;">
+            <button type="button" class="btn btn-default btn-sm" (click)="saveJdToBucket()" [disabled]="savingJd || !jobDescription">
+                <span class="glyphicon" [ngClass]="savingJd ? 'glyphicon-refresh spin' : 'glyphicon-folder-close'"></span>
+                {{ savingJd ? 'Saving...' : 'Save Job Description' }}
+            </button>
+            <button type="button" class="btn btn-default btn-sm" style="margin-left: 6px;" (click)="saveNewCvToBucket()" [disabled]="savingCv || !newCvMarkdown">
+                <span class="glyphicon" [ngClass]="savingCv ? 'glyphicon-refresh spin' : 'glyphicon-folder-close'"></span>
+                {{ savingCv ? 'Saving...' : 'Save New Resume (.md)' }}
+            </button>
+        </div>
+        <div class="help-text" style="display: block; margin-top: 6px; color: #3c763d;" *ngIf="jdSavedPath">
+            <span class="glyphicon glyphicon-ok"></span> Saved to {{ jdSavedPath }}
+        </div>
+        <div class="error-text" style="margin-top: 6px;" *ngIf="saveJdError">{{ saveJdError }}</div>
+        <div class="help-text" style="display: block; margin-top: 6px; color: #3c763d;" *ngIf="cvSavedPath">
+            <span class="glyphicon glyphicon-ok"></span> Saved to {{ cvSavedPath }}
+        </div>
+        <div class="error-text" style="margin-top: 6px;" *ngIf="saveCvError">{{ saveCvError }}</div>
+    </div>
+</div>

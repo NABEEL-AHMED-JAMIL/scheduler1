@@ -41,7 +41,9 @@ import {
     ContentCleanerComponent,
     AudioTranscriptExtractorComponent,
     ImageTextExtractorComponent,
-    AiChatComponent
+    AiChatComponent,
+    CvTailorComponent,
+    AiSuiteHomeComponent
 } from './_component/index';
 import { ToastrModule } from 'ngx-toastr';
 
@@ -106,7 +108,9 @@ import { ToastrModule } from 'ngx-toastr';
         ContentCleanerComponent,
         AudioTranscriptExtractorComponent,
         ImageTextExtractorComponent,
-        AiChatComponent
+        AiChatComponent,
+        CvTailorComponent,
+        AiSuiteHomeComponent
     ],
     providers: [],
     bootstrap: [AppComponent]

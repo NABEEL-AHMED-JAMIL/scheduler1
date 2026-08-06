@@ -18,6 +18,14 @@
     <button type="button" class="btn btn-sm btn-teal" (click)="openAddAgent()" data-toggle="modal" data-target="#agentModal">
         <span class="glyphicon glyphicon-plus"></span> Add Agent
     </button>
+    <div class="btn-group btn-group-sm" role="group" style="margin-left: 6px;">
+        <button type="button" class="btn" [ngClass]="viewMode === 'table' ? 'btn-teal' : 'btn-default'" (click)="setViewMode('table')" title="Table view">
+            <span class="glyphicon glyphicon-th-list"></span>
+        </button>
+        <button type="button" class="btn" [ngClass]="viewMode === 'card' ? 'btn-teal' : 'btn-default'" (click)="setViewMode('card')" title="Card view">
+            <span class="glyphicon glyphicon-th-large"></span>
+        </button>
+    </div>
 </div>
 <span class="help-text" style="margin-bottom: 10px;">
     <span class="glyphicon glyphicon-info-sign"></span>
@@ -29,7 +37,62 @@
     No agents yet -- add one to start processing files with AI.
 </span>
 
-<div class="table-responsive scroll-table" *ngIf="agents.length">
+<div class="entity-card-grid entity-card-grid-4up" *ngIf="agents.length && viewMode === 'card'">
+    <div class="entity-card" [ngClass]="'entity-card-accent-' + (agent.status | lowercase)" *ngFor="let agent of agents | searchFilter: searchAgent; let i = index;">
+        <div class="entity-card-header">
+            <div class="entity-card-header-main">
+                <div class="entity-card-icon"><span class="glyphicon glyphicon-comment"></span></div>
+                <div>
+                    <div class="entity-card-title">{{agent.aiAgentId}} - {{agent.agentName}}</div>
+                    <div class="entity-card-subtitle">{{agent.provider}} &middot; <code>{{agent.model}}</code></div>
+                </div>
+            </div>
+        </div>
+        <div class="entity-card-description" *ngIf="agent.description">{{agent.description}}</div>
+        <div class="entity-card-pills">
+            <span class="pill pill-success" *ngIf="agent.jsonMode" title="Ollama's format=json is enabled -- output is guaranteed valid JSON">JSON</span>
+            <span class="pill" [ngClass]="agent.apiKeyConfigured ? 'pill-success' : 'pill-warning'">{{agent.apiKeyConfigured ? 'Key Configured' : 'Key Not Set'}}</span>
+            <span class="pill" [ngClass]="{
+                'pill-danger': agent.status === 'Delete',
+                'pill-warning': agent.status === 'Inactive',
+                'pill-success': agent.status === 'Active'
+            }">{{agent.status}}</span>
+        </div>
+        <div class="entity-card-stats">
+            <div class="entity-card-stat">
+                <span class="glyphicon glyphicon-file"></span>
+                <span class="entity-card-stat-label">File Types</span> {{agent.targetFileTypes}}
+            </div>
+        </div>
+        <div class="entity-card-footer">
+            <div class="btn-group btn-group-sm" role="group">
+                <button type="button" class="btn btn-default btn-icon ic-edit" title="Edit"
+                    (click)="openEditAgent(agent)" data-toggle="modal" data-target="#agentModal">
+                    <span class="glyphicon glyphicon-edit"></span>
+                </button>
+                <button type="button" class="btn btn-default btn-icon ic-clone" title="Clone"
+                    (click)="openCloneAgent(agent)" data-toggle="modal" data-target="#agentModal">
+                    <span class="glyphicon glyphicon-duplicate"></span>
+                </button>
+                <button type="button" class="btn btn-default btn-icon ic-copy" title="Copy Tool URL -- paste into a Source Task's XML to call this agent from an external consumer"
+                    (click)="copyToolUrl(agent)">
+                    <span class="glyphicon glyphicon-link"></span>
+                </button>
+                <button type="button" class="btn btn-default btn-icon ic-delete" title="Delete"
+                    [disabled]="agent.status === 'Delete'"
+                    (click)="confirmDeleteAgent(agent, i)"
+                    data-toggle="modal" data-target="#deleteAgentModal">
+                    <span class="glyphicon glyphicon-trash"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="help-text" *ngIf="!(agents | searchFilter: searchAgent).length">
+        <span class="glyphicon glyphicon-info-sign"></span> No agents match your search.
+    </div>
+</div>
+
+<div class="table-responsive scroll-table" *ngIf="agents.length && viewMode === 'table'">
     <table class="table table-striped table-bordered table-hover table-modern" style="font-size: 12px;">
         <thead>
             <tr>

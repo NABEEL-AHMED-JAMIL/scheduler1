@@ -162,7 +162,6 @@ export class JobComponent implements OnInit {
                         if (sourceTask.taskStatus === 'Active')
                             return sourceTask;
                     });
-                    console.log(this.sourceTasks);
                     this.paging = response.paging;
                     this.spinnerService.hide();
               } else {

@@ -45,6 +45,7 @@ export class AiAgentComponent implements OnInit {
 
     public deleteAgentId: any;
     public deleteAgentIndex: any;
+    public viewMode: 'table' | 'card' = 'table';
 
     constructor(
         private formBuilder: FormBuilder,
@@ -133,6 +134,10 @@ export class AiAgentComponent implements OnInit {
             instructions: ['', Validators.required],
             jsonMode: [false]
         });
+    }
+
+    public setViewMode(mode: 'table' | 'card'): void {
+        this.viewMode = mode;
     }
 
     public openAddAgent(): void {

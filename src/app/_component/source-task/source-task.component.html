@@ -29,10 +29,87 @@
     <button type="button" class="btn btn-sm btn-default" (click)="refreshSourceTask()">
         <span id="loading" class="glyphicon glyphicon-refresh"></span> Refresh
     </button>
+    <div class="btn-group btn-group-sm" role="group" style="margin-left: 6px;">
+        <button type="button" class="btn" [ngClass]="viewMode === 'table' ? 'btn-teal' : 'btn-default'" (click)="setViewMode('table')" title="Table view">
+            <span class="glyphicon glyphicon-th-list"></span>
+        </button>
+        <button type="button" class="btn" [ngClass]="viewMode === 'card' ? 'btn-teal' : 'btn-default'" (click)="setViewMode('card')" title="Card view">
+            <span class="glyphicon glyphicon-th-large"></span>
+        </button>
+    </div>
+</div>
+
+<!-- Tasks Card grid -->
+<div class="entity-card-grid" *ngIf="viewMode === 'card'">
+    <div class="entity-card" [ngClass]="'entity-card-accent-' + (sourceTask.taskStatus | lowercase)" *ngFor="let sourceTask of sourceTasks | searchFilter: searchSourceTaskDetails; let i = index;">
+        <div class="entity-card-header">
+            <div class="entity-card-header-main">
+                <div class="entity-card-icon"><span class="glyphicon glyphicon-tasks"></span></div>
+                <div>
+                    <div class="entity-card-title">{{sourceTask.taskDetailId}} - {{sourceTask.taskName}}</div>
+                    <div class="entity-card-subtitle" *ngIf="sourceTask.sourceTaskType">
+                        Type: <a (click)="viewSourceTaskType(sourceTask.sourceTaskType)" data-toggle="modal" data-target="#sourceTaskTaype">{{sourceTask.sourceTaskType.sourceTaskTypeId}}</a>
+                        [{{sourceTask.sourceTaskType.serviceName}}] [{{sourceTask.sourceTaskType.queueTopicPartition}}]
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="entity-card-pills">
+            <span class="pill" [ngClass]="{
+                'pill-danger': sourceTask.taskStatus === 'Delete',
+                'pill-warning': sourceTask.taskStatus === 'Inactive',
+                'pill-success': sourceTask.taskStatus === 'Active'
+            }">{{sourceTask.taskStatus}}</span>
+        </div>
+        <div class="entity-card-stats">
+            <div class="entity-card-stat" *ngIf="sourceTask.homePageId">
+                <span class="glyphicon glyphicon-home"></span>
+                <span class="entity-card-stat-label">Home Page</span> {{sourceTask.homePageId}}
+            </div>
+            <div class="entity-card-stat" *ngIf="sourceTask.pipelineId">
+                <span class="glyphicon glyphicon-random"></span>
+                <span class="entity-card-stat-label">Pipeline</span> {{sourceTask.pipelineId}}
+            </div>
+            <div class="entity-card-stat">
+                <span class="glyphicon glyphicon-link"></span>
+                <span class="entity-card-stat-label">Link Jobs</span> {{sourceTask.totalLinksJobs}}
+            </div>
+        </div>
+        <div class="entity-card-footer">
+            <div class="btn-group btn-group-sm">
+                <button type="button" class="btn btn-default btn-icon ic-edit"
+                    [routerLink]="['/editTask', sourceTask.taskDetailId]"
+                    title="Edit">
+                    <span class="glyphicon glyphicon-pencil"></span>
+                </button>
+                <button type="button" class="btn btn-default btn-icon ic-clone"
+                    [disabled]="sourceTask.taskStatus === 'Delete'"
+                    (click)="cloneSourceTask(sourceTask, i)"
+                    title="Clone">
+                    <span class="glyphicon glyphicon-duplicate"></span>
+                </button>
+                <button type="button" class="btn btn-default btn-icon ic-download"
+                    (click)="downloadSourceTask(sourceTask)"
+                    title="Download">
+                    <span class="glyphicon glyphicon-download-alt"></span>
+                </button>
+                <button type="button" class="btn btn-default btn-icon ic-delete"
+                    [disabled]="sourceTask.taskStatus === 'Delete'"
+                    data-toggle="modal" data-target="#deleteTask"
+                    (click)="deleteSourceTask(sourceTask, i)"
+                    title="Delete">
+                    <span class="glyphicon glyphicon-trash"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="help-text" *ngIf="!(sourceTasks | searchFilter: searchSourceTaskDetails).length">
+        <span class="glyphicon glyphicon-info-sign"></span> No tasks match your search.
+    </div>
 </div>
 
 <!-- Tasks Table -->
-<div class="table-responsive scroll-table">
+<div class="table-responsive scroll-table" *ngIf="viewMode === 'table'">
     <table class="table table-bordered table-hover table-modern">
         <thead>
             <tr>

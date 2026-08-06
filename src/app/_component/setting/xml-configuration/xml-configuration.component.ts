@@ -1,20 +1,22 @@
 import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormControl, FormGroup, FormArray, Validators } from '@angular/forms';
-import { ConfigurationMakerService } from '@/_services';
+import { AlertService, ConfigurationMakerService } from '@/_services';
 import { saveAs } from 'file-saver';
 
 @Component({
     selector: 'xml-configuration',
     templateUrl: 'xml-configuration.component.html'
 })
-export class XmlConfigurationComponent implements OnInit {	
+export class XmlConfigurationComponent implements OnInit {
 
+    public ERROR = 'Error';
     public xmlForm!: FormGroup;
     public xmlString = '';
     public xmlInfo: any;
     public file: File | null = null;
 
     constructor(public fb: FormBuilder,
+        private alertService: AlertService,
         private xmlService: ConfigurationMakerService) {
     }
 
@@ -71,7 +73,7 @@ export class XmlConfigurationComponent implements OnInit {
         .subscribe((response: any) => {
             this.xmlString = response.message;
         }, error => {
-            console.log('Error :- ' + JSON.stringify(error));
+            this.alertService.showError(error, this.ERROR);
         });
     }
 

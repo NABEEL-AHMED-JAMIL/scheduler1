@@ -44,7 +44,9 @@ export class SourceTaskComponent implements OnInit {
 
   public deleteViewSourceTask: SourceTask | null = null;
   public deleteSelectedIndex: any = null;
-  
+  public viewMode: 'table' | 'card' = 'table';
+
+
   constructor(private commomService: CommomService,
     private alertService: AlertService,
     private spinnerService: SpinnerService,
@@ -68,6 +70,10 @@ export class SourceTaskComponent implements OnInit {
 
   public refreshSourceTask(): void {
     this.listSourceTask(this.queryCriteria);
+  }
+
+  public setViewMode(mode: 'table' | 'card'): void {
+    this.viewMode = mode;
   }
 
   public listSourceTask(queryCriteria:QueryCriteria): void {

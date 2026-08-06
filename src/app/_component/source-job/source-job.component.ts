@@ -36,6 +36,15 @@ export class SourceJobComponent implements OnInit, OnDestroy  {
     public selectAllSourceJobs = false;
     public deleteViewSourceJob: SourceJobDetail | null = null;
     public deleteSelectedIndex: any = null;
+    /** Table stays the default (this list is dense/operational, matching every other admin
+     * screen); Card is an alternative view for browsing/scanning fewer jobs at a glance. */
+    public viewMode: 'table' | 'card' = 'table';
+    // Row expand (table view) -- linked task + job queue (run history) detail.
+    // Queue list is only fetched the first time a row is expanded, then cached per jobId
+    // so re-collapsing/re-expanding the same row doesn't refetch.
+    public expandedJobId: any = null;
+    public expandedJobQueuesLoading = false;
+    private expandedJobQueuesCache: { [jobId: string]: any[] } = {};
     private webSocketShareSubscription: Subscription;
 
     
@@ -80,6 +89,10 @@ export class SourceJobComponent implements OnInit, OnDestroy  {
     public refreshSourceJobs(): void {
         this.webSocketAPI.connect();
         this.listSourceJob();
+    }
+
+    public setViewMode(mode: 'table' | 'card'): void {
+        this.viewMode = mode;
     }
 
     public batchAction(): void {
@@ -352,6 +365,35 @@ export class SourceJobComponent implements OnInit, OnDestroy  {
             this.spinnerService.hide();
             this.alertService.showError(error, this.ERROR);
         });
+    }
+
+    public get expandedJobQueues(): any[] {
+        return this.expandedJobQueuesCache[this.expandedJobId] || [];
+    }
+
+    public toggleExpandJob(jobId: any): void {
+        if (this.expandedJobId === jobId) {
+            this.expandedJobId = null;
+            return;
+        }
+        this.expandedJobId = jobId;
+        if (this.expandedJobQueuesCache[jobId]) {
+            return;
+        }
+        this.expandedJobQueuesLoading = true;
+        this.sourceJobService.fetchSourceJobQueueListWithJobId(jobId)
+            .pipe(first())
+            .subscribe((response) => {
+                this.expandedJobQueuesLoading = false;
+                if (response.status === ApiCode.SUCCESS) {
+                    this.expandedJobQueuesCache[jobId] = response.data?.jobQueues || [];
+                    return;
+                }
+                this.alertService.showError(response.message, this.ERROR);
+            }, (error) => {
+                this.expandedJobQueuesLoading = false;
+                this.alertService.showError(error, this.ERROR);
+            });
     }
 
     public sourceJobHistoryByJobId(jobId: any): any {
