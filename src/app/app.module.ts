@@ -6,7 +6,8 @@ import {
 import { NgxEchartsModule } from 'ngx-echarts';
 import { BrowserModule } from '@angular/platform-browser';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
-import { HttpClientModule } from '@angular/common/http';
+import { HttpClientModule, HTTP_INTERCEPTORS } from '@angular/common/http';
+import { AuthInterceptor } from '@/_helpers';
 import { AppRoutingModule } from './app.routing';
 import { AppComponent } from './app.component';
 import { SearchFilterPipe } from '@/_helpers';
@@ -27,6 +28,8 @@ import {
     JobHistoryActionComponent,
     JobLogComponent,
     SearchEngineComponent,
+    QueryEngineComponent,
+    KafkaConnectionProfileComponent,
     LoginComponent,
     ObjectBrowserComponent,
     PdfHighlighterComponent,
@@ -43,7 +46,10 @@ import {
     ImageTextExtractorComponent,
     AiChatComponent,
     CvTailorComponent,
-    AiSuiteHomeComponent
+    UnauthorizedComponent,
+    TenantsComponent,
+    UsersComponent,
+    WelcomeComponent
 } from './_component/index';
 import { ToastrModule } from 'ngx-toastr';
 
@@ -94,6 +100,8 @@ import { ToastrModule } from 'ngx-toastr';
         JobHistoryActionComponent,
         JobLogComponent,
         SearchEngineComponent,
+        QueryEngineComponent,
+        KafkaConnectionProfileComponent,
         LoginComponent,
         ObjectBrowserComponent,
         PdfHighlighterComponent,
@@ -110,9 +118,14 @@ import { ToastrModule } from 'ngx-toastr';
         ImageTextExtractorComponent,
         AiChatComponent,
         CvTailorComponent,
-        AiSuiteHomeComponent
+        UnauthorizedComponent,
+        TenantsComponent,
+        UsersComponent,
+        WelcomeComponent
     ],
-    providers: [],
+    providers: [
+        { provide: HTTP_INTERCEPTORS, useClass: AuthInterceptor, multi: true }
+    ],
     bootstrap: [AppComponent]
 })
 export class AppModule { };

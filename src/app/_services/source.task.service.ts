@@ -77,4 +77,31 @@ export class SourceTaskService {
         return this.http.get<ApiResponse>(`${config.apiUrl}/sourceTask.json/fetchSourceTaskWithSourceTaskId?sourceTaskId=`+payload);
     }
 
+    /**
+     * Method use to fetch the jobs linked to a source task -- used by the Task List row's
+     * expand panel (mirrors Job List's expand panel fetching that job's queue/run history).
+     * A generous limit is used since this is a detail panel, not its own paged list.
+     * @param sourceTaskId
+     * @return Observable<ApiResponse>
+     * */
+    public fetchAllLinkJobsWithSourceTaskId(sourceTaskId: any): Observable<ApiResponse> {
+        let params = new HttpParams()
+            .append('sourceTaskId', sourceTaskId)
+            .append('page', '1')
+            .append('limit', '500');
+        return this.http.post<ApiResponse>(`${config.apiUrl}/sourceTask.json/fetchAllLinkJobsWithSourceTaskId`, {}, { params: params });
+    }
+
+    /**
+     * Method use to fetch every source task built on a given source task type -- powers the
+     * Source Task Type page's "Link Source Task" count/picker (Settings), so a user can browse
+     * and pick a target task from that type's tasks, grouped by the task's Group.
+     * @param sourceTaskTypeId
+     * @return Observable<ApiResponse>
+     * */
+    public fetchAllLinkSourceTaskWithSourceTaskTypeId(sourceTaskTypeId: any): Observable<ApiResponse> {
+        return this.http.get<ApiResponse>(
+            `${config.apiUrl}/sourceTask.json/fetchAllLinkSourceTaskWithSourceTaskTypeId?sourceTaskTypeId=${sourceTaskTypeId}`);
+    }
+
 }

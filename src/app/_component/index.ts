@@ -8,6 +8,7 @@ export * from './setting/source-task-type/source-task-type.component';
 export * from './setting/xml-configuration/xml-configuration.component';
 export * from './setting/setting.component';
 export * from './setting/queue-message/queue-message.component';
+export * from './setting/kafka-connection-profile/kafka-connection-profile.component';
 // source-job
 export * from './source-job/job/job.component';
 export * from './source-job/source-job.component';
@@ -18,6 +19,8 @@ export * from './source-task/task/task.component';
 export * from './source-task/source-task.component';
 // search-engine
 export * from './search-engine/search-engine.component';
+// query-engine
+export * from './setting/query-engine/query-engine.component';
 // login
 export * from './login/login.component';
 // object-browser
@@ -52,5 +55,14 @@ export * from './ai-chat/ai-chat.component';
 // cv-tailor
 export * from './cv-tailor/cv-tailor.component';
 
-// ai-suite-home
-export * from './ai-suite-home/ai-suite-home.component';
+// unauthorized
+export * from './unauthorized/unauthorized.component';
+
+// tenants
+export * from './tenants/tenants.component';
+
+// users
+export * from './users/users.component';
+
+// welcome
+export * from './welcome/welcome.component';

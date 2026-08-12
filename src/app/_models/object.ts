@@ -16,13 +16,17 @@ export interface FileInfo {
 
 export interface SourceTaskType {
     sourceTaskTypeId?: any;
+    tenantId?: any;
     description?: any;
     queueTopicPartition?: any;
     serviceName?: any;
     totalTaskLink?:any;
     status?: any;
-    schemaRegister?: any;
-    schemaPayload?: any;
+    /** This type's default Kafka cluster -- null falls through to the tenant's own default.
+     * See KafkaConnectionResolver on the backend for the full resolution order. */
+    kafkaConnectionProfileId?: any;
+    /** Set on read only, for display -- the resolved profile's name. */
+    kafkaConnectionProfileName?: any;
 }
 
 export interface QMessage {

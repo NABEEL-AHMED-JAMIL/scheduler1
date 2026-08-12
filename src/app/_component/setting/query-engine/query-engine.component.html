@@ -1,0 +1,521 @@
+<!-- breadcrumb -->
+<nav class="breadcrumb-bar">
+    <a routerLink="/home">Home</a>
+    <span class="crumb-sep">/</span>
+    <span class="crumb-current">Query Engine</span>
+</nav>
+
+<div class="card-panel" style="padding-bottom: 0;">
+    <div class="toolbar" style="margin-bottom: 0; border-bottom: 1px solid #e5e9ec;">
+        <button type="button" class="btn btn-sm" [ngClass]="activeTab === 'queries' ? 'btn-teal' : 'btn-default'" (click)="setActiveTab('queries')">
+            <span class="glyphicon glyphicon-search"></span> Queries ({{activeQueries.length}})
+        </button>
+        <button type="button" class="btn btn-sm" [ngClass]="activeTab === 'connections' ? 'btn-teal' : 'btn-default'" (click)="setActiveTab('connections')">
+            <span class="glyphicon glyphicon-hdd"></span> Connections ({{activeConnections.length}})
+        </button>
+        <button type="button" class="btn btn-sm" [ngClass]="activeTab === 'executions' ? 'btn-teal' : 'btn-default'" (click)="setActiveTab('executions')">
+            <span class="glyphicon glyphicon-list-alt"></span> Execution History ({{executions.length}})
+        </button>
+    </div>
+</div>
+
+<!-- ============================================================ QUERIES ============================================================ -->
+<div class="card-panel" *ngIf="activeTab === 'queries'">
+    <div class="toolbar">
+        <div class="form-group" style="margin-bottom: 0;">
+            <label for="searchQuery" class="control-label">Saved Queries</label>
+            <input type="text" id="searchQuery" class="form-control" style="width: 280px;" placeholder="Search" [(ngModel)]="searchQuery"/>
+        </div>
+        <span class="toolbar-spacer"></span>
+        <button type="button" class="btn btn-sm btn-default" (click)="fetchAllQueries()">
+            <span class="glyphicon glyphicon-refresh"></span> Refresh
+        </button>
+        <button type="button" class="btn btn-sm btn-teal" (click)="openAddQuery()" data-toggle="modal" data-target="#queryModal"
+            [disabled]="!activeConnections.length" [title]="!activeConnections.length ? 'Add a database connection first' : ''">
+            <span class="glyphicon glyphicon-plus"></span> New Query
+        </button>
+    </div>
+
+    <span class="help-text" *ngIf="!activeConnections.length" style="display: block; margin-bottom: 10px;">
+        <span class="glyphicon glyphicon-info-sign"></span>
+        Add a database connection first (Connections tab) before creating a query.
+    </span>
+
+    <div class="table-responsive scroll-table" *ngIf="activeQueries.length">
+        <table class="table table-striped table-bordered table-hover table-modern" style="font-size: 12px;">
+            <thead>
+                <tr>
+                    <th style="width: 4%;"># Id</th>
+                    <th>Name</th>
+                    <th>Connection</th>
+                    <th class="text-center">Schedule</th>
+                    <th class="text-center">Status</th>
+                    <th class="text-center" style="width: 230px;">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr *ngFor="let query of filteredQueries">
+                    <td>{{query.queryId}}</td>
+                    <td>{{query.queryName}}</td>
+                    <td><code>{{connectionName(query.databaseConnectionProfileId)}}</code></td>
+                    <td class="text-center">
+                        <span class="pill" [ngClass]="scheduleForQuery(query) ? 'pill-success' : 'pill-default'">
+                            {{ scheduleForQuery(query) ? ('every ' + scheduleForQuery(query).intervalMinutes + ' min') : 'None' }}
+                        </span>
+                    </td>
+                    <td class="text-center">
+                        <span class="pill" [ngClass]="{ 'pill-danger': query.status === 'Delete', 'pill-warning': query.status === 'Inactive', 'pill-success': query.status === 'Active' }">
+                            {{query.status}}
+                        </span>
+                    </td>
+                    <td class="text-center">
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button type="button" class="btn btn-default btn-icon" title="Run" (click)="openRunQuery(query)" data-toggle="modal" data-target="#runModal">
+                                <span class="glyphicon glyphicon-play"></span>
+                            </button>
+                            <button type="button" class="btn btn-default btn-icon" title="Schedule" (click)="openScheduleQuery(query)" data-toggle="modal" data-target="#scheduleModal">
+                                <span class="glyphicon glyphicon-time"></span>
+                            </button>
+                            <button type="button" class="btn btn-default btn-icon ic-edit" title="Edit" (click)="onOpenEditQueryClick(query)" data-toggle="modal" data-target="#queryModal">
+                                <span class="glyphicon glyphicon-edit"></span>
+                            </button>
+                            <button type="button" class="btn btn-default btn-icon ic-delete" title="Delete" [disabled]="query.status === 'Delete'"
+                                (click)="confirmDeleteQuery(query)" data-toggle="modal" data-target="#deleteQueryModal">
+                                <span class="glyphicon glyphicon-trash"></span>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <div class="help-text" *ngIf="!activeQueries.length">
+        <span class="glyphicon glyphicon-info-sign"></span> No saved queries yet.
+    </div>
+</div>
+
+<!-- ============================================================ CONNECTIONS ============================================================ -->
+<div class="card-panel" *ngIf="activeTab === 'connections'">
+    <div class="toolbar">
+        <div class="form-group" style="margin-bottom: 0;">
+            <label for="searchConnection" class="control-label">Database Connections</label>
+            <input type="text" id="searchConnection" class="form-control" style="width: 220px;" placeholder="Search" [(ngModel)]="searchConnection"/>
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+            <label for="filterDatabaseType" class="control-label">Type</label>
+            <select id="filterDatabaseType" class="form-control input-sm" style="width: 140px;" [(ngModel)]="filterDatabaseType">
+                <option value="">All Types</option>
+                <option *ngFor="let t of databaseTypeList" [value]="t">{{t}}</option>
+            </select>
+        </div>
+        <span class="toolbar-spacer"></span>
+        <button type="button" class="btn btn-sm btn-default" (click)="fetchAllConnections()">
+            <span class="glyphicon glyphicon-refresh"></span> Refresh
+        </button>
+        <button type="button" class="btn btn-sm btn-teal" (click)="openAddConnection()" data-toggle="modal" data-target="#connectionModal">
+            <span class="glyphicon glyphicon-plus"></span> Add Connection
+        </button>
+    </div>
+
+    <div class="table-responsive scroll-table" *ngIf="activeConnections.length">
+        <table class="table table-striped table-bordered table-hover table-modern" style="font-size: 12px;">
+            <thead>
+                <tr>
+                    <th style="width: 4%;"># Id</th>
+                    <th>Profile Name</th>
+                    <th>Type</th>
+                    <th>Host</th>
+                    <th>Database</th>
+                    <th class="text-center">Status</th>
+                    <th class="text-center" style="width: 150px;">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr *ngFor="let connection of filteredConnections">
+                    <td>{{connection.databaseConnectionProfileId}}</td>
+                    <td>{{connection.profileName}}</td>
+                    <td>{{connection.databaseType}}</td>
+                    <td><code>{{connection.host}}:{{connection.port}}</code></td>
+                    <td>{{connection.databaseName}}</td>
+                    <td class="text-center">
+                        <span class="pill" [ngClass]="{ 'pill-danger': connection.status === 'Delete', 'pill-warning': connection.status === 'Inactive', 'pill-success': connection.status === 'Active' }">
+                            {{connection.status}}
+                        </span>
+                    </td>
+                    <td class="text-center">
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button type="button" class="btn btn-default btn-icon ic-edit" title="Edit" (click)="openEditConnection(connection)" data-toggle="modal" data-target="#connectionModal">
+                                <span class="glyphicon glyphicon-edit"></span>
+                            </button>
+                            <button type="button" class="btn btn-default btn-icon ic-delete" title="Delete" [disabled]="connection.status === 'Delete'"
+                                (click)="confirmDeleteConnection(connection)" data-toggle="modal" data-target="#deleteConnectionModal">
+                                <span class="glyphicon glyphicon-trash"></span>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <div class="help-text" *ngIf="!activeConnections.length">
+        <span class="glyphicon glyphicon-info-sign"></span> No database connections yet -- add one to start creating queries.
+    </div>
+</div>
+
+<!-- ============================================================ EXECUTIONS ============================================================ -->
+<div class="card-panel" *ngIf="activeTab === 'executions'">
+    <div class="toolbar">
+        <div class="form-group" style="margin-bottom: 0;">
+            <label for="searchExecution" class="control-label">Execution History</label>
+            <input type="text" id="searchExecution" class="form-control" style="width: 220px;" placeholder="Search" [(ngModel)]="searchExecution"/>
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+            <label for="filterExecutionStatus" class="control-label">Status</label>
+            <select id="filterExecutionStatus" class="form-control input-sm" style="width: 140px;" [(ngModel)]="filterExecutionStatus">
+                <option value="">All Statuses</option>
+                <option *ngFor="let s of executionStatusOptions" [value]="s">{{s}}</option>
+            </select>
+        </div>
+        <span class="toolbar-spacer"></span>
+        <button type="button" class="btn btn-sm btn-default" (click)="fetchAllExecutions()">
+            <span class="glyphicon glyphicon-refresh"></span> Refresh
+        </button>
+    </div>
+
+    <div class="table-responsive scroll-table" *ngIf="executions.length">
+        <table class="table table-striped table-bordered table-hover table-modern" style="font-size: 12px;">
+            <thead>
+                <tr>
+                    <th style="width: 4%;"># Id</th>
+                    <th>Query</th>
+                    <th class="text-center">Trigger</th>
+                    <th class="text-center">Status</th>
+                    <th class="text-center">Rows</th>
+                    <th>Started</th>
+                    <th>Output</th>
+                    <th>Message</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr *ngFor="let execution of filteredExecutions">
+                    <td>{{execution.executionId}}</td>
+                    <td>{{execution.queryName || ('#' + execution.queryId)}}</td>
+                    <td class="text-center">
+                        <span class="pill pill-default">{{ execution.scheduleId ? 'Scheduled' : 'Manual' }}</span>
+                    </td>
+                    <td class="text-center">
+                        <span class="pill" [ngClass]="{
+                            'pill-success': execution.status === 'SUCCESS',
+                            'pill-danger': execution.status === 'FAILED',
+                            'pill-warning': execution.status === 'RUNNING' || execution.status === 'PENDING',
+                            'pill-default': execution.status === 'CANCELLED'
+                        }">{{execution.status}}</span>
+                    </td>
+                    <td class="text-center">{{execution.rowCount != null ? execution.rowCount : '-'}}</td>
+                    <td style="white-space: nowrap;">{{execution.startedAt | date:'yyyy-MM-dd HH:mm:ss'}}</td>
+                    <td>
+                        <code *ngIf="execution.outputBucket">{{execution.outputBucket}}/{{execution.outputKey}}</code>
+                        <span *ngIf="!execution.outputBucket">-</span>
+                    </td>
+                    <td><div class="cell-message">{{execution.errorMessage}}</div></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <div class="help-text" *ngIf="!executions.length">
+        <span class="glyphicon glyphicon-info-sign"></span> No executions yet -- run a query from the Queries tab.
+    </div>
+</div>
+
+<!-- ============================================================ Connection Modal ============================================================ -->
+<div class="modal fade" id="connectionModal" role="dialog" style="top: 40px;">
+    <div class="modal-dialog" style="width: 560px;">
+        <div class="modal-content" *ngIf="connectionForm">
+            <div class="modal-header">
+                <button type="button" #closeConnectionModal class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title">{{editingConnection ? 'Edit Connection' : 'Add Database Connection'}}</h4>
+            </div>
+            <form [formGroup]="connectionForm" (ngSubmit)="saveConnection()">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="form-group" [ngClass]="{ 'has-error': connectionSubmitted && cf.profileName.errors }">
+                                <label class="control-label" for="profileName">Profile Name</label>
+                                <input type="text" class="form-control" formControlName="profileName" placeholder="e.g. Reporting Warehouse" />
+                                <div *ngIf="connectionSubmitted && cf.profileName.errors" class="text-danger">Profile Name is required</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label class="control-label" for="databaseType">Type</label>
+                                <select class="form-control" formControlName="databaseType">
+                                    <option *ngFor="let t of databaseTypeList" [value]="t">{{t}}</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="form-group" [ngClass]="{ 'has-error': connectionSubmitted && cf.host.errors }">
+                                <label class="control-label" for="host">Host</label>
+                                <input type="text" class="form-control" formControlName="host" placeholder="db.example.com" />
+                                <div *ngIf="connectionSubmitted && cf.host.errors" class="text-danger">Host is required</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group" [ngClass]="{ 'has-error': connectionSubmitted && cf.port.errors }">
+                                <label class="control-label" for="port">Port</label>
+                                <input type="number" class="form-control" formControlName="port" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group" [ngClass]="{ 'has-error': connectionSubmitted && cf.databaseName.errors }">
+                        <label class="control-label" for="databaseName">Database Name</label>
+                        <input type="text" class="form-control" formControlName="databaseName" />
+                        <div *ngIf="connectionSubmitted && cf.databaseName.errors" class="text-danger">Database Name is required</div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group" [ngClass]="{ 'has-error': connectionSubmitted && cf.username.errors }">
+                                <label class="control-label" for="username">Username</label>
+                                <input type="text" class="form-control" formControlName="username" autocomplete="off" />
+                                <div *ngIf="connectionSubmitted && cf.username.errors" class="text-danger">Username is required</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="control-label" for="password">Password</label>
+                                <input type="password" class="form-control" formControlName="password"
+                                    [placeholder]="editingConnection ? 'Leave blank to keep the existing password' : 'Password'" autocomplete="new-password" />
+                                <span class="help-text" *ngIf="editingConnection && editingConnection.passwordConfigured" style="display: block; margin-top: 4px;">
+                                    <span class="glyphicon glyphicon-ok"></span> A password is already configured.
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="control-label" for="additionalProperties">
+                            Additional Properties <span class="help-text" style="font-weight: normal;">(JSON, e.g. sslmode)</span>
+                        </label>
+                        <textarea class="form-control" formControlName="additionalProperties" rows="2" placeholder='{"sslmode": "require"}'></textarea>
+                    </div>
+
+                    <div class="preview-toolbar" style="justify-content: flex-start;">
+                        <button type="button" class="btn btn-sm btn-default" [disabled]="testingConnection" (click)="testConnectionInModal()">
+                            <span class="glyphicon" [ngClass]="testingConnection ? 'glyphicon-refresh spin' : 'glyphicon-flash'"></span>
+                            {{testingConnection ? 'Testing...' : 'Test Connection'}}
+                        </button>
+                    </div>
+                    <div *ngIf="connectionTestResult" [ngClass]="connectionTestResult.success ? 'text-success' : 'text-danger'">
+                        <span class="glyphicon" [ngClass]="connectionTestResult.success ? 'glyphicon-ok' : 'glyphicon-remove'"></span>
+                        {{connectionTestResult.message}}
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-teal">{{editingConnection ? 'Save Connection' : 'Add Connection'}}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Connection Modal -->
+<div class="modal fade" id="deleteConnectionModal" role="dialog">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" #closeDeleteConnectionModal class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title">Delete Connection</h4>
+            </div>
+            <div class="modal-body">
+                <p>Delete this connection? Any saved queries still using it will need a new connection first.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger" (click)="processDeleteConnection()">Yes, Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ Query Modal ============================================================ -->
+<div class="modal fade" id="queryModal" role="dialog" style="top: 20px;">
+    <div class="modal-dialog" style="width: 720px;">
+        <div class="modal-content" *ngIf="queryForm">
+            <div class="modal-header">
+                <button type="button" #closeQueryModal class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title">{{editingQuery ? 'Edit Query' : 'New Query'}}</h4>
+            </div>
+            <form [formGroup]="queryForm" (ngSubmit)="saveQuery()">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-7">
+                            <div class="form-group" [ngClass]="{ 'has-error': querySubmitted && qf.queryName.errors }">
+                                <label class="control-label" for="queryName">Query Name</label>
+                                <input type="text" class="form-control" formControlName="queryName" placeholder="e.g. Weekly Customer Export" />
+                                <div *ngIf="querySubmitted && qf.queryName.errors" class="text-danger">Query Name is required</div>
+                            </div>
+                        </div>
+                        <div class="col-md-5">
+                            <div class="form-group" [ngClass]="{ 'has-error': querySubmitted && qf.databaseConnectionProfileId.errors }">
+                                <label class="control-label" for="databaseConnectionProfileId">Database Connection</label>
+                                <select class="form-control" formControlName="databaseConnectionProfileId">
+                                    <option value="" disabled>Select a connection</option>
+                                    <option *ngFor="let c of activeConnections" [value]="c.databaseConnectionProfileId">{{c.profileName}}</option>
+                                </select>
+                                <div *ngIf="querySubmitted && qf.databaseConnectionProfileId.errors" class="text-danger">Connection is required</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group" [ngClass]="{ 'has-error': querySubmitted && qf.queryText.errors }">
+                        <label class="control-label" for="queryText">SQL Query</label>
+                        <textarea id="queryText" class="form-control code-input" rows="8" formControlName="queryText"
+                            placeholder="SELECT * FROM customers WHERE created_date >= '2026-01-01'"></textarea>
+                        <div *ngIf="querySubmitted && qf.queryText.errors" class="text-danger">Query text is required</div>
+                        <span class="help-text" style="display: block; margin-top: 4px;">
+                            <span class="glyphicon glyphicon-info-sign"></span>
+                            Read-only SELECT statements only -- a single statement, no INSERT/UPDATE/DELETE/DDL. Checked server-side by a real SQL parser, not just this note.
+                        </span>
+                    </div>
+
+                    <div class="preview-toolbar" style="justify-content: flex-start; gap: 8px;">
+                        <button type="button" class="btn btn-sm btn-default" [disabled]="validating" (click)="validateQuery()">
+                            <span class="glyphicon" [ngClass]="validating ? 'glyphicon-refresh spin' : 'glyphicon-ok'"></span>
+                            {{validating ? 'Validating...' : 'Validate'}}
+                        </button>
+                        <button type="button" class="btn btn-sm btn-default" [disabled]="previewing" (click)="previewQuery()">
+                            <span class="glyphicon" [ngClass]="previewing ? 'glyphicon-refresh spin' : 'glyphicon-eye-open'"></span>
+                            {{previewing ? 'Loading...' : 'Preview (first 100 rows)'}}
+                        </button>
+                    </div>
+                    <div *ngIf="validationResult" [ngClass]="validationResult.valid ? 'text-success' : 'text-danger'" style="margin-top: 6px;">
+                        <span class="glyphicon" [ngClass]="validationResult.valid ? 'glyphicon-ok' : 'glyphicon-remove'"></span>
+                        {{validationResult.message}}
+                    </div>
+
+                    <div *ngIf="previewResult" style="margin-top: 10px;">
+                        <span class="help-text" style="display: block; margin-bottom: 4px;">
+                            {{previewResult.rows.length}} row(s) shown{{previewResult.truncated ? ' (more available -- run the query for the full export)' : ''}}
+                        </span>
+                        <div class="table-responsive scroll-table" style="max-height: 220px;">
+                            <table class="table table-striped table-bordered table-modern" style="font-size: 11px; white-space: nowrap;">
+                                <thead>
+                                    <tr><th *ngFor="let col of previewResult.columns">{{col | uppercase}}</th></tr>
+                                </thead>
+                                <tbody>
+                                    <tr *ngFor="let row of previewResult.rows">
+                                        <td *ngFor="let col of previewResult.columns">{{row[col]}}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-teal">{{editingQuery ? 'Save Query' : 'Create Query'}}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Query Modal -->
+<div class="modal fade" id="deleteQueryModal" role="dialog">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" #closeDeleteQueryModal class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title">Delete Query</h4>
+            </div>
+            <div class="modal-body"><p>Delete this saved query?</p></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger" (click)="processDeleteQuery()">Yes, Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ Run Modal ============================================================ -->
+<div class="modal fade" id="runModal" role="dialog">
+    <div class="modal-dialog">
+        <div class="modal-content" *ngIf="runForm">
+            <div class="modal-header">
+                <button type="button" #closeRunModal class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title">Run "{{runningQuery?.queryName}}"</h4>
+            </div>
+            <form [formGroup]="runForm" (ngSubmit)="runQuery()">
+                <div class="modal-body">
+                    <p class="help-text">
+                        <span class="glyphicon glyphicon-info-sign"></span>
+                        The backend streams the result straight to a CSV in the bucket/folder below -- this page never downloads the result itself.
+                    </p>
+                    <div class="form-group" [ngClass]="{ 'has-error': rf.outputBucket.invalid && rf.outputBucket.touched }">
+                        <label class="control-label" for="runOutputBucket">Bucket</label>
+                        <select class="form-control" formControlName="outputBucket">
+                            <option value="" disabled>Select a bucket</option>
+                            <option *ngFor="let b of buckets" [value]="b.bucket">{{b.bucket}}</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="control-label" for="runOutputPrefix">Folder / Prefix <span class="help-text" style="font-weight: normal;">(optional)</span></label>
+                        <input type="text" class="form-control" formControlName="outputPrefix" placeholder="reports/daily/" />
+                    </div>
+                    <div class="form-group" [ngClass]="{ 'has-error': rf.outputFileName.invalid && rf.outputFileName.touched }">
+                        <label class="control-label" for="runOutputFileName">File Name</label>
+                        <input type="text" class="form-control" formControlName="outputFileName" />
+                        <span class="help-text">.csv is added automatically if you leave it off.</span>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-teal" [disabled]="running">
+                        <span class="glyphicon" [ngClass]="running ? 'glyphicon-refresh spin' : 'glyphicon-play'"></span>
+                        {{running ? 'Running...' : 'Run Now'}}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ Schedule Modal ============================================================ -->
+<div class="modal fade" id="scheduleModal" role="dialog">
+    <div class="modal-dialog">
+        <div class="modal-content" *ngIf="scheduleForm">
+            <div class="modal-header">
+                <button type="button" #closeScheduleModal class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title">Schedule "{{schedulingQuery?.queryName}}"</h4>
+            </div>
+            <form [formGroup]="scheduleForm" (ngSubmit)="saveSchedule()">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="control-label" for="scheduleOutputBucket">Bucket</label>
+                        <select class="form-control" formControlName="outputBucket">
+                            <option value="" disabled>Select a bucket</option>
+                            <option *ngFor="let b of buckets" [value]="b.bucket">{{b.bucket}}</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="control-label" for="scheduleOutputPrefix">Folder / Prefix <span class="help-text" style="font-weight: normal;">(optional)</span></label>
+                        <input type="text" class="form-control" formControlName="outputPrefix" placeholder="reports/daily/" />
+                    </div>
+                    <div class="form-group">
+                        <label class="control-label" for="scheduleFileNameTemplate">File Name Template</label>
+                        <input type="text" class="form-control" formControlName="outputFileNameTemplate" placeholder="export_{date}" />
+                        <span class="help-text">Use <code>{{'{'}}date{{'}'}}</code> to insert the run date (yyyy-MM-dd).</span>
+                    </div>
+                    <div class="form-group">
+                        <label class="control-label" for="scheduleIntervalMinutes">Run Every (minutes)</label>
+                        <input type="number" class="form-control" formControlName="intervalMinutes" min="5" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" *ngIf="scheduleForQuery(schedulingQuery)"
+                        (click)="removeSchedule(schedulingQuery)" data-dismiss="modal">
+                        <span class="glyphicon glyphicon-remove"></span> Remove Schedule
+                    </button>
+                    <button type="submit" class="btn btn-teal">Save Schedule</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

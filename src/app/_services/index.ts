@@ -17,3 +17,7 @@ export * from './ollama.service';
 export * from './text-cleaner.service';
 export * from './audio-transcript.service';
 export * from './image-text.service';
+export * from './kafka-connection-profile.service';
+export * from './tenant.service';
+export * from './app-user.service';
+export * from './query-engine.service';

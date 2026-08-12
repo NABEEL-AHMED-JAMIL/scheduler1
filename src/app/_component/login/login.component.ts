@@ -49,11 +49,16 @@ export class LoginComponent implements OnInit {
             return;
         }
         const { username, password } = this.loginForm.value;
-        if (this.authService.login(username, password)) {
+        this.authService.login(username, password).subscribe((errorMessage) => {
+            if (errorMessage) {
+                this.error = errorMessage;
+                this.alertService.showError(this.error, 'Login Failed');
+                return;
+            }
             this.router.navigateByUrl(this.returnUrl);
-        } else {
-            this.error = 'Invalid credentials. Please use admin / admin.';
-            this.alertService.showError(this.error, 'Login Failed');
-        }
+        }, (error) => {
+            this.error = 'Could not reach the server. Please try again.';
+            this.alertService.showError(error, 'Login Failed');
+        });
     }
 }

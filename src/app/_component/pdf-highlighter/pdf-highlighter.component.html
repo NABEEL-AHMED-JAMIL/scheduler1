@@ -7,10 +7,27 @@
 
 <div class="toolbar">
     <div class="form-group" style="margin-bottom: 0;">
-        <label for="searchPdfHighlighterTask" class="control-label">Total PDF Highlighter Task ({{pdfHighlighterTasks.length}})</label>
-        <input type="text" id="searchPdfHighlighterTask" class="form-control" style="width: 280px;"
+        <label for="searchPdfHighlighterTask" class="control-label">Total PDF Highlighter Task ({{filteredPdfHighlighterTasks.length}} / {{pdfHighlighterTasks.length}})</label>
+        <input type="text" id="searchPdfHighlighterTask" class="form-control" style="width: 220px;"
             placeholder="Search" [(ngModel)]="searchPdfHighlighterTask"/>
     </div>
+    <div class="form-group" style="margin-bottom: 0;">
+        <label for="filterHighlighterStatus" class="control-label">Highlighter Status</label>
+        <select id="filterHighlighterStatus" class="form-control input-sm" style="width: 160px;" [(ngModel)]="filterHighlighterStatus">
+            <option value="">All</option>
+            <option *ngFor="let status of highlighterStatusOptions" [value]="status">{{status}}</option>
+        </select>
+    </div>
+    <div class="form-group" style="margin-bottom: 0;">
+        <label for="filterStatus" class="control-label">Status</label>
+        <select id="filterStatus" class="form-control input-sm" style="width: 140px;" [(ngModel)]="filterStatus">
+            <option value="">All Statuses</option>
+            <option *ngFor="let status of statusOptions" [value]="status">{{status}}</option>
+        </select>
+    </div>
+    <button type="button" class="btn btn-sm btn-default" [disabled]="!hasActiveFilters" (click)="clearFilters()" title="Clear all filters">
+        <span class="glyphicon glyphicon-remove"></span> Clear
+    </button>
     <span class="toolbar-spacer"></span>
     <button type="button" class="btn btn-sm btn-default" (click)="fetchAllPdfHighlighterTask()">
         <span class="glyphicon glyphicon-refresh"></span> Refresh
@@ -39,7 +56,7 @@
             </tr>
         </thead>
         <tbody>
-            <tr *ngFor="let pdfHighlighterTask of pdfHighlighterTasks | searchFilter: searchPdfHighlighterTask; let i = index;">
+            <tr *ngFor="let pdfHighlighterTask of filteredPdfHighlighterTasks | searchFilter: searchPdfHighlighterTask; let i = index;">
                 <td>{{pdfHighlighterTask.pdfHighlighterTaskId}}</td>
                 <td>{{pdfHighlighterTask.taskName}}</td>
                 <td>{{pdfHighlighterTask.description}}</td>

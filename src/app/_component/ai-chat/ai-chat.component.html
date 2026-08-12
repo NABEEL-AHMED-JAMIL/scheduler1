@@ -5,7 +5,7 @@
     <span class="crumb-current">AI Assistant</span>
 </nav>
 
-<div class="panel-box" style="background: #fff; border: 1px solid #e2e2e2; border-radius: 6px; padding: 16px; margin-bottom: 16px;">
+<div class="panel-box" style="margin-bottom: 16px;">
     <h4 style="margin-top: 0;"><span class="glyphicon glyphicon-comment"></span> AI Assistant</h4>
     <span class="help-text" style="display: block;">
         <span class="glyphicon glyphicon-info-sign"></span>
@@ -51,7 +51,7 @@
 
     <div class="text-muted" *ngIf="loadingObjects">Loading...</div>
     <div class="table-responsive scroll-table" *ngIf="selectedBucket && !loadingObjects" style="max-height: 360px; overflow-y: auto;">
-        <table class="table table-striped table-hover" style="font-size: 12px;">
+        <table class="table table-bordered table-hover table-modern" style="font-size: 12px;">
             <tbody>
                 <tr *ngFor="let entry of objects" class="bucket-row" (click)="openEntry(entry)">
                     <td style="width: 24px;">
@@ -133,7 +133,7 @@
     <div class="error-text" style="margin-top: 8px;" *ngIf="sendError">{{ sendError }}</div>
 
     <!-- Save to Bucket -->
-    <div style="margin-top: 16px; padding: 12px; background: #f7f7f9; border: 1px solid #e2e2e2; border-radius: 6px;" *ngIf="content || messages.length">
+    <div class="panel-box-subtle" style="margin-top: 16px;" *ngIf="content || messages.length">
         <label class="control-label" style="display: block; margin-bottom: 6px;">Save to Bucket</label>
         <div class="row">
             <div class="col-md-5">
@@ -156,11 +156,11 @@
                 {{ savingChat ? 'Saving...' : 'Save Chat History to Bucket' }}
             </button>
         </div>
-        <div class="help-text" style="display: block; margin-top: 6px; color: #3c763d;" *ngIf="contentSavedPath">
+        <div class="help-text help-text-success" style="margin-top: 6px;" *ngIf="contentSavedPath">
             <span class="glyphicon glyphicon-ok"></span> Saved to {{ contentSavedPath }}
         </div>
         <div class="error-text" style="margin-top: 6px;" *ngIf="saveContentError">{{ saveContentError }}</div>
-        <div class="help-text" style="display: block; margin-top: 6px; color: #3c763d;" *ngIf="chatSavedPath">
+        <div class="help-text help-text-success" style="margin-top: 6px;" *ngIf="chatSavedPath">
             <span class="glyphicon glyphicon-ok"></span> Saved to {{ chatSavedPath }}
         </div>
         <div class="error-text" style="margin-top: 6px;" *ngIf="saveChatError">{{ saveChatError }}</div>

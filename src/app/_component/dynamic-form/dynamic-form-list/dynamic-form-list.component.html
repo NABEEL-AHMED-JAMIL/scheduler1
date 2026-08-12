@@ -7,10 +7,20 @@
 
 <div class="toolbar">
     <div class="form-group" style="margin-bottom: 0;">
-        <label for="searchDynamicForm" class="control-label">Total Forms ({{dynamicForms.length}})</label>
-        <input type="text" id="searchDynamicForm" class="form-control" style="width: 280px;"
+        <label for="searchDynamicForm" class="control-label">Total Forms ({{filteredDynamicForms.length}} / {{dynamicForms.length}})</label>
+        <input type="text" id="searchDynamicForm" class="form-control" style="width: 220px;"
             placeholder="Search" [(ngModel)]="searchDynamicForm"/>
     </div>
+    <div class="form-group" style="margin-bottom: 0;">
+        <label for="filterStatus" class="control-label">Status</label>
+        <select id="filterStatus" class="form-control input-sm" style="width: 140px;" [(ngModel)]="filterStatus">
+            <option value="">All Statuses</option>
+            <option *ngFor="let status of statusOptions" [value]="status">{{status}}</option>
+        </select>
+    </div>
+    <button type="button" class="btn btn-sm btn-default" [disabled]="!hasActiveFilters" (click)="clearFilters()" title="Clear all filters">
+        <span class="glyphicon glyphicon-remove"></span> Clear
+    </button>
     <span class="toolbar-spacer"></span>
     <button type="button" class="btn btn-sm btn-default" (click)="fetchAllForms()">
         <span class="glyphicon glyphicon-refresh"></span> Refresh
@@ -38,7 +48,7 @@
             </tr>
         </thead>
         <tbody>
-            <tr *ngFor="let dynamicForm of dynamicForms | searchFilter: searchDynamicForm; let i = index;">
+            <tr *ngFor="let dynamicForm of filteredDynamicForms | searchFilter: searchDynamicForm; let i = index;">
                 <td>{{dynamicForm.dynamicFormId}}</td>
                 <td>{{dynamicForm.formName}}</td>
                 <td>{{dynamicForm.description}}</td>

@@ -1,0 +1,16 @@
+<nav class="breadcrumb-bar">
+    <a routerLink="/home">Home</a>
+    <span class="crumb-sep">/</span>
+    <span class="crumb-current">Unauthorized</span>
+</nav>
+
+<div class="card-panel" style="text-align: center; padding: 48px 24px;">
+    <span class="glyphicon glyphicon-ban-circle" style="font-size: 40px; color: #c0392b;"></span>
+    <h4 class="card-panel-title" style="margin-top: 16px;">You don't have access to this page</h4>
+    <p class="help-text" style="display: block; margin-bottom: 20px;">
+        Your account role doesn't include this section. Contact your administrator if you think this is wrong.
+    </p>
+    <button type="button" class="btn btn-sm btn-teal" routerLink="/home">
+        <span class="glyphicon glyphicon-home"></span> Back to Home
+    </button>
+</div>

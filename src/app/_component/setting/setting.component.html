@@ -14,7 +14,7 @@
 <!-- Source TaskType -->
 <div class="toolbar">
     <div class="form-group" style="margin-bottom: 0;">
-        <label for="searchSourceTaskTaype" class="control-label">Total Source TaskType ({{sourceTaskTypes.length}})</label>
+        <label for="searchSourceTaskTaype" class="control-label">Total Source TaskType ({{filteredSourceTaskTypes.length}})</label>
         <input type="text" id="searchSourceTaskTaype" class="form-control" style="width: 280px;"
             placeholder="Search" [(ngModel)]="searchSourceTaskTaype"/>
     </div>
@@ -42,25 +42,29 @@
                 <th>Queue Topic Partition</th>
                 <th>Description</th>
                 <th class="text-center">Link Task</th>
-                <th class="text-center">Schema</th>
+                <th class="text-center">Kafka Profile</th>
                 <th class="text-center">Status</th>
                 <th class="text-center">Action</th>
             </tr>
         </thead>
         <tbody>
-            <tr *ngFor="let sourceTaskType of sourceTaskTypes | searchFilter: searchSourceTaskTaype; let i = index;">
+            <tr *ngFor="let sourceTaskType of filteredSourceTaskTypes | searchFilter: searchSourceTaskTaype; let i = index;">
                 <td>{{sourceTaskType.sourceTaskTypeId}}</td>
                 <td>{{sourceTaskType.serviceName}}</td>
                 <td>{{sourceTaskType.queueTopicPartition}}</td>
                 <td>{{sourceTaskType.description}}</td>
                 <td class="text-center">
-                    <a routerLink="" style="pointer-events: none">{{sourceTaskType.totalTaskLink}}</a>
+                    <a href="javascript:void(0);" data-toggle="modal" data-target="#linkSourceTaskModal"
+                        (click)="viewLinkSourceTaskWithSourceTaskType(sourceTaskType)"
+                        title="Browse the {{sourceTaskType.totalTaskLink}} task(s) built on this type">
+                        {{sourceTaskType.totalTaskLink}}
+                    </a>
                 </td>
                 <td class="text-center">
-                    <span class="pill" [ngClass]="{
-                        'pill-danger': sourceTaskType.schemaRegister === false,
-                        'pill-success': sourceTaskType.schemaRegister === true
-                    }">{{sourceTaskType.schemaRegister}}</span>
+                    <span class="pill pill-cyan pill-icon" *ngIf="sourceTaskType.kafkaConnectionProfileName">
+                        <span class="glyphicon glyphicon-transfer"></span> {{sourceTaskType.kafkaConnectionProfileName}}
+                    </span>
+                    <span class="pill pill-default" *ngIf="!sourceTaskType.kafkaConnectionProfileName">(tenant default)</span>
                 </td>
                 <td class="text-center">
                     <span class="pill" [ngClass]="{
@@ -71,6 +75,11 @@
                 </td>
                 <td class="text-center">
                     <div class="btn-group btn-group-sm" role="group">
+                        <button type="button" class="btn btn-default btn-icon" title="Test Kafka Connection for this topic"
+                            [disabled]="testingTopicRowId === sourceTaskType.sourceTaskTypeId"
+                            (click)="testSourceTaskTypeConnection(sourceTaskType)">
+                            <span class="glyphicon" [ngClass]="testingTopicRowId === sourceTaskType.sourceTaskTypeId ? 'glyphicon-refresh spin' : 'glyphicon-flash'"></span>
+                        </button>
                         <button type="button" class="btn btn-default btn-icon ic-edit" data-toggle="modal" data-target="#sourceTaskType"
                             (click)="editSourceTaskType(sourceTaskType)" title="Edit">
                             <span class="glyphicon glyphicon-edit"></span>
@@ -112,6 +121,101 @@
         </div>
     </div>
 </div>
+
+<!-- Link Source Task -- every task built on the row's Source TaskType, grouped/filterable by
+     Group (TASK_GROUPS lookup), so a user can browse and pick a target task. -->
+<div class="modal fade" id="linkSourceTaskModal" role="dialog">
+    <div class="modal-dialog modal-lg" style="width: 800px;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title">
+                    <span class="glyphicon glyphicon-link"></span> Link Source Task
+                    <span class="help-text" *ngIf="sourceTaskType" style="font-weight: 400;">
+                        -- {{sourceTaskType.serviceName}} ({{sourceTaskType.queueTopicPartition}})
+                    </span>
+                </h4>
+            </div>
+            <div class="modal-body">
+                <div class="toolbar" style="margin-bottom: 12px;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="control-label" for="linkedSourceTaskSearch">
+                            Tasks ({{filteredLinkedSourceTasks.length}} of {{linkedSourceTasks.length}})
+                        </label>
+                        <input type="text" id="linkedSourceTaskSearch" class="form-control input-sm"
+                            style="width: 220px;" placeholder="Search by id or name"
+                            [(ngModel)]="linkedSourceTaskSearch" [ngModelOptions]="{ standalone: true }" />
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0; margin-left: 10px;">
+                        <label class="control-label" for="linkedSourceTaskGroupFilter">Group</label>
+                        <select id="linkedSourceTaskGroupFilter" class="form-control input-sm" style="width: 160px;"
+                            [(ngModel)]="linkedSourceTaskGroupFilter" [ngModelOptions]="{ standalone: true }">
+                            <option value="All">All</option>
+                            <option *ngFor="let group of linkedSourceTaskGroups" [value]="group">{{group}}</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="help-text" *ngIf="linkedSourceTasksLoading">
+                    <span class="glyphicon glyphicon-refresh spin"></span> Loading linked tasks...
+                </div>
+                <div class="help-text" *ngIf="!linkedSourceTasksLoading && !linkedSourceTasks.length">
+                    <span class="glyphicon glyphicon-info-sign"></span> No tasks are built on this type yet.
+                </div>
+                <div class="table-responsive" style="max-height: 420px; overflow-y: auto;"
+                    *ngIf="!linkedSourceTasksLoading && linkedSourceTasks.length">
+                    <table class="table table-bordered table-hover table-modern" style="font-size: 12px;">
+                        <thead>
+                            <tr>
+                                <th># No</th>
+                                <th>Task Name</th>
+                                <th>Group</th>
+                                <th class="text-center">Status</th>
+                                <th class="text-center">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr *ngFor="let task of filteredLinkedSourceTasks">
+                                <td>{{task.taskDetailId}}</td>
+                                <td>{{task.taskName}}</td>
+                                <td>
+                                    <span class="pill pill-indigo pill-icon" *ngIf="task.groupLabel">
+                                        <span class="glyphicon glyphicon-folder-open"></span> {{task.groupLabel}}
+                                    </span>
+                                    <span class="help-text" *ngIf="!task.groupLabel">Ungrouped</span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="pill" [ngClass]="{
+                                        'pill-danger': task.taskStatus === 'Delete',
+                                        'pill-warning': task.taskStatus === 'Inactive',
+                                        'pill-success': task.taskStatus === 'Active'
+                                    }">{{task.taskStatus}}</span>
+                                </td>
+                                <td class="text-center">
+                                    <button type="button" class="btn btn-teal btn-sm" data-dismiss="modal"
+                                        (click)="selectLinkedSourceTask(task)" title="Open this task">
+                                        Select
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr *ngIf="!filteredLinkedSourceTasks.length">
+                                <td colspan="5" class="text-center text-muted">No tasks match your search/filter.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Kafka Connection -- lives alongside Source TaskType since queueTopicPartition (above)
+     is exactly what a connection profile publishes to; the per-row Test action above tests
+     a TaskType's own topic against whichever profile is active here. -->
+<h4 id="kafkaConnectionProfile" style="margin-top: 25px;">Kafka Connection</h4>
+<kafka-connection-profile></kafka-connection-profile>
 
 <look-up *ngIf="lookupAction"
     [lookUpAction]="lookupAction"

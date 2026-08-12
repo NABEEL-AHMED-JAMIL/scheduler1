@@ -1,17 +1,18 @@
 import { Component, OnInit, Input, Output, ViewChild, EventEmitter } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { AlertService, SettingService } from '@/_services';
+import { AlertService, SettingService, KafkaConnectionProfileService } from '@/_services';
 import { SpinnerService } from '@/_helpers';
 import { first } from 'rxjs/operators';
 import { ApiCode, Action, STATUS_LIST } from '@/_models';
 import { SourceTaskType } from '@/_models/index';
+import { KafkaConnectionProfile } from '@/_models/kafka-connection-profile.model';
 
 @Component({
     selector: 'source-task-type',
     templateUrl: 'source-task-type.component.html'
 })
 export class SourceTaskTypeComponent implements OnInit {
-    
+
 	public ERROR:string = 'Error';
     public submitted:boolean = false;
 	public isDisable:boolean = false;
@@ -21,6 +22,15 @@ export class SourceTaskTypeComponent implements OnInit {
     public SOURCEC_TASK_TYPE_TITLE: any = 'New SourceTaskType';
 	public sourceTaskTypeStatus: any = STATUS_LIST;
 	public sourceTaskTaypeForm: FormGroup;
+	/** Populated for the "default Kafka cluster" picker -- leaving it unset means "inherit the
+	 * tenant's own default", see KafkaConnectionResolver on the backend. */
+	public kafkaProfiles: KafkaConnectionProfile[] = [];
+	/** Options for the Partition dropdown -- '*' (any partition) plus 0..MAX_PARTITION_INDEX.
+	 * A guided picker instead of a free-text box, capped to match the backend's own limit
+	 * (KafkaTopicPartitionUtil.MAX_PARTITION_INDEX) so an out-of-range value can't even be
+	 * entered here in the first place, not just rejected after a round trip to the server. */
+	public readonly MAX_PARTITION_INDEX = 10;
+	public readonly partitionOptions: string[] = ['*', ...Array.from({ length: this.MAX_PARTITION_INDEX + 1 }, (_, i) => String(i))];
 
 	@Input()
 	public sourceTaskTypeAction: Action;
@@ -34,10 +44,12 @@ export class SourceTaskTypeComponent implements OnInit {
 	constructor(private formBuilder: FormBuilder,
 		private alertService: AlertService,
 		private spinnerService: SpinnerService,
-		private settingService: SettingService){
+		private settingService: SettingService,
+		private kafkaConnectionProfileService: KafkaConnectionProfileService){
 	}
 
     ngOnInit() {
+		this.fetchKafkaProfiles();
 		if (this.sourceTaskTypeAction) {
 			if ((this.sourceTaskTypeAction as Action) === Action.ADD) {
 				this.SOURCEC_TASK_TYPE_TITLE = 'New TaskType';
@@ -60,6 +72,16 @@ export class SourceTaskTypeComponent implements OnInit {
 		return this.sourceTaskTaypeForm.controls;
 	}
 
+	private fetchKafkaProfiles(): void {
+		this.kafkaConnectionProfileService.fetchAllProfiles()
+			.pipe(first())
+			.subscribe((response) => {
+				if (response.status === ApiCode.SUCCESS) {
+					this.kafkaProfiles = (response.data || []).filter((p: KafkaConnectionProfile) => p.status === 'Active');
+				}
+			});
+	}
+
     public submitSourceTaskType() {
 		if ((this.sourceTaskTypeAction as Action) === Action.ADD) {
 			this.addSourceTaskType();
@@ -76,7 +98,7 @@ export class SourceTaskTypeComponent implements OnInit {
 			partitions: ['', Validators.required],
 			queueTopicPartition: ['topic=&partitions=[]', Validators.required],
 			serviceName: ['', Validators.required],
-			schemaPayload: []
+			kafkaConnectionProfileId: ['']
         });
 		this.spinnerService.hide();
 	}
@@ -119,7 +141,7 @@ export class SourceTaskTypeComponent implements OnInit {
 			partitions: [topicParts.partitions, Validators.required],
 			queueTopicPartition: [sourceTaskTaype.queueTopicPartition, Validators.required],
 			serviceName: [sourceTaskTaype.serviceName, Validators.required],
-			schemaPayload: [sourceTaskTaype.schemaPayload],
+			kafkaConnectionProfileId: [sourceTaskTaype.kafkaConnectionProfileId || ''],
 			status: [sourceTaskTaype.status]
         });
 		this.spinnerService.hide();
@@ -161,7 +183,7 @@ export class SourceTaskTypeComponent implements OnInit {
 			partitions: [topicParts.partitions, Validators.required],
 			queueTopicPartition: [sourceTaskTaype.queueTopicPartition, Validators.required],
 			serviceName: [sourceTaskTaype.serviceName, Validators.required],
-			schemaPayload: [sourceTaskTaype.schemaPayload]
+			kafkaConnectionProfileId: [sourceTaskTaype.kafkaConnectionProfileId || '']
         });
 		this.spinnerService.hide();
 	}

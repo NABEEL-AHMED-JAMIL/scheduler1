@@ -1,6 +1,7 @@
-﻿import { Component, OnInit } from '@angular/core';
+﻿import { Component, OnInit, OnDestroy } from '@angular/core';
 import { Router, ActivatedRoute, ParamMap } from '@angular/router';
 import { first } from 'rxjs/operators';
+import { Subscription } from 'rxjs';
 import { SpinnerService } from '@/_helpers';
 import { ApiCode } from '@/_models';
 import {
@@ -33,7 +34,7 @@ import {
     selector: 'job',
     templateUrl: 'job.component.html'
 })
-export class JobComponent implements OnInit {
+export class JobComponent implements OnInit, OnDestroy {
 
     public ERROR = 'Error';
     public SUCESS = 'Sucess';
@@ -56,7 +57,11 @@ export class JobComponent implements OnInit {
     // source list
     public sourceTasks: SourceTask[] = [];
     public selectedSourceTask: SourceTask | null = null;
-    
+    /** Stored so ngOnDestroy can unsubscribe -- paramMap is a long-lived route Observable, not a
+     * one-shot HTTP call, so leaving this subscribed past the component's lifetime leaks a
+     * dangling subscriber tied to the router's internal param stream. */
+    private paramMapSubscription!: Subscription;
+
     constructor(private _router: Router,
         private _activatedRoute: ActivatedRoute,
         private fb: FormBuilder,
@@ -67,7 +72,7 @@ export class JobComponent implements OnInit {
     }
 
     ngOnInit() {
-        this._activatedRoute.paramMap
+        this.paramMapSubscription = this._activatedRoute.paramMap
         .subscribe((params: ParamMap) => {
             const id = params.get('jobId');
             this.jobId = id !== null ? Number(id) : null;
@@ -86,6 +91,10 @@ export class JobComponent implements OnInit {
             this.addSourceJobFormInit();
         }
         this.loadSourceTaskTargetPage(this.sourceTaskQueryCriteria);
+    }
+
+    ngOnDestroy(): void {
+        this.paramMapSubscription?.unsubscribe();
     }
 
     private loadSourceTaskTargetPage(queryCriteria: QueryCriteria) {

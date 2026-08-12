@@ -2,44 +2,124 @@
 <nav class="breadcrumb-bar">
     <a routerLink="/home">Home</a>
     <span class="crumb-sep">/</span>
-    <a href="javascript:void(0)" (click)="backClicked()">List</a>
+    <a href="javascript:void(0)" (click)="backClicked()">{{buttonMessage === 'Job' ? 'Job List' : 'Task List'}}</a>
     <span class="crumb-sep">/</span>
     <span class="crumb-current">Batch Action</span>
 </nav>
 
-<!-- Upload / Download / Template -->
 <input type="file" accept="application/vnd.ms-excel, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    style="display: none;" #inputUpload (change)="uploadBulk($event.target.files[0])" hidden>
+    style="display: none;" #inputUpload (change)="uploadBulk($event.target.files[0]); $event.target.value = null" hidden>
 
-<div class="toolbar" style="justify-content: flex-end;">
-    <button type="button" class="btn btn-sm btn-teal" (click)="inputUpload.click()">
-        <span class="glyphicon glyphicon-upload"></span> Upload {{buttonMessage}}
-    </button>
-    <button type="button" class="btn btn-sm btn-default" (click)="downloadList()">
-        <span class="glyphicon glyphicon-download"></span> Download {{buttonMessage}}
-    </button>
-    <button type="button" class="btn btn-sm btn-default" (click)="downloadSourceTemplate()">
-        <span class="glyphicon glyphicon-cog"></span> Template
-    </button>
+<!-- Tenant-scope banner -- every row this creates lands in this scope server-side
+     (SourceJobBulkServiceImpl.uploadSourceJob / SourceTaskServiceImpl.uploadSourceTask); this
+     just makes that boundary visible instead of silent. -->
+<div class="card-panel" style="margin-bottom: 14px; padding: 12px 18px;">
+    <span class="help-text" style="display: block; margin: 0;">
+        <span class="glyphicon" [ngClass]="isPlatformAdmin ? 'glyphicon-globe' : 'glyphicon-lock'"></span>
+        <ng-container *ngIf="!isPlatformAdmin">
+            Every {{buttonMessage}} in this file is created under <b>your tenant only</b> (tenant #{{tenantId}}) --
+            a row referencing another tenant's task or job will be rejected, and Download only exports your tenant's own records.
+        </ng-container>
+        <ng-container *ngIf="isPlatformAdmin">
+            You're uploading as <b>Platform Admin</b> -- new records aren't tied to any single tenant, and Download exports every tenant's records.
+        </ng-container>
+    </span>
 </div>
 
-<!-- Results / Errors -->
+<!-- Action tiles -->
+<div class="entity-card-grid">
+    <div class="entity-card">
+        <div class="entity-card-header">
+            <div class="entity-card-header-main">
+                <div class="entity-card-icon"><span class="glyphicon glyphicon-upload"></span></div>
+                <div>
+                    <div class="entity-card-title">Upload {{buttonMessage}}</div>
+                </div>
+            </div>
+        </div>
+        <!-- Drag-and-drop zone -- also click-to-browse via the hidden file input above -->
+        <div class="upload-dropzone" [class.upload-dropzone-active]="isDragging" [class.upload-dropzone-busy]="isUploading"
+            (dragover)="onDragOver($event)" (dragleave)="onDragLeave($event)" (drop)="onDrop($event)"
+            (click)="!isUploading && inputUpload.click()">
+            <span class="glyphicon" [ngClass]="isUploading ? 'glyphicon-refresh spin' : 'glyphicon-cloud-upload'"></span>
+            <div class="upload-dropzone-text">
+                <ng-container *ngIf="!isUploading">Drag &amp; drop an .xlsx file here, or click to browse</ng-container>
+                <ng-container *ngIf="isUploading">Uploading {{selectedFileName}}&hellip;</ng-container>
+            </div>
+            <div class="upload-dropzone-filename" *ngIf="selectedFileName && !isUploading">{{selectedFileName}}</div>
+        </div>
+    </div>
+
+    <div class="entity-card">
+        <div class="entity-card-header">
+            <div class="entity-card-header-main">
+                <div class="entity-card-icon"><span class="glyphicon glyphicon-download-alt"></span></div>
+                <div>
+                    <div class="entity-card-title">Download {{buttonMessage}} List</div>
+                </div>
+            </div>
+        </div>
+        <p class="help-text" style="margin: 4px 0 12px;">
+            Export {{isPlatformAdmin ? 'every tenant\'s' : 'your tenant\'s'}} current {{buttonMessage === 'Job' ? 'source jobs' : 'source tasks'}} as an .xlsx file.
+        </p>
+        <!-- The grid stretches every card to the row's tallest (Upload Task's drag-and-drop
+             zone), and this card's own content -- header, one line of text, one button -- never
+             comes close to filling that height, so without an anchor the leftover space just
+             sat as dead margin below the button. margin-top:auto (this card is a flex column,
+             see .entity-card) pushes the gap above the button instead, keeping it flush with
+             the card's bottom edge the way Upload Task's dropzone already reaches. -->
+        <button type="button" class="btn btn-sm btn-default" style="margin-top: auto;" (click)="downloadList()">
+            <span class="glyphicon glyphicon-download-alt"></span> Download {{buttonMessage}}
+        </button>
+    </div>
+
+    <div class="entity-card">
+        <div class="entity-card-header">
+            <div class="entity-card-header-main">
+                <div class="entity-card-icon"><span class="glyphicon glyphicon-cog"></span></div>
+                <div>
+                    <div class="entity-card-title">Upload Template</div>
+                </div>
+            </div>
+        </div>
+        <p class="help-text" style="margin: 4px 0 12px;">
+            Get a blank .xlsx pre-filled with the correct headers and dropdown values{{isPlatformAdmin ? '' : ' (scoped to your tenant\'s own ' + (buttonMessage === 'Job' ? 'tasks)' : 'lookups)')}}.
+        </p>
+        <button type="button" class="btn btn-sm btn-default" style="margin-top: auto;" (click)="downloadSourceTemplate()">
+            <span class="glyphicon glyphicon-cog"></span> Template
+        </button>
+    </div>
+</div>
+
+<!-- Results -->
 <div class="card-panel">
     <h4 class="card-panel-title">Results</h4>
-    <div class="table-responsive">
+
+    <div class="upload-result upload-result-success" *ngIf="lastUploadOk === true">
+        <span class="glyphicon glyphicon-ok-circle"></span> {{lastUploadMessage}}
+    </div>
+    <div class="upload-result upload-result-error" *ngIf="lastUploadOk === false && !errors.length">
+        <span class="glyphicon glyphicon-remove-circle"></span> {{lastUploadMessage}}
+    </div>
+
+    <div class="table-responsive" *ngIf="errors.length">
         <table class="table table-striped table-bordered table-hover table-modern">
             <thead>
                 <tr>
-                    <th>No#</th>
+                    <th style="width: 60px;">Row</th>
                     <th>Error</th>
                 </tr>
             </thead>
             <tbody>
                 <tr *ngFor="let error of errors; let i = index">
-                    <td>{{i+1}}</td>
+                    <td><span class="pill pill-danger">#{{i+1}}</span></td>
                     <td><div class="cell-message" [innerHTML]="error"></div></td>
                 </tr>
             </tbody>
         </table>
+    </div>
+
+    <div class="help-text" *ngIf="lastUploadOk === null && !errors.length">
+        <span class="glyphicon glyphicon-info-sign"></span> Upload a file to see results here.
     </div>
 </div>

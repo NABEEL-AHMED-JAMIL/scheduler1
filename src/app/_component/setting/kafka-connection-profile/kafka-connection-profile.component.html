@@ -1,0 +1,320 @@
+<div class="toolbar">
+    <div class="form-group" style="margin-bottom: 0;">
+        <label for="searchProfile" class="control-label">Total Profiles ({{filteredProfiles.length}} / {{profiles.length}})</label>
+        <input type="text" id="searchProfile" class="form-control" style="width: 220px;"
+            placeholder="Search" [(ngModel)]="searchProfile"/>
+    </div>
+    <div class="form-group" style="margin-bottom: 0;" *ngIf="isPlatformAdmin">
+        <label for="filterScope" class="control-label">Scope</label>
+        <select id="filterScope" class="form-control input-sm" style="width: 140px;" [(ngModel)]="filterScope">
+            <option value="">All Scopes</option>
+            <option value="Platform">Platform-wide</option>
+            <option value="Tenant">Tenant</option>
+        </select>
+    </div>
+    <div class="form-group" style="margin-bottom: 0;">
+        <label for="filterSecurityProtocol" class="control-label">Security Protocol</label>
+        <select id="filterSecurityProtocol" class="form-control input-sm" style="width: 150px;" [(ngModel)]="filterSecurityProtocol">
+            <option value="">All Protocols</option>
+            <option *ngFor="let sp of availableSecurityProtocols" [value]="sp">{{sp}}</option>
+        </select>
+    </div>
+    <div class="form-group" style="margin-bottom: 0;">
+        <label for="filterStatus" class="control-label">Status</label>
+        <select id="filterStatus" class="form-control input-sm" style="width: 140px;" [(ngModel)]="filterStatus">
+            <option value="">All Statuses</option>
+            <option *ngFor="let status of statusOptions" [value]="status">{{status}}</option>
+        </select>
+    </div>
+    <button type="button" class="btn btn-sm btn-default" [disabled]="!hasActiveFilters" (click)="clearFilters()" title="Clear all filters">
+        <span class="glyphicon glyphicon-remove"></span> Clear
+    </button>
+    <span class="toolbar-spacer"></span>
+    <button type="button" class="btn btn-sm btn-default" (click)="fetchAllProfiles()">
+        <span class="glyphicon glyphicon-refresh"></span> Refresh
+    </button>
+    <button type="button" class="btn btn-sm btn-teal" (click)="openAddProfile()" data-toggle="modal" data-target="#profileModal">
+        <span class="glyphicon glyphicon-plus"></span> Add Profile
+    </button>
+</div>
+
+<span class="help-text" style="margin-bottom: 10px; display: block;">
+    <span class="glyphicon glyphicon-info-sign"></span>
+    Configure a Kafka cluster (local or remote) and set it as default to switch which broker
+    {{isPlatformAdmin ? 'the platform-wide fallback' : 'your tenant'}} publishes jobs to. A Source Task Type
+    can still target a specific profile of its own (or your tenant can override just that type) --
+    see the Source Task Type form. When nothing resolves, the app's deploy-time default cluster is used.
+</span>
+
+<span class="help-text" *ngIf="!profiles.length">
+    <span class="glyphicon glyphicon-info-sign"></span>
+    No connection profiles yet -- the default deploy-time Kafka cluster is in use.
+</span>
+
+<div class="table-responsive scroll-table" *ngIf="profiles.length">
+    <table class="table table-striped table-bordered table-hover table-modern" style="font-size: 12px;">
+        <thead>
+            <tr>
+                <th style="width: 4%;"># No</th>
+                <th>Profile Name</th>
+                <th *ngIf="isPlatformAdmin">Scope</th>
+                <th>Bootstrap Servers</th>
+                <th class="text-center">Security Protocol</th>
+                <th class="text-center">Default</th>
+                <th class="text-center">Connection</th>
+                <th class="text-center">Status</th>
+                <th class="text-center" style="width: 260px; white-space: nowrap;">Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr *ngFor="let profile of filteredProfiles | searchFilter: searchProfile; let i = index;">
+                <td>{{profile.kafkaConnectionProfileId}}</td>
+                <td>
+                    {{profile.profileName}}
+                    <span class="pill pill-cyan" style="margin-left: 4px;" *ngIf="profile.environmentLabel">{{profile.environmentLabel}}</span>
+                </td>
+                <td *ngIf="isPlatformAdmin">
+                    <span class="pill" [ngClass]="profile.tenantId ? 'pill-default' : 'pill-indigo'">
+                        {{profile.tenantId ? ('Tenant #' + profile.tenantId) : 'Platform-wide'}}
+                    </span>
+                </td>
+                <td><code>{{profile.bootstrapServers}}</code></td>
+                <td class="text-center">{{profile.securityProtocol}}</td>
+                <td class="text-center">
+                    <span class="pill" [ngClass]="profile.isDefault ? 'pill-success' : 'pill-default'">
+                        {{profile.isDefault ? 'Default' : '-'}}
+                    </span>
+                </td>
+                <td class="text-center">
+                    <span class="pill" [ngClass]="{
+                        'pill-success': profile.connectionStatus === 'SUCCESS',
+                        'pill-danger': profile.connectionStatus === 'FAILED',
+                        'pill-default': !profile.connectionStatus || profile.connectionStatus === 'UNTESTED'
+                    }" [title]="profile.lastTestMessage || ''">
+                        {{profile.connectionStatus || 'UNTESTED'}}
+                    </span>
+                </td>
+                <td class="text-center">
+                    <span class="pill" [ngClass]="{
+                        'pill-danger': profile.status === 'Delete',
+                        'pill-warning': profile.status === 'Inactive',
+                        'pill-success': profile.status === 'Active'
+                    }">{{profile.status}}</span>
+                </td>
+                <td class="text-center">
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button type="button" class="btn btn-default btn-icon" title="Test Connection"
+                            [disabled]="testingRowId === profile.kafkaConnectionProfileId"
+                            (click)="testConnectionForRow(profile)">
+                            <span class="glyphicon" [ngClass]="testingRowId === profile.kafkaConnectionProfileId ? 'glyphicon-refresh spin' : 'glyphicon-flash'"></span>
+                        </button>
+                        <button type="button" class="btn btn-default btn-icon" title="Make this the default connection"
+                            *ngIf="!profile.isDefault"
+                            [disabled]="profile.status === 'Delete' || !canManage(profile)"
+                            [attr.title]="canManage(profile) ? 'Make this the default connection' : 'This is a platform-wide connection -- only a platform admin can change it'"
+                            (click)="setAsDefault(profile)">
+                            <span class="glyphicon glyphicon-ok-circle"></span>
+                        </button>
+                        <button type="button" class="btn btn-default btn-icon" title="Clear default (revert to fallback)"
+                            *ngIf="profile.isDefault"
+                            [disabled]="!canManage(profile)"
+                            [attr.title]="canManage(profile) ? 'Clear default (revert to fallback)' : 'This is a platform-wide connection -- only a platform admin can change it'"
+                            (click)="clearDefault()">
+                            <span class="glyphicon glyphicon-remove-circle"></span>
+                        </button>
+                        <button type="button" class="btn btn-default btn-icon ic-edit"
+                            [disabled]="!canManage(profile)"
+                            [attr.title]="canManage(profile) ? 'Edit' : 'This is a platform-wide connection -- only a platform admin can edit it'"
+                            (click)="openEditProfile(profile)" data-toggle="modal" [attr.data-target]="canManage(profile) ? '#profileModal' : null">
+                            <span class="glyphicon glyphicon-edit"></span>
+                        </button>
+                        <button type="button" class="btn btn-default btn-icon ic-delete"
+                            [disabled]="profile.status === 'Delete' || !canManage(profile)"
+                            [attr.title]="canManage(profile) ? 'Delete' : 'This is a platform-wide connection -- only a platform admin can delete it'"
+                            (click)="confirmDeleteProfile(profile)"
+                            data-toggle="modal" [attr.data-target]="canManage(profile) ? '#deleteProfileModal' : null">
+                            <span class="glyphicon glyphicon-trash"></span>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+<div class="help-text" *ngIf="profiles.length && !(filteredProfiles | searchFilter: searchProfile).length">
+    <span class="glyphicon glyphicon-info-sign"></span> No profiles match your search.
+</div>
+
+<!-- Add/Edit Profile Modal -->
+<div class="modal fade" id="profileModal" role="dialog" style="top: 40px;">
+    <div class="modal-dialog" style="width: 560px;">
+        <div class="modal-content" *ngIf="profileForm">
+            <div class="modal-header">
+                <button type="button" #closeProfileModal class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title">{{editingProfile ? 'Edit Kafka Connection' : 'Add Kafka Connection'}}</h4>
+            </div>
+            <form [formGroup]="profileForm" (ngSubmit)="saveProfile()">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="form-group" [ngClass]="{ 'has-error': submitted && f.profileName.errors }">
+                                <label class="control-label" for="profileName">Profile Name</label>
+                                <input type="text" class="form-control" formControlName="profileName" placeholder="e.g. Production Cluster (AWS MSK)" />
+                                <div *ngIf="submitted && f.profileName.errors">
+                                    <div class="text-danger">Profile Name is required</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label class="control-label" for="environmentLabel">Environment</label>
+                                <input type="text" class="form-control" formControlName="environmentLabel" placeholder="local / prod-remote" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group" [ngClass]="{ 'has-error': submitted && f.bootstrapServers.errors }">
+                        <label class="control-label" for="bootstrapServers">Bootstrap Servers</label>
+                        <input type="text" class="form-control" formControlName="bootstrapServers" placeholder="broker1:9092,broker2:9092" />
+                        <div *ngIf="submitted && f.bootstrapServers.errors">
+                            <div class="text-danger">Bootstrap Servers is required</div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="control-label" for="securityProtocol">Security Protocol</label>
+                                <select class="form-control" formControlName="securityProtocol">
+                                    <option *ngFor="let sp of securityProtocolList" [value]="sp">{{sp}}</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6" *ngIf="isSaslProtocol(f.securityProtocol.value)">
+                            <div class="form-group">
+                                <label class="control-label" for="saslMechanism">SASL Mechanism</label>
+                                <select class="form-control" formControlName="saslMechanism">
+                                    <option value="" disabled>Select a mechanism</option>
+                                    <option *ngFor="let m of saslMechanismList" [value]="m">{{m}}</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row" *ngIf="isSaslProtocol(f.securityProtocol.value)">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="control-label" for="saslUsername">SASL Username</label>
+                                <input type="text" class="form-control" formControlName="saslUsername" />
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="control-label" for="saslPassword">SASL Password</label>
+                                <input type="password" class="form-control" formControlName="saslPassword"
+                                    [placeholder]="editingProfile ? 'Leave blank to keep the existing password' : 'Password'"
+                                    autocomplete="new-password" />
+                                <span class="help-text" *ngIf="editingProfile && editingProfile.saslPasswordConfigured" style="display: block; margin-top: 4px;">
+                                    <span class="glyphicon glyphicon-ok"></span> A password is already configured -- only fill this in to replace it.
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SSL/mTLS -- certificate FILES themselves live on the app server or object
+                         storage, not in the database; these are just the paths/passwords. -->
+                    <ng-container *ngIf="isSslProtocol(f.securityProtocol.value)">
+                        <div class="form-group" [ngClass]="{ 'has-error': submitted && f.sslTruststoreLocation.errors }">
+                            <label class="control-label" for="sslTruststoreLocation">Truststore Location</label>
+                            <input type="text" class="form-control" formControlName="sslTruststoreLocation" placeholder="/etc/kafka-secrets/truststore.jks" />
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="control-label" for="sslTruststorePassword">Truststore Password</label>
+                                    <input type="password" class="form-control" formControlName="sslTruststorePassword"
+                                        [placeholder]="editingProfile && editingProfile.sslTruststorePasswordConfigured ? 'Leave blank to keep existing' : 'Password'"
+                                        autocomplete="new-password" />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="control-label" for="sslKeystoreLocation">Keystore Location (optional -- mTLS)</label>
+                            <input type="text" class="form-control" formControlName="sslKeystoreLocation" placeholder="/etc/kafka-secrets/keystore.jks" />
+                        </div>
+                        <div class="row" *ngIf="f.sslKeystoreLocation.value">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="control-label" for="sslKeystorePassword">Keystore Password</label>
+                                    <input type="password" class="form-control" formControlName="sslKeystorePassword"
+                                        [placeholder]="editingProfile && editingProfile.sslKeystorePasswordConfigured ? 'Leave blank to keep existing' : 'Password'"
+                                        autocomplete="new-password" />
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="control-label" for="sslKeyPassword">Key Password</label>
+                                    <input type="password" class="form-control" formControlName="sslKeyPassword"
+                                        [placeholder]="editingProfile && editingProfile.sslKeyPasswordConfigured ? 'Leave blank to keep existing' : 'Password'"
+                                        autocomplete="new-password" />
+                                </div>
+                            </div>
+                        </div>
+                    </ng-container>
+
+                    <div class="form-group">
+                        <label class="control-label" for="additionalProperties">
+                            Additional Properties <span class="help-text" style="font-weight: normal;">(JSON object, non-secret Kafka client properties only)</span>
+                        </label>
+                        <textarea class="form-control" formControlName="additionalProperties" rows="2"
+                            placeholder='{"request.timeout.ms": "20000"}'></textarea>
+                    </div>
+
+                    <div class="row" *ngIf="editingProfile">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="control-label" for="status">Status</label>
+                                <select class="form-control" formControlName="status">
+                                    <option value="Active">Active</option>
+                                    <option value="Inactive">Inactive</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="preview-toolbar" style="justify-content: flex-start;">
+                        <button type="button" class="btn btn-sm btn-default" [disabled]="testingInModal" (click)="testConnectionInModal()">
+                            <span class="glyphicon" [ngClass]="testingInModal ? 'glyphicon-refresh spin' : 'glyphicon-flash'"></span>
+                            {{testingInModal ? 'Testing...' : 'Test Connection'}}
+                        </button>
+                    </div>
+                    <div *ngIf="modalTestResult" [ngClass]="modalTestResult.success ? 'text-success' : 'text-danger'">
+                        <span class="glyphicon" [ngClass]="modalTestResult.success ? 'glyphicon-ok' : 'glyphicon-remove'"></span>
+                        {{modalTestResult.message}}
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-teal">{{editingProfile ? 'Save Profile' : 'Add Profile'}}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Profile Modal -->
+<div class="modal fade" id="deleteProfileModal" role="dialog" style="top: 85px;">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" #closeDeleteProfileModal class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title">Delete Profile</h4>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete this connection profile?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger" (click)="processDeleteProfile()">Yes</button>
+            </div>
+        </div>
+    </div>
+</div>

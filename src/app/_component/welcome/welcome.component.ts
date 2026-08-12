@@ -1,0 +1,110 @@
+import { Component, OnInit } from '@angular/core';
+import { Router } from '@angular/router';
+import { AuthService } from '@/_services';
+
+interface FeatureCard {
+    icon: string;
+    title: string;
+    description: string;
+    // Maps to a .landing-feature-icon-<accent> class in app.less -- a distinct color per card
+    // so the grid reads as six different capabilities at a glance, not one repeated icon tile.
+    accent: 'indigo' | 'violet' | 'teal' | 'amber' | 'rose' | 'blue';
+}
+
+interface StepCard {
+    step: number;
+    title: string;
+    description: string;
+}
+
+/**
+ * Public landing page at the app's root path -- the first thing an unauthenticated visitor
+ * sees, describing what the platform does and pointing them at Login. Not behind AuthGuard on
+ * purpose (see app.routing.ts). An already-logged-in visitor who lands here anyway (e.g. a
+ * bookmark, or hitting '/' directly) is bounced straight to /home in ngOnInit rather than
+ * shown the marketing page a second time.
+ * @author Nabeel Ahmed
+ */
+@Component({
+    selector: 'welcome',
+    templateUrl: 'welcome.component.html'
+})
+export class WelcomeComponent implements OnInit {
+
+    // Short badges above the headline -- same idea as the feature grid below (grounded in what
+    // the app actually does), just a quicker skim before someone reads the full cards.
+    public readonly highlights: string[] = ['Kafka-Native', 'AI-Powered', 'Multi-Tenant', 'Role-Based Access'];
+
+    // Mirrors the app's real top-nav sections (Source, Object Browser, Tools, AI Suite,
+    // Administration) -- kept in sync with app.component.html by hand, not generated, since
+    // this is a small, fixed list describing what the product actually does today.
+    public readonly features: FeatureCard[] = [
+        {
+            icon: 'glyphicon-briefcase',
+            title: 'Source Jobs & Tasks',
+            description: 'Schedule, run, and monitor ETL jobs against Kafka-backed task types, with full run history, retry/skip controls, and pipeline tracking.',
+            accent: 'indigo'
+        },
+        {
+            icon: 'glyphicon-hdd',
+            title: 'Object Browser',
+            description: 'Browse, upload, and manage files across your configured storage buckets from one place.',
+            accent: 'blue'
+        },
+        {
+            icon: 'glyphicon-picture',
+            title: 'PDF Highlighter & Dynamic Forms',
+            description: 'Define reusable field selectors for PDFs, and build custom dynamic forms with shareable, API-backed submission links.',
+            accent: 'amber'
+        },
+        {
+            icon: 'glyphicon-flash',
+            title: 'AI Suite',
+            description: 'Configure AI agents, manage local Ollama models, and clean up extracted content -- run any of it against a file from Object Browser.',
+            accent: 'violet'
+        },
+        {
+            icon: 'glyphicon-search',
+            title: 'Query Engine',
+            description: 'Store and run validated, read-only SQL queries against your own database connections, on demand or on a recurring schedule, exported straight to storage.',
+            accent: 'teal'
+        },
+        {
+            icon: 'glyphicon-tower',
+            title: 'Multi-Tenant Administration',
+            description: 'Tenant and user management, role-based access control, and Kafka connection profiles scoped per tenant or shared platform-wide.',
+            accent: 'rose'
+        }
+    ];
+
+    // Describes the real login -> use flow (Platform Admin provisions a tenant, a Tenant Admin
+    // sets up the tenant's own config, everyone else works day to day) -- not a generic "3 easy
+    // steps" placeholder.
+    public readonly steps: StepCard[] = [
+        { step: 1, title: 'Sign in to your tenant', description: 'Your Platform Admin provisions your organization and account -- sign in with the credentials you were given.' },
+        { step: 2, title: 'Configure sources, agents & connections', description: 'A Tenant Admin sets up Source Task Types, AI agents, and Kafka/database connections for the team to use.' },
+        { step: 3, title: 'Monitor, run & act', description: 'Everyone else schedules jobs, runs AI agents and queries, and tracks results from the same dashboard.' }
+    ];
+
+    public readonly currentYear = new Date().getFullYear();
+
+    constructor(private router: Router, public authService: AuthService) {
+    }
+
+    ngOnInit(): void {
+        if (this.authService.isLoggedIn()) {
+            this.router.navigate(['/home']);
+        }
+    }
+
+    public goToLogin(): void {
+        this.router.navigate(['/login']);
+    }
+
+    /** Secondary hero CTA -- smooth-scrolls to the feature grid instead of navigating away, for
+     * a visitor who wants to see what's inside before committing to Sign In. */
+    public scrollToFeatures(): void {
+        document.getElementById('landing-features')?.scrollIntoView({ behavior: 'smooth' });
+    }
+
+}

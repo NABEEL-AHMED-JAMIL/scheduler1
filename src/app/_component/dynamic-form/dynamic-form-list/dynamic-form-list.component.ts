@@ -24,6 +24,10 @@ export class DynamicFormListComponent implements OnInit {
     public dynamicForms: DynamicForm[] = [];
     public deleteDynamicFormId: any;
     public deleteSelectedIndex: any;
+    // 'Delete' left out on purpose -- a deleted form is never shown (see filteredDynamicForms).
+    public readonly statusOptions = ['Active', 'Inactive'];
+    // '' means "no filter" -- applied before the free-text search box (see filteredDynamicForms).
+    public filterStatus: string = '';
 
     constructor(
         private router: Router,
@@ -34,6 +38,20 @@ export class DynamicFormListComponent implements OnInit {
 
     ngOnInit() {
         this.fetchAllForms();
+    }
+
+    public get filteredDynamicForms(): DynamicForm[] {
+        return this.dynamicForms.filter((form) =>
+            form.status !== 'Delete' && (!this.filterStatus || form.status === this.filterStatus));
+    }
+
+    public get hasActiveFilters(): boolean {
+        return !!(this.filterStatus || this.searchDynamicForm);
+    }
+
+    public clearFilters(): void {
+        this.filterStatus = '';
+        this.searchDynamicForm = '';
     }
 
     public fetchAllForms(): void {
@@ -97,7 +115,14 @@ export class DynamicFormListComponent implements OnInit {
                 this.spinnerService.hide();
                 if (response.status === ApiCode.SUCCESS) {
                     this.alertService.showSuccess(response.message, 'Form Delete');
-                    this.dynamicForms.splice(this.deleteSelectedIndex, 1);
+                    // look up by id, not the stale searchFilter-view index -- deleteSelectedIndex
+                    // is captured from the *ngFor over the filtered view, so it doesn't line up
+                    // with this.dynamicForms itself whenever a search term is active
+                    const realIndex = this.dynamicForms.findIndex(
+                        (form: any) => form.dynamicFormId === this.deleteDynamicFormId);
+                    if (realIndex > -1) {
+                        this.dynamicForms.splice(realIndex, 1);
+                    }
                     this.closebutton.nativeElement.click();
                     this.deleteDynamicFormId = null;
                     this.deleteSelectedIndex = null;

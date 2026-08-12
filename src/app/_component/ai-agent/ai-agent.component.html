@@ -7,15 +7,32 @@
 
 <div class="toolbar">
     <div class="form-group" style="margin-bottom: 0;">
-        <label for="searchAgent" class="control-label">Total AI Agents ({{agents.length}})</label>
-        <input type="text" id="searchAgent" class="form-control" style="width: 280px;"
+        <label for="searchAgent" class="control-label">Total AI Agents ({{filteredAgents.length}} / {{agents.length}})</label>
+        <input type="text" id="searchAgent" class="form-control" style="width: 220px;"
             placeholder="Search" [(ngModel)]="searchAgent"/>
     </div>
+    <div class="form-group" style="margin-bottom: 0;">
+        <label for="filterProvider" class="control-label">Provider</label>
+        <select id="filterProvider" class="form-control input-sm" style="width: 150px;" [(ngModel)]="filterProvider">
+            <option value="">All Providers</option>
+            <option *ngFor="let provider of availableProviders" [value]="provider">{{provider}}</option>
+        </select>
+    </div>
+    <div class="form-group" style="margin-bottom: 0;">
+        <label for="filterStatus" class="control-label">Status</label>
+        <select id="filterStatus" class="form-control input-sm" style="width: 140px;" [(ngModel)]="filterStatus">
+            <option value="">All Statuses</option>
+            <option *ngFor="let s of statusList" [value]="s.value">{{s.key}}</option>
+        </select>
+    </div>
+    <button type="button" class="btn btn-sm btn-default" [disabled]="!hasActiveFilters" (click)="clearFilters()" title="Clear all filters">
+        <span class="glyphicon glyphicon-remove"></span> Clear
+    </button>
     <span class="toolbar-spacer"></span>
     <button type="button" class="btn btn-sm btn-default" (click)="fetchAllAgents()">
         <span class="glyphicon glyphicon-refresh"></span> Refresh
     </button>
-    <button type="button" class="btn btn-sm btn-teal" (click)="openAddAgent()" data-toggle="modal" data-target="#agentModal">
+    <button type="button" class="btn btn-sm btn-teal" *ngIf="canManageAgents" (click)="openAddAgent()" data-toggle="modal" data-target="#agentModal">
         <span class="glyphicon glyphicon-plus"></span> Add Agent
     </button>
     <div class="btn-group btn-group-sm" role="group" style="margin-left: 6px;">
@@ -30,6 +47,7 @@
 <span class="help-text" style="margin-bottom: 10px;">
     <span class="glyphicon glyphicon-info-sign"></span>
     Configure an AI agent (provider, model, target file types, instructions) -- run it against a file from Object Browser to extract, summarize, or answer questions about its content.
+    <span *ngIf="!canManageAgents">Adding, editing, and deleting agents needs a Tenant Admin -- ask yours to set one up, or use an existing agent from Object Browser.</span>
 </span>
 
 <span class="help-text" *ngIf="!agents.length">
@@ -38,7 +56,7 @@
 </span>
 
 <div class="entity-card-grid entity-card-grid-4up" *ngIf="agents.length && viewMode === 'card'">
-    <div class="entity-card" [ngClass]="'entity-card-accent-' + (agent.status | lowercase)" *ngFor="let agent of agents | searchFilter: searchAgent; let i = index;">
+    <div class="entity-card" [ngClass]="'entity-card-accent-' + (agent.status | lowercase)" *ngFor="let agent of filteredAgents | searchFilter: searchAgent; let i = index;">
         <div class="entity-card-header">
             <div class="entity-card-header-main">
                 <div class="entity-card-icon"><span class="glyphicon glyphicon-comment"></span></div>
@@ -48,7 +66,6 @@
                 </div>
             </div>
         </div>
-        <div class="entity-card-description" *ngIf="agent.description">{{agent.description}}</div>
         <div class="entity-card-pills">
             <span class="pill pill-success" *ngIf="agent.jsonMode" title="Ollama's format=json is enabled -- output is guaranteed valid JSON">JSON</span>
             <span class="pill" [ngClass]="agent.apiKeyConfigured ? 'pill-success' : 'pill-warning'">{{agent.apiKeyConfigured ? 'Key Configured' : 'Key Not Set'}}</span>
@@ -66,19 +83,21 @@
         </div>
         <div class="entity-card-footer">
             <div class="btn-group btn-group-sm" role="group">
-                <button type="button" class="btn btn-default btn-icon ic-edit" title="Edit"
-                    (click)="openEditAgent(agent)" data-toggle="modal" data-target="#agentModal">
-                    <span class="glyphicon glyphicon-edit"></span>
-                </button>
-                <button type="button" class="btn btn-default btn-icon ic-clone" title="Clone"
-                    (click)="openCloneAgent(agent)" data-toggle="modal" data-target="#agentModal">
-                    <span class="glyphicon glyphicon-duplicate"></span>
-                </button>
+                <ng-container *ngIf="canManageAgents">
+                    <button type="button" class="btn btn-default btn-icon ic-edit" title="Edit"
+                        (click)="openEditAgent(agent)" data-toggle="modal" data-target="#agentModal">
+                        <span class="glyphicon glyphicon-edit"></span>
+                    </button>
+                    <button type="button" class="btn btn-default btn-icon ic-clone" title="Clone"
+                        (click)="openCloneAgent(agent)" data-toggle="modal" data-target="#agentModal">
+                        <span class="glyphicon glyphicon-duplicate"></span>
+                    </button>
+                </ng-container>
                 <button type="button" class="btn btn-default btn-icon ic-copy" title="Copy Tool URL -- paste into a Source Task's XML to call this agent from an external consumer"
                     (click)="copyToolUrl(agent)">
                     <span class="glyphicon glyphicon-link"></span>
                 </button>
-                <button type="button" class="btn btn-default btn-icon ic-delete" title="Delete"
+                <button type="button" class="btn btn-default btn-icon ic-delete" title="Delete" *ngIf="canManageAgents"
                     [disabled]="agent.status === 'Delete'"
                     (click)="confirmDeleteAgent(agent, i)"
                     data-toggle="modal" data-target="#deleteAgentModal">
@@ -87,7 +106,7 @@
             </div>
         </div>
     </div>
-    <div class="help-text" *ngIf="!(agents | searchFilter: searchAgent).length">
+    <div class="help-text" *ngIf="!(filteredAgents | searchFilter: searchAgent).length">
         <span class="glyphicon glyphicon-info-sign"></span> No agents match your search.
     </div>
 </div>
@@ -107,7 +126,7 @@
             </tr>
         </thead>
         <tbody>
-            <tr *ngFor="let agent of agents | searchFilter: searchAgent; let i = index;">
+            <tr *ngFor="let agent of filteredAgents | searchFilter: searchAgent; let i = index;">
                 <td>{{agent.aiAgentId}}</td>
                 <td>
                     {{agent.agentName}}
@@ -133,19 +152,21 @@
                 </td>
                 <td class="text-center">
                     <div class="btn-group btn-group-sm" role="group">
-                        <button type="button" class="btn btn-default btn-icon ic-edit" title="Edit"
-                            (click)="openEditAgent(agent)" data-toggle="modal" data-target="#agentModal">
-                            <span class="glyphicon glyphicon-edit"></span>
-                        </button>
-                        <button type="button" class="btn btn-default btn-icon ic-clone" title="Clone"
-                            (click)="openCloneAgent(agent)" data-toggle="modal" data-target="#agentModal">
-                            <span class="glyphicon glyphicon-duplicate"></span>
-                        </button>
+                        <ng-container *ngIf="canManageAgents">
+                            <button type="button" class="btn btn-default btn-icon ic-edit" title="Edit"
+                                (click)="openEditAgent(agent)" data-toggle="modal" data-target="#agentModal">
+                                <span class="glyphicon glyphicon-edit"></span>
+                            </button>
+                            <button type="button" class="btn btn-default btn-icon ic-clone" title="Clone"
+                                (click)="openCloneAgent(agent)" data-toggle="modal" data-target="#agentModal">
+                                <span class="glyphicon glyphicon-duplicate"></span>
+                            </button>
+                        </ng-container>
                         <button type="button" class="btn btn-default btn-icon ic-copy" title="Copy Tool URL -- paste into a Source Task's XML to call this agent from an external consumer"
                             (click)="copyToolUrl(agent)">
                             <span class="glyphicon glyphicon-link"></span>
                         </button>
-                        <button type="button" class="btn btn-default btn-icon ic-delete" title="Delete"
+                        <button type="button" class="btn btn-default btn-icon ic-delete" title="Delete" *ngIf="canManageAgents"
                             [disabled]="agent.status === 'Delete'"
                             (click)="confirmDeleteAgent(agent, i)"
                             data-toggle="modal" data-target="#deleteAgentModal">

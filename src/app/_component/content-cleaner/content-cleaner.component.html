@@ -5,7 +5,7 @@
     <span class="crumb-current">Content Cleaner</span>
 </nav>
 
-<div class="panel-box" style="background: #fff; border: 1px solid #e2e2e2; border-radius: 6px; padding: 16px; margin-bottom: 16px;">
+<div class="panel-box" style="margin-bottom: 16px;">
     <h4 style="margin-top: 0;"><span class="glyphicon glyphicon-magnet"></span> Content Cleaner</h4>
     <span class="help-text" style="display: block; margin-bottom: 10px;">
         <span class="glyphicon glyphicon-info-sign"></span>
@@ -90,7 +90,7 @@
 
             <div class="text-muted" *ngIf="loadingObjects">Loading...</div>
             <div class="table-responsive scroll-table" *ngIf="selectedBucket && !loadingObjects" style="max-height: 360px; overflow-y: auto;">
-                <table class="table table-striped table-hover" style="font-size: 12px;">
+                <table class="table table-bordered table-hover table-modern" style="font-size: 12px;">
                     <tbody>
                         <tr *ngFor="let entry of objects" class="bucket-row" (click)="openEntry(entry)">
                             <td style="width: 24px;">

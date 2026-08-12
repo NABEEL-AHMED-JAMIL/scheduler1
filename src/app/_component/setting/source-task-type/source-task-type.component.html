@@ -32,16 +32,19 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="partitions">Partitions</label>
-                    <input type="text" formControlName="partitions" class="form-control input-sm"
-                        placeholder="Enter partition count or start"
-                        [ngClass]="{ 'is-invalid': sourceTaskTaype.partitions.errors }" />
+                    <label for="partitions">Partition</label>
+                    <select formControlName="partitions" class="form-control input-sm"
+                        [ngClass]="{ 'is-invalid': sourceTaskTaype.partitions.errors }">
+                        <option value="" disabled>Select a partition</option>
+                        <option *ngFor="let p of partitionOptions" [value]="p">{{p === '*' ? 'Any (*)' : p}}</option>
+                    </select>
                     <div *ngIf="submitted && sourceTaskTaype.partitions.errors" class="invalid-feedback">
                         <div *ngIf="sourceTaskTaype.partitions.errors.required" style="color: red;">
-                            Partitions is required
+                            Partition is required
                         </div>
                     </div>
                     <small class="form-text text-muted">
+                        "Any (*)" sends to any partition; a specific number (0-{{MAX_PARTITION_INDEX}}) targets that exact partition index.
                         Final value will be generated as: <code>topic=&lt;topic-name&gt;&amp;partitions=[&lt;value&gt;]</code>
                     </small>
                 </div>
@@ -66,14 +69,18 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="SchemaPayload">SchemaPayload</label>
-                    <textarea type="text" formControlName="schemaPayload" class="form-control input-sm"
-                        [ngClass]="{ 'is-invalid': sourceTaskTaype.schemaPayload.errors }"></textarea>
-                    <div *ngIf="submitted && sourceTaskTaype.schemaPayload.errors" class="invalid-feedback">
-                        <div *ngIf="sourceTaskTaype.schemaPayload.errors.required" style="color: red;">
-                            SchemaPayload is required
-                        </div>
-                    </div>
+                    <label for="kafkaConnectionProfileId">Kafka Connection Profile</label>
+                    <select formControlName="kafkaConnectionProfileId" class="form-control input-sm">
+                        <option value="">(tenant default)</option>
+                        <option *ngFor="let profile of kafkaProfiles" [value]="profile.kafkaConnectionProfileId">
+                            {{profile.profileName}}{{profile.environmentLabel ? ' (' + profile.environmentLabel + ')' : ''}}
+                        </option>
+                    </select>
+                    <span class="help-text" style="display: block; margin-top: 4px;">
+                        <span class="glyphicon glyphicon-info-sign"></span>
+                        Leave unset to publish to your tenant's default Kafka cluster. Manage profiles under
+                        <a routerLink="/setting" fragment="kafkaConnectionProfile">Settings &gt; Kafka Connections</a>.
+                    </span>
                 </div>
             </div>
             <div class="modal-footer" *ngIf="!isDisable">

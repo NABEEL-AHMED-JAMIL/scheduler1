@@ -1,0 +1,72 @@
+<div class="landing-page">
+    <!-- Hero -->
+    <header class="landing-hero">
+        <div class="landing-hero-pattern"></div>
+        <nav class="landing-hero-nav">
+            <span class="landing-brand"><span class="glyphicon glyphicon-plane"></span> ETL 2023</span>
+            <button type="button" class="btn btn-default" (click)="goToLogin()">
+                <span class="glyphicon glyphicon-log-in"></span> Sign In
+            </button>
+        </nav>
+        <div class="landing-hero-body">
+            <div class="landing-highlights">
+                <span class="landing-highlight-pill" *ngFor="let highlight of highlights">{{highlight}}</span>
+            </div>
+            <h1>Multi-tenant ETL orchestration, built around Kafka and AI</h1>
+            <p class="landing-hero-subtitle">
+                Schedule and monitor jobs, process files with AI, run validated SQL queries, and manage it all
+                per-tenant -- from one dashboard.
+            </p>
+            <div class="landing-hero-actions">
+                <button type="button" class="btn btn-teal btn-lg" (click)="goToLogin()">
+                    <span class="glyphicon glyphicon-log-in"></span> Sign In to Get Started
+                </button>
+                <button type="button" class="btn btn-hero-ghost btn-lg" (click)="scrollToFeatures()">
+                    See What's Inside <span class="glyphicon glyphicon-chevron-down"></span>
+                </button>
+            </div>
+        </div>
+        <div class="landing-hero-wave"></div>
+    </header>
+
+    <!-- Feature grid -->
+    <section class="landing-features" id="landing-features">
+        <div class="landing-section-heading">
+            <span class="landing-eyebrow">Platform Capabilities</span>
+            <h2 class="landing-section-title">What you can do</h2>
+        </div>
+        <div class="landing-feature-grid">
+            <div class="landing-feature-card" *ngFor="let feature of features; let i = index"
+                [style.animation-delay.ms]="i * 60">
+                <div class="landing-feature-icon" [ngClass]="'landing-feature-icon-' + feature.accent">
+                    <span class="glyphicon" [ngClass]="feature.icon"></span>
+                </div>
+                <h3>{{feature.title}}</h3>
+                <p>{{feature.description}}</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- How it works -->
+    <section class="landing-steps">
+        <div class="landing-section-heading">
+            <span class="landing-eyebrow">Getting Started</span>
+            <h2 class="landing-section-title">How it works</h2>
+        </div>
+        <div class="landing-step-grid">
+            <div class="landing-step-card" *ngFor="let step of steps">
+                <div class="landing-step-number">{{step.step}}</div>
+                <h3>{{step.title}}</h3>
+                <p>{{step.description}}</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- No separate closing CTA / footer Sign In link -- the nav button and the hero's own
+         "Sign In to Get Started" are the only two Sign In prompts on the page; a visitor who's
+         read this far can just scroll back up rather than being asked a third or fourth time. -->
+    <footer class="landing-footer">
+        <span class="landing-brand landing-brand-footer"><span class="glyphicon glyphicon-plane"></span> ETL 2023</span>
+        <span>&copy; {{currentYear}} ETL 2023</span>
+    </footer>
+</div>

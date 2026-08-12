@@ -1,27 +1,65 @@
-import { Component, OnInit, ViewChild, ElementRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
-import { AlertService, StorageService, AiAgentService } from '@/_services';
+import { AlertService, StorageService } from '@/_services';
 import { first } from 'rxjs/operators';
 import { forkJoin, Observable } from 'rxjs';
 import { ApiCode, ApiResponse, BucketSummary, ObjectSummary, ObjectMetadata } from '@/_models';
-import { AiAgent, agentsForFile, fileExtension } from '@/_models/ai-agent.model';
-import { extractPdfText } from '@/_helpers/pdf-text-extractor';
 
-/** Any single file's extracted text is capped here before being sent to processText --
- * mirrors the backend's own MAX_TEXT_CHARS cap so the UI doesn't send more than the server will use. */
-const MAX_AI_TEXT_CHARS = 60000;
+// marked has no bundled TypeScript types in the version installed here -- same "require as any"
+// pattern used by cv-tailor.component.ts, which already renders markdown this way.
+const marked: any = require('marked');
 
 const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'];
-const PREVIEWABLE_EXTENSIONS = ['json', 'csv', 'txt', 'xml', 'pdf', 'mp3', 'm4a', 'mp4'].concat(IMAGE_EXTENSIONS);
+const PREVIEWABLE_EXTENSIONS = ['json', 'csv', 'txt', 'xml', 'md', 'pdf', 'mp3', 'm4a', 'mp4'].concat(IMAGE_EXTENSIONS);
+// Mirrors process/util/ContentTypeUtil.java on the backend -- needed here because these
+// previews are built into an in-browser Blob rather than just linking straight at the API (see
+// loadPreview: previewObject requires a JWT Authorization header, which a plain <iframe>/<img>/
+// <audio>/<video> src can't carry, so the bytes are fetched via HttpClient -- which does attach
+// it -- and wrapped in a Blob with the right type instead).
+const MEDIA_CONTENT_TYPES: { [extension: string]: string } = {
+    pdf: 'application/pdf',
+    mp3: 'audio/mpeg',
+    m4a: 'audio/mp4',
+    mp4: 'video/mp4',
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    png: 'image/png',
+    gif: 'image/gif',
+    webp: 'image/webp',
+    svg: 'image/svg+xml',
+    bmp: 'image/bmp'
+};
+/** Preview kinds that are plain text under the hood, so all of them can be edited in place
+ * and saved back -- json/csv/txt/xml were previously read-only; only md had Edit/Save. */
+const EDITABLE_TEXT_KINDS = ['json', 'csv', 'txt', 'xml', 'md'];
+const TEXT_CONTENT_TYPES: { [extension: string]: string } = {
+    json: 'application/json',
+    csv: 'text/csv',
+    txt: 'text/plain',
+    xml: 'application/xml',
+    md: 'text/markdown'
+};
 const PAGE_SIZE = 50;
 // Load the next page once the scroll container is within this many pixels of the bottom.
 const SCROLL_FETCH_THRESHOLD_PX = 120;
 // Stagger multi-file downloads so the browser doesn't silently drop near-simultaneous ones.
 const BULK_DOWNLOAD_STAGGER_MS = 350;
+// Upper bound on how many entries a single per-folder count listing will fetch -- a folder
+// this size or larger reports "1000+ items" instead of paging through the whole thing just to
+// print an exact number.
+const FOLDER_STAT_MAX_KEYS = 1000;
 
 interface Breadcrumb {
     name: string;
     prefix: string;
+}
+
+interface FolderStat {
+    files: number;
+    folders: number;
+    capped: boolean;
+    loading: boolean;
+    error: boolean;
 }
 
 /**
@@ -31,7 +69,7 @@ interface Breadcrumb {
     selector: 'object-browser',
     templateUrl: 'object-browser.component.html'
 })
-export class ObjectBrowserComponent implements OnInit {
+export class ObjectBrowserComponent implements OnInit, OnDestroy {
 
     public ERROR = 'Error';
     public SUCCESS = 'Success';
@@ -46,6 +84,14 @@ export class ObjectBrowserComponent implements OnInit {
     public nextContinuationToken: string | null = null;
     public loadingObjects = false;
 
+    // Per-folder file/subfolder counts (Object Browser table) -- there's no backend "folder
+    // stats" endpoint, so each folder's count is a bounded, best-effort listObjects call fired
+    // lazily as folder rows load (see loadFolderStats), one per folder key, cached in this map
+    // so switching directories and back doesn't re-fetch. Capped at FOLDER_STAT_MAX_KEYS so a
+    // folder with thousands of entries can't turn "just show a count" into an unbounded
+    // pagination loop -- past the cap it reads "1000+ items" instead of an exact number.
+    public folderStats: { [key: string]: FolderStat } = {};
+
     // search/filter (applied client-side over whatever's loaded so far)
     public searchName = '';
     public searchDateFrom = '';
@@ -58,30 +104,28 @@ export class ObjectBrowserComponent implements OnInit {
     public selectedObjectMetadata: ObjectMetadata | null = null;
     public loadingMetadata = false;
 
-    public previewKind: 'json' | 'csv' | 'txt' | 'xml' | 'pdf' | 'mp3' | 'm4a' | 'mp4' | 'image' | null = null;
+    public previewKind: 'json' | 'csv' | 'txt' | 'xml' | 'md' | 'pdf' | 'mp3' | 'm4a' | 'mp4' | 'image' | null = null;
     public previewLoading = false;
     public previewError: string | null = null;
     public previewJson: string | null = null;
     public previewText: string | null = null;
     // Streamed source URL, shared by pdf (iframe), mp3/m4a (audio), mp4 (video), and
-    // any image format (img) -- all of them just need a src to point their tag at.
+    // any image format (img) -- all of them just need a src to point their tag at. Backed by
+    // an in-browser Blob (see loadPreview) rather than the raw API URL, so it works alongside
+    // JWT header auth. previewMediaObjectUrl is the raw blob: URL string underneath it, kept
+    // only so it can be revoked (avoids leaking memory as previews are switched).
     public previewMediaUrl: SafeResourceUrl | null = null;
+    private previewMediaObjectUrl: string | null = null;
+
+    // Editable text preview (json/csv/txt/xml/md) -- View shows the read-only rendering
+    // (previewJson/previewText, or previewMdHtml for markdown), Edit swaps in a raw-source
+    // textarea (previewEditText) with Save/Cancel; Save overwrites the object in place.
+    public previewEditMode: 'view' | 'edit' = 'view';
+    public previewMdHtml: string | null = null;
+    public previewEditText = '';
+    public savingPreview = false;
 
     public uploading = false;
-
-    // AI agent processing
-    public agents: AiAgent[] = [];
-    public selectedAiAgentId: any = null;
-    public aiProcessing = false;
-    public aiResult: string | null = null;
-    public aiError: string | null = null;
-    /** The file text actually extracted and sent as the user prompt -- shown alongside the
-     * agent's instructions so you can see exactly what the model was given. */
-    public aiExtractedText: string | null = null;
-    /** When enabled, aiCustomPrompt is prepended to the extracted file content for this run
-     * only -- lets you give one-off instructions without editing the agent's saved system prompt. */
-    public useCustomPrompt = false;
-    public aiCustomPrompt = '';
 
     // new-folder modal
     public newFolderName = '';
@@ -106,131 +150,11 @@ export class ObjectBrowserComponent implements OnInit {
     constructor(
         private alertService: AlertService,
         private storageService: StorageService,
-        private aiAgentService: AiAgentService,
         private sanitizer: DomSanitizer) {
     }
 
     ngOnInit() {
         this.loadBuckets();
-        this.loadAgents();
-    }
-
-    // --- AI agent processing ---
-
-    private loadAgents(): void {
-        this.aiAgentService.fetchAllAgents()
-            .pipe(first())
-            .subscribe((response) => {
-                if (response.status === ApiCode.SUCCESS) {
-                    this.agents = response.data || [];
-                }
-            }, () => { /* non-blocking -- the "Process with AI" action just won't show without agents */ });
-    }
-
-    /** Active agents scoped to the currently selected file's extension. */
-    public get agentsForSelectedObject(): AiAgent[] {
-        if (!this.selectedObject) {
-            return [];
-        }
-        return agentsForFile(this.agents, this.selectedObject.name);
-    }
-
-    /** The agent currently picked in the "Process with AI" modal -- used to show its
-     * instructions (system prompt) alongside the extracted file content and the result.
-     * Compared as strings: a plain (non-ngValue) <select> always emits the changed value
-     * as a string, while agent.aiAgentId is a number, so a strict === here would go stale
-     * (stick on the initial default) the moment the user picks a different agent. */
-    public get selectedAiAgent(): AiAgent | null {
-        return this.agents.find((agent) => String(agent.aiAgentId) === String(this.selectedAiAgentId)) || null;
-    }
-
-    /** Called when the "Process with AI" modal is opened -- defaults to the first matching agent. */
-    public openAiModal(): void {
-        this.aiResult = null;
-        this.aiError = null;
-        this.aiExtractedText = null;
-        this.useCustomPrompt = false;
-        this.aiCustomPrompt = '';
-        const matches = this.agentsForSelectedObject;
-        this.selectedAiAgentId = matches.length ? matches[0].aiAgentId : null;
-    }
-
-    /** Called when the agent dropdown selection changes -- clears the previous run's extracted
-     * content/result so the modal doesn't keep showing another agent's stale prompt/output. */
-    public onAiAgentChanged(): void {
-        this.aiResult = null;
-        this.aiError = null;
-        this.aiExtractedText = null;
-    }
-
-    /** Runs the selected agent against the selected file. This is fire-and-forget from the
-     * user's point of view -- a local model can take anywhere from ~30s (warm) to a few
-     * minutes (cold reload), and there's no way to make that generation itself faster from
-     * here, so instead of forcing the user to sit on the modal we let them close it and keep
-     * browsing: the request keeps running against the file/agent captured at click time
-     * (not whatever "this.selectedObject"/"this.selectedAiAgentId" happen to be by the time
-     * it resolves), and a toast fires on completion either way so they're not left guessing. */
-    public runAiAgent(): void {
-        if (!this.selectedObject || !this.selectedAiAgentId || !this.selectedBucket) {
-            return;
-        }
-        const targetEntry = this.selectedObject;
-        const targetAgentId = this.selectedAiAgentId;
-        const targetAgentName = (this.selectedAiAgent && this.selectedAiAgent.agentName) || 'Agent';
-        const targetCustomPrompt = this.useCustomPrompt ? (this.aiCustomPrompt || '').trim() : '';
-        this.aiResult = null;
-        this.aiError = null;
-        this.aiExtractedText = null;
-        this.aiProcessing = true;
-        this.extractTextForAi(targetEntry)
-            .then((text) => {
-                if (!text || !text.trim()) {
-                    this.aiProcessing = false;
-                    this.aiError = 'No text could be extracted from this file.';
-                    return;
-                }
-                if (text.length > MAX_AI_TEXT_CHARS) {
-                    text = text.substring(0, MAX_AI_TEXT_CHARS);
-                }
-                this.aiExtractedText = text;
-                // A custom prompt is prepended for this run only -- the file content stays
-                // exactly what's shown/copied under "Extracted File Content".
-                const textToSend = targetCustomPrompt ? `${targetCustomPrompt}\n\n---\n\n${text}` : text;
-                this.aiAgentService.processText(targetAgentId, targetEntry.name, textToSend)
-                    .pipe(first())
-                    .subscribe((response) => {
-                        this.aiProcessing = false;
-                        if (response.status === ApiCode.SUCCESS) {
-                            this.aiResult = response.data;
-                            this.alertService.showSuccess(
-                                `${targetAgentName} finished processing "${targetEntry.name}".`, this.SUCCESS);
-                        } else {
-                            this.aiError = response.message;
-                            this.alertService.showError(
-                                `${targetAgentName} failed on "${targetEntry.name}": ${response.message}`, this.ERROR);
-                        }
-                    }, (error) => {
-                        this.aiProcessing = false;
-                        this.aiError = error;
-                        this.alertService.showError(`${targetAgentName} failed on "${targetEntry.name}".`, this.ERROR);
-                    });
-            })
-            .catch((error) => {
-                this.aiProcessing = false;
-                this.aiError = 'Could not read this file: ' + (error && error.message ? error.message : error);
-            });
-    }
-
-    /** Extracts plain text from a file ahead of sending it to an AI agent -- PDFs are parsed
-     * client-side with pdf.js (same as PDF Highlighter); everything else is read as raw text,
-     * which works for csv/txt/json/xml but not for genuinely binary formats like xlsx. */
-    private extractTextForAi(entry: ObjectSummary): Promise<string> {
-        const extension = fileExtension(entry.name);
-        if (extension === 'pdf') {
-            return this.storageService.previewObjectArrayBuffer(this.selectedBucket, entry.key)
-                .toPromise().then((buffer) => extractPdfText(buffer));
-        }
-        return this.storageService.previewObjectText(this.selectedBucket, entry.key).toPromise();
     }
 
     // --- Buckets ---
@@ -284,6 +208,10 @@ export class ObjectBrowserComponent implements OnInit {
                     const page = response.data || {};
                     this.objects = reset ? (page.objects || []) : this.objects.concat(page.objects || []);
                     this.nextContinuationToken = page.nextContinuationToken || null;
+                    if (reset) {
+                        this.folderStats = {};
+                    }
+                    this.loadFolderStats(page.objects || []);
                 } else {
                     this.alertService.showError(response.message, this.ERROR);
                 }
@@ -291,6 +219,70 @@ export class ObjectBrowserComponent implements OnInit {
                 this.loadingObjects = false;
                 this.alertService.showError(error, this.ERROR);
             });
+    }
+
+    /** Fires one bounded listObjects call per not-yet-counted folder in the given page, tallying
+     * how many of its immediate children are files vs subfolders. Lazy/per-page (called with
+     * just the newly-loaded page, not the whole this.objects) so scrolling through a long
+     * directory listing doesn't fire hundreds of count requests up front -- only the folders
+     * that have actually scrolled into the loaded page so far. */
+    private loadFolderStats(entries: ObjectSummary[]): void {
+        const bucket = this.selectedBucket;
+        if (!bucket) {
+            return;
+        }
+        entries
+            .filter((entry) => entry.folder && !this.folderStats[entry.key])
+            .forEach((entry) => {
+                this.folderStats[entry.key] = { files: 0, folders: 0, capped: false, loading: true, error: false };
+                this.storageService.listObjects(bucket, entry.key, null, FOLDER_STAT_MAX_KEYS)
+                    .pipe(first())
+                    .subscribe((response) => {
+                        if (response.status === ApiCode.SUCCESS) {
+                            const children: ObjectSummary[] = response.data?.objects || [];
+                            this.folderStats[entry.key] = {
+                                files: children.filter((c) => !c.folder).length,
+                                folders: children.filter((c) => !!c.folder).length,
+                                capped: !!response.data?.nextContinuationToken,
+                                loading: false,
+                                error: false
+                            };
+                        } else {
+                            this.folderStats[entry.key] = { files: 0, folders: 0, capped: false, loading: false, error: true };
+                        }
+                    }, () => {
+                        this.folderStats[entry.key] = { files: 0, folders: 0, capped: false, loading: false, error: true };
+                    });
+            });
+    }
+
+    /** "1 file, 1 folder" (folder rows only, Size column) -- shown directly rather than folded
+     * into a hover-only tooltip, since "how many files / how many folders" is the actual
+     * question being answered, not just a combined count. */
+    public folderStatLabel(entry: ObjectSummary): string {
+        const stat = this.folderStats[entry.key];
+        if (!stat || stat.loading) {
+            return 'Counting…';
+        }
+        if (stat.error) {
+            return '-';
+        }
+        const prefix = stat.capped ? `${FOLDER_STAT_MAX_KEYS}+ entries, showing ` : '';
+        return `${prefix}${stat.files} file${stat.files === 1 ? '' : 's'}, ${stat.folders} folder${stat.folders === 1 ? '' : 's'}`;
+    }
+
+    /** Tooltip for the folderStatLabel -- same info, spelled out in case the label itself
+     * ever needs to truncate in a narrower layout. */
+    public folderStatTitle(entry: ObjectSummary): string {
+        const stat = this.folderStats[entry.key];
+        if (!stat || stat.loading) {
+            return 'Counting folder contents...';
+        }
+        if (stat.error) {
+            return 'Could not count folder contents.';
+        }
+        const prefix = stat.capped ? `${FOLDER_STAT_MAX_KEYS}+ entries (showing a partial count) -- ` : '';
+        return `${prefix}${stat.files} file${stat.files === 1 ? '' : 's'}, ${stat.folders} folder${stat.folders === 1 ? '' : 's'}`;
     }
 
     /** Infinite scroll: fetch the next page once the user scrolls near the bottom of the table. */
@@ -446,7 +438,7 @@ export class ObjectBrowserComponent implements OnInit {
 
     // --- Object side panel (metadata + preview) ---
 
-    private selectObject(entry: ObjectSummary): void {
+    public selectObject(entry: ObjectSummary): void {
         this.selectedObject = entry;
         this.selectedObjectMetadata = null;
         this.resetPreview();
@@ -475,14 +467,12 @@ export class ObjectBrowserComponent implements OnInit {
         }
         if (IMAGE_EXTENSIONS.indexOf(extension) !== -1) {
             this.previewKind = 'image';
-            this.previewMediaUrl = this.sanitizer.bypassSecurityTrustResourceUrl(
-                this.storageService.previewObjectUrl(this.selectedBucket, entry.key));
+            this.loadMediaPreview(entry.key, extension);
             return;
         }
-        this.previewKind = extension as 'json' | 'csv' | 'txt' | 'xml' | 'pdf' | 'mp3' | 'm4a' | 'mp4';
+        this.previewKind = extension as 'json' | 'csv' | 'txt' | 'xml' | 'md' | 'pdf' | 'mp3' | 'm4a' | 'mp4';
         if (extension === 'pdf' || extension === 'mp3' || extension === 'm4a' || extension === 'mp4') {
-            this.previewMediaUrl = this.sanitizer.bypassSecurityTrustResourceUrl(
-                this.storageService.previewObjectUrl(this.selectedBucket, entry.key));
+            this.loadMediaPreview(entry.key, extension);
             return;
         }
         this.previewLoading = true;
@@ -490,6 +480,7 @@ export class ObjectBrowserComponent implements OnInit {
             .pipe(first())
             .subscribe((text) => {
                 this.previewLoading = false;
+                this.previewEditMode = 'view';
                 if (extension === 'json') {
                     try {
                         this.previewJson = JSON.stringify(JSON.parse(text), null, 2);
@@ -499,11 +490,44 @@ export class ObjectBrowserComponent implements OnInit {
                 } else if (extension === 'csv' || extension === 'txt' || extension === 'xml') {
                     // CSV/XML shown as plain text (not parsed), same as .txt.
                     this.previewText = text;
+                } else if (extension === 'md') {
+                    this.previewText = text;
+                    this.previewMdHtml = marked.parse(text);
                 }
             }, () => {
                 this.previewLoading = false;
                 this.previewError = 'Could not load preview for this file.';
             });
+    }
+
+    /** Fetches an image/pdf/mp3/m4a/mp4 object's bytes via HttpClient (so AuthInterceptor
+     * attaches the JWT) and wraps them in a Blob URL for previewMediaUrl -- a plain <img>/
+     * <iframe>/<audio>/<video> src pointed straight at the API URL can't carry that header and
+     * previewObject requires one, so it 401'd for every media type (most visibly for pdf,
+     * whose iframe just showed a browser error page instead of the file). */
+    private loadMediaPreview(key: string, extension: string): void {
+        this.previewLoading = true;
+        this.storageService.previewObjectArrayBuffer(this.selectedBucket, key)
+            .pipe(first())
+            .subscribe((buffer) => {
+                this.previewLoading = false;
+                const contentType = MEDIA_CONTENT_TYPES[extension] || 'application/octet-stream';
+                this.revokePreviewMediaUrl();
+                this.previewMediaObjectUrl = URL.createObjectURL(new Blob([buffer], { type: contentType }));
+                this.previewMediaUrl = this.sanitizer.bypassSecurityTrustResourceUrl(this.previewMediaObjectUrl);
+            }, () => {
+                this.previewLoading = false;
+                this.previewError = 'Could not load preview for this file.';
+            });
+    }
+
+    /** Releases the current blob: URL (if any) -- called before building a new one and on
+     * reset/destroy so switching between previews doesn't leak memory. */
+    private revokePreviewMediaUrl(): void {
+        if (this.previewMediaObjectUrl) {
+            URL.revokeObjectURL(this.previewMediaObjectUrl);
+            this.previewMediaObjectUrl = null;
+        }
     }
 
     private resetPreview(): void {
@@ -512,7 +536,91 @@ export class ObjectBrowserComponent implements OnInit {
         this.previewError = null;
         this.previewJson = null;
         this.previewText = null;
+        this.revokePreviewMediaUrl();
         this.previewMediaUrl = null;
+        this.previewEditMode = 'view';
+        this.previewMdHtml = null;
+        this.previewEditText = '';
+        this.savingPreview = false;
+    }
+
+    public ngOnDestroy(): void {
+        this.revokePreviewMediaUrl();
+    }
+
+    // --- Text preview edit-in-place (json/csv/txt/xml/md) ---
+
+    /** True when the currently previewed file is one of the plain-text kinds that can be
+     * edited and saved back in place -- everything except pdf/mp3/m4a/mp4/image. */
+    public get isEditableTextPreview(): boolean {
+        return !!this.previewKind && EDITABLE_TEXT_KINDS.indexOf(this.previewKind) !== -1;
+    }
+
+    /** The read-only rendering currently on screen for the active preview kind -- json has its
+     * own pretty-printed field, everything else (csv/txt/xml/md's raw source) shares previewText. */
+    private currentPreviewSource(): string {
+        return (this.previewKind === 'json' ? this.previewJson : this.previewText) || '';
+    }
+
+    /** Switches the preview into edit mode, seeded with the currently loaded source. */
+    public startEditPreview(): void {
+        this.previewEditText = this.currentPreviewSource();
+        this.previewEditMode = 'edit';
+    }
+
+    /** Discards unsaved edits and returns to the read-only view. */
+    public cancelEditPreview(): void {
+        this.previewEditMode = 'view';
+    }
+
+    /** Overwrites the object in place with the edited text (same bucket/prefix/name -- MinIO/S3
+     * PUT on an existing key replaces its content), then re-renders the preview from it. Saves
+     * whatever was typed as-is even if e.g. the JSON doesn't parse -- same as markdown never
+     * validating -- the file is the source of truth, not a schema. */
+    public savePreview(): void {
+        if (!this.selectedObject || !this.selectedBucket || this.savingPreview || !this.previewKind) {
+            return;
+        }
+        const name = this.selectedObject.name;
+        const text = this.previewEditText;
+        const contentType = TEXT_CONTENT_TYPES[this.previewKind] || 'text/plain';
+        const file = new File([text], name, { type: contentType });
+        this.savingPreview = true;
+        this.storageService.uploadObject(this.selectedBucket, this.currentPrefix, file)
+            .pipe(first())
+            .subscribe((response) => {
+                this.savingPreview = false;
+                if (response.status === ApiCode.SUCCESS) {
+                    if (this.previewKind === 'json') {
+                        try {
+                            this.previewJson = JSON.stringify(JSON.parse(text), null, 2);
+                        } catch (e) {
+                            this.previewJson = text;
+                        }
+                    } else {
+                        this.previewText = text;
+                        if (this.previewKind === 'md') {
+                            this.previewMdHtml = marked.parse(text);
+                        }
+                    }
+                    this.previewEditMode = 'view';
+                    this.alertService.showSuccess(`"${name}" saved.`, this.SUCCESS);
+                    if (this.selectedObject) {
+                        this.storageService.objectMetadata(this.selectedBucket, this.selectedObject.key)
+                            .pipe(first())
+                            .subscribe((metaResponse) => {
+                                if (metaResponse.status === ApiCode.SUCCESS) {
+                                    this.selectedObjectMetadata = metaResponse.data;
+                                }
+                            });
+                    }
+                } else {
+                    this.alertService.showError(response.message, this.ERROR);
+                }
+            }, (error) => {
+                this.savingPreview = false;
+                this.alertService.showError(error, this.ERROR);
+            });
     }
 
     public closePanel(): void {
@@ -538,22 +646,6 @@ export class ObjectBrowserComponent implements OnInit {
             return;
         }
         this.copyToClipboard(content, 'Content copied to clipboard.');
-    }
-
-    /** Copies the AI agent's result from the "Process with AI" modal to the clipboard. */
-    public copyAiResult(): void {
-        if (!this.aiResult) {
-            return;
-        }
-        this.copyToClipboard(this.aiResult, 'Result copied to clipboard.');
-    }
-
-    /** Copies the raw extracted file content (not including any custom prompt) to the clipboard. */
-    public copyExtractedText(): void {
-        if (!this.aiExtractedText) {
-            return;
-        }
-        this.copyToClipboard(this.aiExtractedText, 'Extracted content copied to clipboard.');
     }
 
     private copyToClipboard(text: string, successMessage: string): void {
@@ -635,13 +727,38 @@ export class ObjectBrowserComponent implements OnInit {
         });
     }
 
+    /** Same JWT-header problem as loadMediaPreview: a plain <a href> navigation to the API URL
+     * can't carry the Authorization header, so it 401'd. Fetches the bytes via HttpClient
+     * instead and saves them from a Blob, with the filename set explicitly since a blob: URL
+     * has none of its own for the browser to fall back on. */
     private triggerDownload(key: string): void {
-        const link = document.createElement('a');
-        link.href = this.storageService.downloadObjectUrl(this.selectedBucket, key);
-        link.download = '';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        this.storageService.previewObjectArrayBuffer(this.selectedBucket, key)
+            .pipe(first())
+            .subscribe((buffer) => {
+                const objectUrl = URL.createObjectURL(new Blob([buffer]));
+                const link = document.createElement('a');
+                link.href = objectUrl;
+                link.download = this.fileNameFromKey(key);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(objectUrl);
+            }, () => {
+                this.alertService.showError(`Could not download "${this.fileNameFromKey(key)}".`, this.ERROR);
+            });
+    }
+
+    /** Method use to get the last path segment of an object key as its display filename. */
+    private fileNameFromKey(key: string): string {
+        const segments = key.split('/');
+        return segments[segments.length - 1] || key;
+    }
+
+    /** trackBy for the object table -- key is this row's stable identity (same field the
+     * selection/active-row checks already key off), so Angular can diff by it instead of
+     * default object identity and skip re-rendering rows that didn't actually change. */
+    public trackByKey(_index: number, entry: any): any {
+        return entry.key;
     }
 
     // --- Create folder ---

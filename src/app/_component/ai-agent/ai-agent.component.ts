@@ -1,7 +1,7 @@
 import { Component, OnInit, ViewChild } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { first } from 'rxjs/operators';
-import { AlertService, AiAgentService, SettingService } from '@/_services';
+import { AlertService, AiAgentService, SettingService, AuthService } from '@/_services';
 import { SpinnerService } from '@/_helpers';
 import { ApiCode, STATUS_LIST } from '@/_models';
 import { AiAgent, AI_PROVIDER_LOOKUP_TYPE, AI_AGENT_FILE_TYPE_LIST, targetFileTypesList } from '@/_models/ai-agent.model';
@@ -29,7 +29,18 @@ export class AiAgentComponent implements OnInit {
     public submitted: any = false;
 
     public agents: AiAgent[] = [];
-    public statusList: any = STATUS_LIST;
+    // 'Delete' left out of the filter dropdown on purpose -- a deleted agent is never shown
+    // (see filteredAgents), so filtering *for* Delete would always yield nothing. Still used
+    // as-is (with Delete) for the Edit form's own status select below -- that's a real,
+    // reachable state to set an agent to, just not something to filter a list by.
+    public statusList: any = STATUS_LIST.filter((s: any) => s.value !== 'Delete');
+    // Dropdown filters, applied on top of (before) the free-text search box above -- ''
+    // means "no filter" for each. Provider options are derived from the agents actually on
+    // this list (not providerList/Settings>Lookup below, which only feeds the Add/Edit form
+    // and can drift from what's really assigned to existing agents, e.g. a since-removed
+    // provider an old agent still references).
+    public filterProvider: string = '';
+    public filterStatus: string = '';
     /** Populated from Settings > Lookup (parent lookupType AI_PROVIDER, one child per selectable provider). */
     public providerList: any[] = [];
     public loadingProviders: boolean = false;
@@ -52,17 +63,60 @@ export class AiAgentComponent implements OnInit {
         private alertService: AlertService,
         private spinnerService: SpinnerService,
         private aiAgentService: AiAgentService,
-        private settingService: SettingService) {
+        private settingService: SettingService,
+        public authService: AuthService) {
+    }
+
+    /** Add/update/delete an agent is TENANT_ADMIN+ server-side (see AiAgentRestApi's class-level
+     * @PreAuthorize -- only fetch/process* are relaxed to TENANT_USER). The Add/Edit/Delete/Clone
+     * buttons below are gated on this so a Tenant User (who can otherwise use this page fine, to
+     * run an existing agent from Object Browser) doesn't see management controls that always
+     * 403 -- previously they were shown unconditionally and just failed silently on click. */
+    public get canManageAgents(): boolean {
+        const role = this.authService.currentUser?.userRole;
+        return role === 'PLATFORM_ADMIN' || role === 'TENANT_ADMIN';
     }
 
     ngOnInit(): void {
         this.fetchAllAgents();
-        this.loadProviders();
+        // loadProviders backs the Add/Edit form's Provider dropdown only -- that form is gated
+        // to canManageAgents, so a Tenant User has no use for this list. It also calls
+        // SettingRestApi.appSetting, which is TENANT_ADMIN+ server-side -- calling it
+        // unconditionally here meant every Tenant User visiting this page got a confusing
+        // "you don't have permission" error toast on load, even though the rest of the page
+        // (view/run existing agents) works fine for them.
+        if (this.canManageAgents) {
+            this.loadProviders();
+        }
         this.resetAgentForm();
     }
 
     get f() {
         return this.agentForm.controls;
+    }
+
+    public get availableProviders(): string[] {
+        return Array.from(new Set(this.agents
+            .filter((agent) => agent.status !== 'Delete')
+            .map((agent) => agent.provider)
+            .filter((p) => !!p))).sort();
+    }
+
+    public get filteredAgents(): AiAgent[] {
+        return this.agents.filter((agent) =>
+            agent.status !== 'Delete'
+            && (!this.filterProvider || agent.provider === this.filterProvider)
+            && (!this.filterStatus || agent.status === this.filterStatus));
+    }
+
+    public get hasActiveFilters(): boolean {
+        return !!(this.filterProvider || this.filterStatus || this.searchAgent);
+    }
+
+    public clearFilters(): void {
+        this.filterProvider = '';
+        this.filterStatus = '';
+        this.searchAgent = '';
     }
 
     /** Same "parent lookup by type -> fetch its children" pattern used for PIPELINE_IDS/
@@ -108,7 +162,7 @@ export class AiAgentComponent implements OnInit {
             .pipe(first())
             .subscribe((response) => {
                 this.spinnerService.hide();
-                if (response.status === ApiCode.ERROR) {
+                if (response.status !== ApiCode.SUCCESS) {
                     this.alertService.showError(response.message, this.ERROR);
                     return;
                 }
@@ -244,7 +298,7 @@ export class AiAgentComponent implements OnInit {
                 .pipe(first())
                 .subscribe((response) => {
                     this.spinnerService.hide();
-                    if (response.status === ApiCode.ERROR) {
+                    if (response.status !== ApiCode.SUCCESS) {
                         this.alertService.showError(response.message, this.ERROR);
                         return;
                     }
@@ -260,7 +314,7 @@ export class AiAgentComponent implements OnInit {
                 .pipe(first())
                 .subscribe((response) => {
                     this.spinnerService.hide();
-                    if (response.status === ApiCode.ERROR) {
+                    if (response.status !== ApiCode.SUCCESS) {
                         this.alertService.showError(response.message, this.ERROR);
                         return;
                     }
@@ -314,7 +368,7 @@ export class AiAgentComponent implements OnInit {
             .pipe(first())
             .subscribe((response) => {
                 this.spinnerService.hide();
-                if (response.status === ApiCode.ERROR) {
+                if (response.status !== ApiCode.SUCCESS) {
                     this.alertService.showError(response.message, this.ERROR);
                     return;
                 }

@@ -15,12 +15,23 @@
         <input type="date" id="filterEndDate" class="form-control input-sm"
             [(ngModel)]="filterEndDate" [min]="filterStartDate" [max]="today_date" />
     </div>
-    <button type="button" class="btn btn-teal btn-sm" (click)="applyFilter()">
-        <span class="glyphicon glyphicon-filter"></span> Apply
-    </button>
-    <button type="button" class="btn btn-default btn-sm" (click)="resetFilter()" *ngIf="isCustomRange" title="Back to last 7 days">
-        <span class="glyphicon glyphicon-remove"></span> Reset
-    </button>
+    <div class="form-group">
+        <!-- Matches the FROM/TO fields' own label height (empty, not just omitted) so this
+             button's top lines up with their inputs' tops instead of only its bottom -- with
+             align-items:flex-end (see .bucket-toolbar), a bare button next to labeled fields
+             still lands at the right baseline but visibly "floats" high with no label row of
+             its own above it. -->
+        <label class="control-label" aria-hidden="true">&nbsp;</label>
+        <button type="button" class="btn btn-teal btn-sm" (click)="applyFilter()">
+            <span class="glyphicon glyphicon-filter"></span> Apply
+        </button>
+    </div>
+    <div class="form-group" *ngIf="isCustomRange">
+        <label class="control-label" aria-hidden="true">&nbsp;</label>
+        <button type="button" class="btn btn-default btn-sm" (click)="resetFilter()" title="Back to last 7 days">
+            <span class="glyphicon glyphicon-remove"></span> Reset
+        </button>
+    </div>
     <span class="toolbar-spacer"></span>
     <span class="help-text" style="margin: 0;">Showing {{filterStartDate}} &ndash; {{filterEndDate}}</span>
 </div>
@@ -66,7 +77,15 @@
 
 <div class="row row-equal">
     <!-- Job Status Chart -->
-    <div class="col-md-3">
+    <!-- col-md-3-only (no xs/sm) meant Bootstrap's grid percentages simply didn't apply below
+         the 992px "md" breakpoint -- .row-equal's flex row then fell back to each column's
+         natural content width instead, which is what actually produced the cramped, unevenly-
+         sized boxes here (confirmed live: two identically-classed col-md-3's measured 170px vs
+         185px wide, and the col-md-6 next to them was 247px, not the ~2x a real 3/3/6 split
+         would give -- none of that was Bootstrap grid math, it was flex auto-sizing to
+         content). Explicit col-xs-12/col-sm-6 fills the gap: full-width stacked on phones,
+         paired halves on tablets, and the original 3/3/6 desktop layout unchanged at >=992px. -->
+    <div class="col-xs-12 col-sm-6 col-md-3">
         <div class="card-panel">
             <h4 class="card-panel-title"><span class="glyphicon glyphicon-briefcase"></span> Job Status</h4>
             <div id="sourceJobStatusStatistics"
@@ -77,7 +96,7 @@
     </div>
 
     <!-- Running Job Chart -->
-    <div class="col-md-3">
+    <div class="col-xs-12 col-sm-6 col-md-3">
         <div class="card-panel">
             <h4 class="card-panel-title"><span class="glyphicon glyphicon-refresh"></span> Running Job</h4>
             <div id="sourceJobRunningStatistics"
@@ -88,7 +107,7 @@
     </div>
 
     <!-- Weekly Running Chart -->
-    <div class="col-md-6">
+    <div class="col-xs-12 col-md-6">
         <div class="card-panel">
             <h4 class="card-panel-title"><span class="glyphicon glyphicon-stats"></span> Queue Job Statistics</h4>
             <div id="sourceJobWeeklyRunningStatistics"
@@ -105,7 +124,9 @@
         <div class="card-panel">
             <h4 class="card-panel-title">
                 <span class="glyphicon glyphicon-th"></span> Weekday Hrs Queue Job Statistics
-                <span class="help-text" style="display: inline; margin-left: 8px; font-weight: 400;">click a cell to drill down</span>
+                <span class="help-text" style="display: inline; margin-left: 8px; font-weight: 400;">
+                    click a cell to drill down &middot; <span style="color: #4f46e5; font-weight: 700;">bold day</span> = today &middot; <span style="color: #c2410c; font-weight: 700;">bold hour</span> = current hour &middot; amber box = right now
+                </span>
             </h4>
             <div id="sourceJobWeeklyHrsRunningStatistics"
                 class="demo-chart home-chart-tall"
@@ -129,7 +150,7 @@
             </div>
 
             <!-- Table -->
-            <div class="table-responsive">
+            <div class="table-responsive scroll-table">
                 <table class="table table-bordered table-hover table-modern" id="sourceJobWeeklyRunningStatisticsDimensionData">
                     <thead>
                         <tr>
@@ -143,6 +164,7 @@
                             <th>Skip</th>
                             <th>Interrupt</th>
                             <th>Total</th>
+                            <th>Breakdown</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -180,6 +202,17 @@
                             <td class="text-center"
                                 (click)="sourceJobCountAction(sourceJob, 'Total', sourceJob.total)">
                                 {{sourceJob.total}}
+                            </td>
+                            <td style="min-width: 110px;">
+                                <div class="mini-breakdown-bar" *ngIf="breakdownSegments(sourceJob).length; else noBreakdown">
+                                    <span *ngFor="let seg of breakdownSegments(sourceJob)"
+                                        class="mini-breakdown-segment"
+                                        [style.width.%]="seg.pct"
+                                        [style.background]="seg.color"
+                                        [title]="seg.status + ': ' + seg.count">
+                                    </span>
+                                </div>
+                                <ng-template #noBreakdown><span class="help-text">&mdash;</span></ng-template>
                             </td>
                         </tr>
                     </tbody>

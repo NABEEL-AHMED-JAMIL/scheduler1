@@ -26,6 +26,13 @@ export class PdfHighlighterComponent implements OnInit {
     public pdfHighlighterTasks: PdfHighlighterTask[] = [];
     public deletePdfHighlighterTaskId: any;
     public deleteSelectedIndex: any;
+    public readonly highlighterStatusOptions = ['Draft', 'Ready'];
+    // 'Delete' left out on purpose -- a deleted task is never shown (see filteredPdfHighlighterTasks).
+    public readonly statusOptions = ['Active', 'Inactive'];
+    // '' means "no filter" for each -- applied before the free-text search box (see
+    // filteredPdfHighlighterTasks).
+    public filterHighlighterStatus: string = '';
+    public filterStatus: string = '';
 
     constructor(
         private router: Router,
@@ -36,6 +43,23 @@ export class PdfHighlighterComponent implements OnInit {
 
     ngOnInit() {
         this.fetchAllPdfHighlighterTask();
+    }
+
+    public get filteredPdfHighlighterTasks(): PdfHighlighterTask[] {
+        return this.pdfHighlighterTasks.filter((task) =>
+            task.status !== 'Delete'
+            && (!this.filterHighlighterStatus || task.highlighterStatus === this.filterHighlighterStatus)
+            && (!this.filterStatus || task.status === this.filterStatus));
+    }
+
+    public get hasActiveFilters(): boolean {
+        return !!(this.filterHighlighterStatus || this.filterStatus || this.searchPdfHighlighterTask);
+    }
+
+    public clearFilters(): void {
+        this.filterHighlighterStatus = '';
+        this.filterStatus = '';
+        this.searchPdfHighlighterTask = '';
     }
 
     public fetchAllPdfHighlighterTask(): void {
@@ -96,7 +120,14 @@ export class PdfHighlighterComponent implements OnInit {
                 if (response.status === ApiCode.SUCCESS) {
                     this.spinnerService.hide();
                     this.alertService.showSuccess(response.message, this.DELETE_PDF_HIGHLIGHTER_TASK);
-                    this.pdfHighlighterTasks.splice(this.deleteSelectedIndex, 1);
+                    // look up by id, not the stale searchFilter-view index -- deleteSelectedIndex
+                    // is captured from the *ngFor over the filtered view, so it doesn't line up
+                    // with this.pdfHighlighterTasks itself whenever a search term is active
+                    const realIndex = this.pdfHighlighterTasks.findIndex(
+                        (task: any) => task.pdfHighlighterTaskId === this.deletePdfHighlighterTaskId);
+                    if (realIndex > -1) {
+                        this.pdfHighlighterTasks.splice(realIndex, 1);
+                    }
                     this.closebutton.nativeElement.click();
                     this.deletePdfHighlighterTaskId = null;
                     this.deleteSelectedIndex = null;

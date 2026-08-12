@@ -61,7 +61,7 @@ export class FillDynamicFormComponent implements OnInit {
             .pipe(first())
             .subscribe((response) => {
                 this.spinnerService.hide();
-                if (response.status === ApiCode.ERROR) {
+                if (response.status !== ApiCode.SUCCESS) {
                     this.alertService.showError(response.message, this.ERROR);
                     return;
                 }
@@ -85,7 +85,7 @@ export class FillDynamicFormComponent implements OnInit {
             .pipe(first())
             .subscribe((response) => {
                 this.spinnerService.hide();
-                if (response.status === ApiCode.ERROR) {
+                if (response.status !== ApiCode.SUCCESS) {
                     this.alertService.showError(response.message, this.ERROR);
                     this.editingSubmissionId = null;
                     return;
@@ -262,7 +262,7 @@ export class FillDynamicFormComponent implements OnInit {
             .subscribe((response) => {
                 this.loading = false;
                 this.spinnerService.hide();
-                if (response.status === ApiCode.ERROR) {
+                if (response.status !== ApiCode.SUCCESS) {
                     this.alertService.showError(response.message, this.ERROR);
                     return;
                 }

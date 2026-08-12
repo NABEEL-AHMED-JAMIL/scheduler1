@@ -6,3 +6,8 @@ export * from './ollama.model';
 export * from './audio-transcript.model';
 export * from './image-text.model';
 export * from './cv-tailor.model';
+export * from './kafka-connection-profile.model';
+export * from './auth.model';
+export * from './tenant.model';
+export * from './app-user.model';
+export * from './query-engine.model';

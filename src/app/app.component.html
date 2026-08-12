@@ -4,7 +4,7 @@
         <!-- Brand -->
         <div class="navbar-header">
             <a routerLink="/home" class="navbar-brand">
-                ETL 2023
+                <span class="glyphicon glyphicon-plane"></span> ETL 2023
             </a>
         </div>
 
@@ -29,7 +29,10 @@
                     <span class="glyphicon glyphicon-wrench"></span> Tools <span class="caret"></span>
                 </a>
                 <ul class="dropdown-menu">
-                    <li><a routerLink="/setting/searchEngine"><span class="glyphicon glyphicon-search"></span> Search Engine</a></li>
+                    <li *ngIf="authService.currentUser?.userRole === 'PLATFORM_ADMIN'">
+                        <a routerLink="/setting/searchEngine"><span class="glyphicon glyphicon-search"></span> Search Engine</a>
+                    </li>
+                    <li><a routerLink="/setting/queryEngine"><span class="glyphicon glyphicon-hdd"></span> Query Engine</a></li>
                     <li><a routerLink="/pdfHighlighter"><span class="glyphicon glyphicon-picture"></span> PDF Highlighter</a></li>
                     <li><a routerLink="/dynamicForm"><span class="glyphicon glyphicon-th-list"></span> Dynamic Forms</a></li>
                 </ul>
@@ -39,15 +42,47 @@
                     <span class="glyphicon glyphicon-flash"></span> AI Suite <span class="caret"></span>
                 </a>
                 <ul class="dropdown-menu">
-                    <li><a routerLink="/aiSuite"><span class="glyphicon glyphicon-th-large"></span> Browse All Tools</a></li>
-                    <li role="separator" class="divider"></li>
                     <li><a routerLink="/aiAgent"><span class="glyphicon glyphicon-flash"></span> AI Agents</a></li>
-                    <li><a routerLink="/ollamaModels"><span class="glyphicon glyphicon-hdd"></span> Ollama Models</a></li>
+                    <li *ngIf="authService.currentUser?.userRole === 'PLATFORM_ADMIN' || authService.currentUser?.userRole === 'TENANT_ADMIN'">
+                        <a routerLink="/ollamaModels"><span class="glyphicon glyphicon-hdd"></span> Ollama Models</a>
+                    </li>
                     <li><a routerLink="/contentCleaner"><span class="glyphicon glyphicon-magnet"></span> Content Cleaner</a></li>
+                </ul>
+            </li>
+            <!-- Restricted to this one account specifically (not PLATFORM_ADMIN generally) --
+                 see RoleGuard's exactUsernames javadoc and this route's own comments in
+                 app.routing.ts. Personal/experimental tooling, not delegated by role.
+                 Named "Labs" (not "Admin Tools") deliberately -- this is account-restricted
+                 experimental tooling, not the real admin section; "Administration" below is
+                 the actual Users/Tenants admin area and a name clash with it would be misleading. -->
+            <li class="dropdown" routerLinkActive="active" *ngIf="authService.currentUser?.username === 'admin@platform.local'">
+                <a href="javascript:void(0);" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">
+                    <span class="glyphicon glyphicon-flag"></span> Labs <span class="caret"></span>
+                </a>
+                <ul class="dropdown-menu">
                     <li><a routerLink="/audioTranscriptExtractor"><span class="glyphicon glyphicon-headphones"></span> Audio Transcript Extractor</a></li>
                     <li><a routerLink="/imageTextExtractor"><span class="glyphicon glyphicon-camera"></span> Image Text Extractor</a></li>
                     <li><a routerLink="/aiChat"><span class="glyphicon glyphicon-comment"></span> AI Assistant</a></li>
                     <li><a routerLink="/cvTailor"><span class="glyphicon glyphicon-briefcase"></span> CV Tailor</a></li>
+                </ul>
+            </li>
+            <!-- Moved out of Settings -- same role checks as before on each item, unchanged
+                 (Users: PLATFORM_ADMIN or TENANT_ADMIN; Tenants: PLATFORM_ADMIN only). The
+                 container's own *ngIf is the broader of the two so it renders for anyone who
+                 can see at least one item inside -- deliberately NOT merged into the Labs
+                 dropdown above, which is gated to one specific account, not by role. -->
+            <li class="dropdown" routerLinkActive="active"
+                *ngIf="authService.currentUser?.userRole === 'PLATFORM_ADMIN' || authService.currentUser?.userRole === 'TENANT_ADMIN'">
+                <a href="javascript:void(0);" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">
+                    <span class="glyphicon glyphicon-tower"></span> Administration <span class="caret"></span>
+                </a>
+                <ul class="dropdown-menu">
+                    <li *ngIf="authService.currentUser?.userRole === 'PLATFORM_ADMIN' || authService.currentUser?.userRole === 'TENANT_ADMIN'">
+                        <a routerLink="/users" routerLinkActive="active"><span class="glyphicon glyphicon-user"></span> Users</a>
+                    </li>
+                    <li *ngIf="authService.currentUser?.userRole === 'PLATFORM_ADMIN'">
+                        <a routerLink="/tenants" routerLinkActive="active"><span class="glyphicon glyphicon-tower"></span> Tenants</a>
+                    </li>
                 </ul>
             </li>
             <li class="dropdown" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">
@@ -55,7 +90,9 @@
                     <span class="glyphicon glyphicon-cog"></span> Settings <span class="caret"></span>
                 </a>
                 <ul class="dropdown-menu">
-                    <li><a routerLink="/setting" [routerLinkActiveOptions]="{exact: true}" routerLinkActive="active"><span class="glyphicon glyphicon-list-alt"></span> General</a></li>
+                    <li *ngIf="authService.currentUser?.userRole === 'PLATFORM_ADMIN' || authService.currentUser?.userRole === 'TENANT_ADMIN'">
+                        <a routerLink="/setting" [routerLinkActiveOptions]="{exact: true}" routerLinkActive="active"><span class="glyphicon glyphicon-list-alt"></span> General</a>
+                    </li>
                     <li><a routerLink="/setting/queueMessage"><span class="glyphicon glyphicon-envelope"></span> Q-Message</a></li>
                 </ul>
             </li>
@@ -65,15 +102,15 @@
         <ul class="nav navbar-nav navbar-right">
             <li class="dropdown">
                 <a href="javascript:void(0);" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">
-                    <img src="https://avatars.githubusercontent.com/u/24192325?v=4" class="nav-avatar" alt="avatar"> Nabeel Ahmed <span class="caret"></span>
+                    <span class="nav-avatar nav-avatar-initials">{{ userInitials }}</span> {{ authService.currentUser?.fullName }} <span class="caret"></span>
                 </a>
                 <ul class="dropdown-menu dropdown-menu-right user-menu">
                     <li class="user-card">
-                        <img src="https://avatars.githubusercontent.com/u/24192325?v=4" class="user-card-avatar" alt="avatar">
+                        <span class="user-card-avatar user-card-avatar-initials">{{ userInitials }}</span>
                         <div class="user-card-info">
-                            <div class="user-card-name">Nabeel Ahmed</div>
-                            <div class="user-card-role">ETL Administrator</div>
-                            <div class="user-card-email">nabeel.amd93&#64;gmail.com</div>
+                            <div class="user-card-name">{{ authService.currentUser?.fullName }}</div>
+                            <div class="user-card-role">{{ userRoleLabel }}</div>
+                            <div class="user-card-email">{{ authService.currentUser?.username }}</div>
                             <div class="user-card-time">Chicago Time: {{ profileTime }}</div>
                         </div>
                     </li>
@@ -89,7 +126,7 @@
 </nav>
 
 <!-- main app container -->
-<div class="app-content">
+<div class="app-content" [class.app-content-flush]="isFlushRoute">
     <router-outlet></router-outlet>
 </div>
 <spinner></spinner>

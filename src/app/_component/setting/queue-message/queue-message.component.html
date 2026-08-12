@@ -66,6 +66,25 @@
             <input type="text" id="searchQMessageForm" class="form-control" style="width: 280px;"
                 placeholder="Search" [(ngModel)]="searchQMessageForm"/>
         </div>
+        <span class="toolbar-spacer"></span>
+        <button type="button" class="btn btn-sm btn-default" (click)="showGroupByCharts = !showGroupByCharts">
+            <span class="glyphicon" [ngClass]="showGroupByCharts ? 'glyphicon-chevron-up' : 'glyphicon-stats'"></span>
+            {{ showGroupByCharts ? 'Hide' : 'Show' }} Column Insights
+        </button>
+    </div>
+
+    <!-- Column insights -- a Kaggle-style profile strip docked to the table: donut pies for
+         Job Id/Job Status, one stacked bar comparing Run Manual/Skip Manual/Q Send, and a wide
+         Start→End duration comparison across jobs (replaces what used to be three separate,
+         mostly-uninformative "rows per day" lines for Start/End/Skip Time). Same
+         filteredQueueDatas source as the column-header mini bars in the table below; *ngIf per
+         chart so an empty one (nothing matches the current search/filter) just isn't shown. -->
+    <div class="stat-chart-grid" *ngIf="showGroupByCharts">
+        <div class="demo-chart" *ngIf="jobIdChartOptions" echarts [options]="jobIdChartOptions"></div>
+        <div class="demo-chart" *ngIf="jobStatusPieOptions" echarts [options]="jobStatusPieOptions"></div>
+        <div class="demo-chart" *ngIf="booleanFieldsChartOptions" echarts [options]="booleanFieldsChartOptions"></div>
+        <div class="demo-chart stat-chart-wide" *ngIf="durationComparisonChartOptions"
+            echarts [options]="durationComparisonChartOptions" (chartClick)="onDurationChartClick($event)"></div>
     </div>
 
     <div class="table-responsive scroll-table">
@@ -75,19 +94,61 @@
                     <th># QId</th>
                     <th># Job Id</th>
                     <th>Date Created</th>
-                    <th>Start Time</th>
-                    <th>End Time</th>
-                    <th>Skip Time</th>
-                    <th class="text-center">Run Manual</th>
-                    <th class="text-center">Skip Manual</th>
-                    <th class="text-center">Q Send</th>
-                    <th class="text-center">Job Status</th>
+                    <th>
+                        Start Time
+                        <div class="col-mini-chart" *ngIf="dateFillColumnStats('startTime') as bar" [title]="'% of rows with a Start Time set'">
+                            <div class="col-mini-chart-seg" *ngFor="let seg of bar"
+                                [style.height.%]="seg.pct" [style.background]="seg.color" [title]="seg.label + ': ' + seg.count"></div>
+                        </div>
+                    </th>
+                    <th>
+                        End Time
+                        <div class="col-mini-chart" *ngIf="dateFillColumnStats('endTime') as bar" [title]="'% of rows with an End Time set'">
+                            <div class="col-mini-chart-seg" *ngFor="let seg of bar"
+                                [style.height.%]="seg.pct" [style.background]="seg.color" [title]="seg.label + ': ' + seg.count"></div>
+                        </div>
+                    </th>
+                    <th>
+                        Skip Time
+                        <div class="col-mini-chart" *ngIf="dateFillColumnStats('skipTime') as bar" [title]="'% of rows with a Skip Time set'">
+                            <div class="col-mini-chart-seg" *ngFor="let seg of bar"
+                                [style.height.%]="seg.pct" [style.background]="seg.color" [title]="seg.label + ': ' + seg.count"></div>
+                        </div>
+                    </th>
+                    <th class="text-center">
+                        Run Manual
+                        <div class="col-mini-chart" *ngIf="booleanColumnStats('runManual') as bar">
+                            <div class="col-mini-chart-seg" *ngFor="let seg of bar"
+                                [style.height.%]="seg.pct" [style.background]="seg.color" [title]="seg.label + ': ' + seg.count"></div>
+                        </div>
+                    </th>
+                    <th class="text-center">
+                        Skip Manual
+                        <div class="col-mini-chart" *ngIf="booleanColumnStats('skipManual') as bar">
+                            <div class="col-mini-chart-seg" *ngFor="let seg of bar"
+                                [style.height.%]="seg.pct" [style.background]="seg.color" [title]="seg.label + ': ' + seg.count"></div>
+                        </div>
+                    </th>
+                    <th class="text-center">
+                        Q Send
+                        <div class="col-mini-chart" *ngIf="booleanColumnStats('jobSend') as bar">
+                            <div class="col-mini-chart-seg" *ngFor="let seg of bar"
+                                [style.height.%]="seg.pct" [style.background]="seg.color" [title]="seg.label + ': ' + seg.count"></div>
+                        </div>
+                    </th>
+                    <th class="text-center">
+                        Job Status
+                        <div class="col-mini-chart" *ngIf="jobStatusColumnStats as bar">
+                            <div class="col-mini-chart-seg" *ngFor="let seg of bar"
+                                [style.height.%]="seg.pct" [style.background]="seg.color" [title]="seg.label + ': ' + seg.count"></div>
+                        </div>
+                    </th>
                     <th>Message</th>
                     <th class="text-center">Action</th>
                 </tr>
             </thead>
             <tbody>
-                <tr *ngFor="let queueData of queueDatas | searchFilter: searchQMessageForm; let i = index">
+                <tr *ngFor="let queueData of filteredQueueDatas; let i = index">
                     <td>{{queueData.jobQueueId}}</td>
                     <td>{{queueData.jobId}}</td>
                     <td style="white-space: nowrap;">{{queueData.dateCreated | date:'yyyy-MM-dd HH:mm:ss'}}</td>
@@ -116,11 +177,6 @@
                     <td><div class="cell-message">{{queueData.jobStatusMessage}}</div></td>
                     <td class="text-center">
                         <div class="btn-group btn-group-sm" role="group">
-                            <button type="button" class="btn btn-default btn-icon ic-view"
-                                data-toggle="modal" data-target="#qMessageModal"
-                                (click)="showQMessageDetail(queueData)" title="View Message">
-                                <span class="glyphicon glyphicon-eye-open"></span>
-                            </button>
                             <button type="button" class="btn btn-default btn-icon ic-delete" [disabled]="queueData.jobStatus !== 'Queue'"
                                 (click)="deleteQMessage(queueData, i)" title="Delete">
                                 <span class="glyphicon glyphicon-trash"></span>
@@ -135,23 +191,5 @@
                 </tr>
             </tbody>
         </table>
-    </div>
-</div>
-
-<!-- Message modal -->
-<div class="modal fade" id="qMessageModal" role="dialog">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <button type="button" class="close" data-dismiss="modal">&times;</button>
-                <h4 class="modal-title">Message</h4>
-            </div>
-            <div class="modal-body">
-                <pre class="code-box" style="max-height: 420px;">{{selectedQMessage}}</pre>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-            </div>
-        </div>
     </div>
 </div>

@@ -690,6 +690,38 @@ body.jw-modal-open {
   height: 200px;
 }
 
+/* Group-by charts grid (Q-Message / Job History pages) -- small multiples, one card per
+   dimension (Job Id/Status/Run Manual/Skip Manual/Q Send pies, Start/End/Skip Time trend
+   lines), wrapping responsively instead of forcing a fixed column count. */
+/* Kaggle-style column-profile strip -- sits flush against the top of the table it profiles
+   (no bottom border/margin of its own; .table-responsive right below supplies the visual
+   separation). Compact cards (donuts, the boolean-fields bar) stay small multiples in a row;
+   the duration-comparison chart spans the full row via .stat-chart-wide since it carries more
+   information (a ranked list, not just a shape) and needs the width to stay readable. */
+.stat-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.stat-chart-grid .demo-chart {
+  height: 170px;
+  background: @surface;
+  border: 1px solid @line;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.stat-chart-grid .stat-chart-wide {
+  // Not the "1 / -1" shorthand -- LESS's math processor reads the "/" as division and
+  // silently collapses it to a single "-1" (all this session's earlier testing showed a 4px-
+  // wide chart because of exactly that). Separate start/end properties sidestep it entirely.
+  grid-column-start: 1;
+  grid-column-end: -1;
+  height: 260px;
+}
+
 #sourceJobWeeklyRunningStatisticsDimensionData td:hover {
   background-color: #dff0d8;
   ;
@@ -791,6 +823,13 @@ body {
 /* Page content padding (wrapper around <router-outlet>) */
 .app-content {
   padding: 20px 24px;
+}
+
+/* Applied only on the landing route (see AppComponent#isFlushRoute) -- .landing-page manages
+   its own full-bleed sections (hero gradient, feature grid) and needs to sit flush against the
+   viewport edges, unlike every other route which relies on the padding above for its gutter. */
+.app-content-flush {
+  padding: 0;
 }
 
 /* ---------- Navbar ---------- */
@@ -948,6 +987,32 @@ body {
 
 .table-modern > tbody > tr:hover {
   background: #f1f0fd;
+}
+
+/* Column-header mini histogram (Kaggle-CSV-style "chart on top of each column") -- one bar per
+   possible value the column can hold (fixed set, so it's always multi-bar even when every row
+   currently shares one value), height sized by that value's share of the (non-null) rows,
+   sitting on a baseline. A stacked single-strip version of this collapsed into what just read
+   as a plain colored line whenever a column was all-one-value -- vertical bars keep it legible
+   as "a chart" even then (one tall bar against a flat baseline). Hover a bar for the exact count. */
+.col-mini-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 22px;
+  width: 100%;
+  min-width: 40px;
+  max-width: 90px;
+  margin-top: 6px;
+  padding-top: 2px;
+  border-bottom: 1px solid @line;
+}
+
+.col-mini-chart-seg {
+  flex: 1 1 0;
+  min-height: 2px;
+  border-radius: 1px 1px 0 0;
+  background: @line;
 }
 
 .table-modern > tbody > tr.disabled-row {
@@ -1263,6 +1328,340 @@ body {
   text-align: center;
 }
 
+/* ---------- Public landing page (welcome.component) ---------- */
+/* Not a fixed/full-viewport overlay like .login-page -- this is a normal, scrollable page. */
+.landing-page {
+  min-height: 100vh;
+  background: @page-bg;
+  overflow-x: hidden;
+}
+
+@landing-fade-distance: 16px;
+@keyframes landing-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(@landing-fade-distance);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.landing-hero {
+  position: relative;
+  background:
+    radial-gradient(680px circle at 12% -10%, fade(#fff, 16%), transparent 55%),
+    radial-gradient(600px circle at 100% 0%, fade(@brand-accent, 55%), transparent 60%),
+    linear-gradient(135deg, @brand-teal-dark 0%, @brand-teal 50%, @brand-accent 100%);
+  color: #fff;
+  padding-bottom: 88px;
+  overflow: hidden;
+}
+
+/* Faint dot-grid texture over the gradient -- reads as "technical product", not a flat block
+   of color, without pulling in an external image (unlike .login-page's photo background). */
+.landing-hero-pattern {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: radial-gradient(fade(#fff, 14%) 1.5px, transparent 1.5px);
+  background-size: 26px 26px;
+  pointer-events: none;
+}
+
+.landing-hero-nav {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 32px;
+}
+
+.landing-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.landing-hero-nav .btn-default {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.4);
+  color: #fff;
+  backdrop-filter: blur(4px);
+}
+
+.landing-hero-nav .btn-default:hover,
+.landing-hero-nav .btn-default:focus {
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+
+.landing-hero-body {
+  position: relative;
+  max-width: 760px;
+  margin: 40px auto 0;
+  padding: 0 32px;
+  text-align: center;
+  animation: landing-fade-up 0.5s ease-out both;
+}
+
+.landing-highlights {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 22px;
+}
+
+.landing-highlight-pill {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 999px;
+  padding: 5px 14px;
+}
+
+.landing-hero-body h1 {
+  font-size: 38px;
+  font-weight: 800;
+  line-height: 1.22;
+  letter-spacing: -0.01em;
+  margin: 0 0 18px;
+  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.12);
+}
+
+.landing-hero-subtitle {
+  font-size: 16.5px;
+  line-height: 1.65;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0 0 32px;
+}
+
+.landing-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+
+.landing-hero-body .btn-teal {
+  background: #fff;
+  color: @brand-teal-dark;
+  border-color: #fff;
+  font-weight: 700;
+  box-shadow: 0 10px 24px rgba(23, 15, 71, 0.25);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.landing-hero-body .btn-teal:hover,
+.landing-hero-body .btn-teal:focus {
+  background: #fff;
+  color: @brand-teal-dark;
+  transform: translateY(-1px);
+  box-shadow: 0 14px 28px rgba(23, 15, 71, 0.32);
+}
+
+.btn-hero-ghost {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  color: #fff;
+  font-weight: 600;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-hero-ghost:hover,
+.btn-hero-ghost:focus {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.7);
+  color: #fff;
+}
+
+/* Soft curved divider between the hero and the page background, instead of a hard edge --
+   a plain SVG wave, colored to match @page-bg so it blends into the section beneath it. */
+.landing-hero-wave {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 64px;
+  background: @page-bg;
+  clip-path: polygon(0% 100%, 100% 100%, 100% 40%, 75% 70%, 50% 30%, 25% 65%, 0% 20%);
+}
+
+.landing-section-heading {
+  text-align: center;
+  margin: 0 0 32px;
+}
+
+.landing-eyebrow {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: @brand-teal;
+  margin-bottom: 8px;
+}
+
+.landing-section-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: @ink;
+  margin: 0;
+}
+
+.landing-features {
+  max-width: 1100px;
+  margin: -36px auto 0;
+  padding: 0 32px 8px;
+  position: relative;
+}
+
+.landing-feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.landing-feature-card {
+  background: @surface;
+  border: 1px solid @line;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 4px 16px rgba(47, 58, 69, 0.06);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  animation: landing-fade-up 0.5s ease-out both;
+}
+
+.landing-feature-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 28px rgba(47, 58, 69, 0.12);
+}
+
+.landing-feature-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 19px;
+  margin-bottom: 16px;
+}
+
+// Six accent colors, one per feature card -- keeps the grid from reading as one repeated
+// indigo tile six times over, and each color is only ever used for icon bg/fg here.
+.landing-feature-icon-indigo { background: fade(@brand-teal, 12%); color: @brand-teal; }
+.landing-feature-icon-violet { background: fade(@brand-accent, 14%); color: @brand-accent; }
+.landing-feature-icon-teal   { background: fade(#0c7c8c, 14%); color: #0c7c8c; }
+.landing-feature-icon-amber  { background: fade(#b5730a, 14%); color: #b5730a; }
+.landing-feature-icon-rose   { background: fade(#c0392b, 12%); color: #c0392b; }
+.landing-feature-icon-blue   { background: fade(#1c6ea4, 14%); color: #1c6ea4; }
+
+.landing-feature-card h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: @ink;
+  margin: 0 0 8px;
+}
+
+.landing-feature-card p {
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: @muted;
+  margin: 0;
+}
+
+/* How it works */
+.landing-steps {
+  max-width: 1100px;
+  margin: 72px auto 0;
+  padding: 0 32px 24px;
+}
+
+.landing-step-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 24px;
+  position: relative;
+}
+
+.landing-step-card {
+  position: relative;
+  padding: 8px 8px 8px 0;
+}
+
+.landing-step-number {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: @brand-teal;
+  color: #fff;
+  font-weight: 700;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 14px;
+}
+
+.landing-step-card h3 {
+  font-size: 15.5px;
+  font-weight: 600;
+  color: @ink;
+  margin: 0 0 6px;
+}
+
+.landing-step-card p {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: @muted;
+  margin: 0;
+}
+
+.landing-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 28px 32px 36px;
+  color: @muted;
+  font-size: 13px;
+  border-top: 1px solid @line;
+  margin-top: 24px;
+}
+
+.landing-brand-footer {
+  color: @ink;
+  font-size: 14px;
+}
+
+@media (max-width: 767px) {
+  .landing-hero-body h1 {
+    font-size: 27px;
+  }
+
+  .landing-features {
+    margin-top: -20px;
+  }
+
+  .landing-steps {
+    margin-top: 48px;
+  }
+}
+
 /* Navbar user avatar + profile dropdown */
 .nav-avatar {
   width: 26px;
@@ -1272,6 +1671,26 @@ body {
   margin-right: 6px;
   vertical-align: middle;
   border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+/* Initials badge standing in for a photo -- there's no avatar upload, so every real user gets
+   one of these instead of the single hardcoded GitHub photo this used to always show. */
+.nav-avatar-initials,
+.user-card-avatar-initials {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: @brand-teal;
+  color: #fff;
+  font-weight: 700;
+}
+
+.nav-avatar-initials {
+  font-size: 11px;
+}
+
+.user-card-avatar-initials {
+  font-size: 17px;
 }
 
 .user-menu {
@@ -1342,6 +1761,34 @@ body {
   margin-top: 6px;
   font-size: 12px;
   color: @muted;
+}
+
+/* Success-toned help text (e.g. "Saved to bucket at ...") -- same green as .pill-success,
+   instead of the #3c763d one-off it used to be hardcoded to on every AI Suite tool page. */
+.help-text-success {
+  color: #1d7a3f;
+}
+
+/* ---------- Panel box (AI Suite tool pages: CV Tailor, AI Assistant, Content Cleaner,
+   Audio/Image extractors, Ollama Models) ----------
+   Every one of these pages repeated the exact same background/border/radius/padding as an
+   inline style (with hardcoded hex colors) instead of sharing a class -- pulled into one
+   definition, on the same @surface/@line tokens .card-panel already uses. */
+.panel-box {
+  background: @surface;
+  border: 1px solid @line;
+  border-radius: 6px;
+  padding: 16px;
+}
+
+/* Nested "preview" box inside a .panel-box (e.g. a fetched transcript shown before saving) --
+   was background:#f7f7f9 inline, close enough to @page-bg to just reuse it. */
+.panel-box-subtle {
+  margin-top: 12px;
+  padding: 12px;
+  background: @page-bg;
+  border: 1px solid @line;
+  border-radius: 6px;
 }
 
 /* Editable code / payload textarea (matches the read-only code-box look) */
@@ -1503,6 +1950,27 @@ body {
 .pill-purple  { background: #efe6fb; color: #6a3bbf; }
 .pill-cyan    { background: #e0f7fa; color: #0c7c8c; }
 
+/* Pill variant that carries a leading glyphicon (Pipeline/Topic tags on Task & Job cards) --
+   plain .pill is inline-block, which only centers text; this flexes so the icon lines up. */
+.pill-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pill-icon .glyphicon {
+  font-size: 10px;
+  top: 0;
+}
+
+a.pill-icon {
+  cursor: pointer;
+}
+
+a.pill-icon:hover {
+  filter: brightness(0.95);
+}
+
 /* Job running-status pills (used as: class="pill" [ngClass]="'status-'+value") */
 .status-InFlight  { .pill-info; }
 .status-Queue     { .pill-cyan; }
@@ -1511,6 +1979,11 @@ body {
 .status-Failed    { .pill-danger; }
 .status-Completed { .pill-success; }
 .status-Interrupt { .pill-purple; }
+/* Was missing entirely -- a Skip status pill rendered with no background/color at all (just
+   bare bold text), unlike every other status here. #566573 matches the slate gray
+   JOB_QUEUE_STATUS_COLOR.Skip already uses for this exact status elsewhere (source-job
+   component's Run History chart), which is exactly .pill-default's text color. */
+.status-Skip      { .pill-default; }
 
 /* ---------- Buttons (consistent palette) ---------- */
 .btn {
@@ -1720,6 +2193,15 @@ body {
   box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.18);
 }
 
+// LookupValue can hold anything from a single flag to a multi-line JSON/XML config -- the
+// `rows` attribute sets a starting height, this adds a monospace font (values are often
+// code/config, not prose) and a resize handle for anything longer.
+.lookup-value-textarea {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  resize: vertical;
+}
+
 /* ---------- Modals & panels (match the theme) ---------- */
 .modal-content {
   border: none;
@@ -1873,6 +2355,7 @@ body {
   text-overflow: ellipsis;
 }
 
+.bucket-object-table .name-value,
 .bucket-object-table .etag-value,
 .bucket-object-table .content-type-value {
   overflow: hidden;
@@ -1889,20 +2372,10 @@ body {
   background: rgba(79, 70, 229, 0.08) !important;
 }
 
-.row-actions .ic-delete,
-.row-actions .ic-edit,
-.row-actions .ic-copy,
-.row-actions .ic-download {
-  opacity: 0;
-  transition: opacity 0.12s ease;
-}
-
-.bucket-row:hover .row-actions .ic-delete,
-.bucket-row:hover .row-actions .ic-edit,
-.bucket-row:hover .row-actions .ic-copy,
-.bucket-row:hover .row-actions .ic-download {
-  opacity: 1;
-}
+/* Delete/Edit/Copy/Download used to be opacity:0 until the row was hovered (View was the
+   only action always visible) -- on touch devices, and for anyone scanning the column
+   instead of mousing over each row, that meant most of the Action column looked empty.
+   All actions are now always visible, same as View always was. */
 
 .folder-icon {
   color: #e0a63e;
@@ -1955,6 +2428,28 @@ body {
   font-family: 'Courier New', Courier, monospace;
 }
 
+/* Preview modal ("eye"/View action) -- previewBody's pdf/video/image/text elements all size
+   themselves with `flex: 1 1 auto; min-height: 0`, which only does anything inside a flex
+   ancestor with a resolvable height (that's how the side panel gets it, via .bucket-browse-row's
+   fixed 560px chain). The modal had neither: plain `max-height` + `overflow-y: auto` on
+   .modal-body isn't a flex container, so every one of those elements fell back to its
+   intrinsic/default size instead -- most visibly the pdf iframe, which collapsed to a browser's
+   ~150px default iframe height and rendered as a cramped, near-blank box. Giving the modal body
+   the same fixed-height flex column the side panel has fixes all of them at once. */
+.preview-modal-body {
+  height: 75vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.preview-modal-body-inner {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .preview-unavailable {
   padding: 10px 12px;
   background: #f7f9fa;
@@ -1967,6 +2462,8 @@ body {
 .preview-toolbar {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 6px;
 }
 
@@ -1989,6 +2486,27 @@ body {
   font-size: 11px;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+// Was .preview-md-editor -- now shared by every editable preview kind (json/csv/txt/xml/md),
+// not just markdown.
+.preview-text-editor {
+  width: 100%;
+  min-height: 420px;
+  resize: vertical;
+  background: #f7f9fa;
+  border: 1px solid @line;
+  border-radius: 6px;
+  padding: 10px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  color: @ink;
+}
+
+.preview-text-editor:focus {
+  outline: none;
+  border-color: @brand-teal;
 }
 
 .preview-pdf {
@@ -2022,32 +2540,6 @@ body {
   border-radius: 6px;
   background: #f7f9fa;
   object-fit: contain;
-}
-
-/* "Process with AI" modal -- prompt (instructions + extracted content) on the left,
-   result on the right, each independently scrollable so a long file/response doesn't
-   blow out the modal height. */
-.ai-prompt-block {
-  margin-bottom: 12px;
-}
-
-.ai-prompt-sublabel {
-  display: block;
-  font-size: 11px;
-  font-weight: 600;
-  color: @muted;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-  margin-bottom: 4px;
-}
-
-.ai-prompt-instructions,
-.ai-prompt-content {
-  max-height: 180px;
-}
-
-.ai-result-text {
-  max-height: 380px;
 }
 
 .spin {
@@ -2459,7 +2951,12 @@ body {
 .pipeline-stage {
   display: flex;
   align-items: center;
-  flex: 1 1 auto;
+  // Hug the dot+label instead of growing -- .pipeline-stage-connector is the only flexible
+  // element between stages, so it stretches to fill the gap and lands flush against both
+  // neighboring dots. (Previously this also grew, so each dot centered inside its own
+  // expanding box and the connector floated in the middle with visible dead space on
+  // either side instead of touching the dots it's supposed to connect.)
+  flex: 0 0 auto;
   // Never let a stage (dot + label) get squeezed smaller than its content -- without this,
   // narrow viewports would shrink stages unevenly instead of cleanly overflowing into a
   // horizontal scroll, which is what was clipping the last dot/label on mobile.
@@ -2621,6 +3118,42 @@ body {
   font-size: 13px;
   color: @ink;
   word-break: break-word;
+}
+
+/* Per-step timing chart above the audit log views -- seconds elapsed since the previous
+   line (or the queue's Start Time for the first one). */
+.log-gap-chart {
+  width: 100%;
+  height: 160px;
+  margin: 4px 0 16px;
+}
+
+/* ---------- Console view (Job Logs) — raw terminal-style readout of the same audit log
+   lines as Timeline/Table, for reading a run the way it would have printed to stdout ---------- */
+.log-console {
+  max-height: 520px;
+  overflow-y: auto;
+  background: #1e2530;
+  color: #d7dee6;
+  border-radius: 6px;
+  padding: 12px 14px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.log-console-line {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.log-console-time {
+  color: #7b8794;
+  margin-right: 8px;
+}
+
+.log-console-text {
+  color: #d7dee6;
 }
 
 /* ---------- AI Suite hub — card grid launcher ---------- */
@@ -2859,6 +3392,173 @@ body {
   justify-content: flex-end;
 }
 
+// Card-view action buttons (Source Task / Source Job cards) -- break the joined
+// btn-group into separated, rounded icon buttons with a soft tinted hover that
+// matches each action's colour, instead of the flat table-style strip.
+.entity-card-footer .btn-group {
+  display: flex;
+  gap: 6px;
+}
+
+.entity-card-footer .btn-icon {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px !important;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease, border-color 0.12s ease;
+}
+
+.entity-card-footer .btn-icon .glyphicon {
+  font-size: 13px;
+  top: 0;
+}
+
+.entity-card-footer .btn-icon:hover:not([disabled]),
+.entity-card-footer .btn-icon:focus:not([disabled]) {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(54, 66, 77, 0.14);
+}
+
+.entity-card-footer .ic-view:hover:not([disabled])     { background: #eef0fb; border-color: #c7cbf5; }
+.entity-card-footer .ic-edit:hover:not([disabled])     { background: #eaf1fd; border-color: #bcd6fb; }
+.entity-card-footer .ic-delete:hover:not([disabled])   { background: #fdecea; border-color: #f3b4ac; }
+.entity-card-footer .ic-run:hover:not([disabled])      { background: #e8f6ec; border-color: #a9dab8; }
+.entity-card-footer .ic-skip:hover:not([disabled])     { background: #e3f5f7; border-color: #a9dee3; }
+.entity-card-footer .ic-download:hover:not([disabled]) { background: #fdf3e3; border-color: #f3d99a; }
+.entity-card-footer .ic-history:hover:not([disabled]),
+.entity-card-footer .ic-logs:hover:not([disabled]),
+.entity-card-footer .ic-clone:hover:not([disabled]),
+.entity-card-footer .ic-copy:hover:not([disabled])     { background: #eef0f2; border-color: #cfd4d9; }
+.entity-card-footer .ic-interrupt:hover:not([disabled]) { background: #f2ecfb; border-color: #d3c1f0; }
+
+.entity-card-footer .btn-icon[disabled] {
+  box-shadow: none;
+  transform: none;
+}
+
+/* ---------- Batch Action upload dropzone (Source Job / Source Task bulk upload) ---------- */
+.upload-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-align: center;
+  padding: 22px 12px;
+  border: 2px dashed @line;
+  border-radius: 8px;
+  background: #f7f9fa;
+  color: #7b8794;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.upload-dropzone:hover {
+  border-color: @brand-teal;
+  color: @brand-teal-dark;
+}
+
+.upload-dropzone .glyphicon {
+  font-size: 22px;
+}
+
+.upload-dropzone-active {
+  border-color: @brand-teal;
+  background: #eef0fb;
+  color: @brand-teal-dark;
+}
+
+.upload-dropzone-busy {
+  cursor: default;
+  border-style: solid;
+}
+
+.upload-dropzone-text {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.upload-dropzone-filename {
+  font-size: 12px;
+  color: #566573;
+  word-break: break-all;
+}
+
+.upload-result {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 14px;
+}
+
+.upload-result-success {
+  background: #e3f6e9;
+  color: #1d7a3f;
+}
+
+.upload-result-error {
+  background: #fde4e4;
+  color: #c0392b;
+}
+
+/* ---------- List pagination (Source Task / Source Job -- table and card view) ---------- */
+.list-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid @line;
+}
+
+.list-pagination-info {
+  font-size: 12px;
+  color: @muted;
+  min-width: 90px;
+  text-align: center;
+}
+
+.list-pagination-size {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+  font-size: 12px;
+  color: @muted;
+}
+
+.list-pagination-size select {
+  width: auto;
+  height: 28px;
+  padding: 2px 6px;
+  font-size: 12px;
+}
+
+/* ---------- Mini breakdown bar (Home "Job Breakdown" table) -- a per-row stacked strip
+   reusing the same status palette as .status-* pills, so the seven count columns are also
+   readable as a shape at a glance ---------- */
+.mini-breakdown-bar {
+  display: flex;
+  width: 100%;
+  height: 10px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: @line;
+}
+
+.mini-breakdown-segment {
+  height: 100%;
+  min-width: 2px;
+}
+
 /* ---------- Table row expand (Source Job List) -- linked task + queue list ---------- */
 .btn-expand-row {
   width: 24px;
@@ -2893,4 +3593,45 @@ tr.expand-row td {
   text-transform: uppercase;
   letter-spacing: 0.3px;
   margin-bottom: 8px;
+}
+
+.expand-panel-payload {
+  margin-top: 12px;
+}
+
+.expand-panel-payload-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: @muted;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 6px;
+}
+
+.expand-panel-chart {
+  // Previously bare -- the canvas has no background of its own, so it just showed the row's
+  // gray @page-bg straight through, looking unstyled next to the white Task Payload box above
+  // it. Giving it the same card treatment ties the two together.
+  width: 100%;
+  height: 180px;
+  margin-bottom: 12px;
+  background: @surface;
+  border: 1px solid @line;
+  border-radius: 6px;
+  padding: 10px 12px;
+  box-sizing: border-box;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.expand-panel-payload pre {
+  background: #fff;
+  border: 1px solid @line;
+  border-radius: 4px;
+  padding: 10px 12px;
+  font-size: 12px;
+  max-height: 220px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
 }

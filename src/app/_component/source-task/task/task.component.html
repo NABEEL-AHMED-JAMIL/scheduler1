@@ -30,7 +30,7 @@
                         <div class="form-group">
                             <label class="control-label" for="homePageId">Home Page</label>
                             <select class="form-control" formControlName="homePageId">
-                                <option value="" selected>Select Home Page</option>
+                                <option hidden value="" disabled selected>Select Home Page</option>
                                 <option *ngFor="let piplineHomePage of piplineHomePageList" [value]="piplineHomePage.lookupId">{{piplineHomePage.lookupType}}</option>
                             </select>
                         </div>
@@ -57,7 +57,7 @@
                         <div class="form-group">
                             <label class="control-label" for="pipelineId">Pipeline TaskId</label>
                             <select class="form-control" formControlName="pipelineId">
-                                <option value="" selected>Select Pipeline Id</option>
+                                <option hidden value="" disabled selected>Select Pipeline Id</option>
                                 <option *ngFor="let pipelineId of pipelineIdList" [value]="pipelineId.lookupId">{{pipelineId.lookupType}}</option>
                             </select>
                         </div>
@@ -67,6 +67,18 @@
                             <label class="control-label" for="taskStatus">Task Status</label>
                             <select class="form-control" formControlName="taskStatus">
                                 <option *ngFor="let sourceTask of sourceTaskStatus" [value]="sourceTask.value">{{sourceTask.key}}</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div [ngClass]="isEditMode ? 'col-md-6' : 'col-md-12' ">
+                        <div class="form-group">
+                            <label class="control-label" for="groupId">Group</label>
+                            <select class="form-control" formControlName="groupId">
+                                <option hidden value="" disabled selected>Select Group</option>
+                                <option *ngFor="let taskGroup of taskGroupList" [value]="taskGroup.lookupId">{{taskGroup.lookupType}}</option>
                             </select>
                         </div>
                     </div>

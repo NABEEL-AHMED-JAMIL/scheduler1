@@ -3,7 +3,7 @@ import { first } from 'rxjs/operators';
 import { saveAs } from 'file-saver';
 import { AlertService, AiAgentService, StorageService, TextCleanerService } from '@/_services';
 import { ApiCode, BucketSummary, ObjectSummary } from '@/_models';
-import { CV_TAILOR_SUPPORTED_EXTENSIONS } from '@/_models/cv-tailor.model';
+import { CV_TAILOR_PROMPTS, CV_TAILOR_SUPPORTED_EXTENSIONS, CvTailorPromptOption } from '@/_models/cv-tailor.model';
 import { AiAgent, fileExtension } from '@/_models/ai-agent.model';
 import { extractPdfText } from '@/_helpers/pdf-text-extractor';
 
@@ -14,28 +14,6 @@ const marked: any = require('marked');
 
 const PAGE_SIZE = 100;
 
-/** Sent as the processText instructions override (see AiAgentService#processText) so this
- * works out of the box with any active agent, regardless of that agent's own saved
- * instructions -- the same "one-off prompt override" pattern the Ask AI panels use. Asks for
- * plain, simple Markdown (headings/bold/bullets only) specifically so it converts cleanly to
- * PDF later and renders well in the in-app preview. */
-const TAILOR_INSTRUCTIONS = `You are an expert resume/CV writer helping a candidate tailor their resume to a specific job description.
-Given the job description and the candidate's original resume below, rewrite the resume as a clean, well-structured Markdown document that reads like a professional resume and converts cleanly to PDF.
-
-Formatting rules:
-- Start with a level-1 heading (# Full Name) if the name is known from the original resume, otherwise omit it.
-- Use level-2 headings (## Summary, ## Experience, ## Education, ## Skills, etc.) for each section, matching the original resume's sections (add or rename a section only if clearly appropriate).
-- Use "- " bullet points for experience/skill bullet points, and **bold** for job titles, company names, and degree names where natural.
-- Do not use tables, images, or nested/complex markdown that would render awkwardly when converted to PDF -- keep it simple: headings, bold text, bullet lists, and plain paragraphs only.
-
-Content rules:
-- Emphasize relevant skills and experience already present, and use keywords and phrasing from the job description where truthfully supported by the original content.
-- Tighten bullet points for relevance; remove or shorten content that isn't relevant to this job.
-- Where the resume implies a skill or responsibility the job description cares about but never states it explicitly (for example, the candidate clearly led a project but never used the word "leadership"), add a brand-new bullet point that says so.
-- Never invent employers, job titles, dates, certifications, degrees, or skills the candidate doesn't already have some basis for in the original resume.
-
-Output ONLY the Markdown document itself -- no commentary, no surrounding code fence, no headers like "Here is the tailored resume".`;
-
 interface Breadcrumb {
     name: string;
     prefix: string;
@@ -43,11 +21,15 @@ interface Breadcrumb {
 
 /**
  * Tailors an uploaded (or bucket-picked) PDF resume to a pasted job description: an AI agent
- * rewrites the resume as Markdown (chosen so the result converts cleanly to PDF and renders
- * nicely), and every run replaces the previous result outright -- re-upload a resume or edit
- * the job description and click Tailor again for a fresh version. The result can be viewed as
- * raw Markdown or a rendered preview, downloaded as a .md file, or saved (along with the job
- * description) to a bucket.
+ * (any provider, including a local Ollama model) rewrites the resume as Markdown (chosen so the
+ * result converts cleanly to PDF and renders nicely), and every run replaces the previous result
+ * outright -- re-upload a resume or edit the job description and click Tailor again for a fresh
+ * version. Which tailoring prompt drives the rewrite is picked from CV_TAILOR_PROMPTS (General
+ * plus 4 "strong", industry-tuned prompts -- Health Care, Banking, Automobile, Telecom -- see
+ * cv-tailor.model.ts) and sent as a one-off instructions override, so it applies regardless of
+ * the selected agent's own saved instructions. The result can be viewed as raw Markdown or a
+ * rendered preview, downloaded as a .md file, or saved (along with the job description) to a
+ * bucket.
  * @author Nabeel Ahmed
  */
 @Component({
@@ -92,6 +74,12 @@ export class CvTailorComponent implements OnInit {
     public agents: AiAgent[] = [];
     public loadingAgents = false;
     public selectedAgentId: any = '';
+
+    // AI Prompt picker -- General plus 4 "strong", industry-tuned tailoring prompts (Health
+    // Care, Banking, Automobile, Telecom). Works with any active agent, including a local
+    // Ollama one, since it's just an instructions override on processText.
+    public prompts: CvTailorPromptOption[] = CV_TAILOR_PROMPTS;
+    public selectedPromptKey: string = CV_TAILOR_PROMPTS[0].key;
 
     // Tailoring result -- Markdown, plus its rendered HTML preview
     public tailoring = false;
@@ -291,6 +279,11 @@ export class CvTailorComponent implements OnInit {
 
     // --- AI Agent picker + tailoring ---
 
+    /** The full prompt option behind selectedPromptKey -- falls back to General if somehow unset. */
+    public get selectedPrompt(): CvTailorPromptOption {
+        return this.prompts.find((p) => p.key === this.selectedPromptKey) || this.prompts[0];
+    }
+
     public loadAgents(): void {
         this.loadingAgents = true;
         this.aiAgentService.fetchAllAgents()
@@ -329,7 +322,7 @@ export class CvTailorComponent implements OnInit {
         this.newCvMarkdown = '';
         this.previewHtml = '';
         let text = `Job Description:\n${this.jobDescription.trim()}\n\n---\n\nOriginal Resume:\n${this.originalCvText}`;
-        this.aiAgentService.processText(this.selectedAgentId, this.cvSourceLabel, text, TAILOR_INSTRUCTIONS)
+        this.aiAgentService.processText(this.selectedAgentId, this.cvSourceLabel, text, this.selectedPrompt.instructions)
             .pipe(first())
             .subscribe((response) => {
                 this.tailoring = false;

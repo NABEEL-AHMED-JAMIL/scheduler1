@@ -84,7 +84,7 @@ export class CUDynamicFormComponent implements OnInit {
             .pipe(first())
             .subscribe((response) => {
                 this.spinnerService.hide();
-                if (response.status === ApiCode.ERROR) {
+                if (response.status !== ApiCode.SUCCESS) {
                     this.alertService.showError(response.message, this.ERROR);
                     return;
                 }
@@ -121,7 +121,7 @@ export class CUDynamicFormComponent implements OnInit {
                     this.loading = false;
                     this.submitted = false;
                     this.spinnerService.hide();
-                    if (response.status === ApiCode.ERROR) {
+                    if (response.status !== ApiCode.SUCCESS) {
                         this.alertService.showError(response.message, this.ERROR);
                         return;
                     }
@@ -141,7 +141,7 @@ export class CUDynamicFormComponent implements OnInit {
                     this.loading = false;
                     this.submitted = false;
                     this.spinnerService.hide();
-                    if (response.status === ApiCode.ERROR) {
+                    if (response.status !== ApiCode.SUCCESS) {
                         this.alertService.showError(response.message, this.ERROR);
                         return;
                     }
@@ -268,7 +268,7 @@ export class CUDynamicFormComponent implements OnInit {
                 .pipe(first())
                 .subscribe((response) => {
                     this.spinnerService.hide();
-                    if (response.status === ApiCode.ERROR) {
+                    if (response.status !== ApiCode.SUCCESS) {
                         this.alertService.showError(response.message, this.ERROR);
                         return;
                     }
@@ -286,7 +286,7 @@ export class CUDynamicFormComponent implements OnInit {
                 .pipe(first())
                 .subscribe((response) => {
                     this.spinnerService.hide();
-                    if (response.status === ApiCode.ERROR) {
+                    if (response.status !== ApiCode.SUCCESS) {
                         this.alertService.showError(response.message, this.ERROR);
                         return;
                     }
@@ -314,7 +314,7 @@ export class CUDynamicFormComponent implements OnInit {
             .pipe(first())
             .subscribe((response) => {
                 this.spinnerService.hide();
-                if (response.status === ApiCode.ERROR) {
+                if (response.status !== ApiCode.SUCCESS) {
                     this.alertService.showError(response.message, this.ERROR);
                     return;
                 }

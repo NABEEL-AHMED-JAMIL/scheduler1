@@ -2,9 +2,11 @@
 <nav class="breadcrumb-bar">
     <a routerLink="/home">Home</a>
     <span class="crumb-sep">/</span>
-    <a routerLink="/jobList">Job List</a>
-    <span class="crumb-sep">/</span>
-    <a [href]="" (click)="backClicked()">Job History</a>
+    <ng-container *ngIf="backParent">
+        <a [routerLink]="backParent.commands">{{ backParent.label }}</a>
+        <span class="crumb-sep">/</span>
+    </ng-container>
+    <a [href]="" (click)="backClicked()">{{ backLabel }}</a>
     <span class="crumb-sep">/</span>
     <span class="crumb-current">Job Logs</span>
 </nav>
@@ -15,6 +17,10 @@
             <h4 class="card-panel-title panel-banner has-action">
                 <span>Job &amp; Queue Detail</span>
                 <span style="display: flex; align-items: center; gap: 8px;">
+                    <span class="pill pill-success pill-icon" *ngIf="autoRefreshActive"
+                        title="Run is still in flight -- logs refresh automatically every few seconds until it finishes">
+                        <span class="glyphicon glyphicon-refresh spin"></span> Live
+                    </span>
                     <button type="button" class="banner-link" [disabled]="refreshing" (click)="refresh()" title="Reload job/queue detail and logs">
                         <span class="glyphicon glyphicon-refresh" [ngClass]="{'spin': refreshing}"></span> {{ refreshing ? 'Refreshing...' : 'Refresh' }}
                     </button>
@@ -112,7 +118,15 @@
             <button type="button" class="btn" [ngClass]="viewMode === 'table' ? 'btn-teal' : 'btn-default'" (click)="setViewMode('table')">
                 <span class="glyphicon glyphicon-th-list"></span> Table
             </button>
+            <button type="button" class="btn" [ngClass]="viewMode === 'console' ? 'btn-teal' : 'btn-default'" (click)="setViewMode('console')">
+                <span class="glyphicon glyphicon-list"></span> Console
+            </button>
         </div>
+    </div>
+
+    <!-- Log timing chart -- seconds between consecutive log lines, so a stalled step pops out -->
+    <div class="log-gap-chart" *ngIf="logGapChartOptions"
+        echarts [options]="logGapChartOptions">
     </div>
 
     <!-- Timeline view -->
@@ -140,7 +154,6 @@
                     <th style="width: 1px;">No#</th>
                     <th style="width: 160px;">Date</th>
                     <th>Message</th>
-                    <th class="text-center" style="width: 70px;">Action</th>
                 </tr>
             </thead>
             <tbody>
@@ -148,35 +161,19 @@
                     <td>{{i+1}}</td>
                     <td style="white-space: nowrap;">{{audit?.dateCreated | date:'yyyy-MM-dd HH:mm:ss'}}</td>
                     <td><div class="cell-message cell-message-wide" [innerHTML]="audit.logsDetail"></div></td>
-                    <td class="text-center">
-                        <div class="btn-group btn-group-sm" role="group">
-                            <button type="button" class="btn btn-default btn-icon ic-view"
-                                data-toggle="modal" data-target="#logMessageModal"
-                                (click)="showLogDetail(audit)" title="View Message">
-                                <span class="glyphicon glyphicon-eye-open"></span>
-                            </button>
-                        </div>
-                    </td>
                 </tr>
             </tbody>
         </table>
     </div>
-</div>
 
-<!-- Message modal -->
-<div class="modal fade" id="logMessageModal" role="dialog">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <button type="button" class="close" data-dismiss="modal">&times;</button>
-                <h4 class="modal-title">Message</h4>
-            </div>
-            <div class="modal-body">
-                <div class="code-box" style="max-height: 420px;" [innerHTML]="selectedLog"></div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-            </div>
+    <!-- Console view -- raw terminal-style readout, oldest first, no markup -->
+    <div class="log-console" *ngIf="viewMode === 'console'">
+        <div class="log-console-line" *ngFor="let audit of auditLogs | searchFilter: searchAuditLogsForm">
+            <span class="log-console-time">[{{audit?.dateCreated | date:'yyyy-MM-dd HH:mm:ss'}}]</span>
+            <span class="log-console-text">{{plainLogText(audit.logsDetail)}}</span>
+        </div>
+        <div class="help-text" *ngIf="!(auditLogs | searchFilter: searchAuditLogsForm).length">
+            <span class="glyphicon glyphicon-info-sign"></span> No logs match your search.
         </div>
     </div>
 </div>

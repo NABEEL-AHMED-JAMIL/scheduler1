@@ -1,0 +1,214 @@
+<!-- breadcrumb -->
+<nav class="breadcrumb-bar">
+    <a routerLink="/home">Home</a>
+    <span class="crumb-sep">/</span>
+    <span class="crumb-current">Users</span>
+</nav>
+
+<div class="toolbar">
+    <div class="form-group" style="margin-bottom: 0;">
+        <label for="searchUsers" class="control-label">Total Users ({{filteredUsers.length}} / {{users.length}})</label>
+        <input type="text" id="searchUsers" class="form-control" style="width: 220px;"
+            placeholder="Search" [(ngModel)]="search"/>
+    </div>
+    <div class="form-group" style="margin-bottom: 0;" *ngIf="isPlatformAdmin">
+        <label for="filterTenant" class="control-label">Tenant</label>
+        <select id="filterTenant" class="form-control input-sm" style="width: 180px;" [(ngModel)]="filterTenantId">
+            <option value="">All Tenants</option>
+            <option *ngFor="let tenant of tenants" [value]="tenant.tenantId">{{tenant.tenantName}}</option>
+        </select>
+    </div>
+    <div class="form-group" style="margin-bottom: 0;">
+        <label for="filterRole" class="control-label">Role</label>
+        <select id="filterRole" class="form-control input-sm" style="width: 160px;" [(ngModel)]="filterRole">
+            <option value="">All Roles</option>
+            <option *ngFor="let role of roleOptions" [value]="role">{{role}}</option>
+        </select>
+    </div>
+    <div class="form-group" style="margin-bottom: 0;">
+        <label for="filterStatus" class="control-label">Status</label>
+        <select id="filterStatus" class="form-control input-sm" style="width: 140px;" [(ngModel)]="filterStatus">
+            <option value="">All Statuses</option>
+            <option *ngFor="let status of statusOptions" [value]="status">{{status}}</option>
+        </select>
+    </div>
+    <button type="button" class="btn btn-sm btn-default" [disabled]="!hasActiveFilters" (click)="clearFilters()" title="Clear all filters">
+        <span class="glyphicon glyphicon-remove"></span> Clear
+    </button>
+    <span class="toolbar-spacer"></span>
+    <button type="button" class="btn btn-sm btn-default" (click)="listUsers()">
+        <span class="glyphicon glyphicon-refresh"></span> Refresh
+    </button>
+    <button type="button" class="btn btn-sm btn-teal" data-toggle="modal" data-target="#userModal" (click)="addUser()">
+        <span class="glyphicon glyphicon-plus"></span> Add User
+    </button>
+</div>
+<span class="help-text" style="margin-bottom: 10px;">
+    <span class="glyphicon glyphicon-info-sign"></span>
+    <span *ngIf="isPlatformAdmin">As Platform Admin you can see and manage users across every tenant.</span>
+    <span *ngIf="!isPlatformAdmin">You can see and manage users within your own tenant.</span>
+</span>
+
+<div class="table-responsive scroll-table">
+    <table class="table table-striped table-bordered table-hover table-modern" style="font-size: 12px;">
+        <thead>
+            <tr>
+                <th>Full Name</th>
+                <th>Username</th>
+                <th *ngIf="isPlatformAdmin">Tenant</th>
+                <th class="text-center">Role</th>
+                <th class="text-center">Status</th>
+                <th>Last Login</th>
+                <th class="text-center">Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr *ngFor="let user of filteredUsers | searchFilter: search">
+                <td>{{user.fullName}}</td>
+                <td>{{user.username}}</td>
+                <td *ngIf="isPlatformAdmin">
+                    {{user.tenantName || '-'}}
+                    <span *ngIf="user.tenantActive === false" class="pill pill-danger"
+                        title="This user's tenant has been deleted -- they can no longer log in, even though their own account status below still says Active.">Tenant deleted</span>
+                </td>
+                <td class="text-center">
+                    <span class="pill" [ngClass]="{
+                        'pill-purple': user.userRole === 'PLATFORM_ADMIN',
+                        'pill-indigo': user.userRole === 'TENANT_ADMIN',
+                        'pill-cyan': user.userRole === 'TENANT_USER'
+                    }">{{user.userRole}}</span>
+                </td>
+                <td class="text-center">
+                    <span class="pill" [ngClass]="{
+                        'pill-success': user.status === 'Active',
+                        'pill-warning': user.status === 'Inactive',
+                        'pill-danger': user.status === 'Delete'
+                    }" [title]="user.tenantActive === false
+                        ? 'Account status is Active, but this user cannot log in because their tenant has been deleted.'
+                        : ''">{{user.status}}</span>
+                </td>
+                <td>{{user.lastLoginAt ? (user.lastLoginAt | date:'yyyy-MM-dd HH:mm') : 'Never'}}</td>
+                <td class="text-center">
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button type="button" class="btn btn-default btn-icon ic-edit" data-toggle="modal" data-target="#userModal"
+                            (click)="editUser(user)" title="Edit">
+                            <span class="glyphicon glyphicon-edit"></span>
+                        </button>
+                        <button type="button" class="btn btn-default btn-icon" data-toggle="modal" data-target="#resetPasswordModal"
+                            (click)="openResetPassword(user)" title="Reset Password">
+                            <span class="glyphicon glyphicon-lock"></span>
+                        </button>
+                        <button type="button" class="btn btn-default btn-icon" (click)="toggleActive(user)"
+                            [title]="user.status === 'Active' ? 'Deactivate' : 'Activate'">
+                            <span class="glyphicon" [ngClass]="user.status === 'Active' ? 'glyphicon-pause' : 'glyphicon-play'"></span>
+                        </button>
+                        <button type="button" class="btn btn-default btn-icon ic-delete" data-toggle="modal" data-target="#deleteUserModal"
+                            [disabled]="user.status === 'Delete'" (click)="confirmDeleteUser(user)" title="Delete">
+                            <span class="glyphicon glyphicon-trash"></span>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+            <tr *ngIf="!(filteredUsers | searchFilter: search).length">
+                <td [attr.colspan]="isPlatformAdmin ? 7 : 6" class="text-center help-text">
+                    <span class="glyphicon glyphicon-info-sign"></span> No users match your search.
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- Add/Edit User Modal -->
+<div class="modal fade" id="userModal" role="dialog">
+    <div class="modal-dialog">
+        <div class="modal-content" style="border: none">
+            <form *ngIf="userForm" [formGroup]="userForm" (ngSubmit)="submitUser()">
+                <div class="modal-header">
+                    <button type="button" class="close" #closeUserModal data-dismiss="modal">&times;</button>
+                    <h4 class="modal-title">{{isEditMode ? 'Edit User' : 'New User'}}</h4>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="fullName">Full Name</label>
+                        <input type="text" formControlName="fullName" class="form-control input-sm"
+                            [ngClass]="{ 'is-invalid': submitted && f.fullName.errors }" />
+                        <div *ngIf="submitted && f.fullName.errors" style="color: red;">Full name is required</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="username">Username (email)</label>
+                        <input type="text" formControlName="username" class="form-control input-sm"
+                            [ngClass]="{ 'is-invalid': submitted && f.username.errors }" />
+                        <div *ngIf="submitted && f.username.errors" style="color: red;">A valid email is required</div>
+                    </div>
+                    <div class="form-group" *ngIf="!isEditMode">
+                        <label for="password">Password</label>
+                        <input type="password" formControlName="password" class="form-control input-sm"
+                            [ngClass]="{ 'is-invalid': submitted && f.password.errors }" />
+                        <div *ngIf="submitted && f.password.errors" style="color: red;">At least 8 characters</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="userRole">Role</label>
+                        <select class="form-control input-sm" formControlName="userRole">
+                            <option *ngFor="let role of roleOptions" [value]="role"
+                                [disabled]="role === 'PLATFORM_ADMIN' && !isPlatformAdmin">{{role}}</option>
+                        </select>
+                    </div>
+                    <div class="form-group" *ngIf="isPlatformAdmin && f.userRole.value !== 'PLATFORM_ADMIN'">
+                        <label for="tenantId">Tenant</label>
+                        <select class="form-control input-sm" formControlName="tenantId">
+                            <option value="">Select a tenant</option>
+                            <option *ngFor="let tenant of tenants" [value]="tenant.tenantId">{{tenant.tenantName}}</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-teal">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Reset Password Modal -->
+<div class="modal fade" id="resetPasswordModal" role="dialog">
+    <div class="modal-dialog">
+        <div class="modal-content" style="border: none">
+            <form *ngIf="resetPasswordForm" [formGroup]="resetPasswordForm" (ngSubmit)="submitResetPassword()">
+                <div class="modal-header">
+                    <button type="button" class="close" #closeResetPasswordModal data-dismiss="modal">&times;</button>
+                    <h4 class="modal-title">Reset Password -- {{resetPasswordTarget?.username}}</h4>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="newPassword">New Password</label>
+                        <input type="password" formControlName="password" class="form-control input-sm" />
+                        <small class="form-text text-muted">At least 8 characters. The user isn't notified automatically -- share the new password with them yourself.</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-teal">Reset Password</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirm Modal -->
+<div class="modal fade" id="deleteUserModal" role="dialog">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" #closeDeleteModal class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title">Delete User</h4>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete "{{deleteUser?.fullName}}"? They will no longer be able to log in.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger" (click)="processDeleteUser()">Yes, Delete</button>
+            </div>
+        </div>
+    </div>
+</div>

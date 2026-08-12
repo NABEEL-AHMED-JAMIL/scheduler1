@@ -14,7 +14,21 @@
             class="form-control"
             style="width: 280px;"
             placeholder="Search"
-            [(ngModel)]="searchSourceTaskDetails"/>
+            [ngModel]="searchSourceTaskDetails"
+            (ngModelChange)="onSearchChange($event)"/>
+    </div>
+
+    <!-- Status filter -->
+    <div class="form-group" style="margin-bottom: 0; margin-left: 10px;">
+        <label for="statusFilter" class="control-label">Status</label>
+        <select id="statusFilter"
+            class="form-control"
+            style="width: 140px;"
+            [ngModel]="statusFilter"
+            (ngModelChange)="onStatusFilterChange($event)">
+            <option value="All">All</option>
+            <option *ngFor="let status of statusFilterOptions" [value]="status.value">{{status.value}}</option>
+        </select>
     </div>
 
     <span class="toolbar-spacer"></span>
@@ -41,34 +55,40 @@
 
 <!-- Tasks Card grid -->
 <div class="entity-card-grid" *ngIf="viewMode === 'card'">
-    <div class="entity-card" [ngClass]="'entity-card-accent-' + (sourceTask.taskStatus | lowercase)" *ngFor="let sourceTask of sourceTasks | searchFilter: searchSourceTaskDetails; let i = index;">
+    <div class="entity-card" [ngClass]="'entity-card-accent-' + (sourceTask.taskStatus | lowercase)" *ngFor="let sourceTask of pagedSourceTasks; let i = index; trackBy: trackByTaskDetailId">
         <div class="entity-card-header">
             <div class="entity-card-header-main">
                 <div class="entity-card-icon"><span class="glyphicon glyphicon-tasks"></span></div>
                 <div>
                     <div class="entity-card-title">{{sourceTask.taskDetailId}} - {{sourceTask.taskName}}</div>
-                    <div class="entity-card-subtitle" *ngIf="sourceTask.sourceTaskType">
-                        Type: <a (click)="viewSourceTaskType(sourceTask.sourceTaskType)" data-toggle="modal" data-target="#sourceTaskTaype">{{sourceTask.sourceTaskType.sourceTaskTypeId}}</a>
-                        [{{sourceTask.sourceTaskType.serviceName}}] [{{sourceTask.sourceTaskType.queueTopicPartition}}]
-                    </div>
                 </div>
             </div>
         </div>
-        <div class="entity-card-pills">
-            <span class="pill" [ngClass]="{
-                'pill-danger': sourceTask.taskStatus === 'Delete',
-                'pill-warning': sourceTask.taskStatus === 'Inactive',
-                'pill-success': sourceTask.taskStatus === 'Active'
-            }">{{sourceTask.taskStatus}}</span>
+        <!-- Status pill dropped here (border already encodes it) -- this row now carries the
+             Topic and Pipeline tags instead, colored + iconified so they read as distinct,
+             at-a-glance data rather than blending into plain card text. -->
+        <div class="entity-card-pills" *ngIf="sourceTask.sourceTaskType || sourceTask.pipelineId || sourceTask.groupId">
+            <a class="pill pill-cyan pill-icon" *ngIf="sourceTask.sourceTaskType"
+                (click)="viewSourceTaskType(sourceTask.sourceTaskType)" data-toggle="modal" data-target="#sourceTaskTaype"
+                title="Type {{sourceTask.sourceTaskType.sourceTaskTypeId}} -- {{sourceTask.sourceTaskType.queueTopicPartition}}">
+                <span class="glyphicon glyphicon-transfer"></span> {{sourceTask.sourceTaskType.serviceName}}
+            </a>
+            <span class="pill pill-purple pill-icon" *ngIf="sourceTask.pipelineId">
+                <span class="glyphicon glyphicon-random"></span> {{sourceTask.pipelineId}}
+            </span>
+            <!-- groupId is the TASK_GROUPS lookup's label (same "child lookupType read at
+                 listSourceTaskQuery time" convention as homePageId/pipelineId), not a URL. -->
+            <span class="pill pill-indigo pill-icon" *ngIf="sourceTask.groupId">
+                <span class="glyphicon glyphicon-folder-open"></span> {{sourceTask.groupId}}
+            </span>
         </div>
         <div class="entity-card-stats">
             <div class="entity-card-stat" *ngIf="sourceTask.homePageId">
-                <span class="glyphicon glyphicon-home"></span>
-                <span class="entity-card-stat-label">Home Page</span> {{sourceTask.homePageId}}
-            </div>
-            <div class="entity-card-stat" *ngIf="sourceTask.pipelineId">
-                <span class="glyphicon glyphicon-random"></span>
-                <span class="entity-card-stat-label">Pipeline</span> {{sourceTask.pipelineId}}
+                <span class="entity-card-stat-label">Home Page</span>
+                <!-- homePageId is the lookup's TYPE (a name), not a URL -- see table view's note. -->
+                <span class="pill pill-warning pill-icon">
+                    <span class="glyphicon glyphicon-home"></span> {{sourceTask.homePageId}}
+                </span>
             </div>
             <div class="entity-card-stat">
                 <span class="glyphicon glyphicon-link"></span>
@@ -103,8 +123,8 @@
             </div>
         </div>
     </div>
-    <div class="help-text" *ngIf="!(sourceTasks | searchFilter: searchSourceTaskDetails).length">
-        <span class="glyphicon glyphicon-info-sign"></span> No tasks match your search.
+    <div class="help-text" *ngIf="!filteredSourceTasks.length">
+        <span class="glyphicon glyphicon-info-sign"></span> No tasks match your search/filter.
     </div>
 </div>
 
@@ -113,31 +133,55 @@
     <table class="table table-bordered table-hover table-modern">
         <thead>
             <tr>
+                <th style="width: 30px;"></th>
                 <th># No</th>
                 <th>Task Name</th>
                 <th>Source Type</th>
                 <th>HomePage</th>
                 <th>PipelineId</th>
+                <th>Group</th>
                 <th>Link Jobs</th>
                 <th>Status</th>
                 <th class="text-center">Action</th>
             </tr>
         </thead>
         <tbody>
-            <tr *ngFor="let sourceTask of sourceTasks | searchFilter: searchSourceTaskDetails; let i = index;">
+            <ng-container *ngFor="let sourceTask of pagedSourceTasks; let i = index; trackBy: trackByTaskDetailId">
+            <tr>
+                <td class="text-center">
+                    <button type="button" class="btn-expand-row"
+                        (click)="toggleExpandTask(sourceTask.taskDetailId)"
+                        [title]="expandedTaskId === sourceTask.taskDetailId ? 'Collapse' : 'Expand -- view payload and linked jobs'">
+                        <span class="glyphicon" [ngClass]="expandedTaskId === sourceTask.taskDetailId ? 'glyphicon-chevron-down' : 'glyphicon-chevron-right'"></span>
+                    </button>
+                </td>
                 <td>{{sourceTask.taskDetailId}}</td>
                 <td>{{sourceTask.taskName}}</td>
                 <td>
-                    <span *ngIf="sourceTask.sourceTaskType">
-                        <a (click)="viewSourceTaskType(sourceTask.sourceTaskType)"
-                            data-toggle="modal" data-target="#sourceTaskTaype">
-                            {{sourceTask.sourceTaskType.sourceTaskTypeId}}
-                        </a>
-                        <span>[{{sourceTask.sourceTaskType.serviceName}}] [{{sourceTask.sourceTaskType.queueTopicPartition}}]</span>
+                    <a class="pill pill-cyan pill-icon" *ngIf="sourceTask.sourceTaskType"
+                        (click)="viewSourceTaskType(sourceTask.sourceTaskType)" data-toggle="modal" data-target="#sourceTaskTaype"
+                        title="Type {{sourceTask.sourceTaskType.sourceTaskTypeId}} -- {{sourceTask.sourceTaskType.queueTopicPartition}}">
+                        <span class="glyphicon glyphicon-transfer"></span> {{sourceTask.sourceTaskType.serviceName}}
+                    </a>
+                </td>
+                <td>
+                    <!-- homePageId is the lookup's TYPE (a name, e.g. "F768922 Seal Home") --
+                         not a URL, so this is a label, not a link (the actual URL lives in that
+                         lookup's value, never sent to this screen). -->
+                    <span class="pill pill-warning pill-icon" *ngIf="sourceTask.homePageId">
+                        <span class="glyphicon glyphicon-home"></span> {{sourceTask.homePageId}}
                     </span>
                 </td>
-                <td>{{sourceTask.homePageId}}</td>
-                <td>{{sourceTask.pipelineId}}</td>
+                <td>
+                    <span class="pill pill-purple pill-icon" *ngIf="sourceTask.pipelineId">
+                        <span class="glyphicon glyphicon-random"></span> {{sourceTask.pipelineId}}
+                    </span>
+                </td>
+                <td>
+                    <span class="pill pill-indigo pill-icon" *ngIf="sourceTask.groupId">
+                        <span class="glyphicon glyphicon-folder-open"></span> {{sourceTask.groupId}}
+                    </span>
+                </td>
                 <td class="text-center">
                     <span>{{sourceTask.totalLinksJobs}}</span>
                 </td>
@@ -179,8 +223,124 @@
                     </div>
                 </td>
             </tr>
+            <tr class="expand-row" *ngIf="expandedTaskId === sourceTask.taskDetailId">
+                <td colspan="10">
+                    <div class="expand-panel">
+                        <div class="expand-panel-section">
+                            <div class="expand-panel-heading">Task Detail</div>
+                            <div class="entity-card-stats" style="border-top: none; margin-top: 0; padding-top: 0;">
+                                <div class="entity-card-stat" *ngIf="sourceTask?.sourceTaskType">
+                                    <span class="entity-card-stat-label">Type</span>
+                                    <span class="pill pill-cyan pill-icon">
+                                        <span class="glyphicon glyphicon-tag"></span>
+                                        {{sourceTask?.sourceTaskType?.sourceTaskTypeId}} [{{sourceTask?.sourceTaskType?.serviceName}}]
+                                    </span>
+                                </div>
+                                <div class="entity-card-stat" *ngIf="sourceTask?.sourceTaskType?.queueTopicPartition">
+                                    <span class="entity-card-stat-label">Queue/Topic</span>
+                                    <span class="pill pill-info pill-icon">
+                                        <span class="glyphicon glyphicon-transfer"></span>
+                                        {{sourceTask?.sourceTaskType?.queueTopicPartition}}
+                                    </span>
+                                </div>
+                                <div class="entity-card-stat" *ngIf="sourceTask?.pipelineId">
+                                    <span class="entity-card-stat-label">Pipeline</span>
+                                    <span class="pill pill-purple pill-icon">
+                                        <span class="glyphicon glyphicon-random"></span>
+                                        {{sourceTask?.pipelineId}}
+                                    </span>
+                                </div>
+                                <div class="entity-card-stat" *ngIf="sourceTask?.homePageId">
+                                    <span class="entity-card-stat-label">Home Page</span>
+                                    <span class="pill pill-warning pill-icon">
+                                        <span class="glyphicon glyphicon-home"></span> {{sourceTask?.homePageId}}
+                                    </span>
+                                </div>
+                                <div class="entity-card-stat" *ngIf="sourceTask?.groupId">
+                                    <span class="entity-card-stat-label">Group</span>
+                                    <span class="pill pill-indigo pill-icon">
+                                        <span class="glyphicon glyphicon-folder-open"></span> {{sourceTask?.groupId}}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="expand-panel-payload" *ngIf="sourceTask?.taskPayload">
+                                <div class="expand-panel-payload-label">
+                                    <span class="glyphicon glyphicon-list-alt"></span> Task Payload
+                                </div>
+                                <pre>{{sourceTask.taskPayload}}</pre>
+                            </div>
+                        </div>
+                        <div class="expand-panel-section">
+                            <div class="expand-panel-heading">Linked Jobs ({{sourceTask.totalLinksJobs || 0}})</div>
+                            <div class="help-text" *ngIf="expandedTaskJobsLoading">
+                                <span class="glyphicon glyphicon-refresh spin"></span> Loading linked jobs...
+                            </div>
+                            <div class="help-text" *ngIf="!expandedTaskJobsLoading && expandedTaskJobs.length === 0">
+                                <span class="glyphicon glyphicon-info-sign"></span> No jobs linked to this task yet.
+                            </div>
+                            <table class="table table-bordered table-hover table-modern" *ngIf="!expandedTaskJobsLoading && expandedTaskJobs.length">
+                                <thead>
+                                    <tr>
+                                        <th>Job Name</th>
+                                        <th>Execution</th>
+                                        <th>Status</th>
+                                        <th>R-Status</th>
+                                        <th>Last Run</th>
+                                        <th>Created Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr *ngFor="let linkedJob of expandedTaskJobs">
+                                        <td><a routerLink="/editJob/{{linkedJob.jobId}}">{{linkedJob.jobId}}-{{linkedJob.jobName}}</a></td>
+                                        <td class="text-center">
+                                            <span class="pill" [ngClass]="linkedJob.execution == 'Manual' ? 'pill-success' : 'pill-warning'">
+                                                {{linkedJob.execution}}
+                                            </span>
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="pill"
+                                                [ngClass]="{
+                                                    'pill-danger': linkedJob.jobStatus === 'Delete',
+                                                    'pill-warning': linkedJob.jobStatus === 'Inactive',
+                                                    'pill-success': linkedJob.jobStatus === 'Active'
+                                                }">
+                                                {{linkedJob.jobStatus}}
+                                            </span>
+                                        </td>
+                                        <td class="text-center">
+                                            <span *ngIf="linkedJob.jobRunningStatus" class="pill" [ngClass]="'status-' + linkedJob.jobRunningStatus">
+                                                {{linkedJob.jobRunningStatus}}
+                                            </span>
+                                        </td>
+                                        <td class="text-center">{{linkedJob.lastJobRun | date:'yyyy-MM-dd HH:mm:ss'}}</td>
+                                        <td class="text-center">{{linkedJob.dateCreated | date:'yyyy-MM-dd HH:mm:ss'}}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+            </ng-container>
         </tbody>
     </table>
+</div>
+
+<!-- Pagination -->
+<div class="list-pagination" *ngIf="filteredSourceTasks.length">
+    <button type="button" class="btn btn-sm btn-default" [disabled]="currentPage === 1" (click)="goToPage(currentPage - 1)">
+        <span class="glyphicon glyphicon-chevron-left"></span> Prev
+    </button>
+    <span class="list-pagination-info">Page {{currentPage}} of {{totalPages}}</span>
+    <button type="button" class="btn btn-sm btn-default" [disabled]="currentPage === totalPages" (click)="goToPage(currentPage + 1)">
+        Next <span class="glyphicon glyphicon-chevron-right"></span>
+    </button>
+    <label class="list-pagination-size">
+        Per page
+        <select class="form-control" [ngModel]="pageSize" (ngModelChange)="onPageSizeChange($event)">
+            <option *ngFor="let size of pageSizeOptions" [value]="size">{{size}}</option>
+        </select>
+    </label>
 </div>
 
 <div class="view-side-form">

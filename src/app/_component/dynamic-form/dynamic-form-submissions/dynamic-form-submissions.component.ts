@@ -54,7 +54,7 @@ export class DynamicFormSubmissionsComponent implements OnInit {
             .pipe(first())
             .subscribe((response) => {
                 this.spinnerService.hide();
-                if (response.status === ApiCode.ERROR) {
+                if (response.status !== ApiCode.SUCCESS) {
                     this.alertService.showError(response.message, this.ERROR);
                     return;
                 }
@@ -131,12 +131,19 @@ export class DynamicFormSubmissionsComponent implements OnInit {
             .pipe(first())
             .subscribe((response) => {
                 this.spinnerService.hide();
-                if (response.status === ApiCode.ERROR) {
+                if (response.status !== ApiCode.SUCCESS) {
                     this.alertService.showError(response.message, this.ERROR);
                     return;
                 }
                 this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
-                this.submissions.splice(this.deleteSubmissionIndex, 1);
+                // look up by id, not the stale searchFilter-view index -- deleteSubmissionIndex
+                // is captured from the *ngFor over the filtered view, so it doesn't line up
+                // with this.submissions itself whenever a search term is active
+                const realIndex = this.submissions.findIndex(
+                    (submission: any) => submission.dynamicFormSubmissionId === this.deleteSubmissionId);
+                if (realIndex > -1) {
+                    this.submissions.splice(realIndex, 1);
+                }
                 this.closeDeleteSubmissionModal.nativeElement.click();
                 this.deleteSubmissionId = null;
                 this.deleteSubmissionIndex = null;

@@ -1,16 +1,26 @@
-﻿import { Component, OnInit } from '@angular/core';
+﻿import { Component, OnInit, OnDestroy } from '@angular/core';
 import { ApiCode, NameValue } from '../../_models/index';
 import { Router } from '@angular/router';
 import { EChartOption } from 'echarts';
 import { first } from 'rxjs/operators';
 import { SpinnerService } from '@/_helpers';
-import { Subscription } from 'rxjs';
 import { DatePipe } from '@angular/common'
 import {
   AlertService,
   HomeService
 } from '@/_services';
 
+// Same status palette as the .status-* pill classes (app.less) and the Job List/Job Logs
+// charts, so a job's breakdown reads consistently everywhere counts by status show up.
+const BREAKDOWN_COLOR: { [status: string]: string } = {
+  Queue: '#0c7c8c',
+  Start: '#283593',
+  Running: '#b5730a',
+  Failed: '#c0392b',
+  Completed: '#1d7a3f',
+  Skip: '#566573',
+  Interrupt: '#6a3bbf'
+};
 
 /**
  * @author Nabeel Ahmed
@@ -20,9 +30,16 @@ import {
   templateUrl: 'home.component.html',
   providers: [DatePipe]
 })
-export class HomeComponent implements OnInit {
+export class HomeComponent implements OnInit, OnDestroy {
 
   private readonly chicagoTimeZone = 'America/Chicago';
+  // Real-time refresh -- re-pulls every chart/stat off the currently selected date range every
+  // minute so the dashboard doesn't go stale while it's left open. Silent (autoRefreshDashboard)
+  // so it doesn't blank the page with the full spinner or reset whatever the user's doing (a
+  // search in the Job Breakdown table, a drilled-down heatmap cell) every 60 seconds -- only the
+  // manual Apply/Reset/toolbox-refresh paths still show the spinner.
+  private static readonly AUTO_REFRESH_INTERVAL_MS = 60000;
+  private autoRefreshTimer: any = null;
 
   public ERROR = 'Error';
   // search detail
@@ -68,7 +85,6 @@ export class HomeComponent implements OnInit {
   // data pattern -> day|hr|total count
   private heatMapData: any = [[0, 0, '-']];
 
-  public subscription!: Subscription;
   public sourceJobStatusStatistics!: EChartOption;
   public sourceJobRunningStatistics!: EChartOption;
   public sourceJobWeeklyRunningStatistics!: EChartOption;
@@ -93,6 +109,15 @@ export class HomeComponent implements OnInit {
     this.filterStartDate = this.last_7th_date;
     this.filterEndDate = this.today_date;
     this.loadDashboard();
+    this.autoRefreshTimer = setInterval(
+      () => this.autoRefreshDashboard(), HomeComponent.AUTO_REFRESH_INTERVAL_MS);
+  }
+
+  ngOnDestroy(): void {
+    if (this.autoRefreshTimer) {
+      clearInterval(this.autoRefreshTimer);
+      this.autoRefreshTimer = null;
+    }
   }
 
   /** Whether the filter has been moved away from the default last-7-days window. */
@@ -125,6 +150,17 @@ export class HomeComponent implements OnInit {
     this.jobRunningStatistics();
     this.weeklyRunningJobStatistics();
     this.weeklyHrsRunningJobStatistics();
+  }
+
+  /** The 1-minute auto-refresh tick -- same four fetches as loadDashboard, but silent (no
+   * spinner) and without touching searchSourceJobDetails/sourceJobWeeklyRunningStatisticsDimensionData,
+   * so it can't interrupt a search the user's mid-typing or collapse a heatmap drill-down
+   * they've got open. */
+  private autoRefreshDashboard(): void {
+    this.jobStatusStatistics(true);
+    this.jobRunningStatistics(true);
+    this.weeklyRunningJobStatistics(true);
+    this.weeklyHrsRunningJobStatistics(true);
   }
 
   // --- Stat tiles (derived from the same jobStatusData/jobRunningData the pie charts already use) ---
@@ -171,22 +207,33 @@ export class HomeComponent implements OnInit {
     };
   }
 
-  public jobStatusStatistics(): void {
-    this.spinnerService.show();
+  public jobStatusStatistics(silent = false): void {
+    if (!silent) {
+      this.spinnerService.show();
+    }
     this.homeService.jobStatusStatistics(this.filterStartDate, this.filterEndDate)
       .pipe(first())
       .subscribe((response) => {
         if (response.status === ApiCode.SUCCESS) {
-          this.spinnerService.hide();
+          if (!silent) {
+            this.spinnerService.hide();
+          }
           this.jobStatusData = response.data;
           this.drawJobStatusStatistics(this.jobStatusData);
         } else {
           this.drawJobStatusStatistics(this.jobStatusData);
-          this.spinnerService.hide();
+          if (!silent) {
+            this.spinnerService.hide();
+          }
         }
       }, (error) => {
-        this.alertService.showError(error, this.ERROR);
-        this.spinnerService.hide();
+        // Auto-refresh failures stay quiet -- an error toast every minute in the background
+        // (transient network blip, backend restart) would be far more disruptive than just
+        // trying again on the next tick with whatever data is already on screen.
+        if (!silent) {
+          this.alertService.showError(error, this.ERROR);
+          this.spinnerService.hide();
+        }
       });
   }
 
@@ -254,22 +301,30 @@ export class HomeComponent implements OnInit {
     }
   }
 
-  public jobRunningStatistics(): void {
-    this.spinnerService.show();
+  public jobRunningStatistics(silent = false): void {
+    if (!silent) {
+      this.spinnerService.show();
+    }
     this.homeService.jobRunningStatistics(this.filterStartDate, this.filterEndDate)
       .pipe(first())
       .subscribe((response) => {
         if (response.status === ApiCode.SUCCESS) {
-          this.spinnerService.hide();
+          if (!silent) {
+            this.spinnerService.hide();
+          }
           this.jobRunningData = response.data;
           this.drawJobRunningStatistics(this.jobRunningData);
         } else {
           this.drawJobRunningStatistics(this.jobRunningData);
-          this.spinnerService.hide();
+          if (!silent) {
+            this.spinnerService.hide();
+          }
         }
       }, (error) => {
-        this.alertService.showError(error, this.ERROR);
-        this.spinnerService.hide();
+        if (!silent) {
+          this.alertService.showError(error, this.ERROR);
+          this.spinnerService.hide();
+        }
       });
   }
 
@@ -315,13 +370,17 @@ export class HomeComponent implements OnInit {
     };
   }
 
-  public weeklyRunningJobStatistics(): void {
-    this.spinnerService.show();
+  public weeklyRunningJobStatistics(silent = false): void {
+    if (!silent) {
+      this.spinnerService.show();
+    }
     this.homeService.weeklyRunningJobStatistics(this.filterStartDate, this.filterEndDate)
       .pipe(first())
       .subscribe((response) => {
         if (response.status === ApiCode.SUCCESS) {
-          this.spinnerService.hide();
+          if (!silent) {
+            this.spinnerService.hide();
+          }
           this.weeklyRunningJobData = response.data;
           const dayOrder = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
           const dayIndex = dayOrder.map(day =>
@@ -330,11 +389,15 @@ export class HomeComponent implements OnInit {
           this.drawSourceJobWeeklyRunningStatistics(dayIndex);
         } else {
           this.drawSourceJobWeeklyRunningStatistics([0, 0, 0, 0, 0, 0, 0]);
-          this.spinnerService.hide();
+          if (!silent) {
+            this.spinnerService.hide();
+          }
         }
       }, (error) => {
-        this.alertService.showError(error, this.ERROR);
-        this.spinnerService.hide();
+        if (!silent) {
+          this.alertService.showError(error, this.ERROR);
+          this.spinnerService.hide();
+        }
       });
   }
 
@@ -377,12 +440,16 @@ export class HomeComponent implements OnInit {
     };
   }
 
-  public weeklyHrsRunningJobStatistics(): void {
-    this.spinnerService.show();
+  public weeklyHrsRunningJobStatistics(silent = false): void {
+    if (!silent) {
+      this.spinnerService.show();
+    }
     this.homeService.weeklyHrsRunningJobStatistics(this.filterStartDate, this.filterEndDate)
       .pipe(first())
       .subscribe((response) => {
-        this.spinnerService.hide();
+        if (!silent) {
+          this.spinnerService.hide();
+        }
         if (response.status === ApiCode.SUCCESS) {
           this.heatMapData = response.data;
           this.drawWeeklyHrsRunningJobStatistics(
@@ -391,65 +458,147 @@ export class HomeComponent implements OnInit {
             }));
           return;
         }
-        this.alertService.showError(response.message, this.ERROR);
+        if (!silent) {
+          this.alertService.showError(response.message, this.ERROR);
+        }
       }, (error) => {
-        this.spinnerService.hide();
-        this.alertService.showError(error, this.ERROR);
+        if (!silent) {
+          this.spinnerService.hide();
+          this.alertService.showError(error, this.ERROR);
+        }
       });
   }
 
   public drawWeeklyHrsRunningJobStatistics(dataPaload: any): void {
+    // visualMap.max was a hardcoded 2000 -- real per-hour job counts are usually single/low
+    // double digits, so every populated cell landed in the bottom sliver of that range and
+    // rendered the same near-black/maroon shade regardless of whether it was a 2 or a 40,
+    // making the heatmap's whole point (spot the busy cells at a glance) impossible. Deriving
+    // the ceiling from the actual data keeps the color scale meaningful at any volume.
+    const counts = (dataPaload || [])
+      .map((row: any) => Number(row[2]))
+      .filter((n: number) => !isNaN(n));
+    const maxCount = counts.length ? Math.max(...counts) : 1;
+    // The cell color only encodes job count, not which day it happened on -- with 7 same-
+    // looking rows there was no way to tell "today's numbers" from a previous day's at a
+    // glance. A thin markArea outline around today's row turned out too subtle to notice
+    // against the heatmap's own indigo palette (it visually disappeared into the cells). Bold,
+    // colored axis labels read far more reliably -- eyes land on axis text before cell color --
+    // and the current-hour cell gets a high-contrast amber border (a color nothing else in this
+    // chart uses) instead of blending into the same indigo family as everything else.
+    const weekdayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const now = new Date();
+    const todayLabel = weekdayNames[now.getDay()];
+    const currentHourLabel = this.hours[now.getHours()];
+    const NOW_COLOR = '#c2410c';
     this.sourceJobWeeklyHrsRunningStatistics = {
-      toolbox: this.refreshToolbox(() => this.weeklyHrsRunningJobStatistics(), true),
+      // No toolbox (refresh icon) here -- this chart already redraws on every filter change,
+      // and the icon was just clutter in the top-right corner nothing else on the page has.
       tooltip: {
         position: 'top'
       },
       grid: {
+        // right was 13% -- way more than the (now-hidden) color-legend needs, so the heatmap
+        // cells ended well short of the card's right edge with a dead gap after them.
         left: '1%',
-        right: '13%',
+        right: '2%',
         top: '3%',
         height: '80%',
         containLabel: true
       },
-      xAxis: {
+      xAxis: <any>{
         type: 'category',
         data: this.hours,
         splitArea: {
           show: true
+        },
+        axisLabel: {
+          // Cast to any -- rich-text axisLabel formatters (per-value styling via a {token|text}
+          // return) aren't in these echarts typings, but are valid at runtime.
+          formatter: (value: string) => value === currentHourLabel ? `{now|${value}}` : value,
+          rich: {
+            now: { color: NOW_COLOR, fontWeight: 700 }
+          }
         }
       },
-      yAxis: {
+      yAxis: <any>{
         type: 'category',
         data: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
         splitArea: {
           show: true
+        },
+        axisLabel: {
+          // Sunday gets its own sun-gold color regardless of which day is "today" (a small,
+          // fixed themed touch -- Sun-day) -- otherwise the normal indigo "today" bolding applies.
+          formatter: (value: string) => value === 'Sunday' ? `{sunday|${value}}`
+            : value === todayLabel ? `{today|${value}}` : value,
+          rich: {
+            today: { color: '#4f46e5', fontWeight: 700 },
+            sunday: { color: '#d97706', fontWeight: 700 }
+          }
         }
       },
       visualMap: [
         {
+          // show:false -- this still drives the heatmap's value-to-color scale, just without
+          // rendering the vertical legend bar (the "line" on the right the cells didn't need).
+          show: false,
           min: 0,
-          max: 2000,
+          max: maxCount,
           calculable: false,
           orient: 'vertical',
-          left: '97%',
+          left: '93%',
           top: '40',
-          color: ['green', 'black', '#8a6d3b', 'darkred'],
+          // Scoped to the heatmap series (index 0) only -- without this, the "right now"
+          // scatter marker (series index 1) would get recolored by this value scale too,
+          // stripping its fixed amber ring.
+          seriesIndex: 0,
+          // Single-hue light-to-dark sequential scale (app's indigo accent) -- reads as
+          // "low to high" at a glance, unlike the old green/black/brown/darkred stops
+          // which had no consistent light->dark direction to anchor on.
+          color: ['#3730a3', '#4f46e5', '#a5b4fc', '#eef0fb']
         }
       ],
       series: [
         {
           name: 'Daily Job Run',
           type: 'heatmap',
-          data: dataPaload,
+          // Fixed label color read badly at one end of the scale or the other -- the visualMap
+          // goes dark indigo (high count) to near-white lavender (low count), so a single color
+          // was always going to be illegible against half the cells. A series-level label.color
+          // callback (the "normal" way to do this) rendered no text at all here -- not just bad
+          // contrast, the labels vanished outright, so per-datum label overrides (each data item
+          // carries its own {value, label} instead of a plain [hr,day,count] tuple) are used
+          // instead, which is the older/more basic echarts mechanism and reliably supported.
+          //
+          // The "right now" cell (today + current hour) gets the same per-datum treatment for
+          // its own itemStyle -- an amber border directly on the actual cell, in place of two
+          // earlier attempts that didn't pan out: a markArea outline (rendered zero pixels on
+          // this heatmap), then a circular scatter marker overlaid on top (visually didn't read
+          // as "this cell" -- a circle over a square cell looked like an unrelated dot, not a
+          // highlight of the cell itself). A border on the real cell is unambiguous.
+          data: dataPaload.map((row: any) => {
+            const value = Number(row[2]);
+            const isNumeric = !isNaN(value);
+            const isNow = row[0] === currentHourLabel && row[1] === todayLabel;
+            return {
+              value: row,
+              label: {
+                color: !isNumeric ? '#7b8794' : (value > maxCount * 0.45 ? '#ffffff' : '#312e81')
+              },
+              itemStyle: isNow ? { borderColor: NOW_COLOR, borderWidth: 3 } : undefined
+            };
+          }),
           label: {
-            show: true
+            show: true,
+            fontWeight: 600
           },
           emphasis: {
             itemStyle: {
               shadowBlur: 10,
               shadowColor: 'rgba(0, 0, 0, 0.5)'
             }
-          }
+          },
         }
       ]
     };
@@ -476,11 +625,36 @@ export class HomeComponent implements OnInit {
   private selectMap: any;
   public onChartEvent(event: any, type: string) {
     this.searchSourceJobDetails = '';
+    // Each heatmap data point is now {value: [hr, day, count], label, itemStyle} (per-cell label
+    // color/border, see drawWeeklyHrsRunningJobStatistics) rather than the plain [hr, day, count]
+    // tuple it used to be -- so the clicked cell's actual values live at event.data.value now,
+    // not event.data directly (which is undefined for these indices on a plain object, and
+    // silently sent "targetDate=undefined&targetHr=undefined" to the backend as a result).
+    const clicked = event?.data?.value ?? event?.data;
     // fine the data from the main data with the target event
     this.selectMap = this.heatMapData.find((data: any) => {
-      return (data.hr == event?.data[0] && data.dayCode == event?.data[1] && data.count == event?.data[2]);
+      return (data.hr == clicked?.[0] && data.dayCode == clicked?.[1] && data.count == clicked?.[2]);
     });
     this.weeklyHrRunningStatisticsDimension(this.selectMap?.date, this.selectMap?.hr);
+  }
+
+  /** Mini stacked-bar segments for the Job Breakdown table's Breakdown column -- one segment
+   * per non-zero status, width proportional to its share of the row's total, so the seven
+   * count columns are readable as a shape at a glance instead of only as separate numbers. */
+  public breakdownSegments(sourceJob: any): { status: string; count: number; pct: number; color: string }[] {
+    const total = Number(sourceJob?.total) || 0;
+    if (!total) {
+      return [];
+    }
+    const statuses = ['Queue', 'Start', 'Running', 'Failed', 'Completed', 'Skip', 'Interrupt'];
+    return statuses
+      .map(status => ({
+        status,
+        count: Number(sourceJob[status.toLowerCase()]) || 0,
+        color: BREAKDOWN_COLOR[status]
+      }))
+      .filter(seg => seg.count > 0)
+      .map(seg => ({ ...seg, pct: (seg.count / total) * 100 }));
   }
 
   public sourceJobCountAction(sourceJob: any, type: string, count: any): any {
