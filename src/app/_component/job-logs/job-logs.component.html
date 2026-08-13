@@ -17,10 +17,13 @@
             <h4 class="card-panel-title panel-banner has-action">
                 <span>Job &amp; Queue Detail</span>
                 <span style="display: flex; align-items: center; gap: 8px;">
-                    <span class="pill pill-success pill-icon" *ngIf="autoRefreshActive"
-                        title="Run is still in flight -- logs refresh automatically every few seconds until it finishes">
-                        <span class="glyphicon glyphicon-refresh spin"></span> Live
-                    </span>
+                    <button type="button" class="pill pill-icon" *ngIf="jobStillRunning"
+                        [ngClass]="autoRefreshActive ? 'pill-success' : 'pill-default'"
+                        (click)="toggleLive()"
+                        [title]="autoRefreshActive ? 'Run is still in flight -- logs refresh automatically every few seconds. Click to pause.' : 'Live updates paused -- click to resume auto-refresh while this run is still in flight.'">
+                        <span class="glyphicon" [ngClass]="autoRefreshActive ? 'glyphicon-refresh spin' : 'glyphicon-pause'"></span>
+                        {{ autoRefreshActive ? 'Live' : 'Live: Paused' }}
+                    </button>
                     <button type="button" class="banner-link" [disabled]="refreshing" (click)="refresh()" title="Reload job/queue detail and logs">
                         <span class="glyphicon glyphicon-refresh" [ngClass]="{'spin': refreshing}"></span> {{ refreshing ? 'Refreshing...' : 'Refresh' }}
                     </button>
@@ -107,7 +110,7 @@
     <div class="toolbar">
         <div class="form-group" style="margin-bottom: 0;">
             <label for="searchAuditLogsForm" class="control-label">Total Logs ({{auditLogs.length}})</label>
-            <input type="text" id="searchAuditLogsForm" class="form-control" style="width: 280px;"
+            <input type="text" id="searchAuditLogsForm" class="form-control input-sm" style="width: 280px;"
                 placeholder="Search" [(ngModel)]="searchAuditLogsForm"/>
         </div>
         <span class="toolbar-spacer"></span>

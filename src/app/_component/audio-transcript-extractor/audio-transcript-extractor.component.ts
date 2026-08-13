@@ -16,18 +16,6 @@ interface AskEntry {
     answer: string;
 }
 
-/**
- * Extracts a transcript from an audio file (upload, a typed bucket/path, or browsing a bucket),
- * an uploaded video file (audio track extracted via ffmpeg first), or a YouTube link (audio
- * downloaded via yt-dlp first) -- all four funnel into the same noise-reduction + Whisper
- * pipeline as the F768927 batch job, run ad-hoc against a single file instead of via the Kafka
- * job queue (see AudioTranscriptRestApi in process, and job-search's standalone Audio Extract
- * Service / media_extract.py). Once a transcript is extracted,
- * the user picks a saved AI Agent (reusing its provider/model/API key) and types a one-off
- * prompt that overrides the agent's saved instructions for this call only (see
- * AiAgentService#processText's optional instructions param) -- nothing here is persisted.
- * @author Nabeel Ahmed
- */
 @Component({
     selector: 'audio-transcript-extractor',
     templateUrl: 'audio-transcript-extractor.component.html'
@@ -41,22 +29,16 @@ export class AudioTranscriptExtractorComponent implements OnInit {
     public supportedExtensions = AUDIO_SUPPORTED_EXTENSIONS;
     public videoSupportedExtensions = VIDEO_SUPPORTED_EXTENSIONS;
 
-    // Include-timestamps toggle -- applies to every mode below
     public includeTimestamps = false;
 
-    // Upload mode
     public selectedFile: File = null;
 
-    // Path mode
     public pathInput = '';
 
-    // Video mode
     public selectedVideoFile: File = null;
 
-    // YouTube mode
     public youtubeUrl = '';
 
-    // Browse mode
     public buckets: BucketSummary[] = [];
     public loadingBuckets = false;
     public selectedBucket = '';
@@ -65,22 +47,16 @@ export class AudioTranscriptExtractorComponent implements OnInit {
     public currentPrefix = '';
     public breadcrumbs: Breadcrumb[] = [];
 
-    // Shared extraction state
     public sourceLabel = '';
     public extracting = false;
     public extractError = '';
     public transcript = '';
-    /** True when `transcript` was loaded directly from an existing .txt in the bucket (Browse
-     * mode) rather than produced by running extraction -- it's already saved, so the "Save to
-     * Bucket" transcript action is redundant and hidden (see the template). */
+
     public transcriptLoadedFromBucket = false;
 
-    // Save-to-bucket panel -- shared by both "save transcript" and "save Q&A history" below
     public saveBucket = '';
     public saveFolderName = '';
-    /** True when saveFolderName already exists (loaded from the bucket) -- skips the
-     * create-folder call and lets saveFolderName be a full nested prefix if needed, instead
-     * of createFolder's single-segment-only restriction. */
+
     public saveFolderExists = false;
     public savingTranscript = false;
     public transcriptSavedPath = '';
@@ -89,7 +65,6 @@ export class AudioTranscriptExtractorComponent implements OnInit {
     public historySavedPath = '';
     public saveHistoryError = '';
 
-    // Ask AI panel
     public agents: AiAgent[] = [];
     public loadingAgents = false;
     public selectedAgentId: any = '';
@@ -115,8 +90,6 @@ export class AudioTranscriptExtractorComponent implements OnInit {
         this.extractError = '';
     }
 
-    // --- Upload mode ---
-
     public onFileSelected(event: any): void {
         let file: File = event && event.target && event.target.files ? event.target.files[0] : null;
         this.selectedFile = file || null;
@@ -138,8 +111,6 @@ export class AudioTranscriptExtractorComponent implements OnInit {
             .pipe(first())
             .subscribe((response) => this.handleExtractResponse(response), (error) => this.handleExtractError(error));
     }
-
-    // --- Video mode ---
 
     public onVideoFileSelected(event: any): void {
         let file: File = event && event.target && event.target.files ? event.target.files[0] : null;
@@ -163,8 +134,6 @@ export class AudioTranscriptExtractorComponent implements OnInit {
             .subscribe((response) => this.handleExtractResponse(response), (error) => this.handleExtractError(error));
     }
 
-    // --- YouTube mode ---
-
     public extractYoutube(): void {
         let url = (this.youtubeUrl || '').trim();
         if (!url) {
@@ -182,10 +151,6 @@ export class AudioTranscriptExtractorComponent implements OnInit {
             .subscribe((response) => this.handleExtractResponse(response), (error) => this.handleExtractError(error));
     }
 
-    // --- Path mode ---
-
-    /** Accepts "bucket/key/path.mp3" -- everything up to the first "/" is the bucket,
-     * everything after is the object key. */
     public loadFromPath(): void {
         let path = (this.pathInput || '').trim().replace(/^\/+/, '');
         if (!path) {
@@ -201,8 +166,6 @@ export class AudioTranscriptExtractorComponent implements OnInit {
         let key = path.substring(slashIndex + 1);
         this.extractFromBucketKey(bucket, key);
     }
-
-    // --- Browse mode ---
 
     public loadBuckets(): void {
         this.loadingBuckets = true;
@@ -254,9 +217,7 @@ export class AudioTranscriptExtractorComponent implements OnInit {
             this.loadObjects();
             return;
         }
-        // A .txt is treated as an already-extracted transcript (e.g. one saved by "Save
-        // Transcript to Bucket" below) -- show it directly instead of running it through
-        // extraction, which only makes sense for real audio.
+
         if (fileExtension(entry.name) === 'txt') {
             this.loadSavedTranscript(this.selectedBucket, entry.key);
             return;
@@ -280,8 +241,6 @@ export class AudioTranscriptExtractorComponent implements OnInit {
         this.loadObjects();
     }
 
-    // --- Shared extraction ---
-
     private extractFromBucketKey(bucket: string, key: string): void {
         this.sourceLabel = `${bucket}/${key}`;
         this.beginExtraction();
@@ -290,12 +249,6 @@ export class AudioTranscriptExtractorComponent implements OnInit {
             .subscribe((response) => this.handleExtractResponse(response), (error) => this.handleExtractError(error));
     }
 
-    /** Reads a .txt straight out of the bucket (no extraction pipeline involved) -- used when
-     * browsing to an already-saved transcript. Pre-fills the save-target fields with where it
-     * already lives (the full key prefix, which may be nested more than one level deep --
-     * saveFolderExists=true means saveTextToBucketFolder skips createFolder, which only
-     * supports a single new segment, so nesting here is safe) so Q&A history can still be
-     * saved alongside it even though "Save Transcript to Bucket" is hidden. */
     private loadSavedTranscript(bucket: string, key: string): void {
         this.sourceLabel = `${bucket}/${key}`;
         this.beginExtraction();
@@ -345,8 +298,6 @@ export class AudioTranscriptExtractorComponent implements OnInit {
         return extensions.indexOf(fileExtension(fileName)) > -1;
     }
 
-    // --- Copy to clipboard ---
-
     public copyTranscript(): void {
         if (!this.transcript) {
             return;
@@ -381,10 +332,6 @@ export class AudioTranscriptExtractorComponent implements OnInit {
         this.alertService.showSuccess(successMessage, this.SUCCESS);
     }
 
-    // --- Save to Bucket ---
-
-    /** Derived from the source name + a timestamp, e.g. "call_2026-08-03T10-15-00". Editable
-     * before saving -- this is just a starting point, not a hard rule. */
     private suggestFolderName(): string {
         let stem = (this.sourceLabel || 'transcript').split('/').pop()
             .replace(/\.[^.]+$/, '')
@@ -436,8 +383,7 @@ export class AudioTranscriptExtractorComponent implements OnInit {
             this.alertService.showError('Select a bucket.', this.ERROR);
             return false;
         }
-        // An empty folder name is only valid when saveFolderExists -- it means "loaded from
-        // the bucket root", not "no folder chosen yet".
+
         if (!this.saveFolderExists && (!this.saveFolderName || !this.saveFolderName.trim())) {
             this.alertService.showError('Enter a folder name.', this.ERROR);
             return false;
@@ -445,12 +391,6 @@ export class AudioTranscriptExtractorComponent implements OnInit {
         return true;
     }
 
-    /** Uploads content as a plain-text file into bucket/folderPrefix. When folderExists is
-     * false, creates folderPrefix first (via createFolder, which only accepts a single new
-     * path segment). When true (the transcript was loaded from a bucket location that's
-     * already there), skips createFolder entirely and uploads straight to folderPrefix --
-     * this also makes an arbitrarily nested folderPrefix safe, since only createFolder enforces
-     * the single-segment restriction, not a plain upload. */
     private saveTextToBucketFolder(bucket: string, folderPrefix: string, fileName: string, content: string, folderExists: boolean,
         onSuccess: (path: string) => void, onError: (message: string) => void): void {
         let doUpload = () => {
@@ -480,8 +420,6 @@ export class AudioTranscriptExtractorComponent implements OnInit {
                 doUpload();
             }, (error) => onError(error && error.message ? error.message : error));
     }
-
-    // --- Ask AI panel ---
 
     public loadAgents(): void {
         this.loadingAgents = true;

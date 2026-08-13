@@ -11,94 +11,110 @@
     (senderEvent) = "receiverEvent($event)">
 </source-task-type>
 
-<!-- Source TaskType -->
-<div class="toolbar">
-    <div class="form-group" style="margin-bottom: 0;">
-        <label for="searchSourceTaskTaype" class="control-label">Total Source TaskType ({{filteredSourceTaskTypes.length}})</label>
-        <input type="text" id="searchSourceTaskTaype" class="form-control" style="width: 280px;"
-            placeholder="Search" [(ngModel)]="searchSourceTaskTaype"/>
-    </div>
-    <span class="toolbar-spacer"></span>
-    <button type="button" class="btn btn-sm btn-default" (click)="appSetting()">
-        <span class="glyphicon glyphicon-refresh"></span> Refresh
-    </button>
-    <button type="button" class="btn btn-sm btn-teal"
-        data-toggle="modal" data-target="#sourceTaskType"
-        (click)="addSourceTaskType()">
-        <span class="glyphicon glyphicon-plus"></span> Add Source TaskType
-    </button>
-</div>
-<span class="help-text" style="margin-bottom: 10px;">
-    <span class="glyphicon glyphicon-info-sign"></span>
-    Source TaskType helps to configure with Kafka — it lands the request to the valid Kafka consumer.
-</span>
+<!-- Two distinct concerns (Kafka topic wiring vs. Kafka cluster/connection config) that used to
+     just sit stacked one under the other on an increasingly long page -- tabs keep each one's
+     own toolbar/table/filters fully visible without competing for space or scroll position. -->
+<ul class="nav nav-tabs setting-tabs">
+    <li class="active"><a href="#sourceTaskTypeTab" data-toggle="tab">
+        <span class="glyphicon glyphicon-transfer"></span> Source TaskType
+    </a></li>
+    <li><a href="#kafkaConnectionTab" data-toggle="tab">
+        <span class="glyphicon glyphicon-hdd"></span> Kafka Connection
+    </a></li>
+</ul>
 
-<div class="table-responsive scroll-table">
-    <table id="source-task-type" class="table table-striped table-bordered table-hover table-modern" style="font-size: 12px;">
-        <thead>
-            <tr>
-                <th style="width: 4%;"># No</th>
-                <th>Service Name</th>
-                <th>Queue Topic Partition</th>
-                <th>Description</th>
-                <th class="text-center">Link Task</th>
-                <th class="text-center">Kafka Profile</th>
-                <th class="text-center">Status</th>
-                <th class="text-center">Action</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr *ngFor="let sourceTaskType of filteredSourceTaskTypes | searchFilter: searchSourceTaskTaype; let i = index;">
-                <td>{{sourceTaskType.sourceTaskTypeId}}</td>
-                <td>{{sourceTaskType.serviceName}}</td>
-                <td>{{sourceTaskType.queueTopicPartition}}</td>
-                <td>{{sourceTaskType.description}}</td>
-                <td class="text-center">
-                    <a href="javascript:void(0);" data-toggle="modal" data-target="#linkSourceTaskModal"
-                        (click)="viewLinkSourceTaskWithSourceTaskType(sourceTaskType)"
-                        title="Browse the {{sourceTaskType.totalTaskLink}} task(s) built on this type">
-                        {{sourceTaskType.totalTaskLink}}
-                    </a>
-                </td>
-                <td class="text-center">
-                    <span class="pill pill-cyan pill-icon" *ngIf="sourceTaskType.kafkaConnectionProfileName">
-                        <span class="glyphicon glyphicon-transfer"></span> {{sourceTaskType.kafkaConnectionProfileName}}
-                    </span>
-                    <span class="pill pill-default" *ngIf="!sourceTaskType.kafkaConnectionProfileName">(tenant default)</span>
-                </td>
-                <td class="text-center">
-                    <span class="pill" [ngClass]="{
-                        'pill-danger': sourceTaskType.status === 'Delete',
-                        'pill-warning': sourceTaskType.status === 'Inactive',
-                        'pill-success': sourceTaskType.status === 'Active'
-                    }">{{sourceTaskType.status}}</span>
-                </td>
-                <td class="text-center">
-                    <div class="btn-group btn-group-sm" role="group">
-                        <button type="button" class="btn btn-default btn-icon" title="Test Kafka Connection for this topic"
-                            [disabled]="testingTopicRowId === sourceTaskType.sourceTaskTypeId"
-                            (click)="testSourceTaskTypeConnection(sourceTaskType)">
-                            <span class="glyphicon" [ngClass]="testingTopicRowId === sourceTaskType.sourceTaskTypeId ? 'glyphicon-refresh spin' : 'glyphicon-flash'"></span>
-                        </button>
-                        <button type="button" class="btn btn-default btn-icon ic-edit" data-toggle="modal" data-target="#sourceTaskType"
-                            (click)="editSourceTaskType(sourceTaskType)" title="Edit">
-                            <span class="glyphicon glyphicon-edit"></span>
-                        </button>
-                        <button type="button" class="btn btn-default btn-icon ic-download"
-                            (click)="downloadSourceTaskType(sourceTaskType)" title="Download">
-                            <span class="glyphicon glyphicon-download"></span>
-                        </button>
-                        <button type="button" class="btn btn-default btn-icon ic-delete"
-                            (click)="deleteSourceTaskType(sourceTaskType.sourceTaskTypeId, i)"
-                            [disabled]="sourceTaskType.status === 'Delete'"
-                            data-toggle="modal" data-target="#deleteSetting" title="Delete">
-                            <span class="glyphicon glyphicon-trash"></span>
-                        </button>
-                    </div>
-                </td>
-            </tr>
-        </tbody>
-    </table>
+<div class="tab-content">
+<div class="tab-pane active" id="sourceTaskTypeTab">
+<div class="card-panel">
+    <div class="toolbar">
+        <div class="form-group" style="margin-bottom: 0;">
+            <label for="searchSourceTaskTaype" class="control-label">Total Source TaskType ({{filteredSourceTaskTypes.length}})</label>
+            <input type="text" id="searchSourceTaskTaype" class="form-control input-sm" style="width: 280px;"
+                placeholder="Search" [(ngModel)]="searchSourceTaskTaype"/>
+        </div>
+        <span class="toolbar-spacer"></span>
+        <button type="button" class="btn btn-sm btn-default" (click)="appSetting()">
+            <span class="glyphicon glyphicon-refresh"></span> Refresh
+        </button>
+        <button type="button" class="btn btn-sm btn-teal"
+            data-toggle="modal" data-target="#sourceTaskType"
+            (click)="addSourceTaskType()">
+            <span class="glyphicon glyphicon-plus"></span> Add Source TaskType
+        </button>
+    </div>
+    <span class="help-text" style="margin-bottom: 10px;">
+        <span class="glyphicon glyphicon-info-sign"></span>
+        Source TaskType helps to configure with Kafka — it lands the request to the valid Kafka consumer.
+    </span>
+
+    <div class="table-responsive scroll-table">
+        <table id="source-task-type" class="table table-striped table-bordered table-hover table-modern" style="font-size: 12px;">
+            <thead>
+                <tr>
+                    <th style="width: 4%;"># No</th>
+                    <th>Service Name</th>
+                    <th>Queue Topic Partition</th>
+                    <th>Description</th>
+                    <th class="text-center">Link Task</th>
+                    <th class="text-center">Kafka Profile</th>
+                    <th class="text-center">Status</th>
+                    <th class="text-center">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr *ngFor="let sourceTaskType of filteredSourceTaskTypes | searchFilter: searchSourceTaskTaype; let i = index;">
+                    <td>{{sourceTaskType.sourceTaskTypeId}}</td>
+                    <td>{{sourceTaskType.serviceName}}</td>
+                    <td>{{sourceTaskType.queueTopicPartition}}</td>
+                    <td>{{sourceTaskType.description}}</td>
+                    <td class="text-center">
+                        <a href="javascript:void(0);" data-toggle="modal" data-target="#linkSourceTaskModal"
+                            (click)="viewLinkSourceTaskWithSourceTaskType(sourceTaskType)"
+                            title="Browse the {{sourceTaskType.totalTaskLink}} task(s) built on this type">
+                            {{sourceTaskType.totalTaskLink}}
+                        </a>
+                    </td>
+                    <td class="text-center">
+                        <span class="pill pill-cyan pill-icon" *ngIf="sourceTaskType.kafkaConnectionProfileName">
+                            <span class="glyphicon glyphicon-transfer"></span> {{sourceTaskType.kafkaConnectionProfileName}}
+                        </span>
+                        <span class="pill pill-default" *ngIf="!sourceTaskType.kafkaConnectionProfileName">(tenant default)</span>
+                    </td>
+                    <td class="text-center">
+                        <span class="pill" [ngClass]="{
+                            'pill-danger': sourceTaskType.status === 'Delete',
+                            'pill-warning': sourceTaskType.status === 'Inactive',
+                            'pill-success': sourceTaskType.status === 'Active'
+                        }">{{sourceTaskType.status}}</span>
+                    </td>
+                    <td class="text-center">
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button type="button" class="btn btn-default btn-icon" title="Test Kafka Connection for this topic"
+                                [disabled]="testingTopicRowId === sourceTaskType.sourceTaskTypeId"
+                                (click)="testSourceTaskTypeConnection(sourceTaskType)">
+                                <span class="glyphicon" [ngClass]="testingTopicRowId === sourceTaskType.sourceTaskTypeId ? 'glyphicon-refresh spin' : 'glyphicon-flash'"></span>
+                            </button>
+                            <button type="button" class="btn btn-default btn-icon ic-edit" data-toggle="modal" data-target="#sourceTaskType"
+                                (click)="editSourceTaskType(sourceTaskType)" title="Edit">
+                                <span class="glyphicon glyphicon-edit"></span>
+                            </button>
+                            <button type="button" class="btn btn-default btn-icon ic-download"
+                                (click)="downloadSourceTaskType(sourceTaskType)" title="Download">
+                                <span class="glyphicon glyphicon-download"></span>
+                            </button>
+                            <button type="button" class="btn btn-default btn-icon ic-delete"
+                                (click)="deleteSourceTaskType(sourceTaskType.sourceTaskTypeId, i)"
+                                [disabled]="sourceTaskType.status === 'Delete'"
+                                data-toggle="modal" data-target="#deleteSetting" title="Delete">
+                                <span class="glyphicon glyphicon-trash"></span>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
 </div>
 
 <!-- Delete Source TaskType Modal -->
@@ -125,7 +141,7 @@
 <!-- Link Source Task -- every task built on the row's Source TaskType, grouped/filterable by
      Group (TASK_GROUPS lookup), so a user can browse and pick a target task. -->
 <div class="modal fade" id="linkSourceTaskModal" role="dialog">
-    <div class="modal-dialog modal-lg" style="width: 800px;">
+    <div class="modal-dialog modal-lg" style="width: 90%; max-width: 1100px;">
         <div class="modal-content">
             <div class="modal-header">
                 <button type="button" class="close" data-dismiss="modal">&times;</button>
@@ -211,68 +227,12 @@
     </div>
 </div>
 
-<!-- Kafka Connection -- lives alongside Source TaskType since queueTopicPartition (above)
-     is exactly what a connection profile publishes to; the per-row Test action above tests
-     a TaskType's own topic against whichever profile is active here. -->
-<h4 id="kafkaConnectionProfile" style="margin-top: 25px;">Kafka Connection</h4>
-<kafka-connection-profile></kafka-connection-profile>
-
-<look-up *ngIf="lookupAction"
-    [lookUpAction]="lookupAction"
-    [recivedLookupData]="lookupData"
-    (senderEvent) = "receiverEvent($event)">
-</look-up>
-
-<!-- Lookup -->
-<div class="toolbar" style="margin-top: 25px;">
-    <div class="form-group" style="margin-bottom: 15px;">
-        <label for="searchLookupDataForm" class="control-label">Total Lookup ({{lookupDatas.length}})</label>
-        <input type="text" id="searchLookupDataForm" class="form-control" style="width: 280px;"
-            placeholder="Search" [(ngModel)]="searchLookupDataForm"/>
-    </div>
-    <span class="toolbar-spacer"></span>
-    <button type="button" class="btn btn-sm btn-teal"
-        data-toggle="modal" data-target="#lookupDatas"
-        (click)="addLookupDatas()">
-        <span class="glyphicon glyphicon-plus"></span> Add Lookup
-    </button>
+<!-- Kafka Connection -- lives alongside Source TaskType since queueTopicPartition (previous tab)
+     is exactly what a connection profile publishes to; the per-row Test action there tests a
+     TaskType's own topic against whichever profile is active here. -->
+<div class="tab-pane" id="kafkaConnectionTab">
+<div class="card-panel">
+    <kafka-connection-profile></kafka-connection-profile>
 </div>
-<span class="help-text" style="margin-bottom: 10px;">
-    <span class="glyphicon glyphicon-info-sign"></span>
-    Lookup helps to configure system settings like (thread per pool &amp; scheduler last run &amp; scheduler daily etc.)
-</span>
-
-<div class="table-responsive scroll-table">
-    <table id="lookup" class="table table-striped table-bordered table-hover table-modern" style="font-size: 12px;">
-        <thead>
-            <tr>
-                <th style="width: 4%;"># No</th>
-                <th>Lookup Type</th>
-                <th>Lookup Value</th>
-                <th>Description</th>
-                <th class="text-center">Action</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr *ngFor="let lookupData of lookupDatas | searchFilter: searchLookupDataForm; let i = index">
-                <td>{{lookupData.lookupId}}</td>
-                <td>{{lookupData.lookupType}}</td>
-                <td>{{lookupData.lookupValue}}</td>
-                <td>{{lookupData.description}}</td>
-                <td class="text-center">
-                    <div class="btn-group btn-group-sm" role="group">
-                        <button type="button" class="btn btn-default btn-icon ic-edit"
-                            data-toggle="modal" data-target="#lookupDatas"
-                            (click)="editLookupData(lookupData)" title="Edit">
-                            <span class="glyphicon glyphicon-edit"></span>
-                        </button>
-                        <button type="button" class="btn btn-default btn-icon ic-add"
-                            (click)="editSubLookupData(lookupData)" title="Sub Lookup">
-                            <span class="glyphicon glyphicon-plus"></span>
-                        </button>
-                    </div>
-                </td>
-            </tr>
-        </tbody>
-    </table>
+</div>
 </div>

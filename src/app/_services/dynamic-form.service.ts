@@ -4,10 +4,6 @@ import { ApiResponse } from '@/_models';
 import { DynamicForm, DynamicFormField, DynamicFormSubmission } from '@/_models/dynamic-form.model';
 import { Observable } from 'rxjs';
 
-
-/**
- * @author Nabeel Ahmed
- */
 @Injectable({
     providedIn: 'root'
 })

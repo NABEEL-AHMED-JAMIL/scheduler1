@@ -9,12 +9,6 @@ import {
     submissionFieldDisplayValue, isSubmissionFieldTruncated, submissionShareUrl
 } from '@/_models/dynamic-form.model';
 
-/**
- * Full-page detail view for one submission -- shows the form it belongs to,
- * every field's value, and a sidebar of sibling submissions to click between
- * without going back to the list first.
- * @author Nabeel Ahmed
- */
 @Component({
     selector: 'view-dynamic-form-submission',
     templateUrl: 'view-dynamic-form-submission.component.html'
@@ -43,8 +37,7 @@ export class ViewDynamicFormSubmissionComponent implements OnInit {
     }
 
     ngOnInit(): void {
-        // subscribe (not snapshot) -- clicking a sibling submission in the sidebar
-        // reuses this same component instance and just changes the route param.
+
         this.route.params.subscribe((params) => {
             this.dynamicFormId = params.dynamicFormId;
             this.submissionId = params.submissionId;
@@ -112,11 +105,11 @@ export class ViewDynamicFormSubmissionComponent implements OnInit {
                 if (response.status === ApiCode.SUCCESS) {
                     this.otherSubmissions = response.data;
                 }
-            }, () => { /* non-blocking */ });
+            }, () => {  });
     }
 
     public selectSubmission(submission: DynamicFormSubmission): void {
-        // route params are always strings, API ids are numbers -- loose equality is intentional here
+
         if (submission.dynamicFormSubmissionId == this.submissionId) {
             return;
         }
@@ -131,7 +124,6 @@ export class ViewDynamicFormSubmissionComponent implements OnInit {
         return isSubmissionFieldTruncated(field, submission, this.dynamicForm.fields);
     }
 
-    /** Short one-line summary shown per row in the "Other Submissions" sidebar. */
     public previewValue(submission: DynamicFormSubmission): string {
         for (let field of (this.dynamicForm?.fields || [])) {
             let value = submissionFieldDisplayValue(field, submission, this.dynamicForm.fields);
@@ -146,7 +138,6 @@ export class ViewDynamicFormSubmissionComponent implements OnInit {
         this.router.navigate(['/dynamicForm/fill', this.dynamicFormId, 'edit', this.submissionId]);
     }
 
-    /** Direct API link for this submission -- safe to share/copy since it's keyed by uuid, not the sequential id. */
     public get shareUrl(): string {
         return submissionShareUrl(this.submission);
     }
@@ -157,6 +148,21 @@ export class ViewDynamicFormSubmissionComponent implements OnInit {
         }
         navigator.clipboard.writeText(this.shareUrl).then(() => {
             this.alertService.showSuccess('API link copied to clipboard', 'Copied');
+        }, () => {
+            this.alertService.showError('Could not copy to clipboard', this.ERROR);
+        });
+    }
+
+    public get shareToken(): string {
+        return (this.submission && this.submission.uuid) || '';
+    }
+
+    public copyShareToken(): void {
+        if (!this.shareToken) {
+            return;
+        }
+        navigator.clipboard.writeText(this.shareToken).then(() => {
+            this.alertService.showSuccess('Token copied to clipboard', 'Copied');
         }, () => {
             this.alertService.showError('Could not copy to clipboard', this.ERROR);
         });

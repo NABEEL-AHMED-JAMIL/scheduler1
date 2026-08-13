@@ -12,16 +12,6 @@ import {
     isSslProtocol
 } from '@/_models/kafka-connection-profile.model';
 
-/**
- * List/add/edit/delete Kafka connection profiles (local or remote clusters) and pick which one
- * is each tenant's default -- see KafkaConnectionResolver on the backend for the full
- * resolution order (a Source Task Type's own profile, or its tenant's routing override, can
- * still take priority over this "default" pick -- see the Source Task Type form's own picker).
- * When a tenant has no default and no Source Task Type override, the platform-wide shared
- * default (if any) is used, then the original env-var-driven cluster -- this screen is purely
- * additive on top of that.
- * @author Nabeel Ahmed
- */
 @Component({
     selector: 'kafka-connection-profile',
     templateUrl: 'kafka-connection-profile.component.html'
@@ -43,10 +33,7 @@ export class KafkaConnectionProfileComponent implements OnInit {
     public isSaslProtocol = isSaslProtocol;
     public isSslProtocol = isSslProtocol;
     public readonly isPlatformAdmin: boolean;
-    // Dropdown filters, applied on top of (before) the free-text search box -- '' means "no
-    // filter" for each. Scope only matters (and is only shown) for a Platform Admin, same
-    // condition as the Scope column itself.
-    // 'Delete' left out on purpose -- a deleted profile is never shown (see filteredProfiles).
+
     public readonly statusOptions = ['Active', 'Inactive'];
     public filterScope: string = '';
     public filterSecurityProtocol: string = '';
@@ -56,11 +43,9 @@ export class KafkaConnectionProfileComponent implements OnInit {
     public editingProfile: KafkaConnectionProfile;
     public submitted: boolean = false;
 
-    /** Set while a Test Connection call (from the modal, before Save) is in flight. */
     public testingInModal: boolean = false;
     public modalTestResult: { success: boolean; message: string } = null;
 
-    /** Row-level "Test" button -- keyed by kafkaConnectionProfileId so only that row shows a spinner. */
     public testingRowId: any = null;
 
     public deleteProfileId: any;
@@ -74,13 +59,6 @@ export class KafkaConnectionProfileComponent implements OnInit {
         this.isPlatformAdmin = this.authService.currentUser?.userRole === 'PLATFORM_ADMIN';
     }
 
-    /** Whether the current user may edit/delete/set-default/clear-default this profile --
-     * PLATFORM_ADMIN can manage any profile; a tenant admin only their own tenant's (never a
-     * platform-wide/shared one, and fetchAllProfiles never returns another tenant's to begin
-     * with). The backend (KafkaConnectionProfileServiceImpl.scopedFind) already rejects these
-     * the same way -- this just keeps the UI from showing an action button that would always
-     * fail with a confusing "Profile not found" instead of making clear up front why it can't
-     * be used. */
     public canManage(profile: KafkaConnectionProfile): boolean {
         if (this.isPlatformAdmin) {
             return true;
@@ -187,8 +165,6 @@ export class KafkaConnectionProfileComponent implements OnInit {
         });
     }
 
-    /** Tests connectivity for whatever's currently in the modal form -- works before Save too
-     * (an unsaved profile is tested from the form values directly). */
     public testConnectionInModal(): void {
         if (this.profileForm.invalid) {
             this.submitted = true;
@@ -211,7 +187,6 @@ export class KafkaConnectionProfileComponent implements OnInit {
             });
     }
 
-    /** Row action -- tests an already-saved profile by id, no form involved. */
     public testConnectionForRow(profile: KafkaConnectionProfile): void {
         this.testingRowId = profile.kafkaConnectionProfileId;
         this.kafkaConnectionProfileService.testConnection({ kafkaConnectionProfileId: profile.kafkaConnectionProfileId })

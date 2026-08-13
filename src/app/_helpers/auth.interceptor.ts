@@ -10,13 +10,6 @@ import { Observable, throwError } from 'rxjs';
 import { catchError, switchMap } from 'rxjs/operators';
 import { AuthService } from '@/_services';
 
-/**
- * Attaches the access token to every outgoing API request. On a 401 (expired access token),
- * tries one silent refresh-and-retry via AuthService.refreshAccessToken() before giving up and
- * forcing the user back to /login -- so a still-valid session doesn't get logged out just
- * because the short-lived access token expired mid-use.
- * @author Nabeel Ahmed
- */
 @Injectable()
 export class AuthInterceptor implements HttpInterceptor {
 

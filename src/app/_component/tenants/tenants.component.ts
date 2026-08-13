@@ -6,10 +6,6 @@ import { first } from 'rxjs/operators';
 import { ApiCode, Action } from '@/_models';
 import { Tenant } from '@/_models/tenant.model';
 
-/**
- * PLATFORM_ADMIN only (see RoleGuard on this route) -- provisions/renames/suspends tenants.
- * @author Nabeel Ahmed
- */
 @Component({
     selector: 'tenants',
     templateUrl: 'tenants.component.html'
@@ -24,9 +20,9 @@ export class TenantsComponent implements OnInit {
     public submitted = false;
     public isEditMode = false;
     public deleteTenant: Tenant | null = null;
-    // 'Delete' left out on purpose -- a deleted tenant is never shown (see filteredTenants).
+
     public readonly statusOptions = ['Active', 'Suspended'];
-    // '' means "no filter" -- applied before the free-text `search` box (see `filteredTenants`).
+
     public filterStatus: string = '';
 
     @ViewChild('closeTenantModal', { static: false })
@@ -45,7 +41,6 @@ export class TenantsComponent implements OnInit {
         this.listTenants();
     }
 
-    // convenience getter for easy access to form fields
     get f() {
         return this.tenantForm.controls;
     }
@@ -128,8 +123,6 @@ export class TenantsComponent implements OnInit {
             });
     }
 
-    /** Suspended blocks every user under this tenant from logging in (enforced server-side in
-     * AuthServiceImpl.login) -- doesn't touch their data. */
     public toggleSuspend(tenant: Tenant): void {
         this.spinnerService.show();
         const nextStatus = tenant.status === 'Suspended' ? 'Active' : 'Suspended';

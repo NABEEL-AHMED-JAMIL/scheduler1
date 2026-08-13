@@ -22,10 +22,9 @@ export interface SourceTaskType {
     serviceName?: any;
     totalTaskLink?:any;
     status?: any;
-    /** This type's default Kafka cluster -- null falls through to the tenant's own default.
-     * See KafkaConnectionResolver on the backend for the full resolution order. */
+
     kafkaConnectionProfileId?: any;
-    /** Set on read only, for display -- the resolved profile's name. */
+
     kafkaConnectionProfileName?: any;
 }
 
@@ -44,7 +43,6 @@ export interface QMessage {
     skipManual?: any;
 }
 
-// LookupData
 export interface LookupData {
     lookupId?: any;
     dateCreated?: any;
@@ -128,7 +126,6 @@ export const STATUS_LIST: any = [
     }
 ];
 
-// PdfHighlighterTask
 export interface PdfHighlighterTask {
     pdfHighlighterTaskId?: any;
     taskName?: any;
@@ -177,7 +174,6 @@ export const HIGHLIGHTER_STATUS_LIST: any = [
     }
 ];
 
-// Object Browser
 export interface BucketSummary {
     label?: any;
     bucket?: any;

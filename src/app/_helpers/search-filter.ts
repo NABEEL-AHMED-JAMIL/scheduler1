@@ -4,22 +4,12 @@ import {
     PipeTransform
 } from '@angular/core';
 
-
 interface SearchToken {
     field?: string;
     term: string;
     negated: boolean;
 }
 
-/**
- * Also @Injectable (providedIn: 'root') on top of @Pipe -- several components use this outside
- * a template (filtering an array in TypeScript, not `| searchFilter`), and constructor-injecting
- * it there is the correct way to get an instance rather than each one doing `new SearchFilterPipe()`
- * itself. It's only declared (not provided) in app.module.ts, which makes it usable as a
- * template pipe but NOT constructor-injectable on its own -- this is what actually makes DI work
- * for it.
- * @author Nabeel Ahmed
- */
 @Injectable({
     providedIn: 'root'
 })

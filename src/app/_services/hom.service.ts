@@ -3,15 +3,11 @@ import { HttpClient } from '@angular/common/http';
 import { ApiResponse } from '@/_models';
 import { Observable } from 'rxjs';
 
-
-/**
- * @author Nabeel Ahmed
- */
 @Injectable({
     providedIn: 'root'
 })
 export class HomeService {
-    
+
     constructor(private http: HttpClient) { }
 
     public jobStatusStatistics(startDate?: any, endDate?: any): Observable<ApiResponse> {
@@ -28,11 +24,11 @@ export class HomeService {
         return this.http.get<ApiResponse>(`${config.apiUrl}/dashboard.json/weeklyRunningJobStatistics?startDate=${startDate}&endDate=${endDate}`);
     }
 
-    public weeklyHrsRunningJobStatistics(startDate:any, endDate:any): Observable<ApiResponse> {        
+    public weeklyHrsRunningJobStatistics(startDate:any, endDate:any): Observable<ApiResponse> {
         return this.http.get<ApiResponse>(`${config.apiUrl}/dashboard.json/weeklyHrsRunningJobStatistics?startDate=${startDate}&endDate=${endDate}`);
     }
 
-    public weeklyHrRunningStatisticsDimension(targetDate:any, targetHr: any): Observable<ApiResponse> {        
+    public weeklyHrRunningStatisticsDimension(targetDate:any, targetHr: any): Observable<ApiResponse> {
         return this.http.get<ApiResponse>(`${config.apiUrl}/dashboard.json/weeklyHrRunningStatisticsDimension?targetDate=${targetDate}&targetHr=${targetHr}`);
     }
 

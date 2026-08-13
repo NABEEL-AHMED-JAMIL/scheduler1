@@ -1,10 +1,3 @@
-/**
- * Query Engine models -- mirrors the backend Dtos 1:1 (process.model.dto.
- * DatabaseConnectionProfileDto / QueryDefinitionDto / QueryExecutionDto / QueryExecutionRequestDto /
- * QueryPreviewResponseDto / QueryScheduleDto). See those for the authoritative field-by-field
- * javadoc (e.g. why password/queryText are write-only or list-omitted).
- * @author Nabeel Ahmed
- */
 
 export const DATABASE_TYPES = ['POSTGRES'];
 

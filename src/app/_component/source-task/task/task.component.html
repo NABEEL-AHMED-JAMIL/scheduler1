@@ -124,14 +124,22 @@
                                 <tr *ngFor="let tag of sourceTaskForm.get('tagsInfo')['controls']; let i = index;" [formGroup]="tag">
                                     <td>
                                         <input type="text" class="form-control input-sm" name="tagKey" formControlName="tagKey" placeholder="Tag Key">
-                                        <div *ngIf="submitted && tag.get('tagKey').errors">
-                                            <div *ngIf="tag.get('tagKey').errors.required" class="text-danger">
+                                        <div *ngIf="tag.get('tagKey').errors" class="text-danger">
+                                            <div *ngIf="submitted && tag.get('tagKey').errors.required">
                                                 Tag Key is required
+                                            </div>
+                                            <div *ngIf="tag.get('tagKey').errors.hasSpace">
+                                                Tag Key can't contain spaces
                                             </div>
                                         </div>
                                     </td>
                                     <td>
                                         <input type="text" class="form-control input-sm" name="tagParent" formControlName="tagParent" placeholder="Parent Tag">
+                                        <div *ngIf="tag.get('tagParent').errors" class="text-danger">
+                                            <div *ngIf="tag.get('tagParent').errors.hasSpace">
+                                                Tag Parent can't contain spaces
+                                            </div>
+                                        </div>
                                     </td>
                                     <td>
                                         <input type="text" class="form-control input-sm" name="tagValue" formControlName="tagValue" placeholder="Tag Value">

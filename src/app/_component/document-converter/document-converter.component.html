@@ -1,0 +1,249 @@
+<!-- breadcrumb -->
+<nav class="breadcrumb-bar">
+    <a routerLink="/home">Home</a>
+    <span class="crumb-sep">/</span>
+    <span class="crumb-current">Document Converter</span>
+</nav>
+
+<span class="help-text" style="margin-bottom: 14px; display: block;">
+    <span class="glyphicon glyphicon-info-sign"></span>
+    Convert a document to another format (Word/Excel/PowerPoint/OpenDocument/PDF and more).
+    Preview works for PDF, image, plain-text (TXT/CSV/TSV), and HTML; other formats download only.
+</span>
+
+<!-- Convert panel -->
+<div class="card-panel">
+    <h4 class="card-panel-title panel-banner">
+        <span class="glyphicon glyphicon-transfer"></span> Convert a Document
+    </h4>
+
+    <div class="form-group">
+        <label class="control-label" for="documentFile">File</label>
+        <input type="file" id="documentFile" (change)="onFileSelected($event)" />
+        <span class="help-text" *ngIf="selectedFile && !currentFamily" style="display: block; margin-top: 6px;">
+            <span class="glyphicon glyphicon-warning-sign"></span>
+            '{{inputExtension | uppercase}}' isn't a supported input format.
+        </span>
+        <span class="help-text" *ngIf="selectedFile && currentFamily" style="display: block; margin-top: 6px;">
+            <span class="glyphicon glyphicon-ok-circle"></span>
+            Detected as a {{currentFamily.label}} ({{inputExtension | uppercase}}) -- {{(selectedFile.size / 1024) | number:'1.0-0'}} KB.
+        </span>
+    </div>
+
+    <div class="row" *ngIf="currentFamily">
+        <div class="col-md-6">
+            <div class="form-group">
+                <label class="control-label" for="outputFormat">Convert To</label>
+                <select id="outputFormat" class="form-control" [(ngModel)]="outputFormat">
+                    <option *ngFor="let fmt of currentFamily.outputFormats" [value]="fmt">{{fmt | uppercase}}</option>
+                </select>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="form-group" style="margin-top: 26px;">
+                <label class="control-label" style="font-weight: normal;">
+                    <input type="checkbox" [(ngModel)]="saveToBucket" /> Save this conversion to a bucket
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div class="row" *ngIf="currentFamily && saveToBucket">
+        <div class="col-md-6">
+            <div class="form-group">
+                <label class="control-label" for="taskName">Name</label>
+                <input type="text" id="taskName" class="form-control" [(ngModel)]="taskName" placeholder="e.g. Q3 Report" />
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="form-group">
+                <label class="control-label" for="bucket">Bucket</label>
+                <select id="bucket" class="form-control" [(ngModel)]="selectedBucket">
+                    <option value="" disabled>Select a bucket</option>
+                    <option *ngFor="let b of buckets" [value]="b.bucket">{{b.label || b.bucket}}</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="form-group" style="margin-top: 4px;">
+        <button type="button" class="btn btn-teal" [disabled]="!currentFamily || converting" (click)="convert()">
+            <span class="glyphicon" [ngClass]="converting ? 'glyphicon-refresh spin' : 'glyphicon-transfer'"></span>
+            {{converting ? 'Converting...' : 'Convert'}}
+        </button>
+        <button type="button" class="btn btn-default" style="margin-left: 8px;" *ngIf="selectedFile" (click)="startOver()">
+            <span class="glyphicon glyphicon-remove"></span> Start Over
+        </button>
+    </div>
+
+    <!-- Result toolbar -- shown once a conversion has actually run. Two separate buttons, one
+         shared side panel below: click Input or Output to point the panel at that side, same
+         pattern as the Saved Conversions list (and Object Browser) further down the page. -->
+    <div class="toolbar" *ngIf="result" style="margin-top: 18px;">
+        <strong><span class="glyphicon glyphicon-ok-circle" style="color: #1d7a3f;"></span> Converted -- {{result.outputFileName}}</strong>
+        <span class="toolbar-spacer"></span>
+        <span class="help-text" style="margin-right: 10px;" *ngIf="result.save">
+            Saved to <code>{{result.bucketName}}</code>
+        </span>
+        <div class="btn-group btn-group-sm" role="group">
+            <button type="button" class="btn" [ngClass]="resultPreviewSide === 'input' ? 'btn-teal' : 'btn-default'" (click)="toggleResultSide('input')">
+                <span class="glyphicon glyphicon-log-in"></span> Input
+            </button>
+            <button type="button" class="btn" [ngClass]="resultPreviewSide === 'output' ? 'btn-teal' : 'btn-default'" (click)="toggleResultSide('output')">
+                <span class="glyphicon glyphicon-log-out"></span> Output
+            </button>
+        </div>
+    </div>
+
+    <!-- Side panel -- only rendered once Input or Output above is clicked -->
+    <div class="row" *ngIf="result && resultPreviewSide" style="margin-top: 10px;">
+        <div class="col-md-5 bucket-panel-col">
+            <div class="side-panel">
+                <div class="side-panel-header">
+                    <span class="side-panel-title" [title]="resultPreviewFileName">
+                        <span class="glyphicon glyphicon-file file-icon"></span>
+                        {{resultPreviewSide === 'input' ? 'Input' : 'Output'}} -- {{resultPreviewFileName}}
+                    </span>
+                    <button type="button" class="close" (click)="closeResultPreview()">&times;</button>
+                </div>
+                <div class="side-panel-body">
+                    <div class="preview-toolbar">
+                        <button type="button" class="btn btn-sm btn-default" (click)="downloadResultPreviewFile()">
+                            <span class="glyphicon glyphicon-download-alt"></span> Download
+                        </button>
+                    </div>
+                    <iframe *ngIf="resultPreviewKind === 'pdf' || resultPreviewKind === 'html'" [src]="resultPreviewUrlValue" class="preview-pdf"></iframe>
+                    <img *ngIf="resultPreviewKind === 'image'" [src]="resultPreviewUrlValue" class="preview-image" />
+                    <pre *ngIf="resultPreviewKind === 'text'" class="preview-text">{{resultPreviewTextValue}}</pre>
+                    <div class="preview-unavailable" *ngIf="!resultPreviewKind">
+                        <span class="glyphicon glyphicon-info-sign"></span>
+                        No inline preview for {{resultPreviewFormatLabel | uppercase}} -- use Download above.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Saved conversions -->
+<div class="toolbar">
+    <div class="form-group" style="margin-bottom: 0;">
+        <label for="searchTasks" class="control-label">Total Saved Conversions ({{filteredTasks.length}})</label>
+        <input type="text" id="searchTasks" class="form-control input-sm" style="width: 280px;"
+            placeholder="Search" [(ngModel)]="searchTasks"/>
+    </div>
+    <span class="toolbar-spacer"></span>
+    <button type="button" class="btn btn-sm btn-default" (click)="listTasks()">
+        <span class="glyphicon glyphicon-refresh"></span> Refresh
+    </button>
+</div>
+
+<span class="help-text" *ngIf="!tasks.length" style="display: block; margin-bottom: 10px;">
+    <span class="glyphicon glyphicon-info-sign"></span>
+    No saved conversions yet -- check "Save this conversion to a bucket" above to keep one here.
+</span>
+
+<!-- Table + side panel -- same layout as Object Browser: the table shrinks to col-md-8 and a
+     shared side panel opens in col-md-4 once either of a row's two view buttons (Input/Output)
+     is clicked, instead of expanding an inline row underneath. -->
+<div class="row row-equal bucket-browse-row" *ngIf="tasks.length">
+    <div class="bucket-table-col" [ngClass]="previewTask ? 'col-md-8' : 'col-md-12'">
+        <div class="table-responsive scroll-table bucket-scroll">
+            <table class="table table-striped table-bordered table-hover table-modern" style="font-size: 12px;">
+                <thead>
+                    <tr>
+                        <th style="width: 4%;"># No</th>
+                        <th>Name</th>
+                        <th>Input</th>
+                        <th>Output</th>
+                        <th>Bucket</th>
+                        <th>Created</th>
+                        <th class="text-center" style="width: 170px;">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr *ngFor="let task of filteredTasks"
+                        [class.active]="previewTask && previewTask.documentConverterTaskId === task.documentConverterTaskId">
+                        <td>{{task.documentConverterTaskId}}</td>
+                        <td>{{task.taskName}}</td>
+                        <td><span class="pill pill-default">{{task.inputFormat | uppercase}}</span> {{task.inputFileName}}</td>
+                        <td><span class="pill pill-indigo">{{task.outputFormat | uppercase}}</span> {{task.outputFileName}}</td>
+                        <td><code>{{task.bucketName}}</code></td>
+                        <td>{{task.dateCreated | date:'yyyy-MM-dd HH:mm'}}</td>
+                        <td class="text-center">
+                            <div class="btn-group btn-group-sm" role="group">
+                                <button type="button" class="btn btn-icon" title="View Input"
+                                    [ngClass]="previewTask?.documentConverterTaskId === task.documentConverterTaskId && previewSide === 'input' ? 'btn-teal' : 'btn-default'"
+                                    (click)="openPreview(task, 'input')">
+                                    <span class="glyphicon glyphicon-log-in"></span>
+                                </button>
+                                <button type="button" class="btn btn-icon" title="View Output"
+                                    [ngClass]="previewTask?.documentConverterTaskId === task.documentConverterTaskId && previewSide === 'output' ? 'btn-teal' : 'btn-default'"
+                                    (click)="openPreview(task, 'output')">
+                                    <span class="glyphicon glyphicon-log-out"></span>
+                                </button>
+                                <button type="button" class="btn btn-default btn-icon ic-delete" title="Delete"
+                                    data-toggle="modal" data-target="#deleteTaskModal"
+                                    (click)="confirmDeleteTask(task)">
+                                    <span class="glyphicon glyphicon-trash"></span>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- side panel -->
+    <div class="col-md-4 bucket-panel-col" *ngIf="previewTask">
+        <div class="side-panel">
+            <div class="side-panel-header">
+                <span class="side-panel-title" [title]="previewFileName">
+                    <span class="glyphicon glyphicon-file file-icon"></span>
+                    {{previewSide === 'input' ? 'Input' : 'Output'}} -- {{previewFileName}}
+                </span>
+                <button type="button" class="close" (click)="closePreview()">&times;</button>
+            </div>
+
+            <div class="side-panel-body">
+                <div class="preview-toolbar">
+                    <button type="button" class="btn btn-sm btn-default" (click)="downloadPreviewFile()">
+                        <span class="glyphicon glyphicon-download-alt"></span> Download
+                    </button>
+                </div>
+                <div class="text-muted" *ngIf="previewLoading">
+                    <span class="glyphicon glyphicon-refresh spin"></span> Loading preview...
+                </div>
+                <ng-container *ngIf="!previewLoading">
+                    <iframe *ngIf="previewKind === 'pdf' || previewKind === 'html'" [src]="previewUrl" class="preview-pdf"></iframe>
+                    <img *ngIf="previewKind === 'image'" [src]="previewUrl" class="preview-image" />
+                    <pre *ngIf="previewKind === 'text'" class="preview-text">{{previewText}}</pre>
+                    <div class="preview-unavailable" *ngIf="!previewKind">
+                        <span class="glyphicon glyphicon-info-sign"></span>
+                        No inline preview for {{previewFormatLabel | uppercase}} -- use Download above.
+                    </div>
+                </ng-container>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirm Modal -->
+<div class="modal fade" id="deleteTaskModal" role="dialog">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title">Delete Conversion</h4>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete "{{deleteTarget?.taskName}}"? The stored files won't be removed from the bucket.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-danger" data-dismiss="modal" (click)="processDeleteTask()">Yes, Delete</button>
+            </div>
+        </div>
+    </div>
+</div>

@@ -9,12 +9,6 @@ import {
     submissionFieldDisplayValue, submissionShareUrl
 } from '@/_models/dynamic-form.model';
 
-/**
- * Lists every filled-in submission for a form -- clicking a submission's #id
- * opens its own detail page, edit navigates to the fill screen preloaded
- * with that submission, delete removes it after confirmation.
- * @author Nabeel Ahmed
- */
 @Component({
     selector: 'dynamic-form-submissions',
     templateUrl: 'dynamic-form-submissions.component.html'
@@ -136,9 +130,7 @@ export class DynamicFormSubmissionsComponent implements OnInit {
                     return;
                 }
                 this.alertService.showSuccess(response.message, ApiCode.SUCCESS);
-                // look up by id, not the stale searchFilter-view index -- deleteSubmissionIndex
-                // is captured from the *ngFor over the filtered view, so it doesn't line up
-                // with this.submissions itself whenever a search term is active
+
                 const realIndex = this.submissions.findIndex(
                     (submission: any) => submission.dynamicFormSubmissionId === this.deleteSubmissionId);
                 if (realIndex > -1) {
@@ -153,7 +145,6 @@ export class DynamicFormSubmissionsComponent implements OnInit {
             });
     }
 
-    /** One-line, at-a-glance summary for the table row -- first couple of filled-in fields, each capped short. */
     public previewValue(submission: DynamicFormSubmission): string {
         let parts: string[] = [];
         for (let field of (this.dynamicForm?.fields || [])) {

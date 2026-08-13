@@ -29,7 +29,6 @@ import {
     PRIORITY
 } from '../../../global-config';
 
-
 @Component({
     selector: 'job',
     templateUrl: 'job.component.html'
@@ -51,15 +50,12 @@ export class JobComponent implements OnInit, OnDestroy {
     public prioritys: any = PRIORITY;
     public times: any = TIMES;
 
-    // pagint
     public paging!: Paging;
     public sourceTaskQueryCriteria!: QueryCriteria;
-    // source list
+
     public sourceTasks: SourceTask[] = [];
     public selectedSourceTask: SourceTask | null = null;
-    /** Stored so ngOnDestroy can unsubscribe -- paramMap is a long-lived route Observable, not a
-     * one-shot HTTP call, so leaving this subscribed past the component's lifetime leaks a
-     * dangling subscriber tied to the router's internal param stream. */
+
     private paramMapSubscription!: Subscription;
 
     constructor(private _router: Router,

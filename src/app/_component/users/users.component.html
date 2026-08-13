@@ -8,7 +8,7 @@
 <div class="toolbar">
     <div class="form-group" style="margin-bottom: 0;">
         <label for="searchUsers" class="control-label">Total Users ({{filteredUsers.length}} / {{users.length}})</label>
-        <input type="text" id="searchUsers" class="form-control" style="width: 220px;"
+        <input type="text" id="searchUsers" class="form-control input-sm" style="width: 220px;"
             placeholder="Search" [(ngModel)]="search"/>
     </div>
     <div class="form-group" style="margin-bottom: 0;" *ngIf="isPlatformAdmin">
@@ -44,8 +44,7 @@
     </button>
 </div>
 <span class="help-text" style="margin-bottom: 10px;">
-    <span class="glyphicon glyphicon-info-sign"></span>
-    <span *ngIf="isPlatformAdmin">As Platform Admin you can see and manage users across every tenant.</span>
+    <span class="glyphicon glyphicon-info-sign"></span>&nbsp;<span *ngIf="isPlatformAdmin">As Platform Admin you can see and manage users across every tenant.</span>
     <span *ngIf="!isPlatformAdmin">You can see and manage users within your own tenant.</span>
 </span>
 

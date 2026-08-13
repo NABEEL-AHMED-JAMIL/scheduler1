@@ -5,17 +5,11 @@ import { first } from 'rxjs/operators';
 import { forkJoin, Observable } from 'rxjs';
 import { ApiCode, ApiResponse, BucketSummary, ObjectSummary, ObjectMetadata } from '@/_models';
 
-// marked has no bundled TypeScript types in the version installed here -- same "require as any"
-// pattern used by cv-tailor.component.ts, which already renders markdown this way.
 const marked: any = require('marked');
 
 const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'];
 const PREVIEWABLE_EXTENSIONS = ['json', 'csv', 'txt', 'xml', 'md', 'pdf', 'mp3', 'm4a', 'mp4'].concat(IMAGE_EXTENSIONS);
-// Mirrors process/util/ContentTypeUtil.java on the backend -- needed here because these
-// previews are built into an in-browser Blob rather than just linking straight at the API (see
-// loadPreview: previewObject requires a JWT Authorization header, which a plain <iframe>/<img>/
-// <audio>/<video> src can't carry, so the bytes are fetched via HttpClient -- which does attach
-// it -- and wrapped in a Blob with the right type instead).
+
 const MEDIA_CONTENT_TYPES: { [extension: string]: string } = {
     pdf: 'application/pdf',
     mp3: 'audio/mpeg',
@@ -29,8 +23,7 @@ const MEDIA_CONTENT_TYPES: { [extension: string]: string } = {
     svg: 'image/svg+xml',
     bmp: 'image/bmp'
 };
-/** Preview kinds that are plain text under the hood, so all of them can be edited in place
- * and saved back -- json/csv/txt/xml were previously read-only; only md had Edit/Save. */
+
 const EDITABLE_TEXT_KINDS = ['json', 'csv', 'txt', 'xml', 'md'];
 const TEXT_CONTENT_TYPES: { [extension: string]: string } = {
     json: 'application/json',
@@ -40,13 +33,11 @@ const TEXT_CONTENT_TYPES: { [extension: string]: string } = {
     md: 'text/markdown'
 };
 const PAGE_SIZE = 50;
-// Load the next page once the scroll container is within this many pixels of the bottom.
+
 const SCROLL_FETCH_THRESHOLD_PX = 120;
-// Stagger multi-file downloads so the browser doesn't silently drop near-simultaneous ones.
+
 const BULK_DOWNLOAD_STAGGER_MS = 350;
-// Upper bound on how many entries a single per-folder count listing will fetch -- a folder
-// this size or larger reports "1000+ items" instead of paging through the whole thing just to
-// print an exact number.
+
 const FOLDER_STAT_MAX_KEYS = 1000;
 
 interface Breadcrumb {
@@ -62,9 +53,6 @@ interface FolderStat {
     error: boolean;
 }
 
-/**
- * @author Nabeel Ahmed
- */
 @Component({
     selector: 'object-browser',
     templateUrl: 'object-browser.component.html'
@@ -84,20 +72,12 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
     public nextContinuationToken: string | null = null;
     public loadingObjects = false;
 
-    // Per-folder file/subfolder counts (Object Browser table) -- there's no backend "folder
-    // stats" endpoint, so each folder's count is a bounded, best-effort listObjects call fired
-    // lazily as folder rows load (see loadFolderStats), one per folder key, cached in this map
-    // so switching directories and back doesn't re-fetch. Capped at FOLDER_STAT_MAX_KEYS so a
-    // folder with thousands of entries can't turn "just show a count" into an unbounded
-    // pagination loop -- past the cap it reads "1000+ items" instead of an exact number.
     public folderStats: { [key: string]: FolderStat } = {};
 
-    // search/filter (applied client-side over whatever's loaded so far)
     public searchName = '';
     public searchDateFrom = '';
     public searchDateTo = '';
 
-    // multi-select (files and folders -- deleting a selected folder recurses into it)
     public selectedKeys: Set<string> = new Set();
 
     public selectedObject: ObjectSummary | null = null;
@@ -109,17 +89,10 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
     public previewError: string | null = null;
     public previewJson: string | null = null;
     public previewText: string | null = null;
-    // Streamed source URL, shared by pdf (iframe), mp3/m4a (audio), mp4 (video), and
-    // any image format (img) -- all of them just need a src to point their tag at. Backed by
-    // an in-browser Blob (see loadPreview) rather than the raw API URL, so it works alongside
-    // JWT header auth. previewMediaObjectUrl is the raw blob: URL string underneath it, kept
-    // only so it can be revoked (avoids leaking memory as previews are switched).
+
     public previewMediaUrl: SafeResourceUrl | null = null;
     private previewMediaObjectUrl: string | null = null;
 
-    // Editable text preview (json/csv/txt/xml/md) -- View shows the read-only rendering
-    // (previewJson/previewText, or previewMdHtml for markdown), Edit swaps in a raw-source
-    // textarea (previewEditText) with Save/Cancel; Save overwrites the object in place.
     public previewEditMode: 'view' | 'edit' = 'view';
     public previewMdHtml: string | null = null;
     public previewEditText = '';
@@ -127,14 +100,11 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
 
     public uploading = false;
 
-    // new-folder modal
     public newFolderName = '';
 
-    // rename-folder modal
     public renameFolderEntry: ObjectSummary | null = null;
     public renameFolderNewName = '';
 
-    // delete-confirm modal (shared by row delete, side-panel delete, and bulk delete)
     public pendingDeleteEntries: ObjectSummary[] = [];
     public pendingDeleteLabel = '';
 
@@ -156,8 +126,6 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
     ngOnInit() {
         this.loadBuckets();
     }
-
-    // --- Buckets ---
 
     public loadBuckets(): void {
         this.loadingBuckets = true;
@@ -189,8 +157,6 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
         }
     }
 
-    // --- Folders/objects listing ---
-
     public loadObjects(reset: boolean): void {
         if (!this.selectedBucket || this.loadingObjects) {
             return;
@@ -221,11 +187,6 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
             });
     }
 
-    /** Fires one bounded listObjects call per not-yet-counted folder in the given page, tallying
-     * how many of its immediate children are files vs subfolders. Lazy/per-page (called with
-     * just the newly-loaded page, not the whole this.objects) so scrolling through a long
-     * directory listing doesn't fire hundreds of count requests up front -- only the folders
-     * that have actually scrolled into the loaded page so far. */
     private loadFolderStats(entries: ObjectSummary[]): void {
         const bucket = this.selectedBucket;
         if (!bucket) {
@@ -256,9 +217,6 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
             });
     }
 
-    /** "1 file, 1 folder" (folder rows only, Size column) -- shown directly rather than folded
-     * into a hover-only tooltip, since "how many files / how many folders" is the actual
-     * question being answered, not just a combined count. */
     public folderStatLabel(entry: ObjectSummary): string {
         const stat = this.folderStats[entry.key];
         if (!stat || stat.loading) {
@@ -271,8 +229,6 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
         return `${prefix}${stat.files} file${stat.files === 1 ? '' : 's'}, ${stat.folders} folder${stat.folders === 1 ? '' : 's'}`;
     }
 
-    /** Tooltip for the folderStatLabel -- same info, spelled out in case the label itself
-     * ever needs to truncate in a narrower layout. */
     public folderStatTitle(entry: ObjectSummary): string {
         const stat = this.folderStats[entry.key];
         if (!stat || stat.loading) {
@@ -285,7 +241,6 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
         return `${prefix}${stat.files} file${stat.files === 1 ? '' : 's'}, ${stat.folders} folder${stat.folders === 1 ? '' : 's'}`;
     }
 
-    /** Infinite scroll: fetch the next page once the user scrolls near the bottom of the table. */
     public onTableScroll(event: Event): void {
         const el = event.target as HTMLElement;
         const nearBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - SCROLL_FETCH_THRESHOLD_PX;
@@ -294,13 +249,6 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
         }
     }
 
-    /**
-     * Row click handler. Ignores clicks that originated from the row-actions cell instead
-     * of calling stopPropagation() on those buttons -- Rename/Delete rely on Bootstrap's
-     * data-toggle="modal" data-api, which listens on `document` and only fires if the click
-     * actually bubbles that far; stopPropagation() on the button itself would silently kill
-     * the modal before it ever opens.
-     */
     public openEntry(entry: ObjectSummary, event: Event): void {
         if ((event.target as HTMLElement).closest('.row-actions')) {
             return;
@@ -339,8 +287,6 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
         this.loadObjects(true);
     }
 
-    // --- Search / filter (client-side, over whatever's loaded so far) ---
-
     public get filteredObjects(): ObjectSummary[] {
         const term = (this.searchName || '').trim().toLowerCase();
         const from = this.searchDateFrom ? new Date(this.searchDateFrom).getTime() : null;
@@ -374,8 +320,6 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
         this.searchDateFrom = '';
         this.searchDateTo = '';
     }
-
-    // --- Multi-select (files and folders) ---
 
     public toggleSelect(entry: ObjectSummary, event: Event): void {
         event.stopPropagation();
@@ -415,7 +359,6 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
         this.selectedKeys.clear();
     }
 
-    /** Downloads whichever selected items are files -- folders can't be downloaded as a single file (no zip support). */
     public downloadSelectedBulk(): void {
         const fileKeys = this.objects.filter((entry) => !entry.folder && this.selectedKeys.has(entry.key)).map((entry) => entry.key);
         if (!fileKeys.length) {
@@ -426,7 +369,6 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
         });
     }
 
-    /** Opens the shared delete-confirm modal (data-toggle on the triggering button) for the bulk selection. */
     public requestDeleteBulk(): void {
         const entries = this.objects.filter((entry) => this.selectedKeys.has(entry.key));
         if (!entries.length) {
@@ -435,8 +377,6 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
         this.pendingDeleteEntries = entries;
         this.pendingDeleteLabel = `${entries.length} selected item(s)`;
     }
-
-    // --- Object side panel (metadata + preview) ---
 
     public selectObject(entry: ObjectSummary): void {
         this.selectedObject = entry;
@@ -488,7 +428,7 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
                         this.previewJson = text;
                     }
                 } else if (extension === 'csv' || extension === 'txt' || extension === 'xml') {
-                    // CSV/XML shown as plain text (not parsed), same as .txt.
+
                     this.previewText = text;
                 } else if (extension === 'md') {
                     this.previewText = text;
@@ -500,11 +440,6 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
             });
     }
 
-    /** Fetches an image/pdf/mp3/m4a/mp4 object's bytes via HttpClient (so AuthInterceptor
-     * attaches the JWT) and wraps them in a Blob URL for previewMediaUrl -- a plain <img>/
-     * <iframe>/<audio>/<video> src pointed straight at the API URL can't carry that header and
-     * previewObject requires one, so it 401'd for every media type (most visibly for pdf,
-     * whose iframe just showed a browser error page instead of the file). */
     private loadMediaPreview(key: string, extension: string): void {
         this.previewLoading = true;
         this.storageService.previewObjectArrayBuffer(this.selectedBucket, key)
@@ -521,8 +456,6 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
             });
     }
 
-    /** Releases the current blob: URL (if any) -- called before building a new one and on
-     * reset/destroy so switching between previews doesn't leak memory. */
     private revokePreviewMediaUrl(): void {
         if (this.previewMediaObjectUrl) {
             URL.revokeObjectURL(this.previewMediaObjectUrl);
@@ -548,35 +481,23 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
         this.revokePreviewMediaUrl();
     }
 
-    // --- Text preview edit-in-place (json/csv/txt/xml/md) ---
-
-    /** True when the currently previewed file is one of the plain-text kinds that can be
-     * edited and saved back in place -- everything except pdf/mp3/m4a/mp4/image. */
     public get isEditableTextPreview(): boolean {
         return !!this.previewKind && EDITABLE_TEXT_KINDS.indexOf(this.previewKind) !== -1;
     }
 
-    /** The read-only rendering currently on screen for the active preview kind -- json has its
-     * own pretty-printed field, everything else (csv/txt/xml/md's raw source) shares previewText. */
     private currentPreviewSource(): string {
         return (this.previewKind === 'json' ? this.previewJson : this.previewText) || '';
     }
 
-    /** Switches the preview into edit mode, seeded with the currently loaded source. */
     public startEditPreview(): void {
         this.previewEditText = this.currentPreviewSource();
         this.previewEditMode = 'edit';
     }
 
-    /** Discards unsaved edits and returns to the read-only view. */
     public cancelEditPreview(): void {
         this.previewEditMode = 'view';
     }
 
-    /** Overwrites the object in place with the edited text (same bucket/prefix/name -- MinIO/S3
-     * PUT on an existing key replaces its content), then re-renders the preview from it. Saves
-     * whatever was typed as-is even if e.g. the JSON doesn't parse -- same as markdown never
-     * validating -- the file is the source of truth, not a schema. */
     public savePreview(): void {
         if (!this.selectedObject || !this.selectedBucket || this.savingPreview || !this.previewKind) {
             return;
@@ -629,17 +550,14 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
         this.resetPreview();
     }
 
-    /** Downloads a single row's file (row action icon, files only). */
     public downloadEntry(entry: ObjectSummary, event: Event): void {
         this.triggerDownload(entry.key);
     }
 
-    /** Copies a row's full bucket path (file or folder key) to the clipboard. */
     public copyPath(entry: ObjectSummary, event: Event): void {
         this.copyToClipboard(entry.key, 'Path copied to clipboard.');
     }
 
-    /** Copies the currently previewed json/csv/txt file's full content to the clipboard. */
     public copyPreviewContent(): void {
         const content = this.previewKind === 'json' ? this.previewJson : this.previewText;
         if (!content) {
@@ -673,7 +591,6 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
         }
     }
 
-    /** Opens the shared delete-confirm modal for a single row's delete icon (file or folder). */
     public requestDeleteEntry(entry: ObjectSummary, event: Event): void {
         this.pendingDeleteEntries = [entry];
         this.pendingDeleteLabel = entry.folder
@@ -681,10 +598,6 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
             : `"${entry.name}"`;
     }
 
-    /**
-     * Runs the actual delete once the user confirms in the modal, then closes it. Files are
-     * batched into one bulk delete; each folder needs its own recursive deleteFolder call.
-     */
     public confirmDelete(): void {
         const entries = this.pendingDeleteEntries;
         if (!entries.length || !this.selectedBucket) {
@@ -727,10 +640,6 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
         });
     }
 
-    /** Same JWT-header problem as loadMediaPreview: a plain <a href> navigation to the API URL
-     * can't carry the Authorization header, so it 401'd. Fetches the bytes via HttpClient
-     * instead and saves them from a Blob, with the filename set explicitly since a blob: URL
-     * has none of its own for the browser to fall back on. */
     private triggerDownload(key: string): void {
         this.storageService.previewObjectArrayBuffer(this.selectedBucket, key)
             .pipe(first())
@@ -748,22 +657,15 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
             });
     }
 
-    /** Method use to get the last path segment of an object key as its display filename. */
     private fileNameFromKey(key: string): string {
         const segments = key.split('/');
         return segments[segments.length - 1] || key;
     }
 
-    /** trackBy for the object table -- key is this row's stable identity (same field the
-     * selection/active-row checks already key off), so Angular can diff by it instead of
-     * default object identity and skip re-rendering rows that didn't actually change. */
     public trackByKey(_index: number, entry: any): any {
         return entry.key;
     }
 
-    // --- Create folder ---
-
-    /** Called by the New Folder modal's Create button. */
     public confirmCreateFolder(): void {
         if (!this.selectedBucket || !this.newFolderName || !this.newFolderName.trim()) {
             return;
@@ -791,15 +693,11 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
         }
     }
 
-    // --- Rename folder ---
-
-    /** Opens the rename modal (data-toggle on the triggering button) for a folder row. */
     public requestRenameFolder(entry: ObjectSummary, event: Event): void {
         this.renameFolderEntry = entry;
         this.renameFolderNewName = entry.name;
     }
 
-    /** Called by the Rename modal's Rename button. */
     public confirmRenameFolder(): void {
         const entry = this.renameFolderEntry;
         if (!entry || !this.selectedBucket || !this.renameFolderNewName || !this.renameFolderNewName.trim()) {
@@ -823,8 +721,6 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
                 this.closeModal(this.closeRenameModal);
             });
     }
-
-    // --- Upload ---
 
     public triggerUpload(): void {
         if (this.fileInput) {

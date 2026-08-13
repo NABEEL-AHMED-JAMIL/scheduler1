@@ -5,3 +5,4 @@ export * from './role.guard';
 export * from './auth.interceptor';
 export * from './pretty-print';
 export * from './pdf-text-extractor';
+export * from './job-status-chart.helper';

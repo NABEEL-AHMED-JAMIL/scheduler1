@@ -3,9 +3,6 @@ import { HttpClient } from '@angular/common/http';
 import { ApiResponse } from '@/_models';
 import { Observable } from 'rxjs';
 
-/**
- * @author Nabeel Ahmed
- */
 @Injectable({
     providedIn: 'root'
 })
@@ -43,7 +40,6 @@ export class StorageService {
         return this.http.get(this.previewObjectUrl(bucket, key), { responseType: 'text' });
     }
 
-    /** Raw bytes of an object -- used for client-side PDF text extraction (pdf.js) ahead of AI processing. */
     public previewObjectArrayBuffer(bucket: string, key: string): Observable<ArrayBuffer> {
         return this.http.get(this.previewObjectUrl(bucket, key), { responseType: 'arraybuffer' });
     }

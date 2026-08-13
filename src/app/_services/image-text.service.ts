@@ -4,9 +4,6 @@ import { ApiResponse } from '@/_models';
 import { ImageRegion } from '@/_models/image-text.model';
 import { Observable } from 'rxjs';
 
-/**
- * @author Nabeel Ahmed
- */
 @Injectable({
     providedIn: 'root'
 })

@@ -7,12 +7,6 @@ import {
 } from '@angular/router';
 import { AuthService } from '@/_services';
 
-
-/**
- * Blocks access to protected routes unless the user is logged in.
- *
- * @author Nabeel Ahmed
- */
 @Injectable({ providedIn: 'root' })
 export class AuthGuard implements CanActivate {
 

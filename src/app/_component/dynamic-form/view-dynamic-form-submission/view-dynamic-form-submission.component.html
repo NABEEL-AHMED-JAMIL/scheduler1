@@ -22,7 +22,7 @@
             <div class="share-link-box" *ngIf="shareUrl">
                 <div class="share-link-label">
                     <span class="glyphicon glyphicon-link"></span> Shareable API link
-                    <span class="help-text" style="display: inline; margin-left: 4px;">-- fetch this submission's data from Postman, a source task, or anywhere else</span>
+                    <span class="help-text" style="display: inline; margin-left: 4px;">-- fetch this submission's data from Postman, a source task, or anywhere else; no login needed, the token below is what grants access</span>
                 </div>
                 <div class="share-link-row">
                     <code>{{shareUrl}}</code>
@@ -30,6 +30,16 @@
                         <span class="glyphicon glyphicon-copy"></span>
                     </button>
                 </div>
+                <div class="share-link-row" style="margin-top: 6px;">
+                    <span class="help-text" style="margin-right: 6px; white-space: nowrap;">Token:</span>
+                    <code>{{shareToken}}</code>
+                    <button type="button" class="btn btn-icon ic-copy" title="Copy token" (click)="copyShareToken()">
+                        <span class="glyphicon glyphicon-copy"></span>
+                    </button>
+                </div>
+                <span class="help-text" style="display: block; margin-top: 4px;">
+                    <span class="glyphicon glyphicon-info-sign"></span>&nbsp;This token is unique to this submission -- a new submission always gets its own new token, and this one keeps working even if the submission is later edited.
+                </span>
             </div>
 
             <ng-container *ngFor="let field of dynamicForm.fields">

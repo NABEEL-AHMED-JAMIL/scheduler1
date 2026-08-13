@@ -12,16 +12,6 @@ import {
 } from '@/_services/index';
 import { first } from 'rxjs/operators';
 
-
-/**
- * Batch Action -- bulk Upload/Download/Template for Source Job and Source Task, driven by the
- * ':action' route data (see app.routing.ts: 'sourceJob' -> Job, anything else -> Task). Every
- * record this creates is scoped to the uploader's own tenant server-side (see
- * SourceJobBulkServiceImpl.uploadSourceJob / SourceTaskServiceImpl.uploadSourceTask) -- the
- * banner here just makes that boundary visible instead of silent, and a Platform Admin gets
- * its own copy since their uploads are tenant-less by design (see AppUser's own javadoc).
- * @author Nabeel Ahmed
- */
 @Component({
     selector: 'batch-action',
     templateUrl: 'batch-action.component.html'
@@ -37,14 +27,11 @@ export class SourceBatchActionComponent implements OnInit {
     public router = '';
     public action = '';
     public errors: any[] = [];
-    // Drag-and-drop state for the upload zone -- isDragging only drives the hover style,
-    // selectedFileName lets the zone show what's queued/just finished instead of going blank
-    // the instant the native <input> is cleared for a re-upload.
+
     public isDragging = false;
     public selectedFileName: string | null = null;
     public isUploading = false;
-    // Last upload outcome, shown as a result banner above the error table (or in place of it,
-    // when there were no row-level errors to list) -- null before the first upload this visit.
+
     public lastUploadOk: boolean | null = null;
     public lastUploadMessage = '';
 
@@ -174,10 +161,6 @@ export class SourceBatchActionComponent implements OnInit {
         this._router.navigateByUrl(this.router);
     }
 
-    /**
-     * Method is use to download file.
-     * @param data - Array Buffer data
-     */
     public downLoadFile(data: any): void {
         let blob = new Blob([data], {
             type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -186,14 +169,11 @@ export class SourceBatchActionComponent implements OnInit {
         let pwa = window.open(url);
         if (!pwa || pwa.closed || typeof pwa.closed == 'undefined') {
             alert( 'Please disable your Pop-up blocker and try again.');
-            // Nothing ended up using the blob URL -- release it right away instead of leaking it.
+
             window.URL.revokeObjectURL(url);
             return;
         }
-        // Revoke once the popup has actually loaded the blob URL, not immediately -- unlike
-        // object-browser.component.ts's anchor-click download (synchronous, safe to revoke right
-        // after), this opens a real new tab that asynchronously navigates to the blob URL; an
-        // immediate revoke could race that and break the download.
+
         pwa.onload = () => window.URL.revokeObjectURL(url);
     }
 

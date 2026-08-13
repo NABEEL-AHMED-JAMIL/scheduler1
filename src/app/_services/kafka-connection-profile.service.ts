@@ -4,9 +4,6 @@ import { ApiResponse } from '@/_models';
 import { KafkaConnectionProfile } from '@/_models/kafka-connection-profile.model';
 import { Observable } from 'rxjs';
 
-/**
- * @author Nabeel Ahmed
- */
 @Injectable({
     providedIn: 'root'
 })
@@ -27,7 +24,6 @@ export class KafkaConnectionProfileService {
             `${config.apiUrl}/kafkaConnectionProfile.json/deleteProfile?kafkaConnectionProfileId=${kafkaConnectionProfileId}`, {});
     }
 
-    /** The caller's own tenant's profiles plus every platform-wide/shared one. */
     public fetchAllProfiles(): Observable<ApiResponse> {
         return this.http.get<ApiResponse>(`${config.apiUrl}/kafkaConnectionProfile.json/fetchAllProfiles`);
     }
@@ -45,13 +41,10 @@ export class KafkaConnectionProfileService {
         return this.http.post<ApiResponse>(`${config.apiUrl}/kafkaConnectionProfile.json/testConnection`, payload);
     }
 
-    /** Tests that a specific topic (e.g. a Source TaskType's queueTopicPartition topic) is
-     * reachable on the caller's tenant's currently effective Kafka cluster. */
     public testTopic(topicName: any): Observable<ApiResponse> {
         return this.http.get<ApiResponse>(`${config.apiUrl}/kafkaConnectionProfile.json/testTopic?topicName=${encodeURIComponent(topicName)}`);
     }
 
-    /** The caller's own tenant routing override for a source task type, if one exists. */
     public fetchKafkaRoute(sourceTaskTypeId: any): Observable<ApiResponse> {
         return this.http.get<ApiResponse>(`${config.apiUrl}/setting.json/fetchKafkaRoute?sourceTaskTypeId=${sourceTaskTypeId}`);
     }

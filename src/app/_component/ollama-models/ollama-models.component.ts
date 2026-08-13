@@ -5,12 +5,6 @@ import { SpinnerService } from '@/_helpers';
 import { ApiCode } from '@/_models';
 import { OllamaModel, OLLAMA_POPULAR_MODELS, OllamaCatalogEntry, formatBytes } from '@/_models/ollama.model';
 
-/**
- * Lists models currently pulled into the local Ollama container and lets you pull new ones
- * (or delete ones you no longer need) -- these model tags are what an Ollama-provider AI
- * Agent's "Model" field should reference (see ai-agent.component).
- * @author Nabeel Ahmed
- */
 @Component({
     selector: 'ollama-models',
     templateUrl: 'ollama-models.component.html'
@@ -60,7 +54,6 @@ export class OllamaModelsComponent implements OnInit {
             });
     }
 
-    /** The tag actually submitted -- a hand-typed custom tag wins over the dropdown pick. */
     public get tagToPull(): string {
         return (this.customTag || '').trim() || this.selectedPopularTag;
     }

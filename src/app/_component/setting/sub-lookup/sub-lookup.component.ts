@@ -10,11 +10,11 @@ import { ActivatedRoute } from '@angular/router';
     selector: 'sub-lookup',
     templateUrl: 'sub-lookup.component.html'
 })
-export class SubLookupComponent implements OnInit {	
+export class SubLookupComponent implements OnInit {
 
 	public ERROR: string = 'Error';
     public searchLookupDataForm: any = '';
-    // source lookup
+
 	public lookupId: any;
 	public lookupAction: Action | null = null;
 	public lookupData: LookupData | null = null;
@@ -58,9 +58,7 @@ export class SubLookupComponent implements OnInit {
 		.subscribe((response) => {
 			if(response.status === ApiCode.SUCCESS) {
 				this.spinnerService.hide();
-				// look up the real index by id -- the *ngFor index passed in is into the
-				// searchFilter-filtered view, not this.lookupDatas itself, so it pointed at
-				// the wrong row whenever a search term was active
+
 				const realIndex = this.lookupDatas.findIndex((data) => data.lookupId === lookupData.lookupId);
 				if (realIndex > -1) {
 					this.lookupDatas.splice(realIndex, 1);

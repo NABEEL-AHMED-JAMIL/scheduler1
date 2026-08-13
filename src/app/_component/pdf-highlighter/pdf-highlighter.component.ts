@@ -6,11 +6,6 @@ import { first } from 'rxjs/operators';
 import { ApiCode } from '@/_models';
 import { PdfHighlighterTask } from '@/_models/index';
 
-/**
- * Lists PDF highlighter tasks (basic detail only -- task name, highlighter status,
- * status -- no organization/form linkage, that lives on the io-frontend side).
- * @author Nabeel Ahmed
- */
 @Component({
     selector: 'pdf-highlighter',
     templateUrl: 'pdf-highlighter.component.html'
@@ -27,10 +22,9 @@ export class PdfHighlighterComponent implements OnInit {
     public deletePdfHighlighterTaskId: any;
     public deleteSelectedIndex: any;
     public readonly highlighterStatusOptions = ['Draft', 'Ready'];
-    // 'Delete' left out on purpose -- a deleted task is never shown (see filteredPdfHighlighterTasks).
+
     public readonly statusOptions = ['Active', 'Inactive'];
-    // '' means "no filter" for each -- applied before the free-text search box (see
-    // filteredPdfHighlighterTasks).
+
     public filterHighlighterStatus: string = '';
     public filterStatus: string = '';
 
@@ -97,7 +91,6 @@ export class PdfHighlighterComponent implements OnInit {
         this.deleteSelectedIndex = selectedIndex;
     }
 
-    /** Bucket key the task's PDF is stored under (etl-bucket/pdf-highlighter/{id}/{fileName}) -- see PdfHighlighterTaskServiceImpl.taskPrefix(). */
     public filePathFor(pdfHighlighterTask: PdfHighlighterTask): string {
         if (!pdfHighlighterTask.fileName) { return ''; }
         return 'pdf-highlighter/' + pdfHighlighterTask.pdfHighlighterTaskId + '/' + pdfHighlighterTask.fileName;
@@ -120,9 +113,7 @@ export class PdfHighlighterComponent implements OnInit {
                 if (response.status === ApiCode.SUCCESS) {
                     this.spinnerService.hide();
                     this.alertService.showSuccess(response.message, this.DELETE_PDF_HIGHLIGHTER_TASK);
-                    // look up by id, not the stale searchFilter-view index -- deleteSelectedIndex
-                    // is captured from the *ngFor over the filtered view, so it doesn't line up
-                    // with this.pdfHighlighterTasks itself whenever a search term is active
+
                     const realIndex = this.pdfHighlighterTasks.findIndex(
                         (task: any) => task.pdfHighlighterTaskId === this.deletePdfHighlighterTaskId);
                     if (realIndex > -1) {

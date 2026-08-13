@@ -21,3 +21,4 @@ export * from './kafka-connection-profile.service';
 export * from './tenant.service';
 export * from './app-user.service';
 export * from './query-engine.service';
+export * from './document-converter.service';

@@ -1,6 +1,4 @@
-/**
- * @author Nabeel Ahmed
- */
+
 export interface AuthUser {
     accessToken: string;
     refreshToken: string;

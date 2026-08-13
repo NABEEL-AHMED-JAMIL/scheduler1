@@ -6,10 +6,6 @@ import { first } from 'rxjs/operators';
 import { ApiCode } from '@/_models';
 import { DynamicForm, formShareUrl } from '@/_models/dynamic-form.model';
 
-/**
- * Lists dynamic forms -- create a new one, edit its fields, fill it in, or delete it.
- * @author Nabeel Ahmed
- */
 @Component({
     selector: 'dynamic-form-list',
     templateUrl: 'dynamic-form-list.component.html'
@@ -24,9 +20,9 @@ export class DynamicFormListComponent implements OnInit {
     public dynamicForms: DynamicForm[] = [];
     public deleteDynamicFormId: any;
     public deleteSelectedIndex: any;
-    // 'Delete' left out on purpose -- a deleted form is never shown (see filteredDynamicForms).
+
     public readonly statusOptions = ['Active', 'Inactive'];
-    // '' means "no filter" -- applied before the free-text search box (see filteredDynamicForms).
+
     public filterStatus: string = '';
 
     constructor(
@@ -87,9 +83,6 @@ export class DynamicFormListComponent implements OnInit {
         this.router.navigate(['/dynamicForm/submissions', dynamicForm.dynamicFormId]);
     }
 
-    /** Same "Copy API link" idea already used for a single submission (see
-     * dynamic-form-submissions.component.ts#copyShareUrl), but for the whole form definition --
-     * meant to be pasted into Postman, a source task config, etc. */
     public copyShareUrl(dynamicForm: DynamicForm): void {
         let url = formShareUrl(dynamicForm);
         if (!url) {
@@ -115,9 +108,7 @@ export class DynamicFormListComponent implements OnInit {
                 this.spinnerService.hide();
                 if (response.status === ApiCode.SUCCESS) {
                     this.alertService.showSuccess(response.message, 'Form Delete');
-                    // look up by id, not the stale searchFilter-view index -- deleteSelectedIndex
-                    // is captured from the *ngFor over the filtered view, so it doesn't line up
-                    // with this.dynamicForms itself whenever a search term is active
+
                     const realIndex = this.dynamicForms.findIndex(
                         (form: any) => form.dynamicFormId === this.deleteDynamicFormId);
                     if (realIndex > -1) {

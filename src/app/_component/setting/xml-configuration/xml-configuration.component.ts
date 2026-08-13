@@ -52,11 +52,11 @@ export class XmlConfigurationComponent implements OnInit {
     public get tageForms(): FormArray {
         return this.xmlForm.get('tagsInfo') as FormArray;
     }
-    
+
     public tageFormsAddItem(): void {
         this.tageForms.push(this.buildItem());
     }
-    
+
     public tageFormAddItem(index: number): void {
         this.tageForms.insert(index, this.buildItem());
     }
@@ -80,5 +80,5 @@ export class XmlConfigurationComponent implements OnInit {
     public addFile(file: File): void {
         this.file = file;
     }
-    
+
 }

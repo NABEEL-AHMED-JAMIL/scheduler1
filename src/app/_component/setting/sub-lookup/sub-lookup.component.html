@@ -4,6 +4,8 @@
     <span class="crumb-sep">/</span>
     <a routerLink="/setting">Setting</a>
     <span class="crumb-sep">/</span>
+    <a routerLink="/setting/lookup">Lookup</a>
+    <span class="crumb-sep">/</span>
     <span class="crumb-current">Sub Lookup</span>
 </nav>
 
@@ -48,7 +50,7 @@
     <div class="toolbar">
         <div class="form-group" style="margin-bottom: 15px;">
             <label for="searchLookupDataForm" class="control-label">Total Lookups ({{lookupDatas.length}})</label>
-            <input type="text" id="searchLookupDataForm" class="form-control" style="width: 280px;"
+            <input type="text" id="searchLookupDataForm" class="form-control input-sm" style="width: 280px;"
                 placeholder="Search" [(ngModel)]="searchLookupDataForm"/>
         </div>
     </div>

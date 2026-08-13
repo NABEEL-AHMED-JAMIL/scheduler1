@@ -17,6 +17,7 @@ import {
     LookupComponent,
     SourceTaskTypeComponent,
     SettingComponent,
+    SettingLookupComponent,
     XmlConfigurationComponent,
     JobComponent,
     SourceJobComponent,
@@ -49,14 +50,11 @@ import {
     UnauthorizedComponent,
     TenantsComponent,
     UsersComponent,
-    WelcomeComponent
+    WelcomeComponent,
+    DocumentConverterComponent
 } from './_component/index';
 import { ToastrModule } from 'ngx-toastr';
 
-
-/**
- * @author Nabeel Ahmed
- */
 @NgModule({
     imports: [
         BrowserModule,
@@ -86,6 +84,7 @@ import { ToastrModule } from 'ngx-toastr';
         SpinnerComponent,
         HomeComponent,
         SettingComponent,
+        SettingLookupComponent,
         LookupComponent,
         SourceTaskTypeComponent,
         XmlConfigurationComponent,
@@ -121,7 +120,8 @@ import { ToastrModule } from 'ngx-toastr';
         UnauthorizedComponent,
         TenantsComponent,
         UsersComponent,
-        WelcomeComponent
+        WelcomeComponent,
+        DocumentConverterComponent
     ],
     providers: [
         { provide: HTTP_INTERCEPTORS, useClass: AuthInterceptor, multi: true }

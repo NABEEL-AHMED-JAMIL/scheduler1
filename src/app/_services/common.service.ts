@@ -1,15 +1,11 @@
 import { Injectable } from '@angular/core';
 import { saveAs } from 'file-saver';
 
-
-/**
- * @author Nabeel Ahmed
- */
 @Injectable({
     providedIn: 'root'
 })
 export class CommomService {
-    
+
     constructor() {
     }
 
@@ -20,7 +16,7 @@ export class CommomService {
           return value.toString(16);
         });
     }
-    
+
     public createFile(payload: any): any {
         const file = new Blob([JSON.stringify(payload, null, 4)], { type: 'application/json' });
         saveAs(file, 'Raad-Master-Data ' + this.uuid() + '.json');

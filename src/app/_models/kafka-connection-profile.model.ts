@@ -1,12 +1,10 @@
-/**
- * @author Nabeel Ahmed
- */
+
 export interface KafkaConnectionProfile {
     kafkaConnectionProfileId?: any;
-    /** Null = platform-wide/shared profile, usable by any tenant without one of its own. */
+
     tenantId?: any;
     profileName?: string;
-    /** Free-text label for humans, e.g. "local", "prod-remote-eu" -- purely descriptive. */
+
     environmentLabel?: string;
     bootstrapServers?: string;
     securityProtocol?: string;
@@ -23,10 +21,9 @@ export interface KafkaConnectionProfile {
     sslTruststorePassword?: string;
     sslTruststorePasswordConfigured?: boolean;
     sslEndpointIdentificationAlgorithm?: string;
-    /** Free-form JSON object string of non-secret Kafka client properties. */
+
     additionalProperties?: string;
-    /** This tenant's (or the platform's, for a null-tenant profile) default -- replaces the old
-     * single-global-switch "connectionActive". */
+
     isDefault?: boolean;
     status?: string;
     connectionStatus?: 'UNTESTED' | 'SUCCESS' | 'FAILED';

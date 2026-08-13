@@ -1,6 +1,5 @@
 @import "~ngx-toastr/toastr.css";
 
-// global application styles
 a {
   cursor: pointer;
 }
@@ -16,18 +15,15 @@ a {
   border-top-right-radius: 0px;
 }
 
-/* Remove the navbar's default margin-bottom and rounded borders */
 .navbar {
   margin-bottom: 0;
   border-radius: 0;
 }
 
-/* Set height of the grid so .sidenav can be 100% (adjust as needed) */
 .row.content {
   height: 450px
 }
 
-/* Set gray background color and 100% height */
 .sidenav {
   padding-top: 20px;
   background-color: #f1f1f1;
@@ -49,31 +45,26 @@ a {
   border-color: #222222;
 }
 
-/* MODAL STYLES
--------------------------------*/
 jw-modal {
-  /* modals are hidden by default */
+
   display: none;
 
   .jw-modal {
-    /* modal container fixed across whole screen */
+
     position: fixed;
     top: 0;
     right: 0;
     bottom: 0;
     left: 0;
 
-    /* z-index must be higher than .jw-modal-background */
     z-index: 1000;
 
-    /* enables scrolling for tall modals */
     overflow: auto;
 
     .jw-modal-body {
       padding: 20px;
       background: #fff;
 
-      /* margin exposes part of the modal background */
       margin: 40px;
       margin-right: 12%;
       margin-left: 15%;
@@ -83,29 +74,25 @@ jw-modal {
   }
 
   .jw-modal-background {
-    /* modal background fixed across whole screen */
+
     position: fixed;
     top: 0;
     right: 0;
     bottom: 0;
     left: 0;
 
-    /* semi-transparent black  */
     background-color: #000;
     opacity: 0.75;
 
-    /* z-index must be below .jw-modal and above everything else  */
     z-index: 900;
   }
 }
 
 body.jw-modal-open {
-  /* body overflow is hidden to hide main scrollbar when modal window is open */
+
   overflow: hidden;
 }
 
-
-// Colors
 @brand-primary: #4f46e5;
 @brand-secondary: #ff8300;
 @gray: #6b7381;
@@ -113,17 +100,13 @@ body.jw-modal-open {
 @gray-lighter: lighten(@gray, 30%);
 ;
 
-// Button Colors
 @btn-default-color: @gray;
 @btn-default-bg: @gray-lighter;
 
-// Toggle Sizes
 @toggle-default-size: 1.5rem;
 @toggle-default-label-width: 4rem;
 @toggle-default-font-size: .75rem;
 
-
-// General Styles for Demo
 body {
   font-family: 'Montserrat', 'Lato', 'Open Sans', 'Helvetica Neue', Helvetica, Calibri, Arial, sans-serif;
   color: @gray;
@@ -182,10 +165,6 @@ body {
   }
 }
 
-
-
-// Mixin for Switch Colors
-// Variables: @color, @bg, @active-bg
 .toggle-color(@color: @btn-default-color; @bg: @btn-default-bg; @active-bg: @brand-primary; ) {
   color: @color;
   background: @bg;
@@ -200,11 +179,8 @@ body {
   }
 }
 
-// Mixin for Default Switch Styles
-// Variables: @size, @margin, @color, @bg, @active-bg, @font-size
 .toggle-mixin(@size: @toggle-default-size; @margin: @toggle-default-label-width; @font-size: @toggle-default-font-size; ) {
-  // color: @color;
-  // background: @bg;
+
   margin: 0 @margin;
   padding: 0;
   position: relative;
@@ -315,9 +291,6 @@ body {
   }
 }
 
-
-
-// Apply Mixin to different sizes & colors
 .btn-toggle {
 
   .toggle-mixin;
@@ -396,10 +369,6 @@ body {
   text-decoration: none;
 
 }
-
-/* Latest compiled and minified CSS included as External Resource*/
-
-/* Optional theme */
 
 .stepwizard-step p {
   margin-top: 0px;
@@ -497,13 +466,6 @@ td {
   vertical-align: inherit;
 }
 
-
-/*
-  This shorter one should work too:
-  It disables the events of your mouse on the tds
-  that are in a tr with the "disabled" property.
-  (Plus, I added your blur)
-*/
 #table2 tr[disabled] td {
   filter: blur(1px);
   pointer-events: none;
@@ -539,7 +501,6 @@ td {
   background: #f2f2f2;
 }
 
-/* side form */
 .side-form {
   position: absolute;
   z-index: 100;
@@ -549,8 +510,7 @@ td {
   height: 100%;
   overflow: auto;
   background: #fff;
-  // padding: 20px;
-  // border-left: 1px solid #e0e0e0;
+
   font-family: 'Montserrat', 'Lato', 'Open Sans', 'Helvetica Neue', Helvetica, Calibri, Arial, sans-serif;
   color: #6b7381;
   background: #f2f2f2;
@@ -635,54 +595,47 @@ td {
   z-index: 100;
 }
 
-/* MODAL STYLES
--------------------------------*/
 jw-modal {
-  /* modals are hidden by default */
+
   display: none;
 
   .jw-modal {
-    /* modal container fixed across whole screen */
+
     position: fixed;
     top: 0;
     right: 0;
     bottom: 0;
     left: 0;
 
-    /* z-index must be higher than .jw-modal-background */
     z-index: 1000;
 
-    /* enables scrolling for tall modals */
     overflow: auto;
 
     .jw-modal-body {
       padding: 20px;
       background: #fff;
 
-      /* margin exposes part of the modal background */
       margin: 40px;
     }
   }
 
   .jw-modal-background {
-    /* modal background fixed across whole screen */
+
     position: fixed;
     top: 0;
     right: 0;
     bottom: 0;
     left: 0;
 
-    /* semi-transparent black  */
     background-color: #000;
     opacity: 0.75;
 
-    /* z-index must be below .jw-modal and above everything else  */
     z-index: 900;
   }
 }
 
 body.jw-modal-open {
-  /* body overflow is hidden to hide main scrollbar when modal window is open */
+
   overflow: hidden;
 }
 
@@ -690,22 +643,15 @@ body.jw-modal-open {
   height: 200px;
 }
 
-/* Group-by charts grid (Q-Message / Job History pages) -- small multiples, one card per
-   dimension (Job Id/Status/Run Manual/Skip Manual/Q Send pies, Start/End/Skip Time trend
-   lines), wrapping responsively instead of forcing a fixed column count. */
-/* Kaggle-style column-profile strip -- sits flush against the top of the table it profiles
-   (no bottom border/margin of its own; .table-responsive right below supplies the visual
-   separation). Compact cards (donuts, the boolean-fields bar) stay small multiples in a row;
-   the duration-comparison chart spans the full row via .stat-chart-wide since it carries more
-   information (a ranked list, not just a shape) and needs the width to stay readable. */
 .stat-chart-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   margin-bottom: 10px;
 }
 
 .stat-chart-grid .demo-chart {
+  flex: 1 1 190px;
   height: 170px;
   background: @surface;
   border: 1px solid @line;
@@ -714,11 +660,8 @@ body.jw-modal-open {
 }
 
 .stat-chart-grid .stat-chart-wide {
-  // Not the "1 / -1" shorthand -- LESS's math processor reads the "/" as division and
-  // silently collapses it to a single "-1" (all this session's earlier testing showed a 4px-
-  // wide chart because of exactly that). Separate start/end properties sidestep it entirely.
-  grid-column-start: 1;
-  grid-column-end: -1;
+
+  flex-basis: 100%;
   height: 260px;
 }
 
@@ -799,14 +742,9 @@ a {
   background-color: white;
 }
 
-/* =========================================================
-   App theme layer (Bootstrap 3 enhancement)
-   One cohesive teal / slate theme shared by every screen.
-   Simple, clean, and consistent.
-   ========================================================= */
-@brand-teal: #4f46e5;       // indigo (primary)
-@brand-teal-dark: #3730a3;  // deep indigo
-@brand-accent: #7c3aed;     // violet accent
+@brand-teal: #4f46e5;
+@brand-teal-dark: #3730a3;
+@brand-accent: #7c3aed;
 @brand-slate: #2f3a45;
 @ink: #36424d;
 @muted: #7b8794;
@@ -814,25 +752,19 @@ a {
 @surface: #ffffff;
 @page-bg: #f4f6f8;
 
-/* Base */
 body {
   background: @page-bg;
   color: @ink;
 }
 
-/* Page content padding (wrapper around <router-outlet>) */
 .app-content {
   padding: 20px 24px;
 }
 
-/* Applied only on the landing route (see AppComponent#isFlushRoute) -- .landing-page manages
-   its own full-bleed sections (hero gradient, feature grid) and needs to sit flush against the
-   viewport edges, unlike every other route which relies on the padding above for its gutter. */
 .app-content-flush {
   padding: 0;
 }
 
-/* ---------- Navbar ---------- */
 .navbar-inverse {
   background: @brand-slate;
   border: none;
@@ -877,7 +809,6 @@ body {
   background: rgba(255, 255, 255, 0.1);
 }
 
-/* ---------- Breadcrumb bar ---------- */
 .breadcrumb-bar {
   display: flex;
   align-items: center;
@@ -920,7 +851,6 @@ body {
   }
 }
 
-/* ---------- Toolbar: action button row ---------- */
 .toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -937,6 +867,13 @@ body {
   margin-left: 0;
 }
 
+.toolbar > button,
+.toolbar > .btn,
+.toolbar > a.btn,
+.toolbar > .btn-group {
+  margin-bottom: 0;
+}
+
 .toolbar-spacer {
   flex: 1 1 auto;
 }
@@ -945,7 +882,6 @@ body {
   margin-left: 0;
 }
 
-/* ---------- Data table (simple & clean) ---------- */
 .table-modern {
   background: @surface;
   border: 1px solid @line;
@@ -953,7 +889,6 @@ body {
   margin-bottom: 18px;
 }
 
-/* horizontal lines only — keep it simple even with .table-bordered */
 .table-modern > thead > tr > th,
 .table-modern > tbody > tr > td,
 .table-modern > tfoot > tr > td {
@@ -989,12 +924,6 @@ body {
   background: #f1f0fd;
 }
 
-/* Column-header mini histogram (Kaggle-CSV-style "chart on top of each column") -- one bar per
-   possible value the column can hold (fixed set, so it's always multi-bar even when every row
-   currently shares one value), height sized by that value's share of the (non-null) rows,
-   sitting on a baseline. A stacked single-strip version of this collapsed into what just read
-   as a plain colored line whenever a column was all-one-value -- vertical bars keep it legible
-   as "a chart" even then (one tall bar against a flat baseline). Hover a bar for the exact count. */
 .col-mini-chart {
   display: flex;
   align-items: flex-end;
@@ -1027,7 +956,6 @@ body {
   color: @brand-teal;
 }
 
-/* Row-opening link (e.g. submission #id -> detail panel) -- reads as clearly clickable */
 .submission-id-link {
   font-weight: 700;
   text-decoration: none;
@@ -1037,7 +965,6 @@ body {
   text-decoration: underline;
 }
 
-/* "Other Submissions" sidebar rows on the submission detail page */
 .submission-list-item {
   display: flex;
   flex-direction: column;
@@ -1079,7 +1006,6 @@ body {
   color: @muted;
 }
 
-/* Zoom out tables by reducing density globally while keeping full container width */
 .table-responsive .table {
   width: 100%;
   max-width: 100%;
@@ -1100,7 +1026,6 @@ body {
   padding: 6px 8px;
 }
 
-/* Long message / payload cells: keep the table tidy and readable */
 .cell-message {
   max-width: 320px;
   max-height: 110px;
@@ -1119,14 +1044,10 @@ body {
   padding: 6px 8px;
 }
 
-/* Full-width message cell (e.g. logs table where the message column owns the row) */
 .cell-message.cell-message-wide {
   max-width: none;
 }
 
-/* Single-line truncated cell (e.g. dynamic-form submission values) -- caps runaway
-   pasted text to one line with an ellipsis instead of ballooning the row height;
-   the full value is available via [title] and the row's View action. */
 .cell-truncate {
   max-width: 200px;
   overflow: hidden;
@@ -1134,7 +1055,6 @@ body {
   white-space: nowrap;
 }
 
-/* ---------- Detail / info layouts (for redesigned detail pages) ---------- */
 .detail-item {
   margin-bottom: 12px;
 }
@@ -1155,7 +1075,6 @@ body {
   font-size: 13px;
 }
 
-/* Inline entity header: title + status pills on one line (saves vertical space) */
 .entity-head {
   display: flex;
   flex-wrap: wrap;
@@ -1165,13 +1084,12 @@ body {
 }
 
 .entity-head .entity-title {
-  margin: 0 auto 0 0; /* push the status pills to the right side of the row */
+  margin: 0 auto 0 0;
   font-size: 14px;
   font-weight: 700;
   color: @ink;
 }
 
-/* Horizontal meta row: detail-items flow side by side and wrap */
 .meta-grid {
   display: flex;
   flex-wrap: wrap;
@@ -1182,7 +1100,6 @@ body {
   margin-bottom: 10px;
 }
 
-/* Compact inline flags (label + pill), replaces stacked detail-items */
 .flag-group {
   display: flex;
   flex-wrap: wrap;
@@ -1201,7 +1118,6 @@ body {
   color: @muted;
 }
 
-/* Read-only code / payload box */
 .code-box {
   display: block;
   width: 100%;
@@ -1221,7 +1137,6 @@ body {
   margin: 0;
 }
 
-/* Equal-height columns: child .card-panel of each column stretches to the tallest */
 .row-equal {
   display: flex;
   flex-wrap: wrap;
@@ -1235,7 +1150,6 @@ body {
   width: 100%;
 }
 
-/* Panel whose body fills the available height (e.g. equal-height config-tags panel) */
 .panel-fill {
   display: flex;
   flex-direction: column;
@@ -1250,11 +1164,10 @@ body {
 
 .panel-fill > #main-form-content > .scroll-table {
   flex: 1 1 auto;
-  max-height: none; /* fill the panel instead of a fixed cap */
+  max-height: none;
   min-height: 0;
 }
 
-/* Vertically scrollable table area (e.g. growing config-tag rows) with sticky header */
 .scroll-table {
   max-height: 850px;
   overflow-y: auto;
@@ -1270,13 +1183,11 @@ body {
   z-index: 2;
 }
 
-/* Bold black cell text — for logs / query result tables */
 .table-strong > tbody > tr > td {
   font-weight: 600;
   color: #111;
 }
 
-/* Compact table — tighter cells for dense input grids (e.g. config tags) */
 .table-compact {
   font-size: 12px;
 }
@@ -1295,7 +1206,6 @@ body {
   font-size: 12px;
 }
 
-/* Login page */
 .login-page {
   position: fixed;
   top: 0;
@@ -1328,8 +1238,6 @@ body {
   text-align: center;
 }
 
-/* ---------- Public landing page (welcome.component) ---------- */
-/* Not a fixed/full-viewport overlay like .login-page -- this is a normal, scrollable page. */
 .landing-page {
   min-height: 100vh;
   background: @page-bg;
@@ -1359,8 +1267,6 @@ body {
   overflow: hidden;
 }
 
-/* Faint dot-grid texture over the gradient -- reads as "technical product", not a flat block
-   of color, without pulling in an external image (unlike .login-page's photo background). */
 .landing-hero-pattern {
   position: absolute;
   top: 0;
@@ -1487,8 +1393,6 @@ body {
   color: #fff;
 }
 
-/* Soft curved divider between the hero and the page background, instead of a hard edge --
-   a plain SVG wave, colored to match @page-bg so it blends into the section beneath it. */
 .landing-hero-wave {
   position: absolute;
   left: 0;
@@ -1560,14 +1464,13 @@ body {
   margin-bottom: 16px;
 }
 
-// Six accent colors, one per feature card -- keeps the grid from reading as one repeated
-// indigo tile six times over, and each color is only ever used for icon bg/fg here.
 .landing-feature-icon-indigo { background: fade(@brand-teal, 12%); color: @brand-teal; }
 .landing-feature-icon-violet { background: fade(@brand-accent, 14%); color: @brand-accent; }
 .landing-feature-icon-teal   { background: fade(#0c7c8c, 14%); color: #0c7c8c; }
 .landing-feature-icon-amber  { background: fade(#b5730a, 14%); color: #b5730a; }
 .landing-feature-icon-rose   { background: fade(#c0392b, 12%); color: #c0392b; }
 .landing-feature-icon-blue   { background: fade(#1c6ea4, 14%); color: #1c6ea4; }
+.landing-feature-icon-green  { background: fade(#1d7a3f, 12%); color: #1d7a3f; }
 
 .landing-feature-card h3 {
   font-size: 16px;
@@ -1583,7 +1486,6 @@ body {
   margin: 0;
 }
 
-/* How it works */
 .landing-steps {
   max-width: 1100px;
   margin: 72px auto 0;
@@ -1662,7 +1564,6 @@ body {
   }
 }
 
-/* Navbar user avatar + profile dropdown */
 .nav-avatar {
   width: 26px;
   height: 26px;
@@ -1673,8 +1574,6 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.5);
 }
 
-/* Initials badge standing in for a photo -- there's no avatar upload, so every real user gets
-   one of these instead of the single hardcoded GitHub photo this used to always show. */
 .nav-avatar-initials,
 .user-card-avatar-initials {
   display: inline-flex;
@@ -1755,7 +1654,6 @@ body {
   background: @brand-teal;
 }
 
-/* Small helper / hint text under inputs */
 .help-text {
   display: block;
   margin-top: 6px;
@@ -1763,17 +1661,10 @@ body {
   color: @muted;
 }
 
-/* Success-toned help text (e.g. "Saved to bucket at ...") -- same green as .pill-success,
-   instead of the #3c763d one-off it used to be hardcoded to on every AI Suite tool page. */
 .help-text-success {
   color: #1d7a3f;
 }
 
-/* ---------- Panel box (AI Suite tool pages: CV Tailor, AI Assistant, Content Cleaner,
-   Audio/Image extractors, Ollama Models) ----------
-   Every one of these pages repeated the exact same background/border/radius/padding as an
-   inline style (with hardcoded hex colors) instead of sharing a class -- pulled into one
-   definition, on the same @surface/@line tokens .card-panel already uses. */
 .panel-box {
   background: @surface;
   border: 1px solid @line;
@@ -1781,8 +1672,6 @@ body {
   padding: 16px;
 }
 
-/* Nested "preview" box inside a .panel-box (e.g. a fetched transcript shown before saving) --
-   was background:#f7f7f9 inline, close enough to @page-bg to just reuse it. */
 .panel-box-subtle {
   margin-top: 12px;
   padding: 12px;
@@ -1791,7 +1680,6 @@ body {
   border-radius: 6px;
 }
 
-/* Editable code / payload textarea (matches the read-only code-box look) */
 .code-input {
   font-family: 'Courier New', Courier, monospace;
   font-size: 12px;
@@ -1801,7 +1689,6 @@ body {
   background: #f7f9fa;
 }
 
-/* Stat chips strip (e.g. job statistics) */
 .stat-strip {
   display: flex;
   flex-wrap: wrap;
@@ -1836,7 +1723,6 @@ body {
   color: #fff;
 }
 
-/* Status-coloured chips — full tint (bg + border + text) matching the pill palette */
 .chip-tint(@bg; @fg) {
   background: @bg;
   border-color: fade(@fg, 28%);
@@ -1852,7 +1738,6 @@ body {
 .stat-strip .stat-chip.chip-skip      { .chip-tint(#e1f0fb; #1c6ea4); }
 .stat-strip .stat-chip.chip-interrupt { .chip-tint(#efe6fb; #6a3bbf); }
 
-/* Scheduler chips — soft teal tint so the strip reads as one cohesive group */
 .stat-strip .stat-chip.chip-schedule {
   background: #e6f6f4;
   border-color: fade(@brand-teal-dark, 28%);
@@ -1863,7 +1748,6 @@ body {
   color: @brand-teal-dark;
 }
 
-/* ---------- Dashboard KPI tiles (Home) ---------- */
 .kpi-row {
   display: flex;
   flex-wrap: wrap;
@@ -1917,19 +1801,16 @@ body {
 .kpi-tile.kpi-completed .kpi-icon { background: #e3f6e9; color: #1d7a3f; }
 .kpi-tile.kpi-failed    .kpi-icon { background: #fde4e4; color: #c0392b; }
 
-/* ---------- Dashboard charts (Home) ---------- */
 .home-chart-tall {
   height: 240px;
 }
 
-/* Section divider inside a card */
 .card-divider {
   border-top: 1px solid #eceff1;
   padding-top: 12px;
   margin-top: 4px;
 }
 
-/* ---------- Pills / status badges ---------- */
 .pill {
   display: inline-block;
   padding: 3px 10px;
@@ -1950,8 +1831,6 @@ body {
 .pill-purple  { background: #efe6fb; color: #6a3bbf; }
 .pill-cyan    { background: #e0f7fa; color: #0c7c8c; }
 
-/* Pill variant that carries a leading glyphicon (Pipeline/Topic tags on Task & Job cards) --
-   plain .pill is inline-block, which only centers text; this flexes so the icon lines up. */
 .pill-icon {
   display: inline-flex;
   align-items: center;
@@ -1963,15 +1842,22 @@ body {
   top: 0;
 }
 
-a.pill-icon {
+a.pill-icon,
+button.pill-icon {
   cursor: pointer;
 }
 
-a.pill-icon:hover {
+a.pill-icon:hover,
+button.pill-icon:hover {
   filter: brightness(0.95);
 }
 
-/* Job running-status pills (used as: class="pill" [ngClass]="'status-'+value") */
+button.pill-icon {
+  border: none;
+  outline: none;
+  font-family: inherit;
+}
+
 .status-InFlight  { .pill-info; }
 .status-Queue     { .pill-cyan; }
 .status-Start     { .pill-indigo; }
@@ -1979,13 +1865,9 @@ a.pill-icon:hover {
 .status-Failed    { .pill-danger; }
 .status-Completed { .pill-success; }
 .status-Interrupt { .pill-purple; }
-/* Was missing entirely -- a Skip status pill rendered with no background/color at all (just
-   bare bold text), unlike every other status here. #566573 matches the slate gray
-   JOB_QUEUE_STATUS_COLOR.Skip already uses for this exact status elsewhere (source-job
-   component's Run History chart), which is exactly .pill-default's text color. */
+
 .status-Skip      { .pill-default; }
 
-/* ---------- Buttons (consistent palette) ---------- */
 .btn {
   border-radius: 5px;
   font-weight: 500;
@@ -2068,7 +1950,6 @@ a.pill-icon:hover {
   color: #fff;
 }
 
-/* Compact icon action button (table rows) */
 .btn-icon {
   padding: 4px 9px;
   font-size: 13px;
@@ -2084,27 +1965,24 @@ a.pill-icon:hover {
   border-color: #c3c0ef;
 }
 
-/* Consistent action-icon colour scheme across every table.
-   Apply one ic-* class per action button; the colour is the single source of truth. */
-.btn-icon .glyphicon        { color: #566573; }          /* default / neutral */
-.btn-icon.ic-view .glyphicon     { color: #4f46e5; }     /* indigo  */
-.btn-icon.ic-edit .glyphicon     { color: #2563eb; }     /* blue    */
-.btn-icon.ic-delete .glyphicon   { color: #c0392b; }     /* red     */
-.btn-icon.ic-run .glyphicon      { color: #1d7a3f; }     /* green   */
-.btn-icon.ic-skip .glyphicon     { color: #0c7c8c; }     /* cyan    */
-.btn-icon.ic-download .glyphicon { color: #b5730a; }     /* amber   */
-.btn-icon.ic-history .glyphicon  { color: #566573; }     /* slate   */
-.btn-icon.ic-logs .glyphicon     { color: #566573; }     /* slate   */
-.btn-icon.ic-interrupt .glyphicon{ color: #6a3bbf; }     /* purple  */
-.btn-icon.ic-add .glyphicon      { color: #1d7a3f; }     /* green   */
-.btn-icon.ic-copy .glyphicon     { color: #566573; }     /* slate   */
+.btn-icon .glyphicon        { color: #566573; }
+.btn-icon.ic-view .glyphicon     { color: #4f46e5; }
+.btn-icon.ic-edit .glyphicon     { color: #2563eb; }
+.btn-icon.ic-delete .glyphicon   { color: #c0392b; }
+.btn-icon.ic-run .glyphicon      { color: #1d7a3f; }
+.btn-icon.ic-skip .glyphicon     { color: #0c7c8c; }
+.btn-icon.ic-download .glyphicon { color: #b5730a; }
+.btn-icon.ic-history .glyphicon  { color: #566573; }
+.btn-icon.ic-logs .glyphicon     { color: #566573; }
+.btn-icon.ic-interrupt .glyphicon{ color: #6a3bbf; }
+.btn-icon.ic-add .glyphicon      { color: #1d7a3f; }
+.btn-icon.ic-copy .glyphicon     { color: #566573; }
 
 .btn-icon[disabled] .glyphicon,
 .btn-icon.disabled .glyphicon {
   color: #b8c0c7 !important;
 }
 
-/* ---------- Card panel for forms / content sections ---------- */
 .card-panel {
   background: @surface;
   border: 1px solid @line;
@@ -2112,6 +1990,31 @@ a.pill-icon:hover {
   padding: 18px;
   margin-bottom: 18px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.setting-tabs {
+  margin-bottom: 18px;
+}
+
+.setting-tabs > li > a {
+  color: @muted;
+  border-radius: 6px 6px 0 0;
+}
+
+.setting-tabs > li > a:hover {
+  color: @brand-teal-dark;
+  background: fade(@brand-teal, 6%);
+  border-color: transparent;
+}
+
+.setting-tabs > li.active > a,
+.setting-tabs > li.active > a:hover,
+.setting-tabs > li.active > a:focus {
+  color: @brand-teal-dark;
+  font-weight: 600;
+  background: @surface;
+  border-color: @line @line transparent;
+  box-shadow: inset 0 2px 0 @brand-teal;
 }
 
 .card-panel-title {
@@ -2124,7 +2027,6 @@ a.pill-icon:hover {
   padding-bottom: 10px;
 }
 
-/* Filled teal banner header (matches the modal-header / panel-heading theme) */
 .card-panel-title.panel-banner {
   display: flex;
   align-items: center;
@@ -2142,7 +2044,6 @@ a.pill-icon:hover {
   color: rgba(255, 255, 255, 0.85) !important;
 }
 
-/* Banner with a right-aligned action (e.g. Add More button) — keep it tidy on one line */
 .card-panel-title.panel-banner.has-action {
   display: flex;
   align-items: center;
@@ -2177,12 +2078,10 @@ a.pill-icon:hover {
   text-decoration: none;
 }
 
-/* Borderless sub-section inside a card-panel (avoids nested double borders) */
 .form-section {
   margin-top: 18px;
 }
 
-/* ---------- Forms ---------- */
 .control-label {
   font-weight: 600;
   color: @ink;
@@ -2193,16 +2092,12 @@ a.pill-icon:hover {
   box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.18);
 }
 
-// LookupValue can hold anything from a single flag to a multi-line JSON/XML config -- the
-// `rows` attribute sets a starting height, this adds a monospace font (values are often
-// code/config, not prose) and a resize handle for anything longer.
 .lookup-value-textarea {
   font-family: 'Courier New', Courier, monospace;
   font-size: 12px;
   resize: vertical;
 }
 
-/* ---------- Modals & panels (match the theme) ---------- */
 .modal-content {
   border: none;
   border-radius: 8px;
@@ -2242,7 +2137,6 @@ a.pill-icon:hover {
   border-color: @brand-teal;
 }
 
-/* ---------- Bucket Browser ---------- */
 .bucket-panel {
   padding-bottom: 8px;
 }
@@ -2292,11 +2186,6 @@ a.pill-icon:hover {
   min-height: 0;
 }
 
-/* Fixed, predictable height for the browse area -- table and preview panel always
-   match exactly, regardless of row count or preview type (pdf/json/csv), instead of
-   stretching to whichever side happens to be taller. Each side scrolls internally.
-   Set directly on both columns (rather than relying on flex cross-axis stretch from
-   the row) so the height is guaranteed regardless of content size. */
 .bucket-browse-row {
   height: 560px;
 }
@@ -2320,31 +2209,12 @@ a.pill-icon:hover {
   overflow-y: auto;
 }
 
-/* Fixed column widths so Etag/Content Type/Action stay reachable (via horizontal
-   scroll) instead of being silently squeezed to nothing when the side panel narrows
-   the table -- overrides the app-wide ".table-responsive .table { max-width: 100% }"
-   rule, which otherwise forces auto-layout to cram every column into whatever width
-   is left. */
 .bucket-scroll .table.bucket-object-table {
   table-layout: fixed;
   width: 100%;
   max-width: none;
 }
 
-/* Same override for the dynamic-form tables' Action column -- a fixed-count icon
-   button group must not be allowed to wrap onto a second line when other columns
-   (Description, Preview) squeeze it; overrides the app-wide ".table-responsive .table"
-   width cap so the table can genuinely overflow into horizontal scroll instead.
-   table-layout: fixed is required too -- with the default auto layout, a floated
-   .btn-group's min-content width isn't measured the way plain inline content is,
-   so auto-layout still starves the Action column below its declared width even
-   once the table itself is free to grow; fixed layout makes each <th>'s width
-   authoritative regardless of what's floated inside its cells.
-   width is intentionally NOT set here (each table declares its own inline
-   min-width matching the sum of its column widths) -- with table-layout: fixed,
-   a table 'width' of auto falls back to shrinking to the container regardless
-   of the declared column widths, so a real width/min-width value is required
-   for the summed column widths to actually take effect. */
 .table-responsive .table.dynamic-form-table {
   table-layout: fixed;
   max-width: none;
@@ -2371,11 +2241,6 @@ a.pill-icon:hover {
 .bucket-row.active {
   background: rgba(79, 70, 229, 0.08) !important;
 }
-
-/* Delete/Edit/Copy/Download used to be opacity:0 until the row was hovered (View was the
-   only action always visible) -- on touch devices, and for anyone scanning the column
-   instead of mousing over each row, that meant most of the Action column looked empty.
-   All actions are now always visible, same as View always was. */
 
 .folder-icon {
   color: #e0a63e;
@@ -2428,14 +2293,6 @@ a.pill-icon:hover {
   font-family: 'Courier New', Courier, monospace;
 }
 
-/* Preview modal ("eye"/View action) -- previewBody's pdf/video/image/text elements all size
-   themselves with `flex: 1 1 auto; min-height: 0`, which only does anything inside a flex
-   ancestor with a resolvable height (that's how the side panel gets it, via .bucket-browse-row's
-   fixed 560px chain). The modal had neither: plain `max-height` + `overflow-y: auto` on
-   .modal-body isn't a flex container, so every one of those elements fell back to its
-   intrinsic/default size instead -- most visibly the pdf iframe, which collapsed to a browser's
-   ~150px default iframe height and rendered as a cramped, near-blank box. Giving the modal body
-   the same fixed-height flex column the side panel has fixes all of them at once. */
 .preview-modal-body {
   height: 75vh;
   display: flex;
@@ -2467,9 +2324,6 @@ a.pill-icon:hover {
   margin-bottom: 6px;
 }
 
-/* Use alongside .preview-toolbar when the label is long (e.g. "Extracted File Content
-   (sent as user message)") -- flex-end alone crams a long label right up against the
-   button instead of spreading label-left/button-right. */
 .preview-toolbar-spread {
   justify-content: space-between;
   align-items: center;
@@ -2488,8 +2342,6 @@ a.pill-icon:hover {
   word-break: break-word;
 }
 
-// Was .preview-md-editor -- now shared by every editable preview kind (json/csv/txt/xml/md),
-// not just markdown.
 .preview-text-editor {
   width: 100%;
   min-height: 420px;
@@ -2547,9 +2399,6 @@ a.pill-icon:hover {
   display: inline-block;
 }
 
-/* The real file input stays off-screen -- the styled Upload button triggers it via .click().
-   input[hidden] alone isn't reliable enough here (this app's global input rules can win out),
-   so hide it explicitly. */
 .visually-hidden-input {
   position: absolute !important;
   width: 1px !important;
@@ -2566,7 +2415,6 @@ a.pill-icon:hover {
   to { transform: rotate(360deg); }
 }
 
-/* PDF Highlighter detail (upload + canvas box-drawing + field list) */
 .dropzone {
   border: 2px dashed @line;
   border-radius: 6px;
@@ -2769,15 +2617,6 @@ a.pill-icon:hover {
   border-radius: 3px;
 }
 
-/* The up/down field-reorder buttons stack vertically -- this codebase's .btn-group has no
-   float/layout rules of its own (unlike Bootstrap), so the two buttons only stacked at all
-   because they're nested two levels inside a flex container (.field-row-main), which silently
-   "blockifies" their display even though they aren't direct flex items. flex-direction: column
-   (even with identical explicit widths/heights on both buttons) still let the two rows land
-   1px apart horizontally -- a sub-pixel rounding difference in how the flex algorithm
-   distributes/snaps each row's box that no amount of explicit sizing removed. Absolute
-   positioning sidesteps the flex layout algorithm entirely: both buttons get the literal same
-   `left: 0`, so there's no per-row computation left that could disagree between them. */
 .field-order-buttons {
   position: relative;
   flex-shrink: 0;
@@ -2805,8 +2644,6 @@ a.pill-icon:hover {
   border-top: 1px solid #d3dade;
 }
 
-/* A "Section" field renders as a plain heading/divider in the fill form -- it's not an
-   input, just a visual break between groups of fields. */
 .form-section-heading {
   margin: 4px 0 14px;
 }
@@ -2842,7 +2679,6 @@ a.pill-icon:hover {
   font-size: 12px;
 }
 
-/* Shareable API link box (e.g. submission detail's fetch-by-uuid link) */
 .share-link-box {
   background: #f7f9fa;
   border: 1px solid @line;
@@ -2874,7 +2710,6 @@ a.pill-icon:hover {
   font-size: 12px;
 }
 
-/* ---------- CV Tailor rendered Markdown preview ---------- */
 .md-preview {
   max-height: 520px;
   overflow-y: auto;
@@ -2935,31 +2770,21 @@ a.pill-icon:hover {
   margin: 16px 0;
 }
 
-/* ---------- Pipeline stage tracker (Job Logs) — a CI/DAG-style run stepper reusing the
-   same status palette as .stat-strip .chip-* so a job's lifecycle reads consistently
-   everywhere it's shown ---------- */
 .pipeline-stages {
   display: flex;
   align-items: center;
   margin: 4px 0 20px;
   overflow-x: auto;
-  // A little breathing room so the last dot never sits flush against the scroll edge, and so
-  // partial-pixel flex rounding can't clip it.
+
   padding: 2px 6px 2px 2px;
 }
 
 .pipeline-stage {
   display: flex;
   align-items: center;
-  // Hug the dot+label instead of growing -- .pipeline-stage-connector is the only flexible
-  // element between stages, so it stretches to fill the gap and lands flush against both
-  // neighboring dots. (Previously this also grew, so each dot centered inside its own
-  // expanding box and the connector floated in the middle with visible dead space on
-  // either side instead of touching the dots it's supposed to connect.)
+
   flex: 0 0 auto;
-  // Never let a stage (dot + label) get squeezed smaller than its content -- without this,
-  // narrow viewports would shrink stages unevenly instead of cleanly overflowing into a
-  // horizontal scroll, which is what was clipping the last dot/label on mobile.
+
   flex-shrink: 0;
   white-space: nowrap;
 }
@@ -3014,7 +2839,6 @@ a.pill-icon:hover {
   box-shadow: 0 0 0 4px fade(@brand-teal, 15%);
 }
 
-// Per-status dot coloring, same source colors as .stat-strip .chip-* (see chip-tint above)
 .pipeline-stage.stage-queue.is-done .pipeline-stage-dot,
 .pipeline-stage.stage-queue.is-current .pipeline-stage-dot     { .chip-tint(#e0f7fa; #0c7c8c); border-color: fade(#0c7c8c, 40%); }
 .pipeline-stage.stage-start.is-done .pipeline-stage-dot,
@@ -3030,10 +2854,6 @@ a.pill-icon:hover {
 .pipeline-stage.stage-interrupt.is-done .pipeline-stage-dot,
 .pipeline-stage.stage-interrupt.is-current .pipeline-stage-dot { .chip-tint(#efe6fb; #6a3bbf); border-color: fade(#6a3bbf, 40%); }
 
-// Smaller dots/labels/connectors below phone width so all 4 stages fit without needing to
-// scroll -- at 375px (the narrowest common phone) the full-size tracker was ~35px too wide,
-// which combined with browser scroll-anchoring made the last dot land clipped/cut off on
-// first render instead of cleanly scrollable.
 @media (max-width: 480px) {
   .pipeline-stage-dot {
     width: 24px;
@@ -3051,15 +2871,11 @@ a.pill-icon:hover {
   }
 }
 
-/* ---------- Log timeline (Job Logs) — vertical connected-node view, alternative to the
-   plain table for scanning a run's audit trail as a pipeline rather than a data grid ---------- */
 .log-timeline {
   position: relative;
   padding-left: 4px;
 }
 
-// Bounded scroll -- a long-running job (hundreds of log lines) would otherwise turn the whole
-// page into a mile-long scroll instead of scrolling inside a fixed-height panel.
 .log-timeline-scroll {
   max-height: 520px;
   overflow-y: auto;
@@ -3120,16 +2936,12 @@ a.pill-icon:hover {
   word-break: break-word;
 }
 
-/* Per-step timing chart above the audit log views -- seconds elapsed since the previous
-   line (or the queue's Start Time for the first one). */
 .log-gap-chart {
   width: 100%;
   height: 160px;
   margin: 4px 0 16px;
 }
 
-/* ---------- Console view (Job Logs) — raw terminal-style readout of the same audit log
-   lines as Timeline/Table, for reading a run the way it would have printed to stdout ---------- */
 .log-console {
   max-height: 520px;
   overflow-y: auto;
@@ -3156,7 +2968,6 @@ a.pill-icon:hover {
   color: #d7dee6;
 }
 
-/* ---------- AI Suite hub — card grid launcher ---------- */
 .tool-card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -3221,8 +3032,6 @@ a.pill-icon:hover {
   margin-top: 14px;
 }
 
-/* ---------- Entity cards -- Card/Table view toggle for list screens (Source Job, Source
-   Task, AI Agents) ---------- */
 .entity-card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -3230,8 +3039,6 @@ a.pill-icon:hover {
   margin-top: 4px;
 }
 
-// Fixed 4-per-row layout (AI Agents) -- falls back to fewer columns as the
-// viewport narrows instead of squeezing cards below a usable width.
 .entity-card-grid-4up {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
@@ -3275,13 +3082,10 @@ a.pill-icon:hover {
   opacity: 0.6;
 }
 
-// Accent colors -- Active/Inactive/Delete status (Source Task, AI Agent)
 .entity-card-accent-active    { border-left-color: #1d7a3f; }
 .entity-card-accent-inactive  { border-left-color: #b5730a; }
 .entity-card-accent-delete    { border-left-color: #c0392b; }
 
-// Accent colors -- JobStatus running state (Source Job), same source colors as
-// .stat-strip .chip-* / pipeline stage dots above
 .entity-card-accent-queue     { border-left-color: #0c7c8c; }
 .entity-card-accent-start     { border-left-color: #283593; }
 .entity-card-accent-running   { border-left-color: #b5730a; }
@@ -3392,9 +3196,6 @@ a.pill-icon:hover {
   justify-content: flex-end;
 }
 
-// Card-view action buttons (Source Task / Source Job cards) -- break the joined
-// btn-group into separated, rounded icon buttons with a soft tinted hover that
-// matches each action's colour, instead of the flat table-style strip.
 .entity-card-footer .btn-group {
   display: flex;
   gap: 6px;
@@ -3439,7 +3240,6 @@ a.pill-icon:hover {
   transform: none;
 }
 
-/* ---------- Batch Action upload dropzone (Source Job / Source Task bulk upload) ---------- */
 .upload-dropzone {
   display: flex;
   flex-direction: column;
@@ -3508,7 +3308,6 @@ a.pill-icon:hover {
   color: #c0392b;
 }
 
-/* ---------- List pagination (Source Task / Source Job -- table and card view) ---------- */
 .list-pagination {
   display: flex;
   align-items: center;
@@ -3542,9 +3341,6 @@ a.pill-icon:hover {
   font-size: 12px;
 }
 
-/* ---------- Mini breakdown bar (Home "Job Breakdown" table) -- a per-row stacked strip
-   reusing the same status palette as .status-* pills, so the seven count columns are also
-   readable as a shape at a glance ---------- */
 .mini-breakdown-bar {
   display: flex;
   width: 100%;
@@ -3559,7 +3355,6 @@ a.pill-icon:hover {
   min-width: 2px;
 }
 
-/* ---------- Table row expand (Source Job List) -- linked task + queue list ---------- */
 .btn-expand-row {
   width: 24px;
   height: 24px;
@@ -3609,9 +3404,7 @@ tr.expand-row td {
 }
 
 .expand-panel-chart {
-  // Previously bare -- the canvas has no background of its own, so it just showed the row's
-  // gray @page-bg straight through, looking unstyled next to the white Task Payload box above
-  // it. Giving it the same card treatment ties the two together.
+
   width: 100%;
   height: 180px;
   margin-bottom: 12px;

@@ -6,15 +6,13 @@ import {
     SourceJobService,
     WebSocketAPI,
     WebSocketShareService
-} from '@/_services/index';  
+} from '@/_services/index';
 import { ApiCode, STATUS_LIST } from '@/_models';
 import { Router } from '@angular/router';
 import { first } from 'rxjs/operators';
 import { Subscription } from 'rxjs';
 import { EChartOption } from 'echarts';
 
-// Run-status colors kept in step with the .status-* pill classes in app.less so the
-// chart reads as an extension of the table, not a separate palette.
 const JOB_QUEUE_STATUS_COLOR: { [status: string]: string } = {
     Queue: '#0c7c8c',
     Start: '#283593',
@@ -24,7 +22,6 @@ const JOB_QUEUE_STATUS_COLOR: { [status: string]: string } = {
     Interrupt: '#6a3bbf',
     Skip: '#566573'
 };
-
 
 @Component({
     selector: 'source-job',
@@ -41,40 +38,31 @@ export class SourceJobComponent implements OnInit, OnDestroy  {
     public SOURCE_JOB_DETAIL_FETCH = 'SourceJob Fetch';
     public DELETE_SOURCE_JOB = "SourceJob Delete";
     public JOB_IN_QUEUE  = "SourceJob In Queue";
-    // search detail
+
     public searchSourceJobDetails: any = '';
-    // status filter -- Active/Inactive, on top of the free-text search. 'Delete' left out of
-    // the options on purpose -- a deleted job is never shown at all (see filteredSourceJobDetails),
-    // so filtering *for* Delete would always yield nothing.
+
     public readonly statusFilterOptions = STATUS_LIST.filter((s: any) => s.value !== 'Delete');
     public statusFilter: any = 'All';
-    // source list
+
     public sourceJobDetails: SourceJobDetail[] = [];
     public selectedSourceJobIds: Set<any> = new Set<any>();
     public selectAllSourceJobs = false;
     public deleteViewSourceJob: SourceJobDetail | null = null;
     public deleteSelectedIndex: any = null;
-    /** Table stays the default (this list is dense/operational, matching every other admin
-     * screen); Card is an alternative view for browsing/scanning fewer jobs at a glance. */
+
     public viewMode: 'table' | 'card' = 'table';
-    // View mode (table/card) is remembered across reloads -- without this, refreshing
-    // the page (or the in-app Refresh button re-creating this component) always fell
-    // back to the 'table' default and silently threw away the user's choice.
+
     private readonly VIEW_MODE_STORAGE_KEY = 'sourceJobViewMode';
-    // Client-side pagination -- the API returns the full list in one shot, so search +
-    // paging are both applied here to keep them instant and in sync with each other.
+
     public readonly pageSizeOptions = [50, 100, 150, 200];
     public pageSize = 50;
     public currentPage = 1;
-    // Row expand (table view) -- linked task + job queue (run history) detail.
-    // Queue list is only fetched the first time a row is expanded, then cached per jobId
-    // so re-collapsing/re-expanding the same row doesn't refetch.
+
     public expandedJobId: any = null;
     public expandedJobQueuesLoading = false;
     private expandedJobQueuesCache: { [jobId: string]: any[] } = {};
     private webSocketShareSubscription: Subscription;
 
-    
     constructor(
         private router: Router,
         private alertService: AlertService,
@@ -84,10 +72,7 @@ export class SourceJobComponent implements OnInit, OnDestroy  {
         private webSocketShareService: WebSocketShareService,
         private searchFilterPipe: SearchFilterPipe) {
         this.webSocketAPI.connect();
-        // webSocketShareService is a root-provided singleton -- without unsubscribing in
-        // ngOnDestroy, navigating away from and back to this page piles up a new subscriber
-        // on every visit, each stale one still firing (and referencing a destroyed component)
-        // on every future websocket message.
+
         this.webSocketShareSubscription = this.webSocketShareService.getNewValue()
             .subscribe({
                 next: (data) => {
@@ -128,8 +113,6 @@ export class SourceJobComponent implements OnInit, OnDestroy  {
         localStorage.setItem(this.VIEW_MODE_STORAGE_KEY, mode);
     }
 
-    // Filtered (search + status applied) list -- the single source of truth pagination is
-    // computed from, so the page count always matches what search/filter would show.
     public get filteredSourceJobDetails(): SourceJobDetail[] {
         const searched = (this.searchFilterPipe.transform(this.sourceJobDetails, this.searchSourceJobDetails) || [])
             .filter((job: SourceJobDetail) => job.jobStatus !== 'Delete');
@@ -148,10 +131,6 @@ export class SourceJobComponent implements OnInit, OnDestroy  {
         return this.filteredSourceJobDetails.slice(start, start + this.pageSize);
     }
 
-    /** trackBy for both the card grid and table view -- jobId is each row's stable identity, so
-     * Angular can diff by it instead of default object identity and skip re-rendering rows that
-     * didn't actually change (e.g. on every websocket-pushed status update elsewhere in the
-     * list). */
     public trackByJobId(_index: number, sourceJob: SourceJobDetail): any {
         return sourceJob.jobId;
     }
@@ -283,8 +262,7 @@ export class SourceJobComponent implements OnInit, OnDestroy  {
         this.selectAllSourceJobs = checked;
         this.selectedSourceJobIds.clear();
         if (checked) {
-            // Only the current page is visible next to the header checkbox, so "select
-            // all" selects what's on screen rather than every job across every page.
+
             this.pagedSourceJobDetails.forEach(job => {
                 if (job.jobStatus !== 'Delete' && !['Queue', 'Start', 'Running'].includes(job.jobRunningStatus)) {
                     this.selectedSourceJobIds.add(job.jobId);
@@ -414,12 +392,9 @@ export class SourceJobComponent implements OnInit, OnDestroy  {
         .pipe(first())
         .subscribe((response) => {
             if(response.status === ApiCode.SUCCESS) {
-                // reverse once here (not in the template's *ngFor) -- Array.reverse() mutates
-                // in place, so calling it inside a template expression re-ran it on every
-                // change-detection tick, flipping the row order continuously
+
                 this.sourceJobDetails = (response.data || []).reverse();
-                // clamp instead of resetting to page 1 -- keeps the user's place on a
-                // manual refresh, only pulling back if the list shrank under them
+
                 if (this.currentPage > this.totalPages) {
                     this.currentPage = this.totalPages;
                 }
@@ -461,8 +436,6 @@ export class SourceJobComponent implements OnInit, OnDestroy  {
         return this.expandedJobQueuesCache[this.expandedJobId] || [];
     }
 
-    // Duration (minutes) of each run, oldest first so the bars read left-to-right
-    // chronologically -- expandedJobQueues itself stays newest-first for the table above.
     public get expandedJobQueuesChartOptions(): EChartOption | null {
         const runs = this.expandedJobQueues
             .filter(q => q.startTime && q.endTime)
@@ -479,11 +452,7 @@ export class SourceJobComponent implements OnInit, OnDestroy  {
         const colors = runs.map(q => JOB_QUEUE_STATUS_COLOR[q.jobStatus] || '#7b8794');
         return {
             grid: { left: 45, right: 16, top: 24, bottom: 28 },
-            // trigger:'item' required hovering the bar's own (often 1-2px tall) rectangle --
-            // next to one long-running outlier, every normal run rounds down to a sliver too
-            // short to reliably point at, so hover felt broken/showed nothing (or the wrong
-            // run, snagged from whatever was last visible). 'axis' + a shadow axisPointer makes
-            // the whole category column hoverable, at any bar height.
+
             tooltip: {
                 trigger: 'axis',
                 axisPointer: { type: 'shadow' },
@@ -509,17 +478,12 @@ export class SourceJobComponent implements OnInit, OnDestroy  {
                 type: 'bar',
                 data: durations.map((d, i) => ({ value: d, itemStyle: { color: colors[i] } })),
                 barMaxWidth: 28,
-                // Bars navigate to that run's Job Logs on click (onExpandedJobQueuesChartClick)
-                // -- pointer cursor is the only hint of that.
+
                 cursor: 'pointer'
             }]
         };
     }
 
-    /** Queue List (Run History) chart click -> that run's Job Logs -- categories are literally
-     * `#${jobQueueId}` (see expandedJobQueuesChartOptions above), so the clicked bar's own
-     * category label is the jobQueueId. jobId comes from expandedJobId (the row this chart
-     * belongs to), not the click event, since the bar itself doesn't carry it. */
     public onExpandedJobQueuesChartClick(event: any): void {
         const jobQueueId = String(event?.name || '').replace(/^#/, '');
         if (!jobQueueId || !this.expandedJobId) {
@@ -530,9 +494,6 @@ export class SourceJobComponent implements OnInit, OnDestroy  {
         });
     }
 
-    /** Formats an ISO datetime string as 'yyyy-MM-dd HH:mm:ss' -- matches the DatePipe format
-     * used everywhere else in this app, but this one's built inline (no Angular pipe injection)
-     * since it only ever runs inside an echarts tooltip formatter callback. */
     private formatDateTime(value: any): string {
         if (!value) {
             return '-';
@@ -573,7 +534,7 @@ export class SourceJobComponent implements OnInit, OnDestroy  {
 
     public sourceJobHistoryByJobId(jobId: any): any {
         this.router.navigate(['jobList/jobHistory'],
-        { 
+        {
           queryParams: {
             jobId: jobId
           }

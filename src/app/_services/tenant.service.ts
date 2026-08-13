@@ -4,9 +4,6 @@ import { ApiResponse } from '@/_models';
 import { Tenant } from '@/_models/tenant.model';
 import { Observable } from 'rxjs';
 
-/**
- * @author Nabeel Ahmed
- */
 @Injectable({
     providedIn: 'root'
 })

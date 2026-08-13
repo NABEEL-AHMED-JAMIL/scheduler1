@@ -4,17 +4,6 @@ import * as SockJS from 'sockjs-client';
 import { WebSocketShareService } from './websocketshare.service';
 import { AuthService } from './auth.service';
 
-/**
- * Connects to the backend's STOMP/SockJS endpoint and subscribes to this user's own
- * notification queue -- "own" because the CONNECT frame carries the same JWT used for regular
- * REST calls (see StompAuthChannelInterceptor server-side), which the server uses to set the
- * session's Principal to the real logged-in username. /user/queue/reply is Spring's per-user
- * destination convention: the broker rewrites it per-session based on that Principal, so this
- * subscription only ever receives messages the server explicitly sent to this user (via
- * convertAndSendToUser) -- not a fixed shared channel every browser tab used to receive
- * identically regardless of who was actually logged in.
- * @author Nabeel Ahmed
- */
 @Injectable({
     providedIn: 'root'
 })
@@ -27,9 +16,7 @@ export class WebSocketAPI {
         private authService: AuthService) { }
 
     public connect(): any {
-        // No point opening a socket for nobody to receive on -- and no JWT means the server
-        // would just leave the session unauthenticated (no Principal), so nothing sent to it
-        // would ever be delivered anyway.
+
         if (!this.authService.isLoggedIn() || this.connecting) {
             return;
         }
@@ -56,8 +43,6 @@ export class WebSocketAPI {
         console.log("Disconnected");
     }
 
-    // on error, schedule a reconnection attempt -- only while still logged in, so a session
-    // that logged out doesn't keep quietly retrying forever in the background.
     public errorCallBack(error: any): any {
         console.log("errorCallBack -> " + error)
         setTimeout(() => {

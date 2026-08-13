@@ -1,7 +1,7 @@
 <div class="toolbar">
     <div class="form-group" style="margin-bottom: 0;">
         <label for="searchProfile" class="control-label">Total Profiles ({{filteredProfiles.length}} / {{profiles.length}})</label>
-        <input type="text" id="searchProfile" class="form-control" style="width: 220px;"
+        <input type="text" id="searchProfile" class="form-control input-sm" style="width: 220px;"
             placeholder="Search" [(ngModel)]="searchProfile"/>
     </div>
     <div class="form-group" style="margin-bottom: 0;" *ngIf="isPlatformAdmin">

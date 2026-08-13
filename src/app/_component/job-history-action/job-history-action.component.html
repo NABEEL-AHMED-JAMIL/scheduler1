@@ -135,7 +135,7 @@
     <div class="toolbar">
         <div class="form-group" style="margin-bottom: 0;">
             <label for="searchQMessageForm" class="control-label">Total Queue Message ({{filteredQueueDatas.length}} / {{sourceJobQueues.length}})</label>
-            <input type="text" id="searchQMessageForm" class="form-control" style="width: 220px;"
+            <input type="text" id="searchQMessageForm" class="form-control input-sm" style="width: 220px;"
                 placeholder="Search" [(ngModel)]="searchQMessageForm"/>
         </div>
         <div class="form-group" style="margin-bottom: 0;">
@@ -186,6 +186,7 @@
                                 [style.height.%]="seg.pct" [style.background]="seg.color" [title]="seg.label + ': ' + seg.count"></div>
                         </div>
                     </th>
+                    <th>Duration</th>
                     <th>
                         Skip Time
                         <div class="col-mini-chart" *ngIf="dateFillColumnStats('skipTime') as bar" title="% of rows with a Skip Time set">
@@ -225,6 +226,7 @@
                     <td>{{queueData.dateCreated | date:'yyyy-MM-dd HH:mm:ss'}}</td>
                     <td>{{queueData.startTime | date:'yyyy-MM-dd HH:mm:ss'}}</td>
                     <td>{{queueData.endTime | date:'yyyy-MM-dd HH:mm:ss'}}</td>
+                    <td>{{rowDuration(queueData)}}</td>
                     <td>{{queueData.skipTime | date:'yyyy-MM-dd HH:mm:ss'}}</td>
                     <td style="text-transform: capitalize;">
                         <span *ngIf="queueData.runManual" class="pill"

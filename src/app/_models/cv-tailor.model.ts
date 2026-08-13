@@ -1,30 +1,20 @@
-/** CV Tailor only accepts a PDF resume (upload or from the bucket) -- matches how every other
- * "extract text from a document" screen in this app scopes its accepted file types. */
+
 export const CV_TAILOR_SUPPORTED_EXTENSIONS = ['pdf'];
 
-/** Shared formatting rules every tailoring prompt below opens with -- plain Markdown
- * (headings/bold/bullets only) so the result converts cleanly to PDF and renders well in the
- * in-app preview. Kept separate so each industry prompt only has to state its own emphasis. */
 const CV_TAILOR_FORMAT_RULES = `Formatting rules:
 - Start with a level-1 heading (# Full Name) if the name is known from the original resume, otherwise omit it.
 - Use level-2 headings (## Summary, ## Experience, ## Education, ## Skills, etc.) for each section, matching the original resume's sections (add or rename a section only if clearly appropriate).
 - Use "- " bullet points for experience/skill bullet points, and **bold** for job titles, company names, and degree names where natural.
 - Do not use tables, images, or nested/complex markdown that would render awkwardly when converted to PDF -- keep it simple: headings, bold text, bullet lists, and plain paragraphs only.`;
 
-/** Every industry prompt shares this closing guardrail against fabrication -- domain keywords
- * get emphasized, never invented. */
 const CV_TAILOR_INTEGRITY_RULES = `Never invent employers, job titles, dates, certifications, degrees, or skills the candidate doesn't already have some basis for in the original resume. Where the resume implies a skill or responsibility the job description cares about but never states it explicitly, add a brand-new bullet point that says so truthfully -- don't claim domain experience the candidate never had.
 
 Output ONLY the Markdown document itself -- no commentary, no surrounding code fence, no headers like "Here is the tailored resume".`;
 
-/** One selectable tailoring prompt: a generic one plus 4 "strong", industry-tuned ones. Each
- * value is sent as the processText instructions override (see AiAgentService#processText), so
- * it works out of the box with any active agent (including a local Ollama one) regardless of
- * that agent's own saved instructions. */
 export interface CvTailorPromptOption {
     key: string;
     label: string;
-    /** Shown under the picker so the user knows what a given prompt emphasizes. */
+
     description: string;
     instructions: string;
 }

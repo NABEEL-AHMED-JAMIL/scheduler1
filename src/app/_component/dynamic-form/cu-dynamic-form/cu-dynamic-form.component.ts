@@ -10,11 +10,6 @@ import {
     DYNAMIC_FORM_FIELD_TYPE_LIST, OPTION_BASED_FIELD_TYPES, TEXT_LIKE_FIELD_TYPES
 } from '@/_models/dynamic-form.model';
 
-/**
- * Create/edit a dynamic form's name+description, and build its ordered field
- * list (add/edit/remove/reorder) -- each field is its own add/edit modal.
- * @author Nabeel Ahmed
- */
 @Component({
     selector: 'cu-dynamic-form',
     templateUrl: 'cu-dynamic-form.component.html'
@@ -70,7 +65,6 @@ export class CUDynamicFormComponent implements OnInit {
         this.resetFieldForm();
     }
 
-    // convenience getters for easy access to form fields
     get f() {
         return this.dynamicFormForm.controls;
     }
@@ -155,8 +149,6 @@ export class CUDynamicFormComponent implements OnInit {
         }
     }
 
-    // ---------------- Field builder ----------------
-
     private resetFieldForm(): void {
         this.fieldSubmitted = false;
         this.editingField = null;
@@ -207,7 +199,7 @@ export class CUDynamicFormComponent implements OnInit {
             this.optionsDraft.push({ label: '', value: '' });
         }
         if (this.isSection) {
-            // a section is a heading/divider, not an input -- it never collects a value, so it can't be mandatory
+
             this.fieldForm.get('mandatory').setValue(false);
         }
     }
@@ -253,7 +245,7 @@ export class CUDynamicFormComponent implements OnInit {
             fieldOptions: this.isOptionBased ? JSON.stringify(this.optionsDraft.filter(o => o.label && o.value)) : null
         };
         if (this.isSection) {
-            // a section is a heading/divider, not an input -- none of these apply to it
+
             payload.mandatory = false;
             payload.placeHolder = null;
             payload.defaultValue = null;
@@ -329,7 +321,6 @@ export class CUDynamicFormComponent implements OnInit {
             });
     }
 
-    /** Swap fieldOrder with the neighbouring field and persist both. */
     public moveField(index: any, direction: any): void {
         let targetIndex = index + direction;
         if (targetIndex < 0 || targetIndex >= this.dynamicForm.fields.length) {

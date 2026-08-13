@@ -1,11 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 
-
-/**
- * @author Nabeel Ahmed
- */
 @Component({
-    // tslint:disable-next-line: component-selector
+
     selector: 'spinner',
     template: `
         <div class="dark-overlay">

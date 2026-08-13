@@ -13,16 +13,6 @@ interface Breadcrumb {
     prefix: string;
 }
 
-/**
- * Turns raw file/paste content into a clean block of text ready to paste as an AI prompt --
- * three ways in: paste text directly, type a "bucket/key" path, or browse a bucket and click
- * a file (same extensions Object Browser's "Process with AI" targets). Extraction reuses the
- * same pdf.js/plain-text logic as Object Browser; cleaning itself is done server-side (see
- * TextCleanerRestApi/TextCleanerUtil in process) so a Source Task, Dynamic Form, or external
- * caller (e.g. the job-search Python listeners) can hit the same endpoint directly -- the URL
- * is shown in the UI to copy.
- * @author Nabeel Ahmed
- */
 @Component({
     selector: 'content-cleaner',
     templateUrl: 'content-cleaner.component.html'
@@ -35,13 +25,10 @@ export class ContentCleanerComponent implements OnInit {
     public mode: 'paste' | 'path' | 'browse' = 'paste';
     public supportedExtensions = SUPPORTED_EXTENSIONS;
 
-    // Paste mode
     public pastedText = '';
 
-    // Path mode
     public pathInput = '';
 
-    // Browse mode
     public buckets: BucketSummary[] = [];
     public loadingBuckets = false;
     public selectedBucket = '';
@@ -50,7 +37,6 @@ export class ContentCleanerComponent implements OnInit {
     public currentPrefix = '';
     public breadcrumbs: Breadcrumb[] = [];
 
-    // Shared extraction/clean state
     public sourceLabel = '';
     public extracting = false;
     public cleaning = false;
@@ -74,8 +60,6 @@ export class ContentCleanerComponent implements OnInit {
         this.extractError = '';
     }
 
-    // --- Paste mode ---
-
     public cleanPastedText(): void {
         if (!this.pastedText || !this.pastedText.trim()) {
             this.alertService.showError('Paste some text first.', this.ERROR);
@@ -86,10 +70,6 @@ export class ContentCleanerComponent implements OnInit {
         this.runClean();
     }
 
-    // --- Path mode ---
-
-    /** Accepts "bucket/key/path.ext" -- everything up to the first "/" is the bucket,
-     * everything after is the object key. */
     public loadFromPath(): void {
         let path = (this.pathInput || '').trim().replace(/^\/+/, '');
         if (!path) {
@@ -105,8 +85,6 @@ export class ContentCleanerComponent implements OnInit {
         let key = path.substring(slashIndex + 1);
         this.extractFromBucketKey(bucket, key, path);
     }
-
-    // --- Browse mode ---
 
     public loadBuckets(): void {
         this.loadingBuckets = true;
@@ -177,8 +155,6 @@ export class ContentCleanerComponent implements OnInit {
         }
         this.loadObjects();
     }
-
-    // --- Shared extraction ---
 
     private extractFromBucketKey(bucket: string, key: string, label: string): void {
         let extension = fileExtension(key);

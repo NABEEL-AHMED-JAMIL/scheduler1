@@ -4,7 +4,7 @@ import { SpinnerService } from '@/_helpers';
 import { first } from 'rxjs/operators';
 import { ApiCode, Action } from '@/_models';
 import { Router } from '@angular/router';
-import { SourceTaskType, LookupData } from '@/_models/index';
+import { SourceTaskType } from '@/_models/index';
 
 @Component({
     selector: 'setting',
@@ -21,23 +21,17 @@ export class SettingComponent implements OnInit {
 	public searchLookupDataForm: any = '';
 	public APPSETTING_FETCH: string = 'AppSetting Fetch';
 	public DELETE_SOURCE_TASK_TYPE = "Source TaskType Delete";
-	// source tasktype
+
 	public sourceTaskTypeAction: Action | null = null;
 	public sourceTaskType: SourceTaskType | null = null;
-	// source task type
+
 	public sourceTaskTypes: SourceTaskType[] = [];
-    // lookup
-	public lookupAction: Action | null = null;
-	public lookupData: LookupData | null = null;
-	public lookupDatas: LookupData[] = [];
+
 	public deleteSourceTaskTypeId:any;
 	public deleteSelectedIndex:any;
-	// Kafka topic test (per Source TaskType row) -- keyed by sourceTaskTypeId so only that
-	// row's button shows a spinner while a test is in flight.
+
 	public testingTopicRowId: any = null;
-	// Link Source Task picker (opened from a Source TaskType row's "Link Source Task" count) --
-	// every task built on that type, filterable by Group so a long list of tasks reads as
-	// browsable categories instead of one flat list.
+
 	public linkedSourceTasks: any[] = [];
 	public linkedSourceTasksLoading = false;
 	public linkedSourceTaskGroupFilter = 'All';
@@ -57,9 +51,6 @@ export class SettingComponent implements OnInit {
 		this.appSetting();
     }
 
-	/** sourceTaskTypes with soft-deleted (status === 'Delete') rows filtered out -- a deleted
-	 * Source TaskType shouldn't keep cluttering this list, it stays in the database (and
-	 * anything that already linked to it) but isn't surfaced here anymore. */
 	public get filteredSourceTaskTypes(): SourceTaskType[] {
 		return (this.sourceTaskTypes || []).filter((t) => t.status !== 'Delete');
 	}
@@ -72,7 +63,6 @@ export class SettingComponent implements OnInit {
 				if(response.status === ApiCode.SUCCESS) {
 					this.spinnerService.hide();
 					this.sourceTaskTypes = response.data.sourceTaskTypes;
-					this.lookupDatas = response.data.lookupDatas;
 				} else {
 					this.spinnerService.hide();
 					this.alertService.showError(response.message, this.ERROR);
@@ -87,8 +77,6 @@ export class SettingComponent implements OnInit {
 		this.sourceTaskTypeAction = Action.ADD;
 	}
 
-	/** Extracts just the topic name out of "topic=X&partitions=[N]" -- same shape ProducerBulkEngine
-	 * parses server-side (see SourceTaskType.queueTopicPartition). */
 	private topicNameOf(queueTopicPartition: string): string | null {
 		if (!queueTopicPartition) {
 			return null;
@@ -124,19 +112,6 @@ export class SettingComponent implements OnInit {
 		this.sourceTaskType = sourceTaskType;
 	}
 
-	public addLookupDatas(): void {
-		this.lookupAction = Action.ADD;
-	}
-
-	public editLookupData(lookupData: LookupData): void {
-		this.lookupAction = Action.EDIT;
-		this.lookupData = lookupData;
-	}
-
-	public editSubLookupData(lookupData: LookupData): void {
-		this.router.navigate(['/setting/subLookup'],{queryParams: {lookupId: lookupData.lookupId }});
-	}
-
 	public viewLinkSourceTaskWithSourceTaskType(sourceTaskTaype: SourceTaskType): void {
 		this.sourceTaskType = sourceTaskTaype;
 		this.linkedSourceTaskGroupFilter = 'All';
@@ -157,17 +132,12 @@ export class SettingComponent implements OnInit {
 			});
 	}
 
-	/** Distinct group labels present in the currently loaded linked-task list, for the filter
-	 * dropdown -- "Ungrouped" stands in for tasks with no groupId, same as any other optional
-	 * lookup field elsewhere in the app defaults to a plain dash rather than being hidden. */
 	public get linkedSourceTaskGroups(): string[] {
 		const groups = new Set<string>();
 		this.linkedSourceTasks.forEach((task) => groups.add(task.groupLabel || 'Ungrouped'));
 		return Array.from(groups).sort();
 	}
 
-	/** linkedSourceTasks filtered by the Group dropdown and the search box (task id or name) --
-	 * single source of truth for both the visible rows and the "N of M" count in the toolbar. */
 	public get filteredLinkedSourceTasks(): any[] {
 		const search = (this.linkedSourceTaskSearch || '').trim().toLowerCase();
 		return this.linkedSourceTasks.filter((task) => {
@@ -186,8 +156,6 @@ export class SettingComponent implements OnInit {
 		});
 	}
 
-	/** "Select" on a Link Source Task row -- takes the user straight to that task's edit page,
-	 * same as clicking Edit from the Task List itself. */
 	public selectLinkedSourceTask(task: any): void {
 		this.router.navigate(['/editTask', task.taskDetailId]);
 	}
@@ -226,9 +194,7 @@ export class SettingComponent implements OnInit {
 	}
 
 	public showUpdatedSourceTask(sourceTaskTypeId: any): void {
-		// look up by id, not by the *ngFor index that was passed in from deleteSourceTaskType --
-		// that index is into the searchFilter-filtered view, not this.sourceTaskTypes itself,
-		// so it pointed at the wrong row whenever a search term was active
+
 		let selectedObject: SourceTaskType = this.sourceTaskTypes.find(
 			(taskType) => taskType.sourceTaskTypeId === sourceTaskTypeId);
 		if (selectedObject) {
@@ -238,8 +204,6 @@ export class SettingComponent implements OnInit {
 
 	public receiverEvent(action: Action): void {
 		this.sourceTaskTypeAction = null;
-		this.lookupAction = null;
-		this.lookupData = null;
 		this.sourceTaskType = null;
 		if (action == Action.ADD || action == Action.EDIT) {
 			this.appSetting();

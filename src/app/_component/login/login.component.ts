@@ -3,10 +3,6 @@ import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService, AlertService } from '@/_services';
 
-
-/**
- * @author Nabeel Ahmed
- */
 @Component({
     selector: 'login',
     templateUrl: 'login.component.html'
@@ -26,7 +22,7 @@ export class LoginComponent implements OnInit {
     }
 
     ngOnInit(): void {
-        // already logged in -> straight to home
+
         if (this.authService.isLoggedIn()) {
             this.router.navigate(['/home']);
             return;

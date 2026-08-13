@@ -8,8 +8,7 @@ import { ImageRegion } from '@/_models/image-text.model';
 import { AiAgent, fileExtension } from '@/_models/ai-agent.model';
 
 const PAGE_SIZE = 100;
-/** Below this, a drag is treated as an accidental click, not a real selection --
- * matches PDF Highlighter's MIN_DRAG_PX. */
+
 const MIN_DRAG_PX = 6;
 
 interface Breadcrumb {
@@ -29,18 +28,6 @@ interface ScreenRect {
     height: number;
 }
 
-/**
- * OCRs an uploaded image -- optionally cropped to a region the user drags out on the image,
- * same "mark an area, extract just that" interaction as PDF Highlighter (overlay div + drag
- * rect, converted from on-screen pixels to a stable coordinate space on commit -- PDF points
- * there, the image's native pixel size here since there's no fixed-DPI page to anchor to).
- * Once text is extracted, the user picks a saved AI Agent and types a one-off prompt that
- * overrides that agent's saved instructions for this call only -- nothing here is persisted
- * unless explicitly saved to the bucket. Browse mode only opens previously-saved .txt results
- * (mirrors Audio Transcript Extractor's "load a saved transcript directly" behavior); it isn't
- * a second way to pick an image to OCR.
- * @author Nabeel Ahmed
- */
 @Component({
     selector: 'image-text-extractor',
     templateUrl: 'image-text-extractor.component.html'
@@ -56,15 +43,10 @@ export class ImageTextExtractorComponent implements OnInit {
     @ViewChild('imageEl', { static: false }) private imageElRef?: ElementRef<HTMLImageElement>;
     @ViewChild('overlay', { static: false }) private overlayRef?: ElementRef<HTMLDivElement>;
 
-    // Upload mode
     public selectedFile: File = null;
-    /** SafeUrl, not a plain string -- Angular's DomSanitizer strips a raw blob: URL bound via
-     * [src] as a potential XSS vector, which would leave the preview broken for every upload.
-     * bypassSecurityTrustUrl is safe here since we created the blob ourselves, from a file the
-     * user just picked locally -- nothing externally supplied. */
+
     public imagePreviewUrl: SafeUrl = null;
 
-    // Drag-select state (screen/overlay pixel space)
     private naturalWidth = 0;
     private naturalHeight = 0;
     private displayWidth = 0;
@@ -72,14 +54,11 @@ export class ImageTextExtractorComponent implements OnInit {
     private isDrawing = false;
     private dragStart = { x: 0, y: 0 };
     public draftRect: ScreenRect = null;
-    /** Every marked region (screen pixel space, for drawing the boxes) -- multiple are
-     * supported, same idea as PDF Highlighter's field list. Empty means "OCR the whole image". */
+
     public selectedRects: ScreenRect[] = [];
-    /** The committed selections in the image's native pixel coordinates, same order as
-     * selectedRects -- what actually gets sent to the backend, one OCR call per region. */
+
     public selectedRegions: ImageRegion[] = [];
 
-    // Browse mode -- only for opening a previously-saved .txt result, not for picking an image
     public buckets: BucketSummary[] = [];
     public loadingBuckets = false;
     public selectedBucket = '';
@@ -88,20 +67,15 @@ export class ImageTextExtractorComponent implements OnInit {
     public currentPrefix = '';
     public breadcrumbs: Breadcrumb[] = [];
 
-    // Shared extraction state
     public sourceLabel = '';
     public extracting = false;
     public extractError = '';
     public transcript = '';
     public transcriptLoadedFromBucket = false;
 
-    // Content Clean -- reuses the existing Content Cleaner feature (TextCleanerService) to tidy
-    // up OCR output (stray whitespace, smart quotes, hyphen-wrap joins, etc.) before it's used
-    // as an AI prompt. Cleans transcript in place, so Ask AI/Save to Bucket use the result.
     public cleaning = false;
     public cleanError = '';
 
-    // Save-to-bucket panel
     public saveBucket = '';
     public saveFolderName = '';
     public saveFolderExists = false;
@@ -112,7 +86,6 @@ export class ImageTextExtractorComponent implements OnInit {
     public historySavedPath = '';
     public saveHistoryError = '';
 
-    // Ask AI panel
     public agents: AiAgent[] = [];
     public loadingAgents = false;
     public selectedAgentId: any = '';
@@ -139,8 +112,6 @@ export class ImageTextExtractorComponent implements OnInit {
         this.mode = mode;
         this.extractError = '';
     }
-
-    // --- Upload mode ---
 
     public onFileSelected(event: any): void {
         let file: File = event && event.target && event.target.files ? event.target.files[0] : null;
@@ -175,8 +146,6 @@ export class ImageTextExtractorComponent implements OnInit {
             this.overlayRef.nativeElement.style.height = this.displayHeight + 'px';
         }
     }
-
-    // --- Drag-select (mirrors PdfHighlighterDetailComponent's overlay drag logic) ---
 
     public onOverlayMouseDown(event: MouseEvent): void {
         if (!this.overlayRef) {
@@ -213,8 +182,7 @@ export class ImageTextExtractorComponent implements OnInit {
         if (!rect || rect.width < MIN_DRAG_PX || rect.height < MIN_DRAG_PX) {
             return;
         }
-        // Append, don't replace -- lets the user mark several areas (e.g. separate fields on a
-        // form or receipt) and extract all of them in one go.
+
         this.selectedRects = [...this.selectedRects, rect];
         let scaleX = this.displayWidth ? this.naturalWidth / this.displayWidth : 1;
         let scaleY = this.displayHeight ? this.naturalHeight / this.displayHeight : 1;
@@ -249,8 +217,7 @@ export class ImageTextExtractorComponent implements OnInit {
                 .subscribe((response) => this.handleExtractResponse(response), (error) => this.handleExtractError(error));
             return;
         }
-        // One OCR call per marked region, run in parallel, then stitched back together in the
-        // order they were drawn -- each region is independent so there's no reason to serialize.
+
         forkJoin(this.selectedRegions.map((region) =>
             this.imageTextService.extractFromImage(this.selectedFile, region).pipe(first())
         )).subscribe((responses) => {
@@ -266,8 +233,6 @@ export class ImageTextExtractorComponent implements OnInit {
             this.saveFolderName = this.suggestFolderName();
         }, (error) => this.handleExtractError(error));
     }
-
-    // --- Browse mode (open a previously-saved .txt only) ---
 
     public loadBuckets(): void {
         this.loadingBuckets = true;
@@ -353,8 +318,6 @@ export class ImageTextExtractorComponent implements OnInit {
             }, (error) => this.handleExtractError(error));
     }
 
-    // --- Shared extraction ---
-
     private beginExtraction(): void {
         this.extracting = true;
         this.extractError = '';
@@ -390,8 +353,6 @@ export class ImageTextExtractorComponent implements OnInit {
         return extensions.indexOf(fileExtension(fileName)) > -1;
     }
 
-    // --- Copy to clipboard ---
-
     public copyTranscript(): void {
         if (!this.transcript) {
             return;
@@ -426,12 +387,6 @@ export class ImageTextExtractorComponent implements OnInit {
         this.alertService.showSuccess(successMessage, this.SUCCESS);
     }
 
-    // --- Content Clean ---
-
-    /** Runs the extracted text through the existing Content Cleaner endpoint (see
-     * ContentCleanerComponent) and replaces transcript with the cleaned result in place --
-     * OCR output especially benefits from this (stray line breaks, smart quotes, hyphen-wrap
-     * joins) before it's used as an AI prompt. */
     public cleanText(): void {
         if (!this.transcript) {
             return;
@@ -452,8 +407,6 @@ export class ImageTextExtractorComponent implements OnInit {
                 this.cleanError = 'Clean failed: ' + (error && error.message ? error.message : error);
             });
     }
-
-    // --- Save to Bucket ---
 
     private suggestFolderName(): string {
         let stem = (this.sourceLabel || 'image').split('/').pop()
@@ -542,8 +495,6 @@ export class ImageTextExtractorComponent implements OnInit {
                 doUpload();
             }, (error) => onError(error && error.message ? error.message : error));
     }
-
-    // --- Ask AI panel ---
 
     public loadAgents(): void {
         this.loadingAgents = true;

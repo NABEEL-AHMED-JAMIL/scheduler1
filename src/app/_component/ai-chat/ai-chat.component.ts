@@ -16,17 +16,6 @@ interface ChatMessage {
     text: string;
 }
 
-/**
- * A simple general-purpose chat -- pick a saved AI Agent, optionally paste some reference
- * content (e.g. your CV) into the Content box, then chat. Each turn embeds the running
- * conversation (and the Content box, if filled) into AiAgentService#processText's `text` param
- * with no instructions override, so the agent's own saved instructions act as a stable system
- * persona across the whole conversation instead of changing every message -- normal chat
- * semantics, unlike the per-call prompt override the extractor screens use. Each assistant
- * reply has a "Use as Content" button so you can iterate on a CV (or anything else) turn by
- * turn: paste it in, ask for a revision, adopt the reply, ask for another pass, etc.
- * @author Nabeel Ahmed
- */
 @Component({
     selector: 'ai-chat',
     templateUrl: 'ai-chat.component.html'
@@ -38,7 +27,6 @@ export class AiChatComponent implements OnInit {
 
     public mode: 'chat' | 'browse' = 'chat';
 
-    // Ask AI / chat
     public agents: AiAgent[] = [];
     public loadingAgents = false;
     public selectedAgentId: any = '';
@@ -48,7 +36,6 @@ export class AiChatComponent implements OnInit {
     public sending = false;
     public sendError = '';
 
-    // Browse mode -- load an existing .txt into the Content box (e.g. a saved CV)
     public buckets: BucketSummary[] = [];
     public loadingBuckets = false;
     public selectedBucket = '';
@@ -58,7 +45,6 @@ export class AiChatComponent implements OnInit {
     public breadcrumbs: Breadcrumb[] = [];
     public loadingContent = false;
 
-    // Save-to-bucket panel
     public saveBucket = '';
     public saveFolderName = '';
     public saveFolderExists = false;
@@ -83,8 +69,6 @@ export class AiChatComponent implements OnInit {
     public setMode(mode: 'chat' | 'browse'): void {
         this.mode = mode;
     }
-
-    // --- Chat ---
 
     public loadAgents(): void {
         this.loadingAgents = true;
@@ -135,9 +119,6 @@ export class AiChatComponent implements OnInit {
             });
     }
 
-    /** Embeds the Content box (if filled) and the running conversation into one block, with
-     * the new message last -- no instructions override, so the agent's own saved instructions
-     * stay the system persona for the whole chat instead of changing every turn. */
     private buildContext(currentPrompt: string): string {
         let parts: string[] = [];
         if (this.content && this.content.trim()) {
@@ -174,8 +155,6 @@ export class AiChatComponent implements OnInit {
         this.chatSavedPath = '';
         this.saveChatError = '';
     }
-
-    // --- Browse mode (load an existing .txt into the Content box) ---
 
     public loadBuckets(): void {
         this.loadingBuckets = true;
@@ -259,8 +238,6 @@ export class AiChatComponent implements OnInit {
         this.loadObjects();
     }
 
-    // --- Copy to clipboard ---
-
     public copyText(text: string): void {
         if (!text) {
             return;
@@ -287,8 +264,6 @@ export class AiChatComponent implements OnInit {
         document.body.removeChild(textarea);
         this.alertService.showSuccess(successMessage, this.SUCCESS);
     }
-
-    // --- Save to Bucket ---
 
     private suggestFolderName(): string {
         let stamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);

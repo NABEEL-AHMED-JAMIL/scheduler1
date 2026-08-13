@@ -13,20 +13,6 @@ import {
     DATABASE_TYPES
 } from '@/_models/query-engine.model';
 
-/**
- * Query Engine -- create/store a SQL query against a tenant's own database connection, validate
- * + preview it (server-bounded, never the full result set), run it (backend streams the result
- * straight to a CSV in object storage -- see QueryExecutionServiceImpl on the backend; this page
- * never receives query row data itself except the small preview sample), and optionally attach
- * a recurring schedule that reuses the exact same execution path.
- *
- * Replaces (not "extends") the old /setting/searchEngine free-text-SQL-against-the-app's-own-
- * database PLATFORM_ADMIN console -- that page is a different, intentionally separate tool and
- * is left as-is; nothing here is built on top of it. See the design review for the full
- * rationale (multi-tenant connection profiles, encrypted query storage, read-only SQL
- * validation via a real parser, streamed CSV export).
- * @author Nabeel Ahmed
- */
 @Component({
     selector: 'query-engine',
     templateUrl: 'query-engine.component.html'
@@ -45,7 +31,6 @@ export class QueryEngineComponent implements OnInit {
 
     public activeTab: 'connections' | 'queries' | 'executions' = 'queries';
 
-    // ---------------------------------------------------------------- connections
     public connections: DatabaseConnectionProfile[] = [];
     public searchConnection = '';
     public connectionForm: FormGroup;
@@ -56,7 +41,6 @@ export class QueryEngineComponent implements OnInit {
     public connectionTestResult: { success: boolean; message: string } = null;
     public deleteConnectionId: any;
 
-    // ---------------------------------------------------------------- queries
     public queries: QueryDefinition[] = [];
     public searchQuery = '';
     public queryForm: FormGroup;
@@ -68,7 +52,6 @@ export class QueryEngineComponent implements OnInit {
     public previewResult: QueryPreviewResponse = null;
     public deleteQueryId: any;
 
-    // ---------------------------------------------------------------- run / schedule
     public runForm: FormGroup;
     public runningQuery: QueryDefinition;
     public running = false;
@@ -77,12 +60,11 @@ export class QueryEngineComponent implements OnInit {
     public schedulingQuery: QueryDefinition;
     public schedules: QuerySchedule[] = [];
 
-    // ---------------------------------------------------------------- executions
     public executions: QueryExecution[] = [];
     public searchExecution = '';
     public readonly executionStatusOptions = ['PENDING', 'RUNNING', 'SUCCESS', 'FAILED', 'CANCELLED'];
     public filterExecutionStatus = '';
-    // '' means "no filter" -- applied on top of (before) searchConnection above.
+
     public filterDatabaseType = '';
 
     constructor(
@@ -115,10 +97,8 @@ export class QueryEngineComponent implements OnInit {
                 if (response.status === ApiCode.SUCCESS) {
                     this.buckets = response.data || [];
                 }
-            }, () => { /* non-blocking -- bucket picker just stays empty */ });
+            }, () => {  });
     }
-
-    // =================================================================== CONNECTIONS
 
     public fetchAllConnections(): void {
         this.spinnerService.show();
@@ -255,8 +235,6 @@ export class QueryEngineComponent implements OnInit {
             });
     }
 
-    // =================================================================== QUERIES
-
     public fetchAllQueries(): void {
         this.queryEngineService.fetchAllQueries()
             .pipe(first())
@@ -274,7 +252,7 @@ export class QueryEngineComponent implements OnInit {
                 if (response.status === ApiCode.SUCCESS) {
                     this.schedules = response.data || [];
                 }
-            }, () => { /* non-blocking -- schedule pills on the query list just won't show */ });
+            }, () => {  });
     }
 
     public scheduleForQuery(query: QueryDefinition): QuerySchedule | null {
@@ -326,11 +304,6 @@ export class QueryEngineComponent implements OnInit {
             });
     }
 
-    /** The click target for opening the edit modal -- data-toggle="modal" fires immediately on
-     * click, before openEditQuery's async fetchQueryById resolves, so the modal itself opens
-     * right away (against the *previous* queryForm/editingQuery for an instant) and repaints
-     * once the response lands -- same latency-hiding tradeoff every other edit modal in this
-     * app already makes (see kafka-connection-profile.component.html's own openEditProfile). */
     public onOpenEditQueryClick(query: QueryDefinition): void {
         this.openEditQuery(query);
     }
@@ -433,8 +406,6 @@ export class QueryEngineComponent implements OnInit {
             });
     }
 
-    // =================================================================== RUN
-
     public openRunQuery(query: QueryDefinition): void {
         this.runningQuery = query;
         this.runForm = this.formBuilder.group({
@@ -474,8 +445,6 @@ export class QueryEngineComponent implements OnInit {
                 this.alertService.showError(error, this.ERROR);
             });
     }
-
-    // =================================================================== SCHEDULE
 
     public openScheduleQuery(query: QueryDefinition): void {
         this.schedulingQuery = query;
@@ -548,8 +517,6 @@ export class QueryEngineComponent implements OnInit {
             });
     }
 
-    // =================================================================== EXECUTIONS
-
     public fetchAllExecutions(): void {
         this.queryEngineService.fetchAllExecutions()
             .pipe(first())
@@ -568,10 +535,6 @@ export class QueryEngineComponent implements OnInit {
         return searched.filter((e: QueryExecution) => e.status === this.filterExecutionStatus);
     }
 
-    /** Non-deleted connections, with no search/type filter applied -- used for the tab count,
-     * the "add a connection first" gating, and the query form's connection picker, none of
-     * which should be affected by whatever's currently typed into the Connections tab's own
-     * search/type filter (unlike filteredConnections below, which is for that tab's table). */
     public get activeConnections(): DatabaseConnectionProfile[] {
         return this.connections.filter((c) => c.status !== 'Delete');
     }
@@ -585,9 +548,6 @@ export class QueryEngineComponent implements OnInit {
         return searched.filter((c: DatabaseConnectionProfile) => c.databaseType === this.filterDatabaseType);
     }
 
-    /** Non-deleted queries, with no search filter applied -- see activeConnections above for
-     * why this is kept separate from filteredQueries (used for the tab badge count, which
-     * shouldn't fluctuate with whatever's typed into the Queries tab's own search box). */
     public get activeQueries(): QueryDefinition[] {
         return this.queries.filter((q) => q.status !== 'Delete');
     }

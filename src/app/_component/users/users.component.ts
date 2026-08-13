@@ -7,14 +7,6 @@ import { ApiCode, Action } from '@/_models';
 import { AppUserRecord } from '@/_models/app-user.model';
 import { Tenant } from '@/_models/tenant.model';
 
-/**
- * TENANT_ADMIN+ (see RoleGuard on this route). What's actually visible/editable is further
- * scoped server-side by role (see AppUserServiceImpl) -- a Tenant Admin only ever sees their
- * own tenant's users here and can't grant Platform Admin or move a user to another tenant, so
- * this component doesn't need to duplicate that logic, just not render controls for things the
- * backend would reject anyway (see isPlatformAdmin below).
- * @author Nabeel Ahmed
- */
 @Component({
     selector: 'users',
     templateUrl: 'users.component.html'
@@ -33,12 +25,9 @@ export class UsersComponent implements OnInit {
     public resetPasswordTarget: AppUserRecord | null = null;
     public deleteUser: AppUserRecord | null = null;
     public readonly roleOptions = ['PLATFORM_ADMIN', 'TENANT_ADMIN', 'TENANT_USER'];
-    // 'Delete' left out on purpose -- a deleted user is never shown (see filteredUsers), so
-    // filtering *for* Delete would always yield nothing.
+
     public readonly statusOptions = ['Active', 'Inactive'];
-    // Dropdown filters, applied on top of (before) the free-text `search` box below --
-    // '' means "no filter" for each. filterTenantId only has any effect for a Platform Admin
-    // (a Tenant Admin's own list is already scoped server-side to their one tenant).
+
     public filterTenantId: string = '';
     public filterRole: string = '';
     public filterStatus: string = '';
@@ -73,11 +62,8 @@ export class UsersComponent implements OnInit {
         return this.authService.currentUser?.userRole === 'PLATFORM_ADMIN';
     }
 
-    // Applied before the `search` free-text box (see `| searchFilter: search` in the template) --
-    // dropdown filters narrow the working set first, then the text box searches within it.
     public get filteredUsers(): AppUserRecord[] {
-        // Soft-deleted users are never shown, regardless of the Status filter -- see the
-        // analogous note on filteredSourceTaskTypes in setting.component.ts.
+
         return this.users.filter((user) =>
             user.status !== 'Delete'
             && (!this.filterTenantId || String(user.tenantId) === this.filterTenantId)
@@ -96,7 +82,6 @@ export class UsersComponent implements OnInit {
         this.search = '';
     }
 
-    // convenience getter for easy access to form fields
     get f() {
         return this.userForm.controls;
     }

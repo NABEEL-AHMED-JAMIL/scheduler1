@@ -22,13 +22,9 @@ export class SourceTaskTypeComponent implements OnInit {
     public SOURCEC_TASK_TYPE_TITLE: any = 'New SourceTaskType';
 	public sourceTaskTypeStatus: any = STATUS_LIST;
 	public sourceTaskTaypeForm: FormGroup;
-	/** Populated for the "default Kafka cluster" picker -- leaving it unset means "inherit the
-	 * tenant's own default", see KafkaConnectionResolver on the backend. */
+
 	public kafkaProfiles: KafkaConnectionProfile[] = [];
-	/** Options for the Partition dropdown -- '*' (any partition) plus 0..MAX_PARTITION_INDEX.
-	 * A guided picker instead of a free-text box, capped to match the backend's own limit
-	 * (KafkaTopicPartitionUtil.MAX_PARTITION_INDEX) so an out-of-range value can't even be
-	 * entered here in the first place, not just rejected after a round trip to the server. */
+
 	public readonly MAX_PARTITION_INDEX = 10;
 	public readonly partitionOptions: string[] = ['*', ...Array.from({ length: this.MAX_PARTITION_INDEX + 1 }, (_, i) => String(i))];
 
@@ -63,11 +59,10 @@ export class SourceTaskTypeComponent implements OnInit {
 				this.SOURCEC_TASK_TYPE_TITLE = 'View TaskType';
 				this.viewSourceTaskTaypeForm(this.sourceTaskType);
 				this.sourceTaskTaypeForm.disable()
-			} 
+			}
 		}
     }
 
-    // convenience getter for easy access to form fields
 	get sourceTaskTaype() {
 		return this.sourceTaskTaypeForm.controls;
 	}

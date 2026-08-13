@@ -16,10 +16,13 @@ import {
     LookupData
 } from '@/_models/index';
 import {
+    AbstractControl,
     FormArray,
     FormBuilder,
     FormControl,
     FormGroup,
+    ValidationErrors,
+    ValidatorFn,
     Validators
 } from '@angular/forms';
 import {
@@ -29,10 +32,13 @@ import {
     ConfigurationMakerService
 } from '@/_services';
 
+function noWhitespaceValidator(): ValidatorFn {
+    return (control: AbstractControl): ValidationErrors | null => {
+        const value = control.value;
+        return value && /\s/.test(value) ? { hasSpace: true } : null;
+    };
+}
 
-/**
- * @author Nabeel Ahmed
- */
 @Component({
     selector: 'task',
     templateUrl: 'task.component.html',
@@ -55,9 +61,7 @@ export class TaskComponent implements OnInit, OnDestroy {
     public pipelineIdList: any;
     public piplineHomePageList: any;
     public taskGroupList: any;
-    /** Stored so ngOnDestroy can unsubscribe -- paramMap is a long-lived route Observable, not a
-     * one-shot HTTP call, so leaving this subscribed past the component's lifetime leaks a
-     * dangling subscriber tied to the router's internal param stream. */
+
     private paramMapSubscription: Subscription;
 
     constructor(private _router: Router,
@@ -96,9 +100,9 @@ export class TaskComponent implements OnInit, OnDestroy {
             .subscribe((response) => {
 				if(response.status === ApiCode.SUCCESS) {
 					this.spinnerService.hide();
-                    // only the active task can be show
+
 					this.sourceTaskTypes = response.data.sourceTaskTypes.filter(sourceTask => sourceTask.status == 'Active');
-                    // PIPELINE_IDS
+
                     if (response.data.lookupDatas.find(el => el.lookupType === this.PIPELINE_IDS)) {
                         this.settingService.fetchSubLookupByParentId(
                             response.data.lookupDatas.find(el => el.lookupType === this.PIPELINE_IDS).lookupId)
@@ -116,7 +120,7 @@ export class TaskComponent implements OnInit, OnDestroy {
                             this.alertService.showError(error, this.ERROR);
                         });
                     }
-                    // PIPELINE_HOME_PAGES
+
                     if (response.data.lookupDatas.find(el => el.lookupType === this.PIPELINE_HOME_PAGES)) {
                         this.settingService.fetchSubLookupByParentId(
                             response.data.lookupDatas.find(el => el.lookupType === this.PIPELINE_HOME_PAGES).lookupId)
@@ -134,10 +138,7 @@ export class TaskComponent implements OnInit, OnDestroy {
                             this.alertService.showError(error, this.ERROR);
                         });
                     }
-                    // TASK_GROUPS -- same parent+children lookup pattern as PIPELINE_IDS/
-                    // PIPELINE_HOME_PAGES above; add a TASK_GROUPS lookup (Settings > Lookup)
-                    // and its children (Settings > Lookup > sub-lookup) to make this dropdown
-                    // populate. No TASK_GROUPS parent yet just means no groups to pick from.
+
                     if (response.data.lookupDatas.find(el => el.lookupType === this.TASK_GROUPS)) {
                         this.settingService.fetchSubLookupByParentId(
                             response.data.lookupDatas.find(el => el.lookupType === this.TASK_GROUPS).lookupId)
@@ -178,9 +179,7 @@ export class TaskComponent implements OnInit, OnDestroy {
                         sourceTaskTypeId: [response?.data?.sourceTaskType?.sourceTaskTypeId, Validators.required],
                         taskPayload: [response?.data?.taskPayload, Validators.required],
                         taskStatus: [response?.data?.taskStatus],
-                        // '' fallback so an existing task saved without one of these still shows
-                        // the "Select X" placeholder instead of a blank/mismatched selection --
-                        // see the matching '' default in addSourceTaskFormInit above.
+
                         homePageId: [response?.data?.homePageId ?? ''],
                         pipelineId: [response?.data?.pipelineId ?? ''],
                         groupId: [response?.data?.groupId ?? ''],
@@ -209,10 +208,7 @@ export class TaskComponent implements OnInit, OnDestroy {
             sourceTaskTypeId: ['', Validators.required],
             taskPayload: ['', Validators.required],
             taskStatus: [],
-            // '' (not the field-level default of null/undefined) so it actually matches the
-            // hidden/disabled placeholder <option value=""> in task.component.html and shows
-            // "Select Home Page"/"Select Pipeline Id"/"Select Group" as selected on load --
-            // same reasoning as sourceTaskTypeId above.
+
             homePageId: [''],
             pipelineId: [''],
             groupId: [''],
@@ -224,8 +220,8 @@ export class TaskComponent implements OnInit, OnDestroy {
     public buildItem(): any {
         return new FormGroup({
             taskPayloadId: new FormControl(null),
-            tagKey: new FormControl(null),
-            tagParent: new FormControl(null),
+            tagKey: new FormControl(null, noWhitespaceValidator()),
+            tagParent: new FormControl(null, noWhitespaceValidator()),
             tagValue: new FormControl(null),
         });
     }
@@ -233,8 +229,8 @@ export class TaskComponent implements OnInit, OnDestroy {
     public buildItemWithValue(tagInfo: any): any {
         return new FormGroup({
             taskPayloadId: new FormControl(tagInfo?.taskPayloadId),
-            tagKey: new FormControl(tagInfo?.tagKey),
-            tagParent: new FormControl(tagInfo?.tagParent),
+            tagKey: new FormControl(tagInfo?.tagKey, noWhitespaceValidator()),
+            tagParent: new FormControl(tagInfo?.tagParent, noWhitespaceValidator()),
             tagValue: new FormControl(tagInfo?.tagValue),
         });
     }
@@ -279,7 +275,7 @@ export class TaskComponent implements OnInit, OnDestroy {
 				if(response.status === ApiCode.SUCCESS) {
 					this.spinnerService.hide();
 					this.alertService.showSuccess(response.message, this.SUCESS);
-                    // route to source task list
+
                     this._router.navigateByUrl('/taskList');
 				} else {
 					this.spinnerService.hide();
@@ -296,7 +292,7 @@ export class TaskComponent implements OnInit, OnDestroy {
 				if(response.status === ApiCode.SUCCESS) {
 					this.spinnerService.hide();
 					this.alertService.showSuccess(response.message, this.SUCESS);
-                    // route to source task list
+
                     this._router.navigateByUrl('/taskList');
 				} else {
 					this.spinnerService.hide();
@@ -316,7 +312,7 @@ export class TaskComponent implements OnInit, OnDestroy {
     public get tageForms(): FormArray {
         return this.sourceTaskForm.get('tagsInfo') as FormArray;
     }
-    
+
     public tageFormsAddItem(): void {
         this.tageForms.push(this.buildItem());
     }
@@ -324,7 +320,7 @@ export class TaskComponent implements OnInit, OnDestroy {
     private tageFormsAddItemV1(tagInfo: any): void {
         this.tageForms.push(this.buildItemWithValue(tagInfo));
     }
-    
+
     public tageFormAddItem(index: number): void {
         this.tageForms.insert(index, this.buildItem());
     }

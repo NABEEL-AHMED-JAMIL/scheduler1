@@ -1,6 +1,4 @@
-/**
- * @author Nabeel Ahmed
- */
+
 export interface Tenant {
     tenantId?: any;
     uuid?: string;

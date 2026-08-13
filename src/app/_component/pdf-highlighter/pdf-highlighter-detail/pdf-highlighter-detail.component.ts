@@ -5,10 +5,6 @@ import { SpinnerService } from '@/_helpers';
 import { ApiCode, HIGHLIGHTER_STATUS_LIST, STATUS_LIST } from '@/_models';
 import { PdfHighlighterField, PdfHighlighterFieldSelector } from '@/_models/index';
 
-// The plain (non-legacy) build uses private class fields, which this project's webpack 4 /
-// ts-loader pipeline has no loader for (.js files pass through untranspiled) -- the legacy
-// build targets older JS environments and avoids that syntax.
-// tslint:disable-next-line:no-var-requires
 const pdfjsLib: any = require('pdfjs-dist/legacy/build/pdf.js');
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'assets/pdf.worker.min.js';
 
@@ -31,7 +27,6 @@ const MAX_ZOOM = 3;
 const ZOOM_STEP = 0.25;
 const CONTEXT_CHARS = 30;
 
-/** Reads a File's bytes as an ArrayBuffer via FileReader (Blob.arrayBuffer() isn't in this project's TS 3.1 dom lib). */
 function readFileAsArrayBuffer(file: File): Promise<ArrayBuffer> {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -47,13 +42,6 @@ function nextLocalFieldId(): string {
     return 'field-' + Date.now() + '-' + localFieldIdCounter;
 }
 
-/**
- * Full PDF viewer + box-drawing tool for a PdfHighlighterTask -- upload a PDF, drag rectangles
- * over the fields you need, and save the mapping (label + coordinates + an auto-derived
- * text-anchored selector). Ported from io-frontend's ai-tool/pdf-highlighter screen, minus the
- * organization/form linkage (scheduler1 has no such concept).
- * @author Nabeel Ahmed
- */
 @Component({
     selector: 'pdf-highlighter-detail',
     templateUrl: 'pdf-highlighter-detail.component.html'
@@ -67,7 +55,6 @@ export class PdfHighlighterDetailComponent implements OnInit, OnDestroy {
     public readonly highlighterStatusList: any = HIGHLIGHTER_STATUS_LIST;
     public readonly statusList: any = STATUS_LIST;
 
-    // --- Task metadata ---
     public pdfHighlighterTaskId: any = null;
     public taskName = '';
     public description = '';
@@ -78,7 +65,6 @@ export class PdfHighlighterDetailComponent implements OnInit, OnDestroy {
     public setupError = '';
     public readOnly = false;
 
-    // --- PDF viewer state ---
     public fileName = '';
     public fileSize?: number;
     public fileContentType?: string;
@@ -182,8 +168,6 @@ export class PdfHighlighterDetailComponent implements OnInit, OnDestroy {
         });
     }
 
-    // --- Save (create/update task + replace fields + upload file) ---
-
     public saveTask(): void {
         if (this.readOnly) { return; }
         if (!this.taskName || !this.taskName.trim()) {
@@ -265,8 +249,6 @@ export class PdfHighlighterDetailComponent implements OnInit, OnDestroy {
         this.router.navigate(['/pdfHighlighter']);
     }
 
-    // --- File loading ---
-
     public onFileSelected(event: Event): void {
         if (this.readOnly) { return; }
         const input = event.target as HTMLInputElement;
@@ -337,8 +319,7 @@ export class PdfHighlighterDetailComponent implements OnInit, OnDestroy {
         this.totalPages = Math.max(this.pdfDoc.numPages, this.totalPages);
         this.currentPage = 1;
         this.zoom = 1;
-        // The canvas/overlay live behind *ngIf="fileName"; force a sync view update so
-        // the ViewChild refs exist before the first renderPage() looks them up.
+
         this.cdr.detectChanges();
         await this.renderPage();
     }
@@ -357,8 +338,6 @@ export class PdfHighlighterDetailComponent implements OnInit, OnDestroy {
         this.errorMessage = '';
         this.pageTextCache.clear();
     }
-
-    // --- Page rendering ---
 
     private async renderPage(): Promise<void> {
         if (!this.pdfDoc || !this.canvasRef || !this.overlayRef) { return; }
@@ -389,8 +368,6 @@ export class PdfHighlighterDetailComponent implements OnInit, OnDestroy {
         this.enrichFieldSelectors(this.currentPage);
     }
 
-    // --- Text-anchored selectors ---
-
     private async enrichFieldSelectors(pageNum: number): Promise<void> {
         const pending = this.fields.filter((f) => f.page === pageNum && !f.selector);
         if (!pending.length) { return; }
@@ -400,7 +377,7 @@ export class PdfHighlighterDetailComponent implements OnInit, OnDestroy {
                 field.selector = this.buildSelector(pageNum, items, { x: field.x, y: field.y, width: field.width, height: field.height });
             }
         } catch (e) {
-            // Best-effort enrichment -- coordinates alone still work if text extraction fails.
+
         }
     }
 
@@ -473,8 +450,6 @@ export class PdfHighlighterDetailComponent implements OnInit, OnDestroy {
         await this.renderPage();
     }
 
-    // --- Zoom ---
-
     public async zoomIn(): Promise<void> {
         await this.setZoom(this.zoom + ZOOM_STEP);
     }
@@ -493,8 +468,6 @@ export class PdfHighlighterDetailComponent implements OnInit, OnDestroy {
         this.zoom = clamped;
         await this.renderPage();
     }
-
-    // --- Box drawing ---
 
     public onOverlayMouseDown(event: MouseEvent): void {
         if (this.readOnly || !this.pdfDoc || !this.overlayRef) { return; }
@@ -548,7 +521,7 @@ export class PdfHighlighterDetailComponent implements OnInit, OnDestroy {
             const items = await this.getPageTextItems(page);
             field.selector = this.buildSelector(page, items, fieldRect);
         } catch (e) {
-            // Text extraction is best-effort -- the rectangle mapping alone still works.
+
         }
     }
 
@@ -587,8 +560,6 @@ export class PdfHighlighterDetailComponent implements OnInit, OnDestroy {
             height: (field.height * this.scale) + 'px'
         };
     }
-
-    // --- Export ---
 
     public get mappingJson(): string {
         const mapping = this.fields.map((f) => {

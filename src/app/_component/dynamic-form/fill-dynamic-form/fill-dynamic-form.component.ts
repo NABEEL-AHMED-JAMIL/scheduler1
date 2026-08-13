@@ -10,13 +10,6 @@ import {
     sectionKeyFor, payloadValueFor
 } from '@/_models/dynamic-form.model';
 
-/**
- * Renders a dynamic form's fields as a real, validated fillable form.
- * With no :submissionId route param it creates a new submission; with one,
- * it loads that submission and switches into "update" mode. Either way, on
- * success it returns to the submissions screen.
- * @author Nabeel Ahmed
- */
 @Component({
     selector: 'fill-dynamic-form',
     templateUrl: 'fill-dynamic-form.component.html'
@@ -31,10 +24,8 @@ export class FillDynamicFormComponent implements OnInit {
     public dynamicForm: DynamicForm;
     public fillForm: FormGroup;
 
-    /** Non-null when the :submissionId route param is present -- swaps the form into "update" mode. */
     public editingSubmissionId: any = null;
 
-    /** checkbox-group state: fieldName -> Set of checked option values (kept outside the reactive form -- reactive forms don't natively model "N independent checkboxes -> one array value"). */
     public checkboxSelections: { [fieldName: string]: any } = {};
 
     public OPTION_BASED_FIELD_TYPES = OPTION_BASED_FIELD_TYPES;
@@ -122,7 +113,7 @@ export class FillDynamicFormComponent implements OnInit {
         this.checkboxSelections = {};
         (this.dynamicForm.fields || []).forEach((field: DynamicFormField) => {
             if (field.fieldType === DynamicFormFieldType.SECTION) {
-                // a heading/divider -- collects no value, so it gets no control and never enters the payload
+
                 return;
             }
             if (field.fieldType === DynamicFormFieldType.CHECKBOX) {
@@ -211,10 +202,6 @@ export class FillDynamicFormComponent implements OnInit {
         }
     }
 
-    /** Builds the submitted JSON payload, nesting each field's value under the fieldName of the
-     * Section it falls under (e.g. a "session" section wrapping accounts/auth_url produces
-     * payload.session = { accounts, auth_url }) -- fields with no owning section stay flat at
-     * the top level, so a form with no sections behaves exactly as it always has. */
     private buildPayload(): any {
         let payload: any = {};
         (this.dynamicForm.fields || []).forEach((field: DynamicFormField) => {

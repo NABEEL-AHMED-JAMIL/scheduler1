@@ -4,9 +4,6 @@ import { ApiResponse } from '@/_models';
 import { AppUserRecord } from '@/_models/app-user.model';
 import { Observable } from 'rxjs';
 
-/**
- * @author Nabeel Ahmed
- */
 @Injectable({
     providedIn: 'root'
 })

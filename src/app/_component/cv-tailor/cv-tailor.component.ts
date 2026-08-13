@@ -7,9 +7,6 @@ import { CV_TAILOR_PROMPTS, CV_TAILOR_SUPPORTED_EXTENSIONS, CvTailorPromptOption
 import { AiAgent, fileExtension } from '@/_models/ai-agent.model';
 import { extractPdfText } from '@/_helpers/pdf-text-extractor';
 
-// marked has no bundled TypeScript types in the version installed here -- same "require as any"
-// approach pdf-text-extractor.ts already uses for pdfjs-dist.
-// tslint:disable-next-line:no-var-requires
 const marked: any = require('marked');
 
 const PAGE_SIZE = 100;
@@ -19,19 +16,6 @@ interface Breadcrumb {
     prefix: string;
 }
 
-/**
- * Tailors an uploaded (or bucket-picked) PDF resume to a pasted job description: an AI agent
- * (any provider, including a local Ollama model) rewrites the resume as Markdown (chosen so the
- * result converts cleanly to PDF and renders nicely), and every run replaces the previous result
- * outright -- re-upload a resume or edit the job description and click Tailor again for a fresh
- * version. Which tailoring prompt drives the rewrite is picked from CV_TAILOR_PROMPTS (General
- * plus 4 "strong", industry-tuned prompts -- Health Care, Banking, Automobile, Telecom -- see
- * cv-tailor.model.ts) and sent as a one-off instructions override, so it applies regardless of
- * the selected agent's own saved instructions. The result can be viewed as raw Markdown or a
- * rendered preview, downloaded as a .md file, or saved (along with the job description) to a
- * bucket.
- * @author Nabeel Ahmed
- */
 @Component({
     selector: 'cv-tailor',
     templateUrl: 'cv-tailor.component.html'
@@ -42,20 +26,15 @@ export class CvTailorComponent implements OnInit {
     public SUCCESS = 'Success';
 
     public jobDescription = '';
-    // Content Clean -- reuses the existing Content Cleaner feature (TextCleanerService, see
-    // content-cleaner.component.ts / image-text-extractor.component.ts) to tidy up a pasted
-    // job description (stray whitespace, smart quotes, copy-paste artifacts from a job board)
-    // before it's used as part of the tailoring prompt.
+
     public cleaningJd = false;
     public cleanJdError = '';
 
     public mode: 'upload' | 'browse' = 'upload';
     public supportedExtensions = CV_TAILOR_SUPPORTED_EXTENSIONS;
 
-    // Upload mode
     public selectedFile: File = null;
 
-    // Browse mode (pick an existing .pdf resume from a bucket)
     public buckets: BucketSummary[] = [];
     public loadingBuckets = false;
     public selectedBucket = '';
@@ -64,31 +43,24 @@ export class CvTailorComponent implements OnInit {
     public currentPrefix = '';
     public breadcrumbs: Breadcrumb[] = [];
 
-    // Original resume text, extracted client-side from the picked PDF
     public cvSourceLabel = '';
     public extractingCv = false;
     public extractError = '';
     public originalCvText = '';
 
-    // AI Agent picker
     public agents: AiAgent[] = [];
     public loadingAgents = false;
     public selectedAgentId: any = '';
 
-    // AI Prompt picker -- General plus 4 "strong", industry-tuned tailoring prompts (Health
-    // Care, Banking, Automobile, Telecom). Works with any active agent, including a local
-    // Ollama one, since it's just an instructions override on processText.
     public prompts: CvTailorPromptOption[] = CV_TAILOR_PROMPTS;
     public selectedPromptKey: string = CV_TAILOR_PROMPTS[0].key;
 
-    // Tailoring result -- Markdown, plus its rendered HTML preview
     public tailoring = false;
     public tailorError = '';
     public newCvMarkdown = '';
     public previewHtml = '';
     public viewMode: 'preview' | 'markdown' = 'preview';
 
-    // Save-to-bucket panel -- shared by "save job description" and "save new resume"
     public saveBucket = '';
     public saveFolderName = '';
     public saveFolderExists = false;
@@ -110,8 +82,6 @@ export class CvTailorComponent implements OnInit {
         this.loadBuckets();
         this.loadAgents();
     }
-
-    // --- Content Clean (Job Description) ---
 
     public cleanJobDescription(): void {
         if (!this.jobDescription) {
@@ -139,8 +109,6 @@ export class CvTailorComponent implements OnInit {
         this.extractError = '';
     }
 
-    // --- Upload mode ---
-
     public onFileSelected(event: any): void {
         let file: File = event && event.target && event.target.files ? event.target.files[0] : null;
         if (!file) {
@@ -157,8 +125,6 @@ export class CvTailorComponent implements OnInit {
             extractPdfText(buffer).then((text) => this.finishCvExtraction(text), (error) => this.handleCvExtractError(error));
         }, (error: any) => this.handleCvExtractError(error));
     }
-
-    // --- Browse mode ---
 
     public loadBuckets(): void {
         this.loadingBuckets = true;
@@ -235,8 +201,6 @@ export class CvTailorComponent implements OnInit {
         this.loadObjects();
     }
 
-    // --- Shared CV text extraction ---
-
     private beginCvExtraction(sourceLabel: string): void {
         this.cvSourceLabel = sourceLabel;
         this.extractingCv = true;
@@ -277,9 +241,6 @@ export class CvTailorComponent implements OnInit {
         this.saveCvError = '';
     }
 
-    // --- AI Agent picker + tailoring ---
-
-    /** The full prompt option behind selectedPromptKey -- falls back to General if somehow unset. */
     public get selectedPrompt(): CvTailorPromptOption {
         return this.prompts.find((p) => p.key === this.selectedPromptKey) || this.prompts[0];
     }
@@ -301,9 +262,6 @@ export class CvTailorComponent implements OnInit {
             });
     }
 
-    /** Re-runs on every click -- there's no partial/incremental state, just today's full
-     * result replacing whatever was there before (re-upload a resume and/or edit the job
-     * description, then Tailor again for a fresh version). */
     public tailorCv(): void {
         if (!this.originalCvText) {
             this.alertService.showError('Upload or pick a PDF resume first.', this.ERROR);
@@ -340,9 +298,6 @@ export class CvTailorComponent implements OnInit {
             });
     }
 
-    /** Some models wrap their output in a ```markdown ... ``` fence despite being told not
-     * to -- strip it if present so both the raw-text view and the rendered preview show just
-     * the resume itself. */
     private stripCodeFence(text: string): string {
         let trimmed = text.trim();
         let match = trimmed.match(/^```(?:markdown|md)?\s*\n([\s\S]*?)\n```$/i);
@@ -352,8 +307,6 @@ export class CvTailorComponent implements OnInit {
     public setViewMode(mode: 'preview' | 'markdown'): void {
         this.viewMode = mode;
     }
-
-    // --- Copy to clipboard / download ---
 
     public copyJobDescription(): void {
         if (!this.jobDescription) {
@@ -369,8 +322,6 @@ export class CvTailorComponent implements OnInit {
         this.copyToClipboard(this.newCvMarkdown, 'New resume (Markdown) copied to clipboard.');
     }
 
-    /** Local download, no bucket involved -- lets the user immediately drop the .md file into
-     * any Markdown-to-PDF converter. */
     public downloadMarkdown(): void {
         if (!this.newCvMarkdown) {
             return;
@@ -402,8 +353,6 @@ export class CvTailorComponent implements OnInit {
         document.body.removeChild(textarea);
         this.alertService.showSuccess(successMessage, this.SUCCESS);
     }
-
-    // --- Save to Bucket ---
 
     private suggestFolderName(): string {
         let stem = (this.cvSourceLabel || 'resume').split('/').pop()

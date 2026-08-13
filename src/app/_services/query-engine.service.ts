@@ -9,17 +9,12 @@ import {
 } from '@/_models/query-engine.model';
 import { Observable } from 'rxjs';
 
-/**
- * @author Nabeel Ahmed
- */
 @Injectable({
     providedIn: 'root'
 })
 export class QueryEngineService {
 
     constructor(private http: HttpClient) { }
-
-    // ---------------------------------------------------------------- connections
 
     public addConnectionProfile(payload: DatabaseConnectionProfile): Observable<ApiResponse> {
         return this.http.post<ApiResponse>(`${config.apiUrl}/queryEngine.json/connections/add`, payload);
@@ -42,8 +37,6 @@ export class QueryEngineService {
         return this.http.post<ApiResponse>(`${config.apiUrl}/queryEngine.json/connections/testConnection`, payload);
     }
 
-    // ---------------------------------------------------------------- queries
-
     public addQuery(payload: QueryDefinition): Observable<ApiResponse> {
         return this.http.post<ApiResponse>(`${config.apiUrl}/queryEngine.json/queries/add`, payload);
     }
@@ -64,17 +57,13 @@ export class QueryEngineService {
         return this.http.get<ApiResponse>(`${config.apiUrl}/queryEngine.json/queries/fetchById?queryId=${queryId}`);
     }
 
-    /** payload.queryId (re-validate a saved query) or payload.queryText (a not-yet-saved draft). */
     public validateQuery(payload: QueryDefinition): Observable<ApiResponse> {
         return this.http.post<ApiResponse>(`${config.apiUrl}/queryEngine.json/queries/validate`, payload);
     }
 
-    /** Same queryId-or-draft resolution as validateQuery -- returns QueryPreviewResponse in .data. */
     public previewQuery(payload: QueryDefinition): Observable<ApiResponse> {
         return this.http.post<ApiResponse>(`${config.apiUrl}/queryEngine.json/queries/preview`, payload);
     }
-
-    // ---------------------------------------------------------------- execution
 
     public execute(payload: QueryExecutionRequest): Observable<ApiResponse> {
         return this.http.post<ApiResponse>(`${config.apiUrl}/queryEngine.json/executions/execute`, payload);
@@ -87,8 +76,6 @@ export class QueryEngineService {
     public fetchExecutionsByQueryId(queryId: any): Observable<ApiResponse> {
         return this.http.get<ApiResponse>(`${config.apiUrl}/queryEngine.json/executions/fetchByQueryId?queryId=${queryId}`);
     }
-
-    // ---------------------------------------------------------------- schedules
 
     public addSchedule(payload: QuerySchedule): Observable<ApiResponse> {
         return this.http.post<ApiResponse>(`${config.apiUrl}/queryEngine.json/schedules/add`, payload);

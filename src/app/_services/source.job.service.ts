@@ -3,15 +3,11 @@ import { HttpClient } from '@angular/common/http';
 import { ApiResponse } from '@/_models';
 import { Observable } from 'rxjs';
 
-
-/**
- * @author Nabeel Ahmed
- */
 @Injectable({
     providedIn: 'root'
 })
 export class SourceJobService {
-    
+
     constructor(private http: HttpClient) { }
 
     public fetchSourceJobDetailWithSourceJobId(payload:any): Observable<ApiResponse> {
@@ -65,7 +61,7 @@ export class SourceJobService {
             responseType: 'blob'
         });
     }
-    
+
     public downloadListSourceJob(): Observable<any> {
         return this.http.get(`${config.apiUrl}/sourceJob.json/downloadListSourceJob`,
         {

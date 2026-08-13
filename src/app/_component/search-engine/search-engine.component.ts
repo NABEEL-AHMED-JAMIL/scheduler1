@@ -5,26 +5,25 @@ import { first } from 'rxjs/operators';
 import { SpinnerService } from '@/_helpers';
 import { ApiCode } from '@/_models';
 
-
 @Component({
   selector: 'search-engine',
   templateUrl: 'search-engine.component.html'
 })
 export class SearchEngineComponent implements OnInit {
-    
+
     public SUCCESS = 'SUCCESS';
     public ERROR = 'Error';
-    public searchDetails: any = ''; 
+    public searchDetails: any = '';
     public jsonPayload: any;
     public tableQueryForm: FormGroup;
-    
+
     constructor(
         private fb: FormBuilder,
         private alertService: AlertService,
         private spinnerService: SpinnerService,
         private settingService: SettingService) {
     }
-    
+
     ngOnInit() {
         this.tableQueryFormInit();
     }
