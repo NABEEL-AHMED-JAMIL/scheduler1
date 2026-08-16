@@ -67,6 +67,10 @@ export class JobLogComponent implements OnInit, OnDestroy {
 
   public viewMode: 'timeline' | 'table' | 'console' = 'timeline';
 
+  public logGapChartOptions: EChartOption | null = null;
+  private lastZoomStart = 0;
+  private lastZoomEnd: number | null = null;
+
   private queryParamMapSubscription: Subscription;
 
   constructor(private alertService: AlertService,
@@ -162,10 +166,19 @@ export class JobLogComponent implements OnInit, OnDestroy {
       new Date(a.dateCreated).getTime() - new Date(b.dateCreated).getTime());
     this.sourceJob = response.data?.sourceJob;
     this.sourceJobQueue = response.data?.sourceJobQueue;
+    this.logGapChartOptions = this.computeLogGapChartOptions();
     this.scheduleAutoRefreshIfRunning();
   }
 
-  public get logGapChartOptions(): EChartOption | null {
+  public onChartDataZoom(event: any): void {
+    const zoomState = event?.batch?.[0] || event;
+    if (zoomState && typeof zoomState.start === 'number' && typeof zoomState.end === 'number') {
+      this.lastZoomStart = zoomState.start;
+      this.lastZoomEnd = zoomState.end;
+    }
+  }
+
+  private computeLogGapChartOptions(): EChartOption | null {
     const logs = this.auditLogs || [];
     if (logs.length < 2 && !(logs.length === 1 && this.sourceJobQueue?.startTime)) {
       return null;
@@ -189,8 +202,15 @@ export class JobLogComponent implements OnInit, OnDestroy {
     const avg = gaps.reduce((a, b) => a + b, 0) / gaps.length;
 
     const colors = gaps.map(g => g > avg * 2 && g > 5 ? '#b5730a' : '#4f46e5');
+
+    const READABLE_BAR_COUNT = 80;
+    const showsAll = categories.length <= READABLE_BAR_COUNT;
+    const defaultEndPct = showsAll ? 100 : Math.round((READABLE_BAR_COUNT / categories.length) * 100);
+    const zoomStart = this.lastZoomEnd !== null ? this.lastZoomStart : 0;
+    const zoomEnd = this.lastZoomEnd !== null ? this.lastZoomEnd : defaultEndPct;
+
     return {
-      grid: { left: 45, right: 16, top: 24, bottom: 28 },
+      grid: { left: 45, right: 16, top: 24, bottom: 56 },
       tooltip: {
         trigger: 'item',
         formatter: (p: any) => `${p.name}<br/>+${p.value}s since previous`
@@ -206,6 +226,10 @@ export class JobLogComponent implements OnInit, OnDestroy {
         name: 'sec',
         nameTextStyle: { color: '#7b8794' }
       },
+      dataZoom: (showsAll ? undefined : [
+        { type: 'inside', start: zoomStart, end: zoomEnd },
+        { type: 'slider', start: zoomStart, end: zoomEnd, height: 18, bottom: 8 }
+      ]) as any,
       series: [{
         type: 'bar',
         data: gaps.map((g, i) => ({ value: g, itemStyle: { color: colors[i] } })),

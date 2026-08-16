@@ -7,4 +7,9 @@ export interface Tenant {
     status?: 'Active' | 'Inactive' | 'Suspended' | 'Delete';
     dateCreated?: string;
     userCount?: number;
+    kafkaProfileCount?: number;
+    bucketCount?: number;
+    sourceTaskTypeCount?: number;
+    sourceTaskCount?: number;
+    sourceJobCount?: number;
 }

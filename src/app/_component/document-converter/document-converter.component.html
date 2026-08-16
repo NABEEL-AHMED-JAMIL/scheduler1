@@ -1,4 +1,3 @@
-<!-- breadcrumb -->
 <nav class="breadcrumb-bar">
     <a routerLink="/home">Home</a>
     <span class="crumb-sep">/</span>
@@ -11,7 +10,6 @@
     Preview works for PDF, image, plain-text (TXT/CSV/TSV), and HTML; other formats download only.
 </span>
 
-<!-- Convert panel -->
 <div class="card-panel">
     <h4 class="card-panel-title panel-banner">
         <span class="glyphicon glyphicon-transfer"></span> Convert a Document
@@ -76,9 +74,6 @@
         </button>
     </div>
 
-    <!-- Result toolbar -- shown once a conversion has actually run. Two separate buttons, one
-         shared side panel below: click Input or Output to point the panel at that side, same
-         pattern as the Saved Conversions list (and Object Browser) further down the page. -->
     <div class="toolbar" *ngIf="result" style="margin-top: 18px;">
         <strong><span class="glyphicon glyphicon-ok-circle" style="color: #1d7a3f;"></span> Converted -- {{result.outputFileName}}</strong>
         <span class="toolbar-spacer"></span>
@@ -95,7 +90,6 @@
         </div>
     </div>
 
-    <!-- Side panel -- only rendered once Input or Output above is clicked -->
     <div class="row" *ngIf="result && resultPreviewSide" style="margin-top: 10px;">
         <div class="col-md-5 bucket-panel-col">
             <div class="side-panel">
@@ -125,7 +119,6 @@
     </div>
 </div>
 
-<!-- Saved conversions -->
 <div class="toolbar">
     <div class="form-group" style="margin-bottom: 0;">
         <label for="searchTasks" class="control-label">Total Saved Conversions ({{filteredTasks.length}})</label>
@@ -143,9 +136,6 @@
     No saved conversions yet -- check "Save this conversion to a bucket" above to keep one here.
 </span>
 
-<!-- Table + side panel -- same layout as Object Browser: the table shrinks to col-md-8 and a
-     shared side panel opens in col-md-4 once either of a row's two view buttons (Input/Output)
-     is clicked, instead of expanding an inline row underneath. -->
 <div class="row row-equal bucket-browse-row" *ngIf="tasks.length">
     <div class="bucket-table-col" [ngClass]="previewTask ? 'col-md-8' : 'col-md-12'">
         <div class="table-responsive scroll-table bucket-scroll">
@@ -195,7 +185,6 @@
         </div>
     </div>
 
-    <!-- side panel -->
     <div class="col-md-4 bucket-panel-col" *ngIf="previewTask">
         <div class="side-panel">
             <div class="side-panel-header">
@@ -229,7 +218,6 @@
     </div>
 </div>
 
-<!-- Delete Confirm Modal -->
 <div class="modal fade" id="deleteTaskModal" role="dialog">
     <div class="modal-dialog">
         <div class="modal-content">

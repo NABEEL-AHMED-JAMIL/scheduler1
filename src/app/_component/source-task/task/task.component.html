@@ -8,7 +8,6 @@
 
 <form *ngIf="sourceTaskForm" [formGroup]="sourceTaskForm" (ngSubmit)="submitSourceTask()">
     <div class="row row-equal">
-        <!-- Task Details -->
         <div class="col-md-5">
             <div class="card-panel">
                 <h4 class="card-panel-title panel-banner">{{currentTaskState}}</h4>
@@ -99,15 +98,24 @@
             </div>
         </div>
 
-        <!-- Configuration Tags -->
         <div class="col-md-7">
             <div class="card-panel panel-fill">
                 <h4 class="card-panel-title panel-banner has-action">
                     <span>Configuration Tags</span>
+                    <button type="button" class="btn btn-xs btn-link" style="padding-left: 0;" (click)="toggleBucketHelp()">
+                        <span class="glyphicon glyphicon-info-sign"></span>
+                        {{showBucketHelp ? 'Hide' : 'How do I add a bucket?'}}
+                    </button>
                     <button type="button" class="banner-link" title="Add More" (click)="tageFormsAddItem()">
                         <span class="glyphicon glyphicon-plus-sign"></span> Add More
                     </button>
                 </h4>
+                <div class="help-text" *ngIf="showBucketHelp" style="margin: 8px 12px 0;">
+                    <div>Configure buckets in <strong>Setting</strong> by adding entries under the <code>BUCKET_LIST</code> lookup. The bucket name must match the storage provider's bucket exactly.</div>
+                    <div style="margin-top: 6px;">Use these tag keys when generating the source task configuration:</div>
+                    <div style="margin-top: 4px;"><code>bucket</code> or <code>bucket_name</code> for the storage bucket, <code>input_folder</code> for the source folder, and <code>output_folder</code> for the destination folder.</div>
+                    <div style="margin-top: 6px;">After saving the bucket, return here and use its exact name as the tag value.</div>
+                </div>
 
                 <div id="main-form-content" formArrayName="tagsInfo">
                     <div class="table-responsive scroll-table">
@@ -163,7 +171,6 @@
         </div>
     </div>
 
-    <!-- Footer actions -->
     <div class="card-panel">
         <div class="toolbar" style="margin-bottom: 0;">
             <button type="button" class="btn btn-sm btn-default"

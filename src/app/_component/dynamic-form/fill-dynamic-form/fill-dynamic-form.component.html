@@ -35,13 +35,11 @@
                 <ng-container *ngFor="let field of dynamicForm.fields">
                     <div [ngClass]="'col-md-' + (field.fieldWidth || 12)">
 
-                        <!-- section heading/divider -->
                         <div class="form-section-heading" *ngIf="field.fieldType === DynamicFormFieldType.SECTION">
                             <h4>{{field.fieldLabel}}</h4>
                             <hr />
                         </div>
 
-                        <!-- checkbox group -->
                         <div class="form-group" *ngIf="field.fieldType === DynamicFormFieldType.CHECKBOX">
                             <label class="control-label" style="display: block;">
                                 {{field.fieldLabel}} <span class="text-danger" *ngIf="field.mandatory">*</span>
@@ -54,7 +52,6 @@
                             </label>
                         </div>
 
-                        <!-- radio group -->
                         <div class="form-group" *ngIf="field.fieldType === DynamicFormFieldType.RADIO"
                             [ngClass]="{ 'has-error': submitted && getControl(field.fieldName)?.errors }">
                             <label class="control-label" style="display: block;">
@@ -70,7 +67,6 @@
                             </div>
                         </div>
 
-                        <!-- select (single) -->
                         <div class="form-group" *ngIf="field.fieldType === DynamicFormFieldType.SELECT"
                             [ngClass]="{ 'has-error': submitted && getControl(field.fieldName)?.errors }">
                             <label class="control-label">{{field.fieldLabel}} <span class="text-danger" *ngIf="field.mandatory">*</span></label>
@@ -83,7 +79,6 @@
                             </div>
                         </div>
 
-                        <!-- select (multiple) -->
                         <div class="form-group" *ngIf="field.fieldType === DynamicFormFieldType.MULTI_SELECT"
                             [ngClass]="{ 'has-error': submitted && getControl(field.fieldName)?.errors }">
                             <label class="control-label">{{field.fieldLabel}} <span class="text-danger" *ngIf="field.mandatory">*</span></label>
@@ -97,7 +92,6 @@
                             </div>
                         </div>
 
-                        <!-- textarea -->
                         <div class="form-group" *ngIf="field.fieldType === DynamicFormFieldType.TEXTAREA"
                             [ngClass]="{ 'has-error': submitted && getControl(field.fieldName)?.errors }">
                             <label class="control-label">{{field.fieldLabel}} <span class="text-danger" *ngIf="field.mandatory">*</span></label>
@@ -108,7 +102,6 @@
                             </div>
                         </div>
 
-                        <!-- toggle -->
                         <div class="form-group" *ngIf="field.fieldType === DynamicFormFieldType.TOGGLE">
                             <label class="control-label" style="display: block; font-weight: normal;">
                                 <input type="checkbox" style="margin-right: 6px;" [formControlName]="field.fieldName" />
@@ -116,7 +109,6 @@
                             </label>
                         </div>
 
-                        <!-- everything else -> plain input with the matching HTML5 type -->
                         <div class="form-group" *ngIf="[
                                 DynamicFormFieldType.TEXT, DynamicFormFieldType.NUMBER, DynamicFormFieldType.EMAIL,
                                 DynamicFormFieldType.PASSWORD, DynamicFormFieldType.URL, DynamicFormFieldType.TEL,

@@ -60,6 +60,7 @@ export class SourceJobComponent implements OnInit, OnDestroy  {
 
     public expandedJobId: any = null;
     public expandedJobQueuesLoading = false;
+    public expandedJobQueuesChartOptions: EChartOption | null = null;
     private expandedJobQueuesCache: { [jobId: string]: any[] } = {};
     private webSocketShareSubscription: Subscription;
 
@@ -436,7 +437,7 @@ export class SourceJobComponent implements OnInit, OnDestroy  {
         return this.expandedJobQueuesCache[this.expandedJobId] || [];
     }
 
-    public get expandedJobQueuesChartOptions(): EChartOption | null {
+    private computeExpandedJobQueuesChartOptions(): EChartOption | null {
         const runs = this.expandedJobQueues
             .filter(q => q.startTime && q.endTime)
             .slice()
@@ -510,10 +511,12 @@ export class SourceJobComponent implements OnInit, OnDestroy  {
     public toggleExpandJob(jobId: any): void {
         if (this.expandedJobId === jobId) {
             this.expandedJobId = null;
+            this.expandedJobQueuesChartOptions = null;
             return;
         }
         this.expandedJobId = jobId;
         if (this.expandedJobQueuesCache[jobId]) {
+            this.expandedJobQueuesChartOptions = this.computeExpandedJobQueuesChartOptions();
             return;
         }
         this.expandedJobQueuesLoading = true;
@@ -523,6 +526,7 @@ export class SourceJobComponent implements OnInit, OnDestroy  {
                 this.expandedJobQueuesLoading = false;
                 if (response.status === ApiCode.SUCCESS) {
                     this.expandedJobQueuesCache[jobId] = response.data?.jobQueues || [];
+                    this.expandedJobQueuesChartOptions = this.computeExpandedJobQueuesChartOptions();
                     return;
                 }
                 this.alertService.showError(response.message, this.ERROR);

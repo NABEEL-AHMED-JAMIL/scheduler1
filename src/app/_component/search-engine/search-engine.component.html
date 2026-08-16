@@ -1,11 +1,9 @@
-<!-- breadcrumb -->
 <nav class="breadcrumb-bar">
     <a routerLink="/home">Home</a>
     <span class="crumb-sep">/</span>
     <span class="crumb-current">Q-Result</span>
 </nav>
 
-<!-- Query console -->
 <form *ngIf="tableQueryForm" [formGroup]="tableQueryForm" (ngSubmit)="dynamicQueryResponse()">
     <div class="card-panel">
         <h4 class="card-panel-title panel-banner">
@@ -36,7 +34,6 @@
     </div>
 </form>
 
-<!-- Result -->
 <div class="card-panel" *ngIf="jsonPayload">
     <div class="toolbar">
         <div class="form-group" style="margin-bottom: 0;">

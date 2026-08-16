@@ -1,4 +1,3 @@
-<!-- breadcrumb -->
 <nav class="breadcrumb-bar">
     <a routerLink="/home">Home</a>
     <span class="crumb-sep">/</span>
@@ -28,7 +27,6 @@
     </button>
 </div>
 
-<!-- Upload mode -->
 <div *ngIf="mode === 'upload'">
     <div class="form-group">
         <label class="control-label">Image file</label>
@@ -86,7 +84,6 @@
     </div>
 </div>
 
-<!-- Browse mode (open a previously-saved .txt result only) -->
 <div *ngIf="mode === 'browse'">
     <div class="form-group">
         <label class="control-label">Bucket</label>
@@ -125,7 +122,6 @@
     </div>
 </div>
 
-<!-- Output -->
 <div style="margin-top: 16px;">
     <div class="preview-toolbar" *ngIf="sourceLabel">
         <span class="help-text" style="display: inline;">Source: <strong>{{ sourceLabel }}</strong></span>
@@ -151,7 +147,6 @@
         <pre class="preview-text" style="max-height: 420px;">{{ transcript }}</pre>
         <div class="error-text" style="margin-top: 4px;" *ngIf="cleanError">{{ cleanError }}</div>
 
-        <!-- Save to Bucket -- hidden when the text was loaded from an existing bucket .txt (already saved there) -->
         <div class="panel-box-subtle" *ngIf="!transcriptLoadedFromBucket">
             <label class="control-label" style="display: block; margin-bottom: 6px;">Save to Bucket</label>
             <div class="row">
@@ -185,7 +180,6 @@
     </p>
 </div>
 
-<!-- Ask AI panel -->
 <div class="panel-box" style="margin-top: 16px;" *ngIf="transcript">
     <h4 style="margin-top: 0;"><span class="glyphicon glyphicon-comment"></span> Ask AI</h4>
     <span class="help-text" style="display: block; margin-bottom: 10px;">

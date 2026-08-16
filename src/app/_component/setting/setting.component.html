@@ -1,4 +1,3 @@
-<!-- breadcrumb -->
 <nav class="breadcrumb-bar">
     <a routerLink="/home">Home</a>
     <span class="crumb-sep">/</span>
@@ -11,9 +10,6 @@
     (senderEvent) = "receiverEvent($event)">
 </source-task-type>
 
-<!-- Two distinct concerns (Kafka topic wiring vs. Kafka cluster/connection config) that used to
-     just sit stacked one under the other on an increasingly long page -- tabs keep each one's
-     own toolbar/table/filters fully visible without competing for space or scroll position. -->
 <ul class="nav nav-tabs setting-tabs">
     <li class="active"><a href="#sourceTaskTypeTab" data-toggle="tab">
         <span class="glyphicon glyphicon-transfer"></span> Source TaskType
@@ -117,7 +113,6 @@
 </div>
 </div>
 
-<!-- Delete Source TaskType Modal -->
 <div class="modal fade" id="deleteSetting" role="dialog" style="top: 85px;">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -138,8 +133,6 @@
     </div>
 </div>
 
-<!-- Link Source Task -- every task built on the row's Source TaskType, grouped/filterable by
-     Group (TASK_GROUPS lookup), so a user can browse and pick a target task. -->
 <div class="modal fade" id="linkSourceTaskModal" role="dialog">
     <div class="modal-dialog modal-lg" style="width: 90%; max-width: 1100px;">
         <div class="modal-content">
@@ -227,9 +220,6 @@
     </div>
 </div>
 
-<!-- Kafka Connection -- lives alongside Source TaskType since queueTopicPartition (previous tab)
-     is exactly what a connection profile publishes to; the per-row Test action there tests a
-     TaskType's own topic against whichever profile is active here. -->
 <div class="tab-pane" id="kafkaConnectionTab">
 <div class="card-panel">
     <kafka-connection-profile></kafka-connection-profile>

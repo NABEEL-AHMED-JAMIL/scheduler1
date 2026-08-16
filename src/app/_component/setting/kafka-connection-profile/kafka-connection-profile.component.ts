@@ -1,9 +1,9 @@
 import { Component, OnInit, ViewChild } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { first } from 'rxjs/operators';
-import { AlertService, KafkaConnectionProfileService, AuthService } from '@/_services';
+import { AlertService, KafkaConnectionProfileService, AuthService, StorageService } from '@/_services';
 import { SpinnerService } from '@/_helpers';
-import { ApiCode } from '@/_models';
+import { ApiCode, BucketSummary } from '@/_models';
 import {
     KafkaConnectionProfile,
     KAFKA_SECURITY_PROTOCOLS,
@@ -11,6 +11,8 @@ import {
     isSaslProtocol,
     isSslProtocol
 } from '@/_models/kafka-connection-profile.model';
+
+const SSL_SECRET_PREFIX = 'kafka-secrets/';
 
 @Component({
     selector: 'kafka-connection-profile',
@@ -50,11 +52,34 @@ export class KafkaConnectionProfileComponent implements OnInit {
 
     public deleteProfileId: any;
 
+    public buckets: BucketSummary[] = [];
+    public keystoreFile: File = null;
+    public truststoreFile: File = null;
+    public uploadingKeystore: boolean = false;
+    public uploadingTruststore: boolean = false;
+
+    public showProtocolHelp: boolean = false;
+    public showSaslHelp: boolean = false;
+    public showSslHelp: boolean = false;
+
+    public toggleProtocolHelp(): void {
+        this.showProtocolHelp = !this.showProtocolHelp;
+    }
+
+    public toggleSaslHelp(): void {
+        this.showSaslHelp = !this.showSaslHelp;
+    }
+
+    public toggleSslHelp(): void {
+        this.showSslHelp = !this.showSslHelp;
+    }
+
     constructor(
         private formBuilder: FormBuilder,
         private alertService: AlertService,
         private spinnerService: SpinnerService,
         private kafkaConnectionProfileService: KafkaConnectionProfileService,
+        private storageService: StorageService,
         private authService: AuthService) {
         this.isPlatformAdmin = this.authService.currentUser?.userRole === 'PLATFORM_ADMIN';
     }
@@ -69,6 +94,79 @@ export class KafkaConnectionProfileComponent implements OnInit {
     ngOnInit(): void {
         this.fetchAllProfiles();
         this.resetProfileForm();
+        this.loadBuckets();
+    }
+
+    private loadBuckets(): void {
+        this.storageService.buckets()
+            .pipe(first())
+            .subscribe((response) => {
+                if (response.status === ApiCode.SUCCESS) {
+                    this.buckets = response.data || [];
+                }
+            }, () => { /* non-critical -- bucket picker just stays empty */ });
+    }
+
+    public onKeystoreFileSelected(event: any): void {
+        this.keystoreFile = event && event.target && event.target.files ? event.target.files[0] : null;
+    }
+
+    public onTruststoreFileSelected(event: any): void {
+        this.truststoreFile = event && event.target && event.target.files ? event.target.files[0] : null;
+    }
+
+    public uploadKeystore(): void {
+        if (!this.f.sslKeystoreBucket.value) {
+            this.alertService.showError('Choose a bucket first.', this.ERROR);
+            return;
+        }
+        if (!this.keystoreFile) {
+            this.alertService.showError('Choose a keystore file first.', this.ERROR);
+            return;
+        }
+        this.uploadingKeystore = true;
+        const prefix = SSL_SECRET_PREFIX + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '/';
+        this.storageService.uploadObject(this.f.sslKeystoreBucket.value, prefix, this.keystoreFile)
+            .pipe(first())
+            .subscribe((response) => {
+                this.uploadingKeystore = false;
+                if (response.status !== ApiCode.SUCCESS) {
+                    this.alertService.showError(response.message, this.ERROR);
+                    return;
+                }
+                this.f.sslKeystoreLocation.setValue(prefix + this.keystoreFile.name);
+                this.alertService.showSuccess('Keystore uploaded.', this.SUCCESS);
+            }, (error) => {
+                this.uploadingKeystore = false;
+                this.alertService.showError(error, this.ERROR);
+            });
+    }
+
+    public uploadTruststore(): void {
+        if (!this.f.sslTruststoreBucket.value) {
+            this.alertService.showError('Choose a bucket first.', this.ERROR);
+            return;
+        }
+        if (!this.truststoreFile) {
+            this.alertService.showError('Choose a truststore file first.', this.ERROR);
+            return;
+        }
+        this.uploadingTruststore = true;
+        const prefix = SSL_SECRET_PREFIX + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '/';
+        this.storageService.uploadObject(this.f.sslTruststoreBucket.value, prefix, this.truststoreFile)
+            .pipe(first())
+            .subscribe((response) => {
+                this.uploadingTruststore = false;
+                if (response.status !== ApiCode.SUCCESS) {
+                    this.alertService.showError(response.message, this.ERROR);
+                    return;
+                }
+                this.f.sslTruststoreLocation.setValue(prefix + this.truststoreFile.name);
+                this.alertService.showSuccess('Truststore uploaded.', this.SUCCESS);
+            }, (error) => {
+                this.uploadingTruststore = false;
+                this.alertService.showError(error, this.ERROR);
+            });
     }
 
     get f() {
@@ -122,6 +220,11 @@ export class KafkaConnectionProfileComponent implements OnInit {
         this.submitted = false;
         this.editingProfile = null;
         this.modalTestResult = null;
+        this.keystoreFile = null;
+        this.truststoreFile = null;
+        this.showProtocolHelp = false;
+        this.showSaslHelp = false;
+        this.showSslHelp = false;
         this.profileForm = this.formBuilder.group({
             profileName: ['', Validators.required],
             environmentLabel: [''],
@@ -130,9 +233,11 @@ export class KafkaConnectionProfileComponent implements OnInit {
             saslMechanism: [''],
             saslUsername: [''],
             saslPassword: [''],
+            sslKeystoreBucket: [''],
             sslKeystoreLocation: [''],
             sslKeystorePassword: [''],
             sslKeyPassword: [''],
+            sslTruststoreBucket: [''],
             sslTruststoreLocation: [''],
             sslTruststorePassword: [''],
             additionalProperties: ['']
@@ -147,6 +252,11 @@ export class KafkaConnectionProfileComponent implements OnInit {
         this.editingProfile = profile;
         this.submitted = false;
         this.modalTestResult = null;
+        this.keystoreFile = null;
+        this.truststoreFile = null;
+        this.showProtocolHelp = false;
+        this.showSaslHelp = false;
+        this.showSslHelp = false;
         this.profileForm = this.formBuilder.group({
             profileName: [profile.profileName, Validators.required],
             environmentLabel: [profile.environmentLabel || ''],
@@ -155,9 +265,11 @@ export class KafkaConnectionProfileComponent implements OnInit {
             saslMechanism: [profile.saslMechanism || ''],
             saslUsername: [profile.saslUsername || ''],
             saslPassword: [''],
+            sslKeystoreBucket: [profile.sslKeystoreBucket || ''],
             sslKeystoreLocation: [profile.sslKeystoreLocation || ''],
             sslKeystorePassword: [''],
             sslKeyPassword: [''],
+            sslTruststoreBucket: [profile.sslTruststoreBucket || ''],
             sslTruststoreLocation: [profile.sslTruststoreLocation || ''],
             sslTruststorePassword: [''],
             additionalProperties: [profile.additionalProperties || ''],

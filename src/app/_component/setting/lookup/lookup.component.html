@@ -1,7 +1,5 @@
-<!-- new lookupData -->
 <div class="modal fade" id="lookupDatas" role="dialog">
     <div class="modal-dialog modal-lg">
-      <!-- Modal content-->
       <div class="modal-content" style="border: none">
         <form *ngIf="lookupDataForm" [formGroup]="lookupDataForm" (ngSubmit)="submitLookupData()">
             <div class="modal-header">
@@ -23,9 +21,6 @@
                 </div>
                 <div class="form-group">
                     <label for="lookupValue">LookupValue</label>
-                        <!-- Lookup values here range from a one-word flag to a multi-line JSON/XML config
-                             or a file path -- the browser's ~2-row textarea default left almost no room
-                             to see what you were typing, so this gets real height + a resize handle. -->
                         <textarea formControlName="lookupValue" class="form-control input-sm lookup-value-textarea"
                         rows="6"
                         [ngClass]="{ 'is-invalid': lookupData.lookupValue.errors }"

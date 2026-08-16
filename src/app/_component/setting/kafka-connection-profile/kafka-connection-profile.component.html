@@ -145,9 +145,8 @@
     <span class="glyphicon glyphicon-info-sign"></span> No profiles match your search.
 </div>
 
-<!-- Add/Edit Profile Modal -->
 <div class="modal fade" id="profileModal" role="dialog" style="top: 40px;">
-    <div class="modal-dialog" style="width: 560px;">
+    <div class="modal-dialog" style="width: 900px;">
         <div class="modal-content" *ngIf="profileForm">
             <div class="modal-header">
                 <button type="button" #closeProfileModal class="close" data-dismiss="modal">&times;</button>
@@ -184,10 +183,22 @@
                     <div class="row">
                         <div class="col-md-6">
                             <div class="form-group">
-                                <label class="control-label" for="securityProtocol">Security Protocol</label>
+                                <label class="control-label" for="securityProtocol">
+                                    Security Protocol
+                                    <button type="button" class="btn btn-xs btn-link" style="padding: 0 0 0 4px;"
+                                        (click)="toggleProtocolHelp()" title="What do these mean?">
+                                        <span class="glyphicon glyphicon-info-sign"></span>
+                                    </button>
+                                </label>
                                 <select class="form-control" formControlName="securityProtocol">
                                     <option *ngFor="let sp of securityProtocolList" [value]="sp">{{sp}}</option>
                                 </select>
+                                <div class="help-text" *ngIf="showProtocolHelp" style="margin-top: 6px;">
+                                    <div><strong>PLAINTEXT</strong> -- no encryption, no auth. Local/dev clusters only.</div>
+                                    <div><strong>SASL_PLAINTEXT</strong> -- username/password auth, but the connection itself isn't encrypted. Rarely what you want outside a trusted private network.</div>
+                                    <div><strong>SASL_SSL</strong> -- username/password auth over an encrypted (TLS) connection. Most managed clusters (Aiven, Confluent Cloud, MSK with SASL) use this.</div>
+                                    <div><strong>SSL</strong> -- encrypted connection authenticated by certificates instead of a password (mTLS is optional on top).</div>
+                                </div>
                             </div>
                         </div>
                         <div class="col-md-6" *ngIf="isSaslProtocol(f.securityProtocol.value)">
@@ -204,7 +215,13 @@
                     <div class="row" *ngIf="isSaslProtocol(f.securityProtocol.value)">
                         <div class="col-md-6">
                             <div class="form-group">
-                                <label class="control-label" for="saslUsername">SASL Username</label>
+                                <label class="control-label" for="saslUsername">
+                                    SASL Username
+                                    <button type="button" class="btn btn-xs btn-link" style="padding: 0 0 0 4px;"
+                                        (click)="toggleSaslHelp()" title="Where do I get these?">
+                                        <span class="glyphicon glyphicon-info-sign"></span>
+                                    </button>
+                                </label>
                                 <input type="text" class="form-control" formControlName="saslUsername" />
                             </div>
                         </div>
@@ -219,14 +236,53 @@
                                 </span>
                             </div>
                         </div>
+                        <div class="col-md-12" *ngIf="showSaslHelp">
+                            <div class="help-text" style="margin-top: -8px; margin-bottom: 12px;">
+                                Copy the username/password straight from your Kafka provider's console (e.g. Aiven's "Service users" tab, Confluent Cloud API keys, or your own SASL/SCRAM user setup).
+                                The mechanism must match what the provider issued the credentials for -- <strong>PLAIN</strong> for a plain username/password pair,
+                                <strong>SCRAM-SHA-256</strong>/<strong>SCRAM-SHA-512</strong> if the provider explicitly created a SCRAM user. Using the wrong mechanism fails auth even with the right password.
+                                The password is AES-encrypted at rest and never shown again once saved.
+                            </div>
+                        </div>
                     </div>
 
-                    <!-- SSL/mTLS -- certificate FILES themselves live on the app server or object
-                         storage, not in the database; these are just the paths/passwords. -->
                     <ng-container *ngIf="isSslProtocol(f.securityProtocol.value)">
+                        <div class="form-group">
+                            <button type="button" class="btn btn-xs btn-link" style="padding-left: 0;" (click)="toggleSslHelp()">
+                                <span class="glyphicon glyphicon-info-sign"></span>
+                                {{showSslHelp ? 'Hide' : 'How do I get truststore/keystore files?'}}
+                            </button>
+                            <div class="help-text" *ngIf="showSslHelp" style="margin-top: 4px;">
+                                <div>Kafka needs a <strong>PKCS12</strong> truststore/keystore, not raw PEM files. If your provider gave you PEM certs (<code>ca.pem</code>, <code>service.cert</code>, <code>service.key</code>), convert them first:</div>
+                                <div style="margin-top: 6px;"><strong>Truststore (always required for SSL/SASL_SSL):</strong></div>
+                                <pre style="white-space: pre-wrap; margin: 4px 0;">keytool -importcert -alias ca -file ca.pem -keystore truststore.p12 -storetype PKCS12 -storepass YOUR_PASSWORD -noprompt</pre>
+                                <div style="margin-top: 6px;"><strong>Keystore (only for mTLS / client-certificate auth):</strong></div>
+                                <pre style="white-space: pre-wrap; margin: 4px 0;">openssl pkcs12 -export -in service.cert -inkey service.key -certfile ca.pem -out keystore.p12 -passout pass:YOUR_PASSWORD</pre>
+                                <div style="margin-top: 6px;">&#9888; Don't skip <code>-certfile ca.pem</code> on the keystore export -- omitting it causes a "TLS handshake failed" error even though the cert/key pair itself is valid.</div>
+                                <div style="margin-top: 6px;">Then below: pick a bucket, choose the <code>.p12</code> file, click <strong>Upload</strong>, and enter the password you set above. The password is AES-encrypted at rest.</div>
+                            </div>
+                        </div>
                         <div class="form-group" [ngClass]="{ 'has-error': submitted && f.sslTruststoreLocation.errors }">
-                            <label class="control-label" for="sslTruststoreLocation">Truststore Location</label>
-                            <input type="text" class="form-control" formControlName="sslTruststoreLocation" placeholder="/etc/kafka-secrets/truststore.jks" />
+                            <label class="control-label">Truststore File</label>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <select class="form-control" formControlName="sslTruststoreBucket">
+                                        <option value="" disabled>Choose a bucket</option>
+                                        <option *ngFor="let b of buckets" [value]="b.bucket">{{b.label || b.bucket}}</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-5">
+                                    <input type="file" class="form-control" (change)="onTruststoreFileSelected($event)" />
+                                </div>
+                                <div class="col-md-3">
+                                    <button type="button" class="btn btn-default btn-block" [disabled]="uploadingTruststore" (click)="uploadTruststore()">
+                                        {{uploadingTruststore ? 'Uploading...' : 'Upload'}}
+                                    </button>
+                                </div>
+                            </div>
+                            <span class="help-text" *ngIf="f.sslTruststoreLocation.value" style="display: block; margin-top: 4px;">
+                                <span class="glyphicon glyphicon-ok"></span> {{f.sslTruststoreLocation.value}}
+                            </span>
                         </div>
                         <div class="row">
                             <div class="col-md-6">
@@ -239,8 +295,26 @@
                             </div>
                         </div>
                         <div class="form-group">
-                            <label class="control-label" for="sslKeystoreLocation">Keystore Location (optional -- mTLS)</label>
-                            <input type="text" class="form-control" formControlName="sslKeystoreLocation" placeholder="/etc/kafka-secrets/keystore.jks" />
+                            <label class="control-label">Keystore File (optional -- mTLS)</label>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <select class="form-control" formControlName="sslKeystoreBucket">
+                                        <option value="" disabled>Choose a bucket</option>
+                                        <option *ngFor="let b of buckets" [value]="b.bucket">{{b.label || b.bucket}}</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-5">
+                                    <input type="file" class="form-control" (change)="onKeystoreFileSelected($event)" />
+                                </div>
+                                <div class="col-md-3">
+                                    <button type="button" class="btn btn-default btn-block" [disabled]="uploadingKeystore" (click)="uploadKeystore()">
+                                        {{uploadingKeystore ? 'Uploading...' : 'Upload'}}
+                                    </button>
+                                </div>
+                            </div>
+                            <span class="help-text" *ngIf="f.sslKeystoreLocation.value" style="display: block; margin-top: 4px;">
+                                <span class="glyphicon glyphicon-ok"></span> {{f.sslKeystoreLocation.value}}
+                            </span>
                         </div>
                         <div class="row" *ngIf="f.sslKeystoreLocation.value">
                             <div class="col-md-6">
@@ -301,7 +375,6 @@
     </div>
 </div>
 
-<!-- Delete Profile Modal -->
 <div class="modal fade" id="deleteProfileModal" role="dialog" style="top: 85px;">
     <div class="modal-dialog">
         <div class="modal-content">

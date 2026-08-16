@@ -12,14 +12,14 @@ export class SpinnerService {
 
         const spinner = this.document.getElementsByTagName('spinner').item(0) as HTMLElement;
         if (spinner) {
-            spinner.style.display = 'block';
+            spinner.classList.add('is-visible');
         }
     }
 
     public hide() {
         const spinner = this.document.getElementsByTagName('spinner').item(0) as HTMLElement;
         if (spinner) {
-            spinner.style.display = 'none';
+            spinner.classList.remove('is-visible');
         }
     }
 

@@ -62,6 +62,9 @@ export interface SourceTask {
     homePageId?: any;
     sourceTaskType?: SourceTaskType;
     totalLinksJobs?: any;
+    bucket?: string;
+    inputFolder?: string;
+    outputFolder?: string;
 }
 
 export interface SourceJobDetail {

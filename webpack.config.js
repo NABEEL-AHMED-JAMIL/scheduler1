@@ -55,12 +55,12 @@ module.exports = {
         ]),
 
         new webpack.DefinePlugin({
-            config: JSON.stringify({
+            config: `{
                 sessionId: '0hw0dz34',
                 transactionId: '40ef-dd1d-bd9f-1d7f',
-                apiUrl: 'http://localhost:9098/api/v1',
-                webSocketUrl: 'http://localhost:9098/api/v1/ws'
-            })
+                apiUrl: (window.location.protocol + '//' + window.location.hostname + ':9098/api/v1'),
+                webSocketUrl: (window.location.protocol + '//' + window.location.hostname + ':9098/api/v1/ws')
+            }`
         }),
 
         // workaround for warning: Critical dependency

@@ -1,4 +1,3 @@
-<!-- breadcrumb -->
 <nav class="breadcrumb-bar">
     <a routerLink="/home">Home</a>
     <span class="crumb-sep">/</span>
@@ -17,7 +16,6 @@
                 </a>
             </h4>
 
-            <!-- source job -->
             <div class="entity-head">
                 <h5 class="entity-title">Job: {{sourceJob.jobId}} - {{sourceJob.jobName}}</h5>
                 <span class="flag">Status
@@ -79,50 +77,77 @@
                 </div>
             </div>
 
-            <!-- task -->
             <div class="card-divider entity-head">
                 <h5 class="entity-title">Task: {{sourceJob?.taskDetail?.taskDetailId}} - {{sourceJob?.taskDetail?.taskName}}</h5>
-                <span class="flag">Status
-                    <span class="pill" [ngClass]="{
-                        'pill-danger': sourceJob.taskDetail.taskStatus === 'Delete',
-                        'pill-warning': sourceJob.taskDetail.taskStatus === 'Inactive',
-                        'pill-success': sourceJob.taskDetail.taskStatus === 'Active'
-                    }">{{sourceJob.taskDetail.taskStatus}}</span>
-                </span>
             </div>
-            <div class="meta-grid">
-                <div class="detail-item">
-                    <span class="detail-label">Service</span>
-                    <span class="detail-value">{{sourceJob?.taskDetail?.sourceTaskType?.serviceName || '-'}}</span>
+            <!-- Same pill layout as the Job List expand panel's "Linked Task" section -- kept in sync
+                 so a job's task detail looks identical whether you're viewing it from Job List or here. -->
+            <div class="entity-card-stats" style="border-top: none; margin-top: 0; padding-top: 0;">
+                <div class="entity-card-stat">
+                    <a routerLink="/editTask/{{sourceJob?.taskDetail?.taskDetailId}}">{{sourceJob?.taskDetail?.taskDetailId}}-[{{sourceJob?.taskDetail?.taskName}}]</a>
                 </div>
-                <div class="detail-item">
-                    <span class="detail-label">Topic</span>
-                    <span class="detail-value">{{taskTopic}}</span>
+                <div class="entity-card-stat" *ngIf="sourceJob?.taskDetail?.taskStatus">
+                    <span class="entity-card-stat-label">Task Status</span>
+                    <span class="pill pill-icon"
+                        [ngClass]="{
+                            'pill-danger': sourceJob.taskDetail.taskStatus === 'Delete',
+                            'pill-warning': sourceJob.taskDetail.taskStatus === 'Inactive',
+                            'pill-success': sourceJob.taskDetail.taskStatus === 'Active'
+                        }">
+                        <span class="glyphicon glyphicon-flag"></span> {{sourceJob.taskDetail.taskStatus}}
+                    </span>
                 </div>
-                <div class="detail-item">
-                    <span class="detail-label">Partitions</span>
-                    <span class="detail-value">{{taskPartitions}}</span>
+                <div class="entity-card-stat" *ngIf="sourceJob?.taskDetail?.sourceTaskType">
+                    <span class="entity-card-stat-label">Type</span>
+                    <span class="pill pill-cyan pill-icon">
+                        <span class="glyphicon glyphicon-tag"></span>
+                        {{sourceJob?.taskDetail?.sourceTaskType?.sourceTaskTypeId}} [{{sourceJob?.taskDetail?.sourceTaskType?.serviceName}}]
+                    </span>
                 </div>
-                <div class="detail-item">
-                    <span class="detail-label">Pipeline Id</span>
-                    <span class="detail-value">{{sourceJob?.taskDetail?.pipelineId || '-'}}</span>
+                <div class="entity-card-stat" *ngIf="sourceJob?.taskDetail?.sourceTaskType?.queueTopicPartition">
+                    <span class="entity-card-stat-label">Queue/Topic</span>
+                    <span class="pill pill-info pill-icon">
+                        <span class="glyphicon glyphicon-transfer"></span>
+                        {{sourceJob?.taskDetail?.sourceTaskType?.queueTopicPartition}}
+                    </span>
                 </div>
-                <div class="detail-item">
-                    <span class="detail-label">Home Page</span>
-                    <!-- homePageId is the lookup's TYPE (a name, e.g. "F768922 Seal Home") --
-                         not a URL, so this is a label, not a link. -->
-                    <span class="detail-value">{{sourceJob?.taskDetail?.homePageId || '-'}}</span>
+                <div class="entity-card-stat" *ngIf="sourceJob?.taskDetail?.pipelineId">
+                    <span class="entity-card-stat-label">Pipeline</span>
+                    <span class="pill pill-purple pill-icon">
+                        <span class="glyphicon glyphicon-random"></span>
+                        {{sourceJob?.taskDetail?.pipelineId}}
+                    </span>
+                </div>
+                <div class="entity-card-stat" *ngIf="sourceJob?.taskDetail?.homePageId">
+                    <span class="entity-card-stat-label">Home Page</span>
+                    <a class="pill pill-warning pill-icon" [href]="sourceJob.taskDetail.homePageId" target="_blank" rel="noopener">
+                        <span class="glyphicon glyphicon-home"></span> {{sourceJob.taskDetail.homePageId}}
+                        <span class="glyphicon glyphicon-new-window" style="font-size: 10px; margin-left: 2px;"></span>
+                    </a>
+                </div>
+                <div class="entity-card-stat" *ngIf="sourceJob?.taskDetail?.bucket">
+                    <span class="entity-card-stat-label">Bucket / Folder</span>
+                    <span class="pill pill-info pill-icon">
+                        <span class="glyphicon glyphicon-hdd"></span>
+                        {{sourceJob.taskDetail.bucket}} / {{sourceJob.taskDetail.outputFolder || sourceJob.taskDetail.inputFolder}}
+                    </span>
+                    <a class="btn btn-xs btn-default" style="margin-left: 8px;"
+                        [routerLink]="['/objectBrowser']"
+                        [queryParams]="{ bucket: sourceJob.taskDetail.bucket, prefix: sourceJob.taskDetail.outputFolder || sourceJob.taskDetail.inputFolder }">
+                        <span class="glyphicon glyphicon-new-window"></span> View in Bucket
+                    </a>
                 </div>
             </div>
-            <div class="detail-item" style="margin-bottom: 0;">
-                <span class="detail-label">Task Payload</span>
-                <pre class="code-box">{{sourceJob.taskDetail.taskPayload}}</pre>
+            <div class="expand-panel-payload" *ngIf="sourceJob?.taskDetail?.taskPayload">
+                <div class="expand-panel-payload-label">
+                    <span class="glyphicon glyphicon-list-alt"></span> Task Payload
+                </div>
+                <pre>{{sourceJob.taskDetail.taskPayload}}</pre>
             </div>
         </div>
     </div>
 </div>
 
-<!-- queue messages -->
 <div class="card-panel" *ngIf="sourceJobQueues">
     <h4 class="card-panel-title" *ngIf="runHistoryChartOptions">
         <span class="glyphicon glyphicon-stats"></span> Run History
@@ -155,10 +180,6 @@
         </button>
     </div>
 
-    <!-- Column insights -- donut pies for Job Id/Job Status plus one stacked bar comparing
-         Run Manual/Skip Manual/Q Send. No separate Start/End/Skip Time chart here -- the Run
-         History chart above already covers "start vs end, compared across runs", just with
-         actual duration + status instead of a "rows per day" line that never said much. -->
     <div class="stat-chart-grid" *ngIf="showGroupByCharts">
         <div class="demo-chart" *ngIf="jobIdChartOptions" echarts [options]="jobIdChartOptions"></div>
         <div class="demo-chart" *ngIf="jobStatusPieOptions" echarts [options]="jobStatusPieOptions"></div>

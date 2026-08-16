@@ -54,6 +54,40 @@ export class TenantsComponent implements OnInit {
         return !!(this.filterStatus || this.search);
     }
 
+    public get totalUserCount(): number {
+        return this.sumStat('userCount');
+    }
+
+    public get totalBrokerCount(): number {
+        return this.sumStat('kafkaProfileCount');
+    }
+
+    public get totalBucketCount(): number {
+        return this.sumStat('bucketCount');
+    }
+
+    public get totalSourceTaskTypeCount(): number {
+        return this.sumStat('sourceTaskTypeCount');
+    }
+
+    public get totalSourceTaskCount(): number {
+        return this.sumStat('sourceTaskCount');
+    }
+
+    public get totalSourceJobCount(): number {
+        return this.sumStat('sourceJobCount');
+    }
+
+    public get totalSourceCount(): number {
+        return this.totalSourceTaskTypeCount + this.totalSourceTaskCount + this.totalSourceJobCount;
+    }
+
+    private sumStat(field: keyof Tenant): number {
+        return this.tenants
+            .filter((tenant) => tenant.status !== 'Delete')
+            .reduce((sum, tenant) => sum + (Number(tenant[field]) || 0), 0);
+    }
+
     public clearFilters(): void {
         this.filterStatus = '';
         this.search = '';

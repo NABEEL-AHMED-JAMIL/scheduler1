@@ -1,14 +1,24 @@
 import { Component, OnInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
-import { AlertService, StorageService } from '@/_services';
+import { ActivatedRoute } from '@angular/router';
+import { AlertService, StorageService, DocumentConverterService } from '@/_services';
 import { first } from 'rxjs/operators';
 import { forkJoin, Observable } from 'rxjs';
 import { ApiCode, ApiResponse, BucketSummary, ObjectSummary, ObjectMetadata } from '@/_models';
+import { EChartOption } from 'echarts';
+import { ColumnBarSegment, CATEGORY_PALETTE, PILL_SUCCESS_COLOR, PILL_DANGER_COLOR, categoricalColumnStats } from '@/_helpers';
 
 const marked: any = require('marked');
 
 const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'];
-const PREVIEWABLE_EXTENSIONS = ['json', 'csv', 'txt', 'xml', 'md', 'pdf', 'mp3', 'm4a', 'mp4'].concat(IMAGE_EXTENSIONS);
+const DOC_CONVERTIBLE_EXTENSIONS = ['doc', 'docx'];
+const PREVIEWABLE_EXTENSIONS = ['json', 'csv', 'txt', 'xml', 'md', 'pdf', 'mp3', 'm4a', 'mp4']
+    .concat(IMAGE_EXTENSIONS).concat(DOC_CONVERTIBLE_EXTENSIONS);
+
+const DOC_CONTENT_TYPES: { [extension: string]: string } = {
+    doc: 'application/msword',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+};
 
 const MEDIA_CONTENT_TYPES: { [extension: string]: string } = {
     pdf: 'application/pdf',
@@ -40,6 +50,20 @@ const BULK_DOWNLOAD_STAGGER_MS = 350;
 
 const FOLDER_STAT_MAX_KEYS = 1000;
 
+const DIRECTORY_STATS_MAX_KEYS = 1000;
+const FILE_TYPE_TOP_N = 7;
+const SUBFOLDER_SIZE_TOP_N = 7;
+
+const AGE_BUCKET_ORDER = ['Last 30 Days', '1-6 Months', '6-12 Months', '1-2 Years', '2-5 Years', '5+ Years'];
+const AGE_BUCKET_COLOR: { [label: string]: string } = {
+    'Last 30 Days': '#1d7a3f',
+    '1-6 Months': '#4f46e5',
+    '6-12 Months': '#0c7c8c',
+    '1-2 Years': '#b5730a',
+    '2-5 Years': '#6a3bbf',
+    '5+ Years': '#c0392b'
+};
+
 interface Breadcrumb {
     name: string;
     prefix: string;
@@ -48,6 +72,18 @@ interface Breadcrumb {
 interface FolderStat {
     files: number;
     folders: number;
+    totalBytes: number;
+    capped: boolean;
+    loading: boolean;
+    error: boolean;
+}
+
+interface DirectoryStats {
+    totalFiles: number;
+    totalFolders: number;
+    typeCounts: { [extension: string]: number };
+    typeBytes: { [extension: string]: number };
+    ageCounts: { [bucket: string]: number };
     capped: boolean;
     loading: boolean;
     error: boolean;
@@ -68,11 +104,50 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
 
     public currentPrefix = '';
     public breadcrumbs: Breadcrumb[] = [];
-    public objects: ObjectSummary[] = [];
     public nextContinuationToken: string | null = null;
     public loadingObjects = false;
 
-    public folderStats: { [key: string]: FolderStat } = {};
+    private _objects: ObjectSummary[] = [];
+    public get objects(): ObjectSummary[] {
+        return this._objects;
+    }
+    public set objects(value: ObjectSummary[]) {
+        this._objects = value;
+        this.recomputeDirectoryCharts();
+    }
+
+    private _folderStats: { [key: string]: FolderStat } = {};
+    public get folderStats(): { [key: string]: FolderStat } {
+        return this._folderStats;
+    }
+    public set folderStats(value: { [key: string]: FolderStat }) {
+        this._folderStats = value;
+        this.recomputeDirectoryCharts();
+    }
+
+    private _directoryStats: DirectoryStats = {
+        totalFiles: 0, totalFolders: 0, typeCounts: {}, typeBytes: {}, ageCounts: {}, capped: false, loading: false, error: false
+    };
+    public get directoryStats(): DirectoryStats {
+        return this._directoryStats;
+    }
+    public set directoryStats(value: DirectoryStats) {
+        this._directoryStats = value;
+        this.recomputeDirectoryCharts();
+    }
+    public showDirectoryCharts = true;
+
+    public folderFileChartOptions: EChartOption | null = null;
+    public fileTypeChartOptions: EChartOption | null = null;
+    public uploadAgeChartOptions: EChartOption | null = null;
+    public subfolderSizeChartOptions: EChartOption | null = null;
+
+    private recomputeDirectoryCharts(): void {
+        this.folderFileChartOptions = this.computeFolderFileChartOptions();
+        this.fileTypeChartOptions = this.computeFileTypeChartOptions();
+        this.uploadAgeChartOptions = this.computeUploadAgeChartOptions();
+        this.subfolderSizeChartOptions = this.computeSubfolderSizeChartOptions();
+    }
 
     public searchName = '';
     public searchDateFrom = '';
@@ -118,8 +193,10 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
     public closeDeleteModal!: ElementRef<HTMLButtonElement>;
 
     constructor(
+        private route: ActivatedRoute,
         private alertService: AlertService,
         private storageService: StorageService,
+        private documentConverterService: DocumentConverterService,
         private sanitizer: DomSanitizer) {
     }
 
@@ -135,6 +212,7 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
                 this.loadingBuckets = false;
                 if (response.status === ApiCode.SUCCESS) {
                     this.buckets = response.data || [];
+                    this.openDeepLinkFromQueryParams();
                 } else {
                     this.alertService.showError(response.message, this.ERROR);
                 }
@@ -142,6 +220,25 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
                 this.loadingBuckets = false;
                 this.alertService.showError(error, this.ERROR);
             });
+    }
+
+    private openDeepLinkFromQueryParams(): void {
+        const params = this.route.snapshot.queryParamMap;
+        const bucket = params.get('bucket');
+        const prefix = params.get('prefix') || '';
+        if (!bucket || !this.buckets.some((b) => b.bucket === bucket)) {
+            return;
+        }
+        this.selectedBucket = bucket;
+        this.currentPrefix = prefix;
+        this.breadcrumbs = prefix
+            ? prefix.replace(/\/+$/, '').split('/').map((segment, index, segments) => ({
+                name: segment,
+                prefix: segments.slice(0, index + 1).join('/') + '/'
+            }))
+            : [];
+        this.loadObjects(true);
+        this.loadDirectoryStats();
     }
 
     public onBucketChange(): void {
@@ -154,7 +251,176 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
         this.resetSearch();
         if (this.selectedBucket) {
             this.loadObjects(true);
+            this.loadDirectoryStats();
         }
+    }
+
+    public refreshCurrentFolder(): void {
+        if (!this.selectedBucket) {
+            return;
+        }
+        this.closePanel();
+        this.clearSelection();
+        this.objects = [];
+        this.nextContinuationToken = null;
+        this.loadObjects(true);
+        this.loadDirectoryStats();
+    }
+
+    private loadDirectoryStats(): void {
+        const bucket = this.selectedBucket;
+        if (!bucket) {
+            return;
+        }
+        this.directoryStats = { totalFiles: 0, totalFolders: 0, typeCounts: {}, typeBytes: {}, ageCounts: {}, capped: false, loading: true, error: false };
+        const prefix = this.currentPrefix;
+        this.storageService.listObjects(bucket, prefix, null, DIRECTORY_STATS_MAX_KEYS)
+            .pipe(first())
+            .subscribe((response) => {
+                if (bucket !== this.selectedBucket || prefix !== this.currentPrefix) {
+                    return;
+                }
+                if (response.status === ApiCode.SUCCESS) {
+                    const entries: ObjectSummary[] = response.data?.objects || [];
+                    const typeCounts: { [extension: string]: number } = {};
+                    const typeBytes: { [extension: string]: number } = {};
+                    let totalFiles = 0;
+                    let totalFolders = 0;
+                    entries.forEach((entry) => {
+                        if (entry.folder) {
+                            totalFolders++;
+                            return;
+                        }
+                        totalFiles++;
+                        const extension = this.extensionOf(entry.name) || 'other';
+                        typeCounts[extension] = (typeCounts[extension] || 0) + 1;
+                        typeBytes[extension] = (typeBytes[extension] || 0) + (Number(entry.size) || 0);
+                    });
+                    const ageSegments = categoricalColumnStats(
+                        entries.filter((entry) => !entry.folder),
+                        (entry: ObjectSummary) => this.ageBucketOf(entry.lastModified),
+                        AGE_BUCKET_ORDER,
+                        (label) => AGE_BUCKET_COLOR[label] || '#9aa5ac'
+                    );
+                    const ageCounts: { [bucket: string]: number } = {};
+                    ageSegments.forEach((segment) => { ageCounts[segment.label] = segment.count; });
+                    this.directoryStats = {
+                        totalFiles, totalFolders, typeCounts, typeBytes, ageCounts,
+                        capped: !!response.data?.nextContinuationToken,
+                        loading: false, error: false
+                    };
+                } else {
+                    this.directoryStats = { totalFiles: 0, totalFolders: 0, typeCounts: {}, typeBytes: {}, ageCounts: {}, capped: false, loading: false, error: true };
+                }
+            }, () => {
+                if (bucket !== this.selectedBucket || prefix !== this.currentPrefix) {
+                    return;
+                }
+                this.directoryStats = { totalFiles: 0, totalFolders: 0, typeCounts: {}, typeBytes: {}, ageCounts: {}, capped: false, loading: false, error: true };
+            });
+    }
+
+    private computeFolderFileChartOptions(): EChartOption | null {
+        const stats = this.directoryStats;
+        if (!stats.totalFiles && !stats.totalFolders) {
+            return null;
+        }
+        const segments: ColumnBarSegment[] = [
+            { label: 'Files', count: stats.totalFiles, pct: 0, color: PILL_SUCCESS_COLOR },
+            { label: 'Folders', count: stats.totalFolders, pct: 0, color: PILL_DANGER_COLOR }
+        ];
+        return this.compactPieOptions(segments);
+    }
+
+    private computeFileTypeChartOptions(): EChartOption | null {
+        const entries = Object.entries(this.directoryStats.typeCounts).sort((a, b) => b[1] - a[1]);
+        if (!entries.length) {
+            return null;
+        }
+        const top = entries.slice(0, FILE_TYPE_TOP_N);
+        const rest = entries.slice(FILE_TYPE_TOP_N);
+        const restTotal = rest.reduce((sum, [, count]) => sum + count, 0);
+        const segments: ColumnBarSegment[] = top.map(([extension, count], i) => ({
+            label: extension.toUpperCase(), count, pct: 0, color: CATEGORY_PALETTE[i % CATEGORY_PALETTE.length]
+        }));
+        if (restTotal > 0) {
+            segments.push({ label: `Other (${rest.length} types)`, count: restTotal, pct: 0, color: '#9aa5ac' });
+        }
+        return this.compactPieOptions(segments);
+    }
+
+    private computeUploadAgeChartOptions(): EChartOption | null {
+        const counts = this.directoryStats.ageCounts;
+        const segments: ColumnBarSegment[] = AGE_BUCKET_ORDER
+            .filter((label) => (counts[label] || 0) > 0)
+            .map((label) => ({ label, count: counts[label], pct: 0, color: AGE_BUCKET_COLOR[label] }));
+        return this.compactPieOptions(segments);
+    }
+
+    private ageBucketOf(lastModified: any): string {
+        if (!lastModified) {
+            return AGE_BUCKET_ORDER[AGE_BUCKET_ORDER.length - 1];
+        }
+        const modified = new Date(lastModified).getTime();
+        if (isNaN(modified)) {
+            return AGE_BUCKET_ORDER[AGE_BUCKET_ORDER.length - 1];
+        }
+        const daysAgo = Math.max(0, (Date.now() - modified) / (24 * 60 * 60 * 1000));
+        if (daysAgo <= 30) { return 'Last 30 Days'; }
+        if (daysAgo <= 182) { return '1-6 Months'; }
+        if (daysAgo <= 365) { return '6-12 Months'; }
+        if (daysAgo <= 730) { return '1-2 Years'; }
+        if (daysAgo <= 1825) { return '2-5 Years'; }
+        return '5+ Years';
+    }
+
+    private computeSubfolderSizeChartOptions(): EChartOption | null {
+        const folders = this.objects.filter((entry) => entry.folder);
+        const entries = folders
+            .map((entry) => [entry.name, this.folderStats[entry.key]?.totalBytes || 0] as [string, number])
+            .filter(([, bytes]) => bytes > 0)
+            .sort((a, b) => b[1] - a[1]);
+        if (!entries.length) {
+            return null;
+        }
+        const top = entries.slice(0, SUBFOLDER_SIZE_TOP_N);
+        const rest = entries.slice(SUBFOLDER_SIZE_TOP_N);
+        const restTotal = rest.reduce((sum, [, bytes]) => sum + bytes, 0);
+        const segments: ColumnBarSegment[] = top.map(([name, bytes], i) => ({
+            label: name, count: bytes, pct: 0, color: CATEGORY_PALETTE[i % CATEGORY_PALETTE.length]
+        }));
+        if (restTotal > 0) {
+            segments.push({ label: `Other (${rest.length} folders)`, count: restTotal, pct: 0, color: '#9aa5ac' });
+        }
+        return this.compactPieOptions(segments, (bytes) => this.formatSize(bytes));
+    }
+
+    private compactPieOptions(segments: ColumnBarSegment[], valueFormatter?: (value: number) => string): EChartOption | null {
+        const data = segments.filter((s) => s.count > 0);
+        if (!data.length) {
+            return null;
+        }
+        return {
+            tooltip: {
+                trigger: 'item',
+                formatter: (params: any) => `${params.name}: ${valueFormatter ? valueFormatter(params.value) : params.value} (${params.percent}%)`
+            },
+            legend: {
+                orient: 'vertical', left: '54%', right: 2, top: 'center',
+                type: data.length > 5 ? 'scroll' : 'plain',
+                itemWidth: 7, itemHeight: 7, itemGap: 4,
+                textStyle: { fontSize: 9 },
+                formatter: (name: string) => (name.length > 12 ? name.slice(0, 11) + '…' : name)
+            },
+            series: [{
+                type: 'pie',
+                center: ['27%', '50%'],
+                radius: ['44%', '72%'],
+                itemStyle: { borderColor: '#fff', borderWidth: 1 },
+                label: { show: false },
+                data: data.map((s) => ({ name: s.label, value: s.count, itemStyle: { color: s.color } }))
+            }]
+        };
     }
 
     public loadObjects(reset: boolean): void {
@@ -195,24 +461,28 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
         entries
             .filter((entry) => entry.folder && !this.folderStats[entry.key])
             .forEach((entry) => {
-                this.folderStats[entry.key] = { files: 0, folders: 0, capped: false, loading: true, error: false };
+                this.folderStats[entry.key] = { files: 0, folders: 0, totalBytes: 0, capped: false, loading: true, error: false };
                 this.storageService.listObjects(bucket, entry.key, null, FOLDER_STAT_MAX_KEYS)
                     .pipe(first())
                     .subscribe((response) => {
                         if (response.status === ApiCode.SUCCESS) {
                             const children: ObjectSummary[] = response.data?.objects || [];
+                            const fileChildren = children.filter((c) => !c.folder);
                             this.folderStats[entry.key] = {
-                                files: children.filter((c) => !c.folder).length,
+                                files: fileChildren.length,
                                 folders: children.filter((c) => !!c.folder).length,
+                                totalBytes: fileChildren.reduce((sum, c) => sum + (Number(c.size) || 0), 0),
                                 capped: !!response.data?.nextContinuationToken,
                                 loading: false,
                                 error: false
                             };
                         } else {
-                            this.folderStats[entry.key] = { files: 0, folders: 0, capped: false, loading: false, error: true };
+                            this.folderStats[entry.key] = { files: 0, folders: 0, totalBytes: 0, capped: false, loading: false, error: true };
                         }
+                        this.recomputeDirectoryCharts();
                     }, () => {
-                        this.folderStats[entry.key] = { files: 0, folders: 0, capped: false, loading: false, error: true };
+                        this.folderStats[entry.key] = { files: 0, folders: 0, totalBytes: 0, capped: false, loading: false, error: true };
+                        this.recomputeDirectoryCharts();
                     });
             });
     }
@@ -269,6 +539,7 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
         this.nextContinuationToken = null;
         this.resetSearch();
         this.loadObjects(true);
+        this.loadDirectoryStats();
     }
 
     public goToBreadcrumb(index: number): void {
@@ -285,6 +556,7 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
         this.nextContinuationToken = null;
         this.resetSearch();
         this.loadObjects(true);
+        this.loadDirectoryStats();
     }
 
     public get filteredObjects(): ObjectSummary[] {
@@ -410,6 +682,10 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
             this.loadMediaPreview(entry.key, extension);
             return;
         }
+        if (DOC_CONVERTIBLE_EXTENSIONS.indexOf(extension) !== -1) {
+            this.loadDocPreview(entry, extension);
+            return;
+        }
         this.previewKind = extension as 'json' | 'csv' | 'txt' | 'xml' | 'md' | 'pdf' | 'mp3' | 'm4a' | 'mp4';
         if (extension === 'pdf' || extension === 'mp3' || extension === 'm4a' || extension === 'mp4') {
             this.loadMediaPreview(entry.key, extension);
@@ -453,6 +729,37 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
             }, () => {
                 this.previewLoading = false;
                 this.previewError = 'Could not load preview for this file.';
+            });
+    }
+
+    private loadDocPreview(entry: ObjectSummary, extension: string): void {
+        this.previewLoading = true;
+        this.storageService.previewObjectArrayBuffer(this.selectedBucket, entry.key)
+            .pipe(first())
+            .subscribe((buffer) => {
+                const contentType = DOC_CONTENT_TYPES[extension] || 'application/octet-stream';
+                const file = new File([buffer], entry.name, { type: contentType });
+                this.documentConverterService.convert(file, 'pdf', false)
+                    .pipe(first())
+                    .subscribe((response) => {
+                        this.previewLoading = false;
+                        const outputBase64 = response.data?.outputBase64;
+                        if (response.status !== ApiCode.SUCCESS || !outputBase64) {
+                            this.previewError = response.message || 'Could not convert this file for preview.';
+                            return;
+                        }
+                        const pdfBytes = Uint8Array.from(atob(outputBase64), (c) => c.charCodeAt(0));
+                        this.revokePreviewMediaUrl();
+                        this.previewMediaObjectUrl = URL.createObjectURL(new Blob([pdfBytes], { type: 'application/pdf' }));
+                        this.previewMediaUrl = this.sanitizer.bypassSecurityTrustResourceUrl(this.previewMediaObjectUrl);
+                        this.previewKind = 'pdf';
+                    }, (error) => {
+                        this.previewLoading = false;
+                        this.previewError = 'Could not convert this file for preview.';
+                    });
+            }, () => {
+                this.previewLoading = false;
+                this.previewError = 'Could not load this file for preview.';
             });
     }
 

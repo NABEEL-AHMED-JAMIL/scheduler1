@@ -1,9 +1,20 @@
-<!-- breadcrumb -->
 <nav class="breadcrumb-bar">
     <a routerLink="/home">Home</a>
     <span class="crumb-sep">/</span>
+    <a *ngIf="focusedTenantId" routerLink="/tenants">Tenants</a>
+    <span class="crumb-sep" *ngIf="focusedTenantId">/</span>
     <span class="crumb-current">Users</span>
 </nav>
+
+<div class="card-panel" style="display: flex; align-items: center; justify-content: space-between; gap: 12px;" *ngIf="focusedTenantId">
+    <span>
+        <span class="glyphicon glyphicon-filter" style="color: #4f46e5;"></span>
+        Viewing users for <strong>{{focusedTenantName || ('Tenant #' + focusedTenantId)}}</strong>
+    </span>
+    <button type="button" class="btn btn-sm btn-default" (click)="clearTenantFocus()">
+        <span class="glyphicon glyphicon-remove"></span> Show All Tenants
+    </button>
+</div>
 
 <div class="toolbar">
     <div class="form-group" style="margin-bottom: 0;">
@@ -117,7 +128,6 @@
     </table>
 </div>
 
-<!-- Add/Edit User Modal -->
 <div class="modal fade" id="userModal" role="dialog">
     <div class="modal-dialog">
         <div class="modal-content" style="border: none">
@@ -169,7 +179,6 @@
     </div>
 </div>
 
-<!-- Reset Password Modal -->
 <div class="modal fade" id="resetPasswordModal" role="dialog">
     <div class="modal-dialog">
         <div class="modal-content" style="border: none">
@@ -194,7 +203,6 @@
     </div>
 </div>
 
-<!-- Delete Confirm Modal -->
 <div class="modal fade" id="deleteUserModal" role="dialog">
     <div class="modal-dialog">
         <div class="modal-content">

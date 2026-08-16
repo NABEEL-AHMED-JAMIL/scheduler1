@@ -4,7 +4,6 @@
     <span class="crumb-current">Q-Message</span>
 </nav>
 
-<!-- Search Q-Message -->
 <form *ngIf="qMessageSearcForm" [formGroup]="qMessageSearcForm" (ngSubmit)="submitQMessageFilter()">
     <div class="card-panel">
         <h4 class="card-panel-title panel-banner">
@@ -58,7 +57,6 @@
     </div>
 </form>
 
-<!-- Results -->
 <div class="card-panel" *ngIf="queueDatas">
     <div class="toolbar">
         <div class="form-group" style="margin-bottom: 0;">
@@ -73,18 +71,13 @@
         </button>
     </div>
 
-    <!-- Column insights -- a Kaggle-style profile strip docked to the table: donut pies for
-         Job Id/Job Status, one stacked bar comparing Run Manual/Skip Manual/Q Send, and a wide
-         Start→End duration comparison across jobs (replaces what used to be three separate,
-         mostly-uninformative "rows per day" lines for Start/End/Skip Time). Same
-         filteredQueueDatas source as the column-header mini bars in the table below; *ngIf per
-         chart so an empty one (nothing matches the current search/filter) just isn't shown. -->
     <div class="stat-chart-grid" *ngIf="showGroupByCharts">
         <div class="demo-chart" *ngIf="jobIdChartOptions" echarts [options]="jobIdChartOptions"></div>
         <div class="demo-chart" *ngIf="jobStatusPieOptions" echarts [options]="jobStatusPieOptions"></div>
         <div class="demo-chart" *ngIf="booleanFieldsChartOptions" echarts [options]="booleanFieldsChartOptions"></div>
         <div class="demo-chart stat-chart-wide" *ngIf="durationComparisonChartOptions"
-            echarts [options]="durationComparisonChartOptions" (chartClick)="onDurationChartClick($event)"></div>
+            echarts [options]="durationComparisonChartOptions" (chartClick)="onDurationChartClick($event)"
+            (chartDataZoom)="onDurationChartDataZoom($event)"></div>
     </div>
 
     <div class="table-responsive scroll-table">

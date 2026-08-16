@@ -14,7 +14,6 @@ function walk(dir) {
 
 function fixFile(file) {
   const src = fs.readFileSync(file, 'utf8');
-  // Detect the problematic character class containing literal unicode spaces
   const problematic = /\[\^ \f\n\r\t\v[\u1680\u180E\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF]*\]/;
   if (/\u1680|\u180E|\u2000/.test(src) && src.indexOf('[^ \f\n\r\t\v') !== -1) {
     const replaced = src.replace(/\[\^ \f\n\r\t\v[^\]]*\]/g, '[^ \\f\\n\\r\\t\\v\\u1680\\u180E\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]');

@@ -4,116 +4,100 @@ import { Component, OnInit } from '@angular/core';
 
     selector: 'spinner',
     template: `
-        <div class="dark-overlay">
-            <div class="loader">Loading...</div>
+        <div class="loader-overlay">
+            <div class="loader-card">
+                <div class="loader-ring">
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                </div>
+                <span class="loader-text">Loading…</span>
+            </div>
         </div>
     `,
     styles: [
       `
         :host {
-          display: none;
+          display: block;
+          pointer-events: none;
         }
-        :host .dark-overlay {
+        :host .loader-overlay {
           position: fixed;
           width: 100%;
           height: 100%;
           top: 0;
-          background: rgba(0, 0, 0, 0.48);
+          left: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: rgba(15, 20, 30, 0.32);
+          backdrop-filter: blur(2px);
+          -webkit-backdrop-filter: blur(2px);
           z-index: 1040;
+          opacity: 0;
+          visibility: hidden;
+          transition: opacity 0.18s ease, visibility 0.18s ease;
         }
-        :host .loader {
-          color: #ffffff;
-          font-size: 12px;
-          width: 0.7em;
-          height: 0.7em;
-          border-radius: 50%;
+        :host(.is-visible) .loader-overlay {
+          opacity: 1;
+          visibility: visible;
+          pointer-events: auto;
+        }
+        :host .loader-card {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 14px;
+          padding: 26px 34px;
+          background: #ffffff;
+          border-radius: 14px;
+          box-shadow: 0 12px 32px rgba(15, 20, 30, 0.22);
+          transform: translateY(4px) scale(0.97);
+          transition: transform 0.18s ease;
+        }
+        :host(.is-visible) .loader-card {
+          transform: translateY(0) scale(1);
+        }
+        :host .loader-ring {
           position: relative;
-          top: 50%;
-          left: 50%;
-          text-indent: -9999em;
-          animation: load4 1.3s infinite linear;
-          transform: translateX(-50%) translateY(-50%);
+          width: 44px;
+          height: 44px;
         }
-        @-webkit-keyframes load4 {
-          0%,
-          100% {
-            box-shadow: 0 -3em 0 0.2em, 2em -2em 0 0em, 3em 0 0 -1em,
-              2em 2em 0 -1em, 0 3em 0 -1em, -2em 2em 0 -1em, -3em 0 0 -1em,
-              -2em -2em 0 0;
-          }
-          12.5% {
-            box-shadow: 0 -3em 0 0, 2em -2em 0 0.2em, 3em 0 0 0, 2em 2em 0 -1em,
-              0 3em 0 -1em, -2em 2em 0 -1em, -3em 0 0 -1em, -2em -2em 0 -1em;
-          }
-          25% {
-            box-shadow: 0 -3em 0 -0.5em, 2em -2em 0 0, 3em 0 0 0.2em, 2em 2em 0 0,
-              0 3em 0 -1em, -2em 2em 0 -1em, -3em 0 0 -1em, -2em -2em 0 -1em;
-          }
-          37.5% {
-            box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em, 3em 0em 0 0,
-              2em 2em 0 0.2em, 0 3em 0 0em, -2em 2em 0 -1em, -3em 0em 0 -1em,
-              -2em -2em 0 -1em;
-          }
-          50% {
-            box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em, 3em 0 0 -1em,
-              2em 2em 0 0em, 0 3em 0 0.2em, -2em 2em 0 0, -3em 0em 0 -1em,
-              -2em -2em 0 -1em;
-          }
-          62.5% {
-            box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em, 3em 0 0 -1em,
-              2em 2em 0 -1em, 0 3em 0 0, -2em 2em 0 0.2em, -3em 0 0 0,
-              -2em -2em 0 -1em;
-          }
-          75% {
-            box-shadow: 0em -3em 0 -1em, 2em -2em 0 -1em, 3em 0em 0 -1em,
-              2em 2em 0 -1em, 0 3em 0 -1em, -2em 2em 0 0, -3em 0em 0 0.2em,
-              -2em -2em 0 0;
-          }
-          87.5% {
-            box-shadow: 0em -3em 0 0, 2em -2em 0 -1em, 3em 0 0 -1em,
-              2em 2em 0 -1em, 0 3em 0 -1em, -2em 2em 0 0, -3em 0em 0 0,
-              -2em -2em 0 0.2em;
-          }
+        :host .loader-ring div {
+          position: absolute;
+          box-sizing: border-box;
+          width: 44px;
+          height: 44px;
+          border-radius: 50%;
+          border: 3.5px solid transparent;
+          animation: loader-ring-spin 1.15s cubic-bezier(0.5, 0, 0.5, 1) infinite;
         }
-        @keyframes load4 {
-          0%,
+        :host .loader-ring div:nth-child(1) {
+          border-top-color: #4f46e5;
+          animation-delay: 0s;
+        }
+        :host .loader-ring div:nth-child(2) {
+          border-top-color: #7c3aed;
+          opacity: 0.7;
+          animation-delay: -0.15s;
+        }
+        :host .loader-ring div:nth-child(3) {
+          border-top-color: #3730a3;
+          opacity: 0.45;
+          animation-delay: -0.3s;
+        }
+        :host .loader-text {
+          font-size: 13px;
+          font-weight: 600;
+          letter-spacing: 0.02em;
+          color: #2f3a45;
+        }
+        @keyframes loader-ring-spin {
+          0% {
+            transform: rotate(0deg);
+          }
           100% {
-            box-shadow: 0 -3em 0 0.2em, 2em -2em 0 0em, 3em 0 0 -1em,
-              2em 2em 0 -1em, 0 3em 0 -1em, -2em 2em 0 -1em, -3em 0 0 -1em,
-              -2em -2em 0 0;
-          }
-          12.5% {
-            box-shadow: 0 -3em 0 0, 2em -2em 0 0.2em, 3em 0 0 0, 2em 2em 0 -1em,
-              0 3em 0 -1em, -2em 2em 0 -1em, -3em 0 0 -1em, -2em -2em 0 -1em;
-          }
-          25% {
-            box-shadow: 0 -3em 0 -0.5em, 2em -2em 0 0, 3em 0 0 0.2em, 2em 2em 0 0,
-              0 3em 0 -1em, -2em 2em 0 -1em, -3em 0 0 -1em, -2em -2em 0 -1em;
-          }
-          37.5% {
-            box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em, 3em 0em 0 0,
-              2em 2em 0 0.2em, 0 3em 0 0em, -2em 2em 0 -1em, -3em 0em 0 -1em,
-              -2em -2em 0 -1em;
-          }
-          50% {
-            box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em, 3em 0 0 -1em,
-              2em 2em 0 0em, 0 3em 0 0.2em, -2em 2em 0 0, -3em 0em 0 -1em,
-              -2em -2em 0 -1em;
-          }
-          62.5% {
-            box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em, 3em 0 0 -1em,
-              2em 2em 0 -1em, 0 3em 0 0, -2em 2em 0 0.2em, -3em 0 0 0,
-              -2em -2em 0 -1em;
-          }
-          75% {
-            box-shadow: 0em -3em 0 -1em, 2em -2em 0 -1em, 3em 0em 0 -1em,
-              2em 2em 0 -1em, 0 3em 0 -1em, -2em 2em 0 0, -3em 0em 0 0.2em,
-              -2em -2em 0 0;
-          }
-          87.5% {
-            box-shadow: 0em -3em 0 0, 2em -2em 0 -1em, 3em 0 0 -1em,
-              2em 2em 0 -1em, 0 3em 0 -1em, -2em 2em 0 0, -3em 0em 0 0,
-              -2em -2em 0 0.2em;
+            transform: rotate(360deg);
           }
         }
       `

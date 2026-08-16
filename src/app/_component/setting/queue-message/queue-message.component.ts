@@ -6,6 +6,7 @@ import { SpinnerService, SearchFilterPipe } from '@/_helpers';
 import { QMessage } from '@/_models/index';
 import { first } from 'rxjs/operators';
 import { EChartOption } from 'echarts';
+import * as echarts from 'echarts';
 import { ApiCode, NameValue } from '@/_models';
 import { DatePipe } from '@angular/common';
 import {
@@ -23,7 +24,6 @@ import {
 export class QueueMessageComponent implements OnInit {
 
     public ERROR: string = 'Error';
-    public searchQMessageForm: any = '';
     public qMessageSearcForm!: FormGroup;
     public sourceJobRunningStatistics!: EChartOption;
     public jobStatusList: any = ['Queue', 'Start', 'Running', 'Failed', 'Completed', 'Skip', 'Interrupt'];
@@ -57,7 +57,46 @@ export class QueueMessageComponent implements OnInit {
         name: 'Interrupt'
       }
     ];
-  public queueDatas: QMessage[] = [];
+  private _queueDatas: QMessage[] = [];
+  public get queueDatas(): QMessage[] {
+    return this._queueDatas;
+  }
+  public set queueDatas(value: QMessage[]) {
+    this._queueDatas = value;
+    this.recomputeCharts();
+  }
+
+  private _searchQMessageForm: any = '';
+  public get searchQMessageForm(): any {
+    return this._searchQMessageForm;
+  }
+  public set searchQMessageForm(value: any) {
+    this._searchQMessageForm = value;
+    this.recomputeCharts();
+  }
+
+  public jobStatusPieOptions: EChartOption | null = null;
+  public booleanFieldsChartOptions: EChartOption | null = null;
+  public jobIdChartOptions: EChartOption | null = null;
+  public durationComparisonChartOptions: EChartOption | null = null;
+
+  private recomputeCharts(): void {
+    this.jobStatusPieOptions = this.computeJobStatusPieOptions();
+    this.booleanFieldsChartOptions = this.computeBooleanFieldsChartOptions();
+    this.jobIdChartOptions = this.computeJobIdChartOptions();
+    this.durationComparisonChartOptions = this.computeDurationComparisonChartOptions();
+  }
+
+  private durationZoomStart = 0;
+  private durationZoomEnd = 100;
+
+  public onDurationChartDataZoom(event: any): void {
+    const zoomState = event?.batch?.[0] || event;
+    if (zoomState && typeof zoomState.start === 'number' && typeof zoomState.end === 'number') {
+      this.durationZoomStart = zoomState.start;
+      this.durationZoomEnd = zoomState.end;
+    }
+  }
 
   public showGroupByCharts = true;
   public today_date: any;
@@ -172,11 +211,11 @@ export class QueueMessageComponent implements OnInit {
       return sharedRowDuration(row);
     }
 
-    public get jobStatusPieOptions(): EChartOption | null {
+    private computeJobStatusPieOptions(): EChartOption | null {
       return toPieOptions('Job Status', this.jobStatusColumnStats);
     }
 
-    public get booleanFieldsChartOptions(): EChartOption | null {
+    private computeBooleanFieldsChartOptions(): EChartOption | null {
       return sharedBooleanFieldsChartOptions(this.filteredQueueDatas, [
         { key: 'runManual', label: 'Run Manual' },
         { key: 'skipManual', label: 'Skip Manual' },
@@ -184,61 +223,74 @@ export class QueueMessageComponent implements OnInit {
       ]);
     }
 
-    public get jobIdChartOptions(): EChartOption | null {
+    private computeJobIdChartOptions(): EChartOption | null {
       return jobIdRankedBarOptions(this.filteredQueueDatas, false);
     }
 
-    public get durationComparisonChartOptions(): EChartOption | null {
+    private computeDurationComparisonChartOptions(): EChartOption | null {
       const rows = this.filteredQueueDatas.filter((r: any) => r.startTime && r.endTime);
       if (!rows.length) {
         return null;
       }
 
       const jobIds = Array.from(new Set(rows.map((r: any) => String(r.jobId)))).sort((a, b) => Number(a) - Number(b));
+      const categories = jobIds.map((id) => `Job ${id}`);
       const colorByJob = new Map<string, string>(jobIds.map((id, i) => [id, CATEGORY_PALETTE[i % CATEGORY_PALETTE.length]]));
-      const points = rows
-        .slice()
-        .sort((a: any, b: any) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
-        .map((r: any) => {
-          const minutes = Math.max(0, Math.round(
-            ((new Date(r.endTime).getTime() - new Date(r.startTime).getTime()) / 60000) * 10) / 10);
-          return {
-            value: [r.startTime, minutes],
-            jobId: r.jobId, jobQueueId: r.jobQueueId, startTime: r.startTime, endTime: r.endTime, jobStatus: r.jobStatus,
-            itemStyle: { color: colorByJob.get(String(r.jobId)) }
-          };
-        });
+
+      const bars = rows.map((r: any) => {
+        const startMs = new Date(r.startTime).getTime();
+        const endMs = new Date(r.endTime).getTime();
+        const minutes = Math.max(0, Math.round(((endMs - startMs) / 60000) * 10) / 10);
+        return {
+          value: [jobIds.indexOf(String(r.jobId)), startMs, endMs, r.jobId, r.jobQueueId, r.jobStatus, minutes],
+          itemStyle: { color: colorByJob.get(String(r.jobId)) }
+        };
+      });
+
       return {
         title: {
           text: 'Start → End Duration, All Jobs Compared',
           left: 'center', top: 2, textStyle: { fontSize: 11, fontWeight: 600, color: '#36424d' }
         },
         tooltip: {
-          trigger: 'item',
           formatter: (params: any) => {
-            const d = params.data;
-            return `Job ${d.jobId} (${d.jobStatus || '-'})<br/>Duration: ${d.value[1]} min<br/>` +
-              `Start: ${formatDateTime(d.startTime)}<br/>End: ${formatDateTime(d.endTime)}` +
+            const v = params.value;
+            return `Job ${v[3]} (${v[5] || '-'})<br/>Duration: ${v[6]} min<br/>` +
+              `Start: ${formatDateTime(new Date(v[1]).toISOString())}<br/>End: ${formatDateTime(new Date(v[2]).toISOString())}` +
               `<br/><span style="color:#7b8794;">Click to open this run's Job Logs</span>`;
           }
         },
-        grid: { left: 50, right: 16, top: 28, bottom: 12, containLabel: true },
+        grid: { left: 70, right: 16, top: 28, bottom: 44, containLabel: true },
         xAxis: { type: 'time', axisLabel: { fontSize: 8 } },
-        yAxis: { type: 'value', name: 'min', nameTextStyle: { fontSize: 8, color: '#7b8794' }, axisLabel: { fontSize: 8 } },
+        yAxis: { type: 'category', data: categories, axisLabel: { fontSize: 9 } },
+        dataZoom: [
+          { type: 'inside', xAxisIndex: 0, start: this.durationZoomStart, end: this.durationZoomEnd },
+          { type: 'slider', xAxisIndex: 0, start: this.durationZoomStart, end: this.durationZoomEnd, height: 18, bottom: 8 }
+        ] as any,
         series: [{
-          type: 'line',
-          smooth: true,
-          symbolSize: 6,
-          lineStyle: { color: FILL_COLOR, width: 1.5 },
+          type: 'custom',
+          renderItem: (renderParams: any, api: any) => {
+            const categoryIndex = api.value(0);
+            const start = api.coord([api.value(1), categoryIndex]);
+            const end = api.coord([api.value(2), categoryIndex]);
+            const height = Math.min(24, api.size([0, 1])[1] * 0.6);
+            const rectShape = echarts.graphic.clipRectByRect(
+              { x: start[0], y: start[1] - height / 2, width: Math.max(2, end[0] - start[0]), height },
+              { x: renderParams.coordSys.x, y: renderParams.coordSys.y, width: renderParams.coordSys.width, height: renderParams.coordSys.height }
+            );
+            return rectShape && { type: 'rect', shape: rectShape, style: api.style(), transition: [] };
+          },
           cursor: 'pointer',
-          data: points
+          encode: { x: [1, 2], y: 0 },
+          data: bars
         }]
       } as EChartOption;
     }
 
     public onDurationChartClick(event: any): void {
-      const jobId = event?.data?.jobId;
-      const jobQueueId = event?.data?.jobQueueId;
+      const v = event?.value || event?.data?.value || (Array.isArray(event?.data) ? event.data : null);
+      const jobId = v?.[3];
+      const jobQueueId = v?.[4];
       if (!jobId || !jobQueueId) {
         return;
       }

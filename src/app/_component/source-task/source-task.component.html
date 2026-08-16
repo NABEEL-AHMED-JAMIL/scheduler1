@@ -1,12 +1,10 @@
-﻿<!-- Breadcrumb -->
-<nav class="breadcrumb-bar">
+﻿<nav class="breadcrumb-bar">
     <a routerLink="/home">Home</a>
     <span class="crumb-sep">/</span>
     <span class="crumb-current">Task List</span>
 </nav>
 
 <div class="toolbar">
-    <!-- Search Section -->
     <div class="form-group" style="margin-bottom: 0;">
         <label for="searchSourceTaskDetails" class="control-label">Total Source Task ({{sourceTasks.length}})</label>
         <input type="text"
@@ -18,7 +16,6 @@
             (ngModelChange)="onSearchChange($event)"/>
     </div>
 
-    <!-- Status filter -->
     <div class="form-group" style="margin-bottom: 0; margin-left: 10px;">
         <label for="statusFilter" class="control-label">Status</label>
         <select id="statusFilter"
@@ -33,7 +30,6 @@
 
     <span class="toolbar-spacer"></span>
 
-    <!-- Action Buttons -->
     <button type="button" routerLink="/addTask" class="btn btn-sm btn-teal">
         <span class="glyphicon glyphicon-plus"></span> Add Task
     </button>
@@ -53,7 +49,6 @@
     </div>
 </div>
 
-<!-- Tasks Card grid -->
 <div class="entity-card-grid" *ngIf="viewMode === 'card'">
     <div class="entity-card" [ngClass]="'entity-card-accent-' + (sourceTask.taskStatus | lowercase)" *ngFor="let sourceTask of pagedSourceTasks; let i = index; trackBy: trackByTaskDetailId">
         <div class="entity-card-header">
@@ -64,9 +59,6 @@
                 </div>
             </div>
         </div>
-        <!-- Status pill dropped here (border already encodes it) -- this row now carries the
-             Topic and Pipeline tags instead, colored + iconified so they read as distinct,
-             at-a-glance data rather than blending into plain card text. -->
         <div class="entity-card-pills" *ngIf="sourceTask.sourceTaskType || sourceTask.pipelineId || sourceTask.groupId">
             <a class="pill pill-cyan pill-icon" *ngIf="sourceTask.sourceTaskType"
                 (click)="viewSourceTaskType(sourceTask.sourceTaskType)" data-toggle="modal" data-target="#sourceTaskTaype"
@@ -76,8 +68,6 @@
             <span class="pill pill-purple pill-icon" *ngIf="sourceTask.pipelineId">
                 <span class="glyphicon glyphicon-random"></span> {{sourceTask.pipelineId}}
             </span>
-            <!-- groupId is the TASK_GROUPS lookup's label (same "child lookupType read at
-                 listSourceTaskQuery time" convention as homePageId/pipelineId), not a URL. -->
             <span class="pill pill-indigo pill-icon" *ngIf="sourceTask.groupId">
                 <span class="glyphicon glyphicon-folder-open"></span> {{sourceTask.groupId}}
             </span>
@@ -85,7 +75,6 @@
         <div class="entity-card-stats">
             <div class="entity-card-stat" *ngIf="sourceTask.homePageId">
                 <span class="entity-card-stat-label">Home Page</span>
-                <!-- homePageId is the lookup's TYPE (a name), not a URL -- see table view's note. -->
                 <span class="pill pill-warning pill-icon">
                     <span class="glyphicon glyphicon-home"></span> {{sourceTask.homePageId}}
                 </span>
@@ -128,7 +117,6 @@
     </div>
 </div>
 
-<!-- Tasks Table -->
 <div class="table-responsive scroll-table" *ngIf="viewMode === 'table'">
     <table class="table table-bordered table-hover table-modern">
         <thead>
@@ -165,9 +153,6 @@
                     </a>
                 </td>
                 <td>
-                    <!-- homePageId is the lookup's TYPE (a name, e.g. "F768922 Seal Home") --
-                         not a URL, so this is a label, not a link (the actual URL lives in that
-                         lookup's value, never sent to this screen). -->
                     <span class="pill pill-warning pill-icon" *ngIf="sourceTask.homePageId">
                         <span class="glyphicon glyphicon-home"></span> {{sourceTask.homePageId}}
                     </span>
@@ -326,7 +311,6 @@
     </table>
 </div>
 
-<!-- Pagination -->
 <div class="list-pagination" *ngIf="filteredSourceTasks.length">
     <button type="button" class="btn btn-sm btn-default" [disabled]="currentPage === 1" (click)="goToPage(currentPage - 1)">
         <span class="glyphicon glyphicon-chevron-left"></span> Prev
@@ -347,10 +331,8 @@
     <router-outlet></router-outlet>
 </div>
 
-<!-- Modal -->
 <div class="modal fade" id="deleteTask" role="dialog" style="top: 85px;">
     <div class="modal-dialog">
-        <!-- Modal content-->
         <div class="modal-content">
             <div class="modal-header">
                 <button type="button" #closebutton class="close" data-dismiss="modal">&times;</button>

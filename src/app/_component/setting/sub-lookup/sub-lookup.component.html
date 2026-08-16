@@ -1,4 +1,3 @@
-<!-- breadcrumb -->
 <nav class="breadcrumb-bar" *ngIf="!isParent">
     <a routerLink="/home">Home</a>
     <span class="crumb-sep">/</span>
@@ -9,14 +8,12 @@
     <span class="crumb-current">Sub Lookup</span>
 </nav>
 
-<!-- lookup action -->
 <look-up *ngIf="lookupAction"
     [lookUpAction]="lookupAction"
     [recivedLookupData]="lookupData"
     (senderEvent) = "resetEvent($event)">
 </look-up>
 
-<!-- Parent Lookup detail -->
 <div class="card-panel">
     <h4 class="card-panel-title panel-banner has-action">
         <span>Parent Lookup Detail</span>
@@ -45,10 +42,9 @@
     </div>
 </div>
 
-<!-- Sub Lookups -->
 <div class="card-panel">
     <div class="toolbar">
-        <div class="form-group" style="margin-bottom: 15px;">
+        <div class="form-group" style="margin-bottom: 0;">
             <label for="searchLookupDataForm" class="control-label">Total Lookups ({{lookupDatas.length}})</label>
             <input type="text" id="searchLookupDataForm" class="form-control input-sm" style="width: 280px;"
                 placeholder="Search" [(ngModel)]="searchLookupDataForm"/>
@@ -56,7 +52,7 @@
     </div>
 
     <div class="table-responsive">
-        <table id="lookup" class="table table-striped table-bordered table-hover table-modern" style="font-size: 12px; margin-top: 15px;">
+        <table id="lookup" class="table table-striped table-bordered table-hover table-modern" style="font-size: 12px;">
             <thead>
                 <tr>
                     <th style="width: 4%;"># No</th>

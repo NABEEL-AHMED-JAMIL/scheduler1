@@ -1,14 +1,11 @@
-﻿<!-- Navbar -->
-<nav class="navbar navbar-inverse" *ngIf="showNav">
+﻿<nav class="navbar navbar-inverse" *ngIf="showNav">
     <div class="container-fluid">
-        <!-- Brand -->
         <div class="navbar-header">
             <a routerLink="/home" class="navbar-brand">
                 <span class="glyphicon glyphicon-plane"></span> ETL 2023
             </a>
         </div>
 
-        <!-- Menu Items -->
         <ul class="nav navbar-nav">
             <li class="dropdown" routerLinkActive="active">
                 <a href="javascript:void(0);" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">
@@ -52,12 +49,6 @@
                     <li><a routerLink="/contentCleaner"><span class="glyphicon glyphicon-magnet"></span> Content Cleaner</a></li>
                 </ul>
             </li>
-            <!-- Restricted to this one account specifically (not PLATFORM_ADMIN generally) --
-                 see RoleGuard's exactUsernames javadoc and this route's own comments in
-                 app.routing.ts. Personal/experimental tooling, not delegated by role.
-                 Named "Labs" (not "Admin Tools") deliberately -- this is account-restricted
-                 experimental tooling, not the real admin section; "Administration" below is
-                 the actual Users/Tenants admin area and a name clash with it would be misleading. -->
             <li class="dropdown" routerLinkActive="active" *ngIf="authService.currentUser?.username === 'admin@platform.local'">
                 <a href="javascript:void(0);" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">
                     <span class="glyphicon glyphicon-flag"></span> Labs <span class="caret"></span>
@@ -67,11 +58,6 @@
                     <li><a routerLink="/cvTailor"><span class="glyphicon glyphicon-briefcase"></span> CV Tailor</a></li>
                 </ul>
             </li>
-            <!-- Moved out of Settings -- same role checks as before on each item, unchanged
-                 (Users: PLATFORM_ADMIN or TENANT_ADMIN; Tenants: PLATFORM_ADMIN only). The
-                 container's own *ngIf is the broader of the two so it renders for anyone who
-                 can see at least one item inside -- deliberately NOT merged into the Labs
-                 dropdown above, which is gated to one specific account, not by role. -->
             <li class="dropdown" routerLinkActive="active"
                 *ngIf="authService.currentUser?.userRole === 'PLATFORM_ADMIN' || authService.currentUser?.userRole === 'TENANT_ADMIN'">
                 <a href="javascript:void(0);" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">
@@ -102,7 +88,6 @@
             </li>
         </ul>
 
-        <!-- User Profile -->
         <ul class="nav navbar-nav navbar-right">
             <li class="dropdown">
                 <a href="javascript:void(0);" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">
@@ -118,10 +103,6 @@
                             <div class="user-card-time">Chicago Time: {{ profileTime }}</div>
                         </div>
                     </li>
-                    <!-- <li class="dropdown-header">ETL Overview</li>
-                    <li><a href="javascript:void(0);"><span class="glyphicon glyphicon-briefcase"></span> Total Jobs <span class="badge">128</span></a></li>
-                    <li><a href="javascript:void(0);"><span class="glyphicon glyphicon-ok-circle"></span> Completed Today <span class="badge">96</span></a></li>
-                    <li><a href="javascript:void(0);"><span class="glyphicon glyphicon-refresh"></span> Running Now <span class="badge">5</span></a></li> -->
                     <li><a href="javascript:void(0);" (click)="logout()"><span class="glyphicon glyphicon-log-out"></span> Logout</a></li>
                 </ul>
             </li>
@@ -129,7 +110,6 @@
     </div>
 </nav>
 
-<!-- main app container -->
 <div class="app-content" [class.app-content-flush]="isFlushRoute">
     <router-outlet></router-outlet>
 </div>

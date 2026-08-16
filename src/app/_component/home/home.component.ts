@@ -310,7 +310,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     const colorMap: { [key: string]: string } = {
       'START': '#4f46e5',
       'RUNNING': '#f39c12',
-      'FAILED': '#e74c3c',
+      'FAILED': '#c0392b',
       'COMPLETED': '#27ae60'
     };
 

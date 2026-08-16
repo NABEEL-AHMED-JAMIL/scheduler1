@@ -6,7 +6,6 @@
     <span class="crumb-current">{{dynamicFormId ? 'Edit Form' : 'New Form'}}</span>
 </nav>
 
-<!-- Form metadata -->
 <form *ngIf="dynamicFormForm" [formGroup]="dynamicFormForm" (ngSubmit)="onSubmit()">
     <div class="card-panel">
         <h4 class="card-panel-title panel-banner">{{dynamicFormId ? 'Edit Form' : 'New Form'}}</h4>
@@ -47,7 +46,6 @@
     </div>
 </form>
 
-<!-- Fields builder -- only once the form exists -->
 <div class="card-panel" *ngIf="dynamicFormId && dynamicForm">
     <h4 class="card-panel-title has-action" style="display: flex; align-items: center; justify-content: space-between;">
         <span><span class="glyphicon glyphicon-list-alt"></span> Fields ({{dynamicForm.fields?.length || 0}})</span>
@@ -112,7 +110,6 @@
     </div>
 </div>
 
-<!-- Add/Edit Field Modal -->
 <div class="modal fade" id="fieldModal" role="dialog" style="top: 40px;">
     <div class="modal-dialog" style="width: 640px;">
         <div class="modal-content" *ngIf="fieldForm">
@@ -188,7 +185,6 @@
                         </label>
                     </div>
 
-                    <!-- text-like validation -->
                     <div class="row" *ngIf="isTextLike">
                         <div class="col-md-4">
                             <div class="form-group">
@@ -210,7 +206,6 @@
                         </div>
                     </div>
 
-                    <!-- option-based fields -->
                     <div class="form-section" *ngIf="isOptionBased">
                         <label class="control-label" style="display: block; margin-bottom: 6px;">Options</label>
                         <div class="row" style="margin-bottom: 6px;" *ngFor="let option of optionsDraft; let i = index;">
@@ -239,7 +234,6 @@
     </div>
 </div>
 
-<!-- Delete Field Modal -->
 <div class="modal fade" id="deleteFieldModal" role="dialog" style="top: 85px;">
     <div class="modal-dialog">
         <div class="modal-content">

@@ -12,11 +12,13 @@ export interface KafkaConnectionProfile {
     saslUsername?: string;
     saslPassword?: string;
     saslPasswordConfigured?: boolean;
+    sslKeystoreBucket?: string;
     sslKeystoreLocation?: string;
     sslKeystorePassword?: string;
     sslKeystorePasswordConfigured?: boolean;
     sslKeyPassword?: string;
     sslKeyPasswordConfigured?: boolean;
+    sslTruststoreBucket?: string;
     sslTruststoreLocation?: string;
     sslTruststorePassword?: string;
     sslTruststorePasswordConfigured?: boolean;

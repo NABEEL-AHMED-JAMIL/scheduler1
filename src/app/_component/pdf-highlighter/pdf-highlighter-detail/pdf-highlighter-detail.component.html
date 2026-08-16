@@ -1,4 +1,3 @@
-<!-- breadcrumb -->
 <nav class="breadcrumb-bar">
     <a routerLink="/pdfHighlighter">PDF Highlighter</a>
     <span class="crumb-sep">/</span>
@@ -10,7 +9,6 @@
         <span class="glyphicon glyphicon-picture"></span> PDF Highlighter Task
     </h4>
 
-    <!-- Task metadata -->
     <div class="row">
         <div class="col-lg-3 col-md-4">
             <div class="form-group">
@@ -61,7 +59,6 @@
 
 <p class="text-danger" *ngIf="errorMessage" style="margin-top: 10px;">{{errorMessage}}</p>
 
-<!-- Upload state -->
 <div class="card-panel" style="margin-top: 15px;" *ngIf="!fileName && !readOnly">
     <div class="dropzone" (drop)="onDrop($event)" (dragover)="onDragOver($event)">
         <span class="glyphicon glyphicon-cloud-upload dropzone-icon"></span>
@@ -75,7 +72,6 @@
     <p class="help-text"><span class="glyphicon glyphicon-info-sign"></span> No PDF has been uploaded for this task yet.</p>
 </div>
 
-<!-- Viewer + field mapping -->
 <div class="row" *ngIf="fileName" style="margin-top: 15px;">
     <div class="col-lg-8">
         <div class="card-panel">
@@ -188,7 +184,6 @@
     </div>
 </div>
 
-<!-- JSON payload -->
 <div class="row" *ngIf="fileName && fields.length" style="margin-top: 15px;">
     <div class="col-lg-12">
         <div class="card-panel">

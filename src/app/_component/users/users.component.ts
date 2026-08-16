@@ -1,4 +1,5 @@
 import { Component, OnInit, ViewChild } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { AlertService, AppUserService, TenantService, AuthService } from '@/_services';
 import { SpinnerService } from '@/_helpers';
@@ -39,16 +40,21 @@ export class UsersComponent implements OnInit {
     @ViewChild('closeDeleteModal', { static: false })
     public closeDeleteModal: any;
 
+    public focusedTenantId: string = '';
+
     constructor(private formBuilder: FormBuilder,
         private alertService: AlertService,
         private spinnerService: SpinnerService,
         private appUserService: AppUserService,
         private tenantService: TenantService,
+        private route: ActivatedRoute,
         public authService: AuthService) {
     }
 
     ngOnInit() {
         this.listUsers();
+        this.focusedTenantId = this.route.snapshot.queryParamMap.get('tenantId') || '';
+        this.filterTenantId = this.focusedTenantId;
         if (this.isPlatformAdmin) {
             this.tenantService.listTenants().pipe(first()).subscribe((response) => {
                 if (response.status === ApiCode.SUCCESS) {
@@ -56,6 +62,16 @@ export class UsersComponent implements OnInit {
                 }
             });
         }
+    }
+
+    public get focusedTenantName(): string {
+        const tenant = this.tenants.find((t) => String(t.tenantId) === this.focusedTenantId);
+        return tenant ? tenant.tenantName : '';
+    }
+
+    public clearTenantFocus(): void {
+        this.focusedTenantId = '';
+        this.filterTenantId = '';
     }
 
     public get isPlatformAdmin(): boolean {
@@ -112,7 +128,7 @@ export class UsersComponent implements OnInit {
             username: ['', [Validators.required, Validators.email]],
             password: ['', [Validators.required, Validators.minLength(8)]],
             userRole: ['TENANT_USER', Validators.required],
-            tenantId: ['']
+            tenantId: [this.focusedTenantId || '']
         });
     }
 

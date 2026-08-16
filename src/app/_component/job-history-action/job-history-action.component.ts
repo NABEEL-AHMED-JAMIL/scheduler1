@@ -20,12 +20,48 @@ import {
 export class JobHistoryActionComponent implements OnInit, OnDestroy {
 
   public sourceJob: any;
-  public sourceJobQueues: any;
   public sourceJobStatistics: any;
-  public searchQMessageForm: any = '';
+
+  private _sourceJobQueues: any;
+  public get sourceJobQueues(): any {
+    return this._sourceJobQueues;
+  }
+  public set sourceJobQueues(value: any) {
+    this._sourceJobQueues = value;
+    this.recomputeCharts();
+  }
+
+  private _searchQMessageForm: any = '';
+  public get searchQMessageForm(): any {
+    return this._searchQMessageForm;
+  }
+  public set searchQMessageForm(value: any) {
+    this._searchQMessageForm = value;
+    this.recomputeCharts();
+  }
+
+  private _filterJobStatus: string = '';
+  public get filterJobStatus(): string {
+    return this._filterJobStatus;
+  }
+  public set filterJobStatus(value: string) {
+    this._filterJobStatus = value;
+    this.recomputeCharts();
+  }
+
+  public runHistoryChartOptions: EChartOption | null = null;
+  public jobStatusPieOptions: EChartOption | null = null;
+  public booleanFieldsChartOptions: EChartOption | null = null;
+  public jobIdChartOptions: EChartOption | null = null;
+
+  private recomputeCharts(): void {
+    this.runHistoryChartOptions = this.computeRunHistoryChartOptions();
+    this.jobStatusPieOptions = this.computeJobStatusPieOptions();
+    this.booleanFieldsChartOptions = this.computeBooleanFieldsChartOptions();
+    this.jobIdChartOptions = this.computeJobIdChartOptions();
+  }
 
   public readonly jobStatusFilterOptions = JOB_STATUS_ORDER;
-  public filterJobStatus: string = '';
   public ERROR: any = 'Error';
   public homePageId: any = '';
   public pipelineId: any = '';
@@ -103,7 +139,7 @@ export class JobHistoryActionComponent implements OnInit, OnDestroy {
     return searched.filter((row: any) => row.jobStatus === this.filterJobStatus);
   }
 
-  public get runHistoryChartOptions(): EChartOption | null {
+  private computeRunHistoryChartOptions(): EChartOption | null {
     const runs = this.filteredQueueDatas
       .filter((q: any) => q.startTime && q.endTime)
       .slice()
@@ -192,11 +228,11 @@ export class JobHistoryActionComponent implements OnInit, OnDestroy {
     return sharedRowDuration(row);
   }
 
-  public get jobStatusPieOptions(): EChartOption | null {
+  private computeJobStatusPieOptions(): EChartOption | null {
     return toPieOptions('Job Status', this.jobStatusColumnStats);
   }
 
-  public get booleanFieldsChartOptions(): EChartOption | null {
+  private computeBooleanFieldsChartOptions(): EChartOption | null {
     return sharedBooleanFieldsChartOptions(this.filteredQueueDatas, [
       { key: 'runManual', label: 'Run Manual' },
       { key: 'skipManual', label: 'Skip Manual' },
@@ -204,7 +240,7 @@ export class JobHistoryActionComponent implements OnInit, OnDestroy {
     ]);
   }
 
-  public get jobIdChartOptions(): EChartOption | null {
+  private computeJobIdChartOptions(): EChartOption | null {
     if (this.sourceJob) {
       return null;
     }

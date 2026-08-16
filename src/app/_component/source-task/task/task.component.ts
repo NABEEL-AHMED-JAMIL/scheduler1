@@ -61,6 +61,7 @@ export class TaskComponent implements OnInit, OnDestroy {
     public pipelineIdList: any;
     public piplineHomePageList: any;
     public taskGroupList: any;
+    public showBucketHelp: boolean = false;
 
     private paramMapSubscription: Subscription;
 
@@ -91,6 +92,10 @@ export class TaskComponent implements OnInit, OnDestroy {
 
     ngOnDestroy(): void {
         this.paramMapSubscription?.unsubscribe();
+    }
+
+    public toggleBucketHelp(): void {
+        this.showBucketHelp = !this.showBucketHelp;
     }
 
     public appSetting(): void {
