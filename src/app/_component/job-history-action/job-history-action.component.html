@@ -42,8 +42,9 @@
                     <span class="detail-value">{{sourceJob.lastJobRun | date:'yyyy-MM-dd HH:mm:ss'}}</span>
                 </div>
                 <div class="detail-item">
-                    <span class="detail-label">Next Flight</span>
-                    <span class="detail-value">{{sourceJob?.scheduler?.recurrenceTime | date:'yyyy-MM-dd HH:mm:ss'}}</span>
+                    <span class="detail-label">{{sourceJob?.scheduler?.expired ? 'Schedule' : 'Next Run'}}</span>
+                    <span class="detail-value" *ngIf="!sourceJob?.scheduler?.expired">{{sourceJob?.scheduler?.nextRunAt | date:'yyyy-MM-dd HH:mm:ss'}}</span>
+                    <span class="detail-value" *ngIf="sourceJob?.scheduler?.expired">Ended</span>
                 </div>
                 <div class="detail-item">
                     <span class="detail-label">Email Notifications</span>
@@ -56,94 +57,74 @@
             </div>
             <div class="card-divider">
                 <span class="detail-label">Scheduler</span>
-                <div class="stat-strip">
-                    <span class="stat-chip chip-schedule" *ngIf="sourceJob.scheduler?.startDate">Start <span class="stat-num">{{sourceJob.scheduler?.startDate}} {{sourceJob.scheduler?.startTime}}</span></span>
-                    <span class="stat-chip chip-schedule" *ngIf="sourceJob.scheduler?.recurrence">Every <span class="stat-num">{{sourceJob.scheduler?.recurrence}} {{sourceJob.scheduler?.frequency}}</span></span>
-                    <span class="stat-chip chip-schedule" *ngIf="sourceJob.scheduler?.endDate">End <span class="stat-num">{{sourceJob.scheduler?.endDate}} {{sourceJob.scheduler?.startTime}}</span></span>
-                    <span class="stat-chip chip-schedule" *ngIf="!sourceJob.scheduler?.startDate && !sourceJob.scheduler?.recurrence && !sourceJob.scheduler?.endDate">No schedule</span>
+                <div class="mini-kpi-row">
+                    <div class="mini-kpi-tile mini-kpi-schedule" *ngIf="sourceJob.scheduler?.startDate">
+                        <span class="mini-kpi-icon"><span class="glyphicon glyphicon-play"></span></span>
+                        <span>
+                            <span class="mini-kpi-value">{{sourceJob.scheduler?.startDate}} {{sourceJob.scheduler?.startTime}}</span>
+                            <span class="mini-kpi-label">Start</span>
+                        </span>
+                    </div>
+                    <div class="mini-kpi-tile mini-kpi-schedule" *ngIf="sourceJob.scheduler?.intervalValue">
+                        <span class="mini-kpi-icon"><span class="glyphicon glyphicon-repeat"></span></span>
+                        <span>
+                            <span class="mini-kpi-value">{{formatScheduleSummary(sourceJob.scheduler)}}</span>
+                            <span class="mini-kpi-label">Repeats</span>
+                        </span>
+                    </div>
+                    <div class="mini-kpi-tile mini-kpi-schedule" *ngIf="sourceJob.scheduler?.endDate">
+                        <span class="mini-kpi-icon"><span class="glyphicon glyphicon-flag"></span></span>
+                        <span>
+                            <span class="mini-kpi-value">{{sourceJob.scheduler?.endDate}} {{sourceJob.scheduler?.startTime}}</span>
+                            <span class="mini-kpi-label">End</span>
+                        </span>
+                    </div>
+                    <span class="help-text" *ngIf="!sourceJob.scheduler?.startDate && !sourceJob.scheduler?.intervalValue && !sourceJob.scheduler?.endDate">No schedule</span>
                 </div>
             </div>
             <div class="card-divider">
                 <span class="detail-label">Job Statistics</span>
-                <div class="stat-strip">
-                    <span class="stat-chip chip-queue">Queue <span class="stat-num">{{sourceJobStatistics.queue}}</span></span>
-                    <span class="stat-chip chip-start">Start <span class="stat-num">{{sourceJobStatistics.start}}</span></span>
-                    <span class="stat-chip chip-running">Running <span class="stat-num">{{sourceJobStatistics.running}}</span></span>
-                    <span class="stat-chip chip-failed">Failed <span class="stat-num">{{sourceJobStatistics.failed}}</span></span>
-                    <span class="stat-chip chip-completed">Completed <span class="stat-num">{{sourceJobStatistics.completed}}</span></span>
-                    <span class="stat-chip chip-skip">Skip <span class="stat-num">{{sourceJobStatistics.skip}}</span></span>
-                    <span class="stat-chip chip-interrupt">Interrupt <span class="stat-num">{{sourceJobStatistics.interrupt}}</span></span>
-                    <span class="stat-chip stat-total">Total <span class="stat-num">{{sourceJobStatistics.total}}</span></span>
+                <div class="mini-kpi-row">
+                    <div class="mini-kpi-tile mini-kpi-queue">
+                        <span class="mini-kpi-icon"><span class="glyphicon glyphicon-inbox"></span></span>
+                        <span><span class="mini-kpi-value">{{sourceJobStatistics.queue}}</span><span class="mini-kpi-label">Queue</span></span>
+                    </div>
+                    <div class="mini-kpi-tile mini-kpi-start">
+                        <span class="mini-kpi-icon"><span class="glyphicon glyphicon-play"></span></span>
+                        <span><span class="mini-kpi-value">{{sourceJobStatistics.start}}</span><span class="mini-kpi-label">Start</span></span>
+                    </div>
+                    <div class="mini-kpi-tile mini-kpi-running">
+                        <span class="mini-kpi-icon"><span class="glyphicon glyphicon-refresh"></span></span>
+                        <span><span class="mini-kpi-value">{{sourceJobStatistics.running}}</span><span class="mini-kpi-label">Running</span></span>
+                    </div>
+                    <div class="mini-kpi-tile mini-kpi-failed">
+                        <span class="mini-kpi-icon"><span class="glyphicon glyphicon-remove-circle"></span></span>
+                        <span><span class="mini-kpi-value">{{sourceJobStatistics.failed}}</span><span class="mini-kpi-label">Failed</span></span>
+                    </div>
+                    <div class="mini-kpi-tile mini-kpi-completed">
+                        <span class="mini-kpi-icon"><span class="glyphicon glyphicon-ok-circle"></span></span>
+                        <span><span class="mini-kpi-value">{{sourceJobStatistics.completed}}</span><span class="mini-kpi-label">Completed</span></span>
+                    </div>
+                    <div class="mini-kpi-tile mini-kpi-skip">
+                        <span class="mini-kpi-icon"><span class="glyphicon glyphicon-step-forward"></span></span>
+                        <span><span class="mini-kpi-value">{{sourceJobStatistics.skip}}</span><span class="mini-kpi-label">Skip</span></span>
+                    </div>
+                    <div class="mini-kpi-tile mini-kpi-interrupt">
+                        <span class="mini-kpi-icon"><span class="glyphicon glyphicon-pause"></span></span>
+                        <span><span class="mini-kpi-value">{{sourceJobStatistics.interrupt}}</span><span class="mini-kpi-label">Interrupt</span></span>
+                    </div>
+                    <div class="mini-kpi-tile mini-kpi-missed">
+                        <span class="mini-kpi-icon"><span class="glyphicon glyphicon-time"></span></span>
+                        <span><span class="mini-kpi-value">{{sourceJobStatistics.missed}}</span><span class="mini-kpi-label">Missed</span></span>
+                    </div>
+                    <div class="mini-kpi-tile mini-kpi-total">
+                        <span class="mini-kpi-icon"><span class="glyphicon glyphicon-stats"></span></span>
+                        <span><span class="mini-kpi-value">{{sourceJobStatistics.total}}</span><span class="mini-kpi-label">Total</span></span>
+                    </div>
                 </div>
             </div>
 
-            <div class="card-divider entity-head">
-                <h5 class="entity-title">Task: {{sourceJob?.taskDetail?.taskDetailId}} - {{sourceJob?.taskDetail?.taskName}}</h5>
-            </div>
-            <!-- Same pill layout as the Job List expand panel's "Linked Task" section -- kept in sync
-                 so a job's task detail looks identical whether you're viewing it from Job List or here. -->
-            <div class="entity-card-stats" style="border-top: none; margin-top: 0; padding-top: 0;">
-                <div class="entity-card-stat">
-                    <a routerLink="/editTask/{{sourceJob?.taskDetail?.taskDetailId}}">{{sourceJob?.taskDetail?.taskDetailId}}-[{{sourceJob?.taskDetail?.taskName}}]</a>
-                </div>
-                <div class="entity-card-stat" *ngIf="sourceJob?.taskDetail?.taskStatus">
-                    <span class="entity-card-stat-label">Task Status</span>
-                    <span class="pill pill-icon"
-                        [ngClass]="{
-                            'pill-danger': sourceJob.taskDetail.taskStatus === 'Delete',
-                            'pill-warning': sourceJob.taskDetail.taskStatus === 'Inactive',
-                            'pill-success': sourceJob.taskDetail.taskStatus === 'Active'
-                        }">
-                        <span class="glyphicon glyphicon-flag"></span> {{sourceJob.taskDetail.taskStatus}}
-                    </span>
-                </div>
-                <div class="entity-card-stat" *ngIf="sourceJob?.taskDetail?.sourceTaskType">
-                    <span class="entity-card-stat-label">Type</span>
-                    <span class="pill pill-cyan pill-icon">
-                        <span class="glyphicon glyphicon-tag"></span>
-                        {{sourceJob?.taskDetail?.sourceTaskType?.sourceTaskTypeId}} [{{sourceJob?.taskDetail?.sourceTaskType?.serviceName}}]
-                    </span>
-                </div>
-                <div class="entity-card-stat" *ngIf="sourceJob?.taskDetail?.sourceTaskType?.queueTopicPartition">
-                    <span class="entity-card-stat-label">Queue/Topic</span>
-                    <span class="pill pill-info pill-icon">
-                        <span class="glyphicon glyphicon-transfer"></span>
-                        {{sourceJob?.taskDetail?.sourceTaskType?.queueTopicPartition}}
-                    </span>
-                </div>
-                <div class="entity-card-stat" *ngIf="sourceJob?.taskDetail?.pipelineId">
-                    <span class="entity-card-stat-label">Pipeline</span>
-                    <span class="pill pill-purple pill-icon">
-                        <span class="glyphicon glyphicon-random"></span>
-                        {{sourceJob?.taskDetail?.pipelineId}}
-                    </span>
-                </div>
-                <div class="entity-card-stat" *ngIf="sourceJob?.taskDetail?.homePageId">
-                    <span class="entity-card-stat-label">Home Page</span>
-                    <a class="pill pill-warning pill-icon" [href]="sourceJob.taskDetail.homePageId" target="_blank" rel="noopener">
-                        <span class="glyphicon glyphicon-home"></span> {{sourceJob.taskDetail.homePageId}}
-                        <span class="glyphicon glyphicon-new-window" style="font-size: 10px; margin-left: 2px;"></span>
-                    </a>
-                </div>
-                <div class="entity-card-stat" *ngIf="sourceJob?.taskDetail?.bucket">
-                    <span class="entity-card-stat-label">Bucket / Folder</span>
-                    <span class="pill pill-info pill-icon">
-                        <span class="glyphicon glyphicon-hdd"></span>
-                        {{sourceJob.taskDetail.bucket}} / {{sourceJob.taskDetail.outputFolder || sourceJob.taskDetail.inputFolder}}
-                    </span>
-                    <a class="btn btn-xs btn-default" style="margin-left: 8px;"
-                        [routerLink]="['/objectBrowser']"
-                        [queryParams]="{ bucket: sourceJob.taskDetail.bucket, prefix: sourceJob.taskDetail.outputFolder || sourceJob.taskDetail.inputFolder }">
-                        <span class="glyphicon glyphicon-new-window"></span> View in Bucket
-                    </a>
-                </div>
-            </div>
-            <div class="expand-panel-payload" *ngIf="sourceJob?.taskDetail?.taskPayload">
-                <div class="expand-panel-payload-label">
-                    <span class="glyphicon glyphicon-list-alt"></span> Task Payload
-                </div>
-                <pre>{{sourceJob.taskDetail.taskPayload}}</pre>
-            </div>
+            <linked-task-panel [taskDetail]="sourceJob?.taskDetail" [dividerStyle]="true"></linked-task-panel>
         </div>
     </div>
 </div>

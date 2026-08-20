@@ -71,16 +71,30 @@
                             <button type="button" class="btn btn-default btn-icon" title="Run" (click)="openRunQuery(query)" data-toggle="modal" data-target="#runModal">
                                 <span class="glyphicon glyphicon-play"></span>
                             </button>
-                            <button type="button" class="btn btn-default btn-icon" title="Schedule" (click)="openScheduleQuery(query)" data-toggle="modal" data-target="#scheduleModal">
-                                <span class="glyphicon glyphicon-time"></span>
-                            </button>
                             <button type="button" class="btn btn-default btn-icon ic-edit" title="Edit" (click)="onOpenEditQueryClick(query)" data-toggle="modal" data-target="#queryModal">
                                 <span class="glyphicon glyphicon-edit"></span>
                             </button>
-                            <button type="button" class="btn btn-default btn-icon ic-delete" title="Delete" [disabled]="query.status === 'Delete'"
-                                (click)="confirmDeleteQuery(query)" data-toggle="modal" data-target="#deleteQueryModal">
-                                <span class="glyphicon glyphicon-trash"></span>
-                            </button>
+                            <div class="dropdown" style="display: inline-block;">
+                                <button type="button" class="btn btn-default btn-icon ic-more" data-toggle="dropdown" title="More actions">
+                                    <span class="glyphicon glyphicon-option-vertical"></span>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-right">
+                                    <li>
+                                        <a href="javascript:void(0);" data-toggle="modal" data-target="#scheduleModal" (click)="openScheduleQuery(query)">
+                                            <span class="glyphicon glyphicon-time"></span> Schedule
+                                        </a>
+                                    </li>
+                                    <li class="divider"></li>
+                                    <li [class.disabled]="query.status === 'Delete'">
+                                        <a href="javascript:void(0);"
+                                            [attr.data-toggle]="query.status !== 'Delete' ? 'modal' : null"
+                                            [attr.data-target]="query.status !== 'Delete' ? '#deleteQueryModal' : null"
+                                            (click)="confirmDeleteQuery(query)">
+                                            <span class="glyphicon glyphicon-trash"></span> Delete
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
                         </div>
                     </td>
                 </tr>
@@ -144,10 +158,21 @@
                             <button type="button" class="btn btn-default btn-icon ic-edit" title="Edit" (click)="openEditConnection(connection)" data-toggle="modal" data-target="#connectionModal">
                                 <span class="glyphicon glyphicon-edit"></span>
                             </button>
-                            <button type="button" class="btn btn-default btn-icon ic-delete" title="Delete" [disabled]="connection.status === 'Delete'"
-                                (click)="confirmDeleteConnection(connection)" data-toggle="modal" data-target="#deleteConnectionModal">
-                                <span class="glyphicon glyphicon-trash"></span>
-                            </button>
+                            <div class="dropdown" style="display: inline-block;">
+                                <button type="button" class="btn btn-default btn-icon ic-more" data-toggle="dropdown" title="More actions">
+                                    <span class="glyphicon glyphicon-option-vertical"></span>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-right">
+                                    <li [class.disabled]="connection.status === 'Delete'">
+                                        <a href="javascript:void(0);"
+                                            [attr.data-toggle]="connection.status !== 'Delete' ? 'modal' : null"
+                                            [attr.data-target]="connection.status !== 'Delete' ? '#deleteConnectionModal' : null"
+                                            (click)="confirmDeleteConnection(connection)">
+                                            <span class="glyphicon glyphicon-trash"></span> Delete
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
                         </div>
                     </td>
                 </tr>
@@ -260,20 +285,20 @@
                         <div class="col-md-4">
                             <div class="form-group" [ngClass]="{ 'has-error': connectionSubmitted && cf.port.errors }">
                                 <label class="control-label" for="port">Port</label>
-                                <input type="number" class="form-control" formControlName="port" />
+                                <input type="number" class="form-control" formControlName="port" placeholder="e.g. 5432" />
                             </div>
                         </div>
                     </div>
                     <div class="form-group" [ngClass]="{ 'has-error': connectionSubmitted && cf.databaseName.errors }">
                         <label class="control-label" for="databaseName">Database Name</label>
-                        <input type="text" class="form-control" formControlName="databaseName" />
+                        <input type="text" class="form-control" formControlName="databaseName" placeholder="e.g. analytics" />
                         <div *ngIf="connectionSubmitted && cf.databaseName.errors" class="text-danger">Database Name is required</div>
                     </div>
                     <div class="row">
                         <div class="col-md-6">
                             <div class="form-group" [ngClass]="{ 'has-error': connectionSubmitted && cf.username.errors }">
                                 <label class="control-label" for="username">Username</label>
-                                <input type="text" class="form-control" formControlName="username" autocomplete="off" />
+                                <input type="text" class="form-control" formControlName="username" autocomplete="off" placeholder="Database username" />
                                 <div *ngIf="connectionSubmitted && cf.username.errors" class="text-danger">Username is required</div>
                             </div>
                         </div>
@@ -453,7 +478,7 @@
                     </div>
                     <div class="form-group" [ngClass]="{ 'has-error': rf.outputFileName.invalid && rf.outputFileName.touched }">
                         <label class="control-label" for="runOutputFileName">File Name</label>
-                        <input type="text" class="form-control" formControlName="outputFileName" />
+                        <input type="text" class="form-control" formControlName="outputFileName" placeholder="e.g. export" />
                         <span class="help-text">.csv is added automatically if you leave it off.</span>
                     </div>
                 </div>
@@ -495,7 +520,7 @@
                     </div>
                     <div class="form-group">
                         <label class="control-label" for="scheduleIntervalMinutes">Run Every (minutes)</label>
-                        <input type="number" class="form-control" formControlName="intervalMinutes" min="5" />
+                        <input type="number" class="form-control" formControlName="intervalMinutes" min="5" placeholder="e.g. 60" />
                     </div>
                 </div>
                 <div class="modal-footer">

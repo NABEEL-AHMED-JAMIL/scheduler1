@@ -13,6 +13,7 @@ import {
   AlertService,
   CommomService
 } from '@/_services/index';
+import { parseTopicPartition } from '../../global-config';
 
 @Component({
   selector: 'source-task',
@@ -168,6 +169,18 @@ export class SourceTaskComponent implements OnInit {
     return this.expandedTaskJobsCache[this.expandedTaskId] || [];
   }
 
+  public copyToClipboard(text: string): void {
+    navigator.clipboard.writeText(text);
+  }
+
+  public taskTopic(queueTopicPartition: any): string {
+    return parseTopicPartition(queueTopicPartition).topic;
+  }
+
+  public taskPartitions(queueTopicPartition: any): string {
+    return parseTopicPartition(queueTopicPartition).partitions;
+  }
+
   public toggleExpandTask(taskDetailId: any): void {
     if (this.expandedTaskId === taskDetailId) {
       this.expandedTaskId = null;
@@ -196,6 +209,28 @@ export class SourceTaskComponent implements OnInit {
   public deleteSourceTask(viewSourceTask: SourceTask, selectedIndex: any): void {
     this.deleteViewSourceTask = viewSourceTask;
     this.deleteSelectedIndex = selectedIndex;
+  }
+
+  public canCloneTask(sourceTask: SourceTask): boolean {
+    return sourceTask.taskStatus !== 'Delete';
+  }
+
+  public canDeleteTask(sourceTask: SourceTask): boolean {
+    return sourceTask.taskStatus !== 'Delete';
+  }
+
+  public onCloneTaskClick(sourceTask: SourceTask, selectedIndex: any): void {
+    if (!this.canCloneTask(sourceTask)) {
+      return;
+    }
+    this.cloneSourceTask(sourceTask, selectedIndex);
+  }
+
+  public onDeleteTaskClick(sourceTask: SourceTask, selectedIndex: any): void {
+    if (!this.canDeleteTask(sourceTask)) {
+      return;
+    }
+    this.deleteSourceTask(sourceTask, selectedIndex);
   }
 
   public cloneSourceTask(sourceTask: SourceTask, selectedIndex: any): void {

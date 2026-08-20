@@ -15,9 +15,10 @@ export const JOB_STATUS_COLOR: { [key: string]: string } = {
   'completed': '#1d7a3f',
   'skip': '#1c6ea4',
   'interrupt': '#6a3bbf',
+  'missed': '#d97706',
   'inflight': '#0c7c8c'
 };
-export const JOB_STATUS_ORDER = ['Queue', 'Start', 'Running', 'Failed', 'Completed', 'Skip', 'Interrupt'];
+export const JOB_STATUS_ORDER = ['Queue', 'Start', 'Running', 'Failed', 'Completed', 'Skip', 'Interrupt', 'Missed'];
 export const PILL_SUCCESS_COLOR = '#1d7a3f';
 export const PILL_DANGER_COLOR = '#c0392b';
 export const FILL_COLOR = '#4f46e5';

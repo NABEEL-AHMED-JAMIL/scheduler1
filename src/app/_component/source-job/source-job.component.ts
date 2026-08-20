@@ -12,6 +12,7 @@ import { Router } from '@angular/router';
 import { first } from 'rxjs/operators';
 import { Subscription } from 'rxjs';
 import { EChartOption } from 'echarts';
+import { formatScheduleSummary as sharedFormatScheduleSummary } from '../../global-config';
 
 const JOB_QUEUE_STATUS_COLOR: { [status: string]: string } = {
     Queue: '#0c7c8c',
@@ -86,7 +87,7 @@ export class SourceJobComponent implements OnInit, OnDestroy  {
                                     sourceJobDetail.jobStatus = jsonPayload?.jobStatus;
                                     sourceJobDetail.lastJobRun = jsonPayload?.lastJobRun;
                                     if (jsonPayload.execution == 'Auto' && sourceJobDetail.scheduler) {
-                                        sourceJobDetail.scheduler.recurrenceTime = jsonPayload?.recurrenceTime;
+                                        sourceJobDetail.scheduler.nextRunAt = jsonPayload?.nextRunAt;
                                     }
                                 }
                                 return sourceJobDetail;
@@ -189,6 +190,98 @@ export class SourceJobComponent implements OnInit, OnDestroy  {
         });
     }
 
+    public formatScheduleSummary(scheduler: any): string {
+        if (!scheduler) {
+            return '';
+        }
+        return `${sharedFormatScheduleSummary(scheduler)} · ${scheduler.startTime}`;
+    }
+
+    public canRunJob(sourceJob: SourceJobDetail): boolean {
+        return sourceJob.jobRunningStatus !== 'Queue' &&
+            sourceJob.jobRunningStatus !== 'Running' &&
+            sourceJob.jobRunningStatus !== 'Start' &&
+            sourceJob.jobStatus !== 'Delete' &&
+            sourceJob.jobStatus !== 'Inactive';
+    }
+
+    public canSkipJob(sourceJob: SourceJobDetail): boolean {
+        return sourceJob.jobRunningStatus !== 'Queue' &&
+            sourceJob.jobRunningStatus !== 'Running' &&
+            sourceJob.jobRunningStatus !== 'Start' &&
+            sourceJob.execution !== 'Manual' &&
+            sourceJob.jobStatus !== 'Delete' &&
+            sourceJob.jobStatus !== 'Inactive';
+    }
+
+    public onRunJobClick(sourceJob: SourceJobDetail, selectedIndex: any): void {
+        if (!this.canRunJob(sourceJob)) {
+            return;
+        }
+        this.runSourceJob(sourceJob, selectedIndex);
+    }
+
+    public onSkipJobClick(sourceJob: SourceJobDetail, selectedIndex: any): void {
+        if (!this.canSkipJob(sourceJob)) {
+            return;
+        }
+        this.skipNextSourceJob(sourceJob, selectedIndex);
+    }
+
+    public canCloneJob(sourceJob: SourceJobDetail): boolean {
+        return sourceJob.jobStatus !== 'Delete';
+    }
+
+    public canViewHistory(sourceJob: SourceJobDetail): boolean {
+        return sourceJob.tabActive !== false;
+    }
+
+    public canDeleteJob(sourceJob: SourceJobDetail): boolean {
+        return sourceJob.jobStatus !== 'Delete' &&
+            sourceJob.jobRunningStatus !== 'Start' &&
+            sourceJob.jobRunningStatus !== 'Running';
+    }
+
+    public onCloneJobClick(sourceJob: SourceJobDetail, selectedIndex: any): void {
+        if (!this.canCloneJob(sourceJob)) {
+            return;
+        }
+        this.cloneSourceJob(sourceJob, selectedIndex);
+    }
+
+    public onHistoryClick(sourceJob: SourceJobDetail): void {
+        if (!this.canViewHistory(sourceJob)) {
+            return;
+        }
+        this.sourceJobHistoryByJobId(sourceJob.jobId);
+    }
+
+    public onDeleteJobClick(sourceJob: SourceJobDetail, selectedIndex: any): void {
+        if (!this.canDeleteJob(sourceJob)) {
+            return;
+        }
+        this.deleteSourceJob(sourceJob, selectedIndex);
+    }
+
+    public toggleSourceJobStatus(sourceJob: SourceJobDetail, selectedIndex: any): void {
+        let goingActive = sourceJob.jobStatus !== 'Active';
+        this.spinnerService.show();
+        this.sourceJobService.toggleSourceJobStatus(sourceJob)
+        .pipe(first())
+        .subscribe((response) => {
+            this.spinnerService.hide();
+            if (response.status === ApiCode.SUCCESS) {
+                sourceJob.jobStatus = goingActive ? 'Active' : 'Inactive';
+                this.alertService.showSuccess(response.message, this.SUCESS);
+                return;
+            }
+            this.alertService.showError(response.message, this.ERROR);
+        }, (error) => {
+            this.spinnerService.hide();
+            this.alertService.showError(error, this.ERROR);
+        });
+    }
+
     public cloneSourceJob(sourceJob: SourceJobDetail, selectedIndex: any): void {
         this.spinnerService.show();
         this.sourceJobService.fetchSourceJobDetailWithSourceJobId(sourceJob.jobId)
@@ -220,7 +313,9 @@ export class SourceJobComponent implements OnInit, OnDestroy  {
                         endDate: sourceData.scheduler.endDate,
                         startTime: sourceData.scheduler.startTime,
                         frequency: sourceData.scheduler.frequency,
-                        recurrence: sourceData.scheduler.recurrence
+                        intervalValue: sourceData.scheduler.intervalValue,
+                        daysOfWeek: sourceData.scheduler.daysOfWeek,
+                        dayOfMonth: sourceData.scheduler.dayOfMonth
                     }];
                 }
 

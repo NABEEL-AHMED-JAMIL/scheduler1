@@ -75,11 +75,29 @@
                                 (click)="editLookupData(lookupData)" title="Edit">
                                 <span class="glyphicon glyphicon-edit"></span>
                             </button>
-                            <button type="button" class="btn btn-default btn-icon ic-delete"
-                                (click)="deleteLookupData(lookupData, i)"
-                                data-toggle="modal" data-target="#sub-lookup" title="Delete">
-                                <span class="glyphicon glyphicon-trash"></span>
-                            </button>
+                            <div class="dropdown" style="display: inline-block;">
+                                <button type="button" class="btn btn-default btn-icon ic-more" data-toggle="dropdown" title="More actions">
+                                    <span class="glyphicon glyphicon-option-vertical"></span>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-right">
+                                    <li>
+                                        <a href="javascript:void(0);"
+                                            data-toggle="modal" data-target="#sub-lookup"
+                                            (click)="deleteLookupData(lookupData, i)">
+                                            <span class="glyphicon glyphicon-trash"></span> Delete
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                <tr *ngIf="!(lookupDatas | searchFilter: searchLookupDataForm).length">
+                    <td colspan="5">
+                        <div class="empty-state">
+                            <span class="glyphicon glyphicon-search"></span>
+                            <div class="empty-state-title">No sub-lookups found</div>
+                            <div class="empty-state-text">{{lookupDatas.length ? 'No sub-lookups match your search.' : 'Get started by adding a sub-lookup.'}}</div>
                         </div>
                     </td>
                 </tr>

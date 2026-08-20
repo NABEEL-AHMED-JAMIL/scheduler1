@@ -104,18 +104,32 @@
                             (click)="editUser(user)" title="Edit">
                             <span class="glyphicon glyphicon-edit"></span>
                         </button>
-                        <button type="button" class="btn btn-default btn-icon" data-toggle="modal" data-target="#resetPasswordModal"
-                            (click)="openResetPassword(user)" title="Reset Password">
-                            <span class="glyphicon glyphicon-lock"></span>
-                        </button>
                         <button type="button" class="btn btn-default btn-icon" (click)="toggleActive(user)"
                             [title]="user.status === 'Active' ? 'Deactivate' : 'Activate'">
                             <span class="glyphicon" [ngClass]="user.status === 'Active' ? 'glyphicon-pause' : 'glyphicon-play'"></span>
                         </button>
-                        <button type="button" class="btn btn-default btn-icon ic-delete" data-toggle="modal" data-target="#deleteUserModal"
-                            [disabled]="user.status === 'Delete'" (click)="confirmDeleteUser(user)" title="Delete">
-                            <span class="glyphicon glyphicon-trash"></span>
-                        </button>
+                        <div class="dropdown" style="display: inline-block;">
+                            <button type="button" class="btn btn-default btn-icon ic-more" data-toggle="dropdown" title="More actions">
+                                <span class="glyphicon glyphicon-option-vertical"></span>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-right">
+                                <li>
+                                    <a href="javascript:void(0);" data-toggle="modal" data-target="#resetPasswordModal"
+                                        (click)="openResetPassword(user)">
+                                        <span class="glyphicon glyphicon-lock"></span> Reset Password
+                                    </a>
+                                </li>
+                                <li class="divider"></li>
+                                <li [class.disabled]="user.status === 'Delete'">
+                                    <a href="javascript:void(0);"
+                                        [attr.data-toggle]="user.status !== 'Delete' ? 'modal' : null"
+                                        [attr.data-target]="user.status !== 'Delete' ? '#deleteUserModal' : null"
+                                        (click)="confirmDeleteUser(user)">
+                                        <span class="glyphicon glyphicon-trash"></span> Delete
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
                     </div>
                 </td>
             </tr>
@@ -152,7 +166,7 @@
                     <div class="form-group" *ngIf="!isEditMode">
                         <label for="password">Password</label>
                         <input type="password" formControlName="password" class="form-control input-sm"
-                            [ngClass]="{ 'is-invalid': submitted && f.password.errors }" />
+                            [ngClass]="{ 'is-invalid': submitted && f.password.errors }" placeholder="At least 8 characters" />
                         <div *ngIf="submitted && f.password.errors" style="color: red;">At least 8 characters</div>
                     </div>
                     <div class="form-group">
@@ -190,7 +204,7 @@
                 <div class="modal-body">
                     <div class="form-group">
                         <label for="newPassword">New Password</label>
-                        <input type="password" formControlName="password" class="form-control input-sm" />
+                        <input type="password" formControlName="password" class="form-control input-sm" placeholder="At least 8 characters" />
                         <small class="form-text text-muted">At least 8 characters. The user isn't notified automatically -- share the new password with them yourself.</small>
                     </div>
                 </div>

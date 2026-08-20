@@ -4,6 +4,37 @@
     <span class="crumb-current">AI Agents</span>
 </nav>
 
+<div class="kpi-row admin-summary-row" *ngIf="agents.length">
+    <div class="kpi-tile kpi-total">
+        <span class="kpi-icon"><span class="glyphicon glyphicon-comment"></span></span>
+        <span>
+            <span class="kpi-value">{{filteredAgents.length}}</span>
+            <span class="kpi-label">AI Agents</span>
+        </span>
+    </div>
+    <div class="kpi-tile kpi-active">
+        <span class="kpi-icon"><span class="glyphicon glyphicon-ok-circle"></span></span>
+        <span>
+            <span class="kpi-value">{{activeAgentCount}}</span>
+            <span class="kpi-label">Active</span>
+        </span>
+    </div>
+    <div class="kpi-tile kpi-running">
+        <span class="kpi-icon"><span class="glyphicon glyphicon-cog"></span></span>
+        <span>
+            <span class="kpi-value">{{availableProviders.length}}</span>
+            <span class="kpi-label">Providers</span>
+        </span>
+    </div>
+    <div class="kpi-tile kpi-completed">
+        <span class="kpi-icon"><span class="glyphicon glyphicon-lock"></span></span>
+        <span>
+            <span class="kpi-value">{{keyConfiguredCount}}</span>
+            <span class="kpi-label">Keys Configured</span>
+        </span>
+    </div>
+</div>
+
 <div class="toolbar">
     <div class="form-group" style="margin-bottom: 0;">
         <label for="searchAgent" class="control-label">Total AI Agents ({{filteredAgents.length}} / {{agents.length}})</label>
@@ -82,26 +113,35 @@
         </div>
         <div class="entity-card-footer">
             <div class="btn-group btn-group-sm" role="group">
-                <ng-container *ngIf="canManageAgents">
-                    <button type="button" class="btn btn-default btn-icon ic-edit" title="Edit"
-                        (click)="openEditAgent(agent)" data-toggle="modal" data-target="#agentModal">
-                        <span class="glyphicon glyphicon-edit"></span>
-                    </button>
-                    <button type="button" class="btn btn-default btn-icon ic-clone" title="Clone"
-                        (click)="openCloneAgent(agent)" data-toggle="modal" data-target="#agentModal">
-                        <span class="glyphicon glyphicon-duplicate"></span>
-                    </button>
-                </ng-container>
+                <button type="button" class="btn btn-default btn-icon ic-edit" title="Edit" *ngIf="canManageAgents"
+                    (click)="openEditAgent(agent)" data-toggle="modal" data-target="#agentModal">
+                    <span class="glyphicon glyphicon-edit"></span>
+                </button>
                 <button type="button" class="btn btn-default btn-icon ic-copy" title="Copy Tool URL -- paste into a Source Task's XML to call this agent from an external consumer"
                     (click)="copyToolUrl(agent)">
-                    <span class="glyphicon glyphicon-link"></span>
+                    <span class="glyphicon glyphicon-copy"></span>
                 </button>
-                <button type="button" class="btn btn-default btn-icon ic-delete" title="Delete" *ngIf="canManageAgents"
-                    [disabled]="agent.status === 'Delete'"
-                    (click)="confirmDeleteAgent(agent, i)"
-                    data-toggle="modal" data-target="#deleteAgentModal">
-                    <span class="glyphicon glyphicon-trash"></span>
-                </button>
+                <div class="dropdown" style="display: inline-block;" *ngIf="canManageAgents">
+                    <button type="button" class="btn btn-default btn-icon ic-more" data-toggle="dropdown" title="More actions">
+                        <span class="glyphicon glyphicon-option-vertical"></span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-right">
+                        <li>
+                            <a href="javascript:void(0);" data-toggle="modal" data-target="#agentModal" (click)="openCloneAgent(agent)">
+                                <span class="glyphicon glyphicon-duplicate"></span> Clone
+                            </a>
+                        </li>
+                        <li class="divider"></li>
+                        <li [class.disabled]="agent.status === 'Delete'">
+                            <a href="javascript:void(0);"
+                                [attr.data-toggle]="agent.status !== 'Delete' ? 'modal' : null"
+                                [attr.data-target]="agent.status !== 'Delete' ? '#deleteAgentModal' : null"
+                                (click)="confirmDeleteAgent(agent, i)">
+                                <span class="glyphicon glyphicon-trash"></span> Delete
+                            </a>
+                        </li>
+                    </ul>
+                </div>
             </div>
         </div>
     </div>
@@ -151,26 +191,35 @@
                 </td>
                 <td class="text-center">
                     <div class="btn-group btn-group-sm" role="group">
-                        <ng-container *ngIf="canManageAgents">
-                            <button type="button" class="btn btn-default btn-icon ic-edit" title="Edit"
-                                (click)="openEditAgent(agent)" data-toggle="modal" data-target="#agentModal">
-                                <span class="glyphicon glyphicon-edit"></span>
-                            </button>
-                            <button type="button" class="btn btn-default btn-icon ic-clone" title="Clone"
-                                (click)="openCloneAgent(agent)" data-toggle="modal" data-target="#agentModal">
-                                <span class="glyphicon glyphicon-duplicate"></span>
-                            </button>
-                        </ng-container>
+                        <button type="button" class="btn btn-default btn-icon ic-edit" title="Edit" *ngIf="canManageAgents"
+                            (click)="openEditAgent(agent)" data-toggle="modal" data-target="#agentModal">
+                            <span class="glyphicon glyphicon-edit"></span>
+                        </button>
                         <button type="button" class="btn btn-default btn-icon ic-copy" title="Copy Tool URL -- paste into a Source Task's XML to call this agent from an external consumer"
                             (click)="copyToolUrl(agent)">
-                            <span class="glyphicon glyphicon-link"></span>
+                            <span class="glyphicon glyphicon-copy"></span>
                         </button>
-                        <button type="button" class="btn btn-default btn-icon ic-delete" title="Delete" *ngIf="canManageAgents"
-                            [disabled]="agent.status === 'Delete'"
-                            (click)="confirmDeleteAgent(agent, i)"
-                            data-toggle="modal" data-target="#deleteAgentModal">
-                            <span class="glyphicon glyphicon-trash"></span>
-                        </button>
+                        <div class="dropdown" style="display: inline-block;" *ngIf="canManageAgents">
+                            <button type="button" class="btn btn-default btn-icon ic-more" data-toggle="dropdown" title="More actions">
+                                <span class="glyphicon glyphicon-option-vertical"></span>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-right">
+                                <li>
+                                    <a href="javascript:void(0);" data-toggle="modal" data-target="#agentModal" (click)="openCloneAgent(agent)">
+                                        <span class="glyphicon glyphicon-duplicate"></span> Clone
+                                    </a>
+                                </li>
+                                <li class="divider"></li>
+                                <li [class.disabled]="agent.status === 'Delete'">
+                                    <a href="javascript:void(0);"
+                                        [attr.data-toggle]="agent.status !== 'Delete' ? 'modal' : null"
+                                        [attr.data-target]="agent.status !== 'Delete' ? '#deleteAgentModal' : null"
+                                        (click)="confirmDeleteAgent(agent, i)">
+                                        <span class="glyphicon glyphicon-trash"></span> Delete
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
                     </div>
                 </td>
             </tr>

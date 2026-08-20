@@ -18,6 +18,7 @@ export interface DocumentConverterTask {
     outputContentType?: string;
     outputFileSize?: number;
     bucketName?: string;
+    targetFolder?: string;
     inputStorageKey?: string;
     outputStorageKey?: string;
     status?: 'Active' | 'Inactive' | 'Delete';

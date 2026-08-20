@@ -6,6 +6,14 @@ export const UserType = [ 'LOCAL','REMOTE' ];
 
 export const FREQUENCY: String[] = [ 'Mint','Hr','Daily','Weekly','Monthly' ];
 
+export const FREQUENCY_LABEL: { [key: string]: string } = {
+    Mint: 'Minutes',
+    Hr: 'Hours',
+    Daily: 'Days',
+    Weekly: 'Weeks',
+    Monthly: 'Months'
+};
+
 export interface FrequencyDetail {
     key:any;
     value: any[];
@@ -26,21 +34,64 @@ export const FREQUENCY_DETAIL: FrequencyDetail[] = [
     },
     {
         key: 'Weekly',
-        value: [
-            '1','2','3','4','5','6','7','8','9', '10',
-            '11','12','13','14','15','16','17','18','19','20',
-            '21','22','23','24','25','26','27','28','29','30','31'
-        ]
+        value: ['1','2','3','4']
     },
     {
         key: 'Monthly',
-        value: [
-            '1','2','3','4','5','6','7','8','9','10',
-            '11','12','13','14','15','16','17','18','19','20',
-            '21','22','23','24','25','26','27','28','29','30','31'
-        ]
+        value: ['1','2','3','4','5','6']
     }
 ]
+
+export interface DayOption {
+    code: string;
+    label: string;
+}
+
+export const DAYS_OF_WEEK: DayOption[] = [
+    { code: 'MON', label: 'Mon' },
+    { code: 'TUE', label: 'Tue' },
+    { code: 'WED', label: 'Wed' },
+    { code: 'THU', label: 'Thu' },
+    { code: 'FRI', label: 'Fri' },
+    { code: 'SAT', label: 'Sat' },
+    { code: 'SUN', label: 'Sun' }
+];
+
+export const DAY_OF_MONTH_OPTIONS: { value: number; label: string }[] = [
+    { value: 0, label: 'Last day' },
+    ...Array.from({ length: 31 }, (_, i) => ({ value: i + 1, label: String(i + 1) }))
+];
+
+export function formatScheduleSummary(scheduler: any): string {
+    if (!scheduler) {
+        return '';
+    }
+    const unitPlural = (FREQUENCY_LABEL[scheduler.frequency] || scheduler.frequency || '').toLowerCase();
+    const unit = Number(scheduler.intervalValue) === 1 ? unitPlural.replace(/s$/, '') : unitPlural;
+    let text = `Every ${scheduler.intervalValue} ${unit}`;
+    if (scheduler.frequency === 'Weekly' && scheduler.daysOfWeek) {
+        const order = DAYS_OF_WEEK.map(d => d.code);
+        const selected: string[] = scheduler.daysOfWeek.split(',').filter(Boolean);
+        const sorted = selected.sort((a: string, b: string) => order.indexOf(a) - order.indexOf(b));
+        const labels = sorted.map(code => DAYS_OF_WEEK.find(d => d.code === code)?.label || code);
+        if (labels.length) {
+            text = `Every ${scheduler.intervalValue} ${unit} on ${labels.join(', ')}`;
+        }
+    } else if (scheduler.frequency === 'Monthly' && (scheduler.dayOfMonth || scheduler.dayOfMonth === 0)) {
+        const dayLabel = Number(scheduler.dayOfMonth) === 0 ? 'the last day' : `day ${scheduler.dayOfMonth}`;
+        text = `Every ${scheduler.intervalValue} ${unit} on ${dayLabel}`;
+    }
+    return text;
+}
+
+export function parseTopicPartition(raw: any): { topic: string; partitions: string } {
+    const value = String(raw || '');
+    const match = value.match(/topic=([^&]*)&partitions=\[(.*?)\]/);
+    if (match) {
+        return { topic: match[1] || '-', partitions: match[2] || '-' };
+    }
+    return { topic: value || '-', partitions: '-' };
+}
 
 export const TIMES: String[] = ['00:00',
     '00:01','00:02','00:03','00:04','00:05','00:06','00:07','00:08','00:09','00:10',

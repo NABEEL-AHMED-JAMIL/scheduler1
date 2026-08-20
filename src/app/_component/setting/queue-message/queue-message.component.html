@@ -184,6 +184,15 @@
                         </div>
                     </td>
                 </tr>
+                <tr *ngIf="!filteredQueueDatas.length">
+                    <td colspan="13">
+                        <div class="empty-state">
+                            <span class="glyphicon glyphicon-search"></span>
+                            <div class="empty-state-title">No queue messages found</div>
+                            <div class="empty-state-text">{{queueDatas.length ? 'No messages match your search or filter.' : 'No queue messages in the selected date range.'}}</div>
+                        </div>
+                    </td>
+                </tr>
             </tbody>
         </table>
     </div>

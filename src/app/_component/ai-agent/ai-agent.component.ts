@@ -88,6 +88,14 @@ export class AiAgentComponent implements OnInit {
         return !!(this.filterProvider || this.filterStatus || this.searchAgent);
     }
 
+    public get activeAgentCount(): number {
+        return this.agents.filter((agent) => agent.status === 'Active').length;
+    }
+
+    public get keyConfiguredCount(): number {
+        return this.agents.filter((agent) => agent.status !== 'Delete' && agent.apiKeyConfigured).length;
+    }
+
     public clearFilters(): void {
         this.filterProvider = '';
         this.filterStatus = '';

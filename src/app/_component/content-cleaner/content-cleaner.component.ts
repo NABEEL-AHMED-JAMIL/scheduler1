@@ -22,12 +22,10 @@ export class ContentCleanerComponent implements OnInit {
     public ERROR = 'Error';
     public SUCCESS = 'Success';
 
-    public mode: 'paste' | 'path' | 'browse' = 'paste';
+    public mode: 'paste' | 'browse' = 'paste';
     public supportedExtensions = SUPPORTED_EXTENSIONS;
 
     public pastedText = '';
-
-    public pathInput = '';
 
     public buckets: BucketSummary[] = [];
     public loadingBuckets = false;
@@ -55,7 +53,7 @@ export class ContentCleanerComponent implements OnInit {
         this.loadBuckets();
     }
 
-    public setMode(mode: 'paste' | 'path' | 'browse'): void {
+    public setMode(mode: 'paste' | 'browse'): void {
         this.mode = mode;
         this.extractError = '';
     }
@@ -68,22 +66,6 @@ export class ContentCleanerComponent implements OnInit {
         this.sourceLabel = 'Pasted text';
         this.rawText = this.pastedText;
         this.runClean();
-    }
-
-    public loadFromPath(): void {
-        let path = (this.pathInput || '').trim().replace(/^\/+/, '');
-        if (!path) {
-            this.alertService.showError('Enter a path like "etl-bucket/folder/file.pdf".', this.ERROR);
-            return;
-        }
-        let slashIndex = path.indexOf('/');
-        if (slashIndex === -1) {
-            this.alertService.showError('Path must include a bucket, e.g. "etl-bucket/file.txt".', this.ERROR);
-            return;
-        }
-        let bucket = path.substring(0, slashIndex);
-        let key = path.substring(slashIndex + 1);
-        this.extractFromBucketKey(bucket, key, path);
     }
 
     public loadBuckets(): void {
@@ -205,10 +187,6 @@ export class ContentCleanerComponent implements OnInit {
             });
     }
 
-    public copyApiUrl(): void {
-        this.copyToClipboard(this.textCleanerService.cleanUrl, 'API URL copied to clipboard.');
-    }
-
     public get charsSaved(): number {
         return Math.max(0, (this.rawText || '').length - (this.cleanedText || '').length);
     }
@@ -242,7 +220,6 @@ export class ContentCleanerComponent implements OnInit {
 
     public clearAll(): void {
         this.pastedText = '';
-        this.pathInput = '';
         this.sourceLabel = '';
         this.rawText = '';
         this.cleanedText = '';

@@ -29,9 +29,6 @@ import {
     OllamaModelsComponent,
     ContentCleanerComponent,
     AudioTranscriptExtractorComponent,
-    ImageTextExtractorComponent,
-    AiChatComponent,
-    CvTailorComponent,
     UnauthorizedComponent,
     TenantsComponent,
     UsersComponent,
@@ -262,26 +259,6 @@ const routes: Routes = [
         path: 'audioTranscriptExtractor',
         component: AudioTranscriptExtractorComponent,
         canActivate: [AuthGuard]
-    },
-    {
-
-        path: 'imageTextExtractor',
-        component: ImageTextExtractorComponent,
-        canActivate: [AuthGuard]
-    },
-    {
-
-        path: 'aiChat',
-        component: AiChatComponent,
-        canActivate: [AuthGuard, RoleGuard],
-        data: { exactUsernames: ['admin@platform.local'] }
-    },
-    {
-
-        path: 'cvTailor',
-        component: CvTailorComponent,
-        canActivate: [AuthGuard, RoleGuard],
-        data: { exactUsernames: ['admin@platform.local'] }
     },
     {
         path: '**',

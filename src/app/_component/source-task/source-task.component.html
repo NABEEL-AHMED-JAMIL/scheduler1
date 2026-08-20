@@ -62,7 +62,7 @@
         <div class="entity-card-pills" *ngIf="sourceTask.sourceTaskType || sourceTask.pipelineId || sourceTask.groupId">
             <a class="pill pill-cyan pill-icon" *ngIf="sourceTask.sourceTaskType"
                 (click)="viewSourceTaskType(sourceTask.sourceTaskType)" data-toggle="modal" data-target="#sourceTaskTaype"
-                title="Type {{sourceTask.sourceTaskType.sourceTaskTypeId}} -- {{sourceTask.sourceTaskType.queueTopicPartition}}">
+                title="Type {{sourceTask.sourceTaskType.sourceTaskTypeId}} -- {{taskTopic(sourceTask.sourceTaskType.queueTopicPartition)}}">
                 <span class="glyphicon glyphicon-transfer"></span> {{sourceTask.sourceTaskType.serviceName}}
             </a>
             <span class="pill pill-purple pill-icon" *ngIf="sourceTask.pipelineId">
@@ -148,7 +148,7 @@
                 <td>
                     <a class="pill pill-cyan pill-icon" *ngIf="sourceTask.sourceTaskType"
                         (click)="viewSourceTaskType(sourceTask.sourceTaskType)" data-toggle="modal" data-target="#sourceTaskTaype"
-                        title="Type {{sourceTask.sourceTaskType.sourceTaskTypeId}} -- {{sourceTask.sourceTaskType.queueTopicPartition}}">
+                        title="Type {{sourceTask.sourceTaskType.sourceTaskTypeId}} -- {{taskTopic(sourceTask.sourceTaskType.queueTopicPartition)}}">
                         <span class="glyphicon glyphicon-transfer"></span> {{sourceTask.sourceTaskType.serviceName}}
                     </a>
                 </td>
@@ -187,24 +187,32 @@
                             title="Edit">
                             <span class="glyphicon glyphicon-pencil"></span>
                         </button>
-                        <button type="button" class="btn btn-default btn-icon ic-clone"
-                            [disabled]="sourceTask.taskStatus === 'Delete'"
-                            (click)="cloneSourceTask(sourceTask, i)"
-                            title="Clone">
-                            <span class="glyphicon glyphicon-duplicate"></span>
-                        </button>
-                        <button type="button" class="btn btn-default btn-icon ic-download"
-                            (click)="downloadSourceTask(sourceTask)"
-                            title="Download">
-                            <span class="glyphicon glyphicon-download-alt"></span>
-                        </button>
-                        <button type="button" class="btn btn-default btn-icon ic-delete"
-                            [disabled]="sourceTask.taskStatus === 'Delete'"
-                            data-toggle="modal" data-target="#deleteTask"
-                            (click)="deleteSourceTask(sourceTask, i)"
-                            title="Delete">
-                            <span class="glyphicon glyphicon-trash"></span>
-                        </button>
+                        <div class="dropdown" style="display: inline-block;">
+                            <button type="button" class="btn btn-default btn-icon ic-more" data-toggle="dropdown" title="More actions">
+                                <span class="glyphicon glyphicon-option-vertical"></span>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-right">
+                                <li [class.disabled]="!canCloneTask(sourceTask)">
+                                    <a href="javascript:void(0);" (click)="onCloneTaskClick(sourceTask, i)">
+                                        <span class="glyphicon glyphicon-duplicate"></span> Clone Task
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="javascript:void(0);" (click)="downloadSourceTask(sourceTask)">
+                                        <span class="glyphicon glyphicon-download-alt"></span> Download
+                                    </a>
+                                </li>
+                                <li class="divider"></li>
+                                <li [class.disabled]="!canDeleteTask(sourceTask)">
+                                    <a href="javascript:void(0);"
+                                        [attr.data-toggle]="canDeleteTask(sourceTask) ? 'modal' : null"
+                                        [attr.data-target]="canDeleteTask(sourceTask) ? '#deleteTask' : null"
+                                        (click)="onDeleteTaskClick(sourceTask, i)">
+                                        <span class="glyphicon glyphicon-trash"></span> Delete
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
                     </div>
                 </td>
             </tr>
@@ -213,46 +221,73 @@
                     <div class="expand-panel">
                         <div class="expand-panel-section">
                             <div class="expand-panel-heading">Task Detail</div>
-                            <div class="entity-card-stats" style="border-top: none; margin-top: 0; padding-top: 0;">
-                                <div class="entity-card-stat" *ngIf="sourceTask?.sourceTaskType">
-                                    <span class="entity-card-stat-label">Type</span>
-                                    <span class="pill pill-cyan pill-icon">
-                                        <span class="glyphicon glyphicon-tag"></span>
-                                        {{sourceTask?.sourceTaskType?.sourceTaskTypeId}} [{{sourceTask?.sourceTaskType?.serviceName}}]
-                                    </span>
+                            <div class="linked-task-key-value-list">
+                                <div class="linked-task-first-row">
+                                    <div class="linked-task-key-value-row" *ngIf="sourceTask?.sourceTaskType">
+                                        <div class="linked-task-key"><span class="glyphicon glyphicon-tag"></span> Type</div>
+                                        <div class="linked-task-value">{{sourceTask?.sourceTaskType?.sourceTaskTypeId}} [{{sourceTask?.sourceTaskType?.serviceName}}]</div>
+                                    </div>
+                                    <div class="linked-task-key-value-row" *ngIf="sourceTask?.sourceTaskType?.queueTopicPartition">
+                                        <div class="linked-task-key"><span class="glyphicon glyphicon-transfer"></span> Topic</div>
+                                        <div class="linked-task-value">
+                                            {{taskTopic(sourceTask?.sourceTaskType?.queueTopicPartition)}}
+                                            <span class="text-muted">(partitions: {{taskPartitions(sourceTask?.sourceTaskType?.queueTopicPartition)}})</span>
+                                        </div>
+                                    </div>
+                                    <div class="linked-task-key-value-row" *ngIf="sourceTask?.pipelineId">
+                                        <div class="linked-task-key"><span class="glyphicon glyphicon-random"></span> Pipeline</div>
+                                        <div class="linked-task-value">{{sourceTask?.pipelineId}}</div>
+                                    </div>
                                 </div>
-                                <div class="entity-card-stat" *ngIf="sourceTask?.sourceTaskType?.queueTopicPartition">
-                                    <span class="entity-card-stat-label">Queue/Topic</span>
-                                    <span class="pill pill-info pill-icon">
-                                        <span class="glyphicon glyphicon-transfer"></span>
-                                        {{sourceTask?.sourceTaskType?.queueTopicPartition}}
-                                    </span>
+                                <div class="linked-task-second-row">
+                                    <div class="linked-task-key-value-row" *ngIf="sourceTask?.homePageId">
+                                        <div class="linked-task-key"><span class="glyphicon glyphicon-home"></span> Home page</div>
+                                        <div class="linked-task-value">
+                                            <a class="btn btn-xs btn-default" [href]="sourceTask.homePageId" target="_blank" rel="noopener">
+                                                <span class="glyphicon glyphicon-link"></span> {{sourceTask.homePageId}}
+                                            </a>
+                                        </div>
+                                    </div>
+                                    <div class="linked-task-key-value-row" *ngIf="sourceTask?.groupId">
+                                        <div class="linked-task-key"><span class="glyphicon glyphicon-folder-open"></span> Group</div>
+                                        <div class="linked-task-value">{{sourceTask?.groupId}}</div>
+                                    </div>
+                                    <div class="linked-task-key-value-row">
+                                        <div class="linked-task-key"><span class="glyphicon glyphicon-flag"></span> Status</div>
+                                        <div class="linked-task-value">
+                                            <span class="pill"
+                                                [ngClass]="{
+                                                    'pill-danger': sourceTask?.taskStatus === 'Delete',
+                                                    'pill-warning': sourceTask?.taskStatus === 'Inactive',
+                                                    'pill-success': sourceTask?.taskStatus === 'Active'
+                                                }">
+                                                {{sourceTask?.taskStatus}}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="linked-task-key-value-row">
+                                        <div class="linked-task-key"><span class="glyphicon glyphicon-hdd"></span> Bucket path</div>
+                                        <div class="linked-task-value linked-task-storage-value">
+                                            <span *ngIf="!sourceTask?.bucket" style="color: #999;">—</span>
+                                            <a class="btn btn-xs btn-default" *ngIf="sourceTask?.bucket"
+                                                [routerLink]="['/objectBrowser']"
+                                                [queryParams]="{ bucket: sourceTask.bucket, prefix: sourceTask.outputFolder || sourceTask.inputFolder }">
+                                                <span class="glyphicon glyphicon-link"></span> View in Bucket
+                                            </a>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="entity-card-stat" *ngIf="sourceTask?.pipelineId">
-                                    <span class="entity-card-stat-label">Pipeline</span>
-                                    <span class="pill pill-purple pill-icon">
-                                        <span class="glyphicon glyphicon-random"></span>
-                                        {{sourceTask?.pipelineId}}
-                                    </span>
+                                <div class="linked-task-key-value-row linked-task-payload-row" *ngIf="sourceTask?.taskPayload">
+                                    <div class="linked-task-key"><span class="glyphicon glyphicon-list-alt"></span> Task payload</div>
+                                    <div class="linked-task-value">
+                                        <div class="linked-task-payload-wrapper">
+                                            <pre class="linked-task-payload">{{sourceTask.taskPayload}}</pre>
+                                            <button class="linked-task-copy-btn" title="Copy payload" (click)="copyToClipboard(sourceTask.taskPayload)">
+                                                <span class="glyphicon glyphicon-copy"></span>
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="entity-card-stat" *ngIf="sourceTask?.homePageId">
-                                    <span class="entity-card-stat-label">Home Page</span>
-                                    <span class="pill pill-warning pill-icon">
-                                        <span class="glyphicon glyphicon-home"></span> {{sourceTask?.homePageId}}
-                                    </span>
-                                </div>
-                                <div class="entity-card-stat" *ngIf="sourceTask?.groupId">
-                                    <span class="entity-card-stat-label">Group</span>
-                                    <span class="pill pill-indigo pill-icon">
-                                        <span class="glyphicon glyphicon-folder-open"></span> {{sourceTask?.groupId}}
-                                    </span>
-                                </div>
-                            </div>
-                            <div class="expand-panel-payload" *ngIf="sourceTask?.taskPayload">
-                                <div class="expand-panel-payload-label">
-                                    <span class="glyphicon glyphicon-list-alt"></span> Task Payload
-                                </div>
-                                <pre>{{sourceTask.taskPayload}}</pre>
                             </div>
                         </div>
                         <div class="expand-panel-section">
@@ -307,6 +342,15 @@
                 </td>
             </tr>
             </ng-container>
+            <tr *ngIf="!filteredSourceTasks.length">
+                <td colspan="10">
+                    <div class="empty-state">
+                        <span class="glyphicon glyphicon-search"></span>
+                        <div class="empty-state-title">No tasks found</div>
+                        <div class="empty-state-text">No tasks match your search or filter.</div>
+                    </div>
+                </td>
+            </tr>
         </tbody>
     </table>
 </div>

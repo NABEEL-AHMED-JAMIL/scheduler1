@@ -53,21 +53,32 @@
                 </td>
                 <td class="cell-truncate">{{previewValue(submission)}}</td>
                 <td class="text-center">{{submission.dateCreated | date: 'yyyy-MM-dd HH:mm'}}</td>
-                <td class="text-center" style="width: 116px; white-space: nowrap;">
+                <td class="text-center" style="width: 76px; white-space: nowrap;">
                     <div class="btn-group btn-group-sm" role="group">
-                        <button type="button" class="btn btn-default btn-icon ic-copy" title="Copy API link"
-                            (click)="copyShareUrl(submission)">
-                            <span class="glyphicon glyphicon-copy"></span>
-                        </button>
                         <button type="button" class="btn btn-default btn-icon ic-edit" title="Edit"
                             (click)="editSubmission(submission)">
                             <span class="glyphicon glyphicon-edit"></span>
                         </button>
-                        <button type="button" class="btn btn-default btn-icon ic-delete" title="Delete"
-                            (click)="confirmDeleteSubmission(submission, i)"
-                            data-toggle="modal" data-target="#deleteSubmissionModal">
-                            <span class="glyphicon glyphicon-trash"></span>
-                        </button>
+                        <div class="dropdown" style="display: inline-block;">
+                            <button type="button" class="btn btn-default btn-icon ic-more" data-toggle="dropdown" title="More actions">
+                                <span class="glyphicon glyphicon-option-vertical"></span>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-right">
+                                <li>
+                                    <a href="javascript:void(0);" (click)="copyShareUrl(submission)">
+                                        <span class="glyphicon glyphicon-copy"></span> Copy API link
+                                    </a>
+                                </li>
+                                <li class="divider"></li>
+                                <li>
+                                    <a href="javascript:void(0);"
+                                        data-toggle="modal" data-target="#deleteSubmissionModal"
+                                        (click)="confirmDeleteSubmission(submission, i)">
+                                        <span class="glyphicon glyphicon-trash"></span> Delete
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
                     </div>
                 </td>
             </tr>

@@ -31,11 +31,6 @@ export class AiAgentService {
         return this.http.get<ApiResponse>(`${config.apiUrl}/aiAgent.json/fetchAgentByAgentId?aiAgentId=${aiAgentId}`);
     }
 
-    public processText(aiAgentId: any, fileName: any, text: any, instructions?: any): Observable<ApiResponse> {
-        return this.http.post<ApiResponse>(`${config.apiUrl}/aiAgent.json/processText`,
-            { aiAgentId, fileName, text, instructions });
-    }
-
     public processAdHoc(payload: any): Observable<ApiResponse> {
         return this.http.post<ApiResponse>(`${config.apiUrl}/aiAgent.json/processAdHoc`, payload);
     }

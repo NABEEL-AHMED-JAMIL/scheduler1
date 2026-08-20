@@ -26,7 +26,11 @@ import {
     TIMES,
     FREQUENCY,
     FREQUENCY_DETAIL,
-    PRIORITY
+    FREQUENCY_LABEL,
+    DAYS_OF_WEEK,
+    DAY_OF_MONTH_OPTIONS,
+    PRIORITY,
+    parseTopicPartition
 } from '../../../global-config';
 
 @Component({
@@ -44,8 +48,11 @@ export class JobComponent implements OnInit, OnDestroy {
     public isEditMode = false;
     public executionTypes: any = Execution;
     public frequencys: any = FREQUENCY;
-    public recurrences: any;
+    public frequencyLabel: any = FREQUENCY_LABEL;
+    public intervalOptions: any;
     public frequencyDetails: any = FREQUENCY_DETAIL;
+    public daysOfWeekOptions = DAYS_OF_WEEK;
+    public dayOfMonthOptions = DAY_OF_MONTH_OPTIONS;
     public sourceJobStatus: any = STATUS_LIST;
     public prioritys: any = PRIORITY;
     public times: any = TIMES;
@@ -119,7 +126,14 @@ export class JobComponent implements OnInit, OnDestroy {
         };
         const schedulerControl = this.sourceJobForm.get('scheduler');
         if (schedulerControl) {
-            sourceJob.schedulers = [schedulerControl.value];
+            const schedulerValue = schedulerControl.value;
+            sourceJob.schedulers = [{
+                ...schedulerValue,
+                daysOfWeek: (schedulerValue.daysOfWeek && schedulerValue.daysOfWeek.length)
+                    ? schedulerValue.daysOfWeek.join(',') : null,
+                dayOfMonth: (schedulerValue.dayOfMonth === '' || schedulerValue.dayOfMonth === undefined)
+                    ? null : schedulerValue.dayOfMonth,
+            }];
         }
         if (this.jobId) {
             this.sourceJobService.updateSourceJob(sourceJob)
@@ -234,13 +248,16 @@ export class JobComponent implements OnInit, OnDestroy {
                     });
                     if (response?.data?.scheduler) {
                         this.onFrequencyChange(response?.data?.scheduler?.frequency);
+                        const daysOfWeekCsv = response?.data?.scheduler?.daysOfWeek;
                         this.sourceJobForm.addControl('scheduler', this.fb.group({
                             schedulerId: new FormControl(response?.data?.scheduler?.schedulerId),
                             startDate: new FormControl(response?.data?.scheduler?.startDate, [Validators.required]),
                             endDate: new FormControl(response?.data?.scheduler?.endDate),
                             startTime: new FormControl(response?.data?.scheduler?.startTime?.substring(0,5), [Validators.required]),
                             frequency: new FormControl(response?.data?.scheduler?.frequency, [Validators.required]),
-                            recurrence: new FormControl(response?.data?.scheduler?.recurrence, [Validators.required]),
+                            intervalValue: new FormControl(response?.data?.scheduler?.intervalValue, [Validators.required]),
+                            daysOfWeek: new FormControl(daysOfWeekCsv ? daysOfWeekCsv.split(',').filter(Boolean) : []),
+                            dayOfMonth: new FormControl(response?.data?.scheduler?.dayOfMonth ?? null),
                         }));
                     }
 				} else {
@@ -261,6 +278,18 @@ export class JobComponent implements OnInit, OnDestroy {
         return ((this.sourceJobForm.get('taskDetail') as FormGroup).controls);
     }
 
+    public get taskTopic(): string {
+        return parseTopicPartition(this.taskDetail?.queueTopicPartition?.value).topic;
+    }
+
+    public get taskPartitions(): string {
+        return parseTopicPartition(this.taskDetail?.queueTopicPartition?.value).partitions;
+    }
+
+    public copyToClipboard(text: string): void {
+        navigator.clipboard.writeText(text);
+    }
+
     public get scheduler() {
         return ((this.sourceJobForm.get('scheduler') as FormGroup).controls);
     }
@@ -272,7 +301,9 @@ export class JobComponent implements OnInit, OnDestroy {
             endDate: new FormControl(),
             startTime: new FormControl('',[Validators.required]),
             frequency: new FormControl('',[Validators.required]),
-            recurrence: new FormControl('',[Validators.required]),
+            intervalValue: new FormControl('',[Validators.required]),
+            daysOfWeek: new FormControl([]),
+            dayOfMonth: new FormControl(null),
         });
     }
 
@@ -301,10 +332,66 @@ export class JobComponent implements OnInit, OnDestroy {
     }
 
     public onFrequencyChange(selectFrequency: string): void {
-        this.recurrences = this.frequencyDetails
+        this.intervalOptions = this.frequencyDetails
         .find((frequency: any) => {
             return frequency.key === selectFrequency;
         })?.value;
+    }
+
+    public isDaySelected(dayCode: string): boolean {
+        const days: string[] = this.scheduler?.daysOfWeek?.value || [];
+        return days.includes(dayCode);
+    }
+
+    public toggleDay(dayCode: string): void {
+        const control = this.scheduler?.daysOfWeek;
+        if (!control) {
+            return;
+        }
+        const days: string[] = [...(control.value || [])];
+        const index = days.indexOf(dayCode);
+        if (index >= 0) {
+            days.splice(index, 1);
+        } else {
+            days.push(dayCode);
+        }
+        control.setValue(days);
+    }
+
+    public get scheduleSummary(): string {
+        if (!this.sourceJobForm?.get('scheduler')) {
+            return '';
+        }
+        const s = this.scheduler;
+        const interval = s.intervalValue?.value;
+        const frequency = s.frequency?.value;
+        const startTime = s.startTime?.value;
+        const startDate = s.startDate?.value;
+        const endDate = s.endDate?.value;
+        if (!interval || !frequency || !startTime) {
+            return 'Fill in the schedule fields above to see a preview.';
+        }
+        const unitPlural = (this.frequencyLabel[frequency] || frequency).toLowerCase();
+        const unit = Number(interval) === 1 ? unitPlural.replace(/s$/, '') : unitPlural;
+        let repeatText = `Runs every ${interval} ${unit}`;
+        if (frequency === 'Weekly') {
+            const days: string[] = s.daysOfWeek?.value || [];
+            if (days.length) {
+                const order = this.daysOfWeekOptions.map((d: any) => d.code);
+                const sorted = [...days].sort((a, b) => order.indexOf(a) - order.indexOf(b));
+                const labels = sorted.map(code => this.daysOfWeekOptions.find((d: any) => d.code === code)?.label || code);
+                repeatText = `Runs every ${interval} ${unit} on ${labels.join(', ')}`;
+            }
+        } else if (frequency === 'Monthly') {
+            const dayOfMonth = s.dayOfMonth?.value;
+            if (dayOfMonth !== null && dayOfMonth !== undefined && dayOfMonth !== '') {
+                const dayLabel = Number(dayOfMonth) === 0 ? 'the last day' : `day ${dayOfMonth}`;
+                repeatText = `Runs every ${interval} ${unit} on ${dayLabel}`;
+            }
+        }
+        let summary = `${repeatText} at ${startTime}, starting ${startDate || '(pick a start date)'}`;
+        summary += endDate ? `, until ${endDate}.` : ', with no end date.';
+        return summary;
     }
 
 }

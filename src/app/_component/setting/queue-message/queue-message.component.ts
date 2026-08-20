@@ -26,7 +26,7 @@ export class QueueMessageComponent implements OnInit {
     public ERROR: string = 'Error';
     public qMessageSearcForm!: FormGroup;
     public sourceJobRunningStatistics!: EChartOption;
-    public jobStatusList: any = ['Queue', 'Start', 'Running', 'Failed', 'Completed', 'Skip', 'Interrupt'];
+    public jobStatusList: any = ['Queue', 'Start', 'Running', 'Failed', 'Completed', 'Skip', 'Interrupt', 'Missed'];
     public jobRunningData: NameValue[] = [
       {
         value: 0,
@@ -55,6 +55,10 @@ export class QueueMessageComponent implements OnInit {
       {
         value: 0,
         name: 'Interrupt'
+      },
+      {
+        value: 0,
+        name: 'Missed'
       }
     ];
   private _queueDatas: QMessage[] = [];

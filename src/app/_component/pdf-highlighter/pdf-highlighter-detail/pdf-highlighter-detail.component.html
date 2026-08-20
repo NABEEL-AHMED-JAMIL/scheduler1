@@ -150,17 +150,17 @@
                             <span class="glyphicon glyphicon-chevron-down"></span>
                         </button>
                     </div>
-                    <input type="text" class="form-control input-sm" [(ngModel)]="field.label" [ngModelOptions]="{ standalone: true }" [disabled]="readOnly" />
+                    <input type="text" class="form-control input-sm" [(ngModel)]="field.label" [ngModelOptions]="{ standalone: true }" [disabled]="readOnly" placeholder="Field label" />
                     <button *ngIf="!readOnly" type="button" class="btn btn-sm btn-default btn-icon ic-delete" (click)="removeField(field.id)">
                         <span class="glyphicon glyphicon-trash"></span>
                     </button>
                 </div>
                 <div class="field-row-meta">
                     <span class="meta-page">p{{field.page}}</span>
-                    <label class="meta-field">x <input type="number" class="form-control input-sm" [(ngModel)]="field.x" [ngModelOptions]="{ standalone: true }" [disabled]="readOnly" /></label>
-                    <label class="meta-field">y <input type="number" class="form-control input-sm" [(ngModel)]="field.y" [ngModelOptions]="{ standalone: true }" [disabled]="readOnly" /></label>
-                    <label class="meta-field">w <input type="number" class="form-control input-sm" [(ngModel)]="field.width" [ngModelOptions]="{ standalone: true }" [disabled]="readOnly" /></label>
-                    <label class="meta-field">h <input type="number" class="form-control input-sm" [(ngModel)]="field.height" [ngModelOptions]="{ standalone: true }" [disabled]="readOnly" /></label>
+                    <label class="meta-field">x <input type="number" class="form-control input-sm" [(ngModel)]="field.x" [ngModelOptions]="{ standalone: true }" [disabled]="readOnly" placeholder="X" /></label>
+                    <label class="meta-field">y <input type="number" class="form-control input-sm" [(ngModel)]="field.y" [ngModelOptions]="{ standalone: true }" [disabled]="readOnly" placeholder="Y" /></label>
+                    <label class="meta-field">w <input type="number" class="form-control input-sm" [(ngModel)]="field.width" [ngModelOptions]="{ standalone: true }" [disabled]="readOnly" placeholder="Width" /></label>
+                    <label class="meta-field">h <input type="number" class="form-control input-sm" [(ngModel)]="field.height" [ngModelOptions]="{ standalone: true }" [disabled]="readOnly" placeholder="Height" /></label>
                 </div>
                 <div class="field-row-strategy">
                     <label class="checkbox-inline" [title]="field.selector ? 'On: resolve this field by its text selector first, falling back to coordinates. Off: coordinates only.' : 'No text selector available for this box -- coordinates only.'">

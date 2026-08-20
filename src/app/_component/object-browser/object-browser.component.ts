@@ -1,9 +1,9 @@
-import { Component, OnInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, ElementRef, NgZone } from '@angular/core';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { ActivatedRoute } from '@angular/router';
-import { AlertService, StorageService, DocumentConverterService } from '@/_services';
+import { AlertService, AuthService, StorageService, DocumentConverterService, OllamaService, FileChatService, FileShareService } from '@/_services';
 import { first } from 'rxjs/operators';
-import { forkJoin, Observable } from 'rxjs';
+import { forkJoin, Observable, Subscription } from 'rxjs';
 import { ApiCode, ApiResponse, BucketSummary, ObjectSummary, ObjectMetadata } from '@/_models';
 import { EChartOption } from 'echarts';
 import { ColumnBarSegment, CATEGORY_PALETTE, PILL_SUCCESS_COLOR, PILL_DANGER_COLOR, categoricalColumnStats } from '@/_helpers';
@@ -87,6 +87,17 @@ interface DirectoryStats {
     capped: boolean;
     loading: boolean;
     error: boolean;
+}
+
+interface ChatDownloadableFile {
+    filename: string;
+    content: string;
+    mimeType: string;
+
+    pendingExport?: { sourceFormat: string; targetFormat: string; filename: string; mimeType: string };
+
+    convertedBase64?: string;
+    converting?: boolean;
 }
 
 @Component({
@@ -191,13 +202,30 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
     public closeRenameModal!: ElementRef<HTMLButtonElement>;
     @ViewChild('closeDeleteModal', { static: false })
     public closeDeleteModal!: ElementRef<HTMLButtonElement>;
+    @ViewChild('openLeaveChatModal', { static: false })
+    public openLeaveChatModal!: ElementRef<HTMLButtonElement>;
+    @ViewChild('closeEmailShareModal', { static: false })
+    public closeEmailShareModal!: ElementRef<HTMLButtonElement>;
+
+    public pendingFileSwitch: { entry: ObjectSummary; action: 'preview' | 'chat' } | null = null;
+
+    public emailShareEntry: ObjectSummary | null = null;
+    public emailShareBulkKeys: string[] | null = null;
+    public emailShareAddress = '';
+    public emailShareMessage = '';
+    public emailSharing = false;
 
     constructor(
         private route: ActivatedRoute,
         private alertService: AlertService,
+        private authService: AuthService,
         private storageService: StorageService,
         private documentConverterService: DocumentConverterService,
-        private sanitizer: DomSanitizer) {
+        private ollamaService: OllamaService,
+        private fileChatService: FileChatService,
+        private fileShareService: FileShareService,
+        private sanitizer: DomSanitizer,
+        private ngZone: NgZone) {
     }
 
     ngOnInit() {
@@ -265,6 +293,32 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
         this.nextContinuationToken = null;
         this.loadObjects(true);
         this.loadDirectoryStats();
+    }
+
+    public copyCurrentPath(): void {
+        if (!this.selectedBucket) {
+            return;
+        }
+        let path = this.currentPrefix
+            ? `${this.selectedBucket}/${this.currentPrefix.replace(/\/+$/, '')}`
+            : this.selectedBucket;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(path).then(() => {
+                this.alertService.showSuccess('Folder path copied to clipboard.', this.SUCCESS);
+            }, () => {
+                this.alertService.showError('Could not copy to clipboard.', this.ERROR);
+            });
+            return;
+        }
+        let textarea = document.createElement('textarea');
+        textarea.value = path;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        this.alertService.showSuccess('Folder path copied to clipboard.', this.SUCCESS);
     }
 
     private loadDirectoryStats(): void {
@@ -431,11 +485,18 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
             return;
         }
         this.loadingObjects = true;
+        const bucket = this.selectedBucket;
+        const prefix = this.currentPrefix;
         const token = reset ? null : this.nextContinuationToken;
-        this.storageService.listObjects(this.selectedBucket, this.currentPrefix, token, PAGE_SIZE)
+        this.storageService.listObjects(bucket, prefix, token, PAGE_SIZE)
             .pipe(first())
             .subscribe((response) => {
                 this.loadingObjects = false;
+
+                if (bucket !== this.selectedBucket || prefix !== this.currentPrefix) {
+                    this.loadObjects(true);
+                    return;
+                }
                 if (response.status === ApiCode.SUCCESS) {
                     const page = response.data || {};
                     this.objects = reset ? (page.objects || []) : this.objects.concat(page.objects || []);
@@ -449,6 +510,10 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
                 }
             }, (error) => {
                 this.loadingObjects = false;
+                if (bucket !== this.selectedBucket || prefix !== this.currentPrefix) {
+                    this.loadObjects(true);
+                    return;
+                }
                 this.alertService.showError(error, this.ERROR);
             });
     }
@@ -636,8 +701,10 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
         if (!fileKeys.length) {
             return;
         }
+
+        const bucket = this.selectedBucket;
         fileKeys.forEach((key, index) => {
-            setTimeout(() => this.triggerDownload(key), index * BULK_DOWNLOAD_STAGGER_MS);
+            setTimeout(() => this.triggerDownload(bucket, key), index * BULK_DOWNLOAD_STAGGER_MS);
         });
     }
 
@@ -650,7 +717,387 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
         this.pendingDeleteLabel = `${entries.length} selected item(s)`;
     }
 
+    public chatFile: ObjectSummary | null = null;
+    public chatDraft = '';
+
+    public chatMessages: {
+        role: 'user' | 'assistant' | 'error'; author: string; text: string; html?: string;
+        files?: ChatDownloadableFile[];
+    }[] = [];
+    public chatPreparing = false;
+    public chatPrepareError: string | null = null;
+    public chatSending = false;
+
+    public readonly chatSuggestedPrompts: string[] = [
+        'Summarize this file',
+        'What are the key points?',
+        'List any dates mentioned',
+        'Extract names and organizations',
+        'Are there any action items?'
+    ];
+
+    public useSuggestedPrompt(prompt: string): void {
+        this.chatDraft = prompt;
+        if (this.chatInputEl) {
+            this.chatInputEl.nativeElement.focus();
+        }
+    }
+
+    public chatSuggestionsVisible = true;
+
+    public toggleChatSuggestions(): void {
+        this.chatSuggestionsVisible = !this.chatSuggestionsVisible;
+    }
+
+    public copyChatMessage(message: { text: string }): void {
+        this.copyToClipboard(message.text, 'Message copied to clipboard.');
+    }
+
+    public readonly chatSpeechSupported = typeof (window as any).webkitSpeechRecognition !== 'undefined'
+        || typeof (window as any).SpeechRecognition !== 'undefined';
+    public chatListening = false;
+    private chatRecognition: any = null;
+
+    public toggleChatMic(): void {
+        if (this.chatListening) {
+            this.chatRecognition?.stop();
+            return;
+        }
+        const SpeechRecognitionCtor = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        if (!SpeechRecognitionCtor) {
+            return;
+        }
+        const recognition = new SpeechRecognitionCtor();
+        recognition.lang = 'en-US';
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        recognition.onstart = () => this.ngZone.run(() => { this.chatListening = true; });
+        recognition.onresult = (event: any) => this.ngZone.run(() => {
+            const transcript = event.results?.[0]?.[0]?.transcript?.trim();
+            if (transcript) {
+                this.chatDraft = this.chatDraft.trim() ? `${this.chatDraft.trim()} ${transcript}` : transcript;
+            }
+        });
+        recognition.onerror = (event: any) => this.ngZone.run(() => {
+            this.chatListening = false;
+            if (event.error !== 'no-speech' && event.error !== 'aborted') {
+                this.alertService.showError('Could not use the microphone: ' + event.error, this.ERROR);
+            }
+        });
+        recognition.onend = () => this.ngZone.run(() => { this.chatListening = false; });
+        this.chatRecognition = recognition;
+        recognition.start();
+    }
+
+    public chatSlowHint = false;
+    private chatSlowHintTimer: any = null;
+    private chatMessageSubscription: Subscription | null = null;
+
+    @ViewChild('chatMessagesEl', { static: false })
+    private chatMessagesEl: ElementRef;
+    @ViewChild('chatInputEl', { static: false })
+    private chatInputEl: ElementRef<HTMLTextAreaElement>;
+
+    public chatModels: { name: string }[] = [];
+    public chatSelectedModel = '';
+    public loadingChatModels = false;
+
+    public get currentUserName(): string {
+        return this.authService.currentUser?.fullName || this.authService.currentUser?.username || 'You';
+    }
+
+    public onRobotAction(entry: ObjectSummary): void {
+        if (this.confirmLeaveChatIfNeeded(entry, 'chat')) {
+            return;
+        }
+        this.closePanel();
+        this.chatFile = entry;
+        this.loadChatModels();
+        this.prepareChatContext(entry);
+    }
+
+    private confirmLeaveChatIfNeeded(entry: ObjectSummary, action: 'preview' | 'chat'): boolean {
+        if (!this.chatFile || this.chatFile.key === entry.key) {
+            return false;
+        }
+        this.pendingFileSwitch = { entry, action };
+        if (this.openLeaveChatModal) {
+            this.openLeaveChatModal.nativeElement.click();
+        }
+        return true;
+    }
+
+    public cancelLeaveChat(): void {
+        this.pendingFileSwitch = null;
+    }
+
+    public confirmLeaveChat(): void {
+        const pending = this.pendingFileSwitch;
+        this.pendingFileSwitch = null;
+        if (!pending) {
+            return;
+        }
+
+        this.closeChat();
+        if (pending.action === 'chat') {
+            this.onRobotAction(pending.entry);
+        } else {
+            this.selectObject(pending.entry);
+        }
+    }
+
+    private loadChatModels(): void {
+        this.loadingChatModels = true;
+        this.ollamaService.listModels()
+            .pipe(first())
+            .subscribe((response) => {
+                this.loadingChatModels = false;
+                if (response.status === ApiCode.SUCCESS) {
+                    this.chatModels = response.data || [];
+                    if (this.chatModels.length && !this.chatSelectedModel) {
+                        this.chatSelectedModel = this.chatModels[0].name;
+                    }
+                }
+            }, () => {
+                this.loadingChatModels = false;
+            });
+    }
+
+    private prepareChatContext(entry: ObjectSummary): void {
+        this.chatPreparing = true;
+        this.chatPrepareError = null;
+        this.fileChatService.prepareContext(this.selectedBucket, entry.key)
+            .pipe(first())
+            .subscribe((response) => {
+                this.chatPreparing = false;
+                if (response.status !== ApiCode.SUCCESS) {
+                    this.chatPrepareError = response.message || 'Could not read this file.';
+                }
+            }, (error) => {
+                this.chatPreparing = false;
+                this.chatPrepareError = 'Could not read this file.';
+            });
+    }
+
+    public closeChat(): void {
+        this.stopChatMessage();
+        this.chatRecognition?.stop();
+        this.chatFile = null;
+        this.chatDraft = '';
+        this.chatMessages = [];
+        this.chatPreparing = false;
+        this.chatPrepareError = null;
+        this.chatSending = false;
+    }
+
+    public onChatInputKeydown(event: KeyboardEvent): void {
+        if (event.key !== 'Enter' || event.shiftKey || event.isComposing || this.chatSending) {
+            return;
+        }
+        event.preventDefault();
+        this.sendChatMessage();
+    }
+
+    public sendChatMessage(): void {
+        const text = this.chatDraft.trim();
+        if (!text || this.chatSending || this.chatPreparing || !this.chatFile || !this.chatSelectedModel) {
+            return;
+        }
+
+        const MAX_HISTORY_MESSAGES = 8;
+        const history = this.chatMessages
+            .filter((message) => message.role === 'user' || message.role === 'assistant')
+            .slice(-MAX_HISTORY_MESSAGES)
+            .map((message) => ({ role: message.role, text: message.text }));
+
+        this.chatMessages.push({ role: 'user', author: this.currentUserName, text });
+        this.chatDraft = '';
+        this.chatSending = true;
+        this.chatSlowHint = false;
+        this.scrollChatToBottom();
+
+        this.chatSlowHintTimer = setTimeout(() => {
+            this.chatSlowHint = true;
+        }, 8000);
+
+        this.chatMessageSubscription = this.fileChatService.sendMessage({
+            bucket: this.selectedBucket,
+            key: this.chatFile.key,
+            model: this.chatSelectedModel,
+            message: text,
+            history
+        }).pipe(first()).subscribe((response) => {
+            this.onChatMessageSettled();
+            if (response.status === ApiCode.SUCCESS) {
+                this.chatMessages.push({
+                    role: 'assistant', author: 'Assistant', text: response.data,
+                    html: this.renderAssistantMessage(response.data),
+                    files: this.extractDownloadableFiles(response.data)
+                });
+            } else {
+                this.chatMessages.push({ role: 'error', author: 'Assistant', text: response.message || 'Something went wrong.' });
+            }
+            this.scrollChatToBottom();
+        }, (error) => {
+            this.onChatMessageSettled();
+            this.chatMessages.push({ role: 'error', author: 'Assistant', text: 'Something went wrong -- please try again.' });
+            this.scrollChatToBottom();
+        });
+    }
+
+    private renderAssistantMessage(text: string): string {
+        if (!text) {
+            return '';
+        }
+        const trimmed = text.trim();
+        const looksLikeJson = (trimmed.startsWith('{') && trimmed.endsWith('}'))
+            || (trimmed.startsWith('[') && trimmed.endsWith(']'));
+        if (looksLikeJson && !trimmed.includes('```')) {
+            try {
+                const pretty = JSON.stringify(JSON.parse(trimmed), null, 2);
+                return marked.parse('```json\n' + pretty + '\n```');
+            } catch (e) {
+
+            }
+        }
+        return marked.parse(text);
+    }
+
+    private static readonly CHAT_EXPORT_FORMATS: { [ext: string]: string } = {
+        csv: 'text/csv', json: 'application/json', tsv: 'text/tab-separated-values', txt: 'text/plain',
+        xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        pdf: 'application/pdf'
+    };
+
+    private extractDownloadableFiles(text: string): ChatDownloadableFile[] {
+        if (!text) {
+            return [];
+        }
+
+        const fencePattern = /```(csv|json|tsv|txt)\r?\n([\s\S]*?)```\s*(?:TARGET_FORMAT:\s*(xlsx|docx|pdf)\b)?/gi;
+        const baseName = this.chatFile ? this.chatFile.name.replace(/\.[^./]+$/, '') : 'export';
+        const files: ChatDownloadableFile[] = [];
+        let match: RegExpExecArray | null;
+        let index = 0;
+        while ((match = fencePattern.exec(text)) !== null) {
+            const lang = match[1].toLowerCase();
+            const content = match[2].replace(/\r?\n$/, '');
+            const targetFormat = match[3] ? match[3].toLowerCase() : null;
+            if (!content.trim()) {
+                continue;
+            }
+            index++;
+            const suffix = index > 1 ? `-${index}` : '';
+            if (targetFormat && targetFormat !== lang) {
+                const filename = `${baseName}-export${suffix}.${targetFormat}`;
+                files.push({
+                    filename, content, mimeType: ObjectBrowserComponent.CHAT_EXPORT_FORMATS[lang],
+                    pendingExport: {
+                        sourceFormat: lang, targetFormat, filename,
+                        mimeType: ObjectBrowserComponent.CHAT_EXPORT_FORMATS[targetFormat]
+                    }
+                });
+            } else {
+                files.push({
+                    filename: `${baseName}-export${suffix}.${lang}`, content,
+                    mimeType: ObjectBrowserComponent.CHAT_EXPORT_FORMATS[lang]
+                });
+            }
+        }
+        return files;
+    }
+
+    public downloadChatFile(file: ChatDownloadableFile): void {
+        if (file.pendingExport && file.convertedBase64) {
+            this.saveBlobFromBase64(file.convertedBase64, file.pendingExport.mimeType, file.pendingExport.filename);
+            return;
+        }
+        if (file.pendingExport) {
+            this.exportAndDownloadChatFile(file);
+            return;
+        }
+        this.saveBlobFromText(file.content, file.mimeType, file.filename);
+    }
+
+    private exportAndDownloadChatFile(file: ChatDownloadableFile): void {
+        const pending = file.pendingExport;
+        if (!pending || file.converting) {
+            return;
+        }
+        file.converting = true;
+        this.fileChatService.exportFile({
+            content: file.content, sourceFormat: pending.sourceFormat, targetFormat: pending.targetFormat
+        }).pipe(first()).subscribe((response) => {
+            file.converting = false;
+            if (response.status === ApiCode.SUCCESS && response.data) {
+                file.convertedBase64 = response.data;
+                this.saveBlobFromBase64(response.data, pending.mimeType, pending.filename);
+            } else {
+                this.alertService.showError(response.message || 'Could not convert this file.', this.ERROR);
+            }
+        }, () => {
+            file.converting = false;
+            this.alertService.showError('Could not convert this file -- please try again.', this.ERROR);
+        });
+    }
+
+    private saveBlobFromText(content: string, mimeType: string, filename: string): void {
+        this.triggerBlobDownload(new Blob([content], { type: mimeType }), filename);
+    }
+
+    private saveBlobFromBase64(base64: string, mimeType: string, filename: string): void {
+        const binary = atob(base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
+        }
+        this.triggerBlobDownload(new Blob([bytes], { type: mimeType }), filename);
+    }
+
+    private triggerBlobDownload(blob: Blob, filename: string): void {
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = filename;
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+        URL.revokeObjectURL(url);
+    }
+
+    public stopChatMessage(): void {
+        if (this.chatMessageSubscription) {
+            this.chatMessageSubscription.unsubscribe();
+            this.chatMessageSubscription = null;
+        }
+        this.onChatMessageSettled();
+    }
+
+    private onChatMessageSettled(): void {
+        this.chatSending = false;
+        this.chatSlowHint = false;
+        this.chatMessageSubscription = null;
+        if (this.chatSlowHintTimer) {
+            clearTimeout(this.chatSlowHintTimer);
+            this.chatSlowHintTimer = null;
+        }
+    }
+
+    private scrollChatToBottom(): void {
+        setTimeout(() => {
+            if (this.chatMessagesEl) {
+                const el = this.chatMessagesEl.nativeElement;
+                el.scrollTop = el.scrollHeight;
+            }
+        });
+    }
+
     public selectObject(entry: ObjectSummary): void {
+        if (this.confirmLeaveChatIfNeeded(entry, 'preview')) {
+            return;
+        }
+        this.closeChat();
         this.selectedObject = entry;
         this.selectedObjectMetadata = null;
         this.resetPreview();
@@ -786,6 +1233,8 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
 
     public ngOnDestroy(): void {
         this.revokePreviewMediaUrl();
+        this.stopChatMessage();
+        this.chatRecognition?.stop();
     }
 
     public get isEditableTextPreview(): boolean {
@@ -839,6 +1288,11 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
                             .subscribe((metaResponse) => {
                                 if (metaResponse.status === ApiCode.SUCCESS) {
                                     this.selectedObjectMetadata = metaResponse.data;
+                                    const rowEntry = this.objects.find((entry) => entry.key === this.selectedObject.key);
+                                    if (rowEntry) {
+                                        rowEntry.size = metaResponse.data.size;
+                                        rowEntry.lastModified = metaResponse.data.lastModified;
+                                    }
                                 }
                             });
                     }
@@ -855,14 +1309,23 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
         this.selectedObject = null;
         this.selectedObjectMetadata = null;
         this.resetPreview();
+        this.closeChat();
     }
 
     public downloadEntry(entry: ObjectSummary, event: Event): void {
-        this.triggerDownload(entry.key);
+        this.triggerDownload(this.selectedBucket, entry.key);
     }
 
     public copyPath(entry: ObjectSummary, event: Event): void {
         this.copyToClipboard(entry.key, 'Path copied to clipboard.');
+    }
+
+    public copyEtag(entry: ObjectSummary, event: Event): void {
+        event.stopPropagation();
+        if (!entry.etag) {
+            return;
+        }
+        this.copyToClipboard(entry.etag, 'ETag copied to clipboard.');
     }
 
     public copyPreviewContent(): void {
@@ -947,8 +1410,8 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
         });
     }
 
-    private triggerDownload(key: string): void {
-        this.storageService.previewObjectArrayBuffer(this.selectedBucket, key)
+    private triggerDownload(bucket: string, key: string): void {
+        this.storageService.previewObjectArrayBuffer(bucket, key)
             .pipe(first())
             .subscribe((buffer) => {
                 const objectUrl = URL.createObjectURL(new Blob([buffer]));
@@ -1029,6 +1492,52 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
             });
     }
 
+    public requestEmailShare(entry: ObjectSummary, event: Event): void {
+        this.emailShareEntry = entry;
+        this.emailShareBulkKeys = null;
+        this.emailShareAddress = '';
+        this.emailShareMessage = '';
+    }
+
+    public requestEmailShareBulk(): void {
+        if (!this.selectedKeys.size) {
+            return;
+        }
+        this.emailShareEntry = null;
+        this.emailShareBulkKeys = Array.from(this.selectedKeys);
+        this.emailShareAddress = '';
+        this.emailShareMessage = '';
+    }
+
+    public confirmEmailShare(): void {
+        const entry = this.emailShareEntry;
+        const bulkKeys = this.emailShareBulkKeys;
+        if ((!entry && !bulkKeys) || !this.selectedBucket || !this.emailShareAddress || !this.emailShareAddress.trim() || this.emailSharing) {
+            return;
+        }
+        this.emailSharing = true;
+        this.fileShareService.sendFile({
+            bucket: this.selectedBucket,
+            key: bulkKeys ? undefined : entry.key,
+            keys: bulkKeys ? bulkKeys : undefined,
+            recipientEmail: this.emailShareAddress.trim(),
+            message: this.emailShareMessage.trim()
+        }).pipe(first()).subscribe((response) => {
+            this.emailSharing = false;
+            if (response.status === ApiCode.SUCCESS) {
+                this.alertService.showSuccess(response.message || 'Email sent.', this.SUCCESS);
+                this.emailShareEntry = null;
+                this.emailShareBulkKeys = null;
+                this.closeModal(this.closeEmailShareModal);
+            } else {
+                this.alertService.showError(response.message, this.ERROR);
+            }
+        }, (error) => {
+            this.emailSharing = false;
+            this.alertService.showError(error, this.ERROR);
+        });
+    }
+
     public triggerUpload(): void {
         if (this.fileInput) {
             this.fileInput.nativeElement.click();
@@ -1042,14 +1551,19 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
             return;
         }
         this.uploading = true;
+
+        const bucket = this.selectedBucket;
+        const prefix = this.currentPrefix;
         const uploadNext = (index: number) => {
             if (index >= files.length) {
                 this.uploading = false;
                 input.value = '';
-                this.loadObjects(true);
+                if (bucket === this.selectedBucket && prefix === this.currentPrefix) {
+                    this.loadObjects(true);
+                }
                 return;
             }
-            this.storageService.uploadObject(this.selectedBucket, this.currentPrefix, files[index])
+            this.storageService.uploadObject(bucket, prefix, files[index])
                 .pipe(first())
                 .subscribe((response) => {
                     if (response.status !== ApiCode.SUCCESS) {

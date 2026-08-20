@@ -6,26 +6,125 @@
 
 <span class="help-text" style="margin-bottom: 14px; display: block;">
     <span class="glyphicon glyphicon-info-sign"></span>
-    Convert a document to another format (Word/Excel/PowerPoint/OpenDocument/PDF and more).
+    Convert a document, spreadsheet, presentation, drawing, or image to another format (Word/Excel/PowerPoint/
+    OpenDocument/PDF/Visio and more -- see Supported Formats below for the full list).
     Preview works for PDF, image, plain-text (TXT/CSV/TSV), and HTML; other formats download only.
 </span>
 
 <div class="card-panel">
-    <h4 class="card-panel-title panel-banner">
-        <span class="glyphicon glyphicon-transfer"></span> Convert a Document
+    <h4 class="card-panel-title panel-banner has-action">
+        <span><span class="glyphicon glyphicon-transfer"></span> Convert a Document</span>
+        <button type="button" class="banner-link" (click)="showFormatsReference = !showFormatsReference">
+            <span class="glyphicon" [ngClass]="showFormatsReference ? 'glyphicon-chevron-up' : 'glyphicon-list-alt'"></span>
+            {{showFormatsReference ? 'Hide' : 'Supported Formats'}}
+        </button>
     </h4>
 
-    <div class="form-group">
+    <div class="table-responsive" *ngIf="showFormatsReference" style="margin-bottom: 16px;">
+        <table class="table table-bordered table-modern" style="font-size: 12px;">
+            <thead>
+                <tr>
+                    <th style="width: 140px;">Family</th>
+                    <th>From</th>
+                    <th>To</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr *ngFor="let family of formatFamilies">
+                    <td><span class="glyphicon" [ngClass]="familyIcon(family.key)" style="margin-right: 6px; color: #3730a3;"></span><strong>{{family.label}}</strong></td>
+                    <td>
+                        <span class="pill pill-default" *ngFor="let ext of family.inputFormats" style="margin: 2px 3px 2px 0;">.{{ext}}</span>
+                    </td>
+                    <td>
+                        <span class="pill pill-cyan" *ngFor="let ext of family.outputFormats" style="margin: 2px 3px 2px 0;">.{{ext}}</span>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        <span class="help-text" style="display: block;">
+            <span class="glyphicon glyphicon-info-sign"></span>
+            Pick any file under "From" for its family and convert it to any format listed under "To" for that same row.
+        </span>
+    </div>
+
+    <span class="detail-label">Step 1 -- Choose a File</span>
+
+    <div class="toolbar" style="margin-bottom: 12px;">
+        <button type="button" class="btn btn-sm" [ngClass]="mode === 'upload' ? 'btn-teal' : 'btn-default'" (click)="setMode('upload')">
+            <span class="glyphicon glyphicon-upload"></span> Upload File
+        </button>
+        <button type="button" class="btn btn-sm" [ngClass]="mode === 'browse' ? 'btn-teal' : 'btn-default'" (click)="setMode('browse')" style="margin-left: 6px;">
+            <span class="glyphicon glyphicon-folder-open"></span> Browse Bucket
+        </button>
+    </div>
+
+    <div class="form-group" *ngIf="mode === 'upload'">
         <label class="control-label" for="documentFile">File</label>
-        <input type="file" id="documentFile" (change)="onFileSelected($event)" />
-        <span class="help-text" *ngIf="selectedFile && !currentFamily" style="display: block; margin-top: 6px;">
+        <input type="file" id="documentFile" class="form-control" (change)="onFileSelected($event)" />
+    </div>
+
+    <div *ngIf="mode === 'browse'">
+        <div class="form-group">
+            <label class="control-label">Bucket</label>
+            <select class="form-control" [(ngModel)]="browseBucket" (ngModelChange)="onBrowseBucketChange()">
+                <option value="">Select a bucket</option>
+                <option *ngFor="let b of buckets" [value]="b.bucket">{{b.label}} ({{b.provider}})</option>
+            </select>
+        </div>
+
+        <nav class="breadcrumb-bar" *ngIf="browseBucket">
+            <a href="javascript:void(0);" (click)="goToBrowseBreadcrumb(-1)">{{browseBucket}}</a>
+            <ng-container *ngFor="let bc of browseBreadcrumbs; let i = index;">
+                <span class="crumb-sep">/</span>
+                <a href="javascript:void(0);" (click)="goToBrowseBreadcrumb(i)">{{bc.name}}</a>
+            </ng-container>
+        </nav>
+
+        <div class="text-muted" *ngIf="loadingBrowseObjects">Loading...</div>
+        <div class="table-responsive scroll-table" *ngIf="browseBucket && !loadingBrowseObjects" style="max-height: 260px; overflow-y: auto;">
+            <table class="table table-bordered table-hover table-modern" style="font-size: 12px;">
+                <tbody>
+                    <tr *ngFor="let entry of visibleBrowseObjects" class="bucket-row"
+                        [class.active]="browseSelectedEntry && entry.key === browseSelectedEntry.key"
+                        (click)="selectBrowseEntry(entry)">
+                        <td style="width: 24px;">
+                            <span class="glyphicon folder-icon" [ngClass]="entry.folder ? 'glyphicon-folder-close' : 'glyphicon-file'"></span>
+                        </td>
+                        <td>{{entry.name}}</td>
+                    </tr>
+                    <tr *ngIf="!visibleBrowseObjects.length">
+                        <td class="text-muted">No convertible files in this folder.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="selected-file-callout" *ngIf="browseSelectedEntry" style="margin-top: 10px;">
+            <span class="help-text" style="display: block;">
+                <span class="glyphicon glyphicon-file"></span>
+                Selected: <strong>{{browseSelectedEntry.name}}</strong>
+            </span>
+            <button type="button" class="btn btn-teal" style="margin-top: 8px;"
+                [disabled]="loadingSelectedFile" (click)="runBrowseSelectedEntry()">
+                <span class="glyphicon" [ngClass]="loadingSelectedFile ? 'glyphicon-refresh spin' : 'glyphicon-download-alt'"></span>
+                {{loadingSelectedFile ? 'Loading...' : 'Use This File'}}
+            </button>
+        </div>
+    </div>
+
+    <div class="form-group" *ngIf="selectedFile" style="margin-top: 10px;">
+        <span class="help-text" *ngIf="!currentFamily" style="display: block;">
             <span class="glyphicon glyphicon-warning-sign"></span>
             '{{inputExtension | uppercase}}' isn't a supported input format.
         </span>
-        <span class="help-text" *ngIf="selectedFile && currentFamily" style="display: block; margin-top: 6px;">
+        <span class="help-text" *ngIf="currentFamily" style="display: block;">
             <span class="glyphicon glyphicon-ok-circle"></span>
-            Detected as a {{currentFamily.label}} ({{inputExtension | uppercase}}) -- {{(selectedFile.size / 1024) | number:'1.0-0'}} KB.
+            Detected as a {{currentFamily.label}} ({{inputExtension | uppercase}}) -- {{(selectedFile.size / 1024) | number:'1.0-0'}} KB{{mode === 'browse' ? ' -- loaded from ' + browseBucket : ''}}.
         </span>
+    </div>
+
+    <div class="card-divider" *ngIf="currentFamily">
+        <span class="detail-label">Step 2 -- Convert Options</span>
     </div>
 
     <div class="row" *ngIf="currentFamily">
@@ -56,7 +155,7 @@
         <div class="col-md-6">
             <div class="form-group">
                 <label class="control-label" for="bucket">Bucket</label>
-                <select id="bucket" class="form-control" [(ngModel)]="selectedBucket">
+                <select id="bucket" class="form-control" [ngModel]="selectedBucket" (ngModelChange)="onSaveBucketChange($event)">
                     <option value="" disabled>Select a bucket</option>
                     <option *ngFor="let b of buckets" [value]="b.bucket">{{b.label || b.bucket}}</option>
                 </select>
@@ -64,7 +163,57 @@
         </div>
     </div>
 
-    <div class="form-group" style="margin-top: 4px;">
+    <div class="panel-box-subtle" *ngIf="currentFamily && saveToBucket && selectedBucket">
+        <label class="control-label" style="display: block; margin-bottom: 6px;">Target Folder</label>
+        <div style="display: flex; gap: 6px;">
+            <input type="text" class="form-control" [ngModel]="saveFolder"
+                (ngModelChange)="onSaveFolderChange($event)" placeholder="document-converter (default)" />
+            <button type="button" class="btn btn-default" style="white-space: nowrap;"
+                (click)="toggleSaveBrowse()" title="Pick an existing folder">
+                <span class="glyphicon glyphicon-folder-open"></span> Browse
+            </button>
+        </div>
+        <span class="help-text" style="display: block; margin-top: 6px;">
+            Where in <code>{{selectedBucket}}</code> to save the input and output files. Leave blank for the default "document-converter" folder.
+        </span>
+
+        <div class="save-folder-browser" *ngIf="saveBrowsing" style="margin-top: 10px;">
+            <nav class="breadcrumb-bar">
+                <a href="javascript:void(0);" (click)="goToSaveBreadcrumb(-1)">{{selectedBucket}}</a>
+                <ng-container *ngFor="let bc of saveBreadcrumbs; let i = index;">
+                    <span class="crumb-sep">/</span>
+                    <a href="javascript:void(0);" (click)="goToSaveBreadcrumb(i)">{{bc.name}}</a>
+                </ng-container>
+            </nav>
+            <div class="text-muted" *ngIf="loadingSaveFolders">Loading...</div>
+            <div class="table-responsive scroll-table" *ngIf="!loadingSaveFolders" style="max-height: 160px; overflow-y: auto;">
+                <table class="table table-bordered table-hover table-modern" style="font-size: 12px;">
+                    <tbody>
+                        <tr *ngFor="let folder of saveFolders" class="bucket-row" (click)="openSaveFolder(folder)">
+                            <td style="width: 24px;"><span class="glyphicon glyphicon-folder-close folder-icon"></span></td>
+                            <td>{{folder.name}}</td>
+                        </tr>
+                        <tr *ngIf="!saveFolders.length">
+                            <td class="text-muted">No subfolders here.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <button type="button" class="btn btn-teal btn-sm" style="margin-top: 8px;"
+                (click)="useCurrentSaveFolder()" [disabled]="!saveCurrentPrefix">
+                <span class="glyphicon glyphicon-ok"></span> Use This Folder
+            </button>
+            <span class="help-text" style="margin-left: 8px;" *ngIf="!saveCurrentPrefix">
+                Open a folder above, or close this and type a new folder name instead.
+            </span>
+        </div>
+    </div>
+
+    <div class="card-divider" *ngIf="currentFamily" style="margin-top: 16px;">
+        <span class="detail-label">Step 3 -- Convert</span>
+    </div>
+
+    <div class="form-group" style="margin-top: 10px;">
         <button type="button" class="btn btn-teal" [disabled]="!currentFamily || converting" (click)="convert()">
             <span class="glyphicon" [ngClass]="converting ? 'glyphicon-refresh spin' : 'glyphicon-transfer'"></span>
             {{converting ? 'Converting...' : 'Convert'}}
@@ -74,44 +223,46 @@
         </button>
     </div>
 
-    <div class="toolbar" *ngIf="result" style="margin-top: 18px;">
-        <strong><span class="glyphicon glyphicon-ok-circle" style="color: #1d7a3f;"></span> Converted -- {{result.outputFileName}}</strong>
-        <span class="toolbar-spacer"></span>
-        <span class="help-text" style="margin-right: 10px;" *ngIf="result.save">
-            Saved to <code>{{result.bucketName}}</code>
-        </span>
-        <div class="btn-group btn-group-sm" role="group">
-            <button type="button" class="btn" [ngClass]="resultPreviewSide === 'input' ? 'btn-teal' : 'btn-default'" (click)="toggleResultSide('input')">
-                <span class="glyphicon glyphicon-log-in"></span> Input
-            </button>
-            <button type="button" class="btn" [ngClass]="resultPreviewSide === 'output' ? 'btn-teal' : 'btn-default'" (click)="toggleResultSide('output')">
-                <span class="glyphicon glyphicon-log-out"></span> Output
-            </button>
+    <div class="result-panel" *ngIf="result" style="margin-top: 18px;">
+        <div class="toolbar">
+            <strong><span class="glyphicon glyphicon-ok-circle" style="color: #1d7a3f;"></span> Converted -- {{result.outputFileName}}</strong>
+            <span class="toolbar-spacer"></span>
+            <span class="help-text" style="margin-right: 10px;" *ngIf="result.save">
+                Saved to <code>{{result.bucketName}}/{{result.targetFolder}}</code>
+            </span>
+            <div class="btn-group btn-group-sm" role="group">
+                <button type="button" class="btn" [ngClass]="resultPreviewSide === 'input' ? 'btn-teal' : 'btn-default'" (click)="toggleResultSide('input')">
+                    <span class="glyphicon glyphicon-log-in"></span> Input
+                </button>
+                <button type="button" class="btn" [ngClass]="resultPreviewSide === 'output' ? 'btn-teal' : 'btn-default'" (click)="toggleResultSide('output')">
+                    <span class="glyphicon glyphicon-log-out"></span> Output
+                </button>
+            </div>
         </div>
-    </div>
 
-    <div class="row" *ngIf="result && resultPreviewSide" style="margin-top: 10px;">
-        <div class="col-md-5 bucket-panel-col">
-            <div class="side-panel">
-                <div class="side-panel-header">
-                    <span class="side-panel-title" [title]="resultPreviewFileName">
-                        <span class="glyphicon glyphicon-file file-icon"></span>
-                        {{resultPreviewSide === 'input' ? 'Input' : 'Output'}} -- {{resultPreviewFileName}}
-                    </span>
-                    <button type="button" class="close" (click)="closeResultPreview()">&times;</button>
-                </div>
-                <div class="side-panel-body">
-                    <div class="preview-toolbar">
-                        <button type="button" class="btn btn-sm btn-default" (click)="downloadResultPreviewFile()">
-                            <span class="glyphicon glyphicon-download-alt"></span> Download
-                        </button>
+        <div class="row result-preview-row" *ngIf="resultPreviewSide">
+            <div class="col-md-12 bucket-panel-col">
+                <div class="side-panel">
+                    <div class="side-panel-header">
+                        <span class="side-panel-title" [title]="resultPreviewFileName">
+                            <span class="glyphicon glyphicon-file file-icon"></span>
+                            {{resultPreviewSide === 'input' ? 'Input' : 'Output'}} -- {{resultPreviewFileName}}
+                        </span>
+                        <button type="button" class="close" (click)="closeResultPreview()">&times;</button>
                     </div>
-                    <iframe *ngIf="resultPreviewKind === 'pdf' || resultPreviewKind === 'html'" [src]="resultPreviewUrlValue" class="preview-pdf"></iframe>
-                    <img *ngIf="resultPreviewKind === 'image'" [src]="resultPreviewUrlValue" class="preview-image" />
-                    <pre *ngIf="resultPreviewKind === 'text'" class="preview-text">{{resultPreviewTextValue}}</pre>
-                    <div class="preview-unavailable" *ngIf="!resultPreviewKind">
-                        <span class="glyphicon glyphicon-info-sign"></span>
-                        No inline preview for {{resultPreviewFormatLabel | uppercase}} -- use Download above.
+                    <div class="side-panel-body">
+                        <div class="preview-toolbar">
+                            <button type="button" class="btn btn-sm btn-default" (click)="downloadResultPreviewFile()">
+                                <span class="glyphicon glyphicon-download-alt"></span> Download
+                            </button>
+                        </div>
+                        <iframe *ngIf="resultPreviewKind === 'pdf' || resultPreviewKind === 'html'" [src]="resultPreviewUrlValue" class="preview-pdf"></iframe>
+                        <img *ngIf="resultPreviewKind === 'image'" [src]="resultPreviewUrlValue" class="preview-image" />
+                        <pre *ngIf="resultPreviewKind === 'text'" class="preview-text">{{resultPreviewTextValue}}</pre>
+                        <div class="preview-unavailable" *ngIf="!resultPreviewKind">
+                            <span class="glyphicon glyphicon-info-sign"></span>
+                            No inline preview for {{resultPreviewFormatLabel | uppercase}} -- use Download above.
+                        </div>
                     </div>
                 </div>
             </div>
@@ -119,24 +270,44 @@
     </div>
 </div>
 
-<div class="toolbar">
-    <div class="form-group" style="margin-bottom: 0;">
-        <label for="searchTasks" class="control-label">Total Saved Conversions ({{filteredTasks.length}})</label>
-        <input type="text" id="searchTasks" class="form-control input-sm" style="width: 280px;"
-            placeholder="Search" [(ngModel)]="searchTasks"/>
+<div class="card-panel">
+    <h4 class="card-panel-title panel-banner">
+        <span class="glyphicon glyphicon-floppy-save"></span> Saved Conversions
+    </h4>
+
+    <div class="mini-kpi-row" *ngIf="tasks.length" style="margin-bottom: 16px;">
+        <div class="mini-kpi-tile mini-kpi-total">
+            <span class="mini-kpi-icon"><span class="glyphicon glyphicon-floppy-saved"></span></span>
+            <span><span class="mini-kpi-value">{{tasks.length}}</span><span class="mini-kpi-label">Conversions</span></span>
+        </div>
+        <div class="mini-kpi-tile mini-kpi-queue">
+            <span class="mini-kpi-icon"><span class="glyphicon glyphicon-log-in"></span></span>
+            <span><span class="mini-kpi-value">{{formatBytes(totalInputBytes)}}</span><span class="mini-kpi-label">Input Data</span></span>
+        </div>
+        <div class="mini-kpi-tile mini-kpi-completed">
+            <span class="mini-kpi-icon"><span class="glyphicon glyphicon-log-out"></span></span>
+            <span><span class="mini-kpi-value">{{formatBytes(totalOutputBytes)}}</span><span class="mini-kpi-label">Output Data</span></span>
+        </div>
     </div>
-    <span class="toolbar-spacer"></span>
-    <button type="button" class="btn btn-sm btn-default" (click)="listTasks()">
-        <span class="glyphicon glyphicon-refresh"></span> Refresh
-    </button>
-</div>
 
-<span class="help-text" *ngIf="!tasks.length" style="display: block; margin-bottom: 10px;">
-    <span class="glyphicon glyphicon-info-sign"></span>
-    No saved conversions yet -- check "Save this conversion to a bucket" above to keep one here.
-</span>
+    <div class="toolbar">
+        <div class="form-group" style="margin-bottom: 0;">
+            <label for="searchTasks" class="control-label">Total Saved Conversions ({{filteredTasks.length}})</label>
+            <input type="text" id="searchTasks" class="form-control input-sm" style="width: 280px;"
+                placeholder="Search" [(ngModel)]="searchTasks"/>
+        </div>
+        <span class="toolbar-spacer"></span>
+        <button type="button" class="btn btn-sm btn-default" (click)="listTasks()">
+            <span class="glyphicon glyphicon-refresh"></span> Refresh
+        </button>
+    </div>
 
-<div class="row row-equal bucket-browse-row" *ngIf="tasks.length">
+    <span class="help-text" *ngIf="!tasks.length" style="display: block; margin-bottom: 10px;">
+        <span class="glyphicon glyphicon-info-sign"></span>
+        No saved conversions yet -- check "Save this conversion to a bucket" above to keep one here.
+    </span>
+
+    <div class="row row-equal bucket-browse-row" *ngIf="tasks.length">
     <div class="bucket-table-col" [ngClass]="previewTask ? 'col-md-8' : 'col-md-12'">
         <div class="table-responsive scroll-table bucket-scroll">
             <table class="table table-striped table-bordered table-hover table-modern" style="font-size: 12px;">
@@ -172,11 +343,20 @@
                                     (click)="openPreview(task, 'output')">
                                     <span class="glyphicon glyphicon-log-out"></span>
                                 </button>
-                                <button type="button" class="btn btn-default btn-icon ic-delete" title="Delete"
-                                    data-toggle="modal" data-target="#deleteTaskModal"
-                                    (click)="confirmDeleteTask(task)">
-                                    <span class="glyphicon glyphicon-trash"></span>
-                                </button>
+                                <div class="dropdown" style="display: inline-block;">
+                                    <button type="button" class="btn btn-default btn-icon ic-more" data-toggle="dropdown" title="More actions">
+                                        <span class="glyphicon glyphicon-option-vertical"></span>
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-right">
+                                        <li>
+                                            <a href="javascript:void(0);"
+                                                data-toggle="modal" data-target="#deleteTaskModal"
+                                                (click)="confirmDeleteTask(task)">
+                                                <span class="glyphicon glyphicon-trash"></span> Delete
+                                            </a>
+                                        </li>
+                                    </ul>
+                                </div>
                             </div>
                         </td>
                     </tr>
@@ -216,6 +396,7 @@
             </div>
         </div>
     </div>
+</div>
 </div>
 
 <div class="modal fade" id="deleteTaskModal" role="dialog">

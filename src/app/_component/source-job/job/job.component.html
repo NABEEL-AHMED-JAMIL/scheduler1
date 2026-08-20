@@ -8,14 +8,18 @@
 
 <form *ngIf="sourceJobForm" [formGroup]="sourceJobForm" (ngSubmit)="onSubmit()">
     <div class="card-panel">
-        <h3 class="card-panel-title">{{currentTaskState}}</h3>
+        <h3 class="card-panel-title panel-banner">
+            <span class="glyphicon glyphicon-play-circle"></span> {{currentTaskState}}
+        </h3>
 
+        <h4 class="card-panel-title"><span class="glyphicon glyphicon-briefcase"></span> Job Details</h4>
         <div class="row">
             <div class="form-group col-md-3">
                 <label for="jobName" class="control-label">JobName</label>
                 <input type="text" class="form-control"
                     id="jobName"
                     formControlName="jobName"
+                    placeholder="Enter Job Name"
                     [ngClass]="{ 'has-error': submitted && sourceJob.jobName.errors }" />
                 <div *ngIf="submitted && sourceJob.jobName.errors" class="text-danger">
                     <div *ngIf="sourceJob.jobName.errors.required">JobName is required</div>
@@ -56,7 +60,7 @@
                 </div>
             </div>
 
-            <div class="form-group" [ngClass]="isEditMode ? 'col-md-1' : 'col-md-3'">
+            <div class="form-group col-md-3">
                 <label for="priority" class="control-label">Priority</label>
                 <select class="form-control"
                     id="priority"
@@ -69,22 +73,30 @@
                     <div *ngIf="sourceJob.priority.errors.required">Priority is required</div>
                 </div>
             </div>
-
-            <div class="form-group col-md-2" *ngIf="isEditMode">
-                <label for="jobStatus" class="control-label">JobStatus</label>
-                <select class="form-control"
-                    id="jobStatus"
-                    formControlName="jobStatus">
-                    <option *ngFor="let jobStatus of sourceJobStatus"
-                        [value]="jobStatus.value">{{jobStatus.key}}</option>
-                </select>
-            </div>
         </div>
 
-        <div *ngIf="sourceJobForm.get('scheduler')" formGroupName="scheduler" class="form-section">
-            <h4 class="card-panel-title">Schedule Configuration</h4>
+        <div *ngIf="isEditMode || sourceJobForm.get('scheduler')" class="form-section">
+            <h4 class="card-panel-title has-inline-action">
+                <span>
+                    <span class="glyphicon" [ngClass]="sourceJobForm.get('scheduler') ? 'glyphicon-calendar' : 'glyphicon-flag'"></span>
+                    {{ sourceJobForm.get('scheduler') ? 'Schedule Configuration' : 'Job Status' }}
+                </span>
+                <span class="inline-field" *ngIf="isEditMode">
+                    <label for="jobStatus" class="control-label">JobStatus</label>
+                    <select class="form-control"
+                        id="jobStatus"
+                        formControlName="jobStatus">
+                        <option *ngFor="let jobStatus of sourceJobStatus"
+                            [value]="jobStatus.value">{{jobStatus.key}}</option>
+                    </select>
+                </span>
+            </h4>
+            <div class="help-text" *ngIf="isEditMode && !sourceJobForm.get('scheduler')" style="margin-bottom: 0;">
+                <span class="glyphicon glyphicon-info-sign"></span> This job runs manually -- there's no schedule to configure.
+            </div>
+            <div *ngIf="sourceJobForm.get('scheduler')" formGroupName="scheduler" [ngClass]="{ 'card-divider': isEditMode }">
             <div class="row">
-                <div class="form-group col-md-3">
+                <div class="form-group col-md-4">
                     <label for="startDate" class="control-label">Start Date</label>
                     <input type="date" class="form-control"
                         id="startDate"
@@ -94,8 +106,8 @@
                         <div *ngIf="scheduler.startDate?.errors.required">Required*</div>
                     </div>
                 </div>
-                <div class="form-group col-md-3">
-                    <label for="endDate" class="control-label">End Date</label>
+                <div class="form-group col-md-4">
+                    <label for="endDate" class="control-label">End Date <span class="text-muted">(optional)</span></label>
                     <input type="date" class="form-control"
                         id="endDate"
                         formControlName="endDate"
@@ -104,7 +116,7 @@
                         <div *ngIf="scheduler.endDate?.errors.required">Required*</div>
                     </div>
                 </div>
-                <div class="form-group col-md-2">
+                <div class="form-group col-md-4">
                     <label for="startTime" class="control-label">Time</label>
                     <select class="form-control"
                         id="startTime"
@@ -117,101 +129,126 @@
                         <div *ngIf="scheduler.startTime?.errors.required">Required*</div>
                     </div>
                 </div>
-                <div class="form-group col-md-2">
-                    <label for="frequency" class="control-label">Frequency</label>
-                    <select class="form-control"
+            </div>
+
+            <div class="form-group">
+                <label class="control-label">Repeat</label>
+                <div class="schedule-repeat-row">
+                    <span>Every</span>
+                    <select class="form-control schedule-inline-control"
+                        id="intervalValue"
+                        formControlName="intervalValue"
+                        [ngClass]="{ 'has-error': submitted && scheduler.intervalValue?.errors }">
+                        <option hidden value="" disabled selected>-</option>
+                        <option *ngFor="let interval of intervalOptions" [value]="interval">{{interval}}</option>
+                    </select>
+                    <select class="form-control schedule-inline-control"
                         id="frequency"
                         formControlName="frequency"
                         (change)="onFrequencyChange($event.target.value)"
                         [ngClass]="{ 'has-error': submitted && scheduler.frequency?.errors }">
                         <option hidden value="" disabled selected>Frequency</option>
                         <option *ngFor="let frequency of frequencys" [value]="frequency">
-                            {{frequency}}
+                            {{frequencyLabel[frequency] || frequency}}
                         </option>
                     </select>
-                    <div *ngIf="submitted && scheduler.frequency?.errors" class="text-danger">
-                        <div *ngIf="scheduler.frequency?.errors.required">Required*</div>
-                    </div>
                 </div>
-                <div class="form-group col-md-2">
-                    <label for="recurrence" class="control-label">Recurrence</label>
-                    <select class="form-control"
-                        id="recurrence"
-                        formControlName="recurrence"
-                        [ngClass]="{ 'has-error': submitted && scheduler.recurrence?.errors }">
-                        <option hidden value="" disabled selected>Recurrence</option>
-                        <option *ngFor="let recurrence of recurrences" [value]="recurrence">
-                            {{recurrence}}
-                        </option>
-                    </select>
-                    <div *ngIf="submitted && scheduler.recurrence?.errors" class="text-danger">
-                        <div *ngIf="scheduler.recurrence?.errors.required">Required*</div>
-                    </div>
+                <div *ngIf="submitted && (scheduler.intervalValue?.errors || scheduler.frequency?.errors)" class="text-danger">
+                    Required*
                 </div>
+            </div>
+
+            <div class="schedule-day-picker" *ngIf="scheduler.frequency?.value === 'Weekly'">
+                <button type="button" class="day-pill" *ngFor="let day of daysOfWeekOptions"
+                    [class.active]="isDaySelected(day.code)"
+                    (click)="toggleDay(day.code)">
+                    {{day.label}}
+                </button>
+            </div>
+
+            <div class="schedule-month-day" *ngIf="scheduler.frequency?.value === 'Monthly'">
+                <span>On</span>
+                <select class="form-control schedule-inline-control" formControlName="dayOfMonth">
+                    <option [ngValue]="null">Same day each month</option>
+                    <option *ngFor="let day of dayOfMonthOptions" [ngValue]="day.value">{{day.label}}</option>
+                </select>
+            </div>
+
+            <div class="schedule-summary" *ngIf="scheduler.frequency?.value">
+                <span class="glyphicon glyphicon-info-sign"></span> {{scheduleSummary}}
+            </div>
             </div>
         </div>
 
         <div *ngIf="selectedSourceTask" class="form-section">
-            <h4 class="card-panel-title">Task Details</h4>
-            <div class="row" formGroupName="taskDetail">
-                <div class="form-group col-md-3">
-                    <label for="serviceName" class="control-label">ServiceName</label>
-                    <input type="text" class="form-control"
-                        id="serviceName"
-                        formControlName="serviceName"
-                        disabled />
+            <h4 class="card-panel-title">
+                <span class="glyphicon glyphicon-list-alt"></span> Task Details
+                <span class="pill pill-default" style="margin-left: 8px; font-weight: 400; text-transform: none;" title="Carried over from the selected Source Task -- edit the task itself to change these">
+                    <span class="glyphicon glyphicon-lock"></span> Read-only
+                </span>
+            </h4>
+
+            <div formGroupName="taskDetail">
+                <input type="hidden" formControlName="queueTopicPartition" />
+            </div>
+            <div class="linked-task-key-value-list">
+                <div class="linked-task-first-row">
+                    <div class="linked-task-key-value-row">
+                        <div class="linked-task-key"><span class="glyphicon glyphicon-transfer"></span> Service</div>
+                        <div class="linked-task-value">{{taskDetail.serviceName.value || '—'}}</div>
+                    </div>
+                    <div class="linked-task-key-value-row">
+                        <div class="linked-task-key"><span class="glyphicon glyphicon-tag"></span> Topic</div>
+                        <div class="linked-task-value">{{taskTopic}}</div>
+                    </div>
+                    <div class="linked-task-key-value-row">
+                        <div class="linked-task-key"><span class="glyphicon glyphicon-th-list"></span> Partitions</div>
+                        <div class="linked-task-value">{{taskPartitions}}</div>
+                    </div>
                 </div>
-                <div class="form-group col-md-3">
-                    <label for="queueTopicPartition" class="control-label">QueueTopicPartition</label>
-                    <input type="text" class="form-control"
-                        id="queueTopicPartition"
-                        formControlName="queueTopicPartition"
-                        disabled />
+                <div class="linked-task-second-row">
+                    <div class="linked-task-key-value-row">
+                        <div class="linked-task-key"><span class="glyphicon glyphicon-home"></span> Home Page</div>
+                        <div class="linked-task-value">{{taskDetail.homePageId.value || 'No home page set'}}</div>
+                    </div>
+                    <div class="linked-task-key-value-row">
+                        <div class="linked-task-key"><span class="glyphicon glyphicon-random"></span> Pipeline</div>
+                        <div class="linked-task-value">{{taskDetail.pipelineId.value || '—'}}</div>
+                    </div>
                 </div>
-                <div class="form-group col-md-3">
-                    <label for="homePageId" class="control-label">HomePage</label>
-                    <input type="text" class="form-control"
-                        id="homePageId"
-                        formControlName="homePageId"
-                        placeholder="No home page set"
-                        disabled />
-                </div>
-                <div class="form-group col-md-3">
-                    <label for="pipelineId" class="control-label">PipelineId</label>
-                    <input type="text" class="form-control"
-                        id="pipelineId"
-                        formControlName="pipelineId"
-                        placeholder="Enter Pipeline Id"
-                        disabled />
+                <div class="linked-task-key-value-row linked-task-payload-row" *ngIf="taskDetail.taskPayload.value">
+                    <div class="linked-task-key"><span class="glyphicon glyphicon-list-alt"></span> Payload</div>
+                    <div class="linked-task-value">
+                        <div class="linked-task-payload-wrapper">
+                            <pre class="linked-task-payload">{{taskDetail.taskPayload.value}}</pre>
+                            <button type="button" class="linked-task-copy-btn" title="Copy payload" (click)="copyToClipboard(taskDetail.taskPayload.value)">
+                                <span class="glyphicon glyphicon-copy"></span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div class="form-group" formGroupName="taskDetail">
-                <label for="taskPayload" class="control-label">JobPayload</label>
-                <textarea class="form-control"
-                    id="taskPayload"
-                    formControlName="taskPayload"
-                    rows="5"
-                    placeholder="Enter the task configuration detail"
-                    disabled></textarea>
-            </div>
-            <div class="toolbar">
-                <span class="toolbar-spacer"></span>
-                <label class="checkbox-inline">
-                    <input type="checkbox" formControlName="completeJob" id="completeJob" />
-                    Email job complete
-                </label>
-                <label class="checkbox-inline">
-                    <input type="checkbox" formControlName="failJob" id="failJob" />
-                    Email job fail
-                </label>
-                <label class="checkbox-inline">
-                    <input type="checkbox" formControlName="skipJob" id="skipJob" />
-                    Email job skip
-                </label>
+
+            <div class="form-group" style="margin-top: 16px;">
+                <label class="control-label" style="display: block;">Notify by email when this job</label>
+                <div class="toolbar" style="margin-bottom: 0;">
+                    <label class="checkbox-inline">
+                        <input type="checkbox" formControlName="completeJob" id="completeJob" />
+                        Completes
+                    </label>
+                    <label class="checkbox-inline">
+                        <input type="checkbox" formControlName="failJob" id="failJob" />
+                        Fails
+                    </label>
+                    <label class="checkbox-inline">
+                        <input type="checkbox" formControlName="skipJob" id="skipJob" />
+                        Skips
+                    </label>
+                </div>
             </div>
         </div>
 
-        <div class="toolbar" style="margin-bottom: 0;">
+        <div class="toolbar card-divider" style="margin-top: 22px; margin-bottom: 0;">
             <span class="toolbar-spacer"></span>
             <button type="reset" class="btn btn-sm btn-default"
                 (click)="addSourceJobFormInit()">

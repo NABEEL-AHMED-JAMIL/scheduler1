@@ -49,7 +49,7 @@
                 <tr>
                     <th style="width: 4%;"># No</th>
                     <th>Service Name</th>
-                    <th>Queue Topic Partition</th>
+                    <th>Topic</th>
                     <th>Description</th>
                     <th class="text-center">Link Task</th>
                     <th class="text-center">Kafka Profile</th>
@@ -61,7 +61,7 @@
                 <tr *ngFor="let sourceTaskType of filteredSourceTaskTypes | searchFilter: searchSourceTaskTaype; let i = index;">
                     <td>{{sourceTaskType.sourceTaskTypeId}}</td>
                     <td>{{sourceTaskType.serviceName}}</td>
-                    <td>{{sourceTaskType.queueTopicPartition}}</td>
+                    <td>{{taskTopic(sourceTaskType.queueTopicPartition)}}</td>
                     <td>{{sourceTaskType.description}}</td>
                     <td class="text-center">
                         <a href="javascript:void(0);" data-toggle="modal" data-target="#linkSourceTaskModal"
@@ -94,16 +94,27 @@
                                 (click)="editSourceTaskType(sourceTaskType)" title="Edit">
                                 <span class="glyphicon glyphicon-edit"></span>
                             </button>
-                            <button type="button" class="btn btn-default btn-icon ic-download"
-                                (click)="downloadSourceTaskType(sourceTaskType)" title="Download">
-                                <span class="glyphicon glyphicon-download"></span>
-                            </button>
-                            <button type="button" class="btn btn-default btn-icon ic-delete"
-                                (click)="deleteSourceTaskType(sourceTaskType.sourceTaskTypeId, i)"
-                                [disabled]="sourceTaskType.status === 'Delete'"
-                                data-toggle="modal" data-target="#deleteSetting" title="Delete">
-                                <span class="glyphicon glyphicon-trash"></span>
-                            </button>
+                            <div class="dropdown" style="display: inline-block;">
+                                <button type="button" class="btn btn-default btn-icon ic-more" data-toggle="dropdown" title="More actions">
+                                    <span class="glyphicon glyphicon-option-vertical"></span>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-right">
+                                    <li>
+                                        <a href="javascript:void(0);" (click)="downloadSourceTaskType(sourceTaskType)">
+                                            <span class="glyphicon glyphicon-download"></span> Download
+                                        </a>
+                                    </li>
+                                    <li class="divider"></li>
+                                    <li [class.disabled]="sourceTaskType.status === 'Delete'">
+                                        <a href="javascript:void(0);"
+                                            [attr.data-toggle]="sourceTaskType.status !== 'Delete' ? 'modal' : null"
+                                            [attr.data-target]="sourceTaskType.status !== 'Delete' ? '#deleteSetting' : null"
+                                            (click)="deleteSourceTaskType(sourceTaskType.sourceTaskTypeId, i)">
+                                            <span class="glyphicon glyphicon-trash"></span> Delete
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
                         </div>
                     </td>
                 </tr>
@@ -141,7 +152,7 @@
                 <h4 class="modal-title">
                     <span class="glyphicon glyphicon-link"></span> Link Source Task
                     <span class="help-text" *ngIf="sourceTaskType" style="font-weight: 400;">
-                        -- {{sourceTaskType.serviceName}} ({{sourceTaskType.queueTopicPartition}})
+                        -- {{sourceTaskType.serviceName}} ({{taskTopic(sourceTaskType.queueTopicPartition)}})
                     </span>
                 </h4>
             </div>

@@ -25,11 +25,14 @@ import {
     ValidatorFn,
     Validators
 } from '@angular/forms';
+import { parseTopicPartition } from '../../../global-config';
 import {
     AlertService,
     SettingService,
     SourceTaskService,
-    ConfigurationMakerService
+    ConfigurationMakerService,
+    AuthService,
+    TenantService
 } from '@/_services';
 
 function noWhitespaceValidator(): ValidatorFn {
@@ -62,6 +65,8 @@ export class TaskComponent implements OnInit, OnDestroy {
     public piplineHomePageList: any;
     public taskGroupList: any;
     public showBucketHelp: boolean = false;
+    public isPlatformAdmin: boolean = false;
+    public tenants: any[] = [];
 
     private paramMapSubscription: Subscription;
 
@@ -72,7 +77,9 @@ export class TaskComponent implements OnInit, OnDestroy {
 		private spinnerService: SpinnerService,
 		private settingService: SettingService,
         private sourceTaskService: SourceTaskService,
-        private xmlService: ConfigurationMakerService) {
+        private xmlService: ConfigurationMakerService,
+        private authService: AuthService,
+        private tenantService: TenantService) {
     }
 
     ngOnInit() {
@@ -81,13 +88,31 @@ export class TaskComponent implements OnInit, OnDestroy {
             this.taskDetailId = +params.get('taskDetailId');
         });
         this.appSetting();
+        this.isPlatformAdmin = this.authService.currentUser?.userRole === 'PLATFORM_ADMIN';
         if (this.taskDetailId) {
             this.currentTaskState = 'Update Task';
             this.isEditMode = true;
             this.fetchSourceTaskWithSourceTaskId();
         } else {
             this.addSourceTaskFormInit();
+            if (this.isPlatformAdmin) {
+                this.loadTenants();
+            }
         }
+    }
+
+    private loadTenants(): void {
+        this.tenantService.listTenants()
+            .pipe(first())
+            .subscribe((response) => {
+                if (response.status === ApiCode.SUCCESS) {
+                    this.tenants = response.data || [];
+                } else {
+                    this.alertService.showError(response.message, this.ERROR);
+                }
+            }, (error) => {
+                this.alertService.showError(error, this.ERROR);
+            });
     }
 
     ngOnDestroy(): void {
@@ -96,6 +121,10 @@ export class TaskComponent implements OnInit, OnDestroy {
 
     public toggleBucketHelp(): void {
         this.showBucketHelp = !this.showBucketHelp;
+    }
+
+    public taskTopic(queueTopicPartition: any): string {
+        return parseTopicPartition(queueTopicPartition).topic;
     }
 
     public appSetting(): void {
@@ -217,6 +246,7 @@ export class TaskComponent implements OnInit, OnDestroy {
             homePageId: [''],
             pipelineId: [''],
             groupId: [''],
+            tenantId: ['', this.isPlatformAdmin ? Validators.required : []],
             tagsInfo: this.formBuilder.array(Array(10).fill(null).map(() => this.buildItem())),
         });
 		this.spinnerService.hide();
@@ -271,6 +301,7 @@ export class TaskComponent implements OnInit, OnDestroy {
             homePageId: this.sourceTaskForm.get('homePageId').value,
             pipelineId: this.sourceTaskForm.get('pipelineId').value,
             groupId: this.sourceTaskForm.get('groupId').value,
+            tenantId: this.sourceTaskForm.get('tenantId')?.value || null,
             xmlTagsInfo: this.tageForms.value
         }
         if (this.taskDetailId) {

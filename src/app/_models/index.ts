@@ -4,8 +4,6 @@ export * from './dynamic-form.model';
 export * from './ai-agent.model';
 export * from './ollama.model';
 export * from './audio-transcript.model';
-export * from './image-text.model';
-export * from './cv-tailor.model';
 export * from './kafka-connection-profile.model';
 export * from './auth.model';
 export * from './tenant.model';

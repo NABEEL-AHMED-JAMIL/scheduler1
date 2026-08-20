@@ -60,30 +60,51 @@
                     }">{{dynamicForm.status}}</span>
                 </td>
                 <td class="text-center">{{dynamicForm.dateCreated | date: 'yyyy-MM-dd HH:mm'}}</td>
-                <td class="text-center" style="width: 186px; white-space: nowrap;">
+                <td class="text-center" style="width: 110px; white-space: nowrap;">
                     <div class="btn-group btn-group-sm" role="group">
                         <button type="button" class="btn btn-default btn-icon ic-run"
                             (click)="fillDynamicForm(dynamicForm)" title="Fill in">
                             <span class="glyphicon glyphicon-pencil"></span>
                         </button>
-                        <button type="button" class="btn btn-default btn-icon"
-                            (click)="viewSubmissions(dynamicForm)" title="View submissions">
-                            <span class="glyphicon glyphicon-inbox"></span>
-                        </button>
                         <button type="button" class="btn btn-default btn-icon ic-edit"
                             (click)="editDynamicForm(dynamicForm)" title="Edit fields">
                             <span class="glyphicon glyphicon-list-alt"></span>
                         </button>
-                        <button type="button" class="btn btn-default btn-icon ic-copy" title="Copy API link"
-                            (click)="copyShareUrl(dynamicForm)">
-                            <span class="glyphicon glyphicon-copy"></span>
-                        </button>
-                        <button type="button" class="btn btn-default btn-icon ic-delete"
-                            (click)="deleteDynamicForm(dynamicForm.dynamicFormId, i)"
-                            [disabled]="dynamicForm.status === 'Delete'"
-                            data-toggle="modal" data-target="#deleteDynamicForm" title="Delete">
-                            <span class="glyphicon glyphicon-trash"></span>
-                        </button>
+                        <div class="dropdown" style="display: inline-block;">
+                            <button type="button" class="btn btn-default btn-icon ic-more" data-toggle="dropdown" title="More actions">
+                                <span class="glyphicon glyphicon-option-vertical"></span>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-right">
+                                <li>
+                                    <a href="javascript:void(0);" (click)="viewSubmissions(dynamicForm)">
+                                        <span class="glyphicon glyphicon-inbox"></span> View submissions
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="javascript:void(0);" (click)="copyShareUrl(dynamicForm)">
+                                        <span class="glyphicon glyphicon-copy"></span> Copy API link
+                                    </a>
+                                </li>
+                                <li class="divider"></li>
+                                <li [class.disabled]="dynamicForm.status === 'Delete'">
+                                    <a href="javascript:void(0);"
+                                        [attr.data-toggle]="dynamicForm.status !== 'Delete' ? 'modal' : null"
+                                        [attr.data-target]="dynamicForm.status !== 'Delete' ? '#deleteDynamicForm' : null"
+                                        (click)="deleteDynamicForm(dynamicForm.dynamicFormId, i)">
+                                        <span class="glyphicon glyphicon-trash"></span> Delete
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+            <tr *ngIf="!(filteredDynamicForms | searchFilter: searchDynamicForm).length">
+                <td colspan="7">
+                    <div class="empty-state">
+                        <span class="glyphicon glyphicon-search"></span>
+                        <div class="empty-state-title">No forms found</div>
+                        <div class="empty-state-text">{{filteredDynamicForms.length ? 'No forms match your search or filter.' : 'Get started by adding a form.'}}</div>
                     </div>
                 </td>
             </tr>

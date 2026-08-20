@@ -1,4 +1,4 @@
-﻿import { Component, OnInit, OnDestroy } from '@angular/core';
+﻿import { Component, OnInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
 import { ApiCode } from '../../_models/index';
 import { SourceJobService, AlertService } from '@/_services/index';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -9,7 +9,7 @@ import { Subscription } from 'rxjs';
 import { EChartOption } from 'echarts';
 
 const HAPPY_PATH = ['Queue', 'Start', 'Running', 'Completed'];
-const TERMINAL_ALTERNATES = ['Failed', 'Interrupt', 'Skip'];
+const TERMINAL_ALTERNATES = ['Failed', 'Interrupt', 'Skip', 'Missed'];
 
 const TERMINAL_STATUSES = ['Completed', ...TERMINAL_ALTERNATES];
 
@@ -38,7 +38,8 @@ interface PipelineStage {
 const REACHED_ICONS: { [key: string]: string } = {
   Failed: 'glyphicon-remove',
   Interrupt: 'glyphicon-pause',
-  Skip: 'glyphicon-fast-forward'
+  Skip: 'glyphicon-fast-forward',
+  Missed: 'glyphicon-time'
 };
 
 @Component({
@@ -59,6 +60,7 @@ export class JobLogComponent implements OnInit, OnDestroy {
 
   public jobStillRunning = false;
   public liveEnabled = true;
+  public noJobSelected = false;
   private autoRefreshTimer: any = null;
   private currentJobQueueId: any;
   private currentJobId: any;
@@ -66,6 +68,9 @@ export class JobLogComponent implements OnInit, OnDestroy {
   private cameFrom: string | null = null;
 
   public viewMode: 'timeline' | 'table' | 'console' = 'timeline';
+
+  @ViewChild('logScrollContainer', {static: false}) logScrollContainer: ElementRef<HTMLElement>;
+  public stickToBottom = true;
 
   public logGapChartOptions: EChartOption | null = null;
   private lastZoomStart = 0;
@@ -86,6 +91,13 @@ export class JobLogComponent implements OnInit, OnDestroy {
         this.currentJobQueueId = params?.get('jobQueueId');
         this.currentJobId = params?.get('jobId');
         this.cameFrom = params?.get('from') || this.cameFrom;
+        if (!this.currentJobQueueId && !this.currentJobId) {
+          this.noJobSelected = true;
+          this.sourceJob = null;
+          this.sourceJobQueue = null;
+          return;
+        }
+        this.noJobSelected = false;
         this.findSourceJobAuditLog(this.currentJobQueueId, this.currentJobId);
       });
   }
@@ -168,6 +180,26 @@ export class JobLogComponent implements OnInit, OnDestroy {
     this.sourceJobQueue = response.data?.sourceJobQueue;
     this.logGapChartOptions = this.computeLogGapChartOptions();
     this.scheduleAutoRefreshIfRunning();
+    this.scrollToBottomIfSticky();
+  }
+
+  public toggleStickToBottom(): void {
+    this.stickToBottom = !this.stickToBottom;
+    if (this.stickToBottom) {
+      this.scrollToBottomIfSticky();
+    }
+  }
+
+  private scrollToBottomIfSticky(): void {
+    if (!this.stickToBottom) {
+      return;
+    }
+    setTimeout(() => {
+      const el = this.logScrollContainer?.nativeElement;
+      if (el) {
+        el.scrollTop = el.scrollHeight;
+      }
+    });
   }
 
   public onChartDataZoom(event: any): void {
@@ -240,6 +272,7 @@ export class JobLogComponent implements OnInit, OnDestroy {
 
   public setViewMode(mode: 'timeline' | 'table' | 'console'): void {
     this.viewMode = mode;
+    this.scrollToBottomIfSticky();
   }
 
   public plainLogText(html: any): string {

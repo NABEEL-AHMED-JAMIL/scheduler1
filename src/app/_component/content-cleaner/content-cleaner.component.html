@@ -6,29 +6,16 @@
 
 <div class="panel-box" style="margin-bottom: 16px;">
     <h4 style="margin-top: 0;"><span class="glyphicon glyphicon-magnet"></span> Content Cleaner</h4>
-    <span class="help-text" style="display: block; margin-bottom: 10px;">
+    <span class="help-text" style="display: block;">
         <span class="glyphicon glyphicon-info-sign"></span>
         Turns messy extracted text (PDF layout artifacts, stray whitespace, smart quotes, etc.) into a tight
-        block ready to use as an AI prompt. Paste text, point at a bucket file by path, or browse and click one.
-    </span>
-    <label class="control-label" style="display: block;">API Endpoint (usable from a Source Task, Dynamic Form, or an external caller like a Python script)</label>
-    <div class="input-group" style="display: flex; max-width: 640px;">
-        <input type="text" class="form-control" readonly [value]="'POST ' + textCleanerService.cleanUrl" />
-        <button type="button" class="btn btn-default" (click)="copyApiUrl()" style="margin-left: 6px;" title="Copy URL">
-            <span class="glyphicon glyphicon-duplicate"></span> Copy URL
-        </button>
-    </div>
-    <span class="help-text" style="display: block; margin-top: 4px;">
-        Body: <code>{{ '{ "text": "..." }' }}</code> -- response's <code>data</code> field holds the cleaned string.
+        block ready to use as an AI prompt. Paste text, or browse a bucket and click a file.
     </span>
 </div>
 
 <div class="toolbar" style="margin-bottom: 12px;">
     <button type="button" class="btn btn-sm" [ngClass]="mode === 'paste' ? 'btn-teal' : 'btn-default'" (click)="setMode('paste')">
         <span class="glyphicon glyphicon-paste"></span> Paste Text
-    </button>
-    <button type="button" class="btn btn-sm" [ngClass]="mode === 'path' ? 'btn-teal' : 'btn-default'" (click)="setMode('path')" style="margin-left: 6px;">
-        <span class="glyphicon glyphicon-link"></span> File Path
     </button>
     <button type="button" class="btn btn-sm" [ngClass]="mode === 'browse' ? 'btn-teal' : 'btn-default'" (click)="setMode('browse')" style="margin-left: 6px;">
         <span class="glyphicon glyphicon-folder-open"></span> Browse Bucket
@@ -49,20 +36,6 @@
             </div>
             <button type="button" class="btn btn-teal" (click)="cleanPastedText()">
                 <span class="glyphicon glyphicon-magnet"></span> Clean
-            </button>
-        </div>
-
-        <div *ngIf="mode === 'path'">
-            <div class="form-group">
-                <label class="control-label">Bucket / key path</label>
-                <input type="text" class="form-control" [(ngModel)]="pathInput"
-                    placeholder="e.g. etl-bucket/folder/file.pdf" (keyup.enter)="loadFromPath()" />
-                <span class="help-text" style="display: block; margin-top: 4px;">
-                    Supported: {{ supportedExtensions.join(', ') }}
-                </span>
-            </div>
-            <button type="button" class="btn btn-teal" (click)="loadFromPath()">
-                <span class="glyphicon glyphicon-download"></span> Load &amp; Clean
             </button>
         </div>
 

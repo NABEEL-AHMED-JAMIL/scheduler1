@@ -1,7 +1,7 @@
 import { Component, OnInit, ViewChild } from '@angular/core';
 import { first } from 'rxjs/operators';
 import { AlertService, OllamaService } from '@/_services';
-import { SpinnerService } from '@/_helpers';
+import { SpinnerService, CATEGORY_PALETTE } from '@/_helpers';
 import { ApiCode } from '@/_models';
 import { OllamaModel, OLLAMA_POPULAR_MODELS, OllamaCatalogEntry, formatBytes } from '@/_models/ollama.model';
 
@@ -26,6 +26,26 @@ export class OllamaModelsComponent implements OnInit {
     public deleteModelName: any;
 
     public formatBytes = formatBytes;
+
+    private familyColorMap = new Map<string, string>();
+
+    public get totalDiskBytes(): number {
+        return this.models.reduce((sum, m) => sum + (m.size || 0), 0);
+    }
+
+    public get familyCount(): number {
+        return new Set(this.models.map((m) => m.family).filter(Boolean)).size;
+    }
+
+    public familyColor(family: string): string {
+        if (!family) {
+            return CATEGORY_PALETTE[0];
+        }
+        if (!this.familyColorMap.has(family)) {
+            this.familyColorMap.set(family, CATEGORY_PALETTE[this.familyColorMap.size % CATEGORY_PALETTE.length]);
+        }
+        return this.familyColorMap.get(family);
+    }
 
     constructor(
         private alertService: AlertService,

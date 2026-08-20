@@ -1,19 +1,17 @@
 import { Component, OnInit } from '@angular/core';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { first } from 'rxjs/operators';
-import { AlertService, AudioTranscriptService, AiAgentService, StorageService } from '@/_services';
-import { ApiCode, AUDIO_SUPPORTED_EXTENSIONS, VIDEO_SUPPORTED_EXTENSIONS, BucketSummary, ObjectSummary } from '@/_models';
-import { AiAgent, fileExtension } from '@/_models/ai-agent.model';
+import { AlertService, AudioTranscriptService, StorageService } from '@/_services';
+import { ApiCode, AUDIO_SUPPORTED_EXTENSIONS, BucketSummary, ObjectSummary } from '@/_models';
+import { fileExtension } from '@/_models/ai-agent.model';
+
+const TIMESTAMP_PATTERN = /\[\d{2}:\d{2}:\d{2}\.\d{3}\]/g;
 
 const PAGE_SIZE = 100;
 
 interface Breadcrumb {
     name: string;
     prefix: string;
-}
-
-interface AskEntry {
-    prompt: string;
-    answer: string;
 }
 
 @Component({
@@ -25,19 +23,12 @@ export class AudioTranscriptExtractorComponent implements OnInit {
     public ERROR = 'Error';
     public SUCCESS = 'Success';
 
-    public mode: 'upload' | 'path' | 'browse' | 'video' | 'youtube' = 'upload';
+    public mode: 'upload' | 'browse' = 'upload';
     public supportedExtensions = AUDIO_SUPPORTED_EXTENSIONS;
-    public videoSupportedExtensions = VIDEO_SUPPORTED_EXTENSIONS;
 
     public includeTimestamps = false;
 
     public selectedFile: File = null;
-
-    public pathInput = '';
-
-    public selectedVideoFile: File = null;
-
-    public youtubeUrl = '';
 
     public buckets: BucketSummary[] = [];
     public loadingBuckets = false;
@@ -46,6 +37,8 @@ export class AudioTranscriptExtractorComponent implements OnInit {
     public loadingObjects = false;
     public currentPrefix = '';
     public breadcrumbs: Breadcrumb[] = [];
+
+    public selectedEntry: ObjectSummary = null;
 
     public sourceLabel = '';
     public extracting = false;
@@ -61,31 +54,25 @@ export class AudioTranscriptExtractorComponent implements OnInit {
     public savingTranscript = false;
     public transcriptSavedPath = '';
     public saveTranscriptError = '';
-    public savingHistory = false;
-    public historySavedPath = '';
-    public saveHistoryError = '';
 
-    public agents: AiAgent[] = [];
-    public loadingAgents = false;
-    public selectedAgentId: any = '';
-    public prompt = '';
-    public asking = false;
-    public askError = '';
-    public asks: AskEntry[] = [];
+    public saveBrowsing = false;
+    public saveCurrentPrefix = '';
+    public saveBreadcrumbs: Breadcrumb[] = [];
+    public saveFolders: ObjectSummary[] = [];
+    public loadingSaveFolders = false;
 
     constructor(
         private alertService: AlertService,
         private storageService: StorageService,
         private audioTranscriptService: AudioTranscriptService,
-        private aiAgentService: AiAgentService) {
+        private sanitizer: DomSanitizer) {
     }
 
     ngOnInit(): void {
         this.loadBuckets();
-        this.loadAgents();
     }
 
-    public setMode(mode: 'upload' | 'path' | 'browse' | 'video' | 'youtube'): void {
+    public setMode(mode: 'upload' | 'browse'): void {
         this.mode = mode;
         this.extractError = '';
     }
@@ -93,6 +80,10 @@ export class AudioTranscriptExtractorComponent implements OnInit {
     public onFileSelected(event: any): void {
         let file: File = event && event.target && event.target.files ? event.target.files[0] : null;
         this.selectedFile = file || null;
+    }
+
+    public get uploadFileIsSupported(): boolean {
+        return !!this.selectedFile && this.hasExtension(this.selectedFile.name, this.supportedExtensions);
     }
 
     public extractUpload(): void {
@@ -110,61 +101,6 @@ export class AudioTranscriptExtractorComponent implements OnInit {
         this.audioTranscriptService.extractFromUpload(this.selectedFile, this.includeTimestamps)
             .pipe(first())
             .subscribe((response) => this.handleExtractResponse(response), (error) => this.handleExtractError(error));
-    }
-
-    public onVideoFileSelected(event: any): void {
-        let file: File = event && event.target && event.target.files ? event.target.files[0] : null;
-        this.selectedVideoFile = file || null;
-    }
-
-    public extractVideoUpload(): void {
-        if (!this.selectedVideoFile) {
-            this.alertService.showError('Choose a video file first.', this.ERROR);
-            return;
-        }
-        if (!this.hasExtension(this.selectedVideoFile.name, this.videoSupportedExtensions)) {
-            this.alertService.showError(
-                `"${this.selectedVideoFile.name}" isn't a supported type (${this.videoSupportedExtensions.join(', ')}).`, this.ERROR);
-            return;
-        }
-        this.sourceLabel = this.selectedVideoFile.name;
-        this.beginExtraction();
-        this.audioTranscriptService.extractFromVideoUpload(this.selectedVideoFile, this.includeTimestamps)
-            .pipe(first())
-            .subscribe((response) => this.handleExtractResponse(response), (error) => this.handleExtractError(error));
-    }
-
-    public extractYoutube(): void {
-        let url = (this.youtubeUrl || '').trim();
-        if (!url) {
-            this.alertService.showError('Paste a YouTube link first.', this.ERROR);
-            return;
-        }
-        if (!/(youtube\.com|youtu\.be)\//i.test(url)) {
-            this.alertService.showError('That doesn\'t look like a YouTube link.', this.ERROR);
-            return;
-        }
-        this.sourceLabel = url;
-        this.beginExtraction();
-        this.audioTranscriptService.extractFromYoutube(url, this.includeTimestamps)
-            .pipe(first())
-            .subscribe((response) => this.handleExtractResponse(response), (error) => this.handleExtractError(error));
-    }
-
-    public loadFromPath(): void {
-        let path = (this.pathInput || '').trim().replace(/^\/+/, '');
-        if (!path) {
-            this.alertService.showError('Enter a path like "etl-bucket/folder/call.mp3".', this.ERROR);
-            return;
-        }
-        let slashIndex = path.indexOf('/');
-        if (slashIndex === -1) {
-            this.alertService.showError('Path must include a bucket, e.g. "etl-bucket/call.mp3".', this.ERROR);
-            return;
-        }
-        let bucket = path.substring(0, slashIndex);
-        let key = path.substring(slashIndex + 1);
-        this.extractFromBucketKey(bucket, key);
     }
 
     public loadBuckets(): void {
@@ -188,6 +124,7 @@ export class AudioTranscriptExtractorComponent implements OnInit {
         this.currentPrefix = '';
         this.breadcrumbs = [];
         this.objects = [];
+        this.selectedEntry = null;
         if (this.selectedBucket) {
             this.loadObjects();
         }
@@ -210,27 +147,46 @@ export class AudioTranscriptExtractorComponent implements OnInit {
             });
     }
 
-    public openEntry(entry: ObjectSummary): void {
+    public get visibleObjects(): ObjectSummary[] {
+        return this.objects.filter((entry) => entry.folder
+            || this.hasExtension(entry.name, this.supportedExtensions)
+            || this.isSavedTranscript(entry));
+    }
+
+    public selectEntry(entry: ObjectSummary): void {
         if (entry.folder) {
             this.currentPrefix = entry.key;
             this.breadcrumbs = [...this.breadcrumbs, { name: entry.name, prefix: entry.key }];
+            this.selectedEntry = null;
             this.loadObjects();
             return;
         }
 
-        if (fileExtension(entry.name) === 'txt') {
-            this.loadSavedTranscript(this.selectedBucket, entry.key);
-            return;
-        }
-        if (!this.hasExtension(entry.name, this.supportedExtensions)) {
+        if (!this.isSavedTranscript(entry) && !this.hasExtension(entry.name, this.supportedExtensions)) {
             this.alertService.showError(
                 `"${entry.name}" isn't a supported type (${this.supportedExtensions.join(', ')} to extract, or .txt for an already-saved transcript).`, this.ERROR);
             return;
         }
-        this.extractFromBucketKey(this.selectedBucket, entry.key);
+        this.selectedEntry = entry;
+    }
+
+    public runSelectedEntry(): void {
+        if (!this.selectedEntry) {
+            return;
+        }
+        if (this.isSavedTranscript(this.selectedEntry)) {
+            this.loadSavedTranscript(this.selectedBucket, this.selectedEntry.key);
+        } else {
+            this.extractFromBucketKey(this.selectedBucket, this.selectedEntry.key);
+        }
+    }
+
+    public isSavedTranscript(entry: ObjectSummary): boolean {
+        return !!entry && fileExtension(entry.name) === 'txt';
     }
 
     public goToBreadcrumb(index: number): void {
+        this.selectedEntry = null;
         if (index < 0) {
             this.currentPrefix = '';
             this.breadcrumbs = [];
@@ -269,14 +225,12 @@ export class AudioTranscriptExtractorComponent implements OnInit {
         this.extractError = '';
         this.transcript = '';
         this.transcriptLoadedFromBucket = false;
-        this.asks = [];
         this.saveBucket = '';
         this.saveFolderName = '';
         this.saveFolderExists = false;
         this.transcriptSavedPath = '';
         this.saveTranscriptError = '';
-        this.historySavedPath = '';
-        this.saveHistoryError = '';
+        this.closeSaveBrowser();
     }
 
     private handleExtractResponse(response: any): void {
@@ -298,18 +252,21 @@ export class AudioTranscriptExtractorComponent implements OnInit {
         return extensions.indexOf(fileExtension(fileName)) > -1;
     }
 
+    public get highlightedTranscript(): SafeHtml {
+        let escaped = this.escapeHtml(this.transcript || '');
+        let withHighlights = escaped.replace(TIMESTAMP_PATTERN, (match) => `<span class="transcript-timestamp">${match}</span>`);
+        return this.sanitizer.bypassSecurityTrustHtml(withHighlights);
+    }
+
+    private escapeHtml(text: string): string {
+        return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
     public copyTranscript(): void {
         if (!this.transcript) {
             return;
         }
         this.copyToClipboard(this.transcript, 'Transcript copied to clipboard.');
-    }
-
-    public copyAnswer(answer: string): void {
-        if (!answer) {
-            return;
-        }
-        this.copyToClipboard(answer, 'Answer copied to clipboard.');
     }
 
     private copyToClipboard(text: string, successMessage: string): void {
@@ -359,23 +316,79 @@ export class AudioTranscriptExtractorComponent implements OnInit {
             });
     }
 
-    public saveHistoryToBucket(): void {
-        if (!this.asks.length || !this.validateSaveTarget()) {
+    public onSaveBucketChange(bucket: string): void {
+        this.saveBucket = bucket;
+        this.saveFolderName = '';
+        this.saveFolderExists = false;
+        this.closeSaveBrowser();
+    }
+
+    public onSaveFolderNameChange(value: string): void {
+        this.saveFolderName = value;
+        this.saveFolderExists = false;
+    }
+
+    public toggleSaveBrowse(): void {
+        if (!this.saveBucket) {
+            this.alertService.showError('Select a bucket first.', this.ERROR);
             return;
         }
-        let historyText = this.asks.map((a) => `Q: ${a.prompt}\nA: ${a.answer}`).join('\n\n');
-        this.savingHistory = true;
-        this.saveHistoryError = '';
-        this.historySavedPath = '';
-        this.saveTextToBucketFolder(this.saveBucket, this.saveFolderName.trim(), 'qa_history.txt', historyText, this.saveFolderExists,
-            (path) => {
-                this.savingHistory = false;
-                this.historySavedPath = path;
-            },
-            (message) => {
-                this.savingHistory = false;
-                this.saveHistoryError = message;
+        this.saveBrowsing = !this.saveBrowsing;
+        if (this.saveBrowsing) {
+            this.saveCurrentPrefix = '';
+            this.saveBreadcrumbs = [];
+            this.loadSaveFolders();
+        }
+    }
+
+    private closeSaveBrowser(): void {
+        this.saveBrowsing = false;
+        this.saveCurrentPrefix = '';
+        this.saveBreadcrumbs = [];
+        this.saveFolders = [];
+    }
+
+    public loadSaveFolders(): void {
+        this.loadingSaveFolders = true;
+        this.storageService.listObjects(this.saveBucket, this.saveCurrentPrefix, null, PAGE_SIZE)
+            .pipe(first())
+            .subscribe((response) => {
+                this.loadingSaveFolders = false;
+                if (response.status === ApiCode.SUCCESS) {
+                    this.saveFolders = ((response.data && response.data.objects) || []).filter((entry) => entry.folder);
+                } else {
+                    this.alertService.showError(response.message, this.ERROR);
+                }
+            }, (error) => {
+                this.loadingSaveFolders = false;
+                this.alertService.showError(error, this.ERROR);
             });
+    }
+
+    public openSaveFolder(entry: ObjectSummary): void {
+        this.saveCurrentPrefix = entry.key;
+        this.saveBreadcrumbs = [...this.saveBreadcrumbs, { name: entry.name, prefix: entry.key }];
+        this.loadSaveFolders();
+    }
+
+    public goToSaveBreadcrumb(index: number): void {
+        if (index < 0) {
+            this.saveCurrentPrefix = '';
+            this.saveBreadcrumbs = [];
+        } else {
+            this.saveCurrentPrefix = this.saveBreadcrumbs[index].prefix;
+            this.saveBreadcrumbs = this.saveBreadcrumbs.slice(0, index + 1);
+        }
+        this.loadSaveFolders();
+    }
+
+    public useCurrentSaveFolder(): void {
+        if (!this.saveCurrentPrefix) {
+            return;
+        }
+        this.saveFolderName = this.saveCurrentPrefix.replace(/\/+$/, '');
+        this.saveFolderExists = true;
+        this.closeSaveBrowser();
     }
 
     private validateSaveTarget(): boolean {
@@ -421,69 +434,19 @@ export class AudioTranscriptExtractorComponent implements OnInit {
             }, (error) => onError(error && error.message ? error.message : error));
     }
 
-    public loadAgents(): void {
-        this.loadingAgents = true;
-        this.aiAgentService.fetchAllAgents()
-            .pipe(first())
-            .subscribe((response) => {
-                this.loadingAgents = false;
-                if (response.status === ApiCode.SUCCESS) {
-                    this.agents = (response.data || []).filter((agent: AiAgent) => agent.status === 'Active');
-                } else {
-                    this.alertService.showError(response.message, this.ERROR);
-                }
-            }, (error) => {
-                this.loadingAgents = false;
-                this.alertService.showError(error, this.ERROR);
-            });
-    }
-
-    public askAi(): void {
-        if (!this.selectedAgentId) {
-            this.alertService.showError('Select an AI Agent.', this.ERROR);
-            return;
-        }
-        if (!this.prompt || !this.prompt.trim()) {
-            this.alertService.showError('Type a question or instruction first.', this.ERROR);
-            return;
-        }
-        let currentPrompt = this.prompt;
-        this.asking = true;
-        this.askError = '';
-        this.aiAgentService.processText(this.selectedAgentId, this.sourceLabel, this.transcript, currentPrompt)
-            .pipe(first())
-            .subscribe((response) => {
-                this.asking = false;
-                if (response.status === ApiCode.SUCCESS) {
-                    this.asks = [...this.asks, { prompt: currentPrompt, answer: response.data }];
-                    this.prompt = '';
-                } else {
-                    this.askError = response.message;
-                }
-            }, (error) => {
-                this.asking = false;
-                this.askError = 'AI request failed: ' + (error && error.message ? error.message : error);
-            });
-    }
-
     public clearAll(): void {
         this.selectedFile = null;
-        this.pathInput = '';
-        this.selectedVideoFile = null;
-        this.youtubeUrl = '';
+        this.selectedEntry = null;
         this.sourceLabel = '';
         this.transcript = '';
         this.transcriptLoadedFromBucket = false;
         this.extractError = '';
-        this.asks = [];
-        this.askError = '';
         this.saveBucket = '';
         this.saveFolderName = '';
         this.saveFolderExists = false;
         this.transcriptSavedPath = '';
         this.saveTranscriptError = '';
-        this.historySavedPath = '';
-        this.saveHistoryError = '';
+        this.closeSaveBrowser();
     }
 
 }

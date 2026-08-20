@@ -8,7 +8,8 @@ import {
     SourceJobService,
     SourceTaskService,
     AlertService,
-    AuthService
+    AuthService,
+    TenantService
 } from '@/_services/index';
 import { first } from 'rxjs/operators';
 
@@ -37,6 +38,8 @@ export class SourceBatchActionComponent implements OnInit {
 
     public readonly isPlatformAdmin: boolean;
     public readonly tenantId: any;
+    public tenants: any[] = [];
+    public selectedTenantId: any = '';
 
     constructor(private _router: Router,
         private _activatedRoute: ActivatedRoute,
@@ -44,7 +47,8 @@ export class SourceBatchActionComponent implements OnInit {
         private spinnerService: SpinnerService,
         private sourceJobService: SourceJobService,
         private sourceTaskService: SourceTaskService,
-        private authService: AuthService) {
+        private authService: AuthService,
+        private tenantService: TenantService) {
         this._activatedRoute.data
         .subscribe((data: any) => {
             this.router = data.router;
@@ -60,7 +64,24 @@ export class SourceBatchActionComponent implements OnInit {
         this.tenantId = user?.tenantId;
     }
 
+    public get needsTenantPicker(): boolean {
+        return this.isPlatformAdmin && this.action === 'sourceTask';
+    }
+
     ngOnInit() {
+        if (this.needsTenantPicker) {
+            this.tenantService.listTenants()
+                .pipe(first())
+                .subscribe((response: any) => {
+                    if (response.status === this.SUCCESS) {
+                        this.tenants = response.data || [];
+                    } else {
+                        this.alertService.showError(response.message, this.ERROR);
+                    }
+                }, (error: any) => {
+                    this.alertService.showError(error, this.ERROR);
+                });
+        }
     }
 
     public onDragOver(event: DragEvent): void {
@@ -89,6 +110,10 @@ export class SourceBatchActionComponent implements OnInit {
         if (!fileToUpload) {
             return;
         }
+        if (this.needsTenantPicker && !this.selectedTenantId) {
+            this.alertService.showError('Pick a tenant before uploading -- these tasks need to belong to one.', this.ERROR);
+            return;
+        }
         this.selectedFileName = fileToUpload.name;
         this.isUploading = true;
         this.lastUploadOk = null;
@@ -96,7 +121,7 @@ export class SourceBatchActionComponent implements OnInit {
         this.errors = [];
         const uploadCall = this.action === 'sourceJob'
             ? this.sourceJobService.uploadSourceJob(fileToUpload)
-            : this.sourceTaskService.uploadSourceTask(fileToUpload);
+            : this.sourceTaskService.uploadSourceTask(fileToUpload, this.selectedTenantId);
         uploadCall
             .pipe(first())
             .subscribe((response: any) => {
@@ -133,7 +158,7 @@ export class SourceBatchActionComponent implements OnInit {
         downloadCall
             .pipe(first())
             .subscribe((response) => {
-                this.downLoadFile(response);
+                this.downLoadFile(response, `${this.buttonMessage}List.xlsx`);
                 this.spinnerService.hide();
             }, (error: any) => {
                 this.spinnerService.hide();
@@ -149,7 +174,7 @@ export class SourceBatchActionComponent implements OnInit {
         templateCall
             .pipe(first())
             .subscribe((response) => {
-                this.downLoadFile(response);
+                this.downLoadFile(response, `${this.buttonMessage}Template.xlsx`);
                 this.spinnerService.hide();
             }, (error: any) => {
                 this.spinnerService.hide();
@@ -161,20 +186,18 @@ export class SourceBatchActionComponent implements OnInit {
         this._router.navigateByUrl(this.router);
     }
 
-    public downLoadFile(data: any): void {
-        let blob = new Blob([data], {
-            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    public downLoadFile(data: any, fileName: string): void {
+        const blob = new Blob([data], {
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         });
-        let url = window.URL.createObjectURL(blob);
-        let pwa = window.open(url);
-        if (!pwa || pwa.closed || typeof pwa.closed == 'undefined') {
-            alert( 'Please disable your Pop-up blocker and try again.');
-
-            window.URL.revokeObjectURL(url);
-            return;
-        }
-
-        pwa.onload = () => window.URL.revokeObjectURL(url);
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
     }
 
 }

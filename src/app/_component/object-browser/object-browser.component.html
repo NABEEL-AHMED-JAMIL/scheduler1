@@ -18,7 +18,10 @@
         </select>
         <span class="help-text" *ngIf="!loadingBuckets && !buckets.length">
             <span class="glyphicon glyphicon-info-sign"></span>
-            No buckets configured yet -- add entries under the BUCKET_LIST lookup in Setting.
+            No buckets configured yet.
+            <a class="btn btn-sm btn-default" routerLink="/setting/lookup" [queryParams]="{ code: 'BUCKET_LIST' }" style="margin-left: 8px;">
+                <span class="glyphicon glyphicon-plus"></span> Add Bucket
+            </a>
         </span>
     </div>
 </div>
@@ -33,10 +36,15 @@
         </ng-container>
         <span class="breadcrumb-spacer"></span>
         <span class="selected-count" *ngIf="selectedKeys.size">{{ selectedKeys.size }} selected</span>
-        <button type="button" class="btn btn-default btn-icon ic-refresh" (click)="refreshCurrentFolder()"
-            [disabled]="loadingObjects || directoryStats.loading" title="Refresh this folder">
-            <span class="glyphicon glyphicon-refresh" [ngClass]="{'spin': loadingObjects || directoryStats.loading}"></span>
-        </button>
+        <div class="btn-group btn-group-sm">
+            <button type="button" class="btn btn-default btn-icon" (click)="copyCurrentPath()" title="Copy folder path">
+                <span class="glyphicon glyphicon-duplicate"></span>
+            </button>
+            <button type="button" class="btn btn-default btn-icon ic-refresh" (click)="refreshCurrentFolder()"
+                [disabled]="loadingObjects || directoryStats.loading" title="Refresh this folder">
+                <span class="glyphicon glyphicon-refresh" [ngClass]="{'spin': loadingObjects || directoryStats.loading}"></span>
+            </button>
+        </div>
     </nav>
 
     <div class="toolbar bucket-toolbar">
@@ -110,6 +118,10 @@
             title="Downloads any selected files -- selected folders are skipped (not zipped)">
             <span class="glyphicon glyphicon-download-alt"></span> Download
         </button>
+        <button type="button" class="btn btn-default btn-sm" data-toggle="modal" data-target="#emailShareModal"
+            (click)="requestEmailShareBulk()" title="Emails the selection as a ZIP attachment">
+            <span class="glyphicon glyphicon-envelope"></span> Email
+        </button>
         <button type="button" class="btn btn-danger btn-sm" data-toggle="modal" data-target="#deleteConfirmModal"
             (click)="requestDeleteBulk()">
             <span class="glyphicon glyphicon-trash"></span> Delete
@@ -118,7 +130,7 @@
     </div>
 
     <div class="row row-equal bucket-browse-row">
-        <div class="bucket-table-col" [ngClass]="selectedObject ? 'col-md-8' : 'col-md-12'">
+        <div class="bucket-table-col" [ngClass]="chatFile ? 'col-md-8' : 'col-md-12'">
             <div class="table-responsive scroll-table bucket-scroll" (scroll)="onTableScroll($event)">
                 <table class="table table-striped table-bordered table-hover table-modern bucket-object-table" style="font-size: 12px;">
                     <thead>
@@ -127,12 +139,11 @@
                                 <input type="checkbox" [checked]="allVisibleSelected"
                                     [disabled]="!selectableVisibleCount" (click)="toggleSelectAll($event)" />
                             </th>
-                            <th style="width: 260px;">Name</th>
-                            <th style="width: 240px;">ETag</th>
+                            <th style="width: 340px;">Name</th>
                             <th style="width: 170px;">Last Modified</th>
                             <th class="text-right" style="width: 90px;">Size</th>
                             <th style="width: 130px;">Content Type</th>
-                            <th class="text-center" style="width: 150px;">Action</th>
+                            <th class="text-center" style="width: 110px;">Action</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -141,49 +152,84 @@
                             <td (click)="$event.stopPropagation()">
                                 <input type="checkbox" [checked]="isSelected(entry)" (click)="toggleSelect(entry, $event)" />
                             </td>
-                            <td class="name-value" [title]="entry.name">
-                                <span class="glyphicon"
-                                    [ngClass]="entry.folder ? 'glyphicon-folder-open folder-icon' : 'glyphicon-file file-icon'"></span>
-                                {{ entry.name }}
+                            <td class="name-cell">
+                                <div class="name-cell-main" [title]="entry.name">
+                                    <span class="glyphicon"
+                                        [ngClass]="entry.folder ? 'glyphicon-folder-open folder-icon' : 'glyphicon-file file-icon'"></span>
+                                    {{ entry.name }}
+                                </div>
                             </td>
-                            <td class="etag-value" [title]="entry.etag || ''">{{ entry.etag || '-' }}</td>
                             <td>{{ entry.lastModified ? (entry.lastModified | date: 'medium') : '-' }}</td>
                             <td class="text-right" [title]="entry.folder ? folderStatTitle(entry) : ''">
                                 {{ entry.folder ? folderStatLabel(entry) : formatSize(entry.size) }}
                             </td>
                             <td class="content-type-value" [title]="entry.contentType || ''">{{ entry.contentType || '-' }}</td>
                             <td class="text-center row-actions">
-                                <button type="button" class="btn btn-default btn-icon ic-view" *ngIf="!entry.folder"
-                                    (click)="selectObject(entry)" data-toggle="modal" data-target="#objectPreviewModal" title="View">
-                                    <span class="glyphicon glyphicon-eye-open"></span>
-                                </button>
-                                <button type="button" class="btn btn-default btn-icon ic-copy"
-                                    (click)="copyPath(entry, $event)" title="Copy path">
-                                    <span class="glyphicon glyphicon-duplicate"></span>
-                                </button>
-                                <button type="button" class="btn btn-default btn-icon ic-edit" *ngIf="entry.folder"
-                                    data-toggle="modal" data-target="#renameFolderModal"
-                                    (click)="requestRenameFolder(entry, $event)" title="Rename">
-                                    <span class="glyphicon glyphicon-pencil"></span>
-                                </button>
-                                <button type="button" class="btn btn-default btn-icon ic-download" *ngIf="!entry.folder"
-                                    (click)="downloadEntry(entry, $event)" title="Download">
-                                    <span class="glyphicon glyphicon-download-alt"></span>
-                                </button>
-                                <button type="button" class="btn btn-default btn-icon ic-delete"
-                                    data-toggle="modal" data-target="#deleteConfirmModal"
-                                    (click)="requestDeleteEntry(entry, $event)" title="Delete">
-                                    <span class="glyphicon glyphicon-trash"></span>
-                                </button>
+                                <div class="btn-group btn-group-sm" style="align-items: center;">
+                                    <button type="button" class="btn btn-default btn-icon ic-ai" *ngIf="!entry.folder" title="Robot action"
+                                        (click)="onRobotAction(entry)">
+                                        <span class="glyphicon glyphicon-flash"></span>
+                                    </button>
+                                    <div class="dropdown" style="display: inline-block;">
+                                        <button type="button" class="btn btn-default btn-icon ic-more" data-toggle="dropdown" title="Actions">
+                                            <span class="glyphicon glyphicon-option-vertical"></span>
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-right">
+                                            <li *ngIf="!entry.folder">
+                                                <a href="javascript:void(0);"
+                                                    (click)="selectObject(entry)" data-toggle="modal" data-target="#objectPreviewModal">
+                                                    <span class="glyphicon glyphicon-eye-open"></span> View
+                                                </a>
+                                            </li>
+                                            <li *ngIf="!entry.folder">
+                                                <a href="javascript:void(0);" (click)="downloadEntry(entry, $event)">
+                                                    <span class="glyphicon glyphicon-download-alt"></span> Download
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a href="javascript:void(0);"
+                                                    data-toggle="modal" data-target="#emailShareModal"
+                                                    (click)="requestEmailShare(entry, $event)">
+                                                    <span class="glyphicon glyphicon-envelope"></span> Email
+                                                </a>
+                                            </li>
+                                            <li *ngIf="entry.folder">
+                                                <a href="javascript:void(0);"
+                                                    data-toggle="modal" data-target="#renameFolderModal"
+                                                    (click)="requestRenameFolder(entry, $event)">
+                                                    <span class="glyphicon glyphicon-pencil"></span> Rename
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a href="javascript:void(0);" (click)="copyPath(entry, $event)">
+                                                    <span class="glyphicon glyphicon-duplicate"></span> Copy path
+                                                </a>
+                                            </li>
+                                            <li *ngIf="!entry.folder && entry.etag">
+                                                <a href="javascript:void(0);" (click)="copyEtag(entry, $event)">
+                                                    <span class="glyphicon glyphicon-copy"></span> Copy ETag
+                                                </a>
+                                            </li>
+                                            <li class="divider"></li>
+                                            <li>
+                                                <a href="javascript:void(0);"
+                                                    data-toggle="modal" data-target="#deleteConfirmModal"
+                                                    (click)="requestDeleteEntry(entry, $event)">
+                                                    <span class="glyphicon glyphicon-trash"></span> Delete
+                                                </a>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
                             </td>
                         </tr>
                         <tr *ngIf="!filteredObjects.length && !loadingObjects">
-                            <td colspan="7" class="text-center text-muted">
+                            <td colspan="6" class="text-center text-muted">
                                 {{ isFiltering ? 'No files match your search.' : 'This folder is empty.' }}
                             </td>
                         </tr>
                         <tr *ngIf="loadingObjects">
-                            <td colspan="7" class="text-center text-muted">Loading...</td>
+                            <td colspan="6" class="text-center text-muted">Loading...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -194,22 +240,117 @@
             </p>
         </div>
 
-        <div class="col-md-4 bucket-panel-col" *ngIf="selectedObject">
-            <div class="side-panel">
+        <div class="col-md-4 bucket-panel-col" *ngIf="chatFile">
+            <div class="side-panel chat-panel">
                 <div class="side-panel-header">
-                    <span class="side-panel-title" [title]="selectedObject.name">
-                        <span class="glyphicon glyphicon-file file-icon"></span>{{ selectedObject.name }}
+                    <span class="side-panel-title" [title]="chatFile.name">
+                        <span class="glyphicon glyphicon-flash ic-ai"></span>Chat
                     </span>
-                    <button type="button" class="close" (click)="closePanel()">&times;</button>
+                    <button type="button" class="close" (click)="closeChat()">&times;</button>
                 </div>
 
-                <div *ngIf="loadingMetadata" class="text-muted">Loading details...</div>
+                <div class="chat-attachment">
+                    <span class="glyphicon glyphicon-paperclip"></span>
+                    <div class="chat-attachment-info">
+                        <span class="chat-attachment-name" [title]="chatFile.name">{{ chatFile.name }}</span>
+                    </div>
+                </div>
 
-                <div *ngIf="selectedObjectMetadata && !loadingMetadata" class="side-panel-body">
-                    <ng-container *ngTemplateOutlet="previewBody"></ng-container>
+                <div class="chat-messages" #chatMessagesEl>
+                    <div class="chat-messages-empty" *ngIf="chatPreparing">
+                        <span class="glyphicon glyphicon-refresh spin"></span>
+                        Preparing this file for chat&hellip;
+                    </div>
+                    <div class="chat-messages-empty chat-messages-error" *ngIf="!chatPreparing && chatPrepareError">
+                        <span class="glyphicon glyphicon-exclamation-sign"></span>
+                        {{ chatPrepareError }}
+                    </div>
+                    <div class="chat-messages-empty" *ngIf="!chatPreparing && !chatPrepareError && !chatMessages.length">
+                        <span class="glyphicon glyphicon-comment"></span>
+                        Ask something about this file to get started.
+                    </div>
+                    <div class="chat-message"
+                        [ngClass]="message.role === 'user' ? 'chat-message-user' : (message.role === 'error' ? 'chat-message-error' : 'chat-message-assistant')"
+                        *ngFor="let message of chatMessages">
+                        <div class="chat-message-header">
+                            <span class="chat-message-author">{{ message.author }}</span>
+                            <button type="button" class="chat-message-copy-btn" title="Copy message"
+                                *ngIf="message.role === 'assistant'" (click)="copyChatMessage(message)">
+                                <span class="glyphicon glyphicon-copy"></span>
+                            </button>
+                        </div>
+                        <div class="chat-message-text chat-message-rich" *ngIf="message.html" [innerHTML]="message.html"></div>
+                        <span class="chat-message-text" *ngIf="!message.html">{{ message.text }}</span>
+                        <div class="chat-message-file" *ngFor="let file of message.files">
+                            <span class="glyphicon glyphicon-file"></span>
+                            <span class="chat-message-file-name" [title]="file.filename">{{ file.filename }}</span>
+                            <button type="button" class="chat-message-file-btn" [disabled]="file.converting"
+                                [title]="file.converting ? 'Converting...' : 'Download'"
+                                (click)="downloadChatFile(file)">
+                                <span class="glyphicon" [ngClass]="file.converting ? 'glyphicon-refresh spin' : 'glyphicon-download-alt'"></span>
+                                {{ file.converting ? 'Converting...' : 'Download' }}
+                            </button>
+                        </div>
+                    </div>
+                    <div class="chat-message chat-message-assistant chat-message-typing" *ngIf="chatSending">
+                        <span class="chat-message-author">Assistant</span>
+                        <span class="chat-typing-dots"><span></span><span></span><span></span></span>
+                        <span class="chat-typing-hint" *ngIf="chatSlowHint">
+                            Still working&nbsp;&mdash; larger or freshly-loaded models can take a
+                            couple of minutes, especially on the first message. You can keep typing,
+                            or <a href="javascript:void(0);" (click)="stopChatMessage()">stop waiting</a>.
+                        </span>
+                    </div>
+                </div>
+
+                <div class="chat-suggestions-row" *ngIf="!chatPreparing && !chatPrepareError && !chatDraft.trim()">
+                    <div class="chat-suggestions" *ngIf="chatSuggestionsVisible">
+                        <button type="button" class="chat-suggestion-chip" *ngFor="let prompt of chatSuggestedPrompts"
+                            (click)="useSuggestedPrompt(prompt)">{{ prompt }}</button>
+                    </div>
+                    <button type="button" class="chat-suggestions-toggle" (click)="toggleChatSuggestions()">
+                        <span class="glyphicon" [ngClass]="chatSuggestionsVisible ? 'glyphicon-chevron-up' : 'glyphicon-chevron-down'"></span>
+                        {{ chatSuggestionsVisible ? 'Hide suggestions' : 'Show suggestions' }}
+                    </button>
+                </div>
+
+                <div class="chat-input-row">
+                    <textarea class="form-control chat-input" rows="2" placeholder="Message" #chatInputEl
+                        [(ngModel)]="chatDraft" [ngModelOptions]="{standalone: true}"
+                        [disabled]="chatPreparing || !!chatPrepareError || !chatSelectedModel"
+                        (keydown)="onChatInputKeydown($event)"></textarea>
+                    <button type="button" class="btn btn-sm chat-mic-btn" *ngIf="chatSpeechSupported"
+                        [ngClass]="{'chat-mic-btn-active': chatListening}"
+                        [title]="chatListening ? 'Stop listening' : 'Speak your message'"
+                        [disabled]="chatPreparing || !!chatPrepareError || chatSending || !chatSelectedModel"
+                        (click)="toggleChatMic()">
+                        <span class="glyphicon glyphicon-headphones"></span>
+                    </button>
+                    <span class="chat-mic-bars" *ngIf="chatListening" aria-hidden="true">
+                        <span></span><span></span><span></span>
+                    </span>
+                    <button type="button" class="btn btn-teal btn-sm chat-send-btn"
+                        [ngClass]="{'chat-send-btn-stop': chatSending}"
+                        [title]="chatSending ? 'Stop' : 'Send'"
+                        [disabled]="chatPreparing || !!chatPrepareError || (!chatSending && !chatSelectedModel)"
+                        (click)="chatSending ? stopChatMessage() : sendChatMessage()">
+                        <span class="glyphicon" [ngClass]="chatSending ? 'glyphicon-stop' : 'glyphicon-arrow-right'"></span>
+                    </button>
+                </div>
+
+                <div class="chat-model-row">
+                    <span class="glyphicon glyphicon-flash ic-ai"></span>
+                    <span class="chat-model-label">Model</span>
+                    <select class="chat-model-select" [(ngModel)]="chatSelectedModel" [ngModelOptions]="{standalone: true}"
+                        [disabled]="loadingChatModels || !chatModels.length">
+                        <option *ngIf="loadingChatModels" value="">Loading models&hellip;</option>
+                        <option *ngIf="!loadingChatModels && !chatModels.length" value="">No models installed</option>
+                        <option *ngFor="let model of chatModels" [value]="model.name">{{ model.name }}</option>
+                    </select>
                 </div>
             </div>
         </div>
+
     </div>
 </div>
 
@@ -246,7 +387,7 @@
     <div *ngIf="previewKind === 'md' && previewEditMode === 'view'" class="md-preview" [innerHTML]="previewMdHtml"></div>
 
     <div *ngIf="isEditableTextPreview && previewEditMode === 'edit'">
-        <textarea class="preview-text-editor" [(ngModel)]="previewEditText" spellcheck="false"></textarea>
+        <textarea class="preview-text-editor" [(ngModel)]="previewEditText" spellcheck="false" placeholder="This file is empty"></textarea>
         <div class="preview-toolbar" style="margin-top: 8px;">
             <button type="button" class="btn btn-sm btn-teal" [disabled]="savingPreview" (click)="savePreview()">
                 <span class="glyphicon" [ngClass]="savingPreview ? 'glyphicon-refresh spin' : 'glyphicon-ok'"></span>
@@ -338,6 +479,49 @@
     </div>
 </div>
 
+<div class="modal fade" id="emailShareModal" role="dialog">
+    <div class="modal-dialog">
+        <div class="modal-content" style="border: none">
+            <form (ngSubmit)="confirmEmailShare()">
+                <div class="modal-header">
+                    <button type="button" class="close" #closeEmailShareModal data-dismiss="modal">&times;</button>
+                    <h4 class="modal-title">
+                        <span class="glyphicon glyphicon-envelope"></span>
+                        Email {{ emailShareBulkKeys ? (emailShareBulkKeys.length + ' Items') : (emailShareEntry?.folder ? 'Folder' : 'File') }}
+                    </h4>
+                </div>
+                <div class="modal-body">
+                    <p class="help-text">
+                        <span class="glyphicon glyphicon-info-sign"></span>
+                        <span *ngIf="emailShareBulkKeys">Sends {{ emailShareBulkKeys.length }} selected item(s) as a ZIP attachment.</span>
+                        <span *ngIf="!emailShareBulkKeys && emailShareEntry?.folder">Sends "{{ emailShareEntry?.name }}" as a ZIP attachment.</span>
+                        <span *ngIf="!emailShareBulkKeys && !emailShareEntry?.folder">Sends "{{ emailShareEntry?.name }}" as an attachment.</span>
+                    </p>
+                    <div class="form-group">
+                        <label for="emailShareAddress">Recipient email</label>
+                        <input type="email" id="emailShareAddress" class="form-control input-sm" autofocus
+                            placeholder="name@example.com"
+                            [(ngModel)]="emailShareAddress" [ngModelOptions]="{ standalone: true }" />
+                    </div>
+                    <div class="form-group">
+                        <label for="emailShareMessage">Message <span class="help-text" style="font-weight: normal;">(optional)</span></label>
+                        <textarea id="emailShareMessage" class="form-control input-sm" rows="3"
+                            [(ngModel)]="emailShareMessage" [ngModelOptions]="{ standalone: true }"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-primary"
+                        [disabled]="!emailShareAddress || !emailShareAddress.trim() || emailSharing">
+                        <span class="glyphicon" [ngClass]="emailSharing ? 'glyphicon-refresh spin' : 'glyphicon-envelope'"></span>
+                        {{ emailSharing ? 'Sending...' : 'Send' }}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="deleteConfirmModal" role="dialog">
     <div class="modal-dialog">
         <div class="modal-content" style="border: none">
@@ -354,6 +538,34 @@
                 <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
                 <button type="button" class="btn btn-danger" (click)="confirmDelete()">
                     <span class="glyphicon glyphicon-trash"></span> Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<button type="button" data-toggle="modal" data-target="#leaveChatConfirmModal" #openLeaveChatModal style="display: none;"></button>
+
+<div class="modal fade" id="leaveChatConfirmModal" role="dialog">
+    <div class="modal-dialog">
+        <div class="modal-content" style="border: none">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" (click)="cancelLeaveChat()">&times;</button>
+                <h4 class="modal-title">
+                    <span class="glyphicon glyphicon-flash ic-ai"></span> Leave this chat?
+                </h4>
+            </div>
+            <div class="modal-body">
+                <p>
+                    You're chatting about <strong>{{ chatFile?.name }}</strong>.
+                    Opening <strong>{{ pendingFileSwitch?.entry?.name }}</strong> will end this
+                    conversation<span *ngIf="chatSending"> and stop the reply that's still in progress</span>.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal" (click)="cancelLeaveChat()">Stay in chat</button>
+                <button type="button" class="btn btn-teal" data-dismiss="modal" (click)="confirmLeaveChat()">
+                    <span class="glyphicon glyphicon-log-out"></span> Leave &amp; open
                 </button>
             </div>
         </div>

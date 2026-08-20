@@ -107,12 +107,6 @@ body.jw-modal-open {
 @toggle-default-label-width: 4rem;
 @toggle-default-font-size: .75rem;
 
-body {
-  font-family: 'Montserrat', 'Lato', 'Open Sans', 'Helvetica Neue', Helvetica, Calibri, Arial, sans-serif;
-  color: @gray;
-  background: #f2f2f2;
-}
-
 .jumbotron {
   background: @gray;
   color: @gray-lighter;
@@ -797,8 +791,11 @@ a {
 @page-bg: #f4f6f8;
 
 body {
-  background: @page-bg;
+  font-family: 'Montserrat', 'Lato', 'Open Sans', 'Helvetica Neue', Helvetica, Calibri, Arial, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
   color: @ink;
+  background: @page-bg;
 }
 
 .app-content {
@@ -1078,18 +1075,6 @@ body {
   }
 }
 
-.table-modern {
-  font-size: 11px;
-}
-
-.table-modern > thead > tr > th {
-  font-size: 9px;
-  padding: 6px 8px;
-}
-
-.table-modern > tbody > tr > td {
-  padding: 6px 8px;
-}
 
 .cell-message {
   max-width: 320px;
@@ -1124,13 +1109,13 @@ body {
   margin-bottom: 12px;
 }
 
-.detail-item .detail-label {
+.detail-label {
   display: block;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.4px;
   color: @muted;
-  font-weight: 600;
+  font-weight: 700;
   margin-bottom: 3px;
 }
 
@@ -1236,6 +1221,15 @@ body {
 .scroll-table {
   max-height: 850px;
   overflow-y: auto;
+}
+
+// A row-level "..." dropdown menu can render taller than the space between the
+// button and the table edge, and gets visually clipped by overflow-y above --
+// this JS-toggled class (see index.html show.bs.dropdown/hidden.bs.dropdown
+// handlers) lets the open menu escape that clipping without losing the
+// scrollable/sticky-header behavior the rest of the time.
+.scroll-table.dropdown-open {
+  overflow: visible;
 }
 
 .scroll-table > .table-modern {
@@ -1745,6 +1739,22 @@ body {
   border-radius: 6px;
 }
 
+.result-panel {
+  padding: 14px 16px;
+  background: #f3fbf7;
+  border: 1px solid fade(#1d7a3f, 25%);
+  border-radius: 8px;
+}
+
+.result-preview-row {
+  margin-top: 12px;
+  height: 480px;
+}
+
+.result-preview-row .bucket-panel-col {
+  height: 100%;
+}
+
 .code-input {
   font-family: 'Courier New', Courier, monospace;
   font-size: 12px;
@@ -1815,6 +1825,82 @@ body {
 .stat-strip .stat-chip.chip-tasktype { .chip-tint(#efe6fb; #6a3bbf); }
 .stat-strip .stat-chip.chip-task     { .chip-tint(#fff4e0; #b5730a); }
 .stat-strip .stat-chip.chip-job      { .chip-tint(#e3f6e9; #1d7a3f); }
+
+.mini-kpi-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.mini-kpi-tile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: @surface;
+  border: 1px solid @line;
+  border-radius: 6px;
+  padding: 7px 12px;
+}
+
+.mini-kpi-tile .mini-kpi-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.mini-kpi-tile .mini-kpi-value {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  color: @ink;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.mini-kpi-tile .mini-kpi-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  color: #7a8892;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.mini-kpi-tile.mini-kpi-total {
+  background: @brand-teal;
+  border-color: @brand-teal-dark;
+}
+
+.mini-kpi-tile.mini-kpi-total .mini-kpi-value,
+.mini-kpi-tile.mini-kpi-total .mini-kpi-label {
+  color: #fff;
+}
+
+.mini-kpi-tile.mini-kpi-total .mini-kpi-icon {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.mini-kpi-icon-tint(@bg; @fg) {
+  background: @bg;
+  color: @fg;
+}
+
+.mini-kpi-tile.mini-kpi-queue     .mini-kpi-icon { .mini-kpi-icon-tint(#e0f7fa; #0c7c8c); }
+.mini-kpi-tile.mini-kpi-start     .mini-kpi-icon { .mini-kpi-icon-tint(#e8eaf6; #283593); }
+.mini-kpi-tile.mini-kpi-running   .mini-kpi-icon { .mini-kpi-icon-tint(#fff4e0; #b5730a); }
+.mini-kpi-tile.mini-kpi-failed    .mini-kpi-icon { .mini-kpi-icon-tint(#fde4e4; #c0392b); }
+.mini-kpi-tile.mini-kpi-completed .mini-kpi-icon { .mini-kpi-icon-tint(#e3f6e9; #1d7a3f); }
+.mini-kpi-tile.mini-kpi-skip      .mini-kpi-icon { .mini-kpi-icon-tint(#e1f0fb; #1c6ea4); }
+.mini-kpi-tile.mini-kpi-interrupt .mini-kpi-icon { .mini-kpi-icon-tint(#efe6fb; #6a3bbf); }
+.mini-kpi-tile.mini-kpi-missed    .mini-kpi-icon { .mini-kpi-icon-tint(#fef3c7; #d97706); }
+.mini-kpi-tile.mini-kpi-schedule  .mini-kpi-icon { .mini-kpi-icon-tint(#e6f6f4; @brand-teal-dark); }
 
 .admin-card {
   display: flex;
@@ -1956,6 +2042,7 @@ body {
 .pill-default { background: #eceff1; color: #566573; }
 .pill-purple  { background: #efe6fb; color: #6a3bbf; }
 .pill-cyan    { background: #e0f7fa; color: #0c7c8c; }
+.pill-amber   { background: #fef3c7; color: #d97706; }
 
 .pill-icon {
   display: inline-flex;
@@ -1978,6 +2065,21 @@ button.pill-icon:hover {
   filter: brightness(0.95);
 }
 
+.family-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.family-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
 button.pill-icon {
   border: none;
   outline: none;
@@ -1993,6 +2095,7 @@ button.pill-icon {
 .status-Interrupt { .pill-purple; }
 
 .status-Skip      { .pill-default; }
+.status-Missed    { .pill-amber; }
 
 .btn {
   border-radius: 5px;
@@ -2095,7 +2198,7 @@ button.pill-icon {
 .btn-icon.ic-view .glyphicon     { color: #4f46e5; }
 .btn-icon.ic-edit .glyphicon     { color: #2563eb; }
 .btn-icon.ic-delete .glyphicon   { color: #c0392b; }
-.btn-icon.ic-run .glyphicon      { color: #1d7a3f; }
+.btn-icon.ic-run .glyphicon      { color: #1d5fa8; }
 .btn-icon.ic-skip .glyphicon     { color: #0c7c8c; }
 .btn-icon.ic-download .glyphicon { color: #b5730a; }
 .btn-icon.ic-history .glyphicon  { color: #566573; }
@@ -2104,6 +2207,67 @@ button.pill-icon {
 .btn-icon.ic-add .glyphicon      { color: #1d7a3f; }
 .btn-icon.ic-copy .glyphicon     { color: #566573; }
 .btn-icon.ic-refresh .glyphicon  { color: #4f46e5; }
+.btn-icon.ic-active .glyphicon   { color: #1d7a3f; }
+.btn-icon.ic-inactive .glyphicon { color: #adb3b9; }
+.btn-icon.ic-more .glyphicon     { color: #566573; }
+.btn-icon.ic-ai .glyphicon       { color: #be185d; }
+
+.btn-icon.ic-view     { border-color: #c7cbf5; }
+.btn-icon.ic-edit     { border-color: #bcd6fb; }
+.btn-icon.ic-delete   { border-color: #f3b4ac; }
+.btn-icon.ic-run      { border-color: #a9c4e8; }
+.btn-icon.ic-skip     { border-color: #a9dee3; }
+.btn-icon.ic-download { border-color: #f3d99a; }
+.btn-icon.ic-history,
+.btn-icon.ic-logs,
+.btn-icon.ic-clone,
+.btn-icon.ic-copy     { border-color: #cfd4d9; }
+.btn-icon.ic-interrupt { border-color: #d3c1f0; }
+.btn-icon.ic-add      { border-color: #a9dab8; }
+.btn-icon.ic-refresh  { border-color: #c7cbf5; }
+.btn-icon.ic-active   { border-color: #a9dab8; }
+.btn-icon.ic-inactive { border-color: #d8dbde; }
+.btn-icon.ic-ai       { border-color: #f6c6dc; }
+
+// Was fully transparent/borderless -- next to the colored-border primary actions it read as
+// invisible rather than "secondary", and it's now the only way to reach Delete on most tables.
+// Neutral grey border keeps it visually secondary while still reading as a clickable button.
+.btn-icon.ic-more     { border-color: #d3dade; background: #fff; }
+
+.btn-icon.ic-view:hover:not([disabled]),
+.btn-icon.ic-view:focus:not([disabled])         { background: #eef0fb; border-color: #a8adf0; }
+.btn-icon.ic-edit:hover:not([disabled]),
+.btn-icon.ic-edit:focus:not([disabled])         { background: #eaf1fd; border-color: #8fc0f8; }
+.btn-icon.ic-delete:hover:not([disabled]),
+.btn-icon.ic-delete:focus:not([disabled])       { background: #fdecea; border-color: #ec9587; }
+.btn-icon.ic-run:hover:not([disabled]),
+.btn-icon.ic-run:focus:not([disabled])          { background: #e8f0fb; border-color: #7fa8dd; }
+.btn-icon.ic-skip:hover:not([disabled]),
+.btn-icon.ic-skip:focus:not([disabled])         { background: #e3f5f7; border-color: #7fcdd4; }
+.btn-icon.ic-download:hover:not([disabled]),
+.btn-icon.ic-download:focus:not([disabled])     { background: #fdf3e3; border-color: #edc971; }
+.btn-icon.ic-history:hover:not([disabled]),
+.btn-icon.ic-logs:hover:not([disabled]),
+.btn-icon.ic-clone:hover:not([disabled]),
+.btn-icon.ic-copy:hover:not([disabled]),
+.btn-icon.ic-more:hover:not([disabled]),
+.btn-icon.ic-history:focus:not([disabled]),
+.btn-icon.ic-logs:focus:not([disabled]),
+.btn-icon.ic-clone:focus:not([disabled]),
+.btn-icon.ic-copy:focus:not([disabled]),
+.btn-icon.ic-more:focus:not([disabled])         { background: #eef0f2; border-color: #b3bac0; }
+.btn-icon.ic-interrupt:hover:not([disabled]),
+.btn-icon.ic-interrupt:focus:not([disabled])    { background: #f2ecfb; border-color: #bb9de8; }
+.btn-icon.ic-add:hover:not([disabled]),
+.btn-icon.ic-add:focus:not([disabled])          { background: #e8f6ec; border-color: #7fcd94; }
+.btn-icon.ic-refresh:hover:not([disabled]),
+.btn-icon.ic-refresh:focus:not([disabled])      { background: #eef0fb; border-color: #a8adf0; }
+.btn-icon.ic-active:hover:not([disabled]),
+.btn-icon.ic-active:focus:not([disabled])       { background: #e8f6ec; border-color: #7fcd94; }
+.btn-icon.ic-inactive:hover:not([disabled]),
+.btn-icon.ic-inactive:focus:not([disabled])     { background: #f4f5f6; border-color: #c3c8cc; }
+.btn-icon.ic-ai:hover:not([disabled]),
+.btn-icon.ic-ai:focus:not([disabled])           { background: #fce9f1; border-color: #ec8fbb; }
 
 .btn-icon[disabled] .glyphicon,
 .btn-icon.disabled .glyphicon {
@@ -2117,6 +2281,36 @@ button.pill-icon {
   padding: 18px;
   margin-bottom: 18px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 48px 24px;
+  color: @muted;
+}
+
+.empty-state .glyphicon {
+  font-size: 32px;
+  color: @line;
+  margin-bottom: 12px;
+}
+
+.empty-state-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: @ink;
+  margin-bottom: 4px;
+}
+
+.empty-state-text {
+  font-size: 13px;
+  color: @muted;
+  max-width: 420px;
+  margin-bottom: 14px;
 }
 
 .setting-tabs {
@@ -2152,6 +2346,32 @@ button.pill-icon {
   color: @ink;
   border-bottom: 1px solid #eceff1;
   padding-bottom: 10px;
+}
+
+.card-panel-title.has-inline-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.card-panel-title.has-inline-action .inline-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.card-panel-title.has-inline-action .inline-field .control-label {
+  margin-bottom: 0;
+  white-space: nowrap;
+}
+
+.card-panel-title.has-inline-action .inline-field .form-control {
+  width: 160px;
+  display: inline-block;
 }
 
 .card-panel-title.panel-banner {
@@ -2205,6 +2425,18 @@ button.pill-icon {
   text-decoration: none;
 }
 
+.card-panel-title.panel-banner .bucket-help-toggle,
+.card-panel-title.panel-banner .bucket-help-toggle:visited {
+  color: #fff;
+  text-decoration: none;
+}
+
+.card-panel-title.panel-banner .bucket-help-toggle:hover,
+.card-panel-title.panel-banner .bucket-help-toggle:focus {
+  color: #fff;
+  text-decoration: underline;
+}
+
 .form-section {
   margin-top: 18px;
 }
@@ -2223,6 +2455,120 @@ button.pill-icon {
   font-family: 'Courier New', Courier, monospace;
   font-size: 12px;
   resize: vertical;
+}
+
+.schedule-repeat-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.schedule-inline-control {
+  width: auto;
+  min-width: 96px;
+  display: inline-block;
+}
+
+.schedule-day-picker {
+  display: flex;
+  gap: 6px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.day-pill {
+  border: 1px solid @line;
+  background: @surface;
+  color: @ink;
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 6px 4px;
+  border-radius: 8px;
+  width: 46px;
+  text-align: center;
+  cursor: pointer;
+  transition: background .12s ease, color .12s ease, border-color .12s ease;
+}
+
+.day-pill:hover {
+  border-color: @brand-primary;
+}
+
+.day-pill.active {
+  background: @brand-primary;
+  border-color: @brand-primary;
+  color: #fff;
+}
+
+.schedule-month-day {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.schedule-summary {
+  margin-top: 14px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: rgba(79, 70, 229, 0.09);
+  color: @brand-primary;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+}
+
+.schedule-summary .glyphicon {
+  margin-top: 2px;
+}
+
+.schedule-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+}
+
+.schedule-cell-main {
+  font-weight: 600;
+  color: @ink;
+}
+
+.schedule-cell-next {
+  font-size: 11px;
+  color: @muted;
+}
+
+.schedule-cell-expired {
+  color: @brand-secondary;
+  font-weight: 600;
+}
+
+// Warns that the upcoming Next-run is the schedule's last one -- so the user finds out
+// before it fires and the row silently flips to "Schedule ended" with no lead time.
+.schedule-cell-lastflight {
+  color: @brand-secondary;
+  font-weight: 600;
+}
+
+.btn-group-sm:has(.btn-icon) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-group-sm:has(.btn-icon) .btn-icon,
+.btn-group-sm:has(.btn-icon) > .dropdown > .btn-icon {
+  border-radius: 6px !important;
+  margin-left: 0 !important;
+}
+
+.bucket-indicator-icon {
+  margin-left: 6px;
+  color: #2563eb;
 }
 
 .modal-content {
@@ -2311,6 +2657,7 @@ button.pill-icon {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0;
 }
 
 .bucket-browse-row {
@@ -2352,9 +2699,20 @@ button.pill-icon {
   text-overflow: ellipsis;
 }
 
-.bucket-object-table .name-value,
-.bucket-object-table .etag-value,
 .bucket-object-table .content-type-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// Plain single-line name cell -- ETag isn't shown inline at all (not even on hover) to keep
+// this table's rows exactly as compact as every other table in the app. It's still reachable
+// via the row's "..." menu -> Copy ETag, for the rare case someone actually needs it.
+.name-cell {
+  text-align: left;
+}
+
+.name-cell-main {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2416,8 +2774,594 @@ button.pill-icon {
   white-space: nowrap;
 }
 
-.etag-value {
-  font-family: 'Courier New', Courier, monospace;
+.side-panel-title .ic-ai {
+  color: #be185d;
+  margin-right: 6px;
+}
+
+// Chat mode of the same side panel used for object preview -- an attached-file reference
+// chip up top (so it's always clear which file the conversation is about), a scrolling
+// message list, and a message box pinned to the bottom.
+.chat-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-attachment {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-bottom: 12px;
+  padding: 6px 10px;
+  background: #f4f3fd;
+  border: 1px solid #dcd9f7;
+  border-radius: 6px;
+  font-size: 12px;
+  color: @ink;
+}
+
+.chat-attachment .glyphicon-paperclip {
+  color: #6a3bbf;
+  margin-top: 2px;
+}
+
+.chat-attachment-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.chat-attachment-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+// Model picker for the file chat -- sourced from the same Ollama connection Settings >
+// Ollama Models already manages, so whatever's installed there shows up here too. Styled
+// as a chip (same shape/weight as .chat-attachment above it) instead of a bare native
+// select floating on its own, using the AI-magenta family so it visually reads as "this
+// picks the AI", not just a generic form control.
+.chat-model-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 5px 10px;
+  background: #fdf1f7;
+  border: 1px solid #f6c6dc;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.chat-model-row .ic-ai {
+  color: #be185d;
+  flex: 0 0 auto;
+}
+
+.chat-model-label {
+  flex: 0 0 auto;
+  color: @muted;
+}
+
+.chat-model-select {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 4px;
+  border: none;
+  border-radius: 4px;
+  color: @ink;
+  background: transparent;
+  cursor: pointer;
+}
+
+.chat-model-select:focus,
+.chat-model-select:hover:not(:disabled) {
+  background: #fff;
+  outline: none;
+}
+
+.chat-model-select:disabled {
+  color: @muted;
+  cursor: default;
+}
+
+.chat-messages {
+  flex: 1 1 auto;
+  min-height: 120px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.chat-messages-empty {
+  margin: auto 0;
+  text-align: center;
+  color: @muted;
+  font-size: 12px;
+}
+
+.chat-messages-empty .glyphicon {
+  display: block;
+  font-size: 20px;
+  margin-bottom: 6px;
+  color: #c3c0ef;
+}
+
+.chat-message {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.4;
+  max-width: 90%;
+  word-break: break-word;
+}
+
+.chat-message-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.chat-message-author {
+  font-size: 11px;
+  font-weight: 600;
+  color: @muted;
+}
+
+// Icon-only and quiet by default -- a full-weight button here would out-compete the reply
+// text it sits next to. Only assistant replies get one (see the template); there's nothing
+// worth copying back out of your own message or an error string.
+.chat-message-copy-btn {
+  flex: 0 0 auto;
+  padding: 1px 4px;
+  font-size: 11px;
+  line-height: 1.4;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: @muted;
+  cursor: pointer;
+}
+
+.chat-message-copy-btn:hover,
+.chat-message-copy-btn:focus {
+  background: #e7e5fb;
+  color: #4f46e5;
+}
+
+// One of these renders per ```csv/json/tsv/txt fence the model produced when the user asked
+// for the answer as a file (see extractDownloadableFiles()) -- same chip weight as
+// .chat-attachment above the message list, so a file the assistant hands back reads as the
+// same kind of object as the file the conversation is about.
+.chat-message-file {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 5px 8px;
+  background: #fff;
+  border: 1px solid #dcd9f7;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.chat-message-file .glyphicon-file {
+  color: #6a3bbf;
+}
+
+.chat-message-file-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: @ink;
+}
+
+.chat-message-file-btn {
+  flex: 0 0 auto;
+  padding: 3px 8px;
+  font-size: 11px;
+  background: #f4f3fd;
+  border: 1px solid #dcd9f7;
+  border-radius: 4px;
+  color: #4f46e5;
+  cursor: pointer;
+}
+
+.chat-message-file-btn:hover,
+.chat-message-file-btn:focus {
+  background: #e7e5fb;
+  border-color: #c3c0ef;
+}
+
+.chat-message-file-btn:disabled {
+  background: #f4f3fd;
+  border-color: #dcd9f7;
+  color: @muted;
+  cursor: default;
+}
+
+.chat-message-user {
+  align-self: flex-end;
+  background: #eef0fb;
+  color: @ink;
+  border: 1px solid #dcd9f7;
+  border-bottom-right-radius: 2px;
+}
+
+.chat-message-assistant {
+  align-self: flex-start;
+  background: #f4f5f6;
+  color: @ink;
+  border: 1px solid #e2e5e8;
+  border-bottom-left-radius: 2px;
+}
+
+.chat-message-error {
+  align-self: flex-start;
+  background: #fdecea;
+  color: #a83226;
+  border: 1px solid #f3b4ac;
+  border-bottom-left-radius: 2px;
+}
+
+.chat-messages-error {
+  color: #a83226;
+}
+
+.chat-messages-error .glyphicon {
+  color: #ec9587;
+}
+
+.chat-message-typing {
+  padding: 10px 12px;
+}
+
+.chat-typing-dots {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.chat-typing-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #adb3b9;
+  animation: chat-typing-bounce 1.2s infinite ease-in-out both;
+}
+
+.chat-typing-dots span:nth-child(2) { animation-delay: 0.15s; }
+.chat-typing-dots span:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes chat-typing-bounce {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.5; }
+  40% { transform: scale(1); opacity: 1; }
+}
+
+.chat-typing-hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: @muted;
+}
+
+.chat-typing-hint a {
+  color: @brand-primary;
+  text-decoration: underline;
+}
+
+// Common, file-agnostic starter questions -- shown whenever the box is empty (not just on
+// the very first message) so they're there again as soon as the user clears the input, not
+// a one-shot empty-state that disappears for the rest of the conversation.
+.chat-suggestions-row {
+  margin-bottom: 8px;
+}
+
+.chat-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+// Stays visible whether the chips are shown or hidden -- collapsing them to just this one
+// line is the whole point (reclaiming space in a narrow side panel), so the control to bring
+// them back can't disappear along with them.
+.chat-suggestions-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  background: none;
+  border: none;
+  font-size: 11px;
+  color: @muted;
+  cursor: pointer;
+}
+
+.chat-suggestions-toggle:hover,
+.chat-suggestions-toggle:focus {
+  color: #4f46e5;
+}
+
+.chat-suggestions-toggle .glyphicon {
+  font-size: 9px;
+}
+
+.chat-suggestion-chip {
+  padding: 4px 10px;
+  font-size: 11px;
+  line-height: 1.4;
+  background: #f4f3fd;
+  border: 1px solid #dcd9f7;
+  border-radius: 999px;
+  color: #4f46e5;
+  cursor: pointer;
+}
+
+.chat-suggestion-chip:hover,
+.chat-suggestion-chip:focus {
+  background: #e7e5fb;
+  border-color: #c3c0ef;
+}
+
+.chat-input-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.chat-input {
+  resize: none;
+  flex: 1 1 auto;
+}
+
+.chat-send-btn {
+  flex: 0 0 auto;
+}
+
+// Same neutral weight as the disabled/idle send button until actually listening, when it
+// switches to a clear "recording" red so it's obvious the mic is live and needs no toggle
+// hunting to find again.
+.chat-mic-btn {
+  flex: 0 0 auto;
+  background: #fff;
+  border: 1px solid #d3dade;
+  color: #566573;
+}
+
+.chat-mic-btn:hover:not([disabled]),
+.chat-mic-btn:focus:not([disabled]) {
+  background: #f1f0fd;
+  border-color: #c3c0ef;
+  color: #4f46e5;
+}
+
+// Solid, saturated red (not the pale error-tint used elsewhere) -- a color change alone was
+// too subtle to notice at a glance, so this is deliberately the loudest color in the chat
+// panel while it's the only thing indicating a live mic.
+.chat-mic-btn.chat-mic-btn-active {
+  background: #dc3545;
+  border-color: #dc3545;
+  color: #fff;
+  animation: chat-mic-pulse 1.4s ease-in-out infinite;
+}
+
+.chat-mic-btn.chat-mic-btn-active:hover,
+.chat-mic-btn.chat-mic-btn-active:focus {
+  background: #c8283c;
+  border-color: #c8283c;
+  color: #fff;
+}
+
+@keyframes chat-mic-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.35); }
+  50% { box-shadow: 0 0 0 6px rgba(220, 53, 69, 0.15); }
+}
+
+// Small animated "listening" bars next to the mic button -- motion reads as "live" far more
+// reliably than color alone (same reasoning as the typing-dots indicator above). Not driven by
+// actual mic input level (that would need a second parallel getUserMedia stream just for
+// visuals, on top of the one SpeechRecognition already owns internally) -- a staggered bounce
+// is enough to answer "is this actually listening?" at a glance, which was the actual problem.
+.chat-mic-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 14px;
+}
+
+.chat-mic-bars span {
+  width: 3px;
+  background: #dc3545;
+  border-radius: 2px;
+  transform-origin: bottom;
+  animation: chat-mic-bar-bounce 0.9s ease-in-out infinite;
+}
+
+.chat-mic-bars span:nth-child(1) { height: 6px; animation-delay: 0s; }
+.chat-mic-bars span:nth-child(2) { height: 14px; animation-delay: 0.15s; }
+.chat-mic-bars span:nth-child(3) { height: 9px; animation-delay: 0.3s; }
+
+@keyframes chat-mic-bar-bounce {
+  0%, 100% { transform: scaleY(0.35); }
+  50% { transform: scaleY(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-mic-btn.chat-mic-btn-active {
+    animation: none;
+  }
+  .chat-mic-bars span {
+    animation: none;
+    transform: scaleY(0.7);
+  }
+}
+
+// Assistant replies are rendered through `marked` (see renderAssistantMessage()) instead of
+// shown as flat text, so a table/JSON/code answer actually looks like one. The chat bubble caps
+// out at 90% of a narrow (col-md-4) side panel, so anything that can run wide -- a table, a long
+// code line -- gets its own horizontal scroll instead of being allowed to blow out the bubble or
+// the panel.
+.chat-message-rich {
+  font-size: 13px;
+}
+
+.chat-message-rich > *:first-child {
+  margin-top: 0;
+}
+
+.chat-message-rich > *:last-child {
+  margin-bottom: 0;
+}
+
+.chat-message-rich p {
+  margin: 0 0 8px;
+}
+
+.chat-message-rich ul,
+.chat-message-rich ol {
+  margin: 0 0 8px;
+  padding-left: 18px;
+}
+
+.chat-message-rich li {
+  margin-bottom: 2px;
+}
+
+.chat-message-rich strong {
+  color: @ink;
+}
+
+.chat-message-rich h1,
+.chat-message-rich h2,
+.chat-message-rich h3,
+.chat-message-rich h4 {
+  font-size: 13px;
+  font-weight: 700;
+  margin: 10px 0 6px;
+}
+
+.chat-message-rich blockquote {
+  margin: 0 0 8px;
+  padding: 4px 10px;
+  border-left: 3px solid @line;
+  color: @muted;
+}
+
+.chat-message-rich code {
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 12px;
+}
+
+.chat-message-rich pre {
+  display: block;
+  overflow-x: auto;
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  background: #f4f5f6;
+  border: 1px solid @line;
+  border-radius: 6px;
+}
+
+.chat-message-rich pre code {
+  background: none;
+  padding: 0;
+  white-space: pre;
+}
+
+.chat-message-rich table {
+  display: block;
+  overflow-x: auto;
+  margin: 0 0 8px;
+  border-collapse: collapse;
+  font-size: 12px;
+  max-width: 100%;
+}
+
+.chat-message-rich th,
+.chat-message-rich td {
+  border: 1px solid @line;
+  padding: 4px 8px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.chat-message-rich th {
+  background: #f4f5f6;
+  font-weight: 600;
+  color: @ink;
+}
+
+// A user message that happens to contain code or a table stays flat text (never rendered
+// through marked) -- keep it wrapping instead of trying to horizontally scroll a bubble that
+// was never given the same overflow handling.
+.chat-message-user .chat-message-text,
+.chat-message-error .chat-message-text {
+  white-space: pre-wrap;
+}
+
+// While a reply is in flight the same button becomes a Stop control -- a plain icon swap on an
+// otherwise-identical teal button reads as still "sending", not "click me to cancel", so it also
+// gets a distinct color to make the state change unmistakable.
+.chat-send-btn.chat-send-btn-stop {
+  background: #fff;
+  border-color: #e2b4ac;
+  color: #a83226;
+}
+
+.chat-send-btn.chat-send-btn-stop:hover,
+.chat-send-btn.chat-send-btn-stop:focus {
+  background: #fdecea;
+  border-color: #d98d82;
+  color: #a83226;
+}
+
+// Truncated hash text plus a copy button that stays put -- previously the whole cell just
+// clipped with an ellipsis, so getting the full ETag meant selecting/copying by hand out of
+// a title-attribute tooltip. Lives inside .name-cell-sub now (ETag was folded into the Name
+// column instead of its own column).
+.etag-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.etag-copy-btn {
+  flex: 0 0 auto;
+  padding: 2px 5px;
+  font-size: 11px;
+  line-height: 1.4;
+  background: #fff;
+  border: 1px solid #d3dade;
+  border-radius: 4px;
+  color: #566573;
+  cursor: pointer;
+}
+
+.etag-copy-btn:hover,
+.etag-copy-btn:focus {
+  background: #f1f0fd;
+  border-color: #c3c0ef;
+  color: #4f46e5;
 }
 
 .preview-modal-body {
@@ -2467,6 +3411,11 @@ button.pill-icon {
   font-size: 11px;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.transcript-timestamp {
+  color: @brand-teal-dark;
+  font-weight: 700;
 }
 
 .preview-text-editor {
@@ -3061,6 +4010,7 @@ button.pill-icon {
   font-size: 13px;
   color: @ink;
   word-break: break-word;
+  white-space: pre-wrap;
 }
 
 .log-gap-chart {
@@ -3093,6 +4043,60 @@ button.pill-icon {
 
 .log-console-text {
   color: #d7dee6;
+}
+
+.toggle-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: @ink;
+}
+
+.toggle-switch input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-switch-track {
+  position: relative;
+  display: inline-block;
+  width: 38px;
+  height: 20px;
+  background: #ccd1d9;
+  border-radius: 10px;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+
+.toggle-switch-track::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: transform 0.15s ease;
+}
+
+.toggle-switch input:checked + .toggle-switch-track {
+  background: @brand-teal;
+}
+
+.toggle-switch input:checked + .toggle-switch-track::after {
+  transform: translateX(18px);
+}
+
+.toggle-switch input:focus + .toggle-switch-track {
+  box-shadow: 0 0 0 2px fade(@brand-teal, 30%);
 }
 
 .tool-card-grid {
@@ -3164,6 +4168,10 @@ button.pill-icon {
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 16px;
   margin-top: 4px;
+}
+
+.batch-results-panel {
+  margin-top: 18px;
 }
 
 .entity-card-grid-4up {
@@ -3315,6 +4323,239 @@ button.pill-icon {
   color: @muted;
 }
 
+.linked-task-key-value-list {
+  margin-top: 2px;
+  border: 1px solid @line;
+  border-radius: 6px;
+  overflow: hidden;
+  background: @surface;
+}
+
+.linked-task-first-row {
+  display: grid;
+  grid-template-columns: repeat(3, 122px minmax(0, 1fr));
+  border-bottom: 1px solid @line;
+}
+
+.linked-task-first-row .linked-task-key-value-row {
+  display: contents;
+}
+
+.linked-task-first-row .linked-task-key {
+  min-height: 0;
+  padding: 8px 10px;
+  border-right: 1px solid @line;
+}
+
+.linked-task-first-row .linked-task-value {
+  min-height: 0;
+  padding: 8px 10px;
+  border-right: 1px solid @line;
+  overflow: hidden;
+}
+
+.linked-task-first-row .linked-task-key-value-row:last-child .linked-task-value {
+  border-right: 0;
+}
+
+.linked-task-second-row {
+  display: flex;
+  flex-wrap: wrap;
+  border-bottom: 1px solid @line;
+}
+
+.linked-task-second-row .linked-task-key-value-row {
+  display: grid;
+  grid-template-columns: 122px minmax(0, 1fr);
+  flex: 1 1 33.333%;
+  flex-shrink: 0;
+  min-width: 220px;
+  min-height: 46px;
+  border-bottom: 0;
+  border-right: 1px solid @line;
+}
+
+.linked-task-second-row .linked-task-key-value-row:nth-child(n+4) {
+  border-top: 1px solid @line;
+}
+
+.linked-task-second-row .linked-task-key-value-row:nth-child(3n),
+.linked-task-second-row .linked-task-key-value-row:last-child {
+  border-right: 0;
+}
+
+.linked-task-second-row .linked-task-key,
+.linked-task-second-row .linked-task-value {
+  min-height: 0;
+  padding: 8px 10px;
+}
+
+.linked-task-second-row .linked-task-storage-value {
+  align-items: flex-start;
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+
+.linked-task-second-row .linked-task-storage-value .pill {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.linked-task-second-row .linked-task-storage-value .btn {
+  flex: 0 0 auto;
+  margin-left: 0 !important;
+  white-space: nowrap;
+}
+
+.linked-task-key-value-row {
+  display: grid;
+  grid-template-columns: 122px minmax(0, 1fr);
+  align-items: center;
+  min-height: 46px;
+  border-bottom: 1px solid @line;
+}
+
+.linked-task-key-value-row:last-child {
+  border-bottom: 0;
+}
+
+.linked-task-key {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  background: #f7f9fa;
+  color: @muted;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.linked-task-key .glyphicon {
+  width: 14px;
+  color: @brand-teal;
+  text-align: center;
+}
+
+.linked-task-value {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  color: @ink;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.linked-task-value > a:not(.pill) {
+  color: @brand-teal-dark;
+  font-weight: 600;
+}
+
+.linked-task-value > a:not(.pill):hover,
+.linked-task-value > a:not(.pill):focus {
+  color: @brand-teal;
+}
+
+.linked-task-storage-value {
+  flex-wrap: wrap;
+}
+
+.linked-task-payload-row {
+  align-items: stretch;
+}
+
+.linked-task-payload-row .linked-task-value {
+  align-items: stretch;
+}
+
+.linked-task-payload-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.linked-task-copy-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: #fff;
+  border: 1px solid @line;
+  border-radius: 3px;
+  padding: 2px 6px;
+  cursor: pointer;
+  font-size: 12px;
+  color: @gray;
+  opacity: 0.7;
+  line-height: 1.4;
+  &:hover { opacity: 1; color: @brand-primary; border-color: @brand-primary; }
+}
+
+.linked-task-payload {
+  width: 100%;
+  max-height: 220px;
+  margin: 0;
+  padding: 10px 12px;
+  overflow: auto;
+  background: #ffffff;
+  border: 1px solid @line;
+  border-radius: 4px;
+  color: @ink;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+@media (max-width: 991px) {
+  .linked-task-first-row {
+    display: block;
+  }
+
+  .linked-task-first-row .linked-task-key-value-row {
+    display: grid;
+    grid-template-columns: 122px minmax(0, 1fr);
+    min-height: 46px;
+    border-bottom: 1px solid @line;
+  }
+
+  .linked-task-first-row .linked-task-key,
+  .linked-task-first-row .linked-task-value {
+    border-right: 0;
+  }
+
+  .linked-task-second-row {
+    display: block;
+  }
+
+  .linked-task-second-row .linked-task-key-value-row {
+    border-right: 0;
+    border-bottom: 1px solid @line;
+  }
+
+  .linked-task-second-row .linked-task-key-value-row:last-child {
+    border-bottom: 0;
+  }
+
+  .linked-task-key-value-row {
+    grid-template-columns: 1fr;
+  }
+
+  .linked-task-key {
+    min-height: 0;
+    padding-bottom: 4px;
+  }
+
+  .linked-task-value {
+    padding-top: 4px;
+  }
+}
+
 .entity-card-footer {
   margin-top: 14px;
   padding-top: 12px;
@@ -3353,7 +4594,7 @@ button.pill-icon {
 .entity-card-footer .ic-view:hover:not([disabled])     { background: #eef0fb; border-color: #c7cbf5; }
 .entity-card-footer .ic-edit:hover:not([disabled])     { background: #eaf1fd; border-color: #bcd6fb; }
 .entity-card-footer .ic-delete:hover:not([disabled])   { background: #fdecea; border-color: #f3b4ac; }
-.entity-card-footer .ic-run:hover:not([disabled])      { background: #e8f6ec; border-color: #a9dab8; }
+.entity-card-footer .ic-run:hover:not([disabled])      { background: #e8f0fb; border-color: #a9c4e8; }
 .entity-card-footer .ic-skip:hover:not([disabled])     { background: #e3f5f7; border-color: #a9dee3; }
 .entity-card-footer .ic-download:hover:not([disabled]) { background: #fdf3e3; border-color: #f3d99a; }
 .entity-card-footer .ic-history:hover:not([disabled]),

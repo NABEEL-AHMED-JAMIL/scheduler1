@@ -12,6 +12,7 @@ import {
   categoricalColumnStats, toPieOptions, jobIdRankedBarOptions,
   booleanFieldsChartOptions as sharedBooleanFieldsChartOptions, formatDateTime
 } from '@/_helpers';
+import { formatScheduleSummary as sharedFormatScheduleSummary, parseTopicPartition } from '../../global-config';
 
 @Component({
   selector: 'job-history-action',
@@ -21,6 +22,10 @@ export class JobHistoryActionComponent implements OnInit, OnDestroy {
 
   public sourceJob: any;
   public sourceJobStatistics: any;
+
+  public formatScheduleSummary(scheduler: any): string {
+    return sharedFormatScheduleSummary(scheduler);
+  }
 
   private _sourceJobQueues: any;
   public get sourceJobQueues(): any {
@@ -123,12 +128,7 @@ export class JobHistoryActionComponent implements OnInit, OnDestroy {
   }
 
   private parseTopicPartition(): { topic: string; partitions: string } {
-    const raw = String(this.sourceJob?.taskDetail?.sourceTaskType?.queueTopicPartition || '');
-    const match = raw.match(/topic=([^&]*)&partitions=\[(.*?)\]/);
-    if (match) {
-      return { topic: match[1] || '-', partitions: match[2] || '-' };
-    }
-    return { topic: raw || '-', partitions: '-' };
+    return parseTopicPartition(this.sourceJob?.taskDetail?.sourceTaskType?.queueTopicPartition);
   }
 
   public get filteredQueueDatas(): any[] {

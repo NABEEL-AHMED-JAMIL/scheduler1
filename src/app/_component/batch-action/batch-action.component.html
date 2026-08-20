@@ -16,8 +16,11 @@
             Every {{buttonMessage}} in this file is created under <b>your tenant only</b> (tenant #{{tenantId}}) --
             a row referencing another tenant's task or job will be rejected, and Download only exports your tenant's own records.
         </ng-container>
-        <ng-container *ngIf="isPlatformAdmin">
-            You're uploading as <b>Platform Admin</b> -- new records aren't tied to any single tenant, and Download exports every tenant's records.
+        <ng-container *ngIf="isPlatformAdmin && !needsTenantPicker">
+            You're uploading as <b>Platform Admin</b> -- each job takes its tenant from the source task it's linked to, and Download exports every tenant's records.
+        </ng-container>
+        <ng-container *ngIf="needsTenantPicker">
+            You're uploading as <b>Platform Admin</b> -- pick which tenant these tasks belong to below (Platform Admin isn't a member of any tenant itself), and Download exports every tenant's records.
         </ng-container>
     </span>
 </div>
@@ -31,6 +34,13 @@
                     <div class="entity-card-title">Upload {{buttonMessage}}</div>
                 </div>
             </div>
+        </div>
+        <div class="form-group" *ngIf="needsTenantPicker" style="margin-bottom: 12px;">
+            <label class="control-label" for="uploadTenantId">Tenant</label>
+            <select class="form-control" id="uploadTenantId" [(ngModel)]="selectedTenantId" [ngModelOptions]="{standalone: true}">
+                <option value="" disabled>Select Tenant</option>
+                <option *ngFor="let tenant of tenants" [value]="tenant.tenantId">{{tenant.tenantName}}</option>
+            </select>
         </div>
         <div class="upload-dropzone" [class.upload-dropzone-active]="isDragging" [class.upload-dropzone-busy]="isUploading"
             (dragover)="onDragOver($event)" (dragleave)="onDragLeave($event)" (drop)="onDrop($event)"
@@ -79,7 +89,7 @@
     </div>
 </div>
 
-<div class="card-panel">
+<div class="card-panel batch-results-panel">
     <h4 class="card-panel-title">Results</h4>
 
     <div class="upload-result upload-result-success" *ngIf="lastUploadOk === true">

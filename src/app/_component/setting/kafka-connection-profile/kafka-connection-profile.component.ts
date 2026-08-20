@@ -104,7 +104,7 @@ export class KafkaConnectionProfileComponent implements OnInit {
                 if (response.status === ApiCode.SUCCESS) {
                     this.buckets = response.data || [];
                 }
-            }, () => { /* non-critical -- bucket picker just stays empty */ });
+            }, () => {  });
     }
 
     public onKeystoreFileSelected(event: any): void {

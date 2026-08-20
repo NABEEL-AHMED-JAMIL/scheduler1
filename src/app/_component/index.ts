@@ -44,11 +44,7 @@ export * from './content-cleaner/content-cleaner.component';
 
 export * from './audio-transcript-extractor/audio-transcript-extractor.component';
 
-export * from './image-text-extractor/image-text-extractor.component';
-
-export * from './ai-chat/ai-chat.component';
-
-export * from './cv-tailor/cv-tailor.component';
+export * from './linked-task-panel/linked-task-panel.component';
 
 export * from './unauthorized/unauthorized.component';
 

@@ -63,7 +63,7 @@
                 <th class="text-center">Default</th>
                 <th class="text-center">Connection</th>
                 <th class="text-center">Status</th>
-                <th class="text-center" style="width: 260px; white-space: nowrap;">Action</th>
+                <th class="text-center" style="width: 110px; white-space: nowrap;">Action</th>
             </tr>
         </thead>
         <tbody>
@@ -108,33 +108,43 @@
                             (click)="testConnectionForRow(profile)">
                             <span class="glyphicon" [ngClass]="testingRowId === profile.kafkaConnectionProfileId ? 'glyphicon-refresh spin' : 'glyphicon-flash'"></span>
                         </button>
-                        <button type="button" class="btn btn-default btn-icon" title="Make this the default connection"
-                            *ngIf="!profile.isDefault"
-                            [disabled]="profile.status === 'Delete' || !canManage(profile)"
-                            [attr.title]="canManage(profile) ? 'Make this the default connection' : 'This is a platform-wide connection -- only a platform admin can change it'"
-                            (click)="setAsDefault(profile)">
-                            <span class="glyphicon glyphicon-ok-circle"></span>
-                        </button>
-                        <button type="button" class="btn btn-default btn-icon" title="Clear default (revert to fallback)"
-                            *ngIf="profile.isDefault"
-                            [disabled]="!canManage(profile)"
-                            [attr.title]="canManage(profile) ? 'Clear default (revert to fallback)' : 'This is a platform-wide connection -- only a platform admin can change it'"
-                            (click)="clearDefault()">
-                            <span class="glyphicon glyphicon-remove-circle"></span>
-                        </button>
                         <button type="button" class="btn btn-default btn-icon ic-edit"
                             [disabled]="!canManage(profile)"
                             [attr.title]="canManage(profile) ? 'Edit' : 'This is a platform-wide connection -- only a platform admin can edit it'"
                             (click)="openEditProfile(profile)" data-toggle="modal" [attr.data-target]="canManage(profile) ? '#profileModal' : null">
                             <span class="glyphicon glyphicon-edit"></span>
                         </button>
-                        <button type="button" class="btn btn-default btn-icon ic-delete"
-                            [disabled]="profile.status === 'Delete' || !canManage(profile)"
-                            [attr.title]="canManage(profile) ? 'Delete' : 'This is a platform-wide connection -- only a platform admin can delete it'"
-                            (click)="confirmDeleteProfile(profile)"
-                            data-toggle="modal" [attr.data-target]="canManage(profile) ? '#deleteProfileModal' : null">
-                            <span class="glyphicon glyphicon-trash"></span>
-                        </button>
+                        <div class="dropdown" style="display: inline-block;">
+                            <button type="button" class="btn btn-default btn-icon ic-more" data-toggle="dropdown" title="More actions">
+                                <span class="glyphicon glyphicon-option-vertical"></span>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-right">
+                                <li *ngIf="!profile.isDefault" [class.disabled]="profile.status === 'Delete' || !canManage(profile)">
+                                    <a href="javascript:void(0);"
+                                        [attr.title]="canManage(profile) ? 'Make this the default connection' : 'This is a platform-wide connection -- only a platform admin can change it'"
+                                        (click)="setAsDefault(profile)">
+                                        <span class="glyphicon glyphicon-ok-circle"></span> Make Default
+                                    </a>
+                                </li>
+                                <li *ngIf="profile.isDefault" [class.disabled]="!canManage(profile)">
+                                    <a href="javascript:void(0);"
+                                        [attr.title]="canManage(profile) ? 'Clear default (revert to fallback)' : 'This is a platform-wide connection -- only a platform admin can change it'"
+                                        (click)="clearDefault()">
+                                        <span class="glyphicon glyphicon-remove-circle"></span> Clear Default
+                                    </a>
+                                </li>
+                                <li class="divider"></li>
+                                <li [class.disabled]="profile.status === 'Delete' || !canManage(profile)">
+                                    <a href="javascript:void(0);"
+                                        [attr.title]="canManage(profile) ? 'Delete' : 'This is a platform-wide connection -- only a platform admin can delete it'"
+                                        [attr.data-toggle]="canManage(profile) ? 'modal' : null"
+                                        [attr.data-target]="canManage(profile) ? '#deleteProfileModal' : null"
+                                        (click)="confirmDeleteProfile(profile)">
+                                        <span class="glyphicon glyphicon-trash"></span> Delete
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
                     </div>
                 </td>
             </tr>
@@ -222,7 +232,7 @@
                                         <span class="glyphicon glyphicon-info-sign"></span>
                                     </button>
                                 </label>
-                                <input type="text" class="form-control" formControlName="saslUsername" />
+                                <input type="text" class="form-control" formControlName="saslUsername" placeholder="e.g. broker-client" />
                             </div>
                         </div>
                         <div class="col-md-6">

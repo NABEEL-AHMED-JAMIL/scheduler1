@@ -17,7 +17,8 @@ const BREAKDOWN_COLOR: { [status: string]: string } = {
   Failed: '#c0392b',
   Completed: '#1d7a3f',
   Skip: '#566573',
-  Interrupt: '#6a3bbf'
+  Interrupt: '#6a3bbf',
+  Missed: '#d97706'
 };
 
 @Component({
@@ -173,6 +174,16 @@ export class HomeComponent implements OnInit, OnDestroy {
     return match ? Number(match.value) || 0 : 0;
   }
 
+  private statusLabel(value: any): string {
+    const normalized = String(value || '').trim().toUpperCase();
+    const labels: { [status: string]: string } = {
+      ACTIVE: 'Active', INACTIVE: 'Inactive', DELETE: 'Delete', START: 'Start',
+      RUNNING: 'Running', FAILED: 'Failed', COMPLETED: 'Completed', QUEUE: 'Queue',
+      SKIP: 'Skip', INTERRUPT: 'Interrupt', MISSED: 'Missed'
+    };
+    return labels[normalized] || String(value || '');
+  }
+
   private refreshToolbox(onclick: () => void, show = false): any {
     return {
       top: '7px',
@@ -269,8 +280,9 @@ export class HomeComponent implements OnInit, OnDestroy {
             .filter((item: any) => (item.name || '').toUpperCase() !== 'ALL')
             .map((item: any) => ({
               ...item,
+              name: this.statusLabel(item.name),
               itemStyle: {
-                color: colorMap[item.name as keyof typeof colorMap] || '#999'
+                color: colorMap[this.statusLabel(item.name) as keyof typeof colorMap] || '#999'
               }
             }))
         }
@@ -350,6 +362,7 @@ export class HomeComponent implements OnInit, OnDestroy {
           },
           data: (dataPaload || []).map((item: any) => ({
             ...item,
+            name: this.statusLabel(item.name),
             itemStyle: {
               color: colorMap[(item.name || '').toUpperCase()] || '#999'
             }
@@ -596,7 +609,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     if (!total) {
       return [];
     }
-    const statuses = ['Queue', 'Start', 'Running', 'Failed', 'Completed', 'Skip', 'Interrupt'];
+    const statuses = ['Queue', 'Start', 'Running', 'Failed', 'Completed', 'Skip', 'Interrupt', 'Missed'];
     return statuses
       .map(status => ({
         status,

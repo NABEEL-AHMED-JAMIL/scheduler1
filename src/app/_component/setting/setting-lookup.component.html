@@ -64,6 +64,15 @@
                     </div>
                 </td>
             </tr>
+            <tr *ngIf="!(lookupDatas | searchFilter: searchLookupDataForm).length">
+                <td colspan="5">
+                    <div class="empty-state">
+                        <span class="glyphicon glyphicon-search"></span>
+                        <div class="empty-state-title">No lookups found</div>
+                        <div class="empty-state-text">{{lookupDatas.length ? 'No lookups match your search.' : 'Get started by adding a lookup.'}}</div>
+                    </div>
+                </td>
+            </tr>
         </tbody>
     </table>
 </div>

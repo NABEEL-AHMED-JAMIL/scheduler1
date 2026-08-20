@@ -36,12 +36,26 @@
                     </div>
                 </div>
 
+                <div class="form-group" [ngClass]="{ 'has-error': submitted && sourceTask.tenantId.errors }" *ngIf="isPlatformAdmin && !isEditMode">
+                    <label class="control-label" for="tenantId">Tenant</label>
+                    <select class="form-control" formControlName="tenantId"
+                        [ngClass]="{ 'is-invalid': submitted && sourceTask.tenantId.errors }">
+                        <option hidden value="" disabled selected>Select Tenant</option>
+                        <option *ngFor="let tenant of tenants" [value]="tenant.tenantId">{{tenant.tenantName}}</option>
+                    </select>
+                    <div *ngIf="submitted && sourceTask.tenantId.errors">
+                        <div *ngIf="sourceTask.tenantId.errors.required" class="text-danger">
+                            Tenant is required -- you're creating this as Platform Admin, who isn't a member of any tenant.
+                        </div>
+                    </div>
+                </div>
+
                 <div class="form-group" [ngClass]="{ 'has-error': submitted && sourceTask.sourceTaskTypeId.errors }">
                     <label class="control-label" for="sourceTaskTypeId">Source TaskType</label>
                     <select class="form-control" formControlName="sourceTaskTypeId">
                         <option hidden value="" disabled selected>Select SourceType</option>
                         <option *ngFor="let sourceTaskType of sourceTaskTypes" [value]="sourceTaskType.sourceTaskTypeId">
-                            {{sourceTaskType.serviceName}} ({{sourceTaskType.queueTopicPartition}})
+                            {{sourceTaskType.serviceName}} ({{taskTopic(sourceTaskType.queueTopicPartition)}})
                         </option>
                     </select>
                     <div *ngIf="submitted && sourceTask.sourceTaskTypeId.errors">
@@ -102,7 +116,7 @@
             <div class="card-panel panel-fill">
                 <h4 class="card-panel-title panel-banner has-action">
                     <span>Configuration Tags</span>
-                    <button type="button" class="btn btn-xs btn-link" style="padding-left: 0;" (click)="toggleBucketHelp()">
+                    <button type="button" class="btn btn-xs btn-link bucket-help-toggle" style="padding-left: 0;" (click)="toggleBucketHelp()">
                         <span class="glyphicon glyphicon-info-sign"></span>
                         {{showBucketHelp ? 'Hide' : 'How do I add a bucket?'}}
                     </button>

@@ -78,6 +78,7 @@ export interface SourceJobDetail {
     dateCreated?: any;
     taskDetail?: SourceTask;
     scheduler?: Scheduler;
+    tabActive?: any;
 };
 
 export interface Scheduler {
@@ -86,8 +87,11 @@ export interface Scheduler {
     endDate?: any;
     startTime?: any;
     frequency?: any;
-    recurrence?: any;
-    recurrenceTime?: any;
+    intervalValue?: any;
+    daysOfWeek?: any;
+    dayOfMonth?: any;
+    nextRunAt?: any;
+    expired?: any;
 };
 
 export interface Paging {

@@ -30,7 +30,6 @@
     animation: 0.7s draw-circle ease-out;
 }
 
-/*------- Checkmark ---------*/
 .checkmark{
 	stroke-width: 6.25;
     stroke-linecap: round;
@@ -82,7 +81,6 @@
     }
 }
 
-/*---------- Cross ----------*/
 
 .cross {
     stroke-width:6.25;

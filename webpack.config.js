@@ -77,6 +77,8 @@ module.exports = {
     },
     devServer: {
         publicPath: '/scheduler/',
-        historyApiFallback: true
+        historyApiFallback: {
+            index: '/scheduler/index.html'
+        }
     }
 }

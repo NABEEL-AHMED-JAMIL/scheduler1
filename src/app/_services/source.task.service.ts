@@ -63,9 +63,12 @@ export class SourceTaskService {
         });
     }
 
-    public uploadSourceTask(fileToUpload: File): any {
+    public uploadSourceTask(fileToUpload: File, tenantId?: any): any {
         const formData = new FormData();
         formData.append("file", fileToUpload);
+        if (tenantId) {
+            formData.append("tenantId", tenantId);
+        }
         return this.http.post(`${config.apiUrl}/sourceTask.json/uploadSourceTask`, formData);
     }
 

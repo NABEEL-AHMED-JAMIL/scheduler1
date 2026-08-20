@@ -4,58 +4,94 @@
     <span class="crumb-current">Ollama Models</span>
 </nav>
 
-<span class="help-text" style="margin-bottom: 10px;">
+<span class="help-text" style="margin-bottom: 14px; display: block;">
     <span class="glyphicon glyphicon-info-sign"></span>
     Models pulled here run locally in your Ollama Docker container -- free, no API key, no per-token cost.
     Use a model's name below as the "Model" field on an AI Agent with provider <code>Ollama</code>.
 </span>
 
-<div class="toolbar">
-    <label class="control-label" style="margin: 0;">Installed Models ({{models.length}})</label>
-    <span class="toolbar-spacer"></span>
-    <button type="button" class="btn btn-sm btn-default" (click)="fetchModels()">
-        <span class="glyphicon glyphicon-refresh"></span> Refresh
-    </button>
+<div class="kpi-row admin-summary-row">
+    <div class="kpi-tile kpi-total">
+        <span class="kpi-icon"><span class="glyphicon glyphicon-hdd"></span></span>
+        <span>
+            <span class="kpi-value">{{models.length}}</span>
+            <span class="kpi-label">Installed Models</span>
+        </span>
+    </div>
+    <div class="kpi-tile kpi-running">
+        <span class="kpi-icon"><span class="glyphicon glyphicon-floppy-disk"></span></span>
+        <span>
+            <span class="kpi-value">{{formatBytes(totalDiskBytes)}}</span>
+            <span class="kpi-label">Disk Used</span>
+        </span>
+    </div>
+    <div class="kpi-tile kpi-active">
+        <span class="kpi-icon"><span class="glyphicon glyphicon-tags"></span></span>
+        <span>
+            <span class="kpi-value">{{familyCount}}</span>
+            <span class="kpi-label">Model Families</span>
+        </span>
+    </div>
 </div>
 
-<span class="help-text" *ngIf="!loadingModels && !models.length">
-    <span class="glyphicon glyphicon-info-sign"></span>
-    No models pulled yet -- pull one below to get started.
-</span>
+<div class="card-panel">
+    <h4 class="card-panel-title panel-banner has-action">
+        <span class="glyphicon glyphicon-list-alt"></span> Installed Models ({{models.length}})
+        <span class="pull-right">
+            <button type="button" class="btn btn-sm btn-default" (click)="fetchModels()">
+                <span class="glyphicon glyphicon-refresh"></span> Refresh
+            </button>
+        </span>
+    </h4>
 
-<div class="table-responsive scroll-table" *ngIf="models.length" style="margin-bottom: 20px;">
-    <table class="table table-striped table-bordered table-hover table-modern" style="font-size: 12px;">
-        <thead>
-            <tr>
-                <th>Name</th>
-                <th>Family</th>
-                <th>Parameters</th>
-                <th>Quantization</th>
-                <th>Size</th>
-                <th class="text-center" style="width: 70px;">Action</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr *ngFor="let model of models">
-                <td><code>{{model.name}}</code></td>
-                <td>{{model.family || '-'}}</td>
-                <td>{{model.parameterSize || '-'}}</td>
-                <td>{{model.quantizationLevel || '-'}}</td>
-                <td>{{formatBytes(model.size)}}</td>
-                <td class="text-center">
-                    <button type="button" class="btn btn-default btn-icon ic-delete" title="Delete"
-                        (click)="confirmDeleteModel(model)"
-                        data-toggle="modal" data-target="#deleteModelModal">
-                        <span class="glyphicon glyphicon-trash"></span>
-                    </button>
-                </td>
-            </tr>
-        </tbody>
-    </table>
+    <span class="help-text" *ngIf="!loadingModels && !models.length" style="display: block;">
+        <span class="glyphicon glyphicon-info-sign"></span>
+        No models pulled yet -- pull one below to get started.
+    </span>
+
+    <div class="table-responsive scroll-table" *ngIf="models.length">
+        <table class="table table-striped table-bordered table-hover table-modern" style="font-size: 12px;">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Family</th>
+                    <th>Parameters</th>
+                    <th>Quantization</th>
+                    <th>Size</th>
+                    <th class="text-center" style="width: 70px;">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr *ngFor="let model of models">
+                    <td><code>{{model.name}}</code></td>
+                    <td>
+                        <span *ngIf="model.family" class="family-pill">
+                            <span class="family-dot" [style.background]="familyColor(model.family)"></span>
+                            {{model.family}}
+                        </span>
+                        <span *ngIf="!model.family">-</span>
+                    </td>
+                    <td>{{model.parameterSize || '-'}}</td>
+                    <td>{{model.quantizationLevel || '-'}}</td>
+                    <td>{{formatBytes(model.size)}}</td>
+                    <td class="text-center">
+                        <button type="button" class="btn btn-default btn-icon ic-delete" title="Delete"
+                            (click)="confirmDeleteModel(model)"
+                            data-toggle="modal" data-target="#deleteModelModal">
+                            <span class="glyphicon glyphicon-trash"></span>
+                        </button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
 </div>
 
-<div class="panel-box" style="max-width: 640px;">
-    <label class="control-label" style="display: block; margin-bottom: 10px;">Pull a New Model</label>
+<div class="card-panel" style="max-width: 640px;">
+    <h4 class="card-panel-title panel-banner">
+        <span class="glyphicon glyphicon-download-alt"></span> Pull a New Model
+    </h4>
+
     <div class="row">
         <div class="col-md-6">
             <div class="form-group">

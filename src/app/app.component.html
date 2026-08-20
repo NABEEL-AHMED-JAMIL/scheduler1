@@ -34,7 +34,6 @@
                     <li><a routerLink="/dynamicForm"><span class="glyphicon glyphicon-th-list"></span> Dynamic Forms</a></li>
                     <li><a routerLink="/documentConverter"><span class="glyphicon glyphicon-transfer"></span> Document Converter</a></li>
                     <li><a routerLink="/audioTranscriptExtractor"><span class="glyphicon glyphicon-headphones"></span> Audio Transcript Extractor</a></li>
-                    <li><a routerLink="/imageTextExtractor"><span class="glyphicon glyphicon-camera"></span> Image Text Extractor</a></li>
                 </ul>
             </li>
             <li class="dropdown" routerLinkActive="active">
@@ -47,15 +46,6 @@
                         <a routerLink="/ollamaModels"><span class="glyphicon glyphicon-hdd"></span> Ollama Models</a>
                     </li>
                     <li><a routerLink="/contentCleaner"><span class="glyphicon glyphicon-magnet"></span> Content Cleaner</a></li>
-                </ul>
-            </li>
-            <li class="dropdown" routerLinkActive="active" *ngIf="authService.currentUser?.username === 'admin@platform.local'">
-                <a href="javascript:void(0);" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">
-                    <span class="glyphicon glyphicon-flag"></span> Labs <span class="caret"></span>
-                </a>
-                <ul class="dropdown-menu">
-                    <li><a routerLink="/aiChat"><span class="glyphicon glyphicon-comment"></span> AI Assistant</a></li>
-                    <li><a routerLink="/cvTailor"><span class="glyphicon glyphicon-briefcase"></span> CV Tailor</a></li>
                 </ul>
             </li>
             <li class="dropdown" routerLinkActive="active"
@@ -76,7 +66,7 @@
                 <a href="javascript:void(0);" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">
                     <span class="glyphicon glyphicon-cog"></span> Settings <span class="caret"></span>
                 </a>
-                <ul class="dropdown-menu">
+                <ul class="dropdown-menu dropdown-menu-right">
                     <li *ngIf="authService.currentUser?.userRole === 'PLATFORM_ADMIN' || authService.currentUser?.userRole === 'TENANT_ADMIN'">
                         <a routerLink="/setting" [routerLinkActiveOptions]="{exact: true}" routerLinkActive="active"><span class="glyphicon glyphicon-transfer"></span> Source TaskType</a>
                     </li>

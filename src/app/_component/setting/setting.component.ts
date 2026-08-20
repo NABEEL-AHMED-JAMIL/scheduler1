@@ -5,6 +5,7 @@ import { first } from 'rxjs/operators';
 import { ApiCode, Action } from '@/_models';
 import { Router } from '@angular/router';
 import { SourceTaskType } from '@/_models/index';
+import { parseTopicPartition } from '../../global-config';
 
 @Component({
     selector: 'setting',
@@ -53,6 +54,10 @@ export class SettingComponent implements OnInit {
 
 	public get filteredSourceTaskTypes(): SourceTaskType[] {
 		return (this.sourceTaskTypes || []).filter((t) => t.status !== 'Delete');
+	}
+
+	public taskTopic(queueTopicPartition: any): string {
+		return parseTopicPartition(queueTopicPartition).topic;
 	}
 
 	public appSetting() {

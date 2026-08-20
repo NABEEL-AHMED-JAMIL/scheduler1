@@ -1,0 +1,65 @@
+<div [ngClass]="dividerStyle ? 'card-divider' : 'expand-panel-section'">
+    <div class="expand-panel-heading">{{heading}}</div>
+    <div class="linked-task-key-value-list">
+        <div class="linked-task-first-row">
+        <div class="linked-task-key-value-row">
+            <div class="linked-task-key"><span class="glyphicon glyphicon-tasks"></span> Task</div>
+            <div class="linked-task-value">
+                <a class="btn btn-xs btn-default" routerLink="/editTask/{{taskDetail?.taskDetailId}}">
+                    <span class="glyphicon glyphicon-link"></span> {{taskDetail?.taskDetailId}} - {{taskDetail?.taskName}}
+                </a>
+            </div>
+        </div>
+        <div class="linked-task-key-value-row" *ngIf="taskDetail?.sourceTaskType">
+            <div class="linked-task-key"><span class="glyphicon glyphicon-tag"></span> Type</div>
+            <div class="linked-task-value">
+                {{taskDetail?.sourceTaskType?.sourceTaskTypeId}} [{{taskDetail?.sourceTaskType?.serviceName}}]
+            </div>
+        </div>
+        <div class="linked-task-key-value-row" *ngIf="taskDetail?.sourceTaskType?.queueTopicPartition">
+            <div class="linked-task-key"><span class="glyphicon glyphicon-transfer"></span> Topic</div>
+            <div class="linked-task-value">
+                {{taskTopic}} <span class="text-muted">(partitions: {{taskPartitions}})</span>
+            </div>
+        </div>
+        </div>
+        <div class="linked-task-second-row">
+        <div class="linked-task-key-value-row" *ngIf="taskDetail?.pipelineId">
+            <div class="linked-task-key"><span class="glyphicon glyphicon-random"></span> Pipeline</div>
+            <div class="linked-task-value">
+                {{taskDetail?.pipelineId}}
+            </div>
+        </div>
+        <div class="linked-task-key-value-row" *ngIf="taskDetail?.homePageId">
+            <div class="linked-task-key"><span class="glyphicon glyphicon-home"></span> Home page</div>
+            <div class="linked-task-value">
+            <a class="btn btn-xs btn-default" [href]="taskDetail.homePageId" target="_blank" rel="noopener">
+                <span class="glyphicon glyphicon-link"></span> {{taskDetail.homePageId}}
+            </a>
+            </div>
+        </div>
+        <div class="linked-task-key-value-row">
+            <div class="linked-task-key"><span class="glyphicon glyphicon-hdd"></span> Bucket path</div>
+            <div class="linked-task-value linked-task-storage-value">
+            <span *ngIf="!taskDetail?.bucket" style="color: #999;">—</span>
+            <a class="btn btn-xs btn-default" *ngIf="taskDetail?.bucket"
+                [routerLink]="['/objectBrowser']"
+                [queryParams]="{ bucket: taskDetail.bucket, prefix: taskDetail.outputFolder || taskDetail.inputFolder }">
+                <span class="glyphicon glyphicon-link"></span> View in Bucket
+            </a>
+            </div>
+        </div>
+        </div>
+        <div class="linked-task-key-value-row linked-task-payload-row" *ngIf="taskDetail?.taskPayload">
+            <div class="linked-task-key"><span class="glyphicon glyphicon-list-alt"></span> Task payload</div>
+            <div class="linked-task-value">
+                <div class="linked-task-payload-wrapper">
+                    <pre class="linked-task-payload">{{taskDetail.taskPayload}}</pre>
+                    <button class="linked-task-copy-btn" title="Copy payload" (click)="copyToClipboard(taskDetail.taskPayload)">
+                        <span class="glyphicon glyphicon-copy"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

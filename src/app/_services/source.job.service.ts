@@ -33,6 +33,13 @@ export class SourceJobService {
         return this.http.put<ApiResponse>(`${config.apiUrl}/sourceJob.json/deleteSourceJob`, deletePayload);
     }
 
+    public toggleSourceJobStatus(payload:any): Observable<ApiResponse> {
+        let modifyPayload = {
+            jobId: payload?.jobId
+        };
+        return this.http.put<ApiResponse>(`${config.apiUrl}/sourceJob.json/toggleSourceJobStatus`, modifyPayload);
+    }
+
     public runSourceJob(payload:any): Observable<ApiResponse> {
         let modifyPayload = {
             jobId: payload?.jobId

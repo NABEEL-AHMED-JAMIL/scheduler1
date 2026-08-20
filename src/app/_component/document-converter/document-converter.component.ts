@@ -4,12 +4,13 @@ import { first } from 'rxjs/operators';
 import { AlertService, DocumentConverterService, StorageService } from '@/_services';
 import { SpinnerService, SearchFilterPipe } from '@/_helpers';
 import { ApiCode } from '@/_models';
-import { BucketSummary } from '@/_models/object';
+import { BucketSummary, ObjectSummary } from '@/_models/object';
 import {
     DocumentConverterConvertResult,
     DocumentConverterFormatFamily,
     DocumentConverterTask
 } from '@/_models/document-converter.model';
+import { formatBytes } from '@/_models/ollama.model';
 
 type PreviewKind = 'pdf' | 'image' | 'text' | 'html';
 
@@ -18,6 +19,21 @@ const PREVIEWABLE_EXTENSIONS: { [ext: string]: PreviewKind } = {
     txt: 'text', csv: 'text', tsv: 'text',
     html: 'html'
 };
+
+const PAGE_SIZE = 100;
+
+const FAMILY_ICONS: { [key: string]: string } = {
+    TEXT: 'glyphicon-file',
+    SPREADSHEET: 'glyphicon-th',
+    PRESENTATION: 'glyphicon-facetime-video',
+    DRAWING: 'glyphicon-picture',
+    OTHER: 'glyphicon-globe'
+};
+
+interface Breadcrumb {
+    name: string;
+    prefix: string;
+}
 
 @Component({
     selector: 'document-converter',
@@ -30,6 +46,17 @@ export class DocumentConverterComponent implements OnInit, OnDestroy {
 
     public formatFamilies: DocumentConverterFormatFamily[] = [];
     public loadingFormats = false;
+    public showFormatsReference = false;
+
+    public mode: 'upload' | 'browse' = 'upload';
+
+    public browseBucket = '';
+    public browseObjects: ObjectSummary[] = [];
+    public loadingBrowseObjects = false;
+    public browseCurrentPrefix = '';
+    public browseBreadcrumbs: Breadcrumb[] = [];
+    public browseSelectedEntry: ObjectSummary = null;
+    public loadingSelectedFile = false;
 
     public selectedFile: File | null = null;
     public outputFormat = '';
@@ -39,6 +66,14 @@ export class DocumentConverterComponent implements OnInit, OnDestroy {
     public selectedBucket = '';
     public converting = false;
     public result: DocumentConverterConvertResult | null = null;
+
+    public saveFolder = '';
+    public saveFolderExists = false;
+    public saveBrowsing = false;
+    public saveCurrentPrefix = '';
+    public saveBreadcrumbs: Breadcrumb[] = [];
+    public saveFolders: ObjectSummary[] = [];
+    public loadingSaveFolders = false;
 
     public resultPreviewSide: 'input' | 'output' | null = null;
 
@@ -87,6 +122,20 @@ export class DocumentConverterComponent implements OnInit, OnDestroy {
 
     public get filteredTasks(): DocumentConverterTask[] {
         return this.searchFilterPipe.transform(this.tasks, this.searchTasks) || [];
+    }
+
+    public formatBytes = formatBytes;
+
+    public familyIcon(key: string): string {
+        return FAMILY_ICONS[key] || 'glyphicon-file';
+    }
+
+    public get totalInputBytes(): number {
+        return this.tasks.reduce((sum, t) => sum + (t.inputFileSize || 0), 0);
+    }
+
+    public get totalOutputBytes(): number {
+        return this.tasks.reduce((sum, t) => sum + (t.outputFileSize || 0), 0);
     }
 
     private loadSupportedFormats(): void {
@@ -148,6 +197,10 @@ export class DocumentConverterComponent implements OnInit, OnDestroy {
     public onFileSelected(event: Event): void {
         const input = event.target as HTMLInputElement;
         const file = input.files && input.files.length ? input.files[0] : null;
+        this.useSelectedFile(file);
+    }
+
+    private useSelectedFile(file: File | null): void {
         this.selectedFile = file;
         this.outputFormat = '';
         this.result = null;
@@ -191,6 +244,167 @@ export class DocumentConverterComponent implements OnInit, OnDestroy {
         }
     }
 
+    public setMode(mode: 'upload' | 'browse'): void {
+        this.mode = mode;
+        this.useSelectedFile(null);
+        this.browseSelectedEntry = null;
+    }
+
+    public onBrowseBucketChange(): void {
+        this.browseCurrentPrefix = '';
+        this.browseBreadcrumbs = [];
+        this.browseObjects = [];
+        this.browseSelectedEntry = null;
+        if (this.browseBucket) {
+            this.loadBrowseObjects();
+        }
+    }
+
+    public loadBrowseObjects(): void {
+        this.loadingBrowseObjects = true;
+        this.storageService.listObjects(this.browseBucket, this.browseCurrentPrefix, null, PAGE_SIZE)
+            .pipe(first())
+            .subscribe((response) => {
+                this.loadingBrowseObjects = false;
+                if (response.status === ApiCode.SUCCESS) {
+                    this.browseObjects = (response.data && response.data.objects) || [];
+                } else {
+                    this.alertService.showError(response.message, this.ERROR);
+                }
+            }, (error) => {
+                this.loadingBrowseObjects = false;
+                this.alertService.showError(error, this.ERROR);
+            });
+    }
+
+    public get visibleBrowseObjects(): ObjectSummary[] {
+        return this.browseObjects.filter((entry) => entry.folder || this.isConvertibleExtension(entry.name));
+    }
+
+    private isConvertibleExtension(fileName: string): boolean {
+        const ext = this.extensionOf(fileName);
+        return this.formatFamilies.some((f) => f.inputFormats.indexOf(ext) > -1);
+    }
+
+    public selectBrowseEntry(entry: ObjectSummary): void {
+        if (entry.folder) {
+            this.browseCurrentPrefix = entry.key;
+            this.browseBreadcrumbs = [...this.browseBreadcrumbs, { name: entry.name, prefix: entry.key }];
+            this.browseSelectedEntry = null;
+            this.loadBrowseObjects();
+            return;
+        }
+        if (!this.isConvertibleExtension(entry.name)) {
+            this.alertService.showError(`"${entry.name}" isn't a supported input format.`, this.ERROR);
+            return;
+        }
+        this.browseSelectedEntry = entry;
+    }
+
+    public goToBrowseBreadcrumb(index: number): void {
+        this.browseSelectedEntry = null;
+        if (index < 0) {
+            this.browseCurrentPrefix = '';
+            this.browseBreadcrumbs = [];
+        } else {
+            this.browseCurrentPrefix = this.browseBreadcrumbs[index].prefix;
+            this.browseBreadcrumbs = this.browseBreadcrumbs.slice(0, index + 1);
+        }
+        this.loadBrowseObjects();
+    }
+
+    public runBrowseSelectedEntry(): void {
+        if (!this.browseSelectedEntry) {
+            return;
+        }
+        const entry = this.browseSelectedEntry;
+        this.loadingSelectedFile = true;
+        this.storageService.previewObjectArrayBuffer(this.browseBucket, entry.key)
+            .pipe(first())
+            .subscribe((buffer) => {
+                this.loadingSelectedFile = false;
+                this.useSelectedFile(new File([buffer], entry.name));
+            }, (error) => {
+                this.loadingSelectedFile = false;
+                this.alertService.showError(error, this.ERROR);
+            });
+    }
+
+    public onSaveBucketChange(bucket: string): void {
+        this.selectedBucket = bucket;
+        this.saveFolder = '';
+        this.saveFolderExists = false;
+        this.closeSaveBrowser();
+    }
+
+    public onSaveFolderChange(value: string): void {
+        this.saveFolder = value;
+        this.saveFolderExists = false;
+    }
+
+    public toggleSaveBrowse(): void {
+        if (!this.selectedBucket) {
+            this.alertService.showError('Select a bucket first.', this.ERROR);
+            return;
+        }
+        this.saveBrowsing = !this.saveBrowsing;
+        if (this.saveBrowsing) {
+            this.saveCurrentPrefix = '';
+            this.saveBreadcrumbs = [];
+            this.loadSaveFolders();
+        }
+    }
+
+    private closeSaveBrowser(): void {
+        this.saveBrowsing = false;
+        this.saveCurrentPrefix = '';
+        this.saveBreadcrumbs = [];
+        this.saveFolders = [];
+    }
+
+    public loadSaveFolders(): void {
+        this.loadingSaveFolders = true;
+        this.storageService.listObjects(this.selectedBucket, this.saveCurrentPrefix, null, PAGE_SIZE)
+            .pipe(first())
+            .subscribe((response) => {
+                this.loadingSaveFolders = false;
+                if (response.status === ApiCode.SUCCESS) {
+                    this.saveFolders = ((response.data && response.data.objects) || []).filter((entry) => entry.folder);
+                } else {
+                    this.alertService.showError(response.message, this.ERROR);
+                }
+            }, (error) => {
+                this.loadingSaveFolders = false;
+                this.alertService.showError(error, this.ERROR);
+            });
+    }
+
+    public openSaveFolder(entry: ObjectSummary): void {
+        this.saveCurrentPrefix = entry.key;
+        this.saveBreadcrumbs = [...this.saveBreadcrumbs, { name: entry.name, prefix: entry.key }];
+        this.loadSaveFolders();
+    }
+
+    public goToSaveBreadcrumb(index: number): void {
+        if (index < 0) {
+            this.saveCurrentPrefix = '';
+            this.saveBreadcrumbs = [];
+        } else {
+            this.saveCurrentPrefix = this.saveBreadcrumbs[index].prefix;
+            this.saveBreadcrumbs = this.saveBreadcrumbs.slice(0, index + 1);
+        }
+        this.loadSaveFolders();
+    }
+
+    public useCurrentSaveFolder(): void {
+        if (!this.saveCurrentPrefix) {
+            return;
+        }
+        this.saveFolder = this.saveCurrentPrefix.replace(/\/+$/, '');
+        this.saveFolderExists = true;
+        this.closeSaveBrowser();
+    }
+
     public convert(): void {
         if (!this.selectedFile) {
             this.alertService.showError('Choose a file first.', this.ERROR);
@@ -217,6 +431,7 @@ export class DocumentConverterComponent implements OnInit, OnDestroy {
         this.documentConverterService.convert(
             this.selectedFile, this.outputFormat, this.saveToBucket,
             this.saveToBucket ? this.selectedBucket : undefined,
+            this.saveToBucket ? this.saveFolder.trim() : undefined,
             this.saveToBucket ? this.taskName.trim() : undefined)
             .pipe(first())
             .subscribe((response) => {
@@ -333,6 +548,14 @@ export class DocumentConverterComponent implements OnInit, OnDestroy {
         this.saveToBucket = false;
         this.taskName = '';
         this.selectedBucket = '';
+        this.saveFolder = '';
+        this.saveFolderExists = false;
+        this.closeSaveBrowser();
+        this.browseBucket = '';
+        this.browseObjects = [];
+        this.browseCurrentPrefix = '';
+        this.browseBreadcrumbs = [];
+        this.browseSelectedEntry = null;
         this.result = null;
         this.resultPreviewSide = null;
         this.revokeInputPreview();

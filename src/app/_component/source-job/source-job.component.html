@@ -21,7 +21,7 @@
     <div class="form-group" style="margin-bottom: 0; margin-left: 10px;">
         <label for="jobStatusFilter" class="control-label">Status</label>
         <select id="jobStatusFilter"
-            class="form-control"
+            class="form-control input-sm"
             style="width: 140px;"
             [ngModel]="statusFilter"
             (ngModelChange)="onStatusFilterChange($event)">
@@ -75,23 +75,25 @@
         <div class="entity-card-pills">
             <span class="pill" [ngClass]="sourceJob.execution == 'Manual' ? 'pill-success' : 'pill-warning'">{{sourceJob.execution}}</span>
             <span *ngIf="sourceJob.jobRunningStatus" class="pill" [ngClass]="'status-' + sourceJob.jobRunningStatus">{{ sourceJob.jobRunningStatus }}</span>
+            <span *ngIf="sourceJob?.scheduler?.expired" class="pill pill-warning">Schedule ended</span>
+            <span *ngIf="sourceJob?.scheduler?.lastFlight" class="pill pill-warning" title="No more runs are scheduled after this one">Last run</span>
         </div>
         <div class="entity-card-stats">
             <div class="entity-card-stat">
                 <span class="glyphicon glyphicon-calendar"></span>
                 <span class="entity-card-stat-label">Created</span> {{sourceJob.dateCreated | date:'yyyy-MM-dd HH:mm'}}
             </div>
-            <div class="entity-card-stat" *ngIf="sourceJob?.scheduler">
-                <span class="glyphicon glyphicon-repeat"></span>
-                <span class="entity-card-stat-label">Recursion</span> Every {{sourceJob?.scheduler?.recurrence}} {{sourceJob?.scheduler?.frequency}}
-            </div>
             <div class="entity-card-stat" *ngIf="sourceJob.lastJobRun">
                 <span class="glyphicon glyphicon-time"></span>
                 <span class="entity-card-stat-label">Last Run</span> {{sourceJob.lastJobRun | date:'yyyy-MM-dd HH:mm'}}
             </div>
-            <div class="entity-card-stat" *ngIf="sourceJob?.scheduler?.recurrenceTime">
+            <div class="entity-card-stat" *ngIf="sourceJob?.scheduler">
+                <span class="glyphicon glyphicon-repeat"></span>
+                <span class="entity-card-stat-label">Schedule</span> {{formatScheduleSummary(sourceJob?.scheduler)}}
+            </div>
+            <div class="entity-card-stat" *ngIf="sourceJob?.scheduler?.nextRunAt && !sourceJob?.scheduler?.expired">
                 <span class="glyphicon glyphicon-forward"></span>
-                <span class="entity-card-stat-label">Next Flight</span> {{sourceJob?.scheduler?.recurrenceTime | date:'yyyy-MM-dd HH:mm'}}
+                <span class="entity-card-stat-label">Next Run</span> {{sourceJob?.scheduler?.nextRunAt | date:'yyyy-MM-dd HH:mm'}}
             </div>
         </div>
         <div class="entity-card-footer">
@@ -156,11 +158,8 @@
                 <th>Execution</th>
                 <th>Status</th>
                 <th>Created Date</th>
-                <th>Recursion</th>
-                <th>Start Date</th>
-                <th>End Date</th>
                 <th>Last Run</th>
-                <th>Next Flight</th>
+                <th>Schedule</th>
                 <th>R-Status</th>
                 <th class="text-center">Action</th>
             </tr>
@@ -186,7 +185,7 @@
                     <a routerLink="/editJob/{{sourceJob.jobId}}">
                         {{sourceJob.jobId}}-{{sourceJob.jobName}}
                     </a>
-                    <span class="glyphicon glyphicon-hdd" style="margin-left: 6px; color: var(--text-muted, #888);"
+                    <span class="glyphicon glyphicon-hdd bucket-indicator-icon"
                         *ngIf="sourceJob?.taskDetail?.bucket" title="This job writes to a bucket -- expand the row for details."></span>
                 </td>
                 <td class="text-center">
@@ -206,11 +205,21 @@
                     </span>
                 </td>
                 <td class="text-center">{{sourceJob.dateCreated | date:'yyyy-MM-dd HH:mm:ss'}}</td>
-                <td class="text-center">{{sourceJob?.scheduler ? 'Every ' + sourceJob?.scheduler?.recurrence : ''}} {{sourceJob?.scheduler ? sourceJob?.scheduler?.frequency : ''}}</td>
-                <td class="text-center">{{sourceJob?.scheduler?.startDate}} {{sourceJob?.scheduler?.startTime}}</td>
-                <td class="text-center">{{sourceJob?.scheduler?.endDate ? sourceJob?.scheduler?.endDate : ''}} {{sourceJob?.scheduler?.endDate ? sourceJob?.scheduler?.startTime : ''}}</td>
                 <td class="text-center">{{sourceJob.lastJobRun | date:'yyyy-MM-dd HH:mm:ss'}}</td>
-                <td class="text-center">{{sourceJob?.scheduler?.recurrenceTime | date:'yyyy-MM-dd HH:mm:ss'}}</td>
+                <td class="text-center">
+                    <div class="schedule-cell" *ngIf="sourceJob?.scheduler; else noSchedule">
+                        <span class="schedule-cell-main">{{formatScheduleSummary(sourceJob.scheduler)}}</span>
+                        <span class="schedule-cell-next" *ngIf="!sourceJob.scheduler.expired">
+                            Next: {{sourceJob.scheduler.nextRunAt | date:'yyyy-MM-dd HH:mm'}}
+                            <span *ngIf="sourceJob.scheduler.lastFlight" class="schedule-cell-lastflight"
+                                title="No more runs are scheduled after this one"> (last run)</span>
+                        </span>
+                        <span class="schedule-cell-next schedule-cell-expired" *ngIf="sourceJob.scheduler.expired">
+                            Schedule ended
+                        </span>
+                    </div>
+                    <ng-template #noSchedule>—</ng-template>
+                </td>
                 <td class="text-center">
                     <span *ngIf="sourceJob.jobRunningStatus" class="pill"
                         [ngClass]="'status-' + sourceJob.jobRunningStatus">
@@ -218,129 +227,63 @@
                     </span>
                 </td>
                 <td class="text-center">
-                    <div class="btn-group btn-group-sm">
+                    <div class="btn-group btn-group-sm" style="align-items: center;">
+                        <button type="button" class="btn btn-default btn-icon"
+                            [ngClass]="sourceJob.jobStatus === 'Active' ? 'ic-active' : 'ic-inactive'"
+                            [disabled]="sourceJob.jobStatus === 'Delete'"
+                            (click)="toggleSourceJobStatus(sourceJob, i)"
+                            [title]="sourceJob.jobStatus === 'Delete' ? 'Deleted jobs can\'t be activated' : (sourceJob.jobStatus === 'Active' ? 'Deactivate this job' : 'Activate this job')">
+                            <span class="glyphicon" [ngClass]="sourceJob.jobStatus === 'Active' ? 'glyphicon-ok-circle' : 'glyphicon-ban-circle'"></span>
+                        </button>
                         <button type="button" class="btn btn-default btn-icon ic-run"
-                            [disabled]="sourceJob.jobRunningStatus === 'Queue' ||
-                                sourceJob.jobRunningStatus === 'Running' ||
-                                sourceJob.jobRunningStatus === 'Start' ||
-                                sourceJob.jobStatus === 'Delete' ||
-                                sourceJob.jobStatus === 'Inactive'"
-                            (click)="runSourceJob(sourceJob, i)"
+                            [disabled]="!canRunJob(sourceJob)"
+                            (click)="onRunJobClick(sourceJob, i)"
                             title="Run Job">
                             <span class="glyphicon glyphicon-play-circle"></span>
                         </button>
-                        <button type="button" class="btn btn-default btn-icon ic-clone"
-                            [disabled]="sourceJob.jobStatus === 'Delete'"
-                            (click)="cloneSourceJob(sourceJob, i)"
-                            title="Clone Job">
-                            <span class="glyphicon glyphicon-duplicate"></span>
-                        </button>
                         <button type="button" class="btn btn-default btn-icon ic-skip"
-                            [disabled]="sourceJob.jobRunningStatus === 'Queue' ||
-                                sourceJob.jobRunningStatus === 'Running' ||
-                                sourceJob.jobRunningStatus === 'Start' ||
-                                sourceJob.execution == 'Manual' ||
-                                sourceJob.jobStatus === 'Delete' ||
-                                sourceJob.jobStatus === 'Inactive'"
-                            (click)="skipNextSourceJob(sourceJob, i)"
+                            [disabled]="!canSkipJob(sourceJob)"
+                            (click)="onSkipJobClick(sourceJob, i)"
                             title="Skip Next">
                             <span class="glyphicon glyphicon-step-forward"></span>
                         </button>
-                        <button type="button" class="btn btn-default btn-icon ic-history"
-                            [disabled]="sourceJob.tabActive === false"
-                            (click)="sourceJobHistoryByJobId(sourceJob.jobId)"
-                            title="History">
-                            <span class="glyphicon glyphicon-tasks"></span>
-                        </button>
-                        <button type="button" class="btn btn-default btn-icon ic-delete"
-                            [disabled]="sourceJob.jobStatus === 'Delete' ||
-                                sourceJob.jobRunningStatus === 'Start' ||
-                                sourceJob.jobRunningStatus === 'Running'"
-                            data-toggle="modal" data-target="#deleteSourceJob"
-                            (click)="deleteSourceJob(sourceJob, i)"
-                            title="Delete">
-                            <span class="glyphicon glyphicon-trash"></span>
-                        </button>
+                        <div class="dropdown" style="display: inline-block;">
+                            <button type="button" class="btn btn-default btn-icon ic-more" data-toggle="dropdown" title="More actions">
+                                <span class="glyphicon glyphicon-option-vertical"></span>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-right">
+                                <li [class.disabled]="!canCloneJob(sourceJob)">
+                                    <a href="javascript:void(0);" (click)="onCloneJobClick(sourceJob, i)">
+                                        <span class="glyphicon glyphicon-duplicate"></span> Clone Job
+                                    </a>
+                                </li>
+                                <li [class.disabled]="!canViewHistory(sourceJob)">
+                                    <a href="javascript:void(0);" (click)="onHistoryClick(sourceJob)">
+                                        <span class="glyphicon glyphicon-tasks"></span> History
+                                    </a>
+                                </li>
+                                <li class="divider"></li>
+                                <li [class.disabled]="!canDeleteJob(sourceJob)">
+                                    <a href="javascript:void(0);"
+                                        [attr.data-toggle]="canDeleteJob(sourceJob) ? 'modal' : null"
+                                        [attr.data-target]="canDeleteJob(sourceJob) ? '#deleteSourceJob' : null"
+                                        (click)="onDeleteJobClick(sourceJob, i)">
+                                        <span class="glyphicon glyphicon-trash"></span> Delete
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
                     </div>
                 </td>
             </tr>
             <tr class="expand-row" *ngIf="expandedJobId === sourceJob.jobId">
-                <td colspan="13">
+                <td colspan="10">
                     <div class="expand-panel">
-                        <div class="expand-panel-section">
-                            <div class="expand-panel-heading">Linked Task</div>
-                            <div class="entity-card-stats" style="border-top: none; margin-top: 0; padding-top: 0;">
-                                <div class="entity-card-stat">
-                                    <span class="glyphicon glyphicon-tasks"></span>
-                                    <span class="entity-card-stat-label">Task</span>
-                                    <a routerLink="/editTask/{{sourceJob?.taskDetail?.taskDetailId}}">{{sourceJob?.taskDetail?.taskDetailId}}-[{{sourceJob?.taskDetail?.taskName}}]</a>
-                                </div>
-                                <div class="entity-card-stat" *ngIf="sourceJob?.taskDetail?.taskStatus">
-                                    <span class="entity-card-stat-label">Task Status</span>
-                                    <span class="pill pill-icon"
-                                        [ngClass]="{
-                                            'pill-danger': sourceJob?.taskDetail?.taskStatus === 'Delete',
-                                            'pill-warning': sourceJob?.taskDetail?.taskStatus === 'Inactive',
-                                            'pill-success': sourceJob?.taskDetail?.taskStatus === 'Active'
-                                        }">
-                                        <span class="glyphicon glyphicon-flag"></span> {{sourceJob?.taskDetail?.taskStatus}}
-                                    </span>
-                                </div>
-                                <div class="entity-card-stat" *ngIf="sourceJob?.taskDetail?.sourceTaskType">
-                                    <span class="entity-card-stat-label">Type</span>
-                                    <span class="pill pill-cyan pill-icon">
-                                        <span class="glyphicon glyphicon-tag"></span>
-                                        {{sourceJob?.taskDetail?.sourceTaskType?.sourceTaskTypeId}} [{{sourceJob?.taskDetail?.sourceTaskType?.serviceName}}]
-                                    </span>
-                                </div>
-                                <div class="entity-card-stat" *ngIf="sourceJob?.taskDetail?.sourceTaskType?.queueTopicPartition">
-                                    <span class="entity-card-stat-label">Queue/Topic</span>
-                                    <span class="pill pill-info pill-icon">
-                                        <span class="glyphicon glyphicon-transfer"></span>
-                                        {{sourceJob?.taskDetail?.sourceTaskType?.queueTopicPartition}}
-                                    </span>
-                                </div>
-                                <div class="entity-card-stat" *ngIf="sourceJob?.taskDetail?.pipelineId">
-                                    <span class="entity-card-stat-label">Pipeline</span>
-                                    <span class="pill pill-purple pill-icon">
-                                        <span class="glyphicon glyphicon-random"></span>
-                                        {{sourceJob?.taskDetail?.pipelineId}}
-                                    </span>
-                                </div>
-                                <div class="entity-card-stat" *ngIf="sourceJob?.taskDetail?.homePageId">
-                                    <span class="entity-card-stat-label">Home Page</span>
-                                    <a class="pill pill-warning pill-icon" [href]="sourceJob.taskDetail.homePageId" target="_blank" rel="noopener">
-                                        <span class="glyphicon glyphicon-home"></span> {{sourceJob.taskDetail.homePageId}}
-                                        <span class="glyphicon glyphicon-new-window" style="font-size: 10px; margin-left: 2px;"></span>
-                                    </a>
-                                </div>
-                                <div class="entity-card-stat" *ngIf="sourceJob?.taskDetail?.bucket">
-                                    <span class="entity-card-stat-label">Bucket / Folder</span>
-                                    <span class="pill pill-info pill-icon">
-                                        <span class="glyphicon glyphicon-hdd"></span>
-                                        {{sourceJob.taskDetail.bucket}} / {{sourceJob.taskDetail.outputFolder || sourceJob.taskDetail.inputFolder}}
-                                    </span>
-                                    <a class="btn btn-xs btn-default" style="margin-left: 8px;"
-                                        [routerLink]="['/objectBrowser']"
-                                        [queryParams]="{ bucket: sourceJob.taskDetail.bucket, prefix: sourceJob.taskDetail.outputFolder || sourceJob.taskDetail.inputFolder }">
-                                        <span class="glyphicon glyphicon-new-window"></span> View in Bucket
-                                    </a>
-                                </div>
-                            </div>
-                            <div class="expand-panel-payload" *ngIf="sourceJob?.taskDetail?.taskPayload">
-                                <div class="expand-panel-payload-label">
-                                    <span class="glyphicon glyphicon-list-alt"></span> Task Payload
-                                </div>
-                                <pre>{{sourceJob.taskDetail.taskPayload}}</pre>
-                            </div>
-                        </div>
-                        <div class="expand-panel-section">
+                        <linked-task-panel [taskDetail]="sourceJob?.taskDetail"></linked-task-panel>
+                        <div class="expand-panel-section" *ngIf="expandedJobQueuesLoading || expandedJobQueues.length > 0">
                             <div class="expand-panel-heading">Queue List (Run History)</div>
                             <div class="help-text" *ngIf="expandedJobQueuesLoading">
                                 <span class="glyphicon glyphicon-refresh spin"></span> Loading queue list...
-                            </div>
-                            <div class="help-text" *ngIf="!expandedJobQueuesLoading && expandedJobQueues.length === 0">
-                                <span class="glyphicon glyphicon-info-sign"></span> No queue runs yet for this job.
                             </div>
                             <div class="expand-panel-chart" *ngIf="!expandedJobQueuesLoading && expandedJobQueuesChartOptions"
                                 echarts [options]="expandedJobQueuesChartOptions" (chartClick)="onExpandedJobQueuesChartClick($event)"
@@ -351,6 +294,15 @@
                 </td>
             </tr>
             </ng-container>
+            <tr *ngIf="!filteredSourceJobDetails.length">
+                <td colspan="10">
+                    <div class="empty-state">
+                        <span class="glyphicon glyphicon-search"></span>
+                        <div class="empty-state-title">No jobs found</div>
+                        <div class="empty-state-text">No jobs match your search or filter.</div>
+                    </div>
+                </td>
+            </tr>
         </tbody>
     </table>
 </div>

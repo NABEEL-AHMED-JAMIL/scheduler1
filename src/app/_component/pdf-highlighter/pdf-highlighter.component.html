@@ -92,12 +92,30 @@
                             (click)="editPdfHighlighterTask(pdfHighlighterTask)" title="Edit">
                             <span class="glyphicon glyphicon-edit"></span>
                         </button>
-                        <button type="button" class="btn btn-default btn-icon ic-delete"
-                            (click)="deletePdfHighlighterTask(pdfHighlighterTask.pdfHighlighterTaskId, i)"
-                            [disabled]="pdfHighlighterTask.status === 'Delete'"
-                            data-toggle="modal" data-target="#deletePdfHighlighterTask" title="Delete">
-                            <span class="glyphicon glyphicon-trash"></span>
-                        </button>
+                        <div class="dropdown" style="display: inline-block;">
+                            <button type="button" class="btn btn-default btn-icon ic-more" data-toggle="dropdown" title="More actions">
+                                <span class="glyphicon glyphicon-option-vertical"></span>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-right">
+                                <li [class.disabled]="pdfHighlighterTask.status === 'Delete'">
+                                    <a href="javascript:void(0);"
+                                        [attr.data-toggle]="pdfHighlighterTask.status !== 'Delete' ? 'modal' : null"
+                                        [attr.data-target]="pdfHighlighterTask.status !== 'Delete' ? '#deletePdfHighlighterTask' : null"
+                                        (click)="deletePdfHighlighterTask(pdfHighlighterTask.pdfHighlighterTaskId, i)">
+                                        <span class="glyphicon glyphicon-trash"></span> Delete
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+            <tr *ngIf="!(filteredPdfHighlighterTasks | searchFilter: searchPdfHighlighterTask).length">
+                <td colspan="8">
+                    <div class="empty-state">
+                        <span class="glyphicon glyphicon-search"></span>
+                        <div class="empty-state-title">No PDF highlighter tasks found</div>
+                        <div class="empty-state-text">{{pdfHighlighterTasks.length ? 'No tasks match your search or filter.' : 'Get started by adding a PDF highlighter task.'}}</div>
                     </div>
                 </td>
             </tr>

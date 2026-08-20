@@ -98,10 +98,20 @@
                                 (click)="openEditField(field)" data-toggle="modal" data-target="#fieldModal">
                                 <span class="glyphicon glyphicon-edit"></span>
                             </button>
-                            <button type="button" class="btn btn-default btn-icon ic-delete" title="Delete"
-                                (click)="deleteField(field.dynamicFormFieldId, i)" data-toggle="modal" data-target="#deleteFieldModal">
-                                <span class="glyphicon glyphicon-trash"></span>
-                            </button>
+                            <div class="dropdown" style="display: inline-block;">
+                                <button type="button" class="btn btn-default btn-icon ic-more" data-toggle="dropdown" title="More actions">
+                                    <span class="glyphicon glyphicon-option-vertical"></span>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-right">
+                                    <li>
+                                        <a href="javascript:void(0);"
+                                            data-toggle="modal" data-target="#deleteFieldModal"
+                                            (click)="deleteField(field.dynamicFormFieldId, i)">
+                                            <span class="glyphicon glyphicon-trash"></span> Delete
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
                         </div>
                     </td>
                 </tr>
@@ -132,7 +142,7 @@
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label class="control-label" for="fieldWidth">Width (1-12 columns)</label>
-                                <input type="number" class="form-control" formControlName="fieldWidth" min="1" max="12" />
+                                <input type="number" class="form-control" formControlName="fieldWidth" min="1" max="12" placeholder="e.g. 6" />
                             </div>
                         </div>
                     </div>
@@ -167,13 +177,13 @@
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label class="control-label" for="placeHolder">Placeholder</label>
-                                <input type="text" class="form-control" formControlName="placeHolder" />
+                                <input type="text" class="form-control" formControlName="placeHolder" placeholder="Hint text shown inside the empty field" />
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label class="control-label" for="defaultValue">Default Value</label>
-                                <input type="text" class="form-control" formControlName="defaultValue" />
+                                <input type="text" class="form-control" formControlName="defaultValue" placeholder="Pre-filled when the form opens (optional)" />
                             </div>
                         </div>
                     </div>
@@ -195,13 +205,13 @@
                         <div class="col-md-4">
                             <div class="form-group">
                                 <label class="control-label" for="minLength">Min Length</label>
-                                <input type="number" class="form-control" formControlName="minLength" min="0" />
+                                <input type="number" class="form-control" formControlName="minLength" min="0" placeholder="No minimum" />
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="form-group">
                                 <label class="control-label" for="maxLength">Max Length</label>
-                                <input type="number" class="form-control" formControlName="maxLength" min="0" />
+                                <input type="number" class="form-control" formControlName="maxLength" min="0" placeholder="No maximum" />
                             </div>
                         </div>
                     </div>

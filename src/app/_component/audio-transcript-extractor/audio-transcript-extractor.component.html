@@ -4,245 +4,202 @@
     <span class="crumb-current">Audio Transcript Extractor</span>
 </nav>
 
-<div class="panel-box" style="margin-bottom: 16px;">
-    <h4 style="margin-top: 0;"><span class="glyphicon glyphicon-headphones"></span> Audio Transcript Extractor</h4>
-    <span class="help-text" style="display: block;">
+<div class="card-panel">
+    <h4 class="card-panel-title panel-banner">
+        <span class="glyphicon glyphicon-headphones"></span> Audio Transcript Extractor
+    </h4>
+
+    <span class="help-text" style="display: block; margin-bottom: 14px;">
         <span class="glyphicon glyphicon-info-sign"></span>
-        Runs an audio file, video file, or YouTube link through the same noise-reduction +
-        speech-to-text pipeline as the batch transcription job, on demand for a single item --
-        then ask free-form questions about the transcript.
+        Runs an audio file through the same noise-reduction + speech-to-text pipeline as the
+        batch transcription job, on demand for a single item.
     </span>
-</div>
 
-<div class="toolbar" style="margin-bottom: 12px;">
-    <button type="button" class="btn btn-sm" [ngClass]="mode === 'upload' ? 'btn-teal' : 'btn-default'" (click)="setMode('upload')">
-        <span class="glyphicon glyphicon-upload"></span> Upload File
-    </button>
-    <button type="button" class="btn btn-sm" [ngClass]="mode === 'path' ? 'btn-teal' : 'btn-default'" (click)="setMode('path')" style="margin-left: 6px;">
-        <span class="glyphicon glyphicon-link"></span> File Path
-    </button>
-    <button type="button" class="btn btn-sm" [ngClass]="mode === 'browse' ? 'btn-teal' : 'btn-default'" (click)="setMode('browse')" style="margin-left: 6px;">
-        <span class="glyphicon glyphicon-folder-open"></span> Browse Bucket
-    </button>
-    <button type="button" class="btn btn-sm" [ngClass]="mode === 'video' ? 'btn-teal' : 'btn-default'" (click)="setMode('video')" style="margin-left: 6px;">
-        <span class="glyphicon glyphicon-facetime-video"></span> Upload Video
-    </button>
-    <button type="button" class="btn btn-sm" [ngClass]="mode === 'youtube' ? 'btn-teal' : 'btn-default'" (click)="setMode('youtube')" style="margin-left: 6px;">
-        <span class="glyphicon glyphicon-play-circle"></span> YouTube Link
-    </button>
-    <span class="toolbar-spacer"></span>
-    <button type="button" class="btn btn-sm btn-default" (click)="clearAll()">
-        <span class="glyphicon glyphicon-refresh"></span> Clear
-    </button>
-</div>
-
-<div class="checkbox" style="margin-bottom: 12px;">
-    <label>
-        <input type="checkbox" [(ngModel)]="includeTimestamps" /> Include timestamps
-        (<code>[HH:MM:SS.mmm]</code> before each segment, instead of one merged block)
-    </label>
-</div>
-
-<div class="row">
-    <div class="col-md-6">
-        <div *ngIf="mode === 'upload'">
-            <div class="form-group">
-                <label class="control-label">Audio file</label>
-                <input type="file" class="form-control" accept=".mp3,.m4a" (change)="onFileSelected($event)" />
-                <span class="help-text" style="display: block; margin-top: 4px;">
-                    Supported: {{ supportedExtensions.join(', ') }}
-                </span>
-            </div>
-            <button type="button" class="btn btn-teal" (click)="extractUpload()">
-                <span class="glyphicon glyphicon-headphones"></span> Extract Transcript
-            </button>
-        </div>
-
-        <div *ngIf="mode === 'path'">
-            <div class="form-group">
-                <label class="control-label">Bucket / key path</label>
-                <input type="text" class="form-control" [(ngModel)]="pathInput"
-                    placeholder="e.g. etl-bucket/audio_text/input/call.mp3" (keyup.enter)="loadFromPath()" />
-                <span class="help-text" style="display: block; margin-top: 4px;">
-                    Supported: {{ supportedExtensions.join(', ') }}
-                </span>
-            </div>
-            <button type="button" class="btn btn-teal" (click)="loadFromPath()">
-                <span class="glyphicon glyphicon-download"></span> Load &amp; Extract
-            </button>
-        </div>
-
-        <div *ngIf="mode === 'browse'">
-            <div class="form-group">
-                <label class="control-label">Bucket</label>
-                <select class="form-control" [(ngModel)]="selectedBucket" (ngModelChange)="onBucketChange()">
-                    <option value="">Select a bucket</option>
-                    <option *ngFor="let b of buckets" [value]="b.bucket">{{ b.label }} ({{ b.provider }})</option>
-                </select>
-            </div>
-
-            <nav class="breadcrumb-bar" *ngIf="selectedBucket">
-                <a href="javascript:void(0);" (click)="goToBreadcrumb(-1)">{{ selectedBucket }}</a>
-                <ng-container *ngFor="let bc of breadcrumbs; let i = index;">
-                    <span class="crumb-sep">/</span>
-                    <a href="javascript:void(0);" (click)="goToBreadcrumb(i)">{{ bc.name }}</a>
-                </ng-container>
-            </nav>
-
-            <div class="text-muted" *ngIf="loadingObjects">Loading...</div>
-            <div class="table-responsive scroll-table" *ngIf="selectedBucket && !loadingObjects" style="max-height: 360px; overflow-y: auto;">
-                <table class="table table-bordered table-hover table-modern" style="font-size: 12px;">
-                    <tbody>
-                        <tr *ngFor="let entry of objects" class="bucket-row" (click)="openEntry(entry)">
-                            <td style="width: 24px;">
-                                <span class="glyphicon folder-icon" [ngClass]="entry.folder ? 'glyphicon-folder-close' : 'glyphicon-file'"></span>
-                            </td>
-                            <td>{{ entry.name }}</td>
-                        </tr>
-                        <tr *ngIf="!objects.length">
-                            <td class="text-muted">This folder is empty.</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <div *ngIf="mode === 'video'">
-            <div class="form-group">
-                <label class="control-label">Video file</label>
-                <input type="file" class="form-control" accept=".mp4,.mov,.mkv,.webm,.avi" (change)="onVideoFileSelected($event)" />
-                <span class="help-text" style="display: block; margin-top: 4px;">
-                    Supported: {{ videoSupportedExtensions.join(', ') }} -- only the audio track is used.
-                </span>
-            </div>
-            <button type="button" class="btn btn-teal" (click)="extractVideoUpload()">
-                <span class="glyphicon glyphicon-facetime-video"></span> Extract Transcript
-            </button>
-        </div>
-
-        <div *ngIf="mode === 'youtube'">
-            <div class="form-group">
-                <label class="control-label">YouTube link</label>
-                <input type="text" class="form-control" [(ngModel)]="youtubeUrl"
-                    placeholder="e.g. https://www.youtube.com/watch?v=..." (keyup.enter)="extractYoutube()" />
-                <span class="help-text" style="display: block; margin-top: 4px;">
-                    Videos over 2 hours aren't supported for on-demand extraction. Download + transcription
-                    can take a while -- for your own/personal use only, please respect YouTube's terms.
-                </span>
-            </div>
-            <button type="button" class="btn btn-teal" (click)="extractYoutube()">
-                <span class="glyphicon glyphicon-play-circle"></span> Extract Transcript
-            </button>
-        </div>
+    <div class="toolbar" style="margin-bottom: 12px;">
+        <button type="button" class="btn btn-sm" [ngClass]="mode === 'upload' ? 'btn-teal' : 'btn-default'" (click)="setMode('upload')">
+            <span class="glyphicon glyphicon-upload"></span> Upload File
+        </button>
+        <button type="button" class="btn btn-sm" [ngClass]="mode === 'browse' ? 'btn-teal' : 'btn-default'" (click)="setMode('browse')" style="margin-left: 6px;">
+            <span class="glyphicon glyphicon-folder-open"></span> Browse Bucket
+        </button>
+        <span class="toolbar-spacer"></span>
+        <button type="button" class="btn btn-sm btn-default" (click)="clearAll()">
+            <span class="glyphicon glyphicon-refresh"></span> Clear
+        </button>
     </div>
 
-    <div class="col-md-6">
-        <div class="preview-toolbar" *ngIf="sourceLabel">
-            <span class="help-text" style="display: inline;">Source: <strong>{{ sourceLabel }}</strong></span>
-        </div>
-        <div class="text-muted" *ngIf="extracting">
-            <span class="glyphicon glyphicon-refresh spin"></span> Extracting transcript... this can take a minute or two.
-        </div>
-        <div class="error-text" *ngIf="extractError">{{ extractError }}</div>
-
-        <div *ngIf="transcript">
-            <div class="preview-toolbar preview-toolbar-spread">
-                <span class="help-text" style="display: inline;">Transcript ({{ transcript.length }} chars)</span>
-                <button type="button" class="btn btn-default btn-sm" (click)="copyTranscript()" title="Copy transcript to clipboard">
-                    <span class="glyphicon glyphicon-duplicate"></span> Copy
-                </button>
-            </div>
-            <pre class="preview-text" style="max-height: 420px;">{{ transcript }}</pre>
-
-            <div class="panel-box-subtle" *ngIf="!transcriptLoadedFromBucket">
-                <label class="control-label" style="display: block; margin-bottom: 6px;">Save to Bucket</label>
-                <div class="row">
-                    <div class="col-md-5">
-                        <select class="form-control" [(ngModel)]="saveBucket">
-                            <option value="">Select a bucket</option>
-                            <option *ngFor="let b of buckets" [value]="b.bucket">{{ b.label }} ({{ b.provider }})</option>
-                        </select>
-                    </div>
-                    <div class="col-md-7">
-                        <input type="text" class="form-control" [(ngModel)]="saveFolderName" placeholder="Folder name" />
-                    </div>
-                </div>
-                <button type="button" class="btn btn-default btn-sm" style="margin-top: 8px;"
-                    (click)="saveTranscriptToBucket()" [disabled]="savingTranscript">
-                    <span class="glyphicon" [ngClass]="savingTranscript ? 'glyphicon-refresh spin' : 'glyphicon-folder-close'"></span>
-                    {{ savingTranscript ? 'Saving...' : 'Save Transcript to Bucket' }}
-                </button>
-                <div class="help-text help-text-success" style="margin-top: 6px;" *ngIf="transcriptSavedPath">
-                    <span class="glyphicon glyphicon-ok"></span> Saved to {{ transcriptSavedPath }}
-                </div>
-                <div class="error-text" style="margin-top: 6px;" *ngIf="saveTranscriptError">{{ saveTranscriptError }}</div>
-            </div>
-            <div class="help-text" style="display: block; margin-top: 12px;" *ngIf="transcriptLoadedFromBucket">
-                <span class="glyphicon glyphicon-ok"></span> Loaded from the bucket -- already saved at {{ sourceLabel }}.
-            </div>
-        </div>
-
-        <p class="help-text" *ngIf="!transcript && !extracting && !extractError">
-            <span class="glyphicon glyphicon-info-sign"></span> Transcript will appear here.
-        </p>
+    <div class="checkbox" style="margin-bottom: 16px;">
+        <label>
+            <input type="checkbox" [(ngModel)]="includeTimestamps" /> Include timestamps
+            (<code>[HH:MM:SS.mmm]</code> before each segment, instead of one merged block)
+        </label>
     </div>
-</div>
-
-<div class="panel-box" style="margin-top: 16px;" *ngIf="transcript">
-    <h4 style="margin-top: 0;"><span class="glyphicon glyphicon-comment"></span> Ask AI</h4>
-    <span class="help-text" style="display: block; margin-bottom: 10px;">
-        Pick a saved AI Agent (reuses its provider, model, and API key) and type a one-off prompt
-        that overrides that agent's saved instructions for this question -- nothing here is saved.
-    </span>
 
     <div class="row">
-        <div class="col-md-4">
-            <div class="form-group">
-                <label class="control-label">AI Agent</label>
-                <select class="form-control" [(ngModel)]="selectedAgentId">
-                    <option value="" disabled>Select an AI Agent</option>
-                    <option *ngFor="let a of agents" [value]="a.aiAgentId">{{ a.agentName }} ({{ a.provider }})</option>
-                </select>
-                <span class="help-text" *ngIf="!loadingAgents && !agents.length" style="display: block; margin-top: 4px;">
-                    No active agents yet -- add one under AI Suite &gt; AI Agents.
-                </span>
+        <div class="col-md-6">
+            <div *ngIf="mode === 'upload'">
+                <div class="form-group">
+                    <label class="control-label">Audio file</label>
+                    <input type="file" class="form-control" accept=".mp3,.m4a" (change)="onFileSelected($event)" />
+                    <span class="help-text" style="display: block; margin-top: 4px;">
+                        Supported: {{ supportedExtensions.join(', ') }}
+                    </span>
+                    <span class="help-text" *ngIf="selectedFile && !uploadFileIsSupported" style="display: block; margin-top: 4px;">
+                        <span class="glyphicon glyphicon-warning-sign"></span>
+                        "{{ selectedFile.name }}" isn't a supported type ({{ supportedExtensions.join(', ') }}).
+                    </span>
+                    <span class="help-text" *ngIf="selectedFile && uploadFileIsSupported" style="display: block; margin-top: 4px;">
+                        <span class="glyphicon glyphicon-ok-circle"></span>
+                        Selected: {{ selectedFile.name }} -- {{ (selectedFile.size / 1024) | number:'1.0-0' }} KB.
+                    </span>
+                </div>
+                <button type="button" class="btn btn-teal" (click)="extractUpload()">
+                    <span class="glyphicon glyphicon-headphones"></span> Extract Transcript
+                </button>
+            </div>
+
+            <div *ngIf="mode === 'browse'">
+                <div class="form-group">
+                    <label class="control-label">Bucket</label>
+                    <select class="form-control" [(ngModel)]="selectedBucket" (ngModelChange)="onBucketChange()">
+                        <option value="">Select a bucket</option>
+                        <option *ngFor="let b of buckets" [value]="b.bucket">{{ b.label }} ({{ b.provider }})</option>
+                    </select>
+                </div>
+
+                <nav class="breadcrumb-bar" *ngIf="selectedBucket">
+                    <a href="javascript:void(0);" (click)="goToBreadcrumb(-1)">{{ selectedBucket }}</a>
+                    <ng-container *ngFor="let bc of breadcrumbs; let i = index;">
+                        <span class="crumb-sep">/</span>
+                        <a href="javascript:void(0);" (click)="goToBreadcrumb(i)">{{ bc.name }}</a>
+                    </ng-container>
+                </nav>
+
+                <div class="text-muted" *ngIf="loadingObjects">Loading...</div>
+                <div class="table-responsive scroll-table" *ngIf="selectedBucket && !loadingObjects" style="max-height: 300px; overflow-y: auto;">
+                    <table class="table table-bordered table-hover table-modern" style="font-size: 12px;">
+                        <tbody>
+                            <tr *ngFor="let entry of visibleObjects" class="bucket-row"
+                                [class.active]="selectedEntry && entry.key === selectedEntry.key"
+                                (click)="selectEntry(entry)">
+                                <td style="width: 24px;">
+                                    <span class="glyphicon folder-icon" [ngClass]="entry.folder ? 'glyphicon-folder-close' : 'glyphicon-file'"></span>
+                                </td>
+                                <td>{{ entry.name }}</td>
+                            </tr>
+                            <tr *ngIf="!visibleObjects.length">
+                                <td class="text-muted">No audio files (or saved transcripts) in this folder.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="selected-file-callout" *ngIf="selectedEntry" style="margin-top: 10px;">
+                    <span class="help-text" style="display: block;">
+                        <span class="glyphicon" [ngClass]="isSavedTranscript(selectedEntry) ? 'glyphicon-file' : 'glyphicon-headphones'"></span>
+                        Selected: <strong>{{ selectedEntry.name }}</strong>
+                    </span>
+                    <button type="button" class="btn btn-teal" style="margin-top: 8px;" (click)="runSelectedEntry()">
+                        <span class="glyphicon" [ngClass]="isSavedTranscript(selectedEntry) ? 'glyphicon-folder-open' : 'glyphicon-headphones'"></span>
+                        {{ isSavedTranscript(selectedEntry) ? 'Load Transcript' : 'Extract Transcript' }}
+                    </button>
+                </div>
             </div>
         </div>
-    </div>
 
-    <div class="form-group">
-        <label class="control-label">Prompt</label>
-        <textarea class="form-control" rows="3" [(ngModel)]="prompt"
-            placeholder="e.g. Summarize the key points, or list any action items."></textarea>
-    </div>
+        <div class="col-md-6">
+            <div class="side-panel">
+                <div class="side-panel-header">
+                    <span class="side-panel-title" [title]="sourceLabel">
+                        <span class="glyphicon glyphicon-file file-icon"></span>
+                        {{ sourceLabel || 'Transcript' }}
+                    </span>
+                    <button type="button" class="btn btn-default btn-sm" *ngIf="transcript" (click)="copyTranscript()" title="Copy transcript to clipboard">
+                        <span class="glyphicon glyphicon-duplicate"></span> Copy
+                    </button>
+                </div>
+                <div class="side-panel-body">
+                    <div class="text-muted" *ngIf="extracting">
+                        <span class="glyphicon glyphicon-refresh spin"></span> Extracting transcript... this can take a minute or two.
+                    </div>
+                    <div class="error-text" *ngIf="extractError">{{ extractError }}</div>
 
-    <button type="button" class="btn btn-teal" (click)="askAi()" [disabled]="asking">
-        <span class="glyphicon" [ngClass]="asking ? 'glyphicon-refresh spin' : 'glyphicon-send'"></span>
-        {{ asking ? 'Asking...' : 'Ask' }}
-    </button>
-    <div class="error-text" style="margin-top: 8px;" *ngIf="askError">{{ askError }}</div>
+                    <div *ngIf="transcript">
+                        <span class="help-text" style="display: block; margin-bottom: 6px;">{{ transcript.length }} chars</span>
+                        <pre class="preview-text" style="max-height: 340px;" [innerHTML]="highlightedTranscript"></pre>
 
-    <div style="margin-top: 16px;" *ngFor="let ask of asks">
-        <div class="preview-toolbar preview-toolbar-spread">
-            <span class="help-text" style="display: inline;"><strong>Q:</strong> {{ ask.prompt }}</span>
-            <button type="button" class="btn btn-default btn-sm" (click)="copyAnswer(ask.answer)" title="Copy answer to clipboard">
-                <span class="glyphicon glyphicon-duplicate"></span> Copy
-            </button>
+                        <div class="panel-box-subtle" *ngIf="!transcriptLoadedFromBucket" style="margin-top: 12px;">
+                            <label class="control-label" style="display: block; margin-bottom: 6px;">Save to Bucket</label>
+                            <div class="row">
+                                <div class="col-md-5">
+                                    <select class="form-control" [ngModel]="saveBucket" (ngModelChange)="onSaveBucketChange($event)">
+                                        <option value="">Select a bucket</option>
+                                        <option *ngFor="let b of buckets" [value]="b.bucket">{{ b.label }} ({{ b.provider }})</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-7">
+                                    <div style="display: flex; gap: 6px;">
+                                        <input type="text" class="form-control" [ngModel]="saveFolderName"
+                                            (ngModelChange)="onSaveFolderNameChange($event)" placeholder="Folder name" />
+                                        <button type="button" class="btn btn-default" style="white-space: nowrap;"
+                                            (click)="toggleSaveBrowse()" [disabled]="!saveBucket" title="Pick an existing folder">
+                                            <span class="glyphicon glyphicon-folder-open"></span> Browse
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="save-folder-browser" *ngIf="saveBrowsing" style="margin-top: 10px;">
+                                <nav class="breadcrumb-bar">
+                                    <a href="javascript:void(0);" (click)="goToSaveBreadcrumb(-1)">{{ saveBucket }}</a>
+                                    <ng-container *ngFor="let bc of saveBreadcrumbs; let i = index;">
+                                        <span class="crumb-sep">/</span>
+                                        <a href="javascript:void(0);" (click)="goToSaveBreadcrumb(i)">{{ bc.name }}</a>
+                                    </ng-container>
+                                </nav>
+                                <div class="text-muted" *ngIf="loadingSaveFolders">Loading...</div>
+                                <div class="table-responsive scroll-table" *ngIf="!loadingSaveFolders" style="max-height: 160px; overflow-y: auto;">
+                                    <table class="table table-bordered table-hover table-modern" style="font-size: 12px;">
+                                        <tbody>
+                                            <tr *ngFor="let folder of saveFolders" class="bucket-row" (click)="openSaveFolder(folder)">
+                                                <td style="width: 24px;"><span class="glyphicon glyphicon-folder-close folder-icon"></span></td>
+                                                <td>{{ folder.name }}</td>
+                                            </tr>
+                                            <tr *ngIf="!saveFolders.length">
+                                                <td class="text-muted">No subfolders here.</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <button type="button" class="btn btn-teal btn-sm" style="margin-top: 8px;"
+                                    (click)="useCurrentSaveFolder()" [disabled]="!saveCurrentPrefix">
+                                    <span class="glyphicon glyphicon-ok"></span> Use This Folder
+                                </button>
+                                <span class="help-text" style="margin-left: 8px;" *ngIf="!saveCurrentPrefix">
+                                    Open a folder above, or close this and type a new folder name instead.
+                                </span>
+                            </div>
+
+                            <button type="button" class="btn btn-default btn-sm" style="margin-top: 8px;"
+                                (click)="saveTranscriptToBucket()" [disabled]="savingTranscript">
+                                <span class="glyphicon" [ngClass]="savingTranscript ? 'glyphicon-refresh spin' : 'glyphicon-folder-close'"></span>
+                                {{ savingTranscript ? 'Saving...' : 'Save Transcript to Bucket' }}
+                            </button>
+                            <div class="help-text help-text-success" style="margin-top: 6px;" *ngIf="transcriptSavedPath">
+                                <span class="glyphicon glyphicon-ok"></span> Saved to {{ transcriptSavedPath }}
+                            </div>
+                            <div class="error-text" style="margin-top: 6px;" *ngIf="saveTranscriptError">{{ saveTranscriptError }}</div>
+                        </div>
+                        <div class="help-text" style="display: block; margin-top: 12px;" *ngIf="transcriptLoadedFromBucket">
+                            <span class="glyphicon glyphicon-ok"></span> Loaded from the bucket -- already saved at {{ sourceLabel }}.
+                        </div>
+                    </div>
+
+                    <p class="help-text" *ngIf="!transcript && !extracting && !extractError">
+                        <span class="glyphicon glyphicon-info-sign"></span> Transcript will appear here.
+                    </p>
+                </div>
+            </div>
         </div>
-        <pre class="preview-text" style="max-height: 320px;">{{ ask.answer }}</pre>
-    </div>
-
-    <div style="margin-top: 16px;" *ngIf="asks.length">
-        <button type="button" class="btn btn-default btn-sm" (click)="saveHistoryToBucket()" [disabled]="savingHistory">
-            <span class="glyphicon" [ngClass]="savingHistory ? 'glyphicon-refresh spin' : 'glyphicon-folder-close'"></span>
-            {{ savingHistory ? 'Saving...' : 'Save Q&A History to Bucket' }}
-        </button>
-        <span class="help-text" style="margin-left: 8px;">
-            Saves into the same bucket/folder set above (under "Save to Bucket").
-        </span>
-        <div class="help-text help-text-success" style="margin-top: 6px;" *ngIf="historySavedPath">
-            <span class="glyphicon glyphicon-ok"></span> Saved to {{ historySavedPath }}
-        </div>
-        <div class="error-text" style="margin-top: 6px;" *ngIf="saveHistoryError">{{ saveHistoryError }}</div>
     </div>
 </div>
