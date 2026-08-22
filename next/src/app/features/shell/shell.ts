@@ -41,8 +41,6 @@ export class Shell {
         { label: 'Query Engine', path: '/tools/query' },
         { label: 'Document Converter', path: '/tools/converter' },
         { label: 'Audio Transcript', path: '/tools/transcript' },
-        { label: 'PDF Highlighter', path: '/tools/pdf' },
-        { label: 'Dynamic Forms', path: '/tools/forms' },
         { label: 'Content Cleaner', path: '/tools/cleaner' },
       ],
     },
