@@ -67,6 +67,17 @@ export const routes: Routes = [
         loadComponent: () => import('./features/tools/cleaner/cleaner').then(m => m.Cleaner),
       },
       {
+        path: 'settings/task-types',
+        loadComponent: () =>
+          import('./features/settings/task-types/task-types').then(m => m.TaskTypes),
+        data: { roles: ['PLATFORM_ADMIN', 'TENANT_ADMIN'] },
+      },
+      {
+        path: 'settings/lookup',
+        loadComponent: () => import('./features/settings/lookup/lookup').then(m => m.Lookup),
+        data: { roles: ['PLATFORM_ADMIN', 'TENANT_ADMIN'] },
+      },
+      {
         path: 'objects',
         loadComponent: () => import('./features/objects/objects').then(m => m.Objects),
       },

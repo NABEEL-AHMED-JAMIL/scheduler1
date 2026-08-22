@@ -1,0 +1,60 @@
+<div class="space-y-4">
+  <div>
+    <h1 class="text-xl font-semibold tracking-tight">Lookups</h1>
+    <p class="text-sm text-[color:var(--text-secondary)] mt-0.5">
+      Configuration lists the application reads at runtime — providers, pipeline ids,
+      task groups and scheduler watermarks.
+    </p>
+  </div>
+
+  <app-table-shell heading="Lookups" [loading]="loading()" [error]="error()"
+                   [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="lookups().length"
+                   [emptyMessage]="search() ? 'No lookups match your search.' : 'No lookups defined.'"
+                   (retry)="load()">
+    <ng-container toolbar>
+      <input class="input max-w-56" placeholder="Search type or value"
+             [value]="search()" (input)="search.set($any($event.target).value)" />
+    </ng-container>
+
+    <table class="table-modern">
+      <thead>
+        <tr>
+          <th class="w-8"></th>
+          <th>Type</th>
+          <th>Value</th>
+          <th>Description</th>
+          <th class="text-right">Entries</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (lookup of filtered(); track lookup.lookupId) {
+          <tr [class.cursor-pointer]="lookup.children?.length" (click)="toggle(lookup)">
+            <td class="text-[color:var(--text-muted)]">
+              @if (lookup.children?.length) { {{ expanded().has(lookup.lookupId) ? '▾' : '▸' }} }
+            </td>
+            <td class="mono font-medium">{{ lookup.lookupType }}</td>
+            <td class="text-[color:var(--text-secondary)] max-w-64 truncate">{{ lookup.lookupValue }}</td>
+            <td class="text-[color:var(--text-secondary)] max-w-96 truncate">
+              {{ lookup.description || '—' }}
+            </td>
+            <td class="text-right tabular text-[color:var(--text-secondary)]">
+              {{ lookup.children?.length || 0 }}
+            </td>
+          </tr>
+          @if (expanded().has(lookup.lookupId)) {
+            @for (child of lookup.children ?? []; track child.lookupId) {
+              <tr style="background: var(--surface-sunken);">
+                <td></td>
+                <td class="mono text-[color:var(--text-muted)] pl-6">{{ child.lookupType }}</td>
+                <td class="text-[color:var(--text-secondary)]">{{ child.lookupValue }}</td>
+                <td class="text-[color:var(--text-secondary)] max-w-96 truncate" colspan="2">
+                  {{ child.description || '—' }}
+                </td>
+              </tr>
+            }
+          }
+        }
+      </tbody>
+    </table>
+  </app-table-shell>
+</div>

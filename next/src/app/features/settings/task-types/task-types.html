@@ -1,0 +1,47 @@
+<div class="space-y-4">
+  <div>
+    <h1 class="text-xl font-semibold tracking-tight">Source Task Types</h1>
+    <p class="text-sm text-[color:var(--text-secondary)] mt-0.5">
+      A task type names a downstream consumer and the Kafka topic that reaches it.
+      Tasks pick one; many tasks can share a type.
+    </p>
+  </div>
+
+  <app-table-shell heading="Task types" [loading]="loading()" [error]="error()"
+                   [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="types().length"
+                   [emptyMessage]="search() ? 'No task types match your search.' : 'No task types defined yet.'"
+                   (retry)="load()">
+    <ng-container toolbar>
+      <input class="input max-w-56" placeholder="Search name or description"
+             [value]="search()" (input)="search.set($any($event.target).value)" />
+    </ng-container>
+
+    <table class="table-modern">
+      <thead>
+        <tr>
+          <th>Service</th>
+          <th>Description</th>
+          <th>Topic</th>
+          <th>Partitions</th>
+          <th class="text-right">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (type of filtered(); track type.sourceTaskTypeId) {
+          <tr>
+            <td>
+              <div class="font-medium">{{ type.serviceName }}</div>
+              <div class="mono text-[color:var(--text-muted)]">#{{ type.sourceTaskTypeId }}</div>
+            </td>
+            <td class="text-[color:var(--text-secondary)] max-w-96">{{ type.description || '—' }}</td>
+            <td><span class="mono text-brand-600">{{ topicOf(type.queueTopicPartition) || '—' }}</span></td>
+            <td class="mono text-[color:var(--text-muted)]">
+              {{ partitionsOf(type.queueTopicPartition) || '—' }}
+            </td>
+            <td class="text-right"><app-status [label]="type.taskTypeStatus" /></td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </app-table-shell>
+</div>
