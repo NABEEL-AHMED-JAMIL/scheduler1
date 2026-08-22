@@ -214,7 +214,19 @@ html.dark .pill-crit  { background: color-mix(in oklab, var(--color-crit-500) 22
   .input-invalid {
     @apply border-crit-500 focus:ring-crit-500/30;
   }
-  .form-grid { @apply grid sm:grid-cols-2 gap-x-4 gap-y-3.5; }
+  /* Container-based, not viewport-based: this same grid is used inside a 544px dialog and
+     across a 1244px page, and viewport breakpoints would give the dialog three 154px columns.
+     The container must be an ancestor -- an element cannot query itself -- so the form owns it. */
+  form, .form-section { container-type: inline-size; }
+
+  .form-grid { @apply grid gap-x-5 gap-y-4; }
+
+  @container (min-width: 30rem) {
+    .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @container (min-width: 62rem) {
+    .form-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  }
   .form-section {
     @apply border-t pt-4 mt-4 first:border-0 first:pt-0 first:mt-0;
     border-color: var(--border-subtle);
@@ -226,11 +238,13 @@ html.dark .pill-crit  { background: color-mix(in oklab, var(--color-crit-500) 22
   /* Page width is a decision about content, not a per-page guess.
      Data-dense screens take the full shell so tables aren't squeezed into a column;
      forms and prose stay near a readable measure and centre themselves. */
-  .page        { @apply space-y-4; }
-  .page-form   { @apply space-y-4 max-w-3xl; }
-  .page-tool   { @apply space-y-4 max-w-5xl; }
+  .page        { @apply space-y-5; }
+  /* Forms run full width like everything else; the grid below adds columns as the
+     viewport grows so a full-width form doesn't become a column of 1200px inputs. */
+  .page-form   { @apply space-y-5; }
+  .page-tool   { @apply space-y-5; }
 
-  .page-head       { @apply flex flex-wrap items-end justify-between gap-3; }
-  .page-title      { @apply text-xl font-semibold tracking-tight; }
-  .page-subtitle   { @apply text-sm text-[color:var(--text-secondary)] mt-0.5; }
+  .page-head       { @apply flex flex-wrap items-end justify-between gap-3 mb-1; }
+  .page-title      { @apply text-2xl font-semibold tracking-tight; }
+  .page-subtitle   { @apply text-sm text-[color:var(--text-secondary)] mt-1; }
 }
