@@ -73,7 +73,7 @@
       <div class="mt-4 space-y-2">
         <button type="button" class="btn btn-default btn-sm w-full justify-start"
                 [disabled]="downloading() === 'template'" (click)="download('template')">
-          <app-icon [name]="downloading() === 'template' ? 'refresh' : 'template'"
+          <app-icon [name]="downloading() === 'template' ? 'refresh' : 'table'"
                     [class.spin]="downloading() === 'template'" />
           <span class="text-left">
             Import template
