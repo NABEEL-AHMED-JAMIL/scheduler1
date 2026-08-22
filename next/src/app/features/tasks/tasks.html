@@ -6,7 +6,7 @@
       A task describes one unit of work and where it reads and writes. Jobs point at these.
     </p>
     </div>
-    <a routerLink="/tasks/new" class="btn btn-primary btn-sm">New task</a>
+    <a routerLink="/tasks/new" class="btn btn-primary btn-sm"><app-icon name="plus" />New task</a>
   </div>
 
   <app-table-shell heading="Tasks" [loading]="loading()" [error]="error()"
@@ -17,7 +17,7 @@
       <input class="input max-w-64" placeholder="Search id, name, type or pipeline"
              [value]="search()" (input)="search.set($any($event.target).value)" />
       @if (search()) {
-        <button type="button" class="btn btn-ghost btn-sm" (click)="search.set('')">Clear</button>
+        <button type="button" class="btn btn-ghost btn-sm" (click)="search.set('')"><app-icon name="close" />Clear</button>
       }
     </ng-container>
 
@@ -62,7 +62,7 @@
             </td>
             <td class="text-right"><app-status [label]="task.taskStatus" /></td>
             <td class="text-right">
-              <a class="btn btn-ghost btn-sm" [routerLink]="['/tasks', task.taskDetailId, 'edit']">Edit</a>
+              <a class="btn btn-ghost btn-sm" [routerLink]="['/tasks', task.taskDetailId, 'edit']"><app-icon name="edit" />Edit</a>
             </td>
           </tr>
         }

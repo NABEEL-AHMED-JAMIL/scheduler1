@@ -7,6 +7,7 @@ import {
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { Field } from '../../../shared/ui/field';
+import { Icon } from '../../../shared/ui/icon';
 
 const FREQUENCIES = [
   { value: 'Mint',    label: 'Every N minutes', unit: 'minutes' },
@@ -31,7 +32,7 @@ function endAfterStart(group: AbstractControl): ValidationErrors | null {
 
 @Component({
   selector: 'app-job-edit',
-  imports: [ReactiveFormsModule, RouterLink, Field],
+  imports: [Icon, ReactiveFormsModule, RouterLink, Field],
   templateUrl: './job-edit.html',
 })
 export class JobEdit implements OnInit {

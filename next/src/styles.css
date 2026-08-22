@@ -197,8 +197,15 @@ html.dark .pill-warn  { background: color-mix(in oklab, var(--color-warn-500) 22
 html.dark .pill-crit  { background: color-mix(in oklab, var(--color-crit-500) 22%, transparent); @apply text-crit-400; }
 
 @layer components {
+  /* Icons sit inline with the label at a consistent gap, so a button with one and a button
+     without still line up in the same toolbar. */
+  .btn { @apply inline-flex items-center justify-center gap-1.5; }
+  .btn app-icon { @apply opacity-80; }
+  .btn:hover app-icon { @apply opacity-100; }
+  .btn-icon { @apply gap-0; }
+
   .menu-item {
-    @apply w-full text-left px-3 py-1.5 rounded-sm
+    @apply w-full text-left px-3 py-1.5 rounded-sm inline-flex items-center gap-2
            text-[color:var(--text-secondary)]
            hover:bg-[color:var(--surface-sunken)] hover:text-[color:var(--text-primary)]
            focus:bg-[color:var(--surface-sunken)] focus:outline-none;

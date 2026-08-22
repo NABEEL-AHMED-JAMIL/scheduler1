@@ -5,13 +5,13 @@
   <div class="flex items-center gap-2 px-3.5 py-2.5 border-b shrink-0"
        style="border-color: var(--border-subtle);">
     <span class="text-sm font-medium mr-auto truncate" [title]="fileName()">{{ fileName() }}</span>
-    <button type="button" class="btn btn-ghost btn-sm" (click)="viewRequested.emit()">View</button>
+    <button type="button" class="btn btn-ghost btn-sm" (click)="viewRequested.emit()"><app-icon name="eye" />View</button>
     <button type="button" class="btn btn-ghost btn-icon"
             (click)="minimized.set(!minimized())"
             [attr.aria-label]="minimized() ? 'Expand' : 'Minimise'">
-      {{ minimized() ? '▴' : '▾' }}
+      <app-icon [name]="minimized() ? 'chevronRight' : 'chevronDown'" />
     </button>
-    <button type="button" class="btn btn-ghost btn-icon" (click)="closed.emit()" aria-label="Close">×</button>
+    <button type="button" class="btn btn-ghost btn-icon" (click)="closed.emit()" aria-label="Close"><app-icon name="close" /></button>
   </div>
 
   @if (!minimized()) {

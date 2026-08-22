@@ -5,13 +5,14 @@ import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } fr
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { Field } from '../../../shared/ui/field';
+import { Icon } from '../../../shared/ui/icon';
 
 /** Tag keys the pipeline reads to locate storage; a typo in one fails silently at run time. */
 const STORAGE_TAG_KEYS = ['bucket', 'bucket_name', 'input_folder', 'output_folder'];
 
 @Component({
   selector: 'app-task-edit',
-  imports: [ReactiveFormsModule, RouterLink, Field],
+  imports: [Icon, ReactiveFormsModule, RouterLink, Field],
   templateUrl: './task-edit.html',
 })
 export class TaskEdit implements OnInit {

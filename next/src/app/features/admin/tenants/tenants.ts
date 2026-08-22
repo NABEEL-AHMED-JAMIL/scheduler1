@@ -6,6 +6,7 @@ import { TableShell } from '../../../shared/ui/data-table';
 import { StatusPill } from '../../../shared/ui/status-pill';
 import { Dialog } from '@angular/cdk/dialog';
 import { TenantDialog } from './tenant-dialog';
+import { Icon } from '../../../shared/ui/icon';
 
 interface Tenant {
   tenantId: number;
@@ -17,7 +18,7 @@ interface Tenant {
 
 @Component({
   selector: 'app-tenants',
-  imports: [DatePipe, TableShell, StatusPill],
+  imports: [Icon, DatePipe, TableShell, StatusPill],
   templateUrl: './tenants.html',
 })
 export class Tenants implements OnInit {

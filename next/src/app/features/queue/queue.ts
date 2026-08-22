@@ -8,6 +8,7 @@ import { ToastService } from '../../shared/ui/toast.service';
 import { confirmWith } from '../../shared/ui/confirm';
 import { TableShell } from '../../shared/ui/data-table';
 import { StatusPill } from '../../shared/ui/status-pill';
+import { Icon } from '../../shared/ui/icon';
 
 interface QueueRow {
   jobQueueId: number;
@@ -23,7 +24,7 @@ const STATUSES = ['Queue', 'Start', 'Running', 'Completed', 'Failed', 'Skip', 'I
 
 @Component({
   selector: 'app-queue',
-  imports: [DatePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill],
+  imports: [Icon, DatePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill],
   templateUrl: './queue.html',
 })
 export class Queue implements OnInit {

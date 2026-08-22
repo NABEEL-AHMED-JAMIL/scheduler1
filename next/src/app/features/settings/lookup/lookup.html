@@ -30,7 +30,9 @@
         @for (lookup of filtered(); track lookup.lookupId) {
           <tr [class.cursor-pointer]="lookup.children?.length" (click)="toggle(lookup)">
             <td class="text-[color:var(--text-muted)]">
-              @if (lookup.children?.length) { {{ expanded().has(lookup.lookupId) ? '▾' : '▸' }} }
+              @if (lookup.children?.length) {
+                <app-icon [name]="expanded().has(lookup.lookupId) ? 'chevronDown' : 'chevronRight'" />
+              }
             </td>
             <td class="mono font-medium">{{ lookup.lookupType }}</td>
             <td class="text-[color:var(--text-secondary)] max-w-64 truncate">{{ lookup.lookupValue }}</td>

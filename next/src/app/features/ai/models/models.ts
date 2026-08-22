@@ -5,6 +5,7 @@ import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config
 import { ToastService } from '../../../shared/ui/toast.service';
 import { confirmWith } from '../../../shared/ui/confirm';
 import { TableShell } from '../../../shared/ui/data-table';
+import { Icon } from '../../../shared/ui/icon';
 
 interface OllamaModel {
   name: string;
@@ -15,7 +16,7 @@ interface OllamaModel {
 
 @Component({
   selector: 'app-models',
-  imports: [TableShell],
+  imports: [Icon, TableShell],
   templateUrl: './models.html',
 })
 export class Models implements OnInit {

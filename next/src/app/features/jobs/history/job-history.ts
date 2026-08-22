@@ -5,6 +5,7 @@ import { Router, RouterLink } from '@angular/router';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { TableShell } from '../../../shared/ui/data-table';
 import { StatusPill } from '../../../shared/ui/status-pill';
+import { Icon } from '../../../shared/ui/icon';
 
 interface JobQueue {
   jobQueueId: number;
@@ -18,7 +19,7 @@ interface JobQueue {
 
 @Component({
   selector: 'app-job-history',
-  imports: [DatePipe, RouterLink, TableShell, StatusPill],
+  imports: [Icon, DatePipe, RouterLink, TableShell, StatusPill],
   templateUrl: './job-history.html',
 })
 export class JobHistory {

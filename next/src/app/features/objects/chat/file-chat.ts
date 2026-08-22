@@ -2,12 +2,14 @@ import { Component, OnInit, effect, inject, input, output, signal, viewChild, El
 import { HttpClient } from '@angular/common/http';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { ToastService } from '../../../shared/ui/toast.service';
+import { Icon } from '../../../shared/ui/icon';
 
 interface ChatMessage { role: 'user' | 'assistant' | 'error'; text: string; }
 interface Agent { aiAgentId: number; agentName: string; provider: string; status: string; apiKeyConfigured?: boolean; }
 
 @Component({
   selector: 'app-file-chat',
+  imports: [Icon],
   templateUrl: './file-chat.html',
 })
 export class FileChat implements OnInit {

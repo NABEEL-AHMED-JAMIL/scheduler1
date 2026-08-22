@@ -7,6 +7,7 @@ import { HeatCell, HeatSelection, Heatmap } from '../../shared/charts/heatmap';
 import { DashboardService, HourCell, JobBreakdown, NameValue } from './dashboard.service';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { ToastService } from '../../shared/ui/toast.service';
+import { Icon } from '../../shared/ui/icon';
 
 const DAY_ORDER = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -19,7 +20,7 @@ type BreakdownKey = typeof BREAKDOWN_COLUMNS[number];
 
 @Component({
   selector: 'app-dashboard',
-  imports: [RouterLink, Donut, BarChart, Heatmap],
+  imports: [Icon, RouterLink, Donut, BarChart, Heatmap],
   templateUrl: './dashboard.html',
 })
 export class Dashboard implements OnInit {

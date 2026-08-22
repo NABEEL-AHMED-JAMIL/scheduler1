@@ -6,7 +6,7 @@
       S3, Azure, MinIO or FTP/FTPS. Credentials are encrypted and never sent back to the browser.
     </p>
     </div>
-    <button type="button" class="btn btn-primary btn-sm" (click)="create()">New connection</button>
+    <button type="button" class="btn btn-primary btn-sm" (click)="create()"><app-icon name="plus" />New connection</button>
   </div>
 
   <div class="grid grid-cols-3 gap-3 max-w-lg">
@@ -38,7 +38,7 @@
       <input class="input max-w-56" placeholder="Search name, alias or host"
              [value]="search()" (input)="search.set($any($event.target).value)" />
       @if (search() || providerFilter()) {
-        <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()">Clear</button>
+        <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()"><app-icon name="close" />Clear</button>
       }
     </ng-container>
 
@@ -92,21 +92,15 @@
             <td class="text-right">
               <button type="button" class="btn btn-ghost btn-icon" [cdkMenuTriggerFor]="menu"
                       [disabled]="testing() === c.storageConnectionId" aria-label="Actions">
-                <svg class="size-4" viewBox="0 0 16 16" fill="currentColor">
-                  <circle cx="8" cy="3" r="1.4"/><circle cx="8" cy="8" r="1.4"/><circle cx="8" cy="13" r="1.4"/>
-                </svg>
+                <app-icon name="dots" size="1.05em" />
               </button>
               <ng-template #menu>
                 <div cdkMenu class="card shadow-xl py-1 min-w-44 text-sm">
-                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="edit(c)">
-                    Edit
-                  </button>
-                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="test(c)">
-                    Test connection
-                  </button>
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="edit(c)"><app-icon name="edit" />Edit</button>
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="test(c)"><app-icon name="zap" />Test connection</button>
                   <div class="my-1 border-t" style="border-color: var(--border-subtle);"></div>
                   <button cdkMenuItem class="menu-item menu-item-danger"
-                          (cdkMenuItemTriggered)="remove(c)">Delete</button>
+                          (cdkMenuItemTriggered)="remove(c)"><app-icon name="trash" />Delete</button>
                 </div>
               </ng-template>
             </td>

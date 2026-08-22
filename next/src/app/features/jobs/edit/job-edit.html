@@ -146,7 +146,7 @@
         <button type="submit" class="btn btn-primary" [disabled]="saving()">
           {{ saving() ? 'Saving…' : (isEdit() ? 'Save changes' : 'Create job') }}
         </button>
-        <a routerLink="/jobs" class="btn btn-ghost">Cancel</a>
+        <a routerLink="/jobs" class="btn btn-ghost"><app-icon name="close" />Cancel</a>
       </div>
     </form>
   }

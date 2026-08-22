@@ -44,7 +44,7 @@
               @for (name of discovered(); track name) { <option [value]="name">{{ name }}</option> }
             </select>
             <button type="button" class="btn btn-default btn-sm whitespace-nowrap"
-                    (click)="discovered.set([])">Type instead</button>
+                    (click)="discovered.set([])"><app-icon name="edit" />Type instead</button>
           } @else {
             <input id="bucket" class="input mono" formControlName="bucketName"
                    [placeholder]="isAzure() ? 'documents' : 'my-company-data'" />

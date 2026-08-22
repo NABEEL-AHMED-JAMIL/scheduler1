@@ -6,7 +6,7 @@
       Access is enforced on the server — a role decides what a person can reach, not just what they see.
     </p>
     </div>
-    <button type="button" class="btn btn-primary btn-sm" (click)="create()">New user</button>
+    <button type="button" class="btn btn-primary btn-sm" (click)="create()"><app-icon name="plus" />New user</button>
   </div>
 
   <app-table-shell heading="Users" [loading]="loading()" [error]="error()"
@@ -24,7 +24,7 @@
       <input class="input max-w-56" placeholder="Search name, username or email"
              [value]="search()" (input)="search.set($any($event.target).value)" />
       @if (search() || roleFilter()) {
-        <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()">Clear</button>
+        <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()"><app-icon name="close" />Clear</button>
       }
     </ng-container>
 
@@ -52,7 +52,7 @@
             </td>
             <td class="text-right"><app-status [label]="user.status" /></td>
             <td class="text-right">
-              <button type="button" class="btn btn-ghost btn-sm" (click)="edit(user)">Edit</button>
+              <button type="button" class="btn btn-ghost btn-sm" (click)="edit(user)"><app-icon name="edit" />Edit</button>
             </td>
           </tr>
         }

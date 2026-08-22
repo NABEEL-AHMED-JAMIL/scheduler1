@@ -1,8 +1,10 @@
 import { Component, inject } from '@angular/core';
 import { ToastService } from './toast.service';
+import { Icon } from './icon';
 
 @Component({
   selector: 'app-toast-host',
+  imports: [Icon],
   template: `
     <div class="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 w-80 max-w-[calc(100vw-2rem)]"
          role="status" aria-live="polite">
@@ -12,7 +14,7 @@ import { ToastService } from './toast.service';
              [style.border-left-color]="borderFor(toast.tone)">
           <span class="flex-1">{{ toast.message }}</span>
           <button type="button" class="text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
-                  (click)="toasts.dismiss(toast.id)" aria-label="Dismiss">×</button>
+                  (click)="toasts.dismiss(toast.id)" aria-label="Dismiss"><app-icon name="close" size="0.9em" /></button>
         </div>
       }
     </div>

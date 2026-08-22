@@ -6,6 +6,7 @@ import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config
 import { ToastService } from '../../../shared/ui/toast.service';
 import { Field } from '../../../shared/ui/field';
 import { FormDialog } from '../../../shared/ui/form-dialog';
+import { Icon } from '../../../shared/ui/icon';
 
 const PROVIDERS = [
   { value: 'MINIO', label: 'MinIO',      hint: 'Self-hosted, S3-compatible object storage.' },
@@ -17,7 +18,7 @@ const PROVIDERS = [
 
 @Component({
   selector: 'app-connection-dialog',
-  imports: [ReactiveFormsModule, Field, FormDialog],
+  imports: [Icon, ReactiveFormsModule, Field, FormDialog],
   templateUrl: './connection-dialog.html',
 })
 export class ConnectionDialog {

@@ -17,8 +17,8 @@
         <input id="to" type="date" class="input" [value]="endDate()" [min]="startDate()"
                (change)="endDate.set($any($event.target).value)" />
       </div>
-      <button type="button" class="btn btn-primary btn-sm" (click)="applyRange()">Apply</button>
-      <button type="button" class="btn btn-ghost btn-sm" (click)="resetRange()">Reset</button>
+      <button type="button" class="btn btn-primary btn-sm" (click)="applyRange()"><app-icon name="filter" />Apply</button>
+      <button type="button" class="btn btn-ghost btn-sm" (click)="resetRange()"><app-icon name="refresh" />Reset</button>
     </div>
   </div>
 
@@ -89,7 +89,7 @@
         </h2>
         <input class="input max-w-52" placeholder="Search job id or name"
                [value]="breakdownSearch()" (input)="breakdownSearch.set($any($event.target).value)" />
-        <button type="button" class="btn btn-ghost btn-sm" (click)="clearCell()">Close</button>
+        <button type="button" class="btn btn-ghost btn-sm" (click)="clearCell()"><app-icon name="close" />Close</button>
       </div>
 
       @if (breakdownLoading()) {

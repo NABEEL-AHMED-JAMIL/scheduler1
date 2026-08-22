@@ -6,7 +6,7 @@
         Scheduled work. A job binds a task to a timetable.
       </p>
     </div>
-    <a routerLink="/jobs/new" class="btn btn-primary btn-sm">New job</a>
+    <a routerLink="/jobs/new" class="btn btn-primary btn-sm"><app-icon name="plus" />New job</a>
   </div>
 
   <app-table-shell heading="Jobs" [loading]="loading()" [error]="error()"
@@ -30,7 +30,7 @@
       <input class="input max-w-52" placeholder="Search id, job or task"
              [value]="search()" (input)="search.set($any($event.target).value)" />
       @if (search() || statusFilter() || executionFilter()) {
-        <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()">Clear</button>
+        <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()"><app-icon name="close" />Clear</button>
       }
     </ng-container>
 
@@ -56,7 +56,7 @@
               <button type="button" class="text-[color:var(--text-muted)] hover:text-brand-600"
                       (click)="toggleRow(job)"
                       [attr.aria-label]="expanded().has(job.jobId) ? 'Hide details' : 'Show details'">
-                {{ expanded().has(job.jobId) ? '▾' : '▸' }}
+                <app-icon [name]="expanded().has(job.jobId) ? 'chevronDown' : 'chevronRight'" />
               </button>
             </td>
             <td class="max-w-64">
@@ -101,31 +101,25 @@
             <td class="text-right">
               <button type="button" class="btn btn-ghost btn-icon" [cdkMenuTriggerFor]="menu"
                       [disabled]="busyJob() === job.jobId" aria-label="Actions">
-                <svg class="size-4" viewBox="0 0 16 16" fill="currentColor">
-                  <circle cx="8" cy="3" r="1.4"/><circle cx="8" cy="8" r="1.4"/><circle cx="8" cy="13" r="1.4"/>
-                </svg>
+                <app-icon name="dots" size="1.05em" />
               </button>
               <ng-template #menu>
                 <div cdkMenu class="card shadow-xl py-1 min-w-52 text-sm">
                   <button cdkMenuItem class="menu-item" [disabled]="isInFlight(job)"
                           [title]="isInFlight(job) ? 'This job is already queued or running' : ''"
-                          (cdkMenuItemTriggered)="runNow(job)">Run now</button>
+                          (cdkMenuItemTriggered)="runNow(job)"><app-icon name="play" />Run now</button>
                   <button cdkMenuItem class="menu-item" [disabled]="isInFlight(job) || !job.scheduler"
                           [title]="!job.scheduler ? 'Only scheduled jobs have a next run' : ''"
-                          (cdkMenuItemTriggered)="skipNext(job)">Skip next run</button>
+                          (cdkMenuItemTriggered)="skipNext(job)"><app-icon name="skip" />Skip next run</button>
                   <div class="my-1 border-t" style="border-color: var(--border-subtle);"></div>
-                  <a cdkMenuItem class="menu-item block" [routerLink]="['/jobs', job.jobId, 'edit']">
-                    Edit
-                  </a>
-                  <a cdkMenuItem class="menu-item block" [routerLink]="['/jobs', job.jobId, 'history']">
-                    Run history
-                  </a>
+                  <a cdkMenuItem class="menu-item block" [routerLink]="['/jobs', job.jobId, 'edit']"><app-icon name="edit" />Edit</a>
+                  <a cdkMenuItem class="menu-item block" [routerLink]="['/jobs', job.jobId, 'history']"><app-icon name="clock" />Run history</a>
                   <div class="my-1 border-t" style="border-color: var(--border-subtle);"></div>
                   <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="toggleStatus(job)">
                     {{ job.jobStatus === 'Active' ? 'Deactivate' : 'Activate' }}
                   </button>
                   <button cdkMenuItem class="menu-item menu-item-danger"
-                          (cdkMenuItemTriggered)="remove(job)">Delete</button>
+                          (cdkMenuItemTriggered)="remove(job)"><app-icon name="trash" />Delete</button>
                 </div>
               </ng-template>
             </td>

@@ -4,6 +4,7 @@ import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { RouterLink } from '@angular/router';
 import { TableShell } from '../../shared/ui/data-table';
 import { StatusPill } from '../../shared/ui/status-pill';
+import { Icon } from '../../shared/ui/icon';
 
 interface SourceTask {
   taskDetailId: number;
@@ -19,7 +20,7 @@ interface SourceTask {
 
 @Component({
   selector: 'app-tasks',
-  imports: [RouterLink, TableShell, StatusPill],
+  imports: [Icon, RouterLink, TableShell, StatusPill],
   templateUrl: './tasks.html',
 })
 export class Tasks implements OnInit {

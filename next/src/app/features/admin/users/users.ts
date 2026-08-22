@@ -6,6 +6,7 @@ import { StatusPill } from '../../../shared/ui/status-pill';
 import { Dialog } from '@angular/cdk/dialog';
 import { UserDialog } from './user-dialog';
 import { AuthService } from '../../../core/auth/auth.service';
+import { Icon } from '../../../shared/ui/icon';
 
 interface AppUser {
   appUserId: number;
@@ -20,7 +21,7 @@ interface AppUser {
 
 @Component({
   selector: 'app-users',
-  imports: [TableShell, StatusPill],
+  imports: [Icon, TableShell, StatusPill],
   templateUrl: './users.html',
 })
 export class Users implements OnInit {

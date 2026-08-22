@@ -9,6 +9,7 @@ import { confirmWith } from '../../../shared/ui/confirm';
 import { TableShell } from '../../../shared/ui/data-table';
 import { StatusPill } from '../../../shared/ui/status-pill';
 import { ConnectionDialog } from './connection-dialog';
+import { Icon } from '../../../shared/ui/icon';
 
 interface StorageConnection {
   storageConnectionId: number;
@@ -32,7 +33,7 @@ interface StorageConnection {
 
 @Component({
   selector: 'app-storage-connections',
-  imports: [DatePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill],
+  imports: [Icon, DatePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill],
   templateUrl: './storage-connections.html',
 })
 export class StorageConnections implements OnInit {

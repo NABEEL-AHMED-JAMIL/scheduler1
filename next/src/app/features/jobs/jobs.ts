@@ -9,6 +9,7 @@ import { ToastService } from '../../shared/ui/toast.service';
 import { confirmWith } from '../../shared/ui/confirm';
 import { TableShell } from '../../shared/ui/data-table';
 import { StatusPill } from '../../shared/ui/status-pill';
+import { Icon } from '../../shared/ui/icon';
 
 export interface Scheduler {
   schedulerId: number;
@@ -49,7 +50,7 @@ const IN_FLIGHT = ['queue', 'start', 'running'];
 
 @Component({
   selector: 'app-jobs',
-  imports: [DatePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill],
+  imports: [Icon, DatePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill],
   templateUrl: './jobs.html',
 })
 export class Jobs implements OnInit {

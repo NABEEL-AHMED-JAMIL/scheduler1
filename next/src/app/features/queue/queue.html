@@ -35,7 +35,7 @@
       <input class="input max-w-52" placeholder="Search job, run or message"
              [value]="search()" (input)="search.set($any($event.target).value)" />
       @if (search() || selectedStatuses().length || fromDate() || toDate()) {
-        <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()">Clear</button>
+        <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()"><app-icon name="close" />Clear</button>
       }
     </ng-container>
 
@@ -74,16 +74,14 @@
               @if (inFlight(row)) {
                 <button type="button" class="btn btn-ghost btn-icon" [cdkMenuTriggerFor]="menu"
                         aria-label="Actions">
-                  <svg class="size-4" viewBox="0 0 16 16" fill="currentColor">
-                    <circle cx="8" cy="3" r="1.4"/><circle cx="8" cy="8" r="1.4"/><circle cx="8" cy="13" r="1.4"/>
-                  </svg>
+                  <app-icon name="dots" size="1.05em" />
                 </button>
                 <ng-template #menu>
                   <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
                     <button cdkMenuItem class="menu-item menu-item-danger"
-                            (cdkMenuItemTriggered)="forceStatus(row, 'Failed')">Mark as failed</button>
+                            (cdkMenuItemTriggered)="forceStatus(row, 'Failed')"><app-icon name="alert" />Mark as failed</button>
                     <button cdkMenuItem class="menu-item menu-item-danger"
-                            (cdkMenuItemTriggered)="forceStatus(row, 'Interrupt')">Mark as interrupted</button>
+                            (cdkMenuItemTriggered)="forceStatus(row, 'Interrupt')"><app-icon name="alert" />Mark as interrupted</button>
                   </div>
                 </ng-template>
               }

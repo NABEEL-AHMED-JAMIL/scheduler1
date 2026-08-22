@@ -2,6 +2,7 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { ToastService } from '../../../shared/ui/toast.service';
+import { Icon } from '../../../shared/ui/icon';
 
 interface FormatFamily {
   key: string;
@@ -19,6 +20,7 @@ interface ConvertResult {
 
 @Component({
   selector: 'app-converter',
+  imports: [Icon],
   templateUrl: './converter.html',
 })
 export class Converter implements OnInit {

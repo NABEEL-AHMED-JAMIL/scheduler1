@@ -6,7 +6,7 @@
       Every job, bucket, task and agent belongs to a tenant. Isolation is enforced server-side.
     </p>
     </div>
-    <button type="button" class="btn btn-primary btn-sm" (click)="create()">New tenant</button>
+    <button type="button" class="btn btn-primary btn-sm" (click)="create()"><app-icon name="plus" />New tenant</button>
   </div>
 
   <app-table-shell heading="Tenants" [loading]="loading()" [error]="error()"
@@ -17,7 +17,7 @@
       <input class="input max-w-56" placeholder="Search name or id"
              [value]="search()" (input)="search.set($any($event.target).value)" />
       @if (search()) {
-        <button type="button" class="btn btn-ghost btn-sm" (click)="search.set('')">Clear</button>
+        <button type="button" class="btn btn-ghost btn-sm" (click)="search.set('')"><app-icon name="close" />Clear</button>
       }
     </ng-container>
 
@@ -46,7 +46,7 @@
             </td>
             <td class="text-right"><app-status [label]="tenant.status" /></td>
             <td class="text-right">
-              <button type="button" class="btn btn-ghost btn-sm" (click)="edit(tenant)">Edit</button>
+              <button type="button" class="btn btn-ghost btn-sm" (click)="edit(tenant)"><app-icon name="edit" />Edit</button>
             </td>
           </tr>
         }

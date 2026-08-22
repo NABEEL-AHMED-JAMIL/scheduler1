@@ -2,6 +2,7 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { TableShell } from '../../../shared/ui/data-table';
+import { Icon } from '../../../shared/ui/icon';
 
 interface LookupData {
   lookupId: number;
@@ -14,7 +15,7 @@ interface LookupData {
 
 @Component({
   selector: 'app-lookup',
-  imports: [TableShell],
+  imports: [Icon, TableShell],
   templateUrl: './lookup.html',
 })
 export class Lookup implements OnInit {

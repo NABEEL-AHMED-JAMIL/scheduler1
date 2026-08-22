@@ -2,6 +2,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { StorageService } from '../storage.service';
+import { Icon } from '../../../shared/ui/icon';
 
 export interface PreviewData {
   bucket: string;
@@ -16,6 +17,7 @@ const IMAGE = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'];
 
 @Component({
   selector: 'app-preview-dialog',
+  imports: [Icon],
   templateUrl: './preview-dialog.html',
 })
 export class PreviewDialog implements OnInit {

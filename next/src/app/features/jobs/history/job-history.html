@@ -24,9 +24,7 @@
       <span class="text-[color:var(--text-secondary)]">
         on {{ targetDate() }} at {{ hourLabel(targetHr()) }}
       </span>
-      <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="clearDrillDown()">
-        Show all runs
-      </button>
+      <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="clearDrillDown()"><app-icon name="refresh" />Show all runs</button>
     </div>
   }
 
@@ -50,9 +48,7 @@
                    (retry)="load()">
     <ng-container toolbar>
       @if (statusFilter()) {
-        <button type="button" class="btn btn-ghost btn-sm" (click)="statusFilter.set('')">
-          Clear filter
-        </button>
+        <button type="button" class="btn btn-ghost btn-sm" (click)="statusFilter.set('')"><app-icon name="close" />Clear filter</button>
       }
     </ng-container>
 
@@ -89,7 +85,7 @@
             <td class="text-right"><app-status [label]="run.jobStatus" /></td>
             <td class="text-right">
               <a class="btn btn-ghost btn-sm"
-                 [routerLink]="['/jobs', jobId(), 'runs', run.jobQueueId, 'logs']">Logs</a>
+                 [routerLink]="['/jobs', jobId(), 'runs', run.jobQueueId, 'logs']"><app-icon name="file" />Logs</a>
             </td>
           </tr>
         }

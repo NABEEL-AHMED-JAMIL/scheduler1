@@ -13,6 +13,7 @@ import { PromptDialog } from './dialogs/prompt-dialog';
 import { ShareDialog, ShareResult } from './dialogs/share-dialog';
 import { HttpClient } from '@angular/common/http';
 import { API_BASE } from '../../core/api/api.config';
+import { Icon } from '../../shared/ui/icon';
 
 interface Crumb { name: string; prefix: string; }
 
@@ -21,7 +22,7 @@ const SLOW_PROVIDERS = ['FTP', 'FTPS'];
 
 @Component({
   selector: 'app-objects',
-  imports: [DatePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, FileChat],
+  imports: [Icon, DatePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, FileChat],
   templateUrl: './objects.html',
 })
 export class Objects implements OnInit {

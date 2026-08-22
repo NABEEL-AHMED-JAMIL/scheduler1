@@ -8,6 +8,7 @@ import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { AgentDialog } from './agent-dialog';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { confirmWith } from '../../../shared/ui/confirm';
+import { Icon } from '../../../shared/ui/icon';
 
 interface AiAgent {
   aiAgentId: number;
@@ -23,7 +24,7 @@ interface AiAgent {
 
 @Component({
   selector: 'app-agents',
-  imports: [TableShell, StatusPill, CdkMenu, CdkMenuItem, CdkMenuTrigger],
+  imports: [Icon, TableShell, StatusPill, CdkMenu, CdkMenuItem, CdkMenuTrigger],
   templateUrl: './agents.html',
 })
 export class Agents implements OnInit {
