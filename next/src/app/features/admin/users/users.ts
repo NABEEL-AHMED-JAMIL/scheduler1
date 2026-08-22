@@ -1,5 +1,6 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { ActivatedRoute, Router } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
@@ -38,6 +39,8 @@ export class Users implements OnInit {
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
   private readonly auth = inject(AuthService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
 
   readonly users = signal<AppUser[]>([]);
   readonly tenants = signal<any[]>([]);
@@ -47,23 +50,34 @@ export class Users implements OnInit {
   readonly roleFilter = signal('');
   readonly statusFilter = signal('');
   readonly busy = signal<number | null>(null);
+  readonly focusedTenantId = signal<number | null>(null);
 
   readonly sort = createSort<AppUser>('fullName');
 
   readonly canPickTenant = computed(() => this.auth.role() === 'PLATFORM_ADMIN');
   readonly currentUserId = computed(() => this.auth.user()?.appUserId ?? null);
 
+  readonly focusedTenantName = computed(() => {
+    const id = this.focusedTenantId();
+    if (id === null) return '';
+    const fromTenants = this.tenants().find(t => t.tenantId === id);
+    if (fromTenants) return fromTenants.tenantName;
+    return this.users().find(u => u.tenantId === id)?.tenantName ?? `Tenant ${id}`;
+  });
+
   readonly roles = computed(() =>
     [...new Set(this.users().map(u => u.userRole).filter(Boolean))].sort());
 
   readonly hasFilters = computed(() =>
-    !!(this.search() || this.roleFilter() || this.statusFilter()));
+    !!(this.search() || this.roleFilter() || this.statusFilter() || this.focusedTenantId() !== null));
 
   readonly filtered = computed(() => {
     const term = this.search().trim().toLowerCase();
     const role = this.roleFilter();
     const status = this.statusFilter();
+    const focusedTenant = this.focusedTenantId();
     const rows = this.users().filter(user => {
+      if (focusedTenant !== null && user.tenantId !== focusedTenant) return false;
       if (role && user.userRole !== role) return false;
       if (status && user.status !== status) return false;
       if (!term) return true;
@@ -75,7 +89,10 @@ export class Users implements OnInit {
   });
 
   readonly summary = computed(() => {
-    const list = this.users();
+    const focusedTenant = this.focusedTenantId();
+    const list = focusedTenant === null
+      ? this.users()
+      : this.users().filter(u => u.tenantId === focusedTenant);
     return {
       total: list.length,
       active: list.filter(u => u.status === 'Active').length,
@@ -85,8 +102,17 @@ export class Users implements OnInit {
   });
 
   ngOnInit(): void {
+    this.route.queryParamMap.subscribe(params => {
+      const raw = params.get('tenantId');
+      const parsed = raw === null ? null : Number(raw);
+      this.focusedTenantId.set(parsed !== null && Number.isFinite(parsed) ? parsed : null);
+    });
     this.load();
     this.loadTenants();
+  }
+
+  clearTenantFocus(): void {
+    this.router.navigate([], { relativeTo: this.route, queryParams: {} });
   }
 
   load(): void {
@@ -143,9 +169,24 @@ export class Users implements OnInit {
     });
     if (!ok) return;
 
+    this.changeStatus(user, activating ? 'Active' : 'Inactive');
+  }
+
+  async deleteUser(user: AppUser): Promise<void> {
+    const ok = await confirmWith(this.dialog, {
+      title: `Delete ${user.fullName || user.username}?`,
+      body: 'The account is removed from this list and can no longer sign in. Deactivate instead if you only want to block access for now — a deactivated account can be switched back on, a deleted one cannot.',
+      confirmLabel: 'Delete user',
+      danger: true,
+    });
+    if (!ok) return;
+    this.changeStatus(user, 'Delete');
+  }
+
+  private changeStatus(user: AppUser, status: string): void {
     this.busy.set(user.appUserId);
     this.http.put<ApiResponse>(`${API_BASE}/appUser.json/changeUserStatus`,
-      { appUserId: user.appUserId, status: activating ? 'Active' : 'Inactive' }).subscribe({
+      { appUserId: user.appUserId, status }).subscribe({
       next: response => {
         this.busy.set(null);
         if (response.status === API_SUCCESS) {

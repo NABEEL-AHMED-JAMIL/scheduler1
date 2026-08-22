@@ -11,6 +11,18 @@
     </button>
   </div>
 
+  @if (focusedTenantId() !== null) {
+    <div class="card flex flex-wrap items-center gap-2 px-4 py-2.5 text-sm">
+      <app-icon name="filter" class="text-[color:var(--text-muted)]" />
+      <span>
+        Showing users in <strong>{{ focusedTenantName() }}</strong> only.
+      </span>
+      <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="clearTenantFocus()">
+        <app-icon name="close" />Show all tenants
+      </button>
+    </div>
+  }
+
   <div class="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-3xl">
     @for (tile of [
       { label: 'Users',            value: summary().total },
@@ -138,6 +150,12 @@
                           (cdkMenuItemTriggered)="toggleStatus(user)">
                     <app-icon [name]="user.status === 'Active' ? 'close' : 'check'" />
                     {{ user.status === 'Active' ? 'Deactivate' : 'Activate' }}
+                  </button>
+                  <button cdkMenuItem class="menu-item text-crit-500"
+                          [disabled]="isSelf(user)"
+                          [title]="isSelf(user) ? 'You cannot delete your own account' : 'Remove this account for good'"
+                          (cdkMenuItemTriggered)="deleteUser(user)">
+                    <app-icon name="trash" />Delete
                   </button>
                 </div>
               </ng-template>

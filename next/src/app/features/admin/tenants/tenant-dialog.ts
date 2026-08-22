@@ -24,18 +24,23 @@ import { FormDialog } from '../../../shared/ui/form-dialog';
                  placeholder="Ministry of Justice" />
         </app-field>
 
-        <app-field label="Description" for="tenantDescription"
-                   [control]="form.get('description')" [submitted]="submitted()">
-          <textarea id="tenantDescription" class="input resize-y min-h-20"
-                    formControlName="description" placeholder="What this tenant is for"></textarea>
+        <app-field label="Tenant code" for="tenantCode" [required]="true"
+                   [control]="form.get('tenantCode')" [submitted]="submitted()"
+                   [errorMessages]="{ pattern: 'Use lowercase letters, digits, dots, dashes or underscores — no spaces or capitals.' }"
+                   [hint]="isEdit()
+                     ? 'Changing the code does not move any data, but anything referring to the old code stops matching.'
+                     : 'Filled in from the name as you type. Must be unique across every tenant.'">
+          <input id="tenantCode" class="input mono" formControlName="tenantCode"
+                 placeholder="ministry-of-justice" />
         </app-field>
 
         <app-field label="Status" for="tenantStatus" [control]="form.get('status')"
                    [submitted]="submitted()"
-                   hint="Deactivating a tenant stops its users signing in.">
+                   hint="Suspending a tenant stops its users signing in; its data is kept.">
           <select id="tenantStatus" class="input" formControlName="status">
             <option value="Active">Active</option>
-            <option value="Inactive">Inactive</option>
+            <option value="Suspended">Suspended — sign-in blocked</option>
+            <option value="Inactive">Inactive — not in use</option>
           </select>
         </app-field>
       </form>
@@ -56,9 +61,33 @@ export class TenantDialog {
   readonly form: FormGroup = this.fb.group({
     tenantId: [this.data.tenant?.tenantId ?? null],
     tenantName: [this.data.tenant?.tenantName ?? '', Validators.required],
-    description: [this.data.tenant?.description ?? ''],
+    tenantCode: [this.data.tenant?.tenantCode ?? '',
+      [Validators.required, Validators.pattern(/^[a-z0-9][a-z0-9._-]*$/)]],
     status: [this.data.tenant?.status ?? 'Active'],
   });
+
+  constructor() {
+    if (this.isEdit()) return;
+    // While creating, keep the code in step with the name until someone edits the code
+    // themselves -- typing a name and hitting Create is the common path, and the backend
+    // rejects a missing or malformed code.
+    const codeControl = this.form.get('tenantCode')!;
+    codeControl.valueChanges.subscribe(() => {
+      if (codeControl.dirty) this.codeTouchedByUser = true;
+    });
+    this.form.get('tenantName')!.valueChanges.subscribe((name: string) => {
+      if (this.codeTouchedByUser) return;
+      codeControl.setValue(this.slugify(name ?? ''), { emitEvent: false });
+    });
+  }
+
+  private codeTouchedByUser = false;
+
+  private slugify(value: string): string {
+    return value.toLowerCase().trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  }
 
   save(): void {
     this.submitted.set(true);
@@ -78,7 +107,7 @@ export class TenantDialog {
       next: response => {
         this.saving.set(false);
         if (response.status === API_SUCCESS) {
-          this.toast.success(this.isEdit() ? 'Tenant updated.' : 'Tenant created.');
+          this.toast.success(response.message);
           this.ref.close(true);
         } else {
           this.toast.error(response.message);

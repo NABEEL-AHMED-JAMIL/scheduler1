@@ -1,56 +1,124 @@
 <div class="page">
   <div class="page-head">
     <div>
-    <h1 class="page-title">Tenants</h1>
-    <p class="page-subtitle">
-      Every job, bucket, task and agent belongs to a tenant. Isolation is enforced server-side.
-    </p>
+      <h1 class="page-title">Tenants</h1>
+      <p class="page-subtitle">
+        A tenant is an isolated workspace — jobs, buckets, tasks and users never cross between them.
+      </p>
     </div>
-    <button type="button" class="btn btn-primary btn-sm" (click)="create()"><app-icon name="plus" />New tenant</button>
+    <button type="button" class="btn btn-primary btn-sm" (click)="addTenant()">
+      <app-icon name="plus" />New tenant
+    </button>
+  </div>
+
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-3xl">
+    @for (tile of [
+      { label: 'Tenants',  value: stats().tenants,  foot: stats().active + ' active' },
+      { label: 'Users',    value: stats().users,    foot: 'across all tenants' },
+      { label: 'Jobs',     value: stats().jobs,     foot: stats().tasks + ' tasks' },
+      { label: 'Unused',   value: stats().empty,    foot: 'no resources yet' }
+    ]; track tile.label) {
+      <div class="card p-3.5">
+        <div class="text-[11px] font-semibold uppercase tracking-wider text-[color:var(--text-muted)]">
+          {{ tile.label }}
+        </div>
+        <div class="mt-1 text-xl font-semibold tabular">{{ tile.value }}</div>
+        <div class="mt-0.5 text-[11px] text-[color:var(--text-muted)]">{{ tile.foot }}</div>
+      </div>
+    }
   </div>
 
   <app-table-shell heading="Tenants" [loading]="loading()" [error]="error()"
                    [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="tenants().length"
-                   [emptyMessage]="search() ? 'No tenants match your search.' : 'No tenants yet.'"
-                   (retry)="load()">
+                   [emptyMessage]="hasFilters() ? 'No tenants match the current filters.' : 'No tenants yet.'"
+                   (retry)="listTenants()">
     <ng-container toolbar>
-      <input class="input max-w-56" placeholder="Search name or id"
+      <select class="input max-w-36" [value]="statusFilter()"
+              (change)="statusFilter.set($any($event.target).value)">
+        <option value="">All states</option>
+        <option value="Active">Active</option>
+        <option value="Suspended">Suspended</option>
+        <option value="Inactive">Inactive</option>
+      </select>
+      <select class="input max-w-44" [value]="sort.key()"
+              (change)="sort.toggle($any($event.target).value)">
+        <option value="tenantName">Sort by name</option>
+        <option value="userCount">Sort by users</option>
+        <option value="sourceJobCount">Sort by jobs</option>
+        <option value="dateCreated">Sort by created</option>
+      </select>
+      <button type="button" class="btn btn-ghost btn-icon btn-sm"
+              [title]="sort.direction() === 'asc' ? 'Sorted ascending — click for descending' : 'Sorted descending — click for ascending'"
+              (click)="sort.toggle(sort.key())">
+        <span class="text-sm leading-none">{{ sort.direction() === 'asc' ? '\u2191' : '\u2193' }}</span>
+      </button>
+      <input class="input max-w-56" placeholder="Search name or code"
              [value]="search()" (input)="search.set($any($event.target).value)" />
-      @if (search()) {
-        <button type="button" class="btn btn-ghost btn-sm" (click)="search.set('')"><app-icon name="close" />Clear</button>
+      @if (hasFilters()) {
+        <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()">
+          <app-icon name="close" />Clear
+        </button>
       }
     </ng-container>
 
-    <table class="table-modern">
-      <thead>
-        <tr>
-          <th>Tenant</th>
-          <th>Description</th>
-          <th>Created</th>
-          <th class="text-right">Status</th>
-          <th class="w-16"></th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (tenant of filtered(); track tenant.tenantId) {
-          <tr>
-            <td>
-              <div class="font-medium">{{ tenant.tenantName }}</div>
-              <div class="mono text-[color:var(--text-muted)]">#{{ tenant.tenantId }}</div>
-            </td>
-            <td class="text-[color:var(--text-secondary)] max-w-80 truncate">
-              {{ tenant.description || '—' }}
-            </td>
-            <td class="text-[color:var(--text-secondary)] whitespace-nowrap">
-              {{ tenant.dateCreated ? (tenant.dateCreated | date:'d MMM yyyy') : '—' }}
-            </td>
-            <td class="text-right"><app-status [label]="tenant.status" /></td>
-            <td class="text-right">
-              <button type="button" class="btn btn-ghost btn-sm" (click)="edit(tenant)"><app-icon name="edit" />Edit</button>
-            </td>
-          </tr>
-        }
-      </tbody>
-    </table>
+    <div class="grid gap-3 p-4 lg:grid-cols-2 2xl:grid-cols-3">
+      @for (tenant of filtered(); track tenant.tenantId) {
+        <article class="card p-4 flex flex-col gap-3.5"
+                 [style.opacity]="tenant.status === 'Active' ? '1' : '0.72'">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <h3 class="truncate text-sm font-semibold">{{ tenant.tenantName }}</h3>
+              <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[color:var(--text-muted)]">
+                <code class="mono rounded px-1.5 py-0.5"
+                      style="background: var(--surface-sunken);">{{ tenant.tenantCode }}</code>
+                @if (tenant.dateCreated) {
+                  <span>since {{ tenant.dateCreated | date: 'mediumDate' }}</span>
+                }
+              </div>
+            </div>
+            <app-status [label]="tenant.status" />
+          </div>
+
+          <div class="grid grid-cols-3 gap-px overflow-hidden rounded-lg"
+               style="background: var(--border-subtle);">
+            @for (res of resources; track res.key) {
+              <div class="flex flex-col items-center gap-1 px-2 py-2.5"
+                   style="background: var(--surface-raised);"
+                   [title]="$any(tenant)[res.key] + ' ' + res.label.toLowerCase()">
+                <app-icon [name]="res.icon" size="0.95em"
+                          [class]="$any(tenant)[res.key] ? 'text-brand-500' : 'text-[color:var(--text-muted)] opacity-45'" />
+                <span class="text-sm font-semibold tabular leading-none"
+                      [class]="$any(tenant)[res.key] ? '' : 'text-[color:var(--text-muted)] opacity-60'">
+                  {{ $any(tenant)[res.key] || 0 }}
+                </span>
+                <span class="text-[10px] uppercase tracking-wide leading-none text-[color:var(--text-muted)]"
+                      [class.opacity-60]="!$any(tenant)[res.key]">{{ res.label }}</span>
+              </div>
+            }
+          </div>
+
+          <div class="flex flex-wrap items-center gap-1.5 border-t pt-3"
+               style="border-color: var(--border-subtle);">
+            <button type="button" class="btn btn-ghost btn-sm" (click)="viewUsers(tenant)"
+                    [disabled]="!tenant.userCount"
+                    [title]="tenant.userCount ? 'Show the users in this tenant' : 'This tenant has no users yet'">
+              <app-icon name="users" />Users
+            </button>
+            <button type="button" class="btn btn-ghost btn-sm" (click)="editTenant(tenant)">
+              <app-icon name="edit" />Edit
+            </button>
+            <button type="button" class="btn btn-ghost btn-sm" (click)="toggleSuspend(tenant)"
+                    [title]="tenant.status === 'Active' ? 'Block sign-in for this tenant' : 'Allow sign-in again'">
+              <app-icon [name]="tenant.status === 'Active' ? 'pause' : 'play'" />
+              {{ tenant.status === 'Active' ? 'Suspend' : 'Reactivate' }}
+            </button>
+            <button type="button" class="btn btn-ghost btn-icon btn-sm ml-auto"
+                    title="Delete tenant" (click)="deleteTenant(tenant)">
+              <app-icon name="trash" class="text-crit-500" />
+            </button>
+          </div>
+        </article>
+      }
+    </div>
   </app-table-shell>
 </div>

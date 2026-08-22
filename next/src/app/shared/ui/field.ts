@@ -31,6 +31,8 @@ export class Field {
   readonly hint = input<string>('');
   readonly submitted = input(false);
   readonly required = input(false);
+  /** Per-error overrides, keyed by validator name, for when the generic wording is too vague. */
+  readonly errorMessages = input<Record<string, string>>({});
 
   readonly message = computed(() => {
     const control = this.control();
@@ -39,6 +41,10 @@ export class Field {
     // form doesn't greet people in red.
     if (!control.touched && !this.submitted()) return '';
     const errors = control.errors;
+    const overrides = this.errorMessages();
+    for (const name of Object.keys(errors)) {
+      if (overrides[name]) return overrides[name];
+    }
     if (errors['required']) return `${this.label()} is required`;
     if (errors['email']) return 'Enter a valid email address';
     if (errors['min']) return `Must be at least ${errors['min'].min}`;
