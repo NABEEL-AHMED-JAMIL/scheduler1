@@ -102,6 +102,11 @@ export const routes: Routes = [
         data: { roles: ['PLATFORM_ADMIN', 'TENANT_ADMIN'] },
       },
       {
+        path: 'tools/query',
+        loadComponent: () =>
+          import('./features/tools/query-engine/query-engine').then(m => m.QueryEngine),
+      },
+      {
         path: 'admin/settings',
         loadComponent: () =>
           import('./features/settings/hub/settings-hub').then(m => m.SettingsHub),

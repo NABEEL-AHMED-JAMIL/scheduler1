@@ -1,0 +1,241 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Query Engine</h1>
+      <p class="page-subtitle">
+        Saved SQL that runs against a database connection, by hand or on a schedule, writing its result to storage.
+      </p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button type="button" class="btn btn-ghost btn-sm" (click)="loadAll()" [disabled]="loading()">
+        <app-icon name="refresh" [class.spin]="loading()" />Refresh
+      </button>
+      @if (tab() === 'connections') {
+        <button type="button" class="btn btn-primary btn-sm" (click)="addConnection()">
+          <app-icon name="plus" />New connection
+        </button>
+      } @else {
+        <button type="button" class="btn btn-primary btn-sm" (click)="addQuery()">
+          <app-icon name="plus" />New query
+        </button>
+      }
+    </div>
+  </div>
+
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-3xl">
+    @for (tile of [
+      { label: 'Queries',     value: summary().queries,     foot: 'saved' },
+      { label: 'Connections', value: summary().connections, foot: 'databases' },
+      { label: 'Scheduled',   value: summary().scheduled,   foot: 'running on a timer' },
+      { label: 'Failed runs', value: summary().failed,      foot: 'need attention' }
+    ]; track tile.label) {
+      <div class="stat-tile">
+        <div class="stat-label">{{ tile.label }}</div>
+        <div class="stat-value">{{ tile.value }}</div>
+        <div class="stat-foot">{{ tile.foot }}</div>
+      </div>
+    }
+  </div>
+
+  <div class="tabs" role="tablist">
+    @for (t of tabs; track t.id) {
+      <button type="button" class="tab" role="tab" [class.tab-active]="tab() === t.id"
+              [attr.aria-selected]="tab() === t.id" (click)="setTab(t.id)">
+        <app-icon [name]="t.icon" size="0.95em" />{{ t.label }}
+      </button>
+    }
+  </div>
+
+  @if (tab() === 'queries') {
+    <app-table-shell heading="Queries" [loading]="loading()" [error]="error()"
+                     [isEmpty]="!filteredQueries().length" [shown]="filteredQueries().length"
+                     [total]="queries().length" emptyIcon="file"
+                     [emptyMessage]="search() ? 'No queries match that search.' : 'No queries yet.'"
+                     (retry)="loadAll()">
+      <ng-container toolbar>
+        <div class="search-field max-w-56">
+          <app-icon name="search" size="0.95em" />
+          <input class="input" placeholder="Search name or SQL"
+                 [value]="search()" (input)="search.set($any($event.target).value)" />
+        </div>
+      </ng-container>
+
+      <table class="table-modern">
+        <thead>
+          <tr>
+            <th>Query</th><th>Connection</th><th>Schedule</th>
+            <th class="text-right">State</th><th class="w-12"></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (q of filteredQueries(); track q.queryId) {
+            <tr [class.opacity-55]="running() === q.queryId">
+              <td class="max-w-72">
+                <div class="font-medium">{{ q.queryName }}</div>
+                <div class="mono text-xs text-[color:var(--text-muted)] truncate" [title]="q.queryText">
+                  {{ q.queryText }}
+                </div>
+              </td>
+              <td>{{ connectionName(q.databaseConnectionProfileId) }}</td>
+              <td>
+                @if (scheduleFor(q); as s) {
+                  <span class="pill pill-brand"><app-icon name="clock" size="0.85em" />every {{ s.intervalMinutes }}m</span>
+                  @if (s.nextRunAt) {
+                    <div class="text-xs text-[color:var(--text-muted)] mt-0.5">
+                      next {{ s.nextRunAt | date:'d MMM, HH:mm' }}
+                    </div>
+                  }
+                } @else {
+                  <span class="text-[color:var(--text-muted)]">manual only</span>
+                }
+              </td>
+              <td class="text-right"><app-status [label]="q.status" /></td>
+              <td class="text-right">
+                <button type="button" class="btn btn-ghost btn-icon" [cdkMenuTriggerFor]="qMenu"
+                        [disabled]="running() === q.queryId" aria-label="Actions">
+                  <app-icon name="dots" size="1.05em" />
+                </button>
+                <ng-template #qMenu>
+                  <div cdkMenu class="card shadow-xl py-1 min-w-52 text-sm">
+                    <button cdkMenuItem class="menu-item btn-intent-ok" (cdkMenuItemTriggered)="runQuery(q)">
+                      <app-icon name="play" />Run now
+                    </button>
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="editQuery(q)">
+                      <app-icon name="edit" />Edit
+                    </button>
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="schedule(q)">
+                      <app-icon name="clock" />{{ scheduleFor(q) ? 'Edit schedule' : 'Schedule' }}
+                    </button>
+                    @if (scheduleFor(q)) {
+                      <button cdkMenuItem class="menu-item btn-intent-warn" (cdkMenuItemTriggered)="removeSchedule(q)">
+                        <app-icon name="pause" />Remove schedule
+                      </button>
+                    }
+                    <div class="my-1 border-t" style="border-color: var(--border-subtle);"></div>
+                    <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="removeQuery(q)">
+                      <app-icon name="trash" class="icon-crit" />Delete
+                    </button>
+                  </div>
+                </ng-template>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </app-table-shell>
+  }
+
+  @if (tab() === 'connections') {
+    <app-table-shell heading="Database connections" [loading]="loading()" [error]="error()"
+                     [isEmpty]="!filteredConnections().length" [shown]="filteredConnections().length"
+                     [total]="connections().length" emptyIcon="database"
+                     [emptyMessage]="search() ? 'No connections match that search.' : 'No database connections yet.'"
+                     (retry)="loadAll()">
+      <ng-container toolbar>
+        <div class="search-field max-w-56">
+          <app-icon name="search" size="0.95em" />
+          <input class="input" placeholder="Search name, host or database"
+                 [value]="search()" (input)="search.set($any($event.target).value)" />
+        </div>
+      </ng-container>
+
+      <table class="table-modern">
+        <thead>
+          <tr>
+            <th>Profile</th><th>Target</th><th>User</th><th>Password</th>
+            <th class="text-right">State</th><th class="w-12"></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (c of filteredConnections(); track c.databaseConnectionProfileId) {
+            <tr>
+              <td class="font-medium">
+                {{ c.profileName }}
+                <div class="text-xs text-[color:var(--text-muted)]">{{ c.databaseType }}</div>
+              </td>
+              <td class="mono">{{ c.host }}:{{ c.port }}/{{ c.databaseName }}</td>
+              <td class="mono">{{ c.username }}</td>
+              <td>
+                @if (c.passwordConfigured) {
+                  <span class="pill pill-neutral"><app-icon name="lock" size="0.85em" />stored</span>
+                } @else {
+                  <span class="pill pill-warn"><app-icon name="alert" size="0.85em" />not set</span>
+                }
+              </td>
+              <td class="text-right"><app-status [label]="c.status" /></td>
+              <td class="text-right">
+                <button type="button" class="btn btn-ghost btn-icon" [cdkMenuTriggerFor]="cMenu" aria-label="Actions">
+                  <app-icon name="dots" size="1.05em" />
+                </button>
+                <ng-template #cMenu>
+                  <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="editConnection(c)">
+                      <app-icon name="edit" />Edit
+                    </button>
+                    <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="removeConnection(c)">
+                      <app-icon name="trash" class="icon-crit" />Delete
+                    </button>
+                  </div>
+                </ng-template>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </app-table-shell>
+  }
+
+  @if (tab() === 'executions') {
+    <app-table-shell heading="Runs" [loading]="loading()" [error]="error()"
+                     [isEmpty]="!filteredExecutions().length" [shown]="filteredExecutions().length"
+                     [total]="executions().length" emptyIcon="history"
+                     [emptyMessage]="search() ? 'No runs match that search.' : 'Nothing has run yet.'"
+                     (retry)="loadAll()">
+      <ng-container toolbar>
+        <div class="search-field max-w-56">
+          <app-icon name="search" size="0.95em" />
+          <input class="input" placeholder="Search query or output"
+                 [value]="search()" (input)="search.set($any($event.target).value)" />
+        </div>
+      </ng-container>
+
+      <table class="table-modern">
+        <thead>
+          <tr>
+            <th>Query</th><th>Started</th><th>Rows</th><th>Output</th>
+            <th class="text-right">Result</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (e of filteredExecutions(); track e.executionId) {
+            <tr>
+              <td class="font-medium">
+                {{ e.queryName || '#' + e.queryId }}
+                @if (e.scheduleId) {
+                  <span class="pill pill-brand ml-1"><app-icon name="clock" size="0.85em" />scheduled</span>
+                }
+              </td>
+              <td>
+                {{ e.startedAt ? (e.startedAt | date:'d MMM, HH:mm:ss') : '—' }}
+                @if (e.errorMessage) {
+                  <div class="text-xs text-crit-500 truncate max-w-64" [title]="e.errorMessage">
+                    {{ e.errorMessage }}
+                  </div>
+                }
+              </td>
+              <td class="tabular">{{ e.rowCount ?? '—' }}</td>
+              <td class="mono text-xs max-w-64">
+                @if (e.outputKey) {
+                  <span class="truncate block" [title]="e.outputBucket + '/' + e.outputKey">
+                    {{ e.outputBucket }}/{{ e.outputKey }}
+                  </span>
+                } @else { <span class="text-[color:var(--text-muted)]">—</span> }
+              </td>
+              <td class="text-right"><app-status [label]="e.status" /></td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </app-table-shell>
+  }
+</div>

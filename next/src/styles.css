@@ -211,6 +211,21 @@
   .pill-warn    { @apply bg-warn-100; color: var(--color-warn-600); }
   .pill-crit    { @apply bg-crit-100 text-crit-500; }
 
+  /* Tabs share the pill vocabulary rather than inventing a third selected-state look. */
+  .tabs {
+    border-color: var(--border-subtle);
+    @apply flex flex-wrap items-center gap-1 border-b;
+  }
+  .tab {
+    @apply inline-flex items-center gap-1.5 px-3 py-2 -mb-px border-b-2 border-transparent
+           text-sm font-medium text-[color:var(--text-secondary)] transition-colors
+           hover:text-[color:var(--text-primary)];
+  }
+  .tab-active {
+    @apply border-brand-500 text-[color:var(--text-primary)];
+  }
+  .tab-active app-icon { color: var(--color-brand-500); }
+
   .table-modern { @apply w-full text-sm; }
   .table-modern thead th {
     border-color: var(--border-subtle);
@@ -267,6 +282,7 @@ html.dark .icon-warn { color: var(--color-warn-400); }
 html.dark .icon-crit { color: var(--color-crit-400); }
 html.dark .icon-info { color: var(--color-brand-300); }
 html.dark .settings-hub-glyph { color: var(--color-brand-300); }
+html.dark .tab-active app-icon { color: var(--color-brand-300); }
 
 html.dark .btn-intent-warn:hover app-icon,
 html.dark .btn-intent-warn:focus app-icon { color: var(--color-warn-400); }
