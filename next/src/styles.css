@@ -262,3 +262,12 @@ html.dark .pill-crit  { background: color-mix(in oklab, var(--color-crit-500) 22
   .page-title      { @apply text-2xl font-semibold tracking-tight; }
   .page-subtitle   { @apply text-sm text-[color:var(--text-secondary)] mt-1; }
 }
+
+@layer components {
+  /* A sortable header has to look clickable before it is clicked. */
+  .th-sort {
+    @apply cursor-pointer select-none inline-flex items-center gap-1
+           hover:text-[color:var(--text-primary)];
+  }
+  .th-sort-active { @apply text-[color:var(--text-primary)]; }
+}

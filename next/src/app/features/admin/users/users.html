@@ -1,58 +1,146 @@
 <div class="page">
   <div class="page-head">
     <div>
-    <h1 class="page-title">Users</h1>
-    <p class="page-subtitle">
-      Access is enforced on the server — a role decides what a person can reach, not just what they see.
-    </p>
+      <h1 class="page-title">Users</h1>
+      <p class="page-subtitle">
+        Roles are enforced on the server — they decide what a person can reach, not just what they see.
+      </p>
     </div>
-    <button type="button" class="btn btn-primary btn-sm" (click)="create()"><app-icon name="plus" />New user</button>
+    <button type="button" class="btn btn-primary btn-sm" (click)="create()">
+      <app-icon name="plus" />New user
+    </button>
+  </div>
+
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-3xl">
+    @for (tile of [
+      { label: 'Users',            value: summary().total },
+      { label: 'Active',           value: summary().active },
+      { label: 'Admins',           value: summary().admins },
+      { label: 'Never signed in',  value: summary().neverSignedIn }
+    ]; track tile.label) {
+      <div class="card p-3.5">
+        <div class="text-[11px] font-semibold uppercase tracking-wider text-[color:var(--text-muted)]">
+          {{ tile.label }}
+        </div>
+        <div class="mt-1 text-xl font-semibold tabular">{{ tile.value }}</div>
+      </div>
+    }
   </div>
 
   <app-table-shell heading="Users" [loading]="loading()" [error]="error()"
                    [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="users().length"
-                   [emptyMessage]="search() || roleFilter() ? 'No users match the filters.' : 'No users yet.'"
+                   [emptyMessage]="hasFilters() ? 'No users match the current filters.' : 'No users yet.'"
                    (retry)="load()">
     <ng-container toolbar>
-      <select class="input max-w-44" [value]="roleFilter()"
+      <select class="input max-w-40" [value]="roleFilter()"
               (change)="roleFilter.set($any($event.target).value)">
         <option value="">All roles</option>
         @for (role of roles(); track role) {
           <option [value]="role">{{ roleLabel(role) }}</option>
         }
       </select>
-      <input class="input max-w-56" placeholder="Search name, username or email"
+      <select class="input max-w-32" [value]="statusFilter()"
+              (change)="statusFilter.set($any($event.target).value)">
+        <option value="">All states</option>
+        <option value="Active">Active</option>
+        <option value="Inactive">Inactive</option>
+      </select>
+      <input class="input max-w-56" placeholder="Search name, email or tenant"
              [value]="search()" (input)="search.set($any($event.target).value)" />
-      @if (search() || roleFilter()) {
-        <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()"><app-icon name="close" />Clear</button>
+      @if (hasFilters()) {
+        <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()">
+          <app-icon name="close" />Clear
+        </button>
       }
     </ng-container>
 
     <table class="table-modern">
       <thead>
         <tr>
-          <th>Name</th>
-          <th>Username</th>
-          <th>Email</th>
-          <th>Role</th>
-          <th>Tenant</th>
-          <th class="text-right">Status</th>
-          <th class="w-16"></th>
+          @for (column of [
+            { key: 'fullName',    label: 'Name' },
+            { key: 'username',    label: 'Email' },
+            { key: 'userRole',    label: 'Role' },
+            { key: 'tenantName',  label: 'Tenant' },
+            { key: 'lastLoginAt', label: 'Last sign-in' },
+            { key: 'dateCreated', label: 'Created' }
+          ]; track column.key) {
+            <th>
+              <button type="button" class="th-sort"
+                      [class.th-sort-active]="sort.key() === column.key"
+                      (click)="sort.toggle(column.key)">
+                {{ column.label }}
+                <span class="tabular">{{ sort.indicator(column.key) }}</span>
+              </button>
+            </th>
+          }
+          <th class="text-right">
+            <button type="button" class="th-sort" [class.th-sort-active]="sort.key() === 'status'"
+                    (click)="sort.toggle('status')">
+              Status <span class="tabular">{{ sort.indicator('status') }}</span>
+            </button>
+          </th>
+          <th class="w-12"></th>
         </tr>
       </thead>
       <tbody>
         @for (user of filtered(); track user.appUserId) {
-          <tr>
-            <td class="font-medium">{{ user.fullName || '—' }}</td>
-            <td class="mono text-[color:var(--text-secondary)]">{{ user.username }}</td>
-            <td class="text-[color:var(--text-secondary)] max-w-56 truncate">{{ user.email || '—' }}</td>
-            <td><span class="pill pill-brand">{{ roleLabel(user.userRole) }}</span></td>
+          <tr [class.opacity-55]="busy() === user.appUserId">
+            <td class="font-medium">
+              {{ user.fullName || '—' }}
+              @if (isSelf(user)) {
+                <span class="pill pill-neutral ml-1.5">You</span>
+              }
+            </td>
+            <td class="mono text-[color:var(--text-secondary)] max-w-56 truncate"
+                [title]="user.username">{{ user.username }}</td>
+            <td><span [class]="rolePill(user.userRole)">{{ roleLabel(user.userRole) }}</span></td>
             <td class="text-[color:var(--text-secondary)]">
-              {{ user.tenantName || (user.tenantId ? '#' + user.tenantId : 'Platform') }}
+              @if (user.tenantName) {
+                {{ user.tenantName }}
+                @if (user.tenantActive === false) {
+                  <span class="pill pill-warn ml-1.5" title="This user's tenant is deactivated">
+                    tenant off
+                  </span>
+                }
+              } @else if (user.userRole === 'PLATFORM_ADMIN') {
+                <span class="text-[color:var(--text-muted)]">All tenants</span>
+              } @else { — }
+            </td>
+            <td class="text-[color:var(--text-secondary)] whitespace-nowrap">
+              @if (user.lastLoginAt) {
+                {{ user.lastLoginAt | date:'d MMM yyyy, HH:mm' }}
+              } @else {
+                <span class="text-[color:var(--text-muted)]">Never</span>
+              }
+            </td>
+            <td class="text-[color:var(--text-secondary)] whitespace-nowrap">
+              {{ user.dateCreated ? (user.dateCreated | date:'d MMM yyyy') : '—' }}
             </td>
             <td class="text-right"><app-status [label]="user.status" /></td>
             <td class="text-right">
-              <button type="button" class="btn btn-ghost btn-sm" (click)="edit(user)"><app-icon name="edit" />Edit</button>
+              <button type="button" class="btn btn-ghost btn-icon" [cdkMenuTriggerFor]="menu"
+                      [disabled]="busy() === user.appUserId" aria-label="Actions">
+                <app-icon name="dots" size="1.05em" />
+              </button>
+              <ng-template #menu>
+                <div cdkMenu class="card shadow-xl py-1 min-w-52 text-sm">
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="edit(user)">
+                    <app-icon name="edit" />Edit
+                  </button>
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="resetPassword(user)">
+                    <app-icon name="settings" />Reset password
+                  </button>
+                  <div class="my-1 border-t" style="border-color: var(--border-subtle);"></div>
+                  <button cdkMenuItem class="menu-item"
+                          [disabled]="isSelf(user)"
+                          [title]="isSelf(user) ? 'You cannot deactivate your own account' : ''"
+                          (cdkMenuItemTriggered)="toggleStatus(user)">
+                    <app-icon [name]="user.status === 'Active' ? 'close' : 'check'" />
+                    {{ user.status === 'Active' ? 'Deactivate' : 'Activate' }}
+                  </button>
+                </div>
+              </ng-template>
             </td>
           </tr>
         }
