@@ -119,12 +119,33 @@
                     <div class="mono text-[color:var(--text-muted)]">#{{ row.jobId }}</div>
                   </td>
                   @for (column of columns; track column) {
-                    <td class="text-right tabular"
-                        [class.text-[color:var(--text-muted)]]="!countFor(row, column)">
-                      {{ countFor(row, column) }}
+                    <td class="text-right tabular !p-0">
+                      <button type="button"
+                              class="w-full h-full px-4 py-2.5 text-right tabular rounded-sm
+                                     hover:bg-brand-50 hover:text-brand-700
+                                     focus:outline-none focus:ring-2 focus:ring-brand-500
+                                     disabled:hover:bg-transparent"
+                              [class.text-[color:var(--text-muted)]]="!countFor(row, column)"
+                              [disabled]="!countFor(row, column)"
+                              [title]="countFor(row, column)
+                                ? 'View the ' + column + ' runs for this job in this hour'
+                                : 'No ' + column + ' runs'"
+                              (click)="openCount(row, column, countFor(row, column))">
+                        {{ countFor(row, column) }}
+                      </button>
                     </td>
                   }
-                  <td class="text-right tabular font-semibold">{{ row.total }}</td>
+                  <td class="text-right tabular font-semibold !p-0">
+                    <button type="button"
+                            class="w-full h-full px-4 py-2.5 text-right tabular font-semibold rounded-sm
+                                   hover:bg-brand-50 hover:text-brand-700
+                                   focus:outline-none focus:ring-2 focus:ring-brand-500"
+                            [disabled]="!row.total"
+                            title="View every run for this job in this hour"
+                            (click)="openCount(row, 'Total', row.total)">
+                      {{ row.total }}
+                    </button>
+                  </td>
                   <td>
                     <div class="flex h-2 rounded-full overflow-hidden"
                          style="background: var(--surface-sunken);">

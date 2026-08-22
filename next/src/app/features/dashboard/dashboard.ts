@@ -1,6 +1,6 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { Donut } from '../../shared/charts/donut';
 import { BarChart } from '../../shared/charts/bar-chart';
 import { HeatCell, HeatSelection, Heatmap } from '../../shared/charts/heatmap';
@@ -26,6 +26,7 @@ export class Dashboard implements OnInit {
   private readonly dashboard = inject(DashboardService);
   private readonly http = inject(HttpClient);
   private readonly toast = inject(ToastService);
+  private readonly router = inject(Router);
 
   readonly startDate = signal(this.isoDaysAgo(6));
   readonly endDate = signal(this.isoDaysAgo(0));
@@ -164,6 +165,26 @@ export class Dashboard implements OnInit {
     this.selectedCell.set(null);
     this.breakdown.set([]);
     this.breakdownSearch.set('');
+  }
+
+  /**
+   * Clicking a count opens that job's runs for exactly this hour and status. Zero is not a
+   * link -- following it would land on an empty page -- so it says so instead.
+   */
+  openCount(row: JobBreakdown, status: string, count: number): void {
+    if (!count) {
+      this.toast.info(`No ${status.toLowerCase()} runs for ${row.jobName} in this hour.`);
+      return;
+    }
+    const cell = this.selectedCell();
+    this.router.navigate(['/jobs', row.jobId, 'history'], {
+      queryParams: {
+        // Column keys are lowercase; the API and the UI both expect the capitalised status.
+        jobStatus: status.charAt(0).toUpperCase() + status.slice(1),
+        targetDate: cell?.date ?? null,
+        targetHr: cell?.hr ?? null,
+      },
+    });
   }
 
   countFor(row: JobBreakdown, key: BreakdownKey): number {

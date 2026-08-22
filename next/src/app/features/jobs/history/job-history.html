@@ -8,9 +8,27 @@
       }
     </h1>
     <p class="page-subtitle">
-      Every recorded run of job <span class="mono">#{{ jobId() }}</span>.
+      @if (isDrillDown()) {
+        {{ jobStatus() }} runs of job <span class="mono">#{{ jobId() }}</span>
+        on {{ targetDate() }} at {{ hourLabel(targetHr()) }}.
+      } @else {
+        Every recorded run of job <span class="mono">#{{ jobId() }}</span>.
+      }
     </p>
   </div>
+
+  @if (isDrillDown()) {
+    <div class="card px-4 py-2.5 flex flex-wrap items-center gap-2 text-sm">
+      <span class="text-[color:var(--text-secondary)]">Filtered to</span>
+      <span class="pill pill-brand">{{ jobStatus() }}</span>
+      <span class="text-[color:var(--text-secondary)]">
+        on {{ targetDate() }} at {{ hourLabel(targetHr()) }}
+      </span>
+      <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="clearDrillDown()">
+        Show all runs
+      </button>
+    </div>
+  }
 
   @if (summary().length) {
     <div class="flex flex-wrap gap-2">
