@@ -1,0 +1,68 @@
+<div class="min-h-screen grid lg:grid-cols-2">
+  <!-- Left: the sign-in panel itself, kept narrow and calm. -->
+  <div class="flex items-center justify-center px-6 py-12">
+    <div class="w-full max-w-sm">
+      <div class="flex items-center gap-2.5 mb-8">
+        <div class="size-9 rounded-lg bg-brand-500 grid place-items-center text-white font-bold">E</div>
+        <div>
+          <div class="font-semibold leading-tight">ETL Console</div>
+          <div class="text-xs text-[color:var(--text-muted)]">Data pipeline platform</div>
+        </div>
+      </div>
+
+      <h1 class="text-2xl font-semibold tracking-tight mb-1">Sign in</h1>
+      <p class="text-sm text-[color:var(--text-secondary)] mb-7">
+        Use your platform account to continue.
+      </p>
+
+      <form [formGroup]="form" (ngSubmit)="submit()" novalidate class="space-y-4">
+        <div>
+          <label class="label" for="username">Username</label>
+          <input id="username" class="input" formControlName="username"
+                 autocomplete="username" placeholder="you@company.com" />
+          @if (form.controls.username.touched && form.controls.username.invalid) {
+            <p class="text-xs text-crit-500 mt-1">Username is required.</p>
+          }
+        </div>
+
+        <div>
+          <label class="label" for="password">Password</label>
+          <input id="password" class="input" type="password" formControlName="password"
+                 autocomplete="current-password" placeholder="••••••••" />
+          @if (form.controls.password.touched && form.controls.password.invalid) {
+            <p class="text-xs text-crit-500 mt-1">Password is required.</p>
+          }
+        </div>
+
+        @if (error()) {
+          <div class="rounded-md border border-crit-500/30 bg-crit-100 px-3 py-2 text-sm text-crit-500">
+            {{ error() }}
+          </div>
+        }
+
+        <button type="submit" class="btn btn-primary w-full" [disabled]="submitting()">
+          {{ submitting() ? 'Signing in…' : 'Sign in' }}
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Right: a quiet panel rather than a stock photo. Hidden on small screens
+       where it would just push the form down. -->
+  <div class="hidden lg:block relative overflow-hidden bg-ink-900">
+    <div class="absolute inset-0 opacity-[0.18]"
+         style="background-image:
+           linear-gradient(to right, #fff 1px, transparent 1px),
+           linear-gradient(to bottom, #fff 1px, transparent 1px);
+           background-size: 44px 44px;"></div>
+    <div class="absolute -top-28 -right-24 size-[26rem] rounded-full bg-brand-500/25 blur-3xl"></div>
+    <div class="relative h-full flex flex-col justify-end p-12 text-white">
+      <p class="text-xl font-medium max-w-md leading-snug">
+        Schedule the work, watch it run, and read what comes out — in one place.
+      </p>
+      <p class="text-sm text-white/55 mt-3">
+        Pipelines · Object storage · AI assistance
+      </p>
+    </div>
+  </div>
+</div>

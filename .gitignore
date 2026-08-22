@@ -39,3 +39,7 @@ typings
 
 # Generated files
 dist
+# Angular 22 rewrite (next/) — its own node_modules and build output
+next/node_modules/
+next/dist/
+next/.angular/

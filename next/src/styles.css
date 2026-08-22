@@ -1,0 +1,190 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   Design tokens.
+
+   The palette keeps the indigo the product already had -- it is genuinely good
+   and carries continuity for anyone who used the old UI -- but the neutrals are
+   biased a few degrees toward it rather than being pure grey, so surfaces read
+   as chosen rather than defaulted.
+
+   Semantic colours are deliberately separate from the accent: an operations
+   console has to say "this failed" without competing with "this is a link".
+   --------------------------------------------------------------------------- */
+@theme {
+  --color-ink-50:  #f6f7fb;
+  --color-ink-100: #eceef6;
+  --color-ink-200: #dee1ee;
+  --color-ink-300: #c3c8dc;
+  --color-ink-400: #8f97b2;
+  --color-ink-500: #6b7392;
+  --color-ink-600: #4e5570;
+  --color-ink-700: #3a4059;
+  --color-ink-800: #262b3f;
+  --color-ink-900: #171b2b;
+  --color-ink-950: #0f1220;
+
+  --color-brand-50:  #eef0fd;
+  --color-brand-100: #dfe2fc;
+  --color-brand-200: #c4c9f9;
+  --color-brand-300: #9fa5f3;
+  --color-brand-400: #7b7bea;
+  --color-brand-500: #4f46e5;
+  --color-brand-600: #4338ca;
+  --color-brand-700: #3730a3;
+  --color-brand-800: #2e2a82;
+  --color-brand-900: #272567;
+
+  --color-ok-100: #dcf3e6;
+  --color-ok-500: #1d7a44;
+  --color-ok-400: #4ec27f;
+
+  --color-warn-100: #fdf0dd;
+  --color-warn-500: #b45309;
+  --color-warn-400: #e0a25c;
+
+  --color-crit-100: #fbe6ea;
+  --color-crit-500: #bb2d48;
+  --color-crit-400: #f2748c;
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --radius-card: 0.625rem;
+}
+
+/* Surface roles, so a component never reaches for a raw palette step and the
+   whole app switches theme by redefining these alone. */
+@layer base {
+  :root {
+    --surface-page:    var(--color-ink-50);
+    --surface-raised:  #ffffff;
+    --surface-sunken:  var(--color-ink-100);
+    --surface-inverse: var(--color-ink-900);
+    --border-subtle:   var(--color-ink-200);
+    --border-strong:   var(--color-ink-300);
+    --text-primary:    var(--color-ink-900);
+    --text-secondary:  var(--color-ink-500);
+    --text-muted:      var(--color-ink-400);
+    --text-inverse:    #ffffff;
+  }
+
+  html.dark {
+    --surface-page:    var(--color-ink-950);
+    --surface-raised:  var(--color-ink-900);
+    --surface-sunken:  #12151f;
+    --surface-inverse: var(--color-ink-100);
+    --border-subtle:   #2a3049;
+    --border-strong:   #39405c;
+    --text-primary:    var(--color-ink-50);
+    --text-secondary:  var(--color-ink-400);
+    --text-muted:      var(--color-ink-500);
+    --text-inverse:    var(--color-ink-950);
+  }
+
+  html, body {
+    height: 100%;
+  }
+
+  body {
+    background: var(--surface-page);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Digits that sit in columns must line up -- job counts, sizes, durations. */
+  table, .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-brand-500);
+    outline-offset: 2px;
+    border-radius: 3px;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Component primitives.
+
+   Kept as CSS classes rather than Angular components: they carry no behaviour,
+   and a class keeps templates readable (`class="btn btn-primary"`) instead of
+   burying a button under a wrapper element. Anything that needs behaviour --
+   overlays, toasts -- is a real component built on the CDK.
+   --------------------------------------------------------------------------- */
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5
+           text-sm font-medium transition-colors select-none
+           disabled:opacity-45 disabled:pointer-events-none;
+  }
+  .btn-primary {
+    @apply bg-brand-500 text-white hover:bg-brand-600 active:bg-brand-700;
+  }
+  .btn-default {
+    @apply border text-[color:var(--text-primary)]
+           hover:bg-[color:var(--surface-sunken)];
+    border-color: var(--border-subtle);
+    background: var(--surface-raised);
+  }
+  .btn-ghost {
+    @apply text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-sunken)]
+           hover:text-[color:var(--text-primary)];
+  }
+  .btn-danger {
+    @apply bg-crit-500 text-white hover:brightness-110;
+  }
+  .btn-sm { @apply px-2.5 py-1 text-xs; }
+  .btn-icon { @apply px-2 py-1.5; }
+
+  .card {
+    background: var(--surface-raised);
+    border-color: var(--border-subtle);
+    @apply border rounded-[var(--radius-card)];
+  }
+
+  .input {
+    background: var(--surface-raised);
+    border-color: var(--border-subtle);
+    @apply w-full border rounded-md px-3 py-1.5 text-sm
+           placeholder:text-[color:var(--text-muted)]
+           focus:border-brand-500 focus:outline-none;
+  }
+  .label {
+    @apply block text-xs font-semibold uppercase tracking-wide
+           text-[color:var(--text-secondary)] mb-1.5;
+  }
+
+  /* State is encoded in shape as well as colour, so a status is legible in a
+     dense table without reading the word. */
+  .pill {
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5
+           text-[11px] font-semibold whitespace-nowrap;
+  }
+  .pill-neutral { @apply bg-[color:var(--surface-sunken)] text-[color:var(--text-secondary)]; }
+  .pill-brand   { @apply bg-brand-50 text-brand-700; }
+  .pill-ok      { @apply bg-ok-100 text-ok-500; }
+  .pill-warn    { @apply bg-warn-100 text-warn-500; }
+  .pill-crit    { @apply bg-crit-100 text-crit-500; }
+
+  .table-modern { @apply w-full text-sm; }
+  .table-modern thead th {
+    border-color: var(--border-subtle);
+    @apply border-b text-left text-[11px] font-semibold uppercase tracking-wider
+           text-[color:var(--text-muted)] px-4 py-2.5 whitespace-nowrap;
+  }
+  .table-modern tbody td {
+    border-color: var(--border-subtle);
+    @apply border-b px-4 py-2.5 align-middle;
+  }
+  .table-modern tbody tr:last-child td { @apply border-b-0; }
+  .table-modern tbody tr:hover { background: var(--surface-sunken); }
+
+  .mono { font-family: var(--font-mono); @apply text-xs; }
+}
+
+html.dark .pill-brand { @apply bg-brand-900/50 text-brand-300; }
+html.dark .pill-ok    { background: color-mix(in oklab, var(--color-ok-500) 22%, transparent); @apply text-ok-400; }
+html.dark .pill-warn  { background: color-mix(in oklab, var(--color-warn-500) 22%, transparent); @apply text-warn-400; }
+html.dark .pill-crit  { background: color-mix(in oklab, var(--color-crit-500) 22%, transparent); @apply text-crit-400; }
