@@ -7,6 +7,7 @@ import { Observable, BehaviorSubject } from "rxjs";
 export class WebSocketShareService implements OnDestroy {
 
     private notifactionDataSubject = new BehaviorSubject<any>(undefined);
+    private notificationCenterSubject = new BehaviorSubject<any>(undefined);
 
     constructor() { }
 
@@ -18,7 +19,16 @@ export class WebSocketShareService implements OnDestroy {
         return this.notifactionDataSubject.asObservable();
     }
 
+    public onNewNotificationReceive(msg: any) {
+        this.notificationCenterSubject.next(msg);
+    }
+
+    public getNewNotification(): Observable<any> {
+        return this.notificationCenterSubject.asObservable();
+    }
+
     public ngOnDestroy(): void {
         this.notifactionDataSubject.unsubscribe();
+        this.notificationCenterSubject.unsubscribe();
     }
 }

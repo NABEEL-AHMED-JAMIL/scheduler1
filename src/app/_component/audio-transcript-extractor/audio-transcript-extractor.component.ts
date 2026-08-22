@@ -245,7 +245,13 @@ export class AudioTranscriptExtractorComponent implements OnInit {
 
     private handleExtractError(error: any): void {
         this.extracting = false;
-        this.extractError = 'Extraction failed: ' + (error && error.message ? error.message : error);
+        // extractFromUpload/extractFromBucket return real failures (unreadable audio, file too
+        // large, etc.) as an HTTP error status with a ResponseDto body, not a 200 with an
+        // error field -- Angular routes that through this callback as an HttpErrorResponse,
+        // whose own .message is just a generic "Http failure response for <url>: 400" string.
+        // The actual, useful message is nested one level down, in .error.message.
+        const backendMessage = error && error.error && error.error.message;
+        this.extractError = 'Extraction failed: ' + (backendMessage || (error && error.message) || error);
     }
 
     private hasExtension(fileName: string, extensions: string[]): boolean {
@@ -253,8 +259,8 @@ export class AudioTranscriptExtractorComponent implements OnInit {
     }
 
     public get highlightedTranscript(): SafeHtml {
-        let escaped = this.escapeHtml(this.transcript || '');
-        let withHighlights = escaped.replace(TIMESTAMP_PATTERN, (match) => `<span class="transcript-timestamp">${match}</span>`);
+        const escaped = this.escapeHtml(this.transcript || '');
+        const withHighlights = escaped.replace(TIMESTAMP_PATTERN, (match) => `<span class="transcript-timestamp">${match}</span>`);
         return this.sanitizer.bypassSecurityTrustHtml(withHighlights);
     }
 

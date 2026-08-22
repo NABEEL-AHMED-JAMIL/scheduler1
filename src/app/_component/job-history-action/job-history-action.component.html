@@ -261,7 +261,13 @@
                         </div>
                     </td>
                 </tr>
-            </tbody>
+                            <tr *ngIf="!filteredQueueDatas.length">
+                    <td colspan="99" class="table-empty-cell">
+                        <span class="glyphicon glyphicon-info-sign"></span>
+                        No job history matches the current filters.
+                    </td>
+                </tr>
+</tbody>
         </table>
     </div>
 </div>

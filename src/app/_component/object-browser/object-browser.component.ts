@@ -1,7 +1,8 @@
 import { Component, OnInit, OnDestroy, ViewChild, ElementRef, NgZone } from '@angular/core';
-import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
+import { DomSanitizer, SafeHtml, SafeResourceUrl } from '@angular/platform-browser';
 import { ActivatedRoute } from '@angular/router';
-import { AlertService, AuthService, StorageService, DocumentConverterService, OllamaService, FileChatService, FileShareService } from '@/_services';
+import { AlertService, AuthService, StorageService, DocumentConverterService, FileChatService, FileShareService, AiAgentService } from '@/_services';
+import { AiAgent } from '@/_models/ai-agent.model';
 import { first } from 'rxjs/operators';
 import { forkJoin, Observable, Subscription } from 'rxjs';
 import { ApiCode, ApiResponse, BucketSummary, ObjectSummary, ObjectMetadata } from '@/_models';
@@ -14,6 +15,11 @@ const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'];
 const DOC_CONVERTIBLE_EXTENSIONS = ['doc', 'docx'];
 const PREVIEWABLE_EXTENSIONS = ['json', 'csv', 'txt', 'xml', 'md', 'pdf', 'mp3', 'm4a', 'mp4']
     .concat(IMAGE_EXTENSIONS).concat(DOC_CONVERTIBLE_EXTENSIONS);
+
+// Gzipped text is served decompressed by the API (see StorageBrowserServiceImpl.previewGzip),
+// so what matters here is the extension underneath the wrapper. Log formats that aren't in the
+// list above are included because gzipped logs are exactly where they show up.
+const GZIP_PREVIEWABLE_INNER = ['json', 'csv', 'txt', 'xml', 'md', 'log', 'tsv', 'ndjson'];
 
 const DOC_CONTENT_TYPES: { [extension: string]: string } = {
     doc: 'application/msword',
@@ -202,12 +208,20 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
     public closeRenameModal!: ElementRef<HTMLButtonElement>;
     @ViewChild('closeDeleteModal', { static: false })
     public closeDeleteModal!: ElementRef<HTMLButtonElement>;
+    @ViewChild('openPreviewModal', { static: false })
+    public openPreviewModal!: ElementRef<HTMLButtonElement>;
+
+    @ViewChild('openChatFilePreviewModal', { static: false })
+    public openChatFilePreviewModal!: ElementRef<HTMLButtonElement>;
+
     @ViewChild('openLeaveChatModal', { static: false })
     public openLeaveChatModal!: ElementRef<HTMLButtonElement>;
+    @ViewChild('openCloseChatModal', { static: false })
+    public openCloseChatModal!: ElementRef<HTMLButtonElement>;
     @ViewChild('closeEmailShareModal', { static: false })
     public closeEmailShareModal!: ElementRef<HTMLButtonElement>;
 
-    public pendingFileSwitch: { entry: ObjectSummary; action: 'preview' | 'chat' } | null = null;
+    public pendingFileSwitch: ObjectSummary | null = null;
 
     public emailShareEntry: ObjectSummary | null = null;
     public emailShareBulkKeys: string[] | null = null;
@@ -221,8 +235,8 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
         private authService: AuthService,
         private storageService: StorageService,
         private documentConverterService: DocumentConverterService,
-        private ollamaService: OllamaService,
         private fileChatService: FileChatService,
+        private aiAgentService: AiAgentService,
         private fileShareService: FileShareService,
         private sanitizer: DomSanitizer,
         private ngZone: NgZone) {
@@ -277,6 +291,10 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
         this.objects = [];
         this.nextContinuationToken = null;
         this.resetSearch();
+        // Insights start collapsed on FTP/FTPS because building them costs a request per
+        // subfolder there (see isSlowStorageProvider); the user can still open them from the
+        // toolbar and accept the wait. Object stores are fast enough to show them by default.
+        this.showDirectoryCharts = !this.isSlowStorageProvider;
         if (this.selectedBucket) {
             this.loadObjects(true);
             this.loadDirectoryStats();
@@ -319,6 +337,23 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
         document.execCommand('copy');
         document.body.removeChild(textarea);
         this.alertService.showSuccess('Folder path copied to clipboard.', this.SUCCESS);
+    }
+
+    /**
+     * FTP/FTPS pay a full connect + login (+ TLS handshake) per request, ~1.5-2.4s each, where
+     * an object store answers in ~50ms. Folder Insights costs one request per subfolder, so a
+     * directory with fifteen of them turns a single view into sixteen round trips -- measured
+     * at 14s against a real mirror. For these providers the insights pass is therefore left to
+     * the user's existing Show Folder Insights toggle rather than running on arrival.
+     */
+    public get selectedBucketProvider(): string {
+        const match = this.buckets.find((b) => b.bucket === this.selectedBucket);
+        return match && match.provider ? match.provider.toUpperCase() : '';
+    }
+
+    public get isSlowStorageProvider(): boolean {
+        const provider = this.selectedBucketProvider;
+        return provider === 'FTP' || provider === 'FTPS';
     }
 
     private loadDirectoryStats(): void {
@@ -518,9 +553,25 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
             });
     }
 
+    /**
+     * Toggling insights on a slow provider has to kick off the per-folder pass that was skipped
+     * when the folder loaded, otherwise the size column sits on "Counting..." forever.
+     */
+    public toggleDirectoryCharts(): void {
+        this.showDirectoryCharts = !this.showDirectoryCharts;
+        if (this.showDirectoryCharts && this.objects.length) {
+            this.loadFolderStats(this.objects);
+        }
+    }
+
     private loadFolderStats(entries: ObjectSummary[]): void {
         const bucket = this.selectedBucket;
         if (!bucket) {
+            return;
+        }
+        // One request per subfolder is affordable on an object store and punishing on FTP --
+        // see isSlowStorageProvider. Only fan out there once insights are actually on screen.
+        if (this.isSlowStorageProvider && !this.showDirectoryCharts) {
             return;
         }
         entries
@@ -554,6 +605,11 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
 
     public folderStatLabel(entry: ObjectSummary): string {
         const stat = this.folderStats[entry.key];
+        // No stat at all on a slow provider means the per-folder pass was deliberately skipped
+        // rather than still running, so "Counting..." would be a lie that never resolves.
+        if (!stat && this.isSlowStorageProvider && !this.showDirectoryCharts) {
+            return '-';
+        }
         if (!stat || stat.loading) {
             return 'Counting…';
         }
@@ -725,6 +781,9 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
         files?: ChatDownloadableFile[];
     }[] = [];
     public chatPreparing = false;
+    public chatTruncated = false;
+    public chatCharsUsed = 0;
+    public chatTotalChars = 0;
     public chatPrepareError: string | null = null;
     public chatSending = false;
 
@@ -798,29 +857,73 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
     @ViewChild('chatInputEl', { static: false })
     private chatInputEl: ElementRef<HTMLTextAreaElement>;
 
-    public chatModels: { name: string }[] = [];
-    public chatSelectedModel = '';
-    public loadingChatModels = false;
+    // File chat only ever runs through a configured AI Agent -- never a raw Ollama model name
+    // picked ad hoc. "Ollama Models" (Settings) is purely for pulling/managing what's installed
+    // locally; anything meant to actually be *used* somewhere in the app (here included) gets
+    // configured once as an agent on the AI Agents page instead, so there's one place that
+    // defines "what models are available" rather than two.
+    public chatAgents: AiAgent[] = [];
+    public chatSelectedAgentId: any = '';
+    public loadingChatAgents = false;
 
     public get currentUserName(): string {
         return this.authService.currentUser?.fullName || this.authService.currentUser?.username || 'You';
     }
 
+    public chatMinimized = false;
+
     public onRobotAction(entry: ObjectSummary): void {
-        if (this.confirmLeaveChatIfNeeded(entry, 'chat')) {
+        if (this.confirmLeaveChatIfNeeded(entry)) {
             return;
         }
-        this.closePanel();
+        if (!this.selectedObject || this.selectedObject.key !== entry.key) {
+            this.closePanel();
+        }
         this.chatFile = entry;
-        this.loadChatModels();
+        this.chatMinimized = false;
+        this.loadChatAgents();
         this.prepareChatContext(entry);
     }
 
-    private confirmLeaveChatIfNeeded(entry: ObjectSummary, action: 'preview' | 'chat'): boolean {
+    // Minimize just collapses the floating widget down to its header bar -- the conversation
+    // (chatFile, chatMessages, draft) is left completely untouched, unlike closeChat().
+    public toggleChatMinimize(): void {
+        this.chatMinimized = !this.chatMinimized;
+    }
+
+    // The "x" ends the conversation for good (closeChat() wipes chatMessages), so treat it like
+    // any other destructive action and confirm first -- but only when there's actually something
+    // to lose; an empty, just-opened chat can close immediately without asking.
+    public requestCloseChat(): void {
+        if (this.chatMessages.length && this.openCloseChatModal) {
+            this.openCloseChatModal.nativeElement.click();
+            return;
+        }
+        this.closeChat();
+    }
+
+    public confirmCloseChat(): void {
+        this.closeChat();
+    }
+
+    // Only the chat's own "robot action" trigger reaches this now -- previewing a file no
+    // longer competes with an in-progress chat for space, so it never needs to ask.
+    /** Preview the file the chat is about, without disturbing the conversation. */
+    public viewChatFile(): void {
+        if (!this.chatFile) {
+            return;
+        }
+        this.selectObject(this.chatFile);
+        if (this.openPreviewModal) {
+            this.openPreviewModal.nativeElement.click();
+        }
+    }
+
+    private confirmLeaveChatIfNeeded(entry: ObjectSummary): boolean {
         if (!this.chatFile || this.chatFile.key === entry.key) {
             return false;
         }
-        this.pendingFileSwitch = { entry, action };
+        this.pendingFileSwitch = entry;
         if (this.openLeaveChatModal) {
             this.openLeaveChatModal.nativeElement.click();
         }
@@ -839,29 +942,30 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
         }
 
         this.closeChat();
-        if (pending.action === 'chat') {
-            this.onRobotAction(pending.entry);
-        } else {
-            this.selectObject(pending.entry);
-        }
+        this.onRobotAction(pending);
     }
 
-    private loadChatModels(): void {
-        this.loadingChatModels = true;
-        this.ollamaService.listModels()
+    private loadChatAgents(): void {
+        this.loadingChatAgents = true;
+        this.aiAgentService.fetchAllAgents()
             .pipe(first())
             .subscribe((response) => {
-                this.loadingChatModels = false;
+                this.loadingChatAgents = false;
                 if (response.status === ApiCode.SUCCESS) {
-                    this.chatModels = response.data || [];
-                    if (this.chatModels.length && !this.chatSelectedModel) {
-                        this.chatSelectedModel = this.chatModels[0].name;
+                    // Only agents actually usable right now: active, and either don't need a
+                    // key (an Ollama-provider agent) or already have one configured -- an
+                    // agent missing a required key would just fail when picked.
+                    this.chatAgents = (response.data || []).filter((agent: AiAgent) =>
+                        agent.status === 'Active' && (agent.apiKeyConfigured || agent.provider === 'Ollama'));
+                    if (!this.chatSelectedAgentId && this.chatAgents.length) {
+                        this.chatSelectedAgentId = this.chatAgents[0].aiAgentId;
                     }
                 }
             }, () => {
-                this.loadingChatModels = false;
+                this.loadingChatAgents = false;
             });
     }
+
 
     private prepareChatContext(entry: ObjectSummary): void {
         this.chatPreparing = true;
@@ -872,7 +976,14 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
                 this.chatPreparing = false;
                 if (response.status !== ApiCode.SUCCESS) {
                     this.chatPrepareError = response.message || 'Could not read this file.';
+                    return;
                 }
+                // Only part of a long file reaches the model, so say so before the user asks
+                // something like "summarise this" and silently gets the opening section only.
+                const readiness = response.data || {};
+                this.chatTruncated = readiness.truncated === true;
+                this.chatCharsUsed = readiness.charsUsed || 0;
+                this.chatTotalChars = readiness.totalChars || 0;
             }, (error) => {
                 this.chatPreparing = false;
                 this.chatPrepareError = 'Could not read this file.';
@@ -887,6 +998,9 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
         this.chatMessages = [];
         this.chatPreparing = false;
         this.chatPrepareError = null;
+        this.chatTruncated = false;
+        this.chatCharsUsed = 0;
+        this.chatTotalChars = 0;
         this.chatSending = false;
     }
 
@@ -900,7 +1014,7 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
 
     public sendChatMessage(): void {
         const text = this.chatDraft.trim();
-        if (!text || this.chatSending || this.chatPreparing || !this.chatFile || !this.chatSelectedModel) {
+        if (!text || this.chatSending || this.chatPreparing || !this.chatFile || !this.chatSelectedAgentId) {
             return;
         }
 
@@ -920,18 +1034,25 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
             this.chatSlowHint = true;
         }, 8000);
 
-        this.chatMessageSubscription = this.fileChatService.sendMessage({
+        const payload: any = {
             bucket: this.selectedBucket,
             key: this.chatFile.key,
-            model: this.chatSelectedModel,
+            aiAgentId: Number(this.chatSelectedAgentId),
             message: text,
             history
-        }).pipe(first()).subscribe((response) => {
+        };
+
+        this.chatMessageSubscription = this.fileChatService.sendMessage(payload).pipe(first()).subscribe((response) => {
             this.onChatMessageSettled();
             if (response.status === ApiCode.SUCCESS) {
+                // The raw reply carries the export fence (```csv ... ``` etc.) so
+                // extractDownloadableFiles can pull the real file content out of it --
+                // but that same fence must NOT also render inline, or the user sees the
+                // file's raw, escaped markup as a wall of visible tags in the chat bubble
+                // on top of the download button. Strip it from what actually gets displayed.
                 this.chatMessages.push({
                     role: 'assistant', author: 'Assistant', text: response.data,
-                    html: this.renderAssistantMessage(response.data),
+                    html: this.renderAssistantMessage(this.stripExportFences(response.data)),
                     files: this.extractDownloadableFiles(response.data)
                 });
             } else {
@@ -965,25 +1086,79 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
 
     private static readonly CHAT_EXPORT_FORMATS: { [ext: string]: string } = {
         csv: 'text/csv', json: 'application/json', tsv: 'text/tab-separated-values', txt: 'text/plain',
+        html: 'text/html', md: 'text/markdown',
         xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         pdf: 'application/pdf'
     };
+
+    private static readonly CHAT_EXPORT_TARGET_TAGS = ['xlsx', 'docx', 'pdf'];
+
+    // Shared with extractDownloadableFiles below -- kept as one source of truth so the
+    // "what counts as an export fence" logic can't drift between extraction and stripping.
+    // The trailing TARGET_FORMAT capture intentionally accepts any \w+, not just
+    // xlsx|docx|pdf: a model that ignores instructions and tags an unsupported target
+    // (e.g. "TARGET_FORMAT: html") must still have that whole line consumed here so it
+    // doesn't leak into the chat bubble as stray text -- extractDownloadableFiles decides
+    // separately whether the captured value is one it actually acts on. "markdown" is
+    // accepted alongside "md" because the model asked for "a Markdown file" naturally reaches
+    // for the longer, more common spelling of the fence tag despite the prompt asking for
+    // ```md specifically -- without it the whole reply falls through unrecognized and renders
+    // as one big raw code block instead of a real download (see normalizeFenceLang below).
+    private static readonly CHAT_FENCE_PATTERN_SOURCE =
+        '```(csv|json|tsv|txt|html|md|markdown|xlsx|docx|pdf)\\r?\\n([\\s\\S]*?)```[ \\t]*\\r?\\n?\\s*(?:TARGET_FORMAT:\\s*(\\w+)\\b\\s*)?';
+
+    // Fence language aliases the model tends to reach for that don't match our canonical
+    // export-format keys (CHAT_EXPORT_FORMATS, CHAT_EXPORT_TARGET_TAGS) -- normalize before
+    // using the tag as a lookup key or file extension.
+    private static readonly CHAT_FENCE_LANG_ALIASES: { [alias: string]: string } = { markdown: 'md' };
+
+    private static normalizeFenceLang(fenceLang: string): string {
+        return ObjectBrowserComponent.CHAT_FENCE_LANG_ALIASES[fenceLang] || fenceLang;
+    }
+
+    private static readonly CHAT_PROMPT_BLEED_PATTERNS = [
+        /^-{2,}\s*(?:end\s+)?file content\s*-{2,}$/i,
+        /^target_format\s*:\s*\w+\s*$/i,
+        /^\[content truncated[^\]]*\]$/i
+    ];
+
+    private stripChatPromptBleedThrough(content: string): string {
+        const lines = content.split(/\r?\n/);
+        while (lines.length) {
+            const lastLine = lines[lines.length - 1].trim();
+            if (lastLine === '' || ObjectBrowserComponent.CHAT_PROMPT_BLEED_PATTERNS.some((pattern) => pattern.test(lastLine))) {
+                lines.pop();
+                continue;
+            }
+            break;
+        }
+        return lines.join('\n');
+    }
 
     private extractDownloadableFiles(text: string): ChatDownloadableFile[] {
         if (!text) {
             return [];
         }
 
-        const fencePattern = /```(csv|json|tsv|txt)\r?\n([\s\S]*?)```\s*(?:TARGET_FORMAT:\s*(xlsx|docx|pdf)\b)?/gi;
+        const fencePattern = new RegExp(ObjectBrowserComponent.CHAT_FENCE_PATTERN_SOURCE, 'gi');
         const baseName = this.chatFile ? this.chatFile.name.replace(/\.[^./]+$/, '') : 'export';
         const files: ChatDownloadableFile[] = [];
         let match: RegExpExecArray | null;
         let index = 0;
         while ((match = fencePattern.exec(text)) !== null) {
-            const lang = match[1].toLowerCase();
-            const content = match[2].replace(/\r?\n$/, '');
-            const targetFormat = match[3] ? match[3].toLowerCase() : null;
+            const fenceLang = ObjectBrowserComponent.normalizeFenceLang(match[1].toLowerCase());
+            const content = this.stripChatPromptBleedThrough(match[2].replace(/\r?\n$/, ''));
+            const isExportTag = ObjectBrowserComponent.CHAT_EXPORT_TARGET_TAGS.indexOf(fenceLang) !== -1;
+            const lang = isExportTag ? 'txt' : fenceLang;
+            const capturedTarget = match[3] ? match[3].toLowerCase() : null;
+            // Only honor a captured TARGET_FORMAT if it's one of the three we can actually
+            // convert to (xlsx/docx/pdf) -- a model that ignores instructions and writes
+            // e.g. "TARGET_FORMAT: html" on an already-direct ```html fence is just noise
+            // here (still consumed out of the display text above, just not acted on).
+            const targetFormat = capturedTarget && ObjectBrowserComponent.CHAT_EXPORT_TARGET_TAGS.indexOf(capturedTarget) !== -1
+                ? capturedTarget
+                : (isExportTag ? fenceLang : null);
             if (!content.trim()) {
                 continue;
             }
@@ -1006,6 +1181,117 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
             }
         }
         return files;
+    }
+
+    // Removes any export fence (and its trailing TARGET_FORMAT line) from an assistant
+    // reply before it's rendered as chat HTML -- the fence's real content already surfaces
+    // as a download chip via extractDownloadableFiles, so showing it a second time as a
+    // raw escaped code block (or leaving a stray "TARGET_FORMAT: ..." line behind) would
+    // just be visible markup noise in the conversation.
+    private stripExportFences(text: string): string {
+        if (!text) {
+            return text;
+        }
+        const fencePattern = new RegExp(ObjectBrowserComponent.CHAT_FENCE_PATTERN_SOURCE, 'gi');
+        const withoutFences = text.replace(fencePattern, '');
+        // Belt-and-suspenders: the prompt asks the model for TARGET_FORMAT strictly adjacent
+        // to the closing fence (so CHAT_FENCE_PATTERN_SOURCE above can associate it with that
+        // specific fence for conversion), but a model doesn't always place it exactly there --
+        // e.g. on its own paragraph further down. Once fences are already stripped, any
+        // leftover "TARGET_FORMAT: xxx" line by itself is just directive noise either way, so
+        // sweep those up too rather than let them leak into the visible reply as raw text.
+        const withoutStrayTargetFormat = withoutFences.replace(/^[ \t]*TARGET_FORMAT\s*:\s*\w+[ \t]*$/gim, '');
+        return withoutStrayTargetFormat.replace(/\n{3,}/g, '\n\n').trim();
+    }
+
+    // ---- Viewing an assistant-generated file -------------------------------------------
+    // The chip always carries the file's text (`content`), even when the download is a
+    // converted xlsx/docx/pdf -- so a preview is possible in every case, provided it's clear
+    // when what's on screen is the source the conversion runs on rather than the file itself.
+    public chatPreviewFile: ChatDownloadableFile | null = null;
+    public chatPreviewKind: 'markdown' | 'html' | 'table' | 'text' = 'text';
+    public chatPreviewHtml: SafeHtml | null = null;
+    public chatPreviewRows: string[][] = [];
+
+    public get chatPreviewIsPreConversion(): boolean {
+        return !!(this.chatPreviewFile && this.chatPreviewFile.pendingExport);
+    }
+
+    public get chatPreviewSourceLabel(): string {
+        const pending = this.chatPreviewFile && this.chatPreviewFile.pendingExport;
+        return pending ? pending.sourceFormat.toUpperCase() : '';
+    }
+
+    public get chatPreviewTargetLabel(): string {
+        const pending = this.chatPreviewFile && this.chatPreviewFile.pendingExport;
+        return pending ? pending.targetFormat.toUpperCase() : '';
+    }
+
+    public viewChatFileContent(file: ChatDownloadableFile): void {
+        this.chatPreviewFile = file;
+        this.chatPreviewHtml = null;
+        this.chatPreviewRows = [];
+        // For a pending export the filename is the *target* (.xlsx/.docx/.pdf) while the content
+        // in hand is still the source it converts from -- so the source format is what decides
+        // how to render it. Keying off the filename would show a CSV table as raw text.
+        const ext = file.pendingExport
+            ? file.pendingExport.sourceFormat.trim().toLowerCase()
+            : this.extensionOfName(file.filename);
+        if (ext === 'md') {
+            this.chatPreviewKind = 'markdown';
+            this.chatPreviewHtml = this.sanitizer.bypassSecurityTrustHtml(marked.parse(file.content || ''));
+        } else if (ext === 'html') {
+            this.chatPreviewKind = 'html';
+            this.chatPreviewHtml = this.sanitizer.bypassSecurityTrustHtml(file.content || '');
+        } else if (ext === 'csv' || ext === 'tsv') {
+            this.chatPreviewKind = 'table';
+            this.chatPreviewRows = this.parseDelimited(file.content || '', ext === 'tsv' ? '\t' : ',');
+        } else {
+            this.chatPreviewKind = 'text';
+        }
+        if (this.openChatFilePreviewModal) {
+            this.openChatFilePreviewModal.nativeElement.click();
+        }
+    }
+
+    public closeChatFilePreview(): void {
+        this.chatPreviewFile = null;
+        this.chatPreviewHtml = null;
+        this.chatPreviewRows = [];
+    }
+
+    private extensionOfName(filename: string): string {
+        if (!filename) {
+            return '';
+        }
+        const dot = filename.lastIndexOf('.');
+        return dot > -1 ? filename.substring(dot + 1).toLowerCase() : '';
+    }
+
+    /** Minimal delimited parser -- handles quoted fields and escaped quotes, which a plain
+     *  split() would tear apart on any value containing the delimiter. */
+    private parseDelimited(text: string, delimiter: string): string[][] {
+        const rows: string[][] = [];
+        let row: string[] = [];
+        let field = '';
+        let inQuotes = false;
+        for (let i = 0; i < text.length; i++) {
+            const ch = text[i];
+            if (inQuotes) {
+                if (ch === '"') {
+                    if (text[i + 1] === '"') { field += '"'; i++; } else { inQuotes = false; }
+                } else {
+                    field += ch;
+                }
+                continue;
+            }
+            if (ch === '"') { inQuotes = true; }
+            else if (ch === delimiter) { row.push(field); field = ''; }
+            else if (ch === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+            else if (ch !== '\r') { field += ch; }
+        }
+        if (field.length || row.length) { row.push(field); rows.push(row); }
+        return rows.filter((r) => r.some((c) => c.trim().length));
     }
 
     public downloadChatFile(file: ChatDownloadableFile): void {
@@ -1094,10 +1380,9 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
     }
 
     public selectObject(entry: ObjectSummary): void {
-        if (this.confirmLeaveChatIfNeeded(entry, 'preview')) {
-            return;
-        }
-        this.closeChat();
+        // Chat is a floating widget, independent of this preview panel -- previewing a file
+        // (even the one currently being chatted about) no longer needs to close the chat, or
+        // warn that it will, the way it did back when they shared the same panel space.
         this.selectedObject = entry;
         this.selectedObjectMetadata = null;
         this.resetPreview();
@@ -1118,9 +1403,19 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
             });
     }
 
+    /** "audit.json.gz" previews as its inner type; anything else keeps its own extension. */
+    private effectivePreviewExtension(name: string): string {
+        const extension = this.extensionOf(name);
+        if (extension !== 'gz') {
+            return extension;
+        }
+        const inner = this.extensionOf(name.slice(0, -'.gz'.length));
+        return GZIP_PREVIEWABLE_INNER.indexOf(inner) !== -1 ? inner : extension;
+    }
+
     private loadPreview(entry: ObjectSummary): void {
-        const extension = this.extensionOf(entry.name);
-        if (PREVIEWABLE_EXTENSIONS.indexOf(extension) === -1) {
+        const extension = this.effectivePreviewExtension(entry.name);
+        if (PREVIEWABLE_EXTENSIONS.indexOf(extension) === -1 && GZIP_PREVIEWABLE_INNER.indexOf(extension) === -1) {
             this.previewKind = null;
             return;
         }
@@ -1133,7 +1428,9 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
             this.loadDocPreview(entry, extension);
             return;
         }
-        this.previewKind = extension as 'json' | 'csv' | 'txt' | 'xml' | 'md' | 'pdf' | 'mp3' | 'm4a' | 'mp4';
+        // log/tsv/ndjson have no dedicated renderer -- plain text is the honest treatment.
+        const textLike = ['log', 'tsv', 'ndjson'].indexOf(extension) !== -1 ? 'txt' : extension;
+        this.previewKind = textLike as 'json' | 'csv' | 'txt' | 'xml' | 'md' | 'pdf' | 'mp3' | 'm4a' | 'mp4';
         if (extension === 'pdf' || extension === 'mp3' || extension === 'm4a' || extension === 'mp4') {
             this.loadMediaPreview(entry.key, extension);
             return;
@@ -1305,11 +1602,15 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
             });
     }
 
+    // Closes the object PREVIEW panel only. This runs as a side effect of routine navigation
+    // (opening a folder, a breadcrumb click, switching buckets, refreshing) -- none of which
+    // should touch an in-progress chat. The chat is a separate floating widget now and stays
+    // alive across all of that; it only ever closes via the user explicitly minimizing/closing
+    // it (or confirming through requestCloseChat()) or navigating off this page entirely.
     public closePanel(): void {
         this.selectedObject = null;
         this.selectedObjectMetadata = null;
         this.resetPreview();
-        this.closeChat();
     }
 
     public downloadEntry(entry: ObjectSummary, event: Event): void {

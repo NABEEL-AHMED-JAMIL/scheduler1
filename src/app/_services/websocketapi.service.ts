@@ -30,6 +30,9 @@ export class WebSocketAPI {
             _this.stompClient.subscribe('/user/queue/reply', function (sdkEvent) {
                 _this.onMessageReceived(sdkEvent);
             });
+            _this.stompClient.subscribe('/user/queue/notifications', function (sdkEvent) {
+                _this.websocketShare.onNewNotificationReceive(sdkEvent.body);
+            });
         }, function (error) {
             _this.connecting = false;
             _this.errorCallBack(error);

@@ -9,3 +9,4 @@ export * from './auth.model';
 export * from './tenant.model';
 export * from './app-user.model';
 export * from './query-engine.model';
+export * from './notification.model';export * from './storage-connection.model';

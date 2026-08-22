@@ -10,6 +10,7 @@ export * from './setting/setting.component';
 export * from './setting/setting-lookup.component';
 export * from './setting/queue-message/queue-message.component';
 export * from './setting/kafka-connection-profile/kafka-connection-profile.component';
+export * from './setting/storage-connection/storage-connection.component';
 
 export * from './source-job/job/job.component';
 export * from './source-job/source-job.component';
@@ -55,3 +56,5 @@ export * from './users/users.component';
 export * from './welcome/welcome.component';
 
 export * from './document-converter/document-converter.component';
+
+export * from './notification-center/notification-center.component';

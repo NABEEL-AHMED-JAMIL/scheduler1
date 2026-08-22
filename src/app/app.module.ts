@@ -31,6 +31,7 @@ import {
     SearchEngineComponent,
     QueryEngineComponent,
     KafkaConnectionProfileComponent,
+    StorageConnectionComponent,
     LoginComponent,
     ObjectBrowserComponent,
     PdfHighlighterComponent,
@@ -49,7 +50,8 @@ import {
     TenantsComponent,
     UsersComponent,
     WelcomeComponent,
-    DocumentConverterComponent
+    DocumentConverterComponent,
+    NotificationCenterComponent
 } from './_component/index';
 import { ToastrModule } from 'ngx-toastr';
 
@@ -99,6 +101,7 @@ import { ToastrModule } from 'ngx-toastr';
         SearchEngineComponent,
         QueryEngineComponent,
         KafkaConnectionProfileComponent,
+        StorageConnectionComponent,
         LoginComponent,
         ObjectBrowserComponent,
         PdfHighlighterComponent,
@@ -117,7 +120,8 @@ import { ToastrModule } from 'ngx-toastr';
         TenantsComponent,
         UsersComponent,
         WelcomeComponent,
-        DocumentConverterComponent
+        DocumentConverterComponent,
+        NotificationCenterComponent
     ],
     providers: [
         { provide: HTTP_INTERCEPTORS, useClass: AuthInterceptor, multi: true }

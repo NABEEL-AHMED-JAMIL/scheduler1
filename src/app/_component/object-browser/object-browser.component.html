@@ -19,8 +19,8 @@
         <span class="help-text" *ngIf="!loadingBuckets && !buckets.length">
             <span class="glyphicon glyphicon-info-sign"></span>
             No buckets configured yet.
-            <a class="btn btn-sm btn-default" routerLink="/setting/lookup" [queryParams]="{ code: 'BUCKET_LIST' }" style="margin-left: 8px;">
-                <span class="glyphicon glyphicon-plus"></span> Add Bucket
+            <a class="btn btn-sm btn-default" routerLink="/setting/storageConnection" style="margin-left: 8px;">
+                <span class="glyphicon glyphicon-plus"></span> Add a connection
             </a>
         </span>
     </div>
@@ -70,7 +70,7 @@
 
         <span class="toolbar-spacer"></span>
 
-        <button type="button" class="btn btn-default btn-sm" (click)="showDirectoryCharts = !showDirectoryCharts">
+        <button type="button" class="btn btn-default btn-sm" (click)="toggleDirectoryCharts()">
             <span class="glyphicon" [ngClass]="showDirectoryCharts ? 'glyphicon-chevron-up' : 'glyphicon-stats'"></span>
             {{ showDirectoryCharts ? 'Hide' : 'Show' }} Folder Insights
         </button>
@@ -130,7 +130,7 @@
     </div>
 
     <div class="row row-equal bucket-browse-row">
-        <div class="bucket-table-col" [ngClass]="chatFile ? 'col-md-8' : 'col-md-12'">
+        <div class="bucket-table-col col-md-12">
             <div class="table-responsive scroll-table bucket-scroll" (scroll)="onTableScroll($event)">
                 <table class="table table-striped table-bordered table-hover table-modern bucket-object-table" style="font-size: 12px;">
                     <thead>
@@ -240,22 +240,62 @@
             </p>
         </div>
 
-        <div class="col-md-4 bucket-panel-col" *ngIf="chatFile">
+        <!-- Floating widget, not a grid column -- position: fixed takes it out of the row's
+             flow entirely, so the table above always stays full width whether or not chat is
+             open, and the chat itself overlays the page bottom-right like a typical chat app
+             instead of squeezing the table narrower. -->
+        <div class="chat-widget-panel" [class.chat-widget-minimized]="chatMinimized" *ngIf="chatFile">
             <div class="side-panel chat-panel">
                 <div class="side-panel-header">
-                    <span class="side-panel-title" [title]="chatFile.name">
+                    <span class="side-panel-title" [title]="chatFile.name" (click)="chatMinimized ? toggleChatMinimize() : null" [style.cursor]="chatMinimized ? 'pointer' : 'default'">
                         <span class="glyphicon glyphicon-flash ic-ai"></span>Chat
                     </span>
-                    <button type="button" class="close" (click)="closeChat()">&times;</button>
+                    <span class="side-panel-header-actions">
+                        <!-- Minimize keeps the conversation alive, just collapsed to this header bar
+                             (like an IDE panel) -- a fresh click re-expands it. Distinct from the "x",
+                             which ends the conversation for good and confirms first if there's anything to lose. -->
+                        <button type="button" class="close chat-minimize-btn" [title]="chatMinimized ? 'Expand' : 'Minimize'" (click)="toggleChatMinimize()">
+                            <span class="glyphicon" [ngClass]="chatMinimized ? 'glyphicon-chevron-up' : 'glyphicon-minus'"></span>
+                        </button>
+                        <button type="button" class="close" title="Close" (click)="requestCloseChat()">&times;</button>
+                    </span>
                 </div>
 
-                <div class="chat-attachment">
-                    <span class="glyphicon glyphicon-paperclip"></span>
-                    <div class="chat-attachment-info">
-                        <span class="chat-attachment-name" [title]="chatFile.name">{{ chatFile.name }}</span>
-                    </div>
+                <!-- Everything below the header bar disappears while minimized (chatFile/chatMessages
+                     stay intact in the component -- this is purely a display toggle), so the panel
+                     collapses down to just that bar instead of keeping its full fixed height empty. -->
+                <ng-container *ngIf="!chatMinimized">
+
+                <!-- One quiet meta row instead of two separate boxed chips (file + model used to
+                     each get their own bordered/background block) -- what file this is and which
+                     model's answering, both visible up top without hunting for the model picker
+                     buried below the input box at the bottom of the panel. -->
+                <div class="chat-header-meta">
+                    <span class="chat-header-file" [title]="chatFile.name">
+                        <span class="glyphicon glyphicon-paperclip"></span>{{ chatFile.name }}
+                    </span>
+                    <!-- Opens the file in the preview panel beside the chat. The two are
+                         independent, so reading the source no longer means abandoning the
+                         conversation about it. -->
+                    <button type="button" class="chat-header-view-btn" (click)="viewChatFile()"
+                        [disabled]="!chatFile" title="View this file">
+                        <span class="glyphicon glyphicon-eye-open"></span> View
+                    </button>
+                    <!-- Only configured AI Agents are offered here -- "Ollama Models" (Settings)
+                         is purely for pulling/managing what's installed locally, not a second
+                         source of what's selectable in chat. -->
+                    <select class="chat-header-model-select" [(ngModel)]="chatSelectedAgentId" [ngModelOptions]="{standalone: true}"
+                        [disabled]="loadingChatAgents || !chatAgents.length" title="Agent">
+                        <option *ngIf="loadingChatAgents" value="">Loading agents&hellip;</option>
+                        <option *ngIf="!loadingChatAgents && !chatAgents.length" value="">No AI Agents configured</option>
+                        <option *ngFor="let agent of chatAgents" [value]="agent.aiAgentId">{{ agent.agentName }} ({{ agent.provider }})</option>
+                    </select>
                 </div>
 
+                <div class="chat-truncation-notice" *ngIf="chatTruncated && !chatPreparing && !chatPrepareError">
+                    <span class="glyphicon glyphicon-info-sign"></span>
+                    This file is long -- answers use the first {{chatCharsUsed | number}} of {{chatTotalChars | number}} characters.
+                </div>
                 <div class="chat-messages" #chatMessagesEl>
                     <div class="chat-messages-empty" *ngIf="chatPreparing">
                         <span class="glyphicon glyphicon-refresh spin"></span>
@@ -279,11 +319,20 @@
                                 <span class="glyphicon glyphicon-copy"></span>
                             </button>
                         </div>
-                        <div class="chat-message-text chat-message-rich" *ngIf="message.html" [innerHTML]="message.html"></div>
-                        <span class="chat-message-text" *ngIf="!message.html">{{ message.text }}</span>
+                        <!-- role === 'assistant' always sets .html (possibly to an empty string, e.g. a
+                             reply that was only a downloadable file with no intro text) -- branch on role,
+                             not truthiness, so an empty-but-defined .html doesn't fall through to showing
+                             the raw, un-stripped message.text (which would still contain the export fence). -->
+                        <div class="chat-message-text chat-message-rich" *ngIf="message.role === 'assistant'" [innerHTML]="message.html"></div>
+                        <span class="chat-message-text" *ngIf="message.role !== 'assistant'">{{ message.text }}</span>
                         <div class="chat-message-file" *ngFor="let file of message.files">
                             <span class="glyphicon glyphicon-file"></span>
                             <span class="chat-message-file-name" [title]="file.filename">{{ file.filename }}</span>
+                            <button type="button" class="chat-message-file-btn" title="View this file"
+                                (click)="viewChatFileContent(file)">
+                                <span class="glyphicon glyphicon-eye-open"></span>
+                                View
+                            </button>
                             <button type="button" class="chat-message-file-btn" [disabled]="file.converting"
                                 [title]="file.converting ? 'Converting...' : 'Download'"
                                 (click)="downloadChatFile(file)">
@@ -317,12 +366,12 @@
                 <div class="chat-input-row">
                     <textarea class="form-control chat-input" rows="2" placeholder="Message" #chatInputEl
                         [(ngModel)]="chatDraft" [ngModelOptions]="{standalone: true}"
-                        [disabled]="chatPreparing || !!chatPrepareError || !chatSelectedModel"
+                        [disabled]="chatPreparing || !!chatPrepareError || !chatSelectedAgentId"
                         (keydown)="onChatInputKeydown($event)"></textarea>
                     <button type="button" class="btn btn-sm chat-mic-btn" *ngIf="chatSpeechSupported"
                         [ngClass]="{'chat-mic-btn-active': chatListening}"
                         [title]="chatListening ? 'Stop listening' : 'Speak your message'"
-                        [disabled]="chatPreparing || !!chatPrepareError || chatSending || !chatSelectedModel"
+                        [disabled]="chatPreparing || !!chatPrepareError || chatSending || !chatSelectedAgentId"
                         (click)="toggleChatMic()">
                         <span class="glyphicon glyphicon-headphones"></span>
                     </button>
@@ -332,22 +381,13 @@
                     <button type="button" class="btn btn-teal btn-sm chat-send-btn"
                         [ngClass]="{'chat-send-btn-stop': chatSending}"
                         [title]="chatSending ? 'Stop' : 'Send'"
-                        [disabled]="chatPreparing || !!chatPrepareError || (!chatSending && !chatSelectedModel)"
+                        [disabled]="chatPreparing || !!chatPrepareError || (!chatSending && !chatSelectedAgentId)"
                         (click)="chatSending ? stopChatMessage() : sendChatMessage()">
                         <span class="glyphicon" [ngClass]="chatSending ? 'glyphicon-stop' : 'glyphicon-arrow-right'"></span>
                     </button>
                 </div>
 
-                <div class="chat-model-row">
-                    <span class="glyphicon glyphicon-flash ic-ai"></span>
-                    <span class="chat-model-label">Model</span>
-                    <select class="chat-model-select" [(ngModel)]="chatSelectedModel" [ngModelOptions]="{standalone: true}"
-                        [disabled]="loadingChatModels || !chatModels.length">
-                        <option *ngIf="loadingChatModels" value="">Loading models&hellip;</option>
-                        <option *ngIf="!loadingChatModels && !chatModels.length" value="">No models installed</option>
-                        <option *ngFor="let model of chatModels" [value]="model.name">{{ model.name }}</option>
-                    </select>
-                </div>
+                </ng-container>
             </div>
         </div>
 
@@ -544,6 +584,8 @@
     </div>
 </div>
 
+<button type="button" data-toggle="modal" data-target="#objectPreviewModal" #openPreviewModal style="display: none;"></button>
+<button type="button" data-toggle="modal" data-target="#chatFilePreviewModal" #openChatFilePreviewModal style="display: none;"></button>
 <button type="button" data-toggle="modal" data-target="#leaveChatConfirmModal" #openLeaveChatModal style="display: none;"></button>
 
 <div class="modal fade" id="leaveChatConfirmModal" role="dialog">
@@ -558,7 +600,7 @@
             <div class="modal-body">
                 <p>
                     You're chatting about <strong>{{ chatFile?.name }}</strong>.
-                    Opening <strong>{{ pendingFileSwitch?.entry?.name }}</strong> will end this
+                    Opening <strong>{{ pendingFileSwitch?.name }}</strong> will end this
                     conversation<span *ngIf="chatSending"> and stop the reply that's still in progress</span>.
                 </p>
             </div>
@@ -566,6 +608,85 @@
                 <button type="button" class="btn btn-default" data-dismiss="modal" (click)="cancelLeaveChat()">Stay in chat</button>
                 <button type="button" class="btn btn-teal" data-dismiss="modal" (click)="confirmLeaveChat()">
                     <span class="glyphicon glyphicon-log-out"></span> Leave &amp; open
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<button type="button" data-toggle="modal" data-target="#closeChatConfirmModal" #openCloseChatModal style="display: none;"></button>
+
+<div class="modal fade" id="closeChatConfirmModal" role="dialog">
+    <div class="modal-dialog">
+        <div class="modal-content" style="border: none">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title">
+                    <span class="glyphicon glyphicon-flash ic-ai"></span> Close this chat?
+                </h4>
+            </div>
+            <div class="modal-body">
+                <p>
+                    This will end your conversation about <strong>{{ chatFile?.name }}</strong> and clear it
+                    <span *ngIf="chatSending">, stopping the reply that's still in progress</span>.
+                    Use the minimize button instead to keep it and come back later.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Stay in chat</button>
+                <button type="button" class="btn btn-danger" data-dismiss="modal" (click)="confirmCloseChat()">
+                    <span class="glyphicon glyphicon-remove"></span> Close &amp; clear
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="chatFilePreviewModal" role="dialog">
+    <div class="modal-dialog modal-lg" style="width: 90%; max-width: 1000px;">
+        <div class="modal-content" style="border: none;">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" (click)="closeChatFilePreview()">&times;</button>
+                <h4 class="modal-title" [title]="chatPreviewFile?.filename">
+                    <span class="glyphicon glyphicon-file file-icon"></span> {{ chatPreviewFile?.filename }}
+                </h4>
+            </div>
+            <div class="modal-body chat-file-preview-body">
+                <!-- xlsx/docx/pdf are produced by a server-side conversion, so what exists in the
+                     browser is the source the conversion runs on. Say so rather than implying
+                     this is the converted file. -->
+                <div class="help-text" *ngIf="chatPreviewIsPreConversion" style="margin-bottom: 12px;">
+                    <span class="glyphicon glyphicon-info-sign"></span>
+                    Showing the {{ chatPreviewSourceLabel }} content this file is built from &mdash;
+                    use Download to get the converted {{ chatPreviewTargetLabel }}.
+                </div>
+
+                <div *ngIf="chatPreviewKind === 'markdown' || chatPreviewKind === 'html'"
+                    class="md-preview" [innerHTML]="chatPreviewHtml"></div>
+
+                <div class="table-responsive" *ngIf="chatPreviewKind === 'table'">
+                    <table class="table table-bordered table-hover table-modern" style="font-size: 12px;">
+                        <thead>
+                            <tr>
+                                <th *ngFor="let cell of chatPreviewRows[0]">{{ cell }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr *ngFor="let row of chatPreviewRows.slice(1)">
+                                <td *ngFor="let cell of row">{{ cell }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <pre class="preview-text" *ngIf="chatPreviewKind === 'text'">{{ chatPreviewFile?.content }}</pre>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal" (click)="closeChatFilePreview()">Close</button>
+                <button type="button" class="btn btn-teal" [disabled]="chatPreviewFile?.converting"
+                    (click)="downloadChatFile(chatPreviewFile)">
+                    <span class="glyphicon" [ngClass]="chatPreviewFile?.converting ? 'glyphicon-refresh spin' : 'glyphicon-download-alt'"></span>
+                    {{ chatPreviewFile?.converting ? 'Converting...' : 'Download' }}
                 </button>
             </div>
         </div>

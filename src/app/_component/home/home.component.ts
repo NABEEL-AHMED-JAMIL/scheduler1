@@ -7,7 +7,8 @@ import { SpinnerService } from '@/_helpers';
 import { DatePipe } from '@angular/common'
 import {
   AlertService,
-  HomeService
+  HomeService,
+  NotificationService
 } from '@/_services';
 
 const BREAKDOWN_COLOR: { [status: string]: string } = {
@@ -90,6 +91,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     private alertService: AlertService,
     private spinnerService: SpinnerService,
     private homeService: HomeService,
+    public notificationService: NotificationService,
     private router: Router) { }
 
   ngOnInit() {

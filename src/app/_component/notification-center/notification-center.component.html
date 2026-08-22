@@ -1,0 +1,54 @@
+<nav class="breadcrumb-bar">
+    <a routerLink="/home">Home</a>
+    <span class="crumb-sep">/</span>
+    <span class="crumb-current">Notifications</span>
+</nav>
+
+<div class="toolbar">
+    <div class="notification-page-tabs">
+        <span [class.active]="!unreadOnly" (click)="setFilter(false)">All</span>
+        <span [class.active]="unreadOnly" (click)="setFilter(true)">Unread</span>
+    </div>
+    <span class="toolbar-spacer"></span>
+    <button type="button" class="btn btn-sm btn-default" (click)="load()">
+        <span class="glyphicon glyphicon-refresh"></span> Refresh
+    </button>
+    <button type="button" class="btn btn-sm btn-default" [disabled]="(notificationService.unreadCount$ | async) === 0" (click)="onMarkAllRead()">
+        <span class="glyphicon glyphicon-ok"></span> Mark all read
+    </button>
+</div>
+
+<div class="card-panel notification-page-panel">
+    <div class="notification-page-empty" *ngIf="notifications.length === 0">
+        <span class="glyphicon glyphicon-bell"></span>
+        <p>{{ unreadOnly ? 'No unread notifications.' : "You're all caught up." }}</p>
+    </div>
+
+    <div class="notification-page-list" *ngIf="notifications.length > 0">
+        <div class="notification-page-row" *ngFor="let notification of notifications"
+            [class.unread]="!notification.read" (click)="onRowClick(notification)">
+            <span class="notification-icon" [ngClass]="notificationService.iconClass(notification)">
+                <span class="glyphicon" [ngClass]="glyphClass(notification)"></span>
+            </span>
+            <div class="notification-page-row-main">
+                <div class="notification-page-row-top">
+                    <span class="notification-page-row-title">
+                        <span class="notification-unread-dot" *ngIf="!notification.read"></span>{{ notification.title }}
+                    </span>
+                </div>
+                <p class="notification-page-row-msg" *ngIf="notification.message">{{ notification.message }}</p>
+                <div class="notification-page-row-meta">
+                    <span>{{ notification.dateCreated | date:'MMM d, y, h:mm a' }}</span>
+                    <a *ngIf="notification.linkUrl" href="javascript:void(0);">Open &rarr;</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="notification-pager" *ngIf="totalPages > 1">
+    <span [class.disabled]="currentPage === 1" (click)="goToPage(currentPage - 1)">&lsaquo;</span>
+    <span *ngFor="let page of [].constructor(totalPages); let i = index"
+        [class.active]="currentPage === i + 1" (click)="goToPage(i + 1)">{{ i + 1 }}</span>
+    <span [class.disabled]="currentPage === totalPages" (click)="goToPage(currentPage + 1)">&rsaquo;</span>
+</div>

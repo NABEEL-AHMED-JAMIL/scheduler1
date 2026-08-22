@@ -2,7 +2,7 @@
     <div class="container-fluid">
         <div class="navbar-header">
             <a routerLink="/home" class="navbar-brand">
-                <span class="glyphicon glyphicon-plane"></span> ETL 2023
+                <span class="glyphicon glyphicon-plane"></span> ETL
             </a>
         </div>
 
@@ -23,7 +23,7 @@
             </li>
             <li class="dropdown" routerLinkActive="active">
                 <a href="javascript:void(0);" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">
-                    <span class="glyphicon glyphicon-wrench"></span> Tools <span class="caret"></span>
+                    <span class="glyphicon glyphicon-wrench"></span> Productivity Tools <span class="caret"></span>
                 </a>
                 <ul class="dropdown-menu">
                     <li *ngIf="authService.currentUser?.userRole === 'PLATFORM_ADMIN'">
@@ -73,12 +73,56 @@
                     <li *ngIf="authService.currentUser?.userRole === 'PLATFORM_ADMIN' || authService.currentUser?.userRole === 'TENANT_ADMIN'">
                         <a routerLink="/setting/lookup" routerLinkActive="active"><span class="glyphicon glyphicon-list-alt"></span> Lookup</a>
                     </li>
+                    <li *ngIf="authService.currentUser?.userRole === 'PLATFORM_ADMIN' || authService.currentUser?.userRole === 'TENANT_ADMIN'">
+                        <a routerLink="/setting/storageConnection" routerLinkActive="active"><span class="glyphicon glyphicon-hdd"></span> Storage Connections</a>
+                    </li>
                     <li><a routerLink="/setting/queueMessage"><span class="glyphicon glyphicon-envelope"></span> Q-Message</a></li>
                 </ul>
             </li>
         </ul>
 
         <ul class="nav navbar-nav navbar-right">
+            <li class="dropdown notification-dropdown">
+                <a href="javascript:void(0);" class="dropdown-toggle notification-bell-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false" title="Notifications">
+                    <span class="glyphicon glyphicon-bell"></span>
+                    <span class="notification-badge" *ngIf="unreadCount > 0">{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
+                </a>
+                <ul class="dropdown-menu dropdown-menu-right notification-menu">
+                    <li class="notification-menu-head">
+                        <span>Notifications</span>
+                        <button type="button" class="notification-mark-all" *ngIf="unreadCount > 0" (click)="onMarkAllRead($event)">Mark all read</button>
+                    </li>
+                    <li class="notification-menu-empty" *ngIf="recentNotifications.length === 0">
+                        <span class="glyphicon glyphicon-bell"></span>
+                        <p>You're all caught up.</p>
+                    </li>
+                    <li class="notification-scroll" *ngIf="recentNotifications.length">
+                        <div class="notification-row" *ngFor="let notification of recentNotifications"
+                            [class.unread]="!notification.read" (click)="onNotificationClick(notification)">
+                            <span class="notification-icon" [ngClass]="notificationService.iconClass(notification)">
+                                <span class="glyphicon"
+                                    [ngClass]="{
+                                        'glyphicon-ok': notificationService.iconClass(notification) === 'ok',
+                                        'glyphicon-remove': notificationService.iconClass(notification) === 'err',
+                                        'glyphicon-warning-sign': notificationService.iconClass(notification) === 'warn',
+                                        'glyphicon-user': notificationService.iconClass(notification) === 'task',
+                                        'glyphicon-info-sign': notificationService.iconClass(notification) === 'info'
+                                    }"></span>
+                            </span>
+                            <span class="notification-body">
+                                <span class="notification-title">
+                                    <span class="notification-unread-dot" *ngIf="!notification.read"></span>{{ notification.title }}
+                                </span>
+                                <span class="notification-msg" *ngIf="notification.message">{{ notification.message }}</span>
+                                <span class="notification-time">{{ notificationService.timeAgo(notification.dateCreated) }}</span>
+                            </span>
+                        </div>
+                    </li>
+                    <li class="notification-menu-foot">
+                        <a routerLink="/notifications">View all notifications</a>
+                    </li>
+                </ul>
+            </li>
             <li class="dropdown">
                 <a href="javascript:void(0);" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">
                     <span class="nav-avatar nav-avatar-initials">{{ userInitials }}</span> {{ authService.currentUser?.fullName }} <span class="caret"></span>

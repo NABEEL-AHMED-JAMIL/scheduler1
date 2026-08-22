@@ -505,7 +505,7 @@ td {
   overflow: auto;
   background: #fff;
 
-  font-family: 'Montserrat', 'Lato', 'Open Sans', 'Helvetica Neue', Helvetica, Calibri, Arial, sans-serif;
+  font-family: 'IBM Plex Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
   color: #6b7381;
   background: #f2f2f2;
 }
@@ -712,7 +712,7 @@ body.jw-modal-open {
 .qr_name {
   font-size: 20px;
   font-weight: 800;
-  font-family: 'Courier New', Courier, monospace;
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Menlo, Consolas, monospace;
   text-align: center;
   margin-left: 20px;
 }
@@ -783,15 +783,19 @@ a {
 @brand-teal: #4f46e5;
 @brand-teal-dark: #3730a3;
 @brand-accent: #7c3aed;
-@brand-slate: #2f3a45;
-@ink: #36424d;
-@muted: #7b8794;
-@line: #e6eaee;
+// Deeper and cooler than the old #2f3a45 -- the nav is a persistent frame, so it reads
+// better as a quiet dark edge than as another mid-grey competing with the content.
+@brand-slate: #1f2733;
+// Neutrals carry a slight indigo bias rather than sitting on pure grey, so they read as
+// chosen alongside the brand colour instead of inherited from the framework.
+@ink: #1f2532;
+@muted: #6b7385;
+@line: #e4e6ef;
 @surface: #ffffff;
-@page-bg: #f4f6f8;
+@page-bg: #f4f5fa;
 
 body {
-  font-family: 'Montserrat', 'Lato', 'Open Sans', 'Helvetica Neue', Helvetica, Calibri, Arial, sans-serif;
+  font-family: 'IBM Plex Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
   font-size: 13px;
   line-height: 1.5;
   color: @ink;
@@ -938,14 +942,14 @@ body {
 }
 
 .table-modern > thead > tr > th {
-  background: #eef0fb;
-  color: @brand-teal-dark;
-  font-weight: 700;
-  font-size: 11px;
-  letter-spacing: 0.5px;
+  background: #f7f8fc;
+  color: @muted;
+  font-weight: 600;
+  font-size: 10.5px;
+  letter-spacing: 0.7px;
   text-transform: uppercase;
-  border-bottom: 2px solid @brand-teal;
-  padding: 11px 12px;
+  border-bottom: 1px solid @line;
+  padding: 10px 12px;
   white-space: nowrap;
   vertical-align: middle;
 }
@@ -1083,7 +1087,7 @@ body {
   text-align: left;
   white-space: pre-wrap;
   word-break: break-word;
-  font-family: 'Courier New', Courier, monospace;
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Menlo, Consolas, monospace;
   font-size: 11px;
   line-height: 1.4;
   font-weight: 600;
@@ -1175,7 +1179,7 @@ body {
   overflow: auto;
   white-space: pre-wrap;
   word-break: break-word;
-  font-family: 'Courier New', Courier, monospace;
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Menlo, Consolas, monospace;
   font-size: 12px;
   line-height: 1.5;
   font-weight: 600;
@@ -1221,15 +1225,6 @@ body {
 .scroll-table {
   max-height: 850px;
   overflow-y: auto;
-}
-
-// A row-level "..." dropdown menu can render taller than the space between the
-// button and the table edge, and gets visually clipped by overflow-y above --
-// this JS-toggled class (see index.html show.bs.dropdown/hidden.bs.dropdown
-// handlers) lets the open menu escape that clipping without losing the
-// scrollable/sticky-header behavior the rest of the time.
-.scroll-table.dropdown-open {
-  overflow: visible;
 }
 
 .scroll-table > .table-modern {
@@ -1713,6 +1708,362 @@ body {
   background: @brand-teal;
 }
 
+.notification-bell-toggle {
+  position: relative;
+  // The plain nav-link box this inherits is flush with the navbar's top edge but shorter
+  // than the navbar itself, so symmetric top/bottom padding left the bell sitting a few
+  // pixels above true center (the user avatar toggle centers correctly because it isn't
+  // built from this same nav-link box). Shifting padding from bottom to top re-centers it
+  // without changing the toggle's overall hitbox size or its dropdown's position.
+  padding-top: 19px !important;
+  padding-bottom: 11px !important;
+  padding-right: 14px !important;
+}
+
+.notification-bell-toggle .glyphicon-bell {
+  font-size: 15px;
+}
+
+.notification-badge {
+  position: absolute;
+  top: 6px;
+  right: 2px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: @brand-secondary;
+  color: #fff;
+  font-size: 9.5px;
+  font-weight: 800;
+  line-height: 15px;
+  text-align: center;
+  border: 2px solid @brand-slate;
+}
+
+.notification-menu {
+  min-width: 340px;
+  max-width: 380px;
+  padding: 0 0 6px;
+  overflow: hidden;
+}
+
+.notification-menu-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px 10px;
+  border-bottom: 1px solid @line;
+  font-weight: 700;
+  font-size: 13.5px;
+  color: @ink;
+}
+
+.notification-mark-all {
+  font-size: 11px;
+  font-weight: 700;
+  color: @brand-teal;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.notification-menu-empty {
+  padding: 30px 16px;
+  text-align: center;
+  color: @muted;
+}
+
+.notification-menu-empty .glyphicon {
+  font-size: 22px;
+  color: @line;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.notification-menu-empty p {
+  margin: 0;
+  font-size: 12.5px;
+}
+
+.notification-scroll {
+  max-height: 50vh;
+  overflow-y: auto;
+  min-height: 0;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: @brand-teal @page-bg;
+}
+
+.notification-scroll::-webkit-scrollbar {
+  width: 7px;
+}
+
+.notification-scroll::-webkit-scrollbar-track {
+  background: @page-bg;
+}
+
+.notification-scroll::-webkit-scrollbar-thumb {
+  background: @brand-teal;
+  border-radius: 4px;
+}
+
+.notification-row {
+  display: flex;
+  gap: 10px;
+  padding: 9px 16px;
+  border-left: 3px solid transparent;
+  cursor: pointer;
+}
+
+.notification-row:hover {
+  background: #f1f0fd;
+}
+
+.notification-row.unread {
+  background: rgba(79, 70, 229, 0.06);
+  border-left-color: @brand-teal;
+}
+
+.notification-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.notification-icon .glyphicon {
+  font-size: 12px;
+}
+
+.notification-icon.ok {
+  background: #e8f6ee;
+  color: #1d8a4a;
+}
+
+.notification-icon.err {
+  background: #fdecee;
+  color: #dc3545;
+}
+
+.notification-icon.warn {
+  background: #fff6df;
+  color: #8a6300;
+}
+
+.notification-icon.info {
+  background: #e6f7f9;
+  color: #17a2b8;
+}
+
+.notification-icon.task {
+  background: #eef0fb;
+  color: @brand-teal-dark;
+}
+
+.notification-body {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.notification-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: @ink;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.notification-unread-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: @brand-teal;
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+.notification-msg {
+  font-size: 12px;
+  color: @muted;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.notification-time {
+  font-size: 10.5px;
+  color: @muted;
+}
+
+.notification-menu-foot {
+  padding: 10px 16px 2px;
+  text-align: center;
+  border-top: 1px solid @line;
+}
+
+.notification-menu-foot a {
+  font-size: 12px;
+  font-weight: 700;
+  color: @brand-teal-dark;
+}
+
+.notification-page-tabs {
+  display: flex;
+  gap: 4px;
+  background: #f1f0fd;
+  padding: 4px;
+  border-radius: 8px;
+}
+
+.notification-page-tabs span {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 6px;
+  color: @muted;
+  cursor: pointer;
+}
+
+.notification-page-tabs span.active {
+  background: @surface;
+  color: @brand-teal-dark;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.notification-page-panel {
+  padding: 0;
+  overflow: hidden;
+}
+
+.notification-page-empty {
+  padding: 50px 20px;
+  text-align: center;
+  color: @muted;
+}
+
+.notification-page-empty .glyphicon {
+  font-size: 28px;
+  color: @line;
+  display: block;
+  margin-bottom: 10px;
+}
+
+.notification-page-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.notification-page-row {
+  display: flex;
+  gap: 13px;
+  align-items: flex-start;
+  padding: 14px 18px;
+  border-bottom: 1px solid @line;
+  border-left: 3px solid transparent;
+  cursor: pointer;
+}
+
+.notification-page-row:last-child {
+  border-bottom: none;
+}
+
+.notification-page-row:hover {
+  background: #f9f9fd;
+}
+
+.notification-page-row.unread {
+  border-left-color: @brand-teal;
+  background: rgba(79, 70, 229, 0.03);
+}
+
+.notification-page-row .notification-icon {
+  width: 34px;
+  height: 34px;
+}
+
+.notification-page-row .notification-icon .glyphicon {
+  font-size: 14px;
+}
+
+.notification-page-row-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.notification-page-row-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: @ink;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.notification-page-row-msg {
+  font-size: 12.5px;
+  color: @muted;
+  margin: 4px 0 6px;
+}
+
+.notification-page-row-meta {
+  font-size: 11px;
+  color: @muted;
+  display: flex;
+  gap: 16px;
+}
+
+.notification-page-row-meta a {
+  color: @brand-teal-dark;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.notification-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 18px 0;
+  font-size: 12px;
+  color: @muted;
+}
+
+.notification-pager span {
+  width: 26px;
+  height: 26px;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.notification-pager span:hover {
+  background: #f1f0fd;
+}
+
+.notification-pager span.active {
+  background: @brand-teal;
+  color: #fff;
+  font-weight: 700;
+}
+
+.notification-pager span.disabled {
+  opacity: 0.4;
+  cursor: default;
+  pointer-events: none;
+}
+
 .help-text {
   display: block;
   margin-top: 6px;
@@ -1756,7 +2107,7 @@ body {
 }
 
 .code-input {
-  font-family: 'Courier New', Courier, monospace;
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Menlo, Consolas, monospace;
   font-size: 12px;
   line-height: 1.5;
   font-weight: 600;
@@ -2012,6 +2363,7 @@ body {
 .kpi-tile.kpi-running   .kpi-icon { background: #fff4e0; color: #b5730a; }
 .kpi-tile.kpi-completed .kpi-icon { background: #e3f6e9; color: #1d7a3f; }
 .kpi-tile.kpi-failed    .kpi-icon { background: #fde4e4; color: #c0392b; }
+.kpi-tile.kpi-unread    .kpi-icon { background: #eef0fb; color: @brand-teal-dark; }
 
 .home-chart-tall {
   height: 240px;
@@ -2277,10 +2629,25 @@ button.pill-icon {
 .card-panel {
   background: @surface;
   border: 1px solid @line;
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 18px;
   margin-bottom: 18px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 2px rgba(31, 37, 50, 0.04), 0 6px 18px -10px rgba(31, 37, 50, 0.14);
+}
+
+// In-table counterpart to .empty-state: a filtered table still needs its header and column
+// widths, so the "nothing matched" message goes in a full-width cell rather than replacing
+// the table with the block-level empty state used on genuinely empty pages.
+.table-empty-cell {
+  text-align: center;
+  padding: 28px 16px !important;
+  color: @muted;
+  font-size: 12.5px;
+}
+
+.table-empty-cell .glyphicon {
+  margin-right: 6px;
+  color: @line;
 }
 
 .empty-state {
@@ -2452,7 +2819,7 @@ button.pill-icon {
 }
 
 .lookup-value-textarea {
-  font-family: 'Courier New', Courier, monospace;
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Menlo, Consolas, monospace;
   font-size: 12px;
   resize: vertical;
 }
@@ -2586,6 +2953,14 @@ button.pill-icon {
 
 .modal-header .modal-title {
   color: #fff;
+}
+
+// .help-text's own muted-gray color (meant for light backgrounds) would otherwise win over
+// the white set above -- e.g. the "-- ServiceName (topic)" subtitle in the Link Source Task
+// modal's title, currently unreadable against the teal header. Should read white like the
+// rest of the title around it, just lighter-weight.
+.modal-header .help-text {
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .modal-header .close {
@@ -2779,6 +3154,41 @@ button.pill-icon {
   margin-right: 6px;
 }
 
+.side-panel-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+
+// Bootstrap's default .close (21px, float: right, extra text-shadow) is sized for a single
+// lone dismiss glyph -- fine everywhere else it's used solo, but paired with a minimize button
+// here it read as oversized and mismatched next to the rest of the app's compact icon buttons.
+// Scoped to just this header group so it doesn't change .close anywhere else.
+.side-panel-header-actions .close {
+  float: none;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  line-height: 1;
+  text-shadow: none;
+  border-radius: 4px;
+  opacity: 0.45;
+}
+
+.side-panel-header-actions .close:hover,
+.side-panel-header-actions .close:focus {
+  opacity: 1;
+  background: #f1f0fd;
+}
+
+.side-panel-header-actions .close .glyphicon {
+  font-size: 11px;
+}
+
 // Chat mode of the same side panel used for object preview -- an attached-file reference
 // chip up top (so it's always clear which file the conversation is about), a scrolling
 // message list, and a message box pinned to the bottom.
@@ -2787,87 +3197,172 @@ button.pill-icon {
   flex-direction: column;
 }
 
-.chat-attachment {
+@keyframes chat-widget-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// Floating chat-app-style widget anchored to the bottom-right of the viewport (position:
+// fixed, so it overlays the page instead of living in the row grid) -- the file table above
+// always stays full width now, whether or not chat is open, instead of getting squeezed into
+// a narrower column. Plays a short pop-in on open since the element is freshly created each
+// time *ngIf turns true.
+.chat-widget-panel {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  width: 520px;
+  max-width: calc(100vw - 32px);
+  height: 640px;
+  max-height: calc(100vh - 48px);
+  z-index: 2000;
+  animation: chat-widget-pop-in 0.2s ease-out;
+}
+
+.chat-widget-panel .side-panel {
+  height: 100%;
+  min-height: 0;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.22);
+}
+
+// Minimized: collapse the fixed height down to just the header bar's natural height (IDE-panel
+// style) -- everything below it is already removed from the DOM by *ngIf, this just drops the
+// height/padding/border that would otherwise leave an empty gap under the header.
+.chat-widget-panel.chat-widget-minimized {
+  height: auto;
+}
+
+.chat-widget-panel.chat-widget-minimized .side-panel {
+  height: auto;
+}
+
+.chat-widget-panel.chat-widget-minimized .side-panel-header {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+@media (max-width: 480px) {
+  .chat-widget-panel {
+    right: 8px;
+    bottom: 8px;
+    left: 8px;
+    width: auto;
+    max-width: none;
+  }
+}
+
+// One quiet row instead of two separate boxed chips -- which file this chat is grounded in,
+// and which model's answering, both readable at a glance without a heavy chip background
+// competing with the message bubbles just below. Plain text + a borderless select, not a card.
+.chat-header-meta {
   display: flex;
-  align-items: flex-start;
-  gap: 6px;
+  align-items: center;
+  gap: 10px;
   margin-bottom: 12px;
-  padding: 6px 10px;
-  background: #f4f3fd;
-  border: 1px solid #dcd9f7;
-  border-radius: 6px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed @line;
   font-size: 12px;
-  color: @ink;
+  color: @muted;
 }
 
-.chat-attachment .glyphicon-paperclip {
-  color: #6a3bbf;
-  margin-top: 2px;
-}
-
-.chat-attachment-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+.chat-header-file {
+  flex: 1 1 auto;
   min-width: 0;
-}
-
-.chat-attachment-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 600;
+  color: @ink;
 }
 
-// Model picker for the file chat -- sourced from the same Ollama connection Settings >
-// Ollama Models already manages, so whatever's installed there shows up here too. Styled
-// as a chip (same shape/weight as .chat-attachment above it) instead of a bare native
-// select floating on its own, using the AI-magenta family so it visually reads as "this
-// picks the AI", not just a generic form control.
-.chat-model-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 10px;
-  padding: 5px 10px;
-  background: #fdf1f7;
-  border: 1px solid #f6c6dc;
-  border-radius: 6px;
-  font-size: 12px;
+.chat-header-file .glyphicon-paperclip {
+  color: #6a3bbf;
+  margin-right: 4px;
 }
 
-.chat-model-row .ic-ai {
-  color: #be185d;
+// Sits between the filename and the agent picker; styled as a quiet text action rather than
+// a button so the header stays a single calm row.
+.chat-header-view-btn {
   flex: 0 0 auto;
+  margin-left: auto;
+  margin-right: 8px;
+  padding: 2px 6px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: @brand-teal;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
 }
 
-.chat-model-label {
+.chat-header-view-btn:hover:not(:disabled) {
+  background: #eef0fb;
+}
+
+.chat-header-view-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.chat-header-view-btn .glyphicon {
+  font-size: 11px;
+  margin-right: 3px;
+}
+
+.chat-header-model-select {
   flex: 0 0 auto;
-  color: @muted;
-}
-
-.chat-model-select {
-  flex: 1 1 auto;
-  min-width: 0;
+  max-width: 45%;
   font-size: 12px;
   font-weight: 600;
   padding: 2px 4px;
   border: none;
   border-radius: 4px;
-  color: @ink;
+  color: #be185d;
   background: transparent;
   cursor: pointer;
+  text-align: right;
+  text-overflow: ellipsis;
 }
 
-.chat-model-select:focus,
-.chat-model-select:hover:not(:disabled) {
-  background: #fff;
+.chat-header-model-select:focus,
+.chat-header-model-select:hover:not(:disabled) {
+  background: #fdf1f7;
   outline: none;
 }
 
-.chat-model-select:disabled {
+.chat-header-model-select:disabled {
   color: @muted;
   cursor: default;
+}
+
+// Sits above the message list when only part of a long file reaches the model, so the
+// limitation is visible before the first question rather than implied by a thin answer.
+.chat-truncation-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0 12px 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #fff6df;
+  border: 1px solid #f3e2b8;
+  color: #8a6300;
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.chat-truncation-notice .glyphicon {
+  font-size: 12px;
+  margin-top: 1px;
 }
 
 .chat-messages {
@@ -3426,7 +3921,7 @@ button.pill-icon {
   border: 1px solid @line;
   border-radius: 6px;
   padding: 10px;
-  font-family: 'Courier New', Courier, monospace;
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Menlo, Consolas, monospace;
   font-size: 12px;
   line-height: 1.5;
   color: @ink;
@@ -4026,7 +4521,7 @@ button.pill-icon {
   color: #d7dee6;
   border-radius: 6px;
   padding: 12px 14px;
-  font-family: 'Courier New', Courier, monospace;
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Menlo, Consolas, monospace;
   font-size: 12px;
   line-height: 1.6;
 }
@@ -4505,7 +5000,7 @@ button.pill-icon {
   border: 1px solid @line;
   border-radius: 4px;
   color: @ink;
-  font-family: 'Courier New', Courier, monospace;
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Menlo, Consolas, monospace;
   font-size: 12px;
   line-height: 1.45;
   white-space: pre-wrap;
@@ -4795,4 +5290,92 @@ tr.expand-row td {
   white-space: pre-wrap;
   word-break: break-word;
   margin: 0;
+}
+
+// IBM Plex Sans ships proportional figures by default, which makes stacked counts and file
+// sizes in tables visibly ragged. Tabular figures align them without a monospace face.
+.table-modern > tbody > tr > td,
+.kpi-value,
+.mini-kpi-value,
+.stat-num {
+  font-variant-numeric: tabular-nums;
+}
+
+// Keyboard focus was relying on the browser default, which Bootstrap 3 partly suppresses.
+.btn:focus-visible,
+a:focus-visible,
+select:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid @brand-teal;
+  outline-offset: 1px;
+}
+
+
+// <code> is used throughout for bucket names, topics, model ids and paths, but was never
+// styled here -- it fell through to Bootstrap's own Menlo/Courier stack, so the mono face
+// the rest of the theme uses never actually applied to it.
+code,
+kbd,
+pre,
+samp {
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Menlo, Consolas, monospace;
+}
+
+code {
+  font-size: 12px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #f2f3f9;
+  border: 1px solid @line;
+  color: @brand-teal-dark;
+}
+
+
+// Configuration Tags: a key the pipeline actually reads (bucket / bucket_name /
+// input_folder / output_folder) picks up the mono face and brand colour, so a recognised
+// tag is distinguishable from a free-form one at a glance -- a typo in these fails
+// silently at run time rather than on save, so it is worth catching while typing.
+.tag-key-input.tag-key-storage {
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-weight: 500;
+  color: @brand-teal-dark;
+  background: #f2f3fc;
+  border-color: #c3c2f0;
+}
+
+.tag-key-input.tag-key-storage:focus {
+  border-color: @brand-teal;
+  background: @surface;
+}
+
+.tag-value-storage {
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+
+.chat-file-preview-body {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.chat-file-preview-body .preview-text {
+  margin: 0;
+  max-height: none;
+}
+
+
+// Sits inline in the Bucket Name label, so it reads as an aid to that field rather than a
+// separate control competing with Save.
+.discover-buckets-btn {
+  padding: 0 0 0 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  vertical-align: baseline;
+}
+
+.discover-buckets-btn .glyphicon {
+  font-size: 10.5px;
+  margin-right: 3px;
 }

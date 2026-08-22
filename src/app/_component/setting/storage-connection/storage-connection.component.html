@@ -1,0 +1,387 @@
+<nav class="breadcrumb-bar">
+    <a routerLink="/home">Home</a>
+    <span class="crumb-sep">/</span>
+    <span class="crumb-current">Storage Connections</span>
+</nav>
+
+<div class="kpi-row admin-summary-row" *ngIf="connections.length">
+    <div class="kpi-tile kpi-total">
+        <span class="kpi-icon"><span class="glyphicon glyphicon-hdd"></span></span>
+        <span>
+            <span class="kpi-value">{{filteredConnections.length}}</span>
+            <span class="kpi-label">Connections</span>
+        </span>
+    </div>
+    <div class="kpi-tile kpi-active">
+        <span class="kpi-icon"><span class="glyphicon glyphicon-ok-circle"></span></span>
+        <span>
+            <span class="kpi-value">{{activeCount}}</span>
+            <span class="kpi-label">Active</span>
+        </span>
+    </div>
+    <div class="kpi-tile kpi-completed">
+        <span class="kpi-icon"><span class="glyphicon glyphicon-flash"></span></span>
+        <span>
+            <span class="kpi-value">{{verifiedCount}}</span>
+            <span class="kpi-label">Tested OK</span>
+        </span>
+    </div>
+</div>
+
+<div class="toolbar">
+    <div class="form-group" style="margin-bottom: 0;">
+        <label for="searchConnection" class="control-label">Storage Connections ({{filteredConnections.length}} / {{connections.length}})</label>
+        <input type="text" id="searchConnection" class="form-control input-sm" style="width: 220px;"
+            placeholder="Search name, alias, bucket or host" [(ngModel)]="searchConnection"/>
+    </div>
+    <div class="form-group" style="margin-bottom: 0;">
+        <label for="filterProvider" class="control-label">Provider</label>
+        <select id="filterProvider" class="form-control input-sm" style="width: 150px;" [(ngModel)]="filterProvider">
+            <option value="">All Providers</option>
+            <option *ngFor="let p of providers" [value]="p.value">{{p.label}}</option>
+        </select>
+    </div>
+    <button type="button" class="btn btn-sm btn-default" [disabled]="!hasActiveFilters" (click)="clearFilters()" title="Clear all filters">
+        <span class="glyphicon glyphicon-remove"></span> Clear
+    </button>
+    <span class="toolbar-spacer"></span>
+    <button type="button" class="btn btn-sm btn-default" (click)="fetchAllConnections()">
+        <span class="glyphicon glyphicon-refresh"></span> Refresh
+    </button>
+    <button type="button" class="btn btn-sm btn-teal" (click)="openAddConnection()" data-toggle="modal" data-target="#storageConnectionModal">
+        <span class="glyphicon glyphicon-plus"></span> Add Connection
+    </button>
+</div>
+
+<span class="help-text" style="margin-bottom: 10px;">
+    <span class="glyphicon glyphicon-info-sign"></span>
+    Connect an AWS S3 bucket, Azure Blob container, MinIO bucket, or an FTP/FTPS directory.
+    Each connection shows up as a selectable source in Object Browser. Credentials are stored
+    encrypted and are never sent back to the browser once saved.
+</span>
+
+<div class="empty-state" *ngIf="!connections.length">
+    <span class="glyphicon glyphicon-hdd empty-state-icon"></span>
+    <div class="empty-state-title">No storage connections yet</div>
+    <div class="empty-state-text">
+        Add one to browse an S3 bucket, Azure container, MinIO bucket, or FTP/FTPS server from Object Browser.
+    </div>
+</div>
+
+<div class="table-responsive scroll-table" *ngIf="connections.length">
+    <table class="table table-striped table-bordered table-hover table-modern" style="font-size: 12px;">
+        <thead>
+            <tr>
+                <th style="width: 4%;"># No</th>
+                <th>Name</th>
+                <th>Alias</th>
+                <th>Provider</th>
+                <th>Target</th>
+                <th class="text-center">Credentials</th>
+                <th class="text-center">Last Test</th>
+                <th class="text-center">Status</th>
+                <th class="text-center" style="width: 170px; white-space: nowrap;">Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr *ngFor="let connection of filteredConnections">
+                <td>{{connection.storageConnectionId}}</td>
+                <td>
+                    {{connection.connectionName}}
+                    <div class="help-text" *ngIf="connection.description" style="margin: 0;">{{connection.description}}</div>
+                </td>
+                <td><code>{{connection.alias}}</code></td>
+                <td><span class="pill pill-indigo">{{providerLabel(connection.provider)}}</span></td>
+                <td><code>{{targetOf(connection)}}</code></td>
+                <td class="text-center">
+                    <span class="pill"
+                        [ngClass]="(connection.secretKeyConfigured || connection.passwordConfigured || connection.azureConnectionStringConfigured) ? 'pill-success' : 'pill-warning'">
+                        {{ (connection.secretKeyConfigured || connection.passwordConfigured || connection.azureConnectionStringConfigured) ? 'Stored' : 'Not set' }}
+                    </span>
+                </td>
+                <td class="text-center">
+                    <span class="pill" [ngClass]="{
+                        'pill-success': connection.connectionStatus === 'SUCCESS',
+                        'pill-danger': connection.connectionStatus === 'FAILED',
+                        'pill-default': connection.connectionStatus === 'UNTESTED'
+                    }" [title]="connection.lastTestMessage || 'Never tested'">
+                        {{connection.connectionStatus === 'SUCCESS' ? 'OK' : (connection.connectionStatus === 'FAILED' ? 'Failed' : 'Untested')}}
+                    </span>
+                </td>
+                <td class="text-center">
+                    <span class="pill" [ngClass]="{
+                        'pill-danger': connection.status === 'Delete',
+                        'pill-warning': connection.status === 'Inactive',
+                        'pill-success': connection.status === 'Active'
+                    }">{{connection.status}}</span>
+                </td>
+                <td class="text-center">
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button type="button" class="btn btn-default btn-icon ic-edit" title="Edit"
+                            (click)="openEditConnection(connection)" data-toggle="modal" data-target="#storageConnectionModal">
+                            <span class="glyphicon glyphicon-edit"></span>
+                        </button>
+                        <button type="button" class="btn btn-default btn-icon ic-ai" title="Test this connection"
+                            [disabled]="testingId === connection.storageConnectionId"
+                            (click)="testConnection(connection)">
+                            <span class="glyphicon" [ngClass]="testingId === connection.storageConnectionId ? 'glyphicon-refresh spin' : 'glyphicon-flash'"></span>
+                        </button>
+                        <div class="dropdown" style="display: inline-block;">
+                            <button type="button" class="btn btn-default btn-icon ic-more" data-toggle="dropdown" title="More actions">
+                                <span class="glyphicon glyphicon-option-vertical"></span>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-right">
+                                <li>
+                                    <a href="javascript:void(0);"
+                                        data-toggle="modal" data-target="#deleteStorageConnectionModal"
+                                        (click)="confirmDeleteConnection(connection)">
+                                        <span class="glyphicon glyphicon-trash"></span> Delete
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="modal fade" id="storageConnectionModal" role="dialog" style="top: 40px;">
+    <div class="modal-dialog" style="width: 680px;">
+        <div class="modal-content" *ngIf="connectionForm">
+            <div class="modal-header">
+                <button type="button" #closeConnectionModal class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title">{{editingConnection ? 'Edit Storage Connection' : 'Add Storage Connection'}}</h4>
+            </div>
+            <form [formGroup]="connectionForm" (ngSubmit)="saveConnection()">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group" [ngClass]="{ 'has-error': submitted && f.connectionName.errors }">
+                                <label class="control-label" for="connectionName">Connection Name</label>
+                                <input type="text" class="form-control" formControlName="connectionName" placeholder="e.g. Prod S3 Archive" />
+                                <div *ngIf="submitted && f.connectionName.errors" class="text-danger">Connection Name is required</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group" [ngClass]="{ 'has-error': submitted && f.alias.errors }">
+                                <label class="control-label" for="alias">Alias</label>
+                                <input type="text" class="form-control" formControlName="alias" placeholder="e.g. prod-archive" />
+                                <span class="help-text" style="display: block; margin-top: 4px;">
+                                    The stable id used everywhere else in the app (jobs, transcripts, chat). Letters, numbers, dot, dash, underscore.
+                                </span>
+                                <div *ngIf="submitted && f.alias.errors" class="text-danger">Alias is required</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="control-label" for="provider">Provider</label>
+                                <select class="form-control" formControlName="provider" (change)="onProviderChange()">
+                                    <option *ngFor="let p of providers" [value]="p.value">{{p.label}}</option>
+                                </select>
+                                <span class="help-text" style="display: block; margin-top: 4px;">
+                                    <span class="glyphicon glyphicon-info-sign"></span> {{providerHint}}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="col-md-6" *ngIf="editingConnection">
+                            <div class="form-group">
+                                <label class="control-label" for="status">Status</label>
+                                <select class="form-control" formControlName="status">
+                                    <option value="Active">Active</option>
+                                    <option value="Inactive">Inactive</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="control-label" for="description">Description</label>
+                        <input type="text" class="form-control" formControlName="description" placeholder="What this connection is for" />
+                    </div>
+
+                    <!-- Object stores: S3 / Azure / MinIO -->
+                    <ng-container *ngIf="!isFtp">
+                        <div class="card-divider"><span class="detail-label">{{isAzure ? 'Azure Blob' : (isS3 ? 'AWS S3' : 'MinIO')}} Settings</span></div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="control-label" for="bucketName">
+                                        {{isAzure ? 'Container Name' : 'Bucket Name'}}
+                                        <button type="button" class="btn btn-xs btn-link discover-buckets-btn"
+                                            *ngIf="!isFtpFamily" [disabled]="discoveringBuckets"
+                                            (click)="discoverBuckets()"
+                                            [title]="isAzure ? 'List containers these credentials can see' : 'List buckets these credentials can see'">
+                                            <span class="glyphicon" [ngClass]="discoveringBuckets ? 'glyphicon-refresh spin' : 'glyphicon-search'"></span>
+                                            {{discoveringBuckets ? 'Looking…' : 'Discover'}}
+                                        </button>
+                                    </label>
+                                    <input type="text" class="form-control" formControlName="bucketName"
+                                        *ngIf="!discoveredBuckets.length"
+                                        [placeholder]="isAzure ? 'e.g. documents' : 'e.g. my-company-data'" />
+                                    <div style="display: flex; gap: 6px;" *ngIf="discoveredBuckets.length">
+                                        <select class="form-control" formControlName="bucketName">
+                                            <option value="" disabled>Select one</option>
+                                            <option *ngFor="let b of discoveredBuckets" [value]="b">{{b}}</option>
+                                        </select>
+                                        <button type="button" class="btn btn-default" style="white-space: nowrap;"
+                                            (click)="clearDiscoveredBuckets()" title="Type a name instead">
+                                            <span class="glyphicon glyphicon-pencil"></span>
+                                        </button>
+                                    </div>
+                                    <span class="help-text" *ngIf="discoverBucketsError" style="display: block; color: #bb2d48;">
+                                        {{discoverBucketsError}}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="col-md-6" *ngIf="isS3">
+                                <div class="form-group">
+                                    <label class="control-label" for="region">Region</label>
+                                    <input type="text" class="form-control" formControlName="region" placeholder="e.g. us-east-1" />
+                                </div>
+                            </div>
+                            <div class="col-md-6" *ngIf="isAzure">
+                                <div class="form-group">
+                                    <label class="control-label" for="azureAccountName">Storage Account Name</label>
+                                    <input type="text" class="form-control" formControlName="azureAccountName" placeholder="e.g. mystorageaccount" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="control-label" for="endpoint">
+                                Endpoint {{isMinio ? '' : '(optional)'}}
+                            </label>
+                            <input type="text" class="form-control" formControlName="endpoint"
+                                [placeholder]="isMinio ? 'http://host.docker.internal:9000' : (isAzure ? 'https://account.blob.core.windows.net (defaults from account name)' : 'Only for S3-compatible services (Wasabi, Ceph, ...)')" />
+                        </div>
+
+                        <div class="row" *ngIf="!isAzure">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="control-label" for="accessKey">Access Key</label>
+                                    <input type="text" class="form-control" formControlName="accessKey" autocomplete="off"
+                                        [placeholder]="isS3 ? 'Blank = use the host IAM role' : 'MinIO access key'" />
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="control-label" for="secretKey">Secret Key</label>
+                                    <input type="password" class="form-control" formControlName="secretKey" autocomplete="new-password"
+                                        [placeholder]="editingConnection && editingConnection.secretKeyConfigured ? 'Leave blank to keep the stored key' : 'Secret access key'" />
+                                    <span class="help-text" *ngIf="editingConnection && editingConnection.secretKeyConfigured" style="display: block; margin-top: 4px;">
+                                        <span class="glyphicon glyphicon-ok"></span> A key is already stored -- only fill this in to replace it.
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <ng-container *ngIf="isAzure">
+                            <div class="form-group">
+                                <label class="control-label" for="azureConnectionString">Connection String</label>
+                                <input type="password" class="form-control" formControlName="azureConnectionString" autocomplete="new-password"
+                                    [placeholder]="editingConnection && editingConnection.azureConnectionStringConfigured ? 'Leave blank to keep the stored connection string' : 'DefaultEndpointsProtocol=https;AccountName=...'" />
+                                <span class="help-text" style="display: block; margin-top: 4px;">
+                                    Either paste a full connection string here, or fill in the account name above plus the account key below.
+                                </span>
+                            </div>
+                            <div class="form-group">
+                                <label class="control-label" for="secretKey">Account Key</label>
+                                <input type="password" class="form-control" formControlName="secretKey" autocomplete="new-password"
+                                    [placeholder]="editingConnection && editingConnection.secretKeyConfigured ? 'Leave blank to keep the stored key' : 'Azure storage account key'" />
+                            </div>
+                        </ng-container>
+                    </ng-container>
+
+                    <!-- FTP / FTPS -->
+                    <ng-container *ngIf="isFtp">
+                        <div class="card-divider"><span class="detail-label">{{isFtps ? 'FTPS' : 'FTP'}} Settings</span></div>
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="form-group">
+                                    <label class="control-label" for="host">Host</label>
+                                    <input type="text" class="form-control" formControlName="host" placeholder="e.g. ftp.example.com" />
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label class="control-label" for="port">Port</label>
+                                    <input type="number" class="form-control" formControlName="port" placeholder="21" />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="control-label" for="username">Username</label>
+                                    <input type="text" class="form-control" formControlName="username" autocomplete="off" />
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="control-label" for="password">Password</label>
+                                    <input type="password" class="form-control" formControlName="password" autocomplete="new-password"
+                                        [placeholder]="editingConnection && editingConnection.passwordConfigured ? 'Leave blank to keep the stored password' : 'FTP password'" />
+                                    <span class="help-text" *ngIf="editingConnection && editingConnection.passwordConfigured" style="display: block; margin-top: 4px;">
+                                        <span class="glyphicon glyphicon-ok"></span> A password is already stored -- only fill this in to replace it.
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="control-label" for="baseDirectory">Base Directory</label>
+                            <input type="text" class="form-control" formControlName="baseDirectory" placeholder="/ (server root)" />
+                            <span class="help-text" style="display: block; margin-top: 4px;">
+                                Browsing is confined to this directory -- users of this connection can't navigate above it.
+                            </span>
+                        </div>
+                        <div class="form-group">
+                            <label class="checkbox-inline" style="font-weight: normal; margin-right: 16px;">
+                                <input type="checkbox" formControlName="passiveMode" style="margin-right: 4px;" /> Passive mode
+                            </label>
+                            <label class="checkbox-inline" style="font-weight: normal;" *ngIf="isFtps">
+                                <input type="checkbox" formControlName="implicitTls" (change)="onImplicitTlsChange()" style="margin-right: 4px;" /> Implicit TLS
+                            </label>
+                            <span class="help-text" style="display: block; margin-top: 4px;">
+                                Passive mode works through most firewalls and is the right default.
+                                <ng-container *ngIf="isFtps">Implicit TLS encrypts from connect (port 990); leave it off for explicit AUTH TLS (port 21).</ng-container>
+                            </span>
+                        </div>
+                        <span class="help-text" *ngIf="selectedProvider === 'FTP'" style="display: block;">
+                            <span class="glyphicon glyphicon-warning-sign"></span>
+                            Plain FTP sends the password and file contents unencrypted. Prefer FTPS where the server supports it.
+                        </span>
+                    </ng-container>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-teal" [disabled]="loading">{{editingConnection ? 'Save Connection' : 'Add Connection'}}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="deleteStorageConnectionModal" role="dialog" style="top: 85px;">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title">Delete Storage Connection</h4>
+            </div>
+            <div class="modal-body">
+                <p>
+                    Delete "{{deleteTarget?.connectionName}}"? Anything still pointing at the alias
+                    <code>{{deleteTarget?.alias}}</code> will stop resolving. No files are removed from the storage itself.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-danger" data-dismiss="modal" (click)="processDeleteConnection()">Yes, Delete</button>
+            </div>
+        </div>
+    </div>
+</div>

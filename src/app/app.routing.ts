@@ -33,7 +33,9 @@ import {
     TenantsComponent,
     UsersComponent,
     WelcomeComponent,
-    DocumentConverterComponent
+    DocumentConverterComponent,
+    NotificationCenterComponent,
+    StorageConnectionComponent
 } from './_component/index';
 
 const routes: Routes = [
@@ -119,6 +121,13 @@ const routes: Routes = [
     },
     {
 
+        path: 'setting/storageConnection',
+        component: StorageConnectionComponent,
+        canActivate: [AuthGuard, RoleGuard],
+        data: { roles: ['PLATFORM_ADMIN', 'TENANT_ADMIN'] }
+    },
+    {
+
         path: 'setting/lookup',
         component: SettingLookupComponent,
         canActivate: [AuthGuard, RoleGuard],
@@ -179,6 +188,11 @@ const routes: Routes = [
     {
         path: 'objectBrowser',
         component: ObjectBrowserComponent,
+        canActivate: [AuthGuard]
+    },
+    {
+        path: 'notifications',
+        component: NotificationCenterComponent,
         canActivate: [AuthGuard]
     },
     {

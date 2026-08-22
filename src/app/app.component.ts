@@ -1,7 +1,9 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, NavigationEnd } from '@angular/router';
 import { DatePipe } from '@angular/common';
-import { AuthService } from '@/_services';
+import { Subscription } from 'rxjs';
+import { AuthService, NotificationService } from '@/_services';
+import { AppNotification } from '@/_models';
 import * as echarts from 'echarts';
 import './_content/app.less';
 
@@ -24,9 +26,24 @@ export class AppComponent implements OnInit, OnDestroy {
     private readonly chicagoTimeZone = 'America/Chicago';
     private profileTimer: any;
 
+    public unreadCount = 0;
+    public recentNotifications: AppNotification[] = [];
+    private notificationsBootstrapped = false;
+    private routerSubscription: Subscription;
+    private unreadCountSubscription: Subscription;
+    private recentSubscription: Subscription;
+
     constructor(public router: Router,
         public authService: AuthService,
-        private datePipe: DatePipe) {
+        private datePipe: DatePipe,
+        public notificationService: NotificationService) {
+        this.routerSubscription = this.router.events.subscribe((event) => {
+            if (event instanceof NavigationEnd) {
+                this.bootstrapNotifications();
+            }
+        });
+        this.unreadCountSubscription = this.notificationService.unreadCount$.subscribe((count) => this.unreadCount = count);
+        this.recentSubscription = this.notificationService.recent$.subscribe((notifications) => this.recentNotifications = notifications);
     }
 
     public get showNav(): boolean {
@@ -61,7 +78,12 @@ export class AppComponent implements OnInit, OnDestroy {
     public ngOnInit(): void {
         this.updateProfileTime();
         this.profileTimer = setInterval(() => this.updateProfileTime(), 1000);
-        this.initDropdownAutoFlip();
+        this.bootstrapNotifications();
+        if (typeof $ !== 'undefined') {
+            $(document).on('show.bs.dropdown.notificationLoad', '.notification-dropdown', () => {
+                this.notificationService.loadRecent();
+            });
+        }
     }
 
     public ngOnDestroy(): void {
@@ -69,47 +91,37 @@ export class AppComponent implements OnInit, OnDestroy {
             clearInterval(this.profileTimer);
         }
         if (typeof $ !== 'undefined') {
-            $(document).off('show.bs.dropdown.autoFlip');
+            $(document).off('show.bs.dropdown.notificationLoad');
+        }
+        if (this.routerSubscription) {
+            this.routerSubscription.unsubscribe();
+        }
+        if (this.unreadCountSubscription) {
+            this.unreadCountSubscription.unsubscribe();
+        }
+        if (this.recentSubscription) {
+            this.recentSubscription.unsubscribe();
         }
     }
 
-    private initDropdownAutoFlip(): void {
-        if (typeof $ === 'undefined') {
+    private bootstrapNotifications(): void {
+        if (this.notificationsBootstrapped || !this.authService.isLoggedIn()) {
             return;
         }
-        $(document).on('show.bs.dropdown.autoFlip', '.dropdown', function (this: HTMLElement) {
-            const $dropdown = $(this);
-            const $menu = $dropdown.find('.dropdown-menu').first();
-            const $toggle = $dropdown.find('[data-toggle="dropdown"]').first();
-            if (!$menu.length || !$toggle.length) {
-                return;
-            }
+        this.notificationsBootstrapped = true;
+        this.notificationService.connectLive();
+        this.notificationService.refreshUnreadCount();
+        this.notificationService.loadRecent();
+    }
 
-            $dropdown.removeClass('dropup');
-            $menu.css({ visibility: 'hidden', display: 'block' });
+    public onNotificationClick(notification: AppNotification): void {
+        this.notificationService.open(notification);
+    }
 
-            const toggleRect = $toggle[0].getBoundingClientRect();
-            const menuHeight = $menu.outerHeight();
-
-            let lowerBound = window.innerHeight;
-            let upperBound = 0;
-            $dropdown.parents().each(function (this: HTMLElement) {
-                const overflowY = $(this).css('overflow-y');
-                if ((overflowY === 'auto' || overflowY === 'scroll') && this.scrollHeight > this.clientHeight) {
-                    const rect = this.getBoundingClientRect();
-                    lowerBound = Math.min(lowerBound, rect.bottom);
-                    upperBound = Math.max(upperBound, rect.top);
-                }
-            });
-
-            const spaceBelow = lowerBound - toggleRect.bottom;
-            const spaceAbove = toggleRect.top - upperBound;
-            if (spaceBelow < menuHeight + 8 && spaceAbove > spaceBelow) {
-                $dropdown.addClass('dropup');
-            }
-
-            $menu.css({ visibility: '', display: '' });
-        });
+    public onMarkAllRead(event: Event): void {
+        event.stopPropagation();
+        this.notificationService.markAllRead().subscribe();
+        this.notificationService.markAllReadLocally();
     }
 
     private updateProfileTime(): void {
@@ -119,6 +131,10 @@ export class AppComponent implements OnInit, OnDestroy {
 
     public logout(): void {
         this.authService.logout();
+        this.notificationService.disconnectLive();
+        this.notificationsBootstrapped = false;
+        this.unreadCount = 0;
+        this.recentNotifications = [];
     }
 
 }

@@ -9,7 +9,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap">
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
         <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
         <link rel="stylesheet" href="https://cdn.datatables.net/1.10.2/css/jquery.dataTables.min.css">
         <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
@@ -17,11 +17,56 @@
         <script type="text/javascript" src="https://cdn.datatables.net/1.10.2/js/jquery.dataTables.min.js"></script>
         <script type="text/javascript">
             document.addEventListener('DOMContentLoaded', function () {
-                jQuery(document).on('show.bs.dropdown', '.dropdown', function () {
-                    jQuery(this).closest('.scroll-table').addClass('dropdown-open');
+                // Row-level "..." dropdowns live inside a scroll-table (overflow-y: auto,
+                // fixed max-height) so long menus used to get clipped -- an earlier fix set
+                // the whole container to overflow: visible while open, but that also let the
+                // *table itself* (taller than the container) spill out past the container's
+                // box into whatever sits below it on the page, which is its own visible bug.
+                // Instead, "portal" just the open menu: switch it to position: fixed with
+                // coordinates computed from the toggle button's real screen position, so it
+                // renders as a page-level overlay unaffected by any ancestor's clipping or
+                // scroll, while the table container itself keeps clipping/scrolling normally.
+                jQuery(document).on('shown.bs.dropdown', '.dropdown', function () {
+                    var $toggle = jQuery(this).children('[data-toggle="dropdown"]');
+                    var $menu = jQuery(this).children('.dropdown-menu');
+                    if (!$toggle.length || !$menu.length) {
+                        return;
+                    }
+                    // Bootstrap's .dropup sets "bottom: 100%; top: auto" on the menu, which
+                    // fights the fixed coordinates set below and collapses the box to its
+                    // padding. This positions the menu itself, so the class must not be here.
+                    jQuery(this).removeClass('dropup');
+                    var toggleRect = $toggle[0].getBoundingClientRect();
+                    var menuRect = $menu[0].getBoundingClientRect();
+                    var margin = 8;
+                    var openUp = (toggleRect.bottom + menuRect.height + margin > window.innerHeight)
+                        && (toggleRect.top - menuRect.height - margin >= 0);
+                    var top = openUp ? (toggleRect.top - menuRect.height) : toggleRect.bottom;
+                    top = Math.max(margin, Math.min(top, window.innerHeight - menuRect.height - margin));
+                    var isRightAligned = $menu.hasClass('dropdown-menu-right');
+                    var left, right;
+                    if (isRightAligned) {
+                        right = window.innerWidth - toggleRect.right;
+                        right = Math.max(margin, right);
+                        left = 'auto';
+                    } else {
+                        left = Math.max(margin, Math.min(toggleRect.left, window.innerWidth - menuRect.width - margin));
+                        right = 'auto';
+                    }
+                    $menu.css({
+                        position: 'fixed',
+                        top: top + 'px',
+                        left: left === 'auto' ? 'auto' : left + 'px',
+                        right: right === 'auto' ? 'auto' : right + 'px',
+                        margin: 0,
+                        zIndex: 3000
+                    });
                 });
                 jQuery(document).on('hidden.bs.dropdown', '.dropdown', function () {
-                    jQuery(this).closest('.scroll-table').removeClass('dropdown-open');
+                    jQuery(this).removeClass('dropup');
+                    jQuery(this).children('.dropdown-menu').css({
+                        position: '', top: '', left: '', right: '', margin: '', zIndex: ''
+                    });
                 });
             });
         </script>

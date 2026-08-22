@@ -118,17 +118,26 @@
                     <span>Configuration Tags</span>
                     <button type="button" class="btn btn-xs btn-link bucket-help-toggle" style="padding-left: 0;" (click)="toggleBucketHelp()">
                         <span class="glyphicon glyphicon-info-sign"></span>
-                        {{showBucketHelp ? 'Hide' : 'How do I add a bucket?'}}
+                        {{showBucketHelp ? 'Hide' : 'How do I link a bucket?'}}
                     </button>
                     <button type="button" class="banner-link" title="Add More" (click)="tageFormsAddItem()">
                         <span class="glyphicon glyphicon-plus-sign"></span> Add More
                     </button>
                 </h4>
                 <div class="help-text" *ngIf="showBucketHelp" style="margin: 8px 12px 0;">
-                    <div>Configure buckets in <strong>Setting</strong> by adding entries under the <code>BUCKET_LIST</code> lookup. The bucket name must match the storage provider's bucket exactly.</div>
-                    <div style="margin-top: 6px;">Use these tag keys when generating the source task configuration:</div>
-                    <div style="margin-top: 4px;"><code>bucket</code> or <code>bucket_name</code> for the storage bucket, <code>input_folder</code> for the source folder, and <code>output_folder</code> for the destination folder.</div>
-                    <div style="margin-top: 6px;">After saving the bucket, return here and use its exact name as the tag value.</div>
+                    <div>To point this task at storage, add a tag for each part of the path:</div>
+                    <div style="margin-top: 4px;">
+                        <code>bucket</code> (or <code>bucket_name</code>) for the bucket,
+                        <code>input_folder</code> for where files are read from, and
+                        <code>output_folder</code> for where results are written.
+                    </div>
+                    <div style="margin-top: 6px;">
+                        The tag value is the name itself &mdash; type the bucket exactly as the provider spells it,
+                        and folders as a path such as <code>reports/2026</code>.
+                    </div>
+                    <div style="margin-top: 6px;">
+                        Buckets are connected under <strong>Settings &rsaquo; Storage Connections</strong>, where you can also test one before using it here.
+                    </div>
                 </div>
 
                 <div id="main-form-content" formArrayName="tagsInfo">
@@ -145,7 +154,10 @@
                             <tbody>
                                 <tr *ngFor="let tag of sourceTaskForm.get('tagsInfo')['controls']; let i = index;" [formGroup]="tag">
                                     <td>
-                                        <input type="text" class="form-control input-sm" name="tagKey" formControlName="tagKey" placeholder="Tag Key">
+                                        <input type="text" class="form-control input-sm tag-key-input" name="tagKey" formControlName="tagKey"
+                                            placeholder="Tag Key" (blur)="trimTagField(tag.get('tagKey'))"
+                                            [class.tag-key-storage]="isStorageTagKey(tag.get('tagKey').value)"
+                                            [title]="isStorageTagKey(tag.get('tagKey').value) ? 'Recognised storage tag -- the pipeline reads this one' : ''">
                                         <div *ngIf="tag.get('tagKey').errors" class="text-danger">
                                             <div *ngIf="submitted && tag.get('tagKey').errors.required">
                                                 Tag Key is required
@@ -156,7 +168,8 @@
                                         </div>
                                     </td>
                                     <td>
-                                        <input type="text" class="form-control input-sm" name="tagParent" formControlName="tagParent" placeholder="Parent Tag">
+                                        <input type="text" class="form-control input-sm" name="tagParent" formControlName="tagParent" placeholder="Parent Tag"
+                                            (blur)="trimTagField(tag.get('tagParent'))">
                                         <div *ngIf="tag.get('tagParent').errors" class="text-danger">
                                             <div *ngIf="tag.get('tagParent').errors.hasSpace">
                                                 Tag Parent can't contain spaces
@@ -164,7 +177,9 @@
                                         </div>
                                     </td>
                                     <td>
-                                        <input type="text" class="form-control input-sm" name="tagValue" formControlName="tagValue" placeholder="Tag Value">
+                                        <input type="text" class="form-control input-sm" name="tagValue" formControlName="tagValue" (blur)="trimTagField(tag.get('tagValue'))"
+                                            [class.tag-value-storage]="isStorageTagKey(tag.get('tagKey').value)"
+                                            [placeholder]="isStorageTagKey(tag.get('tagKey').value) ? 'e.g. etl-bucket or reports/2026' : 'Tag Value'">
                                     </td>
                                     <td class="text-center">
                                         <div class="btn-group btn-group-sm" role="group">

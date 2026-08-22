@@ -65,6 +65,13 @@
             <span class="kpi-label">Failed jobs</span>
         </span>
     </div>
+    <div class="kpi-tile kpi-unread" routerLink="/notifications" style="cursor: pointer;">
+        <span class="kpi-icon"><span class="glyphicon glyphicon-bell"></span></span>
+        <span>
+            <span class="kpi-value">{{ (notificationService.unreadCount$ | async) || 0 }}</span>
+            <span class="kpi-label">Unread notifications</span>
+        </span>
+    </div>
 </div>
 
 <div class="row row-equal">
@@ -146,7 +153,10 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr *ngFor="let sourceJob of sourceJobWeeklyRunningStatisticsDimensionData | searchFilter: searchSourceJobDetails; let i = index;">
+                        <!-- "as rows" keeps the filter running once instead of a second time
+                             for the empty check below. -->
+                        <ng-container *ngIf="(sourceJobWeeklyRunningStatisticsDimensionData | searchFilter: searchSourceJobDetails) as rows">
+                        <tr *ngFor="let sourceJob of rows; let i = index;">
                             <td>{{sourceJob.jobId}}</td>
                             <td>{{sourceJob.jobName}}</td>
                             <td class="text-center"
@@ -197,6 +207,13 @@
                                 <ng-template #noBreakdown><span class="help-text">&mdash;</span></ng-template>
                             </td>
                         </tr>
+                        <tr *ngIf="!rows.length">
+                            <td colspan="12" class="table-empty-cell">
+                                <span class="glyphicon glyphicon-search"></span>
+                                No jobs match "{{searchSourceJobDetails}}".
+                            </td>
+                        </tr>
+                        </ng-container>
                     </tbody>
                 </table>
             </div>

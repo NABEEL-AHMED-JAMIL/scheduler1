@@ -119,6 +119,47 @@ export class TaskComponent implements OnInit, OnDestroy {
         this.paramMapSubscription?.unsubscribe();
     }
 
+    // The keys the pipeline actually reads off a task to locate storage. Recognising one is
+    // worth surfacing, because a typo here fails silently at run time rather than on save.
+    private static readonly STORAGE_TAG_KEYS = ['bucket', 'bucket_name', 'input_folder', 'output_folder'];
+
+    /**
+     * Strips leading/trailing whitespace from a tag field. A trailing space is invisible in
+     * the input but travels into the payload, where "etl-bucket " never matches the real
+     * bucket and the job fails at run time with nothing obviously wrong on screen. Correcting
+     * it silently is friendlier than rejecting the row for a character nobody can see.
+     */
+    public trimTagField(control: AbstractControl): void {
+        const value = control.value;
+        if (typeof value !== 'string') {
+            return;
+        }
+        const trimmed = value.trim();
+        if (trimmed !== value) {
+            control.setValue(trimmed);
+        }
+    }
+
+    /** Same treatment applied across every tag row, as a safety net on save. */
+    private trimAllTagFields(): void {
+        const tags = this.sourceTaskForm.get('tagsInfo') as FormArray;
+        tags.controls.forEach((row) => {
+            ['tagKey', 'tagParent', 'tagValue'].forEach((field) => {
+                const control = row.get(field);
+                if (control) {
+                    this.trimTagField(control);
+                }
+            });
+        });
+    }
+
+    public isStorageTagKey(tagKey: string): boolean {
+        if (!tagKey) {
+            return false;
+        }
+        return TaskComponent.STORAGE_TAG_KEYS.indexOf(tagKey.trim().toLowerCase()) > -1;
+    }
+
     public toggleBucketHelp(): void {
         this.showBucketHelp = !this.showBucketHelp;
     }
@@ -286,6 +327,7 @@ export class TaskComponent implements OnInit, OnDestroy {
     public submitSourceTask(): void {
         this.submitted = true;
 		this.spinnerService.show();
+		this.trimAllTagFields();
 		if (this.sourceTaskForm.invalid) {
 			this.spinnerService.hide();
 			return;
