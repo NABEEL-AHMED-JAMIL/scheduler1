@@ -45,119 +45,33 @@
     }
   </div>
 
-  <!-- Rings + weekly bars -->
+  <!-- Charts -->
   <div class="grid lg:grid-cols-3 gap-4">
-    @for (ring of [
-      { title: 'Job status',  data: statusRing() },
-      { title: 'Run outcome', data: runningRing() }
-    ]; track ring.title) {
-      <div class="card p-4">
-        <h2 class="text-sm font-semibold mb-3">{{ ring.title }}</h2>
-        @if (ring.data.length) {
-          <div class="flex items-center gap-4">
-            <svg viewBox="0 0 42 42" class="size-28 shrink-0 -rotate-90">
-              @for (segment of ring.data; track segment.name) {
-                <circle cx="21" cy="21" r="15.9" fill="none" stroke-width="6"
-                        [attr.stroke]="'var(--chart-' + $index % 6 + ')'"
-                        [attr.stroke-dasharray]="segment.pct + ' ' + (100 - segment.pct)"
-                        [attr.stroke-dashoffset]="-segment.offset" />
-              }
-            </svg>
-            <ul class="text-sm space-y-1.5 min-w-0">
-              @for (segment of ring.data; track segment.name) {
-                <li class="flex items-center gap-2">
-                  <span class="size-2.5 rounded-full shrink-0"
-                        [style.background]="'var(--chart-' + $index % 6 + ')'"></span>
-                  <span class="capitalize truncate">{{ segment.name.toLowerCase() }}</span>
-                  <span class="ml-auto tabular font-medium">{{ segment.value }}</span>
-                </li>
-              }
-            </ul>
-          </div>
-        } @else {
-          <p class="text-sm text-[color:var(--text-muted)] py-8 text-center">No data in this range.</p>
-        }
-      </div>
-    }
+    <div class="card p-4">
+      <h2 class="text-sm font-semibold mb-3">Job status</h2>
+      <app-donut [data]="statusCategories()" totalLabel="jobs" />
+    </div>
+
+    <div class="card p-4">
+      <h2 class="text-sm font-semibold mb-3">Run outcome</h2>
+      <app-donut [data]="jobRunning()" totalLabel="runs" [colorFor]="outcomeColor" />
+    </div>
 
     <div class="card p-4">
       <h2 class="text-sm font-semibold mb-3">Queue volume by day</h2>
-      @if (weeklyBars().length) {
-        <div class="flex items-end gap-2">
-          @for (bar of weeklyBars(); track bar.name) {
-            <div class="flex-1 flex flex-col items-center gap-1.5 min-w-0">
-              <span class="text-xs tabular text-[color:var(--text-secondary)]">{{ bar.value }}</span>
-              <!-- The track needs a definite height for the bar's percentage to resolve
-                   against; a flex-sized parent leaves it computing to zero. -->
-              <div class="w-full h-16 flex items-end">
-                <div class="w-full rounded-t bg-brand-500 min-h-0.5" [style.height.%]="bar.pct"
-                     [title]="bar.name + ': ' + bar.value"></div>
-              </div>
-              <span class="text-xs text-[color:var(--text-muted)] truncate">{{ bar.name }}</span>
-            </div>
-          }
-        </div>
-      } @else {
-        <p class="text-sm text-[color:var(--text-muted)] py-8 text-center">No runs in this range.</p>
-      }
+      <app-bar-chart [data]="weeklyBars()" [height]="150" />
     </div>
   </div>
 
   <!-- Hour x weekday heatmap -->
   <div class="card p-4">
-    <div class="flex flex-wrap items-baseline gap-2 mb-3">
+    <div class="flex flex-wrap items-baseline gap-2 mb-4">
       <h2 class="text-sm font-semibold">Queue activity by hour</h2>
       <span class="text-xs text-[color:var(--text-muted)]">
         Click any cell to see which jobs ran in that hour
       </span>
     </div>
-
-    @if (heatmap().rows.length) {
-      <div class="overflow-x-auto">
-        <table class="border-separate border-spacing-0.5">
-          <thead>
-            <tr>
-              <th class="w-20"></th>
-              @for (hr of [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23]; track hr) {
-                <th class="text-[10px] font-normal text-[color:var(--text-muted)] w-7">
-                  @if (hr % 3 === 0) { {{ hourLabel(hr) }} }
-                </th>
-              }
-            </tr>
-          </thead>
-          <tbody>
-            @for (row of heatmap().rows; track row.day) {
-              <tr>
-                <td class="text-xs text-[color:var(--text-secondary)] pr-2 whitespace-nowrap">
-                  {{ row.day.slice(0, 3) }}
-                </td>
-                @for (cell of row.hours; track cell.hr) {
-                  <td>
-                    <button type="button"
-                            class="size-6 rounded-sm block w-full transition-transform hover:scale-110
-                                   focus:outline-none focus:ring-2 focus:ring-brand-500"
-                            [style.background]="cell.count
-                              ? 'color-mix(in srgb, var(--color-brand-500) ' + (18 + cell.intensity * 82) + '%, transparent)'
-                              : 'var(--surface-sunken)'"
-                            [class.ring-2]="selectedCell()?.date === cell.date && selectedCell()?.hr === cell.hr"
-                            [class.ring-brand-500]="selectedCell()?.date === cell.date && selectedCell()?.hr === cell.hr"
-                            [disabled]="!cell.count"
-                            [title]="cell.count
-                              ? row.day + ' ' + hourLabel(cell.hr) + ' — ' + cell.count + ' run' + (cell.count === 1 ? '' : 's')
-                              : row.day + ' ' + hourLabel(cell.hr) + ' — no runs'"
-                            (click)="selectCell(cell.date, cell.hr, cell.count)">
-                      <span class="sr-only">{{ cell.count }} runs</span>
-                    </button>
-                  </td>
-                }
-              </tr>
-            }
-          </tbody>
-        </table>
-      </div>
-    } @else {
-      <p class="text-sm text-[color:var(--text-muted)] py-10 text-center">No activity in this range.</p>
-    }
+    <app-heatmap [data]="heatCells()" [selected]="selectedHeat()" (cellClicked)="onHeatCell($event)" />
   </div>
 
   <!-- Drill-down breakdown -->

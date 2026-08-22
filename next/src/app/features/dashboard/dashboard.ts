@@ -1,6 +1,9 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { RouterLink } from '@angular/router';
+import { Donut } from '../../shared/charts/donut';
+import { BarChart } from '../../shared/charts/bar-chart';
+import { HeatCell, HeatSelection, Heatmap } from '../../shared/charts/heatmap';
 import { DashboardService, HourCell, JobBreakdown, NameValue } from './dashboard.service';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { ToastService } from '../../shared/ui/toast.service';
@@ -16,7 +19,7 @@ type BreakdownKey = typeof BREAKDOWN_COLUMNS[number];
 
 @Component({
   selector: 'app-dashboard',
-  imports: [RouterLink],
+  imports: [RouterLink, Donut, BarChart, Heatmap],
   templateUrl: './dashboard.html',
 })
 export class Dashboard implements OnInit {
@@ -58,34 +61,37 @@ export class Dashboard implements OnInit {
   readonly failed      = computed(() => this.valueOf(this.jobRunning(), 'failed'));
 
   // ---- charts -------------------------------------------------------------
-  /** Donut segments with a running offset, so the ring can be drawn with stroke-dasharray. */
-  readonly statusRing = computed(() => this.toRing(this.statusCategories()));
-  readonly runningRing = computed(() => this.toRing(this.jobRunning()));
+  readonly weeklyBars = computed(() =>
+    this.weekly().map(d => ({ name: d.name, value: d.value })));
 
-  readonly weeklyBars = computed(() => {
-    const max = Math.max(1, ...this.weekly().map(d => d.value));
-    return this.weekly().map(d => ({ ...d, pct: (d.value / max) * 100 }));
-  });
-
-  /** Hour-by-weekday grid: 7 rows x 24 columns, only days that have data. */
-  readonly heatmap = computed(() => {
-    const cells = this.hourly();
-    if (!cells.length) return { days: [] as string[], rows: [] as any[], max: 0 };
-    const byDay = new Map<string, Map<number, HourCell>>();
-    for (const cell of cells) {
-      if (!byDay.has(cell.dayCode)) byDay.set(cell.dayCode, new Map());
-      byDay.get(cell.dayCode)!.set(cell.hr, cell);
+  /** Run outcomes keep their status colours so a chart matches the pills in the tables. */
+  readonly outcomeColor = (name: string, index: number): string => {
+    switch ((name ?? '').toLowerCase()) {
+      case 'completed': return 'var(--color-ok-500)';
+      case 'failed':    return 'var(--color-crit-500)';
+      case 'missed':
+      case 'skip':      return 'var(--color-warn-500)';
+      case 'running':
+      case 'start':
+      case 'queue':     return 'var(--color-brand-500)';
+      default:          return `var(--chart-${index % 6})`;
     }
-    const days = DAY_ORDER.filter(d => byDay.has(d));
-    const max = Math.max(1, ...cells.map(c => c.count));
-    const rows = days.map(day => ({
-      day,
-      hours: Array.from({ length: 24 }, (_, hr) => {
-        const cell = byDay.get(day)!.get(hr);
-        return { hr, count: cell?.count ?? 0, date: cell?.date ?? '', intensity: cell ? cell.count / max : 0 };
-      }),
-    }));
-    return { days, rows, max };
+  };
+
+  /** Hour-by-weekday cells for the heatmap; the date rides along so a click can drill in. */
+  readonly heatCells = computed<HeatCell[]>(() =>
+    this.hourly().map(cell => ({
+      day: cell.dayCode,
+      hour: cell.hr,
+      value: cell.count,
+      key: cell.date,
+    })));
+
+  readonly selectedHeat = computed(() => {
+    const cell = this.selectedCell();
+    if (!cell) return null;
+    const match = this.hourly().find(h => h.date === cell.date && h.hr === cell.hr);
+    return match ? { day: match.dayCode, hour: match.hr } : null;
   });
 
   /**
@@ -132,6 +138,10 @@ export class Dashboard implements OnInit {
   }
 
   /** Clicking an hour cell drills into which jobs ran in that exact hour. */
+  onHeatCell(selection: HeatSelection): void {
+    this.selectCell(selection.key ?? '', selection.hour, selection.value);
+  }
+
   selectCell(date: string, hr: number, count: number): void {
     if (!count || !date) return;
     this.selectedCell.set({ date, hr });
@@ -182,18 +192,6 @@ export class Dashboard implements OnInit {
     if (hr === 0) return '12a';
     if (hr === 12) return '12p';
     return hr < 12 ? `${hr}a` : `${hr - 12}p`;
-  }
-
-  private toRing(data: NameValue[]): { name: string; value: number; pct: number; offset: number }[] {
-    const total = this.sum(data);
-    if (!total) return [];
-    let offset = 0;
-    return data.map(d => {
-      const pct = (d.value / total) * 100;
-      const segment = { ...d, pct, offset };
-      offset += pct;
-      return segment;
-    });
   }
 
   private sum(data: NameValue[]): number {
