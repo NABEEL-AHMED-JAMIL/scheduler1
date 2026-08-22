@@ -1,9 +1,12 @@
-<div class="space-y-4">
-  <div>
-    <h1 class="text-xl font-semibold tracking-tight">Source Tasks</h1>
-    <p class="text-sm text-[color:var(--text-secondary)] mt-0.5">
+<div class="page">
+  <div class="page-head">
+    <div>
+    <h1 class="page-title">Source Tasks</h1>
+    <p class="page-subtitle">
       A task describes one unit of work and where it reads and writes. Jobs point at these.
     </p>
+    </div>
+    <a routerLink="/tasks/new" class="btn btn-primary btn-sm">New task</a>
   </div>
 
   <app-table-shell heading="Tasks" [loading]="loading()" [error]="error()"
@@ -27,6 +30,7 @@
           <th>Pipeline</th>
           <th>Storage</th>
           <th class="text-right">Status</th>
+          <th class="w-16"></th>
         </tr>
       </thead>
       <tbody>
@@ -57,6 +61,9 @@
               } @else { — }
             </td>
             <td class="text-right"><app-status [label]="task.taskStatus" /></td>
+            <td class="text-right">
+              <a class="btn btn-ghost btn-sm" [routerLink]="['/tasks', task.taskDetailId, 'edit']">Edit</a>
+            </td>
           </tr>
         }
       </tbody>

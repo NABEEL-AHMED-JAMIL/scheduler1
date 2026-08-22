@@ -1,9 +1,12 @@
-<div class="space-y-4">
-  <div>
-    <h1 class="text-xl font-semibold tracking-tight">Storage Connections</h1>
-    <p class="text-sm text-[color:var(--text-secondary)] mt-0.5">
+<div class="page">
+  <div class="page-head">
+    <div>
+    <h1 class="page-title">Storage Connections</h1>
+    <p class="page-subtitle">
       S3, Azure, MinIO or FTP/FTPS. Credentials are encrypted and never sent back to the browser.
     </p>
+    </div>
+    <button type="button" class="btn btn-primary btn-sm" (click)="create()">New connection</button>
   </div>
 
   <div class="grid grid-cols-3 gap-3 max-w-lg">
@@ -95,6 +98,9 @@
               </button>
               <ng-template #menu>
                 <div cdkMenu class="card shadow-xl py-1 min-w-44 text-sm">
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="edit(c)">
+                    Edit
+                  </button>
                   <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="test(c)">
                     Test connection
                   </button>

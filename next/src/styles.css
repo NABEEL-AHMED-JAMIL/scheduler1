@@ -221,3 +221,16 @@ html.dark .pill-crit  { background: color-mix(in oklab, var(--color-crit-500) 22
   }
   .form-section-title { @apply text-sm font-semibold mb-3; }
 }
+
+@layer components {
+  /* Page width is a decision about content, not a per-page guess.
+     Data-dense screens take the full shell so tables aren't squeezed into a column;
+     forms and prose stay near a readable measure and centre themselves. */
+  .page        { @apply space-y-4; }
+  .page-form   { @apply space-y-4 max-w-3xl; }
+  .page-tool   { @apply space-y-4 max-w-5xl; }
+
+  .page-head       { @apply flex flex-wrap items-end justify-between gap-3; }
+  .page-title      { @apply text-xl font-semibold tracking-tight; }
+  .page-subtitle   { @apply text-sm text-[color:var(--text-secondary)] mt-0.5; }
+}

@@ -1,8 +1,8 @@
-<div class="space-y-4">
-  <div class="flex flex-wrap items-end justify-between gap-3">
+<div class="page">
+  <div class="page-head">
     <div>
-      <h1 class="text-xl font-semibold tracking-tight">Notifications</h1>
-      <p class="text-sm text-[color:var(--text-secondary)] mt-0.5">
+      <h1 class="page-title">Notifications</h1>
+      <p class="page-subtitle">
         Job outcomes and assignments addressed to you.
       </p>
     </div>
@@ -37,7 +37,7 @@
               @if (!item.read) { <span class="pill pill-brand shrink-0">New</span> }
             </div>
             @if (item.message) {
-              <p class="text-sm text-[color:var(--text-secondary)] mt-0.5">{{ item.message }}</p>
+              <p class="page-subtitle">{{ item.message }}</p>
             }
           </div>
           <span class="text-xs text-[color:var(--text-muted)] whitespace-nowrap shrink-0">

@@ -1,6 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
+import { RouterLink } from '@angular/router';
 import { TableShell } from '../../shared/ui/data-table';
 import { StatusPill } from '../../shared/ui/status-pill';
 
@@ -18,7 +19,7 @@ interface SourceTask {
 
 @Component({
   selector: 'app-tasks',
-  imports: [TableShell, StatusPill],
+  imports: [RouterLink, TableShell, StatusPill],
   templateUrl: './tasks.html',
 })
 export class Tasks implements OnInit {

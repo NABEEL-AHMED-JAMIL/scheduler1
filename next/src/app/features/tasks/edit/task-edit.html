@@ -1,0 +1,161 @@
+<div class="page-form">
+  <div>
+    <a routerLink="/tasks" class="text-sm text-brand-600 hover:underline">← Back to tasks</a>
+    <h1 class="page-title mt-1">
+      {{ isEdit() ? 'Edit task' : 'New task' }}
+    </h1>
+    <p class="page-subtitle">
+      A task describes one unit of work and where it reads and writes.
+    </p>
+  </div>
+
+  @if (loading()) {
+    <div class="card p-12 text-center text-sm text-[color:var(--text-muted)]">Loading…</div>
+  } @else {
+    <form [formGroup]="form" (ngSubmit)="save()" class="card p-5">
+      <div class="form-section">
+        <h2 class="form-section-title">Basics</h2>
+        <div class="form-grid">
+          <app-field label="Task name" for="taskName" [required]="true"
+                     [control]="form.get('taskName')" [submitted]="submitted()">
+            <input id="taskName" class="input" formControlName="taskName"
+                   placeholder="Hurricane Data Task" />
+          </app-field>
+
+          <app-field label="Task type" for="taskType" [required]="true"
+                     [control]="form.get('sourceTaskTypeId')" [submitted]="submitted()"
+                     hint="Decides which consumer and Kafka topic this reaches.">
+            <select id="taskType" class="input" formControlName="sourceTaskTypeId">
+              <option [ngValue]="null">Select a type</option>
+              @for (type of taskTypes(); track type.sourceTaskTypeId) {
+                <option [ngValue]="type.sourceTaskTypeId">{{ type.serviceName }}</option>
+              }
+            </select>
+          </app-field>
+
+          <app-field label="Pipeline" for="pipeline" [control]="form.get('pipelineId')"
+                     [submitted]="submitted()">
+            <select id="pipeline" class="input" formControlName="pipelineId">
+              <option value="">None</option>
+              @for (option of lookupOptions('PIPELINE_IDS'); track option.lookupId) {
+                <option [value]="option.lookupValue">{{ option.lookupValue }}</option>
+              }
+            </select>
+          </app-field>
+
+          <app-field label="Group" for="group" [control]="form.get('groupId')"
+                     [submitted]="submitted()">
+            <select id="group" class="input" formControlName="groupId">
+              <option value="">None</option>
+              @for (option of lookupOptions('TASK_GROUPS'); track option.lookupId) {
+                <option [value]="option.lookupValue">{{ option.lookupValue }}</option>
+              }
+            </select>
+          </app-field>
+
+          <app-field label="Home page" for="homePage" [control]="form.get('homePageId')"
+                     [submitted]="submitted()" hint="Where users land after this job completes.">
+            <select id="homePage" class="input" formControlName="homePageId">
+              <option value="">None</option>
+              @for (option of lookupOptions('PIPELINE_HOME_PAGES'); track option.lookupId) {
+                <option [value]="option.lookupValue">{{ option.lookupValue }}</option>
+              }
+            </select>
+          </app-field>
+
+          <app-field label="Status" for="taskStatus" [required]="true"
+                     [control]="form.get('taskStatus')" [submitted]="submitted()">
+            <select id="taskStatus" class="input" formControlName="taskStatus">
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+            </select>
+          </app-field>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="flex items-center gap-2 mb-3">
+          <h2 class="form-section-title mb-0 mr-auto">Configuration tags</h2>
+          <button type="button" class="btn btn-ghost btn-sm" (click)="showTagHelp.set(!showTagHelp())">
+            {{ showTagHelp() ? 'Hide help' : 'How do I link a bucket?' }}
+          </button>
+          <button type="button" class="btn btn-default btn-sm" (click)="addTag()">Add tag</button>
+        </div>
+
+        @if (showTagHelp()) {
+          <div class="rounded-md p-3.5 mb-3 text-sm space-y-1.5"
+               style="background: var(--surface-sunken);">
+            <p>To point this task at storage, add a tag for each part of the path:
+              <span class="mono">bucket</span> (or <span class="mono">bucket_name</span>),
+              <span class="mono">input_folder</span> and <span class="mono">output_folder</span>.</p>
+            <p class="text-[color:var(--text-secondary)]">
+              The value is the name itself — type the bucket exactly as the provider spells it,
+              and folders as a path such as <span class="mono">reports/2026</span>.
+              Buckets are connected under Admin › Storage Connections.
+            </p>
+          </div>
+        }
+
+        <div class="overflow-x-auto">
+          <table class="table-modern">
+            <thead>
+              <tr>
+                <th>Tag key</th>
+                <th>Parent</th>
+                <th>Value</th>
+                <th class="w-12"></th>
+              </tr>
+            </thead>
+            <tbody formArrayName="tags">
+              @for (tag of tags.controls; track $index; let i = $index) {
+                <tr [formGroupName]="i">
+                  <td>
+                    <input class="input" formControlName="tagKey" placeholder="tag key"
+                           (blur)="trimTag(i, 'tagKey')"
+                           [class.mono]="isStorageTag(tag.get('tagKey')?.value)"
+                           [class.text-brand-600]="isStorageTag(tag.get('tagKey')?.value)"
+                           [title]="isStorageTag(tag.get('tagKey')?.value)
+                              ? 'Recognised storage tag — the pipeline reads this one' : ''" />
+                  </td>
+                  <td>
+                    <input class="input" formControlName="tagParent" placeholder="parent"
+                           (blur)="trimTag(i, 'tagParent')" />
+                  </td>
+                  <td>
+                    <input class="input" formControlName="tagValue"
+                           (blur)="trimTag(i, 'tagValue')"
+                           [class.mono]="isStorageTag(tag.get('tagKey')?.value)"
+                           [placeholder]="isStorageTag(tag.get('tagKey')?.value)
+                              ? 'e.g. etl-bucket or reports/2026' : 'value'" />
+                  </td>
+                  <td class="text-right">
+                    <button type="button" class="btn btn-ghost btn-icon text-crit-500"
+                            (click)="removeTag(i)" aria-label="Remove tag">×</button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h2 class="form-section-title">Task payload</h2>
+        <app-field label="XML configuration" for="payload" [control]="form.get('taskPayload')"
+                   [submitted]="submitted()"
+                   hint="Sent to the consumer as-is.">
+          <textarea id="payload" class="input mono text-xs resize-y min-h-40"
+                    formControlName="taskPayload"
+                    placeholder="&lt;pipeline&gt;...&lt;/pipeline&gt;"></textarea>
+        </app-field>
+      </div>
+
+      <div class="flex gap-2 mt-5 pt-4 border-t" style="border-color: var(--border-subtle);">
+        <button type="submit" class="btn btn-primary" [disabled]="saving()">
+          {{ saving() ? 'Saving…' : (isEdit() ? 'Save changes' : 'Create task') }}
+        </button>
+        <a routerLink="/tasks" class="btn btn-ghost">Cancel</a>
+      </div>
+    </form>
+  }
+</div>

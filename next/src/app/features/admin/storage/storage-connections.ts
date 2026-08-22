@@ -8,6 +8,7 @@ import { ToastService } from '../../../shared/ui/toast.service';
 import { confirmWith } from '../../../shared/ui/confirm';
 import { TableShell } from '../../../shared/ui/data-table';
 import { StatusPill } from '../../../shared/ui/status-pill';
+import { ConnectionDialog } from './connection-dialog';
 
 interface StorageConnection {
   storageConnectionId: number;
@@ -88,6 +89,16 @@ export class StorageConnections implements OnInit {
           this.error.set(err?.error?.message || 'Could not load connections.');
         },
       });
+  }
+
+  create(): void {
+    this.dialog.open<boolean>(ConnectionDialog, { data: {}, hasBackdrop: true })
+      .closed.subscribe(saved => { if (saved) this.load(); });
+  }
+
+  edit(connection: StorageConnection): void {
+    this.dialog.open<boolean>(ConnectionDialog, { data: { connection }, hasBackdrop: true })
+      .closed.subscribe(saved => { if (saved) this.load(); });
   }
 
   test(connection: StorageConnection): void {

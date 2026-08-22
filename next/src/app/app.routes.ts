@@ -34,6 +34,14 @@ export const routes: Routes = [
           import('./features/jobs/history/job-history').then(m => m.JobHistory),
       },
       {
+        path: 'tasks/new',
+        loadComponent: () => import('./features/tasks/edit/task-edit').then(m => m.TaskEdit),
+      },
+      {
+        path: 'tasks/:taskDetailId/edit',
+        loadComponent: () => import('./features/tasks/edit/task-edit').then(m => m.TaskEdit),
+      },
+      {
         path: 'tasks',
         loadComponent: () => import('./features/tasks/tasks').then(m => m.Tasks),
       },

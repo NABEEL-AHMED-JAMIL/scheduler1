@@ -1,0 +1,150 @@
+<app-form-dialog
+    [heading]="isEdit() ? 'Edit connection' : 'New storage connection'"
+    subtitle="Credentials are encrypted and never sent back to the browser."
+    [confirmLabel]="isEdit() ? 'Save changes' : 'Create'"
+    [saving]="saving()"
+    (cancelled)="ref.close(false)" (confirmed)="save()">
+
+  <form [formGroup]="form" class="space-y-3.5">
+    <app-field label="Provider" for="provider" [required]="true" [hint]="providerHint()"
+               [control]="form.get('provider')" [submitted]="submitted()">
+      <select id="provider" class="input" formControlName="provider">
+        @for (option of providers; track option.value) {
+          <option [value]="option.value">{{ option.label }}</option>
+        }
+      </select>
+    </app-field>
+
+    <div class="form-grid">
+      <app-field label="Name" for="name" [required]="true"
+                 [control]="form.get('connectionName')" [submitted]="submitted()">
+        <input id="name" class="input" formControlName="connectionName" placeholder="ETL Bucket" />
+      </app-field>
+
+      <app-field label="Alias" for="alias" [required]="true"
+                 [control]="form.get('alias')" [submitted]="submitted()"
+                 hint="How jobs and tasks refer to this. Letters, numbers, . _ - only.">
+        <input id="alias" class="input mono" formControlName="alias" placeholder="etl-bucket" />
+      </app-field>
+    </div>
+
+    <app-field label="Description" for="description" [control]="form.get('description')"
+               [submitted]="submitted()">
+      <input id="description" class="input" formControlName="description"
+             placeholder="What this connection is for" />
+    </app-field>
+
+    @if (isObjectStore()) {
+      <app-field [label]="isAzure() ? 'Container' : 'Bucket'" for="bucket"
+                 [control]="form.get('bucketName')" [submitted]="submitted()">
+        <div class="flex gap-2">
+          @if (discovered().length) {
+            <select id="bucket" class="input" formControlName="bucketName">
+              <option value="">Select one</option>
+              @for (name of discovered(); track name) { <option [value]="name">{{ name }}</option> }
+            </select>
+            <button type="button" class="btn btn-default btn-sm whitespace-nowrap"
+                    (click)="discovered.set([])">Type instead</button>
+          } @else {
+            <input id="bucket" class="input mono" formControlName="bucketName"
+                   [placeholder]="isAzure() ? 'documents' : 'my-company-data'" />
+            <button type="button" class="btn btn-default btn-sm whitespace-nowrap"
+                    [disabled]="discovering()" (click)="discover()">
+              {{ discovering() ? 'Looking…' : 'Discover' }}
+            </button>
+          }
+        </div>
+      </app-field>
+      @if (discoverError()) {
+        <p class="text-xs text-crit-500 -mt-2">{{ discoverError() }}</p>
+      }
+    }
+
+    @if (isS3()) {
+      <div class="form-grid">
+        <app-field label="Region" for="region" [control]="form.get('region')" [submitted]="submitted()">
+          <input id="region" class="input mono" formControlName="region" placeholder="us-east-1" />
+        </app-field>
+        <app-field label="Endpoint" for="endpoint" [control]="form.get('endpoint')"
+                   [submitted]="submitted()" hint="Only for S3-compatible services.">
+          <input id="endpoint" class="input mono" formControlName="endpoint" placeholder="https://…" />
+        </app-field>
+      </div>
+    }
+
+    @if (provider() === 'MINIO') {
+      <app-field label="Endpoint" for="minioEndpoint" [control]="form.get('endpoint')"
+                 [submitted]="submitted()">
+        <input id="minioEndpoint" class="input mono" formControlName="endpoint"
+               placeholder="http://localhost:9000" />
+      </app-field>
+    }
+
+    @if (isFtp()) {
+      <div class="form-grid">
+        <app-field label="Host" for="host" [control]="form.get('host')" [submitted]="submitted()">
+          <input id="host" class="input mono" formControlName="host" placeholder="ftp.example.com" />
+        </app-field>
+        <app-field label="Port" for="port" [control]="form.get('port')" [submitted]="submitted()">
+          <input id="port" type="number" class="input" formControlName="port" />
+        </app-field>
+        <app-field label="Username" for="username" [control]="form.get('username')"
+                   [submitted]="submitted()">
+          <input id="username" class="input" formControlName="username" autocomplete="off" />
+        </app-field>
+        <app-field label="Password" for="password" [control]="form.get('password')"
+                   [submitted]="submitted()"
+                   [hint]="hasStoredSecret() ? 'Leave blank to keep the stored password.' : ''">
+          <input id="password" type="password" class="input" formControlName="password"
+                 autocomplete="new-password" />
+        </app-field>
+      </div>
+      <app-field label="Base directory" for="baseDir" [control]="form.get('baseDirectory')"
+                 [submitted]="submitted()" hint="Everything is browsed relative to this path.">
+        <input id="baseDir" class="input mono" formControlName="baseDirectory" placeholder="/" />
+      </app-field>
+      <div class="flex flex-wrap gap-4">
+        <label class="flex items-center gap-2 text-sm">
+          <input type="checkbox" formControlName="passiveMode" /> Passive mode
+        </label>
+        @if (provider() === 'FTPS') {
+          <label class="flex items-center gap-2 text-sm">
+            <input type="checkbox" formControlName="implicitTls" /> Implicit TLS (port 990)
+          </label>
+        }
+      </div>
+    }
+
+    @if (isS3() || provider() === 'MINIO') {
+      <div class="form-grid">
+        <app-field label="Access key" for="accessKey" [control]="form.get('accessKey')"
+                   [submitted]="submitted()"
+                   [hint]="isS3() ? 'Blank uses the host IAM role.' : ''">
+          <input id="accessKey" class="input mono" formControlName="accessKey" autocomplete="off" />
+        </app-field>
+        <app-field label="Secret key" for="secretKey" [control]="form.get('secretKey')"
+                   [submitted]="submitted()"
+                   [hint]="hasStoredSecret() ? 'Leave blank to keep the stored secret.' : ''">
+          <input id="secretKey" type="password" class="input" formControlName="secretKey"
+                 autocomplete="new-password" />
+        </app-field>
+      </div>
+    }
+
+    @if (isAzure()) {
+      <app-field label="Connection string" for="azure" [control]="form.get('azureConnectionString')"
+                 [submitted]="submitted()"
+                 [hint]="hasStoredSecret() ? 'Leave blank to keep the stored string.' : ''">
+        <input id="azure" type="password" class="input" formControlName="azureConnectionString"
+               autocomplete="new-password" />
+      </app-field>
+    }
+
+    <app-field label="Status" for="status" [control]="form.get('status')" [submitted]="submitted()">
+      <select id="status" class="input" formControlName="status">
+        <option value="Active">Active</option>
+        <option value="Inactive">Inactive</option>
+      </select>
+    </app-field>
+  </form>
+</app-form-dialog>
