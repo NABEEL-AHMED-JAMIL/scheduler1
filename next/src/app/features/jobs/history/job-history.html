@@ -47,6 +47,7 @@
           <th>Duration</th>
           <th>Message</th>
           <th class="text-right">Status</th>
+          <th class="w-16"></th>
         </tr>
       </thead>
       <tbody>
@@ -68,6 +69,10 @@
               </span>
             </td>
             <td class="text-right"><app-status [label]="run.jobStatus" /></td>
+            <td class="text-right">
+              <a class="btn btn-ghost btn-sm"
+                 [routerLink]="['/jobs', jobId(), 'runs', run.jobQueueId, 'logs']">Logs</a>
+            </td>
           </tr>
         }
       </tbody>

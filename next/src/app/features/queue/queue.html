@@ -1,0 +1,96 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Queue Messages</h1>
+      <p class="page-subtitle">What is in flight right now, rather than what already finished.</p>
+    </div>
+    <button type="button" class="btn btn-ghost btn-sm" (click)="load()" [disabled]="loading()">
+      {{ loading() ? 'Loading…' : 'Refresh' }}
+    </button>
+  </div>
+
+  @if (counts().length) {
+    <div class="flex flex-wrap gap-2">
+      @for (item of counts(); track item.status) {
+        <button type="button" class="card px-3.5 py-2 flex items-center gap-2 hover:shadow-md transition-shadow"
+                [class.ring-2]="selectedStatuses().includes(item.status)"
+                [class.ring-brand-500]="selectedStatuses().includes(item.status)"
+                (click)="toggleStatus(item.status)">
+          <app-status [label]="item.status" />
+          <span class="tabular font-semibold">{{ item.count }}</span>
+        </button>
+      }
+    </div>
+  }
+
+  <app-table-shell heading="Queue" [loading]="loading()" [error]="error()"
+                   [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="rows().length"
+                   emptyMessage="Nothing in the queue for these filters."
+                   (retry)="load()">
+    <ng-container toolbar>
+      <input type="date" class="input max-w-40" [value]="fromDate()"
+             (change)="fromDate.set($any($event.target).value); load()" />
+      <input type="date" class="input max-w-40" [value]="toDate()"
+             (change)="toDate.set($any($event.target).value); load()" />
+      <input class="input max-w-52" placeholder="Search job, run or message"
+             [value]="search()" (input)="search.set($any($event.target).value)" />
+      @if (search() || selectedStatuses().length || fromDate() || toDate()) {
+        <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()">Clear</button>
+      }
+    </ng-container>
+
+    <table class="table-modern">
+      <thead>
+        <tr>
+          <th>Run</th>
+          <th>Job</th>
+          <th>Created</th>
+          <th>Duration</th>
+          <th>Message</th>
+          <th class="text-right">Status</th>
+          <th class="w-12"></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of filtered(); track row.jobQueueId) {
+          <tr>
+            <td class="mono text-[color:var(--text-muted)]">#{{ row.jobQueueId }}</td>
+            <td class="mono">{{ row.jobId }}</td>
+            <td class="whitespace-nowrap text-[color:var(--text-secondary)]">
+              {{ row.dateCreated ? (row.dateCreated | date:'d MMM, HH:mm:ss') : '—' }}
+            </td>
+            <td class="tabular text-[color:var(--text-secondary)] whitespace-nowrap">
+              @if (duration(row); as d) { {{ d }} }
+              @else if (inFlight(row)) { <span class="text-warn-500">in flight</span> }
+              @else { — }
+            </td>
+            <td class="max-w-96">
+              <span class="truncate block" [title]="row.jobStatusMessage">
+                {{ row.jobStatusMessage || '—' }}
+              </span>
+            </td>
+            <td class="text-right"><app-status [label]="row.jobStatus" /></td>
+            <td class="text-right">
+              @if (inFlight(row)) {
+                <button type="button" class="btn btn-ghost btn-icon" [cdkMenuTriggerFor]="menu"
+                        aria-label="Actions">
+                  <svg class="size-4" viewBox="0 0 16 16" fill="currentColor">
+                    <circle cx="8" cy="3" r="1.4"/><circle cx="8" cy="8" r="1.4"/><circle cx="8" cy="13" r="1.4"/>
+                  </svg>
+                </button>
+                <ng-template #menu>
+                  <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                    <button cdkMenuItem class="menu-item menu-item-danger"
+                            (cdkMenuItemTriggered)="forceStatus(row, 'Failed')">Mark as failed</button>
+                    <button cdkMenuItem class="menu-item menu-item-danger"
+                            (cdkMenuItemTriggered)="forceStatus(row, 'Interrupt')">Mark as interrupted</button>
+                  </div>
+                </ng-template>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </app-table-shell>
+</div>
