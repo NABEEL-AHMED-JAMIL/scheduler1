@@ -45,6 +45,16 @@ export const routes: Routes = [
         data: { roles: ['PLATFORM_ADMIN'] },
       },
       {
+        path: 'notifications',
+        loadComponent: () =>
+          import('./features/notifications/notifications').then(m => m.Notifications),
+      },
+      {
+        path: 'ai/models',
+        loadComponent: () => import('./features/ai/models/models').then(m => m.Models),
+        data: { roles: ['PLATFORM_ADMIN', 'TENANT_ADMIN'] },
+      },
+      {
         path: 'objects',
         loadComponent: () => import('./features/objects/objects').then(m => m.Objects),
       },

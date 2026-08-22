@@ -1,0 +1,58 @@
+<div class="space-y-4">
+  <div>
+    <h1 class="text-xl font-semibold tracking-tight">Ollama Models</h1>
+    <p class="text-sm text-[color:var(--text-secondary)] mt-0.5">
+      Models installed on the local Ollama host. This is model plumbing — what an agent
+      <em>uses</em> is configured under AI Agents.
+    </p>
+  </div>
+
+  <div class="card p-4">
+    <label class="label" for="pull">Pull a model</label>
+    <div class="flex gap-2 max-w-lg">
+      <input id="pull" class="input" placeholder="e.g. qwen3:14b"
+             [value]="pullName()" (input)="pullName.set($any($event.target).value)"
+             [disabled]="pulling()" />
+      <button type="button" class="btn btn-primary whitespace-nowrap"
+              [disabled]="pulling() || !pullName().trim()" (click)="pull()">
+        {{ pulling() ? 'Pulling…' : 'Pull' }}
+      </button>
+    </div>
+    <p class="text-xs text-[color:var(--text-muted)] mt-2">
+      Downloads run on the server and can take several minutes for a large model.
+    </p>
+  </div>
+
+  <app-table-shell heading="Installed" [loading]="loading()" [error]="error()"
+                   [isEmpty]="!models().length" [total]="models().length" [shown]="models().length"
+                   emptyMessage="No models installed on this host yet."
+                   (retry)="load()">
+    <table class="table-modern">
+      <thead>
+        <tr>
+          <th>Model</th>
+          <th>Parameters</th>
+          <th>Quantization</th>
+          <th class="text-right">Size</th>
+          <th class="w-24"></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (model of models(); track model.name) {
+          <tr>
+            <td class="mono font-medium">{{ model.name }}</td>
+            <td class="text-[color:var(--text-secondary)]">{{ model.details?.parameterSize || '—' }}</td>
+            <td class="text-[color:var(--text-secondary)]">{{ model.details?.quantizationLevel || '—' }}</td>
+            <td class="text-right tabular text-[color:var(--text-secondary)]">
+              {{ formatSize(model.size) }}
+            </td>
+            <td class="text-right">
+              <button type="button" class="btn btn-ghost btn-sm text-crit-500"
+                      (click)="remove(model)">Delete</button>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </app-table-shell>
+</div>

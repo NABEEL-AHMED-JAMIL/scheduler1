@@ -1,0 +1,50 @@
+<div class="space-y-4">
+  <div class="flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <h1 class="text-xl font-semibold tracking-tight">Notifications</h1>
+      <p class="text-sm text-[color:var(--text-secondary)] mt-0.5">
+        Job outcomes and assignments addressed to you.
+      </p>
+    </div>
+    @if (unreadCount()) {
+      <button type="button" class="btn btn-default btn-sm" (click)="markAllRead()">
+        Mark all read ({{ unreadCount() }})
+      </button>
+    }
+  </div>
+
+  <app-table-shell heading="Recent" [loading]="loading()" [error]="error()"
+                   [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="items().length"
+                   [emptyMessage]="unreadOnly() ? 'Nothing unread.' : 'No notifications yet.'"
+                   (retry)="load()">
+    <ng-container toolbar>
+      <label class="flex items-center gap-2 text-sm text-[color:var(--text-secondary)]">
+        <input type="checkbox" [checked]="unreadOnly()"
+               (change)="unreadOnly.set($any($event.target).checked)" />
+        Unread only
+      </label>
+    </ng-container>
+
+    <ul class="divide-y" style="border-color: var(--border-subtle);">
+      @for (item of filtered(); track item.notificationId) {
+        <li class="flex gap-3 px-4 py-3 border-l-2"
+            [style.border-left-color]="item.read ? 'transparent' : toneOf(item)"
+            [class.bg-brand-50]="!item.read"
+            (click)="markRead(item)">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2">
+              <span class="text-sm font-medium truncate">{{ item.title }}</span>
+              @if (!item.read) { <span class="pill pill-brand shrink-0">New</span> }
+            </div>
+            @if (item.message) {
+              <p class="text-sm text-[color:var(--text-secondary)] mt-0.5">{{ item.message }}</p>
+            }
+          </div>
+          <span class="text-xs text-[color:var(--text-muted)] whitespace-nowrap shrink-0">
+            {{ item.dateCreated | date:'d MMM, HH:mm' }}
+          </span>
+        </li>
+      }
+    </ul>
+  </app-table-shell>
+</div>
