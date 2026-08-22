@@ -31,6 +31,7 @@ export class Shell {
       children: [
         { label: 'Source Job', path: '/jobs' },
         { label: 'Source Task', path: '/tasks' },
+        { label: 'Q-Message', path: '/queue' },
       ],
     },
     { label: 'Object Browser', path: '/objects' },
@@ -42,6 +43,7 @@ export class Shell {
         { label: 'Audio Transcript', path: '/tools/transcript' },
         { label: 'PDF Highlighter', path: '/tools/pdf' },
         { label: 'Dynamic Forms', path: '/tools/forms' },
+        { label: 'Content Cleaner', path: '/tools/cleaner' },
       ],
     },
     {
@@ -58,7 +60,10 @@ export class Shell {
         { label: 'Users', path: '/admin/users', adminOnly: true },
         { label: 'Tenants', path: '/admin/tenants', platformOnly: true },
         { label: 'Storage Connections', path: '/admin/storage', adminOnly: true },
-        { label: 'Settings', path: '/admin/settings', adminOnly: true },
+        { label: 'Kafka Connections', path: '/settings/kafka', adminOnly: true },
+        { label: 'Source Task Types', path: '/settings/task-types', adminOnly: true },
+        { label: 'Lookups', path: '/settings/lookup', adminOnly: true },
+        { label: 'All settings', path: '/admin/settings', adminOnly: true },
       ],
     },
   ];

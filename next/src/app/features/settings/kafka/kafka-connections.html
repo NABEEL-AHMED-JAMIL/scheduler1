@@ -1,0 +1,162 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Kafka Connections</h1>
+      <p class="page-subtitle">
+        Broker settings a task uses to reach Kafka. Secrets are encrypted and never sent back to the browser.
+      </p>
+    </div>
+    <button type="button" class="btn btn-primary btn-sm" (click)="create()">
+      <app-icon name="plus" />New profile
+    </button>
+  </div>
+
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-3xl">
+    @for (tile of [
+      { label: 'Profiles',  value: summary().total,    foot: summary().active + ' active' },
+      { label: 'Tested OK', value: summary().testedOk, foot: 'last test passed' },
+      { label: 'Failing',   value: summary().failing,  foot: 'need attention' },
+      { label: 'Default',   value: defaultProfile() ? 1 : 0, foot: defaultProfile()?.profileName || 'none set' }
+    ]; track tile.label) {
+      <div class="stat-tile">
+        <div class="stat-label">{{ tile.label }}</div>
+        <div class="stat-value">{{ tile.value }}</div>
+        <div class="stat-foot truncate">{{ tile.foot }}</div>
+      </div>
+    }
+  </div>
+
+  @if (!defaultProfile() && profiles().length) {
+    <div class="card flex flex-wrap items-center gap-2 px-4 py-2.5 text-sm">
+      <app-icon name="alert" class="icon-warn" />
+      <span>No profile is marked default — a task without an explicit profile has no broker to reach.</span>
+    </div>
+  }
+
+  <app-table-shell heading="Kafka profiles" [loading]="loading()" [error]="error()"
+                   [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="profiles().length"
+                   [emptyMessage]="hasFilters() ? 'No profiles match the current filters.' : 'No Kafka profiles yet.'"
+                   emptyIcon="server"
+                   (retry)="load()">
+    <ng-container toolbar>
+      <select class="input max-w-44" [value]="protocolFilter()"
+              (change)="protocolFilter.set($any($event.target).value)">
+        <option value="">All protocols</option>
+        @for (p of protocols(); track p) { <option [value]="p">{{ p }}</option> }
+      </select>
+      <select class="input max-w-32" [value]="statusFilter()"
+              (change)="statusFilter.set($any($event.target).value)">
+        <option value="">All states</option>
+        <option value="Active">Active</option>
+        <option value="Inactive">Inactive</option>
+      </select>
+      <div class="search-field max-w-56">
+        <app-icon name="search" size="0.95em" />
+        <input class="input" placeholder="Search name, label or broker"
+               [value]="search()" (input)="search.set($any($event.target).value)" />
+      </div>
+      @if (hasFilters()) {
+        <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()">
+          <app-icon name="close" />Clear
+        </button>
+      }
+    </ng-container>
+
+    <table class="table-modern">
+      <thead>
+        <tr>
+          @for (column of [
+            { key: 'profileName', label: 'Profile' },
+            { key: 'bootstrapServers', label: 'Bootstrap servers' },
+            { key: 'securityProtocol', label: 'Security' },
+            { key: 'connectionStatus', label: 'Last test' }
+          ]; track column.key) {
+            <th>
+              <span class="th-sort" [class.th-sort-active]="sort.key() === column.key"
+                    (click)="sort.toggle(column.key)">
+                {{ column.label }}
+                <app-icon [name]="sort.iconFor(column.key)" size="0.875rem"
+                          [class]="sort.key() === column.key ? 'icon-info' : 'icon-muted'" />
+              </span>
+            </th>
+          }
+          <th class="text-right">State</th>
+          <th class="w-12"></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (p of filtered(); track p.kafkaConnectionProfileId) {
+          <tr [class.opacity-55]="testing() === p.kafkaConnectionProfileId">
+            <td class="max-w-56">
+              <div class="font-medium flex items-center gap-1.5">
+                {{ p.profileName }}
+                @if (p.isDefault) {
+                  <span class="pill pill-brand" title="Used by tasks with no explicit profile">
+                    <app-icon name="check" size="0.85em" />default
+                  </span>
+                }
+              </div>
+              @if (p.environmentLabel) {
+                <div class="text-xs text-[color:var(--text-muted)] truncate">{{ p.environmentLabel }}</div>
+              }
+            </td>
+            <td class="max-w-64">
+              <span class="mono truncate block" [title]="p.bootstrapServers">{{ p.bootstrapServers }}</span>
+            </td>
+            <td>
+              <span [class]="protocolTone(p)"
+                    [title]="p.securityProtocol === 'PLAINTEXT' ? 'Unencrypted — credentials and data travel in the clear' : ''">
+                @if (p.securityProtocol === 'PLAINTEXT') { <app-icon name="alert" size="0.85em" /> }
+                @else { <app-icon name="lock" size="0.85em" /> }
+                {{ p.securityProtocol }}
+              </span>
+              @if (p.saslMechanism && p.securityProtocol.startsWith('SASL_')) {
+                <div class="text-xs text-[color:var(--text-muted)] mt-0.5">{{ p.saslMechanism }}</div>
+              }
+            </td>
+            <td>
+              <span [class]="testPill(p)" [title]="p.lastTestMessage || ''">
+                @if (testGlyph(p)) { <app-icon [name]="testGlyph(p)" size="0.85em" /> }{{ testLabel(p) }}
+              </span>
+              @if (p.lastTestedAt) {
+                <div class="text-xs text-[color:var(--text-muted)] mt-0.5">
+                  {{ p.lastTestedAt | date:'d MMM, HH:mm' }}
+                </div>
+              }
+            </td>
+            <td class="text-right"><app-status [label]="p.status" /></td>
+            <td class="text-right">
+              <button type="button" class="btn btn-ghost btn-icon" [cdkMenuTriggerFor]="menu"
+                      [disabled]="testing() === p.kafkaConnectionProfileId" aria-label="Actions">
+                <app-icon name="dots" size="1.05em" />
+              </button>
+              <ng-template #menu>
+                <div cdkMenu class="card shadow-xl py-1 min-w-56 text-sm">
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="edit(p)">
+                    <app-icon name="edit" />Edit
+                  </button>
+                  <button cdkMenuItem class="menu-item btn-intent-ok" (cdkMenuItemTriggered)="testConnection(p)">
+                    <app-icon name="plug" />Test connection
+                  </button>
+                  <div class="my-1 border-t" style="border-color: var(--border-subtle);"></div>
+                  @if (p.isDefault) {
+                    <button cdkMenuItem class="menu-item btn-intent-warn" (cdkMenuItemTriggered)="clearDefault(p)">
+                      <app-icon name="minus" />Clear default
+                    </button>
+                  } @else {
+                    <button cdkMenuItem class="menu-item btn-intent-ok" (cdkMenuItemTriggered)="setDefault(p)">
+                      <app-icon name="check" />Set as default
+                    </button>
+                  }
+                  <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="remove(p)">
+                    <app-icon name="trash" class="icon-crit" />Delete
+                  </button>
+                </div>
+              </ng-template>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </app-table-shell>
+</div>

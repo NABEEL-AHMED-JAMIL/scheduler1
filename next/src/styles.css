@@ -166,6 +166,12 @@
   .stat-value { @apply mt-1 text-xl font-semibold; font-variant-numeric: tabular-nums; }
   .stat-foot  { @apply mt-0.5 text-[11px] text-[color:var(--text-muted)]; }
 
+  .settings-hub-glyph {
+    background: var(--surface-sunken);
+    color: var(--color-brand-500);
+    @apply inline-flex items-center justify-center rounded-lg shrink-0 size-9;
+  }
+
   .card {
     background: var(--surface-raised);
     border-color: var(--border-subtle);
@@ -260,6 +266,7 @@ html.dark .icon-ok   { color: var(--color-ok-400); }
 html.dark .icon-warn { color: var(--color-warn-400); }
 html.dark .icon-crit { color: var(--color-crit-400); }
 html.dark .icon-info { color: var(--color-brand-300); }
+html.dark .settings-hub-glyph { color: var(--color-brand-300); }
 
 html.dark .btn-intent-warn:hover app-icon,
 html.dark .btn-intent-warn:focus app-icon { color: var(--color-warn-400); }

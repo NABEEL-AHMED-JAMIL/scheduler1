@@ -102,6 +102,18 @@ export const routes: Routes = [
         data: { roles: ['PLATFORM_ADMIN', 'TENANT_ADMIN'] },
       },
       {
+        path: 'admin/settings',
+        loadComponent: () =>
+          import('./features/settings/hub/settings-hub').then(m => m.SettingsHub),
+        data: { roles: ['PLATFORM_ADMIN', 'TENANT_ADMIN'] },
+      },
+      {
+        path: 'settings/kafka',
+        loadComponent: () =>
+          import('./features/settings/kafka/kafka-connections').then(m => m.KafkaConnections),
+        data: { roles: ['PLATFORM_ADMIN', 'TENANT_ADMIN'] },
+      },
+      {
         path: 'settings/lookup',
         loadComponent: () => import('./features/settings/lookup/lookup').then(m => m.Lookup),
         data: { roles: ['PLATFORM_ADMIN', 'TENANT_ADMIN'] },
