@@ -3,12 +3,16 @@ import { DatePipe } from '@angular/common';
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { BucketSummary, ObjectSummary, StorageService } from './storage.service';
-import { API_SUCCESS } from '../../core/api/api.config';
+import { API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { ToastService } from '../../shared/ui/toast.service';
 import { confirmWith } from '../../shared/ui/confirm';
 import { copyText } from '../../shared/ui/clipboard.util';
 import { PreviewDialog } from './preview/preview-dialog';
 import { FileChat } from './chat/file-chat';
+import { PromptDialog } from './dialogs/prompt-dialog';
+import { ShareDialog, ShareResult } from './dialogs/share-dialog';
+import { HttpClient } from '@angular/common/http';
+import { API_BASE } from '../../core/api/api.config';
 
 interface Crumb { name: string; prefix: string; }
 
@@ -24,6 +28,7 @@ export class Objects implements OnInit {
   private readonly storage = inject(StorageService);
   private readonly toast = inject(ToastService);
   private readonly dialog = inject(Dialog);
+  private readonly http = inject(HttpClient);
 
   readonly buckets = signal<BucketSummary[]>([]);
   readonly bucket = signal('');
@@ -41,10 +46,27 @@ export class Objects implements OnInit {
 
   readonly isSlowProvider = computed(() => SLOW_PROVIDERS.includes(this.provider()));
 
+  readonly dateFrom = signal('');
+  readonly dateTo = signal('');
+
+  readonly hasFilters = computed(() => !!(this.search() || this.dateFrom() || this.dateTo()));
+
   readonly filtered = computed(() => {
     const term = this.search().trim().toLowerCase();
-    if (!term) return this.objects();
-    return this.objects().filter(o => o.name.toLowerCase().includes(term));
+    const from = this.dateFrom();
+    const to = this.dateTo();
+    return this.objects().filter(entry => {
+      if (term && !entry.name.toLowerCase().includes(term)) return false;
+      // Folders carry no modified date, so a date filter would silently hide them all --
+      // keep them visible and let the dates narrow files only.
+      if ((from || to) && !entry.folder) {
+        const day = (entry.lastModified ?? '').slice(0, 10);
+        if (!day) return false;
+        if (from && day < from) return false;
+        if (to && day > to) return false;
+      }
+      return true;
+    });
   });
 
   readonly counts = computed(() => {
@@ -239,6 +261,92 @@ export class Objects implements OnInit {
   previewChatFile(): void {
     const entry = this.chatFile();
     if (entry) this.preview(entry);
+  }
+
+  clearFilters(): void {
+    this.search.set('');
+    this.dateFrom.set('');
+    this.dateTo.set('');
+  }
+
+  newFolder(): void {
+    this.dialog.open<string>(PromptDialog, {
+      hasBackdrop: true,
+      data: {
+        title: 'New folder',
+        label: 'Folder name',
+        placeholder: 'reports',
+        confirmLabel: 'Create',
+        hint: 'Created inside the folder you are currently viewing.',
+      },
+    }).closed.subscribe(name => {
+      if (!name) return;
+      this.storage.createFolder(this.bucket(), this.prefix(), name).subscribe({
+        next: response => {
+          if (response.status === API_SUCCESS) {
+            this.toast.success(`Folder "${name}" created.`);
+            this.load();
+          } else { this.toast.error(response.message); }
+        },
+        error: err => this.toast.error(err?.error?.message || 'Could not create the folder.'),
+      });
+    });
+  }
+
+  rename(entry: ObjectSummary): void {
+    this.dialog.open<string>(PromptDialog, {
+      hasBackdrop: true,
+      data: {
+        title: 'Rename folder',
+        label: 'New name',
+        initial: entry.name,
+        confirmLabel: 'Rename',
+      },
+    }).closed.subscribe(name => {
+      if (!name || name === entry.name) return;
+      this.storage.renameFolder(this.bucket(), entry.key, name).subscribe({
+        next: response => {
+          if (response.status === API_SUCCESS) {
+            this.toast.success(`Renamed to "${name}".`);
+            this.load();
+          } else { this.toast.error(response.message); }
+        },
+        error: err => this.toast.error(err?.error?.message || 'Rename failed.'),
+      });
+    });
+  }
+
+  /** Emails one file, or the current selection, as a ZIP. */
+  share(entry?: ObjectSummary): void {
+    const keys = entry ? [entry.key] : [...this.selected()];
+    if (!keys.length) return;
+    this.dialog.open<ShareResult>(ShareDialog, {
+      hasBackdrop: true,
+      data: { count: keys.length },
+    }).closed.subscribe(result => {
+      if (!result) return;
+      this.http.post<ApiResponse>(`${API_BASE}/fileShare.json/send`, {
+        bucket: this.bucket(),
+        keys,
+        recipientEmail: result.recipientEmail,
+        message: result.message,
+      }).subscribe({
+        next: response => {
+          response.status === API_SUCCESS
+            ? this.toast.success(`Sent to ${result.recipientEmail}.`)
+            : this.toast.error(response.message);
+        },
+        error: err => this.toast.error(err?.error?.message || 'The email could not be sent.'),
+      });
+    });
+  }
+
+  /** Downloads each selected file individually; folders are skipped rather than zipped. */
+  downloadSelected(): void {
+    const files = this.filtered().filter(o => !o.folder && this.selected().has(o.key));
+    if (!files.length) return;
+    files.forEach(file => window.open(this.storage.downloadUrl(this.bucket(), file.key), '_blank'));
+    this.toast.info(`Downloading ${files.length} file${files.length === 1 ? '' : 's'}.`);
   }
 
   formatBytes(bytes?: number): string {

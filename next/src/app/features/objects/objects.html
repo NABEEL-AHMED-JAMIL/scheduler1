@@ -47,10 +47,18 @@
         </nav>
 
         @if (selected().size) {
+          <button type="button" class="btn btn-default btn-sm" (click)="downloadSelected()">
+            Download {{ selected().size }}
+          </button>
+          <button type="button" class="btn btn-default btn-sm" (click)="share()">
+            Email {{ selected().size }}
+          </button>
           <button type="button" class="btn btn-danger btn-sm" (click)="removeSelected()">
             Delete {{ selected().size }}
           </button>
         }
+
+        <button type="button" class="btn btn-default btn-sm" (click)="newFolder()">New folder</button>
 
         <label class="btn btn-default btn-sm cursor-pointer">
           Upload
@@ -65,8 +73,15 @@
       <!-- Filter bar -->
       <div class="flex flex-wrap items-center gap-3 px-4 py-2.5 border-b text-sm"
            style="border-color: var(--border-subtle);">
-        <input class="input max-w-64" placeholder="Filter by name"
+        <input class="input max-w-56" placeholder="Filter by name"
                [value]="search()" (input)="search.set($any($event.target).value)" />
+        <input type="date" class="input max-w-40" aria-label="Modified from"
+               [value]="dateFrom()" (change)="dateFrom.set($any($event.target).value)" />
+        <input type="date" class="input max-w-40" aria-label="Modified to"
+               [value]="dateTo()" (change)="dateTo.set($any($event.target).value)" />
+        @if (hasFilters()) {
+          <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()">Clear</button>
+        }
         <span class="text-[color:var(--text-muted)] text-xs">
           {{ counts().folders }} folder{{ counts().folders === 1 ? '' : 's' }} ·
           {{ counts().files }} file{{ counts().files === 1 ? '' : 's' }}
@@ -98,6 +113,7 @@
                 <th>Name</th>
                 <th class="w-40">Modified</th>
                 <th class="w-24 text-right">Size</th>
+                <th class="w-36">Type</th>
                 <th class="w-16"></th>
               </tr>
             </thead>
@@ -134,6 +150,8 @@
                   <td class="text-right text-[color:var(--text-secondary)] tabular">
                     {{ entry.folder ? '—' : formatBytes(entry.size) }}
                   </td>
+                  <td class="text-[color:var(--text-muted)] max-w-36 truncate"
+                      [title]="entry.contentType">{{ entry.folder ? '—' : (entry.contentType || '—') }}</td>
                   <td class="text-right">
                     <button type="button" class="btn btn-ghost btn-icon" [cdkMenuTriggerFor]="rowMenu"
                             aria-label="Actions">
@@ -157,6 +175,16 @@
                             Download
                           </button>
                         }
+                        @if (!entry.folder) {
+                          <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="share(entry)">
+                            Email this file
+                          </button>
+                        }
+                        @if (entry.folder) {
+                          <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="rename(entry)">
+                            Rename
+                          </button>
+                        }
                         <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="copy(entry.key, 'Path')">
                           Copy path
                         </button>
@@ -176,7 +204,7 @@
                 </tr>
               } @empty {
                 <tr>
-                  <td colspan="5" class="!py-14 text-center">
+                  <td colspan="6" class="!py-14 text-center">
                     <p class="text-sm text-[color:var(--text-secondary)]">
                       @if (search()) { Nothing matches "{{ search() }}". }
                       @else { This folder is empty. }
