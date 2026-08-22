@@ -1,6 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { DatePipe } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
@@ -9,21 +10,46 @@ import { confirmWith } from '../../shared/ui/confirm';
 import { TableShell } from '../../shared/ui/data-table';
 import { StatusPill } from '../../shared/ui/status-pill';
 
-interface SourceJob {
+export interface Scheduler {
+  schedulerId: number;
+  startDate?: string;
+  endDate?: string;
+  startTime?: string;
+  frequency?: string;
+  intervalValue?: string;
+  dayOfMonth?: number;
+  nextRunAt?: string;
+  expired?: boolean;
+  lastFlight?: boolean;
+}
+
+export interface SourceJob {
   jobId: number;
   jobName: string;
   jobStatus: string;
   jobRunningStatus: string;
-  lastJobRun?: string;
   execution?: string;
-  priority?: string;
+  priority?: number;
+  lastJobRun?: string;
+  dateCreated?: string;
   assignedUsername?: string;
-  taskDetail?: { taskDetailId?: number; taskName?: string };
+  completeJob?: boolean;
+  failJob?: boolean;
+  skipJob?: boolean;
+  scheduler?: Scheduler | null;
+  taskDetail?: {
+    taskDetailId?: number; taskName?: string; taskStatus?: string;
+    bucket?: string; outputFolder?: string; pipelineId?: string; homePageId?: string;
+    sourceTaskType?: { serviceName?: string; queueTopicPartition?: string };
+  };
 }
+
+/** Statuses where an in-flight run means a manual action would collide. */
+const IN_FLIGHT = ['queue', 'start', 'running'];
 
 @Component({
   selector: 'app-jobs',
-  imports: [DatePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill],
+  imports: [DatePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill],
   templateUrl: './jobs.html',
 })
 export class Jobs implements OnInit {
@@ -36,16 +62,23 @@ export class Jobs implements OnInit {
   readonly error = signal('');
   readonly search = signal('');
   readonly statusFilter = signal('');
+  readonly executionFilter = signal('');
   readonly busyJob = signal<number | null>(null);
+  readonly expanded = signal<Set<number>>(new Set());
 
   readonly statuses = computed(() =>
     [...new Set(this.jobs().map(j => j.jobRunningStatus).filter(Boolean))].sort());
 
+  readonly executions = computed(() =>
+    [...new Set(this.jobs().map(j => j.execution).filter(Boolean))].sort() as string[]);
+
   readonly filtered = computed(() => {
     const term = this.search().trim().toLowerCase();
     const status = this.statusFilter();
+    const execution = this.executionFilter();
     return this.jobs().filter(job => {
       if (status && job.jobRunningStatus !== status) return false;
+      if (execution && job.execution !== execution) return false;
       if (!term) return true;
       return String(job.jobId).includes(term)
         || (job.jobName ?? '').toLowerCase().includes(term)
@@ -69,6 +102,38 @@ export class Jobs implements OnInit {
         this.error.set(err?.error?.message || 'Could not load jobs.');
       },
     });
+  }
+
+  toggleRow(job: SourceJob): void {
+    this.expanded.update(set => {
+      const next = new Set(set);
+      next.has(job.jobId) ? next.delete(job.jobId) : next.add(job.jobId);
+      return next;
+    });
+  }
+
+  /** A run already in flight would collide with a manual run or skip. */
+  isInFlight(job: SourceJob): boolean {
+    return IN_FLIGHT.includes((job.jobRunningStatus ?? '').toLowerCase());
+  }
+
+  /** Human summary of a schedule: "Daily every 2 at 00:01" and what is next. */
+  scheduleSummary(job: SourceJob): string {
+    const schedule = job.scheduler;
+    if (!schedule) return job.execution === 'Manual' ? 'On demand' : '—';
+    const parts: string[] = [schedule.frequency ?? ''];
+    if (schedule.intervalValue && schedule.intervalValue !== '1') parts.push(`every ${schedule.intervalValue}`);
+    if (schedule.startTime) parts.push(`at ${schedule.startTime.slice(0, 5)}`);
+    return parts.filter(Boolean).join(' ');
+  }
+
+  scheduleNote(job: SourceJob): { text: string; tone: 'warn' | 'muted' } | null {
+    const schedule = job.scheduler;
+    if (!schedule) return null;
+    if (schedule.expired) return { text: 'Expired — no further runs', tone: 'warn' };
+    if (schedule.lastFlight) return { text: 'Final run scheduled', tone: 'warn' };
+    if (schedule.endDate) return { text: `Ends ${schedule.endDate}`, tone: 'muted' };
+    return null;
   }
 
   runNow(job: SourceJob): void {
@@ -104,7 +169,7 @@ export class Jobs implements OnInit {
       title: activating ? 'Activate job' : 'Deactivate job',
       body: activating
         ? `"${job.jobName}" will resume running on its schedule.`
-        : `"${job.jobName}" will stop running. Slots that pass while it is off are recorded as Missed rather than replayed.`,
+        : `"${job.jobName}" will stop running. Slots that pass while it is off are recorded as Missed rather than replayed when you turn it back on.`,
       confirmLabel: activating ? 'Activate' : 'Deactivate',
     });
     if (!ok) return;
@@ -124,8 +189,41 @@ export class Jobs implements OnInit {
     });
   }
 
+  async remove(job: SourceJob): Promise<void> {
+    const ok = await confirmWith(this.dialog, {
+      title: 'Delete job',
+      body: `"${job.jobName}" will be deleted and will stop running. Its run history is kept.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
+
+    this.http.put<ApiResponse>(`${API_BASE}/sourceJob.json/deleteSourceJob`, null, {
+      params: { jobId: String(job.jobId) },
+    }).subscribe({
+      next: response => {
+        if (response.status === API_SUCCESS) {
+          this.toast.success(`${job.jobName} deleted.`);
+          this.load();
+        } else {
+          this.toast.error(response.message);
+        }
+      },
+      error: err => this.toast.error(err?.error?.message || 'Delete failed.'),
+    });
+  }
+
+  notifications(job: SourceJob): string {
+    const on: string[] = [];
+    if (job.completeJob) on.push('complete');
+    if (job.failJob) on.push('fail');
+    if (job.skipJob) on.push('skip');
+    return on.length ? `Emails on ${on.join(', ')}` : 'No emails';
+  }
+
   clearFilters(): void {
     this.search.set('');
     this.statusFilter.set('');
+    this.executionFilter.set('');
   }
 }
