@@ -1,0 +1,92 @@
+<div class="space-y-4 max-w-4xl">
+  <div>
+    <h1 class="text-xl font-semibold tracking-tight">Document Converter</h1>
+    <p class="text-sm text-[color:var(--text-secondary)] mt-0.5">
+      Convert between Office, OpenDocument, PDF, Markdown and image formats.
+    </p>
+  </div>
+
+  <div class="card p-4 space-y-4">
+    <div>
+      <label class="label" for="file">File</label>
+      <input id="file" type="file" class="input" (change)="onFile($event)" />
+      @if (file() && !family()) {
+        <p class="text-sm text-warn-500 mt-1.5">
+          ".{{ extension() }}" isn't a format this can convert.
+        </p>
+      } @else if (family()) {
+        <p class="text-sm text-[color:var(--text-secondary)] mt-1.5">
+          Detected as {{ family()!.label }} · {{ (file()!.size / 1024).toFixed(0) }} KB
+        </p>
+      }
+    </div>
+
+    @if (family()) {
+      <div class="max-w-xs">
+        <label class="label" for="target">Convert to</label>
+        <select id="target" class="input" [value]="outputFormat()"
+                (change)="outputFormat.set($any($event.target).value)">
+          @for (format of family()!.outputFormats; track format) {
+            <option [value]="format">{{ format.toUpperCase() }}</option>
+          }
+        </select>
+      </div>
+
+      <div class="flex gap-2">
+        <button type="button" class="btn btn-primary" [disabled]="converting()" (click)="convert()">
+          {{ converting() ? 'Converting…' : 'Convert' }}
+        </button>
+        <button type="button" class="btn btn-ghost" (click)="reset()">Clear</button>
+      </div>
+    }
+
+    @if (result(); as done) {
+      <div class="rounded-md p-3.5 flex items-center gap-3"
+           style="background: var(--surface-sunken);">
+        <div class="flex-1 min-w-0">
+          <div class="text-sm font-medium truncate">{{ done.outputFileName }}</div>
+          <div class="text-xs text-[color:var(--text-muted)]">Ready to download</div>
+        </div>
+        <button type="button" class="btn btn-primary btn-sm" (click)="download()">Download</button>
+      </div>
+    }
+  </div>
+
+  <div class="card overflow-hidden">
+    <button type="button" class="w-full flex items-center gap-2 px-4 py-3 text-sm font-semibold"
+            (click)="showFormats.set(!showFormats())">
+      <span class="mr-auto">Supported formats</span>
+      <span class="text-[color:var(--text-muted)]">{{ showFormats() ? '▾' : '▸' }}</span>
+    </button>
+    @if (showFormats()) {
+      <div class="overflow-x-auto border-t" style="border-color: var(--border-subtle);">
+        <table class="table-modern">
+          <thead>
+            <tr><th>Family</th><th>From</th><th>To</th></tr>
+          </thead>
+          <tbody>
+            @for (family of families(); track family.key) {
+              <tr>
+                <td class="font-medium whitespace-nowrap">{{ family.label }}</td>
+                <td>
+                  <div class="flex flex-wrap gap-1">
+                    @for (f of family.inputFormats; track f) {
+                      <span class="pill pill-neutral">{{ f }}</span>
+                    }
+                  </div>
+                </td>
+                <td>
+                  <div class="flex flex-wrap gap-1">
+                    @for (f of family.outputFormats; track f) {
+                      <span class="pill pill-brand">{{ f }}</span>
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+</div>

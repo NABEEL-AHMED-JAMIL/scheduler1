@@ -55,6 +55,18 @@ export const routes: Routes = [
         data: { roles: ['PLATFORM_ADMIN', 'TENANT_ADMIN'] },
       },
       {
+        path: 'tools/converter',
+        loadComponent: () => import('./features/tools/converter/converter').then(m => m.Converter),
+      },
+      {
+        path: 'tools/transcript',
+        loadComponent: () => import('./features/tools/transcript/transcript').then(m => m.Transcript),
+      },
+      {
+        path: 'tools/cleaner',
+        loadComponent: () => import('./features/tools/cleaner/cleaner').then(m => m.Cleaner),
+      },
+      {
         path: 'objects',
         loadComponent: () => import('./features/objects/objects').then(m => m.Objects),
       },

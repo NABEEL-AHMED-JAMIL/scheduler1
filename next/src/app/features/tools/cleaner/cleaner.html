@@ -1,0 +1,32 @@
+<div class="space-y-4 max-w-5xl">
+  <div>
+    <h1 class="text-xl font-semibold tracking-tight">Content Cleaner</h1>
+    <p class="text-sm text-[color:var(--text-secondary)] mt-0.5">
+      Strip boilerplate and noise out of extracted text.
+    </p>
+  </div>
+
+  <div class="grid lg:grid-cols-2 gap-4">
+    <div class="card p-4 flex flex-col">
+      <label class="label" for="raw">Input</label>
+      <textarea id="raw" class="input flex-1 min-h-64 resize-y font-mono text-xs"
+                placeholder="Paste the text to clean"
+                [value]="input()" (input)="input.set($any($event.target).value)"></textarea>
+      <button type="button" class="btn btn-primary btn-sm mt-3 self-start"
+              [disabled]="cleaning() || !input().trim()" (click)="clean()">
+        {{ cleaning() ? 'Cleaning…' : 'Clean' }}
+      </button>
+    </div>
+
+    <div class="card p-4 flex flex-col">
+      <div class="flex items-center gap-2 mb-1.5">
+        <label class="label mb-0 mr-auto" for="clean">Output</label>
+        @if (output()) {
+          <button type="button" class="btn btn-ghost btn-sm" (click)="copy()">Copy</button>
+        }
+      </div>
+      <textarea id="clean" readonly class="input flex-1 min-h-64 resize-y font-mono text-xs"
+                placeholder="The cleaned text appears here" [value]="output()"></textarea>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,84 @@
+<div class="space-y-4 max-w-4xl">
+  <div>
+    <h1 class="text-xl font-semibold tracking-tight">Audio Transcript Extractor</h1>
+    <p class="text-sm text-[color:var(--text-secondary)] mt-0.5">
+      Speech-to-text for .mp3 and .m4a, run through the same pipeline as the batch job.
+    </p>
+  </div>
+
+  <div class="card p-4 space-y-4">
+    <div class="flex gap-1.5">
+      @for (option of [{id:'upload',label:'Upload a file'},{id:'bucket',label:'From a bucket'}]; track option.id) {
+        <button type="button" class="btn btn-sm"
+                [class.btn-primary]="mode() === option.id"
+                [class.btn-default]="mode() !== option.id"
+                (click)="mode.set($any(option.id)); transcript.set('')">{{ option.label }}</button>
+      }
+    </div>
+
+    @if (mode() === 'upload') {
+      <div>
+        <label class="label" for="audio">Audio file</label>
+        <input id="audio" type="file" class="input" accept=".mp3,.m4a" (change)="onFile($event)" />
+      </div>
+    } @else {
+      <div class="grid sm:grid-cols-2 gap-3">
+        <div>
+          <label class="label" for="tbucket">Connection</label>
+          <select id="tbucket" class="input" [value]="bucket()"
+                  (change)="onBucketChange($any($event.target).value)">
+            <option value="">Select a connection</option>
+            @for (b of buckets(); track b.bucket) {
+              <option [value]="b.bucket">{{ b.label }}</option>
+            }
+          </select>
+        </div>
+        <div>
+          <label class="label" for="tfile">Audio file</label>
+          <select id="tfile" class="input" [value]="selectedKey()"
+                  (change)="selectedKey.set($any($event.target).value)"
+                  [disabled]="!bucket() || loadingObjects()">
+            <option value="">
+              {{ loadingObjects() ? 'Loading…' : (audioObjects().length ? 'Select a file' : 'No audio in this folder') }}
+            </option>
+            @for (o of audioObjects(); track o.key) {
+              <option [value]="o.key">{{ o.name }}</option>
+            }
+          </select>
+        </div>
+      </div>
+    }
+
+    <label class="flex items-center gap-2 text-sm">
+      <input type="checkbox" [checked]="timestamps()"
+             (change)="timestamps.set($any($event.target).checked)" />
+      Include timestamps before each segment
+    </label>
+
+    <button type="button" class="btn btn-primary" [disabled]="!canExtract() || extracting()"
+            (click)="extract()">
+      {{ extracting() ? 'Extracting…' : 'Extract transcript' }}
+    </button>
+
+    @if (extracting()) {
+      <p class="text-sm text-[color:var(--text-muted)]">
+        Transcription runs on the server and can take a minute or two.
+      </p>
+    }
+  </div>
+
+  @if (error()) {
+    <div class="card p-4"><p class="text-sm text-crit-500">{{ error() }}</p></div>
+  }
+
+  @if (transcript()) {
+    <div class="card overflow-hidden">
+      <div class="flex items-center gap-2 px-4 py-2.5 border-b" style="border-color: var(--border-subtle);">
+        <span class="text-sm font-semibold mr-auto">Transcript</span>
+        <span class="text-xs text-[color:var(--text-muted)]">{{ transcript().length }} chars</span>
+        <button type="button" class="btn btn-default btn-sm" (click)="copy()">Copy</button>
+      </div>
+      <pre class="p-4 text-sm whitespace-pre-wrap break-words max-h-96 overflow-auto">{{ transcript() }}</pre>
+    </div>
+  }
+</div>
