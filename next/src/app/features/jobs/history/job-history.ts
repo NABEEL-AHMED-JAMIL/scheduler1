@@ -6,6 +6,9 @@ import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config
 import { TableShell } from '../../../shared/ui/data-table';
 import { StatusPill } from '../../../shared/ui/status-pill';
 import { Icon } from '../../../shared/ui/icon';
+import { Donut } from '../../../shared/charts/donut';
+import { BarChart } from '../../../shared/charts/bar-chart';
+import { statusColor } from '../../../shared/charts/status-color';
 
 interface JobQueue {
   jobQueueId: number;
@@ -19,7 +22,7 @@ interface JobQueue {
 
 @Component({
   selector: 'app-job-history',
-  imports: [Icon, DatePipe, RouterLink, TableShell, StatusPill],
+  imports: [Icon, DatePipe, RouterLink, TableShell, StatusPill, Donut, BarChart],
   templateUrl: './job-history.html',
 })
 export class JobHistory {
@@ -60,6 +63,54 @@ export class JobHistory {
     return [...counts.entries()].map(([status, count]) => ({ status, count }))
       .sort((a, b) => b.count - a.count);
   });
+
+  readonly showInsights = signal(false);
+
+  readonly outcomeMix = computed(() =>
+    this.summary().map(s => ({ name: s.status, value: s.count })));
+
+  readonly outcomeColor = statusColor;
+
+  private durationSeconds(run: JobQueue): number | null {
+    if (!run.startTime || !run.endTime) return null;
+    const seconds = (new Date(run.endTime).getTime() - new Date(run.startTime).getTime()) / 1000;
+    return Number.isFinite(seconds) && seconds >= 0 ? seconds : null;
+  }
+
+  /** Runs over time, newest last, so a lengthening trend is visible as a slope. */
+  readonly durationTrend = computed(() => {
+    const points = this.runs()
+      .map(run => ({ run, seconds: this.durationSeconds(run) }))
+      .filter((p): p is { run: JobQueue; seconds: number } => p.seconds !== null)
+      .sort((a, b) => (a.run.startTime ?? '').localeCompare(b.run.startTime ?? ''));
+    return points.slice(-24).map(p => ({
+      name: new Date(p.run.startTime!).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }),
+      value: Math.round(p.seconds),
+    }));
+  });
+
+  readonly durationStats = computed(() => {
+    const values = this.runs()
+      .map(run => this.durationSeconds(run))
+      .filter((v): v is number => v !== null)
+      .sort((a, b) => a - b);
+    if (!values.length) return null;
+    const median = values[Math.floor(values.length / 2)];
+    return {
+      fastest: values[0],
+      median,
+      slowest: values[values.length - 1],
+      count: values.length,
+    };
+  });
+
+  readonly hasInsights = computed(() => this.runs().length > 1);
+
+  formatSeconds(seconds: number): string {
+    if (seconds < 60) return `${Math.round(seconds)}s`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`;
+    return `${Math.floor(seconds / 3600)}h ${Math.round((seconds % 3600) / 60)}m`;
+  }
 
   constructor() {
     // Reading the route inputs inside an effect means clearing the drill-down re-fetches,

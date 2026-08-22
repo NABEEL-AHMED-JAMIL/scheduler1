@@ -243,6 +243,9 @@
   }
   .progress-bar { @apply h-full bg-brand-500 transition-[width] duration-200; }
 
+  .chart-title { @apply text-sm font-semibold mb-3; }
+  .chart-sub { @apply text-xs text-[color:var(--text-muted)] -mt-2 mb-3 leading-snug; }
+
   .table-modern { @apply w-full text-sm; }
   .table-modern thead th {
     border-color: var(--border-subtle);

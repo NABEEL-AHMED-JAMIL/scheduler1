@@ -9,6 +9,11 @@ import { confirmWith } from '../../shared/ui/confirm';
 import { TableShell } from '../../shared/ui/data-table';
 import { StatusPill } from '../../shared/ui/status-pill';
 import { Icon } from '../../shared/ui/icon';
+import { Donut } from '../../shared/charts/donut';
+import { RankedBar } from '../../shared/charts/ranked-bar';
+import { BarChart } from '../../shared/charts/bar-chart';
+import { statusColor } from '../../shared/charts/status-color';
+import { SplitBar } from '../../shared/charts/split-bar';
 
 interface QueueRow {
   jobQueueId: number;
@@ -18,13 +23,17 @@ interface QueueRow {
   startTime?: string;
   endTime?: string;
   dateCreated?: string;
+  runManual?: boolean;
+  jobSend?: boolean;
 }
+
+interface StatusStat { name: string; value: number; }
 
 const STATUSES = ['Queue', 'Start', 'Running', 'Completed', 'Failed', 'Skip', 'Interrupt', 'Missed'];
 
 @Component({
   selector: 'app-queue',
-  imports: [Icon, DatePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill],
+  imports: [Icon, DatePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Donut, RankedBar, BarChart, SplitBar],
   templateUrl: './queue.html',
 })
 export class Queue implements OnInit {
@@ -65,6 +74,100 @@ export class Queue implements OnInit {
       .sort((a, b) => b.count - a.count);
   });
 
+  readonly showInsights = signal(false);
+  /** The server's own breakdown for the range, which counts rows the table has filtered out. */
+  readonly statusStats = signal<StatusStat[]>([]);
+
+  readonly statusMix = computed(() => {
+    const server = this.statusStats();
+    if (server.length) {
+      return server.map(s => ({
+        name: s.name.charAt(0) + s.name.slice(1).toLowerCase(),
+        value: s.value,
+      }));
+    }
+    return this.counts().map(c => ({ name: c.status, value: c.count }));
+  });
+
+  /** Two flags the queue records per message, as the old screen charted them. */
+  readonly flagSplit = computed(() => {
+    const rows = this.rows();
+    const split = (key: 'runManual' | 'jobSend', label: string) => ({
+      label,
+      positive: rows.filter(r => r[key] === true).length,
+      negative: rows.filter(r => r[key] === false).length,
+    });
+    return [split('runManual', 'Started by hand'), split('jobSend', 'Sent to queue')];
+  });
+
+  readonly durations = computed(() => {
+    const buckets = [
+      { name: 'Under 5s', max: 5 },
+      { name: '5-30s', max: 30 },
+      { name: '30s-2m', max: 120 },
+      { name: '2-10m', max: 600 },
+      { name: 'Over 10m', max: Infinity },
+    ];
+    const counts = new Map<string, number>();
+    for (const row of this.rows()) {
+      if (!row.startTime || !row.endTime) continue;
+      const seconds = (new Date(row.endTime).getTime() - new Date(row.startTime).getTime()) / 1000;
+      if (!Number.isFinite(seconds) || seconds < 0) continue;
+      const bucket = buckets.find(b => seconds <= b.max)!;
+      counts.set(bucket.name, (counts.get(bucket.name) ?? 0) + 1);
+    }
+    return buckets
+      .map(b => ({ name: b.name, value: counts.get(b.name) ?? 0 }))
+      .filter(b => b.value > 0);
+  });
+
+  readonly byJob = computed(() => {
+    const map = new Map<string, number>();
+    for (const row of this.rows()) {
+      const key = String(row.jobId ?? '—');
+      map.set(key, (map.get(key) ?? 0) + 1);
+    }
+    return [...map.entries()].map(([name, value]) => ({ name: `Job ${name}`, value }));
+  });
+
+  /** Volume per day, oldest first, so the bars read left to right like a calendar. */
+  readonly byDay = computed(() => {
+    const map = new Map<string, number>();
+    for (const row of this.rows()) {
+      const day = (row.dateCreated ?? '').slice(0, 10);
+      if (!day) continue;
+      map.set(day, (map.get(day) ?? 0) + 1);
+    }
+    return [...map.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([day, value]) => ({
+        name: new Date(day + 'T00:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short' }),
+        value,
+      }));
+  });
+
+  readonly statisticTotal = computed(() =>
+    this.statusMix().reduce((sum, s) => sum + s.value, 0));
+
+  /**
+   * The server counts the whole range but returns a capped slice of rows, so the donut and
+   * the table legitimately disagree. Saying so beats showing two totals and no explanation.
+   */
+  readonly notListed = computed(() =>
+    Math.max(0, this.statisticTotal() - this.rows().length));
+
+  readonly failureRate = computed(() => {
+    const mix = this.statusMix();
+    const total = mix.reduce((sum, s) => sum + s.value, 0);
+    if (!total) return 0;
+    const failed = mix.filter(s => /fail|interrupt/i.test(s.name)).reduce((sum, s) => sum + s.value, 0);
+    return Math.round((failed / total) * 100);
+  });
+
+  readonly hasInsights = computed(() => this.rows().length > 0);
+
+  readonly outcomeColor = statusColor;
+
   ngOnInit(): void { this.load(); }
 
   load(): void {
@@ -82,7 +185,10 @@ export class Queue implements OnInit {
         this.loading.set(false);
         if (response.status !== API_SUCCESS) { this.error.set(response.message); return; }
         const data = response.data as any;
-        this.rows.set(Array.isArray(data) ? data : (data?.jobQueues ?? []));
+        // The payload is { jobStatusStatistic, sourceJobQueues }. This read "jobQueues",
+        // which never matched, so the screen showed an empty table over hundreds of rows.
+        this.rows.set(Array.isArray(data) ? data : (data?.sourceJobQueues ?? []));
+        this.statusStats.set(Array.isArray(data) ? [] : (data?.jobStatusStatistic ?? []));
       },
       error: err => {
         this.loading.set(false);

@@ -87,12 +87,46 @@
           {{ counts().files }} file{{ counts().files === 1 ? '' : 's' }}
           @if (counts().bytes) { · {{ formatBytes(counts().bytes) }} }
         </span>
+        @if (hasInsights()) {
+          <button type="button" class="btn btn-ghost btn-sm ml-auto"
+                  [class.text-brand-600]="showInsights()"
+                  (click)="showInsights.set(!showInsights())">
+            <app-icon name="chart" />{{ showInsights() ? 'Hide' : 'Insights' }}
+          </button>
+        }
         @if (isSlowProvider()) {
-          <span class="pill pill-warn ml-auto" title="Each request opens a new connection">
+          <span class="pill pill-warn" title="Each request opens a new connection">
             {{ provider() }} · slower
           </span>
         }
       </div>
+
+      @if (showInsights() && hasInsights()) {
+        <div class="grid gap-4 p-4 border-b md:grid-cols-2 xl:grid-cols-4"
+             style="border-color: var(--border-subtle); background: var(--surface-page);">
+          <div class="card p-4">
+            <h3 class="chart-title">What is here</h3>
+            <app-donut [data]="mix()" totalLabel="entries in this folder" />
+          </div>
+
+          <div class="card p-4">
+            <h3 class="chart-title">File types</h3>
+            <app-ranked-bar [data]="byType()" [max]="6" />
+          </div>
+
+          <div class="card p-4">
+            <h3 class="chart-title">Last modified</h3>
+            <p class="chart-sub">Oldest data is usually the first worth archiving.</p>
+            <app-ranked-bar [data]="byAge()" [sorted]="false" [max]="6" />
+          </div>
+
+          <div class="card p-4">
+            <h3 class="chart-title">Largest files</h3>
+            <app-ranked-bar [data]="bySize()" [max]="6" [showPercent]="false"
+                            [formatValue]="humanSizeFn" />
+          </div>
+        </div>
+      }
 
       @if (error()) {
         <div class="p-10 text-center">

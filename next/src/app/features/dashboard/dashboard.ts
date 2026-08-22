@@ -8,6 +8,7 @@ import { DashboardService, HourCell, JobBreakdown, NameValue } from './dashboard
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { ToastService } from '../../shared/ui/toast.service';
 import { Icon } from '../../shared/ui/icon';
+import { statusColor } from '../../shared/charts/status-color';
 
 const DAY_ORDER = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -67,18 +68,7 @@ export class Dashboard implements OnInit {
     this.weekly().map(d => ({ name: d.name, value: d.value })));
 
   /** Run outcomes keep their status colours so a chart matches the pills in the tables. */
-  readonly outcomeColor = (name: string, index: number): string => {
-    switch ((name ?? '').toLowerCase()) {
-      case 'completed': return 'var(--color-ok-500)';
-      case 'failed':    return 'var(--color-crit-500)';
-      case 'missed':
-      case 'skip':      return 'var(--color-warn-500)';
-      case 'running':
-      case 'start':
-      case 'queue':     return 'var(--color-brand-500)';
-      default:          return `var(--chart-${index % 6})`;
-    }
-  };
+  readonly outcomeColor = statusColor;
 
   /** Hour-by-weekday cells for the heatmap; the date rides along so a click can drill in. */
   readonly heatCells = computed<HeatCell[]>(() =>

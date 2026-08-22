@@ -7,7 +7,7 @@ export interface Bar { name: string; value: number; meta?: unknown; }
   template: `
     @if (bars().length) {
       <div class="flex items-end gap-1.5" [style.height.px]="height()">
-        @for (bar of bars(); track bar.name) {
+        @for (bar of bars(); track $index) {
           <button type="button"
                   class="flex-1 min-w-0 h-full flex flex-col justify-end items-center gap-1.5
                          rounded-md px-0.5 transition-colors hover:bg-[color:var(--surface-sunken)]
@@ -18,31 +18,42 @@ export interface Bar { name: string; value: number; meta?: unknown; }
             <span class="text-[11px] tabular text-[color:var(--text-secondary)]">{{ bar.value }}</span>
             <span class="w-full rounded-t bg-brand-500 transition-[height]"
                   [style.height.px]="bar.px"></span>
-            <span class="text-[11px] text-[color:var(--text-muted)] truncate w-full text-center">
-              {{ bar.name }}
+            <span class="text-[11px] text-[color:var(--text-muted)] w-full text-center h-4 leading-4"
+                  [class.truncate]="!bar.newGroup">
+              @if (bar.newGroup) {
+                <span class="whitespace-nowrap">{{ bar.name }}</span>
+              }
             </span>
           </button>
         }
       </div>
       @if (usesSqrtScale()) {
         <p class="text-[11px] text-[color:var(--text-muted)] mt-2">
-          Bar heights use a square-root scale so smaller days stay visible next to
+          Bar heights use a square-root scale so smaller {{ unit() }} stay visible next to
           {{ maxValue() }}.
         </p>
       }
     } @else {
-      <p class="text-sm text-[color:var(--text-muted)] py-10 text-center">No runs in this range.</p>
+      <p class="text-sm text-[color:var(--text-muted)] py-10 text-center">{{ emptyMessage() }}</p>
     }
   `,
 })
 export class BarChart {
   readonly data = input.required<Bar[]>();
   readonly height = input(140);
+  /** Named so the scale note reads correctly wherever the chart is used, not just on the dashboard. */
+  readonly unit = input('values');
+  readonly emptyMessage = input('Nothing to show in this range.');
   readonly clickable = input(false);
   readonly barClicked = output<Bar>();
 
   readonly maxValue = computed(() => Math.max(0, ...this.data().map(d => d.value ?? 0)));
 
+  /**
+   * Twenty-four bars from one day all read "Aug 19", and at ~20px each the label truncates to
+   * "A...". A repeated label carries nothing, so only the first of each run is drawn, and it
+   * is free to overflow its own cell because its neighbours are now empty.
+   */
   /**
    * A single busy day can be two orders of magnitude above the rest, and on a linear scale
    * every other bar collapses to a hairline. Above a 20x spread the scale switches to
@@ -60,10 +71,12 @@ export class BarChart {
     // Reserve room for the value and label lines above and below the bar itself.
     const track = Math.max(this.height() - 42, 20);
     const sqrt = this.usesSqrtScale();
-    return this.data().map(bar => {
+    const data = this.data();
+    return data.map((bar, index) => {
       const ratio = sqrt ? Math.sqrt(bar.value) / Math.sqrt(max) : bar.value / max;
       return {
         ...bar,
+        newGroup: index === 0 || bar.name !== data[index - 1].name,
         // A non-zero value never renders as nothing.
         px: bar.value > 0 ? Math.max(Math.round(ratio * track), 3) : 0,
       };

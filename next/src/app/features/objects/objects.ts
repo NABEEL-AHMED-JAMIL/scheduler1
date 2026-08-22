@@ -8,6 +8,8 @@ import { ToastService } from '../../shared/ui/toast.service';
 import { confirmWith } from '../../shared/ui/confirm';
 import { copyText } from '../../shared/ui/clipboard.util';
 import { PreviewDialog } from './preview/preview-dialog';
+import { Donut } from '../../shared/charts/donut';
+import { RankedBar } from '../../shared/charts/ranked-bar';
 import { FileChat } from './chat/file-chat';
 import { PromptDialog } from './dialogs/prompt-dialog';
 import { ShareDialog, ShareResult } from './dialogs/share-dialog';
@@ -22,7 +24,7 @@ const SLOW_PROVIDERS = ['FTP', 'FTPS'];
 
 @Component({
   selector: 'app-objects',
-  imports: [Icon, DatePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, FileChat],
+  imports: [Icon, DatePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, FileChat, Donut, RankedBar],
   templateUrl: './objects.html',
 })
 export class Objects implements OnInit {
@@ -78,6 +80,70 @@ export class Objects implements OnInit {
       bytes: list.reduce((sum, o) => sum + (o.size ?? 0), 0),
     };
   });
+
+  /** Oldest-first, because the order is the point -- sorting these by size would hide the shape. */
+  private static readonly AGE_BUCKETS: { label: string; maxDays: number }[] = [
+    { label: 'Last 30 days', maxDays: 30 },
+    { label: '1-6 months', maxDays: 182 },
+    { label: '6-12 months', maxDays: 365 },
+    { label: '1-2 years', maxDays: 730 },
+    { label: '2-5 years', maxDays: 1825 },
+    { label: '5+ years', maxDays: Infinity },
+  ];
+
+  readonly showInsights = signal(false);
+
+  readonly mix = computed(() => {
+    const c = this.counts();
+    return [
+      { name: 'Files', value: c.files },
+      { name: 'Folders', value: c.folders },
+    ].filter(s => s.value > 0);
+  });
+
+  readonly byType = computed(() => {
+    const counts = new Map<string, number>();
+    this.objects().filter(o => !o.folder).forEach(o => {
+      const dot = o.name.lastIndexOf('.');
+      const ext = dot > 0 && dot < o.name.length - 1
+        ? o.name.slice(dot + 1).toUpperCase()
+        : 'no extension';
+      counts.set(ext, (counts.get(ext) ?? 0) + 1);
+    });
+    return [...counts.entries()].map(([name, value]) => ({ name, value }));
+  });
+
+  readonly byAge = computed(() => {
+    const now = Date.now();
+    const buckets = new Map<string, number>();
+    this.objects().filter(o => !o.folder).forEach(o => {
+      const modified = o.lastModified ? new Date(o.lastModified).getTime() : NaN;
+      const days = Number.isNaN(modified) ? Infinity : Math.max(0, (now - modified) / 86_400_000);
+      const bucket = Objects.AGE_BUCKETS.find(b => days <= b.maxDays) ?? Objects.AGE_BUCKETS[Objects.AGE_BUCKETS.length - 1];
+      buckets.set(bucket.label, (buckets.get(bucket.label) ?? 0) + 1);
+    });
+    return Objects.AGE_BUCKETS
+      .map(b => ({ name: b.label, value: buckets.get(b.label) ?? 0 }))
+      .filter(b => b.value > 0);
+  });
+
+  readonly bySize = computed(() =>
+    this.objects()
+      .filter(o => !o.folder && (o.size ?? 0) > 0)
+      .map(o => ({ name: o.name, value: o.size!, display: this.humanSize(o.size!), key: o.key })));
+
+  readonly hasInsights = computed(() =>
+    this.objects().some(o => !o.folder) || this.counts().folders > 0);
+
+  /** Bound as a value so the template can hand it to the chart without re-binding `this`. */
+  readonly humanSizeFn = (bytes: number) => this.humanSize(bytes);
+
+  humanSize(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KB`;
+    if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+    return `${(bytes / 1024 ** 3).toFixed(2)} GB`;
+  }
 
   readonly allSelected = computed(() => {
     const rows = this.filtered().filter(o => !o.folder);
