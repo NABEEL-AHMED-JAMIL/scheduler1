@@ -102,6 +102,21 @@ export const routes: Routes = [
         data: { roles: ['PLATFORM_ADMIN', 'TENANT_ADMIN'] },
       },
       {
+        path: 'unauthorized',
+        loadComponent: () =>
+          import('./features/unauthorized/unauthorized').then(m => m.Unauthorized),
+      },
+      {
+        path: 'jobs/bulk',
+        loadComponent: () => import('./features/bulk/bulk-transfer').then(m => m.BulkTransfer),
+        data: { kind: 'job' },
+      },
+      {
+        path: 'tasks/bulk',
+        loadComponent: () => import('./features/bulk/bulk-transfer').then(m => m.BulkTransfer),
+        data: { kind: 'task' },
+      },
+      {
         path: 'tools/query',
         loadComponent: () =>
           import('./features/tools/query-engine/query-engine').then(m => m.QueryEngine),

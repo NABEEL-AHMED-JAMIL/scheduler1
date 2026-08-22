@@ -6,7 +6,12 @@
         Scheduled work. A job binds a task to a timetable.
       </p>
     </div>
-    <a routerLink="/jobs/new" class="btn btn-primary btn-sm"><app-icon name="plus" />New job</a>
+    <div class="flex items-center gap-2">
+      <a routerLink="/jobs/bulk" class="btn btn-ghost btn-sm">
+        <app-icon name="upload" />Bulk import
+      </a>
+      <a routerLink="/jobs/new" class="btn btn-primary btn-sm"><app-icon name="plus" />New job</a>
+    </div>
   </div>
 
   <app-table-shell heading="Jobs" [loading]="loading()" [error]="error()"

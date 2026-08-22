@@ -6,7 +6,12 @@
       A task describes one unit of work and where it reads and writes. Jobs point at these.
     </p>
     </div>
-    <a routerLink="/tasks/new" class="btn btn-primary btn-sm"><app-icon name="plus" />New task</a>
+    <div class="flex items-center gap-2">
+      <a routerLink="/tasks/bulk" class="btn btn-ghost btn-sm">
+        <app-icon name="upload" />Bulk import
+      </a>
+      <a routerLink="/tasks/new" class="btn btn-primary btn-sm"><app-icon name="plus" />New task</a>
+    </div>
   </div>
 
   <app-table-shell heading="Tasks" [loading]="loading()" [error]="error()"

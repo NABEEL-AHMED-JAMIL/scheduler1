@@ -226,6 +226,23 @@
   }
   .tab-active app-icon { color: var(--color-brand-500); }
 
+  .dropzone {
+    border-color: var(--border-strong);
+    background: var(--surface-sunken);
+    @apply flex flex-col items-center justify-center text-center rounded-lg border-2 border-dashed
+           px-6 py-10 transition-colors;
+  }
+  .dropzone-active {
+    border-color: var(--color-brand-500);
+    background: color-mix(in oklab, var(--color-brand-500) 8%, var(--surface-sunken));
+  }
+
+  .progress {
+    background: var(--surface-raised);
+    @apply h-1.5 w-full overflow-hidden rounded-full;
+  }
+  .progress-bar { @apply h-full bg-brand-500 transition-[width] duration-200; }
+
   .table-modern { @apply w-full text-sm; }
   .table-modern thead th {
     border-color: var(--border-subtle);

@@ -1,0 +1,100 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <button type="button" class="btn btn-ghost btn-sm -ml-2 mb-1" (click)="back()">
+        <app-icon name="arrowLeft" />Back
+      </button>
+      <h1 class="page-title">Bulk {{ noun() }}</h1>
+      <p class="page-subtitle">
+        Import many {{ noun() }} from a spreadsheet, or export what is already here.
+      </p>
+    </div>
+  </div>
+
+  <div class="grid gap-4 lg:grid-cols-2 items-start">
+    <div class="card p-5">
+      <h2 class="text-sm font-semibold flex items-center gap-2">
+        <app-icon name="upload" class="icon-info" />Import
+      </h2>
+      <p class="text-xs text-[color:var(--text-muted)] mt-1 leading-snug">
+        Start from the template — it carries the column names and the allowed values the
+        importer expects.
+      </p>
+
+      <div class="dropzone mt-4" [class.dropzone-active]="dragging()"
+           (dragover)="onDragOver($event)" (dragleave)="onDragLeave()" (drop)="onDrop($event)">
+        @if (file(); as picked) {
+          <app-icon name="file" size="1.75rem" class="icon-info" />
+          <p class="mt-2 text-sm font-medium break-all">{{ picked.name }}</p>
+          <p class="text-xs text-[color:var(--text-muted)] mt-0.5">{{ fileSize() }}</p>
+          @if (uploading()) {
+            <div class="progress mt-3"><div class="progress-bar" [style.width.%]="progress()"></div></div>
+            <p class="text-xs text-[color:var(--text-muted)] mt-1.5">{{ progress() }}% uploaded</p>
+          } @else {
+            <div class="flex items-center justify-center gap-2 mt-3">
+              <button type="button" class="btn btn-primary btn-sm" (click)="upload()">
+                <app-icon name="upload" />Upload
+              </button>
+              <button type="button" class="btn btn-ghost btn-sm" (click)="clearFile()">
+                <app-icon name="close" />Remove
+              </button>
+            </div>
+          }
+        } @else {
+          <app-icon name="upload" size="1.75rem" class="icon-muted" />
+          <p class="mt-2 text-sm">Drop a spreadsheet here</p>
+          <p class="text-xs text-[color:var(--text-muted)] mt-0.5">.xlsx or .xls</p>
+          <label class="btn btn-default btn-sm mt-3 cursor-pointer">
+            <app-icon name="folder" />Choose a file
+            <input type="file" class="sr-only" accept=".xlsx,.xls" (change)="onPick($event)" />
+          </label>
+        }
+      </div>
+
+      @if (result(); as r) {
+        <div class="card flex items-start gap-2 px-3 py-2.5 text-sm mt-4"
+             [style.border-color]="r.ok ? 'var(--color-ok-500)' : 'var(--color-crit-500)'">
+          <app-icon [name]="r.ok ? 'checkCircle' : 'xCircle'"
+                    [class]="r.ok ? 'icon-ok' : 'icon-crit'" class="mt-0.5 shrink-0" />
+          <span>{{ r.message }}</span>
+        </div>
+      }
+    </div>
+
+    <div class="card p-5">
+      <h2 class="text-sm font-semibold flex items-center gap-2">
+        <app-icon name="download" class="icon-info" />Export
+      </h2>
+      <p class="text-xs text-[color:var(--text-muted)] mt-1 leading-snug">
+        The template is an empty sheet with the right columns. The export is every
+        {{ noun().slice(0, -1) }} you can currently see.
+      </p>
+
+      <div class="mt-4 space-y-2">
+        <button type="button" class="btn btn-default btn-sm w-full justify-start"
+                [disabled]="downloading() === 'template'" (click)="download('template')">
+          <app-icon [name]="downloading() === 'template' ? 'refresh' : 'template'"
+                    [class.spin]="downloading() === 'template'" />
+          <span class="text-left">
+            Import template
+            <span class="block text-xs text-[color:var(--text-muted)] font-normal">
+              Blank sheet with the expected columns
+            </span>
+          </span>
+        </button>
+
+        <button type="button" class="btn btn-default btn-sm w-full justify-start"
+                [disabled]="downloading() === 'exportAll'" (click)="download('exportAll')">
+          <app-icon [name]="downloading() === 'exportAll' ? 'refresh' : 'download'"
+                    [class.spin]="downloading() === 'exportAll'" />
+          <span class="text-left">
+            Export all {{ noun() }}
+            <span class="block text-xs text-[color:var(--text-muted)] font-normal">
+              Everything in your tenant, as a spreadsheet
+            </span>
+          </span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
