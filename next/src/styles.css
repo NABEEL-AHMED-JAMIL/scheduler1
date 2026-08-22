@@ -188,3 +188,13 @@ html.dark .pill-brand { @apply bg-brand-900/50 text-brand-300; }
 html.dark .pill-ok    { background: color-mix(in oklab, var(--color-ok-500) 22%, transparent); @apply text-ok-400; }
 html.dark .pill-warn  { background: color-mix(in oklab, var(--color-warn-500) 22%, transparent); @apply text-warn-400; }
 html.dark .pill-crit  { background: color-mix(in oklab, var(--color-crit-500) 22%, transparent); @apply text-crit-400; }
+
+@layer components {
+  .menu-item {
+    @apply w-full text-left px-3 py-1.5 rounded-sm
+           text-[color:var(--text-secondary)]
+           hover:bg-[color:var(--surface-sunken)] hover:text-[color:var(--text-primary)]
+           focus:bg-[color:var(--surface-sunken)] focus:outline-none;
+  }
+  .menu-item-danger { @apply text-crit-500 hover:text-crit-500; }
+}
