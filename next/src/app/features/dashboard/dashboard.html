@@ -140,13 +140,31 @@
             </tbody>
             @if (breakdownTotal(); as totals) {
               <tfoot>
-                <tr class="font-semibold" style="background: var(--surface-sunken);">
-                  <td>All jobs this hour</td>
+                <tr style="border-top: 2px solid var(--border-strong);">
+                  <td class="font-semibold">
+                    Total
+                    <span class="font-normal text-[color:var(--text-muted)]">
+                      · {{ filteredBreakdown().length }} job{{ filteredBreakdown().length === 1 ? '' : 's' }}
+                    </span>
+                  </td>
                   @for (column of columns; track column) {
-                    <td class="text-right tabular">{{ countFor(totals, column) }}</td>
+                    <td class="text-right tabular font-semibold"
+                        [class.text-[color:var(--text-muted)]]="!countFor(totals, column)"
+                        [class.font-normal]="!countFor(totals, column)">
+                      {{ countFor(totals, column) }}
+                    </td>
                   }
-                  <td class="text-right tabular">{{ totals.total }}</td>
-                  <td></td>
+                  <td class="text-right tabular font-semibold">{{ totals.total }}</td>
+                  <td>
+                    <div class="flex h-2 rounded-full overflow-hidden"
+                         style="background: var(--surface);">
+                      @for (segment of segmentsFor(totals); track segment.key) {
+                        <span [style.width.%]="segment.pct"
+                              [style.background]="'var(--chart-' + $index % 6 + ')'"
+                              [title]="segment.key + ': ' + segment.count"></span>
+                      }
+                    </div>
+                  </td>
                 </tr>
               </tfoot>
             }

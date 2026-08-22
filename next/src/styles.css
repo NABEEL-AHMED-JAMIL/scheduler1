@@ -179,6 +179,13 @@
     @apply border-b px-4 py-2.5 align-middle;
   }
   .table-modern tbody tr:last-child td { @apply border-b-0; }
+
+  /* tfoot had no rule at all, so total rows rendered with zero padding and their
+     content ran flush to the table edge. */
+  .table-modern tfoot td {
+    @apply px-4 py-2.5 align-middle;
+  }
+  .table-modern tfoot tr { background: var(--surface-sunken); }
   .table-modern tbody tr:hover { background: var(--surface-sunken); }
 
   .mono { font-family: var(--font-mono); @apply text-xs; }
