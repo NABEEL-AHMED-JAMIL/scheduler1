@@ -30,11 +30,11 @@
       { label: 'Admins',           value: summary().admins },
       { label: 'Never signed in',  value: summary().neverSignedIn }
     ]; track tile.label) {
-      <div class="card p-3.5">
-        <div class="text-[11px] font-semibold uppercase tracking-wider text-[color:var(--text-muted)]">
+      <div class="stat-tile">
+        <div class="stat-label">
           {{ tile.label }}
         </div>
-        <div class="mt-1 text-xl font-semibold tabular">{{ tile.value }}</div>
+        <div class="stat-value">{{ tile.value }}</div>
       </div>
     }
   </div>

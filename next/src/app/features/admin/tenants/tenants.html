@@ -18,12 +18,12 @@
       { label: 'Jobs',     value: stats().jobs,     foot: stats().tasks + ' tasks' },
       { label: 'Unused',   value: stats().empty,    foot: 'no resources yet' }
     ]; track tile.label) {
-      <div class="card p-3.5">
-        <div class="text-[11px] font-semibold uppercase tracking-wider text-[color:var(--text-muted)]">
+      <div class="stat-tile">
+        <div class="stat-label">
           {{ tile.label }}
         </div>
-        <div class="mt-1 text-xl font-semibold tabular">{{ tile.value }}</div>
-        <div class="mt-0.5 text-[11px] text-[color:var(--text-muted)]">{{ tile.foot }}</div>
+        <div class="stat-value">{{ tile.value }}</div>
+        <div class="stat-foot">{{ tile.foot }}</div>
       </div>
     }
   </div>
