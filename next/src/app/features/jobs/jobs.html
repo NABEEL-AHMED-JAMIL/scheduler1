@@ -6,6 +6,7 @@
         Scheduled work. A job binds a task to a timetable.
       </p>
     </div>
+    <a routerLink="/jobs/new" class="btn btn-primary btn-sm">New job</a>
   </div>
 
   <app-table-shell heading="Jobs" [loading]="loading()" [error]="error()"
@@ -113,6 +114,9 @@
                           [title]="!job.scheduler ? 'Only scheduled jobs have a next run' : ''"
                           (cdkMenuItemTriggered)="skipNext(job)">Skip next run</button>
                   <div class="my-1 border-t" style="border-color: var(--border-subtle);"></div>
+                  <a cdkMenuItem class="menu-item block" [routerLink]="['/jobs', job.jobId, 'edit']">
+                    Edit
+                  </a>
                   <a cdkMenuItem class="menu-item block" [routerLink]="['/jobs', job.jobId, 'history']">
                     Run history
                   </a>

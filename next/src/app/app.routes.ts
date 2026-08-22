@@ -21,6 +21,14 @@ export const routes: Routes = [
         loadComponent: () => import('./features/jobs/jobs').then(m => m.Jobs),
       },
       {
+        path: 'jobs/new',
+        loadComponent: () => import('./features/jobs/edit/job-edit').then(m => m.JobEdit),
+      },
+      {
+        path: 'jobs/:jobId/edit',
+        loadComponent: () => import('./features/jobs/edit/job-edit').then(m => m.JobEdit),
+      },
+      {
         path: 'jobs/:jobId/history',
         loadComponent: () =>
           import('./features/jobs/history/job-history').then(m => m.JobHistory),
