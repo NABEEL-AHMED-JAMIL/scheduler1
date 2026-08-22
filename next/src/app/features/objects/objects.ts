@@ -7,6 +7,8 @@ import { API_SUCCESS } from '../../core/api/api.config';
 import { ToastService } from '../../shared/ui/toast.service';
 import { confirmWith } from '../../shared/ui/confirm';
 import { copyText } from '../../shared/ui/clipboard.util';
+import { PreviewDialog } from './preview/preview-dialog';
+import { FileChat } from './chat/file-chat';
 
 interface Crumb { name: string; prefix: string; }
 
@@ -15,7 +17,7 @@ const SLOW_PROVIDERS = ['FTP', 'FTPS'];
 
 @Component({
   selector: 'app-objects',
-  imports: [DatePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger],
+  imports: [DatePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, FileChat],
   templateUrl: './objects.html',
 })
 export class Objects implements OnInit {
@@ -217,6 +219,26 @@ export class Objects implements OnInit {
         this.toast.error(err?.error?.message || 'Upload failed.');
       },
     });
+  }
+
+  /** The file the chat panel is bound to; null when the panel is closed. */
+  readonly chatFile = signal<ObjectSummary | null>(null);
+
+  preview(entry: ObjectSummary): void {
+    this.dialog.open(PreviewDialog, {
+      data: { bucket: this.bucket(), key: entry.key, name: entry.name },
+      hasBackdrop: true,
+    });
+  }
+
+  openChat(entry: ObjectSummary): void {
+    this.chatFile.set(entry);
+  }
+
+  /** Preview the file the chat is about; the two are independent panels. */
+  previewChatFile(): void {
+    const entry = this.chatFile();
+    if (entry) this.preview(entry);
   }
 
   formatBytes(bytes?: number): string {

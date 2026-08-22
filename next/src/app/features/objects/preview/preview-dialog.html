@@ -1,0 +1,45 @@
+<div class="card shadow-2xl w-[56rem] max-w-[calc(100vw-2rem)] max-h-[85vh] flex flex-col overflow-hidden">
+  <div class="flex items-center gap-3 px-4 py-3 border-b shrink-0"
+       style="border-color: var(--border-subtle);">
+    <span class="text-sm font-medium truncate mr-auto" [title]="data.name">{{ data.name }}</span>
+    <button type="button" class="btn btn-default btn-sm" (click)="download()">Download</button>
+    <button type="button" class="btn btn-ghost btn-icon" (click)="close()" aria-label="Close">×</button>
+  </div>
+
+  <div class="flex-1 overflow-auto p-4 min-h-40">
+    @if (loading()) {
+      <p class="text-center text-sm text-[color:var(--text-muted)] py-12">Loading…</p>
+    } @else if (error()) {
+      <p class="text-center text-sm text-crit-500 py-12">{{ error() }}</p>
+    } @else {
+      @switch (kind()) {
+        @case ('none') {
+          <div class="text-center py-12">
+            <p class="text-sm text-[color:var(--text-secondary)]">
+              There's no inline preview for this file type.
+            </p>
+            <button type="button" class="btn btn-primary btn-sm mt-3" (click)="download()">
+              Download instead
+            </button>
+          </div>
+        }
+        @case ('image') {
+          <img [src]="mediaUrl()" [alt]="data.name" class="max-w-full mx-auto rounded" />
+        }
+        @case ('pdf') {
+          <iframe [src]="mediaUrl()" class="w-full h-[65vh] rounded border"
+                  style="border-color: var(--border-subtle);" [title]="data.name"></iframe>
+        }
+        @case ('audio') {
+          <audio [src]="mediaUrl()" controls class="w-full mt-6"></audio>
+        }
+        @case ('video') {
+          <video [src]="mediaUrl()" controls class="w-full max-h-[65vh] rounded"></video>
+        }
+        @default {
+          <pre class="mono text-xs leading-relaxed whitespace-pre-wrap break-words">{{ text() }}</pre>
+        }
+      }
+    }
+  </div>
+</div>

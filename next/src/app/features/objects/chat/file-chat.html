@@ -1,0 +1,79 @@
+<div class="fixed bottom-4 right-4 z-50 w-[32rem] max-w-[calc(100vw-2rem)] card shadow-2xl
+            flex flex-col overflow-hidden"
+     [style.height]="minimized() ? 'auto' : 'min(38rem, calc(100vh - 3rem))'">
+
+  <div class="flex items-center gap-2 px-3.5 py-2.5 border-b shrink-0"
+       style="border-color: var(--border-subtle);">
+    <span class="text-sm font-medium mr-auto truncate" [title]="fileName()">{{ fileName() }}</span>
+    <button type="button" class="btn btn-ghost btn-sm" (click)="viewRequested.emit()">View</button>
+    <button type="button" class="btn btn-ghost btn-icon"
+            (click)="minimized.set(!minimized())"
+            [attr.aria-label]="minimized() ? 'Expand' : 'Minimise'">
+      {{ minimized() ? '▴' : '▾' }}
+    </button>
+    <button type="button" class="btn btn-ghost btn-icon" (click)="closed.emit()" aria-label="Close">×</button>
+  </div>
+
+  @if (!minimized()) {
+    <div class="flex items-center gap-2 px-3.5 py-2 border-b text-xs shrink-0"
+         style="border-color: var(--border-subtle);">
+      <label class="text-[color:var(--text-muted)]" for="agent">Agent</label>
+      <select id="agent" class="input py-1 text-xs max-w-56"
+              [value]="agentId() ?? ''"
+              (change)="agentId.set(+$any($event.target).value)"
+              [disabled]="!agents().length">
+        @if (!agents().length) { <option value="">No usable agents</option> }
+        @for (agent of agents(); track agent.aiAgentId) {
+          <option [value]="agent.aiAgentId">{{ agent.agentName }} · {{ agent.provider }}</option>
+        }
+      </select>
+    </div>
+
+    <div #scroller class="flex-1 overflow-y-auto px-3.5 py-3 space-y-3 min-h-0">
+      @if (preparing()) {
+        <p class="text-center text-sm text-[color:var(--text-muted)] py-8">Reading the file…</p>
+      } @else if (prepareError()) {
+        <p class="text-center text-sm text-crit-500 py-8">{{ prepareError() }}</p>
+      } @else if (!messages().length) {
+        <p class="text-center text-sm text-[color:var(--text-muted)] py-8">
+          Ask something about this file to get started.
+        </p>
+      }
+
+      @for (message of messages(); track $index) {
+        <div class="flex" [class.justify-end]="message.role === 'user'">
+          <div class="rounded-lg px-3 py-2 text-sm max-w-[85%] whitespace-pre-wrap break-words"
+               [class]="message.role === 'user'
+                          ? 'bg-brand-500 text-white'
+                          : message.role === 'error'
+                            ? 'bg-crit-50 text-crit-500'
+                            : 'bg-[color:var(--surface-sunken)]'">
+            {{ message.text }}
+          </div>
+        </div>
+      }
+
+      @if (sending()) {
+        <p class="text-sm text-[color:var(--text-muted)]">Thinking…</p>
+      }
+    </div>
+
+    @if (!preparing() && !prepareError() && !messages().length) {
+      <div class="flex flex-wrap gap-1.5 px-3.5 pb-2 shrink-0">
+        @for (suggestion of suggestions; track suggestion) {
+          <button type="button" class="pill pill-neutral hover:bg-brand-50"
+                  (click)="send(suggestion)">{{ suggestion }}</button>
+        }
+      </div>
+    }
+
+    <div class="flex gap-2 px-3.5 py-2.5 border-t shrink-0" style="border-color: var(--border-subtle);">
+      <textarea class="input resize-none text-sm" rows="1" placeholder="Message"
+                [value]="draft()" (input)="draft.set($any($event.target).value)"
+                (keydown)="onKeydown($event)"
+                [disabled]="preparing() || !!prepareError()"></textarea>
+      <button type="button" class="btn btn-primary btn-sm self-end"
+              [disabled]="sending() || !draft().trim()" (click)="send()">Send</button>
+    </div>
+  }
+</div>

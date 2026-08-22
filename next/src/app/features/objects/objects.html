@@ -113,7 +113,7 @@
                   </td>
                   <td class="max-w-md">
                     <button type="button" class="flex items-center gap-2 text-left w-full min-w-0"
-                            (click)="entry.folder ? openFolder(entry) : download(entry)">
+                            (click)="entry.folder ? openFolder(entry) : preview(entry)">
                       @if (entry.folder) {
                         <svg class="size-4 shrink-0 text-brand-500" viewBox="0 0 16 16" fill="currentColor">
                           <path d="M1.5 3.5A1.5 1.5 0 0 1 3 2h3l1.5 1.5H13A1.5 1.5 0 0 1 14.5 5v6A1.5 1.5 0 0 1 13 12.5H3A1.5 1.5 0 0 1 1.5 11v-7.5Z"/>
@@ -147,6 +147,12 @@
                     <ng-template #rowMenu>
                       <div cdkMenu class="card shadow-xl py-1 min-w-44 text-sm">
                         @if (!entry.folder) {
+                          <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="preview(entry)">
+                            View
+                          </button>
+                          <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="openChat(entry)">
+                            Chat with this file
+                          </button>
                           <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="download(entry)">
                             Download
                           </button>
@@ -193,3 +199,8 @@
     </div>
   }
 </div>
+
+@if (chatFile(); as file) {
+  <app-file-chat [bucket]="bucket()" [fileKey]="file.key" [fileName]="file.name"
+                 (closed)="chatFile.set(null)" (viewRequested)="previewChatFile()" />
+}
