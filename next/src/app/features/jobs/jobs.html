@@ -1,0 +1,84 @@
+<div class="space-y-4">
+  <div>
+    <h1 class="text-xl font-semibold tracking-tight">Source Jobs</h1>
+    <p class="text-sm text-[color:var(--text-secondary)] mt-0.5">
+      Scheduled work. A job binds a task to a timetable.
+    </p>
+  </div>
+
+  <app-table-shell heading="Jobs" [loading]="loading()" [error]="error()"
+                   [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="jobs().length"
+                   [emptyMessage]="search() || statusFilter() ? 'No jobs match the current filters.' : 'No jobs yet.'"
+                   (retry)="load()">
+    <ng-container toolbar>
+      <select class="input max-w-40" [value]="statusFilter()"
+              (change)="statusFilter.set($any($event.target).value)">
+        <option value="">All statuses</option>
+        @for (status of statuses(); track status) {
+          <option [value]="status">{{ status }}</option>
+        }
+      </select>
+      <input class="input max-w-56" placeholder="Search id, job or task"
+             [value]="search()" (input)="search.set($any($event.target).value)" />
+      @if (search() || statusFilter()) {
+        <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()">Clear</button>
+      }
+    </ng-container>
+
+    <table class="table-modern">
+      <thead>
+        <tr>
+          <th>Job</th>
+          <th>Task</th>
+          <th>Execution</th>
+          <th>Last run</th>
+          <th>Assigned</th>
+          <th>Run status</th>
+          <th class="text-right">State</th>
+          <th class="w-12"></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (job of filtered(); track job.jobId) {
+          <tr [class.opacity-55]="busyJob() === job.jobId">
+            <td class="max-w-72">
+              <div class="font-medium truncate" [title]="job.jobName">{{ job.jobName || '—' }}</div>
+              <div class="mono text-[color:var(--text-muted)]">#{{ job.jobId }}</div>
+            </td>
+            <td class="text-[color:var(--text-secondary)] max-w-48 truncate"
+                [title]="job.taskDetail?.taskName">
+              {{ job.taskDetail?.taskName || '—' }}
+            </td>
+            <td><span class="pill pill-neutral">{{ job.execution || '—' }}</span></td>
+            <td class="text-[color:var(--text-secondary)] whitespace-nowrap">
+              {{ job.lastJobRun ? (job.lastJobRun | date:'d MMM, HH:mm') : '—' }}
+            </td>
+            <td class="text-[color:var(--text-secondary)] max-w-40 truncate">
+              {{ job.assignedUsername || '—' }}
+            </td>
+            <td><app-status [label]="job.jobRunningStatus" /></td>
+            <td class="text-right"><app-status [label]="job.jobStatus" /></td>
+            <td class="text-right">
+              <button type="button" class="btn btn-ghost btn-icon" [cdkMenuTriggerFor]="menu"
+                      [disabled]="busyJob() === job.jobId" aria-label="Actions">
+                <svg class="size-4" viewBox="0 0 16 16" fill="currentColor">
+                  <circle cx="8" cy="3" r="1.4"/><circle cx="8" cy="8" r="1.4"/><circle cx="8" cy="13" r="1.4"/>
+                </svg>
+              </button>
+              <ng-template #menu>
+                <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="runNow(job)">Run now</button>
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="skipNext(job)">Skip next run</button>
+                  <div class="my-1 border-t" style="border-color: var(--border-subtle);"></div>
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="toggleStatus(job)">
+                    {{ job.jobStatus === 'Active' ? 'Deactivate' : 'Activate' }}
+                  </button>
+                </div>
+              </ng-template>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </app-table-shell>
+</div>

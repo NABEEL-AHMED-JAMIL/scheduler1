@@ -1,0 +1,112 @@
+<div class="space-y-4">
+  <div>
+    <h1 class="text-xl font-semibold tracking-tight">Storage Connections</h1>
+    <p class="text-sm text-[color:var(--text-secondary)] mt-0.5">
+      S3, Azure, MinIO or FTP/FTPS. Credentials are encrypted and never sent back to the browser.
+    </p>
+  </div>
+
+  <div class="grid grid-cols-3 gap-3 max-w-lg">
+    @for (tile of [
+      { label: 'Connections', value: summary().total },
+      { label: 'Active',      value: summary().active },
+      { label: 'Tested OK',   value: summary().ok }
+    ]; track tile.label) {
+      <div class="card p-3.5">
+        <div class="text-[11px] font-semibold uppercase tracking-wider text-[color:var(--text-muted)]">
+          {{ tile.label }}
+        </div>
+        <div class="mt-1 text-xl font-semibold tabular">{{ tile.value }}</div>
+      </div>
+    }
+  </div>
+
+  <app-table-shell heading="Connections" [loading]="loading()" [error]="error()"
+                   [isEmpty]="!filtered().length" [shown]="filtered().length"
+                   [total]="connections().length"
+                   [emptyMessage]="search() || providerFilter() ? 'No connections match the filters.' : 'No connections configured yet.'"
+                   (retry)="load()">
+    <ng-container toolbar>
+      <select class="input max-w-36" [value]="providerFilter()"
+              (change)="providerFilter.set($any($event.target).value)">
+        <option value="">All providers</option>
+        @for (p of providers(); track p) { <option [value]="p">{{ p }}</option> }
+      </select>
+      <input class="input max-w-56" placeholder="Search name, alias or host"
+             [value]="search()" (input)="search.set($any($event.target).value)" />
+      @if (search() || providerFilter()) {
+        <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()">Clear</button>
+      }
+    </ng-container>
+
+    <table class="table-modern">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Alias</th>
+          <th>Provider</th>
+          <th>Target</th>
+          <th>Credentials</th>
+          <th>Last test</th>
+          <th class="text-right">State</th>
+          <th class="w-12"></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (c of filtered(); track c.storageConnectionId) {
+          <tr [class.opacity-55]="testing() === c.storageConnectionId">
+            <td class="max-w-56">
+              <div class="font-medium truncate">{{ c.connectionName }}</div>
+              @if (c.description) {
+                <div class="text-xs text-[color:var(--text-muted)] truncate" [title]="c.description">
+                  {{ c.description }}
+                </div>
+              }
+            </td>
+            <td><span class="mono text-brand-600">{{ c.alias }}</span></td>
+            <td><span class="pill pill-neutral">{{ c.provider }}</span></td>
+            <td class="mono text-[color:var(--text-secondary)] max-w-56 truncate" [title]="target(c)">
+              {{ target(c) }}
+            </td>
+            <td>
+              @if (c.secretKeyConfigured || c.passwordConfigured) {
+                <span class="pill pill-ok">Stored</span>
+              } @else {
+                <span class="pill pill-neutral" title="Falls back to the host's credential chain">
+                  Not stored
+                </span>
+              }
+            </td>
+            <td>
+              <span [class]="testPill(c)" [title]="c.lastTestMessage || ''">{{ testLabel(c) }}</span>
+              @if (c.lastTestedAt) {
+                <div class="text-xs text-[color:var(--text-muted)] mt-0.5">
+                  {{ c.lastTestedAt | date:'d MMM, HH:mm' }}
+                </div>
+              }
+            </td>
+            <td class="text-right"><app-status [label]="c.status" /></td>
+            <td class="text-right">
+              <button type="button" class="btn btn-ghost btn-icon" [cdkMenuTriggerFor]="menu"
+                      [disabled]="testing() === c.storageConnectionId" aria-label="Actions">
+                <svg class="size-4" viewBox="0 0 16 16" fill="currentColor">
+                  <circle cx="8" cy="3" r="1.4"/><circle cx="8" cy="8" r="1.4"/><circle cx="8" cy="13" r="1.4"/>
+                </svg>
+              </button>
+              <ng-template #menu>
+                <div cdkMenu class="card shadow-xl py-1 min-w-44 text-sm">
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="test(c)">
+                    Test connection
+                  </button>
+                  <div class="my-1 border-t" style="border-color: var(--border-subtle);"></div>
+                  <button cdkMenuItem class="menu-item menu-item-danger"
+                          (cdkMenuItemTriggered)="remove(c)">Delete</button>
+                </div>
+              </ng-template>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </app-table-shell>
+</div>

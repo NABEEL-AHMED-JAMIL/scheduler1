@@ -17,6 +17,34 @@ export const routes: Routes = [
         loadComponent: () => import('./features/dashboard/dashboard').then(m => m.Dashboard),
       },
       {
+        path: 'jobs',
+        loadComponent: () => import('./features/jobs/jobs').then(m => m.Jobs),
+      },
+      {
+        path: 'tasks',
+        loadComponent: () => import('./features/tasks/tasks').then(m => m.Tasks),
+      },
+      {
+        path: 'admin/storage',
+        loadComponent: () =>
+          import('./features/admin/storage/storage-connections').then(m => m.StorageConnections),
+        data: { roles: ['PLATFORM_ADMIN', 'TENANT_ADMIN'] },
+      },
+      {
+        path: 'ai/agents',
+        loadComponent: () => import('./features/ai/agents/agents').then(m => m.Agents),
+      },
+      {
+        path: 'admin/users',
+        loadComponent: () => import('./features/admin/users/users').then(m => m.Users),
+        data: { roles: ['PLATFORM_ADMIN', 'TENANT_ADMIN'] },
+      },
+      {
+        path: 'admin/tenants',
+        loadComponent: () => import('./features/admin/tenants/tenants').then(m => m.Tenants),
+        data: { roles: ['PLATFORM_ADMIN'] },
+      },
+      {
         path: 'objects',
         loadComponent: () => import('./features/objects/objects').then(m => m.Objects),
       },

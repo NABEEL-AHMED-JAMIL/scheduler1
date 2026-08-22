@@ -1,0 +1,65 @@
+<div class="space-y-4">
+  <div>
+    <h1 class="text-xl font-semibold tracking-tight">Source Tasks</h1>
+    <p class="text-sm text-[color:var(--text-secondary)] mt-0.5">
+      A task describes one unit of work and where it reads and writes. Jobs point at these.
+    </p>
+  </div>
+
+  <app-table-shell heading="Tasks" [loading]="loading()" [error]="error()"
+                   [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="tasks().length"
+                   [emptyMessage]="search() ? 'No tasks match your search.' : 'No tasks yet.'"
+                   (retry)="load()">
+    <ng-container toolbar>
+      <input class="input max-w-64" placeholder="Search id, name, type or pipeline"
+             [value]="search()" (input)="search.set($any($event.target).value)" />
+      @if (search()) {
+        <button type="button" class="btn btn-ghost btn-sm" (click)="search.set('')">Clear</button>
+      }
+    </ng-container>
+
+    <table class="table-modern">
+      <thead>
+        <tr>
+          <th>Task</th>
+          <th>Type</th>
+          <th>Topic</th>
+          <th>Pipeline</th>
+          <th>Storage</th>
+          <th class="text-right">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (task of filtered(); track task.taskDetailId) {
+          <tr>
+            <td class="max-w-64">
+              <div class="font-medium truncate" [title]="task.taskName">{{ task.taskName || '—' }}</div>
+              <div class="mono text-[color:var(--text-muted)]">#{{ task.taskDetailId }}</div>
+            </td>
+            <td class="text-[color:var(--text-secondary)] max-w-44 truncate">
+              {{ task.sourceTaskType?.serviceName || '—' }}
+            </td>
+            <td>
+              @if (topicOf(task.sourceTaskType?.queueTopicPartition); as topic) {
+                <span class="mono text-[color:var(--text-secondary)]">{{ topic }}</span>
+              } @else { — }
+            </td>
+            <td class="text-[color:var(--text-secondary)] max-w-40 truncate"
+                [title]="task.pipelineId">{{ task.pipelineId || '—' }}</td>
+            <td class="text-[color:var(--text-secondary)]">
+              @if (task.bucket) {
+                <div class="mono">{{ task.bucket }}</div>
+                @if (task.inputFolder || task.outputFolder) {
+                  <div class="mono text-[color:var(--text-muted)]">
+                    {{ task.inputFolder || '·' }} → {{ task.outputFolder || '·' }}
+                  </div>
+                }
+              } @else { — }
+            </td>
+            <td class="text-right"><app-status [label]="task.taskStatus" /></td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </app-table-shell>
+</div>

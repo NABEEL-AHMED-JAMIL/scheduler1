@@ -1,0 +1,55 @@
+<div class="space-y-4">
+  <div>
+    <h1 class="text-xl font-semibold tracking-tight">Users</h1>
+    <p class="text-sm text-[color:var(--text-secondary)] mt-0.5">
+      Access is enforced on the server — a role decides what a person can reach, not just what they see.
+    </p>
+  </div>
+
+  <app-table-shell heading="Users" [loading]="loading()" [error]="error()"
+                   [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="users().length"
+                   [emptyMessage]="search() || roleFilter() ? 'No users match the filters.' : 'No users yet.'"
+                   (retry)="load()">
+    <ng-container toolbar>
+      <select class="input max-w-44" [value]="roleFilter()"
+              (change)="roleFilter.set($any($event.target).value)">
+        <option value="">All roles</option>
+        @for (role of roles(); track role) {
+          <option [value]="role">{{ roleLabel(role) }}</option>
+        }
+      </select>
+      <input class="input max-w-56" placeholder="Search name, username or email"
+             [value]="search()" (input)="search.set($any($event.target).value)" />
+      @if (search() || roleFilter()) {
+        <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()">Clear</button>
+      }
+    </ng-container>
+
+    <table class="table-modern">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Username</th>
+          <th>Email</th>
+          <th>Role</th>
+          <th>Tenant</th>
+          <th class="text-right">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (user of filtered(); track user.appUserId) {
+          <tr>
+            <td class="font-medium">{{ user.fullName || '—' }}</td>
+            <td class="mono text-[color:var(--text-secondary)]">{{ user.username }}</td>
+            <td class="text-[color:var(--text-secondary)] max-w-56 truncate">{{ user.email || '—' }}</td>
+            <td><span class="pill pill-brand">{{ roleLabel(user.userRole) }}</span></td>
+            <td class="text-[color:var(--text-secondary)]">
+              {{ user.tenantName || (user.tenantId ? '#' + user.tenantId : 'Platform') }}
+            </td>
+            <td class="text-right"><app-status [label]="user.status" /></td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </app-table-shell>
+</div>

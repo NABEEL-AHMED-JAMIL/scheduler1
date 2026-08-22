@@ -1,0 +1,49 @@
+<div class="space-y-4">
+  <div>
+    <h1 class="text-xl font-semibold tracking-tight">Tenants</h1>
+    <p class="text-sm text-[color:var(--text-secondary)] mt-0.5">
+      Every job, bucket, task and agent belongs to a tenant. Isolation is enforced server-side.
+    </p>
+  </div>
+
+  <app-table-shell heading="Tenants" [loading]="loading()" [error]="error()"
+                   [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="tenants().length"
+                   [emptyMessage]="search() ? 'No tenants match your search.' : 'No tenants yet.'"
+                   (retry)="load()">
+    <ng-container toolbar>
+      <input class="input max-w-56" placeholder="Search name or id"
+             [value]="search()" (input)="search.set($any($event.target).value)" />
+      @if (search()) {
+        <button type="button" class="btn btn-ghost btn-sm" (click)="search.set('')">Clear</button>
+      }
+    </ng-container>
+
+    <table class="table-modern">
+      <thead>
+        <tr>
+          <th>Tenant</th>
+          <th>Description</th>
+          <th>Created</th>
+          <th class="text-right">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (tenant of filtered(); track tenant.tenantId) {
+          <tr>
+            <td>
+              <div class="font-medium">{{ tenant.tenantName }}</div>
+              <div class="mono text-[color:var(--text-muted)]">#{{ tenant.tenantId }}</div>
+            </td>
+            <td class="text-[color:var(--text-secondary)] max-w-80 truncate">
+              {{ tenant.description || '—' }}
+            </td>
+            <td class="text-[color:var(--text-secondary)] whitespace-nowrap">
+              {{ tenant.dateCreated ? (tenant.dateCreated | date:'d MMM yyyy') : '—' }}
+            </td>
+            <td class="text-right"><app-status [label]="tenant.status" /></td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </app-table-shell>
+</div>

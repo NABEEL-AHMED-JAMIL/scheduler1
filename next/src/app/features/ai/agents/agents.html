@@ -1,0 +1,60 @@
+<div class="space-y-4">
+  <div>
+    <h1 class="text-xl font-semibold tracking-tight">AI Agents</h1>
+    <p class="text-sm text-[color:var(--text-secondary)] mt-0.5">
+      Define an agent once — provider, model and instructions — and the file chat uses it everywhere.
+    </p>
+  </div>
+
+  <app-table-shell heading="Agents" [loading]="loading()" [error]="error()"
+                   [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="agents().length"
+                   [emptyMessage]="search() ? 'No agents match your search.' : 'No agents configured yet.'"
+                   (retry)="load()">
+    <ng-container toolbar>
+      <input class="input max-w-56" placeholder="Search name, provider or model"
+             [value]="search()" (input)="search.set($any($event.target).value)" />
+      @if (search()) {
+        <button type="button" class="btn btn-ghost btn-sm" (click)="search.set('')">Clear</button>
+      }
+    </ng-container>
+
+    <table class="table-modern">
+      <thead>
+        <tr>
+          <th>Agent</th>
+          <th>Provider</th>
+          <th>Model</th>
+          <th>File types</th>
+          <th>API key</th>
+          <th class="text-right">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (agent of filtered(); track agent.aiAgentId) {
+          <tr>
+            <td class="max-w-64">
+              <div class="font-medium truncate">{{ agent.agentName }}</div>
+              @if (agent.description) {
+                <div class="text-xs text-[color:var(--text-muted)] truncate">{{ agent.description }}</div>
+              }
+            </td>
+            <td><span class="pill pill-neutral">{{ agent.provider }}</span></td>
+            <td>
+              <span class="mono text-[color:var(--text-secondary)]">{{ agent.model }}</span>
+              @if (agent.jsonMode) { <span class="pill pill-brand ml-1.5">JSON</span> }
+            </td>
+            <td class="mono text-[color:var(--text-muted)] max-w-40 truncate">
+              {{ agent.targetFileTypes || '—' }}
+            </td>
+            <td>
+              @if (keyState(agent); as key) {
+                <span [class]="key.cls" [title]="key.hint">{{ key.label }}</span>
+              }
+            </td>
+            <td class="text-right"><app-status [label]="agent.status" /></td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </app-table-shell>
+</div>
