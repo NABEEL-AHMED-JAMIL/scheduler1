@@ -198,3 +198,14 @@ html.dark .pill-crit  { background: color-mix(in oklab, var(--color-crit-500) 22
   }
   .menu-item-danger { @apply text-crit-500 hover:text-crit-500; }
 }
+
+/* Chart series colours -- distinct from the semantic ok/warn/crit set so a chart
+   segment is never mistaken for a status. */
+:root {
+  --chart-0: #4f46e5;
+  --chart-1: #0ea5e9;
+  --chart-2: #14b8a6;
+  --chart-3: #f59e0b;
+  --chart-4: #e11d48;
+  --chart-5: #8b5cf6;
+}

@@ -1,121 +1,244 @@
-<div class="space-y-5">
-  <div>
-    <h1 class="text-xl font-semibold tracking-tight">Dashboard</h1>
-    <p class="text-sm text-[color:var(--text-secondary)] mt-0.5">
-      Run activity from {{ range.start }} to {{ range.end }}
-    </p>
+<div class="space-y-4">
+  <div class="flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <h1 class="text-xl font-semibold tracking-tight">Dashboard</h1>
+      <p class="text-sm text-[color:var(--text-secondary)] mt-0.5">
+        Showing {{ startDate() }} to {{ endDate() }}
+      </p>
+    </div>
+    <div class="flex items-end gap-2">
+      <div>
+        <label class="label" for="from">From</label>
+        <input id="from" type="date" class="input" [value]="startDate()" [max]="endDate()"
+               (change)="startDate.set($any($event.target).value)" />
+      </div>
+      <div>
+        <label class="label" for="to">To</label>
+        <input id="to" type="date" class="input" [value]="endDate()" [min]="startDate()"
+               (change)="endDate.set($any($event.target).value)" />
+      </div>
+      <button type="button" class="btn btn-primary btn-sm" (click)="applyRange()">Apply</button>
+      <button type="button" class="btn btn-ghost btn-sm" (click)="resetRange()">Reset</button>
+    </div>
   </div>
 
-  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+  <!-- KPI tiles -->
+  <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
     @for (tile of [
-      { label: 'Jobs',       value: jobCount().total,     tone: '' },
-      { label: 'Active',     value: jobCount().active,    tone: '' },
-      { label: 'Running',    value: runCount().running,   tone: 'brand' },
-      { label: 'Completed',  value: runCount().completed, tone: 'ok' },
-      { label: 'Missed',     value: runCount().missed,    tone: 'warn' },
-      { label: 'Failed',     value: runCount().failed,    tone: 'crit' }
+      { label: 'Total jobs',   value: totalJobs(),  tone: 'brand' },
+      { label: 'Active jobs',  value: activeJobs(), tone: 'ok' },
+      { label: 'Running now',  value: runningNow(), tone: 'brand' },
+      { label: 'Completed',    value: completed(),  tone: 'ok' },
+      { label: 'Failed',       value: failed(),     tone: 'crit' },
+      { label: 'Unread',       value: unread(),     tone: 'warn', link: '/notifications' }
     ]; track tile.label) {
-      <div class="card p-4">
+      <a class="card p-4 block hover:shadow-md transition-shadow"
+         [routerLink]="tile.link || null" [class.cursor-default]="!tile.link">
         <div class="text-[11px] font-semibold uppercase tracking-wider text-[color:var(--text-muted)]">
           {{ tile.label }}
         </div>
-        <div class="mt-1.5 text-2xl font-semibold tabular tracking-tight"
-             [class.text-brand-600]="tile.tone === 'brand'"
+        <div class="mt-1.5 text-2xl font-semibold tabular"
              [class.text-ok-500]="tile.tone === 'ok'"
-             [class.text-warn-500]="tile.tone === 'warn'"
-             [class.text-crit-500]="tile.tone === 'crit'">
-          {{ tile.value | number }}
-        </div>
-      </div>
+             [class.text-crit-500]="tile.tone === 'crit'"
+             [class.text-warn-500]="tile.tone === 'warn'">{{ tile.value }}</div>
+      </a>
     }
   </div>
 
-  <div class="card overflow-hidden">
-    <div class="flex flex-wrap items-center gap-2 px-4 py-3 border-b"
-         style="border-color: var(--border-subtle);">
-      <h2 class="text-sm font-semibold mr-auto">
-        Jobs
-        <span class="text-[color:var(--text-muted)] font-normal">
-          ({{ filtered().length }} of {{ jobs().length }})
-        </span>
-      </h2>
-
-      <select class="input max-w-40" [value]="statusFilter()"
-              (change)="statusFilter.set($any($event.target).value)">
-        <option value="">All statuses</option>
-        @for (status of statuses(); track status) {
-          <option [value]="status">{{ status }}</option>
+  <!-- Rings + weekly bars -->
+  <div class="grid lg:grid-cols-3 gap-4">
+    @for (ring of [
+      { title: 'Job status',  data: statusRing() },
+      { title: 'Run outcome', data: runningRing() }
+    ]; track ring.title) {
+      <div class="card p-4">
+        <h2 class="text-sm font-semibold mb-3">{{ ring.title }}</h2>
+        @if (ring.data.length) {
+          <div class="flex items-center gap-4">
+            <svg viewBox="0 0 42 42" class="size-28 shrink-0 -rotate-90">
+              @for (segment of ring.data; track segment.name) {
+                <circle cx="21" cy="21" r="15.9" fill="none" stroke-width="6"
+                        [attr.stroke]="'var(--chart-' + $index % 6 + ')'"
+                        [attr.stroke-dasharray]="segment.pct + ' ' + (100 - segment.pct)"
+                        [attr.stroke-dashoffset]="-segment.offset" />
+              }
+            </svg>
+            <ul class="text-sm space-y-1.5 min-w-0">
+              @for (segment of ring.data; track segment.name) {
+                <li class="flex items-center gap-2">
+                  <span class="size-2.5 rounded-full shrink-0"
+                        [style.background]="'var(--chart-' + $index % 6 + ')'"></span>
+                  <span class="capitalize truncate">{{ segment.name.toLowerCase() }}</span>
+                  <span class="ml-auto tabular font-medium">{{ segment.value }}</span>
+                </li>
+              }
+            </ul>
+          </div>
+        } @else {
+          <p class="text-sm text-[color:var(--text-muted)] py-8 text-center">No data in this range.</p>
         }
-      </select>
+      </div>
+    }
 
-      <input class="input max-w-56" placeholder="Search id, job or task"
-             [value]="search()" (input)="search.set($any($event.target).value)" />
-
-      @if (search() || statusFilter()) {
-        <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()">Clear</button>
+    <div class="card p-4">
+      <h2 class="text-sm font-semibold mb-3">Queue volume by day</h2>
+      @if (weeklyBars().length) {
+        <div class="flex items-end gap-2">
+          @for (bar of weeklyBars(); track bar.name) {
+            <div class="flex-1 flex flex-col items-center gap-1.5 min-w-0">
+              <span class="text-xs tabular text-[color:var(--text-secondary)]">{{ bar.value }}</span>
+              <!-- The track needs a definite height for the bar's percentage to resolve
+                   against; a flex-sized parent leaves it computing to zero. -->
+              <div class="w-full h-16 flex items-end">
+                <div class="w-full rounded-t bg-brand-500 min-h-0.5" [style.height.%]="bar.pct"
+                     [title]="bar.name + ': ' + bar.value"></div>
+              </div>
+              <span class="text-xs text-[color:var(--text-muted)] truncate">{{ bar.name }}</span>
+            </div>
+          }
+        </div>
+      } @else {
+        <p class="text-sm text-[color:var(--text-muted)] py-8 text-center">No runs in this range.</p>
       }
     </div>
+  </div>
 
-    @if (loading()) {
-      <div class="p-12 text-center text-sm text-[color:var(--text-muted)]">Loading…</div>
-    } @else if (error()) {
-      <div class="p-12 text-center text-sm text-crit-500">{{ error() }}</div>
-    } @else {
+  <!-- Hour x weekday heatmap -->
+  <div class="card p-4">
+    <div class="flex flex-wrap items-baseline gap-2 mb-3">
+      <h2 class="text-sm font-semibold">Queue activity by hour</h2>
+      <span class="text-xs text-[color:var(--text-muted)]">
+        Click any cell to see which jobs ran in that hour
+      </span>
+    </div>
+
+    @if (heatmap().rows.length) {
       <div class="overflow-x-auto">
-        <table class="table-modern">
+        <table class="border-separate border-spacing-0.5">
           <thead>
             <tr>
-              <th>Job</th>
-              <th>Task</th>
-              <th>Execution</th>
-              <th>Last run</th>
-              <th>Assigned</th>
-              <th class="text-right">Status</th>
+              <th class="w-20"></th>
+              @for (hr of [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23]; track hr) {
+                <th class="text-[10px] font-normal text-[color:var(--text-muted)] w-7">
+                  @if (hr % 3 === 0) { {{ hourLabel(hr) }} }
+                </th>
+              }
             </tr>
           </thead>
           <tbody>
-            @for (job of filtered(); track job.jobId) {
+            @for (row of heatmap().rows; track row.day) {
               <tr>
-                <td class="max-w-80">
-                  <div class="font-medium truncate" [title]="job.jobName">{{ job.jobName || '—' }}</div>
-                  <div class="mono text-[color:var(--text-muted)]">#{{ job.jobId }}</div>
+                <td class="text-xs text-[color:var(--text-secondary)] pr-2 whitespace-nowrap">
+                  {{ row.day.slice(0, 3) }}
                 </td>
-                <td class="text-[color:var(--text-secondary)]">{{ job.taskDetail?.taskName || '—' }}</td>
-                <td>
-                  <span class="pill pill-neutral">{{ job.execution || '—' }}</span>
-                </td>
-                <td class="text-[color:var(--text-secondary)] whitespace-nowrap">
-                  {{ job.lastJobRun ? (job.lastJobRun | date:'d MMM, HH:mm') : '—' }}
-                </td>
-                <td class="text-[color:var(--text-secondary)]">{{ job.assignedUsername || '—' }}</td>
-                <td class="text-right">
-                  <span [class]="pillClass(job.jobRunningStatus)">{{ job.jobRunningStatus || 'Unknown' }}</span>
-                  @if (job.jobStatus !== 'Active') {
-                    <span class="pill pill-neutral ml-1">{{ job.jobStatus }}</span>
-                  }
-                </td>
-              </tr>
-            } @empty {
-              <tr>
-                <td colspan="6" class="!py-12 text-center">
-                  <p class="text-sm text-[color:var(--text-secondary)]">
-                    @if (search() || statusFilter()) {
-                      No jobs match the current filters.
-                    } @else {
-                      No jobs yet.
-                    }
-                  </p>
-                  @if (search() || statusFilter()) {
-                    <button type="button" class="btn btn-default btn-sm mt-3" (click)="clearFilters()">
-                      Clear filters
+                @for (cell of row.hours; track cell.hr) {
+                  <td>
+                    <button type="button"
+                            class="size-6 rounded-sm block w-full transition-transform hover:scale-110
+                                   focus:outline-none focus:ring-2 focus:ring-brand-500"
+                            [style.background]="cell.count
+                              ? 'color-mix(in srgb, var(--color-brand-500) ' + (18 + cell.intensity * 82) + '%, transparent)'
+                              : 'var(--surface-sunken)'"
+                            [class.ring-2]="selectedCell()?.date === cell.date && selectedCell()?.hr === cell.hr"
+                            [class.ring-brand-500]="selectedCell()?.date === cell.date && selectedCell()?.hr === cell.hr"
+                            [disabled]="!cell.count"
+                            [title]="cell.count
+                              ? row.day + ' ' + hourLabel(cell.hr) + ' — ' + cell.count + ' run' + (cell.count === 1 ? '' : 's')
+                              : row.day + ' ' + hourLabel(cell.hr) + ' — no runs'"
+                            (click)="selectCell(cell.date, cell.hr, cell.count)">
+                      <span class="sr-only">{{ cell.count }} runs</span>
                     </button>
-                  }
-                </td>
+                  </td>
+                }
               </tr>
             }
           </tbody>
         </table>
       </div>
+    } @else {
+      <p class="text-sm text-[color:var(--text-muted)] py-10 text-center">No activity in this range.</p>
     }
   </div>
+
+  <!-- Drill-down breakdown -->
+  @if (selectedCell(); as cell) {
+    <div class="card overflow-hidden">
+      <div class="flex flex-wrap items-center gap-2 px-4 py-3 border-b"
+           style="border-color: var(--border-subtle);">
+        <h2 class="text-sm font-semibold mr-auto">
+          Jobs in {{ cell.date }} at {{ hourLabel(cell.hr) }}
+          @if (breakdown().length) {
+            <span class="font-normal text-[color:var(--text-muted)]">
+              ({{ filteredBreakdown().length }} of {{ breakdown().length }})
+            </span>
+          }
+        </h2>
+        <input class="input max-w-52" placeholder="Search job id or name"
+               [value]="breakdownSearch()" (input)="breakdownSearch.set($any($event.target).value)" />
+        <button type="button" class="btn btn-ghost btn-sm" (click)="clearCell()">Close</button>
+      </div>
+
+      @if (breakdownLoading()) {
+        <p class="p-10 text-center text-sm text-[color:var(--text-muted)]">Loading…</p>
+      } @else if (!filteredBreakdown().length) {
+        <p class="p-10 text-center text-sm text-[color:var(--text-secondary)]">
+          {{ breakdownSearch() ? 'No jobs match your search.' : 'No jobs ran in this hour.' }}
+        </p>
+      } @else {
+        <div class="overflow-x-auto">
+          <table class="table-modern">
+            <thead>
+              <tr>
+                <th>Job</th>
+                @for (column of columns; track column) {
+                  <th class="text-right capitalize">{{ column }}</th>
+                }
+                <th class="text-right">Total</th>
+                <th class="w-28">Breakdown</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of filteredBreakdown(); track row.jobId) {
+                <tr>
+                  <td class="max-w-64">
+                    <div class="font-medium truncate" [title]="row.jobName">{{ row.jobName }}</div>
+                    <div class="mono text-[color:var(--text-muted)]">#{{ row.jobId }}</div>
+                  </td>
+                  @for (column of columns; track column) {
+                    <td class="text-right tabular"
+                        [class.text-[color:var(--text-muted)]]="!countFor(row, column)">
+                      {{ countFor(row, column) }}
+                    </td>
+                  }
+                  <td class="text-right tabular font-semibold">{{ row.total }}</td>
+                  <td>
+                    <div class="flex h-2 rounded-full overflow-hidden"
+                         style="background: var(--surface-sunken);">
+                      @for (segment of segmentsFor(row); track segment.key) {
+                        <span [style.width.%]="segment.pct"
+                              [style.background]="'var(--chart-' + $index % 6 + ')'"
+                              [title]="segment.key + ': ' + segment.count"></span>
+                      }
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+            @if (breakdownTotal(); as totals) {
+              <tfoot>
+                <tr class="font-semibold" style="background: var(--surface-sunken);">
+                  <td>All jobs this hour</td>
+                  @for (column of columns; track column) {
+                    <td class="text-right tabular">{{ countFor(totals, column) }}</td>
+                  }
+                  <td class="text-right tabular">{{ totals.total }}</td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            }
+          </table>
+        </div>
+      }
+    </div>
+  }
 </div>
