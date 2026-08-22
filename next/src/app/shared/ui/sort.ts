@@ -20,6 +20,12 @@ export function createSort<T>(initialKey = '', initialDirection: SortDirection =
     }
   }
 
+  /** Glyph name for a column header: which way it sorts, or that it can be sorted at all. */
+  function iconFor(forKey: string): 'sort' | 'arrowUp' | 'arrowDown' {
+    if (key() !== forKey) return 'sort';
+    return direction() === 'asc' ? 'arrowUp' : 'arrowDown';
+  }
+
   function indicator(forKey: string): '' | '↑' | '↓' {
     if (key() !== forKey) return '';
     return direction() === 'asc' ? '↑' : '↓';
@@ -42,5 +48,5 @@ export function createSort<T>(initialKey = '', initialDirection: SortDirection =
     });
   }
 
-  return { key: key as Signal<string>, direction: direction as Signal<SortDirection>, toggle, indicator, apply };
+  return { key: key as Signal<string>, direction: direction as Signal<SortDirection>, toggle, indicator, iconFor, apply };
 }

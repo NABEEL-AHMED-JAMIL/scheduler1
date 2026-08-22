@@ -50,10 +50,13 @@
       <button type="button" class="btn btn-ghost btn-icon btn-sm"
               [title]="sort.direction() === 'asc' ? 'Sorted ascending — click for descending' : 'Sorted descending — click for ascending'"
               (click)="sort.toggle(sort.key())">
-        <span class="text-sm leading-none">{{ sort.direction() === 'asc' ? '\u2191' : '\u2193' }}</span>
+        <app-icon [name]="sort.direction() === 'asc' ? 'arrowUp' : 'arrowDown'" size="0.95em" />
       </button>
-      <input class="input max-w-56" placeholder="Search name or code"
-             [value]="search()" (input)="search.set($any($event.target).value)" />
+      <div class="search-field max-w-56">
+        <app-icon name="search" size="0.95em" />
+        <input class="input" placeholder="Search name or code"
+               [value]="search()" (input)="search.set($any($event.target).value)" />
+      </div>
       @if (hasFilters()) {
         <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()">
           <app-icon name="close" />Clear
@@ -69,7 +72,7 @@
             <div class="min-w-0">
               <h3 class="truncate text-sm font-semibold">{{ tenant.tenantName }}</h3>
               <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[color:var(--text-muted)]">
-                <code class="mono rounded px-1.5 py-0.5"
+                <code class="mono rounded px-1.5 py-0.5 text-[color:var(--text-secondary)]"
                       style="background: var(--surface-sunken);">{{ tenant.tenantCode }}</code>
                 @if (tenant.dateCreated) {
                   <span>since {{ tenant.dateCreated | date: 'mediumDate' }}</span>
@@ -85,14 +88,13 @@
               <div class="flex flex-col items-center gap-1 px-2 py-2.5"
                    style="background: var(--surface-raised);"
                    [title]="$any(tenant)[res.key] + ' ' + res.label.toLowerCase()">
-                <app-icon [name]="res.icon" size="0.95em"
-                          [class]="$any(tenant)[res.key] ? 'text-brand-500' : 'text-[color:var(--text-muted)] opacity-45'" />
+                <app-icon [name]="res.icon" size="1.05em"
+                          [class]="$any(tenant)[res.key] ? 'icon-info' : 'icon-muted'" />
                 <span class="text-sm font-semibold tabular leading-none"
-                      [class]="$any(tenant)[res.key] ? '' : 'text-[color:var(--text-muted)] opacity-60'">
+                      [class]="$any(tenant)[res.key] ? '' : 'text-[color:var(--text-muted)]'">
                   {{ $any(tenant)[res.key] || 0 }}
                 </span>
-                <span class="text-[10px] uppercase tracking-wide leading-none text-[color:var(--text-muted)]"
-                      [class.opacity-60]="!$any(tenant)[res.key]">{{ res.label }}</span>
+                <span class="text-[10px] uppercase tracking-wide leading-none text-[color:var(--text-muted)]">{{ res.label }}</span>
               </div>
             }
           </div>
@@ -102,19 +104,21 @@
             <button type="button" class="btn btn-ghost btn-sm" (click)="viewUsers(tenant)"
                     [disabled]="!tenant.userCount"
                     [title]="tenant.userCount ? 'Show the users in this tenant' : 'This tenant has no users yet'">
-              <app-icon name="users" />Users
+              <app-icon name="users" [class.icon-info]="!!tenant.userCount" />Users
             </button>
             <button type="button" class="btn btn-ghost btn-sm" (click)="editTenant(tenant)">
               <app-icon name="edit" />Edit
             </button>
-            <button type="button" class="btn btn-ghost btn-sm" (click)="toggleSuspend(tenant)"
+            <button type="button" class="btn btn-ghost btn-sm"
+                    [class]="tenant.status === 'Active' ? 'btn-intent-warn' : 'btn-intent-ok'"
+                    (click)="toggleSuspend(tenant)"
                     [title]="tenant.status === 'Active' ? 'Block sign-in for this tenant' : 'Allow sign-in again'">
               <app-icon [name]="tenant.status === 'Active' ? 'pause' : 'play'" />
               {{ tenant.status === 'Active' ? 'Suspend' : 'Reactivate' }}
             </button>
             <button type="button" class="btn btn-ghost btn-icon btn-sm ml-auto"
                     title="Delete tenant" (click)="deleteTenant(tenant)">
-              <app-icon name="trash" class="text-crit-500" />
+              <app-icon name="trash" class="icon-crit" />
             </button>
           </div>
         </article>

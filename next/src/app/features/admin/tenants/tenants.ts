@@ -31,8 +31,6 @@ interface ResourceCount {
   key: keyof Tenant;
   label: string;
   icon: string;
-  link?: (tenant: Tenant) => any[] | null;
-  queryParams?: (tenant: Tenant) => Record<string, any>;
 }
 
 @Component({
@@ -55,10 +53,10 @@ export class Tenants implements OnInit {
 
   readonly resources: ResourceCount[] = [
     { key: 'userCount', label: 'Users', icon: 'users' },
-    { key: 'sourceJobCount', label: 'Jobs', icon: 'zap' },
-    { key: 'sourceTaskCount', label: 'Tasks', icon: 'file' },
-    { key: 'sourceTaskTypeCount', label: 'Task types', icon: 'template' },
-    { key: 'bucketCount', label: 'Buckets', icon: 'database' },
+    { key: 'sourceJobCount', label: 'Jobs', icon: 'briefcase' },
+    { key: 'sourceTaskCount', label: 'Tasks', icon: 'list' },
+    { key: 'sourceTaskTypeCount', label: 'Task types', icon: 'layers' },
+    { key: 'bucketCount', label: 'Buckets', icon: 'cloud' },
     { key: 'kafkaProfileCount', label: 'Kafka', icon: 'server' },
   ];
 

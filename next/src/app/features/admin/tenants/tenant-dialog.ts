@@ -17,7 +17,7 @@ import { FormDialog } from '../../../shared/ui/form-dialog';
         [confirmLabel]="isEdit() ? 'Save changes' : 'Create'"
         [saving]="saving()"
         (cancelled)="ref.close(false)" (confirmed)="save()">
-      <form [formGroup]="form" class="space-y-3.5">
+      <form [formGroup]="form" class="form-stack">
         <app-field label="Tenant name" for="tenantName" [required]="true"
                    [control]="form.get('tenantName')" [submitted]="submitted()">
           <input id="tenantName" class="input" formControlName="tenantName"

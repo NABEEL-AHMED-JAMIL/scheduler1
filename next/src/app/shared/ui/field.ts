@@ -1,4 +1,5 @@
 import { Component, computed, input } from '@angular/core';
+import { Icon } from './icon';
 import { AbstractControl } from '@angular/forms';
 
 /**
@@ -8,18 +9,25 @@ import { AbstractControl } from '@angular/forms';
  */
 @Component({
   selector: 'app-field',
+  imports: [Icon],
   template: `
-    <div class="space-y-1">
+    <div class="field">
       <label class="label" [attr.for]="for()">
         {{ label() }}
-        @if (required()) { <span class="text-crit-500" aria-hidden="true">*</span> }
+        @if (required()) {
+          <span class="text-crit-500 ml-0.5" aria-hidden="true">*</span>
+          <span class="sr-only">(required)</span>
+        }
       </label>
       <ng-content />
       @if (hint() && !message()) {
-        <p class="text-xs text-[color:var(--text-muted)]">{{ hint() }}</p>
+        <p class="field-note text-[color:var(--text-muted)]">{{ hint() }}</p>
       }
       @if (message()) {
-        <p class="text-xs text-crit-500">{{ message() }}</p>
+        <p class="field-note text-crit-500 flex items-start gap-1.5" role="alert">
+          <app-icon name="alert" size="0.9em" class="mt-px shrink-0" />
+          <span>{{ message() }}</span>
+        </p>
       }
     </div>
   `,

@@ -57,8 +57,11 @@
         <option value="Active">Active</option>
         <option value="Inactive">Inactive</option>
       </select>
-      <input class="input max-w-56" placeholder="Search name, email or tenant"
-             [value]="search()" (input)="search.set($any($event.target).value)" />
+      <div class="search-field max-w-56">
+        <app-icon name="search" size="0.95em" />
+        <input class="input" placeholder="Search name, email or tenant"
+               [value]="search()" (input)="search.set($any($event.target).value)" />
+      </div>
       @if (hasFilters()) {
         <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()">
           <app-icon name="close" />Clear
@@ -82,14 +85,17 @@
                       [class.th-sort-active]="sort.key() === column.key"
                       (click)="sort.toggle(column.key)">
                 {{ column.label }}
-                <span class="tabular">{{ sort.indicator(column.key) }}</span>
+                <app-icon [name]="sort.iconFor(column.key)" size="0.875rem"
+                          [class]="sort.key() === column.key ? 'icon-info' : 'icon-muted'" />
               </button>
             </th>
           }
           <th class="text-right">
             <button type="button" class="th-sort" [class.th-sort-active]="sort.key() === 'status'"
                     (click)="sort.toggle('status')">
-              Status <span class="tabular">{{ sort.indicator('status') }}</span>
+              Status
+              <app-icon [name]="sort.iconFor('status')" size="0.875rem"
+                        [class]="sort.key() === 'status' ? 'icon-info' : 'icon-muted'" />
             </button>
           </th>
           <th class="w-12"></th>
@@ -141,21 +147,22 @@
                     <app-icon name="edit" />Edit
                   </button>
                   <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="resetPassword(user)">
-                    <app-icon name="settings" />Reset password
+                    <app-icon name="key" />Reset password
                   </button>
                   <div class="my-1 border-t" style="border-color: var(--border-subtle);"></div>
                   <button cdkMenuItem class="menu-item"
+                          [class]="isSelf(user) ? '' : (user.status === 'Active' ? 'btn-intent-warn' : 'btn-intent-ok')"
                           [disabled]="isSelf(user)"
                           [title]="isSelf(user) ? 'You cannot deactivate your own account' : ''"
                           (cdkMenuItemTriggered)="toggleStatus(user)">
-                    <app-icon [name]="user.status === 'Active' ? 'close' : 'check'" />
+                    <app-icon [name]="user.status === 'Active' ? 'pause' : 'play'" />
                     {{ user.status === 'Active' ? 'Deactivate' : 'Activate' }}
                   </button>
-                  <button cdkMenuItem class="menu-item text-crit-500"
+                  <button cdkMenuItem class="menu-item menu-item-danger"
                           [disabled]="isSelf(user)"
                           [title]="isSelf(user) ? 'You cannot delete your own account' : 'Remove this account for good'"
                           (cdkMenuItemTriggered)="deleteUser(user)">
-                    <app-icon name="trash" />Delete
+                    <app-icon name="trash" [class.icon-crit]="!isSelf(user)" />Delete
                   </button>
                 </div>
               </ng-template>

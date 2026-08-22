@@ -32,8 +32,11 @@
              (change)="fromDate.set($any($event.target).value); load()" />
       <input type="date" class="input max-w-40" [value]="toDate()"
              (change)="toDate.set($any($event.target).value); load()" />
-      <input class="input max-w-52" placeholder="Search job, run or message"
-             [value]="search()" (input)="search.set($any($event.target).value)" />
+      <div class="search-field max-w-52">
+        <app-icon name="search" size="0.95em" />
+        <input class="input" placeholder="Search job, run or message"
+               [value]="search()" (input)="search.set($any($event.target).value)" />
+      </div>
       @if (search() || selectedStatuses().length || fromDate() || toDate()) {
         <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()"><app-icon name="close" />Clear</button>
       }

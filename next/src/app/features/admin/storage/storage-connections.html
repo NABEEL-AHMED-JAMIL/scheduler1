@@ -35,8 +35,11 @@
         <option value="">All providers</option>
         @for (p of providers(); track p) { <option [value]="p">{{ p }}</option> }
       </select>
-      <input class="input max-w-56" placeholder="Search name, alias or host"
-             [value]="search()" (input)="search.set($any($event.target).value)" />
+      <div class="search-field max-w-56">
+        <app-icon name="search" size="0.95em" />
+        <input class="input" placeholder="Search name, alias or host"
+               [value]="search()" (input)="search.set($any($event.target).value)" />
+      </div>
       @if (search() || providerFilter()) {
         <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()"><app-icon name="close" />Clear</button>
       }

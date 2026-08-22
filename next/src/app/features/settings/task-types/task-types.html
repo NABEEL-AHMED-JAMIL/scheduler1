@@ -12,8 +12,11 @@
                    [emptyMessage]="search() ? 'No task types match your search.' : 'No task types defined yet.'"
                    (retry)="load()">
     <ng-container toolbar>
-      <input class="input max-w-56" placeholder="Search name or description"
-             [value]="search()" (input)="search.set($any($event.target).value)" />
+      <div class="search-field max-w-56">
+        <app-icon name="search" size="0.95em" />
+        <input class="input" placeholder="Search name or description"
+               [value]="search()" (input)="search.set($any($event.target).value)" />
+      </div>
     </ng-container>
 
     <table class="table-modern">

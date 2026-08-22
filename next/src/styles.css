@@ -64,8 +64,11 @@
     --border-subtle:   var(--color-ink-200);
     --border-strong:   var(--color-ink-300);
     --text-primary:    var(--color-ink-900);
-    --text-secondary:  var(--color-ink-500);
-    --text-muted:      var(--color-ink-400);
+    /* Measured against the surface each is used on: ink-500 on white is 4.67:1 and ink-600
+       is 7.35:1, so both clear 4.5. The previous muted step (ink-400) measured 2.90:1 and
+       was carrying every table header, tile label and hint in the app. */
+    --text-secondary:  var(--color-ink-600);
+    --text-muted:      var(--color-ink-500);
     --text-inverse:    #ffffff;
   }
 
@@ -77,8 +80,10 @@
     --border-subtle:   #2a3049;
     --border-strong:   #39405c;
     --text-primary:    var(--color-ink-50);
-    --text-secondary:  var(--color-ink-400);
-    --text-muted:      var(--color-ink-500);
+    /* ink-300 is 10.27:1 and ink-400 is 5.89:1 on the raised surface; the old muted step
+       (ink-500) was 3.66:1. */
+    --text-secondary:  var(--color-ink-300);
+    --text-muted:      var(--color-ink-400);
     --text-inverse:    var(--color-ink-950);
   }
 
@@ -151,6 +156,14 @@
            placeholder:text-[color:var(--text-muted)]
            focus:border-brand-500 focus:outline-none;
   }
+  /* A search box should say so before it is read. The icon is decorative -- the
+     placeholder carries the meaning for screen readers. */
+  .search-field { @apply relative inline-flex items-center; }
+  .search-field > app-icon {
+    @apply absolute left-2.5 pointer-events-none text-[color:var(--text-muted)];
+  }
+  .search-field > .input { @apply pl-8; }
+
   .label {
     @apply block text-xs font-semibold uppercase tracking-wide
            text-[color:var(--text-secondary)] mb-1.5;
@@ -196,13 +209,61 @@ html.dark .pill-ok    { background: color-mix(in oklab, var(--color-ok-500) 22%,
 html.dark .pill-warn  { background: color-mix(in oklab, var(--color-warn-500) 22%, transparent); @apply text-warn-400; }
 html.dark .pill-crit  { background: color-mix(in oklab, var(--color-crit-500) 22%, transparent); @apply text-crit-400; }
 
+/* The -500/-600 semantic steps are mixed for white surfaces. Used as foreground on a dark
+   one they fall to 2.2-3.4:1 -- "Expired" in warn-500 and topic names in brand-600 were the
+   worst. Dark mode gets the lighter step, the same swap the pills already make, so a colour
+   keeps its meaning in both themes without every template having to know about it. */
+html.dark .text-brand-500,
+html.dark .text-brand-600,
+html.dark .text-brand-700 { color: var(--color-brand-300); }
+html.dark .text-ok-500    { color: var(--color-ok-400); }
+html.dark .text-warn-500  { color: var(--color-warn-400); }
+html.dark .text-crit-500  { color: var(--color-crit-400); }
+
+html.dark .icon-ok   { color: var(--color-ok-400); }
+html.dark .icon-warn { color: var(--color-warn-400); }
+html.dark .icon-crit { color: var(--color-crit-400); }
+html.dark .icon-info { color: var(--color-brand-300); }
+
+html.dark .btn-intent-warn:hover app-icon,
+html.dark .btn-intent-warn:focus app-icon { color: var(--color-warn-400); }
+html.dark .btn-intent-ok:hover app-icon,
+html.dark .btn-intent-ok:focus app-icon { color: var(--color-ok-400); }
+html.dark .btn-intent-crit:hover app-icon,
+html.dark .btn-intent-crit:focus app-icon { color: var(--color-crit-400); }
+
 @layer components {
   /* Icons sit inline with the label at a consistent gap, so a button with one and a button
      without still line up in the same toolbar. */
   .btn { @apply inline-flex items-center justify-center gap-1.5; }
-  .btn app-icon { @apply opacity-80; }
-  .btn:hover app-icon { @apply opacity-100; }
+  /* Icons sit a touch lighter than their label so the word leads -- but an icon carrying
+     an intent colour is saying something, so it is never dimmed. */
+  .btn app-icon:not([class*="icon-"]) { @apply opacity-80; }
+  .btn:hover app-icon:not([class*="icon-"]) { @apply opacity-100; }
   .btn-icon { @apply gap-0; }
+
+  /* Icon intent. The -500 steps are tuned for light surfaces and the -400 steps for dark,
+     the same split the pills use, so an intent keeps its meaning and its contrast in both
+     themes rather than being one colour that only works in one of them. */
+  /* Intent on demand. A reversible action (suspend, deactivate) does not need to shout
+     while resting -- a row of amber icons competes with the data. It earns its colour on
+     hover and focus, where the user is actually deciding. Destructive actions keep a
+     standing colour, since a delete deserves a warning before the pointer arrives. */
+  .btn-intent-warn:hover app-icon,
+  .btn-intent-warn:focus-visible app-icon,
+  .btn-intent-warn:focus app-icon { color: var(--color-warn-500); opacity: 1; }
+  .btn-intent-ok:hover app-icon,
+  .btn-intent-ok:focus-visible app-icon,
+  .btn-intent-ok:focus app-icon { color: var(--color-ok-500); opacity: 1; }
+  .btn-intent-crit:hover app-icon,
+  .btn-intent-crit:focus-visible app-icon,
+  .btn-intent-crit:focus app-icon { color: var(--color-crit-500); opacity: 1; }
+
+  .icon-ok    { color: var(--color-ok-500); }
+  .icon-warn  { color: var(--color-warn-500); }
+  .icon-crit  { color: var(--color-crit-500); }
+  .icon-info  { color: var(--color-brand-500); }
+  .icon-muted { color: var(--text-muted); }
 
   .menu-item {
     @apply w-full text-left px-3 py-1.5 rounded-sm inline-flex items-center gap-2
@@ -233,7 +294,25 @@ html.dark .pill-crit  { background: color-mix(in oklab, var(--color-crit-500) 22
      The container must be an ancestor -- an element cannot query itself -- so the form owns it. */
   form, .form-section { container-type: inline-size; }
 
-  .form-grid { @apply grid gap-x-5 gap-y-4; }
+  /* Form rhythm, defined once.
+
+     The gaps inside a field must be smaller than the gap between fields, or the eye groups a
+     label with the field above it instead of its own control. This was inverted: .label
+     carried mb-1.5 on top of a parent space-y-1 (10px label to input) while only 14px
+     separated whole fields, so lower labels looked crowded against the previous field's
+     hint text. One scale now drives every form.
+
+       within a field  6px   label -> control -> hint/error
+       between fields  20px
+       between groups  24px + rule
+  */
+  .field { @apply block; }
+  .field > .label { @apply mb-1.5; }
+  .field-note { @apply mt-1.5 text-xs leading-snug; }
+
+  .form-stack > * + * { margin-top: 1.25rem; }
+
+  .form-grid { @apply grid gap-x-5; row-gap: 1.25rem; }
 
   @container (min-width: 30rem) {
     .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -242,10 +321,15 @@ html.dark .pill-crit  { background: color-mix(in oklab, var(--color-crit-500) 22
     .form-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   }
   .form-section {
-    @apply border-t pt-4 mt-4 first:border-0 first:pt-0 first:mt-0;
+    @apply border-t pt-6 mt-6 first:border-0 first:pt-0 first:mt-0;
     border-color: var(--border-subtle);
   }
-  .form-section-title { @apply text-sm font-semibold mb-3; }
+  .form-section-title { @apply text-sm font-semibold mb-4; }
+  /* Actions are a decision point, not another field -- they sit further out. */
+  .form-actions {
+    @apply flex flex-wrap items-center justify-end gap-2 border-t pt-4 mt-6;
+    border-color: var(--border-subtle);
+  }
 }
 
 @layer components {

@@ -27,9 +27,9 @@
                       [class.bg-brand-50]="openMenu() === item.label"
                       [class.text-brand-600]="openMenu() === item.label">
                 {{ item.label }}
-                <svg class="size-3.5 opacity-60" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                  <path d="M3 4.5 6 7.5 9 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-                </svg>
+                <app-icon name="chevronDown" size="0.85em"
+                          class="icon-muted transition-transform duration-150"
+                          [class.rotate-180]="openMenu() === item.label" />
               </button>
               @if (openMenu() === item.label) {
                 <div class="absolute left-0 top-full mt-1 min-w-52 rounded-lg border shadow-lg py-1 z-50"
@@ -56,13 +56,9 @@
         <button type="button" class="btn btn-ghost btn-icon" (click)="theme.toggle()"
                 [title]="theme.theme() === 'dark' ? 'Switch to light' : 'Switch to dark'">
           @if (theme.theme() === 'dark') {
-            <svg class="size-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-              <path d="M10 3a1 1 0 0 1 1 1v1a1 1 0 1 1-2 0V4a1 1 0 0 1 1-1Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm7-4a1 1 0 0 1-1 1h-1a1 1 0 1 1 0-2h1a1 1 0 0 1 1 1ZM5 10a1 1 0 0 1-1 1H3a1 1 0 1 1 0-2h1a1 1 0 0 1 1 1Zm10.66 5.66a1 1 0 0 1-1.42 0l-.7-.7a1 1 0 1 1 1.41-1.42l.71.71a1 1 0 0 1 0 1.41ZM6.46 6.46a1 1 0 0 1-1.42 0l-.7-.7a1 1 0 0 1 1.41-1.42l.71.71a1 1 0 0 1 0 1.41Zm9.9-2.12a1 1 0 0 1 0 1.42l-.71.7a1 1 0 1 1-1.41-1.41l.7-.71a1 1 0 0 1 1.42 0ZM6.46 13.54a1 1 0 0 1 0 1.42l-.71.7a1 1 0 0 1-1.41-1.41l.7-.71a1 1 0 0 1 1.42 0ZM10 15a1 1 0 0 1 1 1v1a1 1 0 1 1-2 0v-1a1 1 0 0 1 1-1Z"/>
-            </svg>
+            <app-icon name="sun" size="1.05em" label="Switch to light theme" />
           } @else {
-            <svg class="size-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-              <path d="M17.29 12.29A8 8 0 0 1 7.71 2.71a8.001 8.001 0 1 0 9.58 9.58Z"/>
-            </svg>
+            <app-icon name="moon" size="1.05em" label="Switch to dark theme" />
           }
         </button>
 
@@ -94,9 +90,7 @@
 
         <button type="button" class="btn btn-ghost btn-icon md:hidden" (click)="mobileOpen.set(!mobileOpen())"
                 aria-label="Menu">
-          <svg class="size-5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
-            <path d="M3 6h14M3 10h14M3 14h14" stroke-linecap="round"/>
-          </svg>
+          <app-icon [name]="mobileOpen() ? 'close' : 'menu'" size="1.15em" />
         </button>
       </div>
     </div>

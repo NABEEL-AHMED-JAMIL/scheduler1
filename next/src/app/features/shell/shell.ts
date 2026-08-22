@@ -3,6 +3,7 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { LowerCasePipe } from '@angular/common';
 import { AuthService } from '../../core/auth/auth.service';
 import { ThemeService } from '../../core/theme.service';
+import { Icon } from '../../shared/ui/icon';
 
 interface NavItem {
   label: string;
@@ -13,7 +14,7 @@ interface NavItem {
 
 @Component({
   selector: 'app-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, LowerCasePipe],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, LowerCasePipe, Icon],
   templateUrl: './shell.html',
 })
 export class Shell {

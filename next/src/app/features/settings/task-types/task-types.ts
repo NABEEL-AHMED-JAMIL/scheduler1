@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { TableShell } from '../../../shared/ui/data-table';
 import { StatusPill } from '../../../shared/ui/status-pill';
+import { Icon } from '../../../shared/ui/icon';
 
 interface SourceTaskType {
   sourceTaskTypeId: number;
@@ -14,7 +15,7 @@ interface SourceTaskType {
 
 @Component({
   selector: 'app-task-types',
-  imports: [TableShell, StatusPill],
+  imports: [TableShell, StatusPill, Icon],
   templateUrl: './task-types.html',
 })
 export class TaskTypes implements OnInit {

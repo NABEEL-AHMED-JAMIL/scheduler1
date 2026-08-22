@@ -14,8 +14,11 @@
                    [emptyMessage]="search() ? 'No tasks match your search.' : 'No tasks yet.'"
                    (retry)="load()">
     <ng-container toolbar>
-      <input class="input max-w-64" placeholder="Search id, name, type or pipeline"
-             [value]="search()" (input)="search.set($any($event.target).value)" />
+      <div class="search-field max-w-64">
+        <app-icon name="search" size="0.95em" />
+        <input class="input" placeholder="Search id, name, type or pipeline"
+               [value]="search()" (input)="search.set($any($event.target).value)" />
+      </div>
       @if (search()) {
         <button type="button" class="btn btn-ghost btn-sm" (click)="search.set('')"><app-icon name="close" />Clear</button>
       }

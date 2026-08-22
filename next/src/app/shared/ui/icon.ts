@@ -1,4 +1,4 @@
-import { Component, computed, input } from '@angular/core';
+import { Component, computed, input, isDevMode } from '@angular/core';
 
 /**
  * One stroke-based icon set for the whole app. Paths are drawn on a 24x24 grid with a 2px
@@ -49,6 +49,26 @@ const PATHS: Record<string, string> = {
   moon:      'M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z',
   sparkle:   'M12 3l1.9 5.8L20 10.7l-5.1 2 -1.9 5.8-1.9-5.8L6 10.7l5.1-1.9L12 3Z',
   zap:       'M13 2 3 14h9l-1 8 10-12h-9l1-8Z',
+  layers:    'M12 2 2 7l10 5 10-5-10-5Z M2 17l10 5 10-5 M2 12l10 5 10-5',
+  list:      'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',
+  briefcase: 'M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2ZM16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16',
+  menu:      'M3 6h18M3 12h18M3 18h18',
+  arrowUp:   'M12 19V5M5 12l7-7 7 7',
+  arrowDown: 'M12 5v14M19 12l-7 7-7-7',
+  arrowRight:'M5 12h14M12 5l7 7-7 7',
+  chevronUp: 'm18 15-6-6-6 6',
+  sort:      'm8 9 4-4 4 4M8 15l4 4 4-4',
+  checkCircle: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20ZM8.5 12.5l2.5 2.5 4.5-5',
+  xCircle:   'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20ZM15 9l-6 6M9 9l6 6',
+  plug:      'M12 22v-5M9 7V2M15 7V2M6 7h12v4a6 6 0 0 1-12 0V7Z',
+  key:       'M15.5 7.5a5.5 5.5 0 1 1-4.35 8.86l-1.4 1.4H8v2H6v2H2v-4l6.24-6.24A5.5 5.5 0 0 1 15.5 7.5Z M17 10h.01',
+  shield:    'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z',
+  lock:      'M19 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2ZM7 11V7a5 5 0 0 1 10 0v4',
+  power:     'M18.36 6.64a9 9 0 1 1-12.73 0M12 2v10',
+  inbox:     'M22 12h-6l-2 3h-4l-2-3H2 M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11Z',
+  globe:     'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20ZM2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10Z',
+  cloud:     'M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10Z',
+  history:   'M3 12a9 9 0 1 0 3-6.7L3 8m0-5v5h5M12 7v5l3 2',
   save:      'M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2ZM17 21v-8H7v8M7 3v5h8',
 };
 
@@ -77,7 +97,14 @@ export class Icon {
   /** Multi-part glyphs are stored space-separated so each subpath closes cleanly. */
   readonly segments = computed(() => {
     const path = PATHS[this.name()];
-    if (!path) return [];
+    if (!path) {
+      // An unknown name used to render an empty <svg>: the glyph vanished, the layout kept
+      // its space, and nothing complained. Typos reached production that way.
+      if (isDevMode()) {
+        console.error(`[app-icon] no glyph named "${this.name()}" -- nothing will render.`);
+      }
+      return [];
+    }
     return path.split(/(?<=[Zz])\s+(?=[Mm])/).map(p => p.trim()).filter(Boolean);
   });
 }

@@ -87,8 +87,11 @@
             </span>
           }
         </h2>
-        <input class="input max-w-52" placeholder="Search job id or name"
-               [value]="breakdownSearch()" (input)="breakdownSearch.set($any($event.target).value)" />
+        <div class="search-field max-w-52">
+          <app-icon name="search" size="0.95em" />
+          <input class="input" placeholder="Search job id or name"
+                 [value]="breakdownSearch()" (input)="breakdownSearch.set($any($event.target).value)" />
+        </div>
         <button type="button" class="btn btn-ghost btn-sm" (click)="clearCell()"><app-icon name="close" />Close</button>
       </div>
 
