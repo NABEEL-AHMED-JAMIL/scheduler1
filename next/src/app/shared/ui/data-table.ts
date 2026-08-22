@@ -1,4 +1,5 @@
 import { Component, input, output } from '@angular/core';
+import { Icon } from './icon';
 
 /**
  * Shared chrome for the list screens: a titled card with a filter slot, plus consistent
@@ -8,6 +9,7 @@ import { Component, input, output } from '@angular/core';
  */
 @Component({
   selector: 'app-table-shell',
+  imports: [Icon],
   template: `
     <div class="card overflow-hidden">
       <div class="flex flex-wrap items-center gap-2 px-4 py-3 border-b"
@@ -24,16 +26,24 @@ import { Component, input, output } from '@angular/core';
       </div>
 
       @if (loading()) {
-        <div class="p-12 text-center text-sm text-[color:var(--text-muted)]">Loading…</div>
+        <div class="px-6 py-14 text-center text-sm text-[color:var(--text-muted)]">
+          <app-icon name="refresh" size="1.5rem" class="spin block mx-auto mb-3 icon-muted" />
+          Loading…
+        </div>
       } @else if (error()) {
-        <div class="p-12 text-center">
+        <div class="px-6 py-14 text-center">
+          <app-icon name="alert" size="1.75rem" class="icon-crit block mx-auto mb-3" />
           <p class="text-sm text-crit-500">{{ error() }}</p>
-          <button type="button" class="btn btn-default btn-sm mt-3" (click)="retry.emit()">Try again</button>
+          <button type="button" class="btn btn-default btn-sm mt-4" (click)="retry.emit()">
+            <app-icon name="refresh" />Try again
+          </button>
         </div>
       } @else if (isEmpty()) {
-        <div class="p-14 text-center">
+        <div class="px-6 py-14 text-center">
+          <app-icon [name]="emptyIcon()" size="1.75rem"
+                    class="icon-muted block mx-auto mb-3" />
           <p class="text-sm text-[color:var(--text-secondary)]">{{ emptyMessage() }}</p>
-          <ng-content select="[empty-action]" />
+          <div class="mt-4"><ng-content select="[empty-action]" /></div>
         </div>
       } @else {
         <div class="overflow-x-auto"><ng-content /></div>
@@ -47,6 +57,8 @@ export class TableShell {
   readonly error = input('');
   readonly isEmpty = input(false);
   readonly emptyMessage = input('Nothing here yet.');
+  /** Something that suggests what is missing beats a generic box on every screen. */
+  readonly emptyIcon = input('inbox');
   readonly shown = input<number | null>(null);
   readonly total = input<number | null>(null);
   readonly retry = output<void>();

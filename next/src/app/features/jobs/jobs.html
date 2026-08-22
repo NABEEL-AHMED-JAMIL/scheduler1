@@ -13,6 +13,7 @@
                    [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="jobs().length"
                    [emptyMessage]="search() || statusFilter() || executionFilter()
                       ? 'No jobs match the current filters.' : 'No jobs yet.'"
+                   emptyIcon="briefcase"
                    (retry)="load()">
     <ng-container toolbar>
       <select class="input max-w-32" [value]="executionFilter()"

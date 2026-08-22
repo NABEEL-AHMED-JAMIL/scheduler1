@@ -28,6 +28,7 @@
                    [isEmpty]="!filtered().length" [shown]="filtered().length"
                    [total]="connections().length"
                    [emptyMessage]="search() || providerFilter() ? 'No connections match the filters.' : 'No connections configured yet.'"
+                   emptyIcon="cloud"
                    (retry)="load()">
     <ng-container toolbar>
       <select class="input max-w-36" [value]="providerFilter()"
@@ -84,7 +85,9 @@
               }
             </td>
             <td>
-              <span [class]="testPill(c)" [title]="c.lastTestMessage || ''">{{ testLabel(c) }}</span>
+              <span [class]="testPill(c)" [title]="c.lastTestMessage || ''">
+                @if (testGlyph(c)) { <app-icon [name]="testGlyph(c)" size="0.85em" /> }{{ testLabel(c) }}
+              </span>
               @if (c.lastTestedAt) {
                 <div class="text-xs text-[color:var(--text-muted)] mt-0.5">
                   {{ c.lastTestedAt | date:'d MMM, HH:mm' }}

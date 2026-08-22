@@ -10,6 +10,7 @@
   <app-table-shell heading="Task types" [loading]="loading()" [error]="error()"
                    [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="types().length"
                    [emptyMessage]="search() ? 'No task types match your search.' : 'No task types defined yet.'"
+                   emptyIcon="layers"
                    (retry)="load()">
     <ng-container toolbar>
       <div class="search-field max-w-56">

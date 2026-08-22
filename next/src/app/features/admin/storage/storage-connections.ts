@@ -162,6 +162,14 @@ export class StorageConnections implements OnInit {
     }
   }
 
+  testGlyph(connection: StorageConnection): string {
+    switch (connection.connectionStatus) {
+      case 'SUCCESS': return 'checkCircle';
+      case 'FAILED':  return 'xCircle';
+      default:        return '';
+    }
+  }
+
   testLabel(connection: StorageConnection): string {
     switch (connection.connectionStatus) {
       case 'SUCCESS': return 'OK';

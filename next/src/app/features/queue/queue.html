@@ -26,6 +26,7 @@
   <app-table-shell heading="Queue" [loading]="loading()" [error]="error()"
                    [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="rows().length"
                    emptyMessage="Nothing in the queue for these filters."
+                   emptyIcon="clock"
                    (retry)="load()">
     <ng-container toolbar>
       <input type="date" class="input max-w-40" [value]="fromDate()"

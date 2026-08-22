@@ -10,6 +10,7 @@
   <app-table-shell heading="Lookups" [loading]="loading()" [error]="error()"
                    [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="lookups().length"
                    [emptyMessage]="search() ? 'No lookups match your search.' : 'No lookups defined.'"
+                   emptyIcon="list"
                    (retry)="load()">
     <ng-container toolbar>
       <div class="search-field max-w-56">

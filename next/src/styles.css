@@ -17,6 +17,9 @@
   --color-ink-200: #dee1ee;
   --color-ink-300: #c3c8dc;
   --color-ink-400: #8f97b2;
+  /* Between 400 and 500: the lightest muted step that still clears 4.5:1 on the sunken
+     surface, which is what a hovered table row switches to. */
+  --color-ink-450: #616980;
   --color-ink-500: #6b7392;
   --color-ink-600: #4e5570;
   --color-ink-700: #3a4059;
@@ -41,6 +44,9 @@
 
   --color-warn-100: #fdf0dd;
   --color-warn-500: #b45309;
+  /* For warning text on a neutral surface. warn-500 is mixed to sit on warn-100 (as the
+     pills use it) and reads 4.33:1 on the sunken surface a hovered row switches to. */
+  --color-warn-600: #8a3d07;
   --color-warn-400: #e0a25c;
 
   --color-crit-100: #fbe6ea;
@@ -68,7 +74,7 @@
        is 7.35:1, so both clear 4.5. The previous muted step (ink-400) measured 2.90:1 and
        was carrying every table header, tile label and hint in the app. */
     --text-secondary:  var(--color-ink-600);
-    --text-muted:      var(--color-ink-500);
+    --text-muted:      var(--color-ink-450);
     --text-inverse:    #ffffff;
   }
 
@@ -102,6 +108,12 @@
   table, .tabular {
     font-variant-numeric: tabular-nums;
   }
+
+  /* A component host is an unknown element, so it defaults to display:inline -- where
+     vertical margin silently does nothing. .form-stack sets margin-top on its children,
+     which meant the rule applied and had no effect at all until these were blockified.
+     (Grid children are blockified by the grid, which is why .form-grid never showed it.) */
+  app-field, app-form-dialog, app-table-shell { display: block; }
 
   :focus-visible {
     outline: 2px solid var(--color-brand-500);
@@ -178,7 +190,8 @@
   .pill-neutral { @apply bg-[color:var(--surface-sunken)] text-[color:var(--text-secondary)]; }
   .pill-brand   { @apply bg-brand-50 text-brand-700; }
   .pill-ok      { @apply bg-ok-100 text-ok-500; }
-  .pill-warn    { @apply bg-warn-100 text-warn-500; }
+  /* warn-500 on warn-100 measures 4.47:1 -- the one pill under the line. */
+  .pill-warn    { @apply bg-warn-100; color: var(--color-warn-600); }
   .pill-crit    { @apply bg-crit-100 text-crit-500; }
 
   .table-modern { @apply w-full text-sm; }
@@ -201,6 +214,14 @@
   .table-modern tfoot tr { background: var(--surface-sunken); }
   .table-modern tbody tr:hover { background: var(--surface-sunken); }
 
+  /* One rotation utility, for the handful of places that show work in progress.
+     Honours reduced-motion, since a permanent spin is the worst offender there. */
+  .spin { animation: spin 900ms linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) {
+    .spin { animation-duration: 2.4s; }
+  }
+
   .mono { font-family: var(--font-mono); @apply text-xs; }
 }
 
@@ -213,6 +234,10 @@ html.dark .pill-crit  { background: color-mix(in oklab, var(--color-crit-500) 22
    one they fall to 2.2-3.4:1 -- "Expired" in warn-500 and topic names in brand-600 were the
    worst. Dark mode gets the lighter step, the same swap the pills already make, so a colour
    keeps its meaning in both themes without every template having to know about it. */
+/* Utility usage only -- .pill-warn inlines its colour through @apply, so it keeps warn-500
+   against its own light background and is unaffected by this. */
+html:not(.dark) .text-warn-500 { color: var(--color-warn-600); }
+
 html.dark .text-brand-500,
 html.dark .text-brand-600,
 html.dark .text-brand-700 { color: var(--color-brand-300); }

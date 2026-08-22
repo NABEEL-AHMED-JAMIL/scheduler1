@@ -31,6 +31,7 @@
   <app-table-shell heading="Tenants" [loading]="loading()" [error]="error()"
                    [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="tenants().length"
                    [emptyMessage]="hasFilters() ? 'No tenants match the current filters.' : 'No tenants yet.'"
+                   emptyIcon="users"
                    (retry)="listTenants()">
     <ng-container toolbar>
       <select class="input max-w-36" [value]="statusFilter()"

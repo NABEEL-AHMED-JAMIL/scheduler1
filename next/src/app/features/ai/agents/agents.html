@@ -12,6 +12,7 @@
   <app-table-shell heading="Agents" [loading]="loading()" [error]="error()"
                    [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="agents().length"
                    [emptyMessage]="search() ? 'No agents match your search.' : 'No agents configured yet.'"
+                   emptyIcon="sparkle"
                    (retry)="load()">
     <ng-container toolbar>
       <div class="search-field max-w-56">
