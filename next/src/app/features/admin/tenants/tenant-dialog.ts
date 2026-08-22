@@ -1,0 +1,93 @@
+import { Component, computed, inject, signal } from '@angular/core';
+import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
+import { HttpClient } from '@angular/common/http';
+import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
+import { ToastService } from '../../../shared/ui/toast.service';
+import { Field } from '../../../shared/ui/field';
+import { FormDialog } from '../../../shared/ui/form-dialog';
+
+@Component({
+  selector: 'app-tenant-dialog',
+  imports: [ReactiveFormsModule, Field, FormDialog],
+  template: `
+    <app-form-dialog
+        [heading]="isEdit() ? 'Edit tenant' : 'New tenant'"
+        subtitle="Every job, bucket, task and agent belongs to a tenant."
+        [confirmLabel]="isEdit() ? 'Save changes' : 'Create'"
+        [saving]="saving()"
+        (cancelled)="ref.close(false)" (confirmed)="save()">
+      <form [formGroup]="form" class="space-y-3.5">
+        <app-field label="Tenant name" for="tenantName" [required]="true"
+                   [control]="form.get('tenantName')" [submitted]="submitted()">
+          <input id="tenantName" class="input" formControlName="tenantName"
+                 placeholder="Ministry of Justice" />
+        </app-field>
+
+        <app-field label="Description" for="tenantDescription"
+                   [control]="form.get('description')" [submitted]="submitted()">
+          <textarea id="tenantDescription" class="input resize-y min-h-20"
+                    formControlName="description" placeholder="What this tenant is for"></textarea>
+        </app-field>
+
+        <app-field label="Status" for="tenantStatus" [control]="form.get('status')"
+                   [submitted]="submitted()"
+                   hint="Deactivating a tenant stops its users signing in.">
+          <select id="tenantStatus" class="input" formControlName="status">
+            <option value="Active">Active</option>
+            <option value="Inactive">Inactive</option>
+          </select>
+        </app-field>
+      </form>
+    </app-form-dialog>
+  `,
+})
+export class TenantDialog {
+  readonly ref = inject<DialogRef<boolean>>(DialogRef);
+  readonly data = inject<{ tenant?: any }>(DIALOG_DATA);
+  private readonly fb = inject(FormBuilder);
+  private readonly http = inject(HttpClient);
+  private readonly toast = inject(ToastService);
+
+  readonly saving = signal(false);
+  readonly submitted = signal(false);
+  readonly isEdit = computed(() => !!this.data.tenant);
+
+  readonly form: FormGroup = this.fb.group({
+    tenantId: [this.data.tenant?.tenantId ?? null],
+    tenantName: [this.data.tenant?.tenantName ?? '', Validators.required],
+    description: [this.data.tenant?.description ?? ''],
+    status: [this.data.tenant?.status ?? 'Active'],
+  });
+
+  save(): void {
+    this.submitted.set(true);
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      this.toast.error('Check the highlighted fields.');
+      return;
+    }
+
+    this.saving.set(true);
+    const payload = this.form.getRawValue();
+    const request = this.isEdit()
+      ? this.http.put<ApiResponse>(`${API_BASE}/tenant.json/updateTenant`, payload)
+      : this.http.post<ApiResponse>(`${API_BASE}/tenant.json/addTenant`, payload);
+
+    request.subscribe({
+      next: response => {
+        this.saving.set(false);
+        if (response.status === API_SUCCESS) {
+          this.toast.success(this.isEdit() ? 'Tenant updated.' : 'Tenant created.');
+          this.ref.close(true);
+        } else {
+          this.toast.error(response.message);
+        }
+      },
+      error: err => {
+        this.saving.set(false);
+        this.toast.error(err?.error?.message || 'The tenant could not be saved.');
+      },
+    });
+  }
+}

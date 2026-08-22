@@ -1,9 +1,12 @@
 <div class="page">
-  <div>
+  <div class="page-head">
+    <div>
     <h1 class="page-title">Tenants</h1>
     <p class="page-subtitle">
       Every job, bucket, task and agent belongs to a tenant. Isolation is enforced server-side.
     </p>
+    </div>
+    <button type="button" class="btn btn-primary btn-sm" (click)="create()">New tenant</button>
   </div>
 
   <app-table-shell heading="Tenants" [loading]="loading()" [error]="error()"
@@ -25,6 +28,7 @@
           <th>Description</th>
           <th>Created</th>
           <th class="text-right">Status</th>
+          <th class="w-16"></th>
         </tr>
       </thead>
       <tbody>
@@ -41,6 +45,9 @@
               {{ tenant.dateCreated ? (tenant.dateCreated | date:'d MMM yyyy') : '—' }}
             </td>
             <td class="text-right"><app-status [label]="tenant.status" /></td>
+            <td class="text-right">
+              <button type="button" class="btn btn-ghost btn-sm" (click)="edit(tenant)">Edit</button>
+            </td>
           </tr>
         }
       </tbody>

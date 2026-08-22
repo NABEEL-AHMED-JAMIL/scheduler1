@@ -1,0 +1,62 @@
+<app-form-dialog
+    [heading]="isEdit() ? 'Edit user' : 'New user'"
+    subtitle="Roles are enforced on the server, not just in the menu."
+    [confirmLabel]="isEdit() ? 'Save changes' : 'Create'"
+    [saving]="saving()"
+    (cancelled)="ref.close(false)" (confirmed)="save()">
+
+  <form [formGroup]="form" class="space-y-3.5">
+    <div class="form-grid">
+      <app-field label="Full name" for="fullName" [required]="true"
+                 [control]="form.get('fullName')" [submitted]="submitted()">
+        <input id="fullName" class="input" formControlName="fullName" placeholder="Alex Morgan" />
+      </app-field>
+
+      <app-field label="Email" for="username" [required]="true"
+                 [control]="form.get('username')" [submitted]="submitted()"
+                 hint="Used to sign in.">
+        <input id="username" type="email" class="input" formControlName="username"
+               placeholder="alex@example.com" autocomplete="off" />
+      </app-field>
+    </div>
+
+    <app-field label="Password" for="password" [required]="!isEdit()"
+               [control]="form.get('password')" [submitted]="submitted()"
+               [hint]="isEdit() ? 'Leave blank to keep the current password.' : 'At least 8 characters.'">
+      <input id="password" type="password" class="input" formControlName="password"
+             autocomplete="new-password" />
+    </app-field>
+
+    <app-field label="Role" for="userRole" [required]="true" [hint]="roleHint()"
+               [control]="form.get('userRole')" [submitted]="submitted()">
+      <select id="userRole" class="input" formControlName="userRole">
+        @for (option of roles; track option.value) {
+          <option [value]="option.value">{{ option.label }}</option>
+        }
+      </select>
+    </app-field>
+
+    @if (needsTenant() && data.canPickTenant) {
+      <app-field label="Tenant" for="tenantId" [required]="true"
+                 [control]="form.get('tenantId')" [submitted]="submitted()">
+        <select id="tenantId" class="input" formControlName="tenantId">
+          <option [ngValue]="null">Select a tenant</option>
+          @for (tenant of data.tenants; track tenant.tenantId) {
+            <option [ngValue]="tenant.tenantId">{{ tenant.tenantName }}</option>
+          }
+        </select>
+      </app-field>
+    } @else if (!needsTenant()) {
+      <p class="text-sm rounded-md px-3 py-2" style="background: var(--surface-sunken);">
+        A platform admin spans every tenant, so no tenant is assigned.
+      </p>
+    }
+
+    <app-field label="Status" for="userStatus" [control]="form.get('status')" [submitted]="submitted()">
+      <select id="userStatus" class="input" formControlName="status">
+        <option value="Active">Active</option>
+        <option value="Inactive">Inactive</option>
+      </select>
+    </app-field>
+  </form>
+</app-form-dialog>

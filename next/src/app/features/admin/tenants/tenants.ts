@@ -4,6 +4,8 @@ import { DatePipe } from '@angular/common';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { TableShell } from '../../../shared/ui/data-table';
 import { StatusPill } from '../../../shared/ui/status-pill';
+import { Dialog } from '@angular/cdk/dialog';
+import { TenantDialog } from './tenant-dialog';
 
 interface Tenant {
   tenantId: number;
@@ -20,6 +22,7 @@ interface Tenant {
 })
 export class Tenants implements OnInit {
   private readonly http = inject(HttpClient);
+  private readonly dialog = inject(Dialog);
 
   readonly tenants = signal<Tenant[]>([]);
   readonly loading = signal(true);
@@ -32,6 +35,16 @@ export class Tenants implements OnInit {
     return this.tenants().filter(t =>
       (t.tenantName ?? '').toLowerCase().includes(term) || String(t.tenantId).includes(term));
   });
+
+  create(): void {
+    this.dialog.open<boolean>(TenantDialog, { data: {}, hasBackdrop: true })
+      .closed.subscribe(saved => { if (saved) this.load(); });
+  }
+
+  edit(tenant: Tenant): void {
+    this.dialog.open<boolean>(TenantDialog, { data: { tenant }, hasBackdrop: true })
+      .closed.subscribe(saved => { if (saved) this.load(); });
+  }
 
   ngOnInit(): void { this.load(); }
 

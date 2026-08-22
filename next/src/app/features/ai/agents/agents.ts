@@ -3,6 +3,11 @@ import { HttpClient } from '@angular/common/http';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { TableShell } from '../../../shared/ui/data-table';
 import { StatusPill } from '../../../shared/ui/status-pill';
+import { Dialog } from '@angular/cdk/dialog';
+import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
+import { AgentDialog } from './agent-dialog';
+import { ToastService } from '../../../shared/ui/toast.service';
+import { confirmWith } from '../../../shared/ui/confirm';
 
 interface AiAgent {
   aiAgentId: number;
@@ -18,11 +23,13 @@ interface AiAgent {
 
 @Component({
   selector: 'app-agents',
-  imports: [TableShell, StatusPill],
+  imports: [TableShell, StatusPill, CdkMenu, CdkMenuItem, CdkMenuTrigger],
   templateUrl: './agents.html',
 })
 export class Agents implements OnInit {
   private readonly http = inject(HttpClient);
+  private readonly dialog = inject(Dialog);
+  private readonly toast = inject(ToastService);
 
   readonly agents = signal<AiAgent[]>([]);
   readonly loading = signal(true);
@@ -38,7 +45,7 @@ export class Agents implements OnInit {
       || (a.model ?? '').toLowerCase().includes(term));
   });
 
-  ngOnInit(): void { this.load(); }
+  ngOnInit(): void { this.load(); this.loadProviders(); }
 
   load(): void {
     this.loading.set(true);
@@ -53,6 +60,54 @@ export class Agents implements OnInit {
         this.loading.set(false);
         this.error.set(err?.error?.message || 'Could not load agents.');
       },
+    });
+  }
+
+  /** Providers come from the AI_PROVIDER lookup so the list stays configurable. */
+  readonly providers = signal<string[]>([]);
+
+  private loadProviders(): void {
+    this.http.get<ApiResponse<any>>(`${API_BASE}/setting.json/appSetting`).subscribe({
+      next: response => {
+        if (response.status !== API_SUCCESS) return;
+        const lookup = (response.data?.lookupDatas ?? [])
+          .find((l: any) => l.lookupType === 'AI_PROVIDER');
+        const values = (lookup?.children ?? []).map((c: any) => c.lookupValue).filter(Boolean);
+        this.providers.set(values.length ? values : ['OpenAI', 'Anthropic', 'Ollama']);
+      },
+      error: () => this.providers.set(['OpenAI', 'Anthropic', 'Ollama']),
+    });
+  }
+
+  create(): void {
+    this.dialog.open<boolean>(AgentDialog, {
+      data: { providers: this.providers() }, hasBackdrop: true,
+    }).closed.subscribe(saved => { if (saved) this.load(); });
+  }
+
+  edit(agent: AiAgent): void {
+    this.dialog.open<boolean>(AgentDialog, {
+      data: { agent, providers: this.providers() }, hasBackdrop: true,
+    }).closed.subscribe(saved => { if (saved) this.load(); });
+  }
+
+  async remove(agent: AiAgent): Promise<void> {
+    const ok = await confirmWith(this.dialog, {
+      title: 'Delete agent',
+      body: `"${agent.agentName}" will be removed. Any file chat using it will fall back to another agent.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
+    this.http.delete<ApiResponse>(`${API_BASE}/aiAgent.json/deleteAgent`,
+      { params: { aiAgentId: String(agent.aiAgentId) } }).subscribe({
+      next: response => {
+        if (response.status === API_SUCCESS) {
+          this.toast.success(`${agent.agentName} deleted.`);
+          this.load();
+        } else { this.toast.error(response.message); }
+      },
+      error: err => this.toast.error(err?.error?.message || 'Delete failed.'),
     });
   }
 

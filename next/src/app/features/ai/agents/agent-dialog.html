@@ -1,0 +1,93 @@
+<app-form-dialog
+    [heading]="isEdit() ? 'Edit agent' : 'New AI agent'"
+    subtitle="Defined once here, then used by the file chat everywhere."
+    [confirmLabel]="isEdit() ? 'Save changes' : 'Create'"
+    [saving]="saving()"
+    (cancelled)="ref.close(false)" (confirmed)="save()">
+
+  <form [formGroup]="form" class="space-y-3.5">
+    <div class="form-grid">
+      <app-field label="Agent name" for="agentName" [required]="true"
+                 [control]="form.get('agentName')" [submitted]="submitted()">
+        <input id="agentName" class="input" formControlName="agentName"
+               placeholder="Invoice extractor" />
+      </app-field>
+
+      <app-field label="Provider" for="agentProvider" [required]="true"
+                 [control]="form.get('provider')" [submitted]="submitted()">
+        <select id="agentProvider" class="input" formControlName="provider">
+          @for (option of data.providers; track option) { <option [value]="option">{{ option }}</option> }
+        </select>
+      </app-field>
+    </div>
+
+    <app-field label="Description" for="agentDescription" [control]="form.get('description')"
+               [submitted]="submitted()">
+      <input id="agentDescription" class="input" formControlName="description"
+             placeholder="What this agent is for" />
+    </app-field>
+
+    <div class="form-grid">
+      <app-field label="Model" for="model" [required]="true"
+                 [control]="form.get('model')" [submitted]="submitted()">
+        <input id="model" class="input mono" formControlName="model"
+               placeholder="gpt-4.1-mini" />
+      </app-field>
+
+      <app-field label="API endpoint" for="endpoint" [control]="form.get('apiEndpoint')"
+                 [submitted]="submitted()" hint="Leave blank to use the provider default.">
+        <input id="endpoint" class="input mono" formControlName="apiEndpoint"
+               [placeholder]="endpointPlaceholder()" />
+      </app-field>
+    </div>
+
+    @if (needsKey()) {
+      <app-field label="API key" for="apiKey" [control]="form.get('apiKey')" [submitted]="submitted()"
+                 [hint]="data.agent?.apiKeyConfigured
+                    ? 'A key is stored. Leave blank to keep it.'
+                    : 'Stored encrypted and never sent back to the browser.'">
+        <input id="apiKey" type="password" class="input" formControlName="apiKey"
+               autocomplete="new-password" />
+      </app-field>
+    } @else {
+      <p class="text-sm rounded-md px-3 py-2" style="background: var(--surface-sunken);">
+        Ollama runs locally and needs no API key.
+      </p>
+    }
+
+    <div>
+      <span class="label">Target file types</span>
+      <div class="flex flex-wrap gap-1.5 mt-1">
+        @for (type of fileTypes; track type) {
+          <button type="button" class="btn btn-sm"
+                  [class.btn-primary]="selectedTypes().includes(type)"
+                  [class.btn-default]="!selectedTypes().includes(type)"
+                  (click)="toggleType(type)">.{{ type }}</button>
+        }
+      </div>
+    </div>
+
+    <app-field label="Instructions" for="instructions" [required]="true"
+               [control]="form.get('instructions')" [submitted]="submitted()"
+               hint="The system prompt this agent runs with.">
+      <textarea id="instructions" class="input resize-y min-h-24" formControlName="instructions"
+                placeholder="Summarise this document in three bullet points."></textarea>
+    </app-field>
+
+    <div class="form-grid">
+      <app-field label="Status" for="agentStatus" [control]="form.get('status')" [submitted]="submitted()">
+        <select id="agentStatus" class="input" formControlName="status">
+          <option value="Active">Active</option>
+          <option value="Inactive">Inactive</option>
+        </select>
+      </app-field>
+
+      @if (isOllama()) {
+        <label class="flex items-center gap-2 text-sm self-end pb-2">
+          <input type="checkbox" formControlName="jsonMode" />
+          Force JSON output
+        </label>
+      }
+    </div>
+  </form>
+</app-form-dialog>

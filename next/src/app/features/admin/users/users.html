@@ -1,9 +1,12 @@
 <div class="page">
-  <div>
+  <div class="page-head">
+    <div>
     <h1 class="page-title">Users</h1>
     <p class="page-subtitle">
       Access is enforced on the server — a role decides what a person can reach, not just what they see.
     </p>
+    </div>
+    <button type="button" class="btn btn-primary btn-sm" (click)="create()">New user</button>
   </div>
 
   <app-table-shell heading="Users" [loading]="loading()" [error]="error()"
@@ -34,6 +37,7 @@
           <th>Role</th>
           <th>Tenant</th>
           <th class="text-right">Status</th>
+          <th class="w-16"></th>
         </tr>
       </thead>
       <tbody>
@@ -47,6 +51,9 @@
               {{ user.tenantName || (user.tenantId ? '#' + user.tenantId : 'Platform') }}
             </td>
             <td class="text-right"><app-status [label]="user.status" /></td>
+            <td class="text-right">
+              <button type="button" class="btn btn-ghost btn-sm" (click)="edit(user)">Edit</button>
+            </td>
           </tr>
         }
       </tbody>

@@ -1,9 +1,12 @@
 <div class="page">
-  <div>
+  <div class="page-head">
+    <div>
     <h1 class="page-title">AI Agents</h1>
     <p class="page-subtitle">
       Define an agent once — provider, model and instructions — and the file chat uses it everywhere.
     </p>
+    </div>
+    <button type="button" class="btn btn-primary btn-sm" (click)="create()">New agent</button>
   </div>
 
   <app-table-shell heading="Agents" [loading]="loading()" [error]="error()"
@@ -27,6 +30,7 @@
           <th>File types</th>
           <th>API key</th>
           <th class="text-right">Status</th>
+          <th class="w-12"></th>
         </tr>
       </thead>
       <tbody>
@@ -52,6 +56,22 @@
               }
             </td>
             <td class="text-right"><app-status [label]="agent.status" /></td>
+            <td class="text-right">
+              <button type="button" class="btn btn-ghost btn-icon" [cdkMenuTriggerFor]="menu"
+                      aria-label="Actions">
+                <svg class="size-4" viewBox="0 0 16 16" fill="currentColor">
+                  <circle cx="8" cy="3" r="1.4"/><circle cx="8" cy="8" r="1.4"/><circle cx="8" cy="13" r="1.4"/>
+                </svg>
+              </button>
+              <ng-template #menu>
+                <div cdkMenu class="card shadow-xl py-1 min-w-40 text-sm">
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="edit(agent)">Edit</button>
+                  <div class="my-1 border-t" style="border-color: var(--border-subtle);"></div>
+                  <button cdkMenuItem class="menu-item menu-item-danger"
+                          (cdkMenuItemTriggered)="remove(agent)">Delete</button>
+                </div>
+              </ng-template>
+            </td>
           </tr>
         }
       </tbody>
