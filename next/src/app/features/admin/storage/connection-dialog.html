@@ -86,17 +86,17 @@
           <input id="host" class="input mono" formControlName="host" placeholder="ftp.example.com" />
         </app-field>
         <app-field label="Port" for="port" [control]="form.get('port')" [submitted]="submitted()">
-          <input id="port" type="number" class="input" formControlName="port" />
+          <input id="port" type="number" class="input" formControlName="port" placeholder="21" />
         </app-field>
         <app-field label="Username" for="username" [control]="form.get('username')"
                    [submitted]="submitted()">
-          <input id="username" class="input" formControlName="username" autocomplete="off" />
+          <input id="username" class="input" formControlName="username" autocomplete="off" placeholder="user name" />
         </app-field>
         <app-field label="Password" for="password" [control]="form.get('password')"
                    [submitted]="submitted()"
                    [hint]="hasStoredSecret() ? 'Leave blank to keep the stored password.' : ''">
           <input id="password" type="password" class="input" formControlName="password"
-                 autocomplete="new-password" />
+                 autocomplete="new-password" placeholder="password" />
         </app-field>
       </div>
       <app-field label="Base directory" for="baseDir" [control]="form.get('baseDirectory')"
@@ -120,13 +120,13 @@
         <app-field label="Access key" for="accessKey" [control]="form.get('accessKey')"
                    [submitted]="submitted()"
                    [hint]="isS3() ? 'Blank uses the host IAM role.' : ''">
-          <input id="accessKey" class="input mono" formControlName="accessKey" autocomplete="off" />
+          <input id="accessKey" class="input mono" formControlName="accessKey" autocomplete="off" placeholder="AKIA…" />
         </app-field>
         <app-field label="Secret key" for="secretKey" [control]="form.get('secretKey')"
                    [submitted]="submitted()"
                    [hint]="hasStoredSecret() ? 'Leave blank to keep the stored secret.' : ''">
           <input id="secretKey" type="password" class="input" formControlName="secretKey"
-                 autocomplete="new-password" />
+                 autocomplete="new-password" placeholder="secret access key" />
         </app-field>
       </div>
     }
@@ -136,7 +136,7 @@
                  [submitted]="submitted()"
                  [hint]="hasStoredSecret() ? 'Leave blank to keep the stored string.' : ''">
         <input id="azure" type="password" class="input" formControlName="azureConnectionString"
-               autocomplete="new-password" />
+               autocomplete="new-password" placeholder="DefaultEndpointsProtocol=…" />
       </app-field>
     }
 

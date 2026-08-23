@@ -24,7 +24,7 @@
                [control]="form.get('password')" [submitted]="submitted()"
                [hint]="isEdit() ? 'Leave blank to keep the current password.' : 'At least 8 characters.'">
       <input id="password" type="password" class="input" formControlName="password"
-             autocomplete="new-password" />
+             autocomplete="new-password" placeholder="at least 8 characters" />
     </app-field>
 
     <app-field label="Role" for="userRole" [required]="true" [hint]="roleHint()"

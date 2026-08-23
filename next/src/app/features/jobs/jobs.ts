@@ -10,8 +10,6 @@ import { confirmWith } from '../../shared/ui/confirm';
 import { TableShell } from '../../shared/ui/data-table';
 import { StatusPill } from '../../shared/ui/status-pill';
 import { Icon } from '../../shared/ui/icon';
-import { BarChart } from '../../shared/charts/bar-chart';
-import { statusColor } from '../../shared/charts/status-color';
 
 export interface Scheduler {
   schedulerId: number;
@@ -52,7 +50,7 @@ const IN_FLIGHT = ['queue', 'start', 'running'];
 
 @Component({
   selector: 'app-jobs',
-  imports: [Icon, DatePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, BarChart],
+  imports: [Icon, DatePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill],
   templateUrl: './jobs.html',
 })
 export class Jobs implements OnInit {
@@ -108,47 +106,10 @@ export class Jobs implements OnInit {
   }
 
   toggleRow(job: SourceJob): void {
-    const opening = !this.expanded().has(job.jobId);
     this.expanded.update(set => {
       const next = new Set(set);
       next.has(job.jobId) ? next.delete(job.jobId) : next.add(job.jobId);
       return next;
-    });
-    if (opening) this.loadRecentRuns(job.jobId);
-  }
-
-  /** Fetched once per job and kept, so collapsing and reopening does not refetch. */
-  private readonly runsByJob = signal<Record<number, { name: string; value: number; color: string }[]>>({});
-  readonly loadingRuns = signal<Set<number>>(new Set());
-
-  recentRuns(jobId: number) { return this.runsByJob()[jobId]; }
-
-  private loadRecentRuns(jobId: number): void {
-    if (this.runsByJob()[jobId]) return;
-    this.loadingRuns.update(set => new Set(set).add(jobId));
-    this.http.get<ApiResponse<any>>(
-      `${API_BASE}/sourceJob.json/fetchSourceJobQueueListWithJobId`,
-      { params: { jobId } }).subscribe({
-      next: response => {
-        this.loadingRuns.update(set => { const n = new Set(set); n.delete(jobId); return n; });
-        if (response.status !== API_SUCCESS) return;
-        const data = response.data as any;
-        const rows: any[] = Array.isArray(data) ? data : (data?.jobQueues ?? []);
-        const bars = rows
-          .filter(r => r.startTime && r.endTime)
-          .map(r => ({
-            at: new Date(r.startTime).getTime(),
-            seconds: (new Date(r.endTime).getTime() - new Date(r.startTime).getTime()) / 1000,
-            status: r.jobStatus,
-            id: r.jobQueueId,
-          }))
-          .filter(r => Number.isFinite(r.seconds) && r.seconds >= 0)
-          .sort((a, b) => a.at - b.at)
-          .slice(-16)
-          .map(r => ({ name: `#${r.id}`, value: Math.round(r.seconds), color: statusColor(r.status) }));
-        this.runsByJob.update(map => ({ ...map, [jobId]: bars }));
-      },
-      error: () => this.loadingRuns.update(set => { const n = new Set(set); n.delete(jobId); return n; }),
     });
   }
 

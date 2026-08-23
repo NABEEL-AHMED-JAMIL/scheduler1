@@ -46,7 +46,7 @@
           <app-field label="Priority" for="priority" [required]="true"
                      [control]="form.get('priority')" [submitted]="submitted()"
                      hint="1 is highest.">
-            <input id="priority" type="number" min="1" max="9" class="input" formControlName="priority" />
+            <input id="priority" type="number" min="1" max="9" class="input" formControlName="priority" placeholder="1 = highest" />
           </app-field>
 
           <app-field label="State" for="jobStatus" [required]="true"
@@ -75,7 +75,8 @@
             <app-field label="Repeat every" for="interval" [required]="true"
                        [control]="scheduler.get('intervalValue')" [submitted]="submitted()"
                        [hint]="unit()">
-              <input id="interval" type="number" min="1" class="input" formControlName="intervalValue" />
+              <input id="interval" type="number" min="1" class="input" formControlName="intervalValue"
+                     placeholder="e.g. 5" />
             </app-field>
 
             <app-field label="Start date" for="startDate" [required]="true"
@@ -85,7 +86,7 @@
 
             <app-field label="Start time" for="startTime" [required]="true"
                        [control]="scheduler.get('startTime')" [submitted]="submitted()">
-              <input id="startTime" type="time" class="input" formControlName="startTime" />
+              <input id="startTime" type="time" class="input" formControlName="startTime" placeholder="HH:MM" />
             </app-field>
 
             <app-field label="End date" for="endDate" [control]="scheduler"

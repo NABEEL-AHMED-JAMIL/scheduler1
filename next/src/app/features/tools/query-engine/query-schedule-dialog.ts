@@ -33,7 +33,7 @@ import { QueryDefinition, QuerySchedule } from './types';
             <app-field label="Bucket" for="outputBucket" [required]="true"
                        [control]="form.get('outputBucket')" [submitted]="submitted()"
                        hint="Storage connection alias to write into.">
-              <input id="outputBucket" class="input" formControlName="outputBucket" />
+              <input id="outputBucket" class="input" formControlName="outputBucket" placeholder="etl-bucket" />
             </app-field>
 
             <app-field label="Prefix" for="outputPrefix"

@@ -33,6 +33,7 @@
     <table class="table-modern">
       <thead>
         <tr>
+          <th class="w-8"></th>
           <th>Task</th>
           <th>Type</th>
           <th>Topic</th>
@@ -45,6 +46,13 @@
       <tbody>
         @for (task of filtered(); track task.taskDetailId) {
           <tr>
+            <td>
+              <button type="button" class="text-[color:var(--text-muted)] hover:text-brand-600"
+                      (click)="toggleRow(task)"
+                      [attr.aria-label]="expanded().has(task.taskDetailId) ? 'Hide payload' : 'Show payload'">
+                <app-icon [name]="expanded().has(task.taskDetailId) ? 'chevronDown' : 'chevronRight'" />
+              </button>
+            </td>
             <td class="max-w-64">
               <div class="font-medium truncate" [title]="task.taskName">{{ task.taskName || '—' }}</div>
               <div class="mono text-[color:var(--text-muted)]">#{{ task.taskDetailId }}</div>
@@ -74,6 +82,32 @@
               <a class="btn btn-ghost btn-sm" [routerLink]="['/tasks', task.taskDetailId, 'edit']"><app-icon name="edit" />Edit</a>
             </td>
           </tr>
+
+          @if (expanded().has(task.taskDetailId)) {
+            <tr style="background: var(--surface-sunken);">
+              <td></td>
+              <td colspan="7" class="!py-3">
+                @if (task.taskPayload) {
+                  <div class="flex items-center gap-2 mb-1.5">
+                    <app-icon name="file" size="0.9em" class="icon-muted" />
+                    <span class="text-xs font-semibold">Task payload</span>
+                    @if (task.totalLinksJobs) {
+                      <span class="pill pill-neutral">{{ task.totalLinksJobs }} linked job{{ task.totalLinksJobs === 1 ? '' : 's' }}</span>
+                    }
+                    <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="copyPayload(task)">
+                      <app-icon [name]="copiedId() === task.taskDetailId ? 'check' : 'copy'"
+                                [class.icon-ok]="copiedId() === task.taskDetailId" size="0.85em" />
+                      {{ copiedId() === task.taskDetailId ? 'Copied' : 'Copy' }}
+                    </button>
+                  </div>
+                  <pre class="mono text-xs leading-relaxed rounded p-2.5 overflow-x-auto max-h-64"
+                       style="background: var(--surface-raised);">{{ task.taskPayload }}</pre>
+                } @else {
+                  <p class="text-xs text-[color:var(--text-muted)]">This task has no payload configured.</p>
+                }
+              </td>
+            </tr>
+          }
         }
       </tbody>
     </table>

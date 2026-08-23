@@ -38,7 +38,10 @@
             <select id="pipeline" class="input" formControlName="pipelineId">
               <option value="">None</option>
               @for (option of lookupOptions('PIPELINE_IDS'); track option.lookupId) {
-                <option [value]="option.lookupValue">{{ option.lookupValue }}</option>
+                <option [value]="option.lookupId" [title]="option.description || ''">
+                  {{ option.lookupType || option.lookupValue }}
+                  @if (option.lookupValue && option.lookupType) { ({{ option.lookupValue }}) }
+                </option>
               }
             </select>
           </app-field>
@@ -48,7 +51,10 @@
             <select id="group" class="input" formControlName="groupId">
               <option value="">None</option>
               @for (option of lookupOptions('TASK_GROUPS'); track option.lookupId) {
-                <option [value]="option.lookupValue">{{ option.lookupValue }}</option>
+                <option [value]="option.lookupId" [title]="option.description || ''">
+                  {{ option.lookupType || option.lookupValue }}
+                  @if (option.lookupValue && option.lookupType) { ({{ option.lookupValue }}) }
+                </option>
               }
             </select>
           </app-field>
@@ -58,7 +64,10 @@
             <select id="homePage" class="input" formControlName="homePageId">
               <option value="">None</option>
               @for (option of lookupOptions('PIPELINE_HOME_PAGES'); track option.lookupId) {
-                <option [value]="option.lookupValue">{{ option.lookupValue }}</option>
+                <option [value]="option.lookupId" [title]="option.description || ''">
+                  {{ option.lookupType || option.lookupValue }}
+                  @if (option.lookupValue && option.lookupType) { ({{ option.lookupValue }}) }
+                </option>
               }
             </select>
           </app-field>
@@ -103,7 +112,7 @@
                 <th>Tag key</th>
                 <th>Parent</th>
                 <th>Value</th>
-                <th class="w-12"></th>
+                <th class="w-24 text-right">Row</th>
               </tr>
             </thead>
             <tbody formArrayName="tags">
@@ -128,9 +137,13 @@
                            [placeholder]="isStorageTag(tag.get('tagKey')?.value)
                               ? 'e.g. etl-bucket or reports/2026' : 'value'" />
                   </td>
-                  <td class="text-right">
-                    <button type="button" class="btn btn-ghost btn-icon text-crit-500"
-                            (click)="removeTag(i)" aria-label="Remove tag"><app-icon name="trash" /></button>
+                  <td class="text-right whitespace-nowrap">
+                    <button type="button" class="btn btn-ghost btn-icon btn-intent-ok"
+                            (click)="insertTagAfter(i)" title="Add a row below this one"
+                            aria-label="Add row below"><app-icon name="plus" /></button>
+                    <button type="button" class="btn btn-ghost btn-icon btn-intent-crit"
+                            (click)="removeTag(i)" title="Remove this row"
+                            aria-label="Remove row"><app-icon name="trash" /></button>
                   </td>
                 </tr>
               }

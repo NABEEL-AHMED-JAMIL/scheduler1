@@ -5,6 +5,7 @@ import { RouterLink } from '@angular/router';
 import { TableShell } from '../../shared/ui/data-table';
 import { StatusPill } from '../../shared/ui/status-pill';
 import { Icon } from '../../shared/ui/icon';
+import { copyText } from '../../shared/ui/clipboard.util';
 
 interface SourceTask {
   taskDetailId: number;
@@ -16,6 +17,8 @@ interface SourceTask {
   inputFolder?: string;
   outputFolder?: string;
   sourceTaskType?: { sourceTaskTypeId?: number; serviceName?: string; queueTopicPartition?: string };
+  taskPayload?: string;
+  totalLinksJobs?: number;
 }
 
 @Component({
@@ -40,6 +43,24 @@ export class Tasks implements OnInit {
       || (task.sourceTaskType?.serviceName ?? '').toLowerCase().includes(term)
       || (task.pipelineId ?? '').toLowerCase().includes(term));
   });
+
+  readonly expanded = signal<Set<number>>(new Set());
+  readonly copiedId = signal<number | null>(null);
+
+  toggleRow(task: SourceTask): void {
+    this.expanded.update(set => {
+      const next = new Set(set);
+      next.has(task.taskDetailId) ? next.delete(task.taskDetailId) : next.add(task.taskDetailId);
+      return next;
+    });
+  }
+
+  copyPayload(task: SourceTask): void {
+    copyText(task.taskPayload ?? '').then(() => {
+      this.copiedId.set(task.taskDetailId);
+      setTimeout(() => this.copiedId.set(null), 1500);
+    });
+  }
 
   ngOnInit(): void { this.load(); }
 

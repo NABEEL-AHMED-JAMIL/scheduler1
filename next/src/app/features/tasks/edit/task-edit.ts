@@ -1,5 +1,7 @@
 import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { forkJoin, of } from 'rxjs';
+import { catchError, map } from 'rxjs/operators';
 import { Router, RouterLink } from '@angular/router';
 import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
@@ -9,6 +11,9 @@ import { Icon } from '../../../shared/ui/icon';
 
 /** Tag keys the pipeline reads to locate storage; a typo in one fails silently at run time. */
 const STORAGE_TAG_KEYS = ['bucket', 'bucket_name', 'input_folder', 'output_folder'];
+
+/** The lookup parents whose sub-lookups fill the three dropdowns on this form. */
+const LOOKUP_TYPES = ['PIPELINE_IDS', 'TASK_GROUPS', 'PIPELINE_HOME_PAGES'];
 
 @Component({
   selector: 'app-task-edit',
@@ -51,11 +56,29 @@ export class TaskEdit implements OnInit {
       next: response => {
         if (response.status !== API_SUCCESS) return;
         this.taskTypes.set(response.data?.sourceTaskTypes ?? []);
-        const byType: Record<string, any[]> = {};
-        for (const lookup of response.data?.lookupDatas ?? []) {
-          byType[lookup.lookupType] = lookup.children ?? [];
-        }
-        this.lookups.set(byType);
+
+        // appSetting returns only the parent lookup rows -- there is no "children" on them,
+        // so every dropdown rendered with nothing but "None". The options are the sub-lookups,
+        // which have to be fetched per parent.
+        const parents: any[] = response.data?.lookupDatas ?? [];
+        const wanted = parents.filter(p => LOOKUP_TYPES.includes(p.lookupType));
+        if (!wanted.length) return;
+
+        forkJoin(
+          wanted.map(parent =>
+            this.http.get<ApiResponse<any>>(`${API_BASE}/setting.json/fetchSubLookupByParentId`,
+              { params: { parentLookUpId: parent.lookupId } }).pipe(
+              map(sub => ({
+                type: parent.lookupType as string,
+                options: (sub?.data?.lookupDatas ?? []) as any[],
+              })),
+              catchError(() => of({ type: parent.lookupType as string, options: [] as any[] })),
+            )),
+        ).subscribe(results => {
+          const byType: Record<string, any[]> = {};
+          for (const result of results) byType[result.type] = result.options;
+          this.lookups.set(byType);
+        });
       },
       error: () => this.toast.error('Could not load the task settings.'),
     });
@@ -66,8 +89,10 @@ export class TaskEdit implements OnInit {
 
   private loadTask(): void {
     this.loading.set(true);
+    // The endpoint's parameter is sourceTaskId; sending taskDetailId returned 400 and the
+    // form loaded with an empty payload and no tags.
     this.http.get<ApiResponse<any>>(`${API_BASE}/sourceTask.json/fetchSourceTaskWithSourceTaskId`,
-      { params: { taskDetailId: this.taskDetailId() } }).subscribe({
+      { params: { sourceTaskId: this.taskDetailId() } }).subscribe({
       next: response => {
         this.loading.set(false);
         if (response.status !== API_SUCCESS || !response.data) {
@@ -102,6 +127,15 @@ export class TaskEdit implements OnInit {
       tagKey: [tag?.tagKey ?? ''],
       tagParent: [tag?.tagParent ?? ''],
       tagValue: [tag?.tagValue ?? ''],
+    }));
+  }
+
+  /** Inserts directly below the row clicked, as the old form did, so order can be built up. */
+  insertTagAfter(index: number): void {
+    this.tags.insert(index + 1, this.fb.group({
+      tagKey: [''],
+      tagParent: [this.tags.at(index).get('tagParent')?.value ?? ''],
+      tagValue: [''],
     }));
   }
 

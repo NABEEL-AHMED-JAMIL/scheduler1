@@ -138,22 +138,6 @@
             <tr style="background: var(--surface-sunken);">
               <td></td>
               <td colspan="9" class="!py-3">
-                @if (loadingRuns().has(job.jobId)) {
-                  <p class="text-xs text-[color:var(--text-muted)] mb-3 flex items-center gap-1.5">
-                    <app-icon name="refresh" class="spin" size="0.9em" />Loading recent runs…
-                  </p>
-                } @else if (recentRuns(job.jobId); as runs) {
-                  @if (runs.length) {
-                    <div class="mb-4">
-                      <h4 class="text-xs font-semibold mb-1">Recent run durations</h4>
-                      <p class="text-[11px] text-[color:var(--text-muted)] mb-2">
-                        Last {{ runs.length }} runs in seconds, oldest first, coloured by outcome.
-                      </p>
-                      <app-bar-chart [data]="runs" [height]="92" unit="runs" />
-                    </div>
-                  }
-                }
-
                 <dl class="grid sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-2 text-sm">
                   @for (item of [
                     { label: 'Task type',   value: job.taskDetail?.sourceTaskType?.serviceName },

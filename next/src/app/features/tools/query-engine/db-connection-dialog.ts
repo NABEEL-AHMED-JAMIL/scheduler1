@@ -59,17 +59,17 @@ import { DbConnection } from './types';
 
           <app-field label="Port" for="port" [required]="true"
                      [control]="form.get('port')" [submitted]="submitted()">
-            <input id="port" type="number" class="input mono" formControlName="port" />
+            <input id="port" type="number" class="input mono" formControlName="port" placeholder="5432" />
           </app-field>
 
           <app-field label="Database" for="databaseName" [required]="true"
                      [control]="form.get('databaseName')" [submitted]="submitted()">
-            <input id="databaseName" class="input mono" formControlName="databaseName" />
+            <input id="databaseName" class="input mono" formControlName="databaseName" placeholder="reporting" />
           </app-field>
 
           <app-field label="Username" for="username" [required]="true"
                      [control]="form.get('username')" [submitted]="submitted()">
-            <input id="username" class="input" formControlName="username" autocomplete="off" />
+            <input id="username" class="input" formControlName="username" autocomplete="off" placeholder="db user" />
           </app-field>
 
           <app-field label="Password" for="password"

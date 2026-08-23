@@ -98,7 +98,7 @@ const SASL_MECHANISMS = ['PLAIN', 'SCRAM-SHA-256', 'SCRAM-SHA-512'];
             <div class="form-grid">
               <app-field label="Username" for="saslUsername" [required]="true"
                          [control]="form.get('saslUsername')" [submitted]="submitted()">
-                <input id="saslUsername" class="input" formControlName="saslUsername" autocomplete="off" />
+                <input id="saslUsername" class="input" formControlName="saslUsername" autocomplete="off" placeholder="kafka user" />
               </app-field>
 
               <app-field label="Password" for="saslPassword"
@@ -120,7 +120,7 @@ const SASL_MECHANISMS = ['PLAIN', 'SCRAM-SHA-256', 'SCRAM-SHA-512'];
               <app-field label="Truststore bucket" for="sslTruststoreBucket"
                          [control]="form.get('sslTruststoreBucket')" [submitted]="submitted()"
                          hint="Storage connection alias holding the truststore.">
-                <input id="sslTruststoreBucket" class="input" formControlName="sslTruststoreBucket" />
+                <input id="sslTruststoreBucket" class="input" formControlName="sslTruststoreBucket" placeholder="etl-bucket" />
               </app-field>
 
               <app-field label="Truststore path" for="sslTruststoreLocation"
