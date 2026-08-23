@@ -1,0 +1,219 @@
+<div class="page">
+  <div>
+    <a [routerLink]="['/jobs', jobId(), 'history']" class="text-sm text-brand-600 hover:underline">
+      ← Back to run history
+    </a>
+    <div class="flex items-start gap-3">
+      <h1 class="page-title mt-1 mr-auto">Run logs</h1>
+      <button type="button" class="btn btn-ghost btn-sm mt-1" (click)="load()" [disabled]="loading()">
+        <app-icon name="refresh" [class.spin]="loading()" />Refresh
+      </button>
+    </div>
+    <p class="page-subtitle">
+      What the worker reported during run <span class="mono">#{{ jobQueueId() }}</span>
+      of job <span class="mono">#{{ jobId() }}</span>.
+    </p>
+  </div>
+
+  @if (job() || run(); as _) {
+    <div class="card">
+      <button type="button" class="w-full flex items-center gap-2 px-4 py-2.5 text-left"
+              (click)="showDetail.set(!showDetail())">
+        <app-icon name="briefcase" class="icon-info" />
+        <span class="text-sm font-semibold">Job &amp; queue detail</span>
+        @if (run()?.jobStatus) { <app-status [label]="run().jobStatus" /> }
+        <app-icon [name]="showDetail() ? 'chevronDown' : 'chevronRight'" class="icon-muted ml-auto" />
+      </button>
+
+      @if (showDetail()) {
+        <div class="detail-panel grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
+          @if (job(); as j) {
+            <div>
+              <div class="detail-head">Job</div>
+              <dl class="detail-list">
+                <dt>Name</dt>
+                <dd class="truncate">
+                  <a class="text-brand-600 hover:underline"
+                     [routerLink]="['/jobs', jobId(), 'history']">{{ j.jobName }}</a>
+                </dd>
+                <dt>Execution</dt><dd>{{ j.execution || '—' }}</dd>
+                <dt>State</dt><dd><app-status [label]="j.jobStatus" [quiet]="true" /></dd>
+                @if (j.taskDetail?.taskName) {
+                  <dt>Task</dt><dd class="truncate">{{ j.taskDetail.taskName }}</dd>
+                }
+              </dl>
+            </div>
+          }
+
+          @if (run(); as r) {
+            <div>
+              <div class="detail-head">This run</div>
+              <dl class="detail-list">
+                <dt>Run</dt><dd class="mono">#{{ r.jobQueueId }}</dd>
+                <dt>Started</dt>
+                <dd>{{ r.startTime ? (r.startTime | date:'d MMM yyyy, HH:mm:ss') : '—' }}</dd>
+                <dt>Ended</dt>
+                <dd>{{ r.endTime ? (r.endTime | date:'d MMM yyyy, HH:mm:ss') : '—' }}</dd>
+                <dt>Duration</dt><dd class="tabular">{{ duration() }}</dd>
+              </dl>
+            </div>
+
+            <div class="min-w-0">
+              <div class="detail-head">Reported</div>
+              @if (r.jobStatusMessage) {
+                <p class="text-xs leading-relaxed break-words">{{ r.jobStatusMessage }}</p>
+              } @else {
+                <p class="text-xs text-[color:var(--text-muted)]">No closing message.</p>
+              }
+              <div class="text-[11px] text-[color:var(--text-muted)] mt-2">
+                {{ logs().length }} log {{ logs().length === 1 ? 'entry' : 'entries' }}
+              </div>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  }
+
+  @if (hasInsights()) {
+    <div class="flex">
+      <button type="button" class="btn btn-ghost btn-sm -ml-2"
+              [class.text-brand-600]="showInsights()"
+              (click)="showInsights.set(!showInsights())">
+        <app-icon name="chart" />{{ showInsights() ? 'Hide timing' : 'Timing' }}
+      </button>
+    </div>
+
+    @if (showInsights()) {
+      <div class="card chart-card">
+        <div class="flex flex-wrap items-baseline gap-2">
+          <h3 class="chart-title">Where this run waited</h3>
+          @if (gapSummary(); as summary) {
+            <span class="ml-auto text-[11px] tabular text-[color:var(--text-muted)]">
+              {{ summary.entries }} entries · {{ summary.totalLabel }} between first and last
+            </span>
+          }
+        </div>
+        <p class="chart-sub">
+          The longest pauses between one log entry and the next.
+          @if (gapSummary(); as summary) {
+            These {{ topGaps().length }} account for {{ summary.shownShare }}% of the time between
+            the first entry and the last.
+          }
+        </p>
+
+        <app-ranked-bar [data]="topGaps()" [max]="8" [showPercent]="false" [sorted]="false" />
+
+        @if (lateEntries()) {
+          <p class="flex items-start gap-1.5 mt-2 text-[11px] text-[color:var(--color-warn-600)]">
+            <app-icon name="alert" size="0.9em" class="icon-warn mt-px shrink-0" />
+            {{ lateEntries() }} {{ lateEntries() === 1 ? 'entry was' : 'entries were' }} recorded
+            after this run finished, so the gap before {{ lateEntries() === 1 ? 'it' : 'them' }}
+            is not time the run spent working.
+          </p>
+        }
+
+        @if (stallCount()) {
+          <p class="flex items-center gap-1.5 mt-2 text-[11px] text-[color:var(--text-muted)]">
+            <span class="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
+                  style="background: var(--color-warn-500);"></span>
+            {{ stallCount() }} {{ stallCount() === 1 ? 'gap is' : 'gaps are' }} more than twice the
+            average and over five seconds — waiting rather than working.
+          </p>
+        }
+      </div>
+    }
+  }
+
+  <app-table-shell heading="Log entries" [loading]="loading()" [error]="error()"
+                   [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="logs().length"
+                   [emptyMessage]="search() ? 'No entries match your search.' : 'This run reported no log entries.'"
+                   (retry)="load()">
+    <ng-container toolbar>
+      <div class="seg">
+        @for (mode of views; track mode.key) {
+          <button type="button" class="seg-btn" [class.seg-on]="view() === mode.key"
+                  (click)="view.set(mode.key)">
+            <app-icon [name]="mode.icon" size="0.9em" />{{ mode.label }}
+          </button>
+        }
+      </div>
+
+      <div class="search-field max-w-56">
+        <app-icon name="search" size="0.95em" />
+        <input class="input" placeholder="Search entries"
+               [value]="search()" (input)="search.set($any($event.target).value)" />
+      </div>
+      @if (search()) {
+        <button type="button" class="btn btn-ghost btn-sm" (click)="search.set('')"><app-icon name="close" />Clear</button>
+      }
+
+      @if (stillRunning()) {
+        <button type="button" class="btn btn-ghost btn-sm" [class.btn-intent-ok]="autoRefreshing()"
+                (click)="toggleLive()"
+                [title]="autoRefreshing() ? 'Following this run — checking every 5s'
+                                          : 'Not following; refresh by hand'">
+          <span class="live-dot" [class.live-on]="autoRefreshing()"></span>
+          {{ autoRefreshing() ? 'Live' : 'Paused' }}
+        </button>
+      }
+      <button type="button" class="btn btn-ghost btn-sm" [disabled]="refreshing()" (click)="refresh()">
+        <app-icon name="refresh" [class.spin]="refreshing()" />Refresh
+      </button>
+    </ng-container>
+
+    @switch (view()) {
+      @case ('timeline') {
+        <ul class="log-timeline">
+          @for (log of filtered(); track $index) {
+            <li class="log-tl-item">
+              <span class="log-tl-rail">
+                <span class="log-tl-dot" [style.background]="toneOf(log.logsDetail)"></span>
+              </span>
+              <span class="text-xs text-[color:var(--text-muted)] whitespace-nowrap tabular shrink-0 pt-0.5">
+                {{ log.dateCreated ? (log.dateCreated | date:'HH:mm:ss') : '—' }}
+              </span>
+              <span class="text-sm mono break-words min-w-0">{{ log.logsDetail }}</span>
+            </li>
+          }
+        </ul>
+      }
+
+      @case ('table') {
+        <div class="overflow-x-auto">
+          <table class="table-modern">
+            <thead>
+              <tr>
+                <th class="w-12 text-right">#</th>
+                <th class="w-28">Time</th>
+                <th>Message</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (log of filtered(); track $index) {
+                <tr>
+                  <td class="text-right tabular text-[color:var(--text-muted)]">{{ $index + 1 }}</td>
+                  <td class="tabular whitespace-nowrap">
+                    {{ log.dateCreated ? (log.dateCreated | date:'HH:mm:ss') : '—' }}
+                  </td>
+                  <td class="mono break-words">{{ log.logsDetail }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+
+      @case ('console') {
+        <div class="log-console">
+          @for (log of filtered(); track $index) {
+            <div class="log-console-line">
+              <span class="log-console-time">[{{ log.dateCreated ? (log.dateCreated | date:'yyyy-MM-dd HH:mm:ss') : '—' }}]</span>
+              <span>{{ log.logsDetail }}</span>
+            </div>
+          }
+        </div>
+      }
+    }
+  </app-table-shell>
+</div>

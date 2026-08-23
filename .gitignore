@@ -1,5 +1,7 @@
 # Logs
-logs
+# Anchored: a bare `logs` matches any directory of that name at any depth, which silently
+# excluded next/src/app/features/jobs/logs -- a whole feature that was never committed.
+/logs/
 *.log
 npm-debug.log*
 
