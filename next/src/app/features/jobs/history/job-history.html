@@ -28,6 +28,130 @@
     </div>
   }
 
+  @if (detail(); as job) {
+    <div class="card">
+      <button type="button" class="w-full flex items-center gap-2 px-4 py-2.5 text-left"
+              (click)="showDetail.set(!showDetail())">
+        <app-icon name="briefcase" class="icon-info" />
+        <span class="text-sm font-semibold">Job &amp; task detail</span>
+        <span class="pill pill-neutral">#{{ job.jobId }}</span>
+        <app-icon [name]="showDetail() ? 'chevronDown' : 'chevronRight'"
+                  class="icon-muted ml-auto" />
+      </button>
+
+      @if (showDetail()) {
+        <div class="border-t px-4 py-3.5 grid gap-x-6 gap-y-4 md:grid-cols-2 xl:grid-cols-4"
+             style="border-color: var(--border-subtle);">
+
+          <div>
+            <div class="detail-head">Job</div>
+            <dl class="detail-list">
+              <dt>Name</dt><dd>{{ job.jobName }}</dd>
+              <dt>State</dt><dd><app-status [label]="job.jobStatus" /></dd>
+              <dt>Execution</dt><dd>{{ job.execution || '—' }}</dd>
+              <dt>Priority</dt><dd>{{ job.priority ?? '—' }}</dd>
+              <dt>Created</dt><dd>{{ job.dateCreated ? (job.dateCreated | date:'d MMM yyyy, HH:mm') : '—' }}</dd>
+              <dt>Last run</dt><dd>{{ job.lastJobRun ? (job.lastJobRun | date:'d MMM yyyy, HH:mm') : 'Never' }}</dd>
+              @if (job.assignedUsername) { <dt>Assigned</dt><dd>{{ job.assignedUsername }}</dd> }
+            </dl>
+          </div>
+
+          <div>
+            <div class="detail-head">Schedule</div>
+            @if (job.scheduler; as s) {
+              <dl class="detail-list">
+                <dt>Frequency</dt>
+                <dd>{{ s.frequency || '—' }}@if (s.intervalValue && s.intervalValue !== '1') { · every {{ s.intervalValue }} }</dd>
+                <dt>Starts</dt><dd>{{ s.startDate || '—' }}{{ s.startTime ? ' at ' + s.startTime.slice(0,5) : '' }}</dd>
+                <dt>Ends</dt><dd>{{ s.endDate || 'no end date' }}</dd>
+                <dt>Next run</dt>
+                <dd>
+                  @if (s.expired) { <span class="text-warn-500">Expired</span> }
+                  @else { {{ s.nextRunAt ? (s.nextRunAt | date:'d MMM, HH:mm') : '—' }} }
+                </dd>
+              </dl>
+            } @else {
+              <p class="text-xs text-[color:var(--text-muted)]">Runs on demand only.</p>
+            }
+
+            <div class="detail-head mt-3">Email on</div>
+            <div class="flex flex-wrap gap-1.5">
+              @for (n of [
+                { label: 'complete', on: job.completeJob },
+                { label: 'fail',     on: job.failJob },
+                { label: 'skip',     on: job.skipJob }
+              ]; track n.label) {
+                <span class="pill" [class]="n.on ? 'pill pill-ok' : 'pill pill-neutral'">
+                  @if (n.on) { <app-icon name="check" size="0.85em" /> }
+                  {{ n.label }}
+                </span>
+              }
+            </div>
+          </div>
+
+          <div>
+            <div class="detail-head">Runs in this view</div>
+            <div class="grid grid-cols-3 gap-px overflow-hidden rounded-lg"
+                 style="background: var(--border-subtle);">
+              @for (stat of runStats(); track stat.name) {
+                @if (stat.value && stat.name !== 'Total') {
+                  <div class="px-2 py-2 text-center" style="background: var(--surface-raised);">
+                    <div class="text-sm font-semibold tabular leading-none">{{ stat.value }}</div>
+                    <div class="text-[10px] uppercase tracking-wide mt-1 text-[color:var(--text-muted)]">
+                      {{ stat.name }}
+                    </div>
+                  </div>
+                }
+              }
+              <!-- Total spans whatever the outcome cells left, so no blank cell is dealt. -->
+              <div class="col-span-full px-2 py-1.5 text-center"
+                   style="background: var(--surface-sunken);">
+                <span class="text-xs tabular font-semibold">{{ runs().length }}</span>
+                <span class="text-[10px] uppercase tracking-wide ml-1.5 text-[color:var(--text-muted)]">
+                  total
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div class="min-w-0">
+            <div class="detail-head">Linked task</div>
+            @if (job.taskDetail; as task) {
+              <dl class="detail-list">
+                <dt>Task</dt>
+                <dd class="truncate">
+                  <a class="text-brand-600 hover:underline"
+                     [routerLink]="['/tasks', task.taskDetailId, 'edit']">
+                    {{ task.taskName }}
+                  </a>
+                </dd>
+                <dt>Type</dt><dd class="truncate">{{ task.sourceTaskType?.serviceName || '—' }}</dd>
+                <dt>Topic</dt><dd class="mono truncate">{{ topicOf(task.sourceTaskType?.queueTopicPartition) }}</dd>
+                <dt>Pipeline</dt><dd class="truncate">{{ task.pipelineId || '—' }}</dd>
+                <dt>Home page</dt><dd class="truncate">{{ task.homePageId || '—' }}</dd>
+              </dl>
+
+              @if (task.taskPayload) {
+                <div class="flex items-center gap-2 mt-3 mb-1">
+                  <span class="detail-head mb-0">Task payload</span>
+                  <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="copyPayload()">
+                    <app-icon [name]="payloadCopied() ? 'check' : 'copy'"
+                              [class.icon-ok]="payloadCopied()" size="0.85em" />
+                    {{ payloadCopied() ? 'Copied' : 'Copy' }}
+                  </button>
+                </div>
+                <pre class="mono text-[11px] leading-relaxed rounded p-2 overflow-auto max-h-32"
+                     style="background: var(--surface-sunken);">{{ task.taskPayload }}</pre>
+              }
+            } @else {
+              <p class="text-xs text-[color:var(--text-muted)]">No task linked.</p>
+            }
+          </div>
+        </div>
+      }
+    </div>
+  }
+
   @if (summary().length) {
     <div class="flex flex-wrap gap-2">
       @for (item of summary(); track item.status) {
@@ -99,8 +223,16 @@
                    [emptyMessage]="statusFilter() ? 'No runs with that status.' : 'This job has never run.'"
                    (retry)="load()">
     <ng-container toolbar>
-      @if (statusFilter()) {
-        <button type="button" class="btn btn-ghost btn-sm" (click)="statusFilter.set('')"><app-icon name="close" />Clear filter</button>
+      <div class="search-field max-w-56">
+        <app-icon name="search" size="0.95em" />
+        <input class="input" placeholder="Search run id or message"
+               [value]="search()" (input)="search.set($any($event.target).value)" />
+      </div>
+      @if (statusFilter() || search()) {
+        <button type="button" class="btn btn-ghost btn-sm"
+                (click)="statusFilter.set(''); search.set('')">
+          <app-icon name="close" />Clear
+        </button>
       }
     </ng-container>
 
@@ -108,6 +240,7 @@
       <thead>
         <tr>
           <th>Run</th>
+          <th>Queued</th>
           <th>Started</th>
           <th>Ended</th>
           <th>Duration</th>
@@ -119,9 +252,24 @@
       <tbody>
         @for (run of filtered(); track run.jobQueueId) {
           <tr>
-            <td class="mono text-[color:var(--text-muted)]">#{{ run.jobQueueId }}</td>
+            <td class="mono text-[color:var(--text-muted)]">
+              #{{ run.jobQueueId }}
+              @if (run.jobSend) {
+                <app-icon name="send" size="0.8em" class="icon-muted ml-1"
+                          title="Reached the queue" />
+              }
+            </td>
+            <td class="whitespace-nowrap text-[color:var(--text-muted)]">
+              {{ run.dateCreated ? (run.dateCreated | date:'d MMM, HH:mm:ss') : '—' }}
+            </td>
             <td class="whitespace-nowrap text-[color:var(--text-secondary)]">
-              {{ run.startTime ? (run.startTime | date:'d MMM, HH:mm:ss') : '—' }}
+              @if (run.startTime) {
+                {{ run.startTime | date:'d MMM, HH:mm:ss' }}
+              } @else if (run.skipTime) {
+                <span class="text-warn-500" title="This run was skipped rather than started">
+                  skipped {{ run.skipTime | date:'d MMM, HH:mm:ss' }}
+                </span>
+              } @else { — }
             </td>
             <td class="whitespace-nowrap text-[color:var(--text-secondary)]">
               {{ run.endTime ? (run.endTime | date:'d MMM, HH:mm:ss') : '—' }}

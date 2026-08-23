@@ -9,6 +9,7 @@ import { Icon } from '../../../shared/ui/icon';
 import { Donut } from '../../../shared/charts/donut';
 import { BarChart } from '../../../shared/charts/bar-chart';
 import { statusColor } from '../../../shared/charts/status-color';
+import { copyText } from '../../../shared/ui/clipboard.util';
 
 interface JobQueue {
   jobQueueId: number;
@@ -18,6 +19,8 @@ interface JobQueue {
   startTime?: string;
   endTime?: string;
   dateCreated?: string;
+  jobSend?: boolean;
+  skipTime?: string;
 }
 
 @Component({
@@ -51,7 +54,12 @@ export class JobHistory {
 
   readonly filtered = computed(() => {
     const status = this.statusFilter();
-    return status ? this.runs().filter(r => r.jobStatus === status) : this.runs();
+    const term = this.search().trim().toLowerCase();
+    return this.runs().filter(run => {
+      if (status && run.jobStatus !== status) return false;
+      if (!term) return true;
+      return `${run.jobQueueId} ${run.jobStatusMessage ?? ''}`.toLowerCase().includes(term);
+    });
   });
 
   /** Counts per status, so the shape of a job's history reads at a glance. */
@@ -65,6 +73,47 @@ export class JobHistory {
   });
 
   readonly showInsights = signal(false);
+  /** The job and its task, so the run list has the context the old screen showed beside it. */
+  readonly detail = signal<any | null>(null);
+  readonly showDetail = signal(true);
+  readonly payloadCopied = signal(false);
+  readonly search = signal('');
+
+  readonly runStats = computed(() => {
+    const counts = new Map<string, number>();
+    for (const run of this.runs()) counts.set(run.jobStatus, (counts.get(run.jobStatus) ?? 0) + 1);
+    const order = ['Queue', 'Start', 'Running', 'Completed', 'Failed', 'Skip', 'Interrupt', 'Missed'];
+    return order.map(name => ({ name, value: counts.get(name) ?? 0 }))
+      .concat([{ name: 'Total', value: this.runs().length }]);
+  });
+
+  copyPayload(): void {
+    copyText(this.detail()?.taskDetail?.taskPayload ?? '').then(() => {
+      this.payloadCopied.set(true);
+      setTimeout(() => this.payloadCopied.set(false), 1500);
+    });
+  }
+
+  notifyLabel(on?: boolean): string { return on ? 'On' : 'Off'; }
+
+  /** The topic is stored inside "topic=x&partitions=[*]". */
+  topicOf(raw?: string): string {
+    if (!raw) return '—';
+    const match = /topic=([^&]+)/.exec(raw);
+    return match ? match[1] : raw;
+  }
+
+  private loadDetail(): void {
+    this.http.get<ApiResponse<any>>(`${API_BASE}/sourceJob.json/fetchSourceJobDetailWithSourceJobId`,
+      { params: { jobId: this.jobId() } }).subscribe({
+      next: response => {
+        if (response.status === API_SUCCESS) this.detail.set(response.data ?? null);
+      },
+      // The run list is the point of the screen; losing the context panel should not break it.
+      error: () => this.detail.set(null),
+    });
+  }
+
 
   readonly outcomeMix = computed(() =>
     this.summary().map(s => ({ name: s.status, value: s.count })));
@@ -121,6 +170,7 @@ export class JobHistory {
       this.targetDate();
       this.targetHr();
       this.load();
+      this.loadDetail();
     });
 
     // The list endpoint is the only place the job's name is available.

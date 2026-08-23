@@ -6,6 +6,8 @@ import { TableShell } from '../../shared/ui/data-table';
 import { StatusPill } from '../../shared/ui/status-pill';
 import { Icon } from '../../shared/ui/icon';
 import { copyText } from '../../shared/ui/clipboard.util';
+import { ToastService } from '../../shared/ui/toast.service';
+import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 
 interface SourceTask {
   taskDetailId: number;
@@ -23,11 +25,12 @@ interface SourceTask {
 
 @Component({
   selector: 'app-tasks',
-  imports: [Icon, RouterLink, TableShell, StatusPill],
+  imports: [Icon, RouterLink, TableShell, StatusPill, CdkMenu, CdkMenuItem, CdkMenuTrigger],
   templateUrl: './tasks.html',
 })
 export class Tasks implements OnInit {
   private readonly http = inject(HttpClient);
+  private readonly toast = inject(ToastService);
 
   readonly tasks = signal<SourceTask[]>([]);
   readonly loading = signal(true);
@@ -52,6 +55,51 @@ export class Tasks implements OnInit {
       const next = new Set(set);
       next.has(task.taskDetailId) ? next.delete(task.taskDetailId) : next.add(task.taskDetailId);
       return next;
+    });
+  }
+
+  readonly busyTask = signal<number | null>(null);
+
+  /** Same approach as jobs: read the task back in full and post it as a new one. */
+  clone(task: SourceTask): void {
+    this.busyTask.set(task.taskDetailId);
+    this.http.get<ApiResponse<any>>(`${API_BASE}/sourceTask.json/fetchSourceTaskWithSourceTaskId`,
+      { params: { sourceTaskId: task.taskDetailId } }).subscribe({
+      next: response => {
+        if (response.status !== API_SUCCESS || !response.data) {
+          this.busyTask.set(null);
+          this.toast.error(response.message || 'That task could not be read.');
+          return;
+        }
+        const source = response.data;
+        const payload = {
+          taskName: `${source.taskName} (copy)`,
+          sourceTaskType: { sourceTaskTypeId: source.sourceTaskType?.sourceTaskTypeId },
+          taskPayload: source.taskPayload,
+          taskStatus: 'Inactive',
+          homePageId: source.homePageId,
+          pipelineId: source.pipelineId,
+          groupId: source.groupId,
+          xmlTagsInfo: source.xmlTagsInfo ?? [],
+        };
+        this.http.post<ApiResponse>(`${API_BASE}/sourceTask.json/addSourceTask`, payload).subscribe({
+          next: created => {
+            this.busyTask.set(null);
+            if (created.status === API_SUCCESS) {
+              this.toast.success(`Copied as "${payload.taskName}" — it starts inactive.`);
+              this.load();
+            } else { this.toast.error(created.message); }
+          },
+          error: err => {
+            this.busyTask.set(null);
+            this.toast.error(err?.error?.message || 'The copy could not be created.');
+          },
+        });
+      },
+      error: err => {
+        this.busyTask.set(null);
+        this.toast.error(err?.error?.message || 'That task could not be read.');
+      },
     });
   }
 

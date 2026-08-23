@@ -7,6 +7,9 @@
       </p>
     </div>
     <div class="flex items-center gap-2">
+      <button type="button" class="btn btn-ghost btn-sm" (click)="load()" [disabled]="loading()">
+        <app-icon name="refresh" [class.spin]="loading()" />Refresh
+      </button>
       <a routerLink="/jobs/bulk" class="btn btn-ghost btn-sm">
         <app-icon name="upload" />Bulk import
       </a>
@@ -123,6 +126,9 @@
                   <div class="my-1 border-t" style="border-color: var(--border-subtle);"></div>
                   <a cdkMenuItem class="menu-item block" [routerLink]="['/jobs', job.jobId, 'edit']"><app-icon name="edit" />Edit</a>
                   <a cdkMenuItem class="menu-item block" [routerLink]="['/jobs', job.jobId, 'history']"><app-icon name="clock" />Run history</a>
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="clone(job)">
+                    <app-icon name="copy" />Duplicate
+                  </button>
                   <div class="my-1 border-t" style="border-color: var(--border-subtle);"></div>
                   <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="toggleStatus(job)">
                     {{ job.jobStatus === 'Active' ? 'Deactivate' : 'Activate' }}

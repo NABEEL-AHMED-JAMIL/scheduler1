@@ -113,6 +113,64 @@ export class Jobs implements OnInit {
     });
   }
 
+  /**
+   * There is no clone endpoint: the old screen read the job back in full and posted it as a
+   * new one. Same here, with a distinct name so the copy is identifiable in the list.
+   */
+  clone(job: SourceJob): void {
+    this.busyJob.set(job.jobId);
+    this.http.get<ApiResponse<any>>(`${API_BASE}/sourceJob.json/fetchSourceJobDetailWithSourceJobId`,
+      { params: { jobId: job.jobId } }).subscribe({
+      next: response => {
+        if (response.status !== API_SUCCESS || !response.data) {
+          this.busyJob.set(null);
+          this.toast.error(response.message || 'That job could not be read.');
+          return;
+        }
+        const source = response.data;
+        const payload: any = {
+          jobName: `${source.jobName} (copy)`,
+          taskDetail: { taskDetailId: source.taskDetail?.taskDetailId },
+          execution: source.execution,
+          priority: source.priority,
+          // A copy starts inactive: cloning a live schedule should not silently double the runs.
+          jobStatus: 'Inactive',
+          completeJob: source.completeJob,
+          failJob: source.failJob,
+          skipJob: source.skipJob,
+        };
+        if (source.scheduler) {
+          payload.schedulers = [{
+            startDate: source.scheduler.startDate,
+            endDate: source.scheduler.endDate,
+            startTime: source.scheduler.startTime,
+            frequency: source.scheduler.frequency,
+            intervalValue: source.scheduler.intervalValue,
+            daysOfWeek: source.scheduler.daysOfWeek,
+            dayOfMonth: source.scheduler.dayOfMonth,
+          }];
+        }
+        this.http.post<ApiResponse>(`${API_BASE}/sourceJob.json/addSourceJob`, payload).subscribe({
+          next: created => {
+            this.busyJob.set(null);
+            if (created.status === API_SUCCESS) {
+              this.toast.success(`Copied as "${payload.jobName}" — it starts inactive.`);
+              this.load();
+            } else { this.toast.error(created.message); }
+          },
+          error: err => {
+            this.busyJob.set(null);
+            this.toast.error(err?.error?.message || 'The copy could not be created.');
+          },
+        });
+      },
+      error: err => {
+        this.busyJob.set(null);
+        this.toast.error(err?.error?.message || 'That job could not be read.');
+      },
+    });
+  }
+
   /** A run already in flight would collide with a manual run or skip. */
   isInFlight(job: SourceJob): boolean {
     return IN_FLIGHT.includes((job.jobRunningStatus ?? '').toLowerCase());

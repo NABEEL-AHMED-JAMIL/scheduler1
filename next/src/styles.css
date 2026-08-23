@@ -430,6 +430,15 @@ html.dark .btn-intent-crit:focus app-icon { color: var(--color-crit-400); }
   }
   .nav-child-active .nav-child-icon { color: var(--color-brand-500); }
 
+  /* Compact key/value pairs for the context panels. */
+  .detail-head {
+    @apply text-[10px] font-semibold uppercase tracking-wider mb-1.5
+           text-[color:var(--text-muted)];
+  }
+  .detail-list { @apply grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs items-baseline; }
+  .detail-list dt { @apply text-[color:var(--text-muted)] whitespace-nowrap; }
+  .detail-list dd { @apply min-w-0 text-[color:var(--text-primary)]; }
+
   .menu-item {
     @apply w-full text-left px-3 py-1.5 rounded-sm inline-flex items-center gap-2
            text-[color:var(--text-secondary)]

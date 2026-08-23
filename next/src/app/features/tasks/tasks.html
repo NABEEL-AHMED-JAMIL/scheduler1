@@ -7,6 +7,9 @@
     </p>
     </div>
     <div class="flex items-center gap-2">
+      <button type="button" class="btn btn-ghost btn-sm" (click)="load()" [disabled]="loading()">
+        <app-icon name="refresh" [class.spin]="loading()" />Refresh
+      </button>
       <a routerLink="/tasks/bulk" class="btn btn-ghost btn-sm">
         <app-icon name="upload" />Bulk import
       </a>
@@ -80,6 +83,17 @@
             <td class="text-right"><app-status [label]="task.taskStatus" /></td>
             <td class="text-right">
               <a class="btn btn-ghost btn-sm" [routerLink]="['/tasks', task.taskDetailId, 'edit']"><app-icon name="edit" />Edit</a>
+              <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="taskMenu"
+                      [disabled]="busyTask() === task.taskDetailId" aria-label="Actions">
+                <app-icon name="dots" size="1.05em" />
+              </button>
+              <ng-template #taskMenu>
+                <div cdkMenu class="card shadow-xl py-1 min-w-44 text-sm">
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="clone(task)">
+                    <app-icon name="copy" />Duplicate
+                  </button>
+                </div>
+              </ng-template>
             </td>
           </tr>
 
