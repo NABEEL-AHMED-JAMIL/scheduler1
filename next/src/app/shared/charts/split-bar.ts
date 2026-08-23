@@ -20,19 +20,17 @@ export interface SplitRow {
   template: `
     @if (rows().length) {
       <div>
-        <ul class="space-y-2.5">
+        <ul class="space-y-1.5">
           @for (row of rows(); track row.label) {
-            <li>
-              <div class="flex items-baseline gap-2 text-xs">
-                <span class="truncate">{{ row.label }}</span>
-                <span class="ml-auto tabular text-[color:var(--text-muted)]">
-                  {{ row.total }} total
-                </span>
+            <li [title]="row.label + ': ' + row.positive + ' ' + positiveLabel()
+                         + ', ' + row.negative + ' ' + negativeLabel()">
+              <div class="flex items-center gap-2 text-[11px] leading-none">
+                <span class="truncate text-[color:var(--text-secondary)]">{{ row.label }}</span>
+                <span class="ml-auto tabular font-medium shrink-0">{{ row.positive }}</span>
+                <span class="tabular text-[color:var(--text-muted)] shrink-0">/ {{ row.negative }}</span>
               </div>
-              <div class="mt-1 flex h-2.5 rounded-full overflow-hidden"
-                   style="background: var(--surface-sunken);"
-                   [title]="row.label + ': ' + row.positive + ' ' + positiveLabel()
-                            + ', ' + row.negative + ' ' + negativeLabel()">
+              <div class="mt-1 flex h-1.5 rounded-full overflow-hidden"
+                   style="background: var(--surface-sunken);">
                 @if (row.positive) {
                   <span class="h-full" [style.width.%]="row.positiveWidth"
                         style="background: var(--color-ok-500);"></span>
@@ -42,27 +40,23 @@ export interface SplitRow {
                         style="background: var(--color-crit-500);"></span>
                 }
               </div>
-              <div class="mt-1 flex gap-3 text-[11px] text-[color:var(--text-muted)]">
-                <span class="tabular">{{ row.positive }} {{ positiveLabel() }}</span>
-                <span class="tabular">{{ row.negative }} {{ negativeLabel() }}</span>
-              </div>
             </li>
           }
         </ul>
 
-        <div class="mt-3 flex items-center gap-4 text-[11px] text-[color:var(--text-muted)]">
-          <span class="flex items-center gap-1.5">
-            <span class="size-2.5 rounded-full" style="background: var(--color-ok-500);"></span>
+        <div class="mt-2 flex items-center gap-3 text-[10px] text-[color:var(--text-muted)]">
+          <span class="flex items-center gap-1">
+            <span class="size-2 rounded-full" style="background: var(--color-ok-500);"></span>
             {{ positiveLabel() }}
           </span>
-          <span class="flex items-center gap-1.5">
-            <span class="size-2.5 rounded-full" style="background: var(--color-crit-500);"></span>
+          <span class="flex items-center gap-1">
+            <span class="size-2 rounded-full" style="background: var(--color-crit-500);"></span>
             {{ negativeLabel() }}
           </span>
         </div>
       </div>
     } @else {
-      <p class="text-sm text-[color:var(--text-muted)] py-8 text-center">Nothing to show yet.</p>
+      <p class="text-xs text-[color:var(--text-muted)] py-5 text-center">Nothing to show yet.</p>
     }
   `,
 })

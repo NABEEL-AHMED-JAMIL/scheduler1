@@ -6,21 +6,22 @@ export interface Bar { name: string; value: number; meta?: unknown; color?: stri
   selector: 'app-bar-chart',
   template: `
     @if (bars().length) {
-      <div class="flex items-end gap-1.5" [style.height.px]="height()">
+      <div class="flex items-end gap-1" [style.height.px]="height()"
+           [class.justify-start]="bars().length < 6">
         @for (bar of bars(); track $index) {
           <button type="button"
-                  class="flex-1 min-w-0 h-full flex flex-col justify-end items-center gap-1.5
-                         rounded-md px-0.5 transition-colors hover:bg-[color:var(--surface-sunken)]
+                  class="flex-1 min-w-0 max-w-16 h-full flex flex-col justify-end items-center gap-1
+                         rounded transition-colors hover:bg-[color:var(--surface-sunken)]
                          focus:outline-none focus:ring-2 focus:ring-brand-500"
                   [disabled]="!clickable()"
                   [title]="bar.name + ': ' + bar.value"
                   (click)="barClicked.emit(bar)">
-            <span class="text-[11px] tabular text-[color:var(--text-secondary)]">{{ bar.value }}</span>
+            <span class="text-[10px] tabular leading-none text-[color:var(--text-muted)]">{{ bar.value }}</span>
             <span class="w-full rounded-t transition-[height]"
                   [class.bg-brand-500]="!bar.color"
                   [style.background]="bar.color || null"
                   [style.height.px]="bar.px"></span>
-            <span class="text-[11px] text-[color:var(--text-muted)] w-full text-center h-4 leading-4"
+            <span class="text-[10px] text-[color:var(--text-muted)] w-full text-center h-3.5 leading-[0.875rem]"
                   [class.truncate]="!bar.newGroup">
               @if (bar.newGroup) {
                 <span class="whitespace-nowrap">{{ bar.name }}</span>
@@ -30,19 +31,19 @@ export interface Bar { name: string; value: number; meta?: unknown; color?: stri
         }
       </div>
       @if (usesSqrtScale()) {
-        <p class="text-[11px] text-[color:var(--text-muted)] mt-2">
+        <p class="text-[10px] text-[color:var(--text-muted)] mt-1.5 leading-snug">
           Bar heights use a square-root scale so smaller {{ unit() }} stay visible next to
           {{ maxValue() }}.
         </p>
       }
     } @else {
-      <p class="text-sm text-[color:var(--text-muted)] py-10 text-center">{{ emptyMessage() }}</p>
+      <p class="text-xs text-[color:var(--text-muted)] py-6 text-center">{{ emptyMessage() }}</p>
     }
   `,
 })
 export class BarChart {
   readonly data = input.required<Bar[]>();
-  readonly height = input(140);
+  readonly height = input(96);
   /** Named so the scale note reads correctly wherever the chart is used, not just on the dashboard. */
   readonly unit = input('values');
   readonly emptyMessage = input('Nothing to show in this range.');
@@ -71,7 +72,7 @@ export class BarChart {
     const max = this.maxValue();
     if (!max) return [];
     // Reserve room for the value and label lines above and below the bar itself.
-    const track = Math.max(this.height() - 42, 20);
+    const track = Math.max(this.height() - 32, 18);
     const sqrt = this.usesSqrtScale();
     const data = this.data();
     return data.map((bar, index) => {

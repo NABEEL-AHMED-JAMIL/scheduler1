@@ -102,25 +102,25 @@
       </div>
 
       @if (showInsights() && hasInsights()) {
-        <div class="grid gap-4 p-4 border-b md:grid-cols-2 xl:grid-cols-4"
+        <div class="grid gap-3 p-3.5 border-b md:grid-cols-2 xl:grid-cols-4 items-start"
              style="border-color: var(--border-subtle); background: var(--surface-page);">
-          <div class="card p-4">
+          <div class="card chart-card">
             <h3 class="chart-title">What is here</h3>
             <app-donut [data]="mix()" totalLabel="entries in this folder" />
           </div>
 
-          <div class="card p-4">
+          <div class="card chart-card">
             <h3 class="chart-title">File types</h3>
             <app-ranked-bar [data]="byType()" [max]="6" />
           </div>
 
-          <div class="card p-4">
+          <div class="card chart-card">
             <h3 class="chart-title">Last modified</h3>
             <p class="chart-sub">Oldest data is usually the first worth archiving.</p>
             <app-ranked-bar [data]="byAge()" [sorted]="false" [max]="6" />
           </div>
 
-          <div class="card p-4">
+          <div class="card chart-card">
             <h3 class="chart-title">Largest files</h3>
             <app-ranked-bar [data]="bySize()" [max]="6" [showPercent]="false"
                             [formatValue]="humanSizeFn" />

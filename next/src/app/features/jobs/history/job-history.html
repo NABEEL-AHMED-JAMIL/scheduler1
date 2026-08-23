@@ -53,20 +53,20 @@
   }
 
   @if (showInsights() && hasInsights()) {
-    <div class="grid gap-4 lg:grid-cols-3">
-      <div class="card p-4">
+    <div class="grid gap-3 lg:grid-cols-3 items-start">
+      <div class="card chart-card">
         <h3 class="chart-title">Outcomes</h3>
         <app-donut [data]="outcomeMix()" totalLabel="runs" [colorFor]="outcomeColor" />
       </div>
 
-      <div class="card p-4 lg:col-span-2">
+      <div class="card chart-card lg:col-span-2">
         <h3 class="chart-title">How long each run took</h3>
         <p class="chart-sub">
           Most recent {{ durationTrend().length }} runs, oldest first. A rising slope means the
           job is getting slower.
         </p>
         @if (durationTrend().length) {
-          <app-bar-chart [data]="durationTrend()" [height]="150" unit="runs" />
+          <app-bar-chart [data]="durationTrend()" [height]="104" unit="runs" />
         } @else {
           <p class="text-sm text-[color:var(--text-muted)] py-8 text-center">
             No run recorded both a start and an end time.

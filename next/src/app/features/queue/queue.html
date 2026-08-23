@@ -33,48 +33,47 @@
   }
 
   @if (showInsights() && hasInsights()) {
-    <div class="grid gap-4 lg:grid-cols-3">
-      <div class="card p-4">
+    <div class="grid gap-3 lg:grid-cols-3 items-start">
+      <div class="card chart-card">
         <h3 class="chart-title">Outcomes</h3>
         <app-donut [data]="statusMix()" totalLabel="messages in this range"
                    [colorFor]="outcomeColor" />
-        @if (failureRate()) {
-          <p class="chart-sub mt-3 mb-0">
-            {{ failureRate() }}% of messages in this range failed.
-          </p>
-        }
-        @if (notListed()) {
-          <p class="chart-sub mt-1 mb-0 flex items-start gap-1.5">
-            <app-icon name="info" size="0.9em" class="icon-muted mt-px shrink-0" />
-            <span>
-              The table lists {{ rows().length }} of these — the server caps how many rows it
-              returns, so {{ notListed() }} are counted here but not shown below.
+        <p class="chart-sub mt-2 mb-0 flex items-center gap-1.5 flex-wrap">
+          @if (failureRate()) {
+            <span>{{ failureRate() }}% failed.</span>
+          }
+          @if (notListed()) {
+            <span class="inline-flex items-center gap-1"
+                  [title]="'The server caps how many rows it returns, so ' + notListed()
+                           + ' of these are counted in the chart but not listed in the table below.'">
+              <app-icon name="info" size="0.85em" class="icon-muted" />
+              {{ rows().length }} listed below
             </span>
-          </p>
-        }
+          }
+        </p>
       </div>
 
-      <div class="card p-4">
+      <div class="card chart-card">
         <h3 class="chart-title">Busiest jobs</h3>
         <p class="chart-sub">Which jobs are producing the queue traffic.</p>
-        <app-ranked-bar [data]="byJob()" [max]="6" />
+        <app-ranked-bar [data]="byJob()" [max]="5" />
       </div>
 
-      <div class="card p-4">
+      <div class="card chart-card">
         <h3 class="chart-title">Volume by day</h3>
         <p class="chart-sub">Oldest to newest across the selected range.</p>
-        <app-bar-chart [data]="byDay()" [height]="150" unit="days" />
+        <app-bar-chart [data]="byDay()" [height]="104" unit="days" />
       </div>
 
       @if (durations().length) {
-        <div class="card p-4">
+        <div class="card chart-card">
           <h3 class="chart-title">How long runs took</h3>
           <p class="chart-sub">Shortest to longest, from start and end time.</p>
           <app-ranked-bar [data]="durations()" [sorted]="false" [max]="6" />
         </div>
       }
 
-      <div class="card p-4">
+      <div class="card chart-card">
         <h3 class="chart-title">How runs were started</h3>
         <p class="chart-sub">Whether each message was triggered by hand and reached the queue.</p>
         <app-split-bar [data]="flagSplit()" positiveLabel="yes" negativeLabel="no" />

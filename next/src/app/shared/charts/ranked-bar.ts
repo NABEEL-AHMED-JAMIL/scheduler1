@@ -12,32 +12,32 @@ export interface RankedItem {
 /**
  * Horizontal bars, longest first.
  *
- * The old screens drew this data as pie charts. A pie can carry three or four slices; past
- * that the wedges stop being comparable and the legend does the real work. Ranked bars stay
- * readable at a dozen rows, keep a deliberate order when one exists (age buckets run oldest
- * to newest, not largest to smallest), and leave room for the value to be written out.
+ * Kept deliberately dense: label, value and bar share one 22px row, so eight categories fit
+ * in the height a table gives four. A chart beside a table should not be taller than the
+ * data it summarises.
  */
 @Component({
   selector: 'app-ranked-bar',
   template: `
     @if (rows().length) {
-      <ul class="space-y-2">
+      <ul class="space-y-1.5">
         @for (row of rows(); track row.name) {
           <li>
-            <button type="button" class="w-full text-left group"
+            <button type="button" class="w-full text-left group block"
                     [class.cursor-default]="!clickable()"
                     [disabled]="!clickable()"
+                    [title]="row.name + ': ' + (row.display || row.value)"
                     (click)="picked.emit(row)">
-              <span class="flex items-baseline gap-2 text-xs">
-                <span class="truncate" [title]="row.name">{{ row.name }}</span>
+              <span class="flex items-center gap-2 text-[11px] leading-none">
+                <span class="truncate text-[color:var(--text-secondary)]">{{ row.name }}</span>
                 <span class="ml-auto tabular font-medium shrink-0">{{ row.display || row.value }}</span>
                 @if (showPercent()) {
-                  <span class="tabular text-[color:var(--text-muted)] w-9 text-right shrink-0">
+                  <span class="tabular text-[color:var(--text-muted)] w-8 text-right shrink-0">
                     {{ row.percent }}%
                   </span>
                 }
               </span>
-              <span class="mt-1 block h-2 rounded-full overflow-hidden"
+              <span class="mt-1 block h-1.5 rounded-full overflow-hidden"
                     style="background: var(--surface-sunken);">
                 <span class="block h-full rounded-full transition-[width] duration-300"
                       [style.width.%]="row.width"
@@ -49,7 +49,7 @@ export interface RankedItem {
         }
       </ul>
     } @else {
-      <p class="text-sm text-[color:var(--text-muted)] py-8 text-center">Nothing to show yet.</p>
+      <p class="text-xs text-[color:var(--text-muted)] py-5 text-center">Nothing to show yet.</p>
     }
   `,
 })
@@ -57,13 +57,10 @@ export class RankedBar {
   readonly data = input.required<RankedItem[]>();
   /** Off when the order carries meaning of its own, such as age buckets. */
   readonly sorted = input(true);
-  readonly max = input(8);
+  readonly max = input(6);
   readonly showPercent = input(true);
   readonly clickable = input(false);
-  /**
-   * Formats the rolled-up "Other" row. Without it that row falls back to the raw number
-   * while every row above it is formatted -- a byte count next to a list of "8.8 MB".
-   */
+  /** Formats the rolled-up "Other" row so it matches the rows it summarises. */
   readonly formatValue = input<((value: number) => string) | null>(null);
   readonly picked = output<RankedItem>();
 
@@ -92,8 +89,8 @@ export class RankedBar {
     }
 
     const total = source.reduce((sum, d) => sum + d.value, 0);
-    // Bars are scaled against the largest row, not the total: against the total a long tail
-    // of small values collapses into invisible slivers.
+    // Bars scale against the largest row, not the total: against the total a long tail of
+    // small values collapses into invisible slivers.
     const largest = Math.max(...shown.map(d => d.value), 1);
 
     return shown.map((row, index) => ({
