@@ -11,6 +11,7 @@ import { TableShell } from '../../shared/ui/data-table';
 import { StatusPill } from '../../shared/ui/status-pill';
 import { Icon } from '../../shared/ui/icon';
 import { NotifyDialog } from './notify-dialog';
+import { JobAction, jobActionRequest } from './job-actions';
 import { createPager } from '../../shared/ui/pager';
 import { Pagination } from '../../shared/ui/pagination';
 
@@ -247,16 +248,17 @@ export class Jobs implements OnInit {
   }
 
   runNow(job: SourceJob): void {
-    this.act(job, `${API_BASE}/sourceJob.json/runSourceJob`, `${job.jobName} queued to run.`);
+    this.act(job, 'run', `${job.jobName} queued to run.`);
   }
 
   skipNext(job: SourceJob): void {
-    this.act(job, `${API_BASE}/sourceJob.json/skipNextSourceJob`, `Next run of ${job.jobName} skipped.`);
+    this.act(job, 'skip', `Next run of ${job.jobName} skipped.`);
   }
 
-  private act(job: SourceJob, url: string, successMessage: string): void {
+  private act(job: SourceJob, action: JobAction, successMessage: string): void {
+    const request = jobActionRequest(action, job.jobId);
     this.busyJob.set(job.jobId);
-    this.http.post<ApiResponse>(url, null, { params: { jobId: String(job.jobId) } }).subscribe({
+    this.http.request<ApiResponse>(request.method, request.url, { body: request.body }).subscribe({
       next: response => {
         this.busyJob.set(null);
         if (response.status === API_SUCCESS) {
@@ -284,9 +286,8 @@ export class Jobs implements OnInit {
     });
     if (!ok) return;
 
-    this.http.put<ApiResponse>(`${API_BASE}/sourceJob.json/toggleSourceJobStatus`, null, {
-      params: { jobId: String(job.jobId) },
-    }).subscribe({
+    const toggle = jobActionRequest('toggle', job.jobId);
+    this.http.request<ApiResponse>(toggle.method, toggle.url, { body: toggle.body }).subscribe({
       next: response => {
         if (response.status === API_SUCCESS) {
           this.toast.success(`${job.jobName} ${activating ? 'activated' : 'deactivated'}.`);
@@ -308,9 +309,8 @@ export class Jobs implements OnInit {
     });
     if (!ok) return;
 
-    this.http.put<ApiResponse>(`${API_BASE}/sourceJob.json/deleteSourceJob`, null, {
-      params: { jobId: String(job.jobId) },
-    }).subscribe({
+    const remove = jobActionRequest('delete', job.jobId);
+    this.http.request<ApiResponse>(remove.method, remove.url, { body: remove.body }).subscribe({
       next: response => {
         if (response.status === API_SUCCESS) {
           this.toast.success(`${job.jobName} deleted.`);
@@ -372,7 +372,7 @@ export class Jobs implements OnInit {
       title: `Run ${jobs.length} job${jobs.length > 1 ? 's' : ''}?`,
       body: 'Each one is queued immediately, ignoring its schedule.',
       confirmLabel: 'Run them',
-    }, jobs, `${API_BASE}/sourceJob.json/runSourceJob`, 'queued');
+    }, jobs, 'run', 'queued');
   }
 
   /**
@@ -398,16 +398,16 @@ export class Jobs implements OnInit {
       body: 'They stop running and leave the list. Their run history is kept.',
       confirmLabel: 'Delete them',
       danger: true,
-    }, jobs, `${API_BASE}/sourceJob.json/deleteSourceJob`, 'deleted');
+    }, jobs, 'delete', 'deleted');
   }
 
   private async confirmBulk(
     options: { title: string; body: string; confirmLabel: string; danger?: boolean },
-    jobs: SourceJob[], url: string, verb: string): Promise<void> {
-    if (await confirmWith(this.dialog, options)) this.runEach(jobs, url, verb);
+    jobs: SourceJob[], action: JobAction, verb: string): Promise<void> {
+    if (await confirmWith(this.dialog, options)) this.runEach(jobs, action, verb);
   }
 
-  private runEach(jobs: SourceJob[], url: string, verb: string): void {
+  private runEach(jobs: SourceJob[], action: JobAction, verb: string): void {
     this.bulkBusy.set(true);
     const failures: string[] = [];
     let done = 0;
@@ -424,7 +424,8 @@ export class Jobs implements OnInit {
       this.load();
     };
     for (const job of jobs) {
-      this.http.post<ApiResponse>(url, null, { params: { jobId: String(job.jobId) } }).subscribe({
+      const request = jobActionRequest(action, job.jobId);
+      this.http.request<ApiResponse>(request.method, request.url, { body: request.body }).subscribe({
         next: response => {
           if (response.status !== API_SUCCESS) failures.push(`#${job.jobId} ${response.message}`);
           finish();

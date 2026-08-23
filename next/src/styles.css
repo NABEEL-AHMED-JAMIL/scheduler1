@@ -509,7 +509,8 @@ html.dark .btn-intent-crit:focus app-icon { color: var(--color-crit-400); }
 }
 
 @layer components {
-  .input-invalid {
+  .input-invalid,
+  .field-invalid :is(input, select, textarea).input {
     @apply border-crit-500 focus:ring-crit-500/30;
   }
   /* Container-based, not viewport-based: this same grid is used inside a 544px dialog and

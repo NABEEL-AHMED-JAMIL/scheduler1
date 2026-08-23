@@ -1,4 +1,6 @@
 import { Component, computed, input } from '@angular/core';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { of, startWith, switchMap } from 'rxjs';
 import { Icon } from './icon';
 import { AbstractControl } from '@angular/forms';
 
@@ -11,7 +13,7 @@ import { AbstractControl } from '@angular/forms';
   selector: 'app-field',
   imports: [Icon],
   template: `
-    <div class="field">
+    <div class="field" [class.field-invalid]="!!message()">
       <label class="label" [attr.for]="for()">
         {{ label() }}
         @if (required()) {
@@ -42,7 +44,26 @@ export class Field {
   /** Per-error overrides, keyed by validator name, for when the generic wording is too vague. */
   readonly errorMessages = input<Record<string, string>>({});
 
+  /**
+   * A reactive form control is not a signal, so a computed() reading control.errors takes its
+   * value once and never recomputes -- the message stayed on screen while the field was being
+   * corrected, and only ever refreshed because submitted() happened to change. Mirroring the
+   * control's own event stream into a signal gives the computed something to depend on.
+   * `events` rather than statusChanges because it reports touched as well, and the message is
+   * withheld until a field is touched.
+   */
+  private readonly controlEvent = toSignal(
+    toObservable(this.control).pipe(
+      switchMap(control => control ? control.events.pipe(startWith(null)) : of(null))));
+
+  /**
+   * The red border used to be an opt-in `[class.input-invalid]` repeated per control, and it
+   * had been added to two of the eleven controls on the job form -- so most fields announced a
+   * problem in text while looking untouched. The wrapper carries it now: one place, every
+   * control type, and nothing to remember at the call site.
+   */
   readonly message = computed(() => {
+    this.controlEvent();
     const control = this.control();
     if (!control || !control.errors) return '';
     // Errors stay hidden until the field has been touched or the form submitted, so a blank
