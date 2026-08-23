@@ -134,7 +134,7 @@
                     {{ job.jobStatus === 'Active' ? 'Deactivate' : 'Activate' }}
                   </button>
                   <button cdkMenuItem class="menu-item menu-item-danger"
-                          (cdkMenuItemTriggered)="remove(job)"><app-icon name="trash" />Delete</button>
+                          (cdkMenuItemTriggered)="remove(job)"><app-icon name="trash" class="icon-crit" />Delete</button>
                 </div>
               </ng-template>
             </td>

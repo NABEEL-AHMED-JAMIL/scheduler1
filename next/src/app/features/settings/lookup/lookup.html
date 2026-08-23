@@ -48,10 +48,11 @@
               @if (loadingChildren().has($any(lookup.lookupId))) {
                 <app-icon name="refresh" class="spin icon-muted" />
               } @else if (entryCount(lookup)) {
-                <button type="button" class="text-[color:var(--text-muted)] hover:text-brand-600"
+                <button type="button" class="hover:opacity-80"
                         (click)="toggle(lookup)"
                         [attr.aria-label]="expanded().has($any(lookup.lookupId)) ? 'Hide entries' : 'Show entries'">
-                  <app-icon [name]="expanded().has($any(lookup.lookupId)) ? 'chevronDown' : 'chevronRight'" />
+                  <app-icon [name]="expanded().has($any(lookup.lookupId)) ? 'chevronDown' : 'chevronRight'"
+                            [class]="expanded().has($any(lookup.lookupId)) ? 'icon-info' : 'icon-muted'" />
                 </button>
               }
             </td>
@@ -59,7 +60,7 @@
             <td class="text-[color:var(--text-secondary)] max-w-64 truncate">
               @if (lookup.encrypted) {
                 <span class="pill pill-neutral" title="Stored encrypted — the value is not shown">
-                  <app-icon name="lock" size="0.85em" />encrypted
+                  <app-icon name="lock" size="0.85em" class="icon-warn" />encrypted
                 </span>
               } @else {
                 {{ lookup.lookupValue }}
@@ -76,7 +77,7 @@
                 </button>
               } @else {
                 <button type="button" class="btn btn-ghost btn-sm" (click)="addChild(lookup)">
-                  <app-icon name="plus" size="0.85em" />Add
+                  <app-icon name="plus" size="0.85em" class="icon-ok" />Add
                 </button>
               }
             </td>
@@ -91,7 +92,7 @@
                     <app-icon name="edit" />Edit
                   </button>
                   <button cdkMenuItem class="menu-item btn-intent-ok" (cdkMenuItemTriggered)="addChild(lookup)">
-                    <app-icon name="plus" />Add entry
+                    <app-icon name="plus" class="icon-ok" />Add entry
                   </button>
                   <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="remove(lookup)">
                     <app-icon name="trash" class="icon-crit" />Delete
@@ -111,7 +112,7 @@
                 <td class="text-[color:var(--text-secondary)]">
                   @if (child.encrypted) {
                     <span class="pill pill-neutral" title="Stored encrypted — the value is not shown">
-                      <app-icon name="lock" size="0.85em" />encrypted
+                      <app-icon name="lock" size="0.85em" class="icon-warn" />encrypted
                     </span>
                   } @else {
                     {{ child.lookupValue }}
@@ -125,9 +126,9 @@
                           aria-label="Edit entry" (click)="edit(child, lookup)">
                     <app-icon name="edit" size="0.95em" />
                   </button>
-                  <button type="button" class="btn btn-ghost btn-icon btn-intent-crit"
+                  <button type="button" class="btn btn-ghost btn-icon"
                           title="Delete entry" aria-label="Delete entry" (click)="remove(child, lookup)">
-                    <app-icon name="trash" size="0.95em" />
+                    <app-icon name="trash" size="0.95em" class="icon-crit" />
                   </button>
                 </td>
               </tr>
@@ -136,7 +137,7 @@
               <td></td>
               <td colspan="5" class="py-1.5">
                 <button type="button" class="btn btn-ghost btn-sm ml-5" (click)="addChild(lookup)">
-                  <app-icon name="plus" size="0.85em" />Add an entry under {{ lookup.lookupType }}
+                  <app-icon name="plus" size="0.85em" class="icon-ok" />Add an entry under {{ lookup.lookupType }}
                 </button>
               </td>
             </tr>

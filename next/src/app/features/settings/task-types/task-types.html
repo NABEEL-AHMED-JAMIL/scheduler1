@@ -115,7 +115,7 @@
                   </button>
                   @if (canRoute()) {
                     <button cdkMenuItem class="menu-item btn-intent-ok" (cdkMenuItemTriggered)="testRoute(type)">
-                      <app-icon name="plug" />Test Kafka connection
+                      <app-icon name="plug" class="icon-ok" />Test Kafka connection
                     </button>
                   }
                   <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="remove(type)">

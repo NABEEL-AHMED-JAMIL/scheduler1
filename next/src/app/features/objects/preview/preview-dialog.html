@@ -20,7 +20,7 @@
         <button type="button" class="btn btn-ghost btn-sm min-w-14 tabular" (click)="resetZoom()"
                 title="Reset to fit">{{ zoomLabel() }}</button>
         <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="zoomBy(0.25)"
-                [disabled]="zoom() >= 4" title="Zoom in"><app-icon name="plus" /></button>
+                [disabled]="zoom() >= 4" title="Zoom in"><app-icon name="plus" class="icon-ok" /></button>
       </div>
     }
 

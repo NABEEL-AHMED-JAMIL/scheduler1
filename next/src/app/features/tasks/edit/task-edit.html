@@ -88,7 +88,7 @@
           <button type="button" class="btn btn-ghost btn-sm" (click)="showTagHelp.set(!showTagHelp())">
             {{ showTagHelp() ? 'Hide help' : 'How do I link a bucket?' }}
           </button>
-          <button type="button" class="btn btn-default btn-sm" (click)="addTag()"><app-icon name="plus" />Add tag</button>
+          <button type="button" class="btn btn-default btn-sm" (click)="addTag()"><app-icon name="plus" class="icon-ok" />Add tag</button>
         </div>
 
         @if (showTagHelp()) {
@@ -140,10 +140,10 @@
                   <td class="text-right whitespace-nowrap">
                     <button type="button" class="btn btn-ghost btn-icon btn-intent-ok"
                             (click)="insertTagAfter(i)" title="Add a row below this one"
-                            aria-label="Add row below"><app-icon name="plus" /></button>
+                            aria-label="Add row below"><app-icon name="plus" class="icon-ok" /></button>
                     <button type="button" class="btn btn-ghost btn-icon btn-intent-crit"
                             (click)="removeTag(i)" title="Remove this row"
-                            aria-label="Remove row"><app-icon name="trash" /></button>
+                            aria-label="Remove row"><app-icon name="trash" class="icon-crit" /></button>
                   </td>
                 </tr>
               }
