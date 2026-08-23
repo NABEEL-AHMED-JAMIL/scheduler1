@@ -1,6 +1,6 @@
 import { Component, computed, input, output } from '@angular/core';
 
-export interface Bar { name: string; value: number; meta?: unknown; }
+export interface Bar { name: string; value: number; meta?: unknown; color?: string; }
 
 @Component({
   selector: 'app-bar-chart',
@@ -16,7 +16,9 @@ export interface Bar { name: string; value: number; meta?: unknown; }
                   [title]="bar.name + ': ' + bar.value"
                   (click)="barClicked.emit(bar)">
             <span class="text-[11px] tabular text-[color:var(--text-secondary)]">{{ bar.value }}</span>
-            <span class="w-full rounded-t bg-brand-500 transition-[height]"
+            <span class="w-full rounded-t transition-[height]"
+                  [class.bg-brand-500]="!bar.color"
+                  [style.background]="bar.color || null"
                   [style.height.px]="bar.px"></span>
             <span class="text-[11px] text-[color:var(--text-muted)] w-full text-center h-4 leading-4"
                   [class.truncate]="!bar.newGroup">
