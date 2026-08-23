@@ -142,8 +142,23 @@
   .btn {
     @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5
            text-sm font-medium transition-colors select-none
-           disabled:opacity-45 disabled:pointer-events-none;
+           disabled:pointer-events-none;
   }
+  /* Unfilled buttons have nothing to muddy, so fading them reads correctly. */
+  .btn:disabled { @apply opacity-45; }
+
+  /* A filled button faded to 45% goes muddy and drops its white label below readable --
+     "Build XML" sat on a washed brand purple. Disabled filled buttons get a flat muted
+     surface instead, which reads as deliberately off rather than half-rendered. */
+  .btn-primary:disabled,
+  .btn-danger:disabled {
+    background: var(--surface-sunken);
+    color: var(--text-muted);
+    border: 1px solid var(--border-subtle);
+    @apply opacity-100 shadow-none;
+  }
+  .btn-primary:disabled app-icon,
+  .btn-danger:disabled app-icon { color: var(--text-muted); opacity: 1; }
   .btn-primary {
     @apply bg-brand-500 text-white hover:bg-brand-600 active:bg-brand-700;
   }

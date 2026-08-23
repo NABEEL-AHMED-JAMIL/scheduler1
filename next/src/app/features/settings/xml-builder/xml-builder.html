@@ -63,7 +63,7 @@
                   <div class="flex items-center justify-end gap-1">
                     <button type="button" class="btn btn-ghost btn-icon btn-sm"
                             title="Insert a row below" (click)="addAt($index)">
-                      <app-icon name="plus" class="icon-info" />
+                      <app-icon name="plus" />
                     </button>
                     <button type="button" class="btn btn-ghost btn-icon btn-sm btn-intent-crit"
                             title="Remove this row" (click)="removeAt($index)">
@@ -88,7 +88,7 @@
           </ul>
         }
         <button type="button" class="btn btn-primary btn-sm" [disabled]="!canBuild()" (click)="build()">
-          <app-icon name="chart" [class.spin]="building()" />{{ building() ? 'Building…' : 'Build XML' }}
+          <app-icon name="file" [class.spin]="building()" />{{ building() ? 'Building…' : 'Build XML' }}
         </button>
       </div>
     </div>
