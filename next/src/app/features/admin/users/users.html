@@ -6,9 +6,14 @@
         Roles are enforced on the server — they decide what a person can reach, not just what they see.
       </p>
     </div>
-    <button type="button" class="btn btn-primary btn-sm" (click)="create()">
-      <app-icon name="plus" />New user
-    </button>
+    <div class="flex items-center gap-2">
+      <button type="button" class="btn btn-ghost btn-sm" (click)="load()" [disabled]="loading()">
+        <app-icon name="refresh" [class.spin]="loading()" />Refresh
+      </button>
+      <button type="button" class="btn btn-primary btn-sm" (click)="create()">
+        <app-icon name="plus" />New user
+      </button>
+    </div>
   </div>
 
   @if (focusedTenantId() !== null) {
@@ -52,6 +57,15 @@
           <option [value]="role">{{ roleLabel(role) }}</option>
         }
       </select>
+      @if (canPickTenant() && tenantOptions().length > 1) {
+        <select class="input max-w-44" [value]="tenantFilter()"
+                (change)="tenantFilter.set($any($event.target).value)">
+          <option value="">All tenants</option>
+          @for (tenant of tenantOptions(); track tenant.id) {
+            <option [value]="tenant.id">{{ tenant.name }}</option>
+          }
+        </select>
+      }
       <select class="input max-w-32" [value]="statusFilter()"
               (change)="statusFilter.set($any($event.target).value)">
         <option value="">All states</option>

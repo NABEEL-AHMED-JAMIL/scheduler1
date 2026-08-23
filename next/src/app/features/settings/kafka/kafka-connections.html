@@ -6,9 +6,14 @@
         Broker settings a task uses to reach Kafka. Secrets are encrypted and never sent back to the browser.
       </p>
     </div>
-    <button type="button" class="btn btn-primary btn-sm" (click)="create()">
-      <app-icon name="plus" />New profile
-    </button>
+    <div class="flex items-center gap-2">
+      <button type="button" class="btn btn-ghost btn-sm" (click)="load()" [disabled]="loading()">
+        <app-icon name="refresh" [class.spin]="loading()" />Refresh
+      </button>
+      <button type="button" class="btn btn-primary btn-sm" (click)="create()">
+        <app-icon name="plus" />New profile
+      </button>
+    </div>
   </div>
 
   <div class="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-3xl">

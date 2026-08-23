@@ -49,6 +49,7 @@ export class Users implements OnInit {
   readonly search = signal('');
   readonly roleFilter = signal('');
   readonly statusFilter = signal('');
+  readonly tenantFilter = signal('');
   readonly busy = signal<number | null>(null);
   readonly focusedTenantId = signal<number | null>(null);
 
@@ -69,15 +70,28 @@ export class Users implements OnInit {
     [...new Set(this.users().map(u => u.userRole).filter(Boolean))].sort());
 
   readonly hasFilters = computed(() =>
-    !!(this.search() || this.roleFilter() || this.statusFilter() || this.focusedTenantId() !== null));
+    !!(this.search() || this.roleFilter() || this.statusFilter() || this.tenantFilter()
+       || this.focusedTenantId() !== null));
+
+  /** Tenants that actually have users, so the filter never offers an empty result. */
+  readonly tenantOptions = computed(() => {
+    const seen = new Map<number, string>();
+    for (const user of this.users()) {
+      if (user.tenantId != null) seen.set(user.tenantId, user.tenantName ?? `Tenant ${user.tenantId}`);
+    }
+    return [...seen.entries()].map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  });
 
   readonly filtered = computed(() => {
     const term = this.search().trim().toLowerCase();
     const role = this.roleFilter();
     const status = this.statusFilter();
     const focusedTenant = this.focusedTenantId();
+    const tenant = this.tenantFilter();
     const rows = this.users().filter(user => {
       if (focusedTenant !== null && user.tenantId !== focusedTenant) return false;
+      if (tenant && String(user.tenantId) !== tenant) return false;
       if (role && user.userRole !== role) return false;
       if (status && user.status !== status) return false;
       if (!term) return true;
@@ -90,6 +104,7 @@ export class Users implements OnInit {
 
   readonly summary = computed(() => {
     const focusedTenant = this.focusedTenantId();
+    const tenant = this.tenantFilter();
     const list = focusedTenant === null
       ? this.users()
       : this.users().filter(u => u.tenantId === focusedTenant);
@@ -245,5 +260,6 @@ export class Users implements OnInit {
     this.search.set('');
     this.roleFilter.set('');
     this.statusFilter.set('');
+    this.tenantFilter.set('');
   }
 }

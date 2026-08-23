@@ -1,15 +1,24 @@
 <div class="page">
-  <div>
-    <h1 class="page-title">Lookups</h1>
-    <p class="page-subtitle">
-      Configuration lists the application reads at runtime — providers, pipeline ids,
-      task groups and scheduler watermarks.
-    </p>
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Lookups</h1>
+      <p class="page-subtitle">
+        Shared key and value data the forms and pipelines read from. Expand one to see its entries.
+      </p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button type="button" class="btn btn-ghost btn-sm" (click)="load()" [disabled]="loading()">
+        <app-icon name="refresh" [class.spin]="loading()" />Refresh
+      </button>
+      <button type="button" class="btn btn-primary btn-sm" (click)="create()">
+        <app-icon name="plus" />New lookup
+      </button>
+    </div>
   </div>
 
   <app-table-shell heading="Lookups" [loading]="loading()" [error]="error()"
                    [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="lookups().length"
-                   [emptyMessage]="search() ? 'No lookups match your search.' : 'No lookups defined.'"
+                   [emptyMessage]="search() ? 'No lookups match that search.' : 'No lookups defined yet.'"
                    emptyIcon="list"
                    (retry)="load()">
     <ng-container toolbar>
@@ -27,16 +36,23 @@
           <th>Type</th>
           <th>Value</th>
           <th>Description</th>
-          <th class="text-right">Entries</th>
+          <th>Entries</th>
+          <th class="w-12"></th>
         </tr>
       </thead>
       <tbody>
         @for (lookup of filtered(); track lookup.lookupId) {
-          <tr [class.cursor-pointer]="lookup.children?.length" (click)="toggle(lookup)">
-            <td class="text-[color:var(--text-muted)]">
-              @if (lookup.children?.length) {
-                <app-icon [name]="expanded().has(lookup.lookupId) ? 'chevronDown' : 'chevronRight'" />
-              }
+          <tr>
+            <td>
+              <button type="button" class="text-[color:var(--text-muted)] hover:text-brand-600"
+                      (click)="toggle(lookup)"
+                      [attr.aria-label]="expanded().has($any(lookup.lookupId)) ? 'Hide entries' : 'Show entries'">
+                @if (loadingChildren().has($any(lookup.lookupId))) {
+                  <app-icon name="refresh" class="spin" />
+                } @else {
+                  <app-icon [name]="expanded().has($any(lookup.lookupId)) ? 'chevronDown' : 'chevronRight'" />
+                }
+              </button>
             </td>
             <td class="mono font-medium">{{ lookup.lookupType }}</td>
             <td class="text-[color:var(--text-secondary)] max-w-64 truncate">
@@ -48,18 +64,37 @@
                 {{ lookup.lookupValue }}
               }
             </td>
-            <td class="text-[color:var(--text-secondary)] max-w-96 truncate">
-              {{ lookup.description || '—' }}
-            </td>
-            <td class="text-right tabular text-[color:var(--text-secondary)]">
-              {{ lookup.children?.length || 0 }}
+            <td class="text-[color:var(--text-secondary)] max-w-80 truncate"
+                [title]="lookup.description || ''">{{ lookup.description || '—' }}</td>
+            <td class="tabular text-[color:var(--text-muted)]">{{ entryCount(lookup) }}</td>
+            <td class="text-right">
+              <button type="button" class="btn btn-ghost btn-icon" [cdkMenuTriggerFor]="menu"
+                      aria-label="Actions">
+                <app-icon name="dots" size="1.05em" />
+              </button>
+              <ng-template #menu>
+                <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="edit(lookup)">
+                    <app-icon name="edit" />Edit
+                  </button>
+                  <button cdkMenuItem class="menu-item btn-intent-ok" (cdkMenuItemTriggered)="addChild(lookup)">
+                    <app-icon name="plus" />Add entry
+                  </button>
+                  <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="remove(lookup)">
+                    <app-icon name="trash" class="icon-crit" />Delete
+                  </button>
+                </div>
+              </ng-template>
             </td>
           </tr>
-          @if (expanded().has(lookup.lookupId)) {
+
+          @if (expanded().has($any(lookup.lookupId))) {
             @for (child of lookup.children ?? []; track child.lookupId) {
               <tr style="background: var(--surface-sunken);">
                 <td></td>
-                <td class="mono text-[color:var(--text-muted)] pl-6">{{ child.lookupType }}</td>
+                <td class="mono pl-6 text-[color:var(--text-secondary)]">
+                  <app-icon name="chevronRight" size="0.8em" class="icon-muted mr-1" />{{ child.lookupType }}
+                </td>
                 <td class="text-[color:var(--text-secondary)]">
                   @if (child.encrypted) {
                     <span class="pill pill-neutral" title="Stored encrypted — the value is not shown">
@@ -69,8 +104,29 @@
                     {{ child.lookupValue }}
                   }
                 </td>
-                <td class="text-[color:var(--text-secondary)] max-w-96 truncate" colspan="2">
-                  {{ child.description || '—' }}
+                <td class="text-[color:var(--text-muted)] max-w-80 truncate"
+                    [title]="child.description || ''">{{ child.description || '—' }}</td>
+                <td></td>
+                <td class="text-right whitespace-nowrap">
+                  <button type="button" class="btn btn-ghost btn-icon btn-sm"
+                          title="Edit entry" (click)="edit(child, lookup)">
+                    <app-icon name="edit" size="0.9em" />
+                  </button>
+                  <button type="button" class="btn btn-ghost btn-icon btn-sm btn-intent-crit"
+                          title="Delete entry" (click)="remove(child, lookup)">
+                    <app-icon name="trash" size="0.9em" />
+                  </button>
+                </td>
+              </tr>
+            }
+            @if (!(lookup.children ?? []).length && !loadingChildren().has($any(lookup.lookupId))) {
+              <tr style="background: var(--surface-sunken);">
+                <td></td>
+                <td colspan="5" class="text-xs text-[color:var(--text-muted)] py-2">
+                  No entries under this lookup yet.
+                  <button type="button" class="btn btn-ghost btn-sm ml-1" (click)="addChild(lookup)">
+                    <app-icon name="plus" />Add one
+                  </button>
                 </td>
               </tr>
             }

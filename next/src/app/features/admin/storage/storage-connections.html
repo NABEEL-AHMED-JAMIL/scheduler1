@@ -6,7 +6,12 @@
       S3, Azure, MinIO or FTP/FTPS. Credentials are encrypted and never sent back to the browser.
     </p>
     </div>
-    <button type="button" class="btn btn-primary btn-sm" (click)="create()"><app-icon name="plus" />New connection</button>
+    <div class="flex items-center gap-2">
+      <button type="button" class="btn btn-ghost btn-sm" (click)="load()" [disabled]="loading()">
+        <app-icon name="refresh" [class.spin]="loading()" />Refresh
+      </button>
+      <button type="button" class="btn btn-primary btn-sm" (click)="create()"><app-icon name="plus" />New connection</button>
+    </div>
   </div>
 
   <div class="grid grid-cols-3 gap-3 max-w-lg">

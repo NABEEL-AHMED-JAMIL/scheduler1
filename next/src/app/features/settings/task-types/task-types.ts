@@ -9,6 +9,7 @@ import { Icon } from '../../../shared/ui/icon';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { confirmWith } from '../../../shared/ui/confirm';
 import { TaskType, TaskTypeDialog } from './task-type-dialog';
+import { AuthService } from '../../../core/auth/auth.service';
 
 @Component({
   selector: 'app-task-types',
@@ -19,6 +20,7 @@ export class TaskTypes implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
+  private readonly auth = inject(AuthService);
 
   readonly types = signal<TaskType[]>([]);
   readonly profiles = signal<any[]>([]);
@@ -50,6 +52,60 @@ export class TaskTypes implements OnInit {
     };
   });
 
+  readonly routes = signal<Record<number, number>>({});
+  readonly canRoute = computed(() => !this.auth.isPlatformAdmin());
+  readonly testing = signal<number | null>(null);
+
+  /** Which Kafka profile a type is routed to, or the tenant default when unrouted. */
+  routeName(type: TaskType): string {
+    const profileId = this.routes()[type.sourceTaskTypeId!];
+    if (!profileId) return '';
+    const profile = this.profiles().find(p => p.kafkaConnectionProfileId === profileId);
+    return profile ? profile.profileName : `#${profileId}`;
+  }
+
+  private loadRoutes(): void {
+    // The route endpoint rejects a platform admin, so there is nothing to ask for.
+    if (this.auth.isPlatformAdmin()) return;
+    for (const type of this.types()) {
+      const id = type.sourceTaskTypeId;
+      if (!id) continue;
+      this.http.get<ApiResponse<any>>(`${API_BASE}/setting.json/fetchKafkaRoute`,
+        { params: { sourceTaskTypeId: id } }).subscribe({
+        next: response => {
+          if (response.status !== API_SUCCESS) return;
+          const profileId = response.data?.kafkaConnectionProfileId ?? response.data?.profileId;
+          if (profileId) this.routes.update(map => ({ ...map, [id]: profileId }));
+        },
+        // An unrouted type simply has no route; a failure here should not colour the row.
+        error: () => {},
+      });
+    }
+  }
+
+  /** Tests the profile this type publishes through, which is what the old row action did. */
+  testRoute(type: TaskType): void {
+    const profileId = this.routes()[type.sourceTaskTypeId!];
+    if (!profileId) {
+      this.toast.error(`${type.serviceName} uses the tenant default — test that profile directly.`);
+      return;
+    }
+    this.testing.set(type.sourceTaskTypeId!);
+    this.http.post<ApiResponse>(`${API_BASE}/kafkaConnectionProfile.json/testConnection`,
+      { kafkaConnectionProfileId: profileId }).subscribe({
+      next: response => {
+        this.testing.set(null);
+        response.status === API_SUCCESS
+          ? this.toast.success(response.message)
+          : this.toast.error(response.message);
+      },
+      error: err => {
+        this.testing.set(null);
+        this.toast.error(err?.error?.message || 'The broker could not be reached.');
+      },
+    });
+  }
+
   ngOnInit(): void {
     this.load();
     this.http.get<ApiResponse<any[]>>(`${API_BASE}/kafkaConnectionProfile.json/fetchAllProfiles`)
@@ -73,6 +129,7 @@ export class TaskTypes implements OnInit {
         // The payload includes soft-deleted rows, which were being listed as live types.
         this.types.set((response.data?.sourceTaskTypes ?? [])
           .filter((t: TaskType) => t.status !== 'Delete'));
+        this.loadRoutes();
       },
       error: err => {
         this.loading.set(false);

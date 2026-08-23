@@ -7,9 +7,14 @@
         Tasks pick one; many tasks can share a type.
       </p>
     </div>
-    <button type="button" class="btn btn-primary btn-sm" (click)="create()">
-      <app-icon name="plus" />New task type
-    </button>
+    <div class="flex items-center gap-2">
+      <button type="button" class="btn btn-ghost btn-sm" (click)="load()" [disabled]="loading()">
+        <app-icon name="refresh" [class.spin]="loading()" />Refresh
+      </button>
+      <button type="button" class="btn btn-primary btn-sm" (click)="create()">
+        <app-icon name="plus" />New task type
+      </button>
+    </div>
   </div>
 
   <div class="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-3xl">
@@ -58,6 +63,7 @@
           <th>Description</th>
           <th>Topic</th>
           <th>Partitions</th>
+          @if (canRoute()) { <th>Kafka</th> }
           <th>Tasks</th>
           <th class="text-right">Status</th>
           <th class="w-12"></th>
@@ -76,6 +82,19 @@
             <td class="mono text-[color:var(--text-muted)]">
               {{ partitionsOf(type.queueTopicPartition) || '—' }}
             </td>
+            @if (canRoute()) {
+              <td>
+                @if (routeName(type); as route) {
+                  <span class="pill pill-neutral" [title]="'Publishes through ' + route">
+                    <app-icon name="server" size="0.85em" />{{ route }}
+                  </span>
+                } @else {
+                  <span class="text-[color:var(--text-muted)]" title="Uses the tenant default cluster">
+                    default
+                  </span>
+                }
+              </td>
+            }
             <td>
               @if (type.totalTaskLink) {
                 <span class="pill pill-neutral">{{ type.totalTaskLink }}</span>
@@ -94,6 +113,11 @@
                   <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="edit(type)">
                     <app-icon name="edit" />Edit
                   </button>
+                  @if (canRoute()) {
+                    <button cdkMenuItem class="menu-item btn-intent-ok" (cdkMenuItemTriggered)="testRoute(type)">
+                      <app-icon name="plug" />Test Kafka connection
+                    </button>
+                  }
                   <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="remove(type)">
                     <app-icon name="trash" class="icon-crit" />Delete
                   </button>
