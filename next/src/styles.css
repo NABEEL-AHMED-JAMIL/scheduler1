@@ -186,6 +186,29 @@
 
   .row-selected > td { background: var(--surface-sunken); }
 
+  /* An expanded row is a panel, not a taller row. It sits on the sunken surface with a brand
+     rule down its left edge so the eye can see where the detail belongs, and an inset shadow
+     so it reads as recessed rather than as another table row. */
+  .detail-panel {
+    background: var(--surface-sunken);
+    border-left: 3px solid var(--color-brand-500);
+    box-shadow: inset 0 1px 0 var(--border-subtle), inset 0 -1px 0 var(--border-subtle);
+    @apply px-5 py-4;
+    /* The panel lives in a cell spanning a table that is wider than a tablet, so its content
+       sat off-screen until you scrolled sideways. Sticking it to the left of the scroll box
+       and capping it at the viewport keeps it readable where the row is. On a screen wide
+       enough for the whole table the cap never binds and this does nothing. */
+    position: sticky;
+    left: 0;
+    max-width: calc(100vw - 3rem);
+  }
+  .detail-panel dt { @apply mb-0.5; }
+  .detail-section {
+    border-color: var(--border-subtle);
+    @apply mt-4 pt-4 border-t;
+  }
+  html.dark .detail-panel { border-left-color: var(--color-brand-400); }
+
   /* An inline link inside a definition list: coloured and underlined on hover, so it reads
      as a link without a button's weight. */
   .link-inline {
@@ -313,6 +336,18 @@
   /* warn-500 on warn-100 measures 4.47:1 -- the one pill under the line. */
   .pill-warn    { @apply bg-warn-100; color: var(--color-warn-600); }
   .pill-crit    { @apply bg-crit-100 text-crit-500; }
+
+  /* The quiet form of a status: a dot and plain text, for a column where one value is the
+     norm. It has to still read as a status, so the dot keeps the tone's colour. */
+  .status-quiet {
+    @apply inline-flex items-center gap-1.5 text-xs whitespace-nowrap;
+    color: var(--text-secondary);
+  }
+  .status-dot { @apply w-1.5 h-1.5 rounded-full shrink-0; }
+  .dot-ok      { background: var(--color-ok-500); }
+  .dot-neutral { background: var(--color-ink-400); }
+  html.dark .dot-ok      { background: var(--color-ok-400); }
+  html.dark .dot-neutral { background: var(--color-ink-500); }
 
   /* Tabs share the pill vocabulary rather than inventing a third selected-state look. */
   .tabs {

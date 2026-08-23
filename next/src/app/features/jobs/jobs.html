@@ -108,9 +108,13 @@
             </td>
             <td class="max-w-64">
               <div class="font-medium truncate" [title]="job.jobName">{{ job.jobName || '—' }}</div>
-              <div class="mono text-[color:var(--text-muted)]">
-                #{{ job.jobId }}
-                @if (job.priority) { · P{{ job.priority }} }
+              <div class="flex items-center gap-1.5 mt-0.5 text-[11px] leading-none">
+                <span class="mono text-[color:var(--text-muted)]">#{{ job.jobId }}</span>
+                @if (job.priority) {
+                  <span class="text-[color:var(--border-strong)]">·</span>
+                  <span class="text-[color:var(--text-muted)]"
+                        [title]="'Priority ' + job.priority + ' (1 is highest)'">P{{ job.priority }}</span>
+                }
               </div>
             </td>
             <td class="max-w-44">
@@ -120,7 +124,13 @@
                 </span>
               } @else { — }
             </td>
-            <td><span class="pill pill-neutral">{{ job.execution || '—' }}</span></td>
+            <td>
+              @if (job.execution === 'Auto') {
+                <span class="pill pill-brand">{{ job.execution }}</span>
+              } @else {
+                <span class="text-xs text-[color:var(--text-secondary)]">{{ job.execution || '—' }}</span>
+              }
+            </td>
             <td class="max-w-44">
               <div class="text-[color:var(--text-secondary)]">{{ scheduleSummary(job) }}</div>
               @if (scheduleNote(job); as note) {
@@ -144,7 +154,7 @@
               {{ job.dateCreated ? (job.dateCreated | date:'d MMM yyyy') : '—' }}
             </td>
             <td><app-status [label]="job.jobRunningStatus" /></td>
-            <td class="text-right"><app-status [label]="job.jobStatus" /></td>
+            <td class="text-right"><app-status [label]="job.jobStatus" [quiet]="true" /></td>
             <td class="text-right">
               <button type="button" class="btn btn-ghost btn-icon" [cdkMenuTriggerFor]="menu"
                       [disabled]="busyJob() === job.jobId" aria-label="Actions">
@@ -187,10 +197,13 @@
           </tr>
 
           @if (expanded().has(job.jobId)) {
-            <tr style="background: var(--surface-sunken);">
-              <td></td>
-              <td colspan="10" class="!py-3">
-                <dl class="grid sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-2 text-sm">
+            <tr>
+              <!-- One cell spanning the whole row: the empty leading cell was a leftover from
+                   before the checkbox column existed, and it pushed the panel 48px in while
+                   making the row span twelve slots of an eleven-column table. -->
+              <td colspan="11" class="!p-0">
+               <div class="detail-panel">
+                <dl class="grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-3 text-sm">
                   @for (item of [
                     { label: 'Task type',   value: job.taskDetail?.sourceTaskType?.serviceName },
                     { label: 'Pipeline',    value: job.taskDetail?.pipelineId },
@@ -263,6 +276,35 @@
                     </dd>
                   </div>
                 </dl>
+
+                <div class="detail-section">
+                  <div class="flex flex-wrap items-baseline gap-2 mb-2">
+                    <h3 class="text-xs font-semibold uppercase tracking-wider
+                               text-[color:var(--text-secondary)]">Recent runs</h3>
+                    @if (runsByJob()[job.jobId]?.length) {
+                      <span class="text-[11px] text-[color:var(--text-muted)]">
+                        Minutes per run, oldest first — click a bar for that run's logs
+                      </span>
+                    }
+                    <a class="link-inline text-xs ml-auto" [routerLink]="['/jobs', job.jobId, 'history']">
+                      <app-icon name="clock" size="0.85em" class="icon-info" />Full history
+                    </a>
+                  </div>
+
+                  @if (runsLoading() === job.jobId) {
+                    <p class="text-xs text-[color:var(--text-muted)] py-6 text-center">
+                      <app-icon name="refresh" class="spin" size="0.9em" /> Loading run history…
+                    </p>
+                  } @else if (runsByJob()[job.jobId]?.length) {
+                    <app-bar-chart [data]="runsByJob()[job.jobId]!" [height]="120" [clickable]="true"
+                                   (barClicked)="openRunLogs(job, $event)" />
+                  } @else {
+                    <p class="text-xs text-[color:var(--text-muted)] py-6 text-center">
+                      This job has not completed a run yet.
+                    </p>
+                  }
+                </div>
+               </div>
               </td>
             </tr>
           }

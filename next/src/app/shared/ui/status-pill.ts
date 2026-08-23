@@ -6,18 +6,34 @@ import { Icon } from './icon';
   selector: 'app-status',
   imports: [Icon],
   template: `
-    <span [class]="cls()">
-      @if (showIcon() && glyph()) { <app-icon [name]="glyph()" size="0.85em" /> }
-      {{ label() || '—' }}
-    </span>
+    @if (isQuiet()) {
+      <span class="status-quiet">
+        <span class="status-dot" [class]="'dot-' + tone()"></span>{{ label() || '—' }}
+      </span>
+    } @else {
+      <span [class]="cls()">
+        @if (showIcon() && glyph()) { <app-icon [name]="glyph()" size="0.85em" /> }
+        {{ label() || '—' }}
+      </span>
+    }
   `,
 })
 export class StatusPill {
   readonly label = input<string | undefined | null>('');
   /** Shape as well as colour: red and green alone are the one pairing many people cannot separate. */
   readonly showIcon = input(true);
+  /**
+   * For a column where one value is the norm. Every job on the list is Active, so a filled
+   * green chip on all 41 rows said nothing and drowned out the three that had actually
+   * failed. Quiet only applies to the unremarkable tones -- an Inactive or Suspended row
+   * still gets a full chip, which is the whole point of marking the rest down.
+   */
+  readonly quiet = input(false);
 
-  private readonly tone = computed(() => {
+  readonly isQuiet = computed(() =>
+    this.quiet() && (this.tone() === 'ok' || this.tone() === 'neutral'));
+
+  readonly tone = computed(() => {
     switch ((this.label() || '').toLowerCase()) {
       case 'active':
       case 'completed':

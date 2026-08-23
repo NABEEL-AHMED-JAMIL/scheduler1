@@ -13,6 +13,9 @@ import { Icon } from '../../shared/ui/icon';
 import { NotifyDialog } from './notify-dialog';
 import { JobAction, jobActionRequest } from './job-actions';
 import { parseTopicPartition } from '../../shared/ui/topic';
+import { BarChart, Bar } from '../../shared/charts/bar-chart';
+import { statusColor } from '../../shared/charts/status-color';
+import { Router } from '@angular/router';
 import { createPager } from '../../shared/ui/pager';
 import { Pagination } from '../../shared/ui/pagination';
 
@@ -55,7 +58,7 @@ const IN_FLIGHT = ['queue', 'start', 'running'];
 
 @Component({
   selector: 'app-jobs',
-  imports: [Icon, DatePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Pagination],
+  imports: [Icon, DatePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Pagination, BarChart],
   templateUrl: './jobs.html',
 })
 export class Jobs implements OnInit {
@@ -75,6 +78,12 @@ export class Jobs implements OnInit {
   readonly bulkBusy = signal(false);
 
   readonly pager = createPager<SourceJob>();
+
+  private readonly router = inject(Router);
+
+  /** Run history per job, kept so re-opening a row does not refetch. */
+  readonly runsByJob = signal<Record<number, Bar[]>>({});
+  readonly runsLoading = signal<number | null>(null);
 
   readonly statuses = computed(() =>
     [...new Set(this.jobs().map(j => j.jobRunningStatus).filter(Boolean))].sort());
@@ -159,11 +168,51 @@ export class Jobs implements OnInit {
   }
 
   toggleRow(job: SourceJob): void {
+    const opening = !this.expanded().has(job.jobId);
     this.expanded.update(set => {
       const next = new Set(set);
       next.has(job.jobId) ? next.delete(job.jobId) : next.add(job.jobId);
       return next;
     });
+    if (opening && !this.runsByJob()[job.jobId]) this.loadRuns(job.jobId);
+  }
+
+  /**
+   * How long each of this job's recent runs took, oldest first, coloured by outcome. The
+   * legacy row carried the same chart and it is the quickest read of whether a job has been
+   * getting slower or failing intermittently; a bar goes straight to that run's logs.
+   */
+  private loadRuns(jobId: number): void {
+    this.runsLoading.set(jobId);
+    this.http.get<ApiResponse<{ jobQueues?: any[] }>>(
+      `${API_BASE}/sourceJob.json/fetchSourceJobQueueListWithJobId`,
+      { params: { jobId: String(jobId) } }).subscribe({
+      next: response => {
+        this.runsLoading.set(null);
+        const queues = response.status === API_SUCCESS ? (response.data?.jobQueues ?? []) : [];
+        const bars: Bar[] = queues
+          .filter(q => q.startTime && q.endTime)
+          .reverse()
+          .map(q => ({
+            name: `#${q.jobQueueId}`,
+            // Minutes, to one decimal -- a run under six seconds still shows a bar because of
+            // the chart's floor rather than rounding away to zero.
+            value: Math.max(0, Math.round(
+              ((new Date(q.endTime).getTime() - new Date(q.startTime).getTime()) / 60000) * 10) / 10),
+            color: statusColor(q.jobStatus),
+            meta: q.jobQueueId,
+          }));
+        this.runsByJob.update(map => ({ ...map, [jobId]: bars }));
+      },
+      error: () => {
+        this.runsLoading.set(null);
+        this.runsByJob.update(map => ({ ...map, [jobId]: [] }));
+      },
+    });
+  }
+
+  openRunLogs(job: SourceJob, bar: Bar): void {
+    this.router.navigate(['/jobs', job.jobId, 'runs', bar.meta, 'logs']);
   }
 
   /**

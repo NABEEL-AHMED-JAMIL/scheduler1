@@ -94,7 +94,7 @@
                 </div>
               }
             </td>
-            <td class="text-right"><app-status [label]="c.status" /></td>
+            <td class="text-right"><app-status [label]="c.status" [quiet]="true" /></td>
             <td class="text-right">
               <button type="button" class="btn btn-ghost btn-icon" [cdkMenuTriggerFor]="menu"
                       [disabled]="testing() === c.storageConnectionId" aria-label="Actions">

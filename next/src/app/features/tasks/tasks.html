@@ -80,7 +80,7 @@
                 }
               } @else { — }
             </td>
-            <td class="text-right"><app-status [label]="task.taskStatus" /></td>
+            <td class="text-right"><app-status [label]="task.taskStatus" [quiet]="true" /></td>
             <td class="text-right">
               <a class="btn btn-ghost btn-sm" [routerLink]="['/tasks', task.taskDetailId, 'edit']"><app-icon name="edit" />Edit</a>
               <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="taskMenu"

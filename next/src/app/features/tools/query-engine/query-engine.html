@@ -85,7 +85,7 @@
                   <span class="text-[color:var(--text-muted)]">manual only</span>
                 }
               </td>
-              <td class="text-right"><app-status [label]="q.status" /></td>
+              <td class="text-right"><app-status [label]="q.status" [quiet]="true" /></td>
               <td class="text-right">
                 <button type="button" class="btn btn-ghost btn-icon" [cdkMenuTriggerFor]="qMenu"
                         [disabled]="running() === q.queryId" aria-label="Actions">
@@ -158,7 +158,7 @@
                   <span class="pill pill-warn"><app-icon name="alert" size="0.85em" />not set</span>
                 }
               </td>
-              <td class="text-right"><app-status [label]="c.status" /></td>
+              <td class="text-right"><app-status [label]="c.status" [quiet]="true" /></td>
               <td class="text-right">
                 <button type="button" class="btn btn-ghost btn-icon" [cdkMenuTriggerFor]="cMenu" aria-label="Actions">
                   <app-icon name="dots" size="1.05em" />

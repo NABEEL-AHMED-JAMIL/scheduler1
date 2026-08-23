@@ -145,7 +145,7 @@
             <td class="text-[color:var(--text-secondary)] whitespace-nowrap">
               {{ user.dateCreated ? (user.dateCreated | date:'d MMM yyyy') : '—' }}
             </td>
-            <td class="text-right"><app-status [label]="user.status" /></td>
+            <td class="text-right"><app-status [label]="user.status" [quiet]="true" /></td>
             <td class="text-right">
               <button type="button" class="btn btn-ghost btn-icon" [cdkMenuTriggerFor]="menu"
                       [disabled]="busy() === user.appUserId" aria-label="Actions">

@@ -47,7 +47,7 @@
             <div class="detail-head">Job</div>
             <dl class="detail-list">
               <dt>Name</dt><dd>{{ job.jobName }}</dd>
-              <dt>State</dt><dd><app-status [label]="job.jobStatus" /></dd>
+              <dt>State</dt><dd><app-status [label]="job.jobStatus" [quiet]="true" /></dd>
               <dt>Execution</dt><dd>{{ job.execution || '—' }}</dd>
               <dt>Priority</dt><dd>{{ job.priority ?? '—' }}</dd>
               <dt>Created</dt><dd>{{ job.dateCreated ? (job.dateCreated | date:'d MMM yyyy, HH:mm') : '—' }}</dd>

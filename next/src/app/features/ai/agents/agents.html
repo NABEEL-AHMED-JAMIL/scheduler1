@@ -59,7 +59,7 @@
                 <span [class]="key.cls" [title]="key.hint">{{ key.label }}</span>
               }
             </td>
-            <td class="text-right"><app-status [label]="agent.status" /></td>
+            <td class="text-right"><app-status [label]="agent.status" [quiet]="true" /></td>
             <td class="text-right">
               <button type="button" class="btn btn-ghost btn-icon" [cdkMenuTriggerFor]="menu"
                       aria-label="Actions">
