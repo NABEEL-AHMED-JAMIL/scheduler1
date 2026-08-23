@@ -16,20 +16,14 @@
     </div>
   </div>
 
-  <div class="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-3xl">
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
     @for (tile of [
-      { label: 'Tenants',  value: stats().tenants,  foot: stats().active + ' active' },
-      { label: 'Users',    value: stats().users,    foot: 'across all tenants' },
-      { label: 'Jobs',     value: stats().jobs,     foot: stats().tasks + ' tasks' },
-      { label: 'Unused',   value: stats().empty,    foot: 'no resources yet' }
+      { label: 'Tenants',  value: stats().tenants,  foot: stats().active + ' active', icon: 'globe', tone: 'info' },
+      { label: 'Users',    value: stats().users,    foot: 'across all tenants', icon: 'users', tone: 'info' },
+      { label: 'Jobs',     value: stats().jobs,     foot: stats().tasks + ' tasks', icon: 'briefcase', tone: 'info' },
+      { label: 'Unused',   value: stats().empty,    foot: 'no resources yet', icon: 'alert', tone: 'warn' }
     ]; track tile.label) {
-      <div class="stat-tile">
-        <div class="stat-label">
-          {{ tile.label }}
-        </div>
-        <div class="stat-value">{{ tile.value }}</div>
-        <div class="stat-foot">{{ tile.foot }}</div>
-      </div>
+      <app-stat-tile [label]="tile.label" [value]="tile.value" [icon]="tile.icon" [tone]="$any(tile.tone)" [foot]="tile.foot" />
     }
   </div>
 
@@ -74,7 +68,8 @@
       @for (tenant of filtered(); track tenant.tenantId) {
         <article class="card p-4 flex flex-col gap-3.5"
                  [style.opacity]="tenant.status === 'Active' ? '1' : '0.72'">
-          <div class="flex items-start justify-between gap-3">
+          <div class="flex items-start justify-between gap-3 border-b pb-3"
+               style="border-color: var(--border-subtle);">
             <div class="min-w-0">
               <h3 class="truncate text-sm font-semibold">{{ tenant.tenantName }}</h3>
               <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[color:var(--text-muted)]">

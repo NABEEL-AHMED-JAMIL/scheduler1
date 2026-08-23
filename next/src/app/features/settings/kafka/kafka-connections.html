@@ -16,18 +16,14 @@
     </div>
   </div>
 
-  <div class="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-3xl">
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
     @for (tile of [
-      { label: 'Profiles',  value: summary().total,    foot: summary().active + ' active' },
-      { label: 'Tested OK', value: summary().testedOk, foot: 'last test passed' },
-      { label: 'Failing',   value: summary().failing,  foot: 'need attention' },
-      { label: 'Default',   value: defaultProfile() ? 1 : 0, foot: defaultProfile()?.profileName || 'none set' }
+      { label: 'Profiles',  value: summary().total,    foot: summary().active + ' active', icon: 'server', tone: 'info' },
+      { label: 'Tested OK', value: summary().testedOk, foot: 'last test passed', icon: 'plug', tone: 'ok' },
+      { label: 'Failing',   value: summary().failing,  foot: 'need attention', icon: 'xCircle', tone: 'crit' },
+      { label: 'Default',   value: defaultProfile() ? 1 : 0, foot: defaultProfile()?.profileName || 'none set', icon: 'zap', tone: 'info' }
     ]; track tile.label) {
-      <div class="stat-tile">
-        <div class="stat-label">{{ tile.label }}</div>
-        <div class="stat-value">{{ tile.value }}</div>
-        <div class="stat-foot truncate">{{ tile.foot }}</div>
-      </div>
+      <app-stat-tile [label]="tile.label" [value]="tile.value" [icon]="tile.icon" [tone]="$any(tile.tone)" [foot]="tile.foot" />
     }
   </div>
 

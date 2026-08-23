@@ -22,18 +22,14 @@
     </div>
   </div>
 
-  <div class="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-3xl">
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
     @for (tile of [
-      { label: 'Queries',     value: summary().queries,     foot: 'saved' },
-      { label: 'Connections', value: summary().connections, foot: 'databases' },
-      { label: 'Scheduled',   value: summary().scheduled,   foot: 'running on a timer' },
-      { label: 'Failed runs', value: summary().failed,      foot: 'need attention' }
+      { label: 'Queries',     value: summary().queries,     foot: 'saved', icon: 'search', tone: 'info' },
+      { label: 'Connections', value: summary().connections, foot: 'databases', icon: 'database', tone: 'info' },
+      { label: 'Scheduled',   value: summary().scheduled,   foot: 'running on a timer', icon: 'clock', tone: 'info' },
+      { label: 'Failed runs', value: summary().failed,      foot: 'need attention', icon: 'xCircle', tone: 'crit' }
     ]; track tile.label) {
-      <div class="stat-tile">
-        <div class="stat-label">{{ tile.label }}</div>
-        <div class="stat-value">{{ tile.value }}</div>
-        <div class="stat-foot">{{ tile.foot }}</div>
-      </div>
+      <app-stat-tile [label]="tile.label" [value]="tile.value" [icon]="tile.icon" [tone]="$any(tile.tone)" [foot]="tile.foot" />
     }
   </div>
 

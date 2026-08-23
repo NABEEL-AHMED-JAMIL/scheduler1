@@ -5,6 +5,7 @@ import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { TableShell } from '../../../shared/ui/data-table';
+import { StatTile } from '../../../shared/ui/stat-tile';
 import { StatusPill } from '../../../shared/ui/status-pill';
 import { Icon } from '../../../shared/ui/icon';
 import { ToastService } from '../../../shared/ui/toast.service';
@@ -18,7 +19,7 @@ type Tab = 'connections' | 'queries' | 'executions';
 
 @Component({
   selector: 'app-query-engine',
-  imports: [DatePipe, TableShell, StatusPill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger],
+  imports: [StatTile, DatePipe, TableShell, StatusPill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger],
   templateUrl: './query-engine.html',
 })
 export class QueryEngine implements OnInit {

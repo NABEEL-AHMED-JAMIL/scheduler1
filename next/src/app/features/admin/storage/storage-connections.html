@@ -14,18 +14,13 @@
     </div>
   </div>
 
-  <div class="grid grid-cols-3 gap-3 max-w-lg">
+  <div class="grid grid-cols-3 gap-3">
     @for (tile of [
-      { label: 'Connections', value: summary().total },
-      { label: 'Active',      value: summary().active },
-      { label: 'Tested OK',   value: summary().ok }
+      { label: 'Connections', value: summary().total, icon: 'database', tone: 'info' },
+      { label: 'Active',      value: summary().active, icon: 'checkCircle', tone: 'ok' },
+      { label: 'Tested OK',   value: summary().ok, icon: 'plug', tone: 'ok' }
     ]; track tile.label) {
-      <div class="stat-tile">
-        <div class="stat-label">
-          {{ tile.label }}
-        </div>
-        <div class="stat-value">{{ tile.value }}</div>
-      </div>
+      <app-stat-tile [label]="tile.label" [value]="tile.value" [icon]="tile.icon" [tone]="$any(tile.tone)" />
     }
   </div>
 

@@ -28,19 +28,14 @@
     </div>
   }
 
-  <div class="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-3xl">
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
     @for (tile of [
-      { label: 'Users',            value: summary().total },
-      { label: 'Active',           value: summary().active },
-      { label: 'Admins',           value: summary().admins },
-      { label: 'Never signed in',  value: summary().neverSignedIn }
+      { label: 'Users',            value: summary().total, icon: 'users', tone: 'info' },
+      { label: 'Active',           value: summary().active, icon: 'checkCircle', tone: 'ok' },
+      { label: 'Admins',           value: summary().admins, icon: 'shield', tone: 'info' },
+      { label: 'Never signed in',  value: summary().neverSignedIn, icon: 'clock', tone: 'warn' }
     ]; track tile.label) {
-      <div class="stat-tile">
-        <div class="stat-label">
-          {{ tile.label }}
-        </div>
-        <div class="stat-value">{{ tile.value }}</div>
-      </div>
+      <app-stat-tile [label]="tile.label" [value]="tile.value" [icon]="tile.icon" [tone]="$any(tile.tone)" />
     }
   </div>
 

@@ -5,6 +5,7 @@ import { Router } from '@angular/router';
 import { Dialog } from '@angular/cdk/dialog';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { StatusPill } from '../../../shared/ui/status-pill';
+import { StatTile } from '../../../shared/ui/stat-tile';
 import { TableShell } from '../../../shared/ui/data-table';
 import { Icon } from '../../../shared/ui/icon';
 import { ToastService } from '../../../shared/ui/toast.service';
@@ -35,7 +36,7 @@ interface ResourceCount {
 
 @Component({
   selector: 'app-tenants',
-  imports: [Icon, DatePipe, StatusPill, TableShell],
+  imports: [StatTile, Icon, DatePipe, StatusPill, TableShell],
   templateUrl: './tenants.html',
 })
 export class Tenants implements OnInit {

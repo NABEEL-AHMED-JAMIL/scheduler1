@@ -113,7 +113,7 @@
      vertical margin silently does nothing. .form-stack sets margin-top on its children,
      which meant the rule applied and had no effect at all until these were blockified.
      (Grid children are blockified by the grid, which is why .form-grid never showed it.) */
-  app-field, app-form-dialog, app-table-shell { display: block; }
+  app-field, app-form-dialog, app-table-shell, app-stat-tile { display: block; }
 
   :focus-visible {
     outline: 2px solid var(--color-brand-500);
@@ -165,6 +165,12 @@
   .stat-label { @apply text-[11px] font-semibold uppercase tracking-wider text-[color:var(--text-muted)]; }
   .stat-value { @apply mt-1 text-xl font-semibold; font-variant-numeric: tabular-nums; }
   .stat-foot  { @apply mt-0.5 text-[11px] text-[color:var(--text-muted)]; }
+  /* The glyph sits on the sunken surface so it reads as a quiet marker beside the number
+     rather than a second thing competing with it for attention. */
+  .stat-glyph {
+    background: var(--surface-sunken);
+    @apply shrink-0 grid place-items-center rounded-lg w-8 h-8 text-base;
+  }
 
   .settings-hub-glyph {
     background: var(--surface-sunken);
