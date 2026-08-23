@@ -6,13 +6,15 @@
         Showing {{ startDate() }} to {{ endDate() }}
       </p>
     </div>
-    <div class="flex items-end gap-2">
-      <div>
+    <!-- Wraps: a date field has an intrinsic minimum width and two of them plus the
+         buttons need 454px, which overflowed the page on a phone. -->
+    <div class="flex flex-wrap items-end gap-2">
+      <div class="flex-1 min-w-[9.5rem] sm:flex-none">
         <label class="label" for="from">From</label>
         <input id="from" type="date" class="input" [value]="startDate()" [max]="endDate()"
                (change)="startDate.set($any($event.target).value)" />
       </div>
-      <div>
+      <div class="flex-1 min-w-[9.5rem] sm:flex-none">
         <label class="label" for="to">To</label>
         <input id="to" type="date" class="input" [value]="endDate()" [min]="startDate()"
                (change)="endDate.set($any($event.target).value)" />
