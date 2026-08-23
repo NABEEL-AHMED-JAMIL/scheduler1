@@ -439,6 +439,26 @@ html.dark .btn-intent-crit:focus app-icon { color: var(--color-crit-400); }
   .detail-list dt { @apply text-[color:var(--text-muted)] whitespace-nowrap; }
   .detail-list dd { @apply min-w-0 text-[color:var(--text-primary)]; }
 
+  /* A notification row. Unread is marked by a coloured rule and a tinted surface that is
+     derived from the theme -- the previous bg-brand-50 was a light colour applied in both
+     themes, so an unread row went white-on-dark. */
+  .notification-row {
+    @apply flex items-start gap-3 px-4 py-3 border-l-2 border-transparent transition-colors;
+  }
+  .notification-row:hover { background: var(--surface-sunken); }
+  .notification-row.is-unread {
+    border-left-color: var(--tone);
+    background: color-mix(in oklab, var(--tone) 7%, transparent);
+  }
+  .notification-row.is-unread:hover {
+    background: color-mix(in oklab, var(--tone) 12%, transparent);
+  }
+
+  .bell-badge {
+    @apply absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 rounded-full
+           bg-crit-500 text-white text-[10px] font-semibold leading-4 text-center;
+  }
+
   .menu-item {
     @apply w-full text-left px-3 py-1.5 rounded-sm inline-flex items-center gap-2
            text-[color:var(--text-secondary)]

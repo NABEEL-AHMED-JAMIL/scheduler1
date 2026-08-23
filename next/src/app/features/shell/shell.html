@@ -62,6 +62,7 @@
 
       <!-- Right side -->
       <div class="flex items-center gap-1 shrink-0">
+        <app-notification-bell />
         <button type="button" class="btn btn-ghost btn-icon" (click)="theme.toggle()"
                 [title]="theme.theme() === 'dark' ? 'Switch to light' : 'Switch to dark'">
           @if (theme.theme() === 'dark') {

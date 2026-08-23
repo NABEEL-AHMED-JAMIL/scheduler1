@@ -2,47 +2,90 @@
   <div class="page-head">
     <div>
       <h1 class="page-title">Notifications</h1>
-      <p class="page-subtitle">
-        Job outcomes and assignments addressed to you.
-      </p>
+      <p class="page-subtitle">Job outcomes and assignments addressed to you.</p>
     </div>
-    @if (unreadCount()) {
-      <button type="button" class="btn btn-default btn-sm" (click)="markAllRead()">
-        Mark all read ({{ unreadCount() }})
+    <div class="flex items-center gap-2">
+      <button type="button" class="btn btn-ghost btn-sm" (click)="load()" [disabled]="loading()">
+        <app-icon name="refresh" [class.spin]="loading()" />Refresh
       </button>
-    }
+      @if (unreadCount()) {
+        <button type="button" class="btn btn-default btn-sm" (click)="markAllRead()">
+          <app-icon name="check" />Mark all read ({{ unreadCount() }})
+        </button>
+      }
+    </div>
   </div>
 
   <app-table-shell heading="Recent" [loading]="loading()" [error]="error()"
                    [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="items().length"
-                   [emptyMessage]="unreadOnly() ? 'Nothing unread.' : 'No notifications yet.'"
+                   [emptyMessage]="hasFilters() ? 'Nothing matches those filters.' : 'No notifications yet.'"
+                   emptyIcon="bell"
                    (retry)="load()">
     <ng-container toolbar>
-      <label class="flex items-center gap-2 text-sm text-[color:var(--text-secondary)]">
+      @if (types().length > 1) {
+        <select class="input max-w-44" [value]="typeFilter()"
+                (change)="typeFilter.set($any($event.target).value)">
+          <option value="">All kinds</option>
+          @for (type of types(); track type) {
+            <option [value]="type">{{ typeLabel(type) }}</option>
+          }
+        </select>
+      }
+      <label class="flex items-center gap-2 text-sm text-[color:var(--text-secondary)] cursor-pointer">
         <input type="checkbox" [checked]="unreadOnly()"
                (change)="unreadOnly.set($any($event.target).checked)" />
         Unread only
       </label>
+      @if (hasFilters()) {
+        <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()">
+          <app-icon name="close" />Clear
+        </button>
+      }
     </ng-container>
 
     <ul class="divide-y" style="border-color: var(--border-subtle);">
       @for (item of filtered(); track item.notificationId) {
-        <li class="flex gap-3 px-4 py-3 border-l-2"
-            [style.border-left-color]="item.read ? 'transparent' : toneOf(item)"
-            [class.bg-brand-50]="!item.read"
-            (click)="markRead(item)">
+        <li class="notification-row" [class.is-unread]="!item.read"
+            [style.--tone]="toneOf(item)">
+          <app-icon [name]="glyphOf(item)" [class]="intentOf(item)" size="1.1em"
+                    class="mt-0.5 shrink-0" />
+
           <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2">
-              <span class="text-sm font-medium truncate">{{ item.title }}</span>
-              @if (!item.read) { <span class="pill pill-brand shrink-0">New</span> }
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="text-sm font-medium">{{ item.title }}</span>
+              @if (showType(item)) {
+                <span class="pill pill-neutral">{{ typeLabel(item.type) }}</span>
+              }
+              @if (!item.read) { <span class="pill pill-brand">New</span> }
             </div>
             @if (item.message) {
-              <p class="page-subtitle">{{ item.message }}</p>
+              <p class="text-sm text-[color:var(--text-secondary)] mt-0.5 leading-snug">
+                {{ item.message }}
+              </p>
             }
           </div>
-          <span class="text-xs text-[color:var(--text-muted)] whitespace-nowrap shrink-0">
-            {{ item.dateCreated | date:'d MMM, HH:mm' }}
-          </span>
+
+          <div class="flex items-center gap-1 shrink-0">
+            <span class="text-xs text-[color:var(--text-muted)] whitespace-nowrap">
+              {{ item.dateCreated | date: 'd MMM, HH:mm' }}
+            </span>
+
+            @if (!item.read) {
+              <button type="button" class="btn btn-ghost btn-icon btn-sm btn-intent-ok"
+                      title="Mark as read" aria-label="Mark as read"
+                      (click)="markRead(item)">
+                <app-icon name="check" size="0.9em" />
+              </button>
+            }
+
+            @if (targetOf(item); as target) {
+              <button type="button" class="btn btn-ghost btn-sm"
+                      [title]="'Open ' + target"
+                      (click)="open(item)">
+                Open<app-icon name="chevronRight" size="0.85em" />
+              </button>
+            }
+          </div>
         </li>
       }
     </ul>

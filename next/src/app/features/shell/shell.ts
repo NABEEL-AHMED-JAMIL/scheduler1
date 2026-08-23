@@ -4,6 +4,7 @@ import { LowerCasePipe } from '@angular/common';
 import { AuthService } from '../../core/auth/auth.service';
 import { ThemeService } from '../../core/theme.service';
 import { Icon } from '../../shared/ui/icon';
+import { NotificationBell } from './notification-bell';
 
 interface NavChild {
   label: string;
@@ -25,7 +26,7 @@ interface NavItem {
 
 @Component({
   selector: 'app-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, LowerCasePipe, Icon],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, LowerCasePipe, Icon, NotificationBell],
   templateUrl: './shell.html',
 })
 export class Shell {
