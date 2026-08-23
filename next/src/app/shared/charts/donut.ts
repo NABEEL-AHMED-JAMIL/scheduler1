@@ -15,12 +15,12 @@ export interface Slice { name: string; value: number; }
     @if (total()) {
       <div class="flex items-center gap-4">
         <div class="relative shrink-0">
-          <svg viewBox="0 0 42 42" class="size-[72px] -rotate-90" role="img"
+          <svg viewBox="0 0 42 42" class="size-[104px] -rotate-90" role="img"
                [attr.aria-label]="ariaLabel()">
-            <circle cx="21" cy="21" r="15.9" fill="none" stroke-width="4.5"
+            <circle cx="21" cy="21" r="15.9" fill="none" stroke-width="5"
                     [attr.stroke]="'var(--surface-sunken)'" />
             @for (segment of segments(); track segment.name) {
-              <circle cx="21" cy="21" r="15.9" fill="none" stroke-width="4.5"
+              <circle cx="21" cy="21" r="15.9" fill="none" stroke-width="5"
                       stroke-linecap="butt"
                       [attr.stroke]="segment.color"
                       [attr.stroke-dasharray]="segment.dash"
@@ -29,8 +29,14 @@ export interface Slice { name: string; value: number; }
               </circle>
             }
           </svg>
-          <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-            <span class="text-base font-semibold tabular leading-none">{{ compactTotal() }}</span>
+          <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none px-3 text-center">
+            <span class="text-xl font-semibold tabular leading-none">{{ compactTotal() }}</span>
+            @if (totalLabel()) {
+              <span class="text-[10px] leading-tight mt-0.5 max-w-[70px] truncate
+                           text-[color:var(--text-muted)]" [title]="totalLabel()">
+                {{ totalLabel() }}
+              </span>
+            }
           </div>
         </div>
 
@@ -49,9 +55,6 @@ export interface Slice { name: string; value: number; }
           }
         </ul>
       </div>
-      @if (totalLabel()) {
-        <p class="text-[11px] text-[color:var(--text-muted)] mt-2">{{ totalLabel() }}</p>
-      }
     } @else {
       <p class="text-xs text-[color:var(--text-muted)] py-6 text-center">No data in this range.</p>
     }

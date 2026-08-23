@@ -36,7 +36,7 @@
     <div class="grid gap-3 lg:grid-cols-3">
       <div class="card chart-card">
         <h3 class="chart-title">Outcomes</h3>
-        <app-donut [data]="statusMix()" totalLabel="messages in this range"
+        <app-donut [data]="statusMix()" totalLabel="messages"
                    [colorFor]="outcomeColor" />
         <p class="chart-sub mt-2 mb-0 flex items-center gap-1.5 flex-wrap">
           @if (failureRate()) {
