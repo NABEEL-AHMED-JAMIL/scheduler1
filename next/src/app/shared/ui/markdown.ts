@@ -3,8 +3,8 @@ import { NgTemplateOutlet } from '@angular/common';
 import { Icon } from './icon';
 import { copyText } from './clipboard.util';
 
-type Inline = { text: string; code?: boolean; bold?: boolean; italic?: boolean; href?: string };
-type Block =
+export type Inline = { text: string; code?: boolean; bold?: boolean; italic?: boolean; href?: string };
+export type Block =
   | { kind: 'p' | 'h'; level?: number; spans: Inline[] }
   | { kind: 'ul' | 'ol'; items: Inline[][] }
   | { kind: 'code'; lang: string; code: string }
@@ -96,9 +96,11 @@ export class Markdown {
     });
   }
 
-  readonly blocks = computed<Block[]>(() => this.parse(this.source() ?? ''));
+  readonly blocks = computed<Block[]>(() => parseMarkdown(this.source() ?? ''));
 
-  private parse(source: string): Block[] {
+}
+
+export function parseMarkdown(source: string): Block[] {
     const out: Block[] = [];
     const lines = source.replace(/\r\n/g, '\n').split('\n');
     let i = 0;
@@ -125,7 +127,7 @@ export class Markdown {
 
       const heading = /^(#{1,4})\s+(.*)$/.exec(line);
       if (heading) {
-        out.push({ kind: 'h', level: heading[1].length, spans: this.inlines(heading[2]) });
+        out.push({ kind: 'h', level: heading[1].length, spans: parseInlines(heading[2]) });
         i++;
         continue;
       }
@@ -133,7 +135,7 @@ export class Markdown {
       if (/^\s*[-*+]\s+/.test(line)) {
         const items: Inline[][] = [];
         while (i < lines.length && /^\s*[-*+]\s+/.test(lines[i])) {
-          items.push(this.inlines(lines[i].replace(/^\s*[-*+]\s+/, '')));
+          items.push(parseInlines(lines[i].replace(/^\s*[-*+]\s+/, '')));
           i++;
         }
         out.push({ kind: 'ul', items });
@@ -143,7 +145,7 @@ export class Markdown {
       if (/^\s*\d+[.)]\s+/.test(line)) {
         const items: Inline[][] = [];
         while (i < lines.length && /^\s*\d+[.)]\s+/.test(lines[i])) {
-          items.push(this.inlines(lines[i].replace(/^\s*\d+[.)]\s+/, '')));
+          items.push(parseInlines(lines[i].replace(/^\s*\d+[.)]\s+/, '')));
           i++;
         }
         out.push({ kind: 'ol', items });
@@ -162,14 +164,14 @@ export class Markdown {
         paragraph.push(lines[i]);
         i++;
       }
-      out.push({ kind: 'p', spans: this.inlines(paragraph.join(' ')) });
+      out.push({ kind: 'p', spans: parseInlines(paragraph.join(' ')) });
     }
 
     return out;
   }
 
   /** Inline code first: its contents must not then be read as bold or italic markers. */
-  private inlines(text: string): Inline[] {
+export function parseInlines(text: string): Inline[] {
     const spans: Inline[] = [];
     const pattern = /(`[^`]+`)|(\*\*[^*]+\*\*)|(__[^_]+__)|(\*[^*\n]+\*)|(\[[^\]]+\]\((https?:\/\/[^)\s]+)\))/g;
     let last = 0;
@@ -193,4 +195,3 @@ export class Markdown {
     if (last < text.length) spans.push({ text: text.slice(last) });
     return spans.length ? spans : [{ text }];
   }
-}
