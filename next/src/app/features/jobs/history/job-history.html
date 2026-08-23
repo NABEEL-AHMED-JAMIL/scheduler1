@@ -183,6 +183,16 @@
         <app-donut [data]="outcomeMix()" totalLabel="runs" [colorFor]="outcomeColor" />
       </div>
 
+      @if (flagSplit().length) {
+        <div class="card chart-card lg:col-span-3">
+          <h3 class="chart-title">How these runs were started</h3>
+          <p class="chart-sub">
+            The flags the queue recorded per run. A flag no run in view carries is left out.
+          </p>
+          <app-split-bar [data]="flagSplit()" positiveLabel="yes" negativeLabel="no" />
+        </div>
+      }
+
       <div class="card chart-card lg:col-span-2">
         <h3 class="chart-title">How long each run took</h3>
         <p class="chart-sub">

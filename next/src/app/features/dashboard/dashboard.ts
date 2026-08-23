@@ -93,7 +93,22 @@ export class Dashboard implements OnInit {
   private readonly isSummaryRow = (row: JobBreakdown) =>
     !row.jobId || (row.jobName ?? '').trim().toUpperCase() === 'TOTAL';
 
-  readonly breakdownTotal = computed(() => this.breakdown().find(this.isSummaryRow) ?? null);
+  /**
+   * Summed from the rows actually on screen rather than taken from the endpoint's TOTAL row.
+   * The footer used to mix the two -- the endpoint's unfiltered figures beside a job count
+   * that followed the search box -- so filtering an hour down to a handful of jobs still
+   * reported the whole hour's totals, including failures none of the visible rows had.
+   */
+  readonly breakdownTotal = computed<JobBreakdown | null>(() => {
+    const rows = this.filteredBreakdown();
+    if (!rows.length) return null;
+    const summed = { jobName: 'TOTAL', total: 0 } as JobBreakdown;
+    for (const key of BREAKDOWN_COLUMNS) {
+      (summed as any)[key] = rows.reduce((sum, row) => sum + (this.countFor(row, key) ?? 0), 0);
+    }
+    summed.total = rows.reduce((sum, row) => sum + (row.total ?? 0), 0);
+    return summed;
+  });
 
   readonly filteredBreakdown = computed(() => {
     const rows = this.breakdown().filter(row => !this.isSummaryRow(row));

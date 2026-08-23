@@ -186,6 +186,68 @@
 
   .row-selected > td { background: var(--surface-sunken); }
 
+  /* Segmented control: one control with three states rather than three buttons that happen
+     to be adjacent, so the current view is unambiguous. */
+  .seg {
+    background: var(--surface-sunken);
+    border-color: var(--border-subtle);
+    @apply inline-flex items-center gap-0.5 rounded-lg border p-0.5;
+  }
+  .seg-btn {
+    color: var(--text-secondary);
+    @apply inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium
+           transition-colors whitespace-nowrap;
+  }
+  .seg-btn:hover { color: var(--text-primary); }
+  .seg-on {
+    background: var(--surface-raised);
+    color: var(--color-brand-600);
+    @apply shadow-sm;
+  }
+  html.dark .seg-on { color: var(--color-brand-300); }
+
+  /* A dot that only pulses while it is actually following the run. */
+  .live-dot {
+    background: var(--color-ink-400);
+    @apply inline-block w-1.5 h-1.5 rounded-full shrink-0;
+  }
+  .live-on {
+    background: var(--color-ok-500);
+    animation: pulse-soft 1.6s ease-in-out infinite;
+  }
+
+  /* Timeline: a rail down the left with a dot per entry, coloured by the line's severity. */
+  .log-timeline { @apply relative; }
+  .log-tl-item {
+    border-color: var(--border-subtle);
+    @apply relative flex items-start gap-3 pl-9 pr-4 py-2.5;
+  }
+  .log-tl-item + .log-tl-item { @apply border-t; }
+  .log-tl-rail {
+    @apply absolute left-4 top-0 bottom-0 flex justify-center;
+    width: 1px;
+    background: var(--border-subtle);
+  }
+  .log-tl-item:first-child .log-tl-rail { @apply top-3; }
+  .log-tl-item:last-child .log-tl-rail  { @apply bottom-[calc(100%-1.5rem)]; }
+  .log-tl-dot {
+    box-shadow: 0 0 0 3px var(--surface-raised);
+    @apply absolute top-3 w-2 h-2 rounded-full shrink-0;
+  }
+
+  /* Console: the raw stream, monospaced on a dark ground in both themes because that is what
+     a log looks like everywhere else people read one. */
+  .log-console {
+    background: var(--color-ink-900);
+    @apply px-4 py-3 max-h-[32rem] overflow-auto;
+  }
+  .log-console-line {
+    @apply flex gap-2 text-xs leading-relaxed font-mono break-words;
+    color: var(--color-ink-100);
+  }
+  .log-console-line + .log-console-line { @apply mt-0.5; }
+  .log-console-time { color: var(--color-ink-400); @apply shrink-0; }
+
   /* An expanded row is a panel, not a taller row. It sits on the sunken surface with a brand
      rule down its left edge so the eye can see where the detail belongs, and an inset shadow
      so it reads as recessed rather than as another table row. */
@@ -451,7 +513,12 @@
     .typing span { animation: none; opacity: 0.6; }
   }
 
-  .table-modern { @apply w-full text-sm; }
+  /* 12px, not 14px. These are dense operational tables -- job lists, queue runs, log
+     entries -- rather than prose, and the queue and run-history screens had already dropped
+     to 12px on their own, so the app was inconsistent either way. The header sits at 11px,
+     which keeps the hierarchy, and the row height falls by roughly a quarter, which is worth
+     about ten more rows on a laptop screen. Form fields and body copy stay at 14px. */
+  .table-modern { @apply w-full text-xs; }
   .table-modern thead th {
     border-color: var(--border-subtle);
     @apply border-b text-left text-[11px] font-semibold uppercase tracking-wider

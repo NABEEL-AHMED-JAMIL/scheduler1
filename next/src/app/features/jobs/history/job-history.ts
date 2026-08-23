@@ -10,6 +10,7 @@ import { Donut } from '../../../shared/charts/donut';
 import { BarChart } from '../../../shared/charts/bar-chart';
 import { statusColor } from '../../../shared/charts/status-color';
 import { copyText } from '../../../shared/ui/clipboard.util';
+import { SplitBar } from '../../../shared/charts/split-bar';
 
 interface JobQueue {
   jobQueueId: number;
@@ -20,12 +21,14 @@ interface JobQueue {
   endTime?: string;
   dateCreated?: string;
   jobSend?: boolean;
+  runManual?: boolean | null;
+  skipManual?: boolean | null;
   skipTime?: string;
 }
 
 @Component({
   selector: 'app-job-history',
-  imports: [Icon, DatePipe, RouterLink, TableShell, StatusPill, Donut, BarChart],
+  imports: [Icon, DatePipe, RouterLink, TableShell, StatusPill, Donut, BarChart, SplitBar],
   templateUrl: './job-history.html',
 })
 export class JobHistory {
@@ -51,6 +54,29 @@ export class JobHistory {
 
   readonly statuses = computed(() =>
     [...new Set(this.runs().map(r => r.jobStatus).filter(Boolean))].sort());
+
+  /**
+   * The three flags the queue records per run. A flag is only charted when the runs in view
+   * actually carry it: skipManual is null on every row in this database, and a bar that is
+   * always empty is a worse answer than leaving the question out.
+   */
+  readonly flagSplit = computed(() => {
+    const rows = this.filtered();
+    const split = (key: 'jobSend' | 'runManual' | 'skipManual', label: string) => {
+      const known = rows.filter(r => r[key] === true || r[key] === false);
+      if (!known.length) return null;
+      return {
+        label,
+        positive: known.filter(r => r[key] === true).length,
+        negative: known.filter(r => r[key] === false).length,
+      };
+    };
+    return [
+      split('jobSend', 'Reached the queue'),
+      split('runManual', 'Started by hand'),
+      split('skipManual', 'Skipped by hand'),
+    ].filter((row): row is { label: string; positive: number; negative: number } => row !== null);
+  });
 
   readonly filtered = computed(() => {
     const status = this.statusFilter();
