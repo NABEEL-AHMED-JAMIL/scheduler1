@@ -9,6 +9,8 @@ import { Field } from '../../../shared/ui/field';
 import { FormDialog } from '../../../shared/ui/form-dialog';
 import { Icon } from '../../../shared/ui/icon';
 import { KafkaProfile } from './kafka-connections';
+import { BucketSummary, StorageService } from '../../objects/storage.service';
+import { copyText } from '../../../shared/ui/clipboard.util';
 
 const SECURITY_PROTOCOLS = ['PLAINTEXT', 'SASL_PLAINTEXT', 'SASL_SSL', 'SSL'];
 const SASL_MECHANISMS = ['PLAIN', 'SCRAM-SHA-256', 'SCRAM-SHA-512'];
@@ -115,19 +117,105 @@ const SASL_MECHANISMS = ['PLAIN', 'SCRAM-SHA-256', 'SCRAM-SHA-512'];
 
         @if (needsSsl()) {
           <div class="form-section">
-            <div class="form-section-title">TLS material</div>
+            <div class="form-section-title">
+              TLS material
+              <button type="button" class="btn btn-ghost btn-sm ml-auto"
+                      (click)="showGuide.set(!showGuide())">
+                <app-icon name="info" class="icon-info" />
+                {{ showGuide() ? 'Hide' : 'How do I get these files?' }}
+              </button>
+            </div>
+
+            @if (showGuide()) {
+              <div class="guide">
+                <p class="guide-lead">
+                  A truststore tells this client which broker certificates to trust. A keystore
+                  is only needed when the broker asks the client to prove who it is (mTLS).
+                  Both are files you generate once, then upload here.
+                </p>
+
+                <ol class="guide-steps">
+                  <li>
+                    <strong>Get the broker's certificate.</strong> Your Kafka provider supplies
+                    it — on AWS MSK it is the Amazon root CA, on Confluent Cloud the public
+                    root is already trusted and you can skip to SASL_SSL with no truststore.
+                    <div class="guide-cmd">
+                      <code class="guide-code">{{ commands.fetchCert }}</code>
+                      <button type="button" class="btn btn-ghost btn-icon btn-sm shrink-0"
+                              title="Copy command" (click)="copyCommand(commands.fetchCert)">
+                        <app-icon name="copy" size="0.9em" />
+                      </button>
+                    </div>
+                  </li>
+                  <li>
+                    <strong>Turn it into a truststore.</strong> Pick a password and keep it —
+                    it goes in the Truststore password field.
+                    <div class="guide-cmd">
+                      <code class="guide-code">{{ commands.truststore }}</code>
+                      <button type="button" class="btn btn-ghost btn-icon btn-sm shrink-0"
+                              title="Copy command" (click)="copyCommand(commands.truststore)">
+                        <app-icon name="copy" size="0.9em" />
+                      </button>
+                    </div>
+                  </li>
+                  <li>
+                    <strong>Only for mTLS — make a keystore</strong> from the client certificate
+                    and private key your provider issued.
+                    <div class="guide-cmd">
+                      <code class="guide-code">{{ commands.keystore }}</code>
+                      <button type="button" class="btn btn-ghost btn-icon btn-sm shrink-0"
+                              title="Copy command" (click)="copyCommand(commands.keystore)">
+                        <app-icon name="copy" size="0.9em" />
+                      </button>
+                    </div>
+                  </li>
+                  <li>
+                    <strong>Choose a bucket and upload.</strong> Pick a storage connection
+                    below, choose the file, and press Upload — the path fills itself in. Files
+                    land under <code class="guide-inline">kafka-secrets/</code> in that bucket.
+                  </li>
+                  <li>
+                    <strong>Enter the passwords</strong> you chose, then press Test connection
+                    before saving.
+                  </li>
+                </ol>
+
+                <p class="guide-note">
+                  <app-icon name="shield" size="0.95em" class="icon-warn" />
+                  Passwords are stored encrypted and never sent back to this screen — an
+                  existing one shows as dots and stays unless you type a new value.
+                </p>
+              </div>
+            }
             <div class="form-grid">
               <app-field label="Truststore bucket" for="sslTruststoreBucket"
                          [control]="form.get('sslTruststoreBucket')" [submitted]="submitted()"
-                         hint="Storage connection alias holding the truststore.">
-                <input id="sslTruststoreBucket" class="input" formControlName="sslTruststoreBucket" placeholder="etl-bucket" />
+                         hint="The storage connection the broker's truststore lives in.">
+                <select id="sslTruststoreBucket" class="input" formControlName="sslTruststoreBucket">
+                  <option value="">Choose a bucket</option>
+                  @for (b of buckets(); track b.bucket) {
+                    <option [value]="b.bucket">{{ b.label || b.bucket }} · {{ b.provider }}</option>
+                  }
+                </select>
               </app-field>
 
               <app-field label="Truststore path" for="sslTruststoreLocation"
-                         [control]="form.get('sslTruststoreLocation')" [submitted]="submitted()">
+                         [control]="form.get('sslTruststoreLocation')" [submitted]="submitted()"
+                         hint="Upload a file below, or paste the key of one already in the bucket.">
                 <input id="sslTruststoreLocation" class="input mono" formControlName="sslTruststoreLocation"
                        placeholder="kafka-secrets/truststore.p12" />
               </app-field>
+
+              <div class="upload-row sm:col-span-2">
+                <input type="file" class="input" accept=".p12,.jks,.pfx" #truststoreFile
+                       [disabled]="!form.get('sslTruststoreBucket')?.value" />
+                <button type="button" class="btn btn-default btn-sm shrink-0"
+                        [disabled]="uploading() !== null || !form.get('sslTruststoreBucket')?.value"
+                        (click)="uploadStore('truststore', truststoreFile)">
+                  <app-icon name="upload" [class.spin]="uploading() === 'truststore'" />
+                  {{ uploading() === 'truststore' ? 'Uploading…' : 'Upload truststore' }}
+                </button>
+              </div>
 
               <app-field label="Truststore password" for="sslTruststorePassword"
                          [control]="form.get('sslTruststorePassword')" [submitted]="submitted()"
@@ -137,12 +225,34 @@ const SASL_MECHANISMS = ['PLAIN', 'SCRAM-SHA-256', 'SCRAM-SHA-512'];
                        [placeholder]="data.profile?.sslTruststorePasswordConfigured ? '••••••••' : ''" />
               </app-field>
 
+              <app-field label="Keystore bucket" for="sslKeystoreBucket"
+                         [control]="form.get('sslKeystoreBucket')" [submitted]="submitted()"
+                         hint="Only needed when the broker asks the client for a certificate.">
+                <select id="sslKeystoreBucket" class="input" formControlName="sslKeystoreBucket">
+                  <option value="">Choose a bucket</option>
+                  @for (b of buckets(); track b.bucket) {
+                    <option [value]="b.bucket">{{ b.label || b.bucket }} · {{ b.provider }}</option>
+                  }
+                </select>
+              </app-field>
+
               <app-field label="Keystore path" for="sslKeystoreLocation"
                          [control]="form.get('sslKeystoreLocation')" [submitted]="submitted()"
-                         hint="Only needed when the broker asks the client for a certificate.">
+                         hint="Upload a file below, or paste the key of one already in the bucket.">
                 <input id="sslKeystoreLocation" class="input mono" formControlName="sslKeystoreLocation"
                        placeholder="kafka-secrets/keystore.p12" />
               </app-field>
+
+              <div class="upload-row sm:col-span-2">
+                <input type="file" class="input" accept=".p12,.jks,.pfx" #keystoreFile
+                       [disabled]="!form.get('sslKeystoreBucket')?.value" />
+                <button type="button" class="btn btn-default btn-sm shrink-0"
+                        [disabled]="uploading() !== null || !form.get('sslKeystoreBucket')?.value"
+                        (click)="uploadStore('keystore', keystoreFile)">
+                  <app-icon name="upload" [class.spin]="uploading() === 'keystore'" />
+                  {{ uploading() === 'keystore' ? 'Uploading…' : 'Upload keystore' }}
+                </button>
+              </div>
 
               <app-field label="Keystore password" for="sslKeystorePassword"
                          [control]="form.get('sslKeystorePassword')" [submitted]="submitted()"
@@ -201,6 +311,72 @@ export class KafkaDialog {
   readonly testResult = signal<{ ok: boolean; message: string } | null>(null);
   readonly isEdit = computed(() => !!this.data.profile);
 
+  /** Where uploaded TLS material lands, matching the convention the legacy screen used. */
+  private static readonly SECRET_PREFIX = 'kafka-secrets/';
+
+  private readonly storage = inject(StorageService);
+  readonly buckets = signal<BucketSummary[]>([]);
+  readonly uploading = signal<'truststore' | 'keystore' | null>(null);
+  readonly showGuide = signal(false);
+
+  /** The commands are meant to be pasted into a terminal, so each is copyable rather than
+      something to retype from a box that scrolls sideways. */
+  readonly commands = {
+    fetchCert: 'openssl s_client -connect BROKER:9093 -showcerts </dev/null | openssl x509 > broker.pem',
+    truststore: 'keytool -import -alias kafka-broker -file broker.pem \\\n  -keystore truststore.p12 -storetype PKCS12 -storepass CHOOSE_ONE',
+    keystore: 'openssl pkcs12 -export -in client.crt -inkey client.key \\\n  -out keystore.p12 -passout pass:CHOOSE_ONE',
+  };
+
+  async copyCommand(command: string): Promise<void> {
+    if (await copyText(command)) this.toast.success('Command copied.');
+    else this.toast.error('Could not copy the command.');
+  }
+
+  constructor() {
+    // The bucket was a free-text box, so it had to be typed from memory and a typo only
+    // surfaced when the broker connection failed. These are the same storage connections
+    // the object browser lists.
+    this.storage.buckets().subscribe({
+      next: r => { if (r.status === API_SUCCESS) this.buckets.set(r.data ?? []); },
+      error: () => { /* the field falls back to accepting a typed alias */ },
+    });
+  }
+
+  /**
+   * Uploads the chosen .p12/.jks into the selected bucket and fills in the path it landed
+   * at. Previously the path had to be typed by hand with no way to get the file there from
+   * this screen at all; the unique prefix keeps one profile's material from overwriting
+   * another's when two share a bucket and a filename.
+   */
+  uploadStore(kind: 'truststore' | 'keystore', input: HTMLInputElement): void {
+    const file = input.files?.[0];
+    const bucketField = kind === 'truststore' ? 'sslTruststoreBucket' : 'sslKeystoreBucket';
+    const pathField = kind === 'truststore' ? 'sslTruststoreLocation' : 'sslKeystoreLocation';
+    const bucket = this.form.get(bucketField)?.value;
+
+    if (!bucket) { this.toast.error('Choose a bucket first.'); return; }
+    if (!file) { this.toast.error(`Choose a ${kind} file first.`); return; }
+
+    const prefix = `${KafkaDialog.SECRET_PREFIX}${Date.now()}-${Math.random().toString(36).slice(2, 8)}/`;
+    this.uploading.set(kind);
+    this.storage.upload(bucket, prefix, file).subscribe({
+      next: response => {
+        this.uploading.set(null);
+        if (response.status === API_SUCCESS) {
+          this.form.get(pathField)?.setValue(prefix + file.name);
+          input.value = '';
+          this.toast.success(`${kind === 'truststore' ? 'Truststore' : 'Keystore'} uploaded.`);
+        } else {
+          this.toast.error(response.message);
+        }
+      },
+      error: err => {
+        this.uploading.set(null);
+        this.toast.error(err?.error?.message || 'The upload failed.');
+      },
+    });
+  }
+
   readonly form: FormGroup = this.fb.group({
     kafkaConnectionProfileId: [this.data.profile?.kafkaConnectionProfileId ?? null],
     profileName: [this.data.profile?.profileName ?? '', Validators.required],
@@ -213,6 +389,7 @@ export class KafkaDialog {
     sslTruststoreBucket: [this.data.profile?.sslTruststoreBucket ?? ''],
     sslTruststoreLocation: [this.data.profile?.sslTruststoreLocation ?? ''],
     sslTruststorePassword: [''],
+    sslKeystoreBucket: [this.data.profile?.sslKeystoreBucket ?? ''],
     sslKeystoreLocation: [this.data.profile?.sslKeystoreLocation ?? ''],
     sslKeystorePassword: [''],
     sslKeyPassword: [''],

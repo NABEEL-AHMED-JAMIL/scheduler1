@@ -22,6 +22,7 @@ export interface KafkaProfile {
   saslMechanism?: string;
   saslUsername?: string;
   saslPasswordConfigured?: boolean;
+  sslKeystoreBucket?: string;
   sslKeystoreLocation?: string;
   sslKeystorePasswordConfigured?: boolean;
   sslKeyPasswordConfigured?: boolean;

@@ -201,6 +201,39 @@
 
   .row-selected > td { background: var(--surface-sunken); }
 
+  /* File input beside its upload button; the native control has its own chrome, so it gets
+     the row rather than being forced into the form grid's column rhythm. */
+  .upload-row { @apply flex flex-wrap items-center gap-2; }
+  .upload-row input[type="file"] { @apply flex-1 min-w-48 text-xs py-1; }
+
+  /* Inline instructions: a short procedure, not a wall of prose. */
+  .guide {
+    background: var(--surface-sunken);
+    border-color: var(--border-subtle);
+    @apply rounded-lg border p-4 mb-4;
+  }
+  .guide-lead { @apply text-xs leading-relaxed mb-3; color: var(--text-secondary); }
+  .guide-steps { @apply space-y-3 text-xs leading-relaxed list-decimal pl-4; color: var(--text-secondary); }
+  .guide-steps strong { color: var(--text-primary); @apply font-semibold; }
+  .guide-cmd { @apply flex items-start gap-1 mt-1.5; }
+  .guide-cmd .guide-code { @apply mt-0 flex-1 min-w-0; }
+  .guide-code {
+    background: var(--surface-raised);
+    border-color: var(--border-subtle);
+    color: var(--text-primary);
+    @apply block mt-1.5 rounded border px-2.5 py-1.5 font-mono text-[11px]
+           leading-relaxed overflow-x-auto whitespace-pre;
+  }
+  .guide-inline {
+    background: var(--surface-raised);
+    @apply rounded px-1 py-0.5 font-mono text-[11px];
+  }
+  .guide-note {
+    @apply flex items-start gap-1.5 mt-3 pt-3 border-t text-[11px] leading-relaxed;
+    border-color: var(--border-subtle);
+    color: var(--text-muted);
+  }
+
   /* Segmented control: one control with three states rather than three buttons that happen
      to be adjacent, so the current view is unambiguous. */
   .seg {
