@@ -1,0 +1,105 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Search Engine</h1>
+      <p class="page-subtitle">
+        Run a read-only query against the platform database and read the result as a table.
+      </p>
+    </div>
+  </div>
+
+  <div class="card p-4">
+    <div class="field">
+      <label class="label" for="query">SQL query</label>
+      <textarea id="query" class="input mono" rows="8" spellcheck="false"
+                placeholder="SELECT job_id, job_name, job_status FROM source_job LIMIT 100"
+                [value]="query()"
+                (input)="query.set($any($event.target).value)"
+                (keydown.control.enter)="run()" (keydown.meta.enter)="run()"></textarea>
+      @if (warning()) {
+        <div class="field-note flex items-center gap-1.5 text-[color:var(--color-warn-600)]">
+          <app-icon name="alert" size="0.95em" class="icon-warn" />{{ warning() }}
+        </div>
+      } @else {
+        <div class="field-note text-[color:var(--text-muted)]">
+          Only SELECT statements are supported. Ctrl/⌘ + Enter runs the query.
+        </div>
+      }
+    </div>
+
+    <div class="flex items-center gap-2 mt-4">
+      <button type="button" class="btn btn-primary btn-sm" [disabled]="!canRun()" (click)="run()">
+        <app-icon name="play" [class.spin]="running()" />{{ running() ? 'Running…' : 'Run query' }}
+      </button>
+      @if (query() || result()) {
+        <button type="button" class="btn btn-ghost btn-sm" (click)="clear()">
+          <app-icon name="close" />Clear
+        </button>
+      }
+    </div>
+  </div>
+
+  @if (result(); as res) {
+    <div class="card overflow-hidden">
+      <div class="flex flex-wrap items-center gap-2 px-4 py-3 border-b"
+           style="border-color: var(--border-subtle);">
+        <h2 class="text-sm font-semibold mr-auto">
+          Result
+          <span class="text-[color:var(--text-muted)] font-normal">
+            ({{ rows().length }} of {{ (res.data || []).length }})
+          </span>
+        </h2>
+        <div class="search-field max-w-52">
+          <app-icon name="search" size="0.95em" />
+          <input class="input" placeholder="Filter rows"
+                 [value]="filter()" (input)="filter.set($any($event.target).value); pager.reset()" />
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm" [disabled]="!rows().length" (click)="copyResult()">
+          <app-icon name="copy" />Copy
+        </button>
+      </div>
+
+      @if (!columns().length) {
+        <p class="px-4 py-8 text-center text-sm text-[color:var(--text-muted)]">
+          The query ran but returned no columns.
+        </p>
+      } @else {
+        <div class="overflow-x-auto">
+          <table class="table-modern">
+            <thead>
+              <tr>
+                @for (column of columns(); track column) { <th class="whitespace-nowrap">{{ column }}</th> }
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of paged(); track $index) {
+                <tr>
+                  @for (column of columns(); track column) {
+                    <td>
+                      @if (isLong(row, column)) {
+                        <div class="max-w-md max-h-24 overflow-auto whitespace-pre-wrap mono text-xs rounded p-2"
+                             style="background: var(--surface-sunken);">{{ cell(row, column) }}</div>
+                      } @else {
+                        <span class="whitespace-nowrap">{{ cell(row, column) || '—' }}</span>
+                      }
+                    </td>
+                  }
+                </tr>
+              } @empty {
+                <tr>
+                  <td [attr.colspan]="columns().length"
+                      class="py-8 text-center text-sm text-[color:var(--text-muted)]">
+                    No rows match “{{ filter() }}”.
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <app-pagination [total]="rows().length" [page]="pager.page()" [size]="pager.size()"
+                        (goTo)="goToPage($event)" (setSize)="setPageSize($event)" />
+      }
+    </div>
+  }
+</div>

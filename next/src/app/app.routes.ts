@@ -147,6 +147,20 @@ export const routes: Routes = [
         canActivate: [roleGuard],
       },
       {
+        path: 'tools/search',
+        loadComponent: () =>
+          import('./features/tools/search-engine/search-engine').then(m => m.SearchEngine),
+        data: { roles: ['PLATFORM_ADMIN'] },
+        canActivate: [roleGuard],
+      },
+      {
+        path: 'settings/xml',
+        loadComponent: () =>
+          import('./features/settings/xml-builder/xml-builder').then(m => m.XmlBuilder),
+        data: { roles: ['PLATFORM_ADMIN', 'TENANT_ADMIN'] },
+        canActivate: [roleGuard],
+      },
+      {
         path: 'objects',
         loadComponent: () => import('./features/objects/objects').then(m => m.Objects),
       },

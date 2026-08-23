@@ -70,6 +70,8 @@ export class Shell {
           hint: 'Speech to text' },
         { label: 'Content Cleaner', path: '/tools/cleaner', icon: 'sparkle',
           hint: 'Tidy extracted text' },
+        { label: 'Search Engine', path: '/tools/search', icon: 'search', platformOnly: true,
+          hint: 'Ad-hoc read-only SQL' },
       ],
     },
     {
@@ -93,6 +95,8 @@ export class Shell {
           hint: 'S3, Azure, MinIO, FTP' },
         { label: 'Kafka Connections', path: '/settings/kafka', icon: 'server', adminOnly: true,
           hint: 'Brokers and credentials' },
+        { label: 'XML Configuration', path: '/settings/xml', icon: 'file', adminOnly: true,
+          hint: 'Build a master-data document' },
         { label: 'All settings', path: '/admin/settings', icon: 'settings', adminOnly: true,
           hint: 'Every area in one place' },
       ],

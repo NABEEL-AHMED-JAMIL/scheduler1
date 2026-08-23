@@ -72,6 +72,9 @@ describe('route table', () => {
     };
     walk(routes);
     expect(byPath['admin/tenants']).toEqual(['PLATFORM_ADMIN']);
+    // Search Engine ran raw SQL and was platform-admin-only in the legacy app.
+    expect(byPath['tools/search']).toEqual(['PLATFORM_ADMIN']);
+    expect(byPath['settings/xml']).toEqual(['PLATFORM_ADMIN', 'TENANT_ADMIN']);
     for (const p of ['admin/users', 'admin/storage', 'settings/lookup', 'settings/task-types', 'ai/models']) {
       expect(byPath[p]).toEqual(['PLATFORM_ADMIN', 'TENANT_ADMIN']);
     }
