@@ -105,11 +105,11 @@
       </app-field>
       <div class="flex flex-wrap gap-4">
         <label class="flex items-center gap-2 text-sm">
-          <input type="checkbox" formControlName="passiveMode" /> Passive mode
+          <input type="checkbox" class="checkbox" formControlName="passiveMode" /> Passive mode
         </label>
         @if (provider() === 'FTPS') {
           <label class="flex items-center gap-2 text-sm">
-            <input type="checkbox" formControlName="implicitTls" /> Implicit TLS (port 990)
+            <input type="checkbox" class="checkbox" formControlName="implicitTls" /> Implicit TLS (port 990)
           </label>
         }
       </div>

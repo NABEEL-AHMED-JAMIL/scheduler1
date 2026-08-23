@@ -63,6 +63,12 @@
    whole app switches theme by redefining these alone. */
 @layer base {
   :root {
+    /* The select's dropdown list, the date picker panel and the scrollbars are drawn by the
+       OS, not the page. Without this they stay light on the dark theme, which is why a date
+       field read as a white Bootstrap control sitting on a dark form. */
+    color-scheme: light;
+    --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23616980' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+
     --surface-page:    var(--color-ink-50);
     --surface-raised:  #ffffff;
     --surface-sunken:  var(--color-ink-100);
@@ -79,6 +85,8 @@
   }
 
   html.dark {
+    color-scheme: dark;
+    --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239aa3bd' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
     --surface-page:    var(--color-ink-950);
     --surface-raised:  var(--color-ink-900);
     --surface-sunken:  #12151f;
@@ -206,9 +214,79 @@
   .input {
     background: var(--surface-raised);
     border-color: var(--border-subtle);
+    /* min-height rather than a fixed height: a native date field sizes itself from its
+       internal spin fields and came out 34px next to a 26.5px select, so a filter bar mixing
+       the two stepped up and down. This makes every control agree without clipping one whose
+       content is genuinely taller. */
+    min-height: 2.25rem;
     @apply w-full border rounded-md px-3 py-1.5 text-sm
            placeholder:text-[color:var(--text-muted)]
            focus:border-brand-500 focus:outline-none;
+  }
+
+  /* A focus ring the page draws, matching the buttons and checkboxes. Without it the only
+     focus cue was a border colour change, which is not visible enough to navigate by. */
+  .input:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-brand-500) 28%, transparent);
+    border-color: var(--color-brand-500);
+  }
+
+  .input:disabled {
+    background: var(--surface-sunken);
+    @apply cursor-not-allowed opacity-70;
+  }
+
+  /* The OS draws a select's arrow, and it is the single thing that most made these controls
+     read as browser-default rather than part of the app. Replaced with a chevron matching
+     the icon set; the padding keeps the text clear of it. */
+  select.input {
+    appearance: none;
+    background-image: var(--select-chevron);
+    background-repeat: no-repeat;
+    background-position: right 0.6rem center;
+    background-size: 1rem;
+    @apply pr-9 cursor-pointer;
+  }
+  select.input[multiple] { background-image: none; @apply pr-3; }
+
+  /* A date or time field's picker button is an OS glyph that does not follow currentColor,
+     so on the dark theme it was a black icon on a dark field. Inverting reads as the muted
+     grey the rest of the row uses. */
+  .input::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.55;
+    transition: opacity 120ms ease;
+  }
+  .input::-webkit-calendar-picker-indicator:hover { opacity: 1; }
+
+  /* Number spinners appear on hover only; a permanently visible pair of arrows competes with
+     the value for attention in a dense form. */
+  .input[type="number"]::-webkit-inner-spin-button,
+  .input[type="number"]::-webkit-outer-spin-button {
+    opacity: 0;
+    transition: opacity 120ms ease;
+  }
+  .input[type="number"]:hover::-webkit-inner-spin-button,
+  .input[type="number"]:focus::-webkit-inner-spin-button,
+  .input[type="number"]:hover::-webkit-outer-spin-button,
+  .input[type="number"]:focus::-webkit-outer-spin-button { opacity: 1; }
+
+  /* "Choose File / No file chosen" is the most recognisably native control of the lot. The
+     button half becomes a real secondary button and the label beside it takes the muted
+     text colour. */
+  .input[type="file"] {
+    @apply py-1.5 pl-1.5 cursor-pointer text-[color:var(--text-muted)];
+  }
+  .input[type="file"]::file-selector-button {
+    background: var(--surface-sunken);
+    border-color: var(--border-subtle);
+    color: var(--text-secondary);
+    @apply border rounded mr-3 px-3 py-1 text-sm font-medium cursor-pointer;
+  }
+  .input[type="file"]::file-selector-button:hover {
+    background: var(--surface-raised);
+    border-color: var(--border-strong);
   }
   /* A search box should say so before it is read. The icon is decorative -- the
      placeholder carries the meaning for screen readers. */
@@ -393,6 +471,10 @@ html.dark .icon-ok   { color: var(--color-ok-400); }
 html.dark .icon-warn { color: var(--color-warn-400); }
 html.dark .icon-crit { color: var(--color-crit-400); }
 html.dark .icon-info { color: var(--color-brand-300); }
+
+/* The calendar/clock glyph inside a date or time field is drawn by the browser in near-black
+   and ignores currentColor, so on the dark theme it sat invisible against the field. */
+html.dark .input::-webkit-calendar-picker-indicator { filter: invert(1); }
 html.dark .settings-hub-glyph { color: var(--color-brand-300); }
 html.dark .tab-active app-icon { color: var(--color-brand-300); }
 html.dark .md-link { color: var(--color-brand-300); }

@@ -143,7 +143,7 @@
             <thead>
               <tr>
                 <th class="w-10">
-                  <input type="checkbox" [checked]="allSelected()" (change)="toggleSelectAll()"
+                  <input type="checkbox" class="checkbox" [checked]="allSelected()" (change)="toggleSelectAll()"
                          aria-label="Select all files" />
                 </th>
                 <th>Name</th>
@@ -158,7 +158,7 @@
                 <tr>
                   <td>
                     @if (!entry.folder) {
-                      <input type="checkbox" [checked]="selected().has(entry.key)"
+                      <input type="checkbox" class="checkbox" [checked]="selected().has(entry.key)"
                              (change)="toggleSelect(entry.key)"
                              [attr.aria-label]="'Select ' + entry.name" />
                     }

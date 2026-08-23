@@ -50,7 +50,7 @@
     }
 
     <label class="flex items-center gap-2 text-sm">
-      <input type="checkbox" [checked]="timestamps()"
+      <input type="checkbox" class="checkbox" [checked]="timestamps()"
              (change)="timestamps.set($any($event.target).checked)" />
       Include timestamps before each segment
     </label>

@@ -33,7 +33,7 @@ export interface NotifyData {
       <div class="space-y-1">
         @for (option of options; track option.key) {
           <label class="notify-row">
-            <input type="checkbox" class="mt-0.5"
+            <input type="checkbox" class="checkbox mt-0.5"
                    [checked]="state()[option.key]"
                    (change)="toggle(option.key, $any($event.target).checked)" />
             <app-icon [name]="option.icon" [class]="option.intent" size="1em" class="mt-0.5 shrink-0" />

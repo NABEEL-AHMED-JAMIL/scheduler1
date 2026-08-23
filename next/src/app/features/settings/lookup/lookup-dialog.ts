@@ -51,7 +51,7 @@ export interface LookupData {
         </app-field>
 
         <label class="flex items-start gap-2.5 text-sm cursor-pointer">
-          <input type="checkbox" class="mt-0.5" formControlName="encrypted" />
+          <input type="checkbox" class="checkbox mt-0.5" formControlName="encrypted" />
           <span>
             Store encrypted
             <span class="block text-xs text-[color:var(--text-muted)] mt-0.5 leading-snug">

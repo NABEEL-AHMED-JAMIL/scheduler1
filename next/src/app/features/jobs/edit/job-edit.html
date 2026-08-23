@@ -136,7 +136,7 @@
             { control: 'skipJob',     label: 'A run is skipped' }
           ]; track option.control) {
             <label class="flex items-center gap-2 text-sm">
-              <input type="checkbox" [formControlName]="option.control" />
+              <input type="checkbox" class="checkbox" [formControlName]="option.control" />
               {{ option.label }}
             </label>
           }
