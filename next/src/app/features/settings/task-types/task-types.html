@@ -1,23 +1,54 @@
 <div class="page">
-  <div>
-    <h1 class="page-title">Source Task Types</h1>
-    <p class="page-subtitle">
-      A task type names a downstream consumer and the Kafka topic that reaches it.
-      Tasks pick one; many tasks can share a type.
-    </p>
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Source Task Types</h1>
+      <p class="page-subtitle">
+        A task type names a downstream consumer and the Kafka topic that reaches it.
+        Tasks pick one; many tasks can share a type.
+      </p>
+    </div>
+    <button type="button" class="btn btn-primary btn-sm" (click)="create()">
+      <app-icon name="plus" />New task type
+    </button>
+  </div>
+
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-3xl">
+    @for (tile of [
+      { label: 'Task types', value: summary().total,  foot: summary().active + ' active' },
+      { label: 'Linked tasks', value: summary().linked, foot: 'across all types' },
+      { label: 'Unused',     value: summary().unused, foot: 'no task uses them' },
+      { label: 'Routed',     value: profiles().length, foot: 'Kafka profiles available' }
+    ]; track tile.label) {
+      <div class="stat-tile">
+        <div class="stat-label">{{ tile.label }}</div>
+        <div class="stat-value">{{ tile.value }}</div>
+        <div class="stat-foot">{{ tile.foot }}</div>
+      </div>
+    }
   </div>
 
   <app-table-shell heading="Task types" [loading]="loading()" [error]="error()"
                    [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="types().length"
-                   [emptyMessage]="search() ? 'No task types match your search.' : 'No task types defined yet.'"
+                   [emptyMessage]="hasFilters() ? 'No task types match the current filters.' : 'No task types defined yet.'"
                    emptyIcon="layers"
                    (retry)="load()">
     <ng-container toolbar>
+      <select class="input max-w-32" [value]="statusFilter()"
+              (change)="statusFilter.set($any($event.target).value)">
+        <option value="">All states</option>
+        <option value="Active">Active</option>
+        <option value="Inactive">Inactive</option>
+      </select>
       <div class="search-field max-w-56">
         <app-icon name="search" size="0.95em" />
-        <input class="input" placeholder="Search name or description"
+        <input class="input" placeholder="Search name, description or topic"
                [value]="search()" (input)="search.set($any($event.target).value)" />
       </div>
+      @if (hasFilters()) {
+        <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()">
+          <app-icon name="close" />Clear
+        </button>
+      }
     </ng-container>
 
     <table class="table-modern">
@@ -27,7 +58,9 @@
           <th>Description</th>
           <th>Topic</th>
           <th>Partitions</th>
+          <th>Tasks</th>
           <th class="text-right">Status</th>
+          <th class="w-12"></th>
         </tr>
       </thead>
       <tbody>
@@ -37,12 +70,36 @@
               <div class="font-medium">{{ type.serviceName }}</div>
               <div class="mono text-[color:var(--text-muted)]">#{{ type.sourceTaskTypeId }}</div>
             </td>
-            <td class="text-[color:var(--text-secondary)] max-w-96">{{ type.description || '—' }}</td>
+            <td class="text-[color:var(--text-secondary)] max-w-80 truncate"
+                [title]="type.description || ''">{{ type.description || '—' }}</td>
             <td><span class="mono text-brand-600">{{ topicOf(type.queueTopicPartition) || '—' }}</span></td>
             <td class="mono text-[color:var(--text-muted)]">
               {{ partitionsOf(type.queueTopicPartition) || '—' }}
             </td>
-            <td class="text-right"><app-status [label]="type.taskTypeStatus" /></td>
+            <td>
+              @if (type.totalTaskLink) {
+                <span class="pill pill-neutral">{{ type.totalTaskLink }}</span>
+              } @else {
+                <span class="text-[color:var(--text-muted)]">none</span>
+              }
+            </td>
+            <td class="text-right"><app-status [label]="type.status" /></td>
+            <td class="text-right">
+              <button type="button" class="btn btn-ghost btn-icon" [cdkMenuTriggerFor]="menu"
+                      aria-label="Actions">
+                <app-icon name="dots" size="1.05em" />
+              </button>
+              <ng-template #menu>
+                <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="edit(type)">
+                    <app-icon name="edit" />Edit
+                  </button>
+                  <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="remove(type)">
+                    <app-icon name="trash" class="icon-crit" />Delete
+                  </button>
+                </div>
+              </ng-template>
+            </td>
           </tr>
         }
       </tbody>

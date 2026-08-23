@@ -11,6 +11,7 @@ interface LookupData {
   description?: string;
   parentLookupId?: number;
   children?: LookupData[];
+  encrypted?: boolean;
 }
 
 @Component({

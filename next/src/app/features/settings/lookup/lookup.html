@@ -39,7 +39,15 @@
               }
             </td>
             <td class="mono font-medium">{{ lookup.lookupType }}</td>
-            <td class="text-[color:var(--text-secondary)] max-w-64 truncate">{{ lookup.lookupValue }}</td>
+            <td class="text-[color:var(--text-secondary)] max-w-64 truncate">
+              @if (lookup.encrypted) {
+                <span class="pill pill-neutral" title="Stored encrypted — the value is not shown">
+                  <app-icon name="lock" size="0.85em" />encrypted
+                </span>
+              } @else {
+                {{ lookup.lookupValue }}
+              }
+            </td>
             <td class="text-[color:var(--text-secondary)] max-w-96 truncate">
               {{ lookup.description || '—' }}
             </td>
@@ -52,7 +60,15 @@
               <tr style="background: var(--surface-sunken);">
                 <td></td>
                 <td class="mono text-[color:var(--text-muted)] pl-6">{{ child.lookupType }}</td>
-                <td class="text-[color:var(--text-secondary)]">{{ child.lookupValue }}</td>
+                <td class="text-[color:var(--text-secondary)]">
+                  @if (child.encrypted) {
+                    <span class="pill pill-neutral" title="Stored encrypted — the value is not shown">
+                      <app-icon name="lock" size="0.85em" />encrypted
+                    </span>
+                  } @else {
+                    {{ child.lookupValue }}
+                  }
+                </td>
                 <td class="text-[color:var(--text-secondary)] max-w-96 truncate" colspan="2">
                   {{ child.description || '—' }}
                 </td>
