@@ -90,4 +90,79 @@
       </div>
     }
   </div>
+
+  <div class="card overflow-hidden">
+    <div class="flex flex-wrap items-center gap-2 px-4 py-3 border-b"
+         style="border-color: var(--border-subtle);">
+      <h2 class="text-sm font-semibold mr-auto">
+        Recent conversions
+        <span class="text-[color:var(--text-muted)] font-normal">({{ tasks().length }})</span>
+      </h2>
+      <button type="button" class="btn btn-ghost btn-sm" (click)="loadTasks()" [disabled]="tasksLoading()">
+        <app-icon name="refresh" [class.spin]="tasksLoading()" />Refresh
+      </button>
+    </div>
+
+    @if (!tasks().length) {
+      <div class="px-4 py-10 text-center">
+        <app-icon name="file" size="1.6em" class="icon-muted" />
+        <p class="mt-2 text-sm text-[color:var(--text-muted)]">
+          Nothing converted yet. Finished conversions are listed here with a link to the bucket.
+        </p>
+      </div>
+    } @else {
+      <div class="overflow-x-auto">
+        <table class="table-modern">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Conversion</th>
+              <th>Size</th>
+              <th>Location</th>
+              <th>Created</th>
+              <th class="w-10"></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (task of tasks(); track task.documentConverterTaskId) {
+              <tr>
+                <td class="max-w-64">
+                  <div class="font-medium truncate" [title]="task.taskName">{{ task.taskName }}</div>
+                  <div class="mono text-[color:var(--text-muted)] truncate" [title]="task.inputFileName">
+                    {{ task.inputFileName }}
+                  </div>
+                </td>
+                <td>
+                  <span class="pill pill-neutral">{{ task.inputFormat }}</span>
+                  <app-icon name="arrowRight" size="0.85em" class="icon-muted mx-1" />
+                  <span class="pill pill-brand">{{ task.outputFormat }}</span>
+                </td>
+                <td class="tabular whitespace-nowrap text-[color:var(--text-secondary)]">
+                  {{ size(task.inputFileSize) }} → {{ size(task.outputFileSize) }}
+                </td>
+                <td class="max-w-56">
+                  @if (task.bucketName) {
+                    <a class="link-inline truncate" routerLink="/objects"
+                       [queryParams]="{ bucket: task.bucketName, prefix: outputFolderOf(task) }"
+                       [title]="task.bucketName + '/' + outputFolderOf(task)">
+                      <app-icon name="folder" size="0.85em" class="icon-info" />{{ task.bucketName }}
+                    </a>
+                  } @else { <span class="text-[color:var(--text-muted)]">—</span> }
+                </td>
+                <td class="whitespace-nowrap text-[color:var(--text-secondary)]">
+                  {{ task.dateCreated ? (task.dateCreated | date: 'd MMM y, HH:mm') : '—' }}
+                </td>
+                <td>
+                  <button type="button" class="btn btn-ghost btn-icon btn-sm btn-intent-crit"
+                          title="Delete this conversion" (click)="removeTask(task)">
+                    <app-icon name="trash" />
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
 </div>
