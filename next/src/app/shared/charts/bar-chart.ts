@@ -30,12 +30,6 @@ export interface Bar { name: string; value: number; meta?: unknown; color?: stri
           </button>
         }
       </div>
-      @if (usesSqrtScale()) {
-        <p class="text-[10px] text-[color:var(--text-muted)] mt-1.5 leading-snug">
-          Bar heights use a square-root scale so smaller {{ unit() }} stay visible next to
-          {{ maxValue() }}.
-        </p>
-      }
     } @else {
       <p class="text-xs text-[color:var(--text-muted)] py-6 text-center">{{ emptyMessage() }}</p>
     }
@@ -44,8 +38,6 @@ export interface Bar { name: string; value: number; meta?: unknown; color?: stri
 export class BarChart {
   readonly data = input.required<Bar[]>();
   readonly height = input(96);
-  /** Named so the scale note reads correctly wherever the chart is used, not just on the dashboard. */
-  readonly unit = input('values');
   readonly emptyMessage = input('Nothing to show in this range.');
   readonly clickable = input(false);
   readonly barClicked = output<Bar>();
@@ -57,32 +49,22 @@ export class BarChart {
    * "A...". A repeated label carries nothing, so only the first of each run is drawn, and it
    * is free to overflow its own cell because its neighbours are now empty.
    */
-  /**
-   * A single busy day can be two orders of magnitude above the rest, and on a linear scale
-   * every other bar collapses to a hairline. Above a 20x spread the scale switches to
-   * square-root so the small days remain readable, and the chart says so.
-   */
-  readonly usesSqrtScale = computed(() => {
-    const values = this.data().map(d => d.value ?? 0).filter(v => v > 0);
-    if (values.length < 2) return false;
-    return this.maxValue() / Math.min(...values) > 20;
-  });
-
   readonly bars = computed(() => {
     const max = this.maxValue();
     if (!max) return [];
     // Reserve room for the value and label lines above and below the bar itself.
     const track = Math.max(this.height() - 32, 18);
-    const sqrt = this.usesSqrtScale();
     const data = this.data();
-    return data.map((bar, index) => {
-      const ratio = sqrt ? Math.sqrt(bar.value) / Math.sqrt(max) : bar.value / max;
-      return {
-        ...bar,
-        newGroup: index === 0 || bar.name !== data[index - 1].name,
-        // A non-zero value never renders as nothing.
-        px: bar.value > 0 ? Math.max(Math.round(ratio * track), 3) : 0,
-      };
-    });
+    return data.map((bar, index) => ({
+      ...bar,
+      newGroup: index === 0 || bar.name !== data[index - 1].name,
+      /*
+       * Linear, so a bar's length means what it looks like it means. The floor is what keeps a
+       * tiny value visible beside a huge one -- this used to switch to a square-root scale for
+       * that, which needed a caption to explain itself and, because the floor was already
+       * there, only ever served to overstate the middle of the range.
+       */
+      px: bar.value > 0 ? Math.max(Math.round((bar.value / max) * track), 3) : 0,
+    }));
   });
 }

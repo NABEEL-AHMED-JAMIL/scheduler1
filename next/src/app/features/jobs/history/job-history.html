@@ -190,7 +190,7 @@
           job is getting slower.
         </p>
         @if (durationTrend().length) {
-          <app-bar-chart [data]="durationTrend()" [height]="104" unit="runs" />
+          <app-bar-chart [data]="durationTrend()" [height]="104" />
         } @else {
           <p class="text-sm text-[color:var(--text-muted)] py-8 text-center">
             No run recorded both a start and an end time.
