@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard } from './core/auth/auth.guard';
+import { authGuard, roleGuard } from './core/auth/auth.guard';
 import { Shell } from './features/shell/shell';
 
 export const routes: Routes = [
@@ -58,6 +58,7 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/admin/storage/storage-connections').then(m => m.StorageConnections),
         data: { roles: ['PLATFORM_ADMIN', 'TENANT_ADMIN'] },
+        canActivate: [roleGuard],
       },
       {
         path: 'ai/agents',
@@ -67,11 +68,13 @@ export const routes: Routes = [
         path: 'admin/users',
         loadComponent: () => import('./features/admin/users/users').then(m => m.Users),
         data: { roles: ['PLATFORM_ADMIN', 'TENANT_ADMIN'] },
+        canActivate: [roleGuard],
       },
       {
         path: 'admin/tenants',
         loadComponent: () => import('./features/admin/tenants/tenants').then(m => m.Tenants),
         data: { roles: ['PLATFORM_ADMIN'] },
+        canActivate: [roleGuard],
       },
       {
         path: 'notifications',
@@ -82,6 +85,7 @@ export const routes: Routes = [
         path: 'ai/models',
         loadComponent: () => import('./features/ai/models/models').then(m => m.Models),
         data: { roles: ['PLATFORM_ADMIN', 'TENANT_ADMIN'] },
+        canActivate: [roleGuard],
       },
       {
         path: 'tools/converter',
@@ -100,6 +104,7 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/settings/task-types/task-types').then(m => m.TaskTypes),
         data: { roles: ['PLATFORM_ADMIN', 'TENANT_ADMIN'] },
+        canActivate: [roleGuard],
       },
       {
         path: 'unauthorized',
@@ -126,17 +131,20 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/settings/hub/settings-hub').then(m => m.SettingsHub),
         data: { roles: ['PLATFORM_ADMIN', 'TENANT_ADMIN'] },
+        canActivate: [roleGuard],
       },
       {
         path: 'settings/kafka',
         loadComponent: () =>
           import('./features/settings/kafka/kafka-connections').then(m => m.KafkaConnections),
         data: { roles: ['PLATFORM_ADMIN', 'TENANT_ADMIN'] },
+        canActivate: [roleGuard],
       },
       {
         path: 'settings/lookup',
         loadComponent: () => import('./features/settings/lookup/lookup').then(m => m.Lookup),
         data: { roles: ['PLATFORM_ADMIN', 'TENANT_ADMIN'] },
+        canActivate: [roleGuard],
       },
       {
         path: 'objects',
