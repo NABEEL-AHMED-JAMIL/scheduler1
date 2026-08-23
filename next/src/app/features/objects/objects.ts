@@ -315,7 +315,10 @@ export class Objects implements OnInit {
 
   preview(entry: ObjectSummary): void {
     this.dialog.open(PreviewDialog, {
-      data: { bucket: this.bucket(), key: entry.key, name: entry.name },
+      data: {
+        bucket: this.bucket(), key: entry.key, name: entry.name,
+        size: entry.size, lastModified: entry.lastModified,
+      },
       hasBackdrop: true,
     });
   }

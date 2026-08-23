@@ -1,13 +1,19 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { StorageService } from '../storage.service';
+import { DatePipe } from '@angular/common';
 import { Icon } from '../../../shared/ui/icon';
+import { AudioPlayer } from './audio-player';
+import { PdfViewer } from './pdf-viewer';
+import { copyText } from '../../../shared/ui/clipboard.util';
 
 export interface PreviewData {
   bucket: string;
   key: string;
   name: string;
+  size?: number;
+  lastModified?: string;
 }
 
 type PreviewKind = 'text' | 'json' | 'markdown' | 'image' | 'pdf' | 'audio' | 'video' | 'none';
@@ -17,7 +23,7 @@ const IMAGE = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'];
 
 @Component({
   selector: 'app-preview-dialog',
-  imports: [Icon],
+  imports: [Icon, DatePipe, AudioPlayer, PdfViewer],
   templateUrl: './preview-dialog.html',
 })
 export class PreviewDialog implements OnInit {
@@ -28,9 +34,51 @@ export class PreviewDialog implements OnInit {
 
   readonly kind = signal<PreviewKind>('none');
   readonly text = signal('');
-  readonly mediaUrl = signal<SafeResourceUrl | null>(null);
+  /**
+   * Two forms of the same blob. <img>, <audio> and <video> take the plain URL -- a blob: URL
+   * is already safe in that context, and a SafeResourceUrl passed through a child component's
+   * input is stringified into the attribute instead of being bound, which left the audio
+   * element with no source at all. Only the PDF iframe needs the RESOURCE_URL wrapper.
+   */
+  readonly mediaUrl = signal<string | null>(null);
+  readonly frameUrl = signal<SafeResourceUrl | null>(null);
   readonly loading = signal(true);
   readonly error = signal('');
+  readonly zoom = signal(1);
+  readonly copied = signal(false);
+
+  readonly extension = computed(() => this.extensionOf(this.data.name));
+
+  readonly isTextual = computed(() =>
+    ['text', 'json', 'markdown'].includes(this.kind()));
+
+  readonly kindIcon = computed(() => {
+    switch (this.kind()) {
+      case 'image':    return 'eye';
+      case 'pdf':      return 'file';
+      case 'audio':    return 'volume';
+      case 'video':    return 'play';
+      case 'json':
+      case 'markdown':
+      case 'text':     return 'file';
+      default:         return 'file';
+    }
+  });
+
+  readonly kindLabel = computed(() => {
+    switch (this.kind()) {
+      case 'json':     return 'JSON';
+      case 'markdown': return 'Markdown';
+      case 'text':     return 'Text';
+      case 'image':    return 'Image';
+      case 'pdf':      return 'PDF';
+      case 'audio':    return 'Audio';
+      case 'video':    return 'Video';
+      default:         return this.extension() || 'File';
+    }
+  });
+
+  readonly zoomLabel = computed(() => `${Math.round(this.zoom() * 100)}%`);
 
   private objectUrl: string | null = null;
 
@@ -102,13 +150,50 @@ export class PreviewDialog implements OnInit {
       next: blob => {
         this.loading.set(false);
         this.objectUrl = URL.createObjectURL(blob);
-        this.mediaUrl.set(this.sanitizer.bypassSecurityTrustResourceUrl(this.objectUrl));
+        this.mediaUrl.set(this.objectUrl);
+        this.frameUrl.set(this.sanitizer.bypassSecurityTrustResourceUrl(this.objectUrl));
       },
       error: err => {
         this.loading.set(false);
         this.error.set(err?.error?.message || 'Could not load this file.');
       },
     });
+  }
+
+  zoomBy(delta: number): void {
+    this.zoom.update(z => Math.min(4, Math.max(0.25, Math.round((z + delta) * 100) / 100)));
+  }
+
+  resetZoom(): void { this.zoom.set(1); }
+
+  /** Click the image to jump between fit and 2x, which is what people try first. */
+  toggleZoom(): void {
+    this.zoom.update(z => (z === 1 ? 2 : 1));
+  }
+
+  copy(): void {
+    copyText(this.text()).then(() => {
+      this.copied.set(true);
+      setTimeout(() => this.copied.set(false), 1500);
+    });
+  }
+
+  retry(): void {
+    this.error.set('');
+    this.loading.set(true);
+    this.zoom.set(1);
+    this.ngOnInit();
+  }
+
+  openInTab(): void {
+    window.open(this.storage.downloadUrl(this.data.bucket, this.data.key), '_blank', 'noopener');
+  }
+
+  humanSize(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KB`;
+    if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+    return `${(bytes / 1024 ** 3).toFixed(2)} GB`;
   }
 
   download(): void {

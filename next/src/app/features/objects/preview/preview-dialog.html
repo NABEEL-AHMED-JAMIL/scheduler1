@@ -1,43 +1,112 @@
-<div class="card shadow-2xl w-[56rem] max-w-[calc(100vw-2rem)] max-h-[85vh] flex flex-col overflow-hidden">
-  <div class="flex items-center gap-3 px-4 py-3 border-b shrink-0"
+<div class="card shadow-2xl w-[60rem] max-w-[calc(100vw-2rem)] max-h-[88vh] flex flex-col overflow-hidden">
+  <div class="flex items-center gap-3 px-4 py-2.5 border-b shrink-0"
        style="border-color: var(--border-subtle);">
-    <span class="text-sm font-medium truncate mr-auto" [title]="data.name">{{ data.name }}</span>
-    <button type="button" class="btn btn-default btn-sm" (click)="download()"><app-icon name="download" />Download</button>
-    <button type="button" class="btn btn-ghost btn-icon" (click)="close()" aria-label="Close"><app-icon name="close" /></button>
+    <app-icon [name]="kindIcon()" class="icon-info shrink-0" size="1.05em" />
+    <div class="min-w-0 mr-auto">
+      <div class="text-sm font-medium truncate leading-tight" [title]="data.name">{{ data.name }}</div>
+      <div class="text-[11px] text-[color:var(--text-muted)] flex items-center gap-2 leading-tight mt-0.5">
+        <span class="uppercase">{{ kindLabel() }}</span>
+        @if (data.size) { <span>·</span><span>{{ humanSize(data.size) }}</span> }
+        @if (data.lastModified) {
+          <span>·</span><span>{{ data.lastModified | date: 'd MMM yyyy, HH:mm' }}</span>
+        }
+      </div>
+    </div>
+
+    @if (kind() === 'image' && !loading() && !error()) {
+      <div class="flex items-center gap-1 mr-1">
+        <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="zoomBy(-0.25)"
+                [disabled]="zoom() <= 0.25" title="Zoom out"><app-icon name="minus" /></button>
+        <button type="button" class="btn btn-ghost btn-sm min-w-14 tabular" (click)="resetZoom()"
+                title="Reset to fit">{{ zoomLabel() }}</button>
+        <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="zoomBy(0.25)"
+                [disabled]="zoom() >= 4" title="Zoom in"><app-icon name="plus" /></button>
+      </div>
+    }
+
+    @if (isTextual() && !loading() && !error()) {
+      <button type="button" class="btn btn-ghost btn-sm" (click)="copy()">
+        <app-icon [name]="copied() ? 'check' : 'copy'" [class.icon-ok]="copied()" />
+        {{ copied() ? 'Copied' : 'Copy' }}
+      </button>
+    }
+
+    <button type="button" class="btn btn-ghost btn-sm" (click)="openInTab()" title="Open in a new tab">
+      <app-icon name="external" />Open
+    </button>
+    <button type="button" class="btn btn-default btn-sm" (click)="download()">
+      <app-icon name="download" />Download
+    </button>
+    <button type="button" class="btn btn-ghost btn-icon" (click)="close()" aria-label="Close">
+      <app-icon name="close" />
+    </button>
   </div>
 
-  <div class="flex-1 overflow-auto p-4 min-h-40">
+  <div class="flex-1 overflow-auto min-h-48" style="background: var(--surface-sunken);"
+       [class.p-4]="kind() !== 'pdf' && kind() !== 'image'">
     @if (loading()) {
-      <p class="text-center text-sm text-[color:var(--text-muted)] py-12">Loading…</p>
+      <div class="flex flex-col items-center justify-center py-20 gap-3">
+        <app-icon name="refresh" size="1.5rem" class="spin icon-muted" />
+        <p class="text-sm text-[color:var(--text-muted)]">Loading {{ kindLabel().toLowerCase() }}…</p>
+      </div>
     } @else if (error()) {
-      <p class="text-center text-sm text-crit-500 py-12">{{ error() }}</p>
+      <div class="flex flex-col items-center justify-center py-20 gap-3 px-6 text-center">
+        <app-icon name="alert" size="1.75rem" class="icon-crit" />
+        <p class="text-sm text-crit-500">{{ error() }}</p>
+        <div class="flex gap-2 mt-1">
+          <button type="button" class="btn btn-default btn-sm" (click)="retry()">
+            <app-icon name="refresh" />Try again
+          </button>
+          <button type="button" class="btn btn-ghost btn-sm" (click)="download()">
+            <app-icon name="download" />Download instead
+          </button>
+        </div>
+      </div>
     } @else {
       @switch (kind()) {
         @case ('none') {
-          <div class="text-center py-12">
-            <p class="text-sm text-[color:var(--text-secondary)]">
-              There's no inline preview for this file type.
-            </p>
-            <button type="button" class="btn btn-primary btn-sm mt-3" (click)="download()">
-              Download instead
+          <div class="flex flex-col items-center justify-center py-20 gap-3 px-6 text-center">
+            <app-icon name="file" size="1.75rem" class="icon-muted" />
+            <div>
+              <p class="text-sm font-medium">No inline preview for this file type</p>
+              <p class="text-xs text-[color:var(--text-muted)] mt-1">
+                {{ extension() ? '.' + extension() + ' files' : 'Files of this type' }} open in
+                whatever application you have for them.
+              </p>
+            </div>
+            <button type="button" class="btn btn-primary btn-sm mt-1" (click)="download()">
+              <app-icon name="download" />Download
             </button>
           </div>
         }
         @case ('image') {
-          <img [src]="mediaUrl()" [alt]="data.name" class="max-w-full mx-auto rounded" />
+          <div class="min-h-full flex items-center justify-center p-4"
+               [class.cursor-zoom-in]="zoom() === 1" [class.cursor-zoom-out]="zoom() > 1"
+               (click)="toggleZoom()">
+            <img [src]="mediaUrl()" [alt]="data.name"
+                 class="rounded shadow-sm transition-transform duration-150 origin-center"
+                 [style.transform]="'scale(' + zoom() + ')'"
+                 [style.max-width]="zoom() === 1 ? '100%' : 'none'"
+                 [style.max-height]="zoom() === 1 ? '70vh' : 'none'" />
+          </div>
         }
         @case ('pdf') {
-          <iframe [src]="mediaUrl()" class="w-full h-[65vh] rounded border"
-                  style="border-color: var(--border-subtle);" [title]="data.name"></iframe>
+          <div class="h-[72vh]"><app-pdf-viewer [src]="mediaUrl()" /></div>
         }
         @case ('audio') {
-          <audio [src]="mediaUrl()" controls class="w-full mt-6"></audio>
+          <div class="max-w-2xl mx-auto py-10">
+            <app-audio-player [src]="mediaUrl()" />
+          </div>
         }
         @case ('video') {
-          <video [src]="mediaUrl()" controls class="w-full max-h-[65vh] rounded"></video>
+          <div class="flex items-center justify-center py-2">
+            <video [src]="mediaUrl()" controls playsinline
+                   class="max-w-full max-h-[70vh] rounded shadow-sm bg-black"></video>
+          </div>
         }
         @default {
-          <pre class="mono text-xs leading-relaxed whitespace-pre-wrap break-words">{{ text() }}</pre>
+          <pre class="mono text-xs leading-relaxed whitespace-pre-wrap break-words
+                      rounded p-3" style="background: var(--surface-raised);">{{ text() }}</pre>
         }
       }
     }
