@@ -14,7 +14,8 @@
             <a [routerLink]="item.path"
                routerLinkActive="!text-brand-600 !bg-brand-50"
                [routerLinkActiveOptions]="{ exact: item.path === '/' }"
-               class="px-2.5 py-1.5 rounded-md text-sm font-medium text-[color:var(--text-secondary)]
+               class="px-2.5 py-1.5 rounded-md text-sm font-medium whitespace-nowrap
+                      text-[color:var(--text-secondary)]
                       hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-sunken)]">
               {{ item.label }}
             </a>
@@ -22,7 +23,8 @@
             <div class="relative" data-nav-menu>
               <button type="button" (click)="toggleMenu(item.label)"
                       class="px-2.5 py-1.5 rounded-md text-sm font-medium inline-flex items-center gap-1
-                             text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]
+                             whitespace-nowrap text-[color:var(--text-secondary)]
+                             hover:text-[color:var(--text-primary)]
                              hover:bg-[color:var(--surface-sunken)]"
                       [class.bg-brand-50]="openMenu() === item.label"
                       [class.text-brand-600]="openMenu() === item.label">
@@ -32,14 +34,21 @@
                           [class.rotate-180]="openMenu() === item.label" />
               </button>
               @if (openMenu() === item.label) {
-                <div class="absolute left-0 top-full mt-1 min-w-52 rounded-lg border shadow-lg py-1 z-50"
+                <div class="absolute left-0 top-full mt-1 min-w-72 rounded-lg border shadow-lg p-1 z-50"
                      style="background: var(--surface-raised); border-color: var(--border-subtle);">
                   @for (child of item.children; track child.path) {
                     <a [routerLink]="child.path" (click)="openMenu.set(null)"
-                       routerLinkActive="text-brand-600 bg-brand-50"
-                       class="block px-3 py-1.5 text-sm text-[color:var(--text-secondary)]
-                              hover:bg-[color:var(--surface-sunken)] hover:text-[color:var(--text-primary)]">
-                      {{ child.label }}
+                       routerLinkActive="nav-child-active"
+                       class="nav-child">
+                      <app-icon [name]="child.icon" size="1em" class="nav-child-icon" />
+                      <span class="min-w-0">
+                        <span class="block text-sm leading-tight">{{ child.label }}</span>
+                        @if (child.hint) {
+                          <span class="block text-[11px] leading-tight mt-0.5 text-[color:var(--text-muted)]">
+                            {{ child.hint }}
+                          </span>
+                        }
+                      </span>
                     </a>
                   }
                 </div>
@@ -100,15 +109,30 @@
         @for (item of nav(); track item.label) {
           @if (item.path) {
             <a [routerLink]="item.path" (click)="mobileOpen.set(false)"
-               class="block px-2.5 py-2 rounded-md text-sm font-medium">{{ item.label }}</a>
+               routerLinkActive="nav-child-active"
+               [routerLinkActiveOptions]="{ exact: item.path === '/' }"
+               class="nav-child font-medium">
+              @if (item.icon) { <app-icon [name]="item.icon" size="1em" class="nav-child-icon" /> }
+              <span class="text-sm">{{ item.label }}</span>
+            </a>
           } @else {
             <div class="pt-1.5">
-              <div class="px-2.5 text-[11px] font-semibold uppercase tracking-wider text-[color:var(--text-muted)]">
+              <div class="px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-[color:var(--text-muted)]">
                 {{ item.label }}
               </div>
               @for (child of item.children; track child.path) {
                 <a [routerLink]="child.path" (click)="mobileOpen.set(false)"
-                   class="block px-2.5 py-2 rounded-md text-sm">{{ child.label }}</a>
+                   routerLinkActive="nav-child-active" class="nav-child">
+                  <app-icon [name]="child.icon" size="1em" class="nav-child-icon" />
+                  <span class="min-w-0">
+                    <span class="block text-sm leading-tight">{{ child.label }}</span>
+                    @if (child.hint) {
+                      <span class="block text-[11px] leading-tight mt-0.5 text-[color:var(--text-muted)]">
+                        {{ child.hint }}
+                      </span>
+                    }
+                  </span>
+                </a>
               }
             </div>
           }

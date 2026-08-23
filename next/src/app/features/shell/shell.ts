@@ -5,10 +5,21 @@ import { AuthService } from '../../core/auth/auth.service';
 import { ThemeService } from '../../core/theme.service';
 import { Icon } from '../../shared/ui/icon';
 
+interface NavChild {
+  label: string;
+  path: string;
+  icon: string;
+  /** One line saying what the screen is for, shown beside the label in the menu. */
+  hint?: string;
+  adminOnly?: boolean;
+  platformOnly?: boolean;
+}
+
 interface NavItem {
   label: string;
   path?: string;
-  children?: { label: string; path: string; adminOnly?: boolean; platformOnly?: boolean }[];
+  icon?: string;
+  children?: NavChild[];
   adminOnly?: boolean;
 }
 
@@ -24,44 +35,75 @@ export class Shell {
   readonly openMenu = signal<string | null>(null);
   readonly mobileOpen = signal(false);
 
+  /**
+   * Grouped by the job someone is doing, not by which part of the backend serves it.
+   *
+   * "Admin" previously held seven entries that mixed managing people with configuring
+   * infrastructure -- different tasks, done by different people, at different times. Those are
+   * now Administration and Configuration. "Source" named an internal concept rather than a
+   * purpose; it is Pipelines, and the queue moved into it because a run belongs beside the
+   * job that produced it.
+   */
   private readonly allNav: NavItem[] = [
-    { label: 'Dashboard', path: '/' },
+    { label: 'Dashboard', path: '/', icon: 'chart' },
     {
-      label: 'Source',
+      label: 'Pipelines',
       children: [
-        { label: 'Source Job', path: '/jobs' },
-        { label: 'Source Task', path: '/tasks' },
-        { label: 'Q-Message', path: '/queue' },
+        { label: 'Source Jobs', path: '/jobs', icon: 'briefcase',
+          hint: 'Scheduled work and its runs' },
+        { label: 'Source Tasks', path: '/tasks', icon: 'list',
+          hint: 'What a job does, and where' },
+        { label: 'Queue', path: '/queue', icon: 'clock',
+          hint: 'What is in flight right now' },
       ],
     },
-    { label: 'Object Browser', path: '/objects' },
+    { label: 'Object Browser', path: '/objects', icon: 'folder' },
     {
       label: 'Tools',
       children: [
-        { label: 'Query Engine', path: '/tools/query' },
-        { label: 'Document Converter', path: '/tools/converter' },
-        { label: 'Audio Transcript', path: '/tools/transcript' },
-        { label: 'Content Cleaner', path: '/tools/cleaner' },
+        { label: 'Query Engine', path: '/tools/query', icon: 'database',
+          hint: 'Saved SQL, run or scheduled' },
+        { label: 'Document Converter', path: '/tools/converter', icon: 'file',
+          hint: 'Convert between formats' },
+        { label: 'Audio Transcript', path: '/tools/transcript', icon: 'volume',
+          hint: 'Speech to text' },
+        { label: 'Content Cleaner', path: '/tools/cleaner', icon: 'sparkle',
+          hint: 'Tidy extracted text' },
       ],
     },
     {
-      label: 'AI Suite',
+      label: 'AI',
       children: [
-        { label: 'AI Agents', path: '/ai/agents' },
-        { label: 'Models', path: '/ai/models', adminOnly: true },
+        { label: 'AI Agents', path: '/ai/agents', icon: 'sparkle',
+          hint: 'Provider, model and instructions' },
+        { label: 'Models', path: '/ai/models', icon: 'server', adminOnly: true,
+          hint: 'Local Ollama models' },
       ],
     },
     {
-      label: 'Admin',
+      label: 'Configuration',
       adminOnly: true,
       children: [
-        { label: 'Users', path: '/admin/users', adminOnly: true },
-        { label: 'Tenants', path: '/admin/tenants', platformOnly: true },
-        { label: 'Storage Connections', path: '/admin/storage', adminOnly: true },
-        { label: 'Kafka Connections', path: '/settings/kafka', adminOnly: true },
-        { label: 'Source Task Types', path: '/settings/task-types', adminOnly: true },
-        { label: 'Lookups', path: '/settings/lookup', adminOnly: true },
-        { label: 'All settings', path: '/admin/settings', adminOnly: true },
+        { label: 'Source Task Types', path: '/settings/task-types', icon: 'layers', adminOnly: true,
+          hint: 'Consumers and their Kafka topics' },
+        { label: 'Lookups', path: '/settings/lookup', icon: 'list', adminOnly: true,
+          hint: 'Shared key and value data' },
+        { label: 'Storage Connections', path: '/admin/storage', icon: 'cloud', adminOnly: true,
+          hint: 'S3, Azure, MinIO, FTP' },
+        { label: 'Kafka Connections', path: '/settings/kafka', icon: 'server', adminOnly: true,
+          hint: 'Brokers and credentials' },
+        { label: 'All settings', path: '/admin/settings', icon: 'settings', adminOnly: true,
+          hint: 'Every area in one place' },
+      ],
+    },
+    {
+      label: 'Administration',
+      adminOnly: true,
+      children: [
+        { label: 'Users', path: '/admin/users', icon: 'users', adminOnly: true,
+          hint: 'Who can sign in, and as what' },
+        { label: 'Tenants', path: '/admin/tenants', icon: 'globe', platformOnly: true,
+          hint: 'Isolated workspaces' },
       ],
     },
   ];

@@ -371,6 +371,9 @@ html.dark .icon-info { color: var(--color-brand-300); }
 html.dark .settings-hub-glyph { color: var(--color-brand-300); }
 html.dark .tab-active app-icon { color: var(--color-brand-300); }
 html.dark .md-link { color: var(--color-brand-300); }
+html.dark .nav-child-active { @apply text-brand-300; }
+html.dark .nav-child:hover .nav-child-icon,
+html.dark .nav-child-active .nav-child-icon { color: var(--color-brand-300); }
 
 html.dark .btn-intent-warn:hover app-icon,
 html.dark .btn-intent-warn:focus app-icon { color: var(--color-warn-400); }
@@ -411,6 +414,21 @@ html.dark .btn-intent-crit:focus app-icon { color: var(--color-crit-400); }
   .icon-crit  { color: var(--color-crit-500); }
   .icon-info  { color: var(--color-brand-500); }
   .icon-muted { color: var(--text-muted); }
+
+  /* Nav dropdown rows: icon, label and a line of purpose. Wider than a bare list because a
+     menu that says what each screen is for saves a wrong click. */
+  .nav-child {
+    @apply flex items-start gap-2.5 rounded-md px-2.5 py-2 text-[color:var(--text-secondary)]
+           hover:bg-[color:var(--surface-sunken)] hover:text-[color:var(--text-primary)]
+           focus-visible:bg-[color:var(--surface-sunken)];
+  }
+  .nav-child-icon { @apply mt-0.5 shrink-0 text-[color:var(--text-muted)]; }
+  .nav-child:hover .nav-child-icon { color: var(--color-brand-500); }
+  .nav-child-active {
+    background: var(--surface-sunken);
+    @apply text-brand-600;
+  }
+  .nav-child-active .nav-child-icon { color: var(--color-brand-500); }
 
   .menu-item {
     @apply w-full text-left px-3 py-1.5 rounded-sm inline-flex items-center gap-2
