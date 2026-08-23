@@ -25,10 +25,24 @@
     }
 
     @if (isTextual() && !loading() && !error()) {
-      <button type="button" class="btn btn-ghost btn-sm" (click)="copy()">
-        <app-icon [name]="copied() ? 'check' : 'copy'" [class.icon-ok]="copied()" />
-        {{ copied() ? 'Copied' : 'Copy' }}
-      </button>
+      @if (editing()) {
+        <button type="button" class="btn btn-ghost btn-sm" [disabled]="saving()" (click)="cancelEdit()">
+          <app-icon name="close" />Cancel
+        </button>
+        <button type="button" class="btn btn-primary btn-sm"
+                [disabled]="saving() || draft() === text()" (click)="save()">
+          <app-icon name="check" [class.spin]="saving()" />{{ saving() ? 'Saving…' : 'Save' }}
+        </button>
+      } @else {
+        <button type="button" class="btn btn-ghost btn-sm" (click)="copy()">
+          <app-icon [name]="copied() ? 'check' : 'copy'" [class.icon-ok]="copied()" />
+          {{ copied() ? 'Copied' : 'Copy' }}
+        </button>
+        <button type="button" class="btn btn-ghost btn-sm" (click)="startEdit()"
+                title="Edit this file and save it back">
+          <app-icon name="edit" />Edit
+        </button>
+      }
     }
 
     <button type="button" class="btn btn-ghost btn-sm" (click)="openInTab()" title="Open in a new tab">
@@ -105,8 +119,15 @@
           </div>
         }
         @default {
-          <pre class="mono text-xs leading-relaxed whitespace-pre-wrap break-words
-                      rounded p-3" style="background: var(--surface-raised);">{{ text() }}</pre>
+          @if (editing()) {
+            <textarea class="input mono text-xs leading-relaxed w-full h-[70vh] resize-none"
+                      spellcheck="false"
+                      [value]="draft()"
+                      (input)="draft.set($any($event.target).value)"></textarea>
+          } @else {
+            <pre class="mono text-xs leading-relaxed whitespace-pre-wrap break-words
+                        rounded p-3" style="background: var(--surface-raised);">{{ text() }}</pre>
+          }
         }
       }
     }

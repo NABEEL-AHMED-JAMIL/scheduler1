@@ -343,13 +343,15 @@ export class Objects implements OnInit {
   readonly chatFile = signal<ObjectSummary | null>(null);
 
   preview(entry: ObjectSummary): void {
-    this.dialog.open(PreviewDialog, {
+    this.dialog.open<boolean>(PreviewDialog, {
       data: {
         bucket: this.bucket(), key: entry.key, name: entry.name,
         size: entry.size, lastModified: entry.lastModified,
       },
       hasBackdrop: true,
-    });
+    // An edit saved from the preview overwrites the object, so the row's size and modified
+    // date are stale until the folder is read again.
+    }).closed.subscribe(saved => { if (saved) this.load(); });
   }
 
   openChat(entry: ObjectSummary): void {

@@ -2,6 +2,7 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { StorageService } from '../storage.service';
+import { API_SUCCESS } from '../../../core/api/api.config';
 import { DatePipe } from '@angular/common';
 import { Icon } from '../../../shared/ui/icon';
 import { AudioPlayer } from './audio-player';
@@ -27,7 +28,7 @@ const IMAGE = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'];
   templateUrl: './preview-dialog.html',
 })
 export class PreviewDialog implements OnInit {
-  readonly ref = inject<DialogRef<void>>(DialogRef);
+  readonly ref = inject<DialogRef<boolean>>(DialogRef);
   readonly data = inject<PreviewData>(DIALOG_DATA);
   private readonly storage = inject(StorageService);
   private readonly sanitizer = inject(DomSanitizer);
@@ -46,6 +47,10 @@ export class PreviewDialog implements OnInit {
   readonly error = signal('');
   readonly zoom = signal(1);
   readonly copied = signal(false);
+  readonly editing = signal(false);
+  readonly draft = signal('');
+  readonly saving = signal(false);
+  private didSave = false;
 
   readonly extension = computed(() => this.extensionOf(this.data.name));
 
@@ -171,6 +176,54 @@ export class PreviewDialog implements OnInit {
     this.zoom.update(z => (z === 1 ? 2 : 1));
   }
 
+  /**
+   * Editing writes the file back through uploadObject, which overwrites the key -- the same
+   * route the legacy preview used. Only offered for text-like kinds; there is nothing sensible
+   * to hand a textarea for an image or a PDF.
+   */
+  startEdit(): void {
+    this.draft.set(this.text());
+    this.editing.set(true);
+  }
+
+  cancelEdit(): void {
+    this.editing.set(false);
+  }
+
+  save(): void {
+    if (this.saving()) return;
+    const text = this.draft();
+    const type = this.kind() === 'json' ? 'application/json'
+      : this.kind() === 'markdown' ? 'text/markdown' : 'text/plain';
+
+    this.saving.set(true);
+    const file = new File([text], this.data.name, { type });
+    this.storage.upload(this.data.bucket, this.folderOfKey(), file).subscribe({
+      next: response => {
+        this.saving.set(false);
+        if (response.status !== API_SUCCESS) { this.error.set(response.message); return; }
+        // Re-pretty-print JSON so the saved view matches what a fresh load would show.
+        this.text.set(this.kind() === 'json' ? this.prettyJson(text) : text);
+        this.editing.set(false);
+        this.didSave = true;
+      },
+      error: err => {
+        this.saving.set(false);
+        this.error.set(err?.error?.message || 'Could not save this file.');
+      },
+    });
+  }
+
+  /** uploadObject takes the containing folder, not the full key. */
+  private folderOfKey(): string {
+    const cut = this.data.key.lastIndexOf('/');
+    return cut > 0 ? this.data.key.slice(0, cut + 1) : '';
+  }
+
+  private prettyJson(text: string): string {
+    try { return JSON.stringify(JSON.parse(text), null, 2); } catch { return text; }
+  }
+
   copy(): void {
     copyText(this.text()).then(() => {
       this.copied.set(true);
@@ -203,6 +256,7 @@ export class PreviewDialog implements OnInit {
   close(): void {
     // Blob URLs leak for the life of the document unless released explicitly.
     if (this.objectUrl) URL.revokeObjectURL(this.objectUrl);
-    this.ref.close();
+    // Tells the browser whether the listing's size and modified date are now stale.
+    this.ref.close(this.didSave);
   }
 }
