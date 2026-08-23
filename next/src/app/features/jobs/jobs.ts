@@ -10,6 +10,7 @@ import { confirmWith } from '../../shared/ui/confirm';
 import { TableShell } from '../../shared/ui/data-table';
 import { StatusPill } from '../../shared/ui/status-pill';
 import { Icon } from '../../shared/ui/icon';
+import { NotifyDialog } from './notify-dialog';
 
 export interface Scheduler {
   schedulerId: number;
@@ -272,12 +273,26 @@ export class Jobs implements OnInit {
     });
   }
 
-  notifications(job: SourceJob): string {
-    const on: string[] = [];
-    if (job.completeJob) on.push('complete');
-    if (job.failJob) on.push('fail');
-    if (job.skipJob) on.push('skip');
-    return on.length ? `Emails on ${on.join(', ')}` : 'No emails';
+  /** The three switches as chips, so the row reads at a glance rather than as a sentence. */
+  notifyChips(job: SourceJob) {
+    return [
+      { label: 'complete', on: !!job.completeJob, icon: 'checkCircle', intent: 'icon-ok' },
+      { label: 'fail',     on: !!job.failJob,     icon: 'xCircle',     intent: 'icon-crit' },
+      { label: 'skip',     on: !!job.skipJob,     icon: 'alert',       intent: 'icon-warn' },
+    ];
+  }
+
+  notifyCount(job: SourceJob): number {
+    return [job.completeJob, job.failJob, job.skipJob].filter(Boolean).length;
+  }
+
+  editNotifications(job: SourceJob): void {
+    this.dialog.open<boolean>(NotifyDialog, {
+      data: {
+        jobId: job.jobId, jobName: job.jobName,
+        completeJob: job.completeJob, failJob: job.failJob, skipJob: job.skipJob,
+      },
+    }).closed.subscribe(saved => { if (saved) this.load(); });
   }
 
   clearFilters(): void {

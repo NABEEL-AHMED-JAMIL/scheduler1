@@ -129,8 +129,19 @@
                   <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="clone(job)">
                     <app-icon name="copy" />Duplicate
                   </button>
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="editNotifications(job)">
+                    <app-icon name="bell" />Email notifications
+                    @if (notifyCount(job)) {
+                      <span class="pill pill-brand ml-auto">{{ notifyCount(job) }}</span>
+                    } @else {
+                      <span class="text-[11px] text-[color:var(--text-muted)] ml-auto">off</span>
+                    }
+                  </button>
                   <div class="my-1 border-t" style="border-color: var(--border-subtle);"></div>
-                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="toggleStatus(job)">
+                  <button cdkMenuItem class="menu-item"
+                          [class]="job.jobStatus === 'Active' ? 'btn-intent-warn' : 'btn-intent-ok'"
+                          (cdkMenuItemTriggered)="toggleStatus(job)">
+                    <app-icon [name]="job.jobStatus === 'Active' ? 'pause' : 'play'" />
                     {{ job.jobStatus === 'Active' ? 'Deactivate' : 'Activate' }}
                   </button>
                   <button cdkMenuItem class="menu-item menu-item-danger"
@@ -168,9 +179,25 @@
                   }
                   <div>
                     <dt class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">
-                      Notifications
+                      Email notifications
                     </dt>
-                    <dd>{{ notifications(job) }}</dd>
+                    <dd class="flex flex-wrap items-center gap-1.5 mt-1">
+                      @for (chip of notifyChips(job); track chip.label) {
+                        <span [class]="chip.on ? 'pill pill-neutral' : 'pill pill-neutral opacity-45'"
+                              [title]="chip.on ? 'Emailed when the job ' + chip.label + 's'
+                                               : 'Not emailed when the job ' + chip.label + 's'">
+                          @if (chip.on) {
+                            <app-icon [name]="chip.icon" [class]="chip.intent" size="0.85em" />
+                          } @else {
+                            <app-icon name="minus" size="0.85em" class="icon-muted" />
+                          }
+                          {{ chip.label }}
+                        </span>
+                      }
+                      <button type="button" class="btn btn-ghost btn-sm" (click)="editNotifications(job)">
+                        <app-icon name="edit" size="0.85em" />Change
+                      </button>
+                    </dd>
                   </div>
                 </dl>
               </td>
