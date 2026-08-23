@@ -10,7 +10,11 @@ import { Icon } from './icon';
   selector: 'app-form-dialog',
   imports: [Icon],
   template: `
-    <div class="card shadow-2xl w-[34rem] max-w-[calc(100vw-2rem)] max-h-[85vh] flex flex-col overflow-hidden">
+    <!-- width as a style rather than a toggled utility class: Angular class bindings do not
+         reliably carry a Tailwind arbitrary value like w-[58rem], and silently applying
+         neither left the card sized to its content. -->
+    <div class="card shadow-2xl max-w-[calc(100vw-2rem)] max-h-[85vh] flex flex-col overflow-hidden"
+         [style.width]="size() === 'wide' ? '58rem' : '34rem'">
       <div class="px-5 py-3.5 border-b shrink-0" style="border-color: var(--border-subtle);">
         <h2 class="text-base font-semibold">{{ heading() }}</h2>
         @if (subtitle()) {
@@ -43,6 +47,13 @@ export class FormDialog {
   readonly subtitle = input('');
   readonly confirmLabel = input('Save');
   readonly saving = input(false);
+  /**
+   * 'wide' for forms with enough fields that the default column runs to two screens of
+   * scrolling -- the Kafka profile is thirteen fields plus TLS material and a guide. The
+   * form grid is container-query driven, so the extra width becomes extra columns on its
+   * own, and max-w keeps it inside a tablet viewport.
+   */
+  readonly size = input<'default' | 'wide'>('default');
   readonly cancelled = output<void>();
   readonly confirmed = output<void>();
 }

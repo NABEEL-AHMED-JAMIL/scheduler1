@@ -20,6 +20,7 @@ const SASL_MECHANISMS = ['PLAIN', 'SCRAM-SHA-256', 'SCRAM-SHA-512'];
   imports: [ReactiveFormsModule, Field, FormDialog, Icon],
   template: `
     <app-form-dialog
+      size="wide"
         [heading]="isEdit() ? 'Edit Kafka profile' : 'New Kafka profile'"
         subtitle="Where a task publishes and consumes. Secrets are stored encrypted."
         [confirmLabel]="isEdit() ? 'Save changes' : 'Create'"
@@ -126,8 +127,9 @@ const SASL_MECHANISMS = ['PLAIN', 'SCRAM-SHA-256', 'SCRAM-SHA-512'];
               </button>
             </div>
 
+            <div class="tls-layout" [class.tls-with-guide]="showGuide()">
             @if (showGuide()) {
-              <div class="guide">
+              <aside class="guide">
                 <p class="guide-lead">
                   A truststore tells this client which broker certificates to trust. A keystore
                   is only needed when the broker asks the client to prove who it is (mTLS).
@@ -185,7 +187,7 @@ const SASL_MECHANISMS = ['PLAIN', 'SCRAM-SHA-256', 'SCRAM-SHA-512'];
                   Passwords are stored encrypted and never sent back to this screen — an
                   existing one shows as dots and stays unless you type a new value.
                 </p>
-              </div>
+              </aside>
             }
             <div class="form-grid">
               <app-field label="Truststore bucket" for="sslTruststoreBucket"
@@ -269,6 +271,7 @@ const SASL_MECHANISMS = ['PLAIN', 'SCRAM-SHA-256', 'SCRAM-SHA-512'];
                        formControlName="sslKeyPassword" autocomplete="new-password"
                        [placeholder]="data.profile?.sslKeyPasswordConfigured ? '••••••••' : ''" />
               </app-field>
+            </div>
             </div>
           </div>
         }

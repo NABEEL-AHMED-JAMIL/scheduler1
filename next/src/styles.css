@@ -203,6 +203,16 @@
 
   /* File input beside its upload button; the native control has its own chrome, so it gets
      the row rather than being forced into the form grid's column rhythm. */
+  /* The guide sits beside the TLS fields once there is width for it, so opening it costs
+     no vertical scroll; below that it stacks above them as before. Source order puts the
+     guide first so it reads first when stacked, and the columns swap it back on the right. */
+  .tls-layout { @apply grid gap-x-6 gap-y-4; }
+  @container (min-width: 52rem) {
+    .tls-with-guide { grid-template-columns: minmax(0, 1fr) 21rem; }
+    .tls-with-guide > .guide { @apply order-2 mb-0 self-start sticky top-0; }
+    .tls-with-guide > .form-grid { @apply order-1; }
+  }
+
   .upload-row { @apply flex flex-wrap items-center gap-2; }
   .upload-row input[type="file"] { @apply flex-1 min-w-48 text-xs py-1; }
 
