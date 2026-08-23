@@ -1,4 +1,5 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
@@ -150,13 +151,41 @@ export class Objects implements OnInit {
     return rows.length > 0 && rows.every(o => this.selected().has(o.key));
   });
 
+  private readonly route = inject(ActivatedRoute);
+
   ngOnInit(): void {
     this.storage.buckets().subscribe({
       next: response => {
-        if (response.status === API_SUCCESS) this.buckets.set(response.data ?? []);
+        if (response.status === API_SUCCESS) {
+          this.buckets.set(response.data ?? []);
+          this.openDeepLink();
+        }
       },
       error: () => this.toast.error('Could not load storage connections.'),
     });
+  }
+
+  /**
+   * ?bucket=&prefix= opens the browser straight at a folder. A job's row links here with the
+   * bucket its task writes to, and without this the link landed on an empty browser with
+   * nothing selected. Waits for the bucket list so an unknown bucket can be ignored rather
+   * than left selected and failing to load.
+   */
+  private openDeepLink(): void {
+    const params = this.route.snapshot.queryParamMap;
+    const bucket = params.get('bucket');
+    if (!bucket || !this.buckets().some(b => b.bucket === bucket)) return;
+
+    const prefix = params.get('prefix') || '';
+    this.bucket.set(bucket);
+    this.prefix.set(prefix);
+    this.crumbs.set(prefix
+      ? prefix.replace(/\/+$/, '').split('/').map((segment, index, segments) => ({
+          name: segment,
+          prefix: segments.slice(0, index + 1).join('/') + '/',
+        }))
+      : []);
+    this.load();
   }
 
   onBucketChange(value: string): void {

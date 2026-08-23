@@ -8,11 +8,13 @@
     </div>
     <div class="w-full sm:w-72">
       <label class="label" for="bucket">Connection</label>
-      <select id="bucket" class="input" [value]="bucket()"
+      <!-- [selected] per option rather than [value] on the select: the options come from an
+           async list, and a value set on the select before they exist does not stick. -->
+      <select id="bucket" class="input"
               (change)="onBucketChange($any($event.target).value)">
-        <option value="">Select a connection</option>
+        <option value="" [selected]="!bucket()">Select a connection</option>
         @for (b of buckets(); track b.bucket) {
-          <option [value]="b.bucket">{{ b.label }} · {{ b.provider }}</option>
+          <option [value]="b.bucket" [selected]="b.bucket === bucket()">{{ b.label }} · {{ b.provider }}</option>
         }
       </select>
     </div>

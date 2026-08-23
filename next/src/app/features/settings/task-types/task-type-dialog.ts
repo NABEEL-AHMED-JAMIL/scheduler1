@@ -8,6 +8,7 @@ import { Field } from '../../../shared/ui/field';
 import { FormDialog } from '../../../shared/ui/form-dialog';
 import { AuthService } from '../../../core/auth/auth.service';
 import { Icon } from '../../../shared/ui/icon';
+import { parseTopicPartition, formatTopicPartition } from '../../../shared/ui/topic';
 
 export interface TaskType {
   sourceTaskTypeId?: number;
@@ -111,11 +112,7 @@ export class TaskTypeDialog implements OnInit {
   readonly canRoute = computed(() => !this.auth.isPlatformAdmin());
 
   /** Stored as one string, "topic=x&partitions=[*]", but edited as two fields. */
-  private parse(value?: string): { topic: string; partitions: string } {
-    const params = new URLSearchParams(value ?? '');
-    const raw = params.get('partitions') ?? '[*]';
-    return { topic: params.get('topic') ?? '', partitions: raw.replace(/^\[|\]$/g, '') || '*' };
-  }
+  private parse(value?: string) { return parseTopicPartition(value); }
 
   readonly form: FormGroup = this.fb.group({
     sourceTaskTypeId: [this.data.type?.sourceTaskTypeId ?? null],
@@ -158,7 +155,7 @@ export class TaskTypeDialog implements OnInit {
       sourceTaskTypeId: value.sourceTaskTypeId,
       serviceName: value.serviceName,
       description: value.description,
-      queueTopicPartition: `topic=${value.topic}&partitions=[${value.partitions || '*'}]`,
+      queueTopicPartition: formatTopicPartition(value.topic, value.partitions),
       status: value.status,
     };
 

@@ -11,6 +11,7 @@ import { ToastService } from '../../../shared/ui/toast.service';
 import { confirmWith } from '../../../shared/ui/confirm';
 import { TaskType, TaskTypeDialog } from './task-type-dialog';
 import { AuthService } from '../../../core/auth/auth.service';
+import { parseTopicPartition } from '../../../shared/ui/topic';
 
 @Component({
   selector: 'app-task-types',
@@ -175,15 +176,10 @@ export class TaskTypes implements OnInit {
     });
   }
 
-  topicOf(raw?: string): string {
-    if (!raw) return '';
-    const match = /topic=([^&]+)/.exec(raw);
-    return match ? match[1] : raw;
-  }
+  topicOf(raw?: string): string { return parseTopicPartition(raw).topic; }
 
   partitionsOf(raw?: string): string {
-    if (!raw) return '';
-    const match = /partitions=(\[[^\]]*\])/.exec(raw);
-    return match ? match[1] : '';
+    const partitions = parseTopicPartition(raw).partitions;
+    return partitions ? `[${partitions}]` : '';
   }
 }

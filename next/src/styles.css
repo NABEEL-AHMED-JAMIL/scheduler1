@@ -178,6 +178,14 @@
 
   .row-selected > td { background: var(--surface-sunken); }
 
+  /* An inline link inside a definition list: coloured and underlined on hover, so it reads
+     as a link without a button's weight. */
+  .link-inline {
+    color: var(--color-brand-600);
+    @apply inline-flex items-center gap-1 hover:underline;
+  }
+  html.dark .link-inline { color: var(--color-brand-300); }
+
   .stat-glyph {
     background: var(--surface-sunken);
     @apply shrink-0 grid place-items-center rounded-lg w-8 h-8 text-base;

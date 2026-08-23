@@ -212,6 +212,34 @@
                       </div>
                     }
                   }
+                  @if (job.taskDetail?.taskDetailId) {
+                    <div>
+                      <dt class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">Task</dt>
+                      <dd class="mt-1">
+                        <a class="link-inline" [routerLink]="['/tasks', job.taskDetail!.taskDetailId, 'edit']">
+                          <app-icon name="link" size="0.85em" class="icon-info" />
+                          #{{ job.taskDetail!.taskDetailId }} {{ job.taskDetail!.taskName }}
+                        </a>
+                      </dd>
+                    </div>
+                  }
+                  @if (topicOf(job)) {
+                    <div>
+                      <dt class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">Topic</dt>
+                      <dd class="mono truncate" [title]="topicOf(job)">{{ topicOf(job) }}</dd>
+                    </div>
+                  }
+                  @if (bucketLink(job); as target) {
+                    <div>
+                      <dt class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">Storage</dt>
+                      <dd class="mt-1">
+                        <a class="link-inline" routerLink="/objects"
+                           [queryParams]="{ bucket: target.bucket, prefix: target.prefix }">
+                          <app-icon name="folder" size="0.85em" class="icon-info" />View in bucket
+                        </a>
+                      </dd>
+                    </div>
+                  }
                   <div>
                     <dt class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">
                       Email notifications

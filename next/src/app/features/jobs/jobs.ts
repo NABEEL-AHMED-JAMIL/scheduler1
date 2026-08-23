@@ -12,6 +12,7 @@ import { StatusPill } from '../../shared/ui/status-pill';
 import { Icon } from '../../shared/ui/icon';
 import { NotifyDialog } from './notify-dialog';
 import { JobAction, jobActionRequest } from './job-actions';
+import { parseTopicPartition } from '../../shared/ui/topic';
 import { createPager } from '../../shared/ui/pager';
 import { Pagination } from '../../shared/ui/pagination';
 
@@ -433,6 +434,19 @@ export class Jobs implements OnInit {
         error: err => { failures.push(`#${job.jobId} ${err?.error?.message || 'request failed'}`); finish(); },
       });
     }
+  }
+
+  /** The legacy job row linked out to its task, its topic and its bucket; those three were
+      the only way to get from a job to the thing it actually reads and writes. */
+  topicOf(job: SourceJob): string {
+    const parsed = parseTopicPartition(job.taskDetail?.sourceTaskType?.queueTopicPartition);
+    return parsed.topic ? `${parsed.topic} (partitions ${parsed.partitions})` : '';
+  }
+
+  bucketLink(job: SourceJob): { bucket: string; prefix: string } | null {
+    const task = job.taskDetail;
+    if (!task?.bucket) return null;
+    return { bucket: task.bucket, prefix: task.outputFolder || '' };
   }
 
   clearSelection(): void { this.selected.set(new Set()); }
