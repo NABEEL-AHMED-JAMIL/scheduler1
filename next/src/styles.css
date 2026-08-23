@@ -439,9 +439,15 @@
   /* One rotation utility, for the handful of places that show work in progress.
      Honours reduced-motion, since a permanent spin is the worst offender there. */
   .spin { animation: spin 900ms linear infinite; }
+
+  /* The mic while it is listening: a slow pulse, so the recording state is visible without
+     a second label competing with the composer. */
+  @keyframes pulse-soft { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+  .pulse { animation: pulse-soft 1.2s ease-in-out infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: reduce) {
     .spin { animation-duration: 2.4s; }
+    .pulse { animation: none; opacity: 0.75; }
   }
 
   .mono { font-family: var(--font-mono); @apply text-xs; }

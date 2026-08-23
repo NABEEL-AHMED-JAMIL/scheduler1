@@ -64,6 +64,24 @@
                  style="background: var(--surface-sunken);">
               <app-markdown [source]="message.text" />
             </div>
+
+            @if (message.files?.length) {
+              <div class="flex flex-wrap gap-1.5 mt-1.5">
+                @for (file of message.files; track file.filename) {
+                  <button type="button" class="btn btn-ghost btn-sm"
+                          [disabled]="converting() === file.filename"
+                          (click)="download(file)"
+                          [title]="file.pendingExport
+                             ? 'Converted to ' + file.pendingExport.targetFormat + ' before download'
+                             : 'Download ' + file.filename">
+                    <app-icon [name]="converting() === file.filename ? 'refresh' : 'download'"
+                              [class.spin]="converting() === file.filename"
+                              class="icon-info" size="0.85em" />
+                    {{ converting() === file.filename ? 'Converting…' : file.filename }}
+                  </button>
+                }
+              </div>
+            }
             <div class="flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100
                         focus-within:opacity-100 transition-opacity">
               <button type="button" class="btn btn-ghost btn-sm" (click)="copyMessage($index, message.text)">
@@ -86,6 +104,9 @@
         <div class="flex items-center gap-2 text-sm text-[color:var(--text-muted)]">
           <span class="typing"><span></span><span></span><span></span></span>
           <span>Thinking…</span>
+          <button type="button" class="btn btn-ghost btn-sm ml-1" (click)="stop()">
+            <app-icon name="close" size="0.85em" />Stop
+          </button>
         </div>
       }
     </div>
@@ -104,6 +125,16 @@
                 [value]="draft()" (input)="draft.set($any($event.target).value)"
                 (keydown)="onKeydown($event)"
                 [disabled]="preparing() || !!prepareError()"></textarea>
+      @if (voiceSupported) {
+        <button type="button" class="btn btn-ghost btn-icon btn-sm self-end"
+                [class.btn-intent-crit]="listening()"
+                [disabled]="preparing() || !!prepareError()"
+                (click)="toggleMic()"
+                [attr.aria-label]="listening() ? 'Stop dictating' : 'Dictate a message'"
+                [title]="listening() ? 'Listening — click to stop' : 'Dictate a message'">
+          <app-icon [name]="listening() ? 'stop' : 'mic'" [class.pulse]="listening()" />
+        </button>
+      }
       <button type="button" class="btn btn-primary btn-sm self-end"
               [disabled]="sending() || !draft().trim()" (click)="send()">Send</button>
     </div>

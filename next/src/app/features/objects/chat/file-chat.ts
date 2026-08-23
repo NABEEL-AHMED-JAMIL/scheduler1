@@ -5,8 +5,15 @@ import { ToastService } from '../../../shared/ui/toast.service';
 import { Icon } from '../../../shared/ui/icon';
 import { Markdown } from '../../../shared/ui/markdown';
 import { copyText } from '../../../shared/ui/clipboard.util';
+import { ChatFile, parseDownloadableFiles, stripExportFences } from './chat-export';
+import { Subscription } from 'rxjs';
 
-interface ChatMessage { role: 'user' | 'assistant' | 'error'; text: string; }
+interface ChatMessage {
+  role: 'user' | 'assistant' | 'error';
+  text: string;
+  /** Files the reply carried, ready to save. */
+  files?: ChatFile[];
+}
 interface Agent { aiAgentId: number; agentName: string; provider: string; status: string; apiKeyConfigured?: boolean; }
 
 @Component({
@@ -33,6 +40,17 @@ export class FileChat implements OnInit {
   readonly sending = signal(false);
   readonly minimized = signal(false);
   readonly copiedIndex = signal<number | null>(null);
+  readonly listening = signal(false);
+  readonly converting = signal<string | null>(null);
+
+  /** Held so the request can be abandoned; see stop(). */
+  private inFlight: Subscription | null = null;
+  private recognition: any = null;
+
+  /** Dictation needs the browser's speech API, which not every browser exposes. */
+  readonly voiceSupported =
+    typeof window !== 'undefined' &&
+    !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
 
   copyMessage(index: number, text: string): void {
     copyText(text).then(() => {
@@ -124,21 +142,135 @@ export class FileChat implements OnInit {
     // Only the recent turns are sent -- the file itself dominates the context window.
     const history = this.messages().slice(-8).map(m => ({ role: m.role, content: m.text }));
 
-    this.http.post<ApiResponse<string>>(`${API_BASE}/fileChat.json/sendMessage`, {
+    this.inFlight = this.http.post<ApiResponse<string>>(`${API_BASE}/fileChat.json/sendMessage`, {
       bucket: this.bucket(), key: this.fileKey(), aiAgentId: this.agentId(), message, history,
     }).subscribe({
       next: response => {
-        this.sending.set(false);
-        this.messages.update(list => [...list, response.status === API_SUCCESS
-          ? { role: 'assistant', text: String(response.data ?? '') }
-          : { role: 'error', text: response.message }]);
+        this.settle();
+        if (response.status !== API_SUCCESS) {
+          this.messages.update(list => [...list, { role: 'error', text: response.message }]);
+          return;
+        }
+        // The raw reply carries the export fence so the file can be pulled out of it, but that
+        // same fence must not also render -- otherwise the file's escaped markup fills the
+        // bubble directly above a button offering the identical content.
+        const raw = String(response.data ?? '');
+        this.messages.update(list => [...list, {
+          role: 'assistant',
+          text: stripExportFences(raw),
+          files: parseDownloadableFiles(raw, this.baseName()),
+        }]);
       },
       error: err => {
-        this.sending.set(false);
+        this.settle();
         this.messages.update(list => [...list,
           { role: 'error', text: err?.error?.message || 'The agent did not respond.' }]);
       },
     });
+  }
+
+  private settle(): void {
+    this.sending.set(false);
+    this.inFlight = null;
+  }
+
+  /** The file's name without its extension, used to name anything the reply produces. */
+  private baseName(): string {
+    return this.fileName().replace(/\.[^./]+$/, '') || 'export';
+  }
+
+  /**
+   * Abandons a reply in progress. A long answer over a large file is the case people actually
+   * want to escape, and without this the only way out was to close the panel and lose the
+   * conversation with it.
+   */
+  stop(): void {
+    if (!this.inFlight) return;
+    this.inFlight.unsubscribe();
+    this.settle();
+    this.messages.update(list => [...list, { role: 'error', text: 'Stopped.' }]);
+  }
+
+  /**
+   * Dictation into the draft box. Results are appended rather than replacing what is already
+   * typed, so speaking after typing extends the question instead of discarding it. Signals
+   * make the callbacks safe without NgZone -- setting one schedules its own change detection.
+   */
+  toggleMic(): void {
+    if (this.listening()) {
+      this.recognition?.stop();
+      return;
+    }
+    const Ctor = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!Ctor) {
+      this.toast.error('This browser cannot record speech.');
+      return;
+    }
+    const recognition = new Ctor();
+    recognition.lang = 'en-US';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.onstart = () => this.listening.set(true);
+    recognition.onerror = (event: any) => {
+      this.listening.set(false);
+      if (event?.error === 'not-allowed') this.toast.error('Microphone access was refused.');
+      else if (event?.error !== 'aborted') this.toast.error('Could not hear anything.');
+    };
+    recognition.onend = () => { this.listening.set(false); this.recognition = null; };
+    recognition.onresult = (event: any) => {
+      const said = event.results?.[0]?.[0]?.transcript?.trim();
+      if (!said) return;
+      const current = this.draft().trim();
+      this.draft.set(current ? `${current} ${said}` : said);
+    };
+    this.recognition = recognition;
+    recognition.start();
+  }
+
+  /**
+   * A plain fence is already the file; one carrying pendingExport is source text the server
+   * turns into xlsx, docx or pdf before it can be saved.
+   */
+  download(file: ChatFile): void {
+    if (!file.pendingExport) {
+      this.save(new Blob([file.content], { type: file.mimeType }), file.filename);
+      return;
+    }
+    if (this.converting()) return;
+    const pending = file.pendingExport;
+    this.converting.set(file.filename);
+    this.http.post<ApiResponse<string>>(`${API_BASE}/fileChat.json/exportFile`, {
+      content: file.content, sourceFormat: pending.sourceFormat, targetFormat: pending.targetFormat,
+    }).subscribe({
+      next: response => {
+        this.converting.set(null);
+        if (response.status === API_SUCCESS && response.data) {
+          this.save(this.blobFromBase64(String(response.data), pending.mimeType), pending.filename);
+        } else {
+          this.toast.error(response.message || 'Could not convert this file.');
+        }
+      },
+      error: () => {
+        this.converting.set(null);
+        this.toast.error('Could not convert this file.');
+      },
+    });
+  }
+
+  private blobFromBase64(base64: string, mimeType: string): Blob {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return new Blob([bytes], { type: mimeType });
+  }
+
+  private save(blob: Blob, filename: string): void {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   onKeydown(event: KeyboardEvent): void {
