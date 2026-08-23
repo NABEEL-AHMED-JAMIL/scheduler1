@@ -6,7 +6,9 @@ import { TableShell } from '../../shared/ui/data-table';
 import { StatusPill } from '../../shared/ui/status-pill';
 import { Icon } from '../../shared/ui/icon';
 import { copyText } from '../../shared/ui/clipboard.util';
+import { Dialog } from '@angular/cdk/dialog';
 import { ToastService } from '../../shared/ui/toast.service';
+import { confirmWith } from '../../shared/ui/confirm';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { createPager } from '../../shared/ui/pager';
 import { Pagination } from '../../shared/ui/pagination';
@@ -33,6 +35,7 @@ interface SourceTask {
 export class Tasks implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly toast = inject(ToastService);
+  private readonly dialog = inject(Dialog);
 
   readonly tasks = signal<SourceTask[]>([]);
   readonly loading = signal(true);
@@ -115,6 +118,46 @@ export class Tasks implements OnInit {
     copyText(task.taskPayload ?? '').then(() => {
       this.copiedId.set(task.taskDetailId);
       setTimeout(() => this.copiedId.set(null), 1500);
+    });
+  }
+
+  /**
+   * Deleting a task also deletes every job bound to it -- the endpoint cascades through
+   * statusChangeSourceJobWithSourceTaskId -- so the count goes in the prompt rather than
+   * being discovered afterwards. taskStatus has to be in the payload: the endpoint cascades
+   * to the jobs unconditionally but only marks the task itself when that field is present.
+   */
+  async remove(task: SourceTask): Promise<void> {
+    if (task.taskStatus === 'Delete') return;
+    const linked = task.totalLinksJobs ?? 0;
+    const ok = await confirmWith(this.dialog, {
+      title: 'Delete task',
+      body: linked
+        ? `"${task.taskName}" and the ${linked} job${linked > 1 ? 's' : ''} bound to it will be deleted and stop running.`
+        : `"${task.taskName}" will be deleted. No jobs are bound to it.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
+
+    this.busyTask.set(task.taskDetailId);
+    this.http.put<ApiResponse>(`${API_BASE}/sourceTask.json/deleteSourceTask`,
+      { taskDetailId: task.taskDetailId, taskStatus: 'Delete' }).subscribe({
+      next: response => {
+        this.busyTask.set(null);
+        if (response.status === API_SUCCESS) {
+          this.toast.success(linked
+            ? `${task.taskName} and ${linked} job${linked > 1 ? 's' : ''} deleted.`
+            : `${task.taskName} deleted.`);
+          this.load();
+        } else {
+          this.toast.error(response.message);
+        }
+      },
+      error: err => {
+        this.busyTask.set(null);
+        this.toast.error(err?.error?.message || 'Delete failed.');
+      },
     });
   }
 

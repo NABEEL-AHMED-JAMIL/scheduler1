@@ -92,6 +92,14 @@
                   <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="clone(task)">
                     <app-icon name="copy" />Duplicate
                   </button>
+                  <button cdkMenuItem class="menu-item btn-intent-crit"
+                          [disabled]="task.taskStatus === 'Delete'"
+                          (cdkMenuItemTriggered)="remove(task)">
+                    <app-icon name="trash" />Delete
+                    @if (task.totalLinksJobs) {
+                      <span class="pill pill-warn ml-auto">+{{ task.totalLinksJobs }} jobs</span>
+                    }
+                  </button>
                 </div>
               </ng-template>
             </td>
