@@ -33,7 +33,7 @@
   }
 
   @if (showInsights() && hasInsights()) {
-    <div class="grid gap-3 lg:grid-cols-3 items-start">
+    <div class="grid gap-3 lg:grid-cols-3">
       <div class="card chart-card">
         <h3 class="chart-title">Outcomes</h3>
         <app-donut [data]="statusMix()" totalLabel="messages in this range"
@@ -56,7 +56,7 @@
       <div class="card chart-card">
         <h3 class="chart-title">Busiest jobs</h3>
         <p class="chart-sub">Which jobs are producing the queue traffic.</p>
-        <app-ranked-bar [data]="byJob()" [max]="5" />
+        <app-ranked-bar [data]="byJob()" [max]="4" />
       </div>
 
       <div class="card chart-card">

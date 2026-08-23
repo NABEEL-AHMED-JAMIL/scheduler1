@@ -53,7 +53,7 @@
   }
 
   @if (showInsights() && hasInsights()) {
-    <div class="grid gap-3 lg:grid-cols-3 items-start">
+    <div class="grid gap-3 lg:grid-cols-3">
       <div class="card chart-card">
         <h3 class="chart-title">Outcomes</h3>
         <app-donut [data]="outcomeMix()" totalLabel="runs" [colorFor]="outcomeColor" />
