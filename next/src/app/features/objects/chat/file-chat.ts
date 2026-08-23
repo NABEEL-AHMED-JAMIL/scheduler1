@@ -3,13 +3,15 @@ import { HttpClient } from '@angular/common/http';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { Icon } from '../../../shared/ui/icon';
+import { Markdown } from '../../../shared/ui/markdown';
+import { copyText } from '../../../shared/ui/clipboard.util';
 
 interface ChatMessage { role: 'user' | 'assistant' | 'error'; text: string; }
 interface Agent { aiAgentId: number; agentName: string; provider: string; status: string; apiKeyConfigured?: boolean; }
 
 @Component({
   selector: 'app-file-chat',
-  imports: [Icon],
+  imports: [Icon, Markdown],
   templateUrl: './file-chat.html',
 })
 export class FileChat implements OnInit {
@@ -30,6 +32,28 @@ export class FileChat implements OnInit {
   readonly prepareError = signal('');
   readonly sending = signal(false);
   readonly minimized = signal(false);
+  readonly copiedIndex = signal<number | null>(null);
+
+  copyMessage(index: number, text: string): void {
+    copyText(text).then(() => {
+      this.copiedIndex.set(index);
+      setTimeout(() => this.copiedIndex.set(null), 1500);
+    });
+  }
+
+  /**
+   * Drops the last exchange and asks again. The failed or unwanted reply is removed first so
+   * the model is not handed its own bad answer as context for the retry.
+   */
+  retry(): void {
+    if (this.sending()) return;
+    const history = [...this.messages()];
+    while (history.length && history[history.length - 1].role !== 'user') history.pop();
+    const last = history.pop();
+    if (!last) return;
+    this.messages.set(history);
+    this.send(last.text);
+  }
 
   private readonly scroller = viewChild<ElementRef<HTMLElement>>('scroller');
 
