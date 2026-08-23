@@ -8,6 +8,8 @@ import { Icon } from '../../shared/ui/icon';
 import { copyText } from '../../shared/ui/clipboard.util';
 import { ToastService } from '../../shared/ui/toast.service';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
+import { createPager } from '../../shared/ui/pager';
+import { Pagination } from '../../shared/ui/pagination';
 
 interface SourceTask {
   taskDetailId: number;
@@ -25,7 +27,7 @@ interface SourceTask {
 
 @Component({
   selector: 'app-tasks',
-  imports: [Icon, RouterLink, TableShell, StatusPill, CdkMenu, CdkMenuItem, CdkMenuTrigger],
+  imports: [Icon, RouterLink, TableShell, StatusPill, CdkMenu, CdkMenuItem, CdkMenuTrigger, Pagination],
   templateUrl: './tasks.html',
 })
 export class Tasks implements OnInit {
@@ -46,6 +48,12 @@ export class Tasks implements OnInit {
       || (task.sourceTaskType?.serviceName ?? '').toLowerCase().includes(term)
       || (task.pipelineId ?? '').toLowerCase().includes(term));
   });
+
+  readonly pager = createPager<any>();
+  readonly paged = computed(() => this.pager.slice(this.filtered()));
+
+  goToPage(next: number): void { this.pager.goTo(next, this.filtered().length); }
+  setPageSize(size: number): void { this.pager.setSize(size); }
 
   readonly expanded = signal<Set<number>>(new Set());
   readonly copiedId = signal<number | null>(null);

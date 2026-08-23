@@ -167,6 +167,17 @@
   .stat-foot  { @apply mt-0.5 text-[11px] text-[color:var(--text-muted)]; }
   /* The glyph sits on the sunken surface so it reads as a quiet marker beside the number
      rather than a second thing competing with it for attention. */
+  /* The native control inherits nothing useful, so give it the brand colour and a focus
+     ring that matches the buttons rather than the browser default. */
+  .checkbox {
+    accent-color: var(--color-brand-600);
+    @apply w-4 h-4 rounded align-middle cursor-pointer;
+  }
+  .checkbox:disabled { @apply cursor-not-allowed opacity-40; }
+  .checkbox:focus-visible { outline: 2px solid var(--color-brand-500); outline-offset: 2px; }
+
+  .row-selected > td { background: var(--surface-sunken); }
+
   .stat-glyph {
     background: var(--surface-sunken);
     @apply shrink-0 grid place-items-center rounded-lg w-8 h-8 text-base;

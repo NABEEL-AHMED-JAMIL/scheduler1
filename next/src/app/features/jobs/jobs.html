@@ -25,30 +25,56 @@
                    (retry)="load()">
     <ng-container toolbar>
       <select class="input max-w-32" [value]="executionFilter()"
-              (change)="executionFilter.set($any($event.target).value)">
+              (change)="executionFilter.set($any($event.target).value); onFilterChange()">
         <option value="">All types</option>
         @for (execution of executions(); track execution) {
           <option [value]="execution">{{ execution }}</option>
         }
       </select>
       <select class="input max-w-36" [value]="statusFilter()"
-              (change)="statusFilter.set($any($event.target).value)">
+              (change)="statusFilter.set($any($event.target).value); onFilterChange()">
         <option value="">All statuses</option>
         @for (status of statuses(); track status) { <option [value]="status">{{ status }}</option> }
       </select>
       <div class="search-field max-w-52">
         <app-icon name="search" size="0.95em" />
         <input class="input" placeholder="Search id, job or task"
-               [value]="search()" (input)="search.set($any($event.target).value)" />
+               [value]="search()" (input)="search.set($any($event.target).value); onFilterChange()" />
       </div>
       @if (search() || statusFilter() || executionFilter()) {
         <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()"><app-icon name="close" />Clear</button>
       }
     </ng-container>
 
+    @if (selected().size) {
+      <div class="flex flex-wrap items-center gap-2 px-4 py-2.5 border-b"
+           style="background: var(--surface-sunken); border-color: var(--border-subtle);">
+        <span class="text-xs font-medium">{{ selected().size }} selected</span>
+        <button type="button" class="btn btn-ghost btn-sm btn-intent-ok"
+                [disabled]="bulkBusy()" (click)="runSelected()">
+          <app-icon name="play" />Run selected
+        </button>
+        <button type="button" class="btn btn-ghost btn-sm btn-intent-crit"
+                [disabled]="bulkBusy()" (click)="deleteSelected()">
+          <app-icon name="trash" />Delete selected
+        </button>
+        <button type="button" class="btn btn-ghost btn-sm ml-auto"
+                [disabled]="bulkBusy()" (click)="clearSelection()">
+          <app-icon name="close" />Clear selection
+        </button>
+      </div>
+    }
+
     <table class="table-modern">
       <thead>
         <tr>
+          <th class="w-10">
+            <input type="checkbox" class="checkbox" aria-label="Select all jobs on this page"
+                   [checked]="allOnPageSelected()"
+                   [indeterminate]="someOnPageSelected()"
+                   [disabled]="!selectableOnPage().length"
+                   (change)="toggleSelectAllOnPage()" />
+          </th>
           <th class="w-8"></th>
           <th>Job</th>
           <th>Task</th>
@@ -62,8 +88,17 @@
         </tr>
       </thead>
       <tbody>
-        @for (job of filtered(); track job.jobId) {
-          <tr [class.opacity-55]="busyJob() === job.jobId">
+        @for (job of paged(); track job.jobId) {
+          <tr [class.opacity-55]="busyJob() === job.jobId"
+              [class.row-selected]="selected().has(job.jobId)">
+            <td>
+              <input type="checkbox" class="checkbox"
+                     [checked]="selected().has(job.jobId)"
+                     [disabled]="!selectable(job)"
+                     [attr.aria-label]="'Select ' + job.jobName"
+                     [title]="selectable(job) ? '' : (job.jobStatus === 'Delete' ? 'Deleted jobs cannot be selected' : 'Already queued or running')"
+                     (change)="toggleSelect(job)" />
+            </td>
             <td>
               <button type="button" class="text-[color:var(--text-muted)] hover:text-brand-600"
                       (click)="toggleRow(job)"
@@ -154,7 +189,7 @@
           @if (expanded().has(job.jobId)) {
             <tr style="background: var(--surface-sunken);">
               <td></td>
-              <td colspan="9" class="!py-3">
+              <td colspan="10" class="!py-3">
                 <dl class="grid sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-2 text-sm">
                   @for (item of [
                     { label: 'Task type',   value: job.taskDetail?.sourceTaskType?.serviceName },
@@ -206,5 +241,8 @@
         }
       </tbody>
     </table>
+
+    <app-pagination [total]="filtered().length" [page]="pager.page()" [size]="pager.size()"
+                    (goTo)="goToPage($event)" (setSize)="setPageSize($event)" />
   </app-table-shell>
 </div>

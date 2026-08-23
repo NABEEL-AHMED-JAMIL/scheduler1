@@ -11,6 +11,8 @@ import { TableShell } from '../../shared/ui/data-table';
 import { StatusPill } from '../../shared/ui/status-pill';
 import { Icon } from '../../shared/ui/icon';
 import { NotifyDialog } from './notify-dialog';
+import { createPager } from '../../shared/ui/pager';
+import { Pagination } from '../../shared/ui/pagination';
 
 export interface Scheduler {
   schedulerId: number;
@@ -51,7 +53,7 @@ const IN_FLIGHT = ['queue', 'start', 'running'];
 
 @Component({
   selector: 'app-jobs',
-  imports: [Icon, DatePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill],
+  imports: [Icon, DatePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Pagination],
   templateUrl: './jobs.html',
 })
 export class Jobs implements OnInit {
@@ -67,6 +69,10 @@ export class Jobs implements OnInit {
   readonly executionFilter = signal('');
   readonly busyJob = signal<number | null>(null);
   readonly expanded = signal<Set<number>>(new Set());
+  readonly selected = signal<Set<number>>(new Set());
+  readonly bulkBusy = signal(false);
+
+  readonly pager = createPager<SourceJob>();
 
   readonly statuses = computed(() =>
     [...new Set(this.jobs().map(j => j.jobRunningStatus).filter(Boolean))].sort());
@@ -87,6 +93,50 @@ export class Jobs implements OnInit {
         || (job.taskDetail?.taskName ?? '').toLowerCase().includes(term);
     });
   });
+
+  readonly paged = computed(() => this.pager.slice(this.filtered()));
+  readonly totalPages = computed(() => this.pager.totalPagesFor(this.filtered().length));
+
+  /**
+   * A run cannot be stacked on top of one already in flight, and a deleted job has nothing to
+   * run -- the legacy screen refused both, so neither is offered here.
+   */
+  selectable(job: SourceJob): boolean {
+    return job.jobStatus !== 'Delete' && !this.isInFlight(job);
+  }
+
+  readonly selectableOnPage = computed(() => this.paged().filter(job => this.selectable(job)));
+
+  readonly allOnPageSelected = computed(() => {
+    const rows = this.selectableOnPage();
+    return rows.length > 0 && rows.every(job => this.selected().has(job.jobId));
+  });
+
+  readonly someOnPageSelected = computed(() =>
+    this.selectableOnPage().some(job => this.selected().has(job.jobId)) && !this.allOnPageSelected());
+
+  readonly selectedJobs = computed(() =>
+    this.jobs().filter(job => this.selected().has(job.jobId)));
+
+  toggleSelect(job: SourceJob): void {
+    if (!this.selectable(job)) return;
+    this.selected.update(set => {
+      const next = new Set(set);
+      next.has(job.jobId) ? next.delete(job.jobId) : next.add(job.jobId);
+      return next;
+    });
+  }
+
+  /** Select-all covers the page in view, not the whole filtered list, as the old screen did. */
+  toggleSelectAllOnPage(): void {
+    const rows = this.selectableOnPage();
+    const selectAll = !this.allOnPageSelected();
+    this.selected.update(set => {
+      const next = new Set(set);
+      for (const job of rows) selectAll ? next.add(job.jobId) : next.delete(job.jobId);
+      return next;
+    });
+  }
 
   ngOnInit(): void { this.load(); }
 
@@ -294,6 +344,97 @@ export class Jobs implements OnInit {
       },
     }).closed.subscribe(saved => { if (saved) this.load(); });
   }
+
+  onFilterChange(): void {
+    this.pager.reset();
+    this.selected.set(new Set());
+  }
+
+  goToPage(next: number): void { this.pager.goTo(next, this.filtered().length); }
+
+  setPageSize(size: number): void {
+    this.pager.setSize(size);
+    this.selected.set(new Set());
+  }
+
+  /**
+   * Runs the selection one call at a time and reports once, rather than firing a toast per
+   * job: selecting fifty and getting fifty notifications is how the old screen behaved and it
+   * buried any real failure among them.
+   */
+  runSelected(): void {
+    const jobs = this.selectedJobs().filter(job => this.selectable(job));
+    if (!jobs.length) {
+      this.toast.error('Select at least one job that is not deleted or already running.');
+      return;
+    }
+    this.confirmBulk({
+      title: `Run ${jobs.length} job${jobs.length > 1 ? 's' : ''}?`,
+      body: 'Each one is queued immediately, ignoring its schedule.',
+      confirmLabel: 'Run them',
+    }, jobs, `${API_BASE}/sourceJob.json/runSourceJob`, 'queued');
+  }
+
+  /**
+   * A queued, running or failed job cannot be deleted -- the legacy screen refused the whole
+   * batch in that case rather than deleting part of it, so the selection stays intact and the
+   * user can see which rows are the problem.
+   */
+  deleteSelected(): void {
+    const jobs = this.selectedJobs();
+    if (!jobs.length) {
+      this.toast.error('Select at least one job to delete.');
+      return;
+    }
+    const blocked = jobs.filter(job =>
+      this.isInFlight(job) || (job.jobRunningStatus ?? '').toLowerCase() === 'failed');
+    if (blocked.length) {
+      const names = blocked.slice(0, 3).map(job => `#${job.jobId} (${job.jobRunningStatus})`).join(', ');
+      this.toast.error(`Cannot delete while ${blocked.length > 3 ? `${blocked.length} jobs are` : names + ' is'} queued, running or failed.`);
+      return;
+    }
+    this.confirmBulk({
+      title: `Delete ${jobs.length} job${jobs.length > 1 ? 's' : ''}?`,
+      body: 'They stop running and leave the list. Their run history is kept.',
+      confirmLabel: 'Delete them',
+      danger: true,
+    }, jobs, `${API_BASE}/sourceJob.json/deleteSourceJob`, 'deleted');
+  }
+
+  private async confirmBulk(
+    options: { title: string; body: string; confirmLabel: string; danger?: boolean },
+    jobs: SourceJob[], url: string, verb: string): Promise<void> {
+    if (await confirmWith(this.dialog, options)) this.runEach(jobs, url, verb);
+  }
+
+  private runEach(jobs: SourceJob[], url: string, verb: string): void {
+    this.bulkBusy.set(true);
+    const failures: string[] = [];
+    let done = 0;
+    const finish = () => {
+      if (++done < jobs.length) return;
+      this.bulkBusy.set(false);
+      this.selected.set(new Set());
+      const ok = jobs.length - failures.length;
+      if (failures.length) {
+        this.toast.error(`${ok} ${verb}, ${failures.length} failed: ${failures.slice(0, 2).join('; ')}`);
+      } else {
+        this.toast.success(`${ok} job${ok > 1 ? 's' : ''} ${verb}.`);
+      }
+      this.load();
+    };
+    for (const job of jobs) {
+      this.http.post<ApiResponse>(url, null, { params: { jobId: String(job.jobId) } }).subscribe({
+        next: response => {
+          if (response.status !== API_SUCCESS) failures.push(`#${job.jobId} ${response.message}`);
+          finish();
+        },
+        error: err => { failures.push(`#${job.jobId} ${err?.error?.message || 'request failed'}`); finish(); },
+      });
+    }
+  }
+
+  clearSelection(): void { this.selected.set(new Set()); }
 
   clearFilters(): void {
     this.search.set('');

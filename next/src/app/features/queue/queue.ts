@@ -14,6 +14,8 @@ import { RankedBar } from '../../shared/charts/ranked-bar';
 import { BarChart } from '../../shared/charts/bar-chart';
 import { statusColor } from '../../shared/charts/status-color';
 import { SplitBar } from '../../shared/charts/split-bar';
+import { createPager } from '../../shared/ui/pager';
+import { Pagination } from '../../shared/ui/pagination';
 
 interface QueueRow {
   jobQueueId: number;
@@ -33,7 +35,7 @@ const STATUSES = ['Queue', 'Start', 'Running', 'Completed', 'Failed', 'Skip', 'I
 
 @Component({
   selector: 'app-queue',
-  imports: [Icon, DatePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Donut, RankedBar, BarChart, SplitBar],
+  imports: [Icon, DatePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Donut, RankedBar, BarChart, SplitBar, Pagination],
   templateUrl: './queue.html',
 })
 export class Queue implements OnInit {
@@ -66,6 +68,12 @@ export class Queue implements OnInit {
       || String(row.jobQueueId).includes(term)
       || (row.jobStatusMessage ?? '').toLowerCase().includes(term));
   });
+
+  readonly pager = createPager<any>();
+  readonly paged = computed(() => this.pager.slice(this.filtered()));
+
+  goToPage(next: number): void { this.pager.goTo(next, this.filtered().length); }
+  setPageSize(size: number): void { this.pager.setSize(size); }
 
   readonly counts = computed(() => {
     const map = new Map<string, number>();

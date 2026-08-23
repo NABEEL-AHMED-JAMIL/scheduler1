@@ -26,7 +26,7 @@
       <div class="search-field max-w-64">
         <app-icon name="search" size="0.95em" />
         <input class="input" placeholder="Search id, name, type or pipeline"
-               [value]="search()" (input)="search.set($any($event.target).value)" />
+               [value]="search()" (input)="search.set($any($event.target).value); pager.reset()" />
       </div>
       @if (search()) {
         <button type="button" class="btn btn-ghost btn-sm" (click)="search.set('')"><app-icon name="close" />Clear</button>
@@ -47,7 +47,7 @@
         </tr>
       </thead>
       <tbody>
-        @for (task of filtered(); track task.taskDetailId) {
+        @for (task of paged(); track task.taskDetailId) {
           <tr>
             <td>
               <button type="button" class="text-[color:var(--text-muted)] hover:text-brand-600"
@@ -125,5 +125,8 @@
         }
       </tbody>
     </table>
+
+    <app-pagination [total]="filtered().length" [page]="pager.page()" [size]="pager.size()"
+                    (goTo)="goToPage($event)" (setSize)="setPageSize($event)" />
   </app-table-shell>
 </div>
