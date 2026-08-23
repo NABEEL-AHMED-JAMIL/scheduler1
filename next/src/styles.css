@@ -459,6 +459,13 @@ html.dark .btn-intent-crit:focus app-icon { color: var(--color-crit-400); }
            bg-crit-500 text-white text-[10px] font-semibold leading-4 text-center;
   }
 
+  /* A sub-lookup row, tied to its parent by an indent rule rather than only a background. */
+  .lookup-child { background: var(--surface-sunken); }
+  .lookup-child-rule {
+    background: var(--border-strong);
+    @apply inline-block w-2 h-px align-middle mr-2;
+  }
+
   .menu-item {
     @apply w-full text-left px-3 py-1.5 rounded-sm inline-flex items-center gap-2
            text-[color:var(--text-secondary)]

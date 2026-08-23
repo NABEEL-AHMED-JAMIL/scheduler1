@@ -3,7 +3,8 @@
     <div>
       <h1 class="page-title">Lookups</h1>
       <p class="page-subtitle">
-        Shared key and value data the forms and pipelines read from. Expand one to see its entries.
+        Shared key and value data the forms and pipelines read from.
+        @if (totalEntries()) { {{ totalEntries() }} entries across {{ lookups().length }} lookups. }
       </p>
     </div>
     <div class="flex items-center gap-2">
@@ -44,15 +45,15 @@
         @for (lookup of filtered(); track lookup.lookupId) {
           <tr>
             <td>
-              <button type="button" class="text-[color:var(--text-muted)] hover:text-brand-600"
-                      (click)="toggle(lookup)"
-                      [attr.aria-label]="expanded().has($any(lookup.lookupId)) ? 'Hide entries' : 'Show entries'">
-                @if (loadingChildren().has($any(lookup.lookupId))) {
-                  <app-icon name="refresh" class="spin" />
-                } @else {
+              @if (loadingChildren().has($any(lookup.lookupId))) {
+                <app-icon name="refresh" class="spin icon-muted" />
+              } @else if (entryCount(lookup)) {
+                <button type="button" class="text-[color:var(--text-muted)] hover:text-brand-600"
+                        (click)="toggle(lookup)"
+                        [attr.aria-label]="expanded().has($any(lookup.lookupId)) ? 'Hide entries' : 'Show entries'">
                   <app-icon [name]="expanded().has($any(lookup.lookupId)) ? 'chevronDown' : 'chevronRight'" />
-                }
-              </button>
+                </button>
+              }
             </td>
             <td class="mono font-medium">{{ lookup.lookupType }}</td>
             <td class="text-[color:var(--text-secondary)] max-w-64 truncate">
@@ -66,7 +67,19 @@
             </td>
             <td class="text-[color:var(--text-secondary)] max-w-80 truncate"
                 [title]="lookup.description || ''">{{ lookup.description || '—' }}</td>
-            <td class="tabular text-[color:var(--text-muted)]">{{ entryCount(lookup) }}</td>
+            <td>
+              @if (entryCount(lookup)) {
+                <button type="button" class="pill pill-neutral hover:bg-brand-50"
+                        (click)="toggle(lookup)"
+                        [title]="expanded().has($any(lookup.lookupId)) ? 'Hide entries' : 'Show entries'">
+                  {{ entryCount(lookup) }}
+                </button>
+              } @else {
+                <button type="button" class="btn btn-ghost btn-sm" (click)="addChild(lookup)">
+                  <app-icon name="plus" size="0.85em" />Add
+                </button>
+              }
+            </td>
             <td class="text-right">
               <button type="button" class="btn btn-ghost btn-icon" [cdkMenuTriggerFor]="menu"
                       aria-label="Actions">
@@ -90,10 +103,10 @@
 
           @if (expanded().has($any(lookup.lookupId))) {
             @for (child of lookup.children ?? []; track child.lookupId) {
-              <tr style="background: var(--surface-sunken);">
+              <tr class="lookup-child">
                 <td></td>
-                <td class="mono pl-6 text-[color:var(--text-secondary)]">
-                  <app-icon name="chevronRight" size="0.8em" class="icon-muted mr-1" />{{ child.lookupType }}
+                <td class="pl-6 text-[color:var(--text-secondary)]">
+                  <span class="lookup-child-rule"></span>{{ child.lookupType }}
                 </td>
                 <td class="text-[color:var(--text-secondary)]">
                   @if (child.encrypted) {
@@ -108,28 +121,25 @@
                     [title]="child.description || ''">{{ child.description || '—' }}</td>
                 <td></td>
                 <td class="text-right whitespace-nowrap">
-                  <button type="button" class="btn btn-ghost btn-icon btn-sm"
-                          title="Edit entry" (click)="edit(child, lookup)">
-                    <app-icon name="edit" size="0.9em" />
+                  <button type="button" class="btn btn-ghost btn-icon" title="Edit entry"
+                          aria-label="Edit entry" (click)="edit(child, lookup)">
+                    <app-icon name="edit" size="0.95em" />
                   </button>
-                  <button type="button" class="btn btn-ghost btn-icon btn-sm btn-intent-crit"
-                          title="Delete entry" (click)="remove(child, lookup)">
-                    <app-icon name="trash" size="0.9em" />
-                  </button>
-                </td>
-              </tr>
-            }
-            @if (!(lookup.children ?? []).length && !loadingChildren().has($any(lookup.lookupId))) {
-              <tr style="background: var(--surface-sunken);">
-                <td></td>
-                <td colspan="5" class="text-xs text-[color:var(--text-muted)] py-2">
-                  No entries under this lookup yet.
-                  <button type="button" class="btn btn-ghost btn-sm ml-1" (click)="addChild(lookup)">
-                    <app-icon name="plus" />Add one
+                  <button type="button" class="btn btn-ghost btn-icon btn-intent-crit"
+                          title="Delete entry" aria-label="Delete entry" (click)="remove(child, lookup)">
+                    <app-icon name="trash" size="0.95em" />
                   </button>
                 </td>
               </tr>
             }
+            <tr class="lookup-child">
+              <td></td>
+              <td colspan="5" class="py-1.5">
+                <button type="button" class="btn btn-ghost btn-sm ml-5" (click)="addChild(lookup)">
+                  <app-icon name="plus" size="0.85em" />Add an entry under {{ lookup.lookupType }}
+                </button>
+              </td>
+            </tr>
           }
         }
       </tbody>

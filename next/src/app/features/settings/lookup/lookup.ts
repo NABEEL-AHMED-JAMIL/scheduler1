@@ -8,6 +8,8 @@ import { Icon } from '../../../shared/ui/icon';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { confirmWith } from '../../../shared/ui/confirm';
 import { LookupData, LookupDialog } from './lookup-dialog';
+import { forkJoin, of } from 'rxjs';
+import { catchError, map } from 'rxjs/operators';
 
 @Component({
   selector: 'app-lookup',
@@ -41,16 +43,31 @@ export class Lookup implements OnInit {
     this.error.set('');
     this.http.get<ApiResponse<any>>(`${API_BASE}/setting.json/appSetting`).subscribe({
       next: response => {
-        this.loading.set(false);
-        if (response.status !== API_SUCCESS) { this.error.set(response.message); return; }
-        // Children are not part of this payload, so anything already open is refetched
-        // rather than silently emptied.
-        const open = new Set<number>(this.expanded());
-        this.lookups.set(response.data?.lookupDatas ?? []);
-        this.expanded.set(new Set<number>());
-        open.forEach((id: number) => {
-          const row = this.lookups().find(l => l.lookupId === id);
-          if (row) this.toggle(row);
+        if (response.status !== API_SUCCESS) {
+          this.loading.set(false);
+          this.error.set(response.message);
+          return;
+        }
+        const parents: LookupData[] = response.data?.lookupDatas ?? [];
+        if (!parents.length) {
+          this.loading.set(false);
+          this.lookups.set([]);
+          return;
+        }
+
+        // appSetting returns parents with no children, so the entry count is unknown until
+        // each one is asked for. Fetching them all up front is a handful of small requests
+        // and means the Entries column says something before anything is expanded, and that
+        // a row with nothing under it does not offer an expander.
+        forkJoin(parents.map(parent =>
+          this.http.get<ApiResponse<any>>(`${API_BASE}/setting.json/fetchSubLookupByParentId`,
+            { params: { parentLookUpId: parent.lookupId! } }).pipe(
+            map(sub => ({ ...parent, children: (sub?.data?.lookupDatas ?? []) as LookupData[] })),
+            catchError(() => of({ ...parent, children: [] as LookupData[] })),
+          )),
+        ).subscribe(rows => {
+          this.loading.set(false);
+          this.lookups.set(rows);
         });
       },
       error: err => {
@@ -60,35 +77,13 @@ export class Lookup implements OnInit {
     });
   }
 
-  /**
-   * appSetting returns parents only. The screen expected a children array that is never
-   * there, so expanding a row did nothing and every entry count read zero. Children are
-   * fetched on first open and kept.
-   */
+  /** Children are already loaded, so this is only a disclosure toggle. */
   toggle(lookup: LookupData): void {
     const id = lookup.lookupId!;
-    const isOpen = this.expanded().has(id);
     this.expanded.update(set => {
-      const next = new Set(set);
-      isOpen ? next.delete(id) : next.add(id);
+      const next = new Set<number>(set);
+      next.has(id) ? next.delete(id) : next.add(id);
       return next;
-    });
-    if (isOpen || lookup.children) return;
-
-    this.loadingChildren.update(set => new Set(set).add(id));
-    this.http.get<ApiResponse<any>>(`${API_BASE}/setting.json/fetchSubLookupByParentId`,
-      { params: { parentLookUpId: id } }).subscribe({
-      next: response => {
-        this.loadingChildren.update(set => { const n = new Set(set); n.delete(id); return n; });
-        if (response.status !== API_SUCCESS) return;
-        const children = response.data?.lookupDatas ?? [];
-        this.lookups.update(list => list.map(l =>
-          l.lookupId === id ? { ...l, children, childCount: children.length } : l));
-      },
-      error: () => {
-        this.loadingChildren.update(set => { const n = new Set(set); n.delete(id); return n; });
-        this.toast.error('Could not load the entries under that lookup.');
-      },
     });
   }
 
@@ -130,17 +125,28 @@ export class Lookup implements OnInit {
     });
   }
 
+  /** Refetches one parent's children in place, leaving the row open. */
   private refreshChildren(parent: LookupData): void {
-    this.lookups.update(list => list.map(l =>
-      l.lookupId === parent.lookupId ? { ...l, children: undefined } : l));
-    this.expanded.update(set => { const n = new Set(set); n.delete(parent.lookupId!); return n; });
-    const row = this.lookups().find(l => l.lookupId === parent.lookupId);
-    if (row) this.toggle(row);
+    const id = parent.lookupId!;
+    this.loadingChildren.update(set => new Set<number>(set).add(id));
+    this.http.get<ApiResponse<any>>(`${API_BASE}/setting.json/fetchSubLookupByParentId`,
+      { params: { parentLookUpId: id } }).subscribe({
+      next: response => {
+        this.loadingChildren.update(set => { const n = new Set<number>(set); n.delete(id); return n; });
+        if (response.status !== API_SUCCESS) return;
+        const children = response.data?.lookupDatas ?? [];
+        this.lookups.update(list => list.map(l => (l.lookupId === id ? { ...l, children } : l)));
+        this.expanded.update(set => new Set<number>(set).add(id));
+      },
+      error: () => {
+        this.loadingChildren.update(set => { const n = new Set<number>(set); n.delete(id); return n; });
+        this.toast.error('Could not reload the entries under that lookup.');
+      },
+    });
   }
 
-  entryCount(lookup: LookupData): string {
-    if (lookup.children) return String(lookup.children.length);
-    // Unknown until the row is opened; claiming zero was the old bug.
-    return '—';
-  }
+  entryCount(lookup: LookupData): number { return lookup.children?.length ?? 0; }
+
+  readonly totalEntries = computed(() =>
+    this.lookups().reduce((sum, l) => sum + (l.children?.length ?? 0), 0));
 }
