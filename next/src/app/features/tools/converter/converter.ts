@@ -4,6 +4,8 @@ import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config
 import { ToastService } from '../../../shared/ui/toast.service';
 import { Icon } from '../../../shared/ui/icon';
 import { RouterLink } from '@angular/router';
+import { BucketSummary, ObjectSummary, StorageService } from '../../objects/storage.service';
+import { PreviewDialog } from '../../objects/preview/preview-dialog';
 import { Dialog } from '@angular/cdk/dialog';
 import { DatePipe } from '@angular/common';
 import { confirmWith } from '../../../shared/ui/confirm';
@@ -26,6 +28,7 @@ export interface ConverterTask {
   outputFileSize?: number;
   bucketName?: string;
   targetFolder?: string;
+  inputStorageKey?: string;
   outputStorageKey?: string;
   status: string;
   dateCreated?: string;
@@ -55,11 +58,31 @@ export class Converter implements OnInit {
   readonly showFormats = signal(false);
 
   private readonly dialog = inject(Dialog);
+  private readonly storage = inject(StorageService);
+
+  /** Upload, or pick something already in a bucket -- the endpoint only takes a multipart
+      file, so a bucket choice is fetched and handed over as one. */
+  readonly mode = signal<'upload' | 'bucket'>('upload');
+  readonly buckets = signal<BucketSummary[]>([]);
+  readonly bucket = signal('');
+  readonly objects = signal<ObjectSummary[]>([]);
+  readonly loadingObjects = signal(false);
+  readonly selectedKey = signal('');
+  readonly fetchingSource = signal(false);
+
+  /** Where the output goes, when it should go anywhere but the browser's downloads. */
+  readonly saveToBucket = signal(false);
+  readonly saveBucket = signal('');
+  readonly saveFolder = signal('');
+  readonly taskName = signal('');
+
   readonly tasks = signal<ConverterTask[]>([]);
   readonly tasksLoading = signal(false);
 
   readonly extension = computed(() => {
-    const name = this.file()?.name ?? '';
+    const name = this.mode() === 'upload'
+      ? (this.file()?.name ?? '')
+      : this.sourceName();
     const dot = name.lastIndexOf('.');
     return dot >= 0 ? name.slice(dot + 1).toLowerCase() : '';
   });
@@ -67,8 +90,70 @@ export class Converter implements OnInit {
   readonly family = computed(() =>
     this.families().find(f => f.inputFormats.includes(this.extension())) ?? null);
 
+  /** Only files the converter can actually read are worth offering. */
+  readonly convertibleObjects = computed(() => {
+    const known = new Set(this.families().flatMap(f => f.inputFormats));
+    return this.objects().filter(o => {
+      if (o.folder) return false;
+      const dot = o.name.lastIndexOf('.');
+      return dot >= 0 && known.has(o.name.slice(dot + 1).toLowerCase());
+    });
+  });
+
+  readonly sourceName = computed(() => {
+    if (this.mode() === 'upload') return this.file()?.name ?? '';
+    const key = this.selectedKey();
+    return key ? key.slice(key.lastIndexOf('/') + 1) : '';
+  });
+
+  /** Nothing to convert without a source, a target format, and a destination if saving. */
+  readonly canConvert = computed(() => {
+    if (!this.outputFormat()) return false;
+    if (this.saveToBucket() && !this.saveBucket()) return false;
+    return this.mode() === 'upload' ? !!this.file() : !!this.selectedKey();
+  });
+
+  onBucketChange(value: string): void {
+    this.bucket.set(value);
+    this.selectedKey.set('');
+    this.objects.set([]);
+    if (!value) return;
+    this.loadingObjects.set(true);
+    this.storage.listObjects(value, '').subscribe({
+      next: response => {
+        this.loadingObjects.set(false);
+        if (response.status === API_SUCCESS) this.objects.set(response.data?.objects ?? []);
+      },
+      error: () => this.loadingObjects.set(false),
+    });
+  }
+
+  /** Pulls the chosen object down so it can be posted as the multipart file. */
+  private fetchSource(): Promise<File | null> {
+    const bucket = this.bucket(), key = this.selectedKey();
+    if (!bucket || !key) return Promise.resolve(null);
+    this.fetchingSource.set(true);
+    return new Promise(resolve => {
+      this.storage.previewBlob(bucket, key).subscribe({
+        next: blob => {
+          this.fetchingSource.set(false);
+          resolve(new File([blob], this.sourceName()));
+        },
+        error: () => {
+          this.fetchingSource.set(false);
+          this.toast.error('Could not read that file from the bucket.');
+          resolve(null);
+        },
+      });
+    });
+  }
+
   ngOnInit(): void {
     this.loadTasks();
+    this.storage.buckets().subscribe({
+      next: r => { if (r.status === API_SUCCESS) this.buckets.set(r.data ?? []); },
+      error: () => { /* upload mode still works with no bucket list */ },
+    });
     this.http.get<ApiResponse<FormatFamily[]>>(`${API_BASE}/documentConverter.json/supportedFormats`)
       .subscribe({
         next: response => {
@@ -89,14 +174,24 @@ export class Converter implements OnInit {
       family?.outputFormats.find(f => f !== this.extension()) ?? family?.outputFormats[0] ?? '');
   }
 
-  convert(): void {
-    const file = this.file();
-    if (!file || !this.outputFormat()) return;
+  async convert(): Promise<void> {
+    if (!this.outputFormat()) return;
+    // A bucket source has to be pulled down first; an upload is already in hand.
+    const file = this.mode() === 'upload' ? this.file() : await this.fetchSource();
+    if (!file) return;
 
     const form = new FormData();
     form.append('file', file, file.name);
     form.append('outputFormat', this.outputFormat());
-    form.append('save', 'false');
+    // Saving writes the result into a bucket so it outlives this tab; otherwise the file
+    // only exists as the base64 payload in the response.
+    form.append('save', String(this.saveToBucket()));
+    if (this.saveToBucket()) {
+      form.append('bucketName', this.saveBucket());
+      if (this.saveFolder().trim()) form.append('targetFolder', this.saveFolder().trim());
+      const name = this.taskName().trim() || file.name.replace(/\.[^.]+$/, '');
+      form.append('taskName', name);
+    }
 
     this.converting.set(true);
     this.http.post<ApiResponse<ConvertResult>>(`${API_BASE}/documentConverter.json/convert`, form)
@@ -105,7 +200,10 @@ export class Converter implements OnInit {
           this.converting.set(false);
           if (response.status === API_SUCCESS && response.data) {
             this.result.set(response.data);
-            this.toast.success(`Converted to ${this.outputFormat().toUpperCase()}.`);
+            this.toast.success(this.saveToBucket()
+              ? `Converted and saved to ${this.saveBucket()}.`
+              : `Converted to ${this.outputFormat().toUpperCase()}.`);
+            if (this.saveToBucket()) this.loadTasks();
           } else {
             this.toast.error(response.message);
           }
@@ -136,6 +234,8 @@ export class Converter implements OnInit {
     this.file.set(null);
     this.result.set(null);
     this.outputFormat.set('');
+    this.selectedKey.set('');
+    this.taskName.set('');
   }
 
   /**
@@ -172,6 +272,26 @@ export class Converter implements OnInit {
         } else { this.toast.error(response.message); }
       },
       error: err => this.toast.error(err?.error?.message || 'Delete failed.'),
+    });
+  }
+
+  /**
+   * Opens either side of a past conversion in the same viewer the object browser uses, so a
+   * result can be checked without downloading it or hunting for it in a bucket.
+   */
+  view(task: ConverterTask, side: 'input' | 'output'): void {
+    const key = side === 'input' ? task.inputStorageKey : task.outputStorageKey;
+    if (!task.bucketName || !key) {
+      this.toast.info(`This conversion did not keep its ${side} file.`);
+      return;
+    }
+    this.dialog.open(PreviewDialog, {
+      data: {
+        bucket: task.bucketName, key,
+        name: side === 'input' ? task.inputFileName : task.outputFileName,
+        size: side === 'input' ? task.inputFileSize : task.outputFileSize,
+      },
+      hasBackdrop: true,
     });
   }
 

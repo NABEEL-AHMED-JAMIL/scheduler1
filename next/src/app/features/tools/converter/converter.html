@@ -7,19 +7,62 @@
   </div>
 
   <div class="card p-4 space-y-4">
-    <div>
-      <label class="label" for="file">File</label>
-      <input id="file" type="file" class="input" (change)="onFile($event)" />
-      @if (file() && !family()) {
-        <p class="text-sm text-warn-500 mt-1.5">
-          ".{{ extension() }}" isn't a format this can convert.
-        </p>
-      } @else if (family()) {
-        <p class="text-sm text-[color:var(--text-secondary)] mt-1.5">
-          Detected as {{ family()!.label }} · {{ (file()!.size / 1024).toFixed(0) }} KB
-        </p>
+    <div class="seg">
+      @for (option of [{id:'upload',label:'Upload a file',icon:'upload'},
+                       {id:'bucket',label:'From a bucket',icon:'folder'}]; track option.id) {
+        <button type="button" class="seg-btn" [class.seg-on]="mode() === option.id"
+                (click)="mode.set($any(option.id))">
+          <app-icon [name]="option.icon" size="0.9em" />{{ option.label }}
+        </button>
       }
     </div>
+
+    @if (mode() === 'upload') {
+      <div>
+        <label class="label" for="file">File</label>
+        <input id="file" type="file" class="input" (change)="onFile($event)" />
+      </div>
+    } @else {
+      <div class="form-grid">
+        <div class="field">
+          <label class="label" for="cbucket">Bucket</label>
+          <select id="cbucket" class="input"
+                  (change)="onBucketChange($any($event.target).value)">
+            <option value="" [selected]="!bucket()">Choose a bucket</option>
+            @for (b of buckets(); track b.bucket) {
+              <option [value]="b.bucket" [selected]="b.bucket === bucket()">
+                {{ b.label || b.bucket }} · {{ b.provider }}
+              </option>
+            }
+          </select>
+        </div>
+
+        <div class="field">
+          <label class="label" for="cfile">File</label>
+          <select id="cfile" class="input" [disabled]="!bucket() || loadingObjects()"
+                  (change)="selectedKey.set($any($event.target).value)">
+            <option value="" [selected]="!selectedKey()">
+              {{ loadingObjects() ? 'Reading the bucket…'
+                 : !bucket() ? 'Choose a bucket first'
+                 : convertibleObjects().length ? 'Choose a file'
+                 : 'Nothing convertible in this bucket' }}
+            </option>
+            @for (o of convertibleObjects(); track o.key) {
+              <option [value]="o.key" [selected]="o.key === selectedKey()">{{ o.name }}</option>
+            }
+          </select>
+        </div>
+      </div>
+    }
+
+    @if (sourceName() && !family()) {
+      <p class="text-sm text-warn-500">".{{ extension() }}" isn't a format this can convert.</p>
+    } @else if (family()) {
+      <p class="text-sm text-[color:var(--text-secondary)]">
+        Detected as {{ family()!.label }}
+        @if (mode() === 'upload' && file()) { · {{ (file()!.size / 1024).toFixed(0) }} KB }
+      </p>
+    }
 
     @if (family()) {
       <div class="max-w-xs">
@@ -32,9 +75,53 @@
         </select>
       </div>
 
+      <div class="pt-1">
+        <label class="flex items-center gap-2 text-sm cursor-pointer">
+          <input type="checkbox" class="checkbox" [checked]="saveToBucket()"
+                 (change)="saveToBucket.set($any($event.target).checked)" />
+          Save the result to a bucket
+        </label>
+        <p class="field-note text-[color:var(--text-muted)]">
+          Otherwise the converted file only exists in this tab until you download it.
+        </p>
+      </div>
+
+      @if (saveToBucket()) {
+        <div class="form-grid">
+          <div class="field">
+            <label class="label" for="savebucket">Save to bucket</label>
+            <select id="savebucket" class="input"
+                    (change)="saveBucket.set($any($event.target).value)">
+              <option value="" [selected]="!saveBucket()">Choose a bucket</option>
+              @for (b of buckets(); track b.bucket) {
+                <option [value]="b.bucket" [selected]="b.bucket === saveBucket()">
+                  {{ b.label || b.bucket }} · {{ b.provider }}
+                </option>
+              }
+            </select>
+          </div>
+
+          <div class="field">
+            <label class="label" for="savefolder">Folder</label>
+            <input id="savefolder" class="input mono" placeholder="converted/"
+                   [value]="saveFolder()" (input)="saveFolder.set($any($event.target).value)" />
+            <p class="field-note text-[color:var(--text-muted)]">Optional; the bucket root if left empty.</p>
+          </div>
+
+          <div class="field">
+            <label class="label" for="taskname">Name</label>
+            <input id="taskname" class="input" [placeholder]="sourceName() || 'Conversion name'"
+                   [value]="taskName()" (input)="taskName.set($any($event.target).value)" />
+            <p class="field-note text-[color:var(--text-muted)]">Optional; the file's own name if left empty.</p>
+          </div>
+        </div>
+      }
+
       <div class="flex gap-2">
-        <button type="button" class="btn btn-primary" [disabled]="converting()" (click)="convert()">
-          {{ converting() ? 'Converting…' : 'Convert' }}
+        <button type="button" class="btn btn-primary"
+                [disabled]="converting() || fetchingSource() || !canConvert()" (click)="convert()">
+          <app-icon name="refresh" [class.spin]="converting() || fetchingSource()" />
+          {{ fetchingSource() ? 'Reading the file…' : converting() ? 'Converting…' : 'Convert' }}
         </button>
         <button type="button" class="btn btn-ghost" (click)="reset()"><app-icon name="close" />Clear</button>
       </div>
@@ -120,7 +207,7 @@
               <th>Size</th>
               <th>Location</th>
               <th>Created</th>
-              <th class="w-10"></th>
+              <th class="w-28 text-right">View</th>
             </tr>
           </thead>
           <tbody>
@@ -153,10 +240,24 @@
                   {{ task.dateCreated ? (task.dateCreated | date: 'd MMM y, HH:mm') : '—' }}
                 </td>
                 <td>
-                  <button type="button" class="btn btn-ghost btn-icon btn-sm btn-intent-crit"
-                          title="Delete this conversion" (click)="removeTask(task)">
-                    <app-icon name="trash" />
-                  </button>
+                  <div class="flex items-center justify-end gap-1">
+                    <button type="button" class="btn btn-ghost btn-icon btn-sm"
+                            [disabled]="!task.inputStorageKey"
+                            [title]="task.inputStorageKey ? 'View the original file' : 'The original was not kept'"
+                            (click)="view(task, 'input')">
+                      <app-icon name="file" />
+                    </button>
+                    <button type="button" class="btn btn-ghost btn-icon btn-sm"
+                            [disabled]="!task.outputStorageKey"
+                            [title]="task.outputStorageKey ? 'View the converted file' : 'The result was not kept'"
+                            (click)="view(task, 'output')">
+                      <app-icon name="eye" />
+                    </button>
+                    <button type="button" class="btn btn-ghost btn-icon btn-sm btn-intent-crit"
+                            title="Delete this conversion" (click)="removeTask(task)">
+                      <app-icon name="trash" />
+                    </button>
+                  </div>
                 </td>
               </tr>
             }
