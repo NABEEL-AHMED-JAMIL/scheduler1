@@ -213,6 +213,22 @@
     .tls-with-guide > .form-grid { @apply order-1; }
   }
 
+  /* Transcript segments: the timestamp is an index into the audio, so it is set in the
+     brand tint at a smaller size and the speech keeps the readable weight. Hanging indent
+     keeps wrapped speech aligned under itself rather than under the stamp. */
+  .ts-line {
+    @apply flex items-baseline gap-2.5 py-1 leading-relaxed;
+  }
+  .ts-line + .ts-line { border-color: var(--border-subtle); @apply border-t; }
+  .ts-mark {
+    color: var(--color-brand-600);
+    background: color-mix(in srgb, var(--color-brand-500) 10%, transparent);
+    @apply shrink-0 rounded px-1.5 py-0.5 font-mono text-[11px] tabular-nums
+           transition-colors hover:brightness-110;
+  }
+  html.dark .ts-mark { color: var(--color-brand-300); }
+  .ts-text { color: var(--text-primary); @apply text-sm min-w-0; }
+
   .upload-row { @apply flex flex-wrap items-center gap-2; }
   .upload-row input[type="file"] { @apply flex-1 min-w-48 text-xs py-1; }
 

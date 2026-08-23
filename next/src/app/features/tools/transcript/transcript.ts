@@ -28,6 +28,35 @@ export class Transcript implements OnInit {
 
   readonly extracting = signal(false);
   readonly transcript = signal('');
+
+  /**
+   * Splits the transcript on its [HH:MM:SS.mmm] markers so the timestamp can be set apart
+   * from the words. As one flat block the markers competed with the speech for attention,
+   * which is the opposite of what they are for -- they are an index, not content.
+   */
+  readonly segments = computed(() => {
+    const text = this.transcript();
+    if (!text) return [];
+    const pattern = /\[(\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?)\]/g;
+
+    const found: { time: string; at: number; length: number }[] = [];
+    for (let match = pattern.exec(text); match; match = pattern.exec(text)) {
+      found.push({ time: match[1], at: match.index, length: match[0].length });
+    }
+    // No markers means timestamps were switched off: one untimed block.
+    if (!found.length) return [{ time: '', text: text.trim() }];
+
+    const segments: { time: string; text: string }[] = [];
+    const lead = text.slice(0, found[0].at).trim();
+    if (lead) segments.push({ time: '', text: lead });
+
+    found.forEach((marker, index) => {
+      const from = marker.at + marker.length;
+      const to = index + 1 < found.length ? found[index + 1].at : text.length;
+      segments.push({ time: marker.time, text: text.slice(from, to).trim() });
+    });
+    return segments;
+  });
   readonly error = signal('');
 
   readonly audioObjects = computed(() =>
@@ -94,6 +123,12 @@ export class Transcript implements OnInit {
         bucket: this.bucket(), key: this.selectedKey(), timestamps: this.timestamps(),
       }).subscribe(done);
     }
+  }
+
+  /** A timestamp is worth copying on its own -- it is how you cite a moment in the audio. */
+  async copyStamp(time: string): Promise<void> {
+    if (await copyText(time)) this.toast.success(`${time} copied.`);
+    else this.toast.error('Could not copy the timestamp.');
   }
 
   async copy(): Promise<void> {
