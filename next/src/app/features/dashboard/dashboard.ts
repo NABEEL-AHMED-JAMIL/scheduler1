@@ -7,6 +7,8 @@ import { HeatCell, HeatSelection, Heatmap } from '../../shared/charts/heatmap';
 import { DashboardService, HourCell, JobBreakdown, NameValue } from './dashboard.service';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { ToastService } from '../../shared/ui/toast.service';
+import { createPager } from '../../shared/ui/pager';
+import { Pagination } from '../../shared/ui/pagination';
 import { Icon } from '../../shared/ui/icon';
 import { statusColor } from '../../shared/charts/status-color';
 
@@ -21,10 +23,21 @@ type BreakdownKey = typeof BREAKDOWN_COLUMNS[number];
 
 @Component({
   selector: 'app-dashboard',
-  imports: [Icon, RouterLink, Donut, BarChart, Heatmap],
+  imports: [Pagination, Icon, RouterLink, Donut, BarChart, Heatmap],
   templateUrl: './dashboard.html',
 })
 export class Dashboard implements OnInit {
+  /** A busy hour can return every job that ran in it, so the drill-down pages like any list. */
+  readonly breakdownPager = createPager<JobBreakdown>(50);
+  readonly pagedBreakdown = computed(() => this.breakdownPager.slice(this.filteredBreakdown()));
+
+  goToBreakdownPage(page: number): void {
+    this.breakdownPager.goTo(page, this.filteredBreakdown().length);
+  }
+  setBreakdownPageSize(size: number): void {
+    this.breakdownPager.setSize(size);
+  }
+
   private readonly dashboard = inject(DashboardService);
   private readonly http = inject(HttpClient);
   private readonly toast = inject(ToastService);

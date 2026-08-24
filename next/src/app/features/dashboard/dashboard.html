@@ -104,7 +104,10 @@
           {{ breakdownSearch() ? 'No jobs match your search.' : 'No jobs ran in this hour.' }}
         </p>
       } @else {
-        <div class="overflow-x-auto">
+        <!-- A busy hour returns every job that ran in it: one cell held 500 rows and ran the
+             page to 27,000px, with the heatmap and the close button long since scrolled away.
+             The rows scroll in their own box, and the pager keeps that box a readable size. -->
+        <div class="overflow-x-auto scroll-table">
           <table class="table-modern">
             <thead>
               <tr>
@@ -117,7 +120,7 @@
               </tr>
             </thead>
             <tbody>
-              @for (row of filteredBreakdown(); track row.jobId) {
+              @for (row of pagedBreakdown(); track row.jobId) {
                 <tr>
                   <td class="max-w-64">
                     <div class="font-medium truncate" [title]="row.jobName">{{ row.jobName }}</div>
@@ -218,6 +221,12 @@
             }
           </table>
         </div>
+
+        <!-- Outside the scroll box, so the controls do not scroll away with the rows. -->
+        <app-pagination [total]="filteredBreakdown().length" [page]="breakdownPager.page()"
+                        [size]="breakdownPager.size()"
+                        (goTo)="goToBreakdownPage($event)"
+                        (setSize)="setBreakdownPageSize($event)" />
       }
     </div>
   }

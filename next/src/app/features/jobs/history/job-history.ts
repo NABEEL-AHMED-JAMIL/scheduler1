@@ -12,6 +12,7 @@ import { statusColor } from '../../../shared/charts/status-color';
 import { notifyChips, notifySentence } from '../notify-summary';
 import { JobAssistant } from '../assistant/job-assistant';
 import { copyText } from '../../../shared/ui/clipboard.util';
+import { ToastService } from '../../../shared/ui/toast.service';
 import { SplitBar } from '../../../shared/charts/split-bar';
 
 interface JobQueue {
@@ -34,6 +35,30 @@ interface JobQueue {
   templateUrl: './job-history.html',
 })
 export class JobHistory {
+  /** Runs whose full message is open. Short ones never need it. */
+  private readonly openMessages = signal<Set<number>>(new Set());
+  /** Beyond roughly this, the cell truncates and the text is worth opening. */
+  private static readonly LONG_MESSAGE = 60;
+
+  isLongMessage(message?: string | null): boolean {
+    return (message ?? '').length > JobHistory.LONG_MESSAGE;
+  }
+  isMessageOpen(runId: number): boolean {
+    return this.openMessages().has(runId);
+  }
+  toggleMessage(runId: number): void {
+    this.openMessages.update(open => {
+      const next = new Set(open);
+      next.has(runId) ? next.delete(runId) : next.add(runId);
+      return next;
+    });
+  }
+  copyMessage(message?: string | null): void {
+    copyText(message ?? '').then(
+      () => this.toast.success('Message copied.'),
+      () => this.toast.error('Could not copy the message.'));
+  }
+
   /** The assistant as a panel beside the history, rather than a page that replaces it. */
   readonly assistantOpen = signal(false);
   readonly assistantMinimised = signal(false);
@@ -57,6 +82,7 @@ export class JobHistory {
 
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
+  private readonly toast = inject(ToastService);
 
   readonly runs = signal<JobQueue[]>([]);
   readonly loading = signal(true);

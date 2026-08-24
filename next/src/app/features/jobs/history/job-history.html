@@ -325,9 +325,24 @@
               {{ duration(run) || '—' }}
             </td>
             <td class="max-w-96">
-              <span class="truncate block" [title]="run.jobStatusMessage">
-                {{ run.jobStatusMessage || '—' }}
-              </span>
+              @if (run.jobStatusMessage) {
+                <!-- A truncated line with a tooltip is unreadable for the messages that matter:
+                     a failure reason runs to a paragraph and a tooltip cannot be selected or
+                     copied. Long ones open into the same box the task payload uses. -->
+                @if (isLongMessage(run.jobStatusMessage)) {
+                  <button type="button"
+                          class="truncate block w-full text-left link-inline"
+                          [attr.aria-expanded]="isMessageOpen(run.jobQueueId)"
+                          [title]="isMessageOpen(run.jobQueueId) ? 'Hide the full message' : 'Show the full message'"
+                          (click)="toggleMessage(run.jobQueueId)">
+                    {{ run.jobStatusMessage }}
+                  </button>
+                } @else {
+                  <span class="truncate block">{{ run.jobStatusMessage }}</span>
+                }
+              } @else {
+                <span class="text-[color:var(--text-muted)]">—</span>
+              }
             </td>
             <td class="text-right"><app-status [label]="run.jobStatus" /></td>
             <td class="text-right">
@@ -335,6 +350,26 @@
                  [routerLink]="['/jobs', jobId(), 'runs', run.jobQueueId, 'logs']"><app-icon name="file" />Logs</a>
             </td>
           </tr>
+
+          @if (isMessageOpen(run.jobQueueId) && run.jobStatusMessage) {
+            <tr>
+              <td [attr.colspan]="isAllJobs() ? 9 : 8" class="!p-0">
+                <div class="px-4 py-3 border-l-2" style="border-color: var(--color-brand-500);">
+                  <div class="flex items-baseline gap-2 mb-1.5">
+                    <h3 class="text-xs font-semibold uppercase tracking-wider
+                               text-[color:var(--text-secondary)]">Message · run #{{ run.jobQueueId }}</h3>
+                    <button type="button" class="btn btn-default btn-sm ml-auto"
+                            (click)="copyMessage(run.jobStatusMessage)">
+                      <app-icon name="copy" size="0.85em" />Copy
+                    </button>
+                  </div>
+                  <pre class="mono text-xs leading-relaxed rounded p-2.5 overflow-y-auto max-h-64
+                              whitespace-pre-wrap break-words"
+                       style="background: var(--surface-raised);">{{ run.jobStatusMessage }}</pre>
+                </div>
+              </td>
+            </tr>
+          }
         }
       </tbody>
     </table>
