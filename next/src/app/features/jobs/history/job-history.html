@@ -91,19 +91,25 @@
 
           <div>
             <div class="detail-head">Runs in this view</div>
-            <div class="grid grid-cols-3 gap-px overflow-hidden rounded-lg"
+            <!-- Four columns for exactly eight statuses: two full rows, so no cell is ever
+                 left blank and none has to stretch to fill one. Previously only non-zero
+                 outcomes were drawn into a three-column grid, which left empty squares beside
+                 a run that had just one outcome. A status with no runs shows 0, muted --
+                 "none yet" is information; a blank square is not. -->
+            <div class="grid grid-cols-4 gap-px overflow-hidden rounded-lg"
                  style="background: var(--border-subtle);">
               @for (stat of runStats(); track stat.name) {
-                @if (stat.value && stat.name !== 'Total') {
-                  <div class="px-2 py-2 text-center" style="background: var(--surface-raised);">
-                    <div class="text-sm font-semibold tabular leading-none">{{ stat.value }}</div>
+                @if (stat.name !== 'Total') {
+                  <div class="px-2 py-2 text-center"
+                       style="background: var(--surface-raised);">
+                    <div class="text-sm font-semibold tabular leading-none"
+                         [class.text-[color:var(--text-muted)]]="!stat.value">{{ stat.value }}</div>
                     <div class="text-[10px] uppercase tracking-wide mt-1 text-[color:var(--text-muted)]">
                       {{ stat.name }}
                     </div>
                   </div>
                 }
               }
-              <!-- Total spans whatever the outcome cells left, so no blank cell is dealt. -->
               <div class="col-span-full px-2 py-1.5 text-center"
                    style="background: var(--surface-sunken);">
                 <span class="text-xs tabular font-semibold">{{ runs().length }}</span>
