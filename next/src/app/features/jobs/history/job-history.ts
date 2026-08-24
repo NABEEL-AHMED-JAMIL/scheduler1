@@ -33,7 +33,11 @@ interface JobQueue {
 })
 export class JobHistory {
   /** Bound from the route so the page can be linked to directly. */
-  readonly jobId = input.required<string>();
+  /**
+   * Empty when the screen was opened from the dashboard's TOTAL row, which covers every job
+   * that ran in one hour rather than a single one.
+   */
+  readonly jobId = input<string>('');
 
   /**
    * Set when arriving from a dashboard count: the drill-down narrows to one status in one
@@ -130,6 +134,7 @@ export class JobHistory {
   }
 
   private loadDetail(): void {
+    if (!this.jobId()) { this.detail.set(null); return; }
     this.http.get<ApiResponse<any>>(`${API_BASE}/sourceJob.json/fetchSourceJobDetailWithSourceJobId`,
       { params: { jobId: this.jobId() } }).subscribe({
       next: response => {
@@ -203,28 +208,47 @@ export class JobHistory {
     this.http.get<ApiResponse<any[]>>(`${API_BASE}/sourceJob.json/listSourceJob`).subscribe({
       next: response => {
         if (response.status !== API_SUCCESS) return;
+        if (!this.jobId()) return;
         const job = (response.data ?? []).find(j => String(j.jobId) === this.jobId());
         if (job) this.jobName.set(job.jobName);
       },
     });
   }
 
+  /**
+   * A date and an hour are what narrow this screen. Status is optional -- the TOTAL column
+   * sends none on purpose, because no run is ever in a state called "Total", and requiring
+   * one here made that click quietly show the job's entire history instead of the hour.
+   */
   readonly isDrillDown = computed(() =>
-    !!(this.targetDate() && this.targetHr() !== '' && this.jobStatus()));
+    !!(this.targetDate() && this.targetHr() !== ''));
+
+  /** True when drilling into an hour across every job rather than into one job. */
+  readonly isAllJobs = computed(() => !this.jobId());
 
   load(): void {
     this.loading.set(true);
     this.error.set('');
+    if (!this.isDrillDown() && !this.jobId()) {
+      // Nothing identifies what to show. Reachable only by hand-editing the URL.
+      this.loading.set(false);
+      this.error.set('Open a job, or pick an hour on the dashboard, to see runs.');
+      return;
+    }
+
+    // Every parameter on the detail endpoint is optional, so each is sent only when set:
+    // no jobId means every job in the hour, and no status means every status.
+    const drillParams: Record<string, string> = {
+      targetDate: this.targetDate(),
+      targetHr: this.targetHr(),
+    };
+    if (this.jobStatus()) drillParams['jobStatus'] = this.jobStatus();
+    if (this.jobId()) drillParams['jobId'] = this.jobId();
+
     const request = this.isDrillDown()
       ? this.http.get<ApiResponse<any>>(
-          `${API_BASE}/dashboard.json/weeklyHrRunningStatisticsDimensionDetail`, {
-            params: {
-              targetDate: this.targetDate(),
-              targetHr: this.targetHr(),
-              jobStatus: this.jobStatus(),
-              jobId: this.jobId(),
-            },
-          })
+          `${API_BASE}/dashboard.json/weeklyHrRunningStatisticsDimensionDetail`,
+          { params: drillParams })
       : this.http.get<ApiResponse<any>>(
           `${API_BASE}/sourceJob.json/fetchSourceJobQueueListWithJobId`,
           { params: { jobId: this.jobId() } });
@@ -247,6 +271,9 @@ export class JobHistory {
 
   /** Drops the hour/status narrowing and shows the job's whole history. */
   clearDrillDown(): void {
+    // Without a job there is no wider history to widen to -- '/jobs//history' would 404 --
+    // so an all-jobs drill-down goes back to the dashboard it came from.
+    if (!this.jobId()) { this.router.navigate(['/dashboard']); return; }
     this.router.navigate(['/jobs', this.jobId(), 'history']);
   }
 

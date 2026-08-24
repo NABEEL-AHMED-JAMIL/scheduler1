@@ -42,6 +42,13 @@ export const routes: Routes = [
         loadComponent: () => import('./features/queue/queue').then(m => m.Queue),
       },
       {
+        // Same screen without a job: the dashboard's TOTAL row drills into an hour across
+        // every job, which has no single id to put in the path.
+        path: 'jobs/history',
+        loadComponent: () =>
+          import('./features/jobs/history/job-history').then(m => m.JobHistory),
+      },
+      {
         path: 'jobs/:jobId/history',
         loadComponent: () =>
           import('./features/jobs/history/job-history').then(m => m.JobHistory),

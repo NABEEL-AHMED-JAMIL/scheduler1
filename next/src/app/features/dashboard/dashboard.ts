@@ -200,6 +200,31 @@ export class Dashboard implements OnInit {
     this.router.navigate(['/jobs', row.jobId, 'history'], { queryParams });
   }
 
+  /**
+   * The footer's equivalent of openCount. There is no single job behind a total, so this goes
+   * to the history screen without one and the endpoint reads that as "every job in this hour"
+   * -- which is what the old screen did by rendering TOTAL as an ordinary row whose jobId
+   * happened to be null. Migrating that row into a <tfoot> is what dropped the click.
+   */
+  openTotal(status: string, count: number): void {
+    if (!count) {
+      const label = status === 'Total' ? '' : status.toLowerCase() + ' ';
+      this.toast.info(`No ${label}runs in this hour.`);
+      return;
+    }
+    const cell = this.selectedCell();
+    const queryParams: Record<string, string | number | null> = {
+      targetDate: cell?.date ?? null,
+      targetHr: cell?.hr ?? null,
+    };
+    // No run is ever in a state called Total, so the column sends no status and the endpoint
+    // returns every status for the hour.
+    if (status !== 'Total') {
+      queryParams['jobStatus'] = status.charAt(0).toUpperCase() + status.slice(1);
+    }
+    this.router.navigate(['/jobs', 'history'], { queryParams });
+  }
+
   countFor(row: JobBreakdown, key: BreakdownKey): number {
     return (row[key] as number) ?? 0;
   }

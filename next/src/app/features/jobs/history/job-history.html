@@ -9,25 +9,31 @@
     </h1>
     <p class="page-subtitle">
       @if (isDrillDown()) {
-        {{ jobStatus() }} runs of job <span class="mono">#{{ jobId() }}</span>
+        {{ jobStatus() || 'All' }} runs
+        @if (isAllJobs()) { across every job } @else { of job <span class="mono">#{{ jobId() }}</span> }
         on {{ targetDate() }} at {{ hourLabel(targetHr()) }}.
       } @else {
         Every recorded run of job <span class="mono">#{{ jobId() }}</span>.
       }
     </p>
-    <a class="btn btn-ghost btn-sm mt-3" [routerLink]="['/jobs', jobId(), 'assistant']">
-      <app-icon name="chat" />Ask about this job
-    </a>
+    @if (!isAllJobs()) {
+      <a class="btn btn-ghost btn-sm mt-3" [routerLink]="['/jobs', jobId(), 'assistant']">
+        <app-icon name="chat" />Ask about this job
+      </a>
+    }
   </div>
 
   @if (isDrillDown()) {
     <div class="card px-4 py-2.5 flex flex-wrap items-center gap-2 text-sm">
       <span class="text-[color:var(--text-secondary)]">Filtered to</span>
-      <span class="pill pill-brand">{{ jobStatus() }}</span>
+      @if (jobStatus()) { <span class="pill pill-brand">{{ jobStatus() }}</span> }
+      @if (isAllJobs()) { <span class="pill pill-neutral">every job</span> }
       <span class="text-[color:var(--text-secondary)]">
         on {{ targetDate() }} at {{ hourLabel(targetHr()) }}
       </span>
-      <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="clearDrillDown()"><app-icon name="refresh" />Show all runs</button>
+      <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="clearDrillDown()">
+        <app-icon name="refresh" />{{ isAllJobs() ? 'Back to dashboard' : 'Show all runs' }}
+      </button>
     </div>
   }
 
@@ -259,6 +265,7 @@
       <thead>
         <tr>
           <th>Run</th>
+          @if (isAllJobs()) { <th>Job</th> }
           <th>Queued</th>
           <th>Started</th>
           <th>Ended</th>
@@ -278,6 +285,12 @@
                           title="Reached the queue" />
               }
             </td>
+            @if (isAllJobs()) {
+              <td class="mono whitespace-nowrap">
+                <a class="link-inline" [routerLink]="['/jobs', run.jobId, 'history']"
+                   title="Open this job's own history">#{{ run.jobId }}</a>
+              </td>
+            }
             <td class="whitespace-nowrap text-[color:var(--text-muted)]">
               {{ run.dateCreated ? (run.dateCreated | date:'d MMM, HH:mm:ss') : '—' }}
             </td>

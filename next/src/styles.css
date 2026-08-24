@@ -73,6 +73,13 @@
     --surface-page:    var(--color-ink-50);
     --surface-raised:  #ffffff;
     --surface-sunken:  var(--color-ink-100);
+    /* A recessed *area* inside a white card, as distinct from a hover or selected state.
+       ink-100 carries twice the blue cast of the page (chroma 10 against 5) and drops 6.6
+       lightness points from white, so on a white card a large fill of it read as a blue band
+       rather than a shade -- most visibly a table's total row. This is the same idea at a
+       whisper: near the page's own tint, a third of the way to it in lightness. Interactive
+       states keep ink-100, because a hover has to actually register. */
+    --surface-inset:   #f4f6fa;
     --surface-inverse: var(--color-ink-900);
     --border-subtle:   var(--color-ink-200);
     --border-strong:   var(--color-ink-300);
@@ -92,6 +99,8 @@
     --surface-page:    var(--color-ink-950);
     --surface-raised:  var(--color-ink-900);
     --surface-sunken:  #12151f;
+    /* Dark has no cast problem -- everything is already navy -- so an inset is just sunken. */
+    --surface-inset:   #12151f;
     --surface-inverse: var(--color-ink-100);
     --border-subtle:   #2a3049;
     --border-strong:   #39405c;
@@ -293,7 +302,7 @@
 
   /* Inline instructions: a short procedure, not a wall of prose. */
   .guide {
-    background: var(--surface-sunken);
+    background: var(--surface-inset);
     border-color: var(--border-subtle);
     @apply rounded-lg border p-4 mb-4;
   }
@@ -322,7 +331,7 @@
   /* Segmented control: one control with three states rather than three buttons that happen
      to be adjacent, so the current view is unambiguous. */
   .seg {
-    background: var(--surface-sunken);
+    background: var(--surface-inset);
     border-color: var(--border-subtle);
     @apply inline-flex items-center gap-0.5 rounded-lg border p-0.5;
   }
@@ -385,7 +394,7 @@
      rule down its left edge so the eye can see where the detail belongs, and an inset shadow
      so it reads as recessed rather than as another table row. */
   .detail-panel {
-    background: var(--surface-sunken);
+    background: var(--surface-inset);
     border-left: 3px solid var(--color-brand-500);
     box-shadow: inset 0 1px 0 var(--border-subtle), inset 0 -1px 0 var(--border-subtle);
     @apply px-5 py-4;
@@ -574,7 +583,7 @@
 
   .dropzone {
     border-color: var(--border-strong);
-    background: var(--surface-sunken);
+    background: var(--surface-inset);
     @apply flex flex-col items-center justify-center text-center rounded-lg border-2 border-dashed
            px-6 py-10 transition-colors;
   }
@@ -681,7 +690,7 @@
   .table-modern tfoot td {
     @apply px-4 py-2.5 align-middle;
   }
-  .table-modern tfoot tr { background: var(--surface-sunken); }
+  .table-modern tfoot tr { background: var(--surface-inset); }
   .table-modern tbody tr:hover { background: var(--surface-sunken); }
 
   /* One rotation utility, for the handful of places that show work in progress.
@@ -821,7 +830,7 @@ html.dark .btn-intent-crit:focus app-icon { color: var(--color-crit-400); }
   }
 
   /* A sub-lookup row, tied to its parent by an indent rule rather than only a background. */
-  .lookup-child { background: var(--surface-sunken); }
+  .lookup-child { background: var(--surface-inset); }
   .lookup-child-rule {
     background: var(--border-strong);
     @apply inline-block w-2 h-px align-middle mr-2;
