@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
@@ -128,6 +128,10 @@ export class Jobs implements OnInit {
   /** Shown in the toolbar so it is clear whether the table is live or stale. */
   readonly live = this.jobEvents.connected;
 
+  /** Whether the socket has ever been up, and whether it has since dropped. */
+  private everConnected = false;
+  private missedEvents = false;
+
   readonly jobs = signal<SourceJob[]>([]);
   readonly loading = signal(true);
   readonly error = signal('');
@@ -224,6 +228,31 @@ export class Jobs implements OnInit {
     // the whole table for one row's status was what made the list flicker and lose scroll
     // position while anything was running.
     this.jobEvents.events.pipe(takeUntilDestroyed()).subscribe(event => this.applyEvent(event));
+
+    /*
+     * Re-read the list after a gap in the connection.
+     *
+     * Patching rows in place is only sound while every event arrives. A dropped socket loses
+     * them with no replay, so a job that finishes during the gap keeps whatever it said when
+     * the connection went down -- Running, for ever, with a timestamp that only gets older.
+     * The stalled banner then reports that row in good faith, which is how it came to warn
+     * about a run the database had long since completed.
+     *
+     * Only after an actual gap: the first connection follows the initial load, and reloading
+     * there would fetch the same rows twice on every visit.
+     */
+    effect(() => {
+      const live = this.jobEvents.connected();
+      if (!live) {
+        if (this.everConnected) this.missedEvents = true;
+        return;
+      }
+      this.everConnected = true;
+      if (this.missedEvents) {
+        this.missedEvents = false;
+        this.load();
+      }
+    });
   }
 
   private applyEvent(event: JobEvent): void {
