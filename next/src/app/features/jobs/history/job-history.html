@@ -16,11 +16,6 @@
         Every recorded run of job <span class="mono">#{{ jobId() }}</span>.
       }
     </p>
-    @if (!isAllJobs()) {
-      <a class="btn btn-ghost btn-sm mt-3" [routerLink]="['/jobs', jobId(), 'assistant']">
-        <app-icon name="chat" />Ask about this job
-      </a>
-    }
   </div>
 
   @if (isDrillDown()) {
@@ -39,14 +34,29 @@
 
   @if (detail(); as job) {
     <div class="card">
-      <button type="button" class="w-full flex items-center gap-2 px-4 py-2.5 text-left"
-              (click)="showDetail.set(!showDetail())">
-        <app-icon name="briefcase" class="icon-info" />
-        <span class="text-sm font-semibold">Job &amp; task detail</span>
-        <span class="pill pill-neutral">#{{ job.jobId }}</span>
-        <app-icon [name]="showDetail() ? 'chevronDown' : 'chevronRight'"
-                  class="icon-muted ml-auto" />
-      </button>
+      <!-- One flex row of siblings rather than one big button: the assistant link is an <a>,
+           which cannot be nested inside the toggle's <button>. -->
+      <div class="flex items-center gap-2 px-4 py-2.5">
+        <button type="button" class="flex flex-1 min-w-0 items-center gap-2 text-left"
+                [attr.aria-expanded]="showDetail()"
+                (click)="showDetail.set(!showDetail())">
+          <app-icon name="briefcase" class="icon-info shrink-0" />
+          <span class="text-sm font-semibold truncate">Job &amp; task detail</span>
+          <span class="pill pill-neutral shrink-0">#{{ job.jobId }}</span>
+        </button>
+
+        @if (!isAllJobs()) {
+          <a class="btn btn-default btn-sm shrink-0" [routerLink]="['/jobs', jobId(), 'assistant']">
+            <app-icon name="chat" />Ask about this job
+          </a>
+        }
+
+        <button type="button" class="btn btn-ghost btn-icon btn-sm shrink-0"
+                [attr.aria-label]="showDetail() ? 'Collapse job detail' : 'Expand job detail'"
+                (click)="showDetail.set(!showDetail())">
+          <app-icon [name]="showDetail() ? 'chevronDown' : 'chevronRight'" class="icon-muted" />
+        </button>
+      </div>
 
       @if (showDetail()) {
         <div class="border-t px-4 py-3.5 grid gap-x-6 gap-y-4 md:grid-cols-2 xl:grid-cols-4"
@@ -192,21 +202,13 @@
   }
 
   @if (showInsights() && hasInsights()) {
+    <!-- Spans must tile the 3-column grid or every row is left part-empty: the donut (1) and
+         the duration card (2) fill one row, the full-width flag split takes the next. -->
     <div class="grid gap-3 lg:grid-cols-3">
       <div class="card chart-card">
         <h3 class="chart-title">Outcomes</h3>
         <app-donut [data]="outcomeMix()" totalLabel="runs" [colorFor]="outcomeColor" />
       </div>
-
-      @if (flagSplit().length) {
-        <div class="card chart-card lg:col-span-3">
-          <h3 class="chart-title">How these runs were started</h3>
-          <p class="chart-sub">
-            The flags the queue recorded per run. A flag no run in view carries is left out.
-          </p>
-          <app-split-bar [data]="flagSplit()" positiveLabel="yes" negativeLabel="no" />
-        </div>
-      }
 
       <div class="card chart-card lg:col-span-2">
         <h3 class="chart-title">How long each run took</h3>
@@ -240,6 +242,16 @@
           </div>
         }
       </div>
+
+      @if (flagSplit().length) {
+        <div class="card chart-card lg:col-span-3">
+          <h3 class="chart-title">How these runs were started</h3>
+          <p class="chart-sub">
+            The flags the queue recorded per run. A flag no run in view carries is left out.
+          </p>
+          <app-split-bar [data]="flagSplit()" positiveLabel="yes" negativeLabel="no" />
+        </div>
+      }
     </div>
   }
 
