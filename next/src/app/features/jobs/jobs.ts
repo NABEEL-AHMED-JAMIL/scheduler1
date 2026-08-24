@@ -22,6 +22,7 @@ import { createPager } from '../../shared/ui/pager';
 import { Pagination } from '../../shared/ui/pagination';
 import { copyText } from '../../shared/ui/clipboard.util';
 import { isInFlight, isStalled, stalledFor } from './stalled';
+import { notifyChips, notifyCount, notifySentence } from './notify-summary';
 
 export interface Scheduler {
   schedulerId: number;
@@ -189,7 +190,16 @@ export class Jobs implements OnInit {
       return;
     }
     if (event.type === 'job.status' && event.jobRunningStatus) {
-      this.patchJob(event.jobId, { jobRunningStatus: event.jobRunningStatus });
+      const patch: Partial<SourceJob> = { jobRunningStatus: event.jobRunningStatus };
+      // A status push carries the new status but not a new lastJobRun, so the row kept the
+      // previous run's timestamp. The stall check measures from that field, so a run that had
+      // only just started over the socket was flagged as stalled the instant it began.
+      // The event's own `at` is when this run reached this state, which is precisely the
+      // "last update" the warning talks about.
+      if (isInFlight({ jobRunningStatus: event.jobRunningStatus })) {
+        patch.lastJobRun = event.at ?? new Date().toISOString();
+      }
+      this.patchJob(event.jobId, patch);
       return;
     }
     // A toggle or an edit changes fields this event does not carry, so that one row is
@@ -482,17 +492,9 @@ export class Jobs implements OnInit {
   }
 
   /** The three switches as chips, so the row reads at a glance rather than as a sentence. */
-  notifyChips(job: SourceJob) {
-    return [
-      { label: 'complete', on: !!job.completeJob, icon: 'checkCircle', intent: 'icon-ok' },
-      { label: 'fail',     on: !!job.failJob,     icon: 'xCircle',     intent: 'icon-crit' },
-      { label: 'skip',     on: !!job.skipJob,     icon: 'alert',       intent: 'icon-warn' },
-    ];
-  }
-
-  notifyCount(job: SourceJob): number {
-    return [job.completeJob, job.failJob, job.skipJob].filter(Boolean).length;
-  }
+  readonly notifyChips = notifyChips;
+  readonly notifyCount = notifyCount;
+  readonly notifySentence = notifySentence;
 
   editNotifications(job: SourceJob): void {
     this.dialog.open<boolean>(NotifyDialog, {

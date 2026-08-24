@@ -5,7 +5,11 @@
   <title>ETL Console</title>
   <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="icon" href="favicon.ico">
+  <!-- SVG first so the tab shows the app's own mark and stays crisp at any density; the .ico
+       remains for browsers that ignore SVG icons. -->
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="alternate icon" href="favicon.ico">
+  <meta name="theme-color" content="#4f46e5">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet"

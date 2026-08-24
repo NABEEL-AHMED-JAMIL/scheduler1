@@ -84,3 +84,18 @@ describe('the run this was built for', () => {
     expect(stalledFor(job, NOW)).toBe('6 hours');
   });
 });
+
+describe('a run that has only just started', () => {
+  it('is not stalled, however old the job is', () => {
+    // The regression: a socket status push set jobRunningStatus without touching lastJobRun,
+    // so a job whose previous run was hours ago was flagged the moment a new run began. The
+    // fix stamps the event's own time, and this is what that must produce.
+    const justStarted = { jobRunningStatus: 'Running', lastJobRun: ago(2 * MINUTE) };
+    expect(isStalled(justStarted, NOW)).toBe(false);
+  });
+
+  it('is still caught once it goes quiet for long enough', () => {
+    // Same run, no further updates -- which is exactly what the warning means by "no update".
+    expect(isStalled({ jobRunningStatus: 'Running', lastJobRun: ago(45 * MINUTE) }, NOW)).toBe(true);
+  });
+});

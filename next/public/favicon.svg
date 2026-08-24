@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="ETL Console">
+  <!-- The same mark the header shows: a brand-500 rounded square with a white E. The letter is
+       drawn as geometry rather than <text>, because a favicon renders outside the page and
+       cannot rely on Inter, or any particular font, being available. -->
+  <rect width="32" height="32" rx="7" fill="#4f46e5"/>
+  <g fill="#ffffff">
+    <rect x="10.5" y="8"    width="3.4"  height="16"  rx="1.2"/>
+    <rect x="10.5" y="8"    width="11.5" height="3.4" rx="1.2"/>
+    <rect x="10.5" y="14.3" width="9"    height="3.4" rx="1.2"/>
+    <rect x="10.5" y="20.6" width="11.5" height="3.4" rx="1.2"/>
+  </g>
+</svg>

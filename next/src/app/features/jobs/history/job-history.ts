@@ -9,6 +9,7 @@ import { Icon } from '../../../shared/ui/icon';
 import { Donut } from '../../../shared/charts/donut';
 import { BarChart } from '../../../shared/charts/bar-chart';
 import { statusColor } from '../../../shared/charts/status-color';
+import { notifyChips, notifySentence } from '../notify-summary';
 import { copyText } from '../../../shared/ui/clipboard.util';
 import { SplitBar } from '../../../shared/charts/split-bar';
 
@@ -32,6 +33,8 @@ interface JobQueue {
   templateUrl: './job-history.html',
 })
 export class JobHistory {
+  readonly notifyChips = notifyChips;
+  readonly notifySentence = notifySentence;
   /** Bound from the route so the page can be linked to directly. */
   /**
    * Empty when the screen was opened from the dashboard's TOTAL row, which covers every job

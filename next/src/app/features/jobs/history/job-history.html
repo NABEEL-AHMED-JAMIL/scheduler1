@@ -93,16 +93,15 @@
               <p class="text-xs text-[color:var(--text-muted)]">Runs on demand only.</p>
             }
 
-            <div class="detail-head mt-3">Email on</div>
-            <div class="flex flex-wrap gap-1.5">
-              @for (n of [
-                { label: 'complete', on: job.completeJob },
-                { label: 'fail',     on: job.failJob },
-                { label: 'skip',     on: job.skipJob }
-              ]; track n.label) {
-                <span class="pill" [class]="n.on ? 'pill pill-ok' : 'pill pill-neutral'">
-                  @if (n.on) { <app-icon name="check" size="0.85em" /> }
-                  {{ n.label }}
+            <div class="detail-head mt-3">Email notifications</div>
+            <p class="text-sm">{{ notifySentence(job) }}</p>
+            <div class="flex flex-wrap gap-1.5 mt-1.5">
+              @for (chip of notifyChips(job); track chip.label) {
+                <span [class]="chip.on ? 'pill pill-brand' : 'pill pill-neutral opacity-70'"
+                      [title]="chip.on
+                        ? 'An email is sent when this job ' + chip.label
+                        : 'No email is sent when this job ' + chip.label">
+                  <app-icon [name]="chip.on ? 'check' : 'minus'" size="0.85em" />{{ chip.label }}
                 </span>
               }
             </div>

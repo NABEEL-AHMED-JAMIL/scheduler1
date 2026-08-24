@@ -284,26 +284,31 @@
                       </dd>
                     </div>
                   }
-                  <div>
+                  <div class="sm:col-span-2">
                     <dt class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">
                       Email notifications
                     </dt>
-                    <dd class="flex flex-wrap items-center gap-1.5 mt-1">
-                      @for (chip of notifyChips(job); track chip.label) {
-                        <span [class]="chip.on ? 'pill pill-neutral' : 'pill pill-neutral opacity-45'"
-                              [title]="chip.on ? 'Emailed when the job ' + chip.label + 's'
-                                               : 'Not emailed when the job ' + chip.label + 's'">
-                          @if (chip.on) {
-                            <app-icon [name]="chip.icon" [class]="chip.intent" size="0.85em" />
-                          } @else {
-                            <app-icon name="minus" size="0.85em" class="icon-muted" />
-                          }
-                          {{ chip.label }}
-                        </span>
-                      }
-                      <button type="button" class="btn btn-ghost btn-sm" (click)="editNotifications(job)">
-                        <app-icon name="edit" size="0.85em" />Change
-                      </button>
+                    <dd class="mt-1">
+                      <!-- The sentence carries the meaning; the chips are the detail behind it. -->
+                      <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <p class="text-sm">{{ notifySentence(job) }}</p>
+                        <button type="button" class="btn btn-default btn-sm"
+                                (click)="editNotifications(job)">
+                          <app-icon name="edit" size="0.85em" />Change
+                        </button>
+                      </div>
+                      <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
+                        @for (chip of notifyChips(job); track chip.label) {
+                          <!-- Colour says on or off and nothing else: tinting "fails" red made
+                               it read as a run outcome on a panel that also shows one. -->
+                          <span [class]="chip.on ? 'pill pill-brand' : 'pill pill-neutral opacity-70'"
+                                [title]="chip.on
+                                  ? 'An email is sent when this job ' + chip.label
+                                  : 'No email is sent when this job ' + chip.label">
+                            <app-icon [name]="chip.on ? 'check' : 'minus'" size="0.85em" />{{ chip.label }}
+                          </span>
+                        }
+                      </div>
                     </dd>
                   </div>
                 </dl>
