@@ -7,10 +7,10 @@
     </p>
     </div>
     <div class="flex items-center gap-2">
-      <button type="button" class="btn btn-ghost btn-sm" (click)="load()" [disabled]="loading()">
+      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
         <app-icon name="refresh" [class.spin]="loading()" />Refresh
       </button>
-      <a routerLink="/tasks/bulk" class="btn btn-ghost btn-sm">
+      <a routerLink="/tasks/bulk" class="btn btn-default btn-sm">
         <app-icon name="upload" />Bulk import
       </a>
       <a routerLink="/tasks/new" class="btn btn-primary btn-sm"><app-icon name="plus" />New task</a>
@@ -122,7 +122,7 @@
                     @if (task.totalLinksJobs) {
                       <span class="pill pill-neutral">{{ task.totalLinksJobs }} linked job{{ task.totalLinksJobs === 1 ? '' : 's' }}</span>
                     }
-                    <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="copyPayload(task)">
+                    <button type="button" class="btn btn-default btn-sm ml-auto" (click)="copyPayload(task)">
                       <app-icon [name]="copiedId() === task.taskDetailId ? 'check' : 'copy'"
                                 [class.icon-ok]="copiedId() === task.taskDetailId" size="0.85em" />
                       {{ copiedId() === task.taskDetailId ? 'Copied' : 'Copy' }}

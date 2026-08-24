@@ -5,7 +5,7 @@
     </a>
     <div class="flex items-start gap-3">
       <h1 class="page-title mt-1 mr-auto">Run logs</h1>
-      <button type="button" class="btn btn-ghost btn-sm mt-1" (click)="load()" [disabled]="loading()">
+      <button type="button" class="btn btn-default btn-sm mt-1" (click)="load()" [disabled]="loading()">
         <app-icon name="refresh" [class.spin]="loading()" />Refresh
       </button>
     </div>
@@ -149,7 +149,7 @@
       }
 
       @if (stillRunning()) {
-        <button type="button" class="btn btn-ghost btn-sm" [class.btn-intent-ok]="autoRefreshing()"
+        <button type="button" class="btn btn-default btn-sm" [class.btn-intent-ok]="autoRefreshing()"
                 (click)="toggleLive()"
                 [title]="autoRefreshing() ? 'Following this run — checking every 5s'
                                           : 'Not following; refresh by hand'">
@@ -157,7 +157,7 @@
           {{ autoRefreshing() ? 'Live' : 'Paused' }}
         </button>
       }
-      <button type="button" class="btn btn-ghost btn-sm" [disabled]="refreshing()" (click)="refresh()">
+      <button type="button" class="btn btn-default btn-sm" [disabled]="refreshing()" (click)="refresh()">
         <app-icon name="refresh" [class.spin]="refreshing()" />Refresh
       </button>
     </ng-container>

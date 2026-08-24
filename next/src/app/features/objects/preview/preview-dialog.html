@@ -34,7 +34,7 @@
           <app-icon name="check" [class.spin]="saving()" />{{ saving() ? 'Saving…' : 'Save' }}
         </button>
       } @else {
-        <button type="button" class="btn btn-ghost btn-sm" (click)="copy()">
+        <button type="button" class="btn btn-default btn-sm" (click)="copy()">
           <app-icon [name]="copied() ? 'check' : 'copy'" [class.icon-ok]="copied()" />
           {{ copied() ? 'Copied' : 'Copy' }}
         </button>
@@ -71,7 +71,7 @@
           <button type="button" class="btn btn-default btn-sm" (click)="retry()">
             <app-icon name="refresh" />Try again
           </button>
-          <button type="button" class="btn btn-ghost btn-sm" (click)="download()">
+          <button type="button" class="btn btn-default btn-sm" (click)="download()">
             <app-icon name="download" />Download instead
           </button>
         </div>

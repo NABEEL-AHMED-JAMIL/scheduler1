@@ -99,7 +99,7 @@
     <div class="card overflow-hidden">
       <div class="flex items-center gap-2 px-4 py-3 border-b" style="border-color: var(--border-subtle);">
         <h2 class="text-sm font-semibold mr-auto">Output</h2>
-        <button type="button" class="btn btn-ghost btn-sm" [disabled]="!xml()" (click)="copy()">
+        <button type="button" class="btn btn-default btn-sm" [disabled]="!xml()" (click)="copy()">
           <app-icon name="copy" />Copy
         </button>
         <button type="button" class="btn btn-ghost btn-sm" [disabled]="!xml()" (click)="download()">

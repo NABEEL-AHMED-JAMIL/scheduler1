@@ -67,7 +67,7 @@
           <input type="file" class="hidden" (change)="onUpload($event)" />
         </label>
 
-        <button type="button" class="btn btn-ghost btn-sm" (click)="load()" [disabled]="loading()">
+        <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
           {{ loading() ? 'Loading…' : 'Refresh' }}
         </button>
       </div>

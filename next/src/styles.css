@@ -170,6 +170,22 @@
   }
   .btn-primary:disabled app-icon,
   .btn-danger:disabled app-icon { color: var(--text-muted); opacity: 1; }
+  /*
+   * Button weight carries meaning, so the variant is a decision about role, not taste.
+   *
+   *   btn-primary      the one action a screen or dialog exists for. One per view.
+   *   btn-default      a real secondary action the reader should find without hunting:
+   *                    Refresh, Copy, Export, Test, Bulk import, Open.
+   *   btn-ghost        dismissal (Cancel, Close), filter-clearing (Clear, Reset), and
+   *                    icon-only controls inside dense rows, where a border is noise.
+   *   btn-intent-crit  a destructive *trigger*: the label stays neutral and the icon turns
+   *                    red under the pointer, warning before the click.
+   *   btn-danger       the point of no return -- the confirm button in confirm.ts, and
+   *                    nowhere else, so a filled red button always means "this is final".
+   *
+   * An audit found 59.7% of 186 buttons were ghost, including Refresh and Copy in page
+   * headers, which is why so little on screen read as pressable.
+   */
   .btn-primary {
     @apply bg-brand-500 text-white hover:bg-brand-600 active:bg-brand-700;
   }

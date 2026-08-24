@@ -13,10 +13,10 @@
           <span class="live-dot live-on"></span>Live
         </span>
       }
-      <button type="button" class="btn btn-ghost btn-sm" (click)="load()" [disabled]="loading()">
+      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
         <app-icon name="refresh" [class.spin]="loading()" />Refresh
       </button>
-      <a routerLink="/jobs/bulk" class="btn btn-ghost btn-sm">
+      <a routerLink="/jobs/bulk" class="btn btn-default btn-sm">
         <app-icon name="upload" />Bulk import
       </a>
       <a routerLink="/jobs/new" class="btn btn-primary btn-sm"><app-icon name="plus" />New job</a>
@@ -70,7 +70,7 @@
       <div class="flex flex-wrap items-center gap-2 px-4 py-2.5 border-b"
            style="background: var(--surface-sunken); border-color: var(--border-subtle);">
         <span class="text-xs font-medium">{{ selected().size }} selected</span>
-        <button type="button" class="btn btn-ghost btn-sm btn-intent-ok"
+        <button type="button" class="btn btn-default btn-sm btn-intent-ok"
                 [disabled]="bulkBusy()" (click)="runSelected()">
           <app-icon name="play" />Run selected
         </button>
@@ -314,7 +314,7 @@
                       <h3 class="text-xs font-semibold uppercase tracking-wider
                                  text-[color:var(--text-secondary)]">Task payload</h3>
                       @if (payloadFor(job)) {
-                        <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="copyPayload(job)">
+                        <button type="button" class="btn btn-default btn-sm ml-auto" (click)="copyPayload(job)">
                           <app-icon name="copy" size="0.85em" />Copy
                         </button>
                       }

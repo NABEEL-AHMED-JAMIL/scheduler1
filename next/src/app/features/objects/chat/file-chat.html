@@ -84,13 +84,13 @@
             }
             <div class="flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100
                         focus-within:opacity-100 transition-opacity">
-              <button type="button" class="btn btn-ghost btn-sm" (click)="copyMessage($index, message.text)">
+              <button type="button" class="btn btn-default btn-sm" (click)="copyMessage($index, message.text)">
                 <app-icon [name]="copiedIndex() === $index ? 'check' : 'copy'"
                           [class.icon-ok]="copiedIndex() === $index" size="0.85em" />
                 {{ copiedIndex() === $index ? 'Copied' : 'Copy' }}
               </button>
               @if ($index === messages().length - 1) {
-                <button type="button" class="btn btn-ghost btn-sm" [disabled]="sending()"
+                <button type="button" class="btn btn-default btn-sm" [disabled]="sending()"
                         (click)="retry()" title="Ask again">
                   <app-icon name="refresh" size="0.85em" />Regenerate
                 </button>

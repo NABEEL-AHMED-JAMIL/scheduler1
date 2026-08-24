@@ -159,7 +159,7 @@
               @if (task.taskPayload) {
                 <div class="flex items-center gap-2 mt-3 mb-1">
                   <span class="detail-head mb-0">Task payload</span>
-                  <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="copyPayload()">
+                  <button type="button" class="btn btn-default btn-sm ml-auto" (click)="copyPayload()">
                     <app-icon [name]="payloadCopied() ? 'check' : 'copy'"
                               [class.icon-ok]="payloadCopied()" size="0.85em" />
                     {{ payloadCopied() ? 'Copied' : 'Copy' }}

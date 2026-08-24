@@ -185,7 +185,7 @@
         Recent conversions
         <span class="text-[color:var(--text-muted)] font-normal">({{ tasks().length }})</span>
       </h2>
-      <button type="button" class="btn btn-ghost btn-sm" (click)="loadTasks()" [disabled]="tasksLoading()">
+      <button type="button" class="btn btn-default btn-sm" (click)="loadTasks()" [disabled]="tasksLoading()">
         <app-icon name="refresh" [class.spin]="tasksLoading()" />Refresh
       </button>
     </div>

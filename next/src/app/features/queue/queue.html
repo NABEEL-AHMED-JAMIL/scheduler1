@@ -12,7 +12,7 @@
           <app-icon name="chart" />{{ showInsights() ? 'Hide charts' : 'Charts' }}
         </button>
       }
-      <button type="button" class="btn btn-ghost btn-sm" (click)="load()" [disabled]="loading()">
+      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
         <app-icon name="refresh" [class.spin]="loading()" />{{ loading() ? 'Loading…' : 'Refresh' }}
       </button>
     </div>

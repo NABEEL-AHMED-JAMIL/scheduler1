@@ -54,7 +54,7 @@
           <input class="input" placeholder="Filter rows"
                  [value]="filter()" (input)="filter.set($any($event.target).value); pager.reset()" />
         </div>
-        <button type="button" class="btn btn-ghost btn-sm" [disabled]="!rows().length" (click)="copyResult()">
+        <button type="button" class="btn btn-default btn-sm" [disabled]="!rows().length" (click)="copyResult()">
           <app-icon name="copy" />Copy
         </button>
       </div>
