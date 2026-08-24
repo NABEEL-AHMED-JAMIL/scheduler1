@@ -56,7 +56,7 @@
       </div>
 
       <select class="input max-w-40" [value]="roleFilter()"
-              (change)="roleFilter.set($any($event.target).value)">
+              (change)="roleFilter.set($any($event.target).value); pager.reset()">
         <option value="">All roles</option>
         @for (role of roles(); track role) {
           <option [value]="role">{{ roleLabel(role) }}</option>
@@ -80,7 +80,7 @@
       <div class="search-field max-w-56">
         <app-icon name="search" size="0.95em" />
         <input class="input" placeholder="Search name, email or tenant"
-               [value]="search()" (input)="search.set($any($event.target).value)" />
+               [value]="search()" (input)="search.set($any($event.target).value); pager.reset()" />
       </div>
       @if (hasFilters()) {
         <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()">
@@ -91,7 +91,7 @@
 
     @if (view() === 'cards') {
       <div class="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3">
-        @for (user of filtered(); track user.appUserId) {
+        @for (user of paged(); track user.appUserId) {
           <article class="card p-4 flex gap-3 items-start">
             <app-avatar [bucket]="user.avatarBucket" [key]="user.avatarKey"
                         [name]="user.fullName || user.username" [size]="3" />
@@ -160,7 +160,7 @@
         </tr>
       </thead>
       <tbody>
-        @for (user of filtered(); track user.appUserId) {
+        @for (user of paged(); track user.appUserId) {
           <tr [class.opacity-55]="busy() === user.appUserId">
             <td class="font-medium">
               <div class="flex items-center gap-2.5">
@@ -234,5 +234,8 @@
       </tbody>
     </table>
     }
+
+    <app-pagination pager [total]="filtered().length" [page]="pager.page()" [size]="pager.size()"
+                    (goTo)="goToPage($event)" (setSize)="setPageSize($event)" />
   </app-table-shell>
 </div>

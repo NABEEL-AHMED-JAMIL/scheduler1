@@ -16,6 +16,8 @@ import { Avatar } from '../../../shared/ui/avatar';
 import { createSort } from '../../../shared/ui/sort';
 import { UserDialog } from './user-dialog';
 import { PromptDialog } from '../../objects/dialogs/prompt-dialog';
+import { createPager } from '../../../shared/ui/pager';
+import { Pagination } from '../../../shared/ui/pagination';
 
 export interface AppUser {
   appUserId: number;
@@ -35,7 +37,7 @@ export interface AppUser {
 
 @Component({
   selector: 'app-users',
-  imports: [StatTile, DatePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Icon, Avatar],
+  imports: [StatTile, DatePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Icon, Avatar, Pagination],
   templateUrl: './users.html',
 })
 export class Users implements OnInit {
@@ -108,6 +110,12 @@ export class Users implements OnInit {
     });
     return this.sort.apply(rows, (row, key) => (row as any)[key]);
   });
+
+  readonly pager = createPager<AppUser>();
+  readonly paged = computed(() => this.pager.slice(this.filtered()));
+
+  goToPage(next: number): void { this.pager.goTo(next, this.filtered().length); }
+  setPageSize(size: number): void { this.pager.setSize(size); }
 
   readonly summary = computed(() => {
     const focusedTenant = this.focusedTenantId();
