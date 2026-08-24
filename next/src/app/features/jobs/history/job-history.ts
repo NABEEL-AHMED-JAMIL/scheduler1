@@ -10,6 +10,7 @@ import { Donut } from '../../../shared/charts/donut';
 import { BarChart } from '../../../shared/charts/bar-chart';
 import { statusColor } from '../../../shared/charts/status-color';
 import { notifyChips, notifySentence } from '../notify-summary';
+import { JobAssistant } from '../assistant/job-assistant';
 import { copyText } from '../../../shared/ui/clipboard.util';
 import { SplitBar } from '../../../shared/charts/split-bar';
 
@@ -29,10 +30,14 @@ interface JobQueue {
 
 @Component({
   selector: 'app-job-history',
-  imports: [Icon, DatePipe, RouterLink, TableShell, StatusPill, Donut, BarChart, SplitBar],
+  imports: [JobAssistant, Icon, DatePipe, RouterLink, TableShell, StatusPill, Donut, BarChart, SplitBar],
   templateUrl: './job-history.html',
 })
 export class JobHistory {
+  /** The assistant as a panel beside the history, rather than a page that replaces it. */
+  readonly assistantOpen = signal(false);
+  readonly assistantMinimised = signal(false);
+
   readonly notifyChips = notifyChips;
   readonly notifySentence = notifySentence;
   /** Bound from the route so the page can be linked to directly. */

@@ -49,7 +49,7 @@ import { Icon } from './icon';
         <!-- The rows scroll inside their own box so the toolbar above and the pager below
              stay put. Without it a 369-entry log ran the page to 15,000px and the view
              switcher, search and refresh were all off-screen by the second row. -->
-        <div class="overflow-x-auto scroll-table"><ng-content /></div>
+        <div class="overflow-x-auto" [class.scroll-table]="scrollRows()"><ng-content /></div>
       }
       <!-- Outside the scroll box: paging controls that scroll away with the rows are
            unreachable exactly when a long list makes them necessary. -->
@@ -65,6 +65,15 @@ export class TableShell {
   readonly emptyMessage = input('Nothing here yet.');
   /** Something that suggests what is missing beats a generic box on every screen. */
   readonly emptyIcon = input('inbox');
+  /**
+   * Whether the rows scroll in their own box, keeping the toolbar and pager pinned.
+   *
+   * On by default because that is what a long list needs: a 369-entry log ran the page to
+   * 15,000px and put the view switcher, search and refresh off-screen by the second row. A
+   * screen whose list is short enough to read in one piece can turn it off and let the page
+   * scroll instead, which costs the pinning but reads more naturally.
+   */
+  readonly scrollRows = input(true);
   readonly shown = input<number | null>(null);
   readonly total = input<number | null>(null);
   readonly retry = output<void>();

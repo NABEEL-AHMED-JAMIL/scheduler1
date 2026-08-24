@@ -46,9 +46,13 @@
         </button>
 
         @if (!isAllJobs()) {
-          <a class="btn btn-default btn-sm shrink-0" [routerLink]="['/jobs', jobId(), 'assistant']">
+          <!-- Opens beside the history rather than replacing it: the questions are usually
+               about what is on screen, and leaving the page to ask them lost that context. -->
+          <button type="button" class="btn btn-default btn-sm shrink-0"
+                  [class.btn-intent-ok]="assistantOpen()"
+                  (click)="assistantOpen.set(!assistantOpen())">
             <app-icon name="chat" />Ask about this job
-          </a>
+          </button>
         }
 
         <button type="button" class="btn btn-ghost btn-icon btn-sm shrink-0"
@@ -336,3 +340,35 @@
     </table>
   </app-table-shell>
 </div>
+
+@if (assistantOpen() && !isAllJobs()) {
+  <div class="fixed bottom-4 right-4 z-50 w-[34rem] max-w-[calc(100vw-2rem)] card shadow-2xl
+              flex flex-col overflow-hidden"
+       [style.height]="assistantMinimised() ? 'auto' : 'min(40rem, calc(100vh - 3rem))'">
+    <div class="flex items-center gap-2 px-3.5 py-2.5 border-b shrink-0"
+         style="border-color: var(--border-subtle);">
+      <app-icon name="chat" size="0.95em" class="icon-info shrink-0" />
+      <span class="text-sm font-medium mr-auto truncate">
+        Job assistant
+        <span class="text-[color:var(--text-muted)] font-normal">#{{ jobId() }}</span>
+      </span>
+      <a class="btn btn-ghost btn-sm" [routerLink]="['/jobs', jobId(), 'assistant']"
+         title="Open the full page">
+        <app-icon name="expand" />Full page
+      </a>
+      <button type="button" class="btn btn-ghost btn-icon"
+              (click)="assistantMinimised.set(!assistantMinimised())"
+              [attr.aria-label]="assistantMinimised() ? 'Expand' : 'Minimise'">
+        <app-icon [name]="assistantMinimised() ? 'chevronRight' : 'chevronDown'" />
+      </button>
+      <button type="button" class="btn btn-ghost btn-icon" (click)="assistantOpen.set(false)"
+              aria-label="Close"><app-icon name="close" /></button>
+    </div>
+
+    @if (!assistantMinimised()) {
+      <div class="flex-1 min-h-0 overflow-hidden flex flex-col">
+        <app-job-assistant [jobId]="jobId()" [compact]="true" />
+      </div>
+    }
+  </div>
+}

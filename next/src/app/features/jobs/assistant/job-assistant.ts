@@ -1,9 +1,10 @@
-import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, input, output, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { ToastService } from '../../../shared/ui/toast.service';
+import { DictationService } from '../../../shared/ui/dictation.service';
 import { Icon } from '../../../shared/ui/icon';
 import { StatusPill } from '../../../shared/ui/status-pill';
 import { Donut } from '../../../shared/charts/donut';
@@ -38,9 +39,30 @@ interface Turn {
 })
 export class JobAssistant implements OnInit {
   readonly jobId = input.required<string>();
+  /**
+   * Panel mode. The same component, without the page chrome: no back link and no page title,
+   * because a floating panel already says where it is and what it is about. Kept as one
+   * component rather than two so the answers, exports and scope rules cannot drift apart.
+   */
+  readonly compact = input(false);
+  readonly closed = output<void>();
 
   private readonly http = inject(HttpClient);
   private readonly toast = inject(ToastService);
+  private readonly dictation = inject(DictationService);
+
+  readonly voiceSupported = this.dictation.supported;
+  /** Scoped per job so two open assistants cannot both claim the microphone. */
+  private get micId(): string { return `assistant-${this.jobId()}`; }
+  listening(): boolean { return this.dictation.listeningFor(this.micId); }
+
+  /** Speech extends what is typed rather than replacing it. */
+  toggleMic(): void {
+    this.dictation.toggle(this.micId, said => {
+      const current = this.question().trim();
+      this.question.set(current ? `${current} ${said}` : said);
+    });
+  }
 
   readonly loading = signal(true);
   readonly error = signal('');

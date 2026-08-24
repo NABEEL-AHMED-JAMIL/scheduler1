@@ -23,6 +23,7 @@ import { Pagination } from '../../shared/ui/pagination';
 import { copyText } from '../../shared/ui/clipboard.util';
 import { isInFlight, isStalled, stalledFor } from './stalled';
 import { notifyChips, notifyCount, notifySentence } from './notify-summary';
+import { JobAssistant } from './assistant/job-assistant';
 
 export interface Scheduler {
   schedulerId: number;
@@ -76,10 +77,49 @@ const STALLED_AFTER_MS = 30 * 60 * 1000;
 
 @Component({
   selector: 'app-jobs',
-  imports: [Icon, DatePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Pagination, BarChart],
+  imports: [JobAssistant, Icon, DatePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Pagination, BarChart],
   templateUrl: './jobs.html',
 })
 export class Jobs implements OnInit {
+  /**
+   * Live counts across every job, not just the page in view.
+   *
+   * The socket already patches each row's status in place, so these recompute themselves as
+   * runs move -- which is the point: with work in flight the question is "what is happening
+   * right now", and that was only answerable by reading down the Run status column.
+   */
+  readonly statusColour = statusColor;
+
+  readonly liveCounts = computed(() => {
+    const all = this.jobs();
+    const of = (test: (job: SourceJob) => boolean) => all.filter(test).length;
+    const status = (job: SourceJob) => (job.jobRunningStatus ?? '').toLowerCase();
+    return {
+      running:   of(job => status(job) === 'running'),
+      starting:  of(job => status(job) === 'start' || status(job) === 'queue'),
+      completed: of(job => status(job) === 'completed'),
+      failed:    of(job => status(job) === 'failed' || status(job) === 'interrupt'),
+      idle:      of(job => !status(job)),
+      total:     all.length,
+    };
+  });
+
+  /** Only worth showing while something is actually moving. */
+  readonly anyInFlight = computed(() => {
+    const counts = this.liveCounts();
+    return counts.running + counts.starting > 0;
+  });
+
+  /** The assistant as a panel over the list, rather than a page that replaces it. */
+  readonly assistantJob = signal<SourceJob | null>(null);
+  readonly assistantMinimised = signal(false);
+  readonly String = String;
+
+  openAssistant(job: SourceJob): void {
+    this.assistantMinimised.set(false);
+    this.assistantJob.set(job);
+  }
+
   private readonly http = inject(HttpClient);
   private readonly toast = inject(ToastService);
   private readonly dialog = inject(Dialog);

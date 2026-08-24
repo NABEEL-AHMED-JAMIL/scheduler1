@@ -4,6 +4,7 @@ import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { TableShell } from '../../../shared/ui/data-table';
+import { StickToBottom } from '../../../shared/ui/stick-to-bottom';
 import { Icon } from '../../../shared/ui/icon';
 import { RankedBar } from '../../../shared/charts/ranked-bar';
 import { StatusPill } from '../../../shared/ui/status-pill';
@@ -18,7 +19,7 @@ interface AuditLog {
 
 @Component({
   selector: 'app-job-logs',
-  imports: [Icon, DatePipe, RouterLink, TableShell, RankedBar, StatusPill],
+  imports: [StickToBottom, Icon, DatePipe, RouterLink, TableShell, RankedBar, StatusPill],
   templateUrl: './job-logs.html',
 })
 export class JobLogs implements OnInit, OnDestroy {

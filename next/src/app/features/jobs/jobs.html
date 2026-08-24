@@ -37,7 +37,33 @@
     </div>
   }
 
-  <app-table-shell heading="Jobs" [loading]="loading()" [error]="error()"
+  <!-- Live run counts. Driven by the same rows the socket patches, so they move on their own. -->
+  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-px rounded-lg overflow-hidden"
+       style="background: var(--border-subtle);">
+    @for (tile of [
+      { label: 'Running',   value: liveCounts().running,   tone: 'running',   glyph: 'play' },
+      { label: 'Queued',    value: liveCounts().starting,  tone: 'queue',     glyph: 'clock' },
+      { label: 'Completed', value: liveCounts().completed, tone: 'completed', glyph: 'checkCircle' },
+      { label: 'Failed',    value: liveCounts().failed,    tone: 'failed',    glyph: 'xCircle' },
+      { label: 'Never run', value: liveCounts().idle,      tone: '',          glyph: 'minus' }
+    ]; track tile.label) {
+      <div class="px-4 py-3 flex items-center gap-2.5" style="background: var(--surface-raised);">
+        <app-icon [name]="tile.glyph" size="1.05em"
+                  [style.color]="tile.tone ? statusColour(tile.tone) : 'var(--text-muted)'" />
+        <div class="min-w-0">
+          <div class="text-lg font-semibold tabular leading-none">{{ tile.value }}</div>
+          <div class="text-[10px] uppercase tracking-wide mt-1 text-[color:var(--text-muted)]">
+            {{ tile.label }}
+          </div>
+        </div>
+        @if (tile.label === 'Running' && tile.value) {
+          <span class="live-dot live-on ml-auto shrink-0" title="Updating as runs report in"></span>
+        }
+      </div>
+    }
+  </div>
+
+  <app-table-shell heading="Jobs" [scrollRows]="false" [loading]="loading()" [error]="error()"
                    [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="jobs().length"
                    [emptyMessage]="search() || statusFilter() || executionFilter()
                       ? 'No jobs match the current filters.' : 'No jobs yet.'"
@@ -201,7 +227,9 @@
                   <div class="my-1 border-t" style="border-color: var(--border-subtle);"></div>
                   <a cdkMenuItem class="menu-item" [routerLink]="['/jobs', job.jobId, 'edit']"><app-icon name="edit" />Edit</a>
                   <a cdkMenuItem class="menu-item" [routerLink]="['/jobs', job.jobId, 'history']"><app-icon name="clock" />Run history</a>
-                  <a cdkMenuItem class="menu-item" [routerLink]="['/jobs', job.jobId, 'assistant']"><app-icon name="chat" />Ask about this job</a>
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="openAssistant(job)">
+                    <app-icon name="chat" />Ask about this job
+                  </button>
                   <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="clone(job)">
                     <app-icon name="copy" />Duplicate
                   </button>
@@ -376,3 +404,37 @@
                     (goTo)="goToPage($event)" (setSize)="setPageSize($event)" />
   </app-table-shell>
 </div>
+
+@if (assistantJob(); as job) {
+  <div class="fixed bottom-4 right-4 z-50 w-[34rem] max-w-[calc(100vw-2rem)] card shadow-2xl
+              flex flex-col overflow-hidden"
+       [style.height]="assistantMinimised() ? 'auto' : 'min(40rem, calc(100vh - 3rem))'">
+    <div class="flex items-center gap-2 px-3.5 py-2.5 border-b shrink-0"
+         style="border-color: var(--border-subtle);">
+      <app-icon name="chat" size="0.95em" class="icon-info shrink-0" />
+      <span class="text-sm font-medium mr-auto truncate" [title]="job.jobName">
+        {{ job.jobName }}
+        <span class="text-[color:var(--text-muted)] font-normal">#{{ job.jobId }}</span>
+      </span>
+      <a class="btn btn-ghost btn-sm" [routerLink]="['/jobs', job.jobId, 'assistant']"
+         title="Open the full page"><app-icon name="expand" />Full page</a>
+      <button type="button" class="btn btn-ghost btn-icon"
+              (click)="assistantMinimised.set(!assistantMinimised())"
+              [attr.aria-label]="assistantMinimised() ? 'Expand' : 'Minimise'">
+        <app-icon [name]="assistantMinimised() ? 'chevronRight' : 'chevronDown'" />
+      </button>
+      <button type="button" class="btn btn-ghost btn-icon" (click)="assistantJob.set(null)"
+              aria-label="Close"><app-icon name="close" /></button>
+    </div>
+
+    @if (!assistantMinimised()) {
+      <div class="flex-1 min-h-0 overflow-hidden flex flex-col">
+        <!-- Keyed on the job so switching rows rebuilds it against the new one rather than
+             leaving the previous job's answers on screen under a new title. -->
+        @if (assistantJob(); as current) {
+          <app-job-assistant [jobId]="String(current.jobId)" [compact]="true" />
+        }
+      </div>
+    }
+  </div>
+}

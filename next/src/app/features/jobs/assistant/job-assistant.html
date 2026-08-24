@@ -1,9 +1,12 @@
-<div class="page">
-  <a class="link-inline text-sm" [routerLink]="['/jobs', jobId(), 'history']">
-    <app-icon name="arrowLeft" size="0.9em" />Back to run history
-  </a>
+<div [class.page]="!compact()" [class.flex]="compact()" [class.flex-col]="compact()"
+     [class.gap-3]="compact()" [class.min-h-0]="compact()" [class.p-3]="compact()">
+  @if (!compact()) {
+    <a class="link-inline text-sm" [routerLink]="['/jobs', jobId(), 'history']">
+      <app-icon name="arrowLeft" size="0.9em" />Back to run history
+    </a>
+  }
 
-  <div class="page-head">
+  <div class="page-head" [class.hidden]="compact()">
     <div>
       <h1 class="page-title">
         Job assistant
@@ -63,6 +66,15 @@
                  (input)="question.set($any($event.target).value)"
                  (keydown.enter)="ask(question())" />
         </div>
+        @if (voiceSupported) {
+          <button type="button" class="btn btn-ghost btn-icon btn-sm"
+                  [class.btn-intent-crit]="listening()"
+                  (click)="toggleMic()"
+                  [attr.aria-label]="listening() ? 'Stop dictating' : 'Ask by voice'"
+                  [title]="listening() ? 'Listening — click to stop' : 'Ask by voice'">
+            <app-icon [name]="listening() ? 'stop' : 'mic'" [class.pulse]="listening()" />
+          </button>
+        }
         <button type="button" class="btn btn-primary btn-sm" [disabled]="!question().trim()"
                 (click)="ask(question())">
           <app-icon name="send" />Ask
@@ -82,6 +94,9 @@
       </div>
     }
 
+    <div [class.flex-1]="compact()" [class.min-h-0]="compact()"
+         [class.overflow-y-auto]="compact()" [class.flex]="compact()"
+         [class.flex-col]="compact()" [class.gap-3]="compact()">
     @for (turn of turns(); track turn.id) {
       <div class="card p-4">
         <div class="flex items-baseline gap-2 pb-3 mb-3 border-b" style="border-color: var(--border-subtle);">
@@ -180,5 +195,6 @@
         }
       </div>
     }
+    </div>
   }
 </div>

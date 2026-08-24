@@ -164,7 +164,7 @@
 
     @switch (view()) {
       @case ('timeline') {
-        <ul class="log-timeline">
+        <ul class="log-timeline" [appStickToBottom]="filtered().length">
           @for (log of filtered(); track $index) {
             <li class="log-tl-item">
               <span class="log-tl-rail">
@@ -205,7 +205,7 @@
       }
 
       @case ('console') {
-        <div class="log-console">
+        <div class="log-console" [appStickToBottom]="filtered().length">
           @for (log of filtered(); track $index) {
             <div class="log-console-line">
               <span class="log-console-time">[{{ log.dateCreated ? (log.dateCreated | date:'yyyy-MM-dd HH:mm:ss') : '—' }}]</span>
