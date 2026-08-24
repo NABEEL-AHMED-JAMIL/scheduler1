@@ -20,6 +20,18 @@ import { PromptDialog } from '../../objects/dialogs/prompt-dialog';
 import { createPager } from '../../../shared/ui/pager';
 import { Pagination } from '../../../shared/ui/pagination';
 
+/** What one user owns and how their runs have gone, from dashboard.json/userStatistics. */
+export interface UserStatistic {
+  appUserId: number;
+  jobCount: number;
+  activeJobs: number;
+  /** Distinct tasks this user's jobs point at -- tasks carry no owner of their own. */
+  taskCount: number;
+  runCount: number;
+  completedCount: number;
+  failedCount: number;
+}
+
 export interface AppUser {
   appUserId: number;
   uuid?: string;
@@ -50,6 +62,7 @@ export class Users implements OnInit {
   private readonly router = inject(Router);
 
   readonly users = signal<AppUser[]>([]);
+  readonly stats = signal<Record<number, UserStatistic>>({});
   readonly tenants = signal<any[]>([]);
   readonly loading = signal(true);
   readonly error = signal('');
@@ -149,6 +162,7 @@ export class Users implements OnInit {
   load(): void {
     this.loading.set(true);
     this.error.set('');
+    this.loadStats();
     this.http.get<ApiResponse<AppUser[]>>(`${API_BASE}/appUser.json/listUsers`).subscribe({
       next: response => {
         this.loading.set(false);
@@ -160,6 +174,37 @@ export class Users implements OnInit {
         this.error.set(err?.error?.message || 'Could not load users.');
       },
     });
+  }
+
+  /**
+   * Per-user workload, from the aggregate endpoint rather than counted in the browser.
+   *
+   * The user list has no idea what anyone owns, and fetching each user's jobs to find out
+   * would be one request per row. This is a single grouped query, and it is keyed by id so a
+   * row can read its own numbers without scanning.
+   */
+  private loadStats(): void {
+    this.http.get<ApiResponse<UserStatistic[]>>(`${API_BASE}/dashboard.json/userStatistics`)
+      .subscribe({
+        next: response => {
+          if (response.status !== API_SUCCESS) return;
+          const byUser: Record<number, UserStatistic> = {};
+          for (const row of response.data ?? []) byUser[row.appUserId] = row;
+          this.stats.set(byUser);
+        },
+        // Counts are an enrichment: the list is still perfectly usable without them.
+        error: () => { /* left silent on purpose */ },
+      });
+  }
+
+  statFor(user: AppUser): UserStatistic | null {
+    return this.stats()[user.appUserId] ?? null;
+  }
+
+  /** Of the runs that reached a verdict; queued and skipped are neither pass nor fail. */
+  successRate(stat: UserStatistic): number | null {
+    const finished = (stat.completedCount ?? 0) + (stat.failedCount ?? 0);
+    return finished ? Math.round(((stat.completedCount ?? 0) / finished) * 100) : null;
   }
 
   private loadTenants(): void {
