@@ -789,6 +789,13 @@ html.dark .btn-intent-crit:focus app-icon { color: var(--color-crit-400); }
            focus:bg-[color:var(--surface-sunken)] focus:outline-none;
   }
   .menu-item-danger { @apply text-crit-500 hover:text-crit-500; }
+
+  /* An overlay menu shrink-to-fits its content, but .menu-item carries w-full -- a
+     percentage width resolved against a shrink-to-fit parent is circular, and the browser
+     settles it by taking the available width. That is why row menus rendered 500-718px wide
+     instead of hugging their labels. max-content breaks the cycle, leaving min-w-* as the
+     floor and the longest label as the width. */
+  .cdk-menu { width: max-content; max-width: min(22rem, calc(100vw - 2rem)); }
 }
 
 /* Chart series colours -- distinct from the semantic ok/warn/crit set so a chart

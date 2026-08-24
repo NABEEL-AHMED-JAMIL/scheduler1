@@ -193,7 +193,7 @@
                     <!-- CDK positions this itself and flips near the viewport edge, so the
                          last row needs no special handling. -->
                     <ng-template #rowMenu>
-                      <div cdkMenu class="card shadow-xl py-1 min-w-44 text-sm">
+                      <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
                         @if (!entry.folder) {
                           <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="preview(entry)"><app-icon name="eye" />View</button>
                           <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="openChat(entry)"><app-icon name="chat" />Chat with this file</button>
