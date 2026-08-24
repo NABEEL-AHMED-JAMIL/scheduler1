@@ -68,6 +68,32 @@ export interface ChatFile {
   pendingExport?: { sourceFormat: string; targetFormat: string; filename: string; mimeType: string };
 }
 
+/**
+ * Cells opening with = + - or @ are formulas to a spreadsheet, and a csv fence becomes a file
+ * someone opens in Excel. Its content came from a model summarising documents out of a bucket,
+ * so the first character of a cell is not ours to trust. A leading apostrophe is the standard
+ * defusal -- Excel reads the rest as text and does not show the quote.
+ *
+ * A field that parses as a number is left alone, so a column of negatives stays a column of
+ * numbers rather than becoming text the sheet cannot total.
+ */
+const FORMULA_LEAD = /^[=+\-@\t\r]/;
+
+function defuseCell(field: string): string {
+  const value = field.trim();
+  if (!FORMULA_LEAD.test(value)) return field;
+  if (Number.isFinite(Number(value))) return field;
+  // Preserve the original spacing around the value the author wrote.
+  return field.replace(value, `'${value}`);
+}
+
+function defuseSeparated(content: string, separator: string): string {
+  return content
+    .split(/\r?\n/)
+    .map(line => line.split(separator).map(defuseCell).join(separator))
+    .join('\n');
+}
+
 function stripBleed(content: string): string {
   const lines = content.split(/\r?\n/);
   while (lines.length) {
@@ -93,6 +119,13 @@ export function sourceFormatFor(lang: string, targetFormat: string, content: str
   return looksLikeMarkdown(content) ? 'md' : lang;
 }
 
+/** The delimiter a fence's cells are separated by, or null when it is not a cell format. */
+function fenceLangSeparator(lang: string): string | null {
+  if (lang === 'csv') return ',';
+  if (lang === 'tsv') return '\t';
+  return null;
+}
+
 export function parseDownloadableFiles(text: string, baseName = 'export'): ChatFile[] {
   if (!text) return [];
   const pattern = new RegExp(FENCE, 'gi');
@@ -102,8 +135,11 @@ export function parseDownloadableFiles(text: string, baseName = 'export'): ChatF
 
   while ((match = pattern.exec(text)) !== null) {
     const fenceLang = FENCE_ALIASES[match[1].toLowerCase()] ?? match[1].toLowerCase();
-    const content = stripBleed(match[2].replace(/\r?\n$/, ''));
+    let content = stripBleed(match[2].replace(/\r?\n$/, ''));
     if (!content.trim()) continue;
+    // Only the separated formats become spreadsheet cells; json, html and markdown do not.
+    const separator = fenceLangSeparator(match[1].toLowerCase());
+    if (separator) content = defuseSeparated(content, separator);
 
     // A fence tagged xlsx/docx/pdf holds text to be converted, so its own content is plain.
     const taggedForConversion = CONVERTIBLE.includes(fenceLang);

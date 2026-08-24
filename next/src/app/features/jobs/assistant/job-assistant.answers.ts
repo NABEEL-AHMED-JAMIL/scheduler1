@@ -289,8 +289,22 @@ function verdictSentence(stats: RunStats): string {
 
 /** The run history as CSV. The XLSX export is this, converted server-side. */
 export function runsToCsv(facts: JobFacts, runs: JobRun[]): string {
+  /*
+   * Spreadsheets treat a cell opening with = + - or @ as a formula, so a status message
+   * beginning with one is executed when the file is opened -- and this export exists to be
+   * opened in Excel. The message is written by the pipeline, which means its first character
+   * is not ours to trust. A leading apostrophe is the standard defusal: Excel reads the rest
+   * as text and does not display the quote.
+   *
+   * Only strings are treated this way. The run id and duration are numbers, and prefixing
+   * those would turn real figures into text a sheet cannot add up.
+   */
+  const FORMULA_LEAD = /^[=+\-@\t\r]/;
   const escape = (value: unknown) => {
-    const text = value === null || value === undefined ? '' : String(value);
+    if (value === null || value === undefined) return '';
+    const isText = typeof value === 'string';
+    let text = String(value);
+    if (isText && FORMULA_LEAD.test(text)) text = `'${text}`;
     return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
   };
   const header = ['Run', 'Job', 'Status', 'Queued', 'Started', 'Ended', 'Duration (s)', 'Message'];
