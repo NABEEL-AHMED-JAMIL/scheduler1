@@ -67,10 +67,10 @@
     @if (family()) {
       <div class="max-w-xs">
         <label class="label" for="target">Convert to</label>
-        <select id="target" class="input" [value]="outputFormat()"
+        <select id="target" class="input"
                 (change)="outputFormat.set($any($event.target).value)">
           @for (format of family()!.outputFormats; track format) {
-            <option [value]="format">{{ format.toUpperCase() }}</option>
+            <option [value]="format" [selected]="format === outputFormat()">{{ format.toUpperCase() }}</option>
           }
         </select>
       </div>
@@ -240,22 +240,25 @@
                   {{ task.dateCreated ? (task.dateCreated | date: 'd MMM y, HH:mm') : '—' }}
                 </td>
                 <td>
-                  <div class="flex items-center justify-end gap-1">
-                    <button type="button" class="btn btn-ghost btn-icon btn-sm"
+                  <div class="flex items-center justify-end gap-1.5">
+                    <button type="button" class="btn-circle"
                             [disabled]="!task.inputStorageKey"
                             [title]="task.inputStorageKey ? 'View the original file' : 'The original was not kept'"
+                            aria-label="View the original file"
                             (click)="view(task, 'input')">
-                      <app-icon name="file" />
+                      <app-icon name="file" size="0.9em" />
                     </button>
-                    <button type="button" class="btn btn-ghost btn-icon btn-sm"
+                    <button type="button" class="btn-circle"
                             [disabled]="!task.outputStorageKey"
                             [title]="task.outputStorageKey ? 'View the converted file' : 'The result was not kept'"
+                            aria-label="View the converted file"
                             (click)="view(task, 'output')">
-                      <app-icon name="eye" />
+                      <app-icon name="eye" size="0.9em" />
                     </button>
-                    <button type="button" class="btn btn-ghost btn-icon btn-sm btn-intent-crit"
-                            title="Delete this conversion" (click)="removeTask(task)">
-                      <app-icon name="trash" />
+                    <button type="button" class="btn-circle btn-circle-danger"
+                            title="Delete this conversion" aria-label="Delete this conversion"
+                            (click)="removeTask(task)">
+                      <app-icon name="trash" size="0.9em" />
                     </button>
                   </div>
                 </td>

@@ -4,11 +4,13 @@ import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config
 import { ToastService } from '../../../shared/ui/toast.service';
 import { copyText } from '../../../shared/ui/clipboard.util';
 import { BucketSummary, ObjectSummary, StorageService } from '../../objects/storage.service';
+import { Icon } from '../../../shared/ui/icon';
 
 const AUDIO_EXTENSIONS = ['mp3', 'm4a'];
 
 @Component({
   selector: 'app-transcript',
+  imports: [Icon],
   templateUrl: './transcript.html',
 })
 export class Transcript implements OnInit {
@@ -43,8 +45,13 @@ export class Transcript implements OnInit {
     for (let match = pattern.exec(text); match; match = pattern.exec(text)) {
       found.push({ time: match[1], at: match.index, length: match[0].length });
     }
-    // No markers means timestamps were switched off: one untimed block.
-    if (!found.length) return [{ time: '', text: text.trim() }];
+    // No markers means timestamps were switched off. Splitting on line breaks still gives
+    // the table and timeline something to number -- one wall of text would make both views
+    // pointless, and a transcript without stamps is exactly when they are chosen.
+    if (!found.length) {
+      const lines = text.split(/\n+/).map(line => line.trim()).filter(Boolean);
+      return (lines.length ? lines : [text.trim()]).map(line => ({ time: '', text: line }));
+    }
 
     const segments: { time: string; text: string }[] = [];
     const lead = text.slice(0, found[0].at).trim();
@@ -58,6 +65,28 @@ export class Transcript implements OnInit {
     return segments;
   });
   readonly error = signal('');
+
+  /**
+   * The same three readings the run-logs screen offers, and for the same reason: a timeline
+   * to follow it, a table to scan it, and the raw stream when you want the file as it is.
+   * All three work whether or not timestamps were asked for -- without them a segment is a
+   * line and the time column simply stays empty.
+   */
+  readonly view = signal<'timeline' | 'table' | 'console'>('timeline');
+  readonly views = [
+    { key: 'timeline' as const, label: 'Timeline', icon: 'clock' },
+    { key: 'table' as const,    label: 'Table',    icon: 'list' },
+    { key: 'console' as const,  label: 'Console',  icon: 'terminal' },
+  ];
+
+  readonly hasTimes = computed(() => this.segments().some(s => !!s.time));
+
+  /** Plain text for the clipboard, matching whichever reading is on screen. */
+  consoleText(): string {
+    return this.segments()
+      .map(s => (s.time ? `[${s.time}] ${s.text}` : s.text))
+      .join('\n');
+  }
 
   readonly audioObjects = computed(() =>
     this.objects().filter(o => !o.folder && AUDIO_EXTENSIONS.some(e => o.name.toLowerCase().endsWith('.' + e))));

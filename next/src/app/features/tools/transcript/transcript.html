@@ -73,24 +73,85 @@
 
   @if (transcript()) {
     <div class="card overflow-hidden">
-      <div class="flex items-center gap-2 px-4 py-2.5 border-b" style="border-color: var(--border-subtle);">
-        <span class="text-sm font-semibold mr-auto">Transcript</span>
-        <span class="text-xs text-[color:var(--text-muted)]">{{ transcript().length }} chars</span>
-        <button type="button" class="btn btn-default btn-sm" (click)="copy()">Copy</button>
-      </div>
-      <div class="max-h-96 overflow-auto p-4">
-        @for (segment of segments(); track $index) {
-          @if (segment.time) {
-            <p class="ts-line">
-              <button type="button" class="ts-mark" title="Copy this timestamp"
-                      (click)="copyStamp(segment.time)">{{ segment.time }}</button>
-              <span class="ts-text">{{ segment.text }}</span>
-            </p>
-          } @else {
-            <p class="ts-text whitespace-pre-wrap break-words">{{ segment.text }}</p>
+      <div class="flex flex-wrap items-center gap-2 px-4 py-2.5 border-b"
+           style="border-color: var(--border-subtle);">
+        <span class="text-sm font-semibold">Transcript</span>
+        <span class="text-xs text-[color:var(--text-muted)]">
+          {{ segments().length }} {{ segments().length === 1 ? 'segment' : 'segments' }} ·
+          {{ transcript().length }} chars
+        </span>
+
+        <div class="seg ml-auto">
+          @for (mode of views; track mode.key) {
+            <button type="button" class="seg-btn" [class.seg-on]="view() === mode.key"
+                    (click)="view.set(mode.key)">
+              <app-icon [name]="mode.icon" size="0.9em" />{{ mode.label }}
+            </button>
           }
-        }
+        </div>
+        <button type="button" class="btn btn-default btn-sm" (click)="copy()">
+          <app-icon name="copy" />Copy
+        </button>
       </div>
+
+      @switch (view()) {
+        @case ('timeline') {
+          <div class="max-h-96 overflow-auto p-4">
+            @for (segment of segments(); track $index) {
+              @if (segment.time) {
+                <p class="ts-line">
+                  <button type="button" class="ts-mark" title="Copy this timestamp"
+                          (click)="copyStamp(segment.time)">{{ segment.time }}</button>
+                  <span class="ts-text">{{ segment.text }}</span>
+                </p>
+              } @else {
+                <p class="ts-text whitespace-pre-wrap break-words">{{ segment.text }}</p>
+              }
+            }
+          </div>
+        }
+
+        @case ('table') {
+          <div class="max-h-96 overflow-auto">
+            <table class="table-modern">
+              <thead>
+                <tr>
+                  <th class="w-12 text-right">#</th>
+                  @if (hasTimes()) { <th class="w-28">Time</th> }
+                  <th>Text</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (segment of segments(); track $index) {
+                  <tr>
+                    <td class="text-right tabular text-[color:var(--text-muted)]">{{ $index + 1 }}</td>
+                    @if (hasTimes()) {
+                      <td class="tabular whitespace-nowrap">
+                        @if (segment.time) {
+                          <button type="button" class="ts-mark" title="Copy this timestamp"
+                                  (click)="copyStamp(segment.time)">{{ segment.time }}</button>
+                        } @else { <span class="text-[color:var(--text-muted)]">—</span> }
+                      </td>
+                    }
+                    <td class="break-words">{{ segment.text }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        @case ('console') {
+          <div class="log-console max-h-96">
+            @for (segment of segments(); track $index) {
+              <div class="log-console-line">
+                @if (segment.time) { <span class="log-console-time">[{{ segment.time }}]</span> }
+                <span>{{ segment.text }}</span>
+              </div>
+            }
+          </div>
+        }
+      }
     </div>
   }
 </div>

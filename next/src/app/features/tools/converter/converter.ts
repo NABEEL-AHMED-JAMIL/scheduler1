@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { ToastService } from '../../../shared/ui/toast.service';
@@ -165,14 +165,27 @@ export class Converter implements OnInit {
 
   onFile(event: Event): void {
     const input = event.target as HTMLInputElement;
-    const chosen = input.files?.[0] ?? null;
-    this.file.set(chosen);
+    this.file.set(input.files?.[0] ?? null);
     this.result.set(null);
-    // Default to something other than the input's own format, which is the common intent.
-    const family = this.family();
-    this.outputFormat.set(
-      family?.outputFormats.find(f => f !== this.extension()) ?? family?.outputFormats[0] ?? '');
   }
+
+  /**
+   * Picks a target format whenever the source changes, in either mode. Only the upload
+   * handler used to do this, so choosing a file from a bucket left the format empty while
+   * the select appeared to show one -- Convert stayed disabled with nothing explaining why.
+   */
+  private readonly defaultTarget = effect(() => {
+    const family = this.family();
+    const current = untracked(() => this.outputFormat());
+    if (!family) {
+      if (current) this.outputFormat.set('');
+      return;
+    }
+    if (current && family.outputFormats.includes(current)) return;
+    const own = untracked(() => this.extension());
+    this.outputFormat.set(
+      family.outputFormats.find(f => f !== own) ?? family.outputFormats[0] ?? '');
+  });
 
   async convert(): Promise<void> {
     if (!this.outputFormat()) return;
