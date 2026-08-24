@@ -77,6 +77,10 @@ export const routes: Routes = [
         canActivate: [roleGuard],
       },
       {
+        path: 'profile',
+        loadComponent: () => import('./features/profile/profile').then(m => m.Profile),
+      },
+      {
         path: 'notifications',
         loadComponent: () =>
           import('./features/notifications/notifications').then(m => m.Notifications),

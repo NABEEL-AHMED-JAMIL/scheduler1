@@ -75,9 +75,13 @@
         <div class="relative" data-nav-menu>
           <button type="button" (click)="toggleMenu('__user')"
                   class="flex items-center gap-2 px-1.5 py-1 rounded-md hover:bg-[color:var(--surface-sunken)]">
-            <span class="size-7 rounded-full bg-brand-500 text-white grid place-items-center text-[11px] font-semibold">
-              {{ auth.initials() }}
-            </span>
+            @if (auth.avatarUrl()) {
+              <img [src]="auth.avatarUrl()" alt="" class="size-7 rounded-full object-cover" />
+            } @else {
+              <span class="size-7 rounded-full bg-brand-500 text-white grid place-items-center text-[11px] font-semibold">
+                {{ auth.initials() }}
+              </span>
+            }
             <span class="text-sm font-medium hidden sm:block">{{ auth.displayName() }}</span>
           </button>
           @if (openMenu() === '__user') {
@@ -89,10 +93,15 @@
                   {{ auth.role()?.replace('_', ' ') | lowercase }}
                 </div>
               </div>
+              <a routerLink="/profile" (click)="openMenu.set(null)"
+                 class="flex items-center gap-2 px-3 py-1.5 text-sm text-[color:var(--text-secondary)]
+                        hover:bg-[color:var(--surface-sunken)] hover:text-[color:var(--text-primary)]">
+                <app-icon name="user" size="0.95em" />Your profile
+              </a>
               <button type="button" (click)="auth.logout()"
-                      class="w-full text-left px-3 py-1.5 text-sm text-[color:var(--text-secondary)]
+                      class="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-[color:var(--text-secondary)]
                              hover:bg-[color:var(--surface-sunken)] hover:text-[color:var(--text-primary)]">
-                Sign out
+                <app-icon name="logout" size="0.95em" />Sign out
               </button>
             </div>
           }

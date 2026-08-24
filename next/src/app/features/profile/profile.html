@@ -1,0 +1,193 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Your profile</h1>
+      <p class="page-subtitle">
+        How you appear across the console. Your role and tenant are set by an administrator.
+      </p>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <div class="card p-10 text-center text-sm text-[color:var(--text-muted)]">Loading your profile…</div>
+  } @else if (error()) {
+    <div class="card p-8 text-center">
+      <app-icon name="alert" size="1.6em" class="icon-crit" />
+      <p class="mt-2 text-sm">{{ error() }}</p>
+      <button type="button" class="btn btn-default btn-sm mt-3" (click)="load()">
+        <app-icon name="refresh" />Try again
+      </button>
+    </div>
+  } @else if (profile(); as me) {
+    <div class="grid gap-4 lg:grid-cols-[20rem_minmax(0,1fr)] items-start">
+
+      <div class="space-y-4">
+      <div class="card p-5 text-center">
+        <div class="relative inline-block">
+          @if (avatarUrl()) {
+            <img [src]="avatarUrl()" alt="Your profile picture"
+                 class="size-28 rounded-full object-cover mx-auto"
+                 style="border: 2px solid var(--border-subtle);" />
+          } @else {
+            <span class="size-28 rounded-full bg-brand-500 text-white grid place-items-center
+                         text-3xl font-semibold mx-auto">
+              {{ auth.initials() }}
+            </span>
+          }
+          @if (uploading()) {
+            <span class="absolute inset-0 rounded-full grid place-items-center"
+                  style="background: rgba(0,0,0,.55);">
+              <app-icon name="refresh" class="spin text-white" size="1.4em" />
+            </span>
+          }
+        </div>
+
+        <h2 class="mt-3 text-base font-semibold">{{ me.fullName }}</h2>
+        <p class="text-xs text-[color:var(--text-muted)] mono break-all">{{ me.username }}</p>
+
+        <div class="flex items-center justify-center gap-2 mt-4">
+          <label class="btn btn-default btn-sm cursor-pointer"
+                 [class.opacity-50]="uploading() || !targetBucket()">
+            <app-icon name="upload" />{{ avatarUrl() ? 'Replace' : 'Add picture' }}
+            <input type="file" class="sr-only" accept="image/png,image/jpeg,image/webp,image/gif"
+                   [disabled]="uploading() || !targetBucket()" (change)="onPicture($event)" />
+          </label>
+          @if (avatarUrl()) {
+            <button type="button" class="btn btn-ghost btn-sm btn-intent-crit"
+                    [disabled]="uploading()" (click)="removePicture()">
+              <app-icon name="trash" />Remove
+            </button>
+          }
+        </div>
+
+        @if (!targetBucket()) {
+          <p class="field-note text-[color:var(--color-warn-600)] mt-2">
+            No storage connection is available, so there is nowhere to keep a picture.
+          </p>
+        } @else {
+          <p class="field-note text-[color:var(--text-muted)] mt-2">
+            PNG, JPEG, WebP or GIF, up to 2 MB.
+          </p>
+        }
+
+        <dl class="grid grid-cols-2 gap-3 mt-5 pt-5 border-t text-left"
+            style="border-color: var(--border-subtle);">
+          <div>
+            <dt class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">Member for</dt>
+            <dd class="text-sm font-medium tabular">
+              {{ memberDays() }} {{ memberDays() === 1 ? 'day' : 'days' }}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">Role</dt>
+            <dd class="text-sm font-medium capitalize">{{ roleLabel(me.userRole) }}</dd>
+          </div>
+        </dl>
+      </div>
+
+      @if (myOutcomes().length) {
+        <div class="card chart-card">
+          <h3 class="chart-title">Your jobs right now</h3>
+          <p class="chart-sub">How the {{ myJobs().length }} jobs in your name last ran.</p>
+          <app-donut [data]="myOutcomes()" totalLabel="jobs" [colorFor]="outcomeColor" />
+        </div>
+      }
+      </div>
+
+      <div class="space-y-4">
+        <div class="card p-5">
+          <h3 class="text-sm font-semibold mb-4">Details</h3>
+
+          <div class="field max-w-sm">
+            <label class="label" for="fullName">Display name</label>
+            <input id="fullName" class="input" placeholder="Your name"
+                   [value]="name()" (input)="name.set($any($event.target).value)"
+                   (keydown.enter)="saveName()" />
+            <p class="field-note text-[color:var(--text-muted)]">
+              Shown in the header and anywhere a job records who assigned it.
+            </p>
+          </div>
+
+          @if (nameChanged()) {
+            <div class="flex gap-2 mt-3">
+              <button type="button" class="btn btn-primary btn-sm"
+                      [disabled]="savingName()" (click)="saveName()">
+                <app-icon name="save" [class.spin]="savingName()" />
+                {{ savingName() ? 'Saving…' : 'Save name' }}
+              </button>
+              <button type="button" class="btn btn-ghost btn-sm"
+                      (click)="name.set(me.fullName)">Cancel</button>
+            </div>
+          }
+
+          <dl class="grid sm:grid-cols-2 gap-x-6 gap-y-3 mt-6 pt-5 border-t text-sm"
+              style="border-color: var(--border-subtle);">
+            <div>
+              <dt class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">Email</dt>
+              <dd class="mono break-all">{{ me.username }}</dd>
+            </div>
+            <div>
+              <dt class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">Role</dt>
+              <dd class="capitalize">{{ roleLabel(me.userRole) }}</dd>
+            </div>
+            <div>
+              <dt class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">Tenant</dt>
+              <dd>{{ me.tenantName || (me.tenantId ? '#' + me.tenantId : 'All tenants') }}</dd>
+            </div>
+            <div>
+              <dt class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">State</dt>
+              <dd><app-status [label]="me.status" /></dd>
+            </div>
+            <div>
+              <dt class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">Joined</dt>
+              <dd>{{ me.dateCreated ? (me.dateCreated | date: 'd MMM y') : '—' }}</dd>
+            </div>
+            <div>
+              <dt class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">Last sign-in</dt>
+              <dd>{{ me.lastLoginAt ? (me.lastLoginAt | date: 'd MMM y, HH:mm') : 'Never' }}</dd>
+            </div>
+          </dl>
+        </div>
+
+        <div class="card p-5">
+          <h3 class="text-sm font-semibold mb-4">Your activity</h3>
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <a routerLink="/jobs" class="stat-tile hover:border-brand-500 transition-colors">
+              <div class="stat-label">Jobs assigned</div>
+              <div class="stat-value">{{ myJobs().length }}</div>
+              <div class="stat-foot">to {{ me.username }}</div>
+            </a>
+            <div class="stat-tile">
+              <div class="stat-label">Have run</div>
+              <div class="stat-value">{{ runsToday() }}</div>
+              <div class="stat-foot">of those jobs</div>
+            </div>
+            <a routerLink="/notifications" class="stat-tile hover:border-brand-500 transition-colors">
+              <div class="stat-label">Unread</div>
+              <div class="stat-value">{{ unread() }}</div>
+              <div class="stat-foot">notifications</div>
+            </a>
+          </div>
+
+          @if (myJobs().length) {
+            <ul class="mt-4 divide-y" style="border-color: var(--border-subtle);">
+              @for (job of myJobs().slice(0, 5); track job.jobId) {
+                <li class="flex items-center gap-3 py-2">
+                  <app-icon name="briefcase" size="0.95em" class="icon-muted shrink-0" />
+                  <a class="link-inline truncate" [routerLink]="['/jobs', job.jobId, 'history']">
+                    {{ job.jobName }}
+                  </a>
+                  <span class="ml-auto shrink-0"><app-status [label]="job.jobRunningStatus" /></span>
+                </li>
+              }
+            </ul>
+          } @else {
+            <p class="mt-4 text-sm text-[color:var(--text-muted)]">
+              No jobs are assigned to you yet.
+            </p>
+          }
+        </div>
+      </div>
+    </div>
+  }
+</div>

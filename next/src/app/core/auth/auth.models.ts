@@ -9,4 +9,7 @@ export interface AuthUser {
   tenantId?: number;
   accessToken: string;
   refreshToken: string;
+  /** Where the profile picture lives, when one has been set. */
+  avatarBucket?: string | null;
+  avatarKey?: string | null;
 }

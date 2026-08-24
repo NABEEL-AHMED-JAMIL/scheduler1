@@ -1,4 +1,4 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Observable, tap } from 'rxjs';
@@ -27,6 +27,50 @@ export class AuthService {
     const user = this.currentUser();
     return user?.fullName?.trim() || user?.username || '';
   });
+
+  private readonly avatarObjectUrl = signal('');
+
+  /**
+   * The picture as a blob URL rather than the endpoint's own URL. An <img src> cannot carry
+   * the bearer token, so pointing it straight at previewObject produced an unauthenticated
+   * request whose response the browser then blocked outright (ERR_BLOCKED_BY_ORB). Fetching
+   * through HttpClient lets the interceptor attach the token, and the blob URL that comes
+   * back is what the header and the profile screen bind to.
+   */
+  readonly avatarUrl = this.avatarObjectUrl.asReadonly();
+
+  /**
+   * An effect rather than a constructor call. Fetching from the constructor sent the request
+   * while this service was still being instantiated -- the auth interceptor injects it, so
+   * the interceptor was not in place yet and the call went out with no token and came back
+   * 401. An effect defers to after the injector settles, and re-runs whenever the stored
+   * user changes, so signing in or replacing the picture refreshes it without a manual call.
+   */
+  private readonly avatarSync = effect(() => {
+    const user = this.currentUser();
+    const bucket = user?.avatarBucket;
+    const key = user?.avatarKey;
+
+    const previous = untracked(() => this.avatarObjectUrl());
+    if (previous) URL.revokeObjectURL(previous);
+    this.avatarObjectUrl.set('');
+    if (!bucket || !key) return;
+
+    this.http.get(`${API_BASE}/storage.json/previewObject`, {
+      params: { bucket, key },
+      responseType: 'blob',
+    }).subscribe({
+      next: blob => this.avatarObjectUrl.set(URL.createObjectURL(blob)),
+      error: () => this.avatarObjectUrl.set(''),
+    });
+  });
+
+  /** Called by the profile screen so the header reflects an edit straight away. */
+  patchUser(changes: Partial<AuthUser>): void {
+    const user = this.currentUser();
+    if (!user) return;
+    this.persist({ ...user, ...changes });
+  }
 
   readonly initials = computed(() => {
     const name = this.displayName();

@@ -63,6 +63,12 @@ export class StorageService {
     return `${this.base}/downloadObject?bucket=${encodeURIComponent(bucket)}&key=${encodeURIComponent(key)}`;
   }
 
+  /** Inline URL for an <img>; previewObject streams the bytes where downloadObject
+      attaches them. */
+  previewUrl(bucket: string, key: string): string {
+    return `${this.base}/previewObject?bucket=${encodeURIComponent(bucket)}&key=${encodeURIComponent(key)}`;
+  }
+
   upload(bucket: string, prefix: string, file: File): Observable<ApiResponse> {
     const form = new FormData();
     form.append('bucket', bucket);
