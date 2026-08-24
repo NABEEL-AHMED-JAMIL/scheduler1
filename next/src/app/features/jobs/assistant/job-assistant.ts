@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, input, output, signal } from '@angular/core';
+import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
@@ -37,7 +37,7 @@ interface Turn {
   imports: [Icon, DatePipe, RouterLink, StatusPill, Donut, RankedBar],
   templateUrl: './job-assistant.html',
 })
-export class JobAssistant implements OnInit {
+export class JobAssistant {
   readonly jobId = input.required<string>();
   /**
    * Panel mode. The same component, without the page chrome: no back link and no page title,
@@ -71,6 +71,7 @@ export class JobAssistant implements OnInit {
   private turnId = 0;
   readonly exporting = signal<'csv' | 'xlsx' | null>(null);
 
+  private loadTicket = 0;
   private readonly detail = signal<any | null>(null);
   readonly runs = signal<JobRun[]>([]);
 
@@ -123,21 +124,42 @@ export class JobAssistant implements OnInit {
 
   readonly humanDuration = humanDuration;
 
-  ngOnInit(): void { this.load(); }
+  constructor() {
+    /*
+     * Reload whenever the job changes, not only on first construction.
+     *
+     * As a page this component was built fresh per route, so ngOnInit was enough. In the panel
+     * the instance is reused and only the input changes, and it went on showing the job it
+     * happened to load first -- the header naming one job while the answers described another.
+     */
+    effect(() => {
+      this.jobId();
+      // Answers are about one job; carrying them across would put job A's run counts under
+      // job B's name, which is precisely the confusion the scope rules exist to prevent.
+      this.turns.set([]);
+      this.question.set('');
+      this.runs.set([]);
+      this.load();
+    });
+  }
 
   load(): void {
     this.loading.set(true);
     this.error.set('');
     const jobId = this.jobId();
+    // Switching jobs quickly leaves the earlier request in flight; only the newest may land.
+    const ticket = ++this.loadTicket;
 
     this.http.get<ApiResponse<any>>(`${API_BASE}/sourceJob.json/fetchSourceJobDetailWithSourceJobId`,
       { params: { jobId } }).subscribe({
       next: response => {
+        if (ticket !== this.loadTicket) return;
         if (response.status === API_SUCCESS) this.detail.set(response.data ?? null);
         else this.error.set(response.message);
         this.loading.set(false);
       },
       error: err => {
+        if (ticket !== this.loadTicket) return;
         this.loading.set(false);
         this.error.set(err?.error?.message || 'Could not read this job.');
       },
@@ -146,6 +168,7 @@ export class JobAssistant implements OnInit {
     this.http.get<ApiResponse<any>>(`${API_BASE}/sourceJob.json/fetchSourceJobQueueListWithJobId`,
       { params: { jobId } }).subscribe({
       next: response => {
+        if (ticket !== this.loadTicket) return;
         if (response.status === API_SUCCESS) this.runs.set(response.data?.jobQueues ?? []);
       },
       error: () => { /* the assistant still answers what it can without run history */ },

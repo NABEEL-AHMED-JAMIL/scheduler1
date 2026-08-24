@@ -216,6 +216,8 @@
     @apply bg-crit-500 text-white hover:brightness-110;
   }
   .btn-sm { @apply px-2.5 py-1 text-xs; }
+  /* For a panel toolbar, where btn-sm still wraps onto a second row. */
+  .btn-xs { @apply px-2 py-0.5 text-[11px] gap-1; }
   /* A round, bordered icon button for row-level add/remove. The ghost variant carried almost
      no weight at 28px -- it read as decoration rather than something you press -- and a pair
      of them needs an obvious hit target and an obvious difference between the two. */
