@@ -7,6 +7,7 @@ import { TableShell } from '../../../shared/ui/data-table';
 import { StatTile } from '../../../shared/ui/stat-tile';
 import { StatusPill } from '../../../shared/ui/status-pill';
 import { Icon } from '../../../shared/ui/icon';
+import { ViewToggle } from '../../../shared/ui/view-toggle';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { confirmWith } from '../../../shared/ui/confirm';
 import { TaskType, TaskTypeDialog } from './task-type-dialog';
@@ -23,10 +24,11 @@ interface LinkedTask {
 
 @Component({
   selector: 'app-task-types',
-  imports: [StatTile, TableShell, StatusPill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger],
+  imports: [ViewToggle, StatTile, TableShell, StatusPill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger],
   templateUrl: './task-types.html',
 })
 export class TaskTypes implements OnInit {
+  readonly view = signal<'table' | 'cards'>('table');
   private readonly http = inject(HttpClient);
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);

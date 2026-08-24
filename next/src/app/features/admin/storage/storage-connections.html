@@ -31,15 +31,7 @@
                    emptyIcon="cloud"
                    (retry)="load()">
     <ng-container toolbar>
-      <div class="seg">
-        @for (option of [{id:'table',label:'Table',icon:'list'},
-                         {id:'cards',label:'Cards',icon:'layers'}]; track option.id) {
-          <button type="button" class="seg-btn" [class.seg-on]="view() === option.id"
-                  (click)="view.set($any(option.id))">
-            <app-icon [name]="option.icon" size="0.9em" />{{ option.label }}
-          </button>
-        }
-      </div>
+      <app-view-toggle [(value)]="view" key="storage" cardsIcon="layers" />
 
       <select class="input max-w-36" [value]="providerFilter()"
               (change)="providerFilter.set($any($event.target).value)">

@@ -11,6 +11,7 @@ import { TableShell } from '../../../shared/ui/data-table';
 import { StatusPill } from '../../../shared/ui/status-pill';
 import { ConnectionDialog } from './connection-dialog';
 import { Icon } from '../../../shared/ui/icon';
+import { ViewToggle } from '../../../shared/ui/view-toggle';
 
 interface StorageConnection {
   storageConnectionId: number;
@@ -34,7 +35,7 @@ interface StorageConnection {
 
 @Component({
   selector: 'app-storage-connections',
-  imports: [StatTile, Icon, DatePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill],
+  imports: [ViewToggle, StatTile, Icon, DatePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill],
   templateUrl: './storage-connections.html',
 })
 export class StorageConnections implements OnInit {

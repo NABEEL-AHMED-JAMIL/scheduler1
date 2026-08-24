@@ -12,6 +12,7 @@ import { confirmWith } from '../../../shared/ui/confirm';
 import { TableShell } from '../../../shared/ui/data-table';
 import { StatusPill } from '../../../shared/ui/status-pill';
 import { Icon } from '../../../shared/ui/icon';
+import { ViewToggle } from '../../../shared/ui/view-toggle';
 import { Avatar } from '../../../shared/ui/avatar';
 import { createSort } from '../../../shared/ui/sort';
 import { UserDialog } from './user-dialog';
@@ -37,7 +38,7 @@ export interface AppUser {
 
 @Component({
   selector: 'app-users',
-  imports: [StatTile, DatePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Icon, Avatar, Pagination],
+  imports: [ViewToggle, StatTile, DatePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Icon, Avatar, Pagination],
   templateUrl: './users.html',
 })
 export class Users implements OnInit {

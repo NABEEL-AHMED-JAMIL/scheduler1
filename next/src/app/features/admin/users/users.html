@@ -45,15 +45,7 @@
                    emptyIcon="users"
                    (retry)="load()">
     <ng-container toolbar>
-      <div class="seg">
-        @for (option of [{id:'table',label:'Table',icon:'list'},
-                         {id:'cards',label:'Cards',icon:'users'}]; track option.id) {
-          <button type="button" class="seg-btn" [class.seg-on]="view() === option.id"
-                  (click)="view.set($any(option.id))">
-            <app-icon [name]="option.icon" size="0.9em" />{{ option.label }}
-          </button>
-        }
-      </div>
+      <app-view-toggle [(value)]="view" key="users" cardsIcon="users" />
 
       <select class="input max-w-40" [value]="roleFilter()"
               (change)="roleFilter.set($any($event.target).value); pager.reset()">

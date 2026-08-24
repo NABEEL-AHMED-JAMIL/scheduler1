@@ -34,6 +34,7 @@
                    emptyIcon="layers"
                    (retry)="load()">
     <ng-container toolbar>
+      <app-view-toggle [(value)]="view" key="task-types" cardsIcon="server" />
       <select class="input max-w-32" [value]="statusFilter()"
               (change)="statusFilter.set($any($event.target).value)">
         <option value="">All states</option>
@@ -52,6 +53,84 @@
       }
     </ng-container>
 
+    @if (view() === 'cards') {
+      <div class="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
+        @for (type of filtered(); track type.sourceTaskTypeId) {
+          <article class="card p-4 flex flex-col gap-3">
+            <div class="flex items-start gap-2.5">
+              <span class="stat-glyph shrink-0"><app-icon name="server" /></span>
+              <div class="min-w-0 flex-1">
+                <h3 class="font-semibold truncate" [title]="type.serviceName">{{ type.serviceName }}</h3>
+                <p class="mono text-[color:var(--text-muted)]">#{{ type.sourceTaskTypeId }}</p>
+              </div>
+              <div class="shrink-0 flex items-center gap-1">
+                <app-status [label]="type.status" [quiet]="true" />
+                <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="cardMenu"
+                        aria-label="Actions">
+                  <app-icon name="dots" size="1.05em" />
+                </button>
+              <ng-template #cardMenu>
+                <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="edit(type)">
+                    <app-icon name="edit" />Edit
+                  </button>
+                  @if (canRoute()) {
+                    <button cdkMenuItem class="menu-item btn-intent-ok" (cdkMenuItemTriggered)="testRoute(type)">
+                      <app-icon name="plug" class="icon-ok" />Test Kafka connection
+                    </button>
+                  }
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="viewLinked(type)">
+                    <app-icon name="link" class="icon-info" />Linked tasks
+                  </button>
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="download(type)">
+                    <app-icon name="download" />Export as JSON
+                  </button>
+                  <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="remove(type)">
+                    <app-icon name="trash" class="icon-crit" />Delete
+                  </button>
+                </div>
+              </ng-template>
+              </div>
+            </div>
+
+            @if (type.description) {
+              <p class="text-xs text-[color:var(--text-secondary)] line-clamp-2">{{ type.description }}</p>
+            }
+
+            <dl class="text-xs grid gap-1">
+              <div class="flex gap-2 min-w-0">
+                <dt class="text-[color:var(--text-muted)] shrink-0 w-20">Topic</dt>
+                <dd class="mono text-brand-600 truncate min-w-0">
+                  {{ topicOf(type.queueTopicPartition) || '—' }}
+                </dd>
+              </div>
+              <div class="flex gap-2">
+                <dt class="text-[color:var(--text-muted)] shrink-0 w-20">Partitions</dt>
+                <dd class="mono">{{ partitionsOf(type.queueTopicPartition) || '—' }}</dd>
+              </div>
+              @if (canRoute()) {
+                <div class="flex gap-2 min-w-0">
+                  <dt class="text-[color:var(--text-muted)] shrink-0 w-20">Kafka</dt>
+                  <dd class="truncate min-w-0">{{ routeName(type) || 'default cluster' }}</dd>
+                </div>
+              }
+            </dl>
+
+            <div class="flex items-center gap-1.5 mt-auto pt-1">
+              @if (type.totalTaskLink) {
+                <button type="button" class="pill pill-neutral" (click)="viewLinked(type)"
+                        [title]="'Show the ' + type.totalTaskLink + ' tasks using this service'">
+                  <app-icon name="link" size="0.85em" />{{ type.totalTaskLink }}
+                  {{ type.totalTaskLink === 1 ? 'task' : 'tasks' }}
+                </button>
+              } @else {
+                <span class="text-[11px] text-[color:var(--text-muted)]">No tasks use this yet</span>
+              }
+            </div>
+          </article>
+        }
+      </div>
+    } @else {
     <table class="table-modern">
       <thead>
         <tr>
@@ -130,6 +209,7 @@
         }
       </tbody>
     </table>
+    }
   </app-table-shell>
 
   @if (linkedFor(); as type) {

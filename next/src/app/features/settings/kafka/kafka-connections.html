@@ -40,6 +40,7 @@
                    emptyIcon="server"
                    (retry)="load()">
     <ng-container toolbar>
+      <app-view-toggle [(value)]="view" key="kafka" cardsIcon="server" />
       <select class="input max-w-44" [value]="protocolFilter()"
               (change)="protocolFilter.set($any($event.target).value)">
         <option value="">All protocols</option>
@@ -63,6 +64,93 @@
       }
     </ng-container>
 
+    @if (view() === 'cards') {
+      <div class="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
+        @for (p of filtered(); track p.kafkaConnectionProfileId) {
+          <article class="card p-4 flex flex-col gap-3"
+                   [class.opacity-55]="testing() === p.kafkaConnectionProfileId">
+            <div class="flex items-start gap-2.5">
+              <span class="stat-glyph shrink-0"><app-icon name="server" /></span>
+              <div class="min-w-0 flex-1">
+                <h3 class="font-semibold truncate flex items-center gap-1.5" [title]="p.profileName">
+                  <span class="truncate">{{ p.profileName }}</span>
+                  @if (p.isDefault) {
+                    <span class="pill pill-brand shrink-0" title="Used by tasks with no explicit profile">
+                      <app-icon name="check" size="0.85em" />default
+                    </span>
+                  }
+                </h3>
+                @if (p.environmentLabel) {
+                  <p class="text-xs text-[color:var(--text-muted)] truncate">{{ p.environmentLabel }}</p>
+                }
+              </div>
+              <div class="shrink-0 flex items-center gap-1">
+                <app-status [label]="p.status" [quiet]="true" />
+                <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="cardMenu"
+                        [disabled]="testing() === p.kafkaConnectionProfileId" aria-label="Actions">
+                  <app-icon name="dots" size="1.05em" />
+                </button>
+                <ng-template #cardMenu>
+                  <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="edit(p)">
+                      <app-icon name="edit" />Edit
+                    </button>
+                    <button cdkMenuItem class="menu-item btn-intent-ok" (cdkMenuItemTriggered)="testConnection(p)">
+                      <app-icon name="plug" class="icon-ok" />Test connection
+                    </button>
+                    <div class="my-1 border-t" style="border-color: var(--border-subtle);"></div>
+                    @if (p.isDefault) {
+                      <button cdkMenuItem class="menu-item btn-intent-warn" (cdkMenuItemTriggered)="clearDefault(p)">
+                        <app-icon name="minus" />Clear default
+                      </button>
+                    } @else {
+                      <button cdkMenuItem class="menu-item btn-intent-ok" (cdkMenuItemTriggered)="setDefault(p)">
+                        <app-icon name="check" />Set as default
+                      </button>
+                    }
+                    <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="remove(p)">
+                      <app-icon name="trash" class="icon-crit" />Delete
+                    </button>
+                  </div>
+                </ng-template>
+              </div>
+            </div>
+
+            <dl class="text-xs grid gap-1">
+              <div class="flex gap-2 min-w-0">
+                <dt class="text-[color:var(--text-muted)] shrink-0 w-16">Brokers</dt>
+                <dd class="mono truncate min-w-0" [title]="p.bootstrapServers">{{ p.bootstrapServers }}</dd>
+              </div>
+              <div class="flex gap-2 min-w-0">
+                <dt class="text-[color:var(--text-muted)] shrink-0 w-16">Security</dt>
+                <dd class="min-w-0">
+                  <span [class]="protocolTone(p)"
+                        [title]="p.securityProtocol === 'PLAINTEXT' ? 'Unencrypted — credentials and data travel in the clear' : ''">
+                    @if (p.securityProtocol === 'PLAINTEXT') { <app-icon name="alert" size="0.85em" /> }
+                    @else { <app-icon name="lock" size="0.85em" /> }
+                    {{ p.securityProtocol }}
+                  </span>
+                  @if (p.saslMechanism && p.securityProtocol.startsWith('SASL_')) {
+                    <span class="text-[color:var(--text-muted)] ml-1">{{ p.saslMechanism }}</span>
+                  }
+                </dd>
+              </div>
+            </dl>
+
+            <div class="flex flex-wrap items-center gap-1.5 mt-auto pt-1">
+              <span [class]="testPill(p)" [title]="p.lastTestMessage || ''">
+                @if (testGlyph(p)) { <app-icon [name]="testGlyph(p)" size="0.85em" /> }{{ testLabel(p) }}
+              </span>
+              @if (p.lastTestedAt) {
+                <span class="text-[11px] text-[color:var(--text-muted)] ml-auto">
+                  {{ p.lastTestedAt | date:'d MMM, HH:mm' }}
+                </span>
+              }
+            </div>
+          </article>
+        }
+      </div>
+    } @else {
     <table class="table-modern">
       <thead>
         <tr>
@@ -159,5 +247,6 @@
         }
       </tbody>
     </table>
+    }
   </app-table-shell>
 </div>
