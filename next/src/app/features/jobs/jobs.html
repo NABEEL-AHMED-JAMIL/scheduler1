@@ -177,6 +177,7 @@
                   <div class="my-1 border-t" style="border-color: var(--border-subtle);"></div>
                   <a cdkMenuItem class="menu-item" [routerLink]="['/jobs', job.jobId, 'edit']"><app-icon name="edit" />Edit</a>
                   <a cdkMenuItem class="menu-item" [routerLink]="['/jobs', job.jobId, 'history']"><app-icon name="clock" />Run history</a>
+                  <a cdkMenuItem class="menu-item" [routerLink]="['/jobs', job.jobId, 'assistant']"><app-icon name="chat" />Ask about this job</a>
                   <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="clone(job)">
                     <app-icon name="copy" />Duplicate
                   </button>

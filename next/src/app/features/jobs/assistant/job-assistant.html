@@ -1,0 +1,180 @@
+<div class="page">
+  <a class="link-inline text-sm" [routerLink]="['/jobs', jobId(), 'history']">
+    <app-icon name="arrowLeft" size="0.9em" />Back to run history
+  </a>
+
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">
+        Job assistant
+        @if (facts(); as f) { <span class="font-normal text-[color:var(--text-secondary)]">— {{ f.jobName }}</span> }
+      </h1>
+      <p class="page-subtitle">
+        Answers about job #{{ jobId() }} only, built from its own record and runs.
+      </p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button type="button" class="btn btn-ghost btn-sm" [disabled]="!runs().length || exporting()"
+              (click)="exportRuns('csv')">
+        <app-icon name="download" />CSV
+      </button>
+      <button type="button" class="btn btn-ghost btn-sm" [disabled]="!runs().length || exporting()"
+              (click)="exportRuns('xlsx')">
+        <app-icon name="table" [class.spin]="exporting() === 'xlsx'" />
+        {{ exporting() === 'xlsx' ? 'Building…' : 'Excel' }}
+      </button>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <div class="card p-12 text-center text-sm text-[color:var(--text-muted)]">Reading the job…</div>
+  } @else if (error()) {
+    <div class="card p-10 text-center">
+      <app-icon name="alert" size="1.6em" class="icon-warn" />
+      <p class="mt-2 text-sm">{{ error() }}</p>
+      <button type="button" class="btn btn-default btn-sm mt-4" (click)="load()">Try again</button>
+    </div>
+  } @else if (facts(); as f) {
+
+    <div class="card p-4">
+      <div class="flex flex-wrap items-center gap-2">
+        @for (preset of presets; track preset.id) {
+          <button type="button" class="btn btn-default btn-sm"
+                  (click)="askPreset(preset.id, preset.question)">
+            <app-icon [name]="preset.icon" size="0.9em" />{{ preset.label }}
+          </button>
+        }
+        @if (turns().length) {
+          <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="clear()">
+            <app-icon name="close" />Clear
+          </button>
+        }
+      </div>
+
+      <div class="flex items-center gap-2 mt-3">
+        <div class="search-field flex-1">
+          <app-icon name="chat" size="0.95em" />
+          <input class="input" [value]="question()"
+                 placeholder="Ask about this job — its schedule, files, failures or history"
+                 (input)="question.set($any($event.target).value)"
+                 (keydown.enter)="ask(question())" />
+        </div>
+        <button type="button" class="btn btn-primary btn-sm" [disabled]="!question().trim()"
+                (click)="ask(question())">
+          <app-icon name="send" />Ask
+        </button>
+      </div>
+    </div>
+
+    @if (!turns().length) {
+      <div class="card p-10 text-center">
+        <app-icon name="chat" size="1.8em" class="icon-muted" />
+        <p class="mt-3 text-sm text-[color:var(--text-secondary)]">
+          Ask about job #{{ f.jobId }}, or pick one of the questions above.
+        </p>
+        <p class="mt-1 text-xs text-[color:var(--text-muted)]">
+          It answers about this job alone — schedule, storage, run history, failures and statistics.
+        </p>
+      </div>
+    }
+
+    @for (turn of turns(); track turn.at.getTime()) {
+      <div class="card p-4">
+        <div class="flex items-baseline gap-2 pb-3 mb-3 border-b" style="border-color: var(--border-subtle);">
+          <app-icon name="user" size="0.9em" class="icon-muted" />
+          <p class="text-sm font-medium flex-1">{{ turn.question }}</p>
+          <span class="text-[11px] tabular text-[color:var(--text-muted)]">
+            {{ turn.at | date: 'HH:mm' }}
+          </span>
+        </div>
+
+        @for (block of turn.answer.blocks; track $index) {
+          @switch (block.kind) {
+
+            @case ('text') {
+              <p class="text-sm leading-relaxed"
+                 [class.text-[color:var(--color-warn-600)]]="turn.answer.refused">
+                @if (turn.answer.refused) { <app-icon name="alert" size="0.9em" class="icon-warn mr-1" /> }
+                {{ block.text }}
+              </p>
+            }
+
+            @case ('facts') {
+              <dl class="grid sm:grid-cols-2 gap-x-6 gap-y-2 mt-3">
+                @for (row of block.rows; track row.label) {
+                  <div class="flex gap-2 text-sm">
+                    <dt class="text-[color:var(--text-muted)] shrink-0 min-w-24">{{ row.label }}</dt>
+                    <dd class="min-w-0 break-words">{{ row.value }}</dd>
+                  </div>
+                }
+              </dl>
+            }
+
+            @case ('stats') {
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-px mt-3 rounded-lg overflow-hidden"
+                   style="background: var(--border-subtle);">
+                @for (tile of [
+                  { label: 'Runs',         value: stats().total },
+                  { label: 'Success rate', value: stats().successRate === null ? '—' : stats().successRate + '%' },
+                  { label: 'Average',      value: humanDuration(stats().averageSeconds) },
+                  { label: 'Longest',      value: humanDuration(stats().longestSeconds) }
+                ]; track tile.label) {
+                  <div class="px-3 py-2.5 text-center" style="background: var(--surface-raised);">
+                    <div class="text-sm font-semibold tabular leading-none">{{ tile.value }}</div>
+                    <div class="text-[10px] uppercase tracking-wide mt-1 text-[color:var(--text-muted)]">
+                      {{ tile.label }}
+                    </div>
+                  </div>
+                }
+              </div>
+            }
+
+            @case ('chart') {
+              <div class="grid gap-3 mt-3 lg:grid-cols-2">
+                <div class="rounded-lg border p-3" style="border-color: var(--border-subtle);">
+                  <h3 class="chart-title">Outcomes</h3>
+                  <app-donut [data]="outcomeMix()" totalLabel="runs" [colorFor]="outcomeColor" />
+                </div>
+                @if (slowestRuns().length) {
+                  <div class="rounded-lg border p-3" style="border-color: var(--border-subtle);">
+                    <h3 class="chart-title">Slowest runs</h3>
+                    <p class="chart-sub">Where this job spent the most time.</p>
+                    <app-ranked-bar [data]="slowestRuns()" [max]="6" [showPercent]="false" [sorted]="false" />
+                  </div>
+                }
+              </div>
+            }
+
+            @case ('runs') {
+              <div class="overflow-x-auto mt-3 rounded-lg border" style="border-color: var(--border-subtle);">
+                <table class="table-modern">
+                  <thead>
+                    <tr><th>Run</th><th>Started</th><th>Status</th><th>Message</th><th class="w-16"></th></tr>
+                  </thead>
+                  <tbody>
+                    @for (run of block.runs; track run.jobQueueId) {
+                      <tr>
+                        <td class="mono">#{{ run.jobQueueId }}</td>
+                        <td class="whitespace-nowrap text-[color:var(--text-secondary)]">
+                          {{ run.startTime ? (run.startTime | date: 'd MMM, HH:mm') : '—' }}
+                        </td>
+                        <td><app-status [label]="run.jobStatus" /></td>
+                        <td class="max-w-72 truncate" [title]="run.jobStatusMessage">
+                          {{ run.jobStatusMessage || '—' }}
+                        </td>
+                        <td class="text-right">
+                          <a class="link-inline text-xs"
+                             [routerLink]="['/jobs', jobId(), 'runs', run.jobQueueId, 'logs']">Logs</a>
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          }
+        }
+      </div>
+    }
+  }
+</div>

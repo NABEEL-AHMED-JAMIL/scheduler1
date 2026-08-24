@@ -15,6 +15,9 @@
         Every recorded run of job <span class="mono">#{{ jobId() }}</span>.
       }
     </p>
+    <a class="btn btn-ghost btn-sm mt-3" [routerLink]="['/jobs', jobId(), 'assistant']">
+      <app-icon name="chat" />Ask about this job
+    </a>
   </div>
 
   @if (isDrillDown()) {
