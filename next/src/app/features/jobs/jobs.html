@@ -23,6 +23,20 @@
     </div>
   </div>
 
+  @if (stalledCount()) {
+    <div class="card px-4 py-3 flex flex-wrap items-center gap-2"
+         style="border-color: var(--color-warn-500);">
+      <app-icon name="alert" class="icon-warn" />
+      <p class="text-sm flex-1">
+        {{ stalledCount() }}
+        {{ stalledCount() === 1 ? 'run has' : 'runs have' }}
+        been in flight for over half an hour without an update. A worker that has finished but
+        cannot report back leaves a job looking busy for ever — check the worker's logs, and
+        that its callback token still matches the server's.
+      </p>
+    </div>
+  }
+
   <app-table-shell heading="Jobs" [loading]="loading()" [error]="error()"
                    [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="jobs().length"
                    [emptyMessage]="search() || statusFilter() || executionFilter()
@@ -159,7 +173,17 @@
             <td class="text-[color:var(--text-secondary)] whitespace-nowrap">
               {{ job.dateCreated ? (job.dateCreated | date:'d MMM yyyy') : '—' }}
             </td>
-            <td><app-status [label]="job.jobRunningStatus" /></td>
+            <td>
+              <div class="flex items-center gap-1.5">
+                <app-status [label]="job.jobRunningStatus" />
+                @if (isStalled(job)) {
+                  <span class="pill pill-warn shrink-0"
+                        [title]="'No update for ' + stalledFor(job) + '. The worker may have stopped reporting — check its logs and its callback token.'">
+                    <app-icon name="alert" size="0.8em" />stalled
+                  </span>
+                }
+              </div>
+            </td>
             <td class="text-right"><app-status [label]="job.jobStatus" [quiet]="true" /></td>
             <td class="text-right">
               <button type="button" class="btn btn-ghost btn-icon" [cdkMenuTriggerFor]="menu"

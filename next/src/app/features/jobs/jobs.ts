@@ -21,6 +21,7 @@ import { Router } from '@angular/router';
 import { createPager } from '../../shared/ui/pager';
 import { Pagination } from '../../shared/ui/pagination';
 import { copyText } from '../../shared/ui/clipboard.util';
+import { isInFlight, isStalled, stalledFor } from './stalled';
 
 export interface Scheduler {
   schedulerId: number;
@@ -57,7 +58,17 @@ export interface SourceJob {
 }
 
 /** Statuses where an in-flight run means a manual action would collide. */
-const IN_FLIGHT = ['queue', 'start', 'running'];
+
+/**
+ * How long a run may sit in a non-terminal state before it is treated as stranded.
+ *
+ * A run that never reports back leaves the job showing Queue, Start or Running for ever, and
+ * nothing on screen says anything is wrong -- which is exactly what happened when a worker
+ * held a stale callback token: it did the work, wrote every file, and every status callback
+ * came back 401, so the job sat in Start looking busy. Half an hour is far longer than any
+ * run here takes, so passing it means something has gone quiet rather than slow.
+ */
+const STALLED_AFTER_MS = 30 * 60 * 1000;
 
 @Component({
   selector: 'app-jobs',
@@ -364,9 +375,13 @@ export class Jobs implements OnInit {
   }
 
   /** A run already in flight would collide with a manual run or skip. */
-  isInFlight(job: SourceJob): boolean {
-    return IN_FLIGHT.includes((job.jobRunningStatus ?? '').toLowerCase());
-  }
+  readonly isInFlight = isInFlight;
+
+  /** In flight far too long -- the run is not slow, it has stopped reporting. */
+  readonly isStalled = (job: SourceJob) => isStalled(job);
+  readonly stalledFor = (job: SourceJob) => stalledFor(job);
+
+  readonly stalledCount = computed(() => this.jobs().filter(job => this.isStalled(job)).length);
 
   /** Human summary of a schedule: "Daily every 2 at 00:01" and what is next. */
   scheduleSummary(job: SourceJob): string {
