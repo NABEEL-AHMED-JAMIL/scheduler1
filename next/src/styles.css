@@ -553,6 +553,14 @@
   /* warn-500 on warn-100 measures 4.47:1 -- the one pill under the line. */
   .pill-warn    { @apply bg-warn-100; color: var(--color-warn-600); }
   .pill-crit    { @apply bg-crit-100 text-crit-500; }
+  /* Filled chips separate the second status in a family from the first: Running from Start,
+     Failed from Interrupt, Missed from Skip. White text on each of these measures 6.29, 5.86
+     and 7.63 against white, so all three clear 4.5 for small text. */
+  .pill-solid-brand { background: var(--color-brand-500); color: #ffffff; }
+  .pill-solid-crit  { background: var(--color-crit-500);  color: #ffffff; }
+  .pill-solid-warn  { background: var(--color-warn-600);  color: #ffffff; }
+  .pill-solid-ok    { background: var(--color-ok-500);    color: #ffffff; }
+  .pill-solid-neutral { background: var(--color-ink-600); color: #ffffff; }
 
   /* The quiet form of a status: a dot and plain text, for a column where one value is the
      norm. It has to still read as a status, so the dot keeps the tone's colour. */
@@ -714,6 +722,13 @@ html.dark .pill-brand { @apply bg-brand-900/50 text-brand-300; }
 html.dark .pill-ok    { background: color-mix(in oklab, var(--color-ok-500) 22%, transparent); @apply text-ok-400; }
 html.dark .pill-warn  { background: color-mix(in oklab, var(--color-warn-500) 22%, transparent); @apply text-warn-400; }
 html.dark .pill-crit  { background: color-mix(in oklab, var(--color-crit-500) 22%, transparent); @apply text-crit-400; }
+/* Dark keeps the filled chips filled -- that contrast against the soft ones is the whole
+   point -- but lifts each fill so it reads against a navy row rather than sinking into it. */
+html.dark .pill-solid-brand { background: var(--color-brand-500); color: #ffffff; }
+html.dark .pill-solid-crit  { background: #d24a63; color: #1a0508; }
+html.dark .pill-solid-warn  { background: var(--color-warn-400); color: #241202; }
+html.dark .pill-solid-ok    { background: var(--color-ok-400); color: #05200f; }
+html.dark .pill-solid-neutral { background: var(--color-ink-400); color: #0b0e17; }
 
 /* The -500/-600 semantic steps are mixed for white surfaces. Used as foreground on a dark
    one they fall to 2.2-3.4:1 -- "Expired" in warn-500 and topic names in brand-600 were the
