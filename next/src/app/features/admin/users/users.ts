@@ -12,6 +12,7 @@ import { confirmWith } from '../../../shared/ui/confirm';
 import { TableShell } from '../../../shared/ui/data-table';
 import { StatusPill } from '../../../shared/ui/status-pill';
 import { Icon } from '../../../shared/ui/icon';
+import { Avatar } from '../../../shared/ui/avatar';
 import { createSort } from '../../../shared/ui/sort';
 import { UserDialog } from './user-dialog';
 import { PromptDialog } from '../../objects/dialogs/prompt-dialog';
@@ -26,13 +27,15 @@ export interface AppUser {
   tenantId?: number;
   tenantName?: string;
   tenantActive?: boolean;
+  avatarBucket?: string | null;
+  avatarKey?: string | null;
   dateCreated?: string;
   lastLoginAt?: string;
 }
 
 @Component({
   selector: 'app-users',
-  imports: [StatTile, DatePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Icon],
+  imports: [StatTile, DatePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Icon, Avatar],
   templateUrl: './users.html',
 })
 export class Users implements OnInit {
@@ -83,6 +86,9 @@ export class Users implements OnInit {
     return [...seen.entries()].map(([id, name]) => ({ id, name }))
       .sort((a, b) => a.name.localeCompare(b.name));
   });
+
+  /** Table for scanning many at once, cards when the picture and role matter more. */
+  readonly view = signal<'table' | 'cards'>('table');
 
   readonly filtered = computed(() => {
     const term = this.search().trim().toLowerCase();

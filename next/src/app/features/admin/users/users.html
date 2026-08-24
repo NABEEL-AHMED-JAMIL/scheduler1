@@ -45,6 +45,16 @@
                    emptyIcon="users"
                    (retry)="load()">
     <ng-container toolbar>
+      <div class="seg">
+        @for (option of [{id:'table',label:'Table',icon:'list'},
+                         {id:'cards',label:'Cards',icon:'users'}]; track option.id) {
+          <button type="button" class="seg-btn" [class.seg-on]="view() === option.id"
+                  (click)="view.set($any(option.id))">
+            <app-icon [name]="option.icon" size="0.9em" />{{ option.label }}
+          </button>
+        }
+      </div>
+
       <select class="input max-w-40" [value]="roleFilter()"
               (change)="roleFilter.set($any($event.target).value)">
         <option value="">All roles</option>
@@ -79,6 +89,44 @@
       }
     </ng-container>
 
+    @if (view() === 'cards') {
+      <div class="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3">
+        @for (user of filtered(); track user.appUserId) {
+          <article class="card p-4 flex gap-3 items-start">
+            <app-avatar [bucket]="user.avatarBucket" [key]="user.avatarKey"
+                        [name]="user.fullName || user.username" [size]="3" />
+            <div class="min-w-0 flex-1">
+              <div class="flex items-start gap-2">
+                <h3 class="font-semibold truncate" [title]="user.fullName || user.username">
+                  {{ user.fullName || user.username }}
+                </h3>
+                @if (isSelf(user)) { <span class="pill pill-brand shrink-0">You</span> }
+                <div class="ml-auto shrink-0">
+                  <app-status [label]="user.status" [quiet]="true" />
+                </div>
+              </div>
+
+              <p class="mono text-[color:var(--text-muted)] truncate mt-0.5" [title]="user.username">
+                {{ user.username }}
+              </p>
+
+              <div class="flex flex-wrap items-center gap-1.5 mt-2">
+                <span class="pill pill-neutral">{{ roleLabel(user.userRole) }}</span>
+                @if (user.tenantName) {
+                  <span class="pill pill-neutral">{{ user.tenantName }}</span>
+                }
+              </div>
+
+              <p class="text-[11px] text-[color:var(--text-muted)] mt-2">
+                {{ user.lastLoginAt
+                    ? 'Last in ' + (user.lastLoginAt | date: 'd MMM y, HH:mm')
+                    : 'Never signed in' }}
+              </p>
+            </div>
+          </article>
+        }
+      </div>
+    } @else {
     <table class="table-modern">
       <thead>
         <tr>
@@ -115,10 +163,14 @@
         @for (user of filtered(); track user.appUserId) {
           <tr [class.opacity-55]="busy() === user.appUserId">
             <td class="font-medium">
-              {{ user.fullName || '—' }}
-              @if (isSelf(user)) {
-                <span class="pill pill-neutral ml-1.5">You</span>
-              }
+              <div class="flex items-center gap-2.5">
+                <app-avatar [bucket]="user.avatarBucket" [key]="user.avatarKey"
+                            [name]="user.fullName || user.username" [size]="1.75" />
+                <span class="truncate">{{ user.fullName || '—' }}</span>
+                @if (isSelf(user)) {
+                  <span class="pill pill-neutral shrink-0">You</span>
+                }
+              </div>
             </td>
             <td class="mono text-[color:var(--text-secondary)] max-w-56 truncate"
                 [title]="user.username">{{ user.username }}</td>
@@ -181,5 +233,6 @@
         }
       </tbody>
     </table>
+    }
   </app-table-shell>
 </div>

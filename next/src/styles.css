@@ -225,6 +225,18 @@
 
   .row-selected > td { background: var(--surface-sunken); }
 
+  /* A person's picture and its initials stand-in share a shape, so a list of users reads as
+     one column whether or not everyone has uploaded one. */
+  .avatar-img {
+    @apply rounded-full object-cover shrink-0;
+    background: var(--surface-sunken);
+  }
+  .avatar-initials {
+    background: var(--surface-sunken);
+    color: var(--text-secondary);
+    @apply inline-flex items-center justify-center rounded-full font-semibold shrink-0 select-none;
+  }
+
   /* A listing that can run to hundreds of rows scrolls inside its own box rather than
      growing the page, so the toolbar, breadcrumb and column headers stay put. Without this
      a bucket of 200 files pushed every bit of context off the top of the screen. */
