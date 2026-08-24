@@ -143,8 +143,10 @@ export class KafkaConnections implements OnInit {
   }
 
   setDefault(profile: KafkaProfile): void {
-    this.http.post<ApiResponse>(`${API_BASE}/kafkaConnectionProfile.json/setAsDefault`,
-      { kafkaConnectionProfileId: profile.kafkaConnectionProfileId }).subscribe({
+    // setAsDefault takes a request parameter, not a body. Sent as a body the id never arrived,
+    // Spring rejected the call with 400 before the handler ran, and the action did nothing.
+    this.http.post<ApiResponse>(`${API_BASE}/kafkaConnectionProfile.json/setAsDefault`, null,
+      { params: { kafkaConnectionProfileId: String(profile.kafkaConnectionProfileId) } }).subscribe({
       next: response => {
         if (response.status === API_SUCCESS) { this.toast.success(response.message); this.load(); }
         else this.toast.error(response.message);
@@ -174,8 +176,9 @@ export class KafkaConnections implements OnInit {
       danger: true,
     });
     if (!ok) return;
-    this.http.put<ApiResponse>(`${API_BASE}/kafkaConnectionProfile.json/deleteProfile`,
-      { kafkaConnectionProfileId: profile.kafkaConnectionProfileId }).subscribe({
+    // Same as setAsDefault: a request parameter, not a body.
+    this.http.put<ApiResponse>(`${API_BASE}/kafkaConnectionProfile.json/deleteProfile`, null,
+      { params: { kafkaConnectionProfileId: String(profile.kafkaConnectionProfileId) } }).subscribe({
       next: response => {
         if (response.status === API_SUCCESS) { this.toast.success(response.message); this.load(); }
         else this.toast.error(response.message);

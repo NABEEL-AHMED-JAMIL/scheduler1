@@ -233,7 +233,10 @@ export class Queue implements OnInit {
       ? `${API_BASE}/message.json/failJobLogs`
       : `${API_BASE}/message.json/interruptJobLogs`;
 
-    this.http.delete<ApiResponse>(url, { params: { jobQueueId: String(row.jobQueueId) } }).subscribe({
+    // The endpoint's parameter is jobQId, not jobQueueId. Sending the wrong name meant Spring
+    // rejected the call with 400 before the handler ran, so both of these actions had never
+    // once worked -- the dialog confirmed, the toast never appeared, and nothing changed.
+    this.http.delete<ApiResponse>(url, { params: { jobQId: String(row.jobQueueId) } }).subscribe({
       next: response => {
         if (response.status === API_SUCCESS) {
           this.toast.success(`Run #${row.jobQueueId} marked ${status}.`);
