@@ -68,6 +68,7 @@
        field read as a white Bootstrap control sitting on a dark form. */
     color-scheme: light;
     --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23616980' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    --date-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23616980' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='16' rx='2'/%3E%3Cpath d='M3 10h18M8 3v4M16 3v4'/%3E%3C/svg%3E");
 
     --surface-page:    var(--color-ink-50);
     --surface-raised:  #ffffff;
@@ -87,6 +88,7 @@
   html.dark {
     color-scheme: dark;
     --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239aa3bd' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    --date-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239aa3bd' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='16' rx='2'/%3E%3Cpath d='M3 10h18M8 3v4M16 3v4'/%3E%3C/svg%3E");
     --surface-page:    var(--color-ink-950);
     --surface-raised:  var(--color-ink-900);
     --surface-sunken:  #12151f;
@@ -431,15 +433,28 @@
   }
   select.input[multiple] { background-image: none; @apply pr-3; }
 
-  /* A date or time field's picker button is an OS glyph that does not follow currentColor,
-     so on the dark theme it was a black icon on a dark field. Inverting reads as the muted
-     grey the rest of the row uses. */
+  /* A date field's picker button is an OS glyph that follows neither currentColor nor the
+     icon set, so it read as browser chrome sitting inside an app control -- the same thing
+     the select's arrow did before it was replaced. The page draws the calendar itself, and
+     the native button is kept at zero opacity on top of it so it stays the click target
+     that opens the picker. */
+  .input[type="date"],
+  .input[type="time"],
+  .input[type="datetime-local"],
+  .input[type="month"],
+  .input[type="week"] {
+    background-image: var(--date-glyph);
+    background-repeat: no-repeat;
+    background-position: right 0.6rem center;
+    background-size: 1rem;
+    @apply pr-9;
+  }
   .input::-webkit-calendar-picker-indicator {
     cursor: pointer;
-    opacity: 0.55;
-    transition: opacity 120ms ease;
+    opacity: 0;
+    width: 1rem;
+    margin-right: -0.15rem;
   }
-  .input::-webkit-calendar-picker-indicator:hover { opacity: 1; }
 
   /* Number spinners appear on hover only; a permanently visible pair of arrows competes with
      the value for attention in a dense form. */
