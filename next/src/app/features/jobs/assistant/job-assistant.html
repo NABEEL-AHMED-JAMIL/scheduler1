@@ -14,11 +14,15 @@
       </p>
     </div>
     <div class="flex items-center gap-2">
-      <button type="button" class="btn btn-ghost btn-sm" [disabled]="!runs().length || exporting()"
+      <!-- Bordered rather than ghost: these are real actions, and a ghost button in a page
+           header reads as a caption. Not brand-filled -- they are secondary to asking. -->
+      <button type="button" class="btn btn-default btn-sm" [disabled]="!runs().length || exporting()"
+              [title]="runs().length ? 'Download this job\'s runs as CSV' : 'There are no runs to export yet'"
               (click)="exportRuns('csv')">
         <app-icon name="download" />CSV
       </button>
-      <button type="button" class="btn btn-ghost btn-sm" [disabled]="!runs().length || exporting()"
+      <button type="button" class="btn btn-default btn-sm" [disabled]="!runs().length || exporting()"
+              [title]="runs().length ? 'Download this job\'s runs as an Excel workbook' : 'There are no runs to export yet'"
               (click)="exportRuns('xlsx')">
         <app-icon name="table" [class.spin]="exporting() === 'xlsx'" />
         {{ exporting() === 'xlsx' ? 'Building…' : 'Excel' }}
@@ -78,7 +82,7 @@
       </div>
     }
 
-    @for (turn of turns(); track turn.at.getTime()) {
+    @for (turn of turns(); track turn.id) {
       <div class="card p-4">
         <div class="flex items-baseline gap-2 pb-3 mb-3 border-b" style="border-color: var(--border-subtle);">
           <app-icon name="user" size="0.9em" class="icon-muted" />

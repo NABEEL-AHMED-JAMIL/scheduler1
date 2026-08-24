@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { classify, PRESETS } from './job-assistant.intents';
-import { JobFacts, JobRun, answerFor, computeStats, runsToCsv } from './job-assistant.answers';
+import { JobFacts, JobRun, answerFor, computeStats, humanMoment, runsToCsv } from './job-assistant.answers';
 
 const JOB = 1244;
 
@@ -164,5 +164,29 @@ describe('csv export', () => {
     const csv = runsToCsv(facts, [{ jobQueueId: 9, jobStatus: 'Running', startTime: '2026-08-01T09:00:00' }]);
     // trailing empty duration and message rather than a zero that reads as instant
     expect(csv.split('\n')[1]).toMatch(/,,$/);
+  });
+});
+
+describe('timestamps', () => {
+  it('reads a naive API stamp as a person would', () => {
+    // What used to render verbatim, microseconds and all.
+    expect(humanMoment('2026-08-19T00:01:27.90799')).toBe('19 Aug 2026, 00:01');
+  });
+
+  it('returns an unparseable value untouched rather than "Invalid Date"', () => {
+    expect(humanMoment('not a date')).toBe('not a date');
+  });
+
+  it('has a dash for nothing at all', () => {
+    expect(humanMoment(undefined)).toBe('—');
+    expect(humanMoment('')).toBe('—');
+  });
+
+  it('formats the schedule answer rather than dumping the raw stamp', () => {
+    const withRun = { ...facts, lastJobRun: '2026-08-19T00:01:27.90799' };
+    const answer = answerFor('schedule', withRun, runs);
+    const factsBlock = answer.blocks.find(b => b.kind === 'facts') as any;
+    const lastRun = factsBlock.rows.find((r: any) => r.label === 'Last run');
+    expect(lastRun.value).toBe('19 Aug 2026, 00:01');
   });
 });

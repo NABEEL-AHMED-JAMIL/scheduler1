@@ -16,6 +16,8 @@ import {
 } from './job-assistant.answers';
 
 interface Turn {
+  /** Monotonic, so two turns in the same millisecond cannot collide as @for track keys. */
+  id: number;
   question: string;
   answer: Answer;
   at: Date;
@@ -44,6 +46,7 @@ export class JobAssistant implements OnInit {
   readonly error = signal('');
   readonly question = signal('');
   readonly turns = signal<Turn[]>([]);
+  private turnId = 0;
   readonly exporting = signal<'csv' | 'xlsx' | null>(null);
 
   private readonly detail = signal<any | null>(null);
@@ -134,7 +137,7 @@ export class JobAssistant implements OnInit {
 
     const scoped = classify(asked, facts.jobId);
     const answer = answerFor(scoped.intent, facts, this.runs(), scoped.mentionedJobId);
-    this.turns.update(list => [...list, { question: asked, answer, at: new Date() }]);
+    this.turns.update(list => [{ id: ++this.turnId, question: asked, answer, at: new Date() }, ...list]);
     this.question.set('');
   }
 
@@ -142,7 +145,7 @@ export class JobAssistant implements OnInit {
     const facts = this.facts();
     if (!facts) return;
     const answer = answerFor(intent, facts, this.runs());
-    this.turns.update(list => [...list, { question, answer, at: new Date() }]);
+    this.turns.update(list => [{ id: ++this.turnId, question, answer, at: new Date() }, ...list]);
   }
 
   clear(): void { this.turns.set([]); }

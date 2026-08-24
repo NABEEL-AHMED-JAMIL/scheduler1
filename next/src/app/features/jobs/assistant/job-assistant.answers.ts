@@ -99,6 +99,21 @@ export function computeStats(runs: JobRun[]): RunStats {
   };
 }
 
+/**
+ * A timestamp as a person would read it. The API returns a naive local stamp
+ * ("2026-08-19T00:01:27.90799"), which was being printed verbatim next to dates the schedule
+ * rows had already formatted -- so one row read "2026-08-17 at 00:01" and the next dumped its
+ * microseconds. Anything unparseable is returned untouched rather than shown as "Invalid Date".
+ */
+export function humanMoment(value?: string): string {
+  if (!value) return '—';
+  const at = new Date(value);
+  if (!Number.isFinite(at.getTime())) return value;
+  const date = at.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  const time = at.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  return `${date}, ${time}`;
+}
+
 export function humanDuration(seconds: number | null): string {
   if (seconds === null) return 'unknown';
   if (seconds < 60) return `${seconds}s`;
@@ -178,7 +193,7 @@ export function answerFor(intent: Intent, facts: JobFacts, runs: JobRun[],
         if (s.endDate) rows.push({ label: 'Ends', value: s.endDate });
         rows.push({ label: 'Next run', value: s.expired ? 'Expired — no further runs' : (s.nextRunAt ?? 'Not scheduled') });
       }
-      if (facts.lastJobRun) rows.push({ label: 'Last run', value: facts.lastJobRun });
+      if (facts.lastJobRun) rows.push({ label: 'Last run', value: humanMoment(facts.lastJobRun) });
       return { blocks: [{ kind: 'text', text: scheduleSentence(facts) }, ...(rows.length ? [{ kind: 'facts' as const, rows }] : [])] };
     }
 
