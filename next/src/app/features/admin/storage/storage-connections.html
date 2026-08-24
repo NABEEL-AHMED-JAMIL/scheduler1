@@ -31,6 +31,16 @@
                    emptyIcon="cloud"
                    (retry)="load()">
     <ng-container toolbar>
+      <div class="seg">
+        @for (option of [{id:'table',label:'Table',icon:'list'},
+                         {id:'cards',label:'Cards',icon:'layers'}]; track option.id) {
+          <button type="button" class="seg-btn" [class.seg-on]="view() === option.id"
+                  (click)="view.set($any(option.id))">
+            <app-icon [name]="option.icon" size="0.9em" />{{ option.label }}
+          </button>
+        }
+      </div>
+
       <select class="input max-w-36" [value]="providerFilter()"
               (change)="providerFilter.set($any($event.target).value)">
         <option value="">All providers</option>
@@ -46,6 +56,72 @@
       }
     </ng-container>
 
+    @if (view() === 'cards') {
+      <div class="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
+        @for (c of filtered(); track c.storageConnectionId) {
+          <article class="card p-4 flex flex-col gap-3"
+                   [class.opacity-55]="testing() === c.storageConnectionId">
+            <div class="flex items-start gap-2.5">
+              <span class="stat-glyph shrink-0"><app-icon [name]="providerGlyph(c)" /></span>
+              <div class="min-w-0 flex-1">
+                <h3 class="font-semibold truncate" [title]="c.connectionName">{{ c.connectionName }}</h3>
+                <!-- The alias is what a job or task actually references, so it leads. -->
+                <p class="mono text-brand-600 truncate" [title]="c.alias">{{ c.alias }}</p>
+              </div>
+              <div class="shrink-0 flex items-center gap-1">
+                <app-status [label]="c.status" [quiet]="true" />
+                <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="cardMenu"
+                        [disabled]="testing() === c.storageConnectionId" aria-label="Actions">
+                  <app-icon name="dots" size="1.05em" />
+                </button>
+                <ng-template #cardMenu>
+                  <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="edit(c)"><app-icon name="edit" />Edit</button>
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="test(c)"><app-icon name="zap" />Test connection</button>
+                    <div class="my-1 border-t" style="border-color: var(--border-subtle);"></div>
+                    <button cdkMenuItem class="menu-item menu-item-danger"
+                            (cdkMenuItemTriggered)="remove(c)"><app-icon name="trash" class="icon-crit" />Delete</button>
+                  </div>
+                </ng-template>
+              </div>
+            </div>
+
+            @if (c.description) {
+              <p class="text-xs text-[color:var(--text-secondary)] line-clamp-2">{{ c.description }}</p>
+            }
+
+            <dl class="text-xs grid gap-1">
+              <div class="flex gap-2 min-w-0">
+                <dt class="text-[color:var(--text-muted)] shrink-0 w-16">Target</dt>
+                <dd class="mono truncate min-w-0" [title]="target(c)">{{ target(c) }}</dd>
+              </div>
+              <div class="flex gap-2">
+                <dt class="text-[color:var(--text-muted)] shrink-0 w-16">Provider</dt>
+                <dd>{{ c.provider }}</dd>
+              </div>
+            </dl>
+
+            <div class="flex flex-wrap items-center gap-1.5 mt-auto pt-1">
+              <span [class]="testPill(c)" [title]="c.lastTestMessage || ''">
+                @if (testGlyph(c)) { <app-icon [name]="testGlyph(c)" size="0.85em" /> }{{ testLabel(c) }}
+              </span>
+              @if (c.secretKeyConfigured || c.passwordConfigured) {
+                <span class="pill pill-ok">Stored</span>
+              } @else {
+                <span class="pill pill-neutral" title="Falls back to the host's credential chain">
+                  Not stored
+                </span>
+              }
+              @if (c.lastTestedAt) {
+                <span class="text-[11px] text-[color:var(--text-muted)] ml-auto">
+                  {{ c.lastTestedAt | date:'d MMM, HH:mm' }}
+                </span>
+              }
+            </div>
+          </article>
+        }
+      </div>
+    } @else {
     <table class="table-modern">
       <thead>
         <tr>
@@ -114,5 +190,6 @@
         }
       </tbody>
     </table>
+    }
   </app-table-shell>
 </div>

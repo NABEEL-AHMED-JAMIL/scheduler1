@@ -48,6 +48,8 @@ export class StorageConnections implements OnInit {
   readonly search = signal('');
   readonly providerFilter = signal('');
   readonly testing = signal<number | null>(null);
+  /** Cards read better when a connection's target and test result matter more than a wide scan. */
+  readonly view = signal<'table' | 'cards'>('table');
 
   readonly providers = computed(() =>
     [...new Set(this.connections().map(c => c.provider).filter(Boolean))].sort());
@@ -144,6 +146,16 @@ export class StorageConnections implements OnInit {
       },
       error: err => this.toast.error(err?.error?.message || 'Delete failed.'),
     });
+  }
+
+  /** A glyph per provider, so a card is identifiable before its text is read. */
+  providerGlyph(connection: StorageConnection): string {
+    switch ((connection.provider ?? '').toUpperCase()) {
+      case 'FTP':
+      case 'FTPS':  return 'server';
+      case 'AZURE': return 'database';
+      default:      return 'cloud';
+    }
   }
 
   /** What this connection actually points at, phrased per provider. */
