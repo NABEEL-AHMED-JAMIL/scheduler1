@@ -21,6 +21,7 @@ const PATHS: Record<string, string> = {
   pause:     'M6 4h4v16H6zM14 4h4v16h-4z',
   stop:      'M7 7h10v10H7z',
   terminal:  'M4 17l6-5-6-5M12 19h8',
+  code:      'm16 18 6-6-6-6M8 6l-6 6 6 6',
   mic:       'M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3ZM5 11a7 7 0 0 0 14 0M12 18v4M8 22h8',
   filter:    'M22 3H2l8 9.46V19l4 2v-8.54L22 3Z',
   eye:       'M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z',

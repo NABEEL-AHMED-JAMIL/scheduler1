@@ -237,14 +237,22 @@ export class PreviewDialog implements OnInit {
     this.ngOnInit();
   }
 
+  /** Opens the already-fetched blob, which needs no token -- the URL would have needed one. */
   openInTab(): void {
-    window.open(this.storage.downloadUrl(this.data.bucket, this.data.key), '_blank', 'noopener');
+    if (this.objectUrl) { window.open(this.objectUrl, '_blank', 'noopener'); return; }
+    this.storage.download(this.data.bucket, this.data.key).subscribe({
+      next: blob => window.open(URL.createObjectURL(blob), '_blank', 'noopener'),
+      error: err => this.error.set(err?.error?.message || 'Could not open this file.'),
+    });
   }
 
   humanSize = formatSize;
 
   download(): void {
-    window.open(this.storage.downloadUrl(this.data.bucket, this.data.key), '_blank');
+    this.storage.download(this.data.bucket, this.data.key).subscribe({
+      next: blob => StorageService.saveBlob(blob, this.data.name),
+      error: err => this.error.set(err?.error?.message || 'Could not download this file.'),
+    });
   }
 
   close(): void {

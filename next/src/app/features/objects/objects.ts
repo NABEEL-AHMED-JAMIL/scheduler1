@@ -250,7 +250,10 @@ export class Objects implements OnInit {
   }
 
   download(entry: ObjectSummary): void {
-    window.open(this.storage.downloadUrl(this.bucket(), entry.key), '_blank');
+    this.storage.download(this.bucket(), entry.key).subscribe({
+      next: blob => StorageService.saveBlob(blob, StorageService.fileNameOf(entry.key)),
+      error: err => this.toast.error(err?.error?.message || `Could not download ${entry.name}.`),
+    });
   }
 
   async copy(value: string, what: string): Promise<void> {
@@ -442,8 +445,16 @@ export class Objects implements OnInit {
   downloadSelected(): void {
     const files = this.filtered().filter(o => !o.folder && this.selected().has(o.key));
     if (!files.length) return;
-    files.forEach(file => window.open(this.storage.downloadUrl(this.bucket(), file.key), '_blank'));
     this.toast.info(`Downloading ${files.length} file${files.length === 1 ? '' : 's'}.`);
+    let failed = 0;
+    files.forEach(file => this.storage.download(this.bucket(), file.key).subscribe({
+      next: blob => StorageService.saveBlob(blob, StorageService.fileNameOf(file.key)),
+      error: () => {
+        // One summary rather than a toast per file: a failed batch of twenty should not
+        // bury the screen in twenty identical messages.
+        if (++failed === 1) this.toast.error('Some files could not be downloaded.');
+      },
+    }));
   }
 
   formatBytes(bytes?: number): string {

@@ -70,7 +70,7 @@ export class Shell {
         // Then the things that take a file and give one back.
         { label: 'Document Converter', path: '/tools/converter', icon: 'file',
           hint: 'Convert between formats' },
-        { label: 'XML Configuration', path: '/settings/xml', icon: 'template', adminOnly: true,
+        { label: 'XML Configuration', path: '/settings/xml', icon: 'code', adminOnly: true,
           hint: 'Build a master-data document' },
         { label: 'Audio Transcript', path: '/tools/transcript', icon: 'volume',
           hint: 'Speech to text' },
