@@ -36,6 +36,13 @@ interface Turn {
   selector: 'app-job-assistant',
   imports: [Icon, DatePipe, RouterLink, StatusPill, Donut, RankedBar],
   templateUrl: './job-assistant.html',
+  /*
+   * In a panel the host has to be a flex item that can shrink, or the layout chain breaks
+   * here. A component element is display:block with min-height:auto by default, so it sizes
+   * to its content rather than to its parent: inside a 348px panel the host measured 4,733px,
+   * which handed the transcript all the room it asked for and left nothing to scroll.
+   */
+  host: { '[class.assistant-fills-panel]': 'compact()' },
 })
 export class JobAssistant {
   readonly jobId = input.required<string>();

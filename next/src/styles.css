@@ -581,6 +581,15 @@
   .pill-neutral { @apply bg-[color:var(--surface-sunken)] text-[color:var(--text-secondary)]; }
   /* Both halves move together: a background change without its matching foreground is what
      left a light hover carrying light text. */
+  /* A component element does not inherit its parent's flex context. Without this the host
+     grows to its content and the scroll container inside it never has a bounded height. */
+  .assistant-fills-panel {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
   .hover-brand:hover,
   .hover-brand:focus-visible {
     background: var(--hover-brand-bg);
