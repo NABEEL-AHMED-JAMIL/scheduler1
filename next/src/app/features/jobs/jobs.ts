@@ -69,6 +69,9 @@ export interface SourceJob {
  * came back 401, so the job sat in Start looking busy. Half an hour is far longer than any
  * run here takes, so passing it means something has gone quiet rather than slow.
  */
+/** How many runs the in-panel strip shows before it stops being readable. */
+const RECENT_RUN_BARS = 24;
+
 const STALLED_AFTER_MS = 30 * 60 * 1000;
 
 @Component({
@@ -300,6 +303,10 @@ export class Jobs implements OnInit {
         const queues = response.status === API_SUCCESS ? (response.data?.jobQueues ?? []) : [];
         const bars: Bar[] = queues
           .filter(q => q.startTime && q.endTime)
+          // "Recent runs" means recent: the panel is a strip a few hundred pixels wide, and a
+          // job with hundreds of runs drew every one of them into it. Newest first from the
+          // API, so take the window before reversing to oldest-first. Full history has the rest.
+          .slice(0, RECENT_RUN_BARS)
           .reverse()
           .map(q => ({
             name: `#${q.jobQueueId}`,
@@ -390,6 +397,8 @@ export class Jobs implements OnInit {
   /** In flight far too long -- the run is not slow, it has stopped reporting. */
   readonly isStalled = (job: SourceJob) => isStalled(job);
   readonly stalledFor = (job: SourceJob) => stalledFor(job);
+
+  readonly recentRunBars = RECENT_RUN_BARS;
 
   readonly stalledCount = computed(() => this.jobs().filter(job => this.isStalled(job)).length);
 

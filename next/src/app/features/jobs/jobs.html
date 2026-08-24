@@ -343,7 +343,7 @@
                                text-[color:var(--text-secondary)]">Recent runs</h3>
                     @if (runsByJob()[job.jobId]?.length) {
                       <span class="text-[11px] text-[color:var(--text-muted)]">
-                        Minutes per run, oldest first — click a bar for that run's logs
+                        Last {{ recentRunBars }} runs, oldest first · minutes per run — click a bar for its logs
                       </span>
                     }
                     <a class="link-inline text-xs ml-auto" [routerLink]="['/jobs', job.jobId, 'history']">

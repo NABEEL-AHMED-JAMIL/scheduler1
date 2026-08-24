@@ -16,14 +16,19 @@ export interface Bar { name: string; value: number; meta?: unknown; color?: stri
                   [disabled]="!clickable()"
                   [title]="bar.name + ': ' + bar.value"
                   (click)="barClicked.emit(bar)">
-            <span class="text-[10px] tabular leading-none text-[color:var(--text-muted)]">{{ bar.value }}</span>
+            <!-- Past a certain count each bar is a few pixels wide and its number is wider than
+                 the bar, so the labels overlap into an unreadable smear. The bars still carry
+                 the value in their title, and hovering one shows it. -->
+            @if (showValues()) {
+              <span class="text-[10px] tabular leading-none text-[color:var(--text-muted)]">{{ bar.value }}</span>
+            }
             <span class="w-full rounded-t transition-[height]"
                   [class.bg-brand-500]="!bar.color"
                   [style.background]="bar.color || null"
                   [style.height.px]="bar.px"></span>
             <span class="text-[10px] text-[color:var(--text-muted)] w-full text-center h-3.5 leading-[0.875rem]"
                   [class.truncate]="!bar.newGroup">
-              @if (bar.newGroup) {
+              @if (bar.newGroup && showNames()) {
                 <span class="whitespace-nowrap">{{ bar.name }}</span>
               }
             </span>
@@ -67,4 +72,13 @@ export class BarChart {
       px: bar.value > 0 ? Math.max(Math.round((bar.value / max) * track), 3) : 0,
     }));
   });
+
+  /*
+   * Labels are dropped rather than shrunk once the bars get thin. A number needs roughly 20px
+   * to read and a run name closer to 34px, and below those widths the text does not shrink with
+   * the bar -- it overflows into its neighbours. A job with 370 runs rendered every label at
+   * once and the axis became a grey smear.
+   */
+  protected readonly showValues = computed(() => this.bars().length <= 24);
+  protected readonly showNames = computed(() => this.bars().length <= 16);
 }
