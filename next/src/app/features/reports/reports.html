@@ -1,0 +1,297 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Reports</h1>
+      <p class="page-subtitle">
+        Group your runs by any two dimensions, measure them how you like, and take the result
+        with you.
+      </p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
+        <app-icon name="refresh" [class.spin]="loading()" />Refresh
+      </button>
+    </div>
+  </div>
+
+  <!-- range -->
+  <div class="card px-4 py-3">
+    <div class="flex flex-wrap items-end gap-3">
+      <div>
+        <label class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]"
+               for="r-from">From</label>
+        <input id="r-from" type="date" class="input max-w-40 mt-1" [value]="startDate()"
+               (change)="startDate.set($any($event.target).value); load()" />
+      </div>
+      <div>
+        <label class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]"
+               for="r-to">To</label>
+        <input id="r-to" type="date" class="input max-w-40 mt-1" [value]="endDate()"
+               (change)="endDate.set($any($event.target).value); load()" />
+      </div>
+      <span class="pill pill-neutral">{{ data().rows.length }} runs</span>
+      @if (truncated()) {
+        <span class="pill pill-warn" title="Narrow the range to include the rest">
+          <app-icon name="alert" size="0.85em" />capped
+        </span>
+      }
+    </div>
+  </div>
+
+  @if (loading()) {
+    <div class="card p-12 text-center">
+      <div class="spinner mx-auto mb-3" role="status" aria-label="Loading"></div>
+      <p class="text-sm text-[color:var(--text-muted)]">Reading your runs…</p>
+    </div>
+  } @else if (error()) {
+    <div class="card p-10 text-center">
+      <app-icon name="alert" size="1.75em" class="icon-crit" />
+      <p class="mt-2 text-sm text-crit-500">{{ error() }}</p>
+      <button type="button" class="btn btn-default btn-sm mt-4" (click)="load()">Try again</button>
+    </div>
+  } @else if (!hasRows()) {
+    <div class="card p-12 text-center">
+      <app-icon name="chart" size="1.75em" class="icon-muted" />
+      <p class="mt-3 text-sm text-[color:var(--text-secondary)]">No runs in this range.</p>
+      <p class="mt-1 text-xs text-[color:var(--text-muted)]">Widen the dates to see more.</p>
+    </div>
+  } @else {
+
+    <!-- shape -->
+    <div class="card px-4 py-3">
+      <div class="flex flex-wrap items-end gap-3">
+        <div>
+          <label class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]"
+                 for="r-rows">Rows</label>
+          <select id="r-rows" class="input max-w-44 mt-1"
+                  (change)="setRowDim($any($event.target).value)">
+            @for (dimension of dimensions; track dimension.key) {
+              <option [value]="dimension.key"
+                      [selected]="dimension.key === rowDim().key">{{ dimension.label }}</option>
+            }
+          </select>
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm mb-1" (click)="swap()"
+                title="Swap rows and columns">⇄</button>
+        <div>
+          <label class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]"
+                 for="r-cols">Columns</label>
+          <select id="r-cols" class="input max-w-44 mt-1"
+                  (change)="setColDim($any($event.target).value)">
+            @for (dimension of dimensions; track dimension.key) {
+              <option [value]="dimension.key"
+                      [selected]="dimension.key === colDim().key">{{ dimension.label }}</option>
+            }
+          </select>
+        </div>
+        <div>
+          <label class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]"
+                 for="r-measure">Measure</label>
+          <select id="r-measure" class="input max-w-52 mt-1"
+                  (change)="setMeasure($any($event.target).value)">
+            @for (group of measureGroups; track group.label) {
+              <optgroup [label]="group.label">
+                @for (option of group.measures; track option) {
+                  <option [value]="option"
+                          [selected]="option === measure()">{{ measureLabels[option] }}</option>
+                }
+              </optgroup>
+            }
+          </select>
+        </div>
+
+        <div class="flex items-center gap-2 ml-auto">
+          <button type="button" class="btn btn-default btn-sm"
+                  [disabled]="exporting()" (click)="export('csv')">
+            <app-icon name="download" />CSV
+          </button>
+          <button type="button" class="btn btn-default btn-sm"
+                  [disabled]="exporting()" (click)="export('xlsx')">
+            <app-icon name="table" [class.spin]="exporting() === 'xlsx'" />
+            {{ exporting() === 'xlsx' ? 'Building…' : 'Excel' }}
+          </button>
+          <button type="button" class="btn btn-default btn-sm"
+                  [disabled]="exporting()" (click)="saveToBucket('csv')"
+                  title="Write this report into a bucket">
+            <app-icon name="cloud" />Save
+          </button>
+          <button type="button" class="btn btn-default btn-sm"
+                  [disabled]="exporting()" (click)="submit('csv')"
+                  title="Post this report to a configured endpoint">
+            <app-icon name="send" />Submit
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- chart -->
+    <div class="card">
+      <div class="flex flex-wrap items-center gap-1.5 px-4 py-2.5 border-b"
+           style="border-color: var(--border-subtle);">
+        <h2 class="text-sm font-semibold mr-2">Chart</h2>
+        @for (option of chartKinds; track option) {
+          <button type="button" class="btn btn-xs"
+                  [class.btn-default]="chart() === option"
+                  [class.btn-ghost]="chart() !== option"
+                  (click)="chart.set(option)">{{ chartLabels[option] }}</button>
+        }
+      </div>
+      <div class="p-4">
+        <app-report-chart [pivot]="pivot()" [measure]="measure()" [kind]="chart()"
+                          [colorFor]="colourFor" />
+        <div class="flex flex-wrap items-center gap-3 mt-3 text-xs">
+          @for (label of legend(); track label) {
+            <span class="inline-flex items-center gap-1.5">
+              <span class="inline-block size-2.5 rounded-sm"
+                    [style.background]="colourFor(label)"></span>{{ label }}
+            </span>
+          }
+        </div>
+      </div>
+    </div>
+
+    <!-- the grid -->
+    <app-table-shell [heading]="title()" [shown]="pivot().rowLabels.length"
+                     [total]="pivot().rowLabels.length" [isEmpty]="false">
+      <ng-container toolbar>
+        <span class="text-xs text-[color:var(--text-muted)]">
+          Click any number to see the runs behind it
+        </span>
+      </ng-container>
+
+      <table class="table-modern">
+        <thead>
+          <tr>
+            <th class="min-w-48">
+              <div class="font-semibold">{{ rowDim().label }}</div>
+              <div class="text-[10px] uppercase tracking-wide text-[color:var(--text-muted)]">
+                dimension
+              </div>
+            </th>
+            @for (colLabel of pivot().colLabels; track colLabel; let ci = $index) {
+              <th class="min-w-36 align-top">
+                <div class="flex items-baseline gap-1.5">
+                  <span class="font-semibold">{{ colLabel }}</span>
+                </div>
+                <!-- The distribution behind the column, so its shape reads before the rows do. -->
+                @if (isCounting()) {
+                  <div class="flex h-1.5 rounded-full overflow-hidden mt-2 mb-1"
+                       style="background: var(--surface-sunken);">
+                    @for (part of columnMix(ci); track part.label) {
+                      <span [style.width.%]="part.pct" [style.background]="toneFor(part.label)"
+                            [title]="part.label + ': ' + part.count"></span>
+                    }
+                  </div>
+                  <div class="text-[10px] text-[color:var(--text-muted)] font-normal">
+                    {{ columnCompletion(ci) }}% completed · {{ columnCount(ci) }} runs
+                  </div>
+                } @else {
+                  <div class="flex items-end gap-px h-7 mt-2 mb-1">
+                    @for (bin of columnHistogram(ci); track $index) {
+                      <span class="flex-1 rounded-t-sm" [style.height.%]="bin.height"
+                            [style.background]="'var(--series-brand)'" [title]="bin.hint"></span>
+                    }
+                  </div>
+                  <div class="text-[10px] text-[color:var(--text-muted)] font-normal">
+                    {{ columnCount(ci) }} runs
+                  </div>
+                }
+              </th>
+            }
+            <th class="text-right min-w-28">
+              <div class="font-semibold">All</div>
+              <div class="text-[10px] uppercase tracking-wide text-[color:var(--text-muted)]">
+                total
+              </div>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (rowLabel of pivot().rowLabels; track rowLabel; let ri = $index) {
+            <tr>
+              <td class="font-medium max-w-64">
+                <span class="truncate block" [title]="rowLabel">{{ rowLabel }}</span>
+              </td>
+              @for (colLabel of pivot().colLabels; track colLabel; let ci = $index) {
+                <td class="text-right tabular !p-0">
+                  <button type="button"
+                          class="w-full h-full px-4 py-2.5 text-right tabular rounded-sm hover-brand
+                                 focus:outline-none focus:ring-2 focus:ring-brand-500
+                                 disabled:hover:bg-transparent"
+                          [class.text-[color:var(--text-muted)]]="!pivot().matrix[ri][ci]"
+                          [disabled]="!pivot().matrix[ri][ci]"
+                          [title]="rowLabel + ' · ' + colLabel"
+                          (click)="drill(ri, ci)">
+                    {{ format(pivot().matrix[ri][ci]) }}
+                  </button>
+                </td>
+              }
+              <td class="text-right tabular font-semibold !p-0">
+                <button type="button"
+                        class="w-full h-full px-4 py-2.5 text-right tabular font-semibold
+                               rounded-sm hover-brand focus:outline-none focus:ring-2 focus:ring-brand-500"
+                        (click)="drillRow(ri)">{{ format(pivot().rowTotals[ri]) }}</button>
+              </td>
+            </tr>
+          }
+          <tr style="border-top: 2px solid var(--border-strong);">
+            <td class="font-semibold" style="background: var(--surface-raised);">All</td>
+            @for (colLabel of pivot().colLabels; track colLabel; let ci = $index) {
+              <td class="text-right tabular font-semibold !p-0"
+                  style="background: var(--surface-raised);">
+                <button type="button"
+                        class="w-full h-full px-4 py-2.5 text-right tabular font-semibold
+                               rounded-sm hover-brand focus:outline-none focus:ring-2 focus:ring-brand-500"
+                        (click)="drillColumn(ci)">{{ format(pivot().colTotals[ci]) }}</button>
+              </td>
+            }
+            <td class="text-right tabular font-semibold px-4 py-2.5"
+                style="background: var(--surface-raised);">{{ format(pivot().grand) }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </app-table-shell>
+  }
+</div>
+
+@if (drillRows().length) {
+  <div class="fixed inset-x-0 bottom-0 z-40 card shadow-2xl flex flex-col"
+       style="max-height: 56vh; border-radius: 12px 12px 0 0;">
+    <div class="flex items-center gap-2.5 px-4 py-3 border-b"
+         style="border-color: var(--border-subtle);">
+      <h2 class="text-sm font-semibold">{{ drillTitle() }}</h2>
+      <span class="pill pill-neutral">{{ drillRows().length }} runs</span>
+      <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="closeDrill()">
+        <app-icon name="close" />Close
+      </button>
+    </div>
+    <div class="overflow-auto">
+      <table class="table-modern">
+        <thead>
+          <tr><th>Run</th><th>Job</th><th>Task</th><th>Owner</th><th>Day</th>
+              <th class="text-right">Duration</th><th class="text-right">Outcome</th></tr>
+        </thead>
+        <tbody>
+          @for (run of drillRows().slice(0, 300); track runIdOf(run)) {
+            <tr>
+              <td class="mono text-[color:var(--text-muted)]">#{{ runIdOf(run) }}</td>
+              <td class="max-w-56"><span class="truncate block">{{ jobOf(run) }}</span></td>
+              <td class="max-w-48 text-[color:var(--text-secondary)]">
+                <span class="truncate block">{{ labelOf(run, 0) }}</span>
+              </td>
+              <td class="text-[color:var(--text-secondary)]">{{ labelOf(run, 2) }}</td>
+              <td class="mono text-[color:var(--text-secondary)]">{{ labelOf(run, 3) }}</td>
+              <td class="text-right tabular">{{ durationOf(run) }}</td>
+              <td class="text-right"><app-status [label]="labelOf(run, 1)" /></td>
+            </tr>
+          }
+          @if (drillRows().length > 300) {
+            <tr><td colspan="7" class="text-center text-xs text-[color:var(--text-muted)]">
+              … and {{ drillRows().length - 300 }} more
+            </td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+}

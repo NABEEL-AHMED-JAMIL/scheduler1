@@ -138,6 +138,11 @@ export const routes: Routes = [
         data: { kind: 'task' },
       },
       {
+        path: 'reports',
+        loadComponent: () =>
+          import('./features/reports/reports').then(m => m.Reports),
+      },
+      {
         path: 'tools/query',
         loadComponent: () =>
           import('./features/tools/query-engine/query-engine').then(m => m.QueryEngine),

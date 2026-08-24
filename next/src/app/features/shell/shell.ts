@@ -56,6 +56,10 @@ export class Shell {
           hint: 'What a job does, and where' },
         { label: 'Queue', path: '/queue', icon: 'clock',
           hint: 'What is in flight right now' },
+        // Beside the runs it summarises, rather than under Tools: this reads pipeline data
+        // rather than being a general-purpose instrument.
+        { label: 'Reports', path: '/reports', icon: 'chart',
+          hint: 'Group and measure your runs' },
       ],
     },
     { label: 'Object Browser', path: '/objects', icon: 'folder' },
