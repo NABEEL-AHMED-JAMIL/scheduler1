@@ -54,7 +54,7 @@ import { Icon } from '../../../shared/ui/icon';
           </div>
         } @else if (!pageCount()) {
           <div class="flex flex-col items-center justify-center gap-3 py-20">
-            <app-icon name="refresh" size="1.5rem" class="spin icon-muted" />
+            <div class="spinner mx-auto" role="status" aria-label="Loading"></div>
             <p class="text-sm text-[color:var(--text-muted)]">Rendering PDF…</p>
           </div>
         }

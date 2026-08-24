@@ -27,7 +27,7 @@ import { Icon } from './icon';
 
       @if (loading()) {
         <div class="px-6 py-14 text-center text-sm text-[color:var(--text-muted)]">
-          <app-icon name="refresh" size="1.5rem" class="spin block mx-auto mb-3 icon-muted" />
+          <div class="spinner mx-auto mb-3" role="status" aria-label="Loading"></div>
           Loading…
         </div>
       } @else if (error()) {

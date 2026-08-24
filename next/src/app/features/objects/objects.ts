@@ -193,13 +193,22 @@ export class Objects implements OnInit {
     if (value) this.load();
   }
 
+  /** Bumped per listing; a response whose ticket is stale has been superseded. */
+  private listTicket = 0;
+
   load(append = false): void {
     if (!this.bucket()) return;
+    // Only the newest listing may write to the screen. Clicking a large folder and then a
+    // small one left the slow response landing last and replacing the fast one, so the rows
+    // showed the folder we had left while the breadcrumb showed the one we were in -- and
+    // every row action, delete included, then pointed somewhere the reader was not looking.
+    const ticket = ++this.listTicket;
     this.loading.set(true);
     this.error.set('');
     this.storage.listObjects(this.bucket(), this.prefix(), append ? this.nextToken() : undefined)
       .subscribe({
         next: response => {
+          if (ticket !== this.listTicket) return;
           this.loading.set(false);
           if (response.status !== API_SUCCESS) {
             this.error.set(response.message);
@@ -210,6 +219,7 @@ export class Objects implements OnInit {
           this.nextToken.set(response.data?.nextContinuationToken);
         },
         error: err => {
+          if (ticket !== this.listTicket) return;
           this.loading.set(false);
           this.error.set(err?.error?.message || 'Could not list this location.');
         },

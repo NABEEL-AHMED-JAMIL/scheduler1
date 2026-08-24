@@ -84,6 +84,10 @@
        pill-neutral's own text over bg-brand-50 measured 2.22 in dark mode. */
     --hover-brand-bg:  var(--color-brand-50);
     --hover-brand-fg:  var(--color-brand-700);
+    /* Overlay scrollbars stay invisible until the pointer moves, so a list that scrolls
+       inside its own box looks like a list that simply stops. These make the track visible. */
+    --scrollbar-thumb:       #c2c8d6;
+    --scrollbar-thumb-hover: #98a1b5;
     --surface-inverse: var(--color-ink-900);
     --border-subtle:   var(--color-ink-200);
     --border-strong:   var(--color-ink-300);
@@ -108,6 +112,8 @@
     /* The same 22% mix the dark pills use, so a hover matches the chips around it. 6.97. */
     --hover-brand-bg:  color-mix(in oklab, var(--color-brand-500) 22%, var(--surface-raised));
     --hover-brand-fg:  var(--color-brand-300);
+    --scrollbar-thumb:       #3a4258;
+    --scrollbar-thumb-hover: #4d5773;
     --surface-inverse: var(--color-ink-100);
     --border-subtle:   #2a3049;
     --border-strong:   #39405c;
@@ -735,6 +741,23 @@
      Honours reduced-motion, since a permanent spin is the worst offender there. */
   .spin { animation: spin 900ms linear infinite; }
 
+  /*
+   * A ring rather than a spinning glyph. The refresh icon keeps spinning on its own button --
+   * there it means "this refresh is running" -- but a page or table that is loading has no
+   * such button to borrow, and a rotating arrow reads as an action rather than a wait.
+   */
+  .spinner {
+    width: var(--spinner-size, 1.75rem);
+    aspect-ratio: 1;
+    border-radius: 50%;
+    border: 2.5px solid var(--border-subtle);
+    border-top-color: var(--color-brand-500);
+    animation: spin 700ms linear infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .spinner { animation-duration: 2.4s; }
+  }
+
   /* The mic while it is listening: a slow pulse, so the recording state is visible without
      a second label competing with the composer. */
   @keyframes pulse-soft { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
@@ -1028,3 +1051,41 @@ html.dark {
   }
   .th-sort-active { @apply text-[color:var(--text-primary)]; }
 }
+
+/*
+ * Scrollbars, made visible.
+ *
+ * Several regions here scroll inside their own box rather than growing the page -- the table
+ * shell, the log console, the chat transcript. On a platform with overlay scrollbars none of
+ * them showed any sign of it: the jobs table held 2,383px of rows in a 619px box and simply
+ * appeared to stop at row twelve. These are deliberately always-on rather than overlay.
+ */
+/*
+ * The two styling paths are mutually exclusive: once scrollbar-width is set, Chromium takes the
+ * standard path and ignores ::-webkit-scrollbar entirely -- which silently disabled everything
+ * below and left the overlay behaviour untouched. So the standard properties are given only to
+ * engines without the pseudo-elements, and Chromium and Safari get the rules that actually
+ * reserve a gutter.
+ */
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
+  }
+}
+
+::-webkit-scrollbar { width: 11px; height: 11px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 999px;
+  /* Transparent border plus content-box clipping insets the thumb, so it reads as a pill
+     floating in the track rather than a bar welded to the edge. */
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+  background-clip: content-box;
+}
+::-webkit-scrollbar-corner { background: transparent; }
