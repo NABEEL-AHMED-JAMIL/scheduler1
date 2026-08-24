@@ -15,6 +15,7 @@
                    emptyIcon="sparkle"
                    (retry)="load()">
     <ng-container toolbar>
+      <app-view-toggle [(value)]="view" key="agents" cardsIcon="sparkle" />
       <div class="search-field max-w-56">
         <app-icon name="search" size="0.95em" />
         <input class="input" placeholder="Search name, provider or model"
@@ -25,6 +26,60 @@
       }
     </ng-container>
 
+    @if (view() === 'cards') {
+      <div class="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
+        @for (agent of filtered(); track agent.aiAgentId) {
+          <article class="card p-4 flex flex-col gap-3">
+            <div class="flex items-start gap-2.5">
+              <span class="stat-glyph shrink-0"><app-icon name="sparkle" /></span>
+              <div class="min-w-0 flex-1">
+                <h3 class="font-semibold truncate" [title]="agent.agentName">{{ agent.agentName }}</h3>
+                <p class="mono text-xs text-[color:var(--text-secondary)] truncate" [title]="agent.model">
+                  {{ agent.model }}
+                </p>
+              </div>
+              <div class="shrink-0 flex items-center gap-1">
+                <app-status [label]="agent.status" [quiet]="true" />
+                <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="cardMenu"
+                        aria-label="Actions">
+                  <app-icon name="dots" size="1.05em" />
+                </button>
+                <ng-template #cardMenu>
+                  <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="edit(agent)"><app-icon name="edit" />Edit</button>
+                    <div class="my-1 border-t" style="border-color: var(--border-subtle);"></div>
+                    <button cdkMenuItem class="menu-item menu-item-danger"
+                            (cdkMenuItemTriggered)="remove(agent)"><app-icon name="trash" class="icon-crit" />Delete</button>
+                  </div>
+                </ng-template>
+              </div>
+            </div>
+
+            @if (agent.description) {
+              <p class="text-xs text-[color:var(--text-secondary)] line-clamp-2">{{ agent.description }}</p>
+            }
+
+            @if (agent.targetFileTypes) {
+              <dl class="text-xs grid gap-1">
+                <div class="flex gap-2 min-w-0">
+                  <dt class="text-[color:var(--text-muted)] shrink-0 w-16">Handles</dt>
+                  <dd class="mono truncate min-w-0" [title]="agent.targetFileTypes">{{ agent.targetFileTypes }}</dd>
+                </div>
+              </dl>
+            }
+
+            <div class="flex flex-wrap items-center gap-1.5 mt-auto pt-1">
+              <span class="pill pill-neutral">{{ agent.provider }}</span>
+              @if (agent.jsonMode) { <span class="pill pill-brand">JSON</span> }
+              <!-- Whether a key is configured decides if this agent can run at all. -->
+              @if (keyState(agent); as key) {
+                <span [class]="key.cls" [title]="key.hint">{{ key.label }}</span>
+              }
+            </div>
+          </article>
+        }
+      </div>
+    } @else {
     <table class="table-modern">
       <thead>
         <tr>
@@ -78,5 +133,6 @@
         }
       </tbody>
     </table>
+    }
   </app-table-shell>
 </div>

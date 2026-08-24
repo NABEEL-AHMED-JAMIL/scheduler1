@@ -9,6 +9,7 @@ import { AgentDialog } from './agent-dialog';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { confirmWith } from '../../../shared/ui/confirm';
 import { Icon } from '../../../shared/ui/icon';
+import { ViewToggle } from '../../../shared/ui/view-toggle';
 
 interface AiAgent {
   aiAgentId: number;
@@ -24,10 +25,11 @@ interface AiAgent {
 
 @Component({
   selector: 'app-agents',
-  imports: [Icon, TableShell, StatusPill, CdkMenu, CdkMenuItem, CdkMenuTrigger],
+  imports: [ViewToggle, Icon, TableShell, StatusPill, CdkMenu, CdkMenuItem, CdkMenuTrigger],
   templateUrl: './agents.html',
 })
 export class Agents implements OnInit {
+  readonly view = signal<'table' | 'cards'>('table');
   private readonly http = inject(HttpClient);
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);

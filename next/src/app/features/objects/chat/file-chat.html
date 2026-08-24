@@ -114,7 +114,7 @@
     @if (!preparing() && !prepareError() && !messages().length) {
       <div class="flex flex-wrap gap-1.5 px-3.5 pb-2 shrink-0">
         @for (suggestion of suggestions; track suggestion) {
-          <button type="button" class="pill pill-neutral hover:bg-brand-50"
+          <button type="button" class="pill pill-neutral hover-brand"
                   (click)="send(suggestion)">{{ suggestion }}</button>
         }
       </div>

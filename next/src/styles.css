@@ -80,6 +80,10 @@
        whisper: near the page's own tint, a third of the way to it in lightness. Interactive
        states keep ink-100, because a hover has to actually register. */
     --surface-inset:   #f4f6fa;
+    /* Brand-tinted hover, as a token because a hardcoded light tint is unreadable on dark:
+       pill-neutral's own text over bg-brand-50 measured 2.22 in dark mode. */
+    --hover-brand-bg:  var(--color-brand-50);
+    --hover-brand-fg:  var(--color-brand-700);
     --surface-inverse: var(--color-ink-900);
     --border-subtle:   var(--color-ink-200);
     --border-strong:   var(--color-ink-300);
@@ -101,6 +105,9 @@
     --surface-sunken:  #12151f;
     /* Dark has no cast problem -- everything is already navy -- so an inset is just sunken. */
     --surface-inset:   #12151f;
+    /* The same 22% mix the dark pills use, so a hover matches the chips around it. 6.97. */
+    --hover-brand-bg:  color-mix(in oklab, var(--color-brand-500) 22%, var(--surface-raised));
+    --hover-brand-fg:  var(--color-brand-300);
     --surface-inverse: var(--color-ink-100);
     --border-subtle:   #2a3049;
     --border-strong:   #39405c;
@@ -564,6 +571,13 @@
            text-[11px] font-semibold whitespace-nowrap;
   }
   .pill-neutral { @apply bg-[color:var(--surface-sunken)] text-[color:var(--text-secondary)]; }
+  /* Both halves move together: a background change without its matching foreground is what
+     left a light hover carrying light text. */
+  .hover-brand:hover,
+  .hover-brand:focus-visible {
+    background: var(--hover-brand-bg);
+    color: var(--hover-brand-fg);
+  }
   .pill-brand   { @apply bg-brand-50 text-brand-700; }
   .pill-ok      { @apply bg-ok-100 text-ok-500; }
   /* warn-500 on warn-100 measures 4.47:1 -- the one pill under the line. */
@@ -888,15 +902,59 @@ html.dark .btn-intent-crit:focus app-icon { color: var(--color-crit-400); }
   .cdk-menu { width: max-content; max-width: min(22rem, calc(100vw - 2rem)); }
 }
 
-/* Chart series colours -- distinct from the semantic ok/warn/crit set so a chart
-   segment is never mistaken for a status. */
+/*
+ * Chart series colours, for data that has no status meaning -- a breakdown by name, the
+ * slowest runs, disk share. Statuses never come from here: they come from statusColor(), so a
+ * Failed segment is the same red as a Failed pill.
+ *
+ * These are per-theme, which the single fixed set could not be. Measured against the surface
+ * each is drawn on, the old palette swung from 6.29 to 2.15 across the six on white, and
+ * inverted on dark (2.72 to 7.96) -- so whichever theme you were in, some series had all but
+ * disappeared. Every value below clears 4.0 on its own background, and the six are drawn from
+ * the app's own hue families so a chart's amber is the same amber as a warning elsewhere.
+ * Slot 5 is fuchsia rather than the violet it was: violet sat 44 units from brand in slot 0,
+ * close enough to read as the same series.
+ */
 :root {
-  --chart-0: #4f46e5;
-  --chart-1: #0ea5e9;
-  --chart-2: #14b8a6;
-  --chart-3: #f59e0b;
-  --chart-4: #e11d48;
-  --chart-5: #8b5cf6;
+  --chart-0: #4f46e5;   /* brand   6.29 on white */
+  --chart-1: #0369a1;   /* info    5.93 */
+  --chart-2: #1d7a44;   /* ok      5.36 */
+  --chart-3: #b45309;   /* warn    5.02 */
+  --chart-4: #bb2d48;   /* crit    5.86 */
+  --chart-5: #a21caf;   /* fuchsia 6.32 */
+}
+
+/*
+ * Status series colours. A chart segment for a status must be the same family as its pill, and
+ * legible on the surface it is drawn on -- the two goals the old single set could not both
+ * meet: every status fill measured under 4.0 in dark mode (ok 3.19, warn 3.41, crit 2.92,
+ * brand 2.72) because it used the light theme's -500 steps on a navy card.
+ *
+ * Two steps per family, because eight run states share four families: Start against Running,
+ * Skip against Missed, Interrupt against Failed. Fills are held to 3:1 (WCAG 1.4.11, non-text)
+ * and each pair is at least 55 units apart so the two members never read as one series.
+ */
+:root {
+  --series-brand-soft: #7b7bea;  --series-brand: #4338ca;
+  --series-ok-soft:    #2f9d5b;  --series-ok:    #166534;
+  --series-warn-soft:  #d97706;  --series-warn:  #8a3d07;
+  --series-crit-soft:  #e05c74;  --series-crit:  #a01b34;
+  --series-muted:      #6b7690;
+}
+
+html.dark {
+  --series-brand-soft: #6f6fe4;  --series-brand: #a9a9f5;
+  --series-ok-soft:    #2f9d5b;  --series-ok:    #6ee7a0;
+  --series-warn-soft:  #b97a2a;  --series-warn:  #f0c088;
+  --series-crit-soft:  #c4485f;  --series-crit:  #f79bab;
+  --series-muted:      #9aa3bd;
+
+  --chart-0: #8b8bef;   /* brand   5.73 on the raised surface */
+  --chart-1: #38bdf8;   /* info    7.98 */
+  --chart-2: #4ec27f;   /* ok      7.61 */
+  --chart-3: #e0a25c;   /* warn    7.73 */
+  --chart-4: #f2748c;   /* crit    6.23 */
+  --chart-5: #e879f9;   /* fuchsia 6.95 */
 }
 
 @layer components {

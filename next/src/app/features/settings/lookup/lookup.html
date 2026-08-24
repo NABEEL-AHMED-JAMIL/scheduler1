@@ -70,7 +70,7 @@
                 [title]="lookup.description || ''">{{ lookup.description || '—' }}</td>
             <td>
               @if (entryCount(lookup)) {
-                <button type="button" class="pill pill-neutral hover:bg-brand-50"
+                <button type="button" class="pill pill-neutral hover-brand"
                         (click)="toggle(lookup)"
                         [title]="expanded().has($any(lookup.lookupId)) ? 'Hide entries' : 'Show entries'">
                   {{ entryCount(lookup) }}
