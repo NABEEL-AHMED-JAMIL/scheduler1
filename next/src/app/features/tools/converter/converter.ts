@@ -9,6 +9,7 @@ import { PreviewDialog } from '../../objects/preview/preview-dialog';
 import { Dialog } from '@angular/cdk/dialog';
 import { DatePipe } from '@angular/common';
 import { confirmWith } from '../../../shared/ui/confirm';
+import { formatSize } from '../../../shared/ui/format-size';
 
 interface FormatFamily {
   key: string;
@@ -315,11 +316,5 @@ export class Converter implements OnInit {
     return cut > 0 ? key.slice(0, cut + 1) : (task.targetFolder ?? '');
   }
 
-  size(bytes?: number): string {
-    if (!bytes) return '—';
-    const units = ['B', 'KB', 'MB', 'GB'];
-    let value = bytes, unit = 0;
-    while (value >= 1024 && unit < units.length - 1) { value /= 1024; unit++; }
-    return `${value < 10 && unit > 0 ? value.toFixed(1) : Math.round(value)} ${units[unit]}`;
-  }
+  size = formatSize;
 }

@@ -7,6 +7,7 @@ import { Icon } from '../../../shared/ui/icon';
 import { AudioPlayer } from './audio-player';
 import { PdfViewer } from './pdf-viewer';
 import { copyText } from '../../../shared/ui/clipboard.util';
+import { formatSize } from '../../../shared/ui/format-size';
 
 export interface PreviewData {
   bucket: string;
@@ -240,12 +241,7 @@ export class PreviewDialog implements OnInit {
     window.open(this.storage.downloadUrl(this.data.bucket, this.data.key), '_blank', 'noopener');
   }
 
-  humanSize(bytes: number): string {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KB`;
-    if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
-    return `${(bytes / 1024 ** 3).toFixed(2)} GB`;
-  }
+  humanSize = formatSize;
 
   download(): void {
     window.open(this.storage.downloadUrl(this.data.bucket, this.data.key), '_blank');

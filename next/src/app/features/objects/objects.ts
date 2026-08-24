@@ -17,6 +17,7 @@ import { ShareDialog, ShareResult } from './dialogs/share-dialog';
 import { HttpClient } from '@angular/common/http';
 import { API_BASE } from '../../core/api/api.config';
 import { Icon } from '../../shared/ui/icon';
+import { formatSize } from '../../shared/ui/format-size';
 
 interface Crumb { name: string; prefix: string; }
 
@@ -139,12 +140,7 @@ export class Objects implements OnInit {
   /** Bound as a value so the template can hand it to the chart without re-binding `this`. */
   readonly humanSizeFn = (bytes: number) => this.humanSize(bytes);
 
-  humanSize(bytes: number): string {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KB`;
-    if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
-    return `${(bytes / 1024 ** 3).toFixed(2)} GB`;
-  }
+  humanSize = formatSize;
 
   readonly allSelected = computed(() => {
     const rows = this.filtered().filter(o => !o.folder);
