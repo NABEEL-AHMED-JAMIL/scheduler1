@@ -176,21 +176,28 @@ export class Dashboard implements OnInit {
   /**
    * Clicking a count opens that job's runs for exactly this hour and status. Zero is not a
    * link -- following it would land on an empty page -- so it says so instead.
+   *
+   * The Total column is every status at once, not a status of its own. It was passing
+   * "Total" through as a jobStatus filter, and since no run is ever in a state called Total
+   * the history screen filtered them all away -- the one cell that should show the most
+   * showed nothing.
    */
   openCount(row: JobBreakdown, status: string, count: number): void {
     if (!count) {
-      this.toast.info(`No ${status.toLowerCase()} runs for ${row.jobName} in this hour.`);
+      const label = status === 'Total' ? '' : status.toLowerCase() + ' ';
+      this.toast.info(`No ${label}runs for ${row.jobName} in this hour.`);
       return;
     }
     const cell = this.selectedCell();
-    this.router.navigate(['/jobs', row.jobId, 'history'], {
-      queryParams: {
-        // Column keys are lowercase; the API and the UI both expect the capitalised status.
-        jobStatus: status.charAt(0).toUpperCase() + status.slice(1),
-        targetDate: cell?.date ?? null,
-        targetHr: cell?.hr ?? null,
-      },
-    });
+    const queryParams: Record<string, string | number | null> = {
+      targetDate: cell?.date ?? null,
+      targetHr: cell?.hr ?? null,
+    };
+    if (status !== 'Total') {
+      // Column keys are lowercase; the API and the UI both expect the capitalised status.
+      queryParams['jobStatus'] = status.charAt(0).toUpperCase() + status.slice(1);
+    }
+    this.router.navigate(['/jobs', row.jobId, 'history'], { queryParams });
   }
 
   countFor(row: JobBreakdown, key: BreakdownKey): number {

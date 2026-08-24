@@ -4,6 +4,7 @@ import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { RouterLink } from '@angular/router';
 import { TableShell } from '../../shared/ui/data-table';
 import { StatusPill } from '../../shared/ui/status-pill';
+import { DatePipe } from '@angular/common';
 import { Icon } from '../../shared/ui/icon';
 import { copyText } from '../../shared/ui/clipboard.util';
 import { Dialog } from '@angular/cdk/dialog';
@@ -12,6 +13,16 @@ import { confirmWith } from '../../shared/ui/confirm';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { createPager } from '../../shared/ui/pager';
 import { Pagination } from '../../shared/ui/pagination';
+
+export interface LinkedJob {
+  jobId: number;
+  jobName: string;
+  jobStatus: string;
+  jobRunningStatus?: string;
+  execution?: string;
+  priority?: number;
+  lastJobRun?: string;
+}
 
 interface SourceTask {
   taskDetailId: number;
@@ -29,7 +40,7 @@ interface SourceTask {
 
 @Component({
   selector: 'app-tasks',
-  imports: [Icon, RouterLink, TableShell, StatusPill, CdkMenu, CdkMenuItem, CdkMenuTrigger, Pagination],
+  imports: [Icon, RouterLink, TableShell, StatusPill, CdkMenu, CdkMenuItem, CdkMenuTrigger, Pagination, DatePipe],
   templateUrl: './tasks.html',
 })
 export class Tasks implements OnInit {
@@ -62,14 +73,49 @@ export class Tasks implements OnInit {
   readonly copiedId = signal<number | null>(null);
 
   toggleRow(task: SourceTask): void {
+    const opening = !this.expanded().has(task.taskDetailId);
     this.expanded.update(set => {
       const next = new Set(set);
       next.has(task.taskDetailId) ? next.delete(task.taskDetailId) : next.add(task.taskDetailId);
       return next;
     });
+    if (opening && !this.linkedJobs()[task.taskDetailId]) this.loadLinkedJobs(task);
   }
 
+  /** The parameter is sourceTaskId, not taskDetailId -- the same id under a different name. */
+  private loadLinkedJobs(task: SourceTask): void {
+    if (!task.totalLinksJobs) {
+      this.linkedJobs.update(map => ({ ...map, [task.taskDetailId]: [] }));
+      return;
+    }
+    this.linkedLoading.set(task.taskDetailId);
+    this.http.post<ApiResponse<LinkedJob[]>>(
+      `${API_BASE}/sourceTask.json/fetchAllLinkJobsWithSourceTaskId`, {},
+      { params: { sourceTaskId: String(task.taskDetailId) } }).subscribe({
+      next: response => {
+        this.linkedLoading.set(null);
+        if (response.status === API_SUCCESS) {
+          this.linkedJobs.update(map => ({ ...map, [task.taskDetailId]: response.data ?? [] }));
+        }
+      },
+      error: () => {
+        this.linkedLoading.set(null);
+        this.linkedJobs.update(map => ({ ...map, [task.taskDetailId]: [] }));
+      },
+    });
+  }
+
+
   readonly busyTask = signal<number | null>(null);
+
+  /**
+   * The jobs bound to a task, fetched when its panel opens. The count was already on the
+   * row; "23 linked jobs" tells you the task matters but not which jobs would stop if you
+   * changed it, which is the question anyone opening that panel is actually asking.
+   * Cached per task so re-opening a panel does not re-fetch.
+   */
+  readonly linkedJobs = signal<Record<number, LinkedJob[]>>({});
+  readonly linkedLoading = signal<number | null>(null);
 
   /** Same approach as jobs: read the task back in full and post it as a new one. */
   clone(task: SourceTask): void {

@@ -122,10 +122,63 @@
                       {{ copiedId() === task.taskDetailId ? 'Copied' : 'Copy' }}
                     </button>
                   </div>
-                  <pre class="mono text-xs leading-relaxed rounded p-2.5 overflow-x-auto max-h-64"
+                  <pre class="mono text-xs leading-relaxed rounded p-2.5 overflow-y-auto max-h-64 whitespace-pre-wrap break-words"
                        style="background: var(--surface-raised);">{{ task.taskPayload }}</pre>
                 } @else {
                   <p class="text-xs text-[color:var(--text-muted)]">This task has no payload configured.</p>
+                }
+
+                @if (task.totalLinksJobs) {
+                  <div class="flex items-center gap-2 mt-4 mb-1.5">
+                    <app-icon name="briefcase" size="0.9em" class="icon-muted" />
+                    <span class="text-xs font-semibold">Jobs using this task</span>
+                    @if (linkedLoading() === task.taskDetailId) {
+                      <app-icon name="refresh" size="0.85em" class="spin icon-muted" />
+                    }
+                  </div>
+
+                  @if (linkedJobs()[task.taskDetailId]; as jobs) {
+                    @if (jobs.length) {
+                      <div class="rounded border overflow-hidden" style="border-color: var(--border-subtle);">
+                        <div class="overflow-y-auto max-h-64">
+                          <table class="table-modern">
+                            <thead>
+                              <tr>
+                                <th>Job</th>
+                                <th>Type</th>
+                                <th>Last run</th>
+                                <th>Run status</th>
+                                <th class="text-right">State</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              @for (job of jobs; track job.jobId) {
+                                <tr>
+                                  <td class="max-w-64">
+                                    <a class="link-inline truncate" [routerLink]="['/jobs', job.jobId, 'edit']"
+                                       [title]="job.jobName">
+                                      <app-icon name="link" size="0.8em" class="icon-info" />{{ job.jobName }}
+                                    </a>
+                                    <div class="mono text-[color:var(--text-muted)]">#{{ job.jobId }}</div>
+                                  </td>
+                                  <td><span class="pill pill-neutral">{{ job.execution || '—' }}</span></td>
+                                  <td class="whitespace-nowrap text-[color:var(--text-secondary)]">
+                                    {{ job.lastJobRun ? (job.lastJobRun | date: 'd MMM, HH:mm') : 'Never' }}
+                                  </td>
+                                  <td><app-status [label]="job.jobRunningStatus || '—'" /></td>
+                                  <td class="text-right"><app-status [label]="job.jobStatus" [quiet]="true" /></td>
+                                </tr>
+                              }
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    } @else {
+                      <p class="text-xs text-[color:var(--text-muted)]">
+                        Could not read the jobs for this task.
+                      </p>
+                    }
+                  }
                 }
               </td>
             </tr>

@@ -283,6 +283,30 @@
                   </div>
                 </dl>
 
+                @if (job.taskDetail?.taskDetailId) {
+                  <div class="detail-section">
+                    <div class="flex flex-wrap items-baseline gap-2 mb-2">
+                      <h3 class="text-xs font-semibold uppercase tracking-wider
+                                 text-[color:var(--text-secondary)]">Task payload</h3>
+                      @if (payloadFor(job)) {
+                        <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="copyPayload(job)">
+                          <app-icon name="copy" size="0.85em" />Copy
+                        </button>
+                      }
+                    </div>
+                    @if (payloadFor(job); as payload) {
+                      <pre class="mono text-xs leading-relaxed rounded p-2.5 overflow-y-auto max-h-64 whitespace-pre-wrap break-words"
+                           style="background: var(--surface-raised);">{{ payload }}</pre>
+                    } @else if (payloadFor(job) === '') {
+                      <p class="text-xs text-[color:var(--text-muted)]">This task has no payload configured.</p>
+                    } @else {
+                      <p class="flex items-center gap-1.5 text-xs text-[color:var(--text-muted)]">
+                        <app-icon name="refresh" size="0.85em" class="spin" />Reading the task…
+                      </p>
+                    }
+                  </div>
+                }
+
                 <div class="detail-section">
                   <div class="flex flex-wrap items-baseline gap-2 mb-2">
                     <h3 class="text-xs font-semibold uppercase tracking-wider

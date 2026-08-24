@@ -20,6 +20,7 @@ import { statusColor } from '../../shared/charts/status-color';
 import { Router } from '@angular/router';
 import { createPager } from '../../shared/ui/pager';
 import { Pagination } from '../../shared/ui/pagination';
+import { copyText } from '../../shared/ui/clipboard.util';
 
 export interface Scheduler {
   schedulerId: number;
@@ -81,6 +82,14 @@ export class Jobs implements OnInit {
   readonly busyJob = signal<number | null>(null);
   readonly expanded = signal<Set<number>>(new Set());
   readonly selected = signal<Set<number>>(new Set());
+
+  /**
+   * A task's payload, fetched when a job panel opens and cached by task rather than by job --
+   * many jobs share one task, so keying by job would refetch the same XML for each of them.
+   * The job list deliberately does not carry it: at roughly 600 bytes a row it was a third
+   * of that response for something only an opened panel shows.
+   */
+  readonly payloadByTask = signal<Record<number, string>>({});
   readonly bulkBusy = signal(false);
 
   readonly pager = createPager<SourceJob>();
@@ -227,6 +236,32 @@ export class Jobs implements OnInit {
       return next;
     });
     if (opening && !this.runsByJob()[job.jobId]) this.loadRuns(job.jobId);
+    const taskId = job.taskDetail?.taskDetailId;
+    if (opening && taskId && this.payloadByTask()[taskId] === undefined) this.loadPayload(taskId);
+  }
+
+  private loadPayload(taskDetailId: number): void {
+    this.http.get<ApiResponse<any>>(`${API_BASE}/sourceTask.json/fetchSourceTaskWithSourceTaskId`,
+      { params: { sourceTaskId: String(taskDetailId) } }).subscribe({
+      next: response => {
+        const payload = response.status === API_SUCCESS ? (response.data?.taskPayload ?? '') : '';
+        this.payloadByTask.update(map => ({ ...map, [taskDetailId]: payload }));
+      },
+      // An empty string marks it as fetched-and-absent, so it is not requested again.
+      error: () => this.payloadByTask.update(map => ({ ...map, [taskDetailId]: '' })),
+    });
+  }
+
+  payloadFor(job: SourceJob): string | undefined {
+    const taskId = job.taskDetail?.taskDetailId;
+    return taskId ? this.payloadByTask()[taskId] : undefined;
+  }
+
+  async copyPayload(job: SourceJob): Promise<void> {
+    const payload = this.payloadFor(job);
+    if (!payload) return;
+    if (await copyText(payload)) this.toast.success('Task payload copied.');
+    else this.toast.error('Could not copy the payload.');
   }
 
   /**
