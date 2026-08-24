@@ -153,7 +153,7 @@
       </tbody>
     </table>
 
-    <app-pagination [total]="filtered().length" [page]="pager.page()" [size]="pager.size()"
+    <app-pagination pager [total]="filtered().length" [page]="pager.page()" [size]="pager.size()"
                     (goTo)="goToPage($event)" (setSize)="setPageSize($event)" />
   </app-table-shell>
 </div>

@@ -239,6 +239,14 @@
     /* The header must be opaque or rows show through it while scrolling. */
     background: var(--surface-raised);
   }
+  /* A scroller inside a scroller traps the wheel: the inner one swallows the gesture and the
+     outer never moves. The console and timeline views set their own height for when they are
+     used outside a table shell, and give it up when one is already bounding them. */
+  .scroll-table .log-console,
+  .scroll-table .log-timeline {
+    max-height: none;
+    overflow: visible;
+  }
 
   /* File input beside its upload button; the native control has its own chrome, so it gets
      the row rather than being forced into the form grid's column rhythm. */

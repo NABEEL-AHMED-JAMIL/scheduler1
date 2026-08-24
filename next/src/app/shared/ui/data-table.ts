@@ -46,8 +46,14 @@ import { Icon } from './icon';
           <div class="mt-4"><ng-content select="[empty-action]" /></div>
         </div>
       } @else {
-        <div class="overflow-x-auto"><ng-content /></div>
+        <!-- The rows scroll inside their own box so the toolbar above and the pager below
+             stay put. Without it a 369-entry log ran the page to 15,000px and the view
+             switcher, search and refresh were all off-screen by the second row. -->
+        <div class="overflow-x-auto scroll-table"><ng-content /></div>
       }
+      <!-- Outside the scroll box: paging controls that scroll away with the rows are
+           unreachable exactly when a long list makes them necessary. -->
+      <ng-content select="[pager]" />
     </div>
   `,
 })

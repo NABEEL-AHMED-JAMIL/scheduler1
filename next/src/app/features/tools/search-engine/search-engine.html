@@ -97,7 +97,7 @@
           </table>
         </div>
 
-        <app-pagination [total]="rows().length" [page]="pager.page()" [size]="pager.size()"
+        <app-pagination pager [total]="rows().length" [page]="pager.page()" [size]="pager.size()"
                         (goTo)="goToPage($event)" (setSize)="setPageSize($event)" />
       }
     </div>
