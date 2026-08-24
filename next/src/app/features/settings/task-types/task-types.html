@@ -114,6 +114,12 @@
                       <app-icon name="plug" class="icon-ok" />Test Kafka connection
                     </button>
                   }
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="viewLinked(type)">
+                    <app-icon name="link" class="icon-info" />Linked tasks
+                  </button>
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="download(type)">
+                    <app-icon name="download" />Export as JSON
+                  </button>
                   <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="remove(type)">
                     <app-icon name="trash" class="icon-crit" />Delete
                   </button>
@@ -125,4 +131,63 @@
       </tbody>
     </table>
   </app-table-shell>
+
+  @if (linkedFor(); as type) {
+    <div class="card overflow-hidden">
+      <div class="flex flex-wrap items-center gap-2 px-4 py-3 border-b"
+           style="border-color: var(--border-subtle);">
+        <h2 class="text-sm font-semibold mr-auto">
+          Tasks using {{ type.serviceName }}
+          <span class="text-[color:var(--text-muted)] font-normal">({{ linkedFiltered().length }})</span>
+        </h2>
+        @if (linkedTasks().length) {
+          <div class="search-field max-w-52">
+            <app-icon name="search" size="0.95em" />
+            <input class="input" placeholder="Search task or group"
+                   [value]="linkedSearch()" (input)="linkedSearch.set($any($event.target).value)" />
+          </div>
+        }
+        <button type="button" class="btn btn-ghost btn-sm" (click)="closeLinked()">
+          <app-icon name="close" />Close
+        </button>
+      </div>
+
+      @if (linkedLoading()) {
+        <p class="px-4 py-8 text-center text-sm text-[color:var(--text-muted)]">Reading…</p>
+      } @else if (!linkedTasks().length) {
+        <div class="px-4 py-10 text-center">
+          <app-icon name="layers" size="1.6em" class="icon-muted" />
+          <p class="mt-2 text-sm text-[color:var(--text-muted)]">
+            No task uses this type — it is safe to change or delete.
+          </p>
+        </div>
+      } @else {
+        <div class="overflow-x-auto">
+          <table class="table-modern">
+            <thead>
+              <tr><th>Task</th><th>Group</th><th>Status</th><th class="w-10"></th></tr>
+            </thead>
+            <tbody>
+              @for (task of linkedFiltered(); track task.taskDetailId) {
+                <tr>
+                  <td>
+                    <div class="font-medium">{{ task.taskName }}</div>
+                    <div class="mono text-[color:var(--text-muted)]">#{{ task.taskDetailId }}</div>
+                  </td>
+                  <td class="text-[color:var(--text-secondary)]">{{ task.groupLabel || '—' }}</td>
+                  <td><app-status [label]="task.taskStatus" [quiet]="true" /></td>
+                  <td>
+                    <button type="button" class="btn-circle" title="Open this task"
+                            aria-label="Open this task" (click)="openTask(task)">
+                      <app-icon name="chevronRight" size="0.9em" />
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  }
 </div>

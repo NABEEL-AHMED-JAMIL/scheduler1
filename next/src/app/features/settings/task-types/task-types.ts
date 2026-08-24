@@ -12,6 +12,14 @@ import { confirmWith } from '../../../shared/ui/confirm';
 import { TaskType, TaskTypeDialog } from './task-type-dialog';
 import { AuthService } from '../../../core/auth/auth.service';
 import { parseTopicPartition } from '../../../shared/ui/topic';
+import { Router } from '@angular/router';
+
+interface LinkedTask {
+  taskDetailId: number;
+  taskName: string;
+  taskStatus: string;
+  groupLabel?: string;
+}
 
 @Component({
   selector: 'app-task-types',
@@ -43,6 +51,66 @@ export class TaskTypes implements OnInit {
         .toLowerCase().includes(term);
     });
   });
+
+  private readonly router = inject(Router);
+
+  /**
+   * Which source tasks use this type. The legacy screen had it and the endpoint has been
+   * live all along -- without it there is no way to answer "is anything still on this type?"
+   * before changing or deleting it.
+   */
+  readonly linkedFor = signal<TaskType | null>(null);
+  readonly linkedTasks = signal<LinkedTask[]>([]);
+  readonly linkedLoading = signal(false);
+  readonly linkedSearch = signal('');
+
+  readonly linkedFiltered = computed(() => {
+    const term = this.linkedSearch().trim().toLowerCase();
+    const rows = this.linkedTasks();
+    if (!term) return rows;
+    return rows.filter(t =>
+      String(t.taskDetailId).includes(term)
+      || (t.taskName ?? '').toLowerCase().includes(term)
+      || (t.groupLabel ?? '').toLowerCase().includes(term));
+  });
+
+  viewLinked(type: TaskType): void {
+    this.linkedFor.set(type);
+    this.linkedSearch.set('');
+    this.linkedTasks.set([]);
+    this.linkedLoading.set(true);
+    this.http.get<ApiResponse<LinkedTask[]>>(
+      `${API_BASE}/sourceTask.json/fetchAllLinkSourceTaskWithSourceTaskTypeId`,
+      { params: { sourceTaskTypeId: String(type.sourceTaskTypeId) } }).subscribe({
+      next: response => {
+        this.linkedLoading.set(false);
+        if (response.status === API_SUCCESS) this.linkedTasks.set(response.data ?? []);
+        else this.toast.error(response.message);
+      },
+      error: err => {
+        this.linkedLoading.set(false);
+        this.toast.error(err?.error?.message || 'Could not read the linked tasks.');
+      },
+    });
+  }
+
+  closeLinked(): void { this.linkedFor.set(null); this.linkedTasks.set([]); }
+
+  openTask(task: LinkedTask): void {
+    this.router.navigate(['/tasks', task.taskDetailId, 'edit']);
+  }
+
+  /** Exports the type as JSON, as the legacy screen's download did. */
+  download(type: TaskType): void {
+    const blob = new Blob([JSON.stringify(type, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `task-type-${type.serviceName || type.sourceTaskTypeId}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    this.toast.success(`${type.serviceName} exported.`);
+  }
 
   readonly summary = computed(() => {
     const list = this.types();

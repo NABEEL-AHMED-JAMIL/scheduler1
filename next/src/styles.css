@@ -176,6 +176,28 @@
     @apply bg-crit-500 text-white hover:brightness-110;
   }
   .btn-sm { @apply px-2.5 py-1 text-xs; }
+  /* A round, bordered icon button for row-level add/remove. The ghost variant carried almost
+     no weight at 28px -- it read as decoration rather than something you press -- and a pair
+     of them needs an obvious hit target and an obvious difference between the two. */
+  .btn-circle {
+    border-color: var(--border-subtle);
+    background: var(--surface-raised);
+    color: var(--text-secondary);
+    @apply inline-flex items-center justify-center rounded-full border w-7 h-7 p-0 shrink-0
+           transition-colors;
+  }
+  .btn-circle:hover:not(:disabled) {
+    border-color: var(--color-brand-500);
+    color: var(--color-brand-600);
+    background: var(--surface-sunken);
+  }
+  .btn-circle:disabled { @apply opacity-40 cursor-not-allowed; }
+  .btn-circle-danger:hover:not(:disabled) {
+    border-color: var(--color-crit-500);
+    color: var(--color-crit-500);
+  }
+  html.dark .btn-circle:hover:not(:disabled) { color: var(--color-brand-300); }
+  html.dark .btn-circle-danger:hover:not(:disabled) { color: var(--color-crit-400); }
   .btn-icon { @apply px-2 py-1.5; }
 
   /* KPI tiles were p-3.5 while every other card was p-4 -- a 2px difference that reads as
