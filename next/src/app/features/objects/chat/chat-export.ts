@@ -25,6 +25,29 @@ const CONVERTIBLE = ['xlsx', 'docx', 'pdf'];
 
 const FENCE_ALIASES: Record<string, string> = { markdown: 'md' };
 
+/** Targets LibreOffice lays out as a document, where markdown structure is worth keeping. */
+const RICH_TARGETS = ['pdf', 'docx'];
+
+/**
+ * Does this text carry markdown worth parsing? A heading, a bold or italic run, a bullet or
+ * numbered list, a table row, a blockquote, a fenced or inline code span, or a link.
+ */
+const MARKDOWN_SIGNALS = [
+  /^#{1,6}\s+\S/m,
+  /\*\*[^*\n]+\*\*|__[^_\n]+__/,
+  /(^|\s)[*_][^*_\n]+[*_](\s|$)/m,
+  /^\s*[-*+]\s+\S/m,
+  /^\s*\d+\.\s+\S/m,
+  /^\s*\|.*\|\s*$/m,
+  /^\s*>\s+\S/m,
+  /`[^`\n]+`/,
+  /\[[^\]\n]+\]\([^)\n]+\)/,
+];
+
+export function looksLikeMarkdown(text: string): boolean {
+  return MARKDOWN_SIGNALS.some(pattern => pattern.test(text));
+}
+
 const FENCE = String.raw`\`\`\`(csv|json|tsv|txt|html|md|markdown|xlsx|docx|pdf)\r?\n([\s\S]*?)\`\`\`[ \t]*\r?\n?\s*(?:TARGET_FORMAT:\s*(\w+)\b\s*)?`;
 
 /**
@@ -53,6 +76,21 @@ function stripBleed(content: string): string {
     break;
   }
   return lines.join('\n');
+}
+
+/**
+ * What the server should import the content *as*.
+ *
+ * A ```pdf fence means "make this a PDF", so the fence's own language was recorded as txt --
+ * which is what got sent, and LibreOffice imported it as flat text. Every heading, bold run
+ * and table in the reply then came out as literal asterisks and pipes, while the chat beside
+ * it rendered the same text as markdown. Telling the server it is markdown lets LibreOffice's
+ * Markdown filter build real headings, lists and tables, so the file matches what was on
+ * screen. Spreadsheet targets are left alone: markdown structure means nothing to a sheet.
+ */
+export function sourceFormatFor(lang: string, targetFormat: string, content: string): string {
+  if (lang !== 'txt' || !RICH_TARGETS.includes(targetFormat)) return lang;
+  return looksLikeMarkdown(content) ? 'md' : lang;
 }
 
 export function parseDownloadableFiles(text: string, baseName = 'export'): ChatFile[] {
@@ -85,7 +123,10 @@ export function parseDownloadableFiles(text: string, baseName = 'export'): ChatF
       const filename = `${baseName}-export${suffix}.${targetFormat}`;
       files.push({
         filename, content, mimeType: EXPORT_MIME[lang],
-        pendingExport: { sourceFormat: lang, targetFormat, filename, mimeType: EXPORT_MIME[targetFormat] },
+        pendingExport: {
+          sourceFormat: sourceFormatFor(lang, targetFormat, content),
+          targetFormat, filename, mimeType: EXPORT_MIME[targetFormat],
+        },
       });
     } else {
       files.push({

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseDownloadableFiles, stripExportFences, EXPORT_MIME } from './chat-export';
+import { parseDownloadableFiles, stripExportFences, EXPORT_MIME, sourceFormatFor, looksLikeMarkdown } from './chat-export';
 
 const fence = (lang: string, body: string, target?: string) =>
   '```' + lang + '\n' + body + '\n```' + (target ? `\nTARGET_FORMAT: ${target}` : '');
@@ -82,5 +82,50 @@ describe('stripExportFences', () => {
   it('leaves an ordinary code block untouched', () => {
     const reply = '```python\nprint(1)\n```';
     expect(stripExportFences(reply)).toBe(reply);
+  });
+});
+
+describe('sourceFormatFor', () => {
+  const md = '# Report\n\nSome **bold** text\n\n| A | B |\n|---|---|\n| 1 | 2 |\n';
+
+  it('imports markdown as markdown when the target is a document', () => {
+    // The bug: a ```pdf fence recorded its own language as txt, so LibreOffice imported the
+    // reply as flat text and every #, ** and | came out literally -- while the chat beside
+    // it rendered the same string as markdown.
+    expect(sourceFormatFor('txt', 'pdf', md)).toBe('md');
+    expect(sourceFormatFor('txt', 'docx', md)).toBe('md');
+  });
+
+  it('leaves genuinely plain text alone', () => {
+    expect(sourceFormatFor('txt', 'pdf', 'just one plain sentence')).toBe('txt');
+  });
+
+  it('never reinterprets content bound for a spreadsheet', () => {
+    // Markdown structure means nothing to a sheet; csv/txt is what xlsx needs.
+    expect(sourceFormatFor('txt', 'xlsx', md)).toBe('txt');
+  });
+
+  it('does not override a fence that already declared its language', () => {
+    expect(sourceFormatFor('html', 'pdf', '<h1>Report</h1>')).toBe('html');
+    expect(sourceFormatFor('csv', 'xlsx', 'a,b\n1,2')).toBe('csv');
+  });
+});
+
+describe('looksLikeMarkdown', () => {
+  it.each([
+    ['heading', '# Title'],
+    ['bold', 'a **b** c'],
+    ['bullet list', '- one\n- two'],
+    ['numbered list', '1. one\n2. two'],
+    ['table', '| a | b |\n|---|---|'],
+    ['blockquote', '> quoted'],
+    ['inline code', 'run `npm test` now'],
+    ['link', 'see [docs](http://x.y)'],
+  ])('spots a %s', (_label, text) => {
+    expect(looksLikeMarkdown(text)).toBe(true);
+  });
+
+  it('does not see markdown in ordinary prose', () => {
+    expect(looksLikeMarkdown('The run finished at 12:04 and wrote 42 rows.')).toBe(false);
   });
 });

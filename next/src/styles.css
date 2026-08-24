@@ -225,6 +225,21 @@
 
   .row-selected > td { background: var(--surface-sunken); }
 
+  /* A listing that can run to hundreds of rows scrolls inside its own box rather than
+     growing the page, so the toolbar, breadcrumb and column headers stay put. Without this
+     a bucket of 200 files pushed every bit of context off the top of the screen. */
+  .scroll-table {
+    max-height: min(62vh, 40rem);
+    @apply overflow-auto;
+  }
+  .scroll-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    /* The header must be opaque or rows show through it while scrolling. */
+    background: var(--surface-raised);
+  }
+
   /* File input beside its upload button; the native control has its own chrome, so it gets
      the row rather than being forced into the form grid's column rhythm. */
   /* The guide sits beside the TLS fields once there is width for it, so opening it costs
