@@ -14,6 +14,7 @@ import { DbConnection } from './types';
   imports: [ReactiveFormsModule, Field, FormDialog, Icon],
   template: `
     <app-form-dialog
+      size="wide"
         [heading]="isEdit() ? 'Edit database connection' : 'New database connection'"
         subtitle="Where queries run. The password is encrypted and never sent back."
         [confirmLabel]="isEdit() ? 'Save changes' : 'Create'"
@@ -28,7 +29,7 @@ import { DbConnection } from './types';
         </button>
       </ng-container>
 
-      <form [formGroup]="form" class="form-stack">
+      <form [formGroup]="form" class="form-grid">
         @if (testResult(); as result) {
           <div class="card flex items-start gap-2 px-3 py-2.5 text-sm"
                [style.border-color]="result.ok ? 'var(--color-ok-500)' : 'var(--color-crit-500)'">
@@ -43,8 +44,6 @@ import { DbConnection } from './types';
           <input id="profileName" class="input" formControlName="profileName"
                  placeholder="Reporting replica" />
         </app-field>
-
-        <div class="form-grid">
           <app-field label="Database type" for="databaseType" [control]="form.get('databaseType')"
                      [submitted]="submitted()" hint="PostgreSQL is the only engine supported today.">
             <select id="databaseType" class="input" formControlName="databaseType">
@@ -82,9 +81,8 @@ import { DbConnection } from './types';
                    autocomplete="new-password"
                    [placeholder]="data.connection?.passwordConfigured ? '••••••••' : ''" />
           </app-field>
-        </div>
 
-        <app-field label="Additional properties" for="additionalProperties"
+        <app-field class="sm:col-span-2" label="Additional properties" for="additionalProperties"
                    [control]="form.get('additionalProperties')" [submitted]="submitted()"
                    hint="One key=value per line, appended to the JDBC URL.">
           <textarea id="additionalProperties" class="input mono" rows="2"
