@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseMarkdown } from './markdown';
+import { parseMarkdown, parseInlines, Inline } from './markdown';
 
 /**
  * The parser is the piece most likely to break quietly: bad output still renders, it just
@@ -81,5 +81,41 @@ describe('parseMarkdown', () => {
   it('returns nothing for empty input', () => {
     expect(parse('')).toEqual([]);
     expect(parse('   \n  \n')).toEqual([]);
+  });
+});
+
+describe('markdown link safety', () => {
+  const hrefsIn = (text: string): (string | undefined)[] =>
+    parseInlines(text).filter((span: Inline) => span.href).map((span: Inline) => span.href);
+
+  it('only turns http and https into links', () => {
+    expect(hrefsIn('[docs](https://example.com/a)')).toEqual(['https://example.com/a']);
+    expect(hrefsIn('[docs](http://example.com)')).toEqual(['http://example.com']);
+  });
+
+  it.each([
+    ['javascript', '[click](javascript:alert(1))'],
+    ['data html', '[click](data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==)'],
+    ['vbscript', '[click](vbscript:msgbox(1))'],
+    ['file', '[click](file:///etc/passwd)'],
+    ['protocol-relative', '[click](//evil.example.com)'],
+  ])('refuses a %s URL', (_label, source) => {
+    // The scheme is filtered in the parser, so a hostile URL never reaches an [href]
+    // binding at all -- Angular's own URL sanitiser is the second line, not the first.
+    expect(hrefsIn(source)).toEqual([]);
+  });
+
+  it('keeps the visible text when it refuses the URL', () => {
+    const spans = parseInlines('see [click](javascript:alert(1)) here');
+    expect(spans.every((span: Inline) => !span.href)).toBe(true);
+    expect(spans.map((s: any) => s.text).join("")).toContain('see');
+  });
+
+  it('does not treat raw HTML in the source as markup', () => {
+    const blocks = parseMarkdown('<img src=x onerror="alert(1)">');
+    const text = JSON.stringify(blocks);
+    // It must survive as literal characters; the template interpolates it, never binds it.
+    expect(text).toContain('img src=x');
+    expect(hrefsIn('<a href="javascript:alert(1)">x</a>')).toEqual([]);
   });
 });

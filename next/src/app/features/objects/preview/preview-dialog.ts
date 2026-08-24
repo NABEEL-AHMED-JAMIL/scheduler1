@@ -1,6 +1,5 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
-import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { StorageService } from '../storage.service';
 import { API_SUCCESS } from '../../../core/api/api.config';
 import { DatePipe } from '@angular/common';
@@ -31,18 +30,18 @@ export class PreviewDialog implements OnInit {
   readonly ref = inject<DialogRef<boolean>>(DialogRef);
   readonly data = inject<PreviewData>(DIALOG_DATA);
   private readonly storage = inject(StorageService);
-  private readonly sanitizer = inject(DomSanitizer);
 
   readonly kind = signal<PreviewKind>('none');
   readonly text = signal('');
   /**
-   * Two forms of the same blob. <img>, <audio> and <video> take the plain URL -- a blob: URL
-   * is already safe in that context, and a SafeResourceUrl passed through a child component's
-   * input is stringified into the attribute instead of being bound, which left the audio
-   * element with no source at all. Only the PDF iframe needs the RESOURCE_URL wrapper.
+   * <img>, <audio> and <video> take the plain blob: URL, which is already safe in those
+   * contexts. There was a second SafeResourceUrl form here for an iframe that no longer
+   * exists -- the PDF viewer draws to a canvas instead -- so it was a standing sanitizer
+   * bypass with no caller. A blob: URL inherits this origin, so framing one built from an
+   * uploaded .html would run that file's script against the session; removing the unused
+   * bypass keeps that from being one binding away.
    */
   readonly mediaUrl = signal<string | null>(null);
-  readonly frameUrl = signal<SafeResourceUrl | null>(null);
   readonly loading = signal(true);
   readonly error = signal('');
   readonly zoom = signal(1);
@@ -156,7 +155,6 @@ export class PreviewDialog implements OnInit {
         this.loading.set(false);
         this.objectUrl = URL.createObjectURL(blob);
         this.mediaUrl.set(this.objectUrl);
-        this.frameUrl.set(this.sanitizer.bypassSecurityTrustResourceUrl(this.objectUrl));
       },
       error: err => {
         this.loading.set(false);
