@@ -7,6 +7,12 @@
       </p>
     </div>
     <div class="flex items-center gap-2">
+      @if (live()) {
+        <span class="inline-flex items-center gap-1.5 text-[11px] text-[color:var(--text-muted)] mr-1"
+              title="Connected — job status arrives as the pipeline reports it">
+          <span class="live-dot live-on"></span>Live
+        </span>
+      }
       <button type="button" class="btn btn-ghost btn-sm" (click)="load()" [disabled]="loading()">
         <app-icon name="refresh" [class.spin]="loading()" />Refresh
       </button>

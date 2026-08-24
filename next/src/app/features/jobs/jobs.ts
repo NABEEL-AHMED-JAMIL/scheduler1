@@ -13,6 +13,8 @@ import { Icon } from '../../shared/ui/icon';
 import { NotifyDialog } from './notify-dialog';
 import { JobAction, jobActionRequest } from './job-actions';
 import { parseTopicPartition } from '../../shared/ui/topic';
+import { JobEvent, JobEventsService } from '../../core/socket/job-events.service';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { BarChart, Bar } from '../../shared/charts/bar-chart';
 import { statusColor } from '../../shared/charts/status-color';
 import { Router } from '@angular/router';
@@ -65,6 +67,10 @@ export class Jobs implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly toast = inject(ToastService);
   private readonly dialog = inject(Dialog);
+  private readonly jobEvents = inject(JobEventsService);
+
+  /** Shown in the toolbar so it is clear whether the table is live or stale. */
+  readonly live = this.jobEvents.connected;
 
   readonly jobs = signal<SourceJob[]>([]);
   readonly loading = signal(true);
@@ -146,6 +152,52 @@ export class Jobs implements OnInit {
       const next = new Set(set);
       for (const job of rows) selectAll ? next.add(job.jobId) : next.delete(job.jobId);
       return next;
+    });
+  }
+
+  constructor() {
+    // The pipeline reports every status change, so a running job updates in place. Reloading
+    // the whole table for one row's status was what made the list flicker and lose scroll
+    // position while anything was running.
+    this.jobEvents.events.pipe(takeUntilDestroyed()).subscribe(event => this.applyEvent(event));
+  }
+
+  private applyEvent(event: JobEvent): void {
+    if (event.type === 'job.deleted') {
+      this.jobs.update(list => list.filter(job => job.jobId !== event.jobId));
+      this.selected.update(set => { const next = new Set(set); next.delete(event.jobId); return next; });
+      return;
+    }
+    if (event.type === 'job.status' && event.jobRunningStatus) {
+      this.patchJob(event.jobId, { jobRunningStatus: event.jobRunningStatus });
+      return;
+    }
+    // A toggle or an edit changes fields this event does not carry, so that one row is
+    // re-read rather than guessed at -- still one job instead of the whole list.
+    if (event.type === 'job.toggled' || event.type === 'job.updated') {
+      this.refreshOne(event.jobId);
+    }
+  }
+
+  private patchJob(jobId: number, patch: Partial<SourceJob>): void {
+    this.jobs.update(list =>
+      list.map(job => (job.jobId === jobId ? { ...job, ...patch } : job)));
+  }
+
+  /** Re-reads a single job. Used when a push says "changed" without saying how. */
+  private refreshOne(jobId: number): void {
+    this.http.get<ApiResponse<any>>(
+      `${API_BASE}/sourceJob.json/fetchSourceJobDetailWithSourceJobId`,
+      { params: { jobId: String(jobId) } }).subscribe({
+      next: response => {
+        if (response.status !== API_SUCCESS || !response.data) return;
+        const fresh = response.data as SourceJob;
+        // A job the list has not seen before (created elsewhere) joins it.
+        this.jobs.update(list => list.some(job => job.jobId === jobId)
+          ? list.map(job => (job.jobId === jobId ? { ...job, ...fresh } : job))
+          : [...list, fresh]);
+      },
+      error: () => { /* the row simply keeps what it had */ },
     });
   }
 
@@ -257,7 +309,10 @@ export class Jobs implements OnInit {
             this.busyJob.set(null);
             if (created.status === API_SUCCESS) {
               this.toast.success(`Copied as "${payload.jobName}" — it starts inactive.`);
-              this.load();
+              // The new id is in the message; the list picks it up without a full re-read.
+              const newId = Number(/jobId (\d+)/.exec(created.message ?? '')?.[1]);
+              if (Number.isFinite(newId)) this.refreshOne(newId);
+              else this.load();
             } else { this.toast.error(created.message); }
           },
           error: err => {
@@ -313,7 +368,10 @@ export class Jobs implements OnInit {
         this.busyJob.set(null);
         if (response.status === API_SUCCESS) {
           this.toast.success(successMessage);
-          this.load();
+          // The pipeline pushes the real status moments later; this stops the row looking
+          // untouched in the meantime.
+          if (action === 'run') this.patchJob(job.jobId, { jobRunningStatus: 'Queue' });
+          else this.refreshOne(job.jobId);
         } else {
           this.toast.error(response.message);
         }
@@ -341,7 +399,7 @@ export class Jobs implements OnInit {
       next: response => {
         if (response.status === API_SUCCESS) {
           this.toast.success(`${job.jobName} ${activating ? 'activated' : 'deactivated'}.`);
-          this.load();
+          this.patchJob(job.jobId, { jobStatus: activating ? 'Active' : 'Inactive' });
         } else {
           this.toast.error(response.message);
         }
@@ -364,7 +422,7 @@ export class Jobs implements OnInit {
       next: response => {
         if (response.status === API_SUCCESS) {
           this.toast.success(`${job.jobName} deleted.`);
-          this.load();
+          this.jobs.update(list => list.filter(row => row.jobId !== job.jobId));
         } else {
           this.toast.error(response.message);
         }
@@ -392,7 +450,7 @@ export class Jobs implements OnInit {
         jobId: job.jobId, jobName: job.jobName,
         completeJob: job.completeJob, failJob: job.failJob, skipJob: job.skipJob,
       },
-    }).closed.subscribe(saved => { if (saved) this.load(); });
+    }).closed.subscribe(saved => { if (saved) this.refreshOne(job.jobId); });
   }
 
   onFilterChange(): void {
@@ -471,7 +529,14 @@ export class Jobs implements OnInit {
       } else {
         this.toast.success(`${ok} job${ok > 1 ? 's' : ''} ${verb}.`);
       }
-      this.load();
+      // Only the rows acted on changed, and a delete removes them outright.
+      const touched = new Set(jobs.map(job => job.jobId));
+      if (verb === 'deleted') {
+        this.jobs.update(list => list.filter(job => !touched.has(job.jobId)));
+      } else {
+        this.jobs.update(list => list.map(job =>
+          touched.has(job.jobId) ? { ...job, jobRunningStatus: 'Queue' } : job));
+      }
     };
     for (const job of jobs) {
       const request = jobActionRequest(action, job.jobId);
