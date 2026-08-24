@@ -23,6 +23,7 @@
                    emptyIcon="list"
                    (retry)="load()">
     <ng-container toolbar>
+      <app-view-toggle [(value)]="view" key="lookup" cardsIcon="list" />
       <div class="search-field max-w-56">
         <app-icon name="search" size="0.95em" />
         <input class="input" placeholder="Search type or value"
@@ -30,6 +31,81 @@
       </div>
     </ng-container>
 
+    @if (view() === 'cards') {
+      <div class="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
+        @for (lookup of filtered(); track lookup.lookupId) {
+          <article class="card p-4 flex flex-col gap-3">
+            <div class="flex items-start gap-2.5">
+              <span class="stat-glyph shrink-0"><app-icon name="list" /></span>
+              <div class="min-w-0 flex-1">
+                <h3 class="font-semibold mono truncate" [title]="lookup.lookupType">{{ lookup.lookupType }}</h3>
+                <p class="text-xs text-[color:var(--text-secondary)] truncate"
+                   [title]="lookup.description || ''">{{ lookup.description || 'No description' }}</p>
+              </div>
+              <button type="button" class="btn btn-ghost btn-icon btn-sm shrink-0"
+                      [cdkMenuTriggerFor]="cardMenu" aria-label="Actions">
+                <app-icon name="dots" size="1.05em" />
+              </button>
+              <ng-template #cardMenu>
+                <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="edit(lookup)">
+                    <app-icon name="edit" />Edit
+                  </button>
+                  <button cdkMenuItem class="menu-item btn-intent-ok" (cdkMenuItemTriggered)="addChild(lookup)">
+                    <app-icon name="plus" class="icon-ok" />Add entry
+                  </button>
+                  <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="remove(lookup)">
+                    <app-icon name="trash" class="icon-crit" />Delete
+                  </button>
+                </div>
+              </ng-template>
+            </div>
+
+            <div class="text-xs">
+              <div class="text-[color:var(--text-muted)] mb-1">Value</div>
+              @if (lookup.encrypted) {
+                <span class="pill pill-neutral" title="Stored encrypted — the value is not shown">
+                  <app-icon name="lock" size="0.85em" class="icon-warn" />encrypted
+                </span>
+              } @else {
+                <div class="mono break-words">{{ lookup.lookupValue || '—' }}</div>
+              }
+            </div>
+
+            <!-- Entries are the reason to open a lookup, so the count opens them in place. -->
+            <div class="mt-auto pt-1">
+              @if (entryCount(lookup)) {
+                <button type="button" class="pill pill-neutral hover-brand"
+                        (click)="toggle(lookup)">
+                  <app-icon [name]="expanded().has($any(lookup.lookupId)) ? 'chevronDown' : 'chevronRight'"
+                            size="0.85em" />
+                  {{ entryCount(lookup) }} {{ entryCount(lookup) === 1 ? 'entry' : 'entries' }}
+                </button>
+              } @else {
+                <button type="button" class="btn btn-default btn-sm" (click)="addChild(lookup)">
+                  <app-icon name="plus" size="0.85em" class="icon-ok" />Add an entry
+                </button>
+              }
+
+              @if (expanded().has($any(lookup.lookupId)) && lookup.children?.length) {
+                <ul class="mt-2 rounded border divide-y text-xs"
+                    style="border-color: var(--border-subtle);">
+                  @for (child of lookup.children; track child.lookupId) {
+                    <li class="px-2.5 py-1.5 flex items-baseline gap-2"
+                        style="border-color: var(--border-subtle);">
+                      <span class="mono truncate">{{ child.lookupType }}</span>
+                      <span class="text-[color:var(--text-muted)] truncate ml-auto">
+                        {{ child.encrypted ? '••••' : (child.lookupValue || '—') }}
+                      </span>
+                    </li>
+                  }
+                </ul>
+              }
+            </div>
+          </article>
+        }
+      </div>
+    } @else {
     <table class="table-modern">
       <thead>
         <tr>
@@ -148,5 +224,6 @@
         }
       </tbody>
     </table>
+    }
   </app-table-shell>
 </div>

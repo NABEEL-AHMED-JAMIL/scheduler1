@@ -5,6 +5,7 @@ import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { TableShell } from '../../../shared/ui/data-table';
 import { Icon } from '../../../shared/ui/icon';
+import { ViewToggle } from '../../../shared/ui/view-toggle';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { confirmWith } from '../../../shared/ui/confirm';
 import { LookupData, LookupDialog } from './lookup-dialog';
@@ -13,10 +14,11 @@ import { catchError, map } from 'rxjs/operators';
 
 @Component({
   selector: 'app-lookup',
-  imports: [Icon, TableShell, CdkMenu, CdkMenuItem, CdkMenuTrigger],
+  imports: [ViewToggle, Icon, TableShell, CdkMenu, CdkMenuItem, CdkMenuTrigger],
   templateUrl: './lookup.html',
 })
 export class Lookup implements OnInit {
+  readonly view = signal<'table' | 'cards'>('table');
   private readonly http = inject(HttpClient);
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);

@@ -8,6 +8,8 @@ import { StatusPill } from '../../../shared/ui/status-pill';
 import { StatTile } from '../../../shared/ui/stat-tile';
 import { TableShell } from '../../../shared/ui/data-table';
 import { Icon } from '../../../shared/ui/icon';
+import { ViewToggle } from '../../../shared/ui/view-toggle';
+import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { confirmWith } from '../../../shared/ui/confirm';
 import { createSort } from '../../../shared/ui/sort';
@@ -36,10 +38,12 @@ interface ResourceCount {
 
 @Component({
   selector: 'app-tenants',
-  imports: [StatTile, Icon, DatePipe, StatusPill, TableShell],
+  imports: [CdkMenu, CdkMenuItem, CdkMenuTrigger, ViewToggle, StatTile, Icon, DatePipe, StatusPill, TableShell],
   templateUrl: './tenants.html',
 })
 export class Tenants implements OnInit {
+  /** Tenants started as cards; the table is the addition, so cards stay the default. */
+  readonly view = signal<'table' | 'cards'>('cards');
   private readonly http = inject(HttpClient);
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);

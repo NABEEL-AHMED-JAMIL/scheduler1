@@ -23,6 +23,7 @@
                    emptyIcon="list"
                    (retry)="load()">
     <ng-container toolbar>
+      <app-view-toggle [(value)]="view" key="tasks" cardsIcon="layers" />
       <div class="search-field max-w-64">
         <app-icon name="search" size="0.95em" />
         <input class="input" placeholder="Search id, name, type or pipeline"
@@ -33,6 +34,85 @@
       }
     </ng-container>
 
+    @if (view() === 'cards') {
+      <div class="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
+        @for (task of paged(); track task.taskDetailId) {
+          <article class="card p-4 flex flex-col gap-3"
+                   [class.opacity-55]="busyTask() === task.taskDetailId">
+            <div class="flex items-start gap-2.5">
+              <span class="stat-glyph shrink-0"><app-icon name="layers" /></span>
+              <div class="min-w-0 flex-1">
+                <h3 class="font-semibold truncate" [title]="task.taskName">{{ task.taskName || '—' }}</h3>
+                <p class="mono text-[color:var(--text-muted)]">#{{ task.taskDetailId }}</p>
+              </div>
+              <div class="shrink-0 flex items-center gap-1">
+                <app-status [label]="task.taskStatus" [quiet]="true" />
+                <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="cardMenu"
+                        [disabled]="busyTask() === task.taskDetailId" aria-label="Actions">
+                  <app-icon name="dots" size="1.05em" />
+                </button>
+                <ng-template #cardMenu>
+                  <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                    <a cdkMenuItem class="menu-item" [routerLink]="['/tasks', task.taskDetailId, 'edit']">
+                      <app-icon name="edit" />Edit
+                    </a>
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="clone(task)">
+                      <app-icon name="copy" />Duplicate
+                    </button>
+                    <button cdkMenuItem class="menu-item btn-intent-crit"
+                            [disabled]="task.taskStatus === 'Delete'"
+                            (cdkMenuItemTriggered)="remove(task)">
+                      <app-icon name="trash" />Delete
+                      @if (task.totalLinksJobs) {
+                        <span class="pill pill-warn ml-auto">+{{ task.totalLinksJobs }} jobs</span>
+                      }
+                    </button>
+                  </div>
+                </ng-template>
+              </div>
+            </div>
+
+            <dl class="text-xs grid gap-1">
+              <div class="flex gap-2 min-w-0">
+                <dt class="text-[color:var(--text-muted)] shrink-0 w-16">Type</dt>
+                <dd class="truncate min-w-0">{{ task.sourceTaskType?.serviceName || '—' }}</dd>
+              </div>
+              <div class="flex gap-2 min-w-0">
+                <dt class="text-[color:var(--text-muted)] shrink-0 w-16">Topic</dt>
+                <dd class="mono truncate min-w-0">
+                  {{ topicOf(task.sourceTaskType?.queueTopicPartition) || '—' }}
+                </dd>
+              </div>
+              <div class="flex gap-2 min-w-0">
+                <dt class="text-[color:var(--text-muted)] shrink-0 w-16">Pipeline</dt>
+                <dd class="truncate min-w-0" [title]="task.pipelineId">{{ task.pipelineId || '—' }}</dd>
+              </div>
+              <!-- Where it reads and writes is the question a task card is usually opened for. -->
+              <div class="flex gap-2 min-w-0">
+                <dt class="text-[color:var(--text-muted)] shrink-0 w-16">Storage</dt>
+                <dd class="mono truncate min-w-0">
+                  @if (task.bucket) {
+                    {{ task.bucket }}<span class="text-[color:var(--text-muted)]">
+                      · {{ task.inputFolder || '·' }} → {{ task.outputFolder || '·' }}</span>
+                  } @else { — }
+                </dd>
+              </div>
+            </dl>
+
+            <div class="flex flex-wrap items-center gap-1.5 mt-auto pt-1">
+              @if (task.totalLinksJobs) {
+                <span class="pill pill-neutral">
+                  <app-icon name="link" size="0.85em" />{{ task.totalLinksJobs }}
+                  {{ task.totalLinksJobs === 1 ? 'job' : 'jobs' }}
+                </span>
+              } @else {
+                <span class="text-[11px] text-[color:var(--text-muted)]">No job uses this yet</span>
+              }
+            </div>
+          </article>
+        }
+      </div>
+    } @else {
     <table class="table-modern">
       <thead>
         <tr>
@@ -192,6 +272,7 @@
         }
       </tbody>
     </table>
+    }
 
     <app-pagination pager [total]="filtered().length" [page]="pager.page()" [size]="pager.size()"
                     (goTo)="goToPage($event)" (setSize)="setPageSize($event)" />

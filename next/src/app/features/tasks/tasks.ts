@@ -6,6 +6,7 @@ import { TableShell } from '../../shared/ui/data-table';
 import { StatusPill } from '../../shared/ui/status-pill';
 import { DatePipe } from '@angular/common';
 import { Icon } from '../../shared/ui/icon';
+import { ViewToggle } from '../../shared/ui/view-toggle';
 import { copyText } from '../../shared/ui/clipboard.util';
 import { Dialog } from '@angular/cdk/dialog';
 import { ToastService } from '../../shared/ui/toast.service';
@@ -40,10 +41,11 @@ interface SourceTask {
 
 @Component({
   selector: 'app-tasks',
-  imports: [Icon, RouterLink, TableShell, StatusPill, CdkMenu, CdkMenuItem, CdkMenuTrigger, Pagination, DatePipe],
+  imports: [ViewToggle, Icon, RouterLink, TableShell, StatusPill, CdkMenu, CdkMenuItem, CdkMenuTrigger, Pagination, DatePipe],
   templateUrl: './tasks.html',
 })
 export class Tasks implements OnInit {
+  readonly view = signal<'table' | 'cards'>('table');
   private readonly http = inject(HttpClient);
   private readonly toast = inject(ToastService);
   private readonly dialog = inject(Dialog);

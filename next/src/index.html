@@ -7,8 +7,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <!-- SVG first so the tab shows the app's own mark and stays crisp at any density; the .ico
        remains for browsers that ignore SVG icons. -->
-  <link rel="icon" type="image/svg+xml" href="favicon.svg">
-  <link rel="alternate icon" href="favicon.ico">
+  <!-- Versioned because browsers cache a favicon far more stubbornly than any other asset:
+       the file changed and the tab kept drawing the old one until the URL changed with it.
+       Bump v when the mark changes. -->
+  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=2">
+  <link rel="alternate icon" type="image/x-icon" href="favicon.ico?v=2">
+  <link rel="apple-touch-icon" href="favicon.svg?v=2">
   <meta name="theme-color" content="#4f46e5">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

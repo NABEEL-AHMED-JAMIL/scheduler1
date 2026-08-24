@@ -33,6 +33,7 @@
                    emptyIcon="users"
                    (retry)="listTenants()">
     <ng-container toolbar>
+      <app-view-toggle [(value)]="view" key="tenants" cardsIcon="building" />
       <select class="input max-w-36" [value]="statusFilter()"
               (change)="statusFilter.set($any($event.target).value)">
         <option value="">All states</option>
@@ -64,6 +65,72 @@
       }
     </ng-container>
 
+    @if (view() === 'table') {
+      <!-- The same tenants as a table: six resource counts read better in columns when the
+           question is "which tenant has the most", and as cards when it is "tell me about
+           this one". -->
+      <table class="table-modern">
+        <thead>
+          <tr>
+            <th>Tenant</th>
+            <th>Code</th>
+            @for (res of resources; track res.key) {
+              <th class="text-right">{{ res.label }}</th>
+            }
+            <th>Created</th>
+            <th class="text-right">State</th>
+            <th class="w-12"></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (tenant of filtered(); track tenant.tenantId) {
+            <tr [class.opacity-70]="tenant.status !== 'Active'">
+              <td class="max-w-64">
+                <div class="font-medium truncate" [title]="tenant.tenantName">{{ tenant.tenantName }}</div>
+              </td>
+              <td><span class="mono text-[color:var(--text-secondary)]">{{ tenant.tenantCode }}</span></td>
+              @for (res of resources; track res.key) {
+                <td class="text-right tabular"
+                    [class.text-[color:var(--text-muted)]]="!$any(tenant)[res.key]">
+                  {{ $any(tenant)[res.key] || 0 }}
+                </td>
+              }
+              <td class="whitespace-nowrap text-[color:var(--text-secondary)]">
+                {{ tenant.dateCreated ? (tenant.dateCreated | date: 'mediumDate') : '—' }}
+              </td>
+              <td class="text-right"><app-status [label]="tenant.status" [quiet]="true" /></td>
+              <td class="text-right">
+                <button type="button" class="btn btn-ghost btn-icon btn-sm"
+                        [cdkMenuTriggerFor]="rowMenu" aria-label="Actions">
+                  <app-icon name="dots" size="1.05em" />
+                </button>
+                <ng-template #rowMenu>
+                  <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                    <button cdkMenuItem class="menu-item" [disabled]="!tenant.userCount"
+                            (cdkMenuItemTriggered)="viewUsers(tenant)">
+                      <app-icon name="users" class="icon-info" />Users
+                    </button>
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="editTenant(tenant)">
+                      <app-icon name="edit" />Edit
+                    </button>
+                    <button cdkMenuItem class="menu-item"
+                            [class]="tenant.status === 'Active' ? 'btn-intent-warn' : 'btn-intent-ok'"
+                            (cdkMenuItemTriggered)="toggleSuspend(tenant)">
+                      <app-icon [name]="tenant.status === 'Active' ? 'pause' : 'play'" />
+                      {{ tenant.status === 'Active' ? 'Suspend' : 'Reactivate' }}
+                    </button>
+                    <button cdkMenuItem class="menu-item menu-item-danger"
+                            (cdkMenuItemTriggered)="deleteTenant(tenant)">
+                      <app-icon name="trash" class="icon-crit" />Delete
+                    </button>
+                  </div>
+                </ng-template>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    } @else {
     <div class="grid gap-3 p-4 lg:grid-cols-2 2xl:grid-cols-3">
       @for (tenant of filtered(); track tenant.tenantId) {
         <article class="card p-4 flex flex-col gap-3.5"
@@ -125,5 +192,6 @@
         </article>
       }
     </div>
+    }
   </app-table-shell>
 </div>
