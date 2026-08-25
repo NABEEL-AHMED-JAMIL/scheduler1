@@ -69,8 +69,8 @@
   } @else {
     <div class="card overflow-hidden">
       <!-- Path + actions -->
-      <div class="flex flex-wrap items-center gap-2 px-4 py-2.5 border-b"
-           style="border-color: var(--border-subtle);">
+      <div class="flex flex-wrap items-center gap-2 px-4 py-2.5 border-b border-subtle"
+          >
         <nav class="flex items-center gap-1 text-sm mr-auto min-w-0 flex-wrap">
           <button type="button" class="mono text-brand-600 hover:underline" (click)="goToCrumb(-1)">
             {{ bucket() }}
@@ -108,8 +108,8 @@
       </div>
 
       <!-- Filter bar -->
-      <div class="flex flex-wrap items-center gap-3 px-4 py-2.5 border-b text-sm"
-           style="border-color: var(--border-subtle);">
+      <div class="flex flex-wrap items-center gap-3 px-4 py-2.5 border-b text-sm border-subtle"
+          >
         <input class="input max-w-56" placeholder="Filter by name"
                [value]="search()" (input)="search.set($any($event.target).value)" />
         <input type="date" class="input max-w-40" aria-label="Modified from"
@@ -139,8 +139,8 @@
       </div>
 
       @if (showInsights() && hasInsights()) {
-        <div class="grid gap-3 p-3.5 border-b md:grid-cols-2 xl:grid-cols-4"
-             style="border-color: var(--border-subtle); background: var(--surface-page);">
+        <div class="grid gap-3 p-3.5 border-b md:grid-cols-2 xl:grid-cols-4 border-subtle bg-page"
+            >
           <div class="card chart-card">
             <h3 class="chart-title">What is here</h3>
             <app-donut [data]="mix()" totalLabel="entries" />
@@ -244,7 +244,7 @@
                         @if (entry.etag) {
                           <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="copy(entry.etag!, 'ETag')"><app-icon name="copy" />Copy ETag</button>
                         }
-                        <div class="my-1 border-t" style="border-color: var(--border-subtle);"></div>
+                        <div class="my-1 border-t border-subtle"></div>
                         <button cdkMenuItem class="menu-item menu-item-danger"
                                 (cdkMenuItemTriggered)="remove(entry)"><app-icon name="trash" class="icon-crit" />Delete</button>
                       </div>
@@ -266,7 +266,7 @@
         </div>
 
         @if (nextToken()) {
-          <div class="px-4 py-3 border-t text-center" style="border-color: var(--border-subtle);">
+          <div class="px-4 py-3 border-t text-center border-subtle">
             <button type="button" class="btn btn-default btn-sm" (click)="load(true)" [disabled]="loading()">
               {{ loading() ? 'Loading…' : 'Load more' }}
             </button>

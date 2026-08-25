@@ -18,7 +18,7 @@
 
   <div class="grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] items-start">
     <div class="card overflow-hidden">
-      <div class="flex items-center gap-2 px-4 py-3 border-b" style="border-color: var(--border-subtle);">
+      <div class="flex items-center gap-2 px-4 py-3 border-b border-subtle">
         <h2 class="text-sm font-semibold mr-auto">
           Tags
           <span class="text-[color:var(--text-muted)] font-normal">({{ filled().length }} filled)</span>
@@ -80,7 +80,7 @@
         </table>
       </div>
 
-      <div class="px-4 py-3 border-t" style="border-color: var(--border-subtle);">
+      <div class="px-4 py-3 border-t border-subtle">
         @if (problems().length) {
           <ul class="mb-3 space-y-1">
             @for (problem of problems(); track problem) {
@@ -97,7 +97,7 @@
     </div>
 
     <div class="card overflow-hidden">
-      <div class="flex items-center gap-2 px-4 py-3 border-b" style="border-color: var(--border-subtle);">
+      <div class="flex items-center gap-2 px-4 py-3 border-b border-subtle">
         <h2 class="text-sm font-semibold mr-auto">Output</h2>
         <button type="button" class="btn btn-default btn-sm" [disabled]="!xml()" (click)="copy()">
           <app-icon name="copy" />Copy
@@ -108,8 +108,8 @@
       </div>
 
       @if (xml()) {
-        <pre class="p-4 overflow-auto max-h-[32rem] mono text-xs leading-relaxed"
-             style="background: var(--surface-sunken);">{{ xml() }}</pre>
+        <pre class="p-4 overflow-auto max-h-[32rem] mono text-xs leading-relaxed bg-sunken"
+            >{{ xml() }}</pre>
       } @else {
         <div class="px-4 py-12 text-center">
           <app-icon name="file" size="1.6em" class="icon-muted" />

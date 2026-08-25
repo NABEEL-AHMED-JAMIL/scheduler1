@@ -25,7 +25,7 @@ export interface PromptOptions {
           <p class="text-xs text-[color:var(--text-muted)] mt-1.5">{{ data.hint }}</p>
         }
       </div>
-      <div class="flex justify-end gap-2 px-5 py-3 border-t" style="border-color: var(--border-subtle);">
+      <div class="flex justify-end gap-2 px-5 py-3 border-t border-subtle">
         <button type="button" class="btn btn-default btn-sm" (click)="ref.close()">Cancel</button>
         <button type="submit" class="btn btn-primary btn-sm" [disabled]="!value().trim()">
           {{ data.confirmLabel || 'Save' }}

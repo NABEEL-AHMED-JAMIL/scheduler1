@@ -196,7 +196,7 @@
           </tr>
 
           @if (expanded().has(task.taskDetailId)) {
-            <tr style="background: var(--surface-sunken);">
+            <tr class="bg-sunken">
               <td></td>
               <td colspan="7" class="!py-3">
                 @if (task.taskPayload) {
@@ -212,8 +212,8 @@
                       {{ copiedId() === task.taskDetailId ? 'Copied' : 'Copy' }}
                     </button>
                   </div>
-                  <pre class="mono text-xs leading-relaxed rounded p-2.5 overflow-y-auto max-h-64 whitespace-pre-wrap break-words"
-                       style="background: var(--surface-code); border: 1px solid var(--border-subtle);">{{ task.taskPayload }}</pre>
+                  <pre class="mono text-xs leading-relaxed rounded p-2.5 overflow-y-auto max-h-64 whitespace-pre-wrap break-words bg-code border border-subtle"
+                      >{{ task.taskPayload }}</pre>
                 } @else {
                   <p class="text-xs text-[color:var(--text-muted)]">This task has no payload configured.</p>
                 }
@@ -229,7 +229,7 @@
 
                   @if (linkedJobs()[task.taskDetailId]; as jobs) {
                     @if (jobs.length) {
-                      <div class="rounded border overflow-hidden" style="border-color: var(--border-subtle);">
+                      <div class="rounded border overflow-hidden border-subtle">
                         <div class="overflow-y-auto max-h-64">
                           <table class="table-modern">
                             <thead>

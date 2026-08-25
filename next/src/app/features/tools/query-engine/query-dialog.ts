@@ -82,7 +82,7 @@ import { DbConnection, PreviewResult, QueryDefinition } from './types';
             @if (!p.rows.length) {
               <p class="text-sm text-[color:var(--text-muted)]">The query ran and returned no rows.</p>
             } @else {
-              <div class="overflow-auto max-h-64 rounded-md border" style="border-color: var(--border-subtle);">
+              <div class="overflow-auto max-h-64 rounded-md border border-subtle">
                 <table class="table-modern">
                   <thead><tr>@for (col of p.columns; track col) { <th>{{ col }}</th> }</tr></thead>
                   <tbody>

@@ -41,8 +41,8 @@
 
   @if (result(); as res) {
     <div class="card overflow-hidden">
-      <div class="flex flex-wrap items-center gap-2 px-4 py-3 border-b"
-           style="border-color: var(--border-subtle);">
+      <div class="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-subtle"
+          >
         <h2 class="text-sm font-semibold mr-auto">
           Result
           <span class="text-[color:var(--text-muted)] font-normal">
@@ -77,8 +77,8 @@
                   @for (column of columns(); track column) {
                     <td>
                       @if (isLong(row, column)) {
-                        <div class="max-w-md max-h-24 overflow-auto whitespace-pre-wrap mono text-xs rounded p-2"
-                             style="background: var(--surface-sunken);">{{ cell(row, column) }}</div>
+                        <div class="max-w-md max-h-24 overflow-auto whitespace-pre-wrap mono text-xs rounded p-2 bg-sunken"
+                            >{{ cell(row, column) }}</div>
                       } @else {
                         <span class="whitespace-nowrap">{{ cell(row, column) || '—' }}</span>
                       }

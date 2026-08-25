@@ -43,7 +43,7 @@
       }
     </ng-container>
 
-    <ul class="divide-y" style="border-color: var(--border-subtle);">
+    <ul class="divide-y border-subtle">
       @for (item of filtered(); track item.notificationId) {
         <li class="notification-row" [class.is-unread]="!item.read"
             [style.--tone]="toneOf(item)">

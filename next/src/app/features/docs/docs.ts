@@ -56,10 +56,9 @@ interface Step {
     }
   `],
   template: `
-    <div class="min-h-screen flex flex-col" style="background: var(--surface-page);">
+    <div class="min-h-screen flex flex-col bg-page">
 
-      <header class="sticky top-0 z-40 border-b"
-              style="background: var(--surface-raised); border-color: var(--border-subtle);">
+      <header class="sticky top-0 z-40 border-b bg-raised border-subtle">
         <div class="mx-auto w-full max-w-6xl px-5 h-14 flex items-center gap-3">
           <a routerLink="/" class="flex items-center gap-2">
             <div class="size-7 rounded-md bg-brand-500 grid place-items-center text-white text-sm font-bold">E</div>
@@ -254,7 +253,7 @@ interface Step {
         </main>
       </div>
 
-      <footer class="mt-auto border-t" style="border-color: var(--border-subtle);">
+      <footer class="mt-auto border-t border-subtle">
         <div class="mx-auto w-full max-w-6xl px-5 py-6 flex flex-wrap items-center gap-3">
           <a routerLink="/" class="link-inline text-sm">← Back to the front page</a>
           <a routerLink="/login" class="link-inline ml-auto text-sm">Sign in</a>

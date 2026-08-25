@@ -2,8 +2,8 @@
             flex flex-col overflow-hidden"
      [style.height]="minimized() ? 'auto' : 'min(38rem, calc(100vh - 3rem))'">
 
-  <div class="flex items-center gap-2 px-3.5 py-2.5 border-b shrink-0"
-       style="border-color: var(--border-subtle);">
+  <div class="flex items-center gap-2 px-3.5 py-2.5 border-b shrink-0 border-subtle"
+      >
     <span class="text-sm font-medium mr-auto truncate" [title]="fileName()">{{ fileName() }}</span>
     <button type="button" class="btn btn-ghost btn-sm" (click)="viewRequested.emit()"><app-icon name="eye" />View</button>
     <button type="button" class="btn btn-ghost btn-icon"
@@ -15,8 +15,8 @@
   </div>
 
   @if (!minimized()) {
-    <div class="flex items-center gap-2 px-3.5 py-2 border-b text-xs shrink-0"
-         style="border-color: var(--border-subtle);">
+    <div class="flex items-center gap-2 px-3.5 py-2 border-b text-xs shrink-0 border-subtle"
+        >
       <label class="text-[color:var(--text-muted)]" for="agent">Agent</label>
       <select id="agent" class="input py-1 text-xs max-w-56"
               [value]="agentId() ?? ''"
@@ -60,8 +60,8 @@
           </div>
         } @else {
           <div class="group">
-            <div class="rounded-lg rounded-bl-sm px-3 py-2 text-sm max-w-[92%] break-words"
-                 style="background: var(--surface-sunken);">
+            <div class="rounded-lg rounded-bl-sm px-3 py-2 text-sm max-w-[92%] break-words bg-sunken"
+                >
               <app-markdown [source]="message.text" />
             </div>
 
@@ -120,7 +120,7 @@
       </div>
     }
 
-    <div class="flex gap-2 px-3.5 py-2.5 border-t shrink-0" style="border-color: var(--border-subtle);">
+    <div class="flex gap-2 px-3.5 py-2.5 border-t shrink-0 border-subtle">
       <textarea class="input resize-none text-sm" rows="1" placeholder="Message"
                 [value]="draft()" (input)="draft.set($any($event.target).value)"
                 (keydown)="onKeydown($event)"

@@ -110,8 +110,8 @@
 
   @if (transcript()) {
     <div class="card overflow-hidden">
-      <div class="flex flex-wrap items-center gap-2 px-4 py-2.5 border-b"
-           style="border-color: var(--border-subtle);">
+      <div class="flex flex-wrap items-center gap-2 px-4 py-2.5 border-b border-subtle"
+          >
         <span class="text-sm font-semibold">Transcript</span>
         <span class="text-xs text-[color:var(--text-muted)]">
           {{ segments().length }} {{ segments().length === 1 ? 'segment' : 'segments' }} ·

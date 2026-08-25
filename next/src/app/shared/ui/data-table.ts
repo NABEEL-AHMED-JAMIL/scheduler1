@@ -12,8 +12,8 @@ import { Icon } from './icon';
   imports: [Icon],
   template: `
     <div class="card overflow-hidden">
-      <div class="flex flex-wrap items-center gap-2 px-4 py-3 border-b"
-           style="border-color: var(--border-subtle);">
+      <div class="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-subtle"
+          >
         <h2 class="text-sm font-semibold mr-auto">
           {{ heading() }}
           @if (total() !== null) {

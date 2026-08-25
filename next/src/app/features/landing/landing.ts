@@ -60,7 +60,7 @@ import { ThemeService } from '../../core/theme.service';
     @media (prefers-reduced-motion: reduce) { .rise { animation: none; } }
   `],
   template: `
-    <div class="min-h-screen flex flex-col" style="background: var(--surface-page);">
+    <div class="min-h-screen flex flex-col bg-page">
 
       <!-- Hero ------------------------------------------------------------------- -->
       <div class="hero">
@@ -150,7 +150,7 @@ import { ThemeService } from '../../core/theme.service';
       <!-- How a run happens -------------------------------------------------------- -->
       <!-- Raised, not inset: --surface-inset sits two shades from the page, so as a full-width
            band it was invisible. Alternating with the raised surface gives the page its rhythm. -->
-      <section class="border-y" style="background: var(--surface-raised); border-color: var(--border-subtle);">
+      <section class="border-y bg-raised border-subtle">
         <div class="mx-auto w-full max-w-6xl px-5 py-16 sm:py-20">
           <h2 class="text-2xl font-semibold tracking-tight">How a run happens</h2>
           <p class="mt-2 text-[color:var(--text-secondary)]">
@@ -190,7 +190,7 @@ import { ThemeService } from '../../core/theme.service';
         </div>
       </section>
 
-      <footer class="mt-auto border-t" style="border-color: var(--border-subtle);">
+      <footer class="mt-auto border-t border-subtle">
         <div class="mx-auto w-full max-w-6xl px-5 py-6 flex flex-wrap items-center gap-3">
           <span class="text-sm text-[color:var(--text-muted)]">
             ETL Console — pipeline scheduling and run history.

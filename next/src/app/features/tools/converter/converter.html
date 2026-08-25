@@ -128,8 +128,8 @@
     }
 
     @if (result(); as done) {
-      <div class="rounded-md p-3.5 flex items-center gap-3"
-           style="background: var(--surface-sunken);">
+      <div class="rounded-md p-3.5 flex items-center gap-3 bg-sunken"
+          >
         <div class="flex-1 min-w-0">
           <div class="text-sm font-medium truncate">{{ done.outputFileName }}</div>
           <div class="text-xs text-[color:var(--text-muted)]">Ready to download</div>
@@ -147,7 +147,7 @@
                 class="text-[color:var(--text-muted)]" />
     </button>
     @if (showFormats()) {
-      <div class="overflow-x-auto border-t" style="border-color: var(--border-subtle);">
+      <div class="overflow-x-auto border-t border-subtle">
         <table class="table-modern">
           <thead>
             <tr><th>Family</th><th>From</th><th>To</th></tr>
@@ -179,8 +179,8 @@
   </div>
 
   <div class="card overflow-hidden">
-    <div class="flex flex-wrap items-center gap-2 px-4 py-3 border-b"
-         style="border-color: var(--border-subtle);">
+    <div class="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-subtle"
+        >
       <h2 class="text-sm font-semibold mr-auto">
         Recent conversions
         <span class="text-[color:var(--text-muted)] font-normal">({{ tasks().length }})</span>

@@ -1,6 +1,6 @@
 <div class="card shadow-2xl w-[60rem] max-w-[calc(100vw-2rem)] max-h-[88vh] flex flex-col overflow-hidden">
-  <div class="flex items-center gap-3 px-4 py-2.5 border-b shrink-0"
-       style="border-color: var(--border-subtle);">
+  <div class="flex items-center gap-3 px-4 py-2.5 border-b shrink-0 border-subtle"
+      >
     <app-icon [name]="kindIcon()" class="icon-info shrink-0" size="1.05em" />
     <div class="min-w-0 mr-auto">
       <div class="text-sm font-medium truncate leading-tight" [title]="data.name">{{ data.name }}</div>
@@ -56,7 +56,7 @@
     </button>
   </div>
 
-  <div class="flex-1 overflow-auto min-h-48" style="background: var(--surface-sunken);"
+  <div class="flex-1 overflow-auto min-h-48 bg-sunken"
        [class.p-4]="kind() !== 'pdf' && kind() !== 'image'">
     @if (loading()) {
       <div class="flex flex-col items-center justify-center py-20 gap-3">
@@ -126,7 +126,7 @@
                       (input)="draft.set($any($event.target).value)"></textarea>
           } @else {
             <pre class="mono text-xs leading-relaxed whitespace-pre-wrap break-words
-                        rounded p-3" style="background: var(--surface-code); border: 1px solid var(--border-subtle);">{{ text() }}</pre>
+                        rounded p-3 bg-code border border-subtle">{{ text() }}</pre>
           }
         }
       }

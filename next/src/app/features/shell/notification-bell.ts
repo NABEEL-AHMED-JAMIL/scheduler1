@@ -42,10 +42,10 @@ const ROUTE_MAP: Record<string, string> = {
       </button>
 
       @if (open()) {
-        <div class="absolute right-0 top-full mt-1 w-80 rounded-lg border shadow-lg z-50 overflow-hidden"
-             style="background: var(--surface-raised); border-color: var(--border-subtle);">
-          <div class="flex items-center gap-2 px-3 py-2 border-b"
-               style="border-color: var(--border-subtle);">
+        <div class="absolute right-0 top-full mt-1 w-80 rounded-lg border shadow-lg z-50 overflow-hidden bg-raised border-subtle"
+            >
+          <div class="flex items-center gap-2 px-3 py-2 border-b border-subtle"
+              >
             <span class="text-sm font-semibold mr-auto">Notifications</span>
             @if (unread()) {
               <button type="button" class="btn btn-ghost btn-sm" (click)="markAllRead()">
@@ -60,7 +60,7 @@ const ROUTE_MAP: Record<string, string> = {
               <p class="text-sm text-[color:var(--text-muted)]">You are all caught up.</p>
             </div>
           } @else {
-            <ul class="max-h-80 overflow-y-auto divide-y" style="border-color: var(--border-subtle);">
+            <ul class="max-h-80 overflow-y-auto divide-y border-subtle">
               @for (note of recent(); track note.notificationId) {
                 <li>
                   <button type="button" class="w-full text-left flex items-start gap-2.5 px-3 py-2.5
@@ -91,8 +91,8 @@ const ROUTE_MAP: Record<string, string> = {
           }
 
           <a routerLink="/notifications" (click)="open.set(false)"
-             class="block px-3 py-2 text-sm text-center border-t text-brand-600 hover:underline"
-             style="border-color: var(--border-subtle);">
+             class="block px-3 py-2 text-sm text-center border-t text-brand-600 hover:underline border-subtle"
+            >
             View all notifications
           </a>
         </div>

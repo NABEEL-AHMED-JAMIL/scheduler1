@@ -221,7 +221,7 @@
             </table>
           </div>
 
-          <div class="rounded p-3.5" style="background: var(--surface-inset);">
+          <div class="rounded p-3.5 bg-inset">
             @if (viewing(); as chosen) {
               <h3 class="text-sm font-semibold mb-3">
                 Received {{ chosen.dateCreated ? (chosen.dateCreated | date:'d MMM y, HH:mm') : '' }}

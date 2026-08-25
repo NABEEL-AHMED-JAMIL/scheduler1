@@ -79,8 +79,8 @@
   <!-- Drill-down breakdown -->
   @if (selectedCell(); as cell) {
     <div class="card overflow-hidden">
-      <div class="flex flex-wrap items-center gap-2 px-4 py-3 border-b"
-           style="border-color: var(--border-subtle);">
+      <div class="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-subtle"
+          >
         <h2 class="text-sm font-semibold mr-auto">
           Jobs in {{ cell.date }} at {{ hourLabel(cell.hr) }}
           @if (breakdown().length) {
@@ -155,8 +155,8 @@
                     </button>
                   </td>
                   <td>
-                    <div class="flex h-2 rounded-full overflow-hidden"
-                         style="background: var(--surface-sunken);">
+                    <div class="flex h-2 rounded-full overflow-hidden bg-sunken"
+                        >
                       @for (segment of segmentsFor(row); track segment.key) {
                         <span [style.width.%]="segment.pct"
                               [style.background]="'var(--chart-' + $index % 6 + ')'"
@@ -169,7 +169,7 @@
             </tbody>
             @if (breakdownTotal(); as totals) {
               <tfoot>
-                <tr style="border-top: 2px solid var(--border-strong);">
+                <tr class="border-t-2 border-strong">
                   <td class="font-semibold">
                     Total
                     <span class="font-normal text-[color:var(--text-muted)]">
@@ -207,8 +207,11 @@
                     </button>
                   </td>
                   <td>
-                    <div class="flex h-2 rounded-full overflow-hidden"
-                         style="background: var(--surface);">
+                    <!-- This carried background: var(--surface), a token that is not defined
+                         anywhere, so it has always resolved to nothing and the track is
+                         transparent. Removed rather than guessed at: giving it a real colour
+                         would change how the row looks, which is a decision to make on purpose. -->
+                    <div class="flex h-2 rounded-full overflow-hidden">
                       @for (segment of segmentsFor(totals); track segment.key) {
                         <span [style.width.%]="segment.pct"
                               [style.background]="'var(--chart-' + $index % 6 + ')'"

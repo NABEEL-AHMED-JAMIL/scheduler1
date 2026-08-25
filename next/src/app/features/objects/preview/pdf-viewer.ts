@@ -17,8 +17,8 @@ import { Icon } from '../../../shared/ui/icon';
   template: `
     <div class="flex flex-col h-full">
       @if (pageCount()) {
-        <div class="flex items-center gap-1 px-3 py-1.5 border-b shrink-0"
-             style="border-color: var(--border-subtle); background: var(--surface-raised);">
+        <div class="flex items-center gap-1 px-3 py-1.5 border-b shrink-0 border-subtle bg-raised"
+            >
           <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="go(-1)"
                   [disabled]="page() <= 1" title="Previous page">
             <app-icon name="chevronLeft" />
@@ -31,7 +31,7 @@ import { Icon } from '../../../shared/ui/icon';
             <app-icon name="chevronRight" />
           </button>
 
-          <span class="w-px h-4 mx-1.5" style="background: var(--border-subtle);"></span>
+          <span class="w-px h-4 mx-1.5 bg-subtle"></span>
 
           <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="zoomBy(-0.25)"
                   [disabled]="scale() <= 0.5" title="Zoom out"><app-icon name="minus" /></button>

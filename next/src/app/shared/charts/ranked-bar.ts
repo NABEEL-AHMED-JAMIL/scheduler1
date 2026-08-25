@@ -37,8 +37,8 @@ export interface RankedItem {
                   </span>
                 }
               </span>
-              <span class="mt-1 block h-1.5 rounded-full overflow-hidden"
-                    style="background: var(--surface-sunken);">
+              <span class="mt-1 block h-1.5 rounded-full overflow-hidden bg-sunken"
+                   >
                 <span class="block h-full rounded-full transition-[width] duration-300"
                       [style.width.%]="row.width"
                       [style.background]="row.color"

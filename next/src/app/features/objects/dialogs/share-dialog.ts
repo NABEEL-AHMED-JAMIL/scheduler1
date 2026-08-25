@@ -25,7 +25,7 @@ export interface ShareResult { recipientEmail: string; message: string; }
         <textarea id="note" class="input resize-y min-h-20" placeholder="Optional note"
                   [value]="message()" (input)="message.set($any($event.target).value)"></textarea>
       </div>
-      <div class="flex justify-end gap-2 px-5 py-3 border-t" style="border-color: var(--border-subtle);">
+      <div class="flex justify-end gap-2 px-5 py-3 border-t border-subtle">
         <button type="button" class="btn btn-default btn-sm" (click)="ref.close()">Cancel</button>
         <button type="submit" class="btn btn-primary btn-sm" [disabled]="!valid()">Send</button>
       </div>

@@ -67,8 +67,8 @@
       </div>
 
       @if (showDetail()) {
-        <div class="border-t px-4 py-3.5 grid gap-x-6 gap-y-4 md:grid-cols-2 xl:grid-cols-4"
-             style="border-color: var(--border-subtle);">
+        <div class="border-t px-4 py-3.5 grid gap-x-6 gap-y-4 md:grid-cols-2 xl:grid-cols-4 border-subtle"
+            >
 
           <div>
             <div class="detail-head">Job</div>
@@ -122,12 +122,12 @@
                  outcomes were drawn into a three-column grid, which left empty squares beside
                  a run that had just one outcome. A status with no runs shows 0, muted --
                  "none yet" is information; a blank square is not. -->
-            <div class="grid grid-cols-4 gap-px overflow-hidden rounded-lg"
-                 style="background: var(--border-subtle);">
+            <div class="grid grid-cols-4 gap-px overflow-hidden rounded-lg bg-subtle"
+                >
               @for (stat of runStats(); track stat.name) {
                 @if (stat.name !== 'Total') {
-                  <div class="px-2 py-2 text-center"
-                       style="background: var(--surface-raised);">
+                  <div class="px-2 py-2 text-center bg-raised"
+                      >
                     <div class="text-sm font-semibold tabular leading-none"
                          [class.text-[color:var(--text-muted)]]="!stat.value">{{ stat.value }}</div>
                     <div class="text-[10px] uppercase tracking-wide mt-1 text-[color:var(--text-muted)]">
@@ -136,8 +136,8 @@
                   </div>
                 }
               }
-              <div class="col-span-full px-2 py-1.5 text-center"
-                   style="background: var(--surface-sunken);">
+              <div class="col-span-full px-2 py-1.5 text-center bg-sunken"
+                  >
                 <span class="text-xs tabular font-semibold">{{ runs().length }}</span>
                 <span class="text-[10px] uppercase tracking-wide ml-1.5 text-[color:var(--text-muted)]">
                   total
@@ -172,8 +172,8 @@
                     {{ payloadCopied() ? 'Copied' : 'Copy' }}
                   </button>
                 </div>
-                <pre class="mono text-[11px] leading-relaxed rounded p-2 overflow-y-auto max-h-32 whitespace-pre-wrap break-words"
-                     style="background: var(--surface-sunken);">{{ task.taskPayload }}</pre>
+                <pre class="mono text-[11px] leading-relaxed rounded p-2 overflow-y-auto max-h-32 whitespace-pre-wrap break-words bg-sunken"
+                    >{{ task.taskPayload }}</pre>
               }
             } @else {
               <p class="text-xs text-[color:var(--text-muted)]">No task linked.</p>
@@ -232,14 +232,14 @@
         }
 
         @if (durationStats(); as stats) {
-          <div class="grid grid-cols-3 gap-px mt-4 overflow-hidden rounded-lg"
-               style="background: var(--border-subtle);">
+          <div class="grid grid-cols-3 gap-px mt-4 overflow-hidden rounded-lg bg-subtle"
+              >
             @for (stat of [
               { label: 'Fastest', value: stats.fastest },
               { label: 'Median',  value: stats.median },
               { label: 'Slowest', value: stats.slowest }
             ]; track stat.label) {
-              <div class="px-3 py-2.5 text-center" style="background: var(--surface-raised);">
+              <div class="px-3 py-2.5 text-center bg-raised">
                 <div class="text-[10px] uppercase tracking-wide text-[color:var(--text-muted)]">
                   {{ stat.label }}
                 </div>
@@ -358,7 +358,7 @@
           @if (isMessageOpen(run.jobQueueId) && run.jobStatusMessage) {
             <tr>
               <td [attr.colspan]="isAllJobs() ? 9 : 8" class="!p-0">
-                <div class="px-4 py-3 border-l-2" style="border-color: var(--color-brand-500);">
+                <div class="px-4 py-3 border-l-2 border-brand-500">
                   <div class="flex items-baseline gap-2 mb-1.5">
                     <h3 class="text-xs font-semibold uppercase tracking-wider
                                text-[color:var(--text-secondary)]">Message · run #{{ run.jobQueueId }}</h3>
@@ -368,8 +368,8 @@
                     </button>
                   </div>
                   <pre class="mono text-xs leading-relaxed rounded p-2.5 overflow-y-auto max-h-64
-                              whitespace-pre-wrap break-words"
-                       style="background: var(--surface-code); border: 1px solid var(--border-subtle);">{{ run.jobStatusMessage }}</pre>
+                              whitespace-pre-wrap break-words bg-code border border-subtle"
+                      >{{ run.jobStatusMessage }}</pre>
                 </div>
               </td>
             </tr>
@@ -384,8 +384,8 @@
   <div class="fixed bottom-4 right-4 z-50 w-[34rem] max-w-[calc(100vw-2rem)] card shadow-2xl
               flex flex-col overflow-hidden"
        [style.height]="assistantMinimised() ? 'auto' : 'min(40rem, calc(100vh - 3rem))'">
-    <div class="flex items-center gap-2 px-3.5 py-2.5 border-b shrink-0"
-         style="border-color: var(--border-subtle);">
+    <div class="flex items-center gap-2 px-3.5 py-2.5 border-b shrink-0 border-subtle"
+        >
       <app-icon name="chat" size="0.95em" class="icon-info shrink-0" />
       <span class="text-sm font-medium mr-auto truncate">
         Job assistant

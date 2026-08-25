@@ -21,7 +21,7 @@ import { DynamicForm, DynamicFormSubmission, SECTION_TYPE } from './dynamic-form
   selector: 'app-form-fill',
   imports: [Icon, FormRenderer],
   template: `
-    <div class="min-h-screen px-4 py-10" style="background: var(--surface-page);">
+    <div class="min-h-screen px-4 py-10 bg-page">
       <!-- A form defines its own column widths, and this one asks for four fields across.
            At 3xl a quarter column is 168px, which clipped an ordinary email address, so the
            page widens with the viewport instead of staying at reading width. -->
@@ -73,8 +73,8 @@ import { DynamicForm, DynamicFormSubmission, SECTION_TYPE } from './dynamic-form
                 <span>This form is not accepting answers at the moment.</span>
               </p>
             } @else if (!signedIn()) {
-              <div class="rounded p-3 flex items-start gap-2 text-sm"
-                   style="background: var(--surface-inset);">
+              <div class="rounded p-3 flex items-start gap-2 text-sm bg-inset"
+                  >
                 <app-icon name="lock" size="0.95em" class="mt-0.5 shrink-0 icon-muted" />
                 <span>
                   You can read this form, but sending answers needs an account.

@@ -92,8 +92,8 @@
         </div>
 
         @if (showTagHelp()) {
-          <div class="rounded-md p-3.5 mb-3 text-sm space-y-1.5"
-               style="background: var(--surface-sunken);">
+          <div class="rounded-md p-3.5 mb-3 text-sm space-y-1.5 bg-sunken"
+              >
             <p>To point this task at storage, add a tag for each part of the path:
               <span class="mono">bucket</span> (or <span class="mono">bucket_name</span>),
               <span class="mono">input_folder</span> and <span class="mono">output_folder</span>.</p>
@@ -172,13 +172,13 @@
         </div>
 
         @if (previewError()) {
-          <p class="text-xs mt-2" style="color: var(--color-crit-500);">{{ previewError() }}</p>
+          <p class="text-xs mt-2 text-crit-500">{{ previewError() }}</p>
         }
 
         @if (tagXml()) {
           <pre class="mono text-xs leading-relaxed rounded p-2.5 mt-2 overflow-auto max-h-64
-                      whitespace-pre-wrap break-words"
-               style="background: var(--surface-code); border: 1px solid var(--border-subtle);">{{ tagXml() }}</pre>
+                      whitespace-pre-wrap break-words bg-code border border-subtle"
+              >{{ tagXml() }}</pre>
           <p class="text-xs text-[color:var(--text-muted)] mt-1.5">
             The first tag becomes the root element; every other tag needs a parent that already
             exists above it.
@@ -197,7 +197,7 @@
         </app-field>
       </div>
 
-      <div class="flex gap-2 mt-5 pt-4 border-t" style="border-color: var(--border-subtle);">
+      <div class="flex gap-2 mt-5 pt-4 border-t border-subtle">
         <button type="submit" class="btn btn-primary" [disabled]="saving()">
           {{ saving() ? 'Saving…' : (isEdit() ? 'Save changes' : 'Create task') }}
         </button>

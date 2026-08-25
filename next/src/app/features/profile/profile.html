@@ -26,8 +26,8 @@
         <div class="relative inline-block">
           @if (avatarUrl()) {
             <img [src]="avatarUrl()" alt="Your profile picture"
-                 class="size-28 rounded-full object-cover mx-auto"
-                 style="border: 2px solid var(--border-subtle);" />
+                 class="size-28 rounded-full object-cover mx-auto border-2 border-subtle"
+                 />
           } @else {
             <span class="size-28 rounded-full bg-brand-500 text-white grid place-items-center
                          text-3xl font-semibold mx-auto">
@@ -66,8 +66,8 @@
           </p>
         }
 
-        <dl class="grid grid-cols-2 gap-3 mt-5 pt-5 border-t text-left"
-            style="border-color: var(--border-subtle);">
+        <dl class="grid grid-cols-2 gap-3 mt-5 pt-5 border-t text-left border-subtle"
+           >
           <div>
             <dt class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">Member for</dt>
             <dd class="text-sm font-medium tabular">
@@ -92,8 +92,8 @@
 
       <div class="space-y-4">
         @if (me.mustChangePassword) {
-          <div class="card p-4 flex items-start gap-2.5"
-               style="border-color: var(--color-brand-500);">
+          <div class="card p-4 flex items-start gap-2.5 border-brand-500"
+              >
             <app-icon name="key" class="icon-info mt-0.5 shrink-0" />
             <p class="text-sm">
               <strong>Choose your own password.</strong>
@@ -130,8 +130,8 @@
             </div>
           }
 
-          <dl class="grid sm:grid-cols-2 gap-x-6 gap-y-3 mt-6 pt-5 border-t text-sm"
-              style="border-color: var(--border-subtle);">
+          <dl class="grid sm:grid-cols-2 gap-x-6 gap-y-3 mt-6 pt-5 border-t text-sm border-subtle"
+             >
             <div>
               <dt class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">Email</dt>
               <dd class="mono break-all">{{ me.username }}</dd>
@@ -219,7 +219,7 @@
           </div>
 
           @if (myJobs().length) {
-            <ul class="mt-4 divide-y" style="border-color: var(--border-subtle);">
+            <ul class="mt-4 divide-y border-subtle">
               @for (job of myJobs().slice(0, 5); track job.jobId) {
                 <li class="flex items-center gap-3 py-2">
                   <app-icon name="briefcase" size="0.95em" class="icon-muted shrink-0" />

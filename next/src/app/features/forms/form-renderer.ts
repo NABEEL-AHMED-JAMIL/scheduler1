@@ -37,8 +37,8 @@ import {
           @if (field.fieldType === 'section') {
             <!-- A section is a heading between fields, so it takes the full width and collects
                  nothing. The first one needs no rule above it. -->
-            <div class="border-t pt-3" [class.border-t-0]="i === 0" [class.pt-0]="i === 0"
-                 style="border-color: var(--border-subtle);">
+            <div class="border-t pt-3 border-subtle" [class.border-t-0]="i === 0" [class.pt-0]="i === 0"
+                >
               <h3 class="text-sm font-semibold">{{ field.fieldLabel }}</h3>
               @if (field.placeHolder) {
                 <p class="field-note text-[color:var(--text-muted)]">{{ field.placeHolder }}</p>

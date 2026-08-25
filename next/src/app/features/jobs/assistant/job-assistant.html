@@ -108,7 +108,7 @@
          [class.flex-col]="compact()" [class.gap-3]="compact()">
     @for (turn of turns(); track turn.id) {
       <div class="card p-4">
-        <div class="flex items-baseline gap-2 pb-3 mb-3 border-b" style="border-color: var(--border-subtle);">
+        <div class="flex items-baseline gap-2 pb-3 mb-3 border-b border-subtle">
           <app-icon name="user" size="0.9em" class="icon-muted" />
           <p class="text-sm font-medium flex-1">{{ turn.question }}</p>
           <span class="text-[11px] tabular text-[color:var(--text-muted)]">
@@ -139,15 +139,15 @@
             }
 
             @case ('stats') {
-              <div class="grid grid-cols-2 sm:grid-cols-4 gap-px mt-3 rounded-lg overflow-hidden"
-                   style="background: var(--border-subtle);">
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-px mt-3 rounded-lg overflow-hidden bg-subtle"
+                  >
                 @for (tile of [
                   { label: 'Runs',         value: stats().total },
                   { label: 'Success rate', value: stats().successRate === null ? '—' : stats().successRate + '%' },
                   { label: 'Average',      value: humanDuration(stats().averageSeconds) },
                   { label: 'Longest',      value: humanDuration(stats().longestSeconds) }
                 ]; track tile.label) {
-                  <div class="px-3 py-2.5 text-center" style="background: var(--surface-raised);">
+                  <div class="px-3 py-2.5 text-center bg-raised">
                     <div class="text-sm font-semibold tabular leading-none">{{ tile.value }}</div>
                     <div class="text-[10px] uppercase tracking-wide mt-1 text-[color:var(--text-muted)]">
                       {{ tile.label }}
@@ -159,12 +159,12 @@
 
             @case ('chart') {
               <div class="grid gap-3 mt-3 lg:grid-cols-2">
-                <div class="rounded-lg border p-3" style="border-color: var(--border-subtle);">
+                <div class="rounded-lg border p-3 border-subtle">
                   <h3 class="chart-title">Outcomes</h3>
                   <app-donut [data]="outcomeMix()" totalLabel="runs" [colorFor]="outcomeColor" />
                 </div>
                 @if (slowestRuns().length) {
-                  <div class="rounded-lg border p-3" style="border-color: var(--border-subtle);">
+                  <div class="rounded-lg border p-3 border-subtle">
                     <h3 class="chart-title">Slowest runs</h3>
                     <p class="chart-sub">Where this job spent the most time.</p>
                     <app-ranked-bar [data]="slowestRuns()" [max]="6" [showPercent]="false" [sorted]="false" />
@@ -174,7 +174,7 @@
             }
 
             @case ('runs') {
-              <div class="overflow-x-auto mt-3 rounded-lg border" style="border-color: var(--border-subtle);">
+              <div class="overflow-x-auto mt-3 rounded-lg border border-subtle">
                 <table class="table-modern">
                   <thead>
                     <tr><th>Run</th><th>Started</th><th>Status</th><th>Message</th><th class="w-16"></th></tr>

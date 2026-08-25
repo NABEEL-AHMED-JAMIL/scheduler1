@@ -57,6 +57,25 @@
   --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
   --radius-card: 0.625rem;
+
+  /* The semantic roles, registered here so they become real utilities -- bg-raised,
+     border-subtle, text-muted -- instead of being reached for as arbitrary values.
+     These are only the declarations; each one is given its value per theme in the :root and
+     html.dark blocks below, and the generated utility reads the variable, so switching theme
+     still switches every one of them. */
+  --color-page:      var(--surface-page);
+  --color-raised:    var(--surface-raised);
+  --color-sunken:    var(--surface-sunken);
+  --color-inset:     var(--surface-inset);
+  --color-code:      var(--surface-code);
+  --color-inverse:   var(--surface-inverse);
+
+  --color-subtle:    var(--border-subtle);
+  --color-strong:    var(--border-strong);
+
+  --color-primary:   var(--text-primary);
+  --color-secondary: var(--text-secondary);
+  --color-muted:     var(--text-muted);
 }
 
 /* Surface roles, so a component never reaches for a raw palette step and the

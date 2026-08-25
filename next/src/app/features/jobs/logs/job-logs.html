@@ -115,8 +115,8 @@
 
         @if (stallCount()) {
           <p class="flex items-center gap-1.5 mt-2 text-[11px] text-[color:var(--text-muted)]">
-            <span class="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
-                  style="background: var(--color-warn-500);"></span>
+            <span class="inline-block w-2.5 h-2.5 rounded-sm shrink-0 bg-warn-500"
+                 ></span>
             {{ stallCount() }} {{ stallCount() === 1 ? 'gap is' : 'gaps are' }} more than twice the
             average and over five seconds — waiting rather than working.
           </p>

@@ -125,15 +125,15 @@
                    when they own nothing, because a row of zeros reads as a broken widget. -->
               @if (statFor(user); as stat) {
                 @if (stat.jobCount) {
-                  <div class="grid grid-cols-3 gap-px mt-2.5 rounded-lg overflow-hidden"
-                       style="background: var(--border-subtle);">
+                  <div class="grid grid-cols-3 gap-px mt-2.5 rounded-lg overflow-hidden bg-subtle"
+                      >
                     @for (tile of [
                       { label: 'Jobs',  value: stat.jobCount,  hint: stat.activeJobs + ' active' },
                       { label: 'Tasks', value: stat.taskCount, hint: 'used by their jobs' },
                       { label: 'Runs',  value: stat.runCount,
                         hint: successRate(stat) === null ? 'none finished' : successRate(stat) + '% success' }
                     ]; track tile.label) {
-                      <div class="px-2 py-1.5 text-center" style="background: var(--surface-raised);"
+                      <div class="px-2 py-1.5 text-center bg-raised"
                            [title]="tile.hint">
                         <div class="text-sm font-semibold tabular leading-none">{{ tile.value }}</div>
                         <div class="text-[10px] uppercase tracking-wide mt-0.5 text-[color:var(--text-muted)]">
@@ -266,7 +266,7 @@
                   <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="resetPassword(user)">
                     <app-icon name="key" />Reset password
                   </button>
-                  <div class="my-1 border-t" style="border-color: var(--border-subtle);"></div>
+                  <div class="my-1 border-t border-subtle"></div>
                   <button cdkMenuItem class="menu-item"
                           [class]="isSelf(user) ? '' : (user.status === 'Active' ? 'btn-intent-warn' : 'btn-intent-ok')"
                           [disabled]="isSelf(user)"

@@ -15,7 +15,7 @@ import { Icon } from './icon';
          neither left the card sized to its content. -->
     <div class="card shadow-2xl max-w-[calc(100vw-2rem)] max-h-[85vh] flex flex-col overflow-hidden"
          [style.width]="size() === 'wide' ? '58rem' : '34rem'">
-      <div class="px-5 py-3.5 border-b shrink-0" style="border-color: var(--border-subtle);">
+      <div class="px-5 py-3.5 border-b shrink-0 border-subtle">
         <h2 class="text-base font-semibold">{{ heading() }}</h2>
         @if (subtitle()) {
           <p class="text-sm text-[color:var(--text-secondary)] mt-0.5">{{ subtitle() }}</p>
@@ -26,8 +26,8 @@ import { Icon } from './icon';
         <ng-content />
       </div>
 
-      <div class="flex items-center gap-2 px-5 py-3.5 border-t shrink-0"
-           style="border-color: var(--border-subtle);">
+      <div class="flex items-center gap-2 px-5 py-3.5 border-t shrink-0 border-subtle"
+          >
         <ng-content select="[footer-start]" />
         <div class="ml-auto flex gap-2">
           <button type="button" class="btn btn-default btn-sm" [disabled]="saving()"

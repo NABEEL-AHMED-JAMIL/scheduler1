@@ -16,7 +16,7 @@ export interface ConfirmOptions {
         <h2 class="text-base font-semibold">{{ data.title }}</h2>
         <p class="text-sm text-[color:var(--text-secondary)] mt-1.5">{{ data.body }}</p>
       </div>
-      <div class="flex justify-end gap-2 px-5 py-3 border-t" style="border-color: var(--border-subtle);">
+      <div class="flex justify-end gap-2 px-5 py-3 border-t border-subtle">
         <button type="button" class="btn btn-default btn-sm" (click)="ref.close(false)">Cancel</button>
         <button type="button" class="btn btn-sm" [class.btn-danger]="data.danger"
                 [class.btn-primary]="!data.danger" (click)="ref.close(true)" cdkFocusInitial>

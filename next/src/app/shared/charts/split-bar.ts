@@ -29,15 +29,15 @@ export interface SplitRow {
                 <span class="ml-auto tabular font-medium shrink-0">{{ row.positive }}</span>
                 <span class="tabular text-[color:var(--text-muted)] shrink-0">/ {{ row.negative }}</span>
               </div>
-              <div class="mt-1 flex h-1.5 rounded-full overflow-hidden"
-                   style="background: var(--surface-sunken);">
+              <div class="mt-1 flex h-1.5 rounded-full overflow-hidden bg-sunken"
+                  >
                 @if (row.positive) {
-                  <span class="h-full" [style.width.%]="row.positiveWidth"
-                        style="background: var(--color-ok-500);"></span>
+                  <span class="h-full bg-ok-500" [style.width.%]="row.positiveWidth"
+                       ></span>
                 }
                 @if (row.negative) {
-                  <span class="h-full" [style.width.%]="row.negativeWidth"
-                        style="background: var(--color-crit-500);"></span>
+                  <span class="h-full bg-crit-500" [style.width.%]="row.negativeWidth"
+                       ></span>
                 }
               </div>
             </li>
@@ -46,11 +46,11 @@ export interface SplitRow {
 
         <div class="mt-2 flex items-center gap-3 text-[10px] text-[color:var(--text-muted)]">
           <span class="flex items-center gap-1">
-            <span class="size-2 rounded-full" style="background: var(--color-ok-500);"></span>
+            <span class="size-2 rounded-full bg-ok-500"></span>
             {{ positiveLabel() }}
           </span>
           <span class="flex items-center gap-1">
-            <span class="size-2 rounded-full" style="background: var(--color-crit-500);"></span>
+            <span class="size-2 rounded-full bg-crit-500"></span>
             {{ negativeLabel() }}
           </span>
         </div>

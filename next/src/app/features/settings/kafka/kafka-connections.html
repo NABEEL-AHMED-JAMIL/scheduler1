@@ -98,7 +98,7 @@
                     <button cdkMenuItem class="menu-item btn-intent-ok" (cdkMenuItemTriggered)="testConnection(p)">
                       <app-icon name="plug" class="icon-ok" />Test connection
                     </button>
-                    <div class="my-1 border-t" style="border-color: var(--border-subtle);"></div>
+                    <div class="my-1 border-t border-subtle"></div>
                     @if (p.isDefault) {
                       <button cdkMenuItem class="menu-item btn-intent-warn" (cdkMenuItemTriggered)="clearDefault(p)">
                         <app-icon name="minus" />Clear default
@@ -227,7 +227,7 @@
                   <button cdkMenuItem class="menu-item btn-intent-ok" (cdkMenuItemTriggered)="testConnection(p)">
                     <app-icon name="plug" class="icon-ok" />Test connection
                   </button>
-                  <div class="my-1 border-t" style="border-color: var(--border-subtle);"></div>
+                  <div class="my-1 border-t border-subtle"></div>
                   @if (p.isDefault) {
                     <button cdkMenuItem class="menu-item btn-intent-warn" (cdkMenuItemTriggered)="clearDefault(p)">
                       <app-icon name="minus" />Clear default

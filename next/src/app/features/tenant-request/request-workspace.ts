@@ -22,8 +22,8 @@ import { ThemeService } from '../../core/theme.service';
   selector: 'app-request-workspace',
   imports: [ReactiveFormsModule, RouterLink, Field, Icon],
   template: `
-    <div class="min-h-screen flex flex-col" style="background: var(--surface-page);">
-      <header class="border-b" style="border-color: var(--border-subtle);">
+    <div class="min-h-screen flex flex-col bg-page">
+      <header class="border-b border-subtle">
         <div class="mx-auto w-full max-w-3xl px-5 h-14 flex items-center gap-3">
           <a routerLink="/" class="flex items-center gap-2">
             <div class="size-7 rounded-md bg-brand-500 grid place-items-center text-white text-sm font-bold">E</div>
@@ -107,7 +107,7 @@ import { ThemeService } from '../../core/theme.service';
         }
       </div>
 
-      <footer class="mt-auto border-t" style="border-color: var(--border-subtle);">
+      <footer class="mt-auto border-t border-subtle">
         <div class="mx-auto w-full max-w-3xl px-5 py-6 flex flex-wrap items-center gap-3">
           <a routerLink="/" class="link-inline text-sm">← Back to the front page</a>
           <a routerLink="/docs" class="link-inline ml-auto text-sm">Setup guide</a>

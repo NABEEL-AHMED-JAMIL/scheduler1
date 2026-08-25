@@ -176,7 +176,7 @@ import {
             <p class="field-note text-[color:var(--text-muted)]">
               Exactly what someone opening the form will see.
             </p>
-            <div class="rounded p-3.5" style="background: var(--surface-inset);">
+            <div class="rounded p-3.5 bg-inset">
               <app-form-renderer [fields]="previewFields()" [readOnly]="true" />
             </div>
           </div>

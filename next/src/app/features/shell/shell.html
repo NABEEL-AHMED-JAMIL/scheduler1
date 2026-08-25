@@ -1,5 +1,5 @@
 <div class="min-h-screen flex flex-col">
-  <header class="sticky top-0 z-40 border-b" style="background: var(--surface-raised); border-color: var(--border-subtle);">
+  <header class="sticky top-0 z-40 border-b bg-raised border-subtle">
     <div class="mx-auto max-w-[1600px] px-4 h-14 flex items-center gap-1">
 
       <a routerLink="/" class="flex items-center gap-2 mr-4 shrink-0">
@@ -34,8 +34,8 @@
                           [class.rotate-180]="openMenu() === item.label" />
               </button>
               @if (openMenu() === item.label) {
-                <div class="absolute left-0 top-full mt-1 min-w-72 rounded-lg border shadow-lg p-1 z-50"
-                     style="background: var(--surface-raised); border-color: var(--border-subtle);">
+                <div class="absolute left-0 top-full mt-1 min-w-72 rounded-lg border shadow-lg p-1 z-50 bg-raised border-subtle"
+                    >
                   @for (child of item.children; track child.path) {
                     <a [routerLink]="child.path" (click)="openMenu.set(null)"
                        routerLinkActive="nav-child-active"
@@ -85,9 +85,9 @@
             <span class="text-sm font-medium hidden sm:block">{{ auth.displayName() }}</span>
           </button>
           @if (openMenu() === '__user') {
-            <div class="absolute right-0 top-full mt-1 w-56 rounded-lg border shadow-lg py-1 z-50"
-                 style="background: var(--surface-raised); border-color: var(--border-subtle);">
-              <div class="px-3 py-2 border-b" style="border-color: var(--border-subtle);">
+            <div class="absolute right-0 top-full mt-1 w-56 rounded-lg border shadow-lg py-1 z-50 bg-raised border-subtle"
+                >
+              <div class="px-3 py-2 border-b border-subtle">
                 <div class="text-sm font-medium truncate">{{ auth.displayName() }}</div>
                 <div class="text-xs text-[color:var(--text-muted)] mt-0.5">
                   {{ auth.role()?.replace('_', ' ') | lowercase }}
@@ -115,7 +115,7 @@
     </div>
 
     @if (mobileOpen()) {
-      <nav class="xl:hidden border-t px-3 py-2 space-y-0.5" style="border-color: var(--border-subtle);">
+      <nav class="xl:hidden border-t px-3 py-2 space-y-0.5 border-subtle">
         @for (item of nav(); track item.label) {
           @if (item.path) {
             <a [routerLink]="item.path" (click)="mobileOpen.set(false)"

@@ -12,8 +12,8 @@ import { PAGE_SIZES } from './pager';
   host: { class: 'block' },
   template: `
     @if (total() > sizes[0]) {
-      <div class="flex flex-wrap items-center gap-2 px-4 py-3 border-t"
-           style="border-color: var(--border-subtle);">
+      <div class="flex flex-wrap items-center gap-2 px-4 py-3 border-t border-subtle"
+          >
         <span class="text-xs text-[color:var(--text-muted)]">
           {{ firstRow() }}–{{ lastRow() }} of {{ total() }}
         </span>

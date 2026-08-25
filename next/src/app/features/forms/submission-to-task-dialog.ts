@@ -138,8 +138,8 @@ interface SourceTaskSummary {
           <div class="flex flex-col gap-1.5">
             <h3 class="text-sm font-semibold">Payload</h3>
             <pre class="mono text-xs leading-relaxed rounded p-2.5 overflow-auto max-h-64
-                        whitespace-pre-wrap break-words"
-                 style="background: var(--surface-code); border: 1px solid var(--border-subtle);">{{ xml() }}</pre>
+                        whitespace-pre-wrap break-words bg-code border border-subtle"
+                >{{ xml() }}</pre>
           </div>
         } @else if (building()) {
           <p class="text-sm text-[color:var(--text-muted)]">Building the payload…</p>

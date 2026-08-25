@@ -126,8 +126,8 @@
 
     <!-- chart -->
     <div class="card">
-      <div class="flex flex-wrap items-center gap-1.5 px-4 py-2.5 border-b"
-           style="border-color: var(--border-subtle);">
+      <div class="flex flex-wrap items-center gap-1.5 px-4 py-2.5 border-b border-subtle"
+          >
         <h2 class="text-sm font-semibold mr-2">Chart</h2>
         @for (option of chartKinds; track option) {
           <button type="button" class="btn btn-xs"
@@ -175,8 +175,8 @@
                 </div>
                 <!-- The distribution behind the column, so its shape reads before the rows do. -->
                 @if (isCounting()) {
-                  <div class="flex h-1.5 rounded-full overflow-hidden mt-2 mb-1"
-                       style="background: var(--surface-sunken);">
+                  <div class="flex h-1.5 rounded-full overflow-hidden mt-2 mb-1 bg-sunken"
+                      >
                     @for (part of columnMix(ci); track part.label) {
                       <span [style.width.%]="part.pct" [style.background]="toneFor(part.label)"
                             [title]="part.label + ': ' + part.count"></span>
@@ -234,19 +234,19 @@
               </td>
             </tr>
           }
-          <tr style="border-top: 2px solid var(--border-strong);">
-            <td class="font-semibold" style="background: var(--surface-raised);">All</td>
+          <tr class="border-t-2 border-strong">
+            <td class="font-semibold bg-raised">All</td>
             @for (colLabel of pivot().colLabels; track colLabel; let ci = $index) {
-              <td class="text-right tabular font-semibold !p-0"
-                  style="background: var(--surface-raised);">
+              <td class="text-right tabular font-semibold !p-0 bg-raised"
+                 >
                 <button type="button"
                         class="w-full h-full px-4 py-2.5 text-right tabular font-semibold
                                rounded-sm hover-brand focus:outline-none focus:ring-2 focus:ring-brand-500"
                         (click)="drillColumn(ci)">{{ format(pivot().colTotals[ci]) }}</button>
               </td>
             }
-            <td class="text-right tabular font-semibold px-4 py-2.5"
-                style="background: var(--surface-raised);">{{ format(pivot().grand) }}</td>
+            <td class="text-right tabular font-semibold px-4 py-2.5 bg-raised"
+               >{{ format(pivot().grand) }}</td>
           </tr>
         </tbody>
       </table>
@@ -257,8 +257,8 @@
 @if (drillRows().length) {
   <div class="fixed inset-x-0 bottom-0 z-40 card shadow-2xl flex flex-col"
        style="max-height: 56vh; border-radius: 12px 12px 0 0;">
-    <div class="flex items-center gap-2.5 px-4 py-3 border-b"
-         style="border-color: var(--border-subtle);">
+    <div class="flex items-center gap-2.5 px-4 py-3 border-b border-subtle"
+        >
       <h2 class="text-sm font-semibold">{{ drillTitle() }}</h2>
       <span class="pill pill-neutral">{{ drillRows().length }} runs</span>
       <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="closeDrill()">
