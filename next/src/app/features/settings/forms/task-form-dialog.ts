@@ -188,7 +188,7 @@ export const FIELD_TYPES = ['text', 'textarea', 'number', 'url', 'select', 'chec
               The shape a task on this pipeline will send, using the defaults above.
             </p>
             <pre class="mono text-xs leading-relaxed rounded p-2.5 overflow-auto max-h-64 whitespace-pre-wrap break-words"
-                 style="background: var(--surface-raised);">{{ preview() }}</pre>
+                 style="background: var(--surface-code); border: 1px solid var(--border-subtle);">{{ preview() }}</pre>
           </div>
         }
       </form>

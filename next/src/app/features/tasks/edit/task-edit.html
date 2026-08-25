@@ -178,7 +178,7 @@
         @if (tagXml()) {
           <pre class="mono text-xs leading-relaxed rounded p-2.5 mt-2 overflow-auto max-h-64
                       whitespace-pre-wrap break-words"
-               style="background: var(--surface-raised);">{{ tagXml() }}</pre>
+               style="background: var(--surface-code); border: 1px solid var(--border-subtle);">{{ tagXml() }}</pre>
           <p class="text-xs text-[color:var(--text-muted)] mt-1.5">
             The first tag becomes the root element; every other tag needs a parent that already
             exists above it.

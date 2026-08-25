@@ -80,6 +80,13 @@
        whisper: near the page's own tint, a third of the way to it in lightness. Interactive
        states keep ink-100, because a hover has to actually register. */
     --surface-inset:   #f4f6fa;
+    /* A code block is a well, not a card. It was painted with --surface-raised, which is white
+       -- lighter than the inset panel it usually sits in -- so a payload appeared to float
+       above the very area it belongs to, and an expanded row read as three near-identical
+       whites with no depth to it. This goes the other way: below the panel, not above it. The
+       blue-cast worry that keeps --surface-inset so faint does not apply here, because a code
+       block is a bounded box with a border rather than a full-width fill. */
+    --surface-code:    var(--color-ink-100);
     /* Brand-tinted hover, as a token because a hardcoded light tint is unreadable on dark:
        pill-neutral's own text over bg-brand-50 measured 2.22 in dark mode. */
     --hover-brand-bg:  var(--color-brand-50);
@@ -109,6 +116,9 @@
     --surface-sunken:  #12151f;
     /* Dark has no cast problem -- everything is already navy -- so an inset is just sunken. */
     --surface-inset:   #12151f;
+    /* Deeper than both the card and the inset panel, so the well reads the same way it does
+       in light. */
+    --surface-code:    #0c0f18;
     /* The same 22% mix the dark pills use, so a hover matches the chips around it. 6.97. */
     --hover-brand-bg:  color-mix(in oklab, var(--color-brand-500) 22%, var(--surface-raised));
     --hover-brand-fg:  var(--color-brand-300);
