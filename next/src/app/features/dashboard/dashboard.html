@@ -207,11 +207,10 @@
                     </button>
                   </td>
                   <td>
-                    <!-- This carried background: var(--surface), a token that is not defined
-                         anywhere, so it has always resolved to nothing and the track is
-                         transparent. Removed rather than guessed at: giving it a real colour
-                         would change how the row looks, which is a decision to make on purpose. -->
-                    <div class="flex h-2 rounded-full overflow-hidden">
+                    <!-- The track behind the segments. It asked for var(--surface), a token
+                         defined nowhere, so it resolved to nothing and the groove was invisible
+                         whenever the segments did not fill the row. -->
+                    <div class="flex h-2 rounded-full overflow-hidden bg-sunken">
                       @for (segment of segmentsFor(totals); track segment.key) {
                         <span [style.width.%]="segment.pct"
                               [style.background]="'var(--chart-' + $index % 6 + ')'"
