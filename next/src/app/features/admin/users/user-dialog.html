@@ -54,7 +54,7 @@
     <app-field label="Role" for="userRole" [required]="true" [hint]="roleHint()"
                [control]="form.get('userRole')" [submitted]="submitted()">
       <select id="userRole" class="input" formControlName="userRole">
-        @for (option of roles; track option.value) {
+        @for (option of roles(); track option.value) {
           <option [value]="option.value">{{ option.label }}</option>
         }
       </select>

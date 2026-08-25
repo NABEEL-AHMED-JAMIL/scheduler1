@@ -6,6 +6,7 @@ import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config
 import { ToastService } from '../../../shared/ui/toast.service';
 import { Field } from '../../../shared/ui/field';
 import { FormDialog } from '../../../shared/ui/form-dialog';
+import { AuthService } from '../../../core/auth/auth.service';
 
 const ROLES = [
   { value: 'TENANT_USER',   label: 'Tenant user',   hint: 'Runs and monitors work.' },
@@ -25,7 +26,19 @@ export class UserDialog {
   private readonly http = inject(HttpClient);
   private readonly toast = inject(ToastService);
 
-  readonly roles = ROLES;
+  private readonly auth = inject(AuthService);
+
+  /**
+   * Only the roles this administrator can actually grant.
+   *
+   * addUser refuses "Only a Platform Admin can create another Platform Admin", so offering the
+   * option to a tenant admin meant filling in the whole form to be told no at the end. The
+   * server check is the one that matters and stays where it is; this stops the console
+   * proposing something it knows will be refused.
+   */
+  readonly roles = computed(() => this.auth.isPlatformAdmin()
+    ? ROLES
+    : ROLES.filter(r => r.value !== 'PLATFORM_ADMIN'));
   readonly saving = signal(false);
   readonly submitted = signal(false);
 

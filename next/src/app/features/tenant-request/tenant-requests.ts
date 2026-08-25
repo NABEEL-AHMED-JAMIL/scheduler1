@@ -69,29 +69,53 @@ interface TenantRequest {
         <table class="table-modern">
           <thead>
             <tr>
+              <th class="w-8"></th>
               <th>Organisation</th><th>Contact</th><th>Asked for</th>
               <th>Received</th><th>Status</th><th class="w-12"></th>
             </tr>
           </thead>
           <tbody>
             @for (r of requests(); track r.tenantRequestId) {
-              <tr>
+              <tr [class.row-open]="isOpen(r.tenantRequestId)">
+                <td>
+                  <button type="button" class="btn btn-ghost btn-icon btn-sm"
+                          [attr.aria-expanded]="isOpen(r.tenantRequestId)"
+                          [attr.aria-label]="(isOpen(r.tenantRequestId) ? 'Hide' : 'Show')
+                                             + ' the full request from ' + r.organisationName"
+                          (click)="toggle(r.tenantRequestId)">
+                    <app-icon [name]="isOpen(r.tenantRequestId) ? 'chevronDown' : 'chevronRight'" />
+                  </button>
+                </td>
                 <td class="font-medium">{{ r.organisationName }}</td>
                 <td>
                   <div class="text-sm">{{ r.contactName }}</div>
                   <div class="mono text-xs text-[color:var(--text-muted)]">{{ r.contactEmail }}</div>
                 </td>
                 <td class="text-sm max-w-72">
-                  <span class="line-clamp-2" [title]="r.purpose || ''">{{ r.purpose || '—' }}</span>
+                  @if (r.purpose) {
+                    <button type="button"
+                            class="text-left w-full cursor-pointer bg-transparent border-0 p-0
+                                   text-inherit hover:text-brand-600 transition-colors"
+                            [attr.aria-expanded]="isOpen(r.tenantRequestId)"
+                            (click)="toggle(r.tenantRequestId)">
+                      <!-- Stays clamped when open: the panel below carries the full text at a
+                           readable measure, and these opening words are what tie the two
+                           together. Unclamping here as well printed the paragraph twice. -->
+                      <span class="line-clamp-2">{{ r.purpose }}</span>
+                    </button>
+                  } @else {
+                    <span class="text-[color:var(--text-muted)]">Nothing was written here</span>
+                  }
                 </td>
                 <td class="text-xs text-[color:var(--text-secondary)] whitespace-nowrap">
                   {{ r.dateCreated ? (r.dateCreated | date:'d MMM y') : '—' }}
                 </td>
                 <td>
                   <app-status [label]="r.status" [quiet]="true" />
-                  @if (r.status === 'Rejected' && r.decisionNote) {
-                    <div class="text-xs text-[color:var(--text-muted)] mt-0.5 line-clamp-1"
-                         [title]="r.decisionNote">{{ r.decisionNote }}</div>
+                  @if (r.status === 'Rejected' && r.decisionNote && !isOpen(r.tenantRequestId)) {
+                    <div class="text-xs text-[color:var(--text-muted)] mt-0.5 line-clamp-1">
+                      {{ r.decisionNote }}
+                    </div>
                   }
                 </td>
                 <td>
@@ -113,12 +137,59 @@ interface TenantRequest {
                   }
                 </td>
               </tr>
+
+              @if (isOpen(r.tenantRequestId)) {
+                <tr class="row-detail">
+                  <td colspan="7" class="bg-sunken">
+                    <div class="px-3 py-4 flex flex-col gap-4 max-w-3xl">
+                      <div class="flex flex-col gap-1.5">
+                        <h3 class="text-[11px] font-semibold uppercase tracking-wider
+                                   text-[color:var(--text-muted)]">What they asked for</h3>
+                        <p class="text-sm leading-relaxed whitespace-pre-wrap">{{ r.purpose }}</p>
+                      </div>
+                      <div class="flex flex-wrap gap-x-8 gap-y-2 text-sm">
+                        <div class="flex flex-col gap-0.5">
+                          <span class="text-[11px] uppercase tracking-wider
+                                       text-[color:var(--text-muted)]">Contact</span>
+                          <span>{{ r.contactName }}</span>
+                        </div>
+                        <div class="flex flex-col gap-0.5">
+                          <span class="text-[11px] uppercase tracking-wider
+                                       text-[color:var(--text-muted)]">Email</span>
+                          <a class="link-inline mono text-xs"
+                             [href]="'mailto:' + r.contactEmail">{{ r.contactEmail }}</a>
+                        </div>
+                        @if (r.decidedAt) {
+                          <div class="flex flex-col gap-0.5">
+                            <span class="text-[11px] uppercase tracking-wider
+                                         text-[color:var(--text-muted)]">Decided</span>
+                            <span class="text-xs">{{ r.decidedAt | date:'d MMM y, HH:mm' }}</span>
+                          </div>
+                        }
+                      </div>
+                      @if (r.decisionNote) {
+                        <div class="flex flex-col gap-1.5">
+                          <h3 class="text-[11px] font-semibold uppercase tracking-wider
+                                     text-[color:var(--text-muted)]">Reason given</h3>
+                          <p class="text-sm leading-relaxed whitespace-pre-wrap">{{ r.decisionNote }}</p>
+                        </div>
+                      }
+                    </div>
+                  </td>
+                </tr>
+              }
             }
           </tbody>
         </table>
       </app-table-shell>
     </div>
   `,
+  styles: [`
+    /* An open row and its panel are one thing, so the border between them is dropped and the
+       pair shares a ground. Without this the panel reads as an unrelated full-width row. */
+    tr.row-open > td { border-bottom-color: transparent; background: var(--surface-sunken); }
+    tr.row-detail > td { border-bottom: 1px solid var(--border-subtle); }
+  `],
 })
 export class TenantRequests implements OnInit {
   private readonly http = inject(HttpClient);
@@ -129,6 +200,27 @@ export class TenantRequests implements OnInit {
   readonly loading = signal(true);
   readonly error = signal('');
   readonly busy = signal<number | null>(null);
+
+  /**
+   * Which requests are showing their full text.
+   *
+   * The purpose is the only thing a reviewer has to go on, and it does not fit a table cell.
+   * It used to be clamped to two lines behind a title tooltip -- which cannot be selected,
+   * copied, or reached at all on a touch screen. Opening the row shows the whole thing.
+   */
+  private readonly open = signal<ReadonlySet<number>>(new Set());
+
+  isOpen(id: number): boolean {
+    return this.open().has(id);
+  }
+
+  toggle(id: number): void {
+    const next = new Set(this.open());
+    if (!next.delete(id)) {
+      next.add(id);
+    }
+    this.open.set(next);
+  }
 
   readonly summary = computed(() => {
     const list = this.requests();
