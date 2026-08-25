@@ -75,14 +75,15 @@ export class TaskForms implements OnInit {
    * real choices is to read the ones already in use.
    */
   private loadPipelines(): void {
-    this.http.get<ApiResponse<any>>(`${API_BASE}/sourceTask.json/fetchSourceTask`).subscribe({
+    // listSourceTask is a POST taking an optional search body; an empty body means "everything".
+    this.http.post<ApiResponse<any[]>>(`${API_BASE}/sourceTask.json/listSourceTask`, {}).subscribe({
       next: response => {
         if (response.status !== API_SUCCESS) return;
-        const rows = response.data?.sourceTasks ?? response.data ?? [];
+        const rows = response.data ?? [];
         this.pipelines.set([...new Set(
           (Array.isArray(rows) ? rows : [])
             .map((task: any) => String(task.pipelineId ?? '').trim())
-            .filter(Boolean))]);
+            .filter(Boolean))].sort());
       },
       // Suggestions are a convenience; the field takes free text either way.
       error: () => this.pipelines.set([]),

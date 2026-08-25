@@ -78,6 +78,10 @@ const PATHS: Record<string, string> = {
   volumeOff: 'M11 5 6 9H2v6h4l5 4V5Z M23 9l-6 6 M17 9l6 6',
   maximize:  'M8 3H5a2 2 0 0 0-2 2v3 M16 3h3a2 2 0 0 1 2 2v3 M21 16v3a2 2 0 0 1-2 2h-3 M3 16v3a2 2 0 0 0 2 2h3',
   save:      'M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2ZM17 21v-8H7v8M7 3v5h8',
+  // A sheet with a header band and ruled lines: a form definition rather than a plain document.
+  template:  'M4 3h16a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1ZM3 9h18M7 13h10M7 17h6',
+  // An office block, for a tenant: the Tenants screen has been asking for this name all along.
+  building:  'M3 21h18M5 21V5a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v16M13 21V10h5a1 1 0 0 1 1 1v10M8 8h2M8 12h2M8 16h2',
 };
 
 @Component({

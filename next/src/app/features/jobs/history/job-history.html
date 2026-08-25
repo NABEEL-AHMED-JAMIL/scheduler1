@@ -12,8 +12,12 @@
         {{ jobStatus() || 'All' }} runs
         @if (isAllJobs()) { across every job } @else { of job <span class="mono">#{{ jobId() }}</span> }
         on {{ targetDate() }} at {{ hourLabel(targetHr()) }}.
-      } @else {
+      } @else if (jobId()) {
         Every recorded run of job <span class="mono">#{{ jobId() }}</span>.
+      } @else {
+        <!-- Reached without a job: the dashboard's hour drill-down lands here, and so does a
+             direct visit. Naming a job that was never chosen printed a bare "#". -->
+        Pick a job to see its runs, or choose an hour on the dashboard.
       }
     </p>
   </div>

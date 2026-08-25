@@ -96,6 +96,12 @@
                 <dt class="text-[color:var(--text-muted)] shrink-0 w-20">Scope</dt>
                 <dd class="truncate min-w-0">{{ scopeLabel(form) }}</dd>
               </div>
+              @if (form.createdByName) {
+                <div class="flex gap-2 min-w-0">
+                  <dt class="text-[color:var(--text-muted)] shrink-0 w-20">Created by</dt>
+                  <dd class="truncate min-w-0">{{ form.createdByName }}</dd>
+                </div>
+              }
             </dl>
 
             @if (form.fields?.length) {
@@ -119,6 +125,7 @@
             <th>Pipeline</th>
             <th>Fields</th>
             <th>Scope</th>
+            <th>Created by</th>
             <th>Status</th>
             <th class="w-px"></th>
           </tr>
@@ -142,6 +149,7 @@
                 </span>
               </td>
               <td class="text-xs">{{ scopeLabel(form) }}</td>
+              <td class="text-xs text-[color:var(--text-secondary)]">{{ form.createdByName || '—' }}</td>
               <td><app-status [label]="form.formStatus" [quiet]="true" /></td>
               <td>
                 <button type="button" class="btn btn-ghost btn-icon btn-sm"

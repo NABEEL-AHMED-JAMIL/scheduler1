@@ -10,6 +10,8 @@ export interface DbConnection {
   additionalProperties?: string;
   status: string;
   createdAt?: string;
+  createdByName?: string | null;
+  updatedByName?: string | null;
 }
 
 export interface QueryDefinition {
@@ -21,6 +23,8 @@ export interface QueryDefinition {
   version?: number;
   createdAt?: string;
   updatedAt?: string;
+  createdByName?: string | null;
+  updatedByName?: string | null;
 }
 
 export interface QueryExecution {
@@ -35,6 +39,7 @@ export interface QueryExecution {
   outputBucket?: string;
   outputKey?: string;
   errorMessage?: string;
+  createdByName?: string | null;
 }
 
 export interface QuerySchedule {
@@ -48,6 +53,8 @@ export interface QuerySchedule {
   intervalMinutes?: number;
   nextRunAt?: string;
   status: string;
+  createdByName?: string | null;
+  updatedByName?: string | null;
 }
 
 export interface PreviewResult {

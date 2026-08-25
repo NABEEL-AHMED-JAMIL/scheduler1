@@ -30,6 +30,7 @@ export interface TaskForm {
   formStatus?: string;
   dateCreated?: string;
   createdBy?: number;
+  createdByName?: string | null;
   fields: TaskFormField[];
 }
 

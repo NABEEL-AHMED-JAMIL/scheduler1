@@ -71,6 +71,12 @@
                 <div class="mono text-xs text-[color:var(--text-muted)] truncate" [title]="q.queryText">
                   {{ q.queryText }}
                 </div>
+                @if (q.updatedByName || q.createdByName) {
+                  <div class="text-xs text-[color:var(--text-muted)] mt-0.5">
+                    @if (q.updatedByName) { Updated by {{ q.updatedByName }} }
+                    @else { Created by {{ q.createdByName }} }
+                  </div>
+                }
               </td>
               <td>{{ connectionName(q.databaseConnectionProfileId) }}</td>
               <td>
@@ -147,7 +153,9 @@
             <tr>
               <td class="font-medium">
                 {{ c.profileName }}
-                <div class="text-xs text-[color:var(--text-muted)]">{{ c.databaseType }}</div>
+                <div class="text-xs text-[color:var(--text-muted)]">
+                  {{ c.databaseType }}@if (c.createdByName) { · added by {{ c.createdByName }} }
+                </div>
               </td>
               <td class="mono">{{ c.host }}:{{ c.port }}/{{ c.databaseName }}</td>
               <td class="mono">{{ c.username }}</td>
@@ -209,6 +217,8 @@
                 {{ e.queryName || '#' + e.queryId }}
                 @if (e.scheduleId) {
                   <span class="pill pill-brand ml-1"><app-icon name="clock" size="0.85em" />scheduled</span>
+                } @else if (e.createdByName) {
+                  <div class="text-xs text-[color:var(--text-muted)]">run by {{ e.createdByName }}</div>
                 }
               </td>
               <td>
