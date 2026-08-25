@@ -1,6 +1,7 @@
 import { Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Icon } from '../../shared/ui/icon';
+import { ConsolePreview } from './console-preview';
 import { ThemeService } from '../../core/theme.service';
 
 /**
@@ -13,7 +14,7 @@ import { ThemeService } from '../../core/theme.service';
  */
 @Component({
   selector: 'app-landing',
-  imports: [RouterLink, Icon],
+  imports: [RouterLink, Icon, ConsolePreview],
   styles: [`
     :host { display: block; }
 
@@ -30,21 +31,9 @@ import { ThemeService } from '../../core/theme.service';
     .hero-sub     { color: rgb(238 240 253 / 0.72); }
     .hero-eyebrow { color: rgb(159 165 243 / 0.95); }
 
-    /* The mock console panel keeps its own surface, not the page's, so it stays legible on the
-       dark hero whichever theme the visitor is in. */
-    .panel      { background: #171b2b; border: 1px solid rgb(255 255 255 / 0.09);
-                  box-shadow: 0 24px 60px -20px rgb(0 0 0 / 0.55); }
-    .panel-head { background: rgb(255 255 255 / 0.035); border-bottom: 1px solid rgb(255 255 255 / 0.07); }
-    .panel-row  { border-bottom: 1px solid rgb(255 255 255 / 0.05); }
-    .panel-dim  { color: rgb(238 240 253 / 0.55); }
-    .panel-key  { color: rgb(238 240 253 / 0.92); }
-    .chip-ok    { background: rgb(34 197 94 / 0.16);   color: #86efac; }
-    .chip-run   { background: rgb(79 70 229 / 0.30);   color: #c4c9f9; }
-    .chip-wait  { background: rgb(255 255 255 / 0.09); color: rgb(238 240 253 / 0.72); }
 
-    /* Run bars drawn as plain divs, so a public page needs no charting code. */
-    .spark      { background: rgb(159 165 243 / 0.85); border-radius: 2px; }
-    .spark-idle { background: rgb(255 255 255 / 0.14); border-radius: 2px; }
+
+
 
     /* The capabilities are one ruled block rather than nine cards, so they read as a table of
        contents instead of nine boxes competing for attention. */
@@ -127,45 +116,10 @@ import { ThemeService } from '../../core/theme.service';
             </dl>
           </div>
 
-          <!-- Console preview: the jobs table's own shape, so it looks like what you get. -->
+          <!-- The preview is its own component: it is a small app in itself, with three views
+               and their data, and the landing page should not carry that. -->
           <div class="rise" style="animation-delay: .12s;" aria-hidden="true">
-            <div class="panel rounded-xl overflow-hidden">
-              <div class="panel-head px-4 py-3 flex items-center gap-2">
-                <span class="size-2 rounded-full" style="background: #34d399;"></span>
-                <span class="text-xs panel-key font-medium">Source Jobs</span>
-                <span class="text-[11px] panel-dim ml-auto mono">4 scheduled</span>
-              </div>
-
-              <div class="px-4 py-2.5 flex items-center gap-3 text-[11px] panel-dim uppercase tracking-wider">
-                <span class="flex-1">Job</span>
-                <span class="w-24 hidden sm:block">Schedule</span>
-                <span class="w-20 text-right">Status</span>
-              </div>
-
-              @for (row of previewRows; track row.name) {
-                <div class="panel-row px-4 py-3 flex items-center gap-3">
-                  <div class="flex-1 min-w-0">
-                    <div class="text-[13px] panel-key truncate">{{ row.name }}</div>
-                    <div class="text-[11px] panel-dim mono truncate">{{ row.task }}</div>
-                  </div>
-                  <div class="w-24 hidden sm:block text-[11px] panel-dim mono">{{ row.schedule }}</div>
-                  <div class="w-20 flex justify-end">
-                    <span class="text-[11px] px-2 py-0.5 rounded-full whitespace-nowrap"
-                          [class]="row.chip">{{ row.status }}</span>
-                  </div>
-                </div>
-              }
-
-              <div class="px-4 py-3.5">
-                <div class="text-[11px] panel-dim uppercase tracking-wider mb-2">Runs this week</div>
-                <div class="flex items-end gap-1 h-12">
-                  @for (bar of bars; track $index) {
-                    <div class="flex-1" [class]="bar > 0 ? 'spark' : 'spark-idle'"
-                         [style.height.%]="bar > 0 ? bar : 6"></div>
-                  }
-                </div>
-              </div>
-            </div>
+            <app-console-preview />
           </div>
         </div>
       </div>
@@ -260,21 +214,6 @@ export class Landing {
     { label: 'Storage backends', value: '4' },
     { label: 'Export formats', value: 'CSV · XLSX' },
   ];
-
-  /** The shape of a real jobs table, so the panel reads as the product rather than an artwork. */
-  readonly previewRows = [
-    { name: 'Port disruption — nightly load', task: 'Hurricane Data Task',
-      schedule: 'Daily 03:00', status: 'Completed', chip: 'chip-ok' },
-    { name: 'Claims baseline — hourly refresh', task: 'Catastrophe Claims',
-      schedule: 'Hourly', status: 'Running', chip: 'chip-run' },
-    { name: 'Cat bond loss — Mon and Thu', task: 'Loss History',
-      schedule: 'Mon, Thu', status: 'Queued', chip: 'chip-wait' },
-    { name: 'Crop origin risk — month end', task: 'Weather Risk',
-      schedule: 'Last day', status: 'Completed', chip: 'chip-ok' },
-  ];
-
-  /** Relative bar heights; a zero is a quiet day rather than a missing one. */
-  readonly bars = [38, 62, 45, 88, 54, 0, 0, 71, 96, 60, 42, 78];
 
   readonly capabilities = [
     { icon: 'clock', title: 'Schedules that fit the work',
