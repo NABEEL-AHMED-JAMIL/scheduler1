@@ -123,6 +123,13 @@ export const routes: Routes = [
         canActivate: [roleGuard],
       },
       {
+        path: 'settings/forms',
+        loadComponent: () =>
+          import('./features/settings/forms/task-forms').then(m => m.TaskForms),
+        data: { roles: ['PLATFORM_ADMIN', 'TENANT_ADMIN'] },
+        canActivate: [roleGuard],
+      },
+      {
         path: 'unauthorized',
         loadComponent: () =>
           import('./features/unauthorized/unauthorized').then(m => m.Unauthorized),

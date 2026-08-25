@@ -58,6 +58,8 @@ export class SettingsHub {
       blurb: 'Broker settings, security protocol and credentials for the pipeline.' },
     { label: 'Source Task Types', path: '/settings/task-types', icon: 'layers',
       blurb: 'The kinds of task a job can run, and the topic each one publishes to.' },
+    { label: 'Task Forms', path: '/settings/forms', icon: 'template',
+      blurb: 'Describe what a pipeline expects so tasks are filled in, not hand-written.' },
     { label: 'Lookups', path: '/settings/lookup', icon: 'list',
       blurb: 'Shared key/value data the forms and pipelines read from.' },
     { label: 'Q-Message', path: '/queue', icon: 'clock',

@@ -1,0 +1,172 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Task Forms</h1>
+      <p class="page-subtitle">
+        A form describes the payload a pipeline expects, so a task can be filled in field by
+        field instead of hand-written as XML. It holds no payload itself.
+      </p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
+        <app-icon name="refresh" [class.spin]="loading()" />Refresh
+      </button>
+      <button type="button" class="btn btn-primary btn-sm" (click)="create()">
+        <app-icon name="plus" />New form
+      </button>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+    @for (tile of [
+      { label: 'Forms',     value: summary().total,     foot: 'defined', icon: 'template', tone: 'info' },
+      { label: 'Pipelines', value: summary().pipelines, foot: 'covered by a form', icon: 'send', tone: 'info' },
+      { label: 'Fields',    value: summary().fields,    foot: 'across all forms', icon: 'list', tone: 'info' },
+      { label: 'Shared',    value: summary().shared,    foot: 'available to every tenant', icon: 'globe', tone: 'info' }
+    ]; track tile.label) {
+      <app-stat-tile [label]="tile.label" [value]="tile.value" [icon]="tile.icon"
+                     [tone]="$any(tile.tone)" [foot]="tile.foot" />
+    }
+  </div>
+
+  <app-table-shell heading="Forms" [loading]="loading()" [error]="error()"
+                   [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="forms().length"
+                   [emptyMessage]="hasFilters()
+                      ? 'No forms match the current search.'
+                      : 'No forms yet. Create one to let tasks on a pipeline be filled in rather than hand-written.'"
+                   emptyIcon="template"
+                   (retry)="load()">
+    <ng-container toolbar>
+      <app-view-toggle [(value)]="view" key="task-forms" cardsIcon="template" />
+      <div class="search-field max-w-56">
+        <app-icon name="search" size="0.95em" />
+        <input class="input" placeholder="Search name, pipeline or description"
+               [value]="search()" (input)="search.set($any($event.target).value)" />
+      </div>
+      @if (hasFilters()) {
+        <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()">
+          <app-icon name="close" />Clear
+        </button>
+      }
+    </ng-container>
+
+    @if (view() === 'cards') {
+      <div class="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
+        @for (form of filtered(); track form.taskFormId) {
+          <article class="card p-4 flex flex-col gap-3">
+            <div class="flex items-start gap-2.5">
+              <span class="stat-glyph shrink-0"><app-icon name="template" /></span>
+              <div class="min-w-0 flex-1">
+                <h3 class="font-semibold truncate" [title]="form.formName">{{ form.formName }}</h3>
+                <p class="mono text-[color:var(--text-muted)]">{{ form.pipelineId }}</p>
+              </div>
+              <div class="shrink-0 flex items-center gap-1">
+                <app-status [label]="form.formStatus" [quiet]="true" />
+                <button type="button" class="btn btn-ghost btn-icon btn-sm"
+                        [cdkMenuTriggerFor]="cardMenu" aria-label="Actions">
+                  <app-icon name="dots" size="1.05em" />
+                </button>
+                <ng-template #cardMenu>
+                  <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="edit(form)">
+                      <app-icon name="edit" />Edit
+                    </button>
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="duplicate(form)">
+                      <app-icon name="copy" />Duplicate
+                    </button>
+                    <button cdkMenuItem class="menu-item menu-item-danger"
+                            (cdkMenuItemTriggered)="remove(form)">
+                      <app-icon name="trash" class="icon-crit" />Delete
+                    </button>
+                  </div>
+                </ng-template>
+              </div>
+            </div>
+
+            @if (form.description) {
+              <p class="text-xs text-[color:var(--text-secondary)] line-clamp-2">{{ form.description }}</p>
+            }
+
+            <dl class="text-xs grid gap-1">
+              <div class="flex gap-2">
+                <dt class="text-[color:var(--text-muted)] shrink-0 w-20">Fields</dt>
+                <dd>{{ fieldCount(form) }} ({{ requiredCount(form) }} required)</dd>
+              </div>
+              <div class="flex gap-2 min-w-0">
+                <dt class="text-[color:var(--text-muted)] shrink-0 w-20">Scope</dt>
+                <dd class="truncate min-w-0">{{ scopeLabel(form) }}</dd>
+              </div>
+            </dl>
+
+            @if (form.fields?.length) {
+              <div class="flex flex-wrap gap-1">
+                @for (field of form.fields.slice(0, 6); track field.taskFormFieldId) {
+                  <span class="chip mono text-xs" [title]="field.label">{{ field.tagKey }}</span>
+                }
+                @if (form.fields.length > 6) {
+                  <span class="chip text-xs">+{{ form.fields.length - 6 }} more</span>
+                }
+              </div>
+            }
+          </article>
+        }
+      </div>
+    } @else {
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Form</th>
+            <th>Pipeline</th>
+            <th>Fields</th>
+            <th>Scope</th>
+            <th>Status</th>
+            <th class="w-px"></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (form of filtered(); track form.taskFormId) {
+            <tr>
+              <td>
+                <div class="font-medium">{{ form.formName }}</div>
+                @if (form.description) {
+                  <div class="text-xs text-[color:var(--text-muted)] line-clamp-1">
+                    {{ form.description }}
+                  </div>
+                }
+              </td>
+              <td class="mono text-brand-600">{{ form.pipelineId }}</td>
+              <td>
+                {{ fieldCount(form) }}
+                <span class="text-[color:var(--text-muted)] text-xs">
+                  ({{ requiredCount(form) }} required)
+                </span>
+              </td>
+              <td class="text-xs">{{ scopeLabel(form) }}</td>
+              <td><app-status [label]="form.formStatus" [quiet]="true" /></td>
+              <td>
+                <button type="button" class="btn btn-ghost btn-icon btn-sm"
+                        [cdkMenuTriggerFor]="rowMenu" aria-label="Actions">
+                  <app-icon name="dots" size="1.05em" />
+                </button>
+                <ng-template #rowMenu>
+                  <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="edit(form)">
+                      <app-icon name="edit" />Edit
+                    </button>
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="duplicate(form)">
+                      <app-icon name="copy" />Duplicate
+                    </button>
+                    <button cdkMenuItem class="menu-item menu-item-danger"
+                            (cdkMenuItemTriggered)="remove(form)">
+                      <app-icon name="trash" class="icon-crit" />Delete
+                    </button>
+                  </div>
+                </ng-template>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+  </app-table-shell>
+</div>
