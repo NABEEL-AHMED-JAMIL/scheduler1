@@ -204,6 +204,12 @@
                           <app-icon name="eye" />
                         </button>
                         <button type="button" class="btn btn-ghost btn-icon btn-sm"
+                                aria-label="Use as task configuration"
+                                title="Use as task configuration"
+                                (click)="useAsTaskConfig(s)">
+                          <app-icon name="send" class="icon-info" />
+                        </button>
+                        <button type="button" class="btn btn-ghost btn-icon btn-sm"
                                 aria-label="Delete submission" (click)="removeSubmission(s)">
                           <app-icon name="trash" class="icon-crit" />
                         </button>

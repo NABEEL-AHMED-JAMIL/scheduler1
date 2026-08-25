@@ -14,6 +14,7 @@ import { confirmWith } from '../../shared/ui/confirm';
 import { copyText } from '../../shared/ui/clipboard.util';
 import { FormRenderer } from './form-renderer';
 import { DynamicFormDialog } from './dynamic-form-dialog';
+import { SubmissionToTaskDialog } from './submission-to-task-dialog';
 import { DynamicForm, DynamicFormSubmission, SECTION_TYPE } from './dynamic-form.model';
 
 @Component({
@@ -203,6 +204,19 @@ export class DynamicForms implements OnInit {
       if (parts.length === 3) break;
     }
     return parts.join(' · ') || '(no answers)';
+  }
+
+  /**
+   * Writes a submission into a source task as its configuration. The form's own fields supply
+   * the tag names, so this needs the version with fields rather than the list row.
+   */
+  useAsTaskConfig(submission: DynamicFormSubmission): void {
+    const form = this.openForFields();
+    if (!form) { this.toast.error('The form definition is still loading.'); return; }
+    this.dialog.open<boolean>(SubmissionToTaskDialog, { data: { form, submission } })
+      .closed.subscribe(saved => {
+        if (saved) this.toast.success('The task now carries these answers as its payload.');
+      });
   }
 
   clearFilters(): void { this.search.set(''); this.statusFilter.set(''); }
