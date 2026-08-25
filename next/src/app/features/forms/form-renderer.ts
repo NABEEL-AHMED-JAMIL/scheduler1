@@ -15,11 +15,25 @@ import {
 @Component({
   selector: 'app-form-renderer',
   imports: [FormsModule, Icon],
-  styles: [':host { display: block; }'],
+  styles: [`
+    :host { display: block; }
+    /* A field's declared width is what it should get when there is room for it. Below that,
+       four fields across becomes two, then one -- a quarter column on a tablet is 160px, which
+       is not wide enough for an ordinary email address. The spans are set per field as custom
+       properties so the breakpoints stay in CSS rather than being computed per render. */
+    .cell { grid-column: span var(--span-sm) / span var(--span-sm); }
+    @media (min-width: 640px) {
+      .cell { grid-column: span var(--span-md) / span var(--span-md); }
+    }
+    @media (min-width: 1024px) {
+      .cell { grid-column: span var(--span-lg) / span var(--span-lg); }
+    }
+  `],
   template: `
     <div class="grid grid-cols-12 gap-x-4 gap-y-3.5">
       @for (field of ordered(); track field.dynamicFormFieldId ?? field.fieldName; let i = $index) {
-        <div [style.grid-column]="'span ' + span(field) + ' / span ' + span(field)">
+        <div class="cell" [style.--span-lg]="span(field)"
+             [style.--span-md]="spanMedium(field)" [style.--span-sm]="12">
           @if (field.fieldType === 'section') {
             <!-- A section is a heading between fields, so it takes the full width and collects
                  nothing. The first one needs no rule above it. -->
@@ -42,7 +56,7 @@ import {
 
               @switch (kindOf(field)) {
                 @case ('textarea') {
-                  <textarea [id]="idFor(field)" class="input" rows="3" [disabled]="readOnly()"
+                  <textarea [id]="idFor(field)" class="input" [rows]="textareaRows(field)" [disabled]="readOnly()"
                             [placeholder]="field.placeHolder || ''"
                             [ngModel]="valueOf(field)"
                             (ngModelChange)="set(field, $event)"></textarea>
@@ -132,6 +146,11 @@ export class FormRenderer {
     return Math.min(12, Math.max(1, width));
   }
 
+  /** Half-way to full width, so a row of four becomes a row of two before it becomes a list. */
+  spanMedium(field: DynamicFormField): number {
+    return Math.min(12, this.span(field) * 2);
+  }
+
   kindOf(field: DynamicFormField): string {
     if (field.fieldType === 'textarea') return 'textarea';
     if (field.fieldType === 'select') return 'select';
@@ -139,6 +158,14 @@ export class FormRenderer {
     if (field.fieldType === 'radio') return 'radio';
     if (BOOLEAN_TYPES.includes(field.fieldType)) return 'boolean';
     return 'input';
+  }
+
+  /**
+   * A full-width textarea is usually there for something long -- this form keeps a whole JSON
+   * template in one -- so it gets more room than a narrow one sitting beside other fields.
+   */
+  textareaRows(field: DynamicFormField): number {
+    return this.span(field) >= 12 ? 6 : 3;
   }
 
   choices(field: DynamicFormField): string[] { return optionsOf(field); }

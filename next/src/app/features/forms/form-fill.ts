@@ -22,7 +22,10 @@ import { DynamicForm, DynamicFormSubmission, SECTION_TYPE } from './dynamic-form
   imports: [Icon, FormRenderer],
   template: `
     <div class="min-h-screen px-4 py-10" style="background: var(--surface-page);">
-      <div class="mx-auto w-full max-w-3xl flex flex-col gap-4">
+      <!-- A form defines its own column widths, and this one asks for four fields across.
+           At 3xl a quarter column is 168px, which clipped an ordinary email address, so the
+           page widens with the viewport instead of staying at reading width. -->
+      <div class="mx-auto w-full max-w-3xl lg:max-w-5xl xl:max-w-6xl flex flex-col gap-4">
 
         @if (loading()) {
           <div class="card p-6 flex items-center gap-2.5">
