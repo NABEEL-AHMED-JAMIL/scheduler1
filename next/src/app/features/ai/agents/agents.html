@@ -21,6 +21,7 @@
         <input class="input" placeholder="Search name, provider or model"
                [value]="search()" (input)="search.set($any($event.target).value)" />
       </div>
+      <app-mine-filter [(only)]="onlyMine" />
       @if (search()) {
         <button type="button" class="btn btn-ghost btn-sm" (click)="search.set('')"><app-icon name="close" />Clear</button>
       }
@@ -88,6 +89,8 @@
           <th>Model</th>
           <th>File types</th>
           <th>API key</th>
+        <th>Created by</th>
+        <th>Updated by</th>
           <th class="text-right">Status</th>
           <th class="w-12"></th>
         </tr>
@@ -113,6 +116,12 @@
               @if (keyState(agent); as key) {
                 <span [class]="key.cls" [title]="key.hint">{{ key.label }}</span>
               }
+            </td>
+            <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
+              {{ agent.createdByName || '—' }}
+            </td>
+            <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
+              {{ agent.updatedByName || '—' }}
             </td>
             <td class="text-right"><app-status [label]="agent.status" [quiet]="true" /></td>
             <td class="text-right">

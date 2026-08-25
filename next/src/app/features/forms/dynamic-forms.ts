@@ -4,6 +4,8 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
+import { MineFilter, isMine } from '../../shared/ui/mine-filter';
+import { AuthService } from '../../core/auth/auth.service';
 import { TableShell } from '../../shared/ui/data-table';
 import { StatTile } from '../../shared/ui/stat-tile';
 import { StatusPill } from '../../shared/ui/status-pill';
@@ -19,7 +21,7 @@ import { DynamicForm, DynamicFormSubmission, SECTION_TYPE } from './dynamic-form
 
 @Component({
   selector: 'app-dynamic-forms',
-  imports: [ViewToggle, StatTile, TableShell, StatusPill, Icon, FormRenderer, DatePipe,
+  imports: [MineFilter, ViewToggle, StatTile, TableShell, StatusPill, Icon, FormRenderer, DatePipe,
             CdkMenu, CdkMenuItem, CdkMenuTrigger],
   templateUrl: './dynamic-forms.html',
 })
@@ -37,10 +39,17 @@ export class DynamicForms implements OnInit {
 
   readonly hasFilters = computed(() => !!(this.search().trim() || this.statusFilter()));
 
+  private readonly auth = inject(AuthService);
+
+  /** Narrows the list to rows this person created. Not persisted -- see MineFilter. */
+
+  readonly onlyMine = signal(false);
+
+
   readonly filtered = computed(() => {
     const term = this.search().trim().toLowerCase();
     const status = this.statusFilter();
-    return this.forms().filter(f => {
+    return this.mine(this.forms()).filter(f => {
       if (status && f.status !== status) return false;
       if (!term) return true;
       return `${f.formName ?? ''} ${f.description ?? ''}`.toLowerCase().includes(term);
@@ -220,4 +229,18 @@ export class DynamicForms implements OnInit {
   }
 
   clearFilters(): void { this.search.set(''); this.statusFilter.set(''); }
+
+  /**
+   * Applies the "Only mine" toggle.
+   *
+   * Pure -- it runs inside a computed, where writing a signal is not allowed. The surviving
+   * count is already on the table header, so nothing needs recording.
+   */
+  private mine<T extends { createdBy?: number | null }>(rows: T[]): T[] {
+    if (!this.onlyMine()) {
+      return rows;
+    }
+    const myId = this.auth.user()?.appUserId ?? null;
+    return rows.filter(row => isMine(row, myId));
+  }
 }

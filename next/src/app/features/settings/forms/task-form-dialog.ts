@@ -22,6 +22,9 @@ export interface TaskFormField {
 }
 
 export interface TaskForm {
+  /** The editor's name; the author was already carried. */
+  updatedByName?: string | null;
+
   taskFormId?: number;
   pipelineId: string;
   formName: string;

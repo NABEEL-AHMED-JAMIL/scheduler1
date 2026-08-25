@@ -43,6 +43,7 @@
         <input class="input" placeholder="Search name, pipeline or description"
                [value]="search()" (input)="search.set($any($event.target).value)" />
       </div>
+      <app-mine-filter [(only)]="onlyMine" />
       @if (hasFilters()) {
         <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()">
           <app-icon name="close" />Clear
@@ -126,6 +127,7 @@
             <th>Fields</th>
             <th>Scope</th>
             <th>Created by</th>
+            <th>Updated by</th>
             <th>Status</th>
             <th class="w-12"></th>
           </tr>
@@ -150,6 +152,9 @@
               </td>
               <td class="text-xs">{{ scopeLabel(form) }}</td>
               <td class="text-xs text-[color:var(--text-secondary)]">{{ form.createdByName || '—' }}</td>
+              <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
+                {{ form.updatedByName || '—' }}
+              </td>
               <td><app-status [label]="form.formStatus" [quiet]="true" /></td>
               <td>
                 <button type="button" class="btn btn-ghost btn-icon btn-sm"

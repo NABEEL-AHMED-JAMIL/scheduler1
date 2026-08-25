@@ -1,6 +1,8 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
+import { MineFilter, isMine } from '../../../shared/ui/mine-filter';
+import { AuthService } from '../../../core/auth/auth.service';
 import { TableShell } from '../../../shared/ui/data-table';
 import { StatusPill } from '../../../shared/ui/status-pill';
 import { Dialog } from '@angular/cdk/dialog';
@@ -12,6 +14,12 @@ import { Icon } from '../../../shared/ui/icon';
 import { ViewToggle } from '../../../shared/ui/view-toggle';
 
 interface AiAgent {
+  /** Filled in by the server on the way out; null on rows with no recorded author. */
+  createdByName?: string | null;
+  updatedByName?: string | null;
+  /** The author's id, so "Only mine" matches on identity rather than display text. */
+  createdBy?: number | null;
+
   aiAgentId: number;
   agentName: string;
   description?: string;
@@ -25,7 +33,7 @@ interface AiAgent {
 
 @Component({
   selector: 'app-agents',
-  imports: [ViewToggle, Icon, TableShell, StatusPill, CdkMenu, CdkMenuItem, CdkMenuTrigger],
+  imports: [MineFilter, ViewToggle, Icon, TableShell, StatusPill, CdkMenu, CdkMenuItem, CdkMenuTrigger],
   templateUrl: './agents.html',
 })
 export class Agents implements OnInit {
@@ -39,10 +47,18 @@ export class Agents implements OnInit {
   readonly error = signal('');
   readonly search = signal('');
 
+  private readonly auth = inject(AuthService);
+
+  /** Narrows the list to rows this person created. Not persisted -- see MineFilter. */
+
+  readonly onlyMine = signal(false);
+
+
   readonly filtered = computed(() => {
     const term = this.search().trim().toLowerCase();
-    if (!term) return this.agents();
-    return this.agents().filter(a =>
+    const rows = this.mine(this.agents());
+    if (!term) return rows;
+    return rows.filter(a =>
       (a.agentName ?? '').toLowerCase().includes(term)
       || (a.provider ?? '').toLowerCase().includes(term)
       || (a.model ?? '').toLowerCase().includes(term));
@@ -123,5 +139,19 @@ export class Agents implements OnInit {
       return { cls: 'pill pill-neutral', label: 'Not needed', hint: 'Ollama runs locally without a key' };
     }
     return { cls: 'pill pill-warn', label: 'Not set', hint: 'This provider needs an API key to work' };
+  }
+
+  /**
+   * Applies the "Only mine" toggle.
+   *
+   * Pure -- it runs inside a computed, where writing a signal is not allowed. The surviving
+   * count is already on the table header, so nothing needs recording.
+   */
+  private mine<T extends { createdBy?: number | null }>(rows: T[]): T[] {
+    if (!this.onlyMine()) {
+      return rows;
+    }
+    const myId = this.auth.user()?.appUserId ?? null;
+    return rows.filter(row => isMine(row, myId));
   }
 }

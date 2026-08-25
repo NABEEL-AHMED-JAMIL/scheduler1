@@ -4,6 +4,8 @@ import { DatePipe } from '@angular/common';
 import { Router } from '@angular/router';
 import { Dialog } from '@angular/cdk/dialog';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
+import { MineFilter, isMine } from '../../../shared/ui/mine-filter';
+import { AuthService } from '../../../core/auth/auth.service';
 import { StatusPill } from '../../../shared/ui/status-pill';
 import { StatTile } from '../../../shared/ui/stat-tile';
 import { TableShell } from '../../../shared/ui/data-table';
@@ -16,6 +18,12 @@ import { createSort } from '../../../shared/ui/sort';
 import { TenantDialog } from './tenant-dialog';
 
 export interface Tenant {
+  /** Filled in by the server on the way out; null on rows with no recorded author. */
+  createdByName?: string | null;
+  updatedByName?: string | null;
+  /** The author's id, so "Only mine" matches on identity rather than display text. */
+  createdBy?: number | null;
+
   tenantId: number;
   uuid?: string;
   tenantName: string;
@@ -38,7 +46,7 @@ interface ResourceCount {
 
 @Component({
   selector: 'app-tenants',
-  imports: [CdkMenu, CdkMenuItem, CdkMenuTrigger, ViewToggle, StatTile, Icon, DatePipe, StatusPill, TableShell],
+  imports: [MineFilter, CdkMenu, CdkMenuItem, CdkMenuTrigger, ViewToggle, StatTile, Icon, DatePipe, StatusPill, TableShell],
   templateUrl: './tenants.html',
 })
 export class Tenants implements OnInit {
@@ -65,6 +73,13 @@ export class Tenants implements OnInit {
     { key: 'kafkaProfileCount', label: 'Kafka', icon: 'server' },
   ];
 
+  private readonly auth = inject(AuthService);
+
+  /** Narrows the list to rows this person created. Not persisted -- see MineFilter. */
+
+  readonly onlyMine = signal(false);
+
+
   readonly filtered = computed(() => {
     const term = this.search().trim().toLowerCase();
     const status = this.statusFilter();
@@ -73,7 +88,7 @@ export class Tenants implements OnInit {
       if (!term) return true;
       return `${tenant.tenantName} ${tenant.tenantCode}`.toLowerCase().includes(term);
     });
-    return this.sort.apply(rows, (row, key) => (row as any)[key]);
+    return this.sort.apply(this.mine(rows), (row, key) => (row as any)[key]);
   });
 
   readonly hasFilters = computed(() => !!this.search().trim() || !!this.statusFilter());
@@ -197,5 +212,19 @@ export class Tenants implements OnInit {
       },
       error: err => this.toast.error(err?.error?.message || 'The tenant status could not be changed.'),
     });
+  }
+
+  /**
+   * Applies the "Only mine" toggle.
+   *
+   * Pure -- it runs inside a computed, where writing a signal is not allowed. The surviving
+   * count is already on the table header, so nothing needs recording.
+   */
+  private mine<T extends { createdBy?: number | null }>(rows: T[]): T[] {
+    if (!this.onlyMine()) {
+      return rows;
+    }
+    const myId = this.auth.user()?.appUserId ?? null;
+    return rows.filter(row => isMine(row, myId));
   }
 }

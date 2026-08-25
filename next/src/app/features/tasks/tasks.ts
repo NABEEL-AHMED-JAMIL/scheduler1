@@ -1,6 +1,8 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
+import { MineFilter, isMine } from '../../shared/ui/mine-filter';
+import { AuthService } from '../../core/auth/auth.service';
 import { RouterLink } from '@angular/router';
 import { TableShell } from '../../shared/ui/data-table';
 import { StatusPill } from '../../shared/ui/status-pill';
@@ -26,6 +28,12 @@ export interface LinkedJob {
 }
 
 interface SourceTask {
+  /** Filled in by the server on the way out; null on rows with no recorded author. */
+  createdByName?: string | null;
+  updatedByName?: string | null;
+  /** The author's id, so "Only mine" matches on identity rather than display text. */
+  createdBy?: number | null;
+
   taskDetailId: number;
   taskName: string;
   taskStatus: string;
@@ -41,7 +49,7 @@ interface SourceTask {
 
 @Component({
   selector: 'app-tasks',
-  imports: [ViewToggle, Icon, RouterLink, TableShell, StatusPill, CdkMenu, CdkMenuItem, CdkMenuTrigger, Pagination, DatePipe],
+  imports: [MineFilter, ViewToggle, Icon, RouterLink, TableShell, StatusPill, CdkMenu, CdkMenuItem, CdkMenuTrigger, Pagination, DatePipe],
   templateUrl: './tasks.html',
 })
 export class Tasks implements OnInit {
@@ -55,10 +63,18 @@ export class Tasks implements OnInit {
   readonly error = signal('');
   readonly search = signal('');
 
+  private readonly auth = inject(AuthService);
+
+  /** Narrows the list to rows this person created. Not persisted -- see MineFilter. */
+
+  readonly onlyMine = signal(false);
+
+
   readonly filtered = computed(() => {
     const term = this.search().trim().toLowerCase();
-    if (!term) return this.tasks();
-    return this.tasks().filter(task =>
+    const rows = this.mine(this.tasks());
+    if (!term) return rows;
+    return rows.filter(task =>
       String(task.taskDetailId).includes(term)
       || (task.taskName ?? '').toLowerCase().includes(term)
       || (task.sourceTaskType?.serviceName ?? '').toLowerCase().includes(term)
@@ -244,5 +260,19 @@ export class Tasks implements OnInit {
     if (!raw) return '';
     const match = /topic=([^&]+)/.exec(raw);
     return match ? match[1] : raw;
+  }
+
+  /**
+   * Applies the "Only mine" toggle.
+   *
+   * Pure -- it runs inside a computed, where writing a signal is not allowed. The surviving
+   * count is already on the table header, so nothing needs recording.
+   */
+  private mine<T extends { createdBy?: number | null }>(rows: T[]): T[] {
+    if (!this.onlyMine()) {
+      return rows;
+    }
+    const myId = this.auth.user()?.appUserId ?? null;
+    return rows.filter(row => isMine(row, myId));
   }
 }

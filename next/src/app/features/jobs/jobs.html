@@ -87,6 +87,7 @@
         <input class="input" placeholder="Search id, job or task"
                [value]="search()" (input)="search.set($any($event.target).value); onFilterChange()" />
       </div>
+      <app-mine-filter [(only)]="onlyMine" />
       @if (search() || statusFilter() || executionFilter()) {
         <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()"><app-icon name="close" />Clear</button>
       }
@@ -129,6 +130,8 @@
           <th>Next / last run</th>
           <th>Created</th>
           <th>Run status</th>
+        <th>Created by</th>
+        <th>Updated by</th>
           <th class="text-right">State</th>
           <th class="w-12"></th>
         </tr>
@@ -209,6 +212,12 @@
                   </span>
                 }
               </div>
+            </td>
+            <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
+              {{ job.createdByName || '—' }}
+            </td>
+            <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
+              {{ job.updatedByName || '—' }}
             </td>
             <td class="text-right"><app-status [label]="job.jobStatus" [quiet]="true" /></td>
             <td class="text-right">

@@ -29,6 +29,7 @@
         <input class="input" placeholder="Search id, name, type or pipeline"
                [value]="search()" (input)="search.set($any($event.target).value); pager.reset()" />
       </div>
+      <app-mine-filter [(only)]="onlyMine" />
       @if (search()) {
         <button type="button" class="btn btn-ghost btn-sm" (click)="search.set('')"><app-icon name="close" />Clear</button>
       }
@@ -125,6 +126,8 @@
           <th>Topic</th>
           <th>Pipeline</th>
           <th>Storage</th>
+          <th>Created by</th>
+          <th>Updated by</th>
           <th class="text-right">Status</th>
           <th class="w-16"></th>
         </tr>
@@ -162,6 +165,12 @@
                   </div>
                 }
               } @else { — }
+            </td>
+            <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
+              {{ task.createdByName || '—' }}
+            </td>
+            <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
+              {{ task.updatedByName || '—' }}
             </td>
             <td class="text-right"><app-status [label]="task.taskStatus" [quiet]="true" /></td>
             <td class="text-right">

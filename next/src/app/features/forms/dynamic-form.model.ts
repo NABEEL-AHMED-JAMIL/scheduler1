@@ -22,6 +22,12 @@ export interface DynamicFormField {
 }
 
 export interface DynamicForm {
+  /** Filled in by the server on the way out; null on rows with no recorded author. */
+  createdByName?: string | null;
+  updatedByName?: string | null;
+  /** The author's id, so "Only mine" matches on identity rather than display text. */
+  createdBy?: number | null;
+
   dynamicFormId?: number;
   formName: string;
   description?: string | null;

@@ -5,6 +5,8 @@ import { RouterLink } from '@angular/router';
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
+import { MineFilter, isMine } from '../../shared/ui/mine-filter';
+import { AuthService } from '../../core/auth/auth.service';
 import { ToastService } from '../../shared/ui/toast.service';
 import { confirmWith } from '../../shared/ui/confirm';
 import { TableShell } from '../../shared/ui/data-table';
@@ -40,6 +42,12 @@ export interface Scheduler {
 }
 
 export interface SourceJob {
+  /** Filled in by the server on the way out; null on rows with no recorded author. */
+  createdByName?: string | null;
+  updatedByName?: string | null;
+  /** The author's id, so "Only mine" matches on identity rather than display text. */
+  createdBy?: number | null;
+
   jobId: number;
   jobName: string;
   jobStatus: string;
@@ -78,7 +86,7 @@ const STALLED_AFTER_MS = 30 * 60 * 1000;
 
 @Component({
   selector: 'app-jobs',
-  imports: [JobAssistant, Icon, DatePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Pagination, BarChart],
+  imports: [MineFilter, JobAssistant, Icon, DatePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Pagination, BarChart],
   templateUrl: './jobs.html',
 })
 export class Jobs implements OnInit {
@@ -166,11 +174,18 @@ export class Jobs implements OnInit {
   readonly executions = computed(() =>
     [...new Set(this.jobs().map(j => j.execution).filter(Boolean))].sort() as string[]);
 
+  private readonly auth = inject(AuthService);
+
+  /** Narrows the list to rows this person created. Not persisted -- see MineFilter. */
+
+  readonly onlyMine = signal(false);
+
+
   readonly filtered = computed(() => {
     const term = this.search().trim().toLowerCase();
     const status = this.statusFilter();
     const execution = this.executionFilter();
-    return this.jobs().filter(job => {
+    return this.mine(this.jobs()).filter(job => {
       if (status && job.jobRunningStatus !== status) return false;
       if (execution && job.execution !== execution) return false;
       if (!term) return true;
@@ -728,5 +743,19 @@ export class Jobs implements OnInit {
     this.search.set('');
     this.statusFilter.set('');
     this.executionFilter.set('');
+  }
+
+  /**
+   * Applies the "Only mine" toggle.
+   *
+   * Pure -- it runs inside a computed, where writing a signal is not allowed. The surviving
+   * count is already on the table header, so nothing needs recording.
+   */
+  private mine<T extends { createdBy?: number | null }>(rows: T[]): T[] {
+    if (!this.onlyMine()) {
+      return rows;
+    }
+    const myId = this.auth.user()?.appUserId ?? null;
+    return rows.filter(row => isMine(row, myId));
   }
 }
