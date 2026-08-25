@@ -187,7 +187,8 @@ export const FIELD_TYPES = ['text', 'textarea', 'number', 'url', 'select', 'chec
             <p class="field-note text-[color:var(--text-muted)]">
               The shape a task on this pipeline will send, using the defaults above.
             </p>
-            <pre class="code-block mono text-xs overflow-x-auto">{{ preview() }}</pre>
+            <pre class="mono text-xs leading-relaxed rounded p-2.5 overflow-auto max-h-64 whitespace-pre-wrap break-words"
+                 style="background: var(--surface-raised);">{{ preview() }}</pre>
           </div>
         }
       </form>
