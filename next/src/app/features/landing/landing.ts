@@ -80,6 +80,8 @@ import { ThemeService } from '../../core/theme.service';
             <div class="size-7 rounded-md bg-brand-500 grid place-items-center text-white text-sm font-bold">E</div>
             <span class="font-semibold text-[15px] tracking-tight">ETL Console</span>
             <div class="ml-auto flex items-center gap-1.5">
+              <a routerLink="/docs" class="btn btn-ghost btn-sm hidden sm:inline-flex"
+                 style="color: inherit;">Setup guide</a>
               <button type="button" class="btn btn-ghost btn-icon btn-sm" style="color: inherit;"
                       [attr.aria-label]="theme.theme() === 'dark' ? 'Switch to light' : 'Switch to dark'"
                       (click)="theme.toggle()">
@@ -106,6 +108,9 @@ import { ThemeService } from '../../core/theme.service';
             <div class="mt-8 flex flex-wrap items-center gap-3">
               <a routerLink="/login" class="btn btn-primary">
                 Sign in<app-icon name="arrowRight" size="0.95em" />
+              </a>
+              <a routerLink="/docs" class="link-inline text-sm" style="color: #c4c9f9;">
+                Read the setup guide
               </a>
               <span class="hero-sub text-sm">Access is issued by your administrator.</span>
             </div>
@@ -234,7 +239,8 @@ import { ThemeService } from '../../core/theme.service';
           <span class="text-sm text-[color:var(--text-muted)]">
             ETL Console — pipeline scheduling and run history.
           </span>
-          <a routerLink="/login" class="link-inline ml-auto text-sm">Sign in</a>
+          <a routerLink="/docs" class="link-inline ml-auto text-sm">Setup guide</a>
+          <a routerLink="/login" class="link-inline text-sm">Sign in</a>
         </div>
       </footer>
     </div>

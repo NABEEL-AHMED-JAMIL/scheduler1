@@ -16,6 +16,12 @@ export const routes: Routes = [
     loadComponent: () => import('./features/landing/landing').then(m => m.Landing),
   },
   {
+    // Public like the landing page: the setup guide describes the console's own screens and
+    // carries nothing tenant-specific, so it can be linked to and read before signing in.
+    path: 'docs',
+    loadComponent: () => import('./features/docs/docs').then(m => m.Docs),
+  },
+  {
     // A shared form link opens for someone with no account, so it sits outside the shell and
     // outside authGuard. fetchFormByUuid is permitAll on the server for the same reason.
     path: 'f/:uuid',
