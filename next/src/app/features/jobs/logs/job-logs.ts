@@ -26,6 +26,12 @@ export class JobLogs implements OnInit, OnDestroy {
   readonly jobId = input.required<string>();
   readonly jobQueueId = input.required<string>();
 
+  /** Both ids come from the URL, so both are text until proven to be numbers. */
+  private validIds(): boolean {
+    const isId = (value: string) => /^\d+$/.test((value ?? '').trim());
+    return isId(this.jobId()) && isId(this.jobQueueId());
+  }
+
   private readonly http = inject(HttpClient);
 
   readonly logs = signal<AuditLog[]>([]);
@@ -229,6 +235,16 @@ export class JobLogs implements OnInit, OnDestroy {
 
   /** `quiet` keeps the list on screen during an auto-refresh instead of blanking it. */
   load(quiet = false): void {
+    // A link built from a missing id arrives here as the literal text "undefined", and the
+    // server answers with a Java type-conversion error that means nothing to whoever clicked.
+    // Refuse it here and say what actually went wrong.
+    if (!this.validIds()) {
+      this.loading.set(false);
+      this.error.set('That link is missing the run it refers to. Open the run from the job\'s '
+        + 'history instead.');
+      return;
+    }
+
     if (!quiet) this.loading.set(true);
     this.error.set('');
     this.http.get<ApiResponse<AuditLog[]>>(`${API_BASE}/sourceJob.json/findSourceJobAuditLog`, {

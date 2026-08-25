@@ -191,8 +191,12 @@
                           {{ run.jobStatusMessage || '—' }}
                         </td>
                         <td class="text-right">
-                          <a class="link-inline text-xs"
-                             [routerLink]="['/jobs', jobId(), 'runs', run.jobQueueId, 'logs']">Logs</a>
+                          @if (run.jobQueueId) {
+                            <a class="link-inline text-xs"
+                               [routerLink]="['/jobs', jobId(), 'runs', run.jobQueueId, 'logs']">Logs</a>
+                          } @else {
+                            <span class="text-xs text-[color:var(--text-muted)]">—</span>
+                          }
                         </td>
                       </tr>
                     }

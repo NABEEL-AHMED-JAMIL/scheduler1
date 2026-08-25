@@ -431,8 +431,10 @@
       <div class="flex-1 min-h-0 overflow-hidden flex flex-col">
         <!-- Keyed on the job so switching rows rebuilds it against the new one rather than
              leaving the previous job's answers on screen under a new title. -->
-        @if (assistantJob(); as current) {
-          <app-job-assistant [jobId]="String(current.jobId)" [compact]="true" />
+        <!-- String(undefined) is the text "undefined", which would travel into every link this
+             panel builds and reach the server as a job id. Guarded on the id itself. -->
+        @if (assistantJob()?.jobId; as currentJobId) {
+          <app-job-assistant [jobId]="String(currentJobId)" [compact]="true" />
         }
       </div>
     }
