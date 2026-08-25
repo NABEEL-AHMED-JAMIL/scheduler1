@@ -5,6 +5,8 @@ import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { ToastService } from '../../../shared/ui/toast.service';
+import { MineFilter, isMine } from '../../../shared/ui/mine-filter';
+import { AuthService } from '../../../core/auth/auth.service';
 import { StatTile } from '../../../shared/ui/stat-tile';
 import { confirmWith } from '../../../shared/ui/confirm';
 import { TableShell } from '../../../shared/ui/data-table';
@@ -14,6 +16,13 @@ import { Icon } from '../../../shared/ui/icon';
 import { ViewToggle } from '../../../shared/ui/view-toggle';
 
 interface StorageConnection {
+  /** The author's id, so "Only mine" matches on identity rather than display text. */
+  createdBy?: number | null;
+
+  /** Filled in by the server on the way out; null on rows with no recorded author. */
+  createdByName?: string | null;
+  updatedByName?: string | null;
+
   storageConnectionId: number;
   connectionName: string;
   alias: string;
@@ -35,7 +44,7 @@ interface StorageConnection {
 
 @Component({
   selector: 'app-storage-connections',
-  imports: [ViewToggle, StatTile, Icon, DatePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill],
+  imports: [MineFilter, ViewToggle, StatTile, Icon, DatePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill],
   templateUrl: './storage-connections.html',
 })
 export class StorageConnections implements OnInit {
@@ -55,10 +64,17 @@ export class StorageConnections implements OnInit {
   readonly providers = computed(() =>
     [...new Set(this.connections().map(c => c.provider).filter(Boolean))].sort());
 
+  /** Narrows the list to rows this person created. Not persisted -- see MineFilter. */
+
+  private readonly auth = inject(AuthService);
+
+  readonly onlyMine = signal(false);
+
+
   readonly filtered = computed(() => {
     const term = this.search().trim().toLowerCase();
     const provider = this.providerFilter();
-    return this.connections().filter(c => {
+    return this.mine(this.connections()).filter(c => {
       if (provider && c.provider !== provider) return false;
       if (!term) return true;
       return (c.connectionName ?? '').toLowerCase().includes(term)
@@ -195,5 +211,19 @@ export class StorageConnections implements OnInit {
   clearFilters(): void {
     this.search.set('');
     this.providerFilter.set('');
+  }
+
+  /**
+   * Applies the "Only mine" toggle.
+   *
+   * Kept pure -- it runs inside a computed, and writing a signal from there is not allowed. The
+   * count of what survives is already on the table header, so nothing needs to be recorded.
+   */
+  private mine<T extends { createdBy?: number | null }>(rows: T[]): T[] {
+    if (!this.onlyMine()) {
+      return rows;
+    }
+    const myId = this.auth.user()?.appUserId ?? null;
+    return rows.filter(row => isMine(row, myId));
   }
 }

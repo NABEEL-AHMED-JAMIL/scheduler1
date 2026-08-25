@@ -4,6 +4,8 @@ import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { TableShell } from '../../../shared/ui/data-table';
+import { MineFilter, isMine } from '../../../shared/ui/mine-filter';
+import { AuthService } from '../../../core/auth/auth.service';
 import { Icon } from '../../../shared/ui/icon';
 import { ViewToggle } from '../../../shared/ui/view-toggle';
 import { ToastService } from '../../../shared/ui/toast.service';
@@ -14,7 +16,7 @@ import { catchError, map } from 'rxjs/operators';
 
 @Component({
   selector: 'app-lookup',
-  imports: [ViewToggle, Icon, TableShell, CdkMenu, CdkMenuItem, CdkMenuTrigger],
+  imports: [MineFilter, ViewToggle, Icon, TableShell, CdkMenu, CdkMenuItem, CdkMenuTrigger],
   templateUrl: './lookup.html',
 })
 export class Lookup implements OnInit {
@@ -30,10 +32,18 @@ export class Lookup implements OnInit {
   readonly expanded = signal<Set<number>>(new Set<number>());
   readonly loadingChildren = signal<Set<number>>(new Set<number>());
 
+  /** Narrows the list to rows this person created. Not persisted -- see MineFilter. */
+
+  private readonly auth = inject(AuthService);
+
+  readonly onlyMine = signal(false);
+
+
   readonly filtered = computed(() => {
     const term = this.search().trim().toLowerCase();
-    if (!term) return this.lookups();
-    return this.lookups().filter(l =>
+    const rows = this.mine(this.lookups());
+    if (!term) return rows;
+    return rows.filter(l =>
       (l.lookupType ?? '').toLowerCase().includes(term)
       || (l.lookupValue ?? '').toLowerCase().includes(term));
   });
@@ -151,4 +161,18 @@ export class Lookup implements OnInit {
 
   readonly totalEntries = computed(() =>
     this.lookups().reduce((sum, l) => sum + (l.children?.length ?? 0), 0));
+
+  /**
+   * Applies the "Only mine" toggle.
+   *
+   * Kept pure -- it runs inside a computed, and writing a signal from there is not allowed. The
+   * count of what survives is already on the table header, so nothing needs to be recorded.
+   */
+  private mine<T extends { createdBy?: number | null }>(rows: T[]): T[] {
+    if (!this.onlyMine()) {
+      return rows;
+    }
+    const myId = this.auth.user()?.appUserId ?? null;
+    return rows.filter(row => isMine(row, myId));
+  }
 }

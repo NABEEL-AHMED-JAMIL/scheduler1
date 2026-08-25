@@ -29,6 +29,7 @@
         <input class="input" placeholder="Search type or value"
                [value]="search()" (input)="search.set($any($event.target).value)" />
       </div>
+      <app-mine-filter [(only)]="onlyMine" />
     </ng-container>
 
     @if (view() === 'cards') {
@@ -114,6 +115,8 @@
           <th>Value</th>
           <th>Description</th>
           <th>Entries</th>
+          <th>Created by</th>
+          <th>Updated by</th>
           <th class="w-12"></th>
         </tr>
       </thead>
@@ -156,6 +159,12 @@
                   <app-icon name="plus" size="0.85em" class="icon-ok" />Add
                 </button>
               }
+            </td>
+            <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
+              {{ lookup.createdByName || '—' }}
+            </td>
+            <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
+              {{ lookup.updatedByName || '—' }}
             </td>
             <td class="text-right">
               <button type="button" class="btn btn-ghost btn-icon" [cdkMenuTriggerFor]="menu"

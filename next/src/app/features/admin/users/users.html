@@ -74,6 +74,7 @@
         <input class="input" placeholder="Search name, email or tenant"
                [value]="search()" (input)="search.set($any($event.target).value); pager.reset()" />
       </div>
+      <app-mine-filter [(only)]="onlyMine" />
       @if (hasFilters()) {
         <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()">
           <app-icon name="close" />Clear
@@ -169,7 +170,9 @@
             { key: 'userRole',    label: 'Role' },
             { key: 'tenantName',  label: 'Tenant' },
             { key: 'lastLoginAt', label: 'Last sign-in' },
-            { key: 'dateCreated', label: 'Created' }
+            { key: 'dateCreated',   label: 'Created' },
+            { key: 'createdByName', label: 'Created by' },
+            { key: 'updatedByName', label: 'Updated by' }
           ]; track column.key) {
             <th>
               <button type="button" class="th-sort"
@@ -232,8 +235,15 @@
             </td>
             <td class="text-[color:var(--text-secondary)] whitespace-nowrap">
               {{ user.dateCreated ? (user.dateCreated | date:'d MMM yyyy') : '—' }}
-              <app-audit-line [createdByName]="user.createdByName"
-                              [updatedByName]="user.updatedByName" />
+            </td>
+            <td class="text-[color:var(--text-secondary)] whitespace-nowrap">
+              <!-- A dash, not blank: in a column of names an empty cell reads as a rendering
+                   fault, whereas a dash says plainly that nobody is recorded. Rows made before
+                   the audit columns existed, and rows the scheduler wrote, both land here. -->
+              {{ user.createdByName || '—' }}
+            </td>
+            <td class="text-[color:var(--text-secondary)] whitespace-nowrap">
+              {{ user.updatedByName || '—' }}
             </td>
             <td class="text-right tabular">
               @if (statFor(user); as stat) {

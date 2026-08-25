@@ -4,6 +4,7 @@ import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { TableShell } from '../../../shared/ui/data-table';
+import { MineFilter, isMine } from '../../../shared/ui/mine-filter';
 import { StatTile } from '../../../shared/ui/stat-tile';
 import { StatusPill } from '../../../shared/ui/status-pill';
 import { Icon } from '../../../shared/ui/icon';
@@ -24,7 +25,7 @@ interface LinkedTask {
 
 @Component({
   selector: 'app-task-types',
-  imports: [ViewToggle, StatTile, TableShell, StatusPill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger],
+  imports: [MineFilter, ViewToggle, StatTile, TableShell, StatusPill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger],
   templateUrl: './task-types.html',
 })
 export class TaskTypes implements OnInit {
@@ -43,10 +44,15 @@ export class TaskTypes implements OnInit {
 
   readonly hasFilters = computed(() => !!(this.search().trim() || this.statusFilter()));
 
+  /** Narrows the list to rows this person created. Not persisted -- see MineFilter. */
+
+  readonly onlyMine = signal(false);
+
+
   readonly filtered = computed(() => {
     const term = this.search().trim().toLowerCase();
     const status = this.statusFilter();
-    return this.types().filter(t => {
+    return this.mine(this.types()).filter(t => {
       if (status && t.status !== status) return false;
       if (!term) return true;
       return `${t.serviceName ?? ''} ${t.description ?? ''} ${this.topicOf(t.queueTopicPartition)}`
@@ -251,5 +257,19 @@ export class TaskTypes implements OnInit {
   partitionsOf(raw?: string): string {
     const partitions = parseTopicPartition(raw).partitions;
     return partitions ? `[${partitions}]` : '';
+  }
+
+  /**
+   * Applies the "Only mine" toggle.
+   *
+   * Kept pure -- it runs inside a computed, and writing a signal from there is not allowed. The
+   * count of what survives is already on the table header, so nothing needs to be recorded.
+   */
+  private mine<T extends { createdBy?: number | null }>(rows: T[]): T[] {
+    if (!this.onlyMine()) {
+      return rows;
+    }
+    const myId = this.auth.user()?.appUserId ?? null;
+    return rows.filter(row => isMine(row, myId));
   }
 }

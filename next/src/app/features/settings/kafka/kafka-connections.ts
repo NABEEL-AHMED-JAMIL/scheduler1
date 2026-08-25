@@ -5,6 +5,8 @@ import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { TableShell } from '../../../shared/ui/data-table';
+import { MineFilter, isMine } from '../../../shared/ui/mine-filter';
+import { AuthService } from '../../../core/auth/auth.service';
 import { StatTile } from '../../../shared/ui/stat-tile';
 import { StatusPill } from '../../../shared/ui/status-pill';
 import { Icon } from '../../../shared/ui/icon';
@@ -15,6 +17,13 @@ import { createSort } from '../../../shared/ui/sort';
 import { KafkaDialog } from './kafka-dialog';
 
 export interface KafkaProfile {
+  /** The author's id, so "Only mine" matches on identity rather than display text. */
+  createdBy?: number | null;
+
+  /** Filled in by the server on the way out; null on rows with no recorded author. */
+  createdByName?: string | null;
+  updatedByName?: string | null;
+
   kafkaConnectionProfileId: number;
   profileName: string;
   environmentLabel?: string;
@@ -41,7 +50,7 @@ export interface KafkaProfile {
 
 @Component({
   selector: 'app-kafka-connections',
-  imports: [ViewToggle, StatTile, DatePipe, TableShell, StatusPill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger],
+  imports: [MineFilter, ViewToggle, StatTile, DatePipe, TableShell, StatusPill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger],
   templateUrl: './kafka-connections.html',
 })
 export class KafkaConnections implements OnInit {
@@ -65,6 +74,13 @@ export class KafkaConnections implements OnInit {
   readonly hasFilters = computed(() =>
     !!(this.search().trim() || this.protocolFilter() || this.statusFilter()));
 
+  /** Narrows the list to rows this person created. Not persisted -- see MineFilter. */
+
+  private readonly auth = inject(AuthService);
+
+  readonly onlyMine = signal(false);
+
+
   readonly filtered = computed(() => {
     const term = this.search().trim().toLowerCase();
     const protocol = this.protocolFilter();
@@ -75,7 +91,7 @@ export class KafkaConnections implements OnInit {
       if (!term) return true;
       return `${p.profileName} ${p.environmentLabel ?? ''} ${p.bootstrapServers}`.toLowerCase().includes(term);
     });
-    return this.sort.apply(rows, (row, key) => (row as any)[key]);
+    return this.sort.apply(this.mine(rows), (row, key) => (row as any)[key]);
   });
 
   readonly summary = computed(() => {
@@ -214,5 +230,19 @@ export class KafkaConnections implements OnInit {
   /** SASL and SSL each imply a different set of things that must be configured. */
   protocolTone(profile: KafkaProfile): string {
     return profile.securityProtocol === 'PLAINTEXT' ? 'pill pill-warn' : 'pill pill-neutral';
+  }
+
+  /**
+   * Applies the "Only mine" toggle.
+   *
+   * Kept pure -- it runs inside a computed, and writing a signal from there is not allowed. The
+   * count of what survives is already on the table header, so nothing needs to be recorded.
+   */
+  private mine<T extends { createdBy?: number | null }>(rows: T[]): T[] {
+    if (!this.onlyMine()) {
+      return rows;
+    }
+    const myId = this.auth.user()?.appUserId ?? null;
+    return rows.filter(row => isMine(row, myId));
   }
 }

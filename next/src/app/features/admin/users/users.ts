@@ -7,6 +7,7 @@ import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { AuthService } from '../../../core/auth/auth.service';
 import { ToastService } from '../../../shared/ui/toast.service';
+import { MineFilter, isMine } from '../../../shared/ui/mine-filter';
 import { StatTile } from '../../../shared/ui/stat-tile';
 import { confirmWith } from '../../../shared/ui/confirm';
 import { TableShell } from '../../../shared/ui/data-table';
@@ -34,6 +35,9 @@ export interface UserStatistic {
 }
 
 export interface AppUser {
+  /** The author's id, so "Only mine" matches on identity rather than display text. */
+  createdBy?: number | null;
+
   /** Filled in by the server on the way out; absent on rows that predate the audit columns. */
   createdByName?: string | null;
   updatedByName?: string | null;
@@ -56,7 +60,7 @@ export interface AppUser {
 
 @Component({
   selector: 'app-users',
-  imports: [ViewToggle, StatTile, DatePipe, AuditLine, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Icon, Avatar, Pagination],
+  imports: [MineFilter, ViewToggle, StatTile, DatePipe, AuditLine, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Icon, Avatar, Pagination],
   templateUrl: './users.html',
 })
 export class Users implements OnInit {
@@ -112,6 +116,11 @@ export class Users implements OnInit {
   /** Table for scanning many at once, cards when the picture and role matter more. */
   readonly view = signal<'table' | 'cards'>('table');
 
+  /** Narrows the list to rows this person created. Not persisted -- see MineFilter. */
+
+  readonly onlyMine = signal(false);
+
+
   readonly filtered = computed(() => {
     const term = this.search().trim().toLowerCase();
     const role = this.roleFilter();
@@ -129,7 +138,7 @@ export class Users implements OnInit {
         || (user.position ?? '').toLowerCase().includes(term)
         || (user.tenantName ?? '').toLowerCase().includes(term);
     });
-    return this.sort.apply(rows, (row, key) => (row as any)[key]);
+    return this.sort.apply(this.mine(rows), (row, key) => (row as any)[key]);
   });
 
   readonly pager = createPager<AppUser>();
@@ -329,5 +338,19 @@ export class Users implements OnInit {
     this.roleFilter.set('');
     this.statusFilter.set('');
     this.tenantFilter.set('');
+  }
+
+  /**
+   * Applies the "Only mine" toggle.
+   *
+   * Kept pure -- it runs inside a computed, and writing a signal from there is not allowed. The
+   * count of what survives is already on the table header, so nothing needs to be recorded.
+   */
+  private mine<T extends { createdBy?: number | null }>(rows: T[]): T[] {
+    if (!this.onlyMine()) {
+      return rows;
+    }
+    const myId = this.auth.user()?.appUserId ?? null;
+    return rows.filter(row => isMine(row, myId));
   }
 }

@@ -46,6 +46,7 @@
         <input class="input" placeholder="Search name, description or topic"
                [value]="search()" (input)="search.set($any($event.target).value)" />
       </div>
+      <app-mine-filter [(only)]="onlyMine" />
       @if (hasFilters()) {
         <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()">
           <app-icon name="close" />Clear
@@ -140,6 +141,8 @@
           <th>Partitions</th>
           @if (canRoute()) { <th>Kafka</th> }
           <th>Tasks</th>
+          <th>Created by</th>
+          <th>Updated by</th>
           <th class="text-right">Status</th>
           <th class="w-12"></th>
         </tr>
@@ -176,6 +179,12 @@
               } @else {
                 <span class="text-[color:var(--text-muted)]">none</span>
               }
+            </td>
+            <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
+              {{ type.createdByName || '—' }}
+            </td>
+            <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
+              {{ type.updatedByName || '—' }}
             </td>
             <td class="text-right"><app-status [label]="type.status" [quiet]="true" /></td>
             <td class="text-right">

@@ -8,6 +8,13 @@ import { Field } from '../../../shared/ui/field';
 import { FormDialog } from '../../../shared/ui/form-dialog';
 
 export interface LookupData {
+  /** The author's id, so "Only mine" can match on identity rather than display text. */
+  createdBy?: number | null;
+
+  /** Filled in by the server on the way out; null on rows with no recorded author. */
+  createdByName?: string | null;
+  updatedByName?: string | null;
+
   lookupId?: number;
   lookupType: string;
   lookupValue: string;

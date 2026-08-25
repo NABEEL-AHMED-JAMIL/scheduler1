@@ -11,6 +11,13 @@ import { Icon } from '../../../shared/ui/icon';
 import { parseTopicPartition, formatTopicPartition } from '../../../shared/ui/topic';
 
 export interface TaskType {
+  /** The author's id, so "Only mine" can match on identity rather than display text. */
+  createdBy?: number | null;
+
+  /** Filled in by the server on the way out; null on rows with no recorded author. */
+  createdByName?: string | null;
+  updatedByName?: string | null;
+
   sourceTaskTypeId?: number;
   serviceName: string;
   description?: string;

@@ -43,6 +43,7 @@
         <input class="input" placeholder="Search name, alias or host"
                [value]="search()" (input)="search.set($any($event.target).value)" />
       </div>
+      <app-mine-filter [(only)]="onlyMine" />
       @if (search() || providerFilter()) {
         <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()"><app-icon name="close" />Clear</button>
       }
@@ -123,6 +124,8 @@
           <th>Target</th>
           <th>Credentials</th>
           <th>Last test</th>
+          <th>Created by</th>
+          <th>Updated by</th>
           <th class="text-right">State</th>
           <th class="w-12"></th>
         </tr>
@@ -161,6 +164,12 @@
                   {{ c.lastTestedAt | date:'d MMM, HH:mm' }}
                 </div>
               }
+            </td>
+            <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
+              {{ c.createdByName || '—' }}
+            </td>
+            <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
+              {{ c.updatedByName || '—' }}
             </td>
             <td class="text-right"><app-status [label]="c.status" [quiet]="true" /></td>
             <td class="text-right">
