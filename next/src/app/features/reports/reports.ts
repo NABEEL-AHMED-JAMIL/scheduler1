@@ -2,6 +2,7 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { ToastService } from '../../shared/ui/toast.service';
+import { statusColor } from '../../shared/charts/status-color';
 import { Icon } from '../../shared/ui/icon';
 import { StatusPill } from '../../shared/ui/status-pill';
 import { TableShell } from '../../shared/ui/data-table';
@@ -58,25 +59,18 @@ export class Reports implements OnInit {
   readonly chartLabels = CHART_LABELS;
 
   /**
-   * Colour by meaning where a label has one, and by position otherwise.
+   * Colour by meaning where a label has one, by position otherwise.
    *
-   * A status keeps the colour it has everywhere else in the console, so Failed is the same red
-   * in a chart as in a pill. An arbitrary label -- a task or an owner -- takes the next series
-   * colour, which is per-theme and legible on both grounds.
+   * Delegated to statusColor rather than restated here. Writing the mapping out a second time
+   * is how this screen ended up drawing Interrupt in amber while every other chart and pill in
+   * the console drew it in soft red -- the same data, two answers, because there were two
+   * lists to keep in step. statusColor already falls back to the categorical palette for a
+   * label with no status meaning, which is exactly what a task or an owner needs.
    */
   readonly colourFor = (label: string): string => {
-    switch ((label ?? '').toLowerCase()) {
-      case 'completed': return 'var(--series-ok)';
-      case 'failed':    return 'var(--series-crit)';
-      case 'interrupt': return 'var(--series-warn)';
-      case 'queue':
-      case 'start':
-      case 'running':   return 'var(--series-brand)';
-    }
     const pool = this.data();
     const known = [...pool.task, ...pool.owner, ...pool.day];
-    const at = Math.max(0, known.indexOf(label));
-    return `var(--chart-${at % 6})`;
+    return statusColor(label, Math.max(0, known.indexOf(label)));
   };
 
   /** Which labels the legend describes depends on how the chart reads the grid. */
@@ -178,14 +172,8 @@ export class Reports implements OnInit {
     return this.data().rows.filter(r => r[this.colDim().idx] === colIndex).length;
   }
 
-  toneFor(label: string): string {
-    switch (label.toLowerCase()) {
-      case 'completed': return 'var(--series-ok)';
-      case 'failed':    return 'var(--series-crit)';
-      case 'interrupt': return 'var(--series-warn)';
-      default:          return 'var(--series-brand)';
-    }
-  }
+  /** The header strips take the same colours as everything else. */
+  toneFor(label: string): string { return statusColor(label); }
 
   // ---- drilling ---------------------------------------------------------------------------
 
