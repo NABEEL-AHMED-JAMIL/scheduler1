@@ -121,6 +121,9 @@
                     : 'Never signed in' }}
               </p>
 
+              <app-audit-line class="block mt-1" [createdByName]="user.createdByName"
+                              [updatedByName]="user.updatedByName" />
+
               <!-- What they own. Absent until the aggregate lands, and shown as a plain line
                    when they own nothing, because a row of zeros reads as a broken widget. -->
               @if (statFor(user); as stat) {
@@ -229,6 +232,8 @@
             </td>
             <td class="text-[color:var(--text-secondary)] whitespace-nowrap">
               {{ user.dateCreated ? (user.dateCreated | date:'d MMM yyyy') : '—' }}
+              <app-audit-line [createdByName]="user.createdByName"
+                              [updatedByName]="user.updatedByName" />
             </td>
             <td class="text-right tabular">
               @if (statFor(user); as stat) {
