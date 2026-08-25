@@ -142,11 +142,14 @@ type View = 'dashboard' | 'jobs' | 'reports';
                 </div>
               }
             </div>
-            <div class="mt-3 flex items-end gap-1.5 h-10">
+            <!-- Scaled against the largest column rather than by a fixed divisor: at done/2 a
+                 96 became 48px inside a 40px box, so every bar overflowed and they all looked
+                 the same height. -->
+            <div class="mt-3 flex items-end gap-1.5" style="height: 44px;">
               @for (row of reportRows; track row.task) {
-                <div class="flex-1 flex flex-col justify-end gap-0.5">
-                  <div class="bar-ok" [style.height.px]="row.done / 2"></div>
-                  <div class="bar-fail" [style.height.px]="row.failed * 2"></div>
+                <div class="flex-1 flex flex-col justify-end gap-px">
+                  <div class="bar-fail" [style.height.px]="barPx(row.failed)"></div>
+                  <div class="bar-ok" [style.height.px]="barPx(row.done)"></div>
                 </div>
               }
             </div>
@@ -191,6 +194,12 @@ export class ConsolePreview {
     { name: 'Crop origin risk — month end', task: 'Weather Risk',
       schedule: 'Last day', status: 'Completed', chip: 'chip-ok' },
   ];
+
+  /** Tallest column fills the box; everything else is drawn in proportion to it. */
+  barPx(value: number): number {
+    const tallest = Math.max(...this.reportRows.map(r => r.done + r.failed));
+    return Math.round((value / tallest) * 42);
+  }
 
   readonly reportRows = [
     { task: 'Port disruption history', done: 96, failed: 2 },
