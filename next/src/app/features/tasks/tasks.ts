@@ -175,14 +175,25 @@ export class Tasks implements OnInit {
    * being discovered afterwards. taskStatus has to be in the payload: the endpoint cascades
    * to the jobs unconditionally but only marks the task itself when that field is present.
    */
+  /** A task still in use cannot be deleted; the server refuses too, this just says so sooner. */
+  inUse(task: SourceTask): boolean {
+    return (task.totalLinksJobs ?? 0) > 0;
+  }
+
   async remove(task: SourceTask): Promise<void> {
     if (task.taskStatus === 'Delete') return;
     const linked = task.totalLinksJobs ?? 0;
+    if (linked) {
+      // Offering a confirm here would be offering a choice that does not exist -- the server
+      // refuses it. Better to say why, and point at the thing that has to happen first.
+      this.toast.error(
+        `"${task.taskName}" is used by ${linked} job${linked > 1 ? 's' : ''}. ` +
+        `Point those jobs at another task, or delete them, before deleting this one.`);
+      return;
+    }
     const ok = await confirmWith(this.dialog, {
       title: 'Delete task',
-      body: linked
-        ? `"${task.taskName}" and the ${linked} job${linked > 1 ? 's' : ''} bound to it will be deleted and stop running.`
-        : `"${task.taskName}" will be deleted. No jobs are bound to it.`,
+      body: `"${task.taskName}" will be deleted. No jobs are bound to it.`,
       confirmLabel: 'Delete',
       danger: true,
     });

@@ -60,11 +60,14 @@
                       <app-icon name="copy" />Duplicate
                     </button>
                     <button cdkMenuItem class="menu-item btn-intent-crit"
-                            [disabled]="task.taskStatus === 'Delete'"
+                            [disabled]="task.taskStatus === 'Delete' || inUse(task)"
+                            [title]="inUse(task)
+                              ? 'Used by ' + task.totalLinksJobs + ' job(s). Move or delete those first.'
+                              : 'Delete this task'"
                             (cdkMenuItemTriggered)="remove(task)">
                       <app-icon name="trash" />Delete
                       @if (task.totalLinksJobs) {
-                        <span class="pill pill-warn ml-auto">+{{ task.totalLinksJobs }} jobs</span>
+                        <span class="pill pill-warn ml-auto">in use · {{ task.totalLinksJobs }}</span>
                       }
                     </button>
                   </div>
@@ -177,11 +180,14 @@
                     <app-icon name="copy" />Duplicate
                   </button>
                   <button cdkMenuItem class="menu-item btn-intent-crit"
-                          [disabled]="task.taskStatus === 'Delete'"
+                          [disabled]="task.taskStatus === 'Delete' || inUse(task)"
+                          [title]="inUse(task)
+                            ? 'Used by ' + task.totalLinksJobs + ' job(s). Move or delete those first.'
+                            : 'Delete this task'"
                           (cdkMenuItemTriggered)="remove(task)">
                     <app-icon name="trash" />Delete
                     @if (task.totalLinksJobs) {
-                      <span class="pill pill-warn ml-auto">+{{ task.totalLinksJobs }} jobs</span>
+                      <span class="pill pill-warn ml-auto">in use · {{ task.totalLinksJobs }}</span>
                     }
                   </button>
                 </div>
