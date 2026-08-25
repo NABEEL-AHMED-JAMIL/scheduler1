@@ -1,5 +1,5 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
@@ -26,7 +26,7 @@ const SLOW_PROVIDERS = ['FTP', 'FTPS'];
 
 @Component({
   selector: 'app-objects',
-  imports: [Icon, DatePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, FileChat, Donut, RankedBar],
+  imports: [Icon, DatePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, FileChat, Donut, RankedBar],
   templateUrl: './objects.html',
 })
 export class Objects implements OnInit {
@@ -36,6 +36,14 @@ export class Objects implements OnInit {
   private readonly http = inject(HttpClient);
 
   readonly buckets = signal<BucketSummary[]>([]);
+
+  /** FTP is a different kind of thing from an object store, and the card should say so. */
+  providerIcon(provider: string): string {
+    const kind = (provider || '').toUpperCase();
+    if (kind === 'FTP' || kind === 'FTPS') return 'server';
+    return 'cloud';
+  }
+
   readonly bucket = signal('');
   readonly objects = signal<ObjectSummary[]>([]);
   readonly crumbs = signal<Crumb[]>([]);

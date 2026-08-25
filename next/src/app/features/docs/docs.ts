@@ -5,6 +5,21 @@ import { ThemeService } from '../../core/theme.service';
 
 interface Section { id: string; title: string; }
 
+interface StepField { name: string; required: boolean; note: string; }
+
+interface Step {
+  id: string;
+  title: string;
+  intro: string;
+  where?: string;
+  fields?: StepField[];
+  notes?: string[];
+  warn?: string;
+  /** Base name of a screenshot in public/docs; -light.png and -dark.png are expected. */
+  shot?: string;
+  shotCaption?: string;
+}
+
 /**
  * Setup documentation.
  *
@@ -24,6 +39,14 @@ interface Section { id: string; title: string; }
     .doc h2 { scroll-margin-top: 5rem; }
     .doc-body p { line-height: 1.7; }
     .toc-link.is-current { color: var(--color-brand-500); font-weight: 600; }
+    /* A screenshot is a picture of a screen, so it is framed like one rather than floated on
+       the page. max-width keeps a wide capture inside the column on a narrow viewport. */
+    .doc-shot {
+      display: block; width: 100%; max-width: 100%; height: auto;
+      border-radius: 10px; border: 1px solid var(--border-subtle);
+      box-shadow: 0 10px 30px -12px rgb(0 0 0 / 0.28);
+      background: var(--surface-raised);
+    }
     .num {
       display: grid; place-items: center; flex: none;
       width: 1.6rem; height: 1.6rem; border-radius: 999px;
@@ -126,6 +149,22 @@ interface Section { id: string; title: string; }
 
               @for (note of step.notes ?? []; track note) {
                 <p class="mt-3 text-sm text-[color:var(--text-secondary)]">{{ note }}</p>
+              }
+
+              @if (step.shot) {
+                <!-- Two files per shot, swapped by theme: a light screenshot on a dark page
+                     reads as a hole in it. Lazy so the guide does not fetch eight images
+                     before anyone scrolls. -->
+                <figure class="mt-4">
+                  <img class="doc-shot" loading="lazy" decoding="async"
+                       [src]="shotFor(step.shot)"
+                       [alt]="'The ' + step.title.toLowerCase() + ' screen'" />
+                  @if (step.shotCaption) {
+                    <figcaption class="field-note text-[color:var(--text-muted)] mt-2">
+                      {{ step.shotCaption }}
+                    </figcaption>
+                  }
+                </figure>
               }
 
               @if (step.warn) {
@@ -232,7 +271,7 @@ export class Docs implements AfterViewInit {
   private readonly destroyRef = inject(DestroyRef);
   readonly current = signal('');
 
-  readonly steps = [
+  readonly steps: Step[] = [
     {
       id: 'request', title: 'Ask for a workspace',
       intro: 'If you do not have a workspace yet, request one. A platform administrator reviews '
@@ -401,6 +440,11 @@ export class Docs implements AfterViewInit {
     { name: 'Skip', note: 'Passed over deliberately — by a person, or because the job was already queued.' },
     { name: 'Missed', note: 'Its slot went by while nothing was running to take it.' },
   ];
+
+  /** Screenshots come in a light and a dark file; the viewer's theme picks which. */
+  shotFor(name: string): string {
+    return `/docs/${name}-${this.theme.theme()}.png`;
+  }
 
   /**
    * Marks the section being read.

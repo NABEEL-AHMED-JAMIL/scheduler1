@@ -21,16 +21,51 @@
   </div>
 
   @if (!bucket()) {
-    <div class="card p-14 text-center">
-      <p class="text-sm text-[color:var(--text-secondary)]">
-        Choose a connection above to start browsing.
-      </p>
-      @if (!buckets().length) {
-        <p class="text-sm text-[color:var(--text-muted)] mt-2">
-          None are configured yet — add one under Admin → Storage Connections.
-        </p>
-      }
-    </div>
+    <!-- The connections themselves, rather than a line of text telling you to go and find them
+         in the select. There are usually more than a handful, and picking one is the only thing
+         to do on this screen until something is chosen. -->
+    @if (buckets().length) {
+      <div class="flex flex-col gap-3">
+        <div class="flex flex-wrap items-baseline gap-2">
+          <h2 class="text-sm font-semibold">Connections</h2>
+          <span class="text-sm text-[color:var(--text-muted)]">
+            {{ buckets().length }} configured — pick one to browse it
+          </span>
+        </div>
+
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          @for (b of buckets(); track b.bucket) {
+            <button type="button" class="card p-4 text-left flex items-start gap-3 transition-colors
+                                         hover:border-brand-400"
+                    (click)="onBucketChange(b.bucket)">
+              <span class="stat-glyph shrink-0">
+                <app-icon [name]="providerIcon(b.provider)" />
+              </span>
+              <span class="min-w-0 flex-1">
+                <span class="block font-medium truncate" [title]="b.label">{{ b.label }}</span>
+                <span class="block mono text-xs text-[color:var(--text-muted)] truncate"
+                      [title]="b.bucket">{{ b.bucket }}</span>
+                <span class="pill pill-neutral mt-2 inline-block">{{ b.provider }}</span>
+              </span>
+            </button>
+          }
+        </div>
+      </div>
+    } @else {
+      <div class="card p-10 flex flex-col items-center gap-3 text-center">
+        <span class="stat-glyph"><app-icon name="cloud" /></span>
+        <div>
+          <h2 class="text-base font-semibold">No storage is connected yet</h2>
+          <p class="text-sm text-[color:var(--text-secondary)] mt-1 max-w-sm">
+            A connection tells the console where a job may read from and write to. Add one and
+            it appears here.
+          </p>
+        </div>
+        <a routerLink="/admin/storage" class="btn btn-primary btn-sm">
+          <app-icon name="plus" />Add a connection
+        </a>
+      </div>
+    }
   } @else {
     <div class="card overflow-hidden">
       <!-- Path + actions -->
