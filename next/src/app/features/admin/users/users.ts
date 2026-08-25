@@ -37,6 +37,8 @@ export interface AppUser {
   uuid?: string;
   username: string;
   fullName?: string;
+  /** Job title. Separate from userRole, which is the permission level. */
+  position?: string | null;
   userRole: string;
   status: string;
   tenantId?: number;
@@ -120,6 +122,7 @@ export class Users implements OnInit {
       if (!term) return true;
       return (user.username ?? '').toLowerCase().includes(term)
         || (user.fullName ?? '').toLowerCase().includes(term)
+        || (user.position ?? '').toLowerCase().includes(term)
         || (user.tenantName ?? '').toLowerCase().includes(term);
     });
     return this.sort.apply(rows, (row, key) => (row as any)[key]);

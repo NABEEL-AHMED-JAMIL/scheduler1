@@ -39,6 +39,7 @@ export class UserDialog {
   readonly form: FormGroup = this.fb.group({
     appUserId: [this.data.user?.appUserId ?? null],
     fullName: [this.data.user?.fullName ?? '', Validators.required],
+    position: [this.data.user?.position ?? ''],
     username: [this.data.user?.username ?? '', [Validators.required, Validators.email]],
     password: ['', this.data.user ? [] : [Validators.required, Validators.minLength(8)]],
     userRole: [this.data.user?.userRole ?? 'TENANT_USER', Validators.required],

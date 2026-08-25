@@ -89,9 +89,15 @@
                         [name]="user.fullName || user.username" [size]="3" />
             <div class="min-w-0 flex-1">
               <div class="flex items-start gap-2">
-                <h3 class="font-semibold truncate" [title]="user.fullName || user.username">
-                  {{ user.fullName || user.username }}
-                </h3>
+                <div class="min-w-0">
+                  <h3 class="font-semibold truncate" [title]="user.fullName || user.username">
+                    {{ user.fullName || user.username }}
+                  </h3>
+                  @if (user.position) {
+                    <p class="text-xs text-[color:var(--text-muted)] truncate"
+                       [title]="user.position">{{ user.position }}</p>
+                  }
+                </div>
                 @if (isSelf(user)) { <span class="pill pill-brand shrink-0">You</span> }
                 <div class="ml-auto shrink-0">
                   <app-status [label]="user.status" [quiet]="true" />
@@ -156,6 +162,7 @@
           @for (column of [
             { key: 'fullName',    label: 'Name' },
             { key: 'username',    label: 'Email' },
+            { key: 'position',    label: 'Position' },
             { key: 'userRole',    label: 'Role' },
             { key: 'tenantName',  label: 'Tenant' },
             { key: 'lastLoginAt', label: 'Last sign-in' },
@@ -199,6 +206,7 @@
             </td>
             <td class="mono text-[color:var(--text-secondary)] max-w-56 truncate"
                 [title]="user.username">{{ user.username }}</td>
+            <td class="text-[color:var(--text-secondary)]">{{ user.position || '—' }}</td>
             <td><span [class]="rolePill(user.userRole)">{{ roleLabel(user.userRole) }}</span></td>
             <td class="text-[color:var(--text-secondary)]">
               @if (user.tenantName) {

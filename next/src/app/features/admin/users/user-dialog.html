@@ -12,6 +12,30 @@
         <input id="fullName" class="input" formControlName="fullName" placeholder="Alex Morgan" />
       </app-field>
 
+      <app-field label="Position" for="position"
+                 [control]="form.get('position')" [submitted]="submitted()"
+                 hint="Their job title. What they may do in the app is set by Role, below.">
+        <input id="position" class="input" formControlName="position" list="common-positions"
+               placeholder="Software Engineer" />
+        <datalist id="common-positions">
+          <option value="Software Engineer"></option>
+          <option value="Senior Software Engineer"></option>
+          <option value="Team Lead"></option>
+          <option value="Engineering Manager"></option>
+          <option value="Data Engineer"></option>
+          <option value="Data Analyst"></option>
+          <option value="IT Administrator"></option>
+          <option value="Systems Administrator"></option>
+          <option value="Operations Manager"></option>
+          <option value="Operations Analyst"></option>
+          <option value="QA Engineer"></option>
+          <option value="Product Manager"></option>
+          <option value="Compliance Officer"></option>
+          <option value="Finance Analyst"></option>
+          <option value="Support Specialist"></option>
+        </datalist>
+      </app-field>
+
       <app-field label="Email" for="username" [required]="true"
                  [control]="form.get('username')" [submitted]="submitted()"
                  hint="Used to sign in.">
