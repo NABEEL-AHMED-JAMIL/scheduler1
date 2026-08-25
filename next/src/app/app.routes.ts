@@ -1,11 +1,19 @@
 import { Routes } from '@angular/router';
-import { authGuard, roleGuard } from './core/auth/auth.guard';
+import { anonymousOnly, authGuard, roleGuard } from './core/auth/auth.guard';
 import { Shell } from './features/shell/shell';
 
 export const routes: Routes = [
   {
     path: 'login',
     loadComponent: () => import('./features/login/login').then(m => m.Login),
+  },
+  {
+    // The public front door. pathMatch 'full' matters: an empty path would otherwise match
+    // every deep link as a prefix and swallow the whole console.
+    path: '',
+    pathMatch: 'full',
+    canMatch: [anonymousOnly],
+    loadComponent: () => import('./features/landing/landing').then(m => m.Landing),
   },
   {
     // A shared form link opens for someone with no account, so it sits outside the shell and

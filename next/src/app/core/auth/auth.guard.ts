@@ -1,14 +1,17 @@
 import { inject } from '@angular/core';
-import { CanActivateFn, Router } from '@angular/router';
+import { CanActivateFn, CanMatchFn, Router } from '@angular/router';
 import { AuthService } from './auth.service';
 import { UserRole } from './auth.models';
 
-export const authGuard: CanActivateFn = (route) => {
+export const authGuard: CanActivateFn = (_route, state) => {
   const auth = inject(AuthService);
   const router = inject(Router);
 
   if (!auth.isLoggedIn()) {
-    return router.createUrlTree(['/login'], { queryParams: { returnUrl: route.url.join('/') } });
+    // state.url is the address that was actually asked for. route.url is the segments of the
+    // route the guard sits on, which for the shell is the empty path -- so every returnUrl
+    // came out blank and signing in always landed on the default page.
+    return router.createUrlTree(['/login'], { queryParams: { returnUrl: state.url } });
   }
   return true;
 };
@@ -31,3 +34,11 @@ export const roleGuard: CanActivateFn = (route) => {
   }
   return true;
 };
+
+/**
+ * Lets the root path mean two different things without either redirecting through the other:
+ * a visitor gets the landing page, someone signed in gets the console. Angular tries the
+ * routes in order and skips the one whose canMatch says no, so the landing route needs
+ * pathMatch 'full' -- an empty path otherwise matches every deep link as a prefix.
+ */
+export const anonymousOnly: CanMatchFn = () => !inject(AuthService).isLoggedIn();
