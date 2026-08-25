@@ -99,6 +99,8 @@ export class Shell {
           hint: 'Consumers and their Kafka topics' },
         { label: 'Task Forms', path: '/settings/forms', icon: 'template', adminOnly: true,
           hint: 'Fill in a payload instead of writing XML' },
+        { label: 'Dynamic Forms', path: '/settings/dynamic-forms', icon: 'inbox', adminOnly: true,
+          hint: 'Shareable forms and their answers' },
         { label: 'Lookups', path: '/settings/lookup', icon: 'list', adminOnly: true,
           hint: 'Shared key and value data' },
         { label: 'Storage Connections', path: '/admin/storage', icon: 'cloud', adminOnly: true,

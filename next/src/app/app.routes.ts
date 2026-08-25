@@ -8,6 +8,12 @@ export const routes: Routes = [
     loadComponent: () => import('./features/login/login').then(m => m.Login),
   },
   {
+    // A shared form link opens for someone with no account, so it sits outside the shell and
+    // outside authGuard. fetchFormByUuid is permitAll on the server for the same reason.
+    path: 'f/:uuid',
+    loadComponent: () => import('./features/forms/form-fill').then(m => m.FormFill),
+  },
+  {
     path: '',
     component: Shell,
     canActivate: [authGuard],
@@ -126,6 +132,13 @@ export const routes: Routes = [
         path: 'settings/forms',
         loadComponent: () =>
           import('./features/settings/forms/task-forms').then(m => m.TaskForms),
+        data: { roles: ['PLATFORM_ADMIN', 'TENANT_ADMIN'] },
+        canActivate: [roleGuard],
+      },
+      {
+        path: 'settings/dynamic-forms',
+        loadComponent: () =>
+          import('./features/forms/dynamic-forms').then(m => m.DynamicForms),
         data: { roles: ['PLATFORM_ADMIN', 'TENANT_ADMIN'] },
         canActivate: [roleGuard],
       },

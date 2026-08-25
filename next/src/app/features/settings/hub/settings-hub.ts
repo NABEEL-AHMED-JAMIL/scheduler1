@@ -60,6 +60,8 @@ export class SettingsHub {
       blurb: 'The kinds of task a job can run, and the topic each one publishes to.' },
     { label: 'Task Forms', path: '/settings/forms', icon: 'template',
       blurb: 'Describe what a pipeline expects so tasks are filled in, not hand-written.' },
+    { label: 'Dynamic Forms', path: '/settings/dynamic-forms', icon: 'inbox',
+      blurb: 'Build a form, share its link, and collect the answers people send back.' },
     { label: 'Lookups', path: '/settings/lookup', icon: 'list',
       blurb: 'Shared key/value data the forms and pipelines read from.' },
     { label: 'Q-Message', path: '/queue', icon: 'clock',
