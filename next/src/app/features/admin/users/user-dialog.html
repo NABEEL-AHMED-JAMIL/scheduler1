@@ -44,11 +44,14 @@
       </app-field>
     </div>
 
-    <app-field label="Password" for="password" [required]="!isEdit()"
+    <app-field label="Password" for="password"
                [control]="form.get('password')" [submitted]="submitted()"
-               [hint]="isEdit() ? 'Leave blank to keep the current password.' : 'At least 8 characters.'">
+               [hint]="isEdit()
+                 ? 'Leave blank to keep the current password.'
+                 : 'Leave blank and we email them a one-time password. Set one here and it is not emailed \u2014 you pass it on yourself.'">
       <input id="password" type="password" class="input" formControlName="password"
-             autocomplete="new-password" placeholder="at least 8 characters" />
+             autocomplete="new-password"
+             [placeholder]="isEdit() ? '' : 'leave blank to send a one-time password'" />
     </app-field>
 
     <app-field label="Role" for="userRole" [required]="true" [hint]="roleHint()"

@@ -54,7 +54,10 @@ export class UserDialog {
     fullName: [this.data.user?.fullName ?? '', Validators.required],
     position: [this.data.user?.position ?? ''],
     username: [this.data.user?.username ?? '', [Validators.required, Validators.email]],
-    password: ['', this.data.user ? [] : [Validators.required, Validators.minLength(8)]],
+    // Optional in both directions now: blank on a new user means the server generates one and
+    // emails it, which is the better path and so is the default. minLength still applies to a
+    // value that was actually typed -- Angular's minLength passes an empty control.
+    password: ['', [Validators.minLength(8)]],
     userRole: [this.data.user?.userRole ?? 'TENANT_USER', Validators.required],
     tenantId: [this.data.user?.tenantId ?? null],
     status: [this.data.user?.status ?? 'Active'],
@@ -89,7 +92,11 @@ export class UserDialog {
       next: response => {
         this.saving.set(false);
         if (response.status === API_SUCCESS) {
-          this.toast.success(this.isEdit() ? 'User updated.' : 'User created.');
+          // The server's own words, not a fixed string: creating a user now sends mail, and
+          // "created, but the welcome email could not be sent -- reset their password and pass
+          // it on another way" is the one message an administrator must not miss.
+          this.toast.success(response.message
+            || (this.isEdit() ? 'User updated.' : 'User created.'));
           this.ref.close(true);
         } else {
           this.toast.error(response.message);
