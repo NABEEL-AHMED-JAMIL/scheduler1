@@ -162,12 +162,7 @@
             </td>
             <td class="text-right"><app-status [label]="task.taskStatus" [quiet]="true" /></td>
             <td class="text-right">
-              <!-- One flex row so the two controls sit side by side. Left inline they wrapped
-                   in this narrow column, putting the kebab on its own line under Edit. -->
               <div class="flex items-center justify-end gap-1 whitespace-nowrap">
-                <a class="btn btn-ghost btn-sm shrink-0" [routerLink]="['/tasks', task.taskDetailId, 'edit']">
-                  <app-icon name="edit" />Edit
-                </a>
                 <button type="button" class="btn btn-ghost btn-icon btn-sm shrink-0" [cdkMenuTriggerFor]="taskMenu"
                         [disabled]="busyTask() === task.taskDetailId" aria-label="Actions">
                   <app-icon name="dots" size="1.05em" />
@@ -175,6 +170,9 @@
               </div>
               <ng-template #taskMenu>
                 <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                  <a cdkMenuItem class="menu-item" [routerLink]="['/tasks', task.taskDetailId, 'edit']">
+                    <app-icon name="edit" />Edit
+                  </a>
                   <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="clone(task)">
                     <app-icon name="copy" />Duplicate
                   </button>

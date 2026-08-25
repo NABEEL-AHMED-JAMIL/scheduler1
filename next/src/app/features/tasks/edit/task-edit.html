@@ -150,6 +150,40 @@
             </tbody>
           </table>
         </div>
+
+        <!-- What those rows actually become. Nothing on this screen showed it before, so a
+             tag's effect was invisible until the task next ran. -->
+        <div class="flex flex-wrap items-center gap-2 mt-3">
+          <button type="button" class="btn btn-default btn-sm"
+                  [disabled]="previewing()" (click)="previewTagXml()">
+            <app-icon name="code" [class.spin]="previewing()" />
+            {{ previewing() ? 'Building…' : 'Show the XML these tags make' }}
+          </button>
+          @if (tagXml()) {
+            <button type="button" class="btn btn-default btn-sm" (click)="copyTagXml()">
+              <app-icon name="copy" size="0.85em" />Copy
+            </button>
+            <button type="button" class="btn btn-default btn-sm btn-intent-ok"
+                    (click)="useTagXmlAsPayload()"
+                    title="Replace the payload below with this document">
+              <app-icon name="check" size="0.85em" />Use as payload
+            </button>
+          }
+        </div>
+
+        @if (previewError()) {
+          <p class="text-xs mt-2" style="color: var(--color-crit-500);">{{ previewError() }}</p>
+        }
+
+        @if (tagXml()) {
+          <pre class="mono text-xs leading-relaxed rounded p-2.5 mt-2 overflow-auto max-h-64
+                      whitespace-pre-wrap break-words"
+               style="background: var(--surface-raised);">{{ tagXml() }}</pre>
+          <p class="text-xs text-[color:var(--text-muted)] mt-1.5">
+            The first tag becomes the root element; every other tag needs a parent that already
+            exists above it.
+          </p>
+        }
       </div>
 
       <div class="form-section">

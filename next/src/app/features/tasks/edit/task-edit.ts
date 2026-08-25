@@ -6,6 +6,7 @@ import { Router, RouterLink } from '@angular/router';
 import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { ToastService } from '../../../shared/ui/toast.service';
+import { copyText } from '../../../shared/ui/clipboard.util';
 import { Field } from '../../../shared/ui/field';
 import { Icon } from '../../../shared/ui/icon';
 
@@ -156,6 +157,68 @@ export class TaskEdit implements OnInit {
   }
 
   lookupOptions(type: string): any[] { return this.lookups()[type] ?? []; }
+
+  /**
+   * The XML the current tags produce, built by the same code that would build it on save.
+   *
+   * Tags and the payload textarea are stored separately, so nothing on this screen showed what
+   * a tag actually became -- you added rows and hoped. The backend has always been able to
+   * render them; xmlCreateChecker existed for exactly this and was never called from here.
+   *
+   * Asking the server rather than assembling it in the browser is deliberate: a second
+   * implementation would drift from the one that matters, and the nesting rules for tagParent
+   * are more intricate than they look.
+   */
+  readonly tagXml = signal('');
+  readonly previewing = signal(false);
+  readonly previewError = signal('');
+
+  previewTagXml(): void {
+    const tags = (this.form.getRawValue().tags as any[])
+      .filter(t => (t.tagKey ?? '').trim())
+      .map(t => ({ tagKey: (t.tagKey ?? '').trim(),
+                   tagParent: (t.tagParent ?? '').trim(),
+                   tagValue: (t.tagValue ?? '').trim() }));
+    if (!tags.length) {
+      this.tagXml.set('');
+      this.previewError.set('Add a tag first — the first one becomes the root element.');
+      return;
+    }
+    this.previewing.set(true);
+    this.previewError.set('');
+    this.http.post<ApiResponse<string>>(`${API_BASE}/setting.json/xmlCreateChecker`,
+      { xmlTagsInfo: tags }).subscribe({
+      next: response => {
+        this.previewing.set(false);
+        // This endpoint returns the document in `message` rather than `data`.
+        const xml = (response as any).message ?? response.data ?? '';
+        if (response.status !== API_SUCCESS || !xml) {
+          this.previewError.set(response.message || 'Those tags could not be turned into XML.');
+          this.tagXml.set('');
+          return;
+        }
+        this.tagXml.set(String(xml));
+      },
+      error: err => {
+        this.previewing.set(false);
+        this.previewError.set(err?.error?.message || 'Those tags could not be turned into XML.');
+      },
+    });
+  }
+
+  /** Copy the generated document into the payload the consumer actually receives. */
+  useTagXmlAsPayload(): void {
+    const xml = this.tagXml();
+    if (!xml) return;
+    this.form.get('taskPayload')?.setValue(xml);
+    this.toast.success('Payload replaced with the tags above.');
+  }
+
+  copyTagXml(): void {
+    copyText(this.tagXml()).then(
+      () => this.toast.success('XML copied.'),
+      () => this.toast.error('Could not copy the XML.'));
+  }
 
   save(): void {
     this.submitted.set(true);
