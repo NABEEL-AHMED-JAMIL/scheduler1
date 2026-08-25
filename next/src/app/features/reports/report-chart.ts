@@ -1,4 +1,6 @@
-import { Component, computed, input } from '@angular/core';
+import {
+  Component, DestroyRef, ElementRef, afterNextRender, computed, inject, input, signal,
+} from '@angular/core';
 import { Measure, Pivot, formatMeasure } from './pivot';
 
 export type ChartKind =
@@ -24,6 +26,10 @@ interface Bar { x: number; y: number; w: number; h: number; fill: string; hint: 
  */
 @Component({
   selector: 'app-report-chart',
+  // A component host is display:inline by default, and ResizeObserver never fires for an
+  // inline element -- it has no content box to observe. Without this the chart measured its
+  // starting guess for ever and never grew into the card.
+  styles: [':host { display: block; }'],
   template: `
     <svg [attr.viewBox]="'0 0 ' + W + ' ' + H" width="100%" [attr.height]="H"
          role="img" [attr.aria-label]="kind() + ' chart of the report'">
@@ -43,6 +49,11 @@ interface Bar { x: number; y: number; w: number; h: number; fill: string; hint: 
       @for (stroke of strokes(); track $index) {
         <path [attr.d]="stroke.d" fill="none" [attr.stroke]="stroke.fill" stroke-width="2"
               stroke-linejoin="round" stroke-linecap="round"><title>{{ stroke.hint }}</title></path>
+      }
+      @for (label of barLabels(); track $index) {
+        <text [attr.x]="label.x" [attr.y]="label.y" text-anchor="middle"
+              [attr.fill]="'var(--text-secondary)'" font-size="10"
+              font-weight="600">{{ label.text }}</text>
       }
       @for (label of axisLabels(); track $index) {
         <text [attr.x]="label.x" [attr.y]="label.y" [attr.text-anchor]="label.anchor"
@@ -65,9 +76,37 @@ export class ReportChart {
   readonly kind = input.required<ChartKind>();
   readonly colorFor = input.required<(label: string) => string>();
 
-  protected readonly W = 760;
-  protected readonly H = 280;
-  private readonly pad = { l: 60, r: 16, t: 14, b: 44 };
+  /**
+   * The drawing surface follows the card rather than a fixed box.
+   *
+   * A viewBox with a hardcoded width scales to fit, which stretches the type and the stroke
+   * weights along with it -- the chart gets bigger without getting more readable. Measuring the
+   * host instead means a wider screen buys more room between bars at the same weight, which is
+   * what the extra width is worth spending on. Getters rather than plain fields so every
+   * computed geometry below re-runs when the size changes.
+   */
+  private readonly measured = signal(960);
+  protected get W(): number { return this.measured(); }
+  protected get H(): number { return 360; }
+  private readonly pad = { l: 68, r: 20, t: 18, b: 52 };
+
+  private readonly host = inject(ElementRef<HTMLElement>);
+
+  constructor() {
+    // Measured after the first paint and again on resize, rather than through a
+    // ResizeObserver: the observer is the tidier tool but does not fire in every embedded
+    // browser, and a chart that silently keeps its starting guess is worse than one measured
+    // slightly less elegantly.
+    afterNextRender(() => this.remeasure());
+    const onResize = () => this.remeasure();
+    window.addEventListener('resize', onResize, { passive: true });
+    inject(DestroyRef).onDestroy(() => window.removeEventListener('resize', onResize));
+  }
+
+  private remeasure(): void {
+    const width = Math.round((this.host.nativeElement as HTMLElement).getBoundingClientRect().width);
+    if (width > 0) this.measured.set(Math.max(width, 320));
+  }
 
   private get iw() { return this.W - this.pad.l - this.pad.r; }
   private get ih() { return this.H - this.pad.t - this.pad.b; }
@@ -320,7 +359,10 @@ export class ReportChart {
       const { xs } = this.seriesLayout();
       const step = xs.length > 1 ? this.iw / (xs.length - 1) : 0;
       return xs.map((label, xi) => (xs.length > 9 && xi % 2) ? null : ({
-        x: this.pad.l + step * xi, y: this.H - 22, anchor: 'middle',
+        x: this.pad.l + step * xi, y: this.H - 22,
+        // The first and last labels sit on the plot's edges, so centring them puts half of
+        // each outside the viewBox, where SVG clips it. They anchor inward instead.
+        anchor: xi === 0 ? 'start' : (xi === xs.length - 1 ? 'end' : 'middle'),
         text: label.length > 10 ? label.slice(5) : label, full: label,
       })).filter(Boolean) as any[];
     }
@@ -329,6 +371,28 @@ export class ReportChart {
       x: this.pad.l + slot * ri + slot / 2, y: this.H - 22, anchor: 'middle',
       text: shorten(label, 16), full: label,
     }));
+  });
+
+  /**
+   * A number above each bar, but only where it fits.
+   *
+   * Drawn at all widths the labels collide the moment there are more than a handful of bars;
+   * dropped entirely, a wide chart wastes the room it has. So the same rule the table headers
+   * use applies here: show it when there is space, and let the hover title carry it otherwise.
+   */
+  protected readonly barLabels = computed(() => {
+    if (this.kind() !== 'grouped' && this.kind() !== 'stacked') return [];
+    const bars = this.bars();
+    if (!bars.length) return [];
+    const narrowest = Math.min(...bars.map(b => b.w));
+    if (narrowest < 34) return [];
+    return bars
+      .filter(b => b.h > 14)
+      .map(b => ({
+        x: b.x + b.w / 2,
+        y: b.y - 5,
+        text: b.hint.split(': ').pop() ?? '',
+      }));
   });
 
   protected readonly centre = computed(() => {
