@@ -39,7 +39,15 @@ export const routes: Routes = [
     canActivate: [authGuard],
     children: [
       {
+        // The dashboard has its own address rather than living at the root, so it can be linked
+        // to and returned to by name. Run history already tried to send people to /dashboard
+        // and landed on a route that did not exist.
         path: '',
+        pathMatch: 'full',
+        redirectTo: 'dashboard',
+      },
+      {
+        path: 'dashboard',
         loadComponent: () => import('./features/dashboard/dashboard').then(m => m.Dashboard),
       },
       {

@@ -46,7 +46,7 @@ export class Shell {
    * job that produced it.
    */
   private readonly allNav: NavItem[] = [
-    { label: 'Dashboard', path: '/', icon: 'chart' },
+    { label: 'Dashboard', path: '/dashboard', icon: 'chart' },
     {
       label: 'Pipelines',
       children: [
