@@ -55,8 +55,11 @@
     </div>
 
     <div class="card p-4">
-      <h2 class="text-sm font-semibold mb-3">Run outcome</h2>
-      <app-donut [data]="jobRunning()" totalLabel="runs" [colorFor]="outcomeColor" />
+      <!-- jobRunningStatistics counts jobs by the state of their latest run, not runs: a job
+           that ran two hundred times contributes one. Labelled "runs" it read as a run count and
+           disagreed with the two charts beside it, which do count runs. -->
+      <h2 class="text-sm font-semibold mb-3">Jobs by last outcome</h2>
+      <app-donut [data]="jobRunning()" totalLabel="jobs" [colorFor]="outcomeColor" />
     </div>
 
     <div class="card p-4">
