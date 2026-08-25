@@ -35,18 +35,55 @@
         </div>
         <div>
           <label class="label" for="tfile">Audio file</label>
-          <select id="tfile" class="input" [value]="selectedKey()"
+          <select id="tfile" class="input"
                   (change)="selectedKey.set($any($event.target).value)"
-                  [disabled]="!bucket() || loadingObjects()">
-            <option value="">
-              {{ loadingObjects() ? 'Loading…' : (audioObjects().length ? 'Select a file' : 'No audio in this folder') }}
+                  [disabled]="!bucket() || loadingObjects() || !audioObjects().length">
+            <option value="" [selected]="!selectedKey()">
+              {{ loadingObjects()
+                  ? 'Looking…'
+                  : (audioObjects().length
+                      ? 'Select a file'
+                      : (folders().length ? 'Open a folder below' : 'No audio here')) }}
             </option>
             @for (o of audioObjects(); track o.key) {
-              <option [value]="o.key">{{ o.name }}</option>
+              <option [value]="o.key" [selected]="o.key === selectedKey()">{{ o.name }}</option>
             }
           </select>
         </div>
       </div>
+
+      @if (bucket()) {
+        <!-- Audio is rarely at the root of a bucket, so there has to be a way in. -->
+        <div class="flex flex-wrap items-center gap-1.5 text-sm">
+          <app-icon name="folder" size="0.9em" class="icon-muted" />
+          <button type="button" class="link-inline mono" (click)="goTo('')">{{ bucket() }}</button>
+          @for (crumb of crumbs(); track crumb.prefix) {
+            <span class="text-[color:var(--text-muted)]">/</span>
+            <button type="button" class="link-inline mono"
+                    (click)="goTo(crumb.prefix)">{{ crumb.name }}</button>
+          }
+          @if (loadingObjects()) {
+            <span class="text-xs text-[color:var(--text-muted)] ml-1">looking…</span>
+          }
+        </div>
+
+        @if (folders().length) {
+          <div class="flex flex-wrap gap-1.5">
+            @for (folder of folders(); track folder.key) {
+              <button type="button" class="btn btn-default btn-sm"
+                      (click)="openFolder(folder.key)">
+                <app-icon name="folder" size="0.85em" class="icon-info" />{{ folder.name }}
+              </button>
+            }
+          </div>
+        }
+
+        @if (nothingHere()) {
+          <p class="text-xs text-[color:var(--text-muted)]">
+            Nothing here. Go back up and try another folder.
+          </p>
+        }
+      }
     }
 
     <label class="flex items-center gap-2 text-sm">

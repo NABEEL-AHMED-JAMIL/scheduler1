@@ -88,8 +88,24 @@ export class Transcript implements OnInit {
       .join('\n');
   }
 
+  /** Where in the bucket the picker is looking. Empty is the root. */
+  readonly prefix = signal('');
+
+  /** Folders at this level, so audio nested inside them can be reached. */
+  readonly folders = computed(() => this.objects().filter(o => o.folder));
+
   readonly audioObjects = computed(() =>
     this.objects().filter(o => !o.folder && AUDIO_EXTENSIONS.some(e => o.name.toLowerCase().endsWith('.' + e))));
+
+  /** Breadcrumb segments for the current prefix, each with the prefix to jump back to. */
+  readonly crumbs = computed(() => {
+    const parts = this.prefix().split('/').filter(Boolean);
+    return parts.map((name, i) => ({ name, prefix: parts.slice(0, i + 1).join('/') + '/' }));
+  });
+
+  /** True when this level holds neither audio nor anywhere further to look. */
+  readonly nothingHere = computed(() =>
+    !this.loadingObjects() && !this.audioObjects().length && !this.folders().length);
 
   readonly canExtract = computed(() =>
     this.mode() === 'upload' ? !!this.file() : !!this.selectedKey());
@@ -107,16 +123,46 @@ export class Transcript implements OnInit {
     this.bucket.set(value);
     this.selectedKey.set('');
     this.objects.set([]);
+    this.prefix.set('');
     if (!value) return;
+    this.browse('');
+  }
+
+  /** Descend into a folder. */
+  openFolder(key: string): void { this.browse(key); }
+
+  /** Jump to a breadcrumb, or to the bucket root when given nothing. */
+  goTo(prefix: string): void { this.browse(prefix); }
+
+  /**
+   * Lists one level of the bucket.
+   *
+   * The audio this tool is for is rarely at the root -- ours sits two levels down, under
+   * audio_text/input -- and listing only the root showed an empty picker on a bucket holding
+   * forty files. Folders are listed alongside the audio so there is somewhere to go, rather
+   * than being filtered out and leaving the tool looking broken.
+   */
+  private browse(prefix: string): void {
+    this.prefix.set(prefix);
+    this.selectedKey.set('');
     this.loadingObjects.set(true);
-    this.storage.listObjects(value, '', undefined, 200).subscribe({
+    // Only the newest listing may write: clicking through folders quickly would otherwise let
+    // a slow response for an abandoned one replace the level actually being viewed.
+    const ticket = ++this.browseTicket;
+    this.storage.listObjects(this.bucket(), prefix, undefined, 200).subscribe({
       next: response => {
+        if (ticket !== this.browseTicket) return;
         this.loadingObjects.set(false);
         if (response.status === API_SUCCESS) this.objects.set(response.data?.objects ?? []);
       },
-      error: () => this.loadingObjects.set(false),
+      error: () => {
+        if (ticket !== this.browseTicket) return;
+        this.loadingObjects.set(false);
+      },
     });
   }
+
+  private browseTicket = 0;
 
   onFile(event: Event): void {
     this.file.set((event.target as HTMLInputElement).files?.[0] ?? null);
