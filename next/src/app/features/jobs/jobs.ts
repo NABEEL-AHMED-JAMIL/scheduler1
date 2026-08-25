@@ -32,6 +32,7 @@ export interface Scheduler {
   startTime?: string;
   frequency?: string;
   intervalValue?: string;
+  daysOfWeek?: string;
   dayOfMonth?: number;
   nextRunAt?: string;
   expired?: boolean;
@@ -477,8 +478,36 @@ export class Jobs implements OnInit {
     if (!schedule) return job.execution === 'Manual' ? 'On demand' : '—';
     const parts: string[] = [schedule.frequency ?? ''];
     if (schedule.intervalValue && schedule.intervalValue !== '1') parts.push(`every ${schedule.intervalValue}`);
+    // A weekly schedule pinned to weekdays, and a monthly one pinned to a date, run on
+    // different days from their plain counterparts. Leaving that out made three unlike
+    // monthly schedules read identically.
+    const days = this.weekdayLabel(schedule.daysOfWeek);
+    if (days) parts.push(`on ${days}`);
+    const monthDay = this.monthDayLabel(schedule.dayOfMonth);
+    if (monthDay) parts.push(`on the ${monthDay}`);
     if (schedule.startTime) parts.push(`at ${schedule.startTime.slice(0, 5)}`);
     return parts.filter(Boolean).join(' ');
+  }
+
+  private weekdayLabel(daysOfWeek?: string): string {
+    if (!daysOfWeek) return '';
+    const names: Record<string, string> = {
+      MON: 'Mon', TUE: 'Tue', WED: 'Wed', THU: 'Thu', FRI: 'Fri', SAT: 'Sat', SUN: 'Sun',
+    };
+    return daysOfWeek.split(',')
+      .map(code => names[code.trim().toUpperCase()])
+      .filter(Boolean)
+      .join(', ');
+  }
+
+  /** The backend reads a day of 0 (or less) as "the last day of the month". */
+  private monthDayLabel(dayOfMonth?: number): string {
+    if (dayOfMonth === undefined || dayOfMonth === null) return '';
+    if (dayOfMonth <= 0) return 'last day';
+    const tens = dayOfMonth % 100;
+    if (tens >= 11 && tens <= 13) return `${dayOfMonth}th`;
+    const suffix = { 1: 'st', 2: 'nd', 3: 'rd' }[dayOfMonth % 10] ?? 'th';
+    return `${dayOfMonth}${suffix}`;
   }
 
   scheduleNote(job: SourceJob): { text: string; tone: 'warn' | 'muted' } | null {
