@@ -119,6 +119,8 @@ export class Shell {
           hint: 'Who can sign in, and as what' },
         { label: 'Tenants', path: '/admin/tenants', icon: 'globe', platformOnly: true,
           hint: 'Isolated workspaces' },
+          { label: 'Workspace Requests', path: '/admin/tenant-requests', icon: 'inbox',
+            adminOnly: true, hint: 'Asks from outside for a workspace' },
       ],
     },
   ];

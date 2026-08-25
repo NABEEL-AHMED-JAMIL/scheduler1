@@ -16,6 +16,12 @@ export const routes: Routes = [
     loadComponent: () => import('./features/landing/landing').then(m => m.Landing),
   },
   {
+    // Public: whoever is asking for a workspace has no account yet, which is the ask.
+    path: 'request-workspace',
+    loadComponent: () =>
+      import('./features/tenant-request/request-workspace').then(m => m.RequestWorkspace),
+  },
+  {
     // Public like the landing page: the setup guide describes the console's own screens and
     // carries nothing tenant-specific, so it can be linked to and read before signing in.
     path: 'docs',
@@ -154,6 +160,13 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/forms/dynamic-forms').then(m => m.DynamicForms),
         data: { roles: ['PLATFORM_ADMIN', 'TENANT_ADMIN'] },
+        canActivate: [roleGuard],
+      },
+      {
+        path: 'admin/tenant-requests',
+        loadComponent: () =>
+          import('./features/tenant-request/tenant-requests').then(m => m.TenantRequests),
+        data: { roles: ['PLATFORM_ADMIN'] },
         canActivate: [roleGuard],
       },
       {

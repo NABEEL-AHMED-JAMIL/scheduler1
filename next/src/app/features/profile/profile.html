@@ -91,6 +91,20 @@
       </div>
 
       <div class="space-y-4">
+        @if (me.mustChangePassword) {
+          <div class="card p-4 flex items-start gap-2.5"
+               style="border-color: var(--color-brand-500);">
+            <app-icon name="key" class="icon-info mt-0.5 shrink-0" />
+            <p class="text-sm">
+              <strong>Choose your own password.</strong>
+              <span class="text-[color:var(--text-secondary)]">
+                This account was opened with a one-time password that was emailed to you. Set
+                your own below — the emailed one stops working as soon as you do.
+              </span>
+            </p>
+          </div>
+        }
+
         <div class="card p-5">
           <h3 class="text-sm font-semibold mb-4">Details</h3>
 
@@ -143,6 +157,45 @@
               <dd>{{ me.lastLoginAt ? (me.lastLoginAt | date: 'd MMM y, HH:mm') : 'Never' }}</dd>
             </div>
           </dl>
+        </div>
+
+        <div class="card p-5">
+          <h3 class="text-sm font-semibold">Password</h3>
+          <p class="field-note text-[color:var(--text-muted)] mt-1">
+            You are asked for the current one as well, so an unlocked screen is not enough to
+            take the account.
+          </p>
+
+          <div class="grid sm:grid-cols-2 gap-4 mt-4 max-w-xl">
+            <div class="field">
+              <label class="label" for="currentPassword">Current password</label>
+              <input id="currentPassword" type="password" class="input" autocomplete="current-password"
+                     [value]="currentPassword()"
+                     (input)="currentPassword.set($any($event.target).value)" />
+            </div>
+            <div class="field">
+              <label class="label" for="newPassword">New password</label>
+              <input id="newPassword" type="password" class="input" autocomplete="new-password"
+                     [value]="newPassword()"
+                     (input)="newPassword.set($any($event.target).value)" />
+              <p class="field-note text-[color:var(--text-muted)]">At least 8 characters.</p>
+            </div>
+          </div>
+
+          @if (passwordError()) {
+            <p class="field-note text-crit-500 flex items-start gap-1.5 mt-3" role="alert">
+              <app-icon name="alert" size="0.9em" class="mt-px shrink-0" />
+              <span>{{ passwordError() }}</span>
+            </p>
+          }
+
+          <div class="mt-4">
+            <button type="button" class="btn btn-primary btn-sm"
+                    [disabled]="savingPassword() || !canChangePassword()" (click)="changePassword()">
+              <app-icon name="key" [class.spin]="savingPassword()" />
+              {{ savingPassword() ? 'Changing…' : 'Change password' }}
+            </button>
+          </div>
         </div>
 
         <div class="card p-5">

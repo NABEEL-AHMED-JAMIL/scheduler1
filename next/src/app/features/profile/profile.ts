@@ -12,6 +12,7 @@ import { Donut } from '../../shared/charts/donut';
 import { statusColor } from '../../shared/charts/status-color';
 
 interface UserProfile {
+  mustChangePassword?: boolean;
   appUserId: number;
   username: string;
   fullName: string;
@@ -144,6 +145,50 @@ export class Profile implements OnInit {
       error: err => {
         this.loading.set(false);
         this.error.set(err?.error?.message || 'Could not load your profile.');
+      },
+    });
+  }
+
+  // ---- password ------------------------------------------------------------------------
+  readonly currentPassword = signal('');
+  readonly newPassword = signal('');
+  readonly savingPassword = signal(false);
+  readonly passwordError = signal('');
+
+  canChangePassword(): boolean {
+    return !!this.currentPassword() && this.newPassword().length >= 8;
+  }
+
+  /**
+   * Changing a password is its own call rather than part of updateOwnProfile, which changes
+   * what someone is called rather than how they prove who they are. Both values are cleared
+   * whatever the outcome, so neither sits in a component after the request.
+   */
+  changePassword(): void {
+    if (!this.canChangePassword() || this.savingPassword()) return;
+    this.passwordError.set('');
+    this.savingPassword.set(true);
+    this.http.put<ApiResponse>(`${API_BASE}/appUser.json/changeOwnPassword`, {
+      currentPassword: this.currentPassword(),
+      newPassword: this.newPassword(),
+    }).subscribe({
+      next: response => {
+        this.savingPassword.set(false);
+        this.currentPassword.set('');
+        this.newPassword.set('');
+        if (response.status === API_SUCCESS) {
+          this.toast.success(response.message);
+          // The notice at the top is driven by the profile, so it is re-read rather than guessed.
+          this.load();
+        } else {
+          this.passwordError.set(response.message);
+        }
+      },
+      error: err => {
+        this.savingPassword.set(false);
+        this.currentPassword.set('');
+        this.newPassword.set('');
+        this.passwordError.set(err?.error?.message || 'Your password could not be changed.');
       },
     });
   }

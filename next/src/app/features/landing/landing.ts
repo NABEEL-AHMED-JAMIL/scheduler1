@@ -109,10 +109,12 @@ import { ThemeService } from '../../core/theme.service';
               <a routerLink="/login" class="btn btn-primary">
                 Sign in<app-icon name="arrowRight" size="0.95em" />
               </a>
+              <a routerLink="/request-workspace" class="btn btn-default btn-sm">
+                Request a workspace
+              </a>
               <a routerLink="/docs" class="link-inline text-sm" style="color: #c4c9f9;">
                 Read the setup guide
               </a>
-              <span class="hero-sub text-sm">Access is issued by your administrator.</span>
             </div>
 
             <dl class="mt-10 flex flex-wrap gap-x-10 gap-y-4">

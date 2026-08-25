@@ -85,8 +85,8 @@ interface Section { id: string; title: string; }
           <div class="mt-6 card p-4 flex items-start gap-2.5">
             <app-icon name="info" class="icon-info mt-0.5 shrink-0" />
             <p class="text-sm text-[color:var(--text-secondary)]">
-              Steps 1 to 3 need a tenant administrator. Everything from step 4 onward can be done
-              by any signed-in user in the tenant.
+              Step 1 needs no account at all. Steps 2 to 4 need an administrator, and everything
+              from step 5 onward can be done by any signed-in user in the tenant.
             </p>
           </div>
 
@@ -234,6 +234,28 @@ export class Docs implements AfterViewInit {
 
   readonly steps = [
     {
+      id: 'request', title: 'Ask for a workspace',
+      intro: 'If you do not have a workspace yet, request one. A platform administrator reviews '
+           + 'every request; nothing is created until somebody agrees to it.',
+      where: 'Request a workspace, from the front page — no sign-in needed',
+      fields: [
+        { name: 'Organisation', required: true, note: 'The name your workspace will carry.' },
+        { name: 'Your name', required: true, note: 'Who the first administrator will be.' },
+        { name: 'Your email', required: true, note: 'Where the sign-in details are sent, and your username.' },
+        { name: 'Purpose', required: false, note: 'A sentence or two, for whoever reviews the request.' },
+      ],
+      notes: [
+        'When a request is granted you are emailed a username and a password that works once. '
+        + 'Sign in with it, and the console asks you to choose your own password straight away — '
+        + 'the emailed one stops working at that moment. You can change it again any time from '
+        + 'your profile.',
+        'The form answers the same way whether or not the address is already known, so it cannot '
+        + 'be used to find out who has an account here. If you already have one, sign in instead.',
+      ],
+      warn: 'If a welcome email never arrives, ask a platform administrator to reset the password '
+          + 'rather than requesting a second workspace — the account already exists by then.',
+    },
+    {
       id: 'tenant', title: 'Create the tenant and its people',
       intro: 'A tenant is the boundary everything else sits inside. Jobs, tasks, buckets and '
            + 'users all belong to one, and nothing crosses between them.',
@@ -366,7 +388,7 @@ export class Docs implements AfterViewInit {
   ];
 
   readonly roles = [
-    { name: 'PLATFORM_ADMIN', note: 'Every tenant, and the settings that apply across all of them.' },
+    { name: 'PLATFORM_ADMIN', note: 'Every tenant, the settings that apply across all of them, and the workspace requests waiting for a decision.' },
     { name: 'TENANT_ADMIN', note: 'Everything inside one tenant, including its users, connections and forms.' },
     { name: 'TENANT_USER', note: 'The pipelines: tasks, jobs, runs, logs and reports within their tenant.' },
   ];
