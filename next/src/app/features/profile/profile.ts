@@ -85,9 +85,13 @@ export class Profile implements OnInit {
    * original rather than orphaning it.
    */
   readonly targetBucket = computed(() => {
-    const inUse = this.profile()?.avatarBucket;
-    if (inUse) return inUse;
     const all = this.buckets();
+    // Only stay with the recorded bucket while it is still one we can write to. It used to be
+    // honoured unconditionally, so once a storage connection went away every user whose picture
+    // lived there was stuck aiming at it -- each upload rejected with "Unknown bucket", and no
+    // way back from the page.
+    const inUse = this.profile()?.avatarBucket;
+    if (inUse && all.some(b => b.bucket === inUse)) return inUse;
     const minio = all.find(b => (b.provider ?? '').toUpperCase() === 'MINIO');
     return minio?.bucket || all[0]?.bucket || '';
   });

@@ -1,5 +1,6 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
 import { DatePipe } from '@angular/common';
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
@@ -12,6 +13,7 @@ import { confirmWith } from '../../../shared/ui/confirm';
 import { TableShell } from '../../../shared/ui/data-table';
 import { StatusPill } from '../../../shared/ui/status-pill';
 import { ConnectionDialog } from './connection-dialog';
+import { CloneDialog } from './clone-dialog';
 import { Icon } from '../../../shared/ui/icon';
 import { ViewToggle } from '../../../shared/ui/view-toggle';
 
@@ -58,6 +60,11 @@ export class StorageConnections implements OnInit {
   readonly search = signal('');
   readonly providerFilter = signal('');
   readonly testing = signal<number | null>(null);
+
+  /** Ids ticked for a bulk action. Cleared after one runs, so a second click cannot repeat it. */
+  readonly selected = signal<ReadonlySet<number>>(new Set());
+  readonly bulkRunning = signal(false);
+  readonly bulkProgress = signal('');
   /** Cards read better when a connection's target and test result matter more than a wide scan. */
   readonly view = signal<'table' | 'cards'>('table');
 
@@ -225,5 +232,78 @@ export class StorageConnections implements OnInit {
     }
     const myId = this.auth.user()?.appUserId ?? null;
     return rows.filter(row => isMine(row, myId));
+  }
+
+  isSelected(id: number): boolean {
+    return this.selected().has(id);
+  }
+
+  clearSelection(): void {
+    this.selected.set(new Set());
+  }
+
+  toggleSelected(id: number): void {
+    const next = new Set(this.selected());
+    if (!next.delete(id)) {
+      next.add(id);
+    }
+    this.selected.set(next);
+  }
+
+  /** Ticks or clears everything currently on screen, not everything that exists. */
+  toggleAll(): void {
+    const shown = this.filtered().map(c => c.storageConnectionId);
+    this.selected.set(shown.every(id => this.selected().has(id))
+      ? new Set()
+      : new Set(shown));
+  }
+
+  readonly allShownSelected = computed(() => {
+    const shown = this.filtered();
+    return shown.length > 0 && shown.every(c => this.selected().has(c.storageConnectionId));
+  });
+
+  clone(connection: StorageConnection): void {
+    this.dialog.open<boolean>(CloneDialog, { data: { connection }, hasBackdrop: true })
+      .closed.subscribe(saved => { if (saved) this.load(); });
+  }
+
+  /**
+   * Tests every ticked connection, one after another.
+   *
+   * Sequential rather than parallel: each test opens a real connection to a storage server, and
+   * firing twenty at once is a burst of load on something that may be shared. The count moves as
+   * it goes so a long run does not look stuck.
+   */
+  async testSelected(): Promise<void> {
+    const ids = this.filtered()
+      .filter(c => this.selected().has(c.storageConnectionId))
+      .map(c => c.storageConnectionId);
+    if (!ids.length) {
+      this.toast.error('Tick the connections you want to test.');
+      return;
+    }
+    this.bulkRunning.set(true);
+    let passed = 0;
+    let failed = 0;
+    for (let i = 0; i < ids.length; i++) {
+      this.bulkProgress.set(`Testing ${i + 1} of ${ids.length}…`);
+      try {
+        const response = await firstValueFrom(this.http.post<ApiResponse>(
+          `${API_BASE}/storageConnection.json/testConnection`, null,
+          { params: { storageConnectionId: String(ids[i]) } }));
+        response.status === API_SUCCESS ? passed++ : failed++;
+      } catch {
+        failed++;
+      }
+    }
+    this.bulkRunning.set(false);
+    this.bulkProgress.set('');
+    this.selected.set(new Set());
+    this.load();
+    // Both numbers, always: "18 passed" alone hides that two did not.
+    failed === 0
+      ? this.toast.success(`All ${passed} reached their bucket.`)
+      : this.toast.error(`${passed} reached their bucket, ${failed} did not — see Last test.`);
   }
 }

@@ -44,6 +44,23 @@
                [value]="search()" (input)="search.set($any($event.target).value)" />
       </div>
       <app-mine-filter [(only)]="onlyMine" />
+
+      <!-- Only present when something is ticked: a permanently visible bar with nothing to act
+           on reads as a control that is broken rather than idle. -->
+      @if (selected().size) {
+        <div class="flex items-center gap-2 ml-auto">
+          <span class="text-sm text-[color:var(--text-secondary)]">
+            {{ selected().size }} selected
+          </span>
+          <button type="button" class="btn btn-primary btn-sm"
+                  [disabled]="bulkRunning()" (click)="testSelected()">
+            @if (bulkRunning()) { <app-icon name="refresh" class="spin" /> }
+            {{ bulkRunning() ? bulkProgress() : 'Test selected' }}
+          </button>
+          <button type="button" class="btn btn-ghost btn-sm"
+                  [disabled]="bulkRunning()" (click)="clearSelection()">Clear</button>
+        </div>
+      }
       @if (search() || providerFilter()) {
         <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()"><app-icon name="close" />Clear</button>
       }
@@ -71,6 +88,7 @@
                   <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
                     <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="edit(c)"><app-icon name="edit" />Edit</button>
                     <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="test(c)"><app-icon name="zap" />Test connection</button>
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="clone(c)"><app-icon name="copy" />Clone…</button>
                     <div class="my-1 border-t border-subtle"></div>
                     <button cdkMenuItem class="menu-item menu-item-danger"
                             (cdkMenuItemTriggered)="remove(c)"><app-icon name="trash" class="icon-crit" />Delete</button>
@@ -118,6 +136,12 @@
     <table class="table-modern">
       <thead>
         <tr>
+          <th class="w-8">
+            <input type="checkbox" class="accent-brand-600 cursor-pointer"
+                   [checked]="allShownSelected()"
+                   [attr.aria-label]="allShownSelected() ? 'Clear selection' : 'Select all shown'"
+                   (change)="toggleAll()" />
+          </th>
           <th>Name</th>
           <th>Alias</th>
           <th>Provider</th>
@@ -133,6 +157,12 @@
       <tbody>
         @for (c of filtered(); track c.storageConnectionId) {
           <tr [class.opacity-55]="testing() === c.storageConnectionId">
+            <td>
+              <input type="checkbox" class="accent-brand-600 cursor-pointer"
+                     [checked]="isSelected(c.storageConnectionId)"
+                     [attr.aria-label]="'Select ' + c.connectionName"
+                     (change)="toggleSelected(c.storageConnectionId)" />
+            </td>
             <td class="max-w-56">
               <div class="font-medium truncate">{{ c.connectionName }}</div>
               @if (c.description) {
@@ -181,6 +211,7 @@
                 <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
                   <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="edit(c)"><app-icon name="edit" />Edit</button>
                   <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="test(c)"><app-icon name="zap" />Test connection</button>
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="clone(c)"><app-icon name="copy" />Clone…</button>
                   <div class="my-1 border-t border-subtle"></div>
                   <button cdkMenuItem class="menu-item menu-item-danger"
                           (cdkMenuItemTriggered)="remove(c)"><app-icon name="trash" class="icon-crit" />Delete</button>
