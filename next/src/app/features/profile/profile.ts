@@ -55,7 +55,20 @@ export class Profile implements OnInit {
 
   /** Where a new picture goes. Avatars are small and personal, so they sit under one prefix
       in whichever bucket is available rather than being scattered per tenant. */
-  private static readonly PREFIX = 'avatars/';
+  /**
+   * Where a picture lives: <appUserId>/profile/avatar.<ext>.
+   *
+   * A folder per person rather than one flat prefix, so everything belonging to a user sits
+   * together and can be removed with them. The "profile" folder inside leaves room for whatever
+   * else a user might own later without it landing beside the picture.
+   *
+   * The filename is fixed rather than the uploaded one, so replacing a picture overwrites
+   * instead of leaving the previous file behind. Changing format (png to jpg) still strands the
+   * old object, but inside that user's own folder rather than mixed in with everyone else's.
+   */
+  private static folderFor(appUserId: number | null | undefined): string {
+    return `${appUserId}/profile/`;
+  }
 
   /** Same blob URL the header uses -- fetched once, through the interceptor, so the token
       travels with it. */
@@ -235,12 +248,12 @@ export class Profile implements OnInit {
       return;
     }
 
-    // Keyed by user id, so a replacement overwrites rather than piling up copies.
     const extension = file.name.slice(file.name.lastIndexOf('.') + 1).toLowerCase() || 'png';
-    const key = `${Profile.PREFIX}${this.profile()?.appUserId}.${extension}`;
+    const folder = Profile.folderFor(this.profile()?.appUserId);
+    const key = `${folder}avatar.${extension}`;
 
     this.uploading.set(true);
-    this.storage.upload(bucket, Profile.PREFIX, new File([file], `${this.profile()?.appUserId}.${extension}`))
+    this.storage.upload(bucket, folder, new File([file], `avatar.${extension}`))
       .subscribe({
         next: response => {
           if (response.status !== API_SUCCESS) {
