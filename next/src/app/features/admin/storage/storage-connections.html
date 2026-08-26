@@ -29,7 +29,23 @@
                    [total]="connections().length"
                    [emptyMessage]="search() || providerFilter() ? 'No connections match the filters.' : 'No connections configured yet.'"
                    emptyIcon="cloud"
+                   [showSubbar]="selected().size > 0"
                    (retry)="load()">
+    <!-- Lives in the shell's second row, so ticking a box cannot shift the filters above it.
+         Kept at the top level of the shell's content on purpose: nested inside the view-mode
+         @if it sat in an embedded view, where a projection selector never reaches it. -->
+    <div subbar class="contents">
+      <span class="text-sm text-[color:var(--text-secondary)] mr-auto">
+        {{ selected().size }} selected
+      </span>
+      <button type="button" class="btn btn-primary btn-sm"
+              [disabled]="bulkRunning()" (click)="testSelected()">
+        @if (bulkRunning()) { <app-icon name="refresh" class="spin" /> }
+        {{ bulkRunning() ? bulkProgress() : 'Test selected' }}
+      </button>
+      <button type="button" class="btn btn-ghost btn-sm"
+              [disabled]="bulkRunning()" (click)="clearSelection()">Clear</button>
+    </div>
     <ng-container toolbar>
       <app-view-toggle [(value)]="view" key="storage" cardsIcon="layers" />
 
@@ -45,22 +61,6 @@
       </div>
       <app-mine-filter [(only)]="onlyMine" />
 
-      <!-- Only present when something is ticked: a permanently visible bar with nothing to act
-           on reads as a control that is broken rather than idle. -->
-      @if (selected().size) {
-        <div class="flex items-center gap-2 ml-auto">
-          <span class="text-sm text-[color:var(--text-secondary)]">
-            {{ selected().size }} selected
-          </span>
-          <button type="button" class="btn btn-primary btn-sm"
-                  [disabled]="bulkRunning()" (click)="testSelected()">
-            @if (bulkRunning()) { <app-icon name="refresh" class="spin" /> }
-            {{ bulkRunning() ? bulkProgress() : 'Test selected' }}
-          </button>
-          <button type="button" class="btn btn-ghost btn-sm"
-                  [disabled]="bulkRunning()" (click)="clearSelection()">Clear</button>
-        </div>
-      }
       @if (search() || providerFilter()) {
         <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()"><app-icon name="close" />Clear</button>
       }
@@ -132,6 +132,7 @@
           </article>
         }
       </div>
+
     } @else {
     <table class="table-modern">
       <thead>

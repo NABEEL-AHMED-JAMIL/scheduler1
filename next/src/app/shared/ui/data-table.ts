@@ -25,6 +25,20 @@ import { Icon } from './icon';
         <ng-content select="[toolbar]" />
       </div>
 
+      <!-- A second row for controls that come and go -- bulk selection above all. Putting them
+           in the toolbar made the filters slide sideways the moment a row was ticked, because
+           the heading's mr-auto and the new group's ml-auto split the free space between them.
+           Down here nothing above can move.
+
+           Shown by an input rather than by whether anything was projected: content inside an
+           @if lives in an embedded view and does not match a projection selector, so asking the
+           caller directly is the only reliable signal. -->
+      @if (showSubbar()) {
+        <div class="flex flex-wrap items-center gap-2 px-4 py-2.5 border-b border-subtle bg-sunken">
+          <ng-content select="[subbar]" />
+        </div>
+      }
+
       @if (loading()) {
         <div class="px-6 py-14 text-center text-sm text-[color:var(--text-muted)]">
           <div class="spinner mx-auto mb-3" role="status" aria-label="Loading"></div>
@@ -59,6 +73,8 @@ import { Icon } from './icon';
 })
 export class TableShell {
   readonly heading = input.required<string>();
+  /** Whether the second toolbar row is shown. See the note in the template. */
+  readonly showSubbar = input(false);
   readonly loading = input(false);
   readonly error = input('');
   readonly isEmpty = input(false);
