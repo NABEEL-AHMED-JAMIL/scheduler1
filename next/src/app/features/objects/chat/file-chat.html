@@ -11,7 +11,7 @@
             [attr.aria-label]="minimized() ? 'Expand' : 'Minimise'">
       <app-icon [name]="minimized() ? 'chevronRight' : 'chevronDown'" />
     </button>
-    <button type="button" class="btn btn-ghost btn-icon" (click)="closed.emit()" aria-label="Close"><app-icon name="close" /></button>
+    <button type="button" class="btn btn-ghost btn-icon" (click)="close()" aria-label="Close"><app-icon name="close" /></button>
   </div>
 
   @if (!minimized()) {

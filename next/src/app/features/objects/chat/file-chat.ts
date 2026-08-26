@@ -43,6 +43,80 @@ export class FileChat implements OnInit {
   readonly listening = signal(false);
   readonly converting = signal<string | null>(null);
 
+  /**
+   * How long a conversation outlives its panel.
+   *
+   * Closing used to discard the transcript outright -- the component was destroyed and the
+   * messages went with it -- so a mis-click cost the whole conversation. It is kept for half an
+   * hour instead, long enough to reopen the file and carry on, short enough that a shared
+   * machine does not hold somebody's questions about a document indefinitely.
+   *
+   * Deliberately sessionStorage, not localStorage: it dies with the browser tab regardless of
+   * the clock.
+   */
+  private static readonly HISTORY_TTL_MS = 30 * 60 * 1000;
+
+  private historyKey(): string {
+    return `fileChat:${this.bucket()}:${this.fileKey()}`;
+  }
+
+  /** Nothing is written for an empty conversation -- there is no transcript worth restoring. */
+  private rememberHistory(): void {
+    const messages = this.messages();
+    if (!messages.length) {
+      sessionStorage.removeItem(this.historyKey());
+      return;
+    }
+    try {
+      sessionStorage.setItem(this.historyKey(),
+        JSON.stringify({ savedAt: Date.now(), messages }));
+    } catch {
+      // A full or blocked sessionStorage is not worth failing a chat over.
+    }
+  }
+
+  /**
+   * Saved whenever the transcript changes, not only on close.
+   *
+   * Closing the panel is the tidy exit; navigating away, reloading, or a crash are the common
+   * ones, and none of them run close(). An effect covers all of them.
+   */
+  private readonly persist = effect(() => {
+    this.messages();
+    this.rememberHistory();
+  });
+
+  private restoreHistory(): void {
+    try {
+      const raw = sessionStorage.getItem(this.historyKey());
+      if (!raw) return;
+      const saved = JSON.parse(raw) as { savedAt: number; messages: ChatMessage[] };
+      // Expiry is checked on read rather than by a timer: a timer does not run while the panel
+      // is closed, which is exactly the window that needs to expire.
+      if (Date.now() - saved.savedAt > FileChat.HISTORY_TTL_MS) {
+        sessionStorage.removeItem(this.historyKey());
+        return;
+      }
+      this.messages.set(saved.messages ?? []);
+    } catch {
+      sessionStorage.removeItem(this.historyKey());
+    }
+  }
+
+  /**
+   * Closing keeps the transcript here and drops the file's extracted text on the server.
+   *
+   * The extraction is the only trace a chat leaves server-side, and it is the whole readable
+   * contents of the file. Fire-and-forget: the panel closes either way, and a failed eviction
+   * simply means the entry ages out on its own.
+   */
+  close(): void {
+    this.rememberHistory();
+    this.http.post(`${API_BASE}/fileChat.json/endSession`,
+      { bucket: this.bucket(), key: this.fileKey() }).subscribe({ error: () => {} });
+    this.closed.emit();
+  }
+
   /** Held so the request can be abandoned; see stop(). */
   private inFlight: Subscription | null = null;
   private recognition: any = null;
@@ -94,6 +168,7 @@ export class FileChat implements OnInit {
 
   ngOnInit(): void {
     this.loadAgents();
+    this.restoreHistory();
     this.prepare();
   }
 
