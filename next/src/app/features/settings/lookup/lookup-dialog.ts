@@ -8,6 +8,9 @@ import { Field } from '../../../shared/ui/field';
 import { FormDialog } from '../../../shared/ui/form-dialog';
 
 export interface LookupData {
+  /** Which workspace owns it; null means the platform's own, shared with everyone. */
+  tenantId?: number | null;
+
   /** The author's id, so "Only mine" can match on identity rather than display text. */
   createdBy?: number | null;
 

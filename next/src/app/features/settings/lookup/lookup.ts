@@ -175,4 +175,20 @@ export class Lookup implements OnInit {
     const myId = this.auth.user()?.appUserId ?? null;
     return rows.filter(row => isMine(row, myId));
   }
+
+  /**
+   * Whether this entry is the caller's to change.
+   *
+   * A platform admin may change anything. Everyone else may change only rows their own
+   * workspace owns -- a row with no tenant belongs to the platform and is shared with every
+   * workspace, so removing one would take it away from all of them. The server refuses either
+   * way; this stops the console offering a button that can only end in a refusal.
+   */
+  canModify(entry: { tenantId?: number | null }): boolean {
+    if (this.auth.isPlatformAdmin()) {
+      return true;
+    }
+    const mine = this.auth.user()?.tenantId ?? null;
+    return entry.tenantId != null && entry.tenantId === mine;
+  }
 }

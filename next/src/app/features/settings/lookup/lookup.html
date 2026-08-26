@@ -206,24 +206,37 @@
                 <td class="text-[color:var(--text-muted)] max-w-80 truncate"
                     [title]="child.description || ''">{{ child.description || '—' }}</td>
                 <td></td>
+                <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
+                  {{ child.createdByName || '—' }}
+                </td>
+                <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
+                  {{ child.updatedByName || '—' }}
+                </td>
                 <td>
                   <div class="flex items-center justify-end gap-1.5">
-                    <button type="button" class="btn-circle" title="Edit entry"
-                            aria-label="Edit entry" (click)="edit(child, lookup)">
-                      <app-icon name="edit" size="0.9em" />
-                    </button>
-                    <button type="button" class="btn-circle btn-circle-danger"
-                            title="Delete entry" aria-label="Delete entry"
-                            (click)="remove(child, lookup)">
-                      <app-icon name="trash" size="0.9em" />
-                    </button>
+                    @if (canModify(child)) {
+                      <button type="button" class="btn-circle" title="Edit entry"
+                              aria-label="Edit entry" (click)="edit(child, lookup)">
+                        <app-icon name="edit" size="0.9em" />
+                      </button>
+                      <button type="button" class="btn-circle btn-circle-danger"
+                              title="Delete entry" aria-label="Delete entry"
+                              (click)="remove(child, lookup)">
+                        <app-icon name="trash" size="0.9em" />
+                      </button>
+                    } @else {
+                      <span class="pill pill-neutral"
+                            title="Shared with every workspace — only a platform admin can change it">
+                        <app-icon name="lock" size="0.8em" />shared
+                      </span>
+                    }
                   </div>
                 </td>
               </tr>
             }
             <tr class="lookup-child">
               <td></td>
-              <td colspan="5" class="py-1.5">
+              <td colspan="7" class="py-1.5">
                 <button type="button" class="btn btn-ghost btn-sm ml-5" (click)="addChild(lookup)">
                   <app-icon name="plus" size="0.85em" class="icon-ok" />Add an entry under {{ lookup.lookupType }}
                 </button>
