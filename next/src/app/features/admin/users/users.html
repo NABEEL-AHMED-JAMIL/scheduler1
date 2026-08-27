@@ -167,6 +167,7 @@
             { key: 'fullName',    label: 'Name' },
             { key: 'username',    label: 'Email' },
             { key: 'position',    label: 'Position' },
+            { key: 'phoneNumber', label: 'Phone' },
             { key: 'userRole',    label: 'Role' },
             { key: 'tenantName',  label: 'Tenant' },
             { key: 'lastLoginAt', label: 'Last sign-in' },
@@ -213,6 +214,13 @@
             <td class="mono text-[color:var(--text-secondary)] max-w-56 truncate"
                 [title]="user.username">{{ user.username }}</td>
             <td class="text-[color:var(--text-secondary)]">{{ user.position || '—' }}</td>
+            <!-- Monospace and nowrap: a column of numbers is read by comparing digits down the
+                 column, which proportional type and wrapping both make harder. -->
+            <td class="mono text-xs text-[color:var(--text-secondary)] whitespace-nowrap">
+              @if (user.phoneNumber) {
+                <a class="link-inline" [href]="'tel:' + user.phoneNumber">{{ user.phoneNumber }}</a>
+              } @else { — }
+            </td>
             <td><span [class]="rolePill(user.userRole)">{{ roleLabel(user.userRole) }}</span></td>
             <td class="text-[color:var(--text-secondary)]">
               @if (user.tenantName) {

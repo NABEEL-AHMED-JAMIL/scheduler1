@@ -6,6 +6,7 @@ import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config
 import { ToastService } from '../../../shared/ui/toast.service';
 import { Field } from '../../../shared/ui/field';
 import { FormDialog } from '../../../shared/ui/form-dialog';
+import { PhoneInput } from '../../../shared/ui/phone-input';
 import { AuthService } from '../../../core/auth/auth.service';
 
 const ROLES = [
@@ -16,7 +17,7 @@ const ROLES = [
 
 @Component({
   selector: 'app-user-dialog',
-  imports: [ReactiveFormsModule, Field, FormDialog],
+  imports: [ReactiveFormsModule, Field, FormDialog, PhoneInput],
   templateUrl: './user-dialog.html',
 })
 export class UserDialog {
@@ -39,6 +40,10 @@ export class UserDialog {
   readonly roles = computed(() => this.auth.isPlatformAdmin()
     ? ROLES
     : ROLES.filter(r => r.value !== 'PLATFORM_ADMIN'));
+  /** E.164, owned by the phone component -- it validates against the same metadata the
+      server does, so a second Validators rule here could only be a weaker copy. */
+  readonly phone = signal<string>(this.data.user?.phoneNumber ?? '');
+
   readonly saving = signal(false);
   readonly submitted = signal(false);
 
@@ -80,6 +85,8 @@ export class UserDialog {
     }
 
     const payload: any = { ...this.form.getRawValue() };
+    // Sent as E.164; the server re-validates rather than trusting what the browser built.
+    payload.phoneNumber = this.phone() || null;
     if (!payload.password) delete payload.password;
     if (!this.needsTenant()) payload.tenantId = null;
 

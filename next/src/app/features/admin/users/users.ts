@@ -35,6 +35,9 @@ export interface UserStatistic {
 }
 
 export interface AppUser {
+  /** E.164, validated against the same metadata on both sides. */
+  phoneNumber?: string | null;
+
   /** The author's id, so "Only mine" matches on identity rather than display text. */
   createdBy?: number | null;
 
