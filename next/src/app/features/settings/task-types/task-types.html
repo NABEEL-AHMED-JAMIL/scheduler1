@@ -101,7 +101,7 @@
             <dl class="text-xs grid gap-1">
               <div class="flex gap-2 min-w-0">
                 <dt class="text-[color:var(--text-muted)] shrink-0 w-20">Topic</dt>
-                <dd class="mono text-brand-600 truncate min-w-0">
+                <dd class="mono text-accent truncate min-w-0">
                   {{ topicOf(type.queueTopicPartition) || '—' }}
                 </dd>
               </div>
@@ -156,7 +156,7 @@
             </td>
             <td class="text-[color:var(--text-secondary)] max-w-80 truncate"
                 [title]="type.description || ''">{{ type.description || '—' }}</td>
-            <td><span class="mono text-brand-600">{{ topicOf(type.queueTopicPartition) || '—' }}</span></td>
+            <td><span class="mono text-accent">{{ topicOf(type.queueTopicPartition) || '—' }}</span></td>
             <td class="mono text-[color:var(--text-muted)]">
               {{ partitionsOf(type.queueTopicPartition) || '—' }}
             </td>

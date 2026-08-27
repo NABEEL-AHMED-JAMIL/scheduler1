@@ -76,7 +76,7 @@
               <div class="min-w-0 flex-1">
                 <h3 class="font-semibold truncate" [title]="c.connectionName">{{ c.connectionName }}</h3>
                 <!-- The alias is what a job or task actually references, so it leads. -->
-                <p class="mono text-brand-600 truncate" [title]="c.alias">{{ c.alias }}</p>
+                <p class="mono text-accent truncate" [title]="c.alias">{{ c.alias }}</p>
               </div>
               <div class="shrink-0 flex items-center gap-1">
                 <app-status [label]="c.status" [quiet]="true" />
@@ -172,7 +172,7 @@
                 </div>
               }
             </td>
-            <td><span class="mono text-brand-600">{{ c.alias }}</span></td>
+            <td><span class="mono text-accent">{{ c.alias }}</span></td>
             <td><span class="pill pill-neutral">{{ c.provider }}</span></td>
             <td class="mono text-[color:var(--text-secondary)] max-w-56 truncate" [title]="target(c)">
               {{ target(c) }}

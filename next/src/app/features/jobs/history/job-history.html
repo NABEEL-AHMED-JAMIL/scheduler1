@@ -1,6 +1,6 @@
 <div class="page">
   <div>
-    <a routerLink="/jobs" class="text-sm text-brand-600 hover:underline">← Back to jobs</a>
+    <a routerLink="/jobs" class="text-sm text-accent hover:underline">← Back to jobs</a>
     <h1 class="page-title mt-1">
       Run history
       @if (jobName()) {
@@ -152,7 +152,7 @@
               <dl class="detail-list">
                 <dt>Task</dt>
                 <dd class="truncate">
-                  <a class="text-brand-600 hover:underline"
+                  <a class="text-accent hover:underline"
                      [routerLink]="['/tasks', task.taskDetailId, 'edit']">
                     {{ task.taskName }}
                   </a>
@@ -201,7 +201,7 @@
   @if (hasInsights()) {
     <div class="flex">
       <button type="button" class="btn btn-ghost btn-sm -ml-2"
-              [class.text-brand-600]="showInsights()"
+              [class.text-accent]="showInsights()"
               (click)="showInsights.set(!showInsights())">
         <app-icon name="chart" />{{ showInsights() ? 'Hide charts' : 'Charts' }}
       </button>

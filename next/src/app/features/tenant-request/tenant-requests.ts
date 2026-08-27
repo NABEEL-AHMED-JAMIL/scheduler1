@@ -95,7 +95,7 @@ interface TenantRequest {
                   @if (r.purpose) {
                     <button type="button"
                             class="text-left w-full cursor-pointer bg-transparent border-0 p-0
-                                   text-inherit hover:text-brand-600 transition-colors"
+                                   text-inherit hover:text-accent transition-colors"
                             [attr.aria-expanded]="isOpen(r.tenantRequestId)"
                             (click)="toggle(r.tenantRequestId)">
                       <!-- Stays clamped when open: the panel below carries the full text at a

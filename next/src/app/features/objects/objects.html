@@ -72,13 +72,13 @@
       <div class="flex flex-wrap items-center gap-2 px-4 py-2.5 border-b border-subtle"
           >
         <nav class="flex items-center gap-1 text-sm mr-auto min-w-0 flex-wrap">
-          <button type="button" class="mono text-brand-600 hover:underline" (click)="goToCrumb(-1)">
+          <button type="button" class="mono text-accent hover:underline" (click)="goToCrumb(-1)">
             {{ bucket() }}
           </button>
           @for (crumb of crumbs(); track crumb.prefix; let i = $index) {
             <span class="text-[color:var(--text-muted)]">/</span>
             <button type="button" class="hover:underline truncate max-w-40"
-                    [class.text-brand-600]="i < crumbs().length - 1"
+                    [class.text-accent]="i < crumbs().length - 1"
                     (click)="goToCrumb(i)">{{ crumb.name }}</button>
           }
         </nav>
@@ -126,7 +126,7 @@
         </span>
         @if (hasInsights()) {
           <button type="button" class="btn btn-ghost btn-sm ml-auto"
-                  [class.text-brand-600]="showInsights()"
+                  [class.text-accent]="showInsights()"
                   (click)="showInsights.set(!showInsights())">
             <app-icon name="chart" />{{ showInsights() ? 'Hide' : 'Insights' }}
           </button>
@@ -202,7 +202,7 @@
                     <button type="button" class="flex items-center gap-2 text-left w-full min-w-0"
                             (click)="entry.folder ? openFolder(entry) : preview(entry)">
                       @if (entry.folder) {
-                        <app-icon name="folder" class="text-brand-500" />
+                        <app-icon name="folder" class="text-accent" />
                       } @else {
                         <app-icon name="file" class="text-[color:var(--text-muted)]" />
                       }

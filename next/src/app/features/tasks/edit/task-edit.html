@@ -1,6 +1,6 @@
 <div class="page-form">
   <div>
-    <a routerLink="/tasks" class="text-sm text-brand-600 hover:underline">← Back to tasks</a>
+    <a routerLink="/tasks" class="text-sm text-accent hover:underline">← Back to tasks</a>
     <h1 class="page-title mt-1">
       {{ isEdit() ? 'Edit task' : 'New task' }}
     </h1>
@@ -122,7 +122,7 @@
                     <input class="input" formControlName="tagKey" placeholder="tag key"
                            (blur)="trimTag(i, 'tagKey')"
                            [class.mono]="isStorageTag(tag.get('tagKey')?.value)"
-                           [class.text-brand-600]="isStorageTag(tag.get('tagKey')?.value)"
+                           [class.text-accent]="isStorageTag(tag.get('tagKey')?.value)"
                            [title]="isStorageTag(tag.get('tagKey')?.value)
                               ? 'Recognised storage tag — the pipeline reads this one' : ''" />
                   </td>

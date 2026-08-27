@@ -119,7 +119,7 @@ interface SourceTaskSummary {
               @for (tag of tags(); track tag.tagKey) {
                 <tr>
                   <td class="text-xs">{{ labelFor(tag.tagKey) }}</td>
-                  <td class="mono text-xs text-brand-600">&lt;{{ tag.tagKey }}&gt;</td>
+                  <td class="mono text-xs text-accent">&lt;{{ tag.tagKey }}&gt;</td>
                   <td class="mono text-xs max-w-72 truncate" [title]="tag.tagValue">
                     {{ tag.tagValue || '—' }}
                   </td>

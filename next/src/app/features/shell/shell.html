@@ -12,7 +12,7 @@
         @for (item of nav(); track item.label) {
           @if (item.path) {
             <a [routerLink]="item.path"
-               routerLinkActive="!text-brand-600 !bg-brand-50"
+               routerLinkActive="!text-accent !bg-accent-soft"
                [routerLinkActiveOptions]="{ exact: item.path === '/' }"
                class="px-2.5 py-1.5 rounded-md text-sm font-medium whitespace-nowrap
                       text-[color:var(--text-secondary)]
@@ -26,8 +26,8 @@
                              whitespace-nowrap text-[color:var(--text-secondary)]
                              hover:text-[color:var(--text-primary)]
                              hover:bg-[color:var(--surface-sunken)]"
-                      [class.bg-brand-50]="openMenu() === item.label"
-                      [class.text-brand-600]="openMenu() === item.label">
+                      [class.bg-accent-soft]="openMenu() === item.label"
+                      [class.text-accent]="openMenu() === item.label">
                 {{ item.label }}
                 <app-icon name="chevronDown" size="0.85em"
                           class="icon-muted transition-transform duration-150"

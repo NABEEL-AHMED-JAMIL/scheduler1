@@ -91,7 +91,7 @@ const ROUTE_MAP: Record<string, string> = {
           }
 
           <a routerLink="/notifications" (click)="open.set(false)"
-             class="block px-3 py-2 text-sm text-center border-t text-brand-600 hover:underline border-subtle"
+             class="block px-3 py-2 text-sm text-center border-t text-accent hover:underline border-subtle"
             >
             View all notifications
           </a>

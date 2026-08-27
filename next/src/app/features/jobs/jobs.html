@@ -149,7 +149,7 @@
                      (change)="toggleSelect(job)" />
             </td>
             <td>
-              <button type="button" class="text-[color:var(--text-muted)] hover:text-brand-600"
+              <button type="button" class="text-[color:var(--text-muted)] hover:text-accent"
                       (click)="toggleRow(job)"
                       [attr.aria-label]="expanded().has(job.jobId) ? 'Hide details' : 'Show details'">
                 <app-icon [name]="expanded().has(job.jobId) ? 'chevronDown' : 'chevronRight'" />

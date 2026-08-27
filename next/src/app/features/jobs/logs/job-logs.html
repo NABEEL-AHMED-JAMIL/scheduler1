@@ -1,6 +1,6 @@
 <div class="page">
   <div>
-    <a [routerLink]="['/jobs', jobId(), 'history']" class="text-sm text-brand-600 hover:underline">
+    <a [routerLink]="['/jobs', jobId(), 'history']" class="text-sm text-accent hover:underline">
       ← Back to run history
     </a>
     <div class="flex items-start gap-3">
@@ -33,7 +33,7 @@
               <dl class="detail-list">
                 <dt>Name</dt>
                 <dd class="truncate">
-                  <a class="text-brand-600 hover:underline"
+                  <a class="text-accent hover:underline"
                      [routerLink]="['/jobs', jobId(), 'history']">{{ j.jobName }}</a>
                 </dd>
                 <dt>Execution</dt><dd>{{ j.execution || '—' }}</dd>
@@ -78,7 +78,7 @@
   @if (hasInsights()) {
     <div class="flex">
       <button type="button" class="btn btn-ghost btn-sm -ml-2"
-              [class.text-brand-600]="showInsights()"
+              [class.text-accent]="showInsights()"
               (click)="showInsights.set(!showInsights())">
         <app-icon name="chart" />{{ showInsights() ? 'Hide timing' : 'Timing' }}
       </button>

@@ -136,7 +136,7 @@
         @for (task of paged(); track task.taskDetailId) {
           <tr>
             <td>
-              <button type="button" class="text-[color:var(--text-muted)] hover:text-brand-600"
+              <button type="button" class="text-[color:var(--text-muted)] hover:text-accent"
                       (click)="toggleRow(task)"
                       [attr.aria-label]="expanded().has(task.taskDetailId) ? 'Hide payload' : 'Show payload'">
                 <app-icon [name]="expanded().has(task.taskDetailId) ? 'chevronDown' : 'chevronRight'" />

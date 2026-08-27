@@ -7,7 +7,7 @@
     <div class="flex items-center gap-2">
       @if (hasInsights()) {
         <button type="button" class="btn btn-ghost btn-sm"
-                [class.text-brand-600]="showInsights()"
+                [class.text-accent]="showInsights()"
                 (click)="showInsights.set(!showInsights())">
           <app-icon name="chart" />{{ showInsights() ? 'Hide charts' : 'Charts' }}
         </button>
