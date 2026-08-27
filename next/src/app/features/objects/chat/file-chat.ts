@@ -6,6 +6,8 @@ import { Icon } from '../../../shared/ui/icon';
 import { Markdown } from '../../../shared/ui/markdown';
 import { Avatar } from '../../../shared/ui/avatar';
 import { AuthService } from '../../../core/auth/auth.service';
+import { Dialog } from '@angular/cdk/dialog';
+import { confirmWith } from '../../../shared/ui/confirm';
 import { copyText } from '../../../shared/ui/clipboard.util';
 import { ChatFile, parseDownloadableFiles, stripExportFences } from './chat-export';
 import { Subscription } from 'rxjs';
@@ -37,6 +39,7 @@ export class FileChat implements OnInit {
   private readonly toast = inject(ToastService);
   /** Whose picture sits beside their own messages. */
   readonly auth = inject(AuthService);
+  private readonly dialog = inject(Dialog);
 
   readonly agents = signal<Agent[]>([]);
   readonly agentId = signal<number | null>(null);
@@ -51,12 +54,15 @@ export class FileChat implements OnInit {
   readonly converting = signal<string | null>(null);
 
   /**
-   * How long a conversation outlives its panel.
+   * How long an *unintentionally* abandoned conversation survives.
    *
-   * Closing used to discard the transcript outright -- the component was destroyed and the
-   * messages went with it -- so a mis-click cost the whole conversation. It is kept for half an
-   * hour instead, long enough to reopen the file and carry on, short enough that a shared
-   * machine does not hold somebody's questions about a document indefinitely.
+   * Closing deliberately deletes it, so this window covers only the exits that never run
+   * close(): a reload, navigating away, a crash. Half an hour is long enough to come back and
+   * carry on, short enough that a shared machine is not holding somebody's questions about a
+   * document for the rest of the day.
+   *
+   * Checked when the panel opens rather than by a timer, because a timer does not run while the
+   * component is destroyed -- which is the entire window that needs to expire.
    *
    * Deliberately sessionStorage, not localStorage: it dies with the browser tab regardless of
    * the clock.
@@ -117,8 +123,27 @@ export class FileChat implements OnInit {
    * contents of the file. Fire-and-forget: the panel closes either way, and a failed eviction
    * simply means the entry ages out on its own.
    */
-  close(): void {
-    this.rememberHistory();
+  async close(): Promise<void> {
+    // Nothing to lose, nothing to ask. Prompting on an empty chat is friction that teaches
+    // people to click through the dialog without reading it, which is how a real warning gets
+    // ignored later.
+    if (this.messages().length) {
+      const end = await confirmWith(this.dialog, {
+        title: 'Close this chat?',
+        body: 'The conversation is deleted, and the text read from this file is dropped from the '
+            + 'server. Nothing is kept.',
+        confirmLabel: 'Close and delete',
+        danger: true,
+      });
+      if (!end) {
+        return;
+      }
+    }
+    // Order matters: stop the effect re-saving on the way out, then clear, then close. Clearing
+    // first and letting the effect fire again would write the transcript straight back.
+    this.persist.destroy();
+    sessionStorage.removeItem(this.historyKey());
+    this.messages.set([]);
     this.http.post(`${API_BASE}/fileChat.json/endSession`,
       { bucket: this.bucket(), key: this.fileKey() }).subscribe({ error: () => {} });
     this.closed.emit();
