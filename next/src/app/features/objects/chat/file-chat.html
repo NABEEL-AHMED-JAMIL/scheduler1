@@ -34,10 +34,26 @@
         <p class="text-center text-sm text-[color:var(--text-muted)] py-8">Reading the file…</p>
       } @else if (prepareError()) {
         <p class="text-center text-sm text-crit-500 py-8">{{ prepareError() }}</p>
-      } @else if (!messages().length) {
-        <p class="text-center text-sm text-[color:var(--text-muted)] py-8">
-          Ask something about this file to get started.
-        </p>
+      } @else {
+        <!-- The server has always known when a file overruns what the model can read, and the
+             UI has always dropped it. Someone asking "summarise this" deserves to know the
+             summary covers the opening section, before they ask rather than after. -->
+        @if (coverage()?.truncated) {
+          <div class="flex items-start gap-2 rounded-lg px-3 py-2 text-xs"
+               style="background: color-mix(in oklab, var(--color-warn-500) 12%, transparent);">
+            <app-icon name="alert" class="icon-warn mt-0.5 shrink-0" size="0.85em" />
+            <span class="text-[color:var(--text-secondary)]">
+              This file is longer than the model can read at once. Answers cover the first
+              {{ coverage()!.charsUsed | number }} of
+              {{ coverage()!.totalChars | number }} characters.
+            </span>
+          </div>
+        }
+        @if (!messages().length) {
+          <p class="text-center text-sm text-[color:var(--text-muted)] py-8">
+            Ask something about this file to get started.
+          </p>
+        }
       }
 
       @for (message of messages(); track $index) {

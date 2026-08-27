@@ -2,6 +2,7 @@ import { Component, OnInit, effect, inject, input, output, signal, viewChild, El
 import { HttpClient } from '@angular/common/http';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { ToastService } from '../../../shared/ui/toast.service';
+import { DecimalPipe } from '@angular/common';
 import { Icon } from '../../../shared/ui/icon';
 import { Markdown } from '../../../shared/ui/markdown';
 import { Avatar } from '../../../shared/ui/avatar';
@@ -25,7 +26,7 @@ interface Agent { aiAgentId: number; agentName: string; provider: string; status
 
 @Component({
   selector: 'app-file-chat',
-  imports: [Icon, Markdown, Avatar],
+  imports: [Icon, Markdown, Avatar, DecimalPipe],
   templateUrl: './file-chat.html',
 })
 export class FileChat implements OnInit {
@@ -47,6 +48,8 @@ export class FileChat implements OnInit {
   readonly draft = signal('');
   readonly preparing = signal(true);
   readonly prepareError = signal('');
+  /** How much of the file the chosen model will actually see. Null until prepared. */
+  readonly coverage = signal<{ truncated: boolean; charsUsed: number; totalChars: number } | null>(null);
   readonly sending = signal(false);
   readonly minimized = signal(false);
   readonly copiedIndex = signal<number | null>(null);
@@ -199,9 +202,10 @@ export class FileChat implements OnInit {
   }
 
   ngOnInit(): void {
-    this.loadAgents();
     this.restoreHistory();
-    this.prepare();
+    // prepare() runs once the agent list settles: the readable size depends on which provider
+    // answers, so asking before one is chosen reports a limit that may not apply.
+    this.loadAgents();
   }
 
   private loadAgents(): void {
@@ -213,8 +217,11 @@ export class FileChat implements OnInit {
           a.status === 'Active' && (a.apiKeyConfigured || a.provider?.toLowerCase() === 'ollama'));
         this.agents.set(usable);
         if (usable.length && this.agentId() === null) this.agentId.set(usable[0].aiAgentId);
-      },
-      error: () => { /* the prepare error below is the one worth surfacing */ },
+          // Chained rather than run in parallel: the readable size depends on which provider
+          // answers, so preparing before an agent is chosen reports a limit that may not apply.
+          this.prepare();
+        },
+        error: () => { this.prepare(); },
     });
   }
 
@@ -222,10 +229,11 @@ export class FileChat implements OnInit {
     this.preparing.set(true);
     this.prepareError.set('');
     this.http.post<ApiResponse>(`${API_BASE}/fileChat.json/prepareContext`,
-      { bucket: this.bucket(), key: this.fileKey() }).subscribe({
+      { bucket: this.bucket(), key: this.fileKey(), aiAgentId: this.agentId() }).subscribe({
       next: response => {
         this.preparing.set(false);
-        if (response.status !== API_SUCCESS) this.prepareError.set(response.message);
+        if (response.status !== API_SUCCESS) { this.prepareError.set(response.message); return; }
+        this.coverage.set(response.data as any ?? null);
       },
       error: err => {
         this.preparing.set(false);
