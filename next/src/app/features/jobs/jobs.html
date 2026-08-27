@@ -268,8 +268,12 @@
             <tr>
               <!-- One cell spanning the whole row: the empty leading cell was a leftover from
                    before the checkbox column existed, and it pushed the panel 48px in while
-                   making the row span twelve slots of an eleven-column table. -->
-              <td colspan="11" class="!p-0">
+                   making the row span twelve slots of an eleven-column table.
+
+                   The count has to track the header exactly: the table grew Created by and
+                   Updated by, and a colspan left behind at 11 rendered the panel 166px
+                   narrower than the table, which reads as a broken layout. -->
+              <td colspan="13" class="!p-0">
                <div class="detail-panel">
                 <dl class="grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-3 text-sm">
                   @for (item of [

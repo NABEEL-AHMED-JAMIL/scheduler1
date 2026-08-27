@@ -207,7 +207,9 @@
           @if (expanded().has(task.taskDetailId)) {
             <tr class="bg-sunken">
               <td></td>
-              <td colspan="7" class="!py-3">
+              <!-- One leading cell plus this: together they must equal the header count, which
+                   grew to ten when Created by and Updated by were added. -->
+              <td colspan="9" class="!py-3">
                 @if (task.taskPayload) {
                   <div class="flex items-center gap-2 mb-1.5">
                     <app-icon name="file" size="0.9em" class="icon-muted" />
