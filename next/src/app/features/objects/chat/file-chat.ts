@@ -4,6 +4,8 @@ import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config
 import { ToastService } from '../../../shared/ui/toast.service';
 import { Icon } from '../../../shared/ui/icon';
 import { Markdown } from '../../../shared/ui/markdown';
+import { Avatar } from '../../../shared/ui/avatar';
+import { AuthService } from '../../../core/auth/auth.service';
 import { copyText } from '../../../shared/ui/clipboard.util';
 import { ChatFile, parseDownloadableFiles, stripExportFences } from './chat-export';
 import { Subscription } from 'rxjs';
@@ -13,12 +15,15 @@ interface ChatMessage {
   text: string;
   /** Files the reply carried, ready to save. */
   files?: ChatFile[];
+  /** Epoch millis. Stored rather than formatted so a restored transcript keeps its real
+      times, and so the display can follow the reader's locale rather than the writer's. */
+  at?: number;
 }
 interface Agent { aiAgentId: number; agentName: string; provider: string; status: string; apiKeyConfigured?: boolean; }
 
 @Component({
   selector: 'app-file-chat',
-  imports: [Icon, Markdown],
+  imports: [Icon, Markdown, Avatar],
   templateUrl: './file-chat.html',
 })
 export class FileChat implements OnInit {
@@ -30,6 +35,8 @@ export class FileChat implements OnInit {
 
   private readonly http = inject(HttpClient);
   private readonly toast = inject(ToastService);
+  /** Whose picture sits beside their own messages. */
+  readonly auth = inject(AuthService);
 
   readonly agents = signal<Agent[]>([]);
   readonly agentId = signal<number | null>(null);
@@ -210,7 +217,7 @@ export class FileChat implements OnInit {
       return;
     }
 
-    this.messages.update(list => [...list, { role: 'user', text: message }]);
+    this.messages.update(list => [...list, { role: 'user', text: message, at: Date.now() }]);
     this.draft.set('');
     this.sending.set(true);
 
@@ -223,7 +230,7 @@ export class FileChat implements OnInit {
       next: response => {
         this.settle();
         if (response.status !== API_SUCCESS) {
-          this.messages.update(list => [...list, { role: 'error', text: response.message }]);
+          this.messages.update(list => [...list, { role: 'error', text: response.message, at: Date.now() }]);
           return;
         }
         // The raw reply carries the export fence so the file can be pulled out of it, but that
@@ -232,6 +239,7 @@ export class FileChat implements OnInit {
         const raw = String(response.data ?? '');
         this.messages.update(list => [...list, {
           role: 'assistant',
+          at: Date.now(),
           text: stripExportFences(raw),
           files: parseDownloadableFiles(raw, this.baseName()),
         }]);
@@ -239,7 +247,8 @@ export class FileChat implements OnInit {
       error: err => {
         this.settle();
         this.messages.update(list => [...list,
-          { role: 'error', text: err?.error?.message || 'The agent did not respond.' }]);
+          { role: 'error', text: err?.error?.message || 'The agent did not respond.',
+            at: Date.now() }]);
       },
     });
   }
@@ -263,7 +272,7 @@ export class FileChat implements OnInit {
     if (!this.inFlight) return;
     this.inFlight.unsubscribe();
     this.settle();
-    this.messages.update(list => [...list, { role: 'error', text: 'Stopped.' }]);
+    this.messages.update(list => [...list, { role: 'error', text: 'Stopped.', at: Date.now() }]);
   }
 
   /**
@@ -354,5 +363,18 @@ export class FileChat implements OnInit {
       event.preventDefault();
       this.send();
     }
+  }
+
+  /**
+   * The clock time a message was sent, in the reader's own locale.
+   *
+   * Time only, not the date: a conversation is read in the session that produced it, and
+   * history expires after thirty minutes, so a date would be noise on every line.
+   */
+  formatTime(at: number | undefined): string {
+    if (!at) {
+      return '';
+    }
+    return new Date(at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
   }
 }
