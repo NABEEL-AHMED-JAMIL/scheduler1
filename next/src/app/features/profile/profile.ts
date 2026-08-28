@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
@@ -80,6 +80,16 @@ export class Profile implements OnInit {
 
   /** Owned by the phone component, which validates against the same metadata the server uses. */
   readonly phone = signal<string>('');
+  private readonly phoneInput = viewChild(PhoneInput);
+
+  /**
+   * Whether the phone box may show its error yet.
+   *
+   * False while typing -- half a number is invalid by definition, and flagging it on every
+   * keystroke is noise. Flipped on the first save attempt, which is this card's equivalent of
+   * submitting a form.
+   */
+  readonly phoneSubmitted = signal(false);
   readonly position = signal<string>('');
 
   /**
@@ -244,6 +254,14 @@ export class Profile implements OnInit {
 
   saveName(): void {
     if (!this.detailsChanged()) return;
+    // The component empties `value` on an invalid number, so without this a bad entry looks
+    // like a deliberate clearing: Save lights up and the stored number is wiped while the
+    // person believes they corrected it.
+    this.phoneSubmitted.set(true);
+    if (this.phoneInput()?.error()) {
+      this.toast.error('Check the phone number before saving.');
+      return;
+    }
     this.savingName.set(true);
     // Empty clears rather than omits: sending undefined would leave a stale value in place, so
     // a person could never remove a number once they had set one.

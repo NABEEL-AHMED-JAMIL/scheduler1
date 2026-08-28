@@ -133,7 +133,7 @@
                you by an administrator are validated and stored identically. -->
           <div class="field max-w-sm mt-4">
             <label class="label" for="phoneNumber">Phone</label>
-            <app-phone-input [(value)]="phone" inputId="phoneNumber" />
+            <app-phone-input [(value)]="phone" inputId="phoneNumber" [submitted]="phoneSubmitted()" />
             <p class="field-note text-[color:var(--text-muted)]">
               Pick the country, then the number as it is written there. Leave it empty to remove
               the one on file.
