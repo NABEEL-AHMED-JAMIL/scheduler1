@@ -36,6 +36,16 @@ const LOOK: Record<string, StatusLook> = {
   skip:      { tone: 'warn',    glyph: 'skip',        run: true },
   missed:    { tone: 'warn',    glyph: 'alert',       run: true, solid: true },
 
+  // A workspace request's life. These were missing entirely, so all three fell through to
+  // UNKNOWN and rendered as the same neutral grey -- three different outcomes that a reader had
+  // to tell apart by reading the word.
+  //
+  // Pending is warn rather than neutral because it is the only one of the three that is asking
+  // somebody to do something; approved and rejected are settled and can sit quietly.
+  pending:   { tone: 'warn', glyph: 'clock' },
+  approved:  { tone: 'ok',   glyph: 'checkCircle' },
+  rejected:  { tone: 'crit', glyph: 'xCircle' },
+
   // An entity's state, which is a different question from how a run went.
   active:    { tone: 'ok',   glyph: 'checkCircle' },
   success:   { tone: 'ok',   glyph: 'checkCircle' },
