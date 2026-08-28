@@ -15,7 +15,6 @@ import { StatusPill } from '../../../shared/ui/status-pill';
 import { Icon } from '../../../shared/ui/icon';
 import { ViewToggle } from '../../../shared/ui/view-toggle';
 import { Avatar } from '../../../shared/ui/avatar';
-import { AuditLine } from '../../../shared/ui/audit-line';
 import { createSort } from '../../../shared/ui/sort';
 import { UserDialog } from './user-dialog';
 import { PromptDialog } from '../../objects/dialogs/prompt-dialog';
@@ -63,7 +62,7 @@ export interface AppUser {
 
 @Component({
   selector: 'app-users',
-  imports: [MineFilter, ViewToggle, StatTile, DatePipe, AuditLine, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Icon, Avatar, Pagination],
+  imports: [MineFilter, ViewToggle, StatTile, DatePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Icon, Avatar, Pagination],
   templateUrl: './users.html',
 })
 export class Users implements OnInit {

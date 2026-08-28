@@ -85,84 +85,106 @@
     @if (view() === 'cards') {
       <div class="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3">
         @for (user of paged(); track user.appUserId) {
-          <article class="card p-4 flex gap-3 items-start">
-            <app-avatar [bucket]="user.avatarBucket" [key]="user.avatarKey"
-                        [name]="user.fullName || user.username" [size]="3" />
-            <div class="min-w-0 flex-1">
-              <div class="flex items-start gap-2">
-                <div class="min-w-0">
-                  <h3 class="font-semibold truncate" [title]="user.fullName || user.username">
+          <article class="card p-4 flex flex-col gap-3">
+            <!-- Identity band. The avatar is larger and the name is the only thing at full
+                 strength -- previously the phone number was brand-coloured and outshouted it. -->
+            <div class="flex items-start gap-3">
+              <app-avatar [bucket]="user.avatarBucket" [key]="user.avatarKey"
+                          [name]="user.fullName || user.username" [size]="2.75" class="shrink-0" />
+              <div class="min-w-0 flex-1">
+                <div class="flex items-start gap-2">
+                  <h3 class="font-semibold truncate leading-snug"
+                      [title]="user.fullName || user.username">
                     {{ user.fullName || user.username }}
                   </h3>
-                  @if (user.position) {
-                    <p class="text-xs text-[color:var(--text-muted)] truncate"
-                       [title]="user.position">{{ user.position }}</p>
+                  @if (isSelf(user)) { <span class="pill pill-brand shrink-0">You</span> }
+                  <div class="ml-auto shrink-0"><app-status [label]="user.status" [quiet]="true" /></div>
+                </div>
+                @if (user.position) {
+                  <p class="text-xs text-[color:var(--text-muted)] truncate"
+                     [title]="user.position">{{ user.position }}</p>
+                }
+                <!-- Colour carries privilege, a glyph carries category. The role uses the same
+                     mapping as the table -- platform admin red, tenant admin brand -- which the
+                     card was ignoring, so one view showed a red pill and the other grey. The
+                     workspace stays neutral with a mark on it: two coloured pills side by side
+                     would compete, and a workspace name is a label rather than a state. -->
+                <div class="flex flex-wrap items-center gap-1.5 mt-2">
+                  <span [class]="rolePill(user.userRole)">{{ roleLabel(user.userRole) }}</span>
+                  @if (user.tenantName) {
+                    <span class="pill pill-neutral" [title]="'Workspace: ' + user.tenantName">
+                      <app-icon name="building" size="0.8em" class="opacity-70" />{{ user.tenantName }}
+                    </span>
+                  } @else if (user.userRole === 'PLATFORM_ADMIN') {
+                    <span class="pill pill-neutral" title="Reaches every workspace">
+                      <app-icon name="globe" size="0.8em" class="opacity-70" />All tenants
+                    </span>
                   }
                 </div>
-                @if (isSelf(user)) { <span class="pill pill-brand shrink-0">You</span> }
-                <div class="ml-auto shrink-0">
-                  <app-status [label]="user.status" [quiet]="true" />
-                </div>
               </div>
+            </div>
 
-              <p class="mono text-[color:var(--text-muted)] truncate mt-0.5" [title]="user.username">
-                {{ user.username }}
-              </p>
-
-              <!-- Only when there is one, as in the table: a card that always shows a dash for
-                   phone spends a line saying nothing. Tel link so it is dialable from a laptop. -->
+            <!-- Contact. Both lines the same muted weight, because an address and a number are
+                 the same kind of fact; the glyph is what tells them apart at a glance. -->
+            <div class="flex flex-col gap-1 text-xs text-[color:var(--text-muted)]">
+              <div class="flex items-center gap-1.5 min-w-0">
+                <app-icon name="mail" size="0.85em" class="shrink-0 opacity-70" />
+                <span class="mono truncate" [title]="user.username">{{ user.username }}</span>
+              </div>
               @if (user.phoneNumber) {
-                <p class="mt-0.5">
-                  <a class="mono text-xs link-inline"
+                <div class="flex items-center gap-1.5 min-w-0">
+                  <app-icon name="phone" size="0.85em" class="shrink-0 opacity-70" />
+                  <a class="mono truncate hover:text-brand-600 transition-colors"
                      [href]="'tel:' + user.phoneNumber">{{ user.phoneNumber }}</a>
-                </p>
+                </div>
               }
+            </div>
 
-              <div class="flex flex-wrap items-center gap-1.5 mt-2">
-                <span class="pill pill-neutral">{{ roleLabel(user.userRole) }}</span>
-                @if (user.tenantName) {
-                  <span class="pill pill-neutral">{{ user.tenantName }}</span>
-                }
-              </div>
-
-              <p class="text-[11px] text-[color:var(--text-muted)] mt-2">
-                {{ user.lastLoginAt
-                    ? 'Last in ' + (user.lastLoginAt | date: 'd MMM y, HH:mm')
-                    : 'Never signed in' }}
-              </p>
-
-              <app-audit-line class="block mt-1" [createdByName]="user.createdByName"
-                              [updatedByName]="user.updatedByName" />
-
-              <!-- What they own. Absent until the aggregate lands, and shown as a plain line
-                   when they own nothing, because a row of zeros reads as a broken widget. -->
-              @if (statFor(user); as stat) {
-                @if (stat.jobCount) {
-                  <div class="grid grid-cols-3 gap-px mt-2.5 rounded-lg overflow-hidden bg-subtle"
-                      >
-                    @for (tile of [
-                      { label: 'Jobs',  value: stat.jobCount,  hint: stat.activeJobs + ' active' },
-                      { label: 'Tasks', value: stat.taskCount, hint: 'used by their jobs' },
-                      { label: 'Runs',  value: stat.runCount,
-                        hint: successRate(stat) === null ? 'none finished' : successRate(stat) + '% success' }
-                    ]; track tile.label) {
-                      <div class="px-2 py-1.5 text-center bg-raised"
-                           [title]="tile.hint">
-                        <div class="text-sm font-semibold tabular leading-none">{{ tile.value }}</div>
-                        <div class="text-[10px] uppercase tracking-wide mt-0.5 text-[color:var(--text-muted)]">
-                          {{ tile.label }}
-                        </div>
+            <!-- Workload, when there is any. Kept as tiles: three figures compared against each
+                 other read better in a row than as three sentences. -->
+            @if (statFor(user); as stat) {
+              @if (stat.jobCount) {
+                <div class="grid grid-cols-3 gap-px rounded-lg overflow-hidden bg-subtle">
+                  @for (tile of [
+                    { label: 'Jobs',  value: stat.jobCount,  hint: stat.activeJobs + ' active' },
+                    { label: 'Tasks', value: stat.taskCount, hint: 'used by their jobs' },
+                    { label: 'Runs',  value: stat.runCount,
+                      hint: successRate(stat) === null ? 'none finished' : successRate(stat) + '% success' }
+                  ]; track tile.label) {
+                    <div class="px-2 py-1.5 text-center bg-raised" [title]="tile.hint">
+                      <div class="text-sm font-semibold tabular leading-none">{{ tile.value }}</div>
+                      <div class="text-[10px] uppercase tracking-wide mt-0.5 text-[color:var(--text-muted)]">
+                        {{ tile.label }}
                       </div>
-                    }
-                  </div>
-                  @if (stat.failedCount) {
-                    <p class="text-[11px] mt-1.5" [style.color]="'var(--series-crit)'">
-                      {{ stat.failedCount }} failed {{ stat.failedCount === 1 ? 'run' : 'runs' }}
-                    </p>
+                    </div>
                   }
-                } @else {
-                  <p class="text-[11px] text-[color:var(--text-muted)] mt-2">No jobs assigned</p>
+                </div>
+                @if (stat.failedCount) {
+                  <p class="text-[11px] -mt-1.5" [style.color]="'var(--series-crit)'">
+                    {{ stat.failedCount }} failed {{ stat.failedCount === 1 ? 'run' : 'runs' }}
+                  </p>
                 }
+              }
+            }
+
+            <!-- Footer: the incidental facts, behind a rule and pushed to the bottom so cards in
+                 a row line their footers up however tall the content above them is. -->
+            <div class="mt-auto pt-2.5 border-t border-subtle text-[11px]
+                        text-[color:var(--text-muted)] flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span>
+                {{ user.lastLoginAt
+                    ? 'Last in ' + (user.lastLoginAt | date: 'd MMM y')
+                    : 'Never signed in' }}
+              </span>
+              @if (statFor(user); as stat) {
+                @if (!stat.jobCount) {
+                  <span class="text-[color:var(--border-strong)]">·</span>
+                  <span>No jobs</span>
+                }
+              }
+              @if (user.createdByName) {
+                <span class="text-[color:var(--border-strong)]">·</span>
+                <span>Added by {{ user.createdByName }}</span>
               }
             </div>
           </article>
