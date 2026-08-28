@@ -105,40 +105,47 @@
           </div>
         }
 
-        <div class="card p-5">
+        <!-- form-section supplies the containment .form-grid queries against; without an
+             ancestor carrying container-type the grid silently stays one column. -->
+        <div class="card p-5 form-section">
           <h3 class="text-sm font-semibold mb-4">Details</h3>
 
-          <div class="field max-w-sm">
-            <label class="label" for="fullName">Display name</label>
-            <input id="fullName" class="input" placeholder="Your name"
-                   [value]="name()" (input)="name.set($any($event.target).value)"
-                   (keydown.enter)="saveName()" />
-            <p class="field-note text-[color:var(--text-muted)]">
-              Shown in the header and anywhere a job records who assigned it.
-            </p>
+          <!-- One row at full width, folding to two columns then one as the card narrows.
+               items-start keeps the inputs on a shared baseline when one note wraps to two
+               lines and its neighbours do not. -->
+          <div class="form-grid items-start">
+            <div class="field">
+              <label class="label" for="fullName">Display name</label>
+              <input id="fullName" class="input" placeholder="Your name"
+                     [value]="name()" (input)="name.set($any($event.target).value)"
+                     (keydown.enter)="saveName()" />
+              <p class="field-note text-[color:var(--text-muted)]">
+                Shown in the header and wherever a job records who assigned it.
+              </p>
+            </div>
+
+            <div class="field">
+              <label class="label" for="position">Position</label>
+              <input id="position" class="input" placeholder="Data Engineer"
+                     [value]="position()" (input)="position.set($any($event.target).value)"
+                     (keydown.enter)="saveName()" />
+              <p class="field-note text-[color:var(--text-muted)]">
+                Your job title, separate from your permission role.
+              </p>
+            </div>
+
+            <!-- The same component the admin screen uses, so a number set here and one set for
+                 you by an administrator are validated and stored identically. -->
+            <div class="field">
+              <label class="label" for="phoneNumber">Phone</label>
+              <app-phone-input [(value)]="phone" inputId="phoneNumber"
+                               [submitted]="phoneSubmitted()" />
+              <p class="field-note text-[color:var(--text-muted)]">
+                Empty removes the number on file.
+              </p>
+            </div>
           </div>
 
-          <div class="field max-w-sm mt-4">
-            <label class="label" for="position">Position</label>
-            <input id="position" class="input" placeholder="Data Engineer"
-                   [value]="position()" (input)="position.set($any($event.target).value)"
-                   (keydown.enter)="saveName()" />
-            <p class="field-note text-[color:var(--text-muted)]">
-              Your job title. Separate from your permission role, which only an administrator
-              can change.
-            </p>
-          </div>
-
-          <!-- The same component the admin screen uses, so a number set here and one set for
-               you by an administrator are validated and stored identically. -->
-          <div class="field max-w-sm mt-4">
-            <label class="label" for="phoneNumber">Phone</label>
-            <app-phone-input [(value)]="phone" inputId="phoneNumber" [submitted]="phoneSubmitted()" />
-            <p class="field-note text-[color:var(--text-muted)]">
-              Pick the country, then the number as it is written there. Leave it empty to remove
-              the one on file.
-            </p>
-          </div>
 
           @if (detailsChanged()) {
             <div class="flex gap-2 mt-4">
