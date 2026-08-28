@@ -139,6 +139,11 @@ export class Users implements OnInit {
       return (user.username ?? '').toLowerCase().includes(term)
         || (user.fullName ?? '').toLowerCase().includes(term)
         || (user.position ?? '').toLowerCase().includes(term)
+          // Phone lost its own column when identity was merged into one cell, so search is now
+          // the only way to reach it. Separators are stripped from both sides, since a stored
+          // +12025550143 would otherwise never match somebody typing 202 555.
+          || (user.phoneNumber ?? '').replace(/[^0-9+]/g, '')
+               .includes(term.replace(/[^0-9+]/g, ''))
         || (user.tenantName ?? '').toLowerCase().includes(term);
     });
     return this.sort.apply(this.mine(rows), (row, key) => (row as any)[key]);

@@ -164,16 +164,10 @@
       <thead>
         <tr>
           @for (column of [
-            { key: 'fullName',    label: 'Name' },
-            { key: 'username',    label: 'Email' },
-            { key: 'position',    label: 'Position' },
-            { key: 'phoneNumber', label: 'Phone' },
+            { key: 'fullName',    label: 'Person' },
             { key: 'userRole',    label: 'Role' },
             { key: 'tenantName',  label: 'Tenant' },
-            { key: 'lastLoginAt', label: 'Last sign-in' },
-            { key: 'dateCreated',   label: 'Created' },
-            { key: 'createdByName', label: 'Created by' },
-            { key: 'updatedByName', label: 'Updated by' }
+            { key: 'lastLoginAt', label: 'Last sign-in' }
           ]; track column.key) {
             <th>
               <button type="button" class="th-sort"
@@ -185,48 +179,66 @@
               </button>
             </th>
           }
-          <th class="text-right">Jobs</th>
-          <th class="text-right">Runs</th>
-          <th class="text-right">
-            <button type="button" class="th-sort" [class.th-sort-active]="sort.key() === 'status'"
-                    (click)="sort.toggle('status')">
-              Status
-              <app-icon [name]="sort.iconFor('status')" size="0.875rem"
-                        [class]="sort.key() === 'status' ? 'icon-info' : 'icon-muted'" />
-            </button>
-          </th>
+          <th class="text-right">Workload</th>
+          @for (column of [
+            { key: 'dateCreated', label: 'Added' }
+          ]; track column.key) {
+            <th>
+              <button type="button" class="th-sort"
+                      [class.th-sort-active]="sort.key() === column.key"
+                      (click)="sort.toggle(column.key)">
+                {{ column.label }}
+                <app-icon [name]="sort.iconFor(column.key)" size="0.875rem"
+                          [class]="sort.key() === column.key ? 'icon-info' : 'icon-muted'" />
+              </button>
+            </th>
+          }
+          <th class="text-right">State</th>
           <th class="w-12"></th>
         </tr>
       </thead>
       <tbody>
         @for (user of paged(); track user.appUserId) {
           <tr [class.opacity-55]="busy() === user.appUserId">
-            <td class="font-medium">
-              <div class="flex items-center gap-2.5">
+            <!-- Identity in one cell: name, address and number all answer "who is this", and
+                 split across three columns they cost a third of the table's width to say it. -->
+            <td class="max-w-72">
+              <div class="flex items-center gap-2.5 min-w-0">
                 <app-avatar [bucket]="user.avatarBucket" [key]="user.avatarKey"
-                            [name]="user.fullName || user.username" [size]="1.75" />
-                <span class="truncate">{{ user.fullName || '—' }}</span>
-                @if (isSelf(user)) {
-                  <span class="pill pill-neutral shrink-0">You</span>
-                }
+                            [name]="user.fullName || user.username" [size]="2" class="shrink-0" />
+                <div class="min-w-0">
+                  <div class="flex items-center gap-1.5">
+                    <span class="font-medium truncate">{{ user.fullName || '—' }}</span>
+                    @if (isSelf(user)) {
+                      <span class="pill pill-neutral shrink-0">You</span>
+                    }
+                  </div>
+                  <div class="mono text-xs text-[color:var(--text-muted)] truncate"
+                       [title]="user.username">{{ user.username }}</div>
+                  <!-- Only when there is one. A column of dashes is noise; a line that appears
+                       when a number exists is information. -->
+                  @if (user.phoneNumber) {
+                    <a class="mono text-xs link-inline"
+                       [href]="'tel:' + user.phoneNumber">{{ user.phoneNumber }}</a>
+                  }
+                </div>
               </div>
             </td>
-            <td class="mono text-[color:var(--text-secondary)] max-w-56 truncate"
-                [title]="user.username">{{ user.username }}</td>
-            <td class="text-[color:var(--text-secondary)]">{{ user.position || '—' }}</td>
-            <!-- Monospace and nowrap: a column of numbers is read by comparing digits down the
-                 column, which proportional type and wrapping both make harder. -->
-            <td class="mono text-xs text-[color:var(--text-secondary)] whitespace-nowrap">
-              @if (user.phoneNumber) {
-                <a class="link-inline" [href]="'tel:' + user.phoneNumber">{{ user.phoneNumber }}</a>
-              } @else { — }
+
+            <!-- Permission role above, job title below: two facts about standing, read together. -->
+            <td class="max-w-44">
+              <span [class]="rolePill(user.userRole)">{{ roleLabel(user.userRole) }}</span>
+              @if (user.position) {
+                <div class="text-xs text-[color:var(--text-muted)] truncate mt-0.5"
+                     [title]="user.position">{{ user.position }}</div>
+              }
             </td>
-            <td><span [class]="rolePill(user.userRole)">{{ roleLabel(user.userRole) }}</span></td>
-            <td class="text-[color:var(--text-secondary)]">
+
+            <td class="text-[color:var(--text-secondary)] max-w-44">
               @if (user.tenantName) {
-                {{ user.tenantName }}
+                <span class="truncate block" [title]="user.tenantName">{{ user.tenantName }}</span>
                 @if (user.tenantActive === false) {
-                  <span class="pill pill-warn ml-1.5" title="This user's tenant is deactivated">
+                  <span class="pill pill-warn mt-0.5" title="This user's tenant is deactivated">
                     tenant off
                   </span>
                 }
@@ -234,48 +246,60 @@
                 <span class="text-[color:var(--text-muted)]">All tenants</span>
               } @else { — }
             </td>
-            <td class="text-[color:var(--text-secondary)] whitespace-nowrap">
+
+            <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-sm">
               @if (user.lastLoginAt) {
-                {{ user.lastLoginAt | date:'d MMM yyyy, HH:mm' }}
+                {{ user.lastLoginAt | date:'d MMM yyyy' }}
+                <div class="text-xs text-[color:var(--text-muted)]">
+                  {{ user.lastLoginAt | date:'HH:mm' }}
+                </div>
               } @else {
                 <span class="text-[color:var(--text-muted)]">Never</span>
               }
             </td>
-            <td class="text-[color:var(--text-secondary)] whitespace-nowrap">
-              {{ user.dateCreated ? (user.dateCreated | date:'d MMM yyyy') : '—' }}
-            </td>
-            <td class="text-[color:var(--text-secondary)] whitespace-nowrap">
-              <!-- A dash, not blank: in a column of names an empty cell reads as a rendering
-                   fault, whereas a dash says plainly that nobody is recorded. Rows made before
-                   the audit columns existed, and rows the scheduler wrote, both land here. -->
-              {{ user.createdByName || '—' }}
-            </td>
-            <td class="text-[color:var(--text-secondary)] whitespace-nowrap">
-              {{ user.updatedByName || '—' }}
-            </td>
-            <td class="text-right tabular">
+
+            <!-- Jobs and runs answer one question -- how much is this person carrying -- so they
+                 read as one figure with its detail beneath, not two columns to cross-reference. -->
+            <td class="text-right whitespace-nowrap">
               @if (statFor(user); as stat) {
-                <span [class.text-[color:var(--text-muted)]]="!stat.jobCount"
-                      [title]="stat.jobCount ? stat.activeJobs + ' active, ' + stat.taskCount + ' distinct tasks' : 'No jobs assigned'">
-                  {{ stat.jobCount }}
-                </span>
-              } @else { <span class="text-[color:var(--text-muted)]">—</span> }
-            </td>
-            <td class="text-right tabular whitespace-nowrap">
-              @if (statFor(user); as stat) {
-                @if (stat.runCount) {
-                  {{ stat.runCount }}
-                  @if (successRate(stat) !== null) {
-                    <span class="text-[11px] ml-1"
-                          [style.color]="successRate(stat)! >= 80 ? 'var(--series-ok)' : 'var(--series-crit)'"
-                          [title]="stat.completedCount + ' completed, ' + stat.failedCount + ' failed'">
-                      {{ successRate(stat) }}%
-                    </span>
+                @if (stat.jobCount || stat.runCount) {
+                  <div class="tabular">
+                    {{ stat.jobCount }}
+                    <span class="text-[color:var(--text-muted)] text-xs">jobs</span>
+                  </div>
+                  @if (stat.runCount) {
+                    <div class="text-xs text-[color:var(--text-muted)] tabular">
+                      {{ stat.runCount }} runs
+                      @if (successRate(stat) !== null) {
+                        <span [style.color]="successRate(stat)! >= 80 ? 'var(--series-ok)' : 'var(--series-crit)'"
+                              [title]="stat.completedCount + ' completed, ' + stat.failedCount + ' failed'">
+                          {{ successRate(stat) }}%
+                        </span>
+                      }
+                    </div>
                   }
-                } @else { <span class="text-[color:var(--text-muted)]">0</span> }
+                } @else {
+                  <span class="text-[color:var(--text-muted)] text-sm">Nothing yet</span>
+                }
               } @else { <span class="text-[color:var(--text-muted)]">—</span> }
             </td>
+
+            <!-- When, and by whom, in one cell. The editor line appears only when it was somebody
+                 other than the author -- otherwise it restates the line above it. -->
+            <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-sm">
+              {{ user.dateCreated ? (user.dateCreated | date:'d MMM yyyy') : '—' }}
+              @if (user.createdByName) {
+                <div class="text-xs text-[color:var(--text-muted)]">by {{ user.createdByName }}</div>
+              }
+              @if (user.updatedByName && user.updatedByName !== user.createdByName) {
+                <div class="text-xs text-[color:var(--text-muted)]">
+                  edited by {{ user.updatedByName }}
+                </div>
+              }
+            </td>
+
             <td class="text-right"><app-status [label]="user.status" [quiet]="true" /></td>
+
             <td class="text-right">
               <button type="button" class="btn btn-ghost btn-icon" [cdkMenuTriggerFor]="menu"
                       [disabled]="busy() === user.appUserId" aria-label="Actions">
