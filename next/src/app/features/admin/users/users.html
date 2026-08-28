@@ -83,137 +83,147 @@
     </ng-container>
 
     @if (view() === 'cards') {
-      <div class="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div class="grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3 items-stretch">
         @for (user of paged(); track user.appUserId) {
-          <article class="card p-4 flex flex-col gap-3">
-            <!-- Identity band. The avatar is larger and the name is the only thing at full
-                 strength -- previously the phone number was brand-coloured and outshouted it. -->
-            <div class="flex items-start gap-3">
-              <app-avatar [bucket]="user.avatarBucket" [key]="user.avatarKey"
-                          [name]="user.fullName || user.username" [size]="2.75" class="shrink-0" />
-              <div class="min-w-0 flex-1">
-                <div class="flex items-start gap-2">
-                  <h3 class="font-semibold truncate leading-snug"
-                      [title]="user.fullName || user.username">
-                    {{ user.fullName || user.username }}
-                  </h3>
-                  @if (isSelf(user)) { <span class="pill pill-brand shrink-0">You</span> }
-                  <div class="ml-auto shrink-0"><app-status [label]="user.status" [quiet]="true" /></div>
-                </div>
-                @if (user.position) {
-                  <p class="text-xs text-[color:var(--text-muted)] truncate"
-                     [title]="user.position">{{ user.position }}</p>
-                }
-                <!-- Colour carries privilege, a glyph carries category. The role uses the same
-                     mapping as the table -- platform admin red, tenant admin brand -- which the
-                     card was ignoring, so one view showed a red pill and the other grey. The
-                     workspace stays neutral with a mark on it: two coloured pills side by side
-                     would compete, and a workspace name is a label rather than a state. -->
-                <div class="flex flex-wrap items-center gap-1.5 mt-2">
-                  <span [class]="rolePill(user.userRole)">{{ roleLabel(user.userRole) }}</span>
-                  @if (user.tenantName) {
-                    <span class="pill pill-neutral" [title]="'Workspace: ' + user.tenantName">
-                      <app-icon name="building" size="0.8em" class="opacity-70" />{{ user.tenantName }}
-                    </span>
-                  } @else if (user.userRole === 'PLATFORM_ADMIN') {
-                    <span class="pill pill-neutral" title="Reaches every workspace">
-                      <app-icon name="globe" size="0.8em" class="opacity-70" />All tenants
-                    </span>
-                  }
-                </div>
-              </div>
-            </div>
+          <!-- Structure: a rule, then everything else in a padded column. p-0 on the article
+               with padding on the inner div lets the rule bleed to the card's edges without
+               negative margins fighting the padding. -->
+          <article class="card p-0 overflow-hidden flex flex-col transition-all duration-150
+                          hover:-translate-y-0.5
+                          hover:border-[color:var(--border-strong)]
+                          hover:shadow-[0_6px_20px_-8px_rgb(0_0_0/0.35)]">
+            <!-- Privilege, readable before any text is. Quiet for a plain user so every card
+                 keeps the same anatomy. -->
+            <div class="h-1 shrink-0" [style.background]="roleAccent(user.userRole)"></div>
 
-            <!-- Contact. Both lines the same muted weight, because an address and a number are
-                 the same kind of fact; the glyph is what tells them apart at a glance. -->
-            <!-- Both glyphs take icon-info rather than a semantic tone: an address is not "ok"
-                 and a number is not "warn", and borrowing those colours here would blunt what
-                 they mean everywhere else. The envelope and handset shapes carry the difference
-                 between the two lines; the tint only lifts them off the muted text. -->
-            <div class="flex flex-col gap-1 text-xs text-[color:var(--text-muted)]">
-              <div class="flex items-center gap-1.5 min-w-0">
-                <app-icon name="mail" size="0.9em" class="shrink-0 icon-info" />
-                <span class="mono truncate" [title]="user.username">{{ user.username }}</span>
-                <!-- Always present rather than revealed on hover: a control that only exists
-                     under a pointer is unreachable by keyboard and invisible on a touch screen. -->
-                <button type="button"
-                        class="shrink-0 ml-auto p-0.5 rounded text-[color:var(--text-muted)]
-                               hover:text-brand-600 transition-colors"
-                        [attr.aria-label]="copiedKey() === user.appUserId + ':email'
-                          ? 'Address copied' : 'Copy ' + user.username"
-                        [title]="copiedKey() === user.appUserId + ':email' ? 'Copied' : 'Copy address'"
-                        (click)="copyContact(user.appUserId, 'email', user.username)">
-                  <app-icon [name]="copiedKey() === user.appUserId + ':email' ? 'check' : 'copy'"
-                            size="0.85em"
-                            [class]="copiedKey() === user.appUserId + ':email' ? 'icon-ok' : ''" />
-                </button>
+            <div class="p-4 flex flex-col gap-3 flex-1">
+              <div class="flex items-start gap-3">
+                <!-- The ring says what the status pill says. Two channels for one fact, because
+                     colour alone is not a signal everybody receives. -->
+                <span class="rounded-full shrink-0 p-[2px]"
+                      [style.box-shadow]="'0 0 0 2px ' + statusRing(user.status)">
+                  <app-avatar [bucket]="user.avatarBucket" [key]="user.avatarKey"
+                              [name]="user.fullName || user.username" [size]="2.75" />
+                </span>
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-start gap-2">
+                    <h3 class="font-semibold truncate leading-snug"
+                        [title]="user.fullName || user.username">
+                      {{ user.fullName || user.username }}
+                    </h3>
+                    @if (isSelf(user)) { <span class="pill pill-brand shrink-0">You</span> }
+                    <div class="ml-auto shrink-0">
+                      <app-status [label]="user.status" [quiet]="true" />
+                    </div>
+                  </div>
+                  @if (user.position) {
+                    <p class="text-xs text-[color:var(--text-muted)] truncate"
+                       [title]="user.position">{{ user.position }}</p>
+                  }
+                  <div class="flex flex-wrap items-center gap-1.5 mt-2">
+                    <span [class]="rolePill(user.userRole)">{{ roleLabel(user.userRole) }}</span>
+                    @if (user.tenantName) {
+                      <span class="pill pill-neutral" [title]="'Workspace: ' + user.tenantName">
+                        <app-icon name="building" size="0.8em" class="opacity-70" />{{ user.tenantName }}
+                      </span>
+                    } @else if (user.userRole === 'PLATFORM_ADMIN') {
+                      <span class="pill pill-neutral" title="Reaches every workspace">
+                        <app-icon name="globe" size="0.8em" class="opacity-70" />All tenants
+                      </span>
+                    }
+                  </div>
+                </div>
               </div>
-              @if (user.phoneNumber) {
+
+              <!-- Both glyphs take icon-info rather than a semantic tone: an address is not "ok"
+                   and a number is not "warn", and borrowing those colours here would blunt what
+                   they mean everywhere else. The envelope and handset shapes carry the difference
+                   between the two lines; the tint only lifts them off the muted text. -->
+              <div class="flex flex-col gap-1 text-xs text-[color:var(--text-muted)]">
                 <div class="flex items-center gap-1.5 min-w-0">
-                  <app-icon name="phone" size="0.9em" class="shrink-0 icon-info" />
-                  <a class="mono truncate hover:text-brand-600 transition-colors"
-                     [href]="'tel:' + user.phoneNumber">{{ user.phoneNumber }}</a>
+                  <app-icon name="mail" size="0.9em" class="shrink-0 icon-info" />
+                  <span class="mono truncate" [title]="user.username">{{ user.username }}</span>
+                  <!-- Always present rather than revealed on hover: a control that only exists
+                       under a pointer is unreachable by keyboard and invisible on a touch screen. -->
                   <button type="button"
                           class="shrink-0 ml-auto p-0.5 rounded text-[color:var(--text-muted)]
                                  hover:text-brand-600 transition-colors"
-                          [attr.aria-label]="copiedKey() === user.appUserId + ':phone'
-                            ? 'Number copied' : 'Copy ' + user.phoneNumber"
-                          [title]="copiedKey() === user.appUserId + ':phone' ? 'Copied' : 'Copy number'"
-                          (click)="copyContact(user.appUserId, 'phone', user.phoneNumber)">
-                    <app-icon [name]="copiedKey() === user.appUserId + ':phone' ? 'check' : 'copy'"
+                          [attr.aria-label]="copiedKey() === user.appUserId + ':email'
+                            ? 'Address copied' : 'Copy ' + user.username"
+                          [title]="copiedKey() === user.appUserId + ':email' ? 'Copied' : 'Copy address'"
+                          (click)="copyContact(user.appUserId, 'email', user.username)">
+                    <app-icon [name]="copiedKey() === user.appUserId + ':email' ? 'check' : 'copy'"
                               size="0.85em"
-                              [class]="copiedKey() === user.appUserId + ':phone' ? 'icon-ok' : ''" />
+                              [class]="copiedKey() === user.appUserId + ':email' ? 'icon-ok' : ''" />
                   </button>
                 </div>
-              }
-            </div>
-
-            <!-- Workload, when there is any. Kept as tiles: three figures compared against each
-                 other read better in a row than as three sentences. -->
-            @if (statFor(user); as stat) {
-              @if (stat.jobCount) {
-                <div class="grid grid-cols-3 gap-px rounded-lg overflow-hidden bg-subtle">
-                  @for (tile of [
-                    { label: 'Jobs',  value: stat.jobCount,  hint: stat.activeJobs + ' active' },
-                    { label: 'Tasks', value: stat.taskCount, hint: 'used by their jobs' },
-                    { label: 'Runs',  value: stat.runCount,
-                      hint: successRate(stat) === null ? 'none finished' : successRate(stat) + '% success' }
-                  ]; track tile.label) {
-                    <div class="px-2 py-1.5 text-center bg-raised" [title]="tile.hint">
-                      <div class="text-sm font-semibold tabular leading-none">{{ tile.value }}</div>
-                      <div class="text-[10px] uppercase tracking-wide mt-0.5 text-[color:var(--text-muted)]">
-                        {{ tile.label }}
-                      </div>
-                    </div>
-                  }
-                </div>
-                @if (stat.failedCount) {
-                  <p class="text-[11px] -mt-1.5" [style.color]="'var(--series-crit)'">
-                    {{ stat.failedCount }} failed {{ stat.failedCount === 1 ? 'run' : 'runs' }}
-                  </p>
+                @if (user.phoneNumber) {
+                  <div class="flex items-center gap-1.5 min-w-0">
+                    <app-icon name="phone" size="0.9em" class="shrink-0 icon-info" />
+                    <a class="mono truncate hover:text-brand-600 transition-colors"
+                       [href]="'tel:' + user.phoneNumber">{{ user.phoneNumber }}</a>
+                    <button type="button"
+                            class="shrink-0 ml-auto p-0.5 rounded text-[color:var(--text-muted)]
+                                   hover:text-brand-600 transition-colors"
+                            [attr.aria-label]="copiedKey() === user.appUserId + ':phone'
+                              ? 'Number copied' : 'Copy ' + user.phoneNumber"
+                            [title]="copiedKey() === user.appUserId + ':phone' ? 'Copied' : 'Copy number'"
+                            (click)="copyContact(user.appUserId, 'phone', user.phoneNumber)">
+                      <app-icon [name]="copiedKey() === user.appUserId + ':phone' ? 'check' : 'copy'"
+                                size="0.85em"
+                                [class]="copiedKey() === user.appUserId + ':phone' ? 'icon-ok' : ''" />
+                    </button>
+                  </div>
                 }
-              }
-            }
+              </div>
 
-            <!-- Footer: the incidental facts, behind a rule and pushed to the bottom so cards in
-                 a row line their footers up however tall the content above them is. -->
-            <div class="mt-auto pt-2.5 border-t border-subtle text-[11px]
-                        text-[color:var(--text-muted)] flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span>
-                {{ user.lastLoginAt
-                    ? 'Last in ' + (user.lastLoginAt | date: 'd MMM y')
-                    : 'Never signed in' }}
-              </span>
+              <!-- Workload, when there is any. Kept as tiles: three figures compared against each
+                   other read better in a row than as three sentences. -->
               @if (statFor(user); as stat) {
-                @if (!stat.jobCount) {
-                  <span class="text-[color:var(--border-strong)]">·</span>
-                  <span>No jobs</span>
+                @if (stat.jobCount) {
+                  <div class="grid grid-cols-3 gap-px rounded-lg overflow-hidden bg-subtle">
+                    @for (tile of [
+                      { label: 'Jobs',  value: stat.jobCount,  hint: stat.activeJobs + ' active' },
+                      { label: 'Tasks', value: stat.taskCount, hint: 'used by their jobs' },
+                      { label: 'Runs',  value: stat.runCount,
+                        hint: successRate(stat) === null ? 'none finished' : successRate(stat) + '% success' }
+                    ]; track tile.label) {
+                      <div class="px-2 py-1.5 text-center bg-raised" [title]="tile.hint">
+                        <div class="text-sm font-semibold tabular leading-none">{{ tile.value }}</div>
+                        <div class="text-[10px] uppercase tracking-wide mt-0.5 text-[color:var(--text-muted)]">
+                          {{ tile.label }}
+                        </div>
+                      </div>
+                    }
+                  </div>
+                  @if (stat.failedCount) {
+                    <p class="text-[11px] -mt-1.5" [style.color]="'var(--series-crit)'">
+                      {{ stat.failedCount }} failed {{ stat.failedCount === 1 ? 'run' : 'runs' }}
+                    </p>
+                  }
                 }
               }
-              @if (user.createdByName) {
-                <span class="text-[color:var(--border-strong)]">·</span>
-                <span>Added by {{ user.createdByName }}</span>
-              }
+
+              <!-- Footer: the incidental facts, behind a rule and pushed to the bottom so cards in
+                   a row line their footers up however tall the content above them is. -->
+              <div class="mt-auto pt-2.5 border-t border-subtle text-[11px]
+                          text-[color:var(--text-muted)] flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span>
+                  {{ user.lastLoginAt
+                      ? 'Last in ' + (user.lastLoginAt | date: 'd MMM y')
+                      : 'Never signed in' }}
+                </span>
+                @if (statFor(user); as stat) {
+                  @if (!stat.jobCount) {
+                    <span class="text-[color:var(--border-strong)]">·</span>
+                    <span>No jobs</span>
+                  }
+                }
+                @if (user.createdByName) {
+                  <span class="text-[color:var(--border-strong)]">·</span>
+                  <span>Added by {{ user.createdByName }}</span>
+                }
+              </div>
             </div>
           </article>
         }

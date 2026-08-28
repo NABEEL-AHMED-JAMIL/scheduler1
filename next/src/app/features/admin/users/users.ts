@@ -385,4 +385,24 @@ export class Users implements OnInit {
       setTimeout(() => { if (this.copiedKey() === key) this.copiedKey.set(null); }, 1500);
     });
   }
+
+  /**
+   * The colour of a card's top rule, keyed to privilege.
+   *
+   * The point is scanning: across a grid of thirty-five people the two admins should be findable
+   * without reading a single pill. A plain user gets a quiet rule rather than none, so every card
+   * keeps the same anatomy and the eye is not caught by a structural difference instead.
+   */
+  roleAccent(role: string): string {
+    switch (role) {
+      case 'PLATFORM_ADMIN': return 'var(--color-crit-500)';
+      case 'TENANT_ADMIN':   return 'var(--color-brand-500)';
+      default:               return 'var(--border-subtle)';
+    }
+  }
+
+  /** Ring around the avatar: the same fact the status pill carries, said in the portrait. */
+  statusRing(status: string): string {
+    return status === 'Active' ? 'var(--color-ok-500)' : 'var(--text-muted)';
+  }
 }
