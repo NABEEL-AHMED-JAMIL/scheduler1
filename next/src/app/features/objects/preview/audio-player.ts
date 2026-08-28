@@ -1,4 +1,4 @@
-import { Component, ElementRef, computed, effect, input, signal, viewChild } from '@angular/core';
+import { Component, ElementRef, input, signal, viewChild } from '@angular/core';
 import { Icon } from '../../../shared/ui/icon';
 
 /**

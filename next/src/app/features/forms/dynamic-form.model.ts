@@ -42,7 +42,8 @@ export interface DynamicFormSubmission {
   dynamicFormSubmissionId?: number;
   dynamicFormId: number;
   uuid?: string;
-  payload: Record<string, unknown>;
+  /** Absent, not null, when the server has nothing: its DTOs omit null fields. */
+  payload?: Record<string, unknown>;
   dateCreated?: string;
 }
 

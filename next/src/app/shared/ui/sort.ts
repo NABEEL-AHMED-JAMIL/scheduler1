@@ -1,4 +1,4 @@
-import { Signal, computed, signal } from '@angular/core';
+import { Signal, signal } from '@angular/core';
 
 export type SortDirection = 'asc' | 'desc';
 

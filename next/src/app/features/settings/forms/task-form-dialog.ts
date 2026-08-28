@@ -34,7 +34,8 @@ export interface TaskForm {
   dateCreated?: string;
   createdBy?: number;
   createdByName?: string | null;
-  fields: TaskFormField[];
+  /** Absent, not null, when the server has nothing: its DTOs omit null fields. */
+  fields?: TaskFormField[];
 }
 
 /** The set the server accepts; anything else is silently stored as text. */

@@ -1,4 +1,4 @@
-import { Signal, computed, signal } from '@angular/core';
+import { Signal, signal } from '@angular/core';
 
 /** The sizes the legacy list screens offered, kept so a saved habit still works. */
 export const PAGE_SIZES = [50, 100, 150, 200];

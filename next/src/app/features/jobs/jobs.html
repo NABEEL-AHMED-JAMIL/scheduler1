@@ -190,7 +190,7 @@
               }
             </td>
             <td class="whitespace-nowrap">
-              @if (job.scheduler?.nextRunAt && !job.scheduler?.expired) {
+              @if (job.scheduler?.nextRunAt && !job.scheduler.expired) {
                 <div class="text-[color:var(--text-secondary)]">
                   Next {{ job.scheduler!.nextRunAt | date:'d MMM, HH:mm' }}
                 </div>

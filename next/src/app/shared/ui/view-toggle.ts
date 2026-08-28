@@ -1,4 +1,4 @@
-import { Component, effect, inject, input, model } from '@angular/core';
+import { Component, effect, input, model } from '@angular/core';
 import { Icon } from './icon';
 
 export type ListView = 'table' | 'cards';

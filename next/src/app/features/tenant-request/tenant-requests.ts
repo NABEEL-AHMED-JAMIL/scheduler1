@@ -264,21 +264,9 @@ export class TenantRequests implements OnInit {
       confirmLabel: 'Approve and create',
     });
     if (!ok) return;
-    this.busy.set(request.tenantRequestId);
-    this.http.post<ApiResponse>(`${API_BASE}/tenantRequest.json/approve`, null,
-      { params: new HttpParams().set('tenantRequestId', String(request.tenantRequestId)) }).subscribe({
-      next: response => {
-        this.busy.set(null);
-        // A partial success is reported by the server in its message -- the tenant may exist
-        // while the email did not send -- so the message is shown rather than a fixed line.
-        if (response.status === API_SUCCESS) { this.toast.success(response.message); this.load(); }
-        else this.toast.error(response.message);
-      },
-      error: err => {
-        this.busy.set(null);
-        this.toast.error(err?.error?.message || 'The workspace could not be created.');
-      },
-    });
+    this.decide('approve', request,
+      new HttpParams().set('tenantRequestId', String(request.tenantRequestId)),
+      'The workspace could not be created.');
   }
 
   async reject(request: TenantRequest): Promise<void> {
@@ -291,22 +279,42 @@ export class TenantRequests implements OnInit {
         data: { organisationName: request.organisationName }, hasBackdrop: true,
       }).closed);
     if (note === null || note === undefined) return;
-    this.busy.set(request.tenantRequestId);
     let params = new HttpParams().set('tenantRequestId', String(request.tenantRequestId));
     if (note) {
       params = params.set('note', note);
     }
-    this.http.post<ApiResponse>(`${API_BASE}/tenantRequest.json/reject`, null,
-      { params }).subscribe({
-      next: response => {
-        this.busy.set(null);
-        if (response.status === API_SUCCESS) { this.toast.success(response.message); this.load(); }
-        else this.toast.error(response.message);
-      },
-      error: err => {
-        this.busy.set(null);
-        this.toast.error(err?.error?.message || 'The request could not be rejected.');
-      },
-    });
+    this.decide('reject', request, params, 'The request could not be rejected.');
+  }
+
+  /**
+   * Posts a decision and reflects the outcome.
+   *
+   * Both decisions did the same five things -- mark the row busy, post, clear busy, toast, and
+   * reload -- written out twice with only the endpoint and the fallback message differing. The
+   * duplication was the kind that drifts: a fix applied to one and forgotten on the other.
+   *
+   * The server's own message is shown rather than a fixed line, because a decision can partly
+   * succeed: approving creates the workspace even when the welcome email does not send, and only
+   * the server knows which happened.
+   */
+  private decide(action: 'approve' | 'reject', request: TenantRequest,
+                 params: HttpParams, failureMessage: string): void {
+    this.busy.set(request.tenantRequestId);
+    this.http.post<ApiResponse>(`${API_BASE}/tenantRequest.json/${action}`, null, { params })
+      .subscribe({
+        next: response => {
+          this.busy.set(null);
+          if (response.status === API_SUCCESS) {
+            this.toast.success(response.message);
+            this.load();
+          } else {
+            this.toast.error(response.message);
+          }
+        },
+        error: err => {
+          this.busy.set(null);
+          this.toast.error(err?.error?.message || failureMessage);
+        },
+      });
   }
 }
