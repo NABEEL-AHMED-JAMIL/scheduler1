@@ -118,15 +118,37 @@
             </p>
           </div>
 
-          @if (nameChanged()) {
-            <div class="flex gap-2 mt-3">
+          <div class="field max-w-sm mt-4">
+            <label class="label" for="position">Position</label>
+            <input id="position" class="input" placeholder="Data Engineer"
+                   [value]="position()" (input)="position.set($any($event.target).value)"
+                   (keydown.enter)="saveName()" />
+            <p class="field-note text-[color:var(--text-muted)]">
+              Your job title. Separate from your permission role, which only an administrator
+              can change.
+            </p>
+          </div>
+
+          <!-- The same component the admin screen uses, so a number set here and one set for
+               you by an administrator are validated and stored identically. -->
+          <div class="field max-w-sm mt-4">
+            <label class="label" for="phoneNumber">Phone</label>
+            <app-phone-input [(value)]="phone" inputId="phoneNumber" />
+            <p class="field-note text-[color:var(--text-muted)]">
+              Pick the country, then the number as it is written there. Leave it empty to remove
+              the one on file.
+            </p>
+          </div>
+
+          @if (detailsChanged()) {
+            <div class="flex gap-2 mt-4">
               <button type="button" class="btn btn-primary btn-sm"
                       [disabled]="savingName()" (click)="saveName()">
                 <app-icon name="save" [class.spin]="savingName()" />
-                {{ savingName() ? 'Saving…' : 'Save name' }}
+                {{ savingName() ? 'Saving…' : 'Save details' }}
               </button>
               <button type="button" class="btn btn-ghost btn-sm"
-                      (click)="name.set(me.fullName)">Cancel</button>
+                      (click)="resetDetails()">Cancel</button>
             </div>
           }
 

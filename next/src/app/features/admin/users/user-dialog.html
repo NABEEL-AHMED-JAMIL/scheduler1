@@ -36,12 +36,12 @@
         </datalist>
       </app-field>
 
-      <app-field label="Phone" for="phoneNumber"
+      <app-field label="Phone" for="phoneNumber" class="col-span-2"
                  hint="Pick the country, then the number as it is written there.">
         <app-phone-input [(value)]="phone" inputId="phoneNumber" [submitted]="submitted()" />
       </app-field>
 
-      <app-field label="Email" for="username" [required]="true"
+      <app-field label="Email" for="username" [required]="true" class="col-span-2"
                  [control]="form.get('username')" [submitted]="submitted()"
                  hint="Used to sign in.">
         <input id="username" type="email" class="input" formControlName="username"

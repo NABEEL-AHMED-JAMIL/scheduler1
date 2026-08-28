@@ -832,6 +832,35 @@
     .pulse { animation: none; opacity: 0.75; }
   }
 
+  /*
+   * Top-of-page progress bar for route changes. A thin brand-coloured bar that grows across
+   * the top while the next page resolves and fills to 100% as it lands -- the same idiom
+   * GitHub and YouTube use, so it reads as "loading" without a blocking overlay. Width is
+   * driven from RouteProgress; opacity carries the show/hide so the fill always animates
+   * smoothly and the bar fades rather than vanishing.
+   */
+  .route-progress {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 3px;
+    width: 0;
+    z-index: 200;
+    pointer-events: none;
+    opacity: 0;
+    background: linear-gradient(90deg, var(--color-brand-400), var(--color-brand-600));
+    box-shadow: 0 0 10px color-mix(in oklab, var(--color-brand-500) 65%, transparent);
+    border-radius: 0 2px 2px 0;
+    transition: width 220ms ease-out, opacity 300ms ease;
+    will-change: width, opacity;
+  }
+  .route-progress.is-active { opacity: 1; }
+  /* No sliding growth for reduced-motion: the bar still appears/fades to signal loading,
+     it just snaps to width instead of animating across. */
+  @media (prefers-reduced-motion: reduce) {
+    .route-progress { transition: opacity 200ms ease; }
+  }
+
   .mono { font-family: var(--font-mono); @apply text-xs; }
 }
 

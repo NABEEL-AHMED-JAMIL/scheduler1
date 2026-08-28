@@ -28,7 +28,7 @@ import {
           <option [value]="c.code">{{ c.flag }} {{ c.code }} +{{ c.dial }}</option>
         }
       </select>
-      <input class="input" type="tel" inputmode="tel" [id]="inputId()"
+      <input class="input flex-1 min-w-0" type="tel" inputmode="tel" [id]="inputId()"
              [ngModel]="national()" name="phoneNational"
              [ngModelOptions]="{standalone: true}"
              (ngModelChange)="onNationalChange($event)"
@@ -82,8 +82,11 @@ export class PhoneInput {
       const parsed = parsePhoneNumberFromString(incoming);
       if (!parsed) return;
       if (parsed.country && parsed.country !== this.country()) this.country.set(parsed.country);
-      const national = parsed.nationalNumber ?? '';
-      if (national !== this.national()) this.national.set(national);
+      // Group the digits the way the country writes them (50 123 4567), matching how they
+      // format while typing -- otherwise an existing number loads as a raw run (501234567).
+      const raw = parsed.nationalNumber ?? '';
+      const formatted = raw ? new AsYouType(parsed.country ?? this.country()).input(raw) : '';
+      if (formatted !== this.national()) this.national.set(formatted);
     });
   }
 

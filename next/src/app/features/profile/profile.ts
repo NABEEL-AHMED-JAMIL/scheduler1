@@ -5,6 +5,7 @@ import { RouterLink } from '@angular/router';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { AuthService } from '../../core/auth/auth.service';
 import { ToastService } from '../../shared/ui/toast.service';
+import { PhoneInput } from '../../shared/ui/phone-input';
 import { Icon } from '../../shared/ui/icon';
 import { StatusPill } from '../../shared/ui/status-pill';
 import { BucketSummary, StorageService } from '../objects/storage.service';
@@ -24,6 +25,9 @@ interface UserProfile {
   lastLoginAt?: string;
   avatarBucket?: string | null;
   avatarKey?: string | null;
+  position?: string | null;
+  /** E.164, exactly as the admin screen and the server hold it. */
+  phoneNumber?: string | null;
 }
 
 /** Anything the browser will actually render inline as a picture. */
@@ -32,7 +36,7 @@ const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 
 @Component({
   selector: 'app-profile',
-  imports: [Icon, DatePipe, RouterLink, StatusPill, Donut],
+  imports: [PhoneInput, Icon, DatePipe, RouterLink, StatusPill, Donut],
   templateUrl: './profile.html',
 })
 export class Profile implements OnInit {
@@ -74,8 +78,26 @@ export class Profile implements OnInit {
       travels with it. */
   readonly avatarUrl = this.auth.avatarUrl;
 
-  readonly nameChanged = computed(() =>
-    this.name().trim() !== (this.profile()?.fullName ?? '').trim() && !!this.name().trim());
+  /** Owned by the phone component, which validates against the same metadata the server uses. */
+  readonly phone = signal<string>('');
+  readonly position = signal<string>('');
+
+  /**
+   * Whether Save has anything to do.
+   *
+   * Covers every editable field, not just the name. It was name-only, so a corrected phone
+   * number left the button disabled and the change silently unsaveable.
+   *
+   * A blank name still blocks the save -- the server rejects it -- but a blank phone or title
+   * is a legitimate edit that clears the field.
+   */
+  readonly detailsChanged = computed(() => {
+    const p = this.profile();
+    if (!this.name().trim()) return false;
+    return this.name().trim() !== (p?.fullName ?? '').trim()
+        || this.phone().trim() !== (p?.phoneNumber ?? '').trim()
+        || this.position().trim() !== (p?.position ?? '').trim();
+  });
 
   /**
    * Where a picture is written. MinIO first: it is the store this platform actually runs,
@@ -153,7 +175,9 @@ export class Profile implements OnInit {
         this.loading.set(false);
         if (response.status === API_SUCCESS && response.data) {
           this.profile.set(response.data);
-          this.name.set(response.data.fullName ?? '');
+          // Every editable field, not just the name: a field left unset would render empty and
+          // then read as "cleared" the next time anything was saved.
+          this.resetDetails();
           this.syncHeader(response.data);
         } else {
           this.error.set(response.message);
@@ -210,17 +234,32 @@ export class Profile implements OnInit {
     });
   }
 
+  /** Puts every editable field back to what the server last returned. */
+  resetDetails(): void {
+    const p = this.profile();
+    this.name.set(p?.fullName ?? '');
+    this.position.set(p?.position ?? '');
+    this.phone.set(p?.phoneNumber ?? '');
+  }
+
   saveName(): void {
-    if (!this.nameChanged()) return;
+    if (!this.detailsChanged()) return;
     this.savingName.set(true);
+    // Empty clears rather than omits: sending undefined would leave a stale value in place, so
+    // a person could never remove a number once they had set one.
     this.http.put<ApiResponse<UserProfile>>(`${API_BASE}/appUser.json/updateOwnProfile`,
-      { fullName: this.name().trim() }).subscribe({
+      { fullName: this.name().trim(),
+        position: this.position().trim() || null,
+        phoneNumber: this.phone().trim() || null }).subscribe({
       next: response => {
         this.savingName.set(false);
         if (response.status === API_SUCCESS && response.data) {
           this.profile.set(response.data);
+          // Re-read from the response: the server normalises a phone number to E.164, so what
+          // it kept is not always the digits that were typed.
+          this.resetDetails();
           this.syncHeader(response.data);
-          this.toast.success('Name updated.');
+          this.toast.success('Profile updated.');
         } else {
           this.toast.error(response.message);
         }
