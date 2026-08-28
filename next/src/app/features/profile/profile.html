@@ -43,7 +43,19 @@
         </div>
 
         <h2 class="mt-3 text-base font-semibold">{{ me.fullName }}</h2>
-        <p class="text-xs text-[color:var(--text-muted)] mono break-all">{{ me.username }}</p>
+        <!-- The button sits inside the line rather than beside it, so it stays with the address
+             when a long one wraps. break-all on the text only, so the icon is never split off. -->
+        <p class="text-xs text-[color:var(--text-muted)] mono flex items-center justify-center gap-1">
+          <span class="break-all">{{ me.username }}</span>
+          <button type="button"
+                  class="shrink-0 p-0.5 rounded hover:text-brand-600 transition-colors"
+                  [attr.aria-label]="emailCopied() ? 'Address copied' : 'Copy email address'"
+                  [title]="emailCopied() ? 'Copied' : 'Copy'"
+                  (click)="copyEmail()">
+            <app-icon [name]="emailCopied() ? 'check' : 'copy'" size="0.85em"
+                      [class]="emailCopied() ? 'icon-ok' : ''" />
+          </button>
+        </p>
 
         <div class="flex items-center justify-center gap-2 mt-4">
           <label class="btn btn-default btn-sm cursor-pointer"

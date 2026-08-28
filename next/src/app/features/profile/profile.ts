@@ -5,6 +5,7 @@ import { RouterLink } from '@angular/router';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { AuthService } from '../../core/auth/auth.service';
 import { ToastService } from '../../shared/ui/toast.service';
+import { copyText } from '../../shared/ui/clipboard.util';
 import { PhoneInput } from '../../shared/ui/phone-input';
 import { Icon } from '../../shared/ui/icon';
 import { StatusPill } from '../../shared/ui/status-pill';
@@ -124,6 +125,9 @@ export class Profile implements OnInit {
    * storage of its own could not upload at all. The server names one bucket for every user, so
    * there is nothing here to get wrong.
    */
+  /** Briefly true after a copy, so the button can confirm it worked. */
+  readonly emailCopied = signal(false);
+
   readonly targetBucket = computed(() => this.profile()?.avatarUploadBucket ?? '');
 
   readonly myJobs = computed(() => {
@@ -360,5 +364,26 @@ export class Profile implements OnInit {
 
   roleLabel(role?: string): string {
     return (role ?? '').replace(/_/g, ' ').toLowerCase();
+  }
+
+  /**
+   * Copies the address and says so.
+   *
+   * The confirmation matters more than usual here: a copy leaves no trace on the page, so
+   * without it there is no way to tell a successful copy from a click that missed.
+   */
+  copyEmail(): void {
+    const address = this.profile()?.username;
+    if (!address) {
+      return;
+    }
+    copyText(address).then(ok => {
+      if (!ok) {
+        this.toast.error('Could not copy the address.');
+        return;
+      }
+      this.emailCopied.set(true);
+      setTimeout(() => this.emailCopied.set(false), 1500);
+    });
   }
 }
