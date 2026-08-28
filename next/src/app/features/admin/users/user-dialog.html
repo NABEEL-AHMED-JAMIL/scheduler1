@@ -69,8 +69,11 @@
     </app-field>
 
     @if (needsTenant() && data.canPickTenant) {
-      <app-field label="Tenant" for="tenantId" [required]="true"
-                 [control]="form.get('tenantId')" [submitted]="submitted()">
+      <app-field label="Tenant" for="tenantId" [required]="!tenantLocked()"
+                 [control]="form.get('tenantId')" [submitted]="submitted()"
+                 [hint]="tenantLocked()
+                   ? 'Fixed once the account exists. Moving somebody between workspaces re-parents everything they are attached to.'
+                   : ''">
         <select id="tenantId" class="input" formControlName="tenantId">
           <option [ngValue]="null">Select a tenant</option>
           @for (tenant of data.tenants; track tenant.tenantId) {

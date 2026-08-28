@@ -48,6 +48,15 @@ export class UserDialog {
   readonly submitted = signal(false);
 
   readonly isEdit = computed(() => !!this.data.user);
+
+  /**
+   * Whether the workspace is settled and no longer up for changing.
+   *
+   * True only when editing somebody who already has one. A platform admin has none, so demoting
+   * one has to leave the field usable -- otherwise it submits null and the server refuses with
+   * "a tenant is required for this role", which reads as a bug rather than a rule.
+   */
+  readonly tenantLocked = computed(() => this.isEdit() && this.data.user?.tenantId != null);
   readonly role = signal<string>(this.data.user?.userRole ?? 'TENANT_USER');
 
   /** A platform admin spans every tenant, so a tenant choice would be meaningless. */
@@ -64,7 +73,12 @@ export class UserDialog {
     // value that was actually typed -- Angular's minLength passes an empty control.
     password: ['', [Validators.minLength(8)]],
     userRole: [this.data.user?.userRole ?? 'TENANT_USER', Validators.required],
-    tenantId: [this.data.user?.tenantId ?? null],
+    // Disabled when editing: a workspace move re-parents everything the person is attached to,
+    // and it is not a thing to do by brushing past a dropdown in an edit dialog. Shown rather
+    // than hidden, because which workspace somebody belongs to is worth seeing while you edit
+    // them. getRawValue still includes it, so the server receives the unchanged value.
+    tenantId: [{ value: this.data.user?.tenantId ?? null,
+                 disabled: !!this.data.user && this.data.user.tenantId != null }],
     status: [this.data.user?.status ?? 'Active'],
   });
 
@@ -79,7 +93,12 @@ export class UserDialog {
       this.toast.error('Check the highlighted fields.');
       return;
     }
-    if (this.needsTenant() && this.data.canPickTenant && !this.form.get('tenantId')!.value) {
+    // getRawValue, not .value: a disabled control reports null, which would make editing an
+    // existing user fail this check every time.
+    // Only when the field is actually theirs to fill: a locked one already holds a value, and a
+    // disabled control reports null through .value, so getRawValue is what to ask.
+    if (!this.tenantLocked() && this.needsTenant() && this.data.canPickTenant
+        && !this.form.getRawValue().tenantId) {
       this.toast.error('Choose a tenant for this user.');
       return;
     }
