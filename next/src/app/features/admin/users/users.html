@@ -126,16 +126,44 @@
 
             <!-- Contact. Both lines the same muted weight, because an address and a number are
                  the same kind of fact; the glyph is what tells them apart at a glance. -->
+            <!-- Both glyphs take icon-info rather than a semantic tone: an address is not "ok"
+                 and a number is not "warn", and borrowing those colours here would blunt what
+                 they mean everywhere else. The envelope and handset shapes carry the difference
+                 between the two lines; the tint only lifts them off the muted text. -->
             <div class="flex flex-col gap-1 text-xs text-[color:var(--text-muted)]">
               <div class="flex items-center gap-1.5 min-w-0">
-                <app-icon name="mail" size="0.85em" class="shrink-0 opacity-70" />
+                <app-icon name="mail" size="0.9em" class="shrink-0 icon-info" />
                 <span class="mono truncate" [title]="user.username">{{ user.username }}</span>
+                <!-- Always present rather than revealed on hover: a control that only exists
+                     under a pointer is unreachable by keyboard and invisible on a touch screen. -->
+                <button type="button"
+                        class="shrink-0 ml-auto p-0.5 rounded text-[color:var(--text-muted)]
+                               hover:text-brand-600 transition-colors"
+                        [attr.aria-label]="copiedKey() === user.appUserId + ':email'
+                          ? 'Address copied' : 'Copy ' + user.username"
+                        [title]="copiedKey() === user.appUserId + ':email' ? 'Copied' : 'Copy address'"
+                        (click)="copyContact(user.appUserId, 'email', user.username)">
+                  <app-icon [name]="copiedKey() === user.appUserId + ':email' ? 'check' : 'copy'"
+                            size="0.85em"
+                            [class]="copiedKey() === user.appUserId + ':email' ? 'icon-ok' : ''" />
+                </button>
               </div>
               @if (user.phoneNumber) {
                 <div class="flex items-center gap-1.5 min-w-0">
-                  <app-icon name="phone" size="0.85em" class="shrink-0 opacity-70" />
+                  <app-icon name="phone" size="0.9em" class="shrink-0 icon-info" />
                   <a class="mono truncate hover:text-brand-600 transition-colors"
                      [href]="'tel:' + user.phoneNumber">{{ user.phoneNumber }}</a>
+                  <button type="button"
+                          class="shrink-0 ml-auto p-0.5 rounded text-[color:var(--text-muted)]
+                                 hover:text-brand-600 transition-colors"
+                          [attr.aria-label]="copiedKey() === user.appUserId + ':phone'
+                            ? 'Number copied' : 'Copy ' + user.phoneNumber"
+                          [title]="copiedKey() === user.appUserId + ':phone' ? 'Copied' : 'Copy number'"
+                          (click)="copyContact(user.appUserId, 'phone', user.phoneNumber)">
+                    <app-icon [name]="copiedKey() === user.appUserId + ':phone' ? 'check' : 'copy'"
+                              size="0.85em"
+                              [class]="copiedKey() === user.appUserId + ':phone' ? 'icon-ok' : ''" />
+                  </button>
                 </div>
               }
             </div>

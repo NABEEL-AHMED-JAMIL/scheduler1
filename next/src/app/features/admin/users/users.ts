@@ -7,6 +7,7 @@ import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { AuthService } from '../../../core/auth/auth.service';
 import { ToastService } from '../../../shared/ui/toast.service';
+import { copyText } from '../../../shared/ui/clipboard.util';
 import { MineFilter, isMine } from '../../../shared/ui/mine-filter';
 import { StatTile } from '../../../shared/ui/stat-tile';
 import { confirmWith } from '../../../shared/ui/confirm';
@@ -82,6 +83,10 @@ export class Users implements OnInit {
   readonly roleFilter = signal('');
   readonly statusFilter = signal('');
   readonly tenantFilter = signal('');
+  /** Which contact line was just copied, as '<userId>:<field>'. One signal rather than one
+      per row, since only the most recent copy needs confirming. */
+  readonly copiedKey = signal<string | null>(null);
+
   readonly busy = signal<number | null>(null);
   readonly focusedTenantId = signal<number | null>(null);
 
@@ -359,5 +364,25 @@ export class Users implements OnInit {
     }
     const myId = this.auth.user()?.appUserId ?? null;
     return rows.filter(row => isMine(row, myId));
+  }
+
+  /**
+   * Copies a contact detail and confirms it on the line that was clicked.
+   *
+   * Keyed by user and field so two cards showing the same address cannot both light up, and so
+   * copying an email does not tick the phone beside it.
+   */
+  copyContact(userId: number, field: 'email' | 'phone', value: string): void {
+    copyText(value).then(ok => {
+      if (!ok) {
+        this.toast.error('Could not copy that.');
+        return;
+      }
+      const key = `${userId}:${field}`;
+      this.copiedKey.set(key);
+      // Only clear if nothing else was copied in the meantime, or a slow first copy would wipe
+      // the tick off a second, faster one.
+      setTimeout(() => { if (this.copiedKey() === key) this.copiedKey.set(null); }, 1500);
+    });
   }
 }
