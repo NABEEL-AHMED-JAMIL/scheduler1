@@ -1,6 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { HttpClient, HttpParams } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
 import { Dialog } from '@angular/cdk/dialog';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { TableShell } from '../../shared/ui/data-table';
@@ -9,6 +10,7 @@ import { StatusPill } from '../../shared/ui/status-pill';
 import { Icon } from '../../shared/ui/icon';
 import { ToastService } from '../../shared/ui/toast.service';
 import { confirmWith } from '../../shared/ui/confirm';
+import { RejectDialog } from './reject-dialog';
 
 interface TenantRequest {
   tenantRequestId: number;
@@ -111,7 +113,9 @@ interface TenantRequest {
                   {{ r.dateCreated ? (r.dateCreated | date:'d MMM y') : '—' }}
                 </td>
                 <td>
-                  <app-status [label]="r.status" [quiet]="true" />
+                  <!-- A full chip, not the quiet dot: this column is the whole point of the
+                       screen, and Pending in particular is the state somebody is scanning for. -->
+                  <app-status [label]="r.status" />
                   @if (r.status === 'Rejected' && r.decisionNote && !isOpen(r.tenantRequestId)) {
                     <div class="text-xs text-[color:var(--text-muted)] mt-0.5 line-clamp-1">
                       {{ r.decisionNote }}
@@ -278,16 +282,22 @@ export class TenantRequests implements OnInit {
   }
 
   async reject(request: TenantRequest): Promise<void> {
-    const ok = await confirmWith(this.dialog, {
-      title: `Reject the request from ${request.organisationName}?`,
-      body: 'No tenant or account is created. The request is kept, marked rejected.',
-      confirmLabel: 'Reject request',
-      danger: true,
-    });
-    if (!ok) return;
+    // Its own dialog rather than a yes/no confirm, because the endpoint takes a reason and
+    // nothing was ever collecting one -- decision_note was written on every rejection and null
+    // on every row. Closing with the string (or null when cancelled) makes it impossible to
+    // proceed while forgetting to read it.
+    const note = await firstValueFrom(
+      this.dialog.open<string | null>(RejectDialog, {
+        data: { organisationName: request.organisationName }, hasBackdrop: true,
+      }).closed);
+    if (note === null || note === undefined) return;
     this.busy.set(request.tenantRequestId);
+    let params = new HttpParams().set('tenantRequestId', String(request.tenantRequestId));
+    if (note) {
+      params = params.set('note', note);
+    }
     this.http.post<ApiResponse>(`${API_BASE}/tenantRequest.json/reject`, null,
-      { params: new HttpParams().set('tenantRequestId', String(request.tenantRequestId)) }).subscribe({
+      { params }).subscribe({
       next: response => {
         this.busy.set(null);
         if (response.status === API_SUCCESS) { this.toast.success(response.message); this.load(); }
