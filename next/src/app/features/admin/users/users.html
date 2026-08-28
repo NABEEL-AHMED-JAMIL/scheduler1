@@ -109,6 +109,15 @@
                 {{ user.username }}
               </p>
 
+              <!-- Only when there is one, as in the table: a card that always shows a dash for
+                   phone spends a line saying nothing. Tel link so it is dialable from a laptop. -->
+              @if (user.phoneNumber) {
+                <p class="mt-0.5">
+                  <a class="mono text-xs link-inline"
+                     [href]="'tel:' + user.phoneNumber">{{ user.phoneNumber }}</a>
+                </p>
+              }
+
               <div class="flex flex-wrap items-center gap-1.5 mt-2">
                 <span class="pill pill-neutral">{{ roleLabel(user.userRole) }}</span>
                 @if (user.tenantName) {
