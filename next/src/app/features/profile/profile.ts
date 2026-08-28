@@ -8,7 +8,7 @@ import { ToastService } from '../../shared/ui/toast.service';
 import { PhoneInput } from '../../shared/ui/phone-input';
 import { Icon } from '../../shared/ui/icon';
 import { StatusPill } from '../../shared/ui/status-pill';
-import { BucketSummary, StorageService } from '../objects/storage.service';
+import { StorageService } from '../objects/storage.service';
 import { Donut } from '../../shared/charts/donut';
 import { statusColor } from '../../shared/charts/status-color';
 
@@ -24,6 +24,8 @@ interface UserProfile {
   dateCreated?: string;
   lastLoginAt?: string;
   avatarBucket?: string | null;
+  /** Server-nominated destination for a new picture. */
+  avatarUploadBucket?: string | null;
   avatarKey?: string | null;
   position?: string | null;
   /** E.164, exactly as the admin screen and the server hold it. */
@@ -52,8 +54,6 @@ export class Profile implements OnInit {
   readonly name = signal('');
   readonly savingName = signal(false);
   readonly uploading = signal(false);
-
-  readonly buckets = signal<BucketSummary[]>([]);
   readonly jobs = signal<any[]>([]);
   readonly unread = signal(0);
 
@@ -116,17 +116,15 @@ export class Profile implements OnInit {
    * exists, and sticks with the bucket already in use so a replacement lands beside the
    * original rather than orphaning it.
    */
-  readonly targetBucket = computed(() => {
-    const all = this.buckets();
-    // Only stay with the recorded bucket while it is still one we can write to. It used to be
-    // honoured unconditionally, so once a storage connection went away every user whose picture
-    // lived there was stuck aiming at it -- each upload rejected with "Unknown bucket", and no
-    // way back from the page.
-    const inUse = this.profile()?.avatarBucket;
-    if (inUse && all.some(b => b.bucket === inUse)) return inUse;
-    const minio = all.find(b => (b.provider ?? '').toUpperCase() === 'MINIO');
-    return minio?.bucket || all[0]?.bucket || '';
-  });
+  /**
+   * Where a picture is written: whatever the server nominates.
+   *
+   * This used to pick from the buckets the person could see -- preferring MinIO, keeping the one
+   * already in use -- which meant the answer changed with the bucket list and a tenant with no
+   * storage of its own could not upload at all. The server names one bucket for every user, so
+   * there is nothing here to get wrong.
+   */
+  readonly targetBucket = computed(() => this.profile()?.avatarUploadBucket ?? '');
 
   readonly myJobs = computed(() => {
     const me = this.profile()?.username;
@@ -163,10 +161,6 @@ export class Profile implements OnInit {
 
   ngOnInit(): void {
     this.load();
-    this.storage.buckets().subscribe({
-      next: r => { if (r.status === API_SUCCESS) this.buckets.set(r.data ?? []); },
-      error: () => { /* the page still works; uploading just has nowhere to go */ },
-    });
     this.http.get<ApiResponse<any[]>>(`${API_BASE}/sourceJob.json/listSourceJob`).subscribe({
       next: r => { if (r.status === API_SUCCESS) this.jobs.set(r.data ?? []); },
       error: () => { /* activity is supplementary */ },
