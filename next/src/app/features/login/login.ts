@@ -4,10 +4,11 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { API_SUCCESS } from '../../core/api/api.config';
 import { ConsolePreview } from '../landing/console-preview';
+import { Icon } from '../../shared/ui/icon';
 
 @Component({
   selector: 'app-login',
-  imports: [ConsolePreview, ReactiveFormsModule],
+  imports: [ConsolePreview, Icon, ReactiveFormsModule],
   templateUrl: './login.html',
 })
 export class Login {

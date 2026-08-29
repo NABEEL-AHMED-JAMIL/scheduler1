@@ -56,24 +56,34 @@
            linear-gradient(to bottom, #fff 1px, transparent 1px);
            background-size: 44px 44px;"></div>
     <div class="absolute -top-28 -right-24 size-[26rem] rounded-full bg-brand-500/25 blur-3xl"></div>
-    <!-- The panel was a grid pattern with one line of text on the floor and a large void
-         above it. It now shows the thing being signed into: the same preview the landing page
-         uses, drawn from the app's own tokens rather than a screenshot, so it cannot drift out
-         of date and carries no real tenant's data on a page anyone can reach. -->
-    <div class="relative h-full flex flex-col justify-center gap-10 p-12 text-white">
-      <div>
-        <p class="text-2xl font-semibold max-w-md leading-snug tracking-tight">
-          Schedule the work, watch it run, and read what comes out.
-        </p>
-        <p class="text-sm text-white/55 mt-3">
-          Pipelines · Object storage · AI assistance
-        </p>
+    <!-- Shows the thing being signed into: the same preview the landing page uses, drawn from
+         the app's own tokens rather than a screenshot, so it follows the theme, cannot drift out
+         of date, and carries no real tenant's data on a page anyone can reach. -->
+    <!-- Three anchors rather than one block: heading at the top, the preview holding the
+         middle, a footnote on the floor. Centring a ~400px preview in a full-height panel left
+         equal voids above and below; anchoring it high just moved the whole void to the bottom.
+         Spreading the content gives the empty space somewhere to go. -->
+    <div class="relative h-full flex flex-col justify-between gap-8 px-10 py-12 text-white">
+      <p class="text-[1.75rem] font-semibold max-w-lg leading-tight tracking-tight">
+        Schedule the work, watch it run, and read what comes out.
+      </p>
+
+      <!-- No cap: the panel's padding already bounds it, and max-w-lg was leaving 68px of dead
+           space to its right at 1255px for no reason. -->
+      <div class="w-full">
+        <app-console-preview />
       </div>
 
-      <!-- Capped and left-aligned so it stays a preview rather than stretching to fill a very
-           wide panel, where it would stop reading as a window into the product. -->
-      <div class="w-full max-w-lg">
-        <app-console-preview />
+      <div class="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-white/50">
+        <span class="flex items-center gap-1.5">
+          <app-icon name="clock" size="0.9em" />Scheduled pipelines
+        </span>
+        <span class="flex items-center gap-1.5">
+          <app-icon name="cloud" size="0.9em" />Object storage
+        </span>
+        <span class="flex items-center gap-1.5">
+          <app-icon name="sparkle" size="0.9em" />AI assistance
+        </span>
       </div>
     </div>
   </div>
