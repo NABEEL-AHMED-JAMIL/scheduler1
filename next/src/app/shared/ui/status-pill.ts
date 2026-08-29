@@ -43,6 +43,11 @@ const LOOK: Record<string, StatusLook> = {
   // Pending is warn rather than neutral because it is the only one of the three that is asking
   // somebody to do something; approved and rejected are settled and can sit quietly.
   pending:   { tone: 'warn', glyph: 'clock' },
+  // The console calls this state "Waiting" -- on the tiles, in the filter and on the chip --
+  // while the database stores Pending. Aliased rather than renamed so the domain value is
+  // untouched and a chip labelled either way still gets the warn treatment instead of falling
+  // through to the neutral unknown.
+  waiting:   { tone: 'warn', glyph: 'clock' },
   approved:  { tone: 'ok',   glyph: 'checkCircle' },
   rejected:  { tone: 'crit', glyph: 'xCircle' },
 

@@ -801,6 +801,24 @@
   .table-modern tfoot tr { background: var(--surface-inset); }
   .table-modern tbody tr:hover { background: var(--surface-sunken); }
 
+  /* A column that stays reachable when the table is wider than its scroll box.
+     
+     Used for the actions cell: on the requests table the primary control sat 7px past the right
+     edge, so approving a request meant scrolling sideways to find the button. The row's own
+     actions are the last thing that should go off-screen.
+     
+     The background is repeated here because a sticky cell floats over the scrolling content --
+     without it the columns underneath show through. It has to track the row's hover state too,
+     or the pinned cell stays pale while the rest of the row darkens. */
+  .table-modern .col-pin-right {
+    position: sticky;
+    right: 0;
+    background: var(--surface-raised);
+    border-left: 1px solid var(--border-subtle);
+  }
+  .table-modern tbody tr:hover .col-pin-right { background: var(--surface-sunken); }
+  .table-modern thead .col-pin-right { background: var(--surface-raised); }
+
   /* One rotation utility, for the handful of places that show work in progress.
      Honours reduced-motion, since a permanent spin is the worst offender there. */
   .spin { animation: spin 900ms linear infinite; }

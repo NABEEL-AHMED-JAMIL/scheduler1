@@ -75,14 +75,23 @@ interface TenantRequest {
                          ? 'No request matches those filters.'
                          : 'No requests yet. The form at /request-workspace feeds this list.'"
                        emptyIcon="inbox" (retry)="load()">
-        <div toolbar class="flex flex-wrap items-center gap-2">
-          <div class="search-field max-w-64">
+        <!-- shrink-0: the row gives the heading mr-auto and lets everything else shrink, so
+               this collapsed to 340px against the 357px its two controls need and wrapped
+               the select onto a second line. There is ample room -- it just was not
+               claiming it. -->
+          <!-- flex-nowrap, not flex-wrap: the row allots this 340px and the two controls
+               want 357px, so wrapping dropped the status select onto its own line under
+               the search box. Held on one line the search field gives up the difference
+               instead -- a select that has fallen a line reads as broken, a slightly
+               narrower search box does not. min-w-0 is what lets it yield. -->
+          <div toolbar class="flex flex-nowrap items-center gap-2 shrink-0">
+          <div class="search-field max-w-64 min-w-0">
             <app-icon name="search" size="0.95em" />
-            <input class="input" placeholder="Search organisation, contact or purpose"
+            <input class="input min-w-0" placeholder="Search requests"
                    [value]="search()"
                    (input)="search.set($any($event.target).value); pager.reset()" />
           </div>
-          <select class="input max-w-36" [value]="statusFilter()"
+          <select class="input max-w-36 shrink-0" [value]="statusFilter()"
                   (change)="statusFilter.set($any($event.target).value); pager.reset()">
             <option value="">All statuses</option>
             <option value="Pending">Waiting</option>
@@ -139,7 +148,7 @@ interface TenantRequest {
                             [class]="sort.key() === 'status' ? 'icon-info' : 'icon-muted'" />
                 </button>
               </th>
-              <th class="w-12"></th>
+              <th class="w-12 col-pin-right"></th>
             </tr>
           </thead>
           <tbody>
@@ -155,11 +164,16 @@ interface TenantRequest {
                   </button>
                 </td>
                 <td class="font-medium">{{ r.organisationName }}</td>
-                <td>
-                  <div class="text-sm">{{ r.contactName }}</div>
-                  <div class="mono text-xs text-[color:var(--text-muted)]">{{ r.contactEmail }}</div>
+                  <!-- Capped and truncated: an address like
+                       i.halvorsen@blackthorn-rail.example widened this column to 270px on
+                       its own, which is most of why the table outgrew its scroll box and
+                       pushed Approve past the edge. Full value is on the title and in the
+                       panel below. -->
+                  <td class="max-w-48">
+                  <div class="text-sm truncate" [title]="r.contactName">{{ r.contactName }}</div>
+                  <div class="mono text-xs text-[color:var(--text-muted)] truncate" [title]="r.contactEmail">{{ r.contactEmail }}</div>
                 </td>
-                <td class="text-sm max-w-72">
+                <td class="text-sm max-w-64">
                   @if (r.purpose) {
                     <button type="button"
                             class="text-left w-full cursor-pointer bg-transparent border-0 p-0
@@ -181,14 +195,14 @@ interface TenantRequest {
                 <td>
                   <!-- A full chip, not the quiet dot: this column is the whole point of the
                        screen, and Pending in particular is the state somebody is scanning for. -->
-                  <app-status [label]="r.status" />
+                  <app-status [label]="statusLabel(r.status)" />
                   @if (r.status === 'Rejected' && r.decisionNote && !isOpen(r.tenantRequestId)) {
                     <div class="text-xs text-[color:var(--text-muted)] mt-0.5 line-clamp-1">
                       {{ r.decisionNote }}
                     </div>
                   }
                 </td>
-                <td>
+                <td class="col-pin-right">
                   @if (r.status === 'Pending') {
                     <div class="flex items-center gap-1">
                       <button type="button" class="btn btn-primary btn-sm"
@@ -420,5 +434,16 @@ export class TenantRequests implements OnInit {
           this.toast.error(err?.error?.message || failureMessage);
         },
       });
+  }
+
+  /**
+   * What the console calls a request's state.
+   *
+   * The stat tile and the filter both say "Waiting"; the stored value is Pending. Translating
+   * here rather than renaming the domain value keeps one word in front of the reader without
+   * touching what the server and the database agree on.
+   */
+  statusLabel(status: string): string {
+    return status === 'Pending' ? 'Waiting' : status;
   }
 }
