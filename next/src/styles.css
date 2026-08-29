@@ -801,6 +801,25 @@
   .table-modern tfoot tr { background: var(--surface-inset); }
   .table-modern tbody tr:hover { background: var(--surface-sunken); }
 
+  /* A label present for assistive technology and absent on screen.
+     
+     Action columns are a header with nothing in it, which a screen reader announces as a blank
+     column -- the reader is told there is a column and not what it holds. Where the column is
+     only wide enough for a kebab button there is no room to print the word, so it goes here
+     instead. Tailwind ships sr-only, but this project does not pull in its utilities wholesale,
+     so the rule is written out. */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+
   /* A column that stays reachable when the table is wider than its scroll box.
      
      Used for the actions cell: on the requests table the primary control sat 7px past the right

@@ -148,7 +148,7 @@ interface TenantRequest {
                             [class]="sort.key() === 'status' ? 'icon-info' : 'icon-muted'" />
                 </button>
               </th>
-              <th class="w-12 col-pin-right"></th>
+              <th class="w-12 col-pin-right">Actions</th>
             </tr>
           </thead>
           <tbody>
