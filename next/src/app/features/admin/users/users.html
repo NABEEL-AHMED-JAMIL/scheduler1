@@ -56,7 +56,7 @@
       </select>
       @if (canPickTenant() && tenantOptions().length > 1) {
         <select class="input max-w-44" [value]="tenantFilter()"
-                (change)="tenantFilter.set($any($event.target).value)">
+                (change)="tenantFilter.set($any($event.target).value); pager.reset()">
           <option value="">All tenants</option>
           @for (tenant of tenantOptions(); track tenant.id) {
             <option [value]="tenant.id">{{ tenant.name }}</option>
@@ -64,7 +64,7 @@
         </select>
       }
       <select class="input max-w-32" [value]="statusFilter()"
-              (change)="statusFilter.set($any($event.target).value)">
+              (change)="statusFilter.set($any($event.target).value); pager.reset()">
         <option value="">All states</option>
         <option value="Active">Active</option>
         <option value="Inactive">Inactive</option>
@@ -74,7 +74,7 @@
         <input class="input" placeholder="Search name, email or tenant"
                [value]="search()" (input)="search.set($any($event.target).value); pager.reset()" />
       </div>
-      <app-mine-filter [(only)]="onlyMine" />
+      <app-mine-filter [(only)]="onlyMine" (onlyChange)="pager.reset()" />
       @if (hasFilters()) {
         <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()">
           <app-icon name="close" />Clear

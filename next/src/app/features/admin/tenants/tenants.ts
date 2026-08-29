@@ -91,7 +91,9 @@ export class Tenants implements OnInit {
     return this.sort.apply(this.mine(rows), (row, key) => (row as any)[key]);
   });
 
-  readonly hasFilters = computed(() => !!this.search().trim() || !!this.statusFilter());
+  // Only mine narrows the list too, so Clear has to see it and reset it.
+  readonly hasFilters = computed(() =>
+    !!this.search().trim() || !!this.statusFilter() || this.onlyMine());
 
   readonly stats = computed(() => {
     const rows = this.tenants();
@@ -138,6 +140,7 @@ export class Tenants implements OnInit {
   clearFilters(): void {
     this.search.set('');
     this.statusFilter.set('');
+    this.onlyMine.set(false);
   }
 
   addTenant(): void {

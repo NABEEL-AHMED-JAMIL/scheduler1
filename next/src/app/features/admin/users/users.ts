@@ -106,9 +106,11 @@ export class Users implements OnInit {
   readonly roles = computed(() =>
     [...new Set(this.users().map(u => u.userRole).filter(Boolean))].sort());
 
+  // Every control that narrows the list belongs here, including Only mine. Leaving it out meant
+  // somebody could filter down to nothing, press Clear, and still see nothing.
   readonly hasFilters = computed(() =>
     !!(this.search() || this.roleFilter() || this.statusFilter() || this.tenantFilter()
-       || this.focusedTenantId() !== null));
+       || this.focusedTenantId() !== null || this.onlyMine()));
 
   /** Tenants that actually have users, so the filter never offers an empty result. */
   readonly tenantOptions = computed(() => {
@@ -354,6 +356,14 @@ export class Users implements OnInit {
     this.roleFilter.set('');
     this.statusFilter.set('');
     this.tenantFilter.set('');
+    this.onlyMine.set(false);
+    // The tenant focus counts towards hasFilters, so leaving it behind meant Clear left the list
+    // filtered and the button on screen -- it looked broken because it was. It lives in the URL,
+    // so clearing it means navigating; otherwise a refresh brings it straight back.
+    if (this.focusedTenantId() !== null) {
+      this.clearTenantFocus();
+    }
+    this.pager.reset();
   }
 
   /**
