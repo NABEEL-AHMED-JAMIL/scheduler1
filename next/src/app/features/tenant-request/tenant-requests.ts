@@ -10,6 +10,9 @@ import { StatusPill } from '../../shared/ui/status-pill';
 import { Icon } from '../../shared/ui/icon';
 import { ToastService } from '../../shared/ui/toast.service';
 import { confirmWith } from '../../shared/ui/confirm';
+import { createSort } from '../../shared/ui/sort';
+import { Pagination } from '../../shared/ui/pagination';
+import { createPager } from '../../shared/ui/pager';
 import { RejectDialog } from './reject-dialog';
 
 interface TenantRequest {
@@ -35,7 +38,7 @@ interface TenantRequest {
  */
 @Component({
   selector: 'app-tenant-requests',
-  imports: [TableShell, StatTile, StatusPill, Icon, DatePipe],
+  imports: [TableShell, StatTile, StatusPill, Icon, DatePipe, Pagination],
   template: `
     <div class="page">
       <div class="page-head">
@@ -63,21 +66,84 @@ interface TenantRequest {
         }
       </div>
 
+      <!-- shown against total, so "0 of 12" reads as a filter that matched nothing rather
+           than an empty list. -->
       <app-table-shell heading="Requests" [loading]="loading()" [error]="error()"
-                       [isEmpty]="!requests().length" [shown]="requests().length"
+                       [isEmpty]="!filtered().length" [shown]="filtered().length"
                        [total]="requests().length"
-                       emptyMessage="No requests yet. The form at /request-workspace feeds this list."
+                       [emptyMessage]="hasFilters()
+                         ? 'No request matches those filters.'
+                         : 'No requests yet. The form at /request-workspace feeds this list.'"
                        emptyIcon="inbox" (retry)="load()">
+        <div toolbar class="flex flex-wrap items-center gap-2">
+          <div class="search-field max-w-64">
+            <app-icon name="search" size="0.95em" />
+            <input class="input" placeholder="Search organisation, contact or purpose"
+                   [value]="search()"
+                   (input)="search.set($any($event.target).value); pager.reset()" />
+          </div>
+          <select class="input max-w-36" [value]="statusFilter()"
+                  (change)="statusFilter.set($any($event.target).value); pager.reset()">
+            <option value="">All statuses</option>
+            <option value="Pending">Waiting</option>
+            <option value="Approved">Approved</option>
+            <option value="Rejected">Rejected</option>
+          </select>
+          @if (hasFilters()) {
+            <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()">
+              <app-icon name="close" />Clear
+            </button>
+          }
+        </div>
         <table class="table-modern">
           <thead>
             <tr>
               <th class="w-8"></th>
-              <th>Organisation</th><th>Contact</th><th>Asked for</th>
-              <th>Received</th><th>Status</th><th class="w-12"></th>
+              <!-- Only the columns worth ordering by. "Asked for" is free prose, and
+                   sorting it alphabetically would order requests by whichever word
+                   they happen to open with. -->
+              <th>
+                <button type="button" class="th-sort"
+                        [class.th-sort-active]="sort.key() === 'organisationName'"
+                        (click)="sort.toggle('organisationName')">
+                  Organisation
+                  <app-icon [name]="sort.iconFor('organisationName')" size="0.875rem"
+                            [class]="sort.key() === 'organisationName' ? 'icon-info' : 'icon-muted'" />
+                </button>
+              </th>
+              <th>
+                <button type="button" class="th-sort"
+                        [class.th-sort-active]="sort.key() === 'contactName'"
+                        (click)="sort.toggle('contactName')">
+                  Contact
+                  <app-icon [name]="sort.iconFor('contactName')" size="0.875rem"
+                            [class]="sort.key() === 'contactName' ? 'icon-info' : 'icon-muted'" />
+                </button>
+              </th>
+              <th>Asked for</th>
+              <th>
+                <button type="button" class="th-sort"
+                        [class.th-sort-active]="sort.key() === 'dateCreated'"
+                        (click)="sort.toggle('dateCreated')">
+                  Received
+                  <app-icon [name]="sort.iconFor('dateCreated')" size="0.875rem"
+                            [class]="sort.key() === 'dateCreated' ? 'icon-info' : 'icon-muted'" />
+                </button>
+              </th>
+              <th>
+                <button type="button" class="th-sort"
+                        [class.th-sort-active]="sort.key() === 'status'"
+                        (click)="sort.toggle('status')">
+                  Status
+                  <app-icon [name]="sort.iconFor('status')" size="0.875rem"
+                            [class]="sort.key() === 'status' ? 'icon-info' : 'icon-muted'" />
+                </button>
+              </th>
+              <th class="w-12"></th>
             </tr>
           </thead>
           <tbody>
-            @for (r of requests(); track r.tenantRequestId) {
+            @for (r of paged(); track r.tenantRequestId) {
               <tr [class.row-open]="isOpen(r.tenantRequestId)">
                 <td>
                   <button type="button" class="btn btn-ghost btn-icon btn-sm"
@@ -185,6 +251,10 @@ interface TenantRequest {
             }
           </tbody>
         </table>
+
+        <app-pagination pager [total]="filtered().length" [page]="pager.page()"
+                        [size]="pager.size()" (goTo)="goToPage($event)"
+                        (setSize)="setPageSize($event)" />
       </app-table-shell>
     </div>
   `,
@@ -204,6 +274,40 @@ export class TenantRequests implements OnInit {
   readonly loading = signal(true);
   readonly error = signal('');
   readonly busy = signal<number | null>(null);
+
+  /** Free text across the four things a reviewer would recognise a request by. */
+  readonly search = signal('');
+  readonly statusFilter = signal('');
+  readonly sort = createSort<TenantRequest>('dateCreated', 'desc');
+  readonly pager = createPager<TenantRequest>();
+
+  readonly filtered = computed(() => {
+    const term = this.search().trim().toLowerCase();
+    const status = this.statusFilter();
+    const rows = this.requests().filter(request => {
+      if (status && request.status !== status) return false;
+      if (!term) return true;
+      // Purpose is included on purpose: it is often the only thing a reviewer remembers about a
+      // request, and it is the field the decision actually rests on.
+      return `${request.organisationName} ${request.contactName} ${request.contactEmail} ${request.purpose ?? ''}`
+        .toLowerCase().includes(term);
+    });
+    return this.sort.apply(rows, (row, key) => (row as any)[key]);
+  });
+
+  readonly hasFilters = computed(() => !!this.search().trim() || !!this.statusFilter());
+
+  /** The page on screen. createPager clamps, so filtering down cannot strand you on page 4. */
+  readonly paged = computed(() => this.pager.slice(this.filtered()));
+
+  goToPage(next: number): void { this.pager.goTo(next, this.filtered().length); }
+  setPageSize(size: number): void { this.pager.setSize(size); }
+
+  clearFilters(): void {
+    this.search.set('');
+    this.statusFilter.set('');
+    this.pager.reset();
+  }
 
   /**
    * Which requests are showing their full text.

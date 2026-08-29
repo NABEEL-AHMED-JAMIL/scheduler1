@@ -140,14 +140,18 @@ export class Users implements OnInit {
       if (role && user.userRole !== role) return false;
       if (status && user.status !== status) return false;
       if (!term) return true;
+      // Phone lost its own column when identity was merged into one cell, so search is the only
+      // way to reach it. Separators come off both sides, since a stored +12025550143 would
+      // otherwise never match somebody typing 202 555.
+      //
+      // Guarded on the stripped term being non-empty. Without that, a text search like "aisha"
+      // strips to "" -- and every string contains "" -- so the clause matched every user who had
+      // a phone at all, and searching anything returned the whole list.
+      const digits = term.replace(/[^0-9+]/g, '');
       return (user.username ?? '').toLowerCase().includes(term)
         || (user.fullName ?? '').toLowerCase().includes(term)
         || (user.position ?? '').toLowerCase().includes(term)
-          // Phone lost its own column when identity was merged into one cell, so search is now
-          // the only way to reach it. Separators are stripped from both sides, since a stored
-          // +12025550143 would otherwise never match somebody typing 202 555.
-          || (user.phoneNumber ?? '').replace(/[^0-9+]/g, '')
-               .includes(term.replace(/[^0-9+]/g, ''))
+        || (!!digits && (user.phoneNumber ?? '').replace(/[^0-9+]/g, '').includes(digits))
         || (user.tenantName ?? '').toLowerCase().includes(term);
     });
     return this.sort.apply(this.mine(rows), (row, key) => (row as any)[key]);
