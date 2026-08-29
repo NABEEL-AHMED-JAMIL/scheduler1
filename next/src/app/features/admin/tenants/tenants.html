@@ -159,22 +159,50 @@
             <app-status [label]="tenant.status" [quiet]="true" />
           </div>
 
-          <div class="grid grid-cols-3 gap-px overflow-hidden rounded-lg bg-subtle"
-              >
-            @for (res of resources; track res.key) {
-              <div class="flex flex-col items-center gap-1 px-2 py-2.5 bg-raised"
-                  
-                   [title]="$any(tenant)[res.key] + ' ' + res.label.toLowerCase()">
-                <app-icon [name]="res.icon" size="1.05em"
-                          [class]="$any(tenant)[res.key] ? 'icon-info' : 'icon-muted'" />
-                <span class="text-sm font-semibold tabular leading-none"
-                      [class]="$any(tenant)[res.key] ? '' : 'text-[color:var(--text-muted)]'">
-                  {{ $any(tenant)[res.key] || 0 }}
-                </span>
-                <span class="text-[10px] uppercase tracking-wide leading-none text-[color:var(--text-muted)]">{{ res.label }}</span>
+            <!-- Three figures, not six. Task types and Kafka profiles are zero for every tenant
+                 here and jobs and tasks for all but one, so the other three said nothing while
+                 crowding out the two that vary. They are summarised underneath instead. -->
+            <div>
+              <div class="grid grid-cols-3 gap-px overflow-hidden rounded-lg bg-subtle">
+                @for (res of headlineResources; track res.key) {
+                  <div class="flex flex-col items-center gap-1 px-2 py-2.5 bg-raised"
+                       [title]="$any(tenant)[res.key] + ' ' + res.label.toLowerCase()">
+                    <!-- Coloured by which metric it is, not by whether it has a value. Every
+                         icon used to turn grey at zero, which on this data left whole cards
+                         colourless; weight carries the empty/non-empty distinction instead. -->
+                    <app-icon [name]="res.icon" size="1.05em" [class]="resourceTone(res.key)"
+                              [style.opacity]="$any(tenant)[res.key] ? '1' : '0.45'" />
+                    <span class="text-sm font-semibold tabular leading-none"
+                          [class]="$any(tenant)[res.key] ? '' : 'text-[color:var(--text-muted)]'">
+                      {{ $any(tenant)[res.key] || 0 }}
+                    </span>
+                    <span class="text-[10px] uppercase tracking-wide leading-none text-[color:var(--text-muted)]">
+                      {{ res.label }}
+                    </span>
+                  </div>
+                }
               </div>
-            }
-          </div>
+
+              <!-- Share of the busiest workspace. "4 users" carries no scale on its own; against
+                   the largest it does. Hidden when nobody has any, since a row of empty tracks
+                   would be three more things saying nothing. -->
+              @if (shareOf(tenant, 'userCount') > 0) {
+                <div class="mt-2 flex items-center gap-2"
+                     [title]="shareOf(tenant, 'userCount') + '% of the largest workspace by people'">
+                  <div class="h-1 flex-1 rounded-full overflow-hidden bg-sunken">
+                    <div class="h-full rounded-full bg-brand-500 transition-all"
+                         [style.width.%]="shareOf(tenant, 'userCount')"></div>
+                  </div>
+                  <span class="text-[10px] tabular text-[color:var(--text-muted)] shrink-0">
+                    {{ shareOf(tenant, 'userCount') }}%
+                  </span>
+                </div>
+              }
+
+              <p class="mt-2 text-[11px] leading-relaxed text-[color:var(--text-muted)]">
+                {{ quietSummary(tenant) }}
+              </p>
+            </div>
 
           <div class="flex flex-wrap items-center gap-1.5 border-t pt-3 border-subtle"
               >

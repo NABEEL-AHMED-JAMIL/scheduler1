@@ -73,6 +73,65 @@ export class Tenants implements OnInit {
     { key: 'kafkaProfileCount', label: 'Kafka', icon: 'server' },
   ];
 
+  /**
+   * The three worth a tile of their own.
+   *
+   * Six equal tiles meant six mostly-empty boxes: across the current tenants, task types and
+   * Kafka profiles are zero for every single one, and jobs and tasks for all but one. A grid of
+   * zeros says nothing and crowds out the two numbers that do vary.
+   */
+  readonly headlineResources: ResourceCount[] = this.resources.slice(0, 3);
+
+  /** The rest, said in a sentence underneath rather than as more empty boxes. */
+  readonly minorResources: ResourceCount[] = this.resources.slice(3);
+
+  /**
+   * A stable hue per metric, so the eye learns a position rather than re-reading the label.
+   *
+   * Previously every icon was brand-blue when non-zero and grey when zero, which on this data
+   * meant almost every card was entirely grey. Colour now says which metric it is; weight says
+   * whether there is any.
+   */
+  resourceTone(key: string): string {
+    switch (key) {
+      case 'userCount':      return 'icon-info';
+      case 'sourceJobCount': return 'icon-ok';
+      case 'sourceTaskCount':return 'icon-warn';
+      default:               return 'icon-muted';
+    }
+  }
+
+  /**
+   * This tenant's share of the busiest one, for the bar under the headline figures.
+   *
+   * "4 users" on its own carries no scale. Against the largest workspace it does. Returns 0 when
+   * nothing has any, so the bar renders empty rather than dividing by zero.
+   */
+  shareOf(tenant: Tenant, key: string): number {
+    const largest = Math.max(...this.tenants().map(t => Number((t as any)[key]) || 0), 0);
+    if (!largest) {
+      return 0;
+    }
+    return Math.round(((Number((tenant as any)[key]) || 0) / largest) * 100);
+  }
+
+  /** The zero-valued minor metrics, phrased for the summary line. */
+  quietSummary(tenant: Tenant): string {
+    const has = this.minorResources.filter(r => Number((tenant as any)[r.key]) > 0);
+    const missing = this.minorResources.filter(r => !Number((tenant as any)[r.key]));
+    // "1 buckets" reads as a bug in the sentence. Every one of these labels is already plural,
+    // so a count of one needs the trailing s taken off rather than added.
+    const parts = has.map(r => {
+      const count = Number((tenant as any)[r.key]);
+      const label = r.label.toLowerCase();
+      return `${count} ${count === 1 ? label.replace(/s$/, '') : label}`;
+    });
+    if (missing.length === this.minorResources.length) {
+      return 'No task types, buckets or Kafka profiles yet';
+    }
+    return parts.join(' · ') + (missing.length ? ` · no ${missing.map(m => m.label.toLowerCase()).join(', ')}` : '');
+  }
+
   private readonly auth = inject(AuthService);
 
   /** Narrows the list to rows this person created. Not persisted -- see MineFilter. */
