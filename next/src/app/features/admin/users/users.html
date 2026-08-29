@@ -224,6 +224,34 @@
                   <span>Added by {{ user.createdByName }}</span>
                 }
               </div>
+
+              <!-- The same four the table row offers, and the same guards. A card view that can
+                   only look at people while the table can act on them is a worse version of the
+                   same screen; the reason the actions vanished was a rebuild, not a decision. -->
+              <div class="flex flex-wrap items-center gap-1 pt-2.5 border-t border-subtle">
+                <button type="button" class="btn btn-ghost btn-sm" (click)="edit(user)"
+                        [disabled]="busy() === user.appUserId">
+                  <app-icon name="edit" />Edit
+                </button>
+                <button type="button" class="btn btn-ghost btn-sm" (click)="resetPassword(user)"
+                        [disabled]="busy() === user.appUserId" title="Send a new one-time password">
+                  <app-icon name="key" />Reset
+                </button>
+                <button type="button" class="btn btn-ghost btn-sm"
+                        [class]="isSelf(user) ? '' : (user.status === 'Active' ? 'btn-intent-warn' : 'btn-intent-ok')"
+                        [disabled]="isSelf(user) || busy() === user.appUserId"
+                        [title]="isSelf(user) ? 'You cannot deactivate your own account' : ''"
+                        (click)="toggleStatus(user)">
+                  <app-icon [name]="user.status === 'Active' ? 'pause' : 'play'" />
+                  {{ user.status === 'Active' ? 'Deactivate' : 'Activate' }}
+                </button>
+                <button type="button" class="btn btn-ghost btn-icon btn-sm ml-auto"
+                        [disabled]="isSelf(user) || busy() === user.appUserId"
+                        [title]="isSelf(user) ? 'You cannot delete your own account' : 'Remove this account for good'"
+                        (click)="deleteUser(user)">
+                  <app-icon name="trash" [class.icon-crit]="!isSelf(user)" />
+                </button>
+              </div>
             </div>
           </article>
         }
