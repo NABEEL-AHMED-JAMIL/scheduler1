@@ -56,13 +56,25 @@
            linear-gradient(to bottom, #fff 1px, transparent 1px);
            background-size: 44px 44px;"></div>
     <div class="absolute -top-28 -right-24 size-[26rem] rounded-full bg-brand-500/25 blur-3xl"></div>
-    <div class="relative h-full flex flex-col justify-end p-12 text-white">
-      <p class="text-xl font-medium max-w-md leading-snug">
-        Schedule the work, watch it run, and read what comes out — in one place.
-      </p>
-      <p class="text-sm text-white/55 mt-3">
-        Pipelines · Object storage · AI assistance
-      </p>
+    <!-- The panel was a grid pattern with one line of text on the floor and a large void
+         above it. It now shows the thing being signed into: the same preview the landing page
+         uses, drawn from the app's own tokens rather than a screenshot, so it cannot drift out
+         of date and carries no real tenant's data on a page anyone can reach. -->
+    <div class="relative h-full flex flex-col justify-center gap-10 p-12 text-white">
+      <div>
+        <p class="text-2xl font-semibold max-w-md leading-snug tracking-tight">
+          Schedule the work, watch it run, and read what comes out.
+        </p>
+        <p class="text-sm text-white/55 mt-3">
+          Pipelines · Object storage · AI assistance
+        </p>
+      </div>
+
+      <!-- Capped and left-aligned so it stays a preview rather than stretching to fill a very
+           wide panel, where it would stop reading as a window into the product. -->
+      <div class="w-full max-w-lg">
+        <app-console-preview />
+      </div>
     </div>
   </div>
 </div>

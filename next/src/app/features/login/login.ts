@@ -3,10 +3,11 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { API_SUCCESS } from '../../core/api/api.config';
+import { ConsolePreview } from '../landing/console-preview';
 
 @Component({
   selector: 'app-login',
-  imports: [ReactiveFormsModule],
+  imports: [ConsolePreview, ReactiveFormsModule],
   templateUrl: './login.html',
 })
 export class Login {
