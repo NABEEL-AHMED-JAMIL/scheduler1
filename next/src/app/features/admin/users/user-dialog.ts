@@ -8,12 +8,22 @@ import { Field } from '../../../shared/ui/field';
 import { FormDialog } from '../../../shared/ui/form-dialog';
 import { PhoneInput } from '../../../shared/ui/phone-input';
 import { AuthService } from '../../../core/auth/auth.service';
+import { ROLE_META, UserRole } from '../../../core/auth/auth.models';
 
-const ROLES = [
-  { value: 'TENANT_USER',   label: 'Tenant user',   hint: 'Runs and monitors work.' },
-  { value: 'TENANT_ADMIN',  label: 'Tenant admin',  hint: 'Also configures tasks, connections and users.' },
-  { value: 'PLATFORM_ADMIN', label: 'Platform admin', hint: 'Operates across every tenant.' },
-];
+/**
+ * The picker's options, taken from the table that already names every role rather than said a
+ * second time here. The local copy carried the same three labels and hints word for word, so a
+ * reworded hint -- or a fourth role -- had to be remembered in two places and the users list
+ * and this dialog could quietly come to disagree about what a role is called.
+ *
+ * ROLE_META is written user-first and Object.entries keeps that order, which is what puts the
+ * least privilege at the top of the list.
+ */
+const ROLES = Object.entries(ROLE_META).map(([value, meta]) => ({
+  value: value as UserRole,
+  label: meta.label,
+  hint: meta.hint,
+}));
 
 @Component({
   selector: 'app-user-dialog',
@@ -29,6 +39,12 @@ export class UserDialog {
 
   private readonly auth = inject(AuthService);
 
+  /** Whether the row being edited is the signed-in administrator's own. */
+  readonly isSelf = computed(() => {
+    const mine = this.auth.user()?.appUserId;
+    return mine != null && this.data.user?.appUserId === mine;
+  });
+
   /**
    * Only the roles this administrator can actually grant.
    *
@@ -36,10 +52,31 @@ export class UserDialog {
    * option to a tenant admin meant filling in the whole form to be told no at the end. The
    * server check is the one that matters and stays where it is; this stops the console
    * proposing something it knows will be refused.
+   *
+   * A tenant admin staffs its workspace with tenant users and nothing above them -- granting a
+   * second set of keys to everything the workspace holds is the platform's decision -- so that
+   * is the one option it is offered. The role the edited row already carries is kept in the list
+   * whatever it is: the console posts the whole form back, resubmitting an unchanged role grants
+   * nothing and the server allows it, and dropping the option would leave an admin editing their
+   * own name through a picker showing no role at all.
+   *
+   * Your own row is the exception, and it comes first because it binds a platform admin too:
+   * updateUser refuses any role but the one already held -- "You cannot change your own role" --
+   * so a picker offering a second option there can only ever lose somebody the whole form. The
+   * one option it does offer is the one the server accepts, which is what keeps the field
+   * readable while you edit your own name.
    */
-  readonly roles = computed(() => this.auth.isPlatformAdmin()
-    ? ROLES
-    : ROLES.filter(r => r.value !== 'PLATFORM_ADMIN'));
+  readonly roles = computed(() => {
+    const current = this.data.user?.userRole as UserRole | undefined;
+    if (current && this.isSelf()) {
+      return ROLES.filter(r => r.value === current);
+    }
+    if (this.auth.isPlatformAdmin()) {
+      return ROLES;
+    }
+    return ROLES.filter(r => r.value === 'TENANT_USER' || r.value === current);
+  });
+
   /** E.164, owned by the phone component -- it validates against the same metadata the
       server does, so a second Validators rule here could only be a weaker copy. */
   readonly phone = signal<string>(this.data.user?.phoneNumber ?? '');
@@ -57,7 +94,9 @@ export class UserDialog {
    * "a tenant is required for this role", which reads as a bug rather than a rule.
    */
   readonly tenantLocked = computed(() => this.isEdit() && this.data.user?.tenantId != null);
-  readonly role = signal<string>(this.data.user?.userRole ?? 'TENANT_USER');
+  /** UserRole rather than string: every comparison below is against a role literal, and a
+      mistyped one used to compile happily and simply never match. */
+  readonly role = signal<UserRole>(this.data.user?.userRole ?? 'TENANT_USER');
 
   /** A platform admin spans every tenant, so a tenant choice would be meaningless. */
   readonly needsTenant = computed(() => this.role() !== 'PLATFORM_ADMIN');
@@ -83,7 +122,8 @@ export class UserDialog {
   });
 
   constructor() {
-    this.form.get('userRole')!.valueChanges.subscribe(v => this.role.set(v));
+    // The select is fed from ROLES, so the only values it can emit are the three role literals.
+    this.form.get('userRole')!.valueChanges.subscribe((value: UserRole) => this.role.set(value));
   }
 
   save(): void {

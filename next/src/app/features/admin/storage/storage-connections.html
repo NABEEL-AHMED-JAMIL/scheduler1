@@ -3,7 +3,8 @@
     <div>
     <h1 class="page-title">Storage Connections</h1>
     <p class="page-subtitle">
-      S3, Azure, MinIO or FTP/FTPS. Credentials are encrypted and never sent back to the browser.
+      S3, Azure, MinIO or FTP/FTPS. Passwords, secret keys and connection strings are encrypted
+      and never sent back to the browser.
     </p>
     </div>
     <div class="flex items-center gap-2">
@@ -14,21 +15,42 @@
     </div>
   </div>
 
-  <div class="grid grid-cols-3 gap-3">
-    @for (tile of [
-      { label: 'Connections', value: summary().total, icon: 'database', tone: 'info' },
-      { label: 'Active',      value: summary().active, icon: 'checkCircle', tone: 'ok' },
-      { label: 'Tested OK',   value: summary().ok, icon: 'plug', tone: 'ok' }
-    ]; track tile.label) {
-      <app-stat-tile [label]="tile.label" [value]="tile.value" [icon]="tile.icon" [tone]="$any(tile.tone)" />
+  <!-- The row answers "how much of this can a job use, and what is broken": what is in service,
+       then the three test states. The lead is the Active count rather than the headcount, because
+       the headcount is already printed on the card header below and is the sum of the other three
+       tiles, while whether a connection is resolved at all is said nowhere else on the screen.
+       The total stays as its foot, so the row still has a denominator. Counts cover every
+       connection, as they do on Users and Tenants; the line underneath says so while a filter is
+       narrowing the table.
+
+       Glyphs are the screen's own: checkCircle and xCircle are what the Last test column puts on
+       a passed and a failed row, and plug says "a connection" without implying a provider -- a
+       cloud does not describe the FTP and MinIO connections it was counting. -->
+  <div class="space-y-2">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+      @for (tile of [
+        { label: 'In service', value: summary().active,   foot: 'of ' + summary().total + ' configured', icon: 'plug', tone: 'info' },
+        { label: 'Tested OK',  value: summary().ok,       foot: 'last test passed', icon: 'checkCircle', tone: 'ok' },
+        { label: 'Failing',    value: summary().failing,  foot: 'last test failed', icon: 'xCircle', tone: 'crit' },
+        { label: 'Untested',   value: summary().untested, foot: 'never verified', icon: 'clock', tone: 'warn' }
+      ]; track tile.label) {
+        <app-stat-tile [label]="tile.label" [value]="tile.value" [icon]="tile.icon"
+                       [tone]="$any(tile.tone)" [foot]="tile.foot" />
+      }
+    </div>
+    @if (isFiltered()) {
+      <p class="text-xs text-[color:var(--text-muted)]">
+        These totals cover all {{ connections().length }} connections, not the
+        {{ filtered().length }} the filters leave on screen.
+      </p>
     }
   </div>
 
   <app-table-shell heading="Connections" [loading]="loading()" [error]="error()"
                    [isEmpty]="!filtered().length" [shown]="filtered().length"
                    [total]="connections().length"
-                   [emptyMessage]="search() || providerFilter() ? 'No connections match the filters.' : 'No connections configured yet.'"
-                   emptyIcon="cloud"
+                   [emptyMessage]="isFiltered() ? 'No connections match the filters.' : 'No connections configured yet.'"
+                   emptyIcon="plug"
                    [showSubbar]="selected().size > 0"
                    (retry)="load()">
     <!-- Lives in the shell's second row, so ticking a box cannot shift the filters above it.
@@ -119,7 +141,7 @@
               @if (c.secretKeyConfigured || c.passwordConfigured) {
                 <span class="pill pill-ok">Stored</span>
               } @else {
-                <span class="pill pill-neutral" title="Falls back to the host's credential chain">
+                <span class="pill pill-neutral" title="No key is stored. The connection only works if this platform was deliberately configured to lend its own host credentials, which is off by default.">
                   Not stored
                 </span>
               }
@@ -181,7 +203,7 @@
               @if (c.secretKeyConfigured || c.passwordConfigured) {
                 <span class="pill pill-ok">Stored</span>
               } @else {
-                <span class="pill pill-neutral" title="Falls back to the host's credential chain">
+                <span class="pill pill-neutral" title="No key is stored. The connection only works if this platform was deliberately configured to lend its own host credentials, which is off by default.">
                   Not stored
                 </span>
               }

@@ -9,6 +9,7 @@ import { ToastService } from '../../../shared/ui/toast.service';
 import { copyText } from '../../../shared/ui/clipboard.util';
 import { Field } from '../../../shared/ui/field';
 import { Icon } from '../../../shared/ui/icon';
+import { TaskForm, TaskFormField } from '../../settings/forms/task-form-dialog';
 
 /** Tag keys the pipeline reads to locate storage; a typo in one fails silently at run time. */
 const STORAGE_TAG_KEYS = ['bucket', 'bucket_name', 'input_folder', 'output_folder'];
@@ -36,6 +37,26 @@ export class TaskEdit implements OnInit {
   readonly submitted = signal(false);
   readonly showTagHelp = signal(false);
 
+  /**
+   * The form this task's pipeline expects, when somebody has defined one.
+   *
+   * Forms have been buildable under Settings for a while but nothing ever asked for one, so a
+   * task was always filled in as raw tag rows -- you had to know that F768926 wants a
+   * `search_term` nested under `params` before you could write it down. When a form exists its
+   * fields are what you fill in; the tag rows below are still there, and still what gets saved.
+   */
+  readonly taskFormDef = signal<TaskForm | null>(null);
+  readonly formLoading = signal(false);
+  /** Whether the raw tag table is on show. Opened by default only when no form is driving it. */
+  readonly showTags = signal(true);
+
+  /** The fields in the order their author put them in; `position` is not guaranteed sorted. */
+  readonly formFields = computed(() =>
+    [...(this.taskFormDef()?.fields ?? [])].sort((a, b) => a.position - b.position));
+
+  /** Which pipeline the currently loaded form belongs to, so the same fetch is not repeated. */
+  private loadedFormPipeline: string | null = null;
+
   readonly isEdit = computed(() => !!this.taskDetailId());
 
   readonly form: FormGroup = this.fb.group({
@@ -48,9 +69,14 @@ export class TaskEdit implements OnInit {
     groupId: [''],
     taskPayload: [''],
     tags: this.fb.array([]),
+    // Filled in from the pipeline's form when there is one. Its controls write through to
+    // `tags`, so everything downstream -- the XML preview, the save payload -- is unchanged.
+    formData: this.fb.group({}),
   });
 
   get tags(): FormArray { return this.form.get('tags') as FormArray; }
+
+  get formData(): FormGroup { return this.form.get('formData') as FormGroup; }
 
   ngOnInit(): void {
     this.http.get<ApiResponse<any>>(`${API_BASE}/setting.json/appSetting`).subscribe({
@@ -84,6 +110,12 @@ export class TaskEdit implements OnInit {
       error: () => this.toast.error('Could not load the task settings.'),
     });
 
+    // A pipeline chosen by hand loads its form straight away. Editing an existing task goes
+    // through loadTask instead, which has to wait for the tags before it can prefill.
+    this.form.get('pipelineId')!.valueChanges.subscribe(pipelineId => {
+      this.loadFormForPipeline((pipelineId ?? '').trim());
+    });
+
     if (this.isEdit()) this.loadTask();
     else this.addTag();
   }
@@ -101,6 +133,8 @@ export class TaskEdit implements OnInit {
           return;
         }
         const task = response.data;
+        // emitEvent:false: the pipeline watcher would otherwise fetch the form and prefill it
+        // from tags that are still two lines from being loaded, so every field came up blank.
         this.form.patchValue({
           taskDetailId: task.taskDetailId,
           taskName: task.taskName,
@@ -110,11 +144,12 @@ export class TaskEdit implements OnInit {
           pipelineId: task.pipelineId,
           groupId: task.groupId,
           taskPayload: task.taskPayload,
-        });
+        }, { emitEvent: false });
         const existing = task.xmlTagsInfo ?? task.tagsInfo ?? [];
         this.tags.clear();
         for (const tag of existing) this.addTag(tag);
         if (!this.tags.length) this.addTag();
+        this.loadFormForPipeline((task.pipelineId ?? '').trim());
       },
       error: err => {
         this.loading.set(false);
@@ -220,8 +255,148 @@ export class TaskEdit implements OnInit {
       () => this.toast.error('Could not copy the XML.'));
   }
 
+  /**
+   * Fetches the form the chosen pipeline expects, if it has one.
+   *
+   * A pipeline with no form is the normal case and comes back as a success with null data, so
+   * the absence is not treated as a failure -- the tag table simply stays as it was.
+   */
+  private loadFormForPipeline(pipelineId: string): void {
+    if (pipelineId === this.loadedFormPipeline) return;
+    this.loadedFormPipeline = pipelineId;
+
+    if (!pipelineId) {
+      this.clearForm();
+      return;
+    }
+    this.formLoading.set(true);
+    this.http.get<ApiResponse<TaskForm>>(`${API_BASE}/taskForm.json/formForPipeline`,
+      { params: { pipelineId } }).subscribe({
+      next: response => {
+        this.formLoading.set(false);
+        // Guard against a slow response for a pipeline the user has since moved off.
+        if (this.loadedFormPipeline !== pipelineId) return;
+        if (response.status !== API_SUCCESS || !response.data) {
+          this.clearForm();
+          return;
+        }
+        this.taskFormDef.set(response.data);
+        this.buildFormControls();
+        // Tucked away once a form is answering for them, but one click from view: a form
+        // describes the tags its author thought of, and a task can legitimately need others.
+        this.showTags.set(false);
+      },
+      error: () => {
+        this.formLoading.set(false);
+        if (this.loadedFormPipeline === pipelineId) this.clearForm();
+      },
+    });
+  }
+
+  private clearForm(): void {
+    this.taskFormDef.set(null);
+    for (const name of Object.keys(this.formData.controls)) {
+      this.formData.removeControl(name, { emitEvent: false });
+    }
+    this.showTags.set(true);
+  }
+
+  /** Stable control name for a field. Two fields can share a tagKey under different parents. */
+  controlName(field: TaskFormField): string {
+    return `${field.tagParent ?? ''}|${field.tagKey}`;
+  }
+
+  /**
+   * Builds one control per field and seeds it from whatever the task already has.
+   *
+   * An existing task's tags win over the field's default: the default describes a new task, and
+   * overwriting a saved value with it would quietly undo somebody's edit on first open.
+   */
+  private buildFormControls(): void {
+    for (const name of Object.keys(this.formData.controls)) {
+      this.formData.removeControl(name, { emitEvent: false });
+    }
+    for (const field of this.formFields()) {
+      const existing = this.findTag(field);
+      const seed = existing ?? field.defaultValue ?? '';
+      const control = this.fb.control(
+        field.fieldType === 'checkbox' ? seed === 'true' : seed,
+        field.required ? [Validators.required] : []);
+      this.formData.addControl(this.controlName(field), control, { emitEvent: false });
+    }
+    this.syncFormToTags();
+  }
+
+  private findTag(field: TaskFormField): string | null {
+    const parent = (field.tagParent ?? '').trim();
+    for (const group of this.tags.controls) {
+      const value = group.getRawValue();
+      if ((value.tagKey ?? '').trim() === field.tagKey
+          && (value.tagParent ?? '').trim() === parent) {
+        return value.tagValue ?? '';
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Writes the form's answers into the tag rows.
+   *
+   * The form does not replace the tags, it authors them -- which is what keeps the XML preview,
+   * the payload button and the save request working with no knowledge of forms at all. Rows the
+   * form does not own are left alone, so a hand-added tag survives.
+   */
+  syncFormToTags(): void {
+    for (const field of this.formFields()) {
+      const control = this.formData.get(this.controlName(field));
+      if (!control) continue;
+      const raw = control.value;
+      const value = field.fieldType === 'checkbox' ? String(!!raw) : String(raw ?? '');
+      const parent = (field.tagParent ?? '').trim();
+
+      const match = this.tags.controls.find(group => {
+        const current = group.getRawValue();
+        return (current.tagKey ?? '').trim() === field.tagKey
+            && (current.tagParent ?? '').trim() === parent;
+      });
+
+      if (!value) {
+        // A blank answer means no tag at all rather than an empty one: an empty
+        // <search_term/> is not the same thing to a consumer as its absence.
+        if (match) this.tags.removeAt(this.tags.controls.indexOf(match), { emitEvent: false });
+        continue;
+      }
+      if (match) {
+        match.get('tagValue')!.setValue(value, { emitEvent: false });
+      } else {
+        this.tags.push(this.fb.group({
+          tagKey: [field.tagKey],
+          tagParent: [parent],
+          tagValue: [value],
+        }), { emitEvent: false });
+      }
+    }
+    // A blank starter row is added on a new task; once a form has filled things in it is just
+    // an empty element in the generated XML.
+    for (let i = this.tags.length - 1; i >= 0; i--) {
+      const value = this.tags.at(i).getRawValue();
+      if (!(value.tagKey ?? '').trim() && !(value.tagValue ?? '').trim()) {
+        this.tags.removeAt(i, { emitEvent: false });
+      }
+    }
+    if (!this.tags.length) this.addTag();
+  }
+
+  /** Choices for a select field. The author writes them one per line. */
+  fieldChoices(field: TaskFormField): string[] {
+    return (field.fieldOptions ?? '').split('\n').map(o => o.trim()).filter(Boolean);
+  }
+
   save(): void {
     this.submitted.set(true);
+    // Belt and braces: the fields sync as they are typed, but a value restored by the browser
+    // or set programmatically would not have fired an input event.
+    if (this.taskFormDef()) this.syncFormToTags();
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       this.toast.error('Check the highlighted fields.');

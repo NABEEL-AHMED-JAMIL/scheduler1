@@ -49,13 +49,24 @@ export class DictationService {
     recognition.lang = 'en-US';
     recognition.continuous = false;
     recognition.interimResults = false;
+    // stop() above is asynchronous, so handing the microphone from one composer to the next has
+    // the old session's onend arriving after the new one has already started. It was clearing
+    // the owner -- the new composer then showed no live mic while it was recording -- and
+    // nulling this.recognition, which left that session with nothing to stop it by. Each
+    // handler checks it is still the live session before touching either.
+    const isCurrent = () => this.recognition === recognition;
+
     recognition.onstart = () => this.owner.set(id);
     recognition.onerror = (event: any) => {
-      this.owner.set(null);
+      if (isCurrent()) this.owner.set(null);
       if (event?.error === 'not-allowed') this.toast.error('Microphone access was refused.');
       else if (event?.error !== 'aborted') this.toast.error('Could not hear anything.');
     };
-    recognition.onend = () => { this.owner.set(null); this.recognition = null; };
+    recognition.onend = () => {
+      if (!isCurrent()) return;
+      this.owner.set(null);
+      this.recognition = null;
+    };
     recognition.onresult = (event: any) => {
       const said = event.results?.[0]?.[0]?.transcript?.trim();
       if (said) onText(said);

@@ -6,6 +6,7 @@ import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { ToastService } from '../../shared/ui/toast.service';
 import { TableShell } from '../../shared/ui/data-table';
 import { Icon } from '../../shared/ui/icon';
+import { notificationTarget } from './notification-links';
 
 interface Notification {
   notificationId: number;
@@ -18,19 +19,6 @@ interface Notification {
   /** The API field is linkUrl; this was read as linkPath, so nothing was ever clickable. */
   linkUrl?: string;
 }
-
-/**
- * The backend stores routes from the Angular 8 app, so a stored link points at a page that
- * does not exist here. Rewriting them on the way out keeps old rows useful without touching
- * the data or breaking the old app, which is still running against the same database.
- */
-const ROUTE_MAP: Record<string, string> = {
-  '/jobList': '/jobs',
-  '/taskList': '/tasks',
-  '/objectBrowser': '/objects',
-  '/users': '/admin/users',
-  '/tenants': '/admin/tenants',
-};
 
 @Component({
   selector: 'app-notifications',
@@ -92,10 +80,7 @@ export class Notifications implements OnInit {
 
   /** Where a row goes when clicked, or null when the notification carries no link. */
   targetOf(item: Notification): string | null {
-    const raw = (item.linkUrl ?? '').trim();
-    if (!raw) return null;
-    const [path] = raw.split('?');
-    return ROUTE_MAP[path] ?? (path.startsWith('/') ? path : null);
+    return notificationTarget(item.linkUrl);
   }
 
   open(item: Notification): void {

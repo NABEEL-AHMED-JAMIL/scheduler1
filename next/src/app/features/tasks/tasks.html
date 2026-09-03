@@ -10,10 +10,15 @@
       <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
         <app-icon name="refresh" [class.spin]="loading()" />Refresh
       </button>
-      <a routerLink="/tasks/bulk" class="btn btn-default btn-sm">
-        <app-icon name="upload" />Bulk import
-      </a>
-      <a routerLink="/tasks/new" class="btn btn-primary btn-sm"><app-icon name="plus" />New task</a>
+      <!-- The list is TENANT_USER and stays open; everything that writes a task is TENANT_ADMIN.
+           Both routes behind these links are guarded, so for a tenant user they only ever led to
+           /unauthorized -- an offer the console already knows it cannot keep. -->
+      @if (auth.canManageTasks()) {
+        <a routerLink="/tasks/bulk" class="btn btn-default btn-sm">
+          <app-icon name="upload" />Bulk import
+        </a>
+        <a routerLink="/tasks/new" class="btn btn-primary btn-sm"><app-icon name="plus" />New task</a>
+      }
     </div>
   </div>
 
@@ -48,31 +53,36 @@
               </div>
               <div class="shrink-0 flex items-center gap-1">
                 <app-status [label]="task.taskStatus" [quiet]="true" />
-                <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="cardMenu"
-                        [disabled]="busyTask() === task.taskDetailId" aria-label="Actions">
-                  <app-icon name="dots" size="1.05em" />
-                </button>
-                <ng-template #cardMenu>
-                  <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
-                    <a cdkMenuItem class="menu-item" [routerLink]="['/tasks', task.taskDetailId, 'edit']">
-                      <app-icon name="edit" />Edit
-                    </a>
-                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="clone(task)">
-                      <app-icon name="copy" />Duplicate
-                    </button>
-                    <button cdkMenuItem class="menu-item btn-intent-crit"
-                            [disabled]="task.taskStatus === 'Delete' || inUse(task)"
-                            [title]="inUse(task)
-                              ? 'Used by ' + task.totalLinksJobs + ' job(s). Move or delete those first.'
-                              : 'Delete this task'"
-                            (cdkMenuItemTriggered)="remove(task)">
-                      <app-icon name="trash" />Delete
-                      @if (task.totalLinksJobs) {
-                        <span class="pill pill-warn ml-auto">in use · {{ task.totalLinksJobs }}</span>
-                      }
-                    </button>
-                  </div>
-                </ng-template>
+                <!-- Edit, Duplicate and Delete are the whole menu and all three are TENANT_ADMIN
+                     (Duplicate posts addSourceTask), so the trigger goes with them rather than
+                     opening on nothing. -->
+                @if (auth.canManageTasks()) {
+                  <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="cardMenu"
+                          [disabled]="busyTask() === task.taskDetailId" aria-label="Actions">
+                    <app-icon name="dots" size="1.05em" />
+                  </button>
+                  <ng-template #cardMenu>
+                    <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                      <a cdkMenuItem class="menu-item" [routerLink]="['/tasks', task.taskDetailId, 'edit']">
+                        <app-icon name="edit" />Edit
+                      </a>
+                      <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="clone(task)">
+                        <app-icon name="copy" />Duplicate
+                      </button>
+                      <button cdkMenuItem class="menu-item btn-intent-crit"
+                              [disabled]="task.taskStatus === 'Delete' || inUse(task)"
+                              [title]="inUse(task)
+                                ? 'Used by ' + task.totalLinksJobs + ' job(s). Move or delete those first.'
+                                : 'Delete this task'"
+                              (cdkMenuItemTriggered)="remove(task)">
+                        <app-icon name="trash" />Delete
+                        @if (task.totalLinksJobs) {
+                          <span class="pill pill-warn ml-auto">in use · {{ task.totalLinksJobs }}</span>
+                        }
+                      </button>
+                    </div>
+                  </ng-template>
+                }
               </div>
             </div>
 
@@ -174,33 +184,35 @@
             </td>
             <td class="text-right"><app-status [label]="task.taskStatus" [quiet]="true" /></td>
             <td class="text-right">
-              <div class="flex items-center justify-end gap-1 whitespace-nowrap">
-                <button type="button" class="btn btn-ghost btn-icon btn-sm shrink-0" [cdkMenuTriggerFor]="taskMenu"
-                        [disabled]="busyTask() === task.taskDetailId" aria-label="Actions">
-                  <app-icon name="dots" size="1.05em" />
-                </button>
-              </div>
-              <ng-template #taskMenu>
-                <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
-                  <a cdkMenuItem class="menu-item" [routerLink]="['/tasks', task.taskDetailId, 'edit']">
-                    <app-icon name="edit" />Edit
-                  </a>
-                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="clone(task)">
-                    <app-icon name="copy" />Duplicate
-                  </button>
-                  <button cdkMenuItem class="menu-item btn-intent-crit"
-                          [disabled]="task.taskStatus === 'Delete' || inUse(task)"
-                          [title]="inUse(task)
-                            ? 'Used by ' + task.totalLinksJobs + ' job(s). Move or delete those first.'
-                            : 'Delete this task'"
-                          (cdkMenuItemTriggered)="remove(task)">
-                    <app-icon name="trash" />Delete
-                    @if (task.totalLinksJobs) {
-                      <span class="pill pill-warn ml-auto">in use · {{ task.totalLinksJobs }}</span>
-                    }
+              @if (auth.canManageTasks()) {
+                <div class="flex items-center justify-end gap-1 whitespace-nowrap">
+                  <button type="button" class="btn btn-ghost btn-icon btn-sm shrink-0" [cdkMenuTriggerFor]="taskMenu"
+                          [disabled]="busyTask() === task.taskDetailId" aria-label="Actions">
+                    <app-icon name="dots" size="1.05em" />
                   </button>
                 </div>
-              </ng-template>
+                <ng-template #taskMenu>
+                  <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                    <a cdkMenuItem class="menu-item" [routerLink]="['/tasks', task.taskDetailId, 'edit']">
+                      <app-icon name="edit" />Edit
+                    </a>
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="clone(task)">
+                      <app-icon name="copy" />Duplicate
+                    </button>
+                    <button cdkMenuItem class="menu-item btn-intent-crit"
+                            [disabled]="task.taskStatus === 'Delete' || inUse(task)"
+                            [title]="inUse(task)
+                              ? 'Used by ' + task.totalLinksJobs + ' job(s). Move or delete those first.'
+                              : 'Delete this task'"
+                            (cdkMenuItemTriggered)="remove(task)">
+                      <app-icon name="trash" />Delete
+                      @if (task.totalLinksJobs) {
+                        <span class="pill pill-warn ml-auto">in use · {{ task.totalLinksJobs }}</span>
+                      }
+                    </button>
+                  </div>
+                </ng-template>
+              }
             </td>
           </tr>
 

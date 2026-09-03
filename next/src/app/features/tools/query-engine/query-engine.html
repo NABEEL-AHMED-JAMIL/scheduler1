@@ -10,14 +10,16 @@
       <button type="button" class="btn btn-default btn-sm" (click)="loadAll()" [disabled]="loading()">
         <app-icon name="refresh" [class.spin]="loading()" />Refresh
       </button>
-      @if (tab() === 'connections') {
-        <button type="button" class="btn btn-primary btn-sm" (click)="addConnection()">
-          <app-icon name="plus" />New connection
-        </button>
-      } @else {
-        <button type="button" class="btn btn-primary btn-sm" (click)="addQuery()">
-          <app-icon name="plus" />New query
-        </button>
+      @if (auth.canManageQueries()) {
+        @if (tab() === 'connections') {
+          <button type="button" class="btn btn-primary btn-sm" (click)="addConnection()">
+            <app-icon name="plus" />New connection
+          </button>
+        } @else {
+          <button type="button" class="btn btn-primary btn-sm" (click)="addQuery()">
+            <app-icon name="plus" />New query
+          </button>
+        }
       }
     </div>
   </div>
@@ -99,24 +101,29 @@
                 </button>
                 <ng-template #qMenu>
                   <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                    <!-- Run now is executions/execute, which is TENANT_USER: running a query
+                         somebody else defined is the whole point of the page for a tenant user,
+                         so it stays. Editing, scheduling and deleting the definition do not. -->
                     <button cdkMenuItem class="menu-item btn-intent-ok" (cdkMenuItemTriggered)="runQuery(q)">
                       <app-icon name="play" />Run now
                     </button>
-                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="editQuery(q)">
-                      <app-icon name="edit" />Edit
-                    </button>
-                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="schedule(q)">
-                      <app-icon name="clock" />{{ scheduleFor(q) ? 'Edit schedule' : 'Schedule' }}
-                    </button>
-                    @if (scheduleFor(q)) {
-                      <button cdkMenuItem class="menu-item btn-intent-warn" (cdkMenuItemTriggered)="removeSchedule(q)">
-                        <app-icon name="pause" />Remove schedule
+                    @if (auth.canManageQueries()) {
+                      <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="editQuery(q)">
+                        <app-icon name="edit" />Edit
+                      </button>
+                      <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="schedule(q)">
+                        <app-icon name="clock" />{{ scheduleFor(q) ? 'Edit schedule' : 'Schedule' }}
+                      </button>
+                      @if (scheduleFor(q)) {
+                        <button cdkMenuItem class="menu-item btn-intent-warn" (cdkMenuItemTriggered)="removeSchedule(q)">
+                          <app-icon name="pause" />Remove schedule
+                        </button>
+                      }
+                      <div class="my-1 border-t border-subtle"></div>
+                      <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="removeQuery(q)">
+                        <app-icon name="trash" class="icon-crit" />Delete
                       </button>
                     }
-                    <div class="my-1 border-t border-subtle"></div>
-                    <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="removeQuery(q)">
-                      <app-icon name="trash" class="icon-crit" />Delete
-                    </button>
                   </div>
                 </ng-template>
               </td>
@@ -168,19 +175,24 @@
               </td>
               <td class="text-right"><app-status [label]="c.status" [quiet]="true" /></td>
               <td class="text-right">
-                <button type="button" class="btn btn-ghost btn-icon" [cdkMenuTriggerFor]="cMenu" aria-label="Actions">
-                  <app-icon name="dots" size="1.05em" />
-                </button>
-                <ng-template #cMenu>
-                  <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
-                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="editConnection(c)">
-                      <app-icon name="edit" />Edit
-                    </button>
-                    <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="removeConnection(c)">
-                      <app-icon name="trash" class="icon-crit" />Delete
-                    </button>
-                  </div>
-                </ng-template>
+                <!-- Nothing in this menu is readable-only, so the trigger goes with it. The
+                     connection list itself stays visible: a query names its connection, and
+                     that column is unreadable without these rows. -->
+                @if (auth.canManageQueries()) {
+                  <button type="button" class="btn btn-ghost btn-icon" [cdkMenuTriggerFor]="cMenu" aria-label="Actions">
+                    <app-icon name="dots" size="1.05em" />
+                  </button>
+                  <ng-template #cMenu>
+                    <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                      <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="editConnection(c)">
+                        <app-icon name="edit" />Edit
+                      </button>
+                      <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="removeConnection(c)">
+                        <app-icon name="trash" class="icon-crit" />Delete
+                      </button>
+                    </div>
+                  </ng-template>
+                }
               </td>
             </tr>
           }

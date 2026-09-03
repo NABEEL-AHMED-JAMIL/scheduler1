@@ -96,7 +96,7 @@
       @if (myOutcomes().length) {
         <div class="card chart-card">
           <h3 class="chart-title">Your jobs right now</h3>
-          <p class="chart-sub">How the {{ myJobs().length }} jobs in your name last ran.</p>
+          <p class="chart-sub">How the {{ jobsAssigned() }} jobs in your name last ran.</p>
           <app-donut [data]="myOutcomes()" totalLabel="jobs" [colorFor]="outcomeColor" />
         </div>
       }
@@ -240,17 +240,36 @@
         </div>
 
         <div class="card p-5">
-          <h3 class="text-sm font-semibold mb-4">Your activity</h3>
-          <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <div class="flex items-baseline gap-2 mb-4">
+            <h3 class="text-sm font-semibold">Your activity</h3>
+            <span class="text-xs text-[color:var(--text-muted)] ml-auto">
+              last {{ windowDays() }} days
+            </span>
+          </div>
+
+          <!-- Four figures rather than three, and each one now says what it counts. "Have run"
+               counted every job whose status was set and not Missed, which is neither a period
+               nor an event -- it read as "today" and meant "ever". -->
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <a routerLink="/jobs" class="stat-tile hover:border-brand-500 transition-colors">
-              <div class="stat-label">Jobs assigned</div>
-              <div class="stat-value">{{ myJobs().length }}</div>
-              <div class="stat-foot">to {{ me.username }}</div>
+              <div class="stat-label">Jobs</div>
+              <div class="stat-value">{{ jobsAssigned() }}</div>
+              <div class="stat-foot">{{ activeJobs() }} active</div>
             </a>
             <div class="stat-tile">
-              <div class="stat-label">Have run</div>
-              <div class="stat-value">{{ runsToday() }}</div>
-              <div class="stat-foot">of those jobs</div>
+              <div class="stat-label">Runs</div>
+              <div class="stat-value">{{ recentRuns() }}</div>
+              <div class="stat-foot">in {{ windowDays() }} days</div>
+            </div>
+            <!-- The only tile that ever needs acting on, so it is the only one that changes
+                 colour -- a red zero would cry wolf every time somebody opened their profile. -->
+            <div class="stat-tile" [class.border-crit-500]="recentFailures() > 0">
+              <div class="stat-label">Failed</div>
+              <div class="stat-value"
+                   [style.color]="recentFailures() > 0 ? 'var(--series-crit)' : null">
+                {{ recentFailures() }}
+              </div>
+              <div class="stat-foot">in {{ windowDays() }} days</div>
             </div>
             <a routerLink="/notifications" class="stat-tile hover:border-brand-500 transition-colors">
               <div class="stat-label">Unread</div>
@@ -259,20 +278,59 @@
             </a>
           </div>
 
-          @if (myJobs().length) {
-            <ul class="mt-4 divide-y border-subtle">
-              @for (job of myJobs().slice(0, 5); track job.jobId) {
-                <li class="flex items-center gap-3 py-2">
-                  <app-icon name="briefcase" size="0.95em" class="icon-muted shrink-0" />
-                  <a class="link-inline truncate" [routerLink]="['/jobs', job.jobId, 'history']">
-                    {{ job.jobName }}
-                  </a>
-                  <span class="ml-auto shrink-0"><app-status [label]="job.jobRunningStatus" /></span>
+          <h4 class="text-xs font-semibold uppercase tracking-wider text-[color:var(--text-muted)] mt-5 mb-2">
+            Recent runs
+          </h4>
+
+          @if (activityLoading()) {
+            <p class="text-sm text-[color:var(--text-muted)]">Loading&hellip;</p>
+          } @else if (runs().length) {
+            <ul class="divide-y border-subtle">
+              @for (run of runs(); track run.jobQueueId) {
+                <li class="py-2.5 flex flex-col gap-1">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <app-icon name="briefcase" size="0.95em" class="icon-muted shrink-0" />
+                    <a class="link-inline truncate" [routerLink]="['/jobs', run.jobId, 'history']"
+                       [title]="run.jobName">{{ run.jobName }}</a>
+                    <span class="ml-auto shrink-0"><app-status [label]="run.jobStatus" /></span>
+                  </div>
+                  <!-- The line the old list did not have. A name and a pill say a job exists and
+                       how it ended; when it ran and how long it took is what tells somebody
+                       whether that is normal. -->
+                  <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 pl-6
+                              text-[11px] text-[color:var(--text-muted)]">
+                    @if (run.startTime) {
+                      <span>{{ run.startTime | date: 'd MMM, HH:mm' }}</span>
+                      <span class="text-[color:var(--border-strong)]">&middot;</span>
+                      <span>
+                        {{ runDuration(run) }}{{ stillRunning(run) ? ' so far' : '' }}
+                      </span>
+                    } @else {
+                      <span>Not started yet</span>
+                    }
+                  </div>
+                  @if (run.jobStatusMessage) {
+                    <p class="pl-6 text-[11px] leading-relaxed line-clamp-2"
+                       [style.color]="'var(--series-crit)'" [title]="run.jobStatusMessage">
+                      {{ run.jobStatusMessage }}
+                    </p>
+                  }
                 </li>
               }
             </ul>
+          } @else if (activityFailed()) {
+            <!-- Said before the empty state below it: a failed call and an empty answer both
+                 leave this card with nothing to list, and "no jobs are assigned to you" is a
+                 claim about the account rather than about the request. -->
+            <p class="text-sm text-[color:var(--text-muted)]">
+              Your activity could not be read just now. The rest of this page is unaffected.
+            </p>
+          } @else if (jobsAssigned()) {
+            <p class="text-sm text-[color:var(--text-muted)]">
+              None of your {{ jobsAssigned() }} jobs has run yet.
+            </p>
           } @else {
-            <p class="mt-4 text-sm text-[color:var(--text-muted)]">
+            <p class="text-sm text-[color:var(--text-muted)]">
               No jobs are assigned to you yet.
             </p>
           }

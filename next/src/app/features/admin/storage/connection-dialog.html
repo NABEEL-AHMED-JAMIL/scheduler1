@@ -1,7 +1,7 @@
 <app-form-dialog
     size="wide"
     [heading]="isEdit() ? 'Edit connection' : 'New storage connection'"
-    subtitle="Credentials are encrypted and never sent back to the browser."
+    subtitle="Passwords, secret keys and connection strings are encrypted and never sent back to the browser."
     [confirmLabel]="isEdit() ? 'Save changes' : 'Create'"
     [saving]="saving()"
     (cancelled)="ref.close(false)" (confirmed)="save()">
@@ -33,7 +33,7 @@
     </app-field>
 
     @if (isObjectStore()) {
-      <app-field [label]="isAzure() ? 'Container' : 'Bucket'" for="bucket"
+      <app-field [label]="isAzure() ? 'Container' : 'Bucket'" for="bucket" [required]="true"
                  [control]="form.get('bucketName')" [submitted]="submitted()">
         <div class="flex gap-2">
           @if (discovered().length) {
@@ -69,7 +69,7 @@
     }
 
     @if (provider() === 'MINIO') {
-      <app-field label="Endpoint" for="minioEndpoint" [control]="form.get('endpoint')"
+      <app-field label="Endpoint" for="minioEndpoint" [required]="true" [control]="form.get('endpoint')"
                  [submitted]="submitted()">
         <input id="minioEndpoint" class="input mono" formControlName="endpoint"
                placeholder="http://localhost:9000" />
@@ -77,17 +77,17 @@
     }
 
     @if (isFtp()) {
-        <app-field label="Host" for="host" [control]="form.get('host')" [submitted]="submitted()">
+        <app-field label="Host" for="host" [required]="true" [control]="form.get('host')" [submitted]="submitted()">
           <input id="host" class="input mono" formControlName="host" placeholder="ftp.example.com" />
         </app-field>
         <app-field label="Port" for="port" [control]="form.get('port')" [submitted]="submitted()">
           <input id="port" type="number" class="input" formControlName="port" placeholder="21" />
         </app-field>
-        <app-field label="Username" for="username" [control]="form.get('username')"
+        <app-field label="Username" for="username" [required]="true" [control]="form.get('username')"
                    [submitted]="submitted()">
           <input id="username" class="input" formControlName="username" autocomplete="off" placeholder="user name" />
         </app-field>
-        <app-field label="Password" for="password" [control]="form.get('password')"
+        <app-field label="Password" for="password" [required]="!isEdit()" [control]="form.get('password')"
                    [submitted]="submitted()"
                    [hint]="hasStoredSecret() ? 'Leave blank to keep the stored password.' : ''">
           <input id="password" type="password" class="input" formControlName="password"
@@ -126,17 +126,37 @@
     @if (isAzure()) {
       <app-field class="sm:col-span-2" label="Connection string" for="azure" [control]="form.get('azureConnectionString')"
                  [submitted]="submitted()"
-                 [hint]="hasStoredSecret() ? 'Leave blank to keep the stored string.' : ''">
+                 [errorMessages]="{ azureCredential: 'Give a connection string, or an account name and key below.' }"
+                 [hint]="hasStoredAzureString() ? 'Leave blank to keep the stored string.' : 'Either this, or the account name and key below.'">
         <input id="azure" type="password" class="input" formControlName="azureConnectionString"
                autocomplete="new-password" placeholder="DefaultEndpointsProtocol=…" />
       </app-field>
+
+      <app-field label="Account name" for="azureAccount" [control]="form.get('azureAccountName')"
+                 [submitted]="submitted()" hint="The storage account, when no connection string is used.">
+        <input id="azureAccount" class="input mono" formControlName="azureAccountName" placeholder="etlstore" />
+      </app-field>
+      <app-field label="Account key" for="azureKey" [control]="form.get('secretKey')"
+                 [submitted]="submitted()"
+                 [hint]="hasStoredAzureKey() ? 'Leave blank to keep the stored key.' : 'Pairs with the account name.'">
+        <input id="azureKey" type="password" class="input" formControlName="secretKey"
+               autocomplete="new-password" placeholder="account key" />
+      </app-field>
     }
 
-    <app-field label="Status" for="status" [control]="form.get('status')" [submitted]="submitted()">
+    <app-field label="Status" for="status" [control]="form.get('status')" [submitted]="submitted()"
+               hint="Inactive connections are not resolved by jobs, tasks or Kafka profiles.">
       <select id="status" class="input" formControlName="status">
         <option value="Active">Active</option>
         <option value="Inactive">Inactive</option>
       </select>
     </app-field>
+
+    @if (dependentWarning()) {
+      <p class="field-note text-warn-500 flex items-start gap-1.5 sm:col-span-2">
+        <app-icon name="alert" size="0.9em" class="mt-px shrink-0" />
+        <span>{{ dependentWarning() }}</span>
+      </p>
+    }
   </form>
 </app-form-dialog>

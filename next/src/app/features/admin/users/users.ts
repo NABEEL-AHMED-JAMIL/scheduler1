@@ -6,6 +6,7 @@ import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { AuthService } from '../../../core/auth/auth.service';
+import { ROLE_META, ROLE_RANK, isUserRole } from '../../../core/auth/auth.models';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { copyText } from '../../../shared/ui/clipboard.util';
 import { MineFilter, isMine } from '../../../shared/ui/mine-filter';
@@ -92,7 +93,7 @@ export class Users implements OnInit {
 
   readonly sort = createSort<AppUser>('fullName');
 
-  readonly canPickTenant = computed(() => this.auth.role() === 'PLATFORM_ADMIN');
+  readonly canPickTenant = this.auth.isPlatformAdmin;
   readonly currentUserId = computed(() => this.auth.user()?.appUserId ?? null);
 
   readonly focusedTenantName = computed(() => {
@@ -174,7 +175,7 @@ export class Users implements OnInit {
     return {
       total: list.length,
       active: list.filter(u => u.status === 'Active').length,
-      admins: list.filter(u => u.userRole !== 'TENANT_USER').length,
+      admins: list.filter(u => isUserRole(u.userRole) && ROLE_RANK[u.userRole] > ROLE_RANK.TENANT_USER).length,
       neverSignedIn: list.filter(u => !u.lastLoginAt).length,
     };
   });
@@ -262,10 +263,37 @@ export class Users implements OnInit {
     }).closed.subscribe(saved => { if (saved) this.load(); });
   }
 
+  /**
+   * Whether a row is a platform admin, asked of the row rather than of the signed-in user.
+   *
+   * A method rather than the role literal repeated in the template: this is a fact about somebody
+   * else's account, so it cannot go through AuthService like every other role decision now does,
+   * and a bare string comparison in markup is the shape that gets missed when a role is renamed.
+   */
+  reachesEveryTenant(user: AppUser): boolean {
+    return user.userRole === 'PLATFORM_ADMIN';
+  }
+
   /** Signing yourself out of the application is not a mistake worth allowing by accident. */
   isSelf(user: AppUser): boolean {
     return this.currentUserId() !== null && user.appUserId === this.currentUserId();
   }
+
+  /**
+   * Whether this administrator can act on the row at all.
+   *
+   * The same question the server's scopedFind answers: a platform admin reaches every account, a
+   * tenant admin reaches the tenant users in its workspace, and anybody reaches their own row.
+   * Asked here because listUsers still returns the peer administrators -- so without it the row
+   * offers Edit, Reset password, Deactivate and Delete, and every one of them comes back "user
+   * not found" about a row that is plainly on screen.
+   */
+  canManage(user: AppUser): boolean {
+    return this.auth.isPlatformAdmin() || this.isSelf(user) || user.userRole === 'TENANT_USER';
+  }
+
+  /** Said on the row in place of the controls, so the absence is a rule rather than a gap. */
+  readonly managedByPlatformOnly = 'Only a Platform Admin can manage another Tenant Admin.';
 
   async toggleStatus(user: AppUser): Promise<void> {
     const activating = user.status !== 'Active';
@@ -344,11 +372,7 @@ export class Users implements OnInit {
   }
 
   rolePill(role: string): string {
-    switch (role) {
-      case 'PLATFORM_ADMIN': return 'pill pill-crit';
-      case 'TENANT_ADMIN':   return 'pill pill-brand';
-      default:               return 'pill pill-neutral';
-    }
+    return this.metaFor(role).pill;
   }
 
   clearFilters(): void {
@@ -408,11 +432,13 @@ export class Users implements OnInit {
    * keeps the same anatomy and the eye is not caught by a structural difference instead.
    */
   roleAccent(role: string): string {
-    switch (role) {
-      case 'PLATFORM_ADMIN': return 'var(--color-crit-500)';
-      case 'TENANT_ADMIN':   return 'var(--color-brand-500)';
-      default:               return 'var(--border-subtle)';
-    }
+    return this.metaFor(role).accent;
+  }
+
+  /** A row's role comes off the wire as a string, so an unrecognised one reads as the quietest
+      of the three rather than crashing the cell it is drawn in. */
+  private metaFor(role: string) {
+    return isUserRole(role) ? ROLE_META[role] : ROLE_META.TENANT_USER;
   }
 
   /** Ring around the avatar: the same fact the status pill carries, said in the portrait. */

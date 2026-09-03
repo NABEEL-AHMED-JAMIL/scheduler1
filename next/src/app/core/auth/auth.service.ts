@@ -3,9 +3,32 @@ import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Observable, tap } from 'rxjs';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../api/api.config';
-import { AuthUser, UserRole } from './auth.models';
+import { AuthUser, ROLE_RANK, UserRole, isUserRole } from './auth.models';
 
 const STORAGE_KEY = 'etl_auth_user';
+
+/**
+ * The role the server signed into the access token, or null when there is nothing readable.
+ *
+ * The stored blob carries a userRole field of its own, but it sits in localStorage where
+ * anything on the page can rewrite it -- typing PLATFORM_ADMIN into devtools opened the entire
+ * admin menu, and every call those screens made then came back 403. JwtAuthenticationFilter
+ * takes the role from the token's `userRole` claim and nowhere else, so that claim is the only
+ * copy worth believing. Unreadable means no role at all rather than fall back to the blob:
+ * anyone who can forge the field can also break the token.
+ */
+function roleFromToken(token: string | null | undefined): UserRole | null {
+  const payload = token?.split('.')[1];
+  if (!payload) return null;
+  try {
+    // Base64url: atob wants the standard alphabet, and tolerates the missing padding.
+    const claims = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+    const role = claims?.userRole;
+    return isUserRole(role) ? role : null;
+  } catch {
+    return null;
+  }
+}
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -17,11 +40,62 @@ export class AuthService {
 
   readonly user = this.currentUser.asReadonly();
   readonly isLoggedIn = computed(() => this.currentUser() !== null);
-  readonly role = computed<UserRole | null>(() => this.currentUser()?.userRole ?? null);
+  readonly role = computed<UserRole | null>(() => roleFromToken(this.currentUser()?.accessToken));
 
-  readonly isPlatformAdmin = computed(() => this.role() === 'PLATFORM_ADMIN');
-  readonly isTenantAdmin = computed(() =>
-    this.role() === 'TENANT_ADMIN' || this.role() === 'PLATFORM_ADMIN');
+  /**
+   * The one place the hierarchy is expressed: a platform admin has everything a tenant admin
+   * has, and a tenant admin everything a tenant user has, exactly as the server's RoleHierarchy
+   * says. A screen or a route asks for the minimum it needs and never has to remember to name
+   * the roles above it as well.
+   *
+   * Fails closed: with no readable role there is no minimum a session can meet.
+   */
+  hasAtLeast(minimum: UserRole): boolean {
+    const role = this.role();
+    return role !== null && ROLE_RANK[role] >= ROLE_RANK[minimum];
+  }
+
+  readonly isPlatformAdmin = computed(() => this.hasAtLeast('PLATFORM_ADMIN'));
+  readonly isTenantAdmin = computed(() => this.hasAtLeast('TENANT_ADMIN'));
+
+  /**
+   * Whether the session still owes a password change, which passwordChangeGuard turns into
+   * "the profile screen is the only page this session opens".
+   *
+   * Taken from the stored blob rather than the token, unlike the role. Editing this one in
+   * devtools gains nothing: it only skips a prompt to replace a password its owner already
+   * knows, and the server is what stops honouring the old one, once it is replaced.
+   */
+  readonly mustChangePassword = computed(() => this.currentUser()?.mustChangePassword === true);
+
+  /**
+   * The debt is paid. Called from the interceptor when changeOwnPassword succeeds, rather than
+   * from the screen that made the call: the guard would otherwise hold the session on the
+   * profile page until the next sign-in re-reported a flag the server has already cleared.
+   */
+  passwordChanged(): void {
+    if (this.currentUser()?.mustChangePassword) this.patchUser({ mustChangePassword: false });
+  }
+
+  /*
+   * Named for what the screen is about to do rather than for a role, so a control is gated on
+   * the same fact the endpoint behind it checks. Each one names the API it stands for; when
+   * that annotation moves, this is the single line that follows it.
+   */
+
+  /** sourceTask.json add/update/delete -- SourceTaskRestApi is class-level TENANT_ADMIN. */
+  readonly canManageTasks = computed(() => this.hasAtLeast('TENANT_ADMIN'));
+  /** queryEngine.json connections, queries and schedules add/update/delete. Reads and execute
+      are TENANT_USER, so only the definitions are gated. */
+  readonly canManageQueries = computed(() => this.hasAtLeast('TENANT_ADMIN'));
+  /** aiAgent.json addAgent/updateAgent/deleteAgent. Fetching the agents is TENANT_USER. */
+  readonly canManageAgents = computed(() => this.hasAtLeast('TENANT_ADMIN'));
+  /** dynamicForm.json -- the whole builder, submitting a shared form aside. */
+  readonly canManageForms = computed(() => this.hasAtLeast('TENANT_ADMIN'));
+  /** appUser.json addUser/changeUserStatus/resetPassword. */
+  readonly canManageUsers = computed(() => this.hasAtLeast('TENANT_ADMIN'));
+  /** tenant.json -- a tenant spans the platform, so only a platform admin touches one. */
+  readonly canManageTenants = computed(() => this.hasAtLeast('PLATFORM_ADMIN'));
 
   readonly displayName = computed(() => {
     const user = this.currentUser();
@@ -40,16 +114,30 @@ export class AuthService {
   readonly avatarUrl = this.avatarObjectUrl.asReadonly();
 
   /**
+   * Where the picture lives, and nothing else about the user.
+   *
+   * The sync below watched the whole stored user, so every write to it re-fetched: a token
+   * refresh, a name change, settling the password debt. Each one revoked the blob URL and went
+   * back to the server for a picture that had not moved, and the header emptied and refilled
+   * while it did. Compared by value, so a new user object carrying the same location is not a
+   * change at all.
+   */
+  private readonly avatarSource = computed(
+    () => {
+      const user = this.currentUser();
+      return { bucket: user?.avatarBucket ?? '', key: user?.avatarKey ?? '' };
+    },
+    { equal: (a, b) => a.bucket === b.bucket && a.key === b.key });
+
+  /**
    * An effect rather than a constructor call. Fetching from the constructor sent the request
    * while this service was still being instantiated -- the auth interceptor injects it, so
    * the interceptor was not in place yet and the call went out with no token and came back
-   * 401. An effect defers to after the injector settles, and re-runs whenever the stored
-   * user changes, so signing in or replacing the picture refreshes it without a manual call.
+   * 401. An effect defers to after the injector settles, and re-runs whenever the picture
+   * changes, so signing in or replacing it refreshes without a manual call.
    */
   private readonly avatarSync = effect(() => {
-    const user = this.currentUser();
-    const bucket = user?.avatarBucket;
-    const key = user?.avatarKey;
+    const { bucket, key } = this.avatarSource();
 
     const previous = untracked(() => this.avatarObjectUrl());
     if (previous) URL.revokeObjectURL(previous);

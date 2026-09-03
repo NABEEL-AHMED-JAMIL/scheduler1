@@ -13,6 +13,28 @@ import { StorageService } from '../objects/storage.service';
 import { Donut } from '../../shared/charts/donut';
 import { statusColor } from '../../shared/charts/status-color';
 
+/** One run of one of the caller's jobs, as /sourceJob.json/myActivity reports it. */
+export interface ActivityRun {
+  jobQueueId: number;
+  jobId: number;
+  jobName: string;
+  jobStatus: string;
+  startTime?: string;
+  endTime?: string;
+  /** Only present on a failure -- a completed run has nothing to explain. */
+  jobStatusMessage?: string;
+}
+
+export interface UserActivity {
+  jobsAssigned: number;
+  activeJobs: number;
+  recentRuns: number;
+  recentFailures: number;
+  windowDays: number;
+  runs: ActivityRun[];
+  outcomes: { name: string; value: number }[];
+}
+
 interface UserProfile {
   mustChangePassword?: boolean;
   appUserId: number;
@@ -55,7 +77,16 @@ export class Profile implements OnInit {
   readonly name = signal('');
   readonly savingName = signal(false);
   readonly uploading = signal(false);
-  readonly jobs = signal<any[]>([]);
+  readonly activity = signal<UserActivity | null>(null);
+  readonly activityLoading = signal(true);
+  /**
+   * Whether the activity call came back at all.
+   *
+   * A failed request and a person with no jobs both leave `activity` null, and the card read the
+   * pair as the same thing -- so a 500 on this endpoint told everybody they had no jobs assigned,
+   * which for someone who runs a dozen is a plainly wrong statement rather than an empty card.
+   */
+  readonly activityFailed = signal(false);
   readonly unread = signal(0);
 
   /** Where a new picture goes. Avatars are small and personal, so they sit under one prefix
@@ -130,24 +161,22 @@ export class Profile implements OnInit {
 
   readonly targetBucket = computed(() => this.profile()?.avatarUploadBucket ?? '');
 
-  readonly myJobs = computed(() => {
-    const me = this.profile()?.username;
-    if (!me) return [];
-    return this.jobs().filter(j => j.assignedUsername === me);
-  });
+  /**
+   * How many jobs are in this person's name.
+   *
+   * From the server now. It used to fetch every job in the tenant and keep the ones whose
+   * assignedUsername matched -- so showing somebody their own three jobs cost the whole
+   * workspace's job list, and it matched on a display name rather than on an id.
+   */
+  readonly jobsAssigned = computed(() => this.activity()?.jobsAssigned ?? 0);
+  readonly activeJobs = computed(() => this.activity()?.activeJobs ?? 0);
+  readonly recentRuns = computed(() => this.activity()?.recentRuns ?? 0);
+  readonly recentFailures = computed(() => this.activity()?.recentFailures ?? 0);
+  readonly windowDays = computed(() => this.activity()?.windowDays ?? 7);
+  readonly runs = computed<ActivityRun[]>(() => this.activity()?.runs ?? []);
 
-  /** How the jobs in their name are currently sitting -- the one picture worth having here,
-      since a profile is about the person rather than the platform. */
-  readonly myOutcomes = computed(() => {
-    const counts = new Map<string, number>();
-    for (const job of this.myJobs()) {
-      const status = job.jobRunningStatus || 'Not run';
-      counts.set(status, (counts.get(status) ?? 0) + 1);
-    }
-    return [...counts.entries()]
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value);
-  });
+  /** How the jobs in their name last ran -- counted in the database, not over a full job list. */
+  readonly myOutcomes = computed(() => this.activity()?.outcomes ?? []);
 
   readonly outcomeColor = (name: string) => statusColor(name);
 
@@ -160,14 +189,40 @@ export class Profile implements OnInit {
     return Math.max(0, Math.floor(days));
   });
 
-  readonly runsToday = computed(() =>
-    this.myJobs().filter(j => j.jobRunningStatus && j.jobRunningStatus !== 'Missed').length);
+  /**
+   * How long a run took, or how long it has been going.
+   *
+   * Written out in words rather than as a clock, because these are read at a glance and "1h 4m"
+   * is the answer to "did that take longer than usual", which a reader can only get from
+   * "01:04:12" by doing the subtraction themselves.
+   */
+  runDuration(run: ActivityRun): string {
+    if (!run.startTime) return '';
+    const started = new Date(run.startTime).getTime();
+    const finished = run.endTime ? new Date(run.endTime).getTime() : Date.now();
+    const seconds = Math.max(0, Math.round((finished - started) / 1000));
+    if (seconds < 60) return `${seconds}s`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ${seconds % 60}s`;
+    return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+  }
+
+  /** True while a run has started and not finished, so the duration reads as "so far". */
+  stillRunning(run: ActivityRun): boolean {
+    return !!run.startTime && !run.endTime;
+  }
 
   ngOnInit(): void {
     this.load();
-    this.http.get<ApiResponse<any[]>>(`${API_BASE}/sourceJob.json/listSourceJob`).subscribe({
-      next: r => { if (r.status === API_SUCCESS) this.jobs.set(r.data ?? []); },
-      error: () => { /* activity is supplementary */ },
+    this.http.get<ApiResponse<UserActivity>>(`${API_BASE}/sourceJob.json/myActivity`).subscribe({
+      next: r => {
+        this.activityLoading.set(false);
+        if (r.status === API_SUCCESS) this.activity.set(r.data ?? null);
+        else this.activityFailed.set(true);
+      },
+      // Supplementary: a profile that cannot render because the activity call failed would be a
+      // worse page than one whose activity card says it could not be read.
+      error: () => { this.activityLoading.set(false); this.activityFailed.set(true); },
     });
     this.http.get<ApiResponse<number>>(`${API_BASE}/notification.json/unreadCount`).subscribe({
       next: r => { if (r.status === API_SUCCESS) this.unread.set(Number(r.data ?? 0)); },

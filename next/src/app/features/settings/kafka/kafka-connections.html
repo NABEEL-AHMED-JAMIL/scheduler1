@@ -101,7 +101,7 @@
                     </button>
                     <div class="my-1 border-t border-subtle"></div>
                     @if (p.isDefault) {
-                      <button cdkMenuItem class="menu-item btn-intent-warn" (cdkMenuItemTriggered)="clearDefault(p)">
+                      <button cdkMenuItem class="menu-item btn-intent-warn" (cdkMenuItemTriggered)="clearDefault()">
                         <app-icon name="minus" />Clear default
                       </button>
                     } @else {
@@ -238,7 +238,7 @@
                   </button>
                   <div class="my-1 border-t border-subtle"></div>
                   @if (p.isDefault) {
-                    <button cdkMenuItem class="menu-item btn-intent-warn" (cdkMenuItemTriggered)="clearDefault(p)">
+                    <button cdkMenuItem class="menu-item btn-intent-warn" (cdkMenuItemTriggered)="clearDefault()">
                       <app-icon name="minus" />Clear default
                     </button>
                   } @else {

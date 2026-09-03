@@ -102,7 +102,7 @@
                      colour alone is not a signal everybody receives. -->
                 <span class="rounded-full shrink-0 p-[2px]"
                       [style.box-shadow]="'0 0 0 2px ' + statusRing(user.status)">
-                  <app-avatar [bucket]="user.avatarBucket" [key]="user.avatarKey"
+                  <app-avatar [appUserId]="user.appUserId"
                               [name]="user.fullName || user.username" [size]="2.75" />
                 </span>
                 <div class="min-w-0 flex-1">
@@ -126,7 +126,7 @@
                       <span class="pill pill-neutral" [title]="'Workspace: ' + user.tenantName">
                         <app-icon name="building" size="0.8em" class="opacity-70" />{{ user.tenantName }}
                       </span>
-                    } @else if (user.userRole === 'PLATFORM_ADMIN') {
+                    } @else if (reachesEveryTenant(user)) {
                       <span class="pill pill-neutral" title="Reaches every workspace">
                         <app-icon name="globe" size="0.8em" class="opacity-70" />All tenants
                       </span>
@@ -228,6 +228,12 @@
               <!-- The same four the table row offers, and the same guards. A card view that can
                    only look at people while the table can act on them is a worse version of the
                    same screen; the reason the actions vanished was a rebuild, not a decision. -->
+              @if (!canManage(user)) {
+                <div class="flex items-center gap-1.5 pt-2.5 border-t border-subtle
+                            text-xs text-[color:var(--text-muted)]">
+                  <app-icon name="lock" />{{ managedByPlatformOnly }}
+                </div>
+              } @else {
               <div class="flex flex-wrap items-center gap-1 pt-2.5 border-t border-subtle">
                 <button type="button" class="btn btn-ghost btn-sm" (click)="edit(user)"
                         [disabled]="busy() === user.appUserId">
@@ -252,6 +258,7 @@
                   <app-icon name="trash" [class.icon-crit]="!isSelf(user)" />
                 </button>
               </div>
+              }
             </div>
           </article>
         }
@@ -301,7 +308,7 @@
                  split across three columns they cost a third of the table's width to say it. -->
             <td class="max-w-72">
               <div class="flex items-center gap-2.5 min-w-0">
-                <app-avatar [bucket]="user.avatarBucket" [key]="user.avatarKey"
+                <app-avatar [appUserId]="user.appUserId"
                             [name]="user.fullName || user.username" [size]="2" class="shrink-0" />
                 <div class="min-w-0">
                   <div class="flex items-center gap-1.5">
@@ -339,7 +346,7 @@
                     tenant off
                   </span>
                 }
-              } @else if (user.userRole === 'PLATFORM_ADMIN') {
+              } @else if (reachesEveryTenant(user)) {
                 <span class="text-[color:var(--text-muted)]">All tenants</span>
               } @else { — }
             </td>
@@ -398,6 +405,15 @@
             <td class="text-right"><app-status [label]="user.status" [quiet]="true" /></td>
 
             <td class="text-right">
+              <!-- No menu at all on a row this administrator cannot act on. Every item in it
+                   would come back "user not found" about somebody visibly in the list, so the
+                   lock says the rule once instead of four refusals saying it wrongly. -->
+              @if (!canManage(user)) {
+                <span class="text-[color:var(--text-muted)] inline-flex"
+                      [title]="managedByPlatformOnly" [attr.aria-label]="managedByPlatformOnly">
+                  <app-icon name="lock" size="1.05em" />
+                </span>
+              } @else {
               <button type="button" class="btn btn-ghost btn-icon" [cdkMenuTriggerFor]="menu"
                       [disabled]="busy() === user.appUserId" aria-label="Actions">
                 <app-icon name="dots" size="1.05em" />
@@ -427,6 +443,7 @@
                   </button>
                 </div>
               </ng-template>
+              }
             </td>
           </tr>
         }

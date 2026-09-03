@@ -2,6 +2,7 @@ import { Component, OnInit, computed, effect, inject, signal } from '@angular/co
 import { HttpClient } from '@angular/common/http';
 import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
+import { EMPTY, catchError, from, mergeMap, tap } from 'rxjs';
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
@@ -83,6 +84,15 @@ export interface SourceJob {
 const RECENT_RUN_BARS = 24;
 
 const STALLED_AFTER_MS = 30 * 60 * 1000;
+
+/**
+ * How many of a bulk action's calls may be in flight at once.
+ *
+ * Selecting fifty jobs used to open fifty connections at the same instant; the browser then
+ * serialises them in an order of its own and the whole batch is at the mercy of the slowest.
+ * A handful at a time keeps the queue moving and is still far quicker than one after another.
+ */
+const BULK_CONCURRENCY = 4;
 
 @Component({
   selector: 'app-jobs',
@@ -640,7 +650,7 @@ export class Jobs implements OnInit {
   }
 
   /**
-   * Runs the selection one call at a time and reports once, rather than firing a toast per
+   * Runs the selection a few calls at a time and reports once, rather than firing a toast per
    * job: selecting fifty and getting fifty notifications is how the old screen behaved and it
    * buried any real failure among them.
    */
@@ -692,36 +702,54 @@ export class Jobs implements OnInit {
   private runEach(jobs: SourceJob[], action: JobAction, verb: string): void {
     this.bulkBusy.set(true);
     const failures: string[] = [];
-    let done = 0;
-    const finish = () => {
-      if (++done < jobs.length) return;
-      this.bulkBusy.set(false);
-      this.selected.set(new Set());
-      const ok = jobs.length - failures.length;
-      if (failures.length) {
-        this.toast.error(`${ok} ${verb}, ${failures.length} failed: ${failures.slice(0, 2).join('; ')}`);
-      } else {
-        this.toast.success(`${ok} job${ok > 1 ? 's' : ''} ${verb}.`);
-      }
-      // Only the rows acted on changed, and a delete removes them outright.
-      const touched = new Set(jobs.map(job => job.jobId));
-      if (verb === 'deleted') {
-        this.jobs.update(list => list.filter(job => !touched.has(job.jobId)));
-      } else {
-        this.jobs.update(list => list.map(job =>
-          touched.has(job.jobId) ? { ...job, jobRunningStatus: 'Queue' } : job));
-      }
-    };
-    for (const job of jobs) {
-      const request = jobActionRequest(action, job.jobId);
-      this.http.request<ApiResponse>(request.method, request.url, { body: request.body }).subscribe({
-        next: response => {
-          if (response.status !== API_SUCCESS) failures.push(`#${job.jobId} ${response.message}`);
-          finish();
-        },
-        error: err => { failures.push(`#${job.jobId} ${err?.error?.message || 'request failed'}`); finish(); },
-      });
-    }
+    const succeeded = new Set<number>();
+
+    from(jobs).pipe(
+      mergeMap(job => {
+        const request = jobActionRequest(action, job.jobId);
+        return this.http.request<ApiResponse>(request.method, request.url, { body: request.body })
+          .pipe(
+            tap(response => {
+              if (response.status !== API_SUCCESS) {
+                failures.push(`#${job.jobId} ${response.message}`);
+                return;
+              }
+              succeeded.add(job.jobId);
+              // Marked as its own call returns rather than all of them at the end, and only
+              // while the row still says nothing is happening. A batch of fifty outlives the
+              // first row's real status, so writing Queue over every touched row at the end
+              // put a run the socket had already reported as Running back to Queue. The
+              // pipeline is the authority on a row that has moved.
+              const current = this.jobs().find(row => row.jobId === job.jobId);
+              if (action === 'run' && current && !this.isInFlight(current)) {
+                this.patchJob(job.jobId, { jobRunningStatus: 'Queue' });
+              }
+            }),
+            // Swallowed on purpose: one job's failure is recorded and reported with the rest
+            // at the end, and must not tear down the calls still queued behind it.
+            catchError(err => {
+              failures.push(`#${job.jobId} ${err?.error?.message || 'request failed'}`);
+              return EMPTY;
+            }),
+          );
+      }, BULK_CONCURRENCY),
+    ).subscribe({
+      complete: () => {
+        this.bulkBusy.set(false);
+        this.selected.set(new Set());
+        const ok = jobs.length - failures.length;
+        if (failures.length) {
+          this.toast.error(`${ok} ${verb}, ${failures.length} failed: ${failures.slice(0, 2).join('; ')}`);
+        } else {
+          this.toast.success(`${ok} job${ok > 1 ? 's' : ''} ${verb}.`);
+        }
+        // A delete removes its rows outright, and only the ones the server actually deleted:
+        // a row whose call failed is still there and hiding it would say otherwise.
+        if (verb === 'deleted') {
+          this.jobs.update(list => list.filter(job => !succeeded.has(job.jobId)));
+        }
+      },
+    });
   }
 
   /** The legacy job row linked out to its task, its topic and its bucket; those three were

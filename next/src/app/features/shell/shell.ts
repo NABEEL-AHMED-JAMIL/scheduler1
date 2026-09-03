@@ -52,6 +52,10 @@ export class Shell {
       children: [
         { label: 'Source Jobs', path: '/jobs', icon: 'briefcase',
           hint: 'Scheduled work and its runs' },
+        // Deliberately not adminOnly: listSourceTask is TENANT_USER, and a job points at a
+        // task, so reading the list is part of reading the console. Only writing one is
+        // TENANT_ADMIN, and those controls are gated inside the page on auth.canManageTasks --
+        // the same computed this menu's adminOnly entries resolve through.
         { label: 'Source Tasks', path: '/tasks', icon: 'list',
           hint: 'What a job does, and where' },
         { label: 'Queue', path: '/queue', icon: 'clock',
@@ -85,6 +89,10 @@ export class Shell {
     {
       label: 'AI',
       children: [
+        // Open for the same reason as Source Tasks: fetchAllAgents is TENANT_USER and the
+        // object browser's file chat depends on it, so the list is readable by everyone and
+        // only New agent, Edit and Delete are gated (auth.canManageAgents). Models below is a
+        // genuine admin screen -- every call it makes is TENANT_ADMIN -- and keeps its flag.
         { label: 'AI Agents', path: '/ai/agents', icon: 'sparkle',
           hint: 'Provider, model and instructions' },
         { label: 'Models', path: '/ai/models', icon: 'server', adminOnly: true,

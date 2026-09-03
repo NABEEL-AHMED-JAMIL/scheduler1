@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Router, RouterLink } from '@angular/router';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { Icon } from '../../shared/ui/icon';
+import { notificationTarget } from '../notifications/notification-links';
 
 interface Note {
   notificationId: number;
@@ -13,14 +14,6 @@ interface Note {
   dateCreated: string;
   linkUrl?: string;
 }
-
-const ROUTE_MAP: Record<string, string> = {
-  '/jobList': '/jobs',
-  '/taskList': '/tasks',
-  '/objectBrowser': '/objects',
-  '/users': '/admin/users',
-  '/tenants': '/admin/tenants',
-};
 
 /**
  * The bell the old app had in its header.
@@ -149,8 +142,7 @@ export class NotificationBell implements OnInit, OnDestroy {
           error: () => {},
         });
     }
-    const raw = (note.linkUrl ?? '').split('?')[0];
-    const target = ROUTE_MAP[raw] ?? (raw.startsWith('/') ? raw : null);
+    const target = notificationTarget(note.linkUrl);
     if (target) this.router.navigateByUrl(target);
   }
 

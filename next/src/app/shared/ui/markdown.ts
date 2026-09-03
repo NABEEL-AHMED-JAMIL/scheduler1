@@ -1,7 +1,8 @@
-import { Component, computed, input, signal } from '@angular/core';
+import { Component, computed, inject, input, signal } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { Icon } from './icon';
 import { copyText } from './clipboard.util';
+import { ToastService } from './toast.service';
 
 export type Inline = { text: string; code?: boolean; bold?: boolean; italic?: boolean; href?: string };
 export type Block =
@@ -86,13 +87,26 @@ export type Block =
   `,
 })
 export class Markdown {
+  private readonly toast = inject(ToastService);
+
   readonly source = input.required<string>();
   readonly copiedIndex = signal<number | null>(null);
 
   copyBlock(index: number, code: string): void {
-    copyText(code).then(() => {
+    copyText(code).then(copied => {
+      // copyText reports whether the clipboard actually took it -- it refuses in an unfocused
+      // document, over plain http, and without the permission. The tick used to appear either
+      // way, which told the reader their snippet was copied when nothing was.
+      if (!copied) {
+        this.toast.error('Could not copy that.');
+        return;
+      }
       this.copiedIndex.set(index);
-      setTimeout(() => this.copiedIndex.set(null), 1500);
+      // Only clear if nothing else was copied since, or copying a second block inside the
+      // window would have the first block's timer wipe the tick off the second.
+      setTimeout(() => {
+        if (this.copiedIndex() === index) this.copiedIndex.set(null);
+      }, 1500);
     });
   }
 

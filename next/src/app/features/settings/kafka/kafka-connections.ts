@@ -39,6 +39,10 @@ export interface KafkaProfile {
   sslTruststoreBucket?: string;
   sslTruststoreLocation?: string;
   sslTruststorePasswordConfigured?: boolean;
+
+  /** "https" verifies the broker's hostname, "" switches the check off. Declared because the
+      dialog has to send back what it was given: the server writes this field on every save. */
+  sslEndpointIdentificationAlgorithm?: string;
   additionalProperties?: string;
   isDefault?: boolean;
   status: string;
@@ -171,9 +175,16 @@ export class KafkaConnections implements OnInit {
     });
   }
 
-  clearDefault(profile: KafkaProfile): void {
-    this.http.post<ApiResponse>(`${API_BASE}/kafkaConnectionProfile.json/clearDefault`,
-      { kafkaConnectionProfileId: profile.kafkaConnectionProfileId }).subscribe({
+  /**
+   * Takes the default off whichever profile currently holds it.
+   *
+   * The endpoint takes nothing at all -- a tenant has one default, so there is no id to name. It
+   * was being sent one anyway, which Spring dropped on the floor and which read as though the
+   * clear were scoped to this row.
+   */
+  clearDefault(): void {
+    this.http.post<ApiResponse>(`${API_BASE}/kafkaConnectionProfile.json/clearDefault`, null)
+      .subscribe({
       next: response => {
         if (response.status === API_SUCCESS) { this.toast.success(response.message); this.load(); }
         else this.toast.error(response.message);

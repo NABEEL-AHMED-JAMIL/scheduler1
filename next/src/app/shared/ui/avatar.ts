@@ -5,10 +5,15 @@ import { API_BASE } from '../../core/api/api.config';
 /**
  * Someone's picture, or their initials when there is none.
  *
- * The picture lives behind storage.json/previewObject, which needs the bearer token -- a
- * plain <img src> is an unauthenticated request the browser then blocks outright. So it is
- * fetched through HttpClient, where the interceptor attaches the token, and bound as a blob
- * URL. Each instance revokes its own URL, otherwise a list of users leaks one per row.
+ * Two ways in. Given an `appUserId` it asks appUser.json/avatar, which resolves the key from that
+ * person's row on the server; given a bucket and key it reads the object directly. The first is
+ * for other people, because platform buckets are no longer readable by whoever can guess a key --
+ * the ids in those keys run in sequence -- and the second is for your own picture, which the
+ * storage guard still lets you read.
+ *
+ * Either way it goes through HttpClient rather than a plain <img src>: the request needs the
+ * bearer token the interceptor attaches, and an unauthenticated one is blocked outright. The blob
+ * URL is revoked per instance, otherwise a list of users leaks one per row.
  */
 @Component({
   selector: 'app-avatar',
@@ -22,6 +27,8 @@ import { API_BASE } from '../../core/api/api.config';
   `,
 })
 export class Avatar {
+  /** Preferred for anyone but the signed-in user: the server decides which key to read. */
+  readonly appUserId = input<number | null | undefined>(null);
   readonly bucket = input<string | null | undefined>(null);
   readonly key = input<string | null | undefined>(null);
   readonly name = input('');
@@ -48,17 +55,22 @@ export class Avatar {
     });
 
     effect(() => {
+      const appUserId = this.appUserId();
       const bucket = this.bucket();
       const key = this.key();
 
       const previous = untracked(() => this.objectUrl());
       if (previous) URL.revokeObjectURL(previous);
       this.objectUrl.set('');
-      if (!bucket || !key) return;
+      if (!appUserId && (!bucket || !key)) return;
 
-      this.http.get(`${API_BASE}/storage.json/previewObject`, {
-        params: { bucket, key }, responseType: 'blob',
-      }).subscribe({
+      const request = appUserId
+        ? this.http.get(`${API_BASE}/appUser.json/avatar`,
+            { params: { appUserId }, responseType: 'blob' })
+        : this.http.get(`${API_BASE}/storage.json/previewObject`,
+            { params: { bucket: bucket!, key: key! }, responseType: 'blob' });
+
+      request.subscribe({
         next: blob => this.objectUrl.set(URL.createObjectURL(blob)),
         // A missing or unreadable picture falls back to initials rather than a broken image.
         error: () => this.objectUrl.set(''),

@@ -1,11 +1,21 @@
 import { Routes } from '@angular/router';
-import { anonymousOnly, authGuard, roleGuard } from './core/auth/auth.guard';
+import { anonymousOnly, authGuard, passwordChangeGuard, roleGuard } from './core/auth/auth.guard';
 import { Shell } from './features/shell/shell';
 
 export const routes: Routes = [
   {
+    // Signed out only. A stale bookmark or a restored tab otherwise put someone who is already
+    // signed in in front of a bare sign-in form outside the shell, which reads as having been
+    // logged out -- and signing in again from there wrote a second session over the first with
+    // no logout in between. The redirect below catches them instead.
     path: 'login',
+    canMatch: [anonymousOnly],
     loadComponent: () => import('./features/login/login').then(m => m.Login),
+  },
+  {
+    // Only reached when the guard above says no, i.e. there is already a session.
+    path: 'login',
+    redirectTo: '/dashboard',
   },
   {
     // The public front door. pathMatch 'full' matters: an empty path would otherwise match
@@ -37,6 +47,9 @@ export const routes: Routes = [
     path: '',
     component: Shell,
     canActivate: [authGuard],
+    // On the shell rather than on each child: the password gate has to see every move
+    // between the children, and only the profile screen is exempt.
+    canActivateChild: [passwordChangeGuard],
     children: [
       {
         // The dashboard has its own address rather than living at the root, so it can be linked
@@ -88,14 +101,23 @@ export const routes: Routes = [
           import('./features/jobs/history/job-history').then(m => m.JobHistory),
       },
       {
+        // The editor is nothing but writes, and addSourceTask/updateSourceTask are TENANT_ADMIN.
+        // Ungated, a tenant user could fill in a task name, type, pipeline and the whole XML
+        // payload and only be told no when they pressed Save, with the work lost.
         path: 'tasks/new',
         loadComponent: () => import('./features/tasks/edit/task-edit').then(m => m.TaskEdit),
+        data: { minRole: 'TENANT_ADMIN' },
+        canActivate: [roleGuard],
       },
       {
         path: 'tasks/:taskDetailId/edit',
         loadComponent: () => import('./features/tasks/edit/task-edit').then(m => m.TaskEdit),
+        data: { minRole: 'TENANT_ADMIN' },
+        canActivate: [roleGuard],
       },
       {
+        // The list itself stays open: listSourceTask is TENANT_USER on purpose, and a job
+        // points at a task, so seeing them is part of reading the console.
         path: 'tasks',
         loadComponent: () => import('./features/tasks/tasks').then(m => m.Tasks),
       },
@@ -103,23 +125,26 @@ export const routes: Routes = [
         path: 'admin/storage',
         loadComponent: () =>
           import('./features/admin/storage/storage-connections').then(m => m.StorageConnections),
-        data: { roles: ['PLATFORM_ADMIN', 'TENANT_ADMIN'] },
+        data: { minRole: 'TENANT_ADMIN' },
         canActivate: [roleGuard],
       },
       {
+        // Deliberately open, unlike its Models sibling: fetchAllAgents is TENANT_USER and the
+        // objects screen depends on it. Only add/update/delete need TENANT_ADMIN, so the gate
+        // belongs on those controls (auth.canManageAgents) rather than on the page.
         path: 'ai/agents',
         loadComponent: () => import('./features/ai/agents/agents').then(m => m.Agents),
       },
       {
         path: 'admin/users',
         loadComponent: () => import('./features/admin/users/users').then(m => m.Users),
-        data: { roles: ['PLATFORM_ADMIN', 'TENANT_ADMIN'] },
+        data: { minRole: 'TENANT_ADMIN' },
         canActivate: [roleGuard],
       },
       {
         path: 'admin/tenants',
         loadComponent: () => import('./features/admin/tenants/tenants').then(m => m.Tenants),
-        data: { roles: ['PLATFORM_ADMIN'] },
+        data: { minRole: 'PLATFORM_ADMIN' },
         canActivate: [roleGuard],
       },
       {
@@ -134,7 +159,7 @@ export const routes: Routes = [
       {
         path: 'ai/models',
         loadComponent: () => import('./features/ai/models/models').then(m => m.Models),
-        data: { roles: ['PLATFORM_ADMIN', 'TENANT_ADMIN'] },
+        data: { minRole: 'TENANT_ADMIN' },
         canActivate: [roleGuard],
       },
       {
@@ -153,28 +178,28 @@ export const routes: Routes = [
         path: 'settings/task-types',
         loadComponent: () =>
           import('./features/settings/task-types/task-types').then(m => m.TaskTypes),
-        data: { roles: ['PLATFORM_ADMIN', 'TENANT_ADMIN'] },
+        data: { minRole: 'TENANT_ADMIN' },
         canActivate: [roleGuard],
       },
       {
         path: 'settings/forms',
         loadComponent: () =>
           import('./features/settings/forms/task-forms').then(m => m.TaskForms),
-        data: { roles: ['PLATFORM_ADMIN', 'TENANT_ADMIN'] },
+        data: { minRole: 'TENANT_ADMIN' },
         canActivate: [roleGuard],
       },
       {
         path: 'settings/dynamic-forms',
         loadComponent: () =>
           import('./features/forms/dynamic-forms').then(m => m.DynamicForms),
-        data: { roles: ['PLATFORM_ADMIN', 'TENANT_ADMIN'] },
+        data: { minRole: 'TENANT_ADMIN' },
         canActivate: [roleGuard],
       },
       {
         path: 'admin/tenant-requests',
         loadComponent: () =>
           import('./features/tenant-request/tenant-requests').then(m => m.TenantRequests),
-        data: { roles: ['PLATFORM_ADMIN'] },
+        data: { minRole: 'PLATFORM_ADMIN' },
         canActivate: [roleGuard],
       },
       {
@@ -188,9 +213,13 @@ export const routes: Routes = [
         data: { kind: 'job' },
       },
       {
+        // Unlike its jobs twin, every call this page makes -- template, export and upload --
+        // sits under SourceTaskRestApi's class-level TENANT_ADMIN, so there is no state in
+        // which it does anything for a tenant user.
         path: 'tasks/bulk',
         loadComponent: () => import('./features/bulk/bulk-transfer').then(m => m.BulkTransfer),
-        data: { kind: 'task' },
+        data: { kind: 'task', minRole: 'TENANT_ADMIN' },
+        canActivate: [roleGuard],
       },
       {
         path: 'reports',
@@ -198,6 +227,9 @@ export const routes: Routes = [
           import('./features/reports/reports').then(m => m.Reports),
       },
       {
+        // Open on purpose: reading connections, queries, schedules and history, and running a
+        // saved query, are all TENANT_USER. Only the definitions are TENANT_ADMIN, so those
+        // controls are gated in the template (auth.canManageQueries), not the route.
         path: 'tools/query',
         loadComponent: () =>
           import('./features/tools/query-engine/query-engine').then(m => m.QueryEngine),
@@ -206,39 +238,47 @@ export const routes: Routes = [
         path: 'admin/settings',
         loadComponent: () =>
           import('./features/settings/hub/settings-hub').then(m => m.SettingsHub),
-        data: { roles: ['PLATFORM_ADMIN', 'TENANT_ADMIN'] },
+        data: { minRole: 'TENANT_ADMIN' },
         canActivate: [roleGuard],
       },
       {
         path: 'settings/kafka',
         loadComponent: () =>
           import('./features/settings/kafka/kafka-connections').then(m => m.KafkaConnections),
-        data: { roles: ['PLATFORM_ADMIN', 'TENANT_ADMIN'] },
+        data: { minRole: 'TENANT_ADMIN' },
         canActivate: [roleGuard],
       },
       {
         path: 'settings/lookup',
         loadComponent: () => import('./features/settings/lookup/lookup').then(m => m.Lookup),
-        data: { roles: ['PLATFORM_ADMIN', 'TENANT_ADMIN'] },
+        data: { minRole: 'TENANT_ADMIN' },
         canActivate: [roleGuard],
       },
       {
         path: 'tools/search',
         loadComponent: () =>
           import('./features/tools/search-engine/search-engine').then(m => m.SearchEngine),
-        data: { roles: ['PLATFORM_ADMIN'] },
+        data: { minRole: 'PLATFORM_ADMIN' },
         canActivate: [roleGuard],
       },
       {
         path: 'settings/xml',
         loadComponent: () =>
           import('./features/settings/xml-builder/xml-builder').then(m => m.XmlBuilder),
-        data: { roles: ['PLATFORM_ADMIN', 'TENANT_ADMIN'] },
+        data: { minRole: 'TENANT_ADMIN' },
         canActivate: [roleGuard],
       },
       {
+        // TENANT_USER rather than nothing at all: StorageBrowserRestApi's floor is a signed-in
+        // user, and which bucket and key that user may actually reach is decided per request,
+        // so no role the route could name would say more than the server already does. What it
+        // does add is the case authGuard cannot see -- a session whose token carries no
+        // readable role lands on /unauthorized rather than on a page that is nothing but
+        // storage calls, every one of which comes back refused.
         path: 'objects',
         loadComponent: () => import('./features/objects/objects').then(m => m.Objects),
+        data: { minRole: 'TENANT_USER' },
+        canActivate: [roleGuard],
       },
     ],
   },

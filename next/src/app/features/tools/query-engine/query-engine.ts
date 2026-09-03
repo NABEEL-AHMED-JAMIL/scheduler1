@@ -4,6 +4,7 @@ import { DatePipe } from '@angular/common';
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
+import { AuthService } from '../../../core/auth/auth.service';
 import { TableShell } from '../../../shared/ui/data-table';
 import { StatTile } from '../../../shared/ui/stat-tile';
 import { StatusPill } from '../../../shared/ui/status-pill';
@@ -26,6 +27,14 @@ export class QueryEngine implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
+
+  /**
+   * Public because the template gates on it. Reading connections, queries, schedules and runs
+   * is TENANT_USER, and so is executing a saved query -- that half of the page is the same for
+   * everyone. Only the definitions are TENANT_ADMIN, which is why the route stays open and the
+   * gate sits on the controls that write.
+   */
+  readonly auth = inject(AuthService);
 
   readonly tab = signal<Tab>('queries');
   readonly connections = signal<DbConnection[]>([]);

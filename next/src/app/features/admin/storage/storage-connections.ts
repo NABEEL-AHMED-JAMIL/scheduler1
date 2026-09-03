@@ -16,6 +16,7 @@ import { ConnectionDialog } from './connection-dialog';
 import { CloneDialog } from './clone-dialog';
 import { Icon } from '../../../shared/ui/icon';
 import { ViewToggle } from '../../../shared/ui/view-toggle';
+import { kafkaDependencyNote, kafkaProfilesUsing } from './kafka-dependents';
 
 interface StorageConnection {
   /** The author's id, so "Only mine" matches on identity rather than display text. */
@@ -91,12 +92,30 @@ export class StorageConnections implements OnInit {
     });
   });
 
+  /** True while anything narrows the table, which is when the tiles need saying out loud. */
+  readonly isFiltered = computed(() =>
+    !!this.search().trim() || !!this.providerFilter() || this.onlyMine());
+
+  /**
+   * Counts the estate, not the filtered view -- the same choice Users and Tenants make, and the
+   * one that is useful here: a failing connection matters whether or not it survives the search
+   * box. Because the table header underneath counts the filtered view instead, the row says so
+   * in a line beneath it while a filter is on.
+   *
+   * The tiles lead with `active` rather than `total`: the total is already on the card header
+   * below and is the sum of the three test states, so it is the one figure on the row that says
+   * nothing new, while an Inactive connection is resolved by no job, task or Kafka profile and
+   * is reported nowhere else. It stays on the lead tile's foot as the denominator.
+   */
   readonly summary = computed(() => {
     const list = this.connections();
+    const withStatus = (value: string) => list.filter(c => c.connectionStatus === value).length;
     return {
       total: list.length,
       active: list.filter(c => c.status === 'Active').length,
-      ok: list.filter(c => c.connectionStatus === 'SUCCESS').length,
+      ok: withStatus('SUCCESS'),
+      failing: withStatus('FAILED'),
+      untested: list.filter(c => c.connectionStatus !== 'SUCCESS' && c.connectionStatus !== 'FAILED').length,
     };
   });
 
@@ -109,8 +128,13 @@ export class StorageConnections implements OnInit {
       .subscribe({
         next: response => {
           this.loading.set(false);
-          if (response.status === API_SUCCESS) this.connections.set(response.data ?? []);
-          else this.error.set(response.message);
+          if (response.status === API_SUCCESS) {
+            const rows = response.data ?? [];
+            this.connections.set(rows);
+            this.pruneSelection(rows);
+          } else {
+            this.error.set(response.message);
+          }
         },
         error: err => {
           this.loading.set(false);
@@ -149,9 +173,13 @@ export class StorageConnections implements OnInit {
   }
 
   async remove(connection: StorageConnection): Promise<void> {
+    // Kafka profiles bind to the alias and nothing warns about it anywhere else, so they are
+    // named here, while the delete can still be called off.
+    const kafka = kafkaDependencyNote(await kafkaProfilesUsing(this.http, connection.alias));
     const ok = await confirmWith(this.dialog, {
       title: 'Delete connection',
-      body: `"${connection.connectionName}" will be removed. Jobs and tasks pointing at "${connection.alias}" will stop resolving.`,
+      body: `"${connection.connectionName}" will be removed. Jobs and tasks pointing at "${connection.alias}" will stop resolving.`
+        + (kafka ? ` ${kafka}` : ''),
       confirmLabel: 'Delete',
       danger: true,
     });
@@ -242,6 +270,19 @@ export class StorageConnections implements OnInit {
     this.selected.set(new Set());
   }
 
+  /**
+   * Drops ticks for rows that are no longer there. A deleted row left its id in the set, so the
+   * bulk bar went on counting a connection that could not be tested -- and with every ticked row
+   * deleted the bar stayed open over an empty selection.
+   */
+  private pruneSelection(rows: StorageConnection[]): void {
+    const current = this.selected();
+    if (!current.size) return;
+    const present = new Set(rows.map(c => c.storageConnectionId));
+    const kept = [...current].filter(id => present.has(id));
+    if (kept.length !== current.size) this.selected.set(new Set(kept));
+  }
+
   toggleSelected(id: number): void {
     const next = new Set(this.selected());
     if (!next.delete(id)) {
@@ -274,11 +315,15 @@ export class StorageConnections implements OnInit {
    * Sequential rather than parallel: each test opens a real connection to a storage server, and
    * firing twenty at once is a burst of load on something that may be shared. The count moves as
    * it goes so a long run does not look stuck.
+   *
+   * Everything ticked is tested, not only what the filter leaves on screen. Intersecting the two
+   * meant that typing in the search box after ticking five rows silently tested two of them,
+   * cleared all five ticks and reported "All 2 reached their bucket" -- with the bar above still
+   * saying five were selected. A tick is a choice about a connection; a filter is a choice about
+   * the view. Ids that no longer exist are already dropped by pruneSelection on every load.
    */
   async testSelected(): Promise<void> {
-    const ids = this.filtered()
-      .filter(c => this.selected().has(c.storageConnectionId))
-      .map(c => c.storageConnectionId);
+    const ids = [...this.selected()];
     if (!ids.length) {
       this.toast.error('Tick the connections you want to test.');
       return;

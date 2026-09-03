@@ -8,7 +8,9 @@ import { TableShell } from '../../shared/ui/data-table';
 import { StatTile } from '../../shared/ui/stat-tile';
 import { StatusPill } from '../../shared/ui/status-pill';
 import { Icon } from '../../shared/ui/icon';
+import { ViewToggle } from '../../shared/ui/view-toggle';
 import { ToastService } from '../../shared/ui/toast.service';
+import { copyText } from '../../shared/ui/clipboard.util';
 import { confirmWith } from '../../shared/ui/confirm';
 import { createSort } from '../../shared/ui/sort';
 import { Pagination } from '../../shared/ui/pagination';
@@ -38,240 +40,8 @@ interface TenantRequest {
  */
 @Component({
   selector: 'app-tenant-requests',
-  imports: [TableShell, StatTile, StatusPill, Icon, DatePipe, Pagination],
-  template: `
-    <div class="page">
-      <div class="page-head">
-        <div>
-          <h1 class="page-title">Workspace Requests</h1>
-          <p class="page-subtitle">
-            Asks from outside for a workspace. Approving one creates the tenant, its first
-            administrator, and emails them how to sign in.
-          </p>
-        </div>
-        <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
-          <app-icon name="refresh" [class.spin]="loading()" />Refresh
-        </button>
-      </div>
-
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-        @for (tile of [
-          { label: 'Waiting',  value: summary().pending,  foot: 'need a decision', icon: 'inbox', tone: 'warn' },
-          { label: 'Approved', value: summary().approved, foot: 'became tenants', icon: 'checkCircle', tone: 'ok' },
-          { label: 'Rejected', value: summary().rejected, foot: 'declined', icon: 'xCircle', tone: 'info' },
-          { label: 'Total',    value: summary().total,    foot: 'all time', icon: 'users', tone: 'info' }
-        ]; track tile.label) {
-          <app-stat-tile [label]="tile.label" [value]="tile.value" [icon]="tile.icon"
-                         [tone]="$any(tile.tone)" [foot]="tile.foot" />
-        }
-      </div>
-
-      <!-- shown against total, so "0 of 12" reads as a filter that matched nothing rather
-           than an empty list. -->
-      <app-table-shell heading="Requests" [loading]="loading()" [error]="error()"
-                       [isEmpty]="!filtered().length" [shown]="filtered().length"
-                       [total]="requests().length"
-                       [emptyMessage]="hasFilters()
-                         ? 'No request matches those filters.'
-                         : 'No requests yet. The form at /request-workspace feeds this list.'"
-                       emptyIcon="inbox" (retry)="load()">
-        <!-- shrink-0: the row gives the heading mr-auto and lets everything else shrink, so
-               this collapsed to 340px against the 357px its two controls need and wrapped
-               the select onto a second line. There is ample room -- it just was not
-               claiming it. -->
-          <!-- flex-nowrap, not flex-wrap: the row allots this 340px and the two controls
-               want 357px, so wrapping dropped the status select onto its own line under
-               the search box. Held on one line the search field gives up the difference
-               instead -- a select that has fallen a line reads as broken, a slightly
-               narrower search box does not. min-w-0 is what lets it yield. -->
-          <div toolbar class="flex flex-nowrap items-center gap-2 shrink-0">
-          <div class="search-field max-w-64 min-w-0">
-            <app-icon name="search" size="0.95em" />
-            <input class="input min-w-0" placeholder="Search requests"
-                   [value]="search()"
-                   (input)="search.set($any($event.target).value); pager.reset()" />
-          </div>
-          <select class="input max-w-36 shrink-0" [value]="statusFilter()"
-                  (change)="statusFilter.set($any($event.target).value); pager.reset()">
-            <option value="">All statuses</option>
-            <option value="Pending">Waiting</option>
-            <option value="Approved">Approved</option>
-            <option value="Rejected">Rejected</option>
-          </select>
-          @if (hasFilters()) {
-            <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()">
-              <app-icon name="close" />Clear
-            </button>
-          }
-        </div>
-        <table class="table-modern">
-          <thead>
-            <tr>
-              <th class="w-8"></th>
-              <!-- Only the columns worth ordering by. "Asked for" is free prose, and
-                   sorting it alphabetically would order requests by whichever word
-                   they happen to open with. -->
-              <th>
-                <button type="button" class="th-sort"
-                        [class.th-sort-active]="sort.key() === 'organisationName'"
-                        (click)="sort.toggle('organisationName')">
-                  Organisation
-                  <app-icon [name]="sort.iconFor('organisationName')" size="0.875rem"
-                            [class]="sort.key() === 'organisationName' ? 'icon-info' : 'icon-muted'" />
-                </button>
-              </th>
-              <th>
-                <button type="button" class="th-sort"
-                        [class.th-sort-active]="sort.key() === 'contactName'"
-                        (click)="sort.toggle('contactName')">
-                  Contact
-                  <app-icon [name]="sort.iconFor('contactName')" size="0.875rem"
-                            [class]="sort.key() === 'contactName' ? 'icon-info' : 'icon-muted'" />
-                </button>
-              </th>
-              <th>Asked for</th>
-              <th>
-                <button type="button" class="th-sort"
-                        [class.th-sort-active]="sort.key() === 'dateCreated'"
-                        (click)="sort.toggle('dateCreated')">
-                  Received
-                  <app-icon [name]="sort.iconFor('dateCreated')" size="0.875rem"
-                            [class]="sort.key() === 'dateCreated' ? 'icon-info' : 'icon-muted'" />
-                </button>
-              </th>
-              <th>
-                <button type="button" class="th-sort"
-                        [class.th-sort-active]="sort.key() === 'status'"
-                        (click)="sort.toggle('status')">
-                  Status
-                  <app-icon [name]="sort.iconFor('status')" size="0.875rem"
-                            [class]="sort.key() === 'status' ? 'icon-info' : 'icon-muted'" />
-                </button>
-              </th>
-              <th class="w-12 col-pin-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (r of paged(); track r.tenantRequestId) {
-              <tr [class.row-open]="isOpen(r.tenantRequestId)">
-                <td>
-                  <button type="button" class="btn btn-ghost btn-icon btn-sm"
-                          [attr.aria-expanded]="isOpen(r.tenantRequestId)"
-                          [attr.aria-label]="(isOpen(r.tenantRequestId) ? 'Hide' : 'Show')
-                                             + ' the full request from ' + r.organisationName"
-                          (click)="toggle(r.tenantRequestId)">
-                    <app-icon [name]="isOpen(r.tenantRequestId) ? 'chevronDown' : 'chevronRight'" />
-                  </button>
-                </td>
-                <td class="font-medium">{{ r.organisationName }}</td>
-                  <!-- Capped and truncated: an address like
-                       i.halvorsen@blackthorn-rail.example widened this column to 270px on
-                       its own, which is most of why the table outgrew its scroll box and
-                       pushed Approve past the edge. Full value is on the title and in the
-                       panel below. -->
-                  <td class="max-w-48">
-                  <div class="text-sm truncate" [title]="r.contactName">{{ r.contactName }}</div>
-                  <div class="mono text-xs text-[color:var(--text-muted)] truncate" [title]="r.contactEmail">{{ r.contactEmail }}</div>
-                </td>
-                <td class="text-sm max-w-64">
-                  @if (r.purpose) {
-                    <button type="button"
-                            class="text-left w-full cursor-pointer bg-transparent border-0 p-0
-                                   text-inherit hover:text-accent transition-colors"
-                            [attr.aria-expanded]="isOpen(r.tenantRequestId)"
-                            (click)="toggle(r.tenantRequestId)">
-                      <!-- Stays clamped when open: the panel below carries the full text at a
-                           readable measure, and these opening words are what tie the two
-                           together. Unclamping here as well printed the paragraph twice. -->
-                      <span class="line-clamp-2">{{ r.purpose }}</span>
-                    </button>
-                  } @else {
-                    <span class="text-[color:var(--text-muted)]">Nothing was written here</span>
-                  }
-                </td>
-                <td class="text-xs text-[color:var(--text-secondary)] whitespace-nowrap">
-                  {{ r.dateCreated ? (r.dateCreated | date:'d MMM y') : '—' }}
-                </td>
-                <td>
-                  <!-- A full chip, not the quiet dot: this column is the whole point of the
-                       screen, and Pending in particular is the state somebody is scanning for. -->
-                  <app-status [label]="statusLabel(r.status)" />
-                  @if (r.status === 'Rejected' && r.decisionNote && !isOpen(r.tenantRequestId)) {
-                    <div class="text-xs text-[color:var(--text-muted)] mt-0.5 line-clamp-1">
-                      {{ r.decisionNote }}
-                    </div>
-                  }
-                </td>
-                <td class="col-pin-right">
-                  @if (r.status === 'Pending') {
-                    <div class="flex items-center gap-1">
-                      <button type="button" class="btn btn-primary btn-sm"
-                              [disabled]="busy() === r.tenantRequestId" (click)="approve(r)">
-                        Approve
-                      </button>
-                      <button type="button" class="btn btn-ghost btn-sm"
-                              [disabled]="busy() === r.tenantRequestId" (click)="reject(r)">
-                        Reject
-                      </button>
-                    </div>
-                  } @else {
-                    <span class="text-xs text-[color:var(--text-muted)] whitespace-nowrap">
-                      {{ r.decidedAt ? (r.decidedAt | date:'d MMM') : '' }}
-                    </span>
-                  }
-                </td>
-              </tr>
-
-              @if (isOpen(r.tenantRequestId)) {
-                <tr class="row-detail">
-                  <td colspan="7" class="bg-sunken">
-                    <div class="px-3 py-4 flex flex-col gap-4 max-w-3xl">
-                      <div class="flex flex-col gap-1.5">
-                        <h3 class="text-[11px] font-semibold uppercase tracking-wider
-                                   text-[color:var(--text-muted)]">What they asked for</h3>
-                        <p class="text-sm leading-relaxed whitespace-pre-wrap">{{ r.purpose }}</p>
-                      </div>
-                      <div class="flex flex-wrap gap-x-8 gap-y-2 text-sm">
-                        <div class="flex flex-col gap-0.5">
-                          <span class="text-[11px] uppercase tracking-wider
-                                       text-[color:var(--text-muted)]">Contact</span>
-                          <span>{{ r.contactName }}</span>
-                        </div>
-                        <div class="flex flex-col gap-0.5">
-                          <span class="text-[11px] uppercase tracking-wider
-                                       text-[color:var(--text-muted)]">Email</span>
-                          <a class="link-inline mono text-xs"
-                             [href]="'mailto:' + r.contactEmail">{{ r.contactEmail }}</a>
-                        </div>
-                        @if (r.decidedAt) {
-                          <div class="flex flex-col gap-0.5">
-                            <span class="text-[11px] uppercase tracking-wider
-                                         text-[color:var(--text-muted)]">Decided</span>
-                            <span class="text-xs">{{ r.decidedAt | date:'d MMM y, HH:mm' }}</span>
-                          </div>
-                        }
-                      </div>
-                      @if (r.decisionNote) {
-                        <div class="flex flex-col gap-1.5">
-                          <h3 class="text-[11px] font-semibold uppercase tracking-wider
-                                     text-[color:var(--text-muted)]">Reason given</h3>
-                          <p class="text-sm leading-relaxed whitespace-pre-wrap">{{ r.decisionNote }}</p>
-                        </div>
-                      }
-                    </div>
-                  </td>
-                </tr>
-              }
-            }
-          </tbody>
-        </table>
-
-        <app-pagination pager [total]="filtered().length" [page]="pager.page()"
-                        [size]="pager.size()" (goTo)="goToPage($event)"
-                        (setSize)="setPageSize($event)" />
-      </app-table-shell>
-    </div>
-  `,
+  imports: [TableShell, StatTile, StatusPill, Icon, ViewToggle, DatePipe, Pagination],
+  templateUrl: './tenant-requests.html',
   styles: [`
     /* An open row and its panel are one thing, so the border between them is dropped and the
        pair shares a ground. Without this the panel reads as an unrelated full-width row. */
@@ -288,6 +58,18 @@ export class TenantRequests implements OnInit {
   readonly loading = signal(true);
   readonly error = signal('');
   readonly busy = signal<number | null>(null);
+
+  /**
+   * Cards by default, unlike the other admin screens.
+   *
+   * A request is read before it is compared: the paragraph somebody wrote is the whole basis
+   * for approving or refusing, and a table cell can only ever show its first two lines. The
+   * table stays for when the list is long enough to want sorting.
+   */
+  readonly view = signal<'table' | 'cards'>('cards');
+
+  /** Which contact address was last copied, as `<requestId>:<field>`. */
+  readonly copiedKey = signal<string | null>(null);
 
   /** Free text across the four things a reviewer would recognise a request by. */
   readonly search = signal('');
@@ -306,7 +88,8 @@ export class TenantRequests implements OnInit {
       return `${request.organisationName} ${request.contactName} ${request.contactEmail} ${request.purpose ?? ''}`
         .toLowerCase().includes(term);
     });
-    return this.sort.apply(rows, (row, key) => (row as any)[key]);
+    return this.sort.apply(rows, (row, key) =>
+      key === 'status' ? (STATUS_ORDER[row.status] ?? 9) : (row as any)[key]);
   });
 
   readonly hasFilters = computed(() => !!this.search().trim() || !!this.statusFilter());
@@ -342,6 +125,42 @@ export class TenantRequests implements OnInit {
       next.add(id);
     }
     this.open.set(next);
+  }
+
+  /**
+   * Whether a card needs its "Read all" control.
+   *
+   * The clamp is four lines and CSS will not say whether it bit, so this estimates from the
+   * text. Erring long would print a control that expands nothing, so the threshold sits above
+   * what four lines hold at this measure rather than at it.
+   */
+  isLong(purpose: string): boolean {
+    return purpose.length > 220 || purpose.split('\n').length > 4;
+  }
+
+  /** The colour of a card's top rule. Amber is the only one that asks for anything. */
+  statusAccent(status: string): string {
+    switch (status) {
+      case 'Pending':  return 'var(--color-warn-600)';
+      case 'Approved': return 'var(--color-ok-500)';
+      // Not red: a refused request is an ordinary outcome, and spending the alarm colour here
+      // would blunt what it means on the screens where something has actually gone wrong.
+      default:         return 'var(--border-subtle)';
+    }
+  }
+
+  copyContact(requestId: number, field: 'email', value: string): void {
+    copyText(value).then(ok => {
+      if (!ok) {
+        this.toast.error('Could not copy that.');
+        return;
+      }
+      const key = `${requestId}:${field}`;
+      this.copiedKey.set(key);
+      // Only clear if nothing else was copied in the meantime, or a slow first copy would wipe
+      // the tick off a second, faster one.
+      setTimeout(() => { if (this.copiedKey() === key) this.copiedKey.set(null); }, 1500);
+    });
   }
 
   readonly summary = computed(() => {
@@ -447,3 +266,12 @@ export class TenantRequests implements OnInit {
     return status === 'Pending' ? 'Waiting' : status;
   }
 }
+
+/**
+ * Sort order for the Status column.
+ *
+ * Alphabetical put Approved first and buried Pending in the middle, which is backwards on a
+ * screen whose only job is finding the requests nobody has answered yet. Sorting by urgency
+ * means one click brings the outstanding work to the top.
+ */
+const STATUS_ORDER: Record<string, number> = { Pending: 0, Approved: 1, Rejected: 2 };

@@ -6,7 +6,27 @@ import { AuthService } from '../auth/auth.service';
 import { API_BASE } from '../api/api.config';
 
 export interface JobEvent {
-  type: 'job.status' | 'job.log' | 'job.deleted' | 'job.toggled' | string;
+  /**
+   * Closed on purpose. The trailing `| string` this used to carry widened the whole union back
+   * to `string`, so the compiler had nothing to check against: 'job.log' was declared here and
+   * read nowhere, while the jobs table branched on a 'job.updated' this never mentioned, and
+   * neither showed up as an error. A misspelt type is a branch that silently never runs, which
+   * is exactly the failure the socket exists to avoid, so the set is spelled out and the
+   * compiler is left able to say so.
+   *
+   * Only `job.status` reaches a client today. `job.log` is published by the server and consumed
+   * nowhere here; `job.deleted`, `job.toggled` and `job.updated` are declared by
+   * JobEventPublisher.publishChanged, which has **no callers anywhere in the backend** -- so the
+   * branches for them in the jobs table are unreachable, and an edit, toggle or delete made in one
+   * tab stays invisible in another until a manual refresh, on a screen that says it is live.
+   *
+   * They are kept in the union because that is the contract the server is expected to fill; the
+   * fix is on the server (call publishChanged from add/update/toggle/delete in
+   * SourceJobServiceImpl), and is planned in .ai/synthesis/source-jobs.md. Narrowing this type
+   * catches a typo on THIS side only -- publishChanged takes a bare Java String with no shared
+   * constant, so a misspelling there is still invisible to the compiler.
+   */
+  type: 'job.status' | 'job.log' | 'job.deleted' | 'job.toggled' | 'job.updated';
   jobId: number;
   jobQueueId?: number;
   jobRunningStatus?: string;
@@ -47,19 +67,36 @@ export class JobEventsService {
   private readonly destination = computed(() => {
     const user = this.auth.user();
     if (!user) return null;
-    return user.userRole === 'PLATFORM_ADMIN'
+    // The role comes from the token by way of AuthService rather than from the stored blob's
+    // own userRole field. That field sits in localStorage where anything on the page can
+    // rewrite it, and this was the last role decision left reading it -- typing PLATFORM_ADMIN
+    // into devtools pointed the socket at the cross-tenant feed on a token the server refuses
+    // it for, so the console simply stopped receiving events.
+    return this.auth.isPlatformAdmin()
       ? '/topic/jobs.all'
       : `/topic/jobs.${user.tenantId}`;
   });
+
+  /**
+   * The two facts the socket actually follows, compared by value.
+   *
+   * The stored user is one object, rewritten whole for anything that changes about a person: a
+   * rename, a new picture, the password debt being settled. Reading the token straight off it
+   * inside the effect made every one of those tear the connection down and shake hands again,
+   * losing whatever job events arrived in between. Same shape as AuthService.avatarSource, and
+   * for the same reason.
+   */
+  private readonly session = computed(
+    () => ({ destination: this.destination(), token: this.auth.user()?.accessToken ?? '' }),
+    { equal: (a, b) => a.destination === b.destination && a.token === b.token });
 
   constructor() {
     // Follows the session: connects on sign-in, tears down on sign-out, and reconnects with
     // a fresh token when the interceptor refreshes one.
     effect(() => {
-      const target = this.destination();
-      const token = this.auth.user()?.accessToken;
+      const { destination, token } = this.session();
       this.disconnect();
-      if (target && token) this.connect(target, token);
+      if (destination && token) this.connect(destination, token);
     });
   }
 

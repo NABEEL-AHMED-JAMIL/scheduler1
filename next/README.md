@@ -1,59 +1,66 @@
-# Next
+# ETL Console — frontend (Angular 22)
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 22.1.5.
+The rewrite of `../src` (Angular 8). Same backend, new application. Feature parity is being reached **one feature at a time** — see [`../../.ai/discovery/features.md`](../../.ai/discovery/features.md) for what has made the crossing and what has not.
 
-## Development server
-
-To start a local development server, run:
+## Running
 
 ```bash
+npm install
 ng serve
 ```
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+`http://localhost:4200`. The backend must be running: the app calls `http://<hostname>:9098/api/v1`, set in `src/app/core/api/api.config.ts`. Start it from `../../process` with `docker-compose up -d`.
 
-## Code scaffolding
-
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
+## Tests
 
 ```bash
-ng generate component component-name
+npx ng test --watch=false
 ```
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+31 spec files, 445 tests.
 
-```bash
-ng generate --help
-```
+**Run them through `ng test`, not `npx vitest`.** The `test` target uses the `@angular/build:unit-test` builder, which is what applies the Angular compiler plugin. Running vitest directly leaves components uncompiled and produces a screenful of `Cannot read properties of null (reading 'ngModule')` failures that have nothing to do with your change.
 
-## Building
+There is no e2e builder configured. End-to-end coverage currently lives in the backend's suite (`../../process/run-e2e.sh`), which drives the real HTTP API through the real security chain.
 
-To build the project run:
+## Build
 
 ```bash
 ng build
 ```
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
+Output goes to `dist/next/`.
 
-## Running unit tests
+## Layout
 
-To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use the following command:
-
-```bash
-ng test
+```
+src/app/
+├── core/
+│   ├── api/       API base URL and HTTP plumbing
+│   ├── auth/      auth service, route guard, HTTP interceptor (each with specs)
+│   ├── socket/    job-events websocket (@stomp/stompjs)
+│   └── theme.service.ts
+├── shared/
+│   ├── ui/        avatar, status pill, view toggle, markdown, topic, dictation…
+│   ├── charts/    bar chart and friends (ECharts)
+│   └── testing/   test helpers, e.g. memory storage for vitest's partial localStorage
+└── features/      20 folders: admin (users, tenants, storage, settings),
+                   jobs, queue, tasks, forms, settings (kafka, task-types,
+                   lookup, dynamic-forms), ai (agents, models), tools
+                   (converter, transcript, cleaner, query), reports, profile,
+                   notifications, tenant-request, bulk, objects, dashboard,
+                   shell, login, landing, docs, unauthorized
 ```
 
-## Running end-to-end tests
+Routing is in `src/app/app.routes.ts`; every route lazy-loads a standalone component, and authenticated routes sit behind the guard in `src/app/core/auth`.
 
-For end-to-end (e2e) testing, run:
+## Conventions
 
-```bash
-ng e2e
-```
+- **Standalone components** with `imports: [...]` — no NgModules.
+- **Signals** for component state; `@if` / `@for` control flow, not `*ngIf` / `*ngFor`.
+- **Tailwind 4** with design tokens. Both dark and light mode are supported and both must be checked before a feature is called done.
+- **Authorization in this app is presentation, not enforcement.** A hidden button is a convenience; the rule that matters is on the server. Never treat a guard here as a security control.
 
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
+## Working on a feature
 
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+Read [`../../.ai/README.md`](../../.ai/README.md) first. The short version: a feature has a grooming document and a synthesis document before anyone writes code, and acceptance criteria that can be checked by someone who did not write them.

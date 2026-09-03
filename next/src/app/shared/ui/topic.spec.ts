@@ -3,6 +3,13 @@ import { parseTopicPartition, formatTopicPartition } from './topic';
 
 describe('parseTopicPartition', () => {
   it('splits a well-formed value', () => {
+    expect(parseTopicPartition('topic=orders&partitions=[0]'))
+      .toEqual({ topic: 'orders', partitions: '0' });
+  });
+
+  // The server takes one index or the wildcard, but a stored value may hold anything; reading
+  // has to show what is there rather than an empty cell.
+  it('reads a partition list the server would not accept', () => {
     expect(parseTopicPartition('topic=orders&partitions=[0,1]'))
       .toEqual({ topic: 'orders', partitions: '0,1' });
   });

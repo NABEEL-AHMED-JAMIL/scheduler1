@@ -63,7 +63,8 @@ export class Tasks implements OnInit {
   readonly error = signal('');
   readonly search = signal('');
 
-  private readonly auth = inject(AuthService);
+  /** Public: the template gates every write control on auth.canManageTasks(). */
+  readonly auth = inject(AuthService);
 
   /** Narrows the list to rows this person created. Not persisted -- see MineFilter. */
 
