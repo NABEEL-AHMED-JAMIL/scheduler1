@@ -63,7 +63,7 @@ const SUBFOLDER_SIZE_TOP_N = 7;
 const AGE_BUCKET_ORDER = ['Last 30 Days', '1-6 Months', '6-12 Months', '1-2 Years', '2-5 Years', '5+ Years'];
 const AGE_BUCKET_COLOR: { [label: string]: string } = {
     'Last 30 Days': '#1d7a3f',
-    '1-6 Months': '#726006',
+    '1-6 Months': '#2563eb',
     '6-12 Months': '#0c7c8c',
     '1-2 Years': '#b5730a',
     '2-5 Years': '#6a3bbf',

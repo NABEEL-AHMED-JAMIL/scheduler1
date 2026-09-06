@@ -73,7 +73,7 @@ import { Component, OnInit } from '@angular/core';
           animation: loader-ring-spin 1.15s cubic-bezier(0.5, 0, 0.5, 1) infinite;
         }
         :host .loader-ring div:nth-child(1) {
-          border-top-color: #726006;
+          border-top-color: #2563eb;
           animation-delay: 0s;
         }
         :host .loader-ring div:nth-child(2) {
@@ -82,7 +82,7 @@ import { Component, OnInit } from '@angular/core';
           animation-delay: -0.15s;
         }
         :host .loader-ring div:nth-child(3) {
-          border-top-color: #4e4104;
+          border-top-color: #1e40af;
           opacity: 0.45;
           animation-delay: -0.3s;
         }

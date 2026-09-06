@@ -9,7 +9,7 @@ export interface ColumnBarSegment {
 
 export const JOB_STATUS_COLOR: { [key: string]: string } = {
   'queue': '#0c7c8c',
-  'start': '#726006',
+  'start': '#2563eb',
   'running': '#b5730a',
   'failed': '#c0392b',
   'completed': '#1d7a3f',
@@ -21,10 +21,10 @@ export const JOB_STATUS_COLOR: { [key: string]: string } = {
 export const JOB_STATUS_ORDER = ['Queue', 'Start', 'Running', 'Failed', 'Completed', 'Skip', 'Interrupt', 'Missed'];
 export const PILL_SUCCESS_COLOR = '#1d7a3f';
 export const PILL_DANGER_COLOR = '#c0392b';
-export const FILL_COLOR = '#726006';
+export const FILL_COLOR = '#2563eb';
 export const EMPTY_COLOR = '#d7dce1';
 
-export const CATEGORY_PALETTE = ['#726006', '#0c7c8c', '#b5730a', '#c0392b', '#1d7a3f', '#6a3bbf', '#1c6ea4', '#e67e22'];
+export const CATEGORY_PALETTE = ['#2563eb', '#0c7c8c', '#b5730a', '#c0392b', '#1d7a3f', '#6a3bbf', '#1c6ea4', '#e67e22'];
 export const JOB_ID_PIE_TOP_N = 8;
 
 export function compactAxisNumber(value: number): string {

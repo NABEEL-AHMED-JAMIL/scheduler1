@@ -94,12 +94,13 @@ body.jw-modal-open {
 }
 
 /* Matches the next app's --color-brand-500 (see styles.css) so both frontends share one
-   identity. Was #4f46e5 (indigo), then briefly #0a6b76 (teal), before this rebrand to a
-   warm "sun" gold -- kept ~20 degrees of hue from @brand-secondary/warn colours so a
-   primary action is never mistakeable for a warning. */
-@brand-primary: #726006;
+   identity. Was #4f46e5 (indigo), then #0a6b76 (teal), then #726006 (gold), before this
+   rebrand to Tailwind's own default Blue -- real published palette values, not a hand-tuned
+   hue. Slotted to blue-600 rather than blue-500 itself: blue-500 only reaches 3.68:1 for
+   white text, short of AA, where blue-600 clears 5.17:1. */
+@brand-primary: #2563eb;
 @brand-secondary: #ff8300;
-@gray: #817d6b;
+@gray: #64748b;
 @gray-light: lighten(@gray, 15%);
 @gray-lighter: lighten(@gray, 30%);
 ;
@@ -784,24 +785,22 @@ a {
   background-color: white;
 }
 
-// Genuinely gold now -- this was named @brand-teal while actually holding the old indigo,
-// then briefly a real teal. Matches the next app's --color-brand-500/700 so both frontends
+// This has been @brand-teal through indigo, teal, and gold -- now finally a real Tailwind
+// blue (blue-600/blue-800). Matches the next app's --color-brand-500/700 so both frontends
 // share one identity.
-@brand-teal: #726006;
-@brand-teal-dark: #4e4104;
+@brand-teal: #2563eb;
+@brand-teal-dark: #1e40af;
 @brand-accent: #7c3aed;
 // Deeper and cooler than the old #2f3a45 -- the nav is a persistent frame, so it reads
 // better as a quiet dark edge than as another mid-grey competing with the content.
-// Same lightness/saturation as before, hue-rotated from indigo (~220) to gold (~50) to
-// match the rebrand -- see the next app's --color-ink-* in styles.css for the same family.
-@brand-slate: #33301f;
-// Neutrals carry a slight gold bias rather than sitting on pure grey, so they read as
-// chosen alongside the brand colour instead of inherited from the framework.
-@ink: #322f1f;
-@muted: #85816b;
-@line: #efede4;
+// Tailwind's own Slate scale throughout below (slate-800/500/200/50) -- the original indigo
+// neutrals already sat close to Slate's own hue, so this reads as a refinement, not a shift.
+@brand-slate: #1e293b;
+@ink: #1e293b;
+@muted: #64748b;
+@line: #e2e8f0;
 @surface: #ffffff;
-@page-bg: #faf9f4;
+@page-bg: #f8fafc;
 
 body {
   font-family: 'IBM Plex Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;

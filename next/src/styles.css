@@ -3,56 +3,53 @@
 /* ---------------------------------------------------------------------------
    Design tokens.
 
-   Rebrand from the product's original indigo (then briefly teal/cyan) to a warm
-   "sun" gold, alongside a near-black neutral scale carrying the same hue (a
-   whisper of warm gold bias rather than pure grey) so surfaces still read as
-   chosen rather than defaulted. The accent's hue (~50, a true gold) sits a
-   deliberate ~20 degrees from warn's (~26-32, a burnt orange-amber) -- an
-   operations console has to say "this failed" without competing with "this
-   is a link", so the two must never be mistakeable for one another even at a
-   glance, which the first draft of this rebrand (hue ~42) cut too close.
+   Rebrand from the product's original indigo (then briefly teal, then gold) to
+   Tailwind's own default Blue, on Tailwind's own default Slate neutrals -- real
+   published palette values throughout, not hand-derived hues, for the
+   familiar, polished look those two scales have on their own.
 
    Every load-bearing pair below was re-measured against WCAG 2 contrast
-   (relative luminance, not eyeballed) to at least match what the earlier
-   palettes cleared -- see the ratios noted next to each one. Values were
-   generated from HSL (gold hue ~50 for both the accent and the neutrals) and
-   hand-tuned where the raw interpolation fell short of 4.5:1. A pure, bright
-   yellow reads as pale and fails white-text contrast at any usable
-   saturation, so brand-500 (the shade a filled button keeps) is a deep,
-   saturated gold rather than a pastel one -- the brighter, lighter steps
-   (300/400) carry the "sun" identity everywhere else: dark-mode accent text,
-   hover tints, chart accents, focus rings.
+   (relative luminance, not eyeballed) exactly as the previous two palettes
+   were. Two real consequences of using the official scale as-is, rather than
+   tuning a custom one to fit: Tailwind's blue-500 itself only reaches 3.68:1
+   for white text -- short of AA -- so brand-500 here (the shade a filled
+   button keeps) is slotted to blue-600 instead, and every step from there
+   down is likewise shifted one below its Tailwind number (brand-900 is
+   blue-950). And Slate's own 400/500 steps leave a real gap on the sunken
+   surface (400 measures 2.34:1, 500 only 4.34:1 -- both short of 4.5), so
+   ink-450 is the one custom value here, interpolated 20% from slate-500
+   toward slate-600 to actually clear it.
 
    Semantic colours are deliberately separate from the accent: ok/warn/crit
    keep their original green/amber/rose, which read correctly against every
    accent this product has had.
    --------------------------------------------------------------------------- */
 @theme {
-  --color-ink-50:  #f7f7f5;
-  --color-ink-100: #f0efea;
-  --color-ink-200: #e1e0d8;
-  --color-ink-300: #cbc8bb;
-  --color-ink-400: #9b9785;
+  --color-ink-50:  #f8fafc;
+  --color-ink-100: #f1f5f9;
+  --color-ink-200: #e2e8f0;
+  --color-ink-300: #cbd5e1;
+  --color-ink-400: #94a3b8;
   /* Between 400 and 500: the lightest muted step that still clears 4.5:1 on the sunken
-     surface, which is what a hovered table row switches to. Measured: 5.02:1. */
-  --color-ink-450: #696656;
-  --color-ink-500: #817d67;
-  --color-ink-600: #5d5a49;
-  --color-ink-700: #444134;
-  --color-ink-800: #2d2b22;
-  --color-ink-900: #1d1c16;
-  --color-ink-950: #14130e;
+     surface, which is what a hovered table row switches to. Measured: 4.75:1. */
+  --color-ink-450: #5e6e84;
+  --color-ink-500: #64748b;
+  --color-ink-600: #475569;
+  --color-ink-700: #334155;
+  --color-ink-800: #1e293b;
+  --color-ink-900: #0f172a;
+  --color-ink-950: #020617;
 
-  --color-brand-50:  #fbf9ef;
-  --color-brand-100: #f5f0d6;
-  --color-brand-200: #efe3a9;
-  --color-brand-300: #e9d467;
-  --color-brand-400: #d9b812;
-  --color-brand-500: #726006;
-  --color-brand-600: #5f5004;
-  --color-brand-700: #4e4104;
-  --color-brand-800: #3d3405;
-  --color-brand-900: #312a06;
+  --color-brand-50:  #eff6ff;
+  --color-brand-100: #dbeafe;
+  --color-brand-200: #bfdbfe;
+  --color-brand-300: #93c5fd;
+  --color-brand-400: #60a5fa;
+  --color-brand-500: #2563eb;
+  --color-brand-600: #1d4ed8;
+  --color-brand-700: #1e40af;
+  --color-brand-800: #1e3a8a;
+  --color-brand-900: #172554;
 
   --color-ok-100: #dcf3e6;
   --color-ok-500: #1d7a44;
@@ -95,8 +92,8 @@
 
   /* The accent as *text* is a different colour from the accent as a *fill*, and they have to
      move in opposite directions between themes. Measured on this palette: brand-500 on a dark
-     card is 2.76:1 -- below AA -- while white on brand-500 is 6.19:1. So a filled button keeps
-     brand-500 in both themes, and accent text switches to brand-300 (11.45:1) in the dark one.
+     card is 3.45:1 -- below AA -- while white on brand-500 is 5.17:1. So a filled button keeps
+     brand-500 in both themes, and accent text switches to brand-300 (9.90:1) in the dark one.
      Before this there was no token for it, which is why forty-three hand-written html.dark
      rules had accumulated, each re-lightening one component. */
   --color-accent:      var(--accent-text);
@@ -111,25 +108,22 @@
        OS, not the page. Without this they stay light on the dark theme, which is why a date
        field read as a white Bootstrap control sitting on a dark form. */
     color-scheme: light;
-    --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23696656' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-    --date-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23696656' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='16' rx='2'/%3E%3Cpath d='M3 10h18M8 3v4M16 3v4'/%3E%3C/svg%3E");
+    --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235e6e84' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    --date-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235e6e84' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='16' rx='2'/%3E%3Cpath d='M3 10h18M8 3v4M16 3v4'/%3E%3C/svg%3E");
 
     --surface-page:    var(--color-ink-50);
     --surface-raised:  #ffffff;
     --surface-sunken:  var(--color-ink-100);
     /* A recessed *area* inside a white card, as distinct from a hover or selected state.
-       ink-100 carries a touch more of the warm-gold cast than the page and drops a few
-       lightness points from white, so on a white card a large fill of it read as a tinted band
-       rather than a shade -- most visibly a table's total row. This is the same idea at a
-       whisper: near the page's own tint, a third of the way to it in lightness. Interactive
-       states keep ink-100, because a hover has to actually register. */
-    --surface-inset:   #f5f4f1;
+       ink-100 drops a few lightness points from white so on a white card a large fill of it
+       reads as a shade rather than nothing -- most visibly a table's total row. This is the
+       same idea at a whisper: near the page's own tint, a third of the way to it in
+       lightness. Interactive states keep ink-100, because a hover has to actually register. */
+    --surface-inset:   #f6f8fb;
     /* A code block is a well, not a card. It was painted with --surface-raised, which is white
        -- lighter than the inset panel it usually sits in -- so a payload appeared to float
        above the very area it belongs to, and an expanded row read as three near-identical
-       whites with no depth to it. This goes the other way: below the panel, not above it. The
-       warm-cast worry that keeps --surface-inset so faint does not apply here, because a code
-       block is a bounded box with a border rather than a full-width fill. */
+       whites with no depth to it. This goes the other way: below the panel, not above it. */
     --surface-code:    var(--color-ink-100);
     /* Brand-tinted hover, as a token because a hardcoded light tint is unreadable on dark:
        pill-neutral's own text over a raw bg-brand-50 measures well under 4.5 in dark mode. */
@@ -137,16 +131,17 @@
     --hover-brand-fg:  var(--color-brand-700);
     /* Overlay scrollbars stay invisible until the pointer moves, so a list that scrolls
        inside its own box looks like a list that simply stops. These make the track visible. */
-    --scrollbar-thumb:       #cbc8bb;
-    --scrollbar-thumb-hover: #9b9785;
+    --scrollbar-thumb:       #cbd5e1;
+    --scrollbar-thumb-hover: #94a3b8;
     --surface-inverse: var(--color-ink-900);
     --border-subtle:   var(--color-ink-200);
     --border-strong:   var(--color-ink-300);
     --text-primary:    var(--color-ink-900);
-    /* Measured against the surface each is used on: ink-500 on white is 4.15:1 -- just short
-       of 4.5 -- while ink-600 clears it at 6.94:1, which is why text-secondary is 600 rather
-       than 500 (500 is reserved for non-text uses, e.g. .dot-neutral). The previous muted step
-       (ink-400) measured 2.93:1 and was carrying every table header, tile label and hint. */
+    /* Measured against the surface each is used on: ink-500 (Tailwind's own slate-500) is
+       4.76:1 on white -- ink-600 at 7.58:1 is used anyway, for headroom this system has kept
+       everywhere else. ink-500 is reserved for non-text uses, e.g. .dot-neutral. The Slate
+       scale's own 400 step measures 2.56:1 and would have been carrying every table header,
+       tile label and hint. */
     --text-secondary:  var(--color-ink-600);
     --text-muted:      var(--color-ink-450);
     --text-inverse:    #ffffff;
@@ -156,34 +151,34 @@
 
   html.dark {
     color-scheme: dark;
-    --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239b9785' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-    --date-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239b9785' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='16' rx='2'/%3E%3Cpath d='M3 10h18M8 3v4M16 3v4'/%3E%3C/svg%3E");
+    --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    --date-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='16' rx='2'/%3E%3Cpath d='M3 10h18M8 3v4M16 3v4'/%3E%3C/svg%3E");
     --surface-page:    var(--color-ink-950);
     --surface-raised:  var(--color-ink-900);
-    --surface-sunken:  #161510;
-    /* Dark has no cast problem -- everything is already this hue -- so an inset is just sunken. */
-    --surface-inset:   #161510;
+    /* Dark has no cast problem -- everything is already this hue -- so sunken and inset both
+       sit at the same depth as the page itself; only --surface-raised (a card) sits above it. */
+    --surface-sunken:  var(--color-ink-950);
+    --surface-inset:   var(--color-ink-950);
     /* Deeper than both the card and the inset panel, so the well reads the same way it does
-       in light. */
-    --surface-code:    #0e0d09;
-    /* The same mix the dark pills use, so a hover matches the chips around it -- comfortably
-       above 4.5 for the text that sits on it. */
+       in light -- true black, since Slate's own scale bottoms out at ink-950. */
+    --surface-code:    #000000;
+    /* The same mix the dark pills use, so a hover matches the chips around it. */
     --hover-brand-bg:  color-mix(in oklab, var(--color-brand-500) 22%, var(--surface-raised));
     --hover-brand-fg:  var(--color-brand-300);
-    --scrollbar-thumb:       #444134;
-    --scrollbar-thumb-hover: #5d5a49;
+    --scrollbar-thumb:       #334155;
+    --scrollbar-thumb-hover: #475569;
     --surface-inverse: var(--color-ink-100);
     --border-subtle:   var(--color-ink-800);
     --border-strong:   var(--color-ink-700);
     --text-primary:    var(--color-ink-50);
-    /* ink-300 is 10.18:1 and ink-400 is 5.82:1 on the raised surface; the old muted step
-       (ink-500) was 4.12:1. */
+    /* ink-300 is 12.02:1 and ink-400 is 6.96:1 on the raised surface; the old muted step
+       (ink-500) was 3.75:1. */
     --text-secondary:  var(--color-ink-300);
     --text-muted:      var(--color-ink-400);
     --text-inverse:    var(--color-ink-950);
-    /* brand-300 measures 11.45:1 on the raised surface where brand-600 managed 2.14:1. */
+    /* brand-300 measures 9.90:1 on the raised surface where brand-600 managed 2.66:1. */
     --accent-text:     var(--color-brand-300);
-    /* brand-50 is a near-white lavender and was never redefined here, so the active nav item
+    /* brand-50 is a near-white blue tint and was never redefined here, so the active nav item
        rendered as a bright chip on a dark bar. Mixed from the accent instead, so it stays a
        tint of the same hue at a weight that belongs on this ground. */
     --accent-soft:     color-mix(in oklab, var(--color-brand-500) 26%, var(--surface-raised));
@@ -1072,7 +1067,7 @@ html.dark .btn-intent-crit:focus app-icon { color: var(--color-crit-400); }
  * close enough to read as the same series.
  */
 :root {
-  --chart-0: #726006;   /* brand   6.19 on white */
+  --chart-0: #2563eb;   /* brand   5.17 on white */
   --chart-1: #0369a1;   /* info    5.93 */
   --chart-2: #1d7a44;   /* ok      5.36 */
   --chart-3: #b45309;   /* warn    5.02 */
@@ -1091,21 +1086,21 @@ html.dark .btn-intent-crit:focus app-icon { color: var(--color-crit-400); }
  * and each pair is at least 55 units apart so the two members never read as one series.
  */
 :root {
-  --series-brand-soft: #9c8616;  --series-brand: #5e5005;
+  --series-brand-soft: #3b82f6;  --series-brand: #1e40af;
   --series-ok-soft:    #2f9d5b;  --series-ok:    #166534;
   --series-warn-soft:  #d97706;  --series-warn:  #8a3d07;
   --series-crit-soft:  #e05c74;  --series-crit:  #a01b34;
-  --series-muted:      #817d67;
+  --series-muted:      #64748b;
 }
 
 html.dark {
-  --series-brand-soft: #9c8616;  --series-brand: #cdae11;
+  --series-brand-soft: #3b82f6;  --series-brand: #60a5fa;
   --series-ok-soft:    #2f9d5b;  --series-ok:    #6ee7a0;
   --series-warn-soft:  #b97a2a;  --series-warn:  #f0c088;
   --series-crit-soft:  #c4485f;  --series-crit:  #f79bab;
-  --series-muted:      #9b9785;
+  --series-muted:      #94a3b8;
 
-  --chart-0: #b39814;   /* brand   6.06 on the raised surface */
+  --chart-0: #3b82f6;   /* brand   4.85 on the raised surface */
   --chart-1: #38bdf8;   /* info    7.98 */
   --chart-2: #4ec27f;   /* ok      7.61 */
   --chart-3: #e0a25c;   /* warn    7.73 */
