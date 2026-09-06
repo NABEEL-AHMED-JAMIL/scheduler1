@@ -233,7 +233,7 @@ export class JobLogComponent implements OnInit, OnDestroy {
     }
     const avg = gaps.reduce((a, b) => a + b, 0) / gaps.length;
 
-    const colors = gaps.map(g => g > avg * 2 && g > 5 ? '#b5730a' : '#0a6b76');
+    const colors = gaps.map(g => g > avg * 2 && g > 5 ? '#b5730a' : '#726006');
 
     const READABLE_BAR_COUNT = 80;
     const showsAll = categories.length <= READABLE_BAR_COUNT;

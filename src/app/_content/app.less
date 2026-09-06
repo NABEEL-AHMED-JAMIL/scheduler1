@@ -94,10 +94,12 @@ body.jw-modal-open {
 }
 
 /* Matches the next app's --color-brand-500 (see styles.css) so both frontends share one
-   identity. Was #4f46e5 (indigo) before this rebrand to teal/cyan. */
-@brand-primary: #0a6b76;
+   identity. Was #4f46e5 (indigo), then briefly #0a6b76 (teal), before this rebrand to a
+   warm "sun" gold -- kept ~20 degrees of hue from @brand-secondary/warn colours so a
+   primary action is never mistakeable for a warning. */
+@brand-primary: #726006;
 @brand-secondary: #ff8300;
-@gray: #6b7d81;
+@gray: #817d6b;
 @gray-light: lighten(@gray, 15%);
 @gray-lighter: lighten(@gray, 30%);
 ;
@@ -782,23 +784,24 @@ a {
   background-color: white;
 }
 
-// Genuinely teal now -- this was named @brand-teal while actually holding the old indigo.
-// Matches the next app's --color-brand-500/700 so both frontends share one identity.
-@brand-teal: #0a6b76;
-@brand-teal-dark: #054a51;
+// Genuinely gold now -- this was named @brand-teal while actually holding the old indigo,
+// then briefly a real teal. Matches the next app's --color-brand-500/700 so both frontends
+// share one identity.
+@brand-teal: #726006;
+@brand-teal-dark: #4e4104;
 @brand-accent: #7c3aed;
 // Deeper and cooler than the old #2f3a45 -- the nav is a persistent frame, so it reads
 // better as a quiet dark edge than as another mid-grey competing with the content.
-// Same lightness/saturation as before, hue-rotated from indigo (~220) to teal (~190) to
+// Same lightness/saturation as before, hue-rotated from indigo (~220) to gold (~50) to
 // match the rebrand -- see the next app's --color-ink-* in styles.css for the same family.
-@brand-slate: #1f3033;
-// Neutrals carry a slight teal bias rather than sitting on pure grey, so they read as
+@brand-slate: #33301f;
+// Neutrals carry a slight gold bias rather than sitting on pure grey, so they read as
 // chosen alongside the brand colour instead of inherited from the framework.
-@ink: #1f2f32;
-@muted: #6b8185;
-@line: #e4edef;
+@ink: #322f1f;
+@muted: #85816b;
+@line: #efede4;
 @surface: #ffffff;
-@page-bg: #f4f9fa;
+@page-bg: #faf9f4;
 
 body {
   font-family: 'IBM Plex Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
