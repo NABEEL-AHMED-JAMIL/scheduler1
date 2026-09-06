@@ -355,14 +355,23 @@ export class Users implements OnInit {
         this.toast.error('Use at least 8 characters.');
         return;
       }
+      // The dialog is already gone by this point (it closes on submit, before this fires), so
+      // `busy` is what the row's own Edit/Reset/status/delete buttons key off of -- without it,
+      // this action alone gave no in-flight feedback anywhere and its own [disabled] guards
+      // (users.html:242-245, :426-428) were checking a signal this method never set.
+      this.busy.set(user.appUserId);
       this.http.put<ApiResponse>(`${API_BASE}/appUser.json/resetPassword`,
         { appUserId: user.appUserId, password }).subscribe({
         next: response => {
+          this.busy.set(null);
           response.status === API_SUCCESS
             ? this.toast.success(response.message)
             : this.toast.error(response.message);
         },
-        error: err => this.toast.error(err?.error?.message || 'Could not reset the password.'),
+        error: err => {
+          this.busy.set(null);
+          this.toast.error(err?.error?.message || 'Could not reset the password.');
+        },
       });
     });
   }

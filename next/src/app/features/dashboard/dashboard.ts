@@ -14,9 +14,16 @@ import { statusColor } from '../../shared/charts/status-color';
 
 const DAY_ORDER = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-/** Status keys shown in the breakdown table, in lifecycle order. */
+/**
+ * Status keys shown in the breakdown table, in lifecycle order.
+ *
+ * Must cover every status the backend's `total` sums over (WeeklyHrJobDimensionStatisticsDto),
+ * `stop` included -- leaving one out makes `breakdownTotal`/`segmentsFor` undercount against a
+ * `total` that still includes it, so the footer total and the per-row outcome bar both silently
+ * stop summing to what they claim.
+ */
 const BREAKDOWN_COLUMNS = [
-  'queue', 'start', 'running', 'failed', 'completed', 'skip', 'interrupt', 'missed',
+  'queue', 'start', 'running', 'failed', 'completed', 'skip', 'stop', 'interrupt', 'missed',
 ] as const;
 
 type BreakdownKey = typeof BREAKDOWN_COLUMNS[number];

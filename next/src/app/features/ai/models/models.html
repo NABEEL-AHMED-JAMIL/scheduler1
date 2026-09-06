@@ -59,9 +59,10 @@
     <div class="flex gap-2 max-w-lg">
       <input id="pull" class="input" placeholder="e.g. qwen3:14b"
              [value]="pullName()" (input)="pullName.set($any($event.target).value)"
-             [disabled]="pulling()" />
+             [disabled]="!!pulling()" />
       <button type="button" class="btn btn-primary whitespace-nowrap"
-              [disabled]="pulling() || !pullName().trim()" (click)="pull()">
+              [disabled]="!!pulling() || !pullName().trim()" (click)="pull()">
+        <app-icon name="download" [class.spin]="!!pulling()" />
         {{ pulling() ? 'Pulling…' : 'Pull' }}
       </button>
     </div>
@@ -114,8 +115,9 @@
                       <span class="pill pill-ok"><app-icon name="check" size="0.85em" />Installed</span>
                     } @else {
                       <button type="button" class="btn btn-default btn-sm"
-                              [disabled]="pulling()" (click)="pullNamed(m.name)">
-                        <app-icon name="download" />Pull
+                              [disabled]="!!pulling()" (click)="pullNamed(m.name)">
+                        <app-icon name="download" [class.spin]="pulling() === m.name" />
+                        {{ pulling() === m.name ? 'Pulling…' : 'Pull' }}
                       </button>
                     }
                   </td>

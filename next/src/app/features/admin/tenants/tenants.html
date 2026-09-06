@@ -110,8 +110,9 @@
               <td class="text-right"><app-status [label]="tenant.status" [quiet]="true" /></td>
               <td class="text-right">
                 <button type="button" class="btn btn-ghost btn-icon btn-sm"
+                        [disabled]="busy() === tenant.tenantId"
                         [cdkMenuTriggerFor]="rowMenu" aria-label="Actions">
-                  <app-icon name="dots" size="1.05em" />
+                  <app-icon name="dots" size="1.05em" [class.spin]="busy() === tenant.tenantId" />
                 </button>
                 <ng-template #rowMenu>
                   <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
@@ -216,14 +217,17 @@
             </button>
             <button type="button" class="btn btn-ghost btn-sm"
                     [class]="tenant.status === 'Active' ? 'btn-intent-warn' : 'btn-intent-ok'"
+                    [disabled]="busy() === tenant.tenantId"
                     (click)="toggleSuspend(tenant)"
                     [title]="tenant.status === 'Active' ? 'Block sign-in for this tenant' : 'Allow sign-in again'">
-              <app-icon [name]="tenant.status === 'Active' ? 'pause' : 'play'" />
+              <app-icon [name]="tenant.status === 'Active' ? 'pause' : 'play'"
+                        [class.spin]="busy() === tenant.tenantId" />
               {{ tenant.status === 'Active' ? 'Suspend' : 'Reactivate' }}
             </button>
             <button type="button" class="btn btn-ghost btn-icon btn-sm ml-auto"
+                    [disabled]="busy() === tenant.tenantId"
                     title="Delete tenant" (click)="deleteTenant(tenant)">
-              <app-icon name="trash" class="icon-crit" />
+              <app-icon name="trash" class="icon-crit" [class.spin]="busy() === tenant.tenantId" />
             </button>
           </div>
         </article>

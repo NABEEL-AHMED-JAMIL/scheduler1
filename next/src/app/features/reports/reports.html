@@ -113,12 +113,14 @@
           <button type="button" class="btn btn-default btn-sm"
                   [disabled]="exporting()" (click)="saveToBucket('csv')"
                   title="Write this report into a bucket">
-            <app-icon name="cloud" />Save
+            <app-icon name="cloud" [class.spin]="exporting() === 'bucket'" />
+            {{ exporting() === 'bucket' ? 'Saving…' : 'Save' }}
           </button>
           <button type="button" class="btn btn-default btn-sm"
                   [disabled]="exporting()" (click)="submit('csv')"
                   title="Post this report to a configured endpoint">
-            <app-icon name="send" />Submit
+            <app-icon name="send" [class.spin]="exporting() === 'submit'" />
+            {{ exporting() === 'submit' ? 'Submitting…' : 'Submit' }}
           </button>
         </div>
       </div>

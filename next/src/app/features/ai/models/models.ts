@@ -66,7 +66,10 @@ export class Models implements OnInit {
   readonly loading = signal(true);
   readonly error = signal('');
   readonly pullName = signal('');
-  readonly pulling = signal(false);
+  /** The model currently being pulled, or null -- keeping the name (not just a boolean) is what
+      lets the catalogue tell the reader *which* row's Pull button is running, since only one
+      pull can be in flight at a time but the list can show many "Pull" buttons at once. */
+  readonly pulling = signal<string | null>(null);
   readonly showCatalogue = signal(false);
   readonly catalogueFilter = signal('');
 
@@ -143,13 +146,13 @@ export class Models implements OnInit {
   pull(): void {
     const name = this.pullName().trim();
     if (!name) return;
-    this.pulling.set(true);
+    this.pulling.set(name);
     // Downloads are gigabytes and run server-side; the request returns when Ollama is done,
     // so the button stays disabled rather than pretending it was instant.
     this.http.post<ApiResponse>(`${API_BASE}/ollama.json/pullModel`, null, { params: { name } })
       .subscribe({
         next: response => {
-          this.pulling.set(false);
+          this.pulling.set(null);
           if (response.status === API_SUCCESS) {
             this.toast.success(`${name} pulled.`);
             this.pullName.set('');
@@ -159,7 +162,7 @@ export class Models implements OnInit {
           }
         },
         error: err => {
-          this.pulling.set(false);
+          this.pulling.set(null);
           this.toast.error(err?.error?.message || 'The pull failed.');
         },
       });

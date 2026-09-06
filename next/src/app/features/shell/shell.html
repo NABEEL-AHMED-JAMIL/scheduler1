@@ -26,8 +26,8 @@
                              whitespace-nowrap text-[color:var(--text-secondary)]
                              hover:text-[color:var(--text-primary)]
                              hover:bg-[color:var(--surface-sunken)]"
-                      [class.bg-accent-soft]="openMenu() === item.label"
-                      [class.text-accent]="openMenu() === item.label">
+                      [class.bg-accent-soft]="openMenu() === item.label || isSectionActive(item)"
+                      [class.text-accent]="openMenu() === item.label || isSectionActive(item)">
                 {{ item.label }}
                 <app-icon name="chevronDown" size="0.85em"
                           class="icon-muted transition-transform duration-150"

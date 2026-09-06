@@ -155,30 +155,40 @@ export class FileChat implements OnInit {
    * contents of the file. Fire-and-forget: the panel closes either way, and a failed eviction
    * simply means the entry ages out on its own.
    */
+  /** True while a close is already being confirmed/actioned -- guards against a fast double-click
+      opening two "Close this chat?" dialogs stacked, each independently able to run this body. */
+  readonly closing = signal(false);
+
   async close(): Promise<void> {
-    // Nothing to lose, nothing to ask. Prompting on an empty chat is friction that teaches
-    // people to click through the dialog without reading it, which is how a real warning gets
-    // ignored later.
-    if (this.messages().length) {
-      const end = await confirmWith(this.dialog, {
-        title: 'Close this chat?',
-        body: 'The conversation is deleted, and the text read from this file is dropped from the '
-            + 'server. Nothing is kept.',
-        confirmLabel: 'Close and delete',
-        danger: true,
-      });
-      if (!end) {
-        return;
+    if (this.closing()) return;
+    this.closing.set(true);
+    try {
+      // Nothing to lose, nothing to ask. Prompting on an empty chat is friction that teaches
+      // people to click through the dialog without reading it, which is how a real warning gets
+      // ignored later.
+      if (this.messages().length) {
+        const end = await confirmWith(this.dialog, {
+          title: 'Close this chat?',
+          body: 'The conversation is deleted, and the text read from this file is dropped from '
+              + 'the server. Nothing is kept.',
+          confirmLabel: 'Close and delete',
+          danger: true,
+        });
+        if (!end) {
+          return;
+        }
       }
+      // Order matters: stop the effect re-saving on the way out, then clear, then close. Clearing
+      // first and letting the effect fire again would write the transcript straight back.
+      this.persist.destroy();
+      sessionStorage.removeItem(this.historyKey());
+      this.messages.set([]);
+      this.http.post(`${API_BASE}/fileChat.json/endSession`,
+        { bucket: this.bucket(), key: this.fileKey() }).subscribe({ error: () => {} });
+      this.closed.emit();
+    } finally {
+      this.closing.set(false);
     }
-    // Order matters: stop the effect re-saving on the way out, then clear, then close. Clearing
-    // first and letting the effect fire again would write the transcript straight back.
-    this.persist.destroy();
-    sessionStorage.removeItem(this.historyKey());
-    this.messages.set([]);
-    this.http.post(`${API_BASE}/fileChat.json/endSession`,
-      { bucket: this.bucket(), key: this.fileKey() }).subscribe({ error: () => {} });
-    this.closed.emit();
   }
 
   /** Held so the request can be abandoned; see stop(). */
@@ -259,6 +269,20 @@ export class FileChat implements OnInit {
         },
         error: () => { this.prepare(); },
     });
+  }
+
+  /**
+   * Switching agents mid-session used to leave the coverage banner (truncated/RAG/char-count)
+   * describing the *previous* agent's context window until the next message was sent and
+   * `refreshCoverage()` happened to run -- the select's own (change) only ever wrote `agentId`
+   * and nothing re-read readiness for the newly chosen agent. `prepare()` is the right call here
+   * rather than the quieter `refreshCoverage()`: switching agents is exactly the "just opened the
+   * panel" moment as far as readiness is concerned, so `preparing`/`prepareError` should reflect
+   * it too, not just the banner.
+   */
+  onAgentChange(id: number): void {
+    this.agentId.set(id);
+    this.prepare();
   }
 
   private prepare(): void {

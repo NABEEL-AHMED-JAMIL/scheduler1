@@ -1,4 +1,6 @@
-import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import {
+  Component, ElementRef, HostListener, OnDestroy, OnInit, computed, inject, signal,
+} from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router, RouterLink } from '@angular/router';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
@@ -96,6 +98,7 @@ interface Note {
 export class NotificationBell implements OnInit, OnDestroy {
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
+  private readonly elementRef = inject(ElementRef<HTMLElement>);
 
   readonly open = signal(false);
   readonly items = signal<Note[]>([]);
@@ -117,6 +120,23 @@ export class NotificationBell implements OnInit, OnDestroy {
   toggle(): void {
     this.open.update(v => !v);
     if (this.open()) this.load();
+  }
+
+  // Shell's own document:click/Escape handlers close its nav dropdowns but never touch this
+  // component's `open` -- they don't know about it, and shouldn't have to. Without these two,
+  // clicking anywhere else on the page or pressing Escape closed every other header dropdown
+  // and left this one open; it could only be dismissed by clicking the bell again, a
+  // notification, or "View all notifications".
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent): void {
+    if (this.open() && !this.elementRef.nativeElement.contains(event.target as Node)) {
+      this.open.set(false);
+    }
+  }
+
+  @HostListener('document:keydown.escape')
+  onEscape(): void {
+    this.open.set(false);
   }
 
   private load(): void {

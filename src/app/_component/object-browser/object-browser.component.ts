@@ -852,6 +852,12 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
     public chatSlowHint = false;
     private chatSlowHintTimer: any = null;
     private chatMessageSubscription: Subscription | null = null;
+    // loadChatAgents/prepareChatContext (and the refresh triggered by re-picking an agent) were
+    // fire-and-forget: closeChat() never cancelled them, so a slow response for file A could
+    // still land -- and overwrite chatAgents/chatPreparing/chatPrepareError/the coverage fields
+    // -- after file B's panel was already open, since none of those fields are keyed by file.
+    // Held here so closeChat() (and the start of a new chain) can cancel whatever came before.
+    private chatSetupSubscription: Subscription | null = null;
 
     @ViewChild('chatMessagesEl', { static: false })
     private chatMessagesEl: ElementRef;
@@ -952,10 +958,20 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
     // "next" app's file-chat.ts (loadAgents chaining into prepare()), which this legacy port
     // originally copied the aiAgentId parameter from without also copying this chaining.
     private loadChatAgents(entry: ObjectSummary): void {
+        // Cancel whatever the previous file's (or a same-file re-click's) chain left in flight
+        // before starting a new one -- see the field comment on chatSetupSubscription.
+        this.chatSetupSubscription?.unsubscribe();
         this.loadingChatAgents = true;
-        this.aiAgentService.fetchAllAgents()
+        this.chatSetupSubscription = this.aiAgentService.fetchAllAgents()
             .pipe(first())
             .subscribe((response) => {
+                // The panel may have moved on to a different file (or closed) while this was in
+                // flight; unsubscribe() above only stops a *later* chain's request from starting,
+                // it doesn't retroactively cancel one already in flight when it was issued, so
+                // this still has to check freshness for itself before touching shared state.
+                if (!this.chatFile || this.chatFile.key !== entry.key) {
+                    return;
+                }
                 this.loadingChatAgents = false;
                 if (response.status === ApiCode.SUCCESS) {
                     // Only agents actually usable right now: active, and either don't need a
@@ -979,6 +995,9 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
                 }
                 this.prepareChatContext(entry);
             }, () => {
+                if (!this.chatFile || this.chatFile.key !== entry.key) {
+                    return;
+                }
                 this.loadingChatAgents = false;
                 this.prepareChatContext(entry);
             });
@@ -988,9 +1007,12 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
     private prepareChatContext(entry: ObjectSummary): void {
         this.chatPreparing = true;
         this.chatPrepareError = null;
-        this.fileChatService.prepareContext(this.selectedBucket, entry.key, this.chatSelectedAgentId)
+        this.chatSetupSubscription = this.fileChatService.prepareContext(this.selectedBucket, entry.key, this.chatSelectedAgentId)
             .pipe(first())
             .subscribe((response) => {
+                if (!this.chatFile || this.chatFile.key !== entry.key) {
+                    return;
+                }
                 this.chatPreparing = false;
                 if (response.status !== ApiCode.SUCCESS) {
                     this.chatPrepareError = response.message || 'Could not read this file.';
@@ -998,6 +1020,9 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
                 }
                 this.applyChatReadiness(response.data);
             }, (error) => {
+                if (!this.chatFile || this.chatFile.key !== entry.key) {
+                    return;
+                }
                 this.chatPreparing = false;
                 this.chatPrepareError = 'Could not read this file.';
             });
@@ -1033,6 +1058,8 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
 
     public closeChat(): void {
         this.stopChatMessage();
+        this.chatSetupSubscription?.unsubscribe();
+        this.chatSetupSubscription = null;
         this.chatRecognition?.stop();
         this.chatFile = null;
         this.chatDraft = '';
@@ -1720,11 +1747,19 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
             : `"${entry.name}"`;
     }
 
+    // Guards the delete modal's "Yes" button, which had no [disabled] binding of its own -- a
+    // rapid double-click fired two concurrent forkJoin delete batches for the same keys.
+    public deleting = false;
+
     public confirmDelete(): void {
+        if (this.deleting) {
+            return;
+        }
         const entries = this.pendingDeleteEntries;
         if (!entries.length || !this.selectedBucket) {
             return;
         }
+        this.deleting = true;
         const fileKeys = entries.filter((entry) => !entry.folder).map((entry) => entry.key);
         const folderEntries = entries.filter((entry) => entry.folder);
 
@@ -1737,10 +1772,12 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
         folderEntries.forEach((folder) => requests.push(this.storageService.deleteFolder(this.selectedBucket, folder.key)));
 
         if (!requests.length) {
+            this.deleting = false;
             return;
         }
 
         forkJoin(requests).pipe(first()).subscribe((responses) => {
+            this.deleting = false;
             const deletedKeys = entries.map((entry) => entry.key);
             this.objects = this.objects.filter((entry) => deletedKeys.indexOf(entry.key) === -1);
             deletedKeys.forEach((key) => this.selectedKeys.delete(key));
@@ -1756,6 +1793,7 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
             this.pendingDeleteEntries = [];
             this.closeModal(this.closeDeleteModal);
         }, (error) => {
+            this.deleting = false;
             this.alertService.showError(error, this.ERROR);
             this.pendingDeleteEntries = [];
             this.closeModal(this.closeDeleteModal);

@@ -87,15 +87,17 @@
           <button type="button" class="btn btn-default btn-sm" (click)="downloadSelected()">
             Download {{ selected().size }}
           </button>
-          <button type="button" class="btn btn-default btn-sm" (click)="share()">
+          <button type="button" class="btn btn-default btn-sm" (click)="share()" [disabled]="actionBusy()">
             Email {{ selected().size }}
           </button>
-          <button type="button" class="btn btn-danger btn-sm" (click)="removeSelected()">
+          <button type="button" class="btn btn-danger btn-sm" (click)="removeSelected()"
+                  [disabled]="actionBusy()">
             Delete {{ selected().size }}
           </button>
         }
 
-        <button type="button" class="btn btn-default btn-sm" (click)="newFolder()">New folder</button>
+        <button type="button" class="btn btn-default btn-sm" (click)="newFolder()"
+                [disabled]="actionBusy()">New folder</button>
 
         <label class="btn btn-default btn-sm cursor-pointer">
           Upload
@@ -190,7 +192,7 @@
             </thead>
             <tbody>
               @for (entry of filtered(); track entry.key) {
-                <tr>
+                <tr [class.row-selected]="!entry.folder && selected().has(entry.key)">
                   <td>
                     @if (!entry.folder) {
                       <input type="checkbox" class="checkbox" [checked]="selected().has(entry.key)"
@@ -221,7 +223,7 @@
                       [title]="entry.contentType">{{ entry.folder ? '—' : (entry.contentType || '—') }}</td>
                   <td class="text-right">
                     <button type="button" class="btn btn-ghost btn-icon" [cdkMenuTriggerFor]="rowMenu"
-                            aria-label="Actions">
+                            [disabled]="actionBusy()" aria-label="Actions">
                       <app-icon name="dots" size="1.05em" />
                     </button>
 

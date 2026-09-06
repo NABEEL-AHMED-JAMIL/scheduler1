@@ -11,7 +11,8 @@
             [attr.aria-label]="minimized() ? 'Expand' : 'Minimise'">
       <app-icon [name]="minimized() ? 'chevronRight' : 'chevronDown'" />
     </button>
-    <button type="button" class="btn btn-ghost btn-icon" (click)="close()" aria-label="Close"><app-icon name="close" /></button>
+    <button type="button" class="btn btn-ghost btn-icon" (click)="close()" [disabled]="closing()"
+            aria-label="Close"><app-icon name="close" /></button>
   </div>
 
   @if (!minimized()) {
@@ -20,7 +21,7 @@
       <label class="text-[color:var(--text-muted)]" for="agent">Agent</label>
       <select id="agent" class="input py-1 text-xs max-w-56"
               [value]="agentId() ?? ''"
-              (change)="agentId.set(+$any($event.target).value)"
+              (change)="onAgentChange(+$any($event.target).value)"
               [disabled]="!agents().length">
         @if (!agents().length) { <option value="">No usable agents</option> }
         @for (agent of agents(); track agent.aiAgentId) {

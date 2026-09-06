@@ -99,11 +99,11 @@
         <span class="text-xs font-medium">{{ selected().size }} selected</span>
         <button type="button" class="btn btn-default btn-sm btn-intent-ok"
                 [disabled]="bulkBusy()" (click)="runSelected()">
-          <app-icon name="play" />Run selected
+          <app-icon name="play" [class.spin]="bulkBusy()" />Run selected
         </button>
         <button type="button" class="btn btn-ghost btn-sm btn-intent-crit"
                 [disabled]="bulkBusy()" (click)="deleteSelected()">
-          <app-icon name="trash" />Delete selected
+          <app-icon name="trash" [class.spin]="bulkBusy()" />Delete selected
         </button>
         <button type="button" class="btn btn-ghost btn-sm ml-auto"
                 [disabled]="bulkBusy()" (click)="clearSelection()">

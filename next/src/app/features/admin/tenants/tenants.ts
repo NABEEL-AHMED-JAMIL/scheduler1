@@ -62,6 +62,8 @@ export class Tenants implements OnInit {
   readonly error = signal('');
   readonly search = signal('');
   readonly statusFilter = signal('');
+  /** Which tenant's status change is in flight, or null; guards suspend/reactivate/delete. */
+  readonly busy = signal<number | null>(null);
   readonly sort = createSort<Tenant>('tenantName');
 
   readonly resources: ResourceCount[] = [
@@ -262,9 +264,11 @@ export class Tenants implements OnInit {
   }
 
   private changeStatus(tenant: Tenant, status: string): void {
+    this.busy.set(tenant.tenantId);
     this.http.put<ApiResponse>(`${API_BASE}/tenant.json/changeTenantStatus`,
       { tenantId: tenant.tenantId, status }).subscribe({
       next: response => {
+        this.busy.set(null);
         if (response.status === API_SUCCESS) {
           this.toast.success(response.message);
           this.listTenants();
@@ -272,7 +276,10 @@ export class Tenants implements OnInit {
           this.toast.error(response.message);
         }
       },
-      error: err => this.toast.error(err?.error?.message || 'The tenant status could not be changed.'),
+      error: err => {
+        this.busy.set(null);
+        this.toast.error(err?.error?.message || 'The tenant status could not be changed.');
+      },
     });
   }
 

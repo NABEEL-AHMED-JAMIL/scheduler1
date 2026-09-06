@@ -367,10 +367,27 @@ export class ReportChart {
       })).filter(Boolean) as any[];
     }
     const slot = this.iw / Math.max(p.rowLabels.length, 1);
-    return p.rowLabels.map((label, ri) => ({
-      x: this.pad.l + slot * ri + slot / 2, y: this.H - 22, anchor: 'middle',
-      text: shorten(label, 16), full: label,
-    }));
+    // A slot narrower than a shortened label's rendered width prints every label anyway, and
+    // centred text-anchor="middle" labels overlap illegibly the moment neighbouring slots are
+    // that tight -- 22 task names in the width a report card actually has is the common case,
+    // not an edge one. The line/area branch above already thins its own x-axis the same way
+    // once it gets crowded (skip every other past 9 points); this generalises that to any
+    // density rather than a fixed "every other", so it degrades gracefully instead of either
+    // overlapping (drawing all of them) or going unreadably sparse (a fixed skip that's too
+    // aggressive for a mild overflow, or not aggressive enough for a severe one).
+    // shorten() caps a label at 16 characters; measured live at font-size 10, a full 16-char
+    // shortened label ("WPV commons.m ·…") renders up to ~98px wide. 120 leaves real headroom
+    // above that rather than being tuned to the exact pixel, so a slightly wider font metric on
+    // another OS/browser doesn't reopen the same overlap.
+    const minSlotForLabel = 120;
+    const stride = slot < minSlotForLabel ? Math.ceil(minSlotForLabel / slot) : 1;
+    return p.rowLabels
+      .map((label, ri) => ({ label, ri }))
+      .filter((_, i) => i % stride === 0)
+      .map(({ label, ri }) => ({
+        x: this.pad.l + slot * ri + slot / 2, y: this.H - 22, anchor: 'middle',
+        text: shorten(label, 16), full: label,
+      }));
   });
 
   /**

@@ -86,6 +86,7 @@
 
     <button type="button" class="btn btn-primary" [disabled]="!canExtract() || extracting()"
             (click)="extract()">
+      <app-icon name="volume" [class.spin]="extracting()" />
       {{ extracting() ? 'Extracting…' : 'Extract transcript' }}
     </button>
 

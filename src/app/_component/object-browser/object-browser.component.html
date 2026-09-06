@@ -579,9 +579,10 @@
                 <p>Delete {{ pendingDeleteLabel }}? This can't be undone.</p>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-danger" (click)="confirmDelete()">
-                    <span class="glyphicon glyphicon-trash"></span> Delete
+                <button type="button" class="btn btn-default" data-dismiss="modal" [disabled]="deleting">Close</button>
+                <button type="button" class="btn btn-danger" (click)="confirmDelete()" [disabled]="deleting">
+                    <span class="glyphicon glyphicon-trash" [class.spin]="deleting"></span>
+                    {{ deleting ? 'Deleting…' : 'Delete' }}
                 </button>
             </div>
         </div>

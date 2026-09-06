@@ -36,6 +36,11 @@ export class Notifications implements OnInit {
   readonly unreadOnly = signal(false);
   readonly typeFilter = signal('');
 
+  /** Which single row is being marked read, or null; guards the row button against double-fire. */
+  readonly markingId = signal<number | null>(null);
+  /** True while "Mark all read" is in flight; guards that button the same way. */
+  readonly markingAll = signal(false);
+
   readonly types = computed(() =>
     [...new Set(this.items().map(n => n.type).filter(Boolean))].sort() as string[]);
 
@@ -90,22 +95,35 @@ export class Notifications implements OnInit {
   }
 
   markRead(item: Notification): void {
-    if (item.read) return;
+    if (item.read || this.markingId() !== null) return;
+    this.markingId.set(item.notificationId);
     this.http.post<ApiResponse>(`${API_BASE}/notification.json/markRead/${item.notificationId}`, null)
       .subscribe({
-        next: () => this.items.update(list =>
-          list.map(n => (n.notificationId === item.notificationId ? { ...n, read: true } : n))),
-        error: () => this.toast.error('Could not mark that as read.'),
+        next: () => {
+          this.markingId.set(null);
+          this.items.update(list =>
+            list.map(n => (n.notificationId === item.notificationId ? { ...n, read: true } : n)));
+        },
+        error: () => {
+          this.markingId.set(null);
+          this.toast.error('Could not mark that as read.');
+        },
       });
   }
 
   markAllRead(): void {
+    if (this.markingAll()) return;
+    this.markingAll.set(true);
     this.http.post<ApiResponse>(`${API_BASE}/notification.json/markAllRead`, null).subscribe({
       next: () => {
+        this.markingAll.set(false);
         this.items.update(list => list.map(n => ({ ...n, read: true })));
         this.toast.success('All notifications marked as read.');
       },
-      error: () => this.toast.error('Could not mark them as read.'),
+      error: () => {
+        this.markingAll.set(false);
+        this.toast.error('Could not mark them as read.');
+      },
     });
   }
 

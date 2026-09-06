@@ -1,5 +1,6 @@
 import { Component, HostListener, computed, inject, signal } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { LowerCasePipe } from '@angular/common';
 import { AuthService } from '../../core/auth/auth.service';
 import { ThemeService } from '../../core/theme.service';
@@ -32,9 +33,25 @@ interface NavItem {
 export class Shell {
   readonly auth = inject(AuthService);
   readonly theme = inject(ThemeService);
+  private readonly router = inject(Router);
 
   readonly openMenu = signal<string | null>(null);
   readonly mobileOpen = signal(false);
+
+  /**
+   * Only `openMenu` drove a dropdown trigger's highlight, so a section with no menu open --
+   * which is how the nav looks the rest of the time -- never showed which one you were in.
+   * The two leaf links (Dashboard, Object Browser) get this for free from `routerLinkActive`;
+   * a dropdown trigger has no `[routerLink]` of its own to hang that off, so its own current
+   * route is tracked here instead.
+   */
+  readonly currentUrl = signal(this.router.url);
+
+  constructor() {
+    this.router.events.pipe(takeUntilDestroyed()).subscribe(event => {
+      if (event instanceof NavigationEnd) this.currentUrl.set(event.urlAfterRedirects);
+    });
+  }
 
   /**
    * Grouped by the job someone is doing, not by which part of the backend serves it.
@@ -139,6 +156,12 @@ export class Shell {
 
   toggleMenu(label: string): void {
     this.openMenu.update(current => (current === label ? null : label));
+  }
+
+  /** True while the current route is one of this section's children -- open or not. */
+  isSectionActive(item: NavItem): boolean {
+    const url = this.currentUrl();
+    return !!item.children?.some(child => url === child.path || url.startsWith(child.path + '/'));
   }
 
   @HostListener('document:click', ['$event'])

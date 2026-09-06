@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { Dialog } from '@angular/cdk/dialog';
@@ -53,6 +53,15 @@ export class Objects implements OnInit {
   readonly search = signal('');
   readonly selected = signal<Set<string>>(new Set());
   readonly nextToken = signal<string | undefined>(undefined);
+
+  /**
+   * Guards removeSelected/newFolder/rename/share against being re-entered while their own
+   * confirm/prompt dialog or the request behind it is still in flight -- none of them had a
+   * reentrancy guard of their own, so a fast double-click opened two confirm dialogs stacked (a
+   * second `removeSelected` while the first was still awaiting its dialog) or, once past the
+   * dialog, fired the same mutating request twice concurrently.
+   */
+  readonly actionBusy = signal(false);
 
   readonly provider = computed(() =>
     this.buckets().find(b => b.bucket === this.bucket())?.provider?.toUpperCase() ?? '');
@@ -283,6 +292,8 @@ export class Objects implements OnInit {
   }
 
   async remove(entry: ObjectSummary): Promise<void> {
+    if (this.actionBusy()) return;
+    this.actionBusy.set(true);
     const ok = await confirmWith(this.dialog, {
       title: entry.folder ? 'Delete folder' : 'Delete file',
       body: entry.folder
@@ -291,7 +302,7 @@ export class Objects implements OnInit {
       confirmLabel: 'Delete',
       danger: true,
     });
-    if (!ok) return;
+    if (!ok) { this.actionBusy.set(false); return; }
 
     const request = entry.folder
       ? this.storage.deleteFolder(this.bucket(), entry.key)
@@ -299,6 +310,7 @@ export class Objects implements OnInit {
 
     request.subscribe({
       next: response => {
+        this.actionBusy.set(false);
         if (response.status === API_SUCCESS) {
           this.toast.success(`${entry.name} deleted.`);
           this.load();
@@ -306,23 +318,29 @@ export class Objects implements OnInit {
           this.toast.error(response.message);
         }
       },
-      error: err => this.toast.error(err?.error?.message || 'Delete failed.'),
+      error: err => {
+        this.actionBusy.set(false);
+        this.toast.error(err?.error?.message || 'Delete failed.');
+      },
     });
   }
 
   async removeSelected(): Promise<void> {
+    if (this.actionBusy()) return;
     const keys = [...this.selected()];
     if (!keys.length) return;
+    this.actionBusy.set(true);
     const ok = await confirmWith(this.dialog, {
       title: `Delete ${keys.length} file${keys.length === 1 ? '' : 's'}`,
       body: 'The selected files will be deleted. This cannot be undone.',
       confirmLabel: 'Delete',
       danger: true,
     });
-    if (!ok) return;
+    if (!ok) { this.actionBusy.set(false); return; }
 
     this.storage.deleteObjects(this.bucket(), keys).subscribe({
       next: response => {
+        this.actionBusy.set(false);
         if (response.status === API_SUCCESS) {
           this.toast.success(`${keys.length} file${keys.length === 1 ? '' : 's'} deleted.`);
           this.selected.set(new Set());
@@ -331,7 +349,10 @@ export class Objects implements OnInit {
           this.toast.error(response.message);
         }
       },
-      error: err => this.toast.error(err?.error?.message || 'Delete failed.'),
+      error: err => {
+        this.actionBusy.set(false);
+        this.toast.error(err?.error?.message || 'Delete failed.');
+      },
     });
   }
 
@@ -371,7 +392,27 @@ export class Objects implements OnInit {
     }).closed.subscribe(saved => { if (saved) this.load(); });
   }
 
-  openChat(entry: ObjectSummary): void {
+  /** The FileChat instance currently rendered behind `@if (chatFile(); ...)`, if any. */
+  private readonly chatRef = viewChild(FileChat);
+
+  /**
+   * Rebinding `chatFile` straight to a different entry reuses the same FileChat instance --
+   * `@if` only tears it down on a truthy-to-falsy transition -- so its `ngOnInit`, which loads
+   * agents and prepares the file, never ran again for the new file. The panel kept file A's
+   * messages, agent list and coverage banner visible under file B's header and bucket/key
+   * inputs, and any in-flight request from A's session was left running rather than cancelled.
+   * Routing every switch through the same close() the × button uses closes A's session (with
+   * its own "unsaved conversation" confirm, which the user can decline to stay on A) before B is
+   * ever opened, so there is always at most one file's session open, and its own inputs are only
+   * ever set once its predecessor's teardown has actually finished.
+   */
+  async openChat(entry: ObjectSummary): Promise<void> {
+    const current = this.chatFile();
+    if (current?.key === entry.key) return;
+    if (current) {
+      await this.chatRef()?.close();
+      if (this.chatFile()) return; // declined to close -- stay on the current chat
+    }
     this.chatFile.set(entry);
   }
 
@@ -388,6 +429,8 @@ export class Objects implements OnInit {
   }
 
   newFolder(): void {
+    if (this.actionBusy()) return;
+    this.actionBusy.set(true);
     this.dialog.open<string>(PromptDialog, {
       hasBackdrop: true,
       data: {
@@ -398,20 +441,26 @@ export class Objects implements OnInit {
         hint: 'Created inside the folder you are currently viewing.',
       },
     }).closed.subscribe(name => {
-      if (!name) return;
+      if (!name) { this.actionBusy.set(false); return; }
       this.storage.createFolder(this.bucket(), this.prefix(), name).subscribe({
         next: response => {
+          this.actionBusy.set(false);
           if (response.status === API_SUCCESS) {
             this.toast.success(`Folder "${name}" created.`);
             this.load();
           } else { this.toast.error(response.message); }
         },
-        error: err => this.toast.error(err?.error?.message || 'Could not create the folder.'),
+        error: err => {
+          this.actionBusy.set(false);
+          this.toast.error(err?.error?.message || 'Could not create the folder.');
+        },
       });
     });
   }
 
   rename(entry: ObjectSummary): void {
+    if (this.actionBusy()) return;
+    this.actionBusy.set(true);
     this.dialog.open<string>(PromptDialog, {
       hasBackdrop: true,
       data: {
@@ -421,28 +470,34 @@ export class Objects implements OnInit {
         confirmLabel: 'Rename',
       },
     }).closed.subscribe(name => {
-      if (!name || name === entry.name) return;
+      if (!name || name === entry.name) { this.actionBusy.set(false); return; }
       this.storage.renameFolder(this.bucket(), entry.key, name).subscribe({
         next: response => {
+          this.actionBusy.set(false);
           if (response.status === API_SUCCESS) {
             this.toast.success(`Renamed to "${name}".`);
             this.load();
           } else { this.toast.error(response.message); }
         },
-        error: err => this.toast.error(err?.error?.message || 'Rename failed.'),
+        error: err => {
+          this.actionBusy.set(false);
+          this.toast.error(err?.error?.message || 'Rename failed.');
+        },
       });
     });
   }
 
   /** Emails one file, or the current selection, as a ZIP. */
   share(entry?: ObjectSummary): void {
+    if (this.actionBusy()) return;
     const keys = entry ? [entry.key] : [...this.selected()];
     if (!keys.length) return;
+    this.actionBusy.set(true);
     this.dialog.open<ShareResult>(ShareDialog, {
       hasBackdrop: true,
       data: { count: keys.length },
     }).closed.subscribe(result => {
-      if (!result) return;
+      if (!result) { this.actionBusy.set(false); return; }
       this.http.post<ApiResponse>(`${API_BASE}/fileShare.json/send`, {
         bucket: this.bucket(),
         keys,
@@ -450,11 +505,15 @@ export class Objects implements OnInit {
         message: result.message,
       }).subscribe({
         next: response => {
+          this.actionBusy.set(false);
           response.status === API_SUCCESS
             ? this.toast.success(`Sent to ${result.recipientEmail}.`)
             : this.toast.error(response.message);
         },
-        error: err => this.toast.error(err?.error?.message || 'The email could not be sent.'),
+        error: err => {
+          this.actionBusy.set(false);
+          this.toast.error(err?.error?.message || 'The email could not be sent.');
+        },
       });
     });
   }

@@ -105,11 +105,19 @@ export class PdfHighlighterComponent implements OnInit {
         });
     }
 
+    // The modal's "Yes" button had no [disabled] binding of its own -- the full-page spinner
+    // overlay shares the Bootstrap modal's z-index band rather than sitting above it, so it
+    // cannot be relied on alone to block a fast double-click from firing this twice.
+    public deletingPdfHighlighterTask = false;
+
     public processDeletePdfHighlighterTask(): void {
+        if (this.deletingPdfHighlighterTask) { return; }
+        this.deletingPdfHighlighterTask = true;
         this.spinnerService.show();
         this.pdfHighlighterService.deletePdfHighlighterTask(this.deletePdfHighlighterTaskId)
             .pipe(first())
             .subscribe((response) => {
+                this.deletingPdfHighlighterTask = false;
                 if (response.status === ApiCode.SUCCESS) {
                     this.spinnerService.hide();
                     this.alertService.showSuccess(response.message, this.DELETE_PDF_HIGHLIGHTER_TASK);
@@ -127,6 +135,7 @@ export class PdfHighlighterComponent implements OnInit {
                     this.alertService.showError(response.message, this.ERROR);
                 }
             }, (error) => {
+                this.deletingPdfHighlighterTask = false;
                 this.spinnerService.hide();
                 this.alertService.showError(error, this.ERROR);
             });

@@ -57,7 +57,8 @@
     @if (view() === 'cards') {
       <div class="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
         @for (type of filtered(); track type.sourceTaskTypeId) {
-          <article class="card p-4 flex flex-col gap-3">
+          <article class="card p-4 flex flex-col gap-3"
+                   [class.opacity-55]="testing() === type.sourceTaskTypeId">
             <div class="flex items-start gap-2.5">
               <span class="stat-glyph shrink-0"><app-icon name="server" /></span>
               <div class="min-w-0 flex-1">
@@ -67,7 +68,7 @@
               <div class="shrink-0 flex items-center gap-1">
                 <app-status [label]="type.status" [quiet]="true" />
                 <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="cardMenu"
-                        aria-label="Actions">
+                        [disabled]="testing() === type.sourceTaskTypeId" aria-label="Actions">
                   <app-icon name="dots" size="1.05em" />
                 </button>
               <ng-template #cardMenu>
@@ -156,7 +157,7 @@
       </thead>
       <tbody>
         @for (type of filtered(); track type.sourceTaskTypeId) {
-          <tr>
+          <tr [class.opacity-55]="testing() === type.sourceTaskTypeId">
             <td>
               <div class="font-medium">{{ type.serviceName }}</div>
               <div class="mono text-[color:var(--text-muted)]">#{{ type.sourceTaskTypeId }}</div>
@@ -196,7 +197,7 @@
             <td class="text-right"><app-status [label]="type.status" [quiet]="true" /></td>
             <td class="text-right">
               <button type="button" class="btn btn-ghost btn-icon" [cdkMenuTriggerFor]="menu"
-                      aria-label="Actions">
+                      [disabled]="testing() === type.sourceTaskTypeId" aria-label="Actions">
                 <app-icon name="dots" size="1.05em" />
               </button>
               <ng-template #menu>

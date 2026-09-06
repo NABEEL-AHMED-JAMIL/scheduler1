@@ -9,8 +9,10 @@
         <app-icon name="refresh" [class.spin]="loading()" />Refresh
       </button>
       @if (unreadCount()) {
-        <button type="button" class="btn btn-default btn-sm" (click)="markAllRead()">
-          <app-icon name="check" />Mark all read ({{ unreadCount() }})
+        <button type="button" class="btn btn-default btn-sm" (click)="markAllRead()"
+                [disabled]="markingAll()">
+          <app-icon name="check" [class.spin]="markingAll()" />
+          {{ markingAll() ? 'Marking…' : 'Mark all read (' + unreadCount() + ')' }}
         </button>
       }
     </div>
@@ -73,8 +75,10 @@
             @if (!item.read) {
               <button type="button" class="btn btn-ghost btn-icon btn-sm btn-intent-ok"
                       title="Mark as read" aria-label="Mark as read"
+                      [disabled]="markingId() === item.notificationId"
                       (click)="markRead(item)">
-                <app-icon name="check" size="0.9em" />
+                <app-icon name="check" size="0.9em"
+                          [class.spin]="markingId() === item.notificationId" />
               </button>
             }
 

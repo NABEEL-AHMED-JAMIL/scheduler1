@@ -112,8 +112,17 @@ export class PdfHighlighterDetailComponent implements OnInit, OnDestroy {
         }
     }
 
+    // loadingTask/loading were tracked but never read anywhere in the template, and
+    // spinnerService (injected below) was never called from this file at all -- unlike the
+    // sibling list component, which calls show()/hide() around its own async work. There was no
+    // spinner, disabled state, or "Loading…" text while the task/fields were fetched or the
+    // stored PDF was downloaded and parsed; the form and viewer just sat blank/stale until data
+    // silently appeared. Paired one-for-one with the existing loadingTask/loading transitions
+    // below rather than introduced as new state, so the overlay's lifecycle can't drift from
+    // what those flags already (correctly) track.
     private loadTask(pdfHighlighterTaskId: any): void {
         this.loadingTask = true;
+        this.spinnerService.show();
         this.pdfHighlighterService.fetchPdfHighlighterTaskById(pdfHighlighterTaskId).subscribe((response) => {
             if (response.status === ApiCode.SUCCESS) {
                 const task = response.data;
@@ -132,10 +141,12 @@ export class PdfHighlighterDetailComponent implements OnInit, OnDestroy {
                 this.loadFieldsFromServer(pdfHighlighterTaskId);
             } else {
                 this.loadingTask = false;
+                this.spinnerService.hide();
                 this.alertService.showError(response.message, this.ERROR);
             }
         }, (error) => {
             this.loadingTask = false;
+            this.spinnerService.hide();
             this.alertService.showError(error, this.ERROR);
         });
     }
@@ -143,6 +154,7 @@ export class PdfHighlighterDetailComponent implements OnInit, OnDestroy {
     private loadFieldsFromServer(pdfHighlighterTaskId: any): void {
         this.pdfHighlighterService.fetchPdfHighlighterFields(pdfHighlighterTaskId).subscribe((response) => {
             this.loadingTask = false;
+            this.spinnerService.hide();
             if (response.status === ApiCode.SUCCESS) {
                 const serverFields: any[] = response.data || [];
                 this.fields = serverFields.map((f) => ({
@@ -164,6 +176,7 @@ export class PdfHighlighterDetailComponent implements OnInit, OnDestroy {
             }
         }, (error) => {
             this.loadingTask = false;
+            this.spinnerService.hide();
             this.alertService.showError(error, this.ERROR);
         });
     }
@@ -279,6 +292,7 @@ export class PdfHighlighterDetailComponent implements OnInit, OnDestroy {
             return;
         }
         this.loading = true;
+        this.spinnerService.show();
         this.errorMessage = '';
         readFileAsArrayBuffer(file).then((buffer) => {
             this.fileName = file.name;
@@ -288,27 +302,33 @@ export class PdfHighlighterDetailComponent implements OnInit, OnDestroy {
             return this.openPdfBuffer(buffer);
         }).then(() => {
             this.loading = false;
+            this.spinnerService.hide();
         }).catch(() => {
             this.errorMessage = 'Could not read that PDF. Please try a different file.';
             this.pdfDoc = null;
             this.fileName = '';
             this.loading = false;
+            this.spinnerService.hide();
         });
     }
 
     private loadStoredFile(pdfHighlighterTaskId: any): void {
         this.loading = true;
+        this.spinnerService.show();
         this.errorMessage = '';
         this.pdfHighlighterService.downloadPdfHighlighterFile(pdfHighlighterTaskId).subscribe((blob) => {
             readFileAsArrayBuffer(blob as any).then((buffer) => this.openPdfBuffer(buffer)).then(() => {
                 this.loading = false;
+                this.spinnerService.hide();
             }).catch(() => {
                 this.errorMessage = 'Could not load the stored PDF. You can upload it again below.';
                 this.loading = false;
+                this.spinnerService.hide();
             });
         }, () => {
             this.errorMessage = 'Could not load the stored PDF. You can upload it again below.';
             this.loading = false;
+            this.spinnerService.hide();
         });
     }
 
@@ -339,33 +359,42 @@ export class PdfHighlighterDetailComponent implements OnInit, OnDestroy {
         this.pageTextCache.clear();
     }
 
+    // Rapid double-clicks on next/prev/zoom used to start a second render().promise on the same
+    // canvas while the first was still awaiting -- pdf.js rejects one of the two, and because
+    // `this.rendering = false` previously sat only on the success path, that rejection left the
+    // viewer permanently dimmed (.viewer-box.rendering) with no way to recover but a reload. The
+    // guard below stops a second render from starting at all; the try/finally is the backstop
+    // for any other rejection (a corrupt page, a torn-down canvas) so `rendering` always clears.
     private async renderPage(): Promise<void> {
-        if (!this.pdfDoc || !this.canvasRef || !this.overlayRef) { return; }
+        if (!this.pdfDoc || !this.canvasRef || !this.overlayRef || this.rendering) { return; }
         this.rendering = true;
-        const page = await this.pdfDoc.getPage(this.currentPage);
-        const unscaledViewport = page.getViewport({ scale: 1 });
-        const containerWidth = (this.viewerScrollRef ? this.viewerScrollRef.nativeElement.clientWidth : MAX_RENDER_WIDTH) - 48;
-        const fitWidth = Math.min(Math.max(containerWidth, 320), MAX_RENDER_WIDTH);
-        const fitScale = fitWidth / unscaledViewport.width;
-        this.scale = fitScale * this.zoom;
-        const viewport = page.getViewport({ scale: this.scale });
+        try {
+            const page = await this.pdfDoc.getPage(this.currentPage);
+            const unscaledViewport = page.getViewport({ scale: 1 });
+            const containerWidth = (this.viewerScrollRef ? this.viewerScrollRef.nativeElement.clientWidth : MAX_RENDER_WIDTH) - 48;
+            const fitWidth = Math.min(Math.max(containerWidth, 320), MAX_RENDER_WIDTH);
+            const fitScale = fitWidth / unscaledViewport.width;
+            this.scale = fitScale * this.zoom;
+            const viewport = page.getViewport({ scale: this.scale });
 
-        const canvas = this.canvasRef.nativeElement;
-        const ctx = canvas.getContext('2d');
-        const pixelRatio = window.devicePixelRatio || 1;
-        canvas.width = Math.floor(viewport.width * pixelRatio);
-        canvas.height = Math.floor(viewport.height * pixelRatio);
-        canvas.style.width = viewport.width + 'px';
-        canvas.style.height = viewport.height + 'px';
+            const canvas = this.canvasRef.nativeElement;
+            const ctx = canvas.getContext('2d');
+            const pixelRatio = window.devicePixelRatio || 1;
+            canvas.width = Math.floor(viewport.width * pixelRatio);
+            canvas.height = Math.floor(viewport.height * pixelRatio);
+            canvas.style.width = viewport.width + 'px';
+            canvas.style.height = viewport.height + 'px';
 
-        const overlay = this.overlayRef.nativeElement;
-        overlay.style.width = viewport.width + 'px';
-        overlay.style.height = viewport.height + 'px';
+            const overlay = this.overlayRef.nativeElement;
+            overlay.style.width = viewport.width + 'px';
+            overlay.style.height = viewport.height + 'px';
 
-        const transform = pixelRatio !== 1 ? [pixelRatio, 0, 0, pixelRatio, 0, 0] : undefined;
-        await page.render({ canvasContext: ctx, viewport, transform }).promise;
-        this.rendering = false;
-        this.enrichFieldSelectors(this.currentPage);
+            const transform = pixelRatio !== 1 ? [pixelRatio, 0, 0, pixelRatio, 0, 0] : undefined;
+            await page.render({ canvasContext: ctx, viewport, transform }).promise;
+            this.enrichFieldSelectors(this.currentPage);
+        } finally {
+            this.rendering = false;
+        }
     }
 
     private async enrichFieldSelectors(pageNum: number): Promise<void> {

@@ -11,15 +11,14 @@ import { formatSize } from './format-size';
  *
  * Owns only the picking -- drag/drop, the hidden native input, the chosen-file preview, and
  * removing it. What happens once a file is picked (a convert button, a checkbox, a format
- * select) stays entirely the caller's, the same way bulk-transfer's own Upload button sits
- * outside its dropzone today.
+ * select) stays entirely the caller's.
  */
 @Component({
   selector: 'app-file-dropzone',
   imports: [Icon],
   template: `
     <div class="dropzone" [class.dropzone-active]="dragging()"
-         (dragover)="onDragOver($event)" (dragleave)="onDragLeave()" (drop)="onDrop($event)">
+         (dragover)="onDragOver($event)" (dragleave)="onDragLeave($event)" (drop)="onDrop($event)">
       @if (file(); as picked) {
         <app-icon name="file" size="1.75rem" class="icon-info" />
         <p class="mt-2 text-sm font-medium break-all">{{ picked.name }}</p>
@@ -56,7 +55,18 @@ export class FileDropzone {
     this.dragging.set(true);
   }
 
-  onDragLeave(): void {
+  /**
+   * dragenter/dragleave bubble and fire on the outgoing/incoming element pair whenever the
+   * pointer crosses from parent to child, and every child of this div (the icon, the text, the
+   * "Choose a file" label) sits inside it. Without this check, dragging across any of them fired
+   * a dragleave on the dropzone itself, flickering `.dropzone-active` off and back on mid-drag.
+   * `relatedTarget` is where the pointer is headed; if that's still inside the zone, it moved to
+   * a child, not out of it.
+   */
+  onDragLeave(event: DragEvent): void {
+    const related = event.relatedTarget as Node | null;
+    const zone = event.currentTarget as Node;
+    if (related && zone.contains(related)) return;
     this.dragging.set(false);
   }
 

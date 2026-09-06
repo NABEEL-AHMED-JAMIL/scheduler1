@@ -135,7 +135,10 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-danger" id="closeModal"
-                    (click)="processDeletePdfHighlighterTask()">Yes</button>
+                    [disabled]="deletingPdfHighlighterTask"
+                    (click)="processDeletePdfHighlighterTask()">
+                    {{ deletingPdfHighlighterTask ? 'Deleting…' : 'Yes' }}
+                </button>
             </div>
         </div>
     </div>

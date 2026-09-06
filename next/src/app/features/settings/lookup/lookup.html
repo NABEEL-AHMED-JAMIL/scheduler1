@@ -77,7 +77,8 @@
             <div class="mt-auto pt-1">
               @if (entryCount(lookup)) {
                 <button type="button" class="pill pill-neutral hover-brand"
-                        (click)="toggle(lookup)">
+                        (click)="toggle(lookup)"
+                        [attr.aria-expanded]="expanded().has($any(lookup.lookupId))">
                   <app-icon [name]="expanded().has($any(lookup.lookupId)) ? 'chevronDown' : 'chevronRight'"
                             size="0.85em" />
                   {{ entryCount(lookup) }} {{ entryCount(lookup) === 1 ? 'entry' : 'entries' }}
@@ -129,7 +130,8 @@
               } @else if (entryCount(lookup)) {
                 <button type="button" class="hover:opacity-80"
                         (click)="toggle(lookup)"
-                        [attr.aria-label]="expanded().has($any(lookup.lookupId)) ? 'Hide entries' : 'Show entries'">
+                        [attr.aria-label]="expanded().has($any(lookup.lookupId)) ? 'Hide entries' : 'Show entries'"
+                        [attr.aria-expanded]="expanded().has($any(lookup.lookupId))">
                   <app-icon [name]="expanded().has($any(lookup.lookupId)) ? 'chevronDown' : 'chevronRight'"
                             [class]="expanded().has($any(lookup.lookupId)) ? 'icon-info' : 'icon-muted'" />
                 </button>
@@ -151,7 +153,8 @@
               @if (entryCount(lookup)) {
                 <button type="button" class="pill pill-neutral hover-brand"
                         (click)="toggle(lookup)"
-                        [title]="expanded().has($any(lookup.lookupId)) ? 'Hide entries' : 'Show entries'">
+                        [title]="expanded().has($any(lookup.lookupId)) ? 'Hide entries' : 'Show entries'"
+                        [attr.aria-expanded]="expanded().has($any(lookup.lookupId))">
                   {{ entryCount(lookup) }}
                 </button>
               } @else {
