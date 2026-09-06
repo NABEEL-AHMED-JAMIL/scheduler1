@@ -1,5 +1,6 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { Dialog } from '@angular/cdk/dialog';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { ToastService } from '../../shared/ui/toast.service';
 import { statusColor } from '../../shared/charts/status-color';
@@ -7,6 +8,7 @@ import { Icon } from '../../shared/ui/icon';
 import { StatusPill } from '../../shared/ui/status-pill';
 import { TableShell } from '../../shared/ui/data-table';
 import { CHART_LABELS, ChartKind, ReportChart } from './report-chart';
+import { ReportDestinationDialog } from './report-destination-dialog';
 import {
   DIMENSIONS, Dimension, MEASURE_GROUPS, MEASURE_LABELS, Measure, RunData, RunRow,
   COUNTING, JOB_NAME, RUN_ID, SECONDS, buildPivot, formatMeasure, humanSeconds,
@@ -30,6 +32,7 @@ const EMPTY: RunData = { task: [], status: [], owner: [], day: [], rows: [] };
 export class Reports implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly toast = inject(ToastService);
+  private readonly dialog = inject(Dialog);
 
   readonly loading = signal(true);
   readonly error = signal('');
@@ -243,18 +246,25 @@ export class Reports implements OnInit {
   }
 
   saveToBucket(format: 'csv' | 'xlsx'): void {
-    const bucket = window.prompt('Save into which bucket?', 'etl-bucket');
-    if (!bucket) return;
-    const folder = window.prompt('Which folder?', 'reports') ?? 'reports';
-    this.send({ ...this.grid(), format, destination: 'bucket', bucket, folder }, 'bucket',
-      response => this.toast.success(response.message));
+    this.dialog.open<{ bucket: string; folder: string }>(ReportDestinationDialog, {
+      hasBackdrop: true,
+      data: { kind: 'bucket' },
+    }).closed.subscribe(result => {
+      if (!result) return;
+      this.send({ ...this.grid(), format, destination: 'bucket', bucket: result.bucket, folder: result.folder },
+        'bucket', response => this.toast.success(response.message));
+    });
   }
 
   submit(format: 'csv' | 'xlsx'): void {
-    const submitUrl = window.prompt('Submit the report to which endpoint?', 'https://');
-    if (!submitUrl || submitUrl === 'https://') return;
-    this.send({ ...this.grid(), format, destination: 'submit', submitUrl }, 'submit',
-      response => this.toast.success(response.message));
+    this.dialog.open<{ submitUrl: string }>(ReportDestinationDialog, {
+      hasBackdrop: true,
+      data: { kind: 'submit' },
+    }).closed.subscribe(result => {
+      if (!result) return;
+      this.send({ ...this.grid(), format, destination: 'submit', submitUrl: result.submitUrl },
+        'submit', response => this.toast.success(response.message));
+    });
   }
 
   private send(body: unknown, tag: string, onOk: (response: ApiResponse<unknown>) => void): void {

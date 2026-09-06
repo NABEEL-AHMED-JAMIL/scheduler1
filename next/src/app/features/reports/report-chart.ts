@@ -358,12 +358,21 @@ export class ReportChart {
     if (kind === 'line' || kind === 'area') {
       const { xs } = this.seriesLayout();
       const step = xs.length > 1 ? this.iw / (xs.length - 1) : 0;
-      return xs.map((label, xi) => (xs.length > 9 && xi % 2) ? null : ({
+      // A fixed "skip every other past 9 points" ignores how wide the labels actually render --
+      // the same problem the default bar axis below has its own fix for. 22 task names at this
+      // card's width still overlapped after skipping every other, since each surviving label was
+      // still up to the label's full length (sliced from character 5, not truncated). Thinned by
+      // measured slot width the same way, and shorten()'d instead of an odd slice(5) that dropped
+      // a label's meaningful prefix rather than marking the cut with an ellipsis.
+      const minSlotForLabel = 120;
+      const stride = step > 0 && step < minSlotForLabel ? Math.ceil(minSlotForLabel / step) : 1;
+      const lastIndex = xs.length - 1;
+      return xs.map((label, xi) => (xi % stride !== 0 && xi !== lastIndex) ? null : ({
         x: this.pad.l + step * xi, y: this.H - 22,
         // The first and last labels sit on the plot's edges, so centring them puts half of
         // each outside the viewBox, where SVG clips it. They anchor inward instead.
-        anchor: xi === 0 ? 'start' : (xi === xs.length - 1 ? 'end' : 'middle'),
-        text: label.length > 10 ? label.slice(5) : label, full: label,
+        anchor: xi === 0 ? 'start' : (xi === lastIndex ? 'end' : 'middle'),
+        text: shorten(label, 16), full: label,
       })).filter(Boolean) as any[];
     }
     const slot = this.iw / Math.max(p.rowLabels.length, 1);
