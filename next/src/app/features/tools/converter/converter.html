@@ -7,21 +7,11 @@
   </div>
 
   <div class="card p-4 space-y-4">
-    <div class="seg">
-      @for (option of [{id:'upload',label:'Upload a file',icon:'upload'},
-                       {id:'bucket',label:'From a bucket',icon:'folder'}]; track option.id) {
-        <button type="button" class="seg-btn" [class.seg-on]="mode() === option.id"
-                (click)="mode.set($any(option.id))">
-          <app-icon [name]="option.icon" size="0.9em" />{{ option.label }}
-        </button>
-      }
-    </div>
+    <app-segmented [(value)]="mode" [options]="modeOptions" ariaLabel="Choose a source" />
 
     @if (mode() === 'upload') {
-      <div>
-        <label class="label" for="file">File</label>
-        <input id="file" type="file" class="input" (change)="onFile($event)" />
-      </div>
+      <app-file-dropzone [file]="file()" (fileChange)="onFile($event)"
+                         prompt="Drop a document here" />
     } @else {
       <div class="form-grid">
         <div class="field">

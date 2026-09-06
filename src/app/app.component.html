@@ -26,12 +26,7 @@
                     <span class="glyphicon glyphicon-wrench"></span> Productivity Tools <span class="caret"></span>
                 </a>
                 <ul class="dropdown-menu">
-                    <li *ngIf="authService.currentUser?.userRole === 'PLATFORM_ADMIN'">
-                        <a routerLink="/setting/searchEngine"><span class="glyphicon glyphicon-search"></span> Search Engine</a>
-                    </li>
-                    <li><a routerLink="/setting/queryEngine"><span class="glyphicon glyphicon-hdd"></span> Query Engine</a></li>
                     <li><a routerLink="/pdfHighlighter"><span class="glyphicon glyphicon-picture"></span> PDF Highlighter</a></li>
-                    <li><a routerLink="/dynamicForm"><span class="glyphicon glyphicon-th-list"></span> Dynamic Forms</a></li>
                     <li><a routerLink="/documentConverter"><span class="glyphicon glyphicon-transfer"></span> Document Converter</a></li>
                     <li><a routerLink="/audioTranscriptExtractor"><span class="glyphicon glyphicon-headphones"></span> Audio Transcript Extractor</a></li>
                 </ul>

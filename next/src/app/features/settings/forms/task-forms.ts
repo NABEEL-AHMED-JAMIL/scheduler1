@@ -35,6 +35,14 @@ export class TaskForms implements OnInit {
 
   private readonly auth = inject(AuthService);
 
+  /**
+   * A new form always belongs to one tenant. A platform admin has none, so
+   * TaskFormServiceImpl.saveForm files their new form under the seeded "default" tenant instead
+   * of refusing it -- only that tenant's users can use it. Surfaced here so a platform admin
+   * knows where to find (or sign in as, to fully manage) what they are about to create.
+   */
+  readonly isPlatformAdmin = computed(() => this.auth.isPlatformAdmin());
+
   /** Narrows the list to rows this person created. Not persisted -- see MineFilter. */
 
   readonly onlyMine = signal(false);
@@ -54,7 +62,6 @@ export class TaskForms implements OnInit {
     return {
       total: list.length,
       fields: list.reduce((sum, form) => sum + (form.fields?.length ?? 0), 0),
-      shared: list.filter(form => form.tenantId == null).length,
       pipelines: new Set(list.map(form => form.pipelineId)).size,
     };
   });
@@ -104,10 +111,6 @@ export class TaskForms implements OnInit {
 
   requiredCount(form: TaskForm): number {
     return (form.fields ?? []).filter(field => field.required).length;
-  }
-
-  scopeLabel(form: TaskForm): string {
-    return form.tenantId == null ? 'All tenants' : `Tenant ${form.tenantId}`;
   }
 
   create(): void {

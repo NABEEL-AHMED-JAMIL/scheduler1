@@ -2,7 +2,7 @@ import { Component, OnInit, OnDestroy, ViewChild, ElementRef, NgZone } from '@an
 import { DomSanitizer, SafeHtml, SafeResourceUrl } from '@angular/platform-browser';
 import { ActivatedRoute } from '@angular/router';
 import { AlertService, AuthService, StorageService, DocumentConverterService, FileChatService, FileShareService, AiAgentService } from '@/_services';
-import { AiAgent } from '@/_models/ai-agent.model';
+import { AiAgent, agentAcceptsFile } from '@/_models/ai-agent.model';
 import { first } from 'rxjs/operators';
 import { forkJoin, Observable, Subscription } from 'rxjs';
 import { ApiCode, ApiResponse, BucketSummary, ObjectSummary, ObjectMetadata } from '@/_models';
@@ -782,6 +782,7 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
     }[] = [];
     public chatPreparing = false;
     public chatTruncated = false;
+    public chatUsingRetrieval = false;
     public chatCharsUsed = 0;
     public chatTotalChars = 0;
     public chatPrepareError: string | null = null;
@@ -881,8 +882,7 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
         }
         this.chatFile = entry;
         this.chatMinimized = false;
-        this.loadChatAgents();
-        this.prepareChatContext(entry);
+        this.loadChatAgents(entry);
     }
 
     // Minimize just collapses the floating widget down to its header bar -- the conversation
@@ -945,7 +945,13 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
         this.onRobotAction(pending);
     }
 
-    private loadChatAgents(): void {
+    // prepareChatContext runs only once this settles, never in parallel with it: the
+    // target-file-type check prepareContext runs depends on which agent is actually selected,
+    // so firing it before one is chosen either skips the check entirely (no agent id yet) or
+    // runs it against whatever agent happened to be selected for a PREVIOUS file. Mirrors the
+    // "next" app's file-chat.ts (loadAgents chaining into prepare()), which this legacy port
+    // originally copied the aiAgentId parameter from without also copying this chaining.
+    private loadChatAgents(entry: ObjectSummary): void {
         this.loadingChatAgents = true;
         this.aiAgentService.fetchAllAgents()
             .pipe(first())
@@ -955,14 +961,26 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
                     // Only agents actually usable right now: active, and either don't need a
                     // key (an Ollama-provider agent) or already have one configured -- an
                     // agent missing a required key would just fail when picked.
-                    this.chatAgents = (response.data || []).filter((agent: AiAgent) =>
+                    const usable = (response.data || []).filter((agent: AiAgent) =>
                         agent.status === 'Active' && (agent.apiKeyConfigured || agent.provider === 'Ollama'));
+                    // Narrowed further to agents that actually accept this file's type where at
+                    // least one does -- offering an agent configured for "csv,json" against a
+                    // PDF used to be silently useless right up until the backend's rejection.
+                    // If nothing matches, every usable agent is still offered rather than an
+                    // empty, unexplained dropdown; the backend's own error names the mismatch
+                    // clearly if one of them is picked and asked.
+                    const matching = this.chatFile
+                        ? usable.filter((agent: AiAgent) => agentAcceptsFile(agent, this.chatFile.key))
+                        : usable;
+                    this.chatAgents = matching.length ? matching : usable;
                     if (!this.chatSelectedAgentId && this.chatAgents.length) {
                         this.chatSelectedAgentId = this.chatAgents[0].aiAgentId;
                     }
                 }
+                this.prepareChatContext(entry);
             }, () => {
                 this.loadingChatAgents = false;
+                this.prepareChatContext(entry);
             });
     }
 
@@ -970,7 +988,7 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
     private prepareChatContext(entry: ObjectSummary): void {
         this.chatPreparing = true;
         this.chatPrepareError = null;
-        this.fileChatService.prepareContext(this.selectedBucket, entry.key)
+        this.fileChatService.prepareContext(this.selectedBucket, entry.key, this.chatSelectedAgentId)
             .pipe(first())
             .subscribe((response) => {
                 this.chatPreparing = false;
@@ -978,16 +996,39 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
                     this.chatPrepareError = response.message || 'Could not read this file.';
                     return;
                 }
-                // Only part of a long file reaches the model, so say so before the user asks
-                // something like "summarise this" and silently gets the opening section only.
-                const readiness = response.data || {};
-                this.chatTruncated = readiness.truncated === true;
-                this.chatCharsUsed = readiness.charsUsed || 0;
-                this.chatTotalChars = readiness.totalChars || 0;
+                this.applyChatReadiness(response.data);
             }, (error) => {
                 this.chatPreparing = false;
                 this.chatPrepareError = 'Could not read this file.';
             });
+    }
+
+    /** Silent re-check of the same readiness prepareChatContext fetches, called after every
+        message so the banner reflects the state a question was actually just answered against --
+        the backend re-evaluates RAG availability and retrieval fresh on every message, which can
+        genuinely differ from the one-shot snapshot taken when the chat panel first opened. Left
+        the existing banner in place on failure rather than disrupting a chat that already
+        succeeded. */
+    private refreshChatReadiness(entry: ObjectSummary): void {
+        this.fileChatService.prepareContext(this.selectedBucket, entry.key, this.chatSelectedAgentId)
+            .pipe(first())
+            .subscribe((response) => {
+                if (response.status === ApiCode.SUCCESS) {
+                    this.applyChatReadiness(response.data);
+                }
+            }, () => { /* best-effort; the existing banner stands */ });
+    }
+
+    private applyChatReadiness(data: any): void {
+        // Only part of a long file reaches the model, so say so before the user asks something
+        // like "summarise this" and silently gets the opening section only. usingRetrieval is
+        // the separate, mutually-exclusive case: not truncated, but answers are drawn from
+        // indexed excerpts rather than the whole text every time.
+        const readiness = data || {};
+        this.chatTruncated = readiness.truncated === true;
+        this.chatUsingRetrieval = readiness.usingRetrieval === true;
+        this.chatCharsUsed = readiness.charsUsed || 0;
+        this.chatTotalChars = readiness.totalChars || 0;
     }
 
     public closeChat(): void {
@@ -999,9 +1040,16 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
         this.chatPreparing = false;
         this.chatPrepareError = null;
         this.chatTruncated = false;
+        this.chatUsingRetrieval = false;
         this.chatCharsUsed = 0;
         this.chatTotalChars = 0;
         this.chatSending = false;
+        // Otherwise an agent selected for THIS file (e.g. an image-only one, auto-picked because
+        // it was the only match) carries over as the pre-selected agent for whatever file gets
+        // opened next, and prepareChatContext fires against that stale, possibly-mismatched
+        // agent before loadChatAgents has a chance to recompute a real match for the new file.
+        this.chatSelectedAgentId = '';
+        this.chatAgents = [];
     }
 
     public onChatInputKeydown(event: KeyboardEvent): void {
@@ -1055,6 +1103,9 @@ export class ObjectBrowserComponent implements OnInit, OnDestroy {
                     html: this.renderAssistantMessage(this.stripExportFences(response.data)),
                     files: this.extractDownloadableFiles(response.data)
                 });
+                if (this.chatFile) {
+                    this.refreshChatReadiness(this.chatFile);
+                }
             } else {
                 this.chatMessages.push({ role: 'error', author: 'Assistant', text: response.message || 'Something went wrong.' });
             }

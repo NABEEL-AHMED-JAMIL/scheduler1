@@ -75,7 +75,7 @@
                   <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="edit(type)">
                     <app-icon name="edit" />Edit
                   </button>
-                  @if (canRoute()) {
+                  @if (kafkaDisplay(type)) {
                     <button cdkMenuItem class="menu-item btn-intent-ok" (cdkMenuItemTriggered)="testRoute(type)">
                       <app-icon name="plug" class="icon-ok" />Test Kafka connection
                     </button>
@@ -109,12 +109,19 @@
                 <dt class="text-[color:var(--text-muted)] shrink-0 w-20">Partitions</dt>
                 <dd class="mono">{{ partitionsOf(type.queueTopicPartition) || '—' }}</dd>
               </div>
-              @if (canRoute()) {
-                <div class="flex gap-2 min-w-0">
-                  <dt class="text-[color:var(--text-muted)] shrink-0 w-20">Kafka</dt>
-                  <dd class="truncate min-w-0">{{ routeName(type) || 'default cluster' }}</dd>
-                </div>
-              }
+              <div class="flex gap-2 min-w-0">
+                <dt class="text-[color:var(--text-muted)] shrink-0 w-20">Kafka</dt>
+                <dd class="truncate min-w-0">
+                  @if (kafkaDisplay(type); as name) {
+                    <button type="button" class="text-accent hover:underline"
+                            [title]="'Open ' + name + ' in Kafka Connections'"
+                            (click)="openKafkaProfile(type)">{{ name }}</button>
+                    @if (isOverride(type)) { <span class="text-[color:var(--text-muted)]">(your override)</span> }
+                  } @else {
+                    cluster default
+                  }
+                </dd>
+              </div>
             </dl>
 
             <div class="flex items-center gap-1.5 mt-auto pt-1">
@@ -139,7 +146,7 @@
           <th>Description</th>
           <th>Topic</th>
           <th>Partitions</th>
-          @if (canRoute()) { <th>Kafka</th> }
+          <th>Kafka</th>
           <th>Tasks</th>
           <th>Created by</th>
           <th>Updated by</th>
@@ -160,19 +167,19 @@
             <td class="mono text-[color:var(--text-muted)]">
               {{ partitionsOf(type.queueTopicPartition) || '—' }}
             </td>
-            @if (canRoute()) {
-              <td>
-                @if (routeName(type); as route) {
-                  <span class="pill pill-neutral" [title]="'Publishes through ' + route">
-                    <app-icon name="server" size="0.85em" />{{ route }}
-                  </span>
-                } @else {
-                  <span class="text-[color:var(--text-muted)]" title="Uses the tenant default cluster">
-                    default
-                  </span>
-                }
-              </td>
-            }
+            <td>
+              @if (kafkaDisplay(type); as name) {
+                <button type="button" class="pill pill-neutral hover:opacity-80"
+                        [title]="(isOverride(type) ? 'Your override -- publishes through ' : 'Publishes through ') + name + '. Click to open it in Kafka Connections.'"
+                        (click)="openKafkaProfile(type)">
+                  <app-icon name="server" size="0.85em" />{{ name }}
+                </button>
+              } @else {
+                <span class="text-[color:var(--text-muted)]" title="Uses the platform's default cluster">
+                  cluster default
+                </span>
+              }
+            </td>
             <td>
               @if (type.totalTaskLink) {
                 <span class="pill pill-neutral">{{ type.totalTaskLink }}</span>
@@ -197,7 +204,7 @@
                   <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="edit(type)">
                     <app-icon name="edit" />Edit
                   </button>
-                  @if (canRoute()) {
+                  @if (kafkaDisplay(type)) {
                     <button cdkMenuItem class="menu-item btn-intent-ok" (cdkMenuItemTriggered)="testRoute(type)">
                       <app-icon name="plug" class="icon-ok" />Test Kafka connection
                     </button>

@@ -272,6 +272,14 @@
               <!-- A full chip, not the quiet dot: this column is the whole point of the
                    screen, and Waiting in particular is the state somebody is scanning for. -->
               <app-status [label]="statusLabel(r.status)" />
+              <!-- When it was decided lives here, next to what it decided -- not under
+                   "Actions", where a bare date with nothing else in the column read as the
+                   column having broken rather than as "there's nothing left to do here". -->
+              @if (r.status !== 'Pending' && r.decidedAt) {
+                <div class="text-xs text-[color:var(--text-muted)] mt-0.5 whitespace-nowrap">
+                  {{ statusLabel(r.status) }} {{ r.decidedAt | date:'d MMM y' }}
+                </div>
+              }
               @if (r.status === 'Rejected' && r.decisionNote && !isOpen(r.tenantRequestId)) {
                 <div class="text-xs text-[color:var(--text-muted)] mt-0.5 line-clamp-1">
                   {{ r.decisionNote }}
@@ -291,9 +299,7 @@
                   </button>
                 </div>
               } @else {
-                <span class="text-xs text-[color:var(--text-muted)] whitespace-nowrap">
-                  {{ r.decidedAt ? (r.decidedAt | date:'d MMM') : '' }}
-                </span>
+                <span class="text-xs text-[color:var(--text-muted)]">—</span>
               }
             </td>
           </tr>

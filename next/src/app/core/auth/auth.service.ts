@@ -85,13 +85,8 @@ export class AuthService {
 
   /** sourceTask.json add/update/delete -- SourceTaskRestApi is class-level TENANT_ADMIN. */
   readonly canManageTasks = computed(() => this.hasAtLeast('TENANT_ADMIN'));
-  /** queryEngine.json connections, queries and schedules add/update/delete. Reads and execute
-      are TENANT_USER, so only the definitions are gated. */
-  readonly canManageQueries = computed(() => this.hasAtLeast('TENANT_ADMIN'));
   /** aiAgent.json addAgent/updateAgent/deleteAgent. Fetching the agents is TENANT_USER. */
   readonly canManageAgents = computed(() => this.hasAtLeast('TENANT_ADMIN'));
-  /** dynamicForm.json -- the whole builder, submitting a shared form aside. */
-  readonly canManageForms = computed(() => this.hasAtLeast('TENANT_ADMIN'));
   /** appUser.json addUser/changeUserStatus/resetPassword. */
   readonly canManageUsers = computed(() => this.hasAtLeast('TENANT_ADMIN'));
   /** tenant.json -- a tenant spans the platform, so only a platform admin touches one. */

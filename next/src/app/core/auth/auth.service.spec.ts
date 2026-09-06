@@ -106,7 +106,6 @@ describe('AuthService.hasAtLeast', () => {
     expect(tenantUser.hasAtLeast('TENANT_ADMIN')).toBe(false);
     expect(tenantUser.hasAtLeast('TENANT_USER')).toBe(true);
     expect(tenantUser.canManageTasks()).toBe(false);
-    expect(tenantUser.canManageQueries()).toBe(false);
     expect(tenantUser.canManageAgents()).toBe(false);
   });
 });

@@ -10,5 +10,11 @@
             ]
         },
         "skipLibCheck": true
-    }
+    },
+    // No default here is "include everything under this directory" -- with next/ living right
+    // beside src/ in this same repo, that swept next/'s own (newer, incompatible) TypeScript
+    // straight into this app's webpack build: 1400+ spurious errors from files this app's entry
+    // point (src/main.ts, see webpack.config.js) never imports, drowning out anything real.
+    "include": ["src/**/*.ts"],
+    "exclude": ["node_modules", "next"]
 }

@@ -48,6 +48,17 @@
               {{ coverage()!.totalChars | number }} characters.
             </span>
           </div>
+        } @else if (coverage()?.usingRetrieval) {
+          <!-- Distinct from the truncation warning above, and mutually exclusive with it: this
+               file isn't being cut short, but answers are drawn from indexed excerpts judged
+               relevant to each question rather than the whole text every time. -->
+          <div class="flex items-start gap-2 rounded-lg px-3 py-2 text-xs"
+               style="background: color-mix(in oklab, var(--color-brand-500) 10%, transparent);">
+            <app-icon name="info" class="mt-0.5 shrink-0" style="color: var(--color-brand-500);" size="0.85em" />
+            <span class="text-[color:var(--text-secondary)]">
+              Answers are drawn from indexed excerpts of this file most relevant to each question.
+            </span>
+          </div>
         }
         @if (!messages().length) {
           <p class="text-center text-sm text-[color:var(--text-muted)] py-8">

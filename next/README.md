@@ -11,6 +11,20 @@ ng serve
 
 `http://localhost:4200`. The backend must be running: the app calls `http://<hostname>:9098/api/v1`, set in `src/app/core/api/api.config.ts`. Start it from `../../process` with `docker-compose up -d`.
 
+### In Docker
+
+```bash
+docker compose up -d --build
+```
+
+`http://localhost:4400/` — 4400, not 4200: it's the port the backend's `app.console.url` default and `WEBSOCKET_ALLOWED_ORIGINS` already assume (email links, websocket CORS), see `docker-compose.yml`. `API_BASE` is derived from `window.location.hostname` at build-independent runtime, so the container needs no environment variable or build arg to find the backend — it only has to be reachable at the same hostname on `:9098`.
+
+```bash
+curl http://localhost:4400/health   # → 200 OK
+```
+
+Full detail, including the two build gotchas specific to the newer Angular builder (`dist/next/browser/`, not `dist/next/`; SPA fallback for path-based routing), is in [`../DEPLOYMENT.md`](../DEPLOYMENT.md).
+
 ## Tests
 
 ```bash

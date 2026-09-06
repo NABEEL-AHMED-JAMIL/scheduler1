@@ -5,12 +5,14 @@ import { ToastService } from '../../../shared/ui/toast.service';
 import { copyText } from '../../../shared/ui/clipboard.util';
 import { BucketSummary, ObjectSummary, StorageService } from '../../objects/storage.service';
 import { Icon } from '../../../shared/ui/icon';
+import { Segmented, SegmentOption } from '../../../shared/ui/segmented';
+import { FileDropzone } from '../../../shared/ui/file-dropzone';
 
 const AUDIO_EXTENSIONS = ['mp3', 'm4a'];
 
 @Component({
   selector: 'app-transcript',
-  imports: [Icon],
+  imports: [Icon, Segmented, FileDropzone],
   templateUrl: './transcript.html',
 })
 export class Transcript implements OnInit {
@@ -19,6 +21,10 @@ export class Transcript implements OnInit {
   private readonly toast = inject(ToastService);
 
   readonly mode = signal<'upload' | 'bucket'>('upload');
+  readonly modeOptions: SegmentOption<'upload' | 'bucket'>[] = [
+    { id: 'upload', label: 'Upload a file', icon: 'upload' },
+    { id: 'bucket', label: 'From a bucket', icon: 'folder' },
+  ];
   readonly timestamps = signal(false);
   readonly file = signal<File | null>(null);
 
@@ -73,10 +79,10 @@ export class Transcript implements OnInit {
    * line and the time column simply stays empty.
    */
   readonly view = signal<'timeline' | 'table' | 'console'>('timeline');
-  readonly views = [
-    { key: 'timeline' as const, label: 'Timeline', icon: 'clock' },
-    { key: 'table' as const,    label: 'Table',    icon: 'list' },
-    { key: 'console' as const,  label: 'Console',  icon: 'terminal' },
+  readonly views: SegmentOption<'timeline' | 'table' | 'console'>[] = [
+    { id: 'timeline', label: 'Timeline', icon: 'clock' },
+    { id: 'table',    label: 'Table',    icon: 'list' },
+    { id: 'console',  label: 'Console',  icon: 'terminal' },
   ];
 
   readonly hasTimes = computed(() => this.segments().some(s => !!s.time));
@@ -164,8 +170,8 @@ export class Transcript implements OnInit {
 
   private browseTicket = 0;
 
-  onFile(event: Event): void {
-    this.file.set((event.target as HTMLInputElement).files?.[0] ?? null);
+  onFile(file: File | null): void {
+    this.file.set(file);
     this.transcript.set('');
   }
 

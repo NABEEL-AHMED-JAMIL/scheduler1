@@ -1,6 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { DatePipe } from '@angular/common';
+import { ActivatedRoute, Router } from '@angular/router';
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
@@ -62,6 +63,21 @@ export class KafkaConnections implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+
+  /** Set by ?profileId=… when arriving from a link on another screen (e.g. Task Types). */
+  readonly focusedProfileId = signal<number | null>(null);
+
+  readonly focusedProfileName = computed(() => {
+    const id = this.focusedProfileId();
+    if (id === null) return '';
+    return this.profiles().find(p => p.kafkaConnectionProfileId === id)?.profileName ?? `#${id}`;
+  });
+
+  clearProfileFocus(): void {
+    this.router.navigate([], { relativeTo: this.route, queryParams: {} });
+  }
 
   readonly profiles = signal<KafkaProfile[]>([]);
   readonly loading = signal(true);
@@ -76,7 +92,8 @@ export class KafkaConnections implements OnInit {
     [...new Set(this.profiles().map(p => p.securityProtocol).filter(Boolean))].sort());
 
   readonly hasFilters = computed(() =>
-    !!(this.search().trim() || this.protocolFilter() || this.statusFilter()));
+    !!(this.search().trim() || this.protocolFilter() || this.statusFilter()
+       || this.focusedProfileId() !== null));
 
   /** Narrows the list to rows this person created. Not persisted -- see MineFilter. */
 
@@ -89,7 +106,9 @@ export class KafkaConnections implements OnInit {
     const term = this.search().trim().toLowerCase();
     const protocol = this.protocolFilter();
     const status = this.statusFilter();
+    const focusedProfile = this.focusedProfileId();
     const rows = this.profiles().filter(p => {
+      if (focusedProfile !== null && p.kafkaConnectionProfileId !== focusedProfile) return false;
       if (protocol && p.securityProtocol !== protocol) return false;
       if (status && p.status !== status) return false;
       if (!term) return true;
@@ -111,6 +130,11 @@ export class KafkaConnections implements OnInit {
   readonly defaultProfile = computed(() => this.profiles().find(p => p.isDefault) ?? null);
 
   ngOnInit(): void {
+    this.route.queryParamMap.subscribe(params => {
+      const raw = params.get('profileId');
+      const parsed = raw === null ? null : Number(raw);
+      this.focusedProfileId.set(parsed !== null && Number.isFinite(parsed) ? parsed : null);
+    });
     this.load();
   }
 
@@ -132,6 +156,7 @@ export class KafkaConnections implements OnInit {
     this.search.set('');
     this.protocolFilter.set('');
     this.statusFilter.set('');
+    if (this.focusedProfileId() !== null) this.clearProfileFocus();
   }
 
   create(): void {

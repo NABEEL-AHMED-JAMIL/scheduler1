@@ -27,6 +27,18 @@
     }
   </div>
 
+  @if (focusedProfileId() !== null) {
+    <div class="card flex flex-wrap items-center gap-2 px-4 py-2.5 text-sm">
+      <app-icon name="filter" class="text-[color:var(--text-muted)]" />
+      <span>
+        Showing <strong>{{ focusedProfileName() }}</strong> only — opened from a task type.
+      </span>
+      <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="clearProfileFocus()">
+        <app-icon name="close" />Show all profiles
+      </button>
+    </div>
+  }
+
   @if (!defaultProfile() && profiles().length) {
     <div class="card flex flex-wrap items-center gap-2 px-4 py-2.5 text-sm">
       <app-icon name="alert" class="icon-warn" />

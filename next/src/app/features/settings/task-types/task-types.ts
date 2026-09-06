@@ -108,6 +108,13 @@ export class TaskTypes implements OnInit {
     this.router.navigate(['/tasks', task.taskDetailId, 'edit']);
   }
 
+  /** Jumps to the Kafka Connections screen, filtered to just this one profile. */
+  openKafkaProfile(type: TaskType): void {
+    const id = this.kafkaProfileIdFor(type);
+    if (id === null) return;
+    this.router.navigate(['/settings/kafka'], { queryParams: { profileId: id } });
+  }
+
   /** Exports the type as JSON, as the legacy screen's download did. */
   download(type: TaskType): void {
     const blob = new Blob([JSON.stringify(type, null, 2)], { type: 'application/json' });
@@ -142,6 +149,26 @@ export class TaskTypes implements OnInit {
     return profile ? profile.profileName : `#${profileId}`;
   }
 
+  /**
+   * What KafkaConnectionResolver would actually pick for this type, most specific first: a
+   * tenant's own override, else the type's own default (kafkaConnectionProfileName, shared with
+   * every tenant that uses it), else the cluster default. Shown to every role -- unlike the
+   * override itself, the type's own default is not tenant-scoped.
+   */
+  kafkaDisplay(type: TaskType): string {
+    return this.routeName(type) || type.kafkaConnectionProfileName || '';
+  }
+
+  /** True when the name shown is this tenant's own override rather than the type's default. */
+  isOverride(type: TaskType): boolean {
+    return !!this.routeName(type);
+  }
+
+  /** The profile id kafkaDisplay() is naming, so its pill can link straight to it. */
+  kafkaProfileIdFor(type: TaskType): number | null {
+    return this.routes()[type.sourceTaskTypeId!] ?? type.kafkaConnectionProfileId ?? null;
+  }
+
   private loadRoutes(): void {
     // The route endpoint rejects a platform admin, so there is nothing to ask for.
     if (this.auth.isPlatformAdmin()) return;
@@ -161,11 +188,15 @@ export class TaskTypes implements OnInit {
     }
   }
 
-  /** Tests the profile this type publishes through, which is what the old row action did. */
+  /**
+   * Tests whichever profile this type would actually publish through -- the tenant's own
+   * override if set, else the type's own default. Available to every role now that the
+   * default is not tenant-scoped; only a bare cluster-default fallback has nothing to test.
+   */
   testRoute(type: TaskType): void {
-    const profileId = this.routes()[type.sourceTaskTypeId!];
+    const profileId = this.routes()[type.sourceTaskTypeId!] ?? type.kafkaConnectionProfileId;
     if (!profileId) {
-      this.toast.error(`${type.serviceName} uses the tenant default — test that profile directly.`);
+      this.toast.error(`${type.serviceName} uses the platform's default cluster — test that profile directly.`);
       return;
     }
     this.testing.set(type.sourceTaskTypeId!);

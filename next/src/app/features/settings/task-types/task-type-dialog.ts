@@ -54,8 +54,8 @@ export interface TaskType {
         <div class="form-grid">
           <app-field label="Topic" for="topic" [required]="true"
                      [control]="form.get('topic')" [submitted]="submitted()"
-                     hint="Letters and hyphens only — the server rejects digits, dots and underscores."
-                     [errorMessages]="{ pattern: 'Use letters and hyphens only, such as scrapping-topic.' }">
+                     hint="Letters, digits, dots, underscores and hyphens — up to 249 characters."
+                     [errorMessages]="{ pattern: 'Use letters, digits, dots, underscores or hyphens, such as test-user-1-topic.' }">
             <input id="topic" class="input mono" formControlName="topic" placeholder="scrapping-topic" />
           </app-field>
 
@@ -67,12 +67,25 @@ export interface TaskType {
           </app-field>
         </div>
 
+        <app-field label="Default Kafka connection" for="defaultKafkaProfile"
+                   [control]="form.get('defaultKafkaConnectionProfileId')" [submitted]="submitted()"
+                   hint="Which cluster this topic's messages publish to. Shared with every tenant that uses this type, unless a tenant sets its own override below. Leave unset to use the platform's default cluster.">
+          <select id="defaultKafkaProfile" class="input" formControlName="defaultKafkaConnectionProfileId">
+            <option [ngValue]="null">Platform default</option>
+            @for (profile of data.profiles; track profile.kafkaConnectionProfileId) {
+              <option [ngValue]="profile.kafkaConnectionProfileId">
+                {{ profile.profileName }}@if (profile.environmentLabel) { ({{ profile.environmentLabel }}) }
+              </option>
+            }
+          </select>
+        </app-field>
+
         @if (canRoute()) {
-          <app-field label="Kafka connection" for="kafkaProfile"
-                     [control]="form.get('kafkaConnectionProfileId')" [submitted]="submitted()"
-                     hint="Leave unset to publish to your tenant's default cluster.">
-            <select id="kafkaProfile" class="input" formControlName="kafkaConnectionProfileId">
-              <option [ngValue]="null">Tenant default</option>
+          <app-field label="Your override" for="kafkaProfile"
+                     [control]="form.get('routeKafkaConnectionProfileId')" [submitted]="submitted()"
+                     hint="Replaces the default above for your tenant only. Leave unset to use the default as-is.">
+            <select id="kafkaProfile" class="input" formControlName="routeKafkaConnectionProfileId">
+              <option [ngValue]="null">Use the default above</option>
               @for (profile of data.profiles; track profile.kafkaConnectionProfileId) {
                 <option [ngValue]="profile.kafkaConnectionProfileId">
                   {{ profile.profileName }}@if (profile.environmentLabel) { ({{ profile.environmentLabel }}) }
@@ -84,8 +97,8 @@ export interface TaskType {
           <p class="field-note text-[color:var(--text-muted)] flex items-start gap-1.5">
             <app-icon name="info" size="0.9em" class="mt-px shrink-0" />
             <span>
-              Kafka routing is a per-tenant override, so it is set by a tenant admin rather than
-              here — a platform admin publishes unscoped.
+              A tenant can still override the default above for themselves; that per-tenant
+              override is set by a tenant admin rather than here.
             </span>
           </p>
         }
@@ -125,14 +138,20 @@ export class TaskTypeDialog implements OnInit {
     sourceTaskTypeId: [this.data.type?.sourceTaskTypeId ?? null],
     serviceName: [this.data.type?.serviceName ?? '', Validators.required],
     description: [this.data.type?.description ?? ''],
-    // The server's own pattern is ^topic=([a-zA-Z-]*)&partitions=\[([0-9]+|\*)\]$, so a
-    // digit in the topic or a comma-separated partition list is rejected. Enforced here to
-    // fail in the field rather than as an error after save.
+    // The server's own pattern is ^topic=([a-zA-Z0-9._-]{1,249})&partitions=\[([0-9]+|\*)\]$
+    // (see KafkaTopicPartitionUtil) -- letters, digits, dots, underscores and hyphens, since
+    // the broker itself accepts all of those and names like "orders-v2" or "etl.jobs" are
+    // real topics. A comma-separated partition list is still rejected. Enforced here to fail
+    // in the field rather than as an error after save.
     topic: [this.parse(this.data.type?.queueTopicPartition).topic,
-      [Validators.required, Validators.pattern(/^[a-zA-Z-]+$/)]],
+      [Validators.required, Validators.pattern(/^[a-zA-Z0-9._-]{1,249}$/)]],
     partitions: [this.parse(this.data.type?.queueTopicPartition).partitions,
       Validators.pattern(/^(\*|10|[0-9])$/)],
-    kafkaConnectionProfileId: [this.data.type?.kafkaConnectionProfileId ?? null],
+    // The type's own default -- saved on the type itself and shared with every tenant that
+    // uses it (KafkaConnectionResolver falls back to it once no tenant override applies).
+    defaultKafkaConnectionProfileId: [this.data.type?.kafkaConnectionProfileId ?? null],
+    // A separate, per-tenant override on top of the default above -- see canRoute.
+    routeKafkaConnectionProfileId: [null],
     status: [this.data.type?.status ?? 'Active'],
   });
 
@@ -145,7 +164,7 @@ export class TaskTypeDialog implements OnInit {
       next: response => {
         if (response.status !== API_SUCCESS) return;
         const routed = response.data?.kafkaConnectionProfileId ?? response.data?.profileId ?? null;
-        if (routed) this.form.patchValue({ kafkaConnectionProfileId: routed });
+        if (routed) this.form.patchValue({ routeKafkaConnectionProfileId: routed });
       },
     });
   }
@@ -163,6 +182,7 @@ export class TaskTypeDialog implements OnInit {
       serviceName: value.serviceName,
       description: value.description,
       queueTopicPartition: formatTopicPartition(value.topic, value.partitions),
+      kafkaConnectionProfileId: value.defaultKafkaConnectionProfileId,
       status: value.status,
     };
 
@@ -179,7 +199,7 @@ export class TaskTypeDialog implements OnInit {
           return;
         }
         const id = value.sourceTaskTypeId ?? (response.data as any)?.sourceTaskTypeId;
-        this.applyRoute(id, value.kafkaConnectionProfileId, response.message);
+        this.applyRoute(id, value.routeKafkaConnectionProfileId, response.message);
       },
       error: err => {
         this.saving.set(false);

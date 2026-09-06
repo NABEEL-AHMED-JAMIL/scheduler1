@@ -10,6 +10,8 @@ import { Dialog } from '@angular/cdk/dialog';
 import { DatePipe } from '@angular/common';
 import { confirmWith } from '../../../shared/ui/confirm';
 import { formatSize } from '../../../shared/ui/format-size';
+import { Segmented, SegmentOption } from '../../../shared/ui/segmented';
+import { FileDropzone } from '../../../shared/ui/file-dropzone';
 
 interface FormatFamily {
   key: string;
@@ -44,7 +46,7 @@ interface ConvertResult {
 
 @Component({
   selector: 'app-converter',
-  imports: [Icon, RouterLink, DatePipe],
+  imports: [Icon, RouterLink, DatePipe, Segmented, FileDropzone],
   templateUrl: './converter.html',
 })
 export class Converter implements OnInit {
@@ -64,6 +66,10 @@ export class Converter implements OnInit {
   /** Upload, or pick something already in a bucket -- the endpoint only takes a multipart
       file, so a bucket choice is fetched and handed over as one. */
   readonly mode = signal<'upload' | 'bucket'>('upload');
+  readonly modeOptions: SegmentOption<'upload' | 'bucket'>[] = [
+    { id: 'upload', label: 'Upload a file', icon: 'upload' },
+    { id: 'bucket', label: 'From a bucket', icon: 'folder' },
+  ];
   readonly buckets = signal<BucketSummary[]>([]);
   readonly bucket = signal('');
   readonly objects = signal<ObjectSummary[]>([]);
@@ -164,9 +170,8 @@ export class Converter implements OnInit {
       });
   }
 
-  onFile(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    this.file.set(input.files?.[0] ?? null);
+  onFile(file: File | null): void {
+    this.file.set(file);
     this.result.set(null);
   }
 

@@ -20,22 +20,12 @@ export * from './batch-action/batch-action.component';
 export * from './source-task/task/task.component';
 export * from './source-task/source-task.component';
 
-export * from './search-engine/search-engine.component';
-
-export * from './setting/query-engine/query-engine.component';
-
 export * from './login/login.component';
 
 export * from './object-browser/object-browser.component';
 
 export * from './pdf-highlighter/pdf-highlighter-detail/pdf-highlighter-detail.component';
 export * from './pdf-highlighter/pdf-highlighter.component';
-
-export * from './dynamic-form/dynamic-form-list/dynamic-form-list.component';
-export * from './dynamic-form/cu-dynamic-form/cu-dynamic-form.component';
-export * from './dynamic-form/fill-dynamic-form/fill-dynamic-form.component';
-export * from './dynamic-form/dynamic-form-submissions/dynamic-form-submissions.component';
-export * from './dynamic-form/view-dynamic-form-submission/view-dynamic-form-submission.component';
 
 export * from './ai-agent/ai-agent.component';
 

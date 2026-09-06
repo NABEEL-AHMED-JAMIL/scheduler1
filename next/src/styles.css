@@ -503,19 +503,6 @@
     @apply shrink-0 grid place-items-center rounded-lg w-8 h-8 text-base;
   }
 
-  /* One accent, mixed from the surface it sits on, so the tint lands at the same weight in
-     both themes without a second set of values.
-
-     Deliberately not a hue per category: the only other ramps here are ok, warn and crit, and
-     those carry status. A red glyph on Q-Message and an amber one on Task Forms would read as
-     an alarm and a warning rather than as categories. Categorising by colour needs decorative
-     hues added to the palette first. */
-  .settings-hub-glyph {
-    background: color-mix(in oklab, var(--accent-text) 15%, var(--surface-raised));
-    color: var(--accent-text);
-    @apply inline-flex items-center justify-center rounded-lg shrink-0 size-9;
-  }
-
   .card {
     background: var(--surface-raised);
     border-color: var(--border-subtle);

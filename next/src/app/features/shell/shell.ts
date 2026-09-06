@@ -70,24 +70,15 @@ export class Shell {
     {
       label: 'Tools',
       children: [
-        // Querying first and together -- saved queries, then the ad-hoc escape hatch.
-        { label: 'Query Engine', path: '/tools/query', icon: 'database',
-          hint: 'Saved SQL, run or scheduled' },
-        { label: 'Search Engine', path: '/tools/search', icon: 'search', platformOnly: true,
-          hint: 'Ad-hoc read-only SQL' },
-        // Then the things that take a file and give one back.
+        // The things that take a file and give one back.
         { label: 'Document Converter', path: '/tools/converter', icon: 'file',
           hint: 'Convert between formats' },
-        { label: 'XML Configuration', path: '/settings/xml', icon: 'code', adminOnly: true,
-          hint: 'Build a master-data document' },
         { label: 'Audio Transcript', path: '/tools/transcript', icon: 'volume',
           hint: 'Speech to text' },
-        { label: 'Content Cleaner', path: '/tools/cleaner', icon: 'sparkle',
-          hint: 'Tidy extracted text' },
       ],
     },
     {
-      label: 'AI',
+      label: 'Assistants',
       children: [
         // Open for the same reason as Source Tasks: fetchAllAgents is TENANT_USER and the
         // object browser's file chat depends on it, so the list is readable by everyone and
@@ -105,18 +96,14 @@ export class Shell {
       children: [
         { label: 'Source Task Types', path: '/settings/task-types', icon: 'layers', adminOnly: true,
           hint: 'Consumers and their Kafka topics' },
+        { label: 'Kafka Connections', path: '/settings/kafka', icon: 'server', adminOnly: true,
+          hint: 'Brokers and credentials' },
         { label: 'Task Forms', path: '/settings/forms', icon: 'template', adminOnly: true,
           hint: 'Fill in a payload instead of writing XML' },
-        { label: 'Dynamic Forms', path: '/settings/dynamic-forms', icon: 'inbox', adminOnly: true,
-          hint: 'Shareable forms and their answers' },
         { label: 'Lookups', path: '/settings/lookup', icon: 'list', adminOnly: true,
           hint: 'Shared key and value data' },
         { label: 'Storage Connections', path: '/admin/storage', icon: 'cloud', adminOnly: true,
           hint: 'S3, Azure, MinIO, FTP' },
-        { label: 'Kafka Connections', path: '/settings/kafka', icon: 'server', adminOnly: true,
-          hint: 'Brokers and credentials' },
-        { label: 'All settings', path: '/admin/settings', icon: 'settings', adminOnly: true,
-          hint: 'Every area in one place' },
       ],
     },
     {

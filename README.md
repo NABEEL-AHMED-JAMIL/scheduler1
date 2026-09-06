@@ -7,7 +7,7 @@
 | Stack | Angular 8, Webpack 4, Node 14 | Angular 22, standalone components, signals, Tailwind CSS 4 |
 | Tests | none | vitest, 31 spec files, 445 tests |
 | Built by | `webpack.config.js` | Angular CLI (`next/angular.json`) |
-| Deployed | **yes** — this is what the Docker image ships | not yet — no Dockerfile, no compose service |
+| Deployed | yes — this is what production runs | yes, in Docker (`next/Dockerfile`, port 4400) — production has not cut over yet |
 | Status | superseded, reference only | **where the work is** |
 
 `next/` is the replacement for `src/`, not a second product. Almost every recent commit touches `next/src`.
@@ -27,6 +27,8 @@ cd next && npm install && ng serve
 ```
 
 `http://localhost:4200`. It expects the backend at `http://localhost:9098/api/v1` (see `next/src/app/core/api/api.config.ts`), so start `process/` first.
+
+To run it in Docker instead — the same way it will eventually deploy — see [DEPLOYMENT.md](DEPLOYMENT.md). Briefly: `cd next && docker compose up -d --build`, then `http://localhost:4400/`. 4400, not 4200 — that port is what the backend's `app.console.url` default and `WEBSOCKET_ALLOWED_ORIGINS` already assume.
 
 Tests:
 

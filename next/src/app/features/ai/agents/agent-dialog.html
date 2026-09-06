@@ -30,9 +30,21 @@
 
     <div class="form-grid">
       <app-field label="Model" for="model" [required]="true"
-                 [control]="form.get('model')" [submitted]="submitted()">
-        <input id="model" class="input mono" formControlName="model"
-               placeholder="gpt-4.1-mini" />
+                 [control]="form.get('model')" [submitted]="submitted()"
+                 [hint]="isOllama() ? 'From what is pulled on this host -- manage the list on the AI Models screen.' : ''">
+        @if (isOllama()) {
+          <select id="model" class="input mono" formControlName="model">
+            @if (loadingOllamaModels()) {
+              <option value="" disabled>Loading installed models…</option>
+            } @else if (!modelOptions().length) {
+              <option value="" disabled>No models pulled yet -- add one on the AI Models screen.</option>
+            }
+            @for (name of modelOptions(); track name) { <option [value]="name">{{ name }}</option> }
+          </select>
+        } @else {
+          <input id="model" class="input mono" formControlName="model"
+                 placeholder="gpt-4.1-mini" />
+        }
       </app-field>
 
       <app-field label="API endpoint" for="endpoint" [control]="form.get('apiEndpoint')"

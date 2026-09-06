@@ -17,12 +17,22 @@
     </div>
   </div>
 
-  <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+  @if (isPlatformAdmin()) {
+    <div class="card flex flex-wrap items-center gap-2 px-4 py-2.5 text-sm">
+      <app-icon name="info" class="text-[color:var(--text-muted)]" />
+      <span>
+        A form belongs to one tenant. A form you create here is filed under the default tenant —
+        only that tenant's users can use it. Sign in as a specific tenant to create one for them
+        instead.
+      </span>
+    </div>
+  }
+
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
     @for (tile of [
       { label: 'Forms',     value: summary().total,     foot: 'defined', icon: 'template', tone: 'info' },
       { label: 'Pipelines', value: summary().pipelines, foot: 'covered by a form', icon: 'send', tone: 'info' },
-      { label: 'Fields',    value: summary().fields,    foot: 'across all forms', icon: 'list', tone: 'info' },
-      { label: 'Shared',    value: summary().shared,    foot: 'available to every tenant', icon: 'globe', tone: 'info' }
+      { label: 'Fields',    value: summary().fields,    foot: 'across all forms', icon: 'list', tone: 'info' }
     ]; track tile.label) {
       <app-stat-tile [label]="tile.label" [value]="tile.value" [icon]="tile.icon"
                      [tone]="$any(tile.tone)" [foot]="tile.foot" />
@@ -93,10 +103,6 @@
                 <dt class="text-[color:var(--text-muted)] shrink-0 w-20">Fields</dt>
                 <dd>{{ fieldCount(form) }} ({{ requiredCount(form) }} required)</dd>
               </div>
-              <div class="flex gap-2 min-w-0">
-                <dt class="text-[color:var(--text-muted)] shrink-0 w-20">Scope</dt>
-                <dd class="truncate min-w-0">{{ scopeLabel(form) }}</dd>
-              </div>
               @if (form.createdByName) {
                 <div class="flex gap-2 min-w-0">
                   <dt class="text-[color:var(--text-muted)] shrink-0 w-20">Created by</dt>
@@ -125,7 +131,6 @@
             <th>Form</th>
             <th>Pipeline</th>
             <th>Fields</th>
-            <th>Scope</th>
             <th>Created by</th>
             <th>Updated by</th>
             <th>Status</th>
@@ -150,7 +155,6 @@
                   ({{ requiredCount(form) }} required)
                 </span>
               </td>
-              <td class="text-xs">{{ scopeLabel(form) }}</td>
               <td class="text-xs text-[color:var(--text-secondary)]">{{ form.createdByName || '—' }}</td>
               <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
                 {{ form.updatedByName || '—' }}

@@ -351,8 +351,9 @@ export class Docs implements AfterViewInit {
         { name: 'Bucket', required: false, note: 'Where output lands. This is the connection added in step 2.' },
         { name: 'Payload', required: true, note: 'The configuration the worker receives, as XML tags.' },
       ],
-      notes: ['You do not have to write the XML by hand. Tools → XML Configuration builds it '
-            + 'from tag rows, and a dynamic form submission can be turned into a payload directly.'],
+      notes: ['You do not have to write the XML by hand. Enter the payload as tag rows and use '
+            + '"Show the XML these tags make" on this screen to preview it, or fill in a Task '
+            + 'Form (Configuration → Task Forms) if the pipeline has one defined.'],
     },
     {
       id: 'job', title: 'Put the task on a timetable',
@@ -401,10 +402,6 @@ export class Docs implements AfterViewInit {
       intro: 'None of these are needed to run a pipeline, but each removes work once you are '
            + 'past the basics.',
       notes: [
-        'Query Engine — register a database, save a SQL query, preview it, and have it run to a '
-        + 'bucket on a schedule of its own.',
-        'Dynamic Forms — build a form, share its link, and turn what comes back into a task’s '
-        + 'configuration instead of hand-writing XML.',
         'Task Forms — describe what a pipeline expects once, so its tasks are filled in field by '
         + 'field rather than as raw tags.',
         'Lookups — shared key and value data the forms and pipelines read from.',

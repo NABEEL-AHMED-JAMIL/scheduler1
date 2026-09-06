@@ -29,7 +29,6 @@ export interface TaskForm {
   pipelineId: string;
   formName: string;
   description?: string | null;
-  tenantId?: number | null;
   formStatus?: string;
   dateCreated?: string;
   createdBy?: number;

@@ -134,11 +134,9 @@ describe('route table', () => {
     const byPath: Record<string, string> = {};
     walk(routes, r => { if (r.data?.minRole) byPath[r.path] = r.data.minRole; });
     expect(byPath['admin/tenants']).toBe('PLATFORM_ADMIN');
-    // Search Engine ran raw SQL and was platform-admin-only in the legacy app.
-    expect(byPath['tools/search']).toBe('PLATFORM_ADMIN');
     expect(byPath['admin/tenant-requests']).toBe('PLATFORM_ADMIN');
     for (const p of ['admin/users', 'admin/storage', 'settings/lookup', 'settings/task-types',
-                     'settings/xml', 'settings/dynamic-forms', 'ai/models']) {
+                     'ai/models']) {
       expect(byPath[p]).toBe('TENANT_ADMIN');
     }
   });
@@ -154,10 +152,10 @@ describe('route table', () => {
   });
 
   // Their read APIs are genuinely TENANT_USER; the writes are gated on the controls instead.
-  it('leaves the task list, agents and the query engine open', () => {
+  it('leaves the task list and agents open', () => {
     const guarded: string[] = [];
     walk(routes, r => { if (r.data?.minRole) guarded.push(r.path); });
-    for (const p of ['tasks', 'ai/agents', 'tools/query', 'jobs/bulk']) {
+    for (const p of ['tasks', 'ai/agents', 'jobs/bulk']) {
       expect(guarded).not.toContain(p);
     }
   });

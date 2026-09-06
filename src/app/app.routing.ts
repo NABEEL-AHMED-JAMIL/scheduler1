@@ -14,17 +14,10 @@ import {
     SubLookupComponent,
     JobHistoryActionComponent,
     JobLogComponent,
-    SearchEngineComponent,
-    QueryEngineComponent,
     LoginComponent,
     ObjectBrowserComponent,
     PdfHighlighterComponent,
     PdfHighlighterDetailComponent,
-    DynamicFormListComponent,
-    CUDynamicFormComponent,
-    FillDynamicFormComponent,
-    DynamicFormSubmissionsComponent,
-    ViewDynamicFormSubmissionComponent,
     AiAgentComponent,
     OllamaModelsComponent,
     ContentCleanerComponent,
@@ -155,19 +148,6 @@ const routes: Routes = [
     },
     {
 
-        path: 'setting/searchEngine',
-        component: SearchEngineComponent,
-        canActivate: [AuthGuard, RoleGuard],
-        data: { roles: ['PLATFORM_ADMIN'] }
-    },
-    {
-
-        path: 'setting/queryEngine',
-        component: QueryEngineComponent,
-        canActivate: [AuthGuard]
-    },
-    {
-
         path: 'tenants',
         component: TenantsComponent,
         canActivate: [AuthGuard, RoleGuard],
@@ -208,41 +188,6 @@ const routes: Routes = [
     {
         path: 'pdfHighlighter/:pdfHighlighterTaskId',
         component: PdfHighlighterDetailComponent,
-        canActivate: [AuthGuard]
-    },
-    {
-        path: 'dynamicForm',
-        component: DynamicFormListComponent,
-        canActivate: [AuthGuard]
-    },
-    {
-        path: 'dynamicForm/new',
-        component: CUDynamicFormComponent,
-        canActivate: [AuthGuard]
-    },
-    {
-        path: 'dynamicForm/edit/:dynamicFormId',
-        component: CUDynamicFormComponent,
-        canActivate: [AuthGuard]
-    },
-    {
-        path: 'dynamicForm/fill/:dynamicFormId',
-        component: FillDynamicFormComponent,
-        canActivate: [AuthGuard]
-    },
-    {
-        path: 'dynamicForm/fill/:dynamicFormId/edit/:submissionId',
-        component: FillDynamicFormComponent,
-        canActivate: [AuthGuard]
-    },
-    {
-        path: 'dynamicForm/submissions/:dynamicFormId',
-        component: DynamicFormSubmissionsComponent,
-        canActivate: [AuthGuard]
-    },
-    {
-        path: 'dynamicForm/submissions/:dynamicFormId/:submissionId',
-        component: ViewDynamicFormSubmissionComponent,
         canActivate: [AuthGuard]
     },
     {

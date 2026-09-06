@@ -54,8 +54,4 @@ export class SettingService {
         return this.http.delete<ApiResponse>(`${config.apiUrl}/message.json/interruptJobLogs?jobQId=`+jobQId);
     }
 
-    public dynamicQueryResponse(payload: any): Observable<ApiResponse> {
-        return this.http.post<ApiResponse>(`${config.apiUrl}/setting.json/dynamicQueryResponse`, payload);
-    }
-
 }

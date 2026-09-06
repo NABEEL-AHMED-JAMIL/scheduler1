@@ -15,7 +15,7 @@ function flatten(rs: any[], prefix = ''): { path: string; route: any }[] {
 
 const find = (path: string) => flatten(routes).find(entry => entry.route.path === path)?.route;
 
-describe('storage and query routes', () => {
+describe('storage routes', () => {
   /*
    * The object browser is the frontend half of the storage guards: which bucket and key a
    * caller may reach is decided per request on the server, so the route can only name the
@@ -27,17 +27,5 @@ describe('storage and query routes', () => {
     const objects = find('objects');
     expect(objects?.data?.minRole).toBe('TENANT_USER');
     expect(objects?.canActivate).toContain(roleGuard);
-  });
-
-  /*
-   * The other half of the same rule, in the other direction. Reading connections, queries,
-   * schedules and runs is TENANT_USER, and so is executing a saved query, so a minimum on this
-   * route would take the page away from the people it was built for. Only the definitions are
-   * TENANT_ADMIN, and query-engine.html gates those controls on auth.canManageQueries().
-   */
-  it('leaves /tools/query open, gating its write controls in the template instead', () => {
-    const query = find('tools/query');
-    expect(query).toBeDefined();
-    expect(query?.data?.minRole).toBeUndefined();
   });
 });

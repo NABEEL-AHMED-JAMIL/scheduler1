@@ -22,7 +22,32 @@ interface ChatMessage {
       times, and so the display can follow the reader's locale rather than the writer's. */
   at?: number;
 }
-interface Agent { aiAgentId: number; agentName: string; provider: string; status: string; apiKeyConfigured?: boolean; }
+export interface Agent {
+  aiAgentId: number; agentName: string; provider: string; status: string;
+  apiKeyConfigured?: boolean; targetFileTypes?: string;
+}
+
+/** Lowercased, comma-split target file types (e.g. "PDF, csv" -> ['pdf', 'csv']). Blank/unset
+    means unrestricted -- mirrors FileChatServiceImpl.acceptsFileType, the actual enforcement;
+    this filter only shapes which agents are offered, it doesn't decide what's allowed. */
+export function targetFileTypesList(targetFileTypes: string | undefined): string[] {
+  return (targetFileTypes ?? '').split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+}
+
+export function fileExtension(fileName: string): string {
+  const dot = fileName.lastIndexOf('.');
+  return dot === -1 || dot === fileName.length - 1 ? '' : fileName.slice(dot + 1).toLowerCase();
+}
+
+/** Not gzip-aware the way the backend check is (see ContentTypeUtil.innerExtensionOfGzip) --
+    worst case a ".csv.gz" file hides an agent that would actually have been allowed, never the
+    other way around, and the backend is what actually enforces this regardless. */
+export function agentAcceptsFile(agent: Agent, fileName: string): boolean {
+  const types = targetFileTypesList(agent.targetFileTypes);
+  if (!types.length) return true;
+  const ext = fileExtension(fileName);
+  return !!ext && types.includes(ext);
+}
 
 @Component({
   selector: 'app-file-chat',
@@ -48,8 +73,12 @@ export class FileChat implements OnInit {
   readonly draft = signal('');
   readonly preparing = signal(true);
   readonly prepareError = signal('');
-  /** How much of the file the chosen model will actually see. Null until prepared. */
-  readonly coverage = signal<{ truncated: boolean; charsUsed: number; totalChars: number } | null>(null);
+  /** How much of the file the chosen model will actually see. Null until prepared.
+      Re-fetched after every message, not just once at panel-open -- resolveContext makes its
+      own live per-message decision (RAG availability can flip mid-session, a retrieval can come
+      back partial or fail over to truncation) that can genuinely differ from this one-shot
+      snapshot, and a banner reflecting the state from minutes ago is worse than none. */
+  readonly coverage = signal<{ truncated: boolean; usingRetrieval: boolean; charsUsed: number; totalChars: number } | null>(null);
   readonly sending = signal(false);
   readonly minimized = signal(false);
   readonly copiedIndex = signal<number | null>(null);
@@ -215,8 +244,15 @@ export class FileChat implements OnInit {
         // Only agents that can actually answer: active, and either keyed or local Ollama.
         const usable = (response.data ?? []).filter(a =>
           a.status === 'Active' && (a.apiKeyConfigured || a.provider?.toLowerCase() === 'ollama'));
-        this.agents.set(usable);
-        if (usable.length && this.agentId() === null) this.agentId.set(usable[0].aiAgentId);
+        // Narrowed further to agents that actually accept this file's type where at least one
+        // does -- offering "Bucket Assistant (csv,json)" against a PDF used to be silently
+        // useless right up until the backend's new rejection message. If nothing matches, every
+        // usable agent is still offered rather than showing an empty, unexplained dropdown; the
+        // backend's own error names the mismatch clearly if one of them is picked and asked.
+        const matching = usable.filter(a => agentAcceptsFile(a, this.fileKey()));
+        const offered = matching.length ? matching : usable;
+        this.agents.set(offered);
+        if (offered.length && this.agentId() === null) this.agentId.set(offered[0].aiAgentId);
           // Chained rather than run in parallel: the readable size depends on which provider
           // answers, so preparing before an agent is chosen reports a limit that may not apply.
           this.prepare();
@@ -239,6 +275,21 @@ export class FileChat implements OnInit {
         this.preparing.set(false);
         this.prepareError.set(err?.error?.message || 'Could not read this file.');
       },
+    });
+  }
+
+  /** Silent re-check of the same readiness `prepare()` fetches, called after every message so
+      the banner reflects the live state a question was actually just answered against, not the
+      state from when the panel opened. Deliberately doesn't touch `preparing`/`prepareError` --
+      a failed refresh just leaves the existing banner in place rather than disrupting the chat
+      that already succeeded. */
+  private refreshCoverage(): void {
+    this.http.post<ApiResponse>(`${API_BASE}/fileChat.json/prepareContext`,
+      { bucket: this.bucket(), key: this.fileKey(), aiAgentId: this.agentId() }).subscribe({
+      next: response => {
+        if (response.status === API_SUCCESS) { this.coverage.set(response.data as any ?? null); }
+      },
+      error: () => { /* best-effort; the existing banner stands */ },
     });
   }
 
@@ -276,6 +327,7 @@ export class FileChat implements OnInit {
           text: stripExportFences(raw),
           files: parseDownloadableFiles(raw, this.baseName()),
         }]);
+        this.refreshCoverage();
       },
       error: err => {
         this.settle();

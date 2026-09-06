@@ -38,12 +38,6 @@ export const routes: Routes = [
     loadComponent: () => import('./features/docs/docs').then(m => m.Docs),
   },
   {
-    // A shared form link opens for someone with no account, so it sits outside the shell and
-    // outside authGuard. fetchFormByUuid is permitAll on the server for the same reason.
-    path: 'f/:uuid',
-    loadComponent: () => import('./features/forms/form-fill').then(m => m.FormFill),
-  },
-  {
     path: '',
     component: Shell,
     canActivate: [authGuard],
@@ -171,10 +165,6 @@ export const routes: Routes = [
         loadComponent: () => import('./features/tools/transcript/transcript').then(m => m.Transcript),
       },
       {
-        path: 'tools/cleaner',
-        loadComponent: () => import('./features/tools/cleaner/cleaner').then(m => m.Cleaner),
-      },
-      {
         path: 'settings/task-types',
         loadComponent: () =>
           import('./features/settings/task-types/task-types').then(m => m.TaskTypes),
@@ -185,13 +175,6 @@ export const routes: Routes = [
         path: 'settings/forms',
         loadComponent: () =>
           import('./features/settings/forms/task-forms').then(m => m.TaskForms),
-        data: { minRole: 'TENANT_ADMIN' },
-        canActivate: [roleGuard],
-      },
-      {
-        path: 'settings/dynamic-forms',
-        loadComponent: () =>
-          import('./features/forms/dynamic-forms').then(m => m.DynamicForms),
         data: { minRole: 'TENANT_ADMIN' },
         canActivate: [roleGuard],
       },
@@ -227,21 +210,6 @@ export const routes: Routes = [
           import('./features/reports/reports').then(m => m.Reports),
       },
       {
-        // Open on purpose: reading connections, queries, schedules and history, and running a
-        // saved query, are all TENANT_USER. Only the definitions are TENANT_ADMIN, so those
-        // controls are gated in the template (auth.canManageQueries), not the route.
-        path: 'tools/query',
-        loadComponent: () =>
-          import('./features/tools/query-engine/query-engine').then(m => m.QueryEngine),
-      },
-      {
-        path: 'admin/settings',
-        loadComponent: () =>
-          import('./features/settings/hub/settings-hub').then(m => m.SettingsHub),
-        data: { minRole: 'TENANT_ADMIN' },
-        canActivate: [roleGuard],
-      },
-      {
         path: 'settings/kafka',
         loadComponent: () =>
           import('./features/settings/kafka/kafka-connections').then(m => m.KafkaConnections),
@@ -251,20 +219,6 @@ export const routes: Routes = [
       {
         path: 'settings/lookup',
         loadComponent: () => import('./features/settings/lookup/lookup').then(m => m.Lookup),
-        data: { minRole: 'TENANT_ADMIN' },
-        canActivate: [roleGuard],
-      },
-      {
-        path: 'tools/search',
-        loadComponent: () =>
-          import('./features/tools/search-engine/search-engine').then(m => m.SearchEngine),
-        data: { minRole: 'PLATFORM_ADMIN' },
-        canActivate: [roleGuard],
-      },
-      {
-        path: 'settings/xml',
-        loadComponent: () =>
-          import('./features/settings/xml-builder/xml-builder').then(m => m.XmlBuilder),
         data: { minRole: 'TENANT_ADMIN' },
         canActivate: [roleGuard],
       },

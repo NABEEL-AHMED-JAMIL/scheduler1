@@ -41,6 +41,33 @@ export class AgentDialog {
   readonly isOllama = computed(() => this.provider().toLowerCase() === 'ollama');
   readonly endpointPlaceholder = computed(() => ENDPOINT_PLACEHOLDER[this.provider()] ?? '');
 
+  /**
+   * What is actually pulled on this Ollama host, not a name typed blind. Only Ollama has a
+   * concept of "installed" at all -- a hosted provider's model catalogue is not something this
+   * server can enumerate, so every other provider keeps the free-text field it always had.
+   *
+   * Loaded once and reused rather than refetched on every provider switch back to Ollama within
+   * the same dialog session -- the AI Models screen is where pulling happens, and nothing in
+   * this dialog changes what is installed, so there is nothing to go stale here.
+   */
+  readonly ollamaModels = signal<string[]>([]);
+  readonly loadingOllamaModels = signal(false);
+
+  /**
+   * The select's option list: live models plus the currently-saved value if it is not one of
+   * them. Without the second half, editing an agent whose model was pulled on a different host,
+   * or has since been deleted here, would silently blank the field the moment this dialog loads
+   * -- the saved value is still what the agent runs with until someone actually changes it.
+   */
+  readonly modelOptions = computed(() => {
+    const installed = this.ollamaModels();
+    const current = this.form?.get('model')?.value as string | undefined;
+    if (current && !installed.includes(current)) {
+      return [...installed, current];
+    }
+    return installed;
+  });
+
   readonly form: FormGroup = this.fb.group({
     aiAgentId: [this.data.agent?.aiAgentId ?? null],
     agentName: [this.data.agent?.agentName ?? '', Validators.required],
@@ -55,7 +82,33 @@ export class AgentDialog {
   });
 
   constructor() {
-    this.form.get('provider')!.valueChanges.subscribe(v => this.provider.set(v));
+    this.form.get('provider')!.valueChanges.subscribe(v => {
+      this.provider.set(v);
+      if (this.isOllama()) {
+        this.loadOllamaModels();
+      }
+    });
+    if (this.isOllama()) {
+      this.loadOllamaModels();
+    }
+  }
+
+  private loadOllamaModels(): void {
+    if (this.ollamaModels().length || this.loadingOllamaModels()) {
+      return;
+    }
+    this.loadingOllamaModels.set(true);
+    this.http.get<ApiResponse<{ name: string }[]>>(`${API_BASE}/ollama.json/listModels`).subscribe({
+      next: response => {
+        this.loadingOllamaModels.set(false);
+        if (response.status === API_SUCCESS) {
+          this.ollamaModels.set((response.data ?? []).map(m => m.name).filter(Boolean));
+        }
+        // A failed fetch leaves the list empty -- modelOptions() still offers the saved value
+        // (if any), and the field falls back to being typed by hand, exactly as it always was.
+      },
+      error: () => this.loadingOllamaModels.set(false),
+    });
   }
 
   toggleType(type: string): void {

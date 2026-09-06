@@ -7,20 +7,12 @@
   </div>
 
   <div class="card p-4 space-y-4">
-    <div class="flex gap-1.5">
-      @for (option of [{id:'upload',label:'Upload a file'},{id:'bucket',label:'From a bucket'}]; track option.id) {
-        <button type="button" class="btn btn-sm"
-                [class.btn-primary]="mode() === option.id"
-                [class.btn-default]="mode() !== option.id"
-                (click)="mode.set($any(option.id)); transcript.set('')">{{ option.label }}</button>
-      }
-    </div>
+    <app-segmented [value]="mode()" (valueChange)="mode.set($event); transcript.set('')"
+                   [options]="modeOptions" ariaLabel="Choose a source" />
 
     @if (mode() === 'upload') {
-      <div>
-        <label class="label" for="audio">Audio file</label>
-        <input id="audio" type="file" class="input" accept=".mp3,.m4a" (change)="onFile($event)" />
-      </div>
+      <app-file-dropzone [file]="file()" (fileChange)="onFile($event)"
+                         accept=".mp3,.m4a" prompt="Drop an audio file here" hint=".mp3 or .m4a" />
     } @else {
       <div class="grid sm:grid-cols-2 gap-3">
         <div>
@@ -118,14 +110,8 @@
           {{ transcript().length }} chars
         </span>
 
-        <div class="seg ml-auto">
-          @for (mode of views; track mode.key) {
-            <button type="button" class="seg-btn" [class.seg-on]="view() === mode.key"
-                    (click)="view.set(mode.key)">
-              <app-icon [name]="mode.icon" size="0.9em" />{{ mode.label }}
-            </button>
-          }
-        </div>
+        <app-segmented class="ml-auto" [(value)]="view" [options]="views"
+                       ariaLabel="Choose how to read the transcript" />
         <button type="button" class="btn btn-default btn-sm" (click)="copy()">
           <app-icon name="copy" />Copy
         </button>

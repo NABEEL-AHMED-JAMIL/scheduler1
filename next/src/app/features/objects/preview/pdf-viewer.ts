@@ -99,8 +99,13 @@ export class PdfViewer implements OnDestroy {
       this.error.set('');
       this.pageCount.set(0);
       const pdfjs: any = await import('pdfjs-dist');
-      // Without an explicit worker the library falls back to the main thread and warns; the
-      // URL is resolved through the bundler so it is hashed and served like any other asset.
+      // Without an explicit worker the library falls back to the main thread and warns.
+      // Angular's esbuild builder (@angular/build:application) does not rewrite `new URL(...,
+      // import.meta.url)` the way Vite does -- this resolves to a plain, unhashed path served
+      // from the deployed origin's root, and it is only reachable at all because angular.json's
+      // `assets` config explicitly copies pdfjs-dist's worker file to that exact path. Change
+      // this path and the asset entry together, or the worker silently 404s (behind nginx's SPA
+      // fallback, so it looks like index.html loaded instead of throwing a clean 404).
       pdfjs.GlobalWorkerOptions.workerSrc =
         new URL('pdfjs-dist/build/pdf.worker.mjs', import.meta.url).toString();
 

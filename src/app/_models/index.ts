@@ -1,6 +1,5 @@
 ﻿export * from './object';
 export * from './response';
-export * from './dynamic-form.model';
 export * from './ai-agent.model';
 export * from './ollama.model';
 export * from './audio-transcript.model';
@@ -8,5 +7,4 @@ export * from './kafka-connection-profile.model';
 export * from './auth.model';
 export * from './tenant.model';
 export * from './app-user.model';
-export * from './query-engine.model';
 export * from './notification.model';export * from './storage-connection.model';

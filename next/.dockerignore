@@ -1,0 +1,19 @@
+# The build stage runs npm install itself; a host-built node_modules is the wrong platform's
+# native bindings and would only slow the context upload down, not save any work.
+node_modules
+dist
+.angular
+coverage
+
+.git
+.gitignore
+.DS_Store
+
+# IDE
+.idea
+.vscode
+*.launch
+
+# Never send local env/secrets into a build context.
+.env
+.env.*

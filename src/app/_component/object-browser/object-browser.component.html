@@ -296,6 +296,10 @@
                     <span class="glyphicon glyphicon-info-sign"></span>
                     This file is long -- answers use the first {{chatCharsUsed | number}} of {{chatTotalChars | number}} characters.
                 </div>
+                <div class="chat-truncation-notice" *ngIf="!chatTruncated && chatUsingRetrieval && !chatPreparing && !chatPrepareError">
+                    <span class="glyphicon glyphicon-info-sign"></span>
+                    Answers are drawn from indexed excerpts of this file most relevant to each question.
+                </div>
                 <div class="chat-messages" #chatMessagesEl>
                     <div class="chat-messages-empty" *ngIf="chatPreparing">
                         <span class="glyphicon glyphicon-refresh spin"></span>
