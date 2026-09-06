@@ -70,6 +70,14 @@
           </div>
         }
 
+        @if (nextToken()) {
+          <button type="button" class="btn btn-ghost btn-sm" (click)="loadMore()"
+                  [disabled]="loadingObjects()">
+            <app-icon name="refresh" size="0.85em" [class.spin]="loadingObjects()" />
+            {{ loadingObjects() ? 'Loading…' : 'This folder has more — load more' }}
+          </button>
+        }
+
         @if (nothingHere()) {
           <p class="text-xs text-[color:var(--text-muted)]">
             Nothing here. Go back up and try another folder.

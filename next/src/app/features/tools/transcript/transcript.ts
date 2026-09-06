@@ -97,6 +97,13 @@ export class Transcript implements OnInit {
   /** Where in the bucket the picker is looking. Empty is the root. */
   readonly prefix = signal('');
 
+  /** Set when a level has more entries than one page returned; the token to fetch the rest.
+      Undefined means either the level is fully loaded or hasn't loaded yet. Without this, a
+      folder holding more than 200 entries (an "ETL Avatars"-style bucket with hundreds of
+      per-user folders is a real example) silently truncated at 200 with no way to reach
+      anything past it -- the audio being looked for could be sitting just past the cut. */
+  readonly nextToken = signal<string | undefined>(undefined);
+
   /** Folders at this level, so audio nested inside them can be reached. */
   readonly folders = computed(() => this.objects().filter(o => o.folder));
 
@@ -129,6 +136,7 @@ export class Transcript implements OnInit {
     this.bucket.set(value);
     this.selectedKey.set('');
     this.objects.set([]);
+    this.nextToken.set(undefined);
     this.prefix.set('');
     if (!value) return;
     this.browse('');
@@ -140,6 +148,9 @@ export class Transcript implements OnInit {
   /** Jump to a breadcrumb, or to the bucket root when given nothing. */
   goTo(prefix: string): void { this.browse(prefix); }
 
+  /** Fetches the next page of the level currently open, appending rather than replacing. */
+  loadMore(): void { this.browse(this.prefix(), true); }
+
   /**
    * Lists one level of the bucket.
    *
@@ -148,24 +159,28 @@ export class Transcript implements OnInit {
    * forty files. Folders are listed alongside the audio so there is somewhere to go, rather
    * than being filtered out and leaving the tool looking broken.
    */
-  private browse(prefix: string): void {
+  private browse(prefix: string, append = false): void {
     this.prefix.set(prefix);
     this.selectedKey.set('');
     this.loadingObjects.set(true);
     // Only the newest listing may write: clicking through folders quickly would otherwise let
     // a slow response for an abandoned one replace the level actually being viewed.
     const ticket = ++this.browseTicket;
-    this.storage.listObjects(this.bucket(), prefix, undefined, 200).subscribe({
-      next: response => {
-        if (ticket !== this.browseTicket) return;
-        this.loadingObjects.set(false);
-        if (response.status === API_SUCCESS) this.objects.set(response.data?.objects ?? []);
-      },
-      error: () => {
-        if (ticket !== this.browseTicket) return;
-        this.loadingObjects.set(false);
-      },
-    });
+    this.storage.listObjects(this.bucket(), prefix, append ? this.nextToken() : undefined, 200)
+      .subscribe({
+        next: response => {
+          if (ticket !== this.browseTicket) return;
+          this.loadingObjects.set(false);
+          if (response.status !== API_SUCCESS) return;
+          const page = response.data?.objects ?? [];
+          this.objects.update(current => (append ? [...current, ...page] : page));
+          this.nextToken.set(response.data?.nextContinuationToken);
+        },
+        error: () => {
+          if (ticket !== this.browseTicket) return;
+          this.loadingObjects.set(false);
+        },
+      });
   }
 
   private browseTicket = 0;

@@ -1,6 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
+import { Subject } from 'rxjs';
 import { Transcript } from './transcript';
 import { StorageService } from '../../objects/storage.service';
 import { ToastService } from '../../../shared/ui/toast.service';
@@ -108,5 +109,69 @@ describe('Transcript segments', () => {
     t.onFile(file);
     expect(t.file()).toBe(file);
     expect(t.transcript()).toBe('');
+  });
+});
+
+function transcriptWithStorage(listObjects: ReturnType<typeof vi.fn>) {
+  TestBed.resetTestingModule();
+  TestBed.configureTestingModule({
+    providers: [
+      { provide: HttpClient, useValue: {} },
+      { provide: StorageService, useValue: { listObjects, buckets: () => new Subject() } },
+      { provide: ToastService, useValue: { success: () => {}, error: () => {}, info: () => {} } },
+    ],
+  });
+  return TestBed.runInInjectionContext(() => new Transcript());
+}
+
+const page = (objects: any[], nextContinuationToken?: string) => ({
+  status: 'SUCCESS', message: '', data: { objects, nextContinuationToken },
+});
+
+/**
+ * Regression tests: a bucket level with more entries than one page returns (a real example:
+ * an avatars-style bucket with hundreds of per-user folders) previously had no way to fetch the
+ * rest -- listObjects's own continuation token was fetched but never read.
+ */
+describe('Transcript bucket pagination', () => {
+  it('requests 200 at a time and exposes a continuation token when more remain', () => {
+    const responses = new Subject<any>();
+    const listObjects = vi.fn(() => responses.asObservable());
+    const t = transcriptWithStorage(listObjects);
+
+    t.onBucketChange('etl-avatar');
+    expect(listObjects).toHaveBeenCalledWith('etl-avatar', '', undefined, 200);
+
+    responses.next(page([{ name: '1000', key: '1000/', folder: true }], '2544/'));
+    expect(t.nextToken()).toBe('2544/');
+  });
+
+  it('loadMore appends the next page rather than replacing the current one', () => {
+    const responses = new Subject<any>();
+    const listObjects = vi.fn(() => responses.asObservable());
+    const t = transcriptWithStorage(listObjects);
+
+    t.onBucketChange('etl-avatar');
+    responses.next(page([{ name: '1000', key: '1000/', folder: true }], '2544/'));
+
+    t.loadMore();
+    expect(listObjects).toHaveBeenLastCalledWith('etl-avatar', '', '2544/', 200);
+    responses.next(page([{ name: '2545', key: '2545/', folder: true }]));
+
+    expect(t.folders().map(f => f.key)).toEqual(['1000/', '2545/']);
+    expect(t.nextToken()).toBeUndefined();
+  });
+
+  it('switching buckets clears a stale continuation token from the previous one', () => {
+    const responses = new Subject<any>();
+    const listObjects = vi.fn(() => responses.asObservable());
+    const t = transcriptWithStorage(listObjects);
+
+    t.onBucketChange('etl-avatar');
+    responses.next(page([], '2544/'));
+    expect(t.nextToken()).toBe('2544/');
+
+    t.onBucketChange('etl-bucket');
+    expect(t.nextToken()).toBeUndefined();
   });
 });

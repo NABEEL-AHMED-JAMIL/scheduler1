@@ -77,6 +77,23 @@ export class Converter implements OnInit {
   readonly selectedKey = signal('');
   readonly fetchingSource = signal(false);
 
+  /** Where in the bucket the picker is looking. Empty is the root. This mode used to only ever
+      list the root (prefix hard-coded to '') with no way to go any deeper, so any bucket that
+      organises its documents into folders -- the common case -- showed "Nothing convertible in
+      this bucket" regardless of what it actually held. */
+  readonly prefix = signal('');
+  /** Set when a level has more entries than one page returned; the token to fetch the rest. */
+  readonly nextToken = signal<string | undefined>(undefined);
+
+  /** Folders at this level, so a document nested inside one can be reached. */
+  readonly folders = computed(() => this.objects().filter(o => o.folder));
+
+  /** Breadcrumb segments for the current prefix, each with the prefix to jump back to. */
+  readonly crumbs = computed(() => {
+    const parts = this.prefix().split('/').filter(Boolean);
+    return parts.map((name, i) => ({ name, prefix: parts.slice(0, i + 1).join('/') + '/' }));
+  });
+
   /** Where the output goes, when it should go anywhere but the browser's downloads. */
   readonly saveToBucket = signal(false);
   readonly saveBucket = signal('');
@@ -113,6 +130,10 @@ export class Converter implements OnInit {
     return key ? key.slice(key.lastIndexOf('/') + 1) : '';
   });
 
+  /** True when this level holds neither a convertible document nor anywhere further to look. */
+  readonly nothingHere = computed(() =>
+    !this.loadingObjects() && !this.convertibleObjects().length && !this.folders().length);
+
   /** Nothing to convert without a source, a target format, and a destination if saving. */
   readonly canConvert = computed(() => {
     if (!this.outputFormat()) return false;
@@ -124,15 +145,46 @@ export class Converter implements OnInit {
     this.bucket.set(value);
     this.selectedKey.set('');
     this.objects.set([]);
+    this.nextToken.set(undefined);
+    this.prefix.set('');
     if (!value) return;
+    this.browse('');
+  }
+
+  /** Descend into a folder. */
+  openFolder(key: string): void { this.browse(key); }
+
+  /** Jump to a breadcrumb, or to the bucket root when given nothing. */
+  goTo(prefix: string): void { this.browse(prefix); }
+
+  /** Fetches the next page of the level currently open, appending rather than replacing. */
+  loadMore(): void { this.browse(this.prefix(), true); }
+
+  /** Bumped per listing; a response whose ticket is stale has been superseded. */
+  private browseTicket = 0;
+
+  private browse(prefix: string, append = false): void {
+    this.prefix.set(prefix);
+    this.selectedKey.set('');
     this.loadingObjects.set(true);
-    this.storage.listObjects(value, '').subscribe({
-      next: response => {
-        this.loadingObjects.set(false);
-        if (response.status === API_SUCCESS) this.objects.set(response.data?.objects ?? []);
-      },
-      error: () => this.loadingObjects.set(false),
-    });
+    // Only the newest listing may write: clicking through folders quickly would otherwise let
+    // a slow response for an abandoned one replace the level actually being viewed.
+    const ticket = ++this.browseTicket;
+    this.storage.listObjects(this.bucket(), prefix, append ? this.nextToken() : undefined, 200)
+      .subscribe({
+        next: response => {
+          if (ticket !== this.browseTicket) return;
+          this.loadingObjects.set(false);
+          if (response.status !== API_SUCCESS) return;
+          const page = response.data?.objects ?? [];
+          this.objects.update(current => (append ? [...current, ...page] : page));
+          this.nextToken.set(response.data?.nextContinuationToken);
+        },
+        error: () => {
+          if (ticket !== this.browseTicket) return;
+          this.loadingObjects.set(false);
+        },
+      });
   }
 
   /** Pulls the chosen object down so it can be posted as the multipart file. */
