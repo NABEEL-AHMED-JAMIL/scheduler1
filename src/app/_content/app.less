@@ -93,9 +93,11 @@ body.jw-modal-open {
   overflow: hidden;
 }
 
-@brand-primary: #4f46e5;
+/* Matches the next app's --color-brand-500 (see styles.css) so both frontends share one
+   identity. Was #4f46e5 (indigo) before this rebrand to teal/cyan. */
+@brand-primary: #0a6b76;
 @brand-secondary: #ff8300;
-@gray: #6b7381;
+@gray: #6b7d81;
 @gray-light: lighten(@gray, 15%);
 @gray-lighter: lighten(@gray, 30%);
 ;
@@ -780,19 +782,23 @@ a {
   background-color: white;
 }
 
-@brand-teal: #4f46e5;
-@brand-teal-dark: #3730a3;
+// Genuinely teal now -- this was named @brand-teal while actually holding the old indigo.
+// Matches the next app's --color-brand-500/700 so both frontends share one identity.
+@brand-teal: #0a6b76;
+@brand-teal-dark: #054a51;
 @brand-accent: #7c3aed;
 // Deeper and cooler than the old #2f3a45 -- the nav is a persistent frame, so it reads
 // better as a quiet dark edge than as another mid-grey competing with the content.
-@brand-slate: #1f2733;
-// Neutrals carry a slight indigo bias rather than sitting on pure grey, so they read as
+// Same lightness/saturation as before, hue-rotated from indigo (~220) to teal (~190) to
+// match the rebrand -- see the next app's --color-ink-* in styles.css for the same family.
+@brand-slate: #1f3033;
+// Neutrals carry a slight teal bias rather than sitting on pure grey, so they read as
 // chosen alongside the brand colour instead of inherited from the framework.
-@ink: #1f2532;
-@muted: #6b7385;
-@line: #e4e6ef;
+@ink: #1f2f32;
+@muted: #6b8185;
+@line: #e4edef;
 @surface: #ffffff;
-@page-bg: #f4f5fa;
+@page-bg: #f4f9fa;
 
 body {
   font-family: 'IBM Plex Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
@@ -2547,7 +2553,7 @@ button.pill-icon {
 }
 
 .btn-icon .glyphicon        { color: #566573; }
-.btn-icon.ic-view .glyphicon     { color: #4f46e5; }
+.btn-icon.ic-view .glyphicon     { color: @brand-primary; }
 .btn-icon.ic-edit .glyphicon     { color: #2563eb; }
 .btn-icon.ic-delete .glyphicon   { color: #c0392b; }
 .btn-icon.ic-run .glyphicon      { color: #1d5fa8; }
@@ -2558,7 +2564,7 @@ button.pill-icon {
 .btn-icon.ic-interrupt .glyphicon{ color: #6a3bbf; }
 .btn-icon.ic-add .glyphicon      { color: #1d7a3f; }
 .btn-icon.ic-copy .glyphicon     { color: #566573; }
-.btn-icon.ic-refresh .glyphicon  { color: #4f46e5; }
+.btn-icon.ic-refresh .glyphicon  { color: @brand-primary; }
 .btn-icon.ic-active .glyphicon   { color: #1d7a3f; }
 .btn-icon.ic-inactive .glyphicon { color: #adb3b9; }
 .btn-icon.ic-more .glyphicon     { color: #566573; }
@@ -3432,7 +3438,7 @@ button.pill-icon {
 .chat-message-copy-btn:hover,
 .chat-message-copy-btn:focus {
   background: #e7e5fb;
-  color: #4f46e5;
+  color: @brand-primary;
 }
 
 // One of these renders per ```csv/json/tsv/txt fence the model produced when the user asked
@@ -3472,7 +3478,7 @@ button.pill-icon {
   background: #f4f3fd;
   border: 1px solid #dcd9f7;
   border-radius: 4px;
-  color: #4f46e5;
+  color: @brand-primary;
   cursor: pointer;
 }
 
@@ -3590,7 +3596,7 @@ button.pill-icon {
 
 .chat-suggestions-toggle:hover,
 .chat-suggestions-toggle:focus {
-  color: #4f46e5;
+  color: @brand-primary;
 }
 
 .chat-suggestions-toggle .glyphicon {
@@ -3604,7 +3610,7 @@ button.pill-icon {
   background: #f4f3fd;
   border: 1px solid #dcd9f7;
   border-radius: 999px;
-  color: #4f46e5;
+  color: @brand-primary;
   cursor: pointer;
 }
 
@@ -3643,7 +3649,7 @@ button.pill-icon {
 .chat-mic-btn:focus:not([disabled]) {
   background: #f1f0fd;
   border-color: #c3c0ef;
-  color: #4f46e5;
+  color: @brand-primary;
 }
 
 // Solid, saturated red (not the pale error-tint used elsewhere) -- a color change alone was
@@ -3856,7 +3862,7 @@ button.pill-icon {
 .etag-copy-btn:focus {
   background: #f1f0fd;
   border-color: #c3c0ef;
-  color: #4f46e5;
+  color: @brand-primary;
 }
 
 .preview-modal-body {

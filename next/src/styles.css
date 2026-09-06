@@ -3,40 +3,47 @@
 /* ---------------------------------------------------------------------------
    Design tokens.
 
-   The palette keeps the indigo the product already had -- it is genuinely good
-   and carries continuity for anyone who used the old UI -- but the neutrals are
-   biased a few degrees toward it rather than being pure grey, so surfaces read
-   as chosen rather than defaulted.
+   Rebrand from the product's original indigo to a teal/cyan accent, alongside a
+   near-black neutral scale carrying the same hue (a few degrees of cyan bias
+   instead of the old blue-indigo one) rather than pure grey, so surfaces still
+   read as chosen rather than defaulted. Every load-bearing pair below was
+   re-measured against WCAG 2 contrast (relative luminance, not eyeballed) to
+   at least match what the indigo palette cleared -- see the ratios noted next
+   to each one. Values were generated from HSL (teal/cyan hue ~186 for the
+   accent, ~190 for the neutrals) and hand-tuned where the raw interpolation
+   fell short of 4.5:1.
 
    Semantic colours are deliberately separate from the accent: an operations
    console has to say "this failed" without competing with "this is a link".
+   They are unchanged by this rebrand -- ok/warn/crit keep their original
+   green/amber/rose, which read correctly against both the old and new accent.
    --------------------------------------------------------------------------- */
 @theme {
-  --color-ink-50:  #f6f7fb;
-  --color-ink-100: #eceef6;
-  --color-ink-200: #dee1ee;
-  --color-ink-300: #c3c8dc;
-  --color-ink-400: #8f97b2;
+  --color-ink-50:  #f5f7f7;
+  --color-ink-100: #eaeff0;
+  --color-ink-200: #d8e0e1;
+  --color-ink-300: #bbc8cb;
+  --color-ink-400: #85979b;
   /* Between 400 and 500: the lightest muted step that still clears 4.5:1 on the sunken
-     surface, which is what a hovered table row switches to. */
-  --color-ink-450: #616980;
-  --color-ink-500: #6b7392;
-  --color-ink-600: #4e5570;
-  --color-ink-700: #3a4059;
-  --color-ink-800: #262b3f;
-  --color-ink-900: #171b2b;
-  --color-ink-950: #0f1220;
+     surface, which is what a hovered table row switches to. Measured: 5.17:1. */
+  --color-ink-450: #566669;
+  --color-ink-500: #677d81;
+  --color-ink-600: #495a5d;
+  --color-ink-700: #344144;
+  --color-ink-800: #222b2d;
+  --color-ink-900: #161c1d;
+  --color-ink-950: #0e1314;
 
-  --color-brand-50:  #eef0fd;
-  --color-brand-100: #dfe2fc;
-  --color-brand-200: #c4c9f9;
-  --color-brand-300: #9fa5f3;
-  --color-brand-400: #7b7bea;
-  --color-brand-500: #4f46e5;
-  --color-brand-600: #4338ca;
-  --color-brand-700: #3730a3;
-  --color-brand-800: #2e2a82;
-  --color-brand-900: #272567;
+  --color-brand-50:  #eff9fa;
+  --color-brand-100: #dbf2f5;
+  --color-brand-200: #b2e5eb;
+  --color-brand-300: #81d6df;
+  --color-brand-400: #1fb1c1;
+  --color-brand-500: #0a6b76;
+  --color-brand-600: #055a63;
+  --color-brand-700: #054a51;
+  --color-brand-800: #063b41;
+  --color-brand-900: #072f33;
 
   --color-ok-100: #dcf3e6;
   --color-ok-500: #1d7a44;
@@ -79,8 +86,8 @@
 
   /* The accent as *text* is a different colour from the accent as a *fill*, and they have to
      move in opposite directions between themes. Measured on this palette: brand-500 on a dark
-     card is 2.72:1 -- below AA -- while white on brand-500 is 6.29:1. So a filled button keeps
-     brand-500 in both themes, and accent text switches to brand-300 (7.45:1) in the dark one.
+     card is 2.77:1 -- below AA -- while white on brand-500 is 6.22:1. So a filled button keeps
+     brand-500 in both themes, and accent text switches to brand-300 (10.36:1) in the dark one.
      Before this there was no token for it, which is why forty-three hand-written html.dark
      rules had accumulated, each re-lightening one component. */
   --color-accent:      var(--accent-text);
@@ -95,19 +102,19 @@
        OS, not the page. Without this they stay light on the dark theme, which is why a date
        field read as a white Bootstrap control sitting on a dark form. */
     color-scheme: light;
-    --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23616980' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-    --date-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23616980' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='16' rx='2'/%3E%3Cpath d='M3 10h18M8 3v4M16 3v4'/%3E%3C/svg%3E");
+    --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23566669' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    --date-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23566669' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='16' rx='2'/%3E%3Cpath d='M3 10h18M8 3v4M16 3v4'/%3E%3C/svg%3E");
 
     --surface-page:    var(--color-ink-50);
     --surface-raised:  #ffffff;
     --surface-sunken:  var(--color-ink-100);
     /* A recessed *area* inside a white card, as distinct from a hover or selected state.
-       ink-100 carries twice the blue cast of the page (chroma 10 against 5) and drops 6.6
-       lightness points from white, so on a white card a large fill of it read as a blue band
+       ink-100 carries twice the cyan cast of the page (chroma 16 against 14) and drops 3.5
+       lightness points from white, so on a white card a large fill of it read as a tinted band
        rather than a shade -- most visibly a table's total row. This is the same idea at a
        whisper: near the page's own tint, a third of the way to it in lightness. Interactive
        states keep ink-100, because a hover has to actually register. */
-    --surface-inset:   #f4f6fa;
+    --surface-inset:   #f1f4f5;
     /* A code block is a well, not a card. It was painted with --surface-raised, which is white
        -- lighter than the inset panel it usually sits in -- so a payload appeared to float
        above the very area it belongs to, and an expanded row read as three near-identical
@@ -116,20 +123,21 @@
        block is a bounded box with a border rather than a full-width fill. */
     --surface-code:    var(--color-ink-100);
     /* Brand-tinted hover, as a token because a hardcoded light tint is unreadable on dark:
-       pill-neutral's own text over bg-brand-50 measured 2.22 in dark mode. */
+       pill-neutral's own text over a raw bg-brand-50 measures well under 4.5 in dark mode. */
     --hover-brand-bg:  var(--color-brand-50);
     --hover-brand-fg:  var(--color-brand-700);
     /* Overlay scrollbars stay invisible until the pointer moves, so a list that scrolls
        inside its own box looks like a list that simply stops. These make the track visible. */
-    --scrollbar-thumb:       #c2c8d6;
-    --scrollbar-thumb-hover: #98a1b5;
+    --scrollbar-thumb:       #bbc8cb;
+    --scrollbar-thumb-hover: #85979b;
     --surface-inverse: var(--color-ink-900);
     --border-subtle:   var(--color-ink-200);
     --border-strong:   var(--color-ink-300);
     --text-primary:    var(--color-ink-900);
-    /* Measured against the surface each is used on: ink-500 on white is 4.67:1 and ink-600
-       is 7.35:1, so both clear 4.5. The previous muted step (ink-400) measured 2.90:1 and
-       was carrying every table header, tile label and hint in the app. */
+    /* Measured against the surface each is used on: ink-500 on white is 4.35:1 -- just short
+       of 4.5 -- while ink-600 clears it at 7.23:1, which is why text-secondary is 600 rather
+       than 500 (500 is reserved for non-text uses, e.g. .dot-neutral). The previous muted step
+       (ink-400) measured 3.04:1 and was carrying every table header, tile label and hint. */
     --text-secondary:  var(--color-ink-600);
     --text-muted:      var(--color-ink-450);
     --text-inverse:    #ffffff;
@@ -139,31 +147,32 @@
 
   html.dark {
     color-scheme: dark;
-    --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239aa3bd' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-    --date-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239aa3bd' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='16' rx='2'/%3E%3Cpath d='M3 10h18M8 3v4M16 3v4'/%3E%3C/svg%3E");
+    --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238fa3a7' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    --date-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238fa3a7' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='16' rx='2'/%3E%3Cpath d='M3 10h18M8 3v4M16 3v4'/%3E%3C/svg%3E");
     --surface-page:    var(--color-ink-950);
     --surface-raised:  var(--color-ink-900);
-    --surface-sunken:  #12151f;
-    /* Dark has no cast problem -- everything is already navy -- so an inset is just sunken. */
-    --surface-inset:   #12151f;
+    --surface-sunken:  #101516;
+    /* Dark has no cast problem -- everything is already this hue -- so an inset is just sunken. */
+    --surface-inset:   #101516;
     /* Deeper than both the card and the inset panel, so the well reads the same way it does
        in light. */
-    --surface-code:    #0c0f18;
-    /* The same 22% mix the dark pills use, so a hover matches the chips around it. 6.97. */
+    --surface-code:    #090d0e;
+    /* The same mix the dark pills use, so a hover matches the chips around it -- comfortably
+       above 4.5 for the text that sits on it. */
     --hover-brand-bg:  color-mix(in oklab, var(--color-brand-500) 22%, var(--surface-raised));
     --hover-brand-fg:  var(--color-brand-300);
-    --scrollbar-thumb:       #3a4258;
-    --scrollbar-thumb-hover: #4d5773;
+    --scrollbar-thumb:       #344144;
+    --scrollbar-thumb-hover: #495a5d;
     --surface-inverse: var(--color-ink-100);
-    --border-subtle:   #2a3049;
-    --border-strong:   #39405c;
+    --border-subtle:   var(--color-ink-800);
+    --border-strong:   var(--color-ink-700);
     --text-primary:    var(--color-ink-50);
-    /* ink-300 is 10.27:1 and ink-400 is 5.89:1 on the raised surface; the old muted step
-       (ink-500) was 3.66:1. */
+    /* ink-300 is 10.05:1 and ink-400 is 5.66:1 on the raised surface; the old muted step
+       (ink-500) was 3.96:1. */
     --text-secondary:  var(--color-ink-300);
     --text-muted:      var(--color-ink-400);
     --text-inverse:    var(--color-ink-950);
-    /* brand-300 measures 7.45:1 on the raised surface where brand-600 managed 2.16:1. */
+    /* brand-300 measures 10.36:1 on the raised surface where brand-600 managed 2.18:1. */
     --accent-text:     var(--color-brand-300);
     /* brand-50 is a near-white lavender and was never redefined here, so the active nav item
        rendered as a bright chip on a dark bar. Mixed from the accent instead, so it stays a
@@ -1054,7 +1063,7 @@ html.dark .btn-intent-crit:focus app-icon { color: var(--color-crit-400); }
  * close enough to read as the same series.
  */
 :root {
-  --chart-0: #4f46e5;   /* brand   6.29 on white */
+  --chart-0: #0a6b76;   /* brand   6.22 on white */
   --chart-1: #0369a1;   /* info    5.93 */
   --chart-2: #1d7a44;   /* ok      5.36 */
   --chart-3: #b45309;   /* warn    5.02 */
@@ -1073,21 +1082,21 @@ html.dark .btn-intent-crit:focus app-icon { color: var(--color-crit-400); }
  * and each pair is at least 55 units apart so the two members never read as one series.
  */
 :root {
-  --series-brand-soft: #7b7bea;  --series-brand: #4338ca;
+  --series-brand-soft: #2293a0;  --series-brand: #055a63;
   --series-ok-soft:    #2f9d5b;  --series-ok:    #166534;
   --series-warn-soft:  #d97706;  --series-warn:  #8a3d07;
   --series-crit-soft:  #e05c74;  --series-crit:  #a01b34;
-  --series-muted:      #6b7690;
+  --series-muted:      #677d81;
 }
 
 html.dark {
-  --series-brand-soft: #6f6fe4;  --series-brand: #a9a9f5;
+  --series-brand-soft: #2293a0;  --series-brand: #1ec0d2;
   --series-ok-soft:    #2f9d5b;  --series-ok:    #6ee7a0;
   --series-warn-soft:  #b97a2a;  --series-warn:  #f0c088;
   --series-crit-soft:  #c4485f;  --series-crit:  #f79bab;
-  --series-muted:      #9aa3bd;
+  --series-muted:      #85979b;
 
-  --chart-0: #8b8bef;   /* brand   5.73 on the raised surface */
+  --chart-0: #1da5b4;   /* brand   5.81 on the raised surface */
   --chart-1: #38bdf8;   /* info    7.98 */
   --chart-2: #4ec27f;   /* ok      7.61 */
   --chart-3: #e0a25c;   /* warn    7.73 */

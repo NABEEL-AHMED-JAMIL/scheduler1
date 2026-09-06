@@ -322,7 +322,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   public drawJobRunningStatistics(dataPaload: any): void {
 
     const colorMap: { [key: string]: string } = {
-      'START': '#4f46e5',
+      'START': '#0a6b76',
       'RUNNING': '#f39c12',
       'FAILED': '#c0392b',
       'COMPLETED': '#27ae60'
@@ -418,7 +418,7 @@ export class HomeComponent implements OnInit, OnDestroy {
         bottom: '3%',
         containLabel: true
       },
-      color: ['#4f46e5'],
+      color: ['#0a6b76'],
       xAxis: [
         {
           type: 'category',
@@ -523,7 +523,7 @@ export class HomeComponent implements OnInit, OnDestroy {
           formatter: (value: string) => value === 'Sunday' ? `{sunday|${value}}`
             : value === todayLabel ? `{today|${value}}` : value,
           rich: {
-            today: { color: '#4f46e5', fontWeight: 700 },
+            today: { color: '#0a6b76', fontWeight: 700 },
             sunday: { color: '#d97706', fontWeight: 700 }
           }
         }
@@ -541,7 +541,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
           seriesIndex: 0,
 
-          color: ['#3730a3', '#4f46e5', '#a5b4fc', '#eef0fb']
+          color: ['#054a51', '#0a6b76', '#81d6df', '#eff9fa']
         }
       ],
       series: [
