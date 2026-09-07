@@ -114,10 +114,10 @@
             @if (form.fields?.length) {
               <div class="flex flex-wrap gap-1">
                 @for (field of form.fields.slice(0, 6); track field.taskFormFieldId) {
-                  <span class="chip mono text-xs" [title]="field.label">{{ field.tagKey }}</span>
+                  <span class="pill pill-neutral mono" [title]="field.label">{{ field.tagKey }}</span>
                 }
                 @if (form.fields.length > 6) {
-                  <span class="chip text-xs">+{{ form.fields.length - 6 }} more</span>
+                  <span class="pill pill-neutral">+{{ form.fields.length - 6 }} more</span>
                 }
               </div>
             }

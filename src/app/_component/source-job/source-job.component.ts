@@ -14,14 +14,19 @@ import { Subscription } from 'rxjs';
 import { EChartOption } from 'echarts';
 import { formatScheduleSummary as sharedFormatScheduleSummary } from '../../global-config';
 
+// Matches JOB_STATUS_COLOR in job-status-chart.helper.ts and app.less's .status-* pills -- this
+// table used to disagree with both (Start was indigo #283593 here, brand blue everywhere else),
+// so the same run rendered a different colour in this chart than in its own status pill.
 const JOB_QUEUE_STATUS_COLOR: { [status: string]: string } = {
-    Queue: '#0c7c8c',
-    Start: '#283593',
-    Running: '#b5730a',
-    Failed: '#c0392b',
-    Completed: '#1d7a3f',
-    Interrupt: '#6a3bbf',
-    Skip: '#566573'
+    Queue: '#475569',
+    Start: '#1e40af',
+    Running: '#2563eb',
+    Failed: '#bb2d48',
+    Completed: '#1d7a44',
+    Interrupt: '#f2748c',
+    Skip: '#b45309',
+    Missed: '#8a3d07',
+    InFlight: '#1e40af'
 };
 
 @Component({

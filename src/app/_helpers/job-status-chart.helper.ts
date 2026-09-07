@@ -7,24 +7,30 @@ export interface ColumnBarSegment {
   color: string;
 }
 
+/**
+ * Matches the run-status colours in app.less (.status-* and .pill-solid-*) and the next app's
+ * status-color.ts, so a job's stage is the same colour in a chart as it is in its own pill.
+ * Running and Failed use the brighter "solid" shade -- brand-500 and crit-500 -- to keep the
+ * same weight distinction the pills give them over Start and Interrupt, which share their tone.
+ */
 export const JOB_STATUS_COLOR: { [key: string]: string } = {
-  'queue': '#0c7c8c',
-  'start': '#2563eb',
-  'running': '#b5730a',
-  'failed': '#c0392b',
-  'completed': '#1d7a3f',
-  'skip': '#1c6ea4',
-  'interrupt': '#6a3bbf',
-  'missed': '#d97706',
-  'inflight': '#0c7c8c'
+  'queue': '#475569',
+  'start': '#1e40af',
+  'running': '#2563eb',
+  'failed': '#bb2d48',
+  'completed': '#1d7a44',
+  'skip': '#b45309',
+  'interrupt': '#f2748c',
+  'missed': '#8a3d07',
+  'inflight': '#1e40af'
 };
 export const JOB_STATUS_ORDER = ['Queue', 'Start', 'Running', 'Failed', 'Completed', 'Skip', 'Interrupt', 'Missed'];
-export const PILL_SUCCESS_COLOR = '#1d7a3f';
-export const PILL_DANGER_COLOR = '#c0392b';
+export const PILL_SUCCESS_COLOR = '#1d7a44';
+export const PILL_DANGER_COLOR = '#bb2d48';
 export const FILL_COLOR = '#2563eb';
 export const EMPTY_COLOR = '#d7dce1';
 
-export const CATEGORY_PALETTE = ['#2563eb', '#0c7c8c', '#b5730a', '#c0392b', '#1d7a3f', '#6a3bbf', '#1c6ea4', '#e67e22'];
+export const CATEGORY_PALETTE = ['#2563eb', '#0369a1', '#1d7a44', '#b45309', '#bb2d48', '#a21caf', '#475569', '#1d4ed8'];
 export const JOB_ID_PIE_TOP_N = 8;
 
 export function compactAxisNumber(value: number): string {
