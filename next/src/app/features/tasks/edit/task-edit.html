@@ -147,139 +147,25 @@
           </div>
 
           <p class="text-xs text-[color:var(--text-muted)] mt-3">
-            These answers become the configuration tags below. Anything the form does not cover
-            can still be added there by hand.
+            The payload sent to the pipeline is generated from these answers when you save --
+            there is nothing else to configure.
           </p>
         </div>
-      }
-
-      <div class="form-section">
-        <div class="flex items-center gap-2 mb-3">
-          <h2 class="form-section-title mb-0 mr-auto">Configuration tags</h2>
-          <!-- Collapsed while a form is answering for them, so the screen leads with the
-               question rather than its output. Never hidden outright: a form covers the tags
-               its author thought of, and a task can legitimately need one they did not. -->
-          @if (taskFormDef()) {
-            <button type="button" class="btn btn-ghost btn-sm" (click)="showTags.set(!showTags())">
-              <app-icon [name]="showTags() ? 'chevronDown' : 'chevronRight'" />
-              {{ showTags() ? 'Hide tags' : 'Edit tags directly' }}
-            </button>
-          }
-          @if (showTags()) {
-            <button type="button" class="btn btn-ghost btn-sm" (click)="showTagHelp.set(!showTagHelp())">
-              {{ showTagHelp() ? 'Hide help' : 'How do I link a bucket?' }}
-            </button>
-            <button type="button" class="btn btn-default btn-sm" (click)="addTag()"><app-icon name="plus" class="icon-ok" />Add tag</button>
-          }
+      } @else if (!loading()) {
+        <!-- No form exists for the chosen pipeline (or none is chosen yet). A pipeline is only
+             ever defined by creating its form now, so this is the fallback for a pipeline that
+             predates one, not a second way to configure a pipeline that has one. -->
+        <div class="form-section">
+          <h2 class="form-section-title">Task payload</h2>
+          <app-field label="XML configuration" for="payload" [required]="true"
+                     [control]="form.get('taskPayload')" [submitted]="submitted()"
+                     hint="This pipeline has no form, so this is sent to the consumer as-is. Create a form under Configuration › Pipeline Forms to fill this in field by field instead.">
+            <textarea id="payload" class="input mono text-xs resize-y min-h-40"
+                      formControlName="taskPayload"
+                      placeholder="&lt;pipeline&gt;...&lt;/pipeline&gt;"></textarea>
+          </app-field>
         </div>
-
-        @if (showTags()) {
-          @if (showTagHelp()) {
-            <div class="rounded-md p-3.5 mb-3 text-sm space-y-1.5 bg-sunken"
-                >
-              <p>To point this task at storage, add a tag for each part of the path:
-                <span class="mono">bucket</span> (or <span class="mono">bucket_name</span>),
-                <span class="mono">input_folder</span> and <span class="mono">output_folder</span>.</p>
-              <p class="text-[color:var(--text-secondary)]">
-                The value is the name itself — type the bucket exactly as the provider spells it,
-                and folders as a path such as <span class="mono">reports/2026</span>.
-                Buckets are connected under Admin › Storage Connections.
-              </p>
-            </div>
-          }
-
-          <div class="overflow-x-auto">
-            <table class="table-modern">
-              <thead>
-                <tr>
-                  <th>Tag key</th>
-                  <th>Parent</th>
-                  <th>Value</th>
-                  <th class="w-24 text-right">Row</th>
-                </tr>
-              </thead>
-              <tbody formArrayName="tags">
-                @for (tag of tags.controls; track $index; let i = $index) {
-                  <tr [formGroupName]="i">
-                    <td>
-                      <input class="input" formControlName="tagKey" placeholder="tag key"
-                             (blur)="trimTag(i, 'tagKey')"
-                             [class.mono]="isStorageTag(tag.get('tagKey')?.value)"
-                             [class.text-accent]="isStorageTag(tag.get('tagKey')?.value)"
-                             [title]="isStorageTag(tag.get('tagKey')?.value)
-                                ? 'Recognised storage tag — the pipeline reads this one' : ''" />
-                    </td>
-                    <td>
-                      <input class="input" formControlName="tagParent" placeholder="parent"
-                             (blur)="trimTag(i, 'tagParent')" />
-                    </td>
-                    <td>
-                      <input class="input" formControlName="tagValue"
-                             (blur)="trimTag(i, 'tagValue')"
-                             [class.mono]="isStorageTag(tag.get('tagKey')?.value)"
-                             [placeholder]="isStorageTag(tag.get('tagKey')?.value)
-                                ? 'e.g. etl-bucket or reports/2026' : 'value'" />
-                    </td>
-                    <td class="text-right whitespace-nowrap">
-                      <button type="button" class="btn btn-ghost btn-icon btn-intent-ok"
-                              (click)="insertTagAfter(i)" title="Add a row below this one"
-                              aria-label="Add row below"><app-icon name="plus" class="icon-ok" /></button>
-                      <button type="button" class="btn btn-ghost btn-icon btn-intent-crit"
-                              (click)="removeTag(i)" title="Remove this row"
-                              aria-label="Remove row"><app-icon name="trash" class="icon-crit" /></button>
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          </div>
-
-          <!-- What those rows actually become. Nothing on this screen showed it before, so a
-               tag's effect was invisible until the task next ran. -->
-          <div class="flex flex-wrap items-center gap-2 mt-3">
-            <button type="button" class="btn btn-default btn-sm"
-                    [disabled]="previewing()" (click)="previewTagXml()">
-              <app-icon name="code" [class.spin]="previewing()" />
-              {{ previewing() ? 'Building…' : 'Show the XML these tags make' }}
-            </button>
-            @if (tagXml()) {
-              <button type="button" class="btn btn-default btn-sm" (click)="copyTagXml()">
-                <app-icon name="copy" size="0.85em" />Copy
-              </button>
-              <button type="button" class="btn btn-default btn-sm btn-intent-ok"
-                      (click)="useTagXmlAsPayload()"
-                      title="Replace the payload below with this document">
-                <app-icon name="check" size="0.85em" />Use as payload
-              </button>
-            }
-          </div>
-
-          @if (previewError()) {
-            <p class="text-xs mt-2 text-crit-500">{{ previewError() }}</p>
-          }
-
-          @if (tagXml()) {
-            <pre class="mono text-xs leading-relaxed rounded p-2.5 mt-2 overflow-auto max-h-64
-                        whitespace-pre-wrap break-words bg-code border border-subtle"
-                >{{ tagXml() }}</pre>
-            <p class="text-xs text-[color:var(--text-muted)] mt-1.5">
-              The first tag becomes the root element; every other tag needs a parent that already
-              exists above it.
-            </p>
-          }
-        }
-      </div>
-
-      <div class="form-section">
-        <h2 class="form-section-title">Task payload</h2>
-        <app-field label="XML configuration" for="payload" [control]="form.get('taskPayload')"
-                   [submitted]="submitted()"
-                   hint="Sent to the consumer as-is.">
-          <textarea id="payload" class="input mono text-xs resize-y min-h-40"
-                    formControlName="taskPayload"
-                    placeholder="&lt;pipeline&gt;...&lt;/pipeline&gt;"></textarea>
-        </app-field>
-      </div>
+      }
 
       <div class="flex gap-2 mt-5 pt-4 border-t border-subtle">
         <button type="submit" class="btn btn-primary" [disabled]="saving()">

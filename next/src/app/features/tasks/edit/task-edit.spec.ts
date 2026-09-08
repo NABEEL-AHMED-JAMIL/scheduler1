@@ -14,18 +14,21 @@ import { API_BASE, API_SUCCESS } from '../../../core/api/api.config';
  * a stale LOOKUP_TYPES entry or a leftover numeric-id assumption would not throw anywhere, it
  * would just make the Pipeline field quietly empty or mismatched against Pipeline Forms.
  */
-function taskEditWith(getImpl: (url: string, opts?: any) => any) {
+function taskEditWith(getImpl: (url: string, opts?: any) => any,
+                       postImpl: (url: string, body?: any) => any = () => of({})) {
   const get = vi.fn(getImpl);
+  const post = vi.fn(postImpl);
+  const toast = { success: vi.fn(), error: vi.fn(), info: () => {} };
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
     providers: [
-      { provide: HttpClient, useValue: { get, post: vi.fn(() => of({})) } },
-      { provide: ToastService, useValue: { success: () => {}, error: () => {}, info: () => {} } },
+      { provide: HttpClient, useValue: { get, post } },
+      { provide: ToastService, useValue: toast },
       { provide: Router, useValue: { navigate: () => {} } },
     ],
   });
   const component = TestBed.runInInjectionContext(() => new TaskEdit());
-  return { component, get };
+  return { component, get, post, toast };
 }
 
 const appSettingWithPipelineIdsLookup = of({
@@ -110,5 +113,70 @@ describe('TaskEdit pipeline selection', () => {
 
     expect(get).toHaveBeenCalledWith(`${API_BASE}/taskForm.json/formForPipeline`,
       { params: { pipelineId: 'F768926' } });
+  });
+});
+
+/**
+ * There is no more "Configuration tags" screen (removed 2026-09-07) -- a pipeline's form is the
+ * only surface an operator fills in, so the payload the worker receives has to be generated from
+ * the form's answers automatically on save, not by a "Show the XML" button that no longer exists.
+ * These tests exist because this is exactly the kind of change that fails silently: forgetting to
+ * generate the payload would save a task with an empty `taskPayload` that the server rejects, or
+ * -- worse, if the server's own requirement is ever loosened -- one that silently sends nothing
+ * to the pipeline at all.
+ */
+describe('TaskEdit -- payload generated from the pipeline form on save', () => {
+  const oneFieldForm = {
+    taskFormId: 9, pipelineId: 'F768926', formName: 'Hurricanes ETL',
+    fields: [{ tagKey: 'search_term', tagParent: null, label: 'Search term',
+               fieldType: 'text', required: true, position: 0 }],
+  };
+
+  it('calls xmlCreateChecker with the form\'s answers and submits the result as the payload', () => {
+    const { component, post } = taskEditWith(url => {
+      if (url.endsWith('/setting.json/appSetting')) {
+        return of({ status: API_SUCCESS, data: { sourceTaskTypes: [], lookupDatas: [] } });
+      }
+      if (url.endsWith('/taskForm.json/listPipelines')) return of({ status: API_SUCCESS, data: [oneFieldForm] });
+      if (url.endsWith('/taskForm.json/formForPipeline')) return of({ status: API_SUCCESS, data: oneFieldForm });
+      throw new Error(`unexpected GET ${url}`);
+    }, (url, body) => {
+      if (url.endsWith('/setting.json/xmlCreateChecker')) {
+        expect(body).toEqual({ xmlTagsInfo: [{ tagKey: 'search_term', tagParent: '', tagValue: 'hurricanes' }] });
+        return of({ status: API_SUCCESS, message: '<search_term>hurricanes</search_term>' });
+      }
+      if (url.endsWith('/sourceTask.json/addSourceTask')) {
+        expect(body.taskPayload).toBe('<search_term>hurricanes</search_term>');
+        expect(body.xmlTagsInfo).toEqual([{ tagKey: 'search_term', tagParent: '', tagValue: 'hurricanes' }]);
+        return of({ status: API_SUCCESS, message: 'Task created.' });
+      }
+      throw new Error(`unexpected POST ${url}`);
+    });
+    component.ngOnInit();
+    component.form.patchValue({ taskName: 'AC', sourceTaskTypeId: 1, taskStatus: 'Active', pipelineId: 'F768926' });
+    component.formData.get('|search_term')!.setValue('hurricanes');
+
+    component.save();
+
+    expect(post).toHaveBeenCalledWith(`${API_BASE}/setting.json/xmlCreateChecker`, expect.anything());
+    expect(post).toHaveBeenCalledWith(`${API_BASE}/sourceTask.json/addSourceTask`, expect.anything());
+  });
+
+  it('still requires a hand-written payload when no pipeline form applies', () => {
+    const { component, post, toast } = taskEditWith(url => {
+      if (url.endsWith('/setting.json/appSetting')) {
+        return of({ status: API_SUCCESS, data: { sourceTaskTypes: [], lookupDatas: [] } });
+      }
+      if (url.endsWith('/taskForm.json/listPipelines')) return of({ status: API_SUCCESS, data: [] });
+      throw new Error(`unexpected GET ${url}`);
+    });
+    component.ngOnInit();
+    component.form.patchValue({ taskName: 'AC', sourceTaskTypeId: 1, taskStatus: 'Active' });
+    // pipelineId left empty -> no form -> taskPayload stays required and, here, blank.
+
+    component.save();
+
+    expect(toast.error).toHaveBeenCalledWith('Check the highlighted fields.');
+    expect(post).not.toHaveBeenCalled();
   });
 });

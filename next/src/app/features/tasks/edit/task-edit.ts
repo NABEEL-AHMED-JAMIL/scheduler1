@@ -6,13 +6,9 @@ import { Router, RouterLink } from '@angular/router';
 import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { ToastService } from '../../../shared/ui/toast.service';
-import { copyText } from '../../../shared/ui/clipboard.util';
 import { Field } from '../../../shared/ui/field';
 import { Icon } from '../../../shared/ui/icon';
 import { TaskForm, TaskFormField } from '../../settings/forms/task-form-dialog';
-
-/** Tag keys the pipeline reads to locate storage; a typo in one fails silently at run time. */
-const STORAGE_TAG_KEYS = ['bucket', 'bucket_name', 'input_folder', 'output_folder'];
 
 /** The lookup parents whose sub-lookups fill the two remaining lookup-backed dropdowns here.
  *  Pipeline used to be a third one (PIPELINE_IDS) -- it now reads from Pipeline Forms instead,
@@ -42,20 +38,18 @@ export class TaskEdit implements OnInit {
   readonly saving = signal(false);
   readonly loading = signal(false);
   readonly submitted = signal(false);
-  readonly showTagHelp = signal(false);
 
   /**
    * The form this task's pipeline expects, when somebody has defined one.
    *
-   * Forms have been buildable under Settings for a while but nothing ever asked for one, so a
-   * task was always filled in as raw tag rows -- you had to know that F768926 wants a
-   * `search_term` nested under `params` before you could write it down. When a form exists its
-   * fields are what you fill in; the tag rows below are still there, and still what gets saved.
+   * There is no more hand-written "Configuration tags" table (removed 2026-09-07): a pipeline is
+   * now defined by creating its Pipeline Form, so filling in the task IS filling in the form.
+   * The tag rows this used to expose for direct editing still exist -- `xmlTagsInfo` is still
+   * what the server stores and what `xmlCreateChecker` still turns into the payload -- they are
+   * just no longer a screen the operator sees or touches; the form's fields are the only surface.
    */
   readonly taskFormDef = signal<TaskForm | null>(null);
   readonly formLoading = signal(false);
-  /** Whether the raw tag table is on show. Opened by default only when no form is driving it. */
-  readonly showTags = signal(true);
 
   /** The fields in the order their author put them in; `position` is not guaranteed sorted. */
   readonly formFields = computed(() =>
@@ -74,10 +68,12 @@ export class TaskEdit implements OnInit {
     homePageId: [''],
     pipelineId: [''],
     groupId: [''],
-    taskPayload: [''],
+    // Required only when no pipeline form is driving the task -- see the validator swap in
+    // loadFormForPipeline/clearForm. A form-driven task generates its payload on save instead.
+    taskPayload: ['', Validators.required],
     tags: this.fb.array([]),
     // Filled in from the pipeline's form when there is one. Its controls write through to
-    // `tags`, so everything downstream -- the XML preview, the save payload -- is unchanged.
+    // `tags`, which `save()` turns into the payload -- the operator never edits either directly.
     formData: this.fb.group({}),
   });
 
@@ -132,7 +128,6 @@ export class TaskEdit implements OnInit {
     });
 
     if (this.isEdit()) this.loadTask();
-    else this.addTag();
   }
 
   private loadTask(): void {
@@ -162,8 +157,7 @@ export class TaskEdit implements OnInit {
         }, { emitEvent: false });
         const existing = task.xmlTagsInfo ?? task.tagsInfo ?? [];
         this.tags.clear();
-        for (const tag of existing) this.addTag(tag);
-        if (!this.tags.length) this.addTag();
+        for (const tag of existing) this.pushTagRow(tag);
         this.loadFormForPipeline((task.pipelineId ?? '').trim());
       },
       error: err => {
@@ -173,7 +167,8 @@ export class TaskEdit implements OnInit {
     });
   }
 
-  addTag(tag?: any): void {
+  /** Internal only -- there is no more UI that adds, removes or edits a tag row by hand. */
+  private pushTagRow(tag?: any): void {
     this.tags.push(this.fb.group({
       tagKey: [tag?.tagKey ?? ''],
       tagParent: [tag?.tagParent ?? ''],
@@ -181,100 +176,13 @@ export class TaskEdit implements OnInit {
     }));
   }
 
-  /** Inserts directly below the row clicked, as the old form did, so order can be built up. */
-  insertTagAfter(index: number): void {
-    this.tags.insert(index + 1, this.fb.group({
-      tagKey: [''],
-      tagParent: [this.tags.at(index).get('tagParent')?.value ?? ''],
-      tagValue: [''],
-    }));
-  }
-
-  removeTag(index: number): void {
-    this.tags.removeAt(index);
-    if (!this.tags.length) this.addTag();
-  }
-
-  isStorageTag(key: string): boolean {
-    return STORAGE_TAG_KEYS.includes((key ?? '').trim().toLowerCase());
-  }
-
-  /** Trailing space is invisible in the field but travels into the payload and breaks matching. */
-  trimTag(index: number, control: 'tagKey' | 'tagParent' | 'tagValue'): void {
-    const field = this.tags.at(index).get(control)!;
-    const value = field.value;
-    if (typeof value === 'string' && value !== value.trim()) field.setValue(value.trim());
-  }
-
   lookupOptions(type: string): any[] { return this.lookups()[type] ?? []; }
-
-  /**
-   * The XML the current tags produce, built by the same code that would build it on save.
-   *
-   * Tags and the payload textarea are stored separately, so nothing on this screen showed what
-   * a tag actually became -- you added rows and hoped. The backend has always been able to
-   * render them; xmlCreateChecker existed for exactly this and was never called from here.
-   *
-   * Asking the server rather than assembling it in the browser is deliberate: a second
-   * implementation would drift from the one that matters, and the nesting rules for tagParent
-   * are more intricate than they look.
-   */
-  readonly tagXml = signal('');
-  readonly previewing = signal(false);
-  readonly previewError = signal('');
-
-  previewTagXml(): void {
-    const tags = (this.form.getRawValue().tags as any[])
-      .filter(t => (t.tagKey ?? '').trim())
-      .map(t => ({ tagKey: (t.tagKey ?? '').trim(),
-                   tagParent: (t.tagParent ?? '').trim(),
-                   tagValue: (t.tagValue ?? '').trim() }));
-    if (!tags.length) {
-      this.tagXml.set('');
-      this.previewError.set('Add a tag first — the first one becomes the root element.');
-      return;
-    }
-    this.previewing.set(true);
-    this.previewError.set('');
-    this.http.post<ApiResponse<string>>(`${API_BASE}/setting.json/xmlCreateChecker`,
-      { xmlTagsInfo: tags }).subscribe({
-      next: response => {
-        this.previewing.set(false);
-        // This endpoint returns the document in `message` rather than `data`.
-        const xml = (response as any).message ?? response.data ?? '';
-        if (response.status !== API_SUCCESS || !xml) {
-          this.previewError.set(response.message || 'Those tags could not be turned into XML.');
-          this.tagXml.set('');
-          return;
-        }
-        this.tagXml.set(String(xml));
-      },
-      error: err => {
-        this.previewing.set(false);
-        this.previewError.set(err?.error?.message || 'Those tags could not be turned into XML.');
-      },
-    });
-  }
-
-  /** Copy the generated document into the payload the consumer actually receives. */
-  useTagXmlAsPayload(): void {
-    const xml = this.tagXml();
-    if (!xml) return;
-    this.form.get('taskPayload')?.setValue(xml);
-    this.toast.success('Payload replaced with the tags above.');
-  }
-
-  copyTagXml(): void {
-    copyText(this.tagXml()).then(
-      () => this.toast.success('XML copied.'),
-      () => this.toast.error('Could not copy the XML.'));
-  }
 
   /**
    * Fetches the form the chosen pipeline expects, if it has one.
    *
    * A pipeline with no form is the normal case and comes back as a success with null data, so
-   * the absence is not treated as a failure -- the tag table simply stays as it was.
+   * the absence is not treated as a failure -- the task falls back to a hand-written payload.
    */
   private loadFormForPipeline(pipelineId: string): void {
     if (pipelineId === this.loadedFormPipeline) return;
@@ -297,9 +205,10 @@ export class TaskEdit implements OnInit {
         }
         this.taskFormDef.set(response.data);
         this.buildFormControls();
-        // Tucked away once a form is answering for them, but one click from view: a form
-        // describes the tags its author thought of, and a task can legitimately need others.
-        this.showTags.set(false);
+        // The payload is generated from the form's answers on save now, not hand-written --
+        // required only falls to the box itself when there is no form driving it.
+        this.form.get('taskPayload')!.clearValidators();
+        this.form.get('taskPayload')!.updateValueAndValidity({ emitEvent: false });
       },
       error: () => {
         this.formLoading.set(false);
@@ -313,7 +222,9 @@ export class TaskEdit implements OnInit {
     for (const name of Object.keys(this.formData.controls)) {
       this.formData.removeControl(name, { emitEvent: false });
     }
-    this.showTags.set(true);
+    // No form to generate a payload from any more -- back to requiring a hand-written one.
+    this.form.get('taskPayload')!.setValidators(Validators.required);
+    this.form.get('taskPayload')!.updateValueAndValidity({ emitEvent: false });
   }
 
   /** Stable control name for a field. Two fields can share a tagKey under different parents. */
@@ -357,9 +268,9 @@ export class TaskEdit implements OnInit {
   /**
    * Writes the form's answers into the tag rows.
    *
-   * The form does not replace the tags, it authors them -- which is what keeps the XML preview,
-   * the payload button and the save request working with no knowledge of forms at all. Rows the
-   * form does not own are left alone, so a hand-added tag survives.
+   * The form does not replace the tags, it authors them -- which is what keeps `xmlTagsInfo` and
+   * the payload generation in `save()` working with no knowledge of forms at all. A tag the form
+   * does not own (from before this task had a form) is left alone rather than dropped.
    */
   syncFormToTags(): void {
     for (const field of this.formFields()) {
@@ -391,15 +302,13 @@ export class TaskEdit implements OnInit {
         }), { emitEvent: false });
       }
     }
-    // A blank starter row is added on a new task; once a form has filled things in it is just
-    // an empty element in the generated XML.
+    // A row with neither a key nor a value is not a tag -- drop it rather than send it.
     for (let i = this.tags.length - 1; i >= 0; i--) {
       const value = this.tags.at(i).getRawValue();
       if (!(value.tagKey ?? '').trim() && !(value.tagValue ?? '').trim()) {
         this.tags.removeAt(i, { emitEvent: false });
       }
     }
-    if (!this.tags.length) this.addTag();
   }
 
   /** Choices for a select field. The author writes them one per line. */
@@ -411,13 +320,77 @@ export class TaskEdit implements OnInit {
     this.submitted.set(true);
     // Belt and braces: the fields sync as they are typed, but a value restored by the browser
     // or set programmatically would not have fired an input event.
-    if (this.taskFormDef()) this.syncFormToTags();
+    if (this.taskFormDef()) {
+      this.syncFormToTags();
+      // The payload is generated from the form's own answers below, never from whatever the
+      // (hidden) box last held, so its own validity does not gate a form-driven save.
+      this.form.get('formData')!.markAllAsTouched();
+      if (this.form.get('formData')!.invalid || this.form.get('taskName')!.invalid
+          || this.form.get('sourceTaskTypeId')!.invalid || this.form.get('taskStatus')!.invalid) {
+        this.form.markAllAsTouched();
+        this.toast.error('Check the highlighted fields.');
+        return;
+      }
+      this.generatePayloadFromTags(xml => {
+        if (xml == null) return; // generatePayloadFromTags already toasted why
+        this.form.get('taskPayload')!.setValue(xml);
+        this.submitTask();
+      });
+      return;
+    }
+
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       this.toast.error('Check the highlighted fields.');
       return;
     }
+    this.submitTask();
+  }
 
+  /**
+   * Turns the tag rows a Pipeline Form authored into the document the worker actually receives.
+   *
+   * There is no more "Configuration tags" screen to preview this on demand (removed 2026-09-07,
+   * along with the rest of the hand-edited tag table) -- the form's fields are the only surface,
+   * so generating the payload has to happen here, on save, rather than waiting for a click that
+   * no longer exists. Asking the server rather than assembling the document in the browser is
+   * still deliberate: a second implementation would drift from the one that matters, and the
+   * nesting rules for `tagParent` are more intricate than they look.
+   */
+  private generatePayloadFromTags(then: (xml: string | null) => void): void {
+    const tags = (this.form.getRawValue().tags as any[])
+      .filter(t => (t.tagKey ?? '').trim())
+      .map(t => ({ tagKey: (t.tagKey ?? '').trim(),
+                   tagParent: (t.tagParent ?? '').trim(),
+                   tagValue: (t.tagValue ?? '').trim() }));
+    if (!tags.length) {
+      this.toast.error('Fill in at least one field before saving.');
+      then(null);
+      return;
+    }
+    this.saving.set(true);
+    this.http.post<ApiResponse<string>>(`${API_BASE}/setting.json/xmlCreateChecker`,
+      { xmlTagsInfo: tags }).subscribe({
+      next: response => {
+        // This endpoint returns the document in `message` rather than `data`.
+        const xml = (response as any).message ?? response.data ?? '';
+        if (response.status !== API_SUCCESS || !xml) {
+          this.saving.set(false);
+          this.toast.error(response.message || 'Those answers could not be turned into a payload.');
+          then(null);
+          return;
+        }
+        then(String(xml));
+      },
+      error: err => {
+        this.saving.set(false);
+        this.toast.error(err?.error?.message || 'Those answers could not be turned into a payload.');
+        then(null);
+      },
+    });
+  }
+
+  private submitTask(): void {
     const value = this.form.getRawValue();
     const payload = {
       taskDetailId: value.taskDetailId,

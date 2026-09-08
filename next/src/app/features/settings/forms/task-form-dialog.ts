@@ -94,7 +94,12 @@ export const FIELD_TYPES = ['text', 'textarea', 'number', 'url', 'select', 'chec
 
         <div class="grid grid-cols-1 xl:grid-cols-2 gap-2.5 items-start" formArrayName="fields">
           @for (row of fields.controls; track row; let i = $index) {
-            <div class="card p-3 flex flex-col gap-2.5" [formGroupName]="i">
+            <!-- A trailing odd-one-out spans both columns: with the grid's own width and just
+                 one field (or an odd last field), leaving it in a single column stranded a full
+                 card's width of empty space beside it. -->
+            <div class="card p-3 flex flex-col gap-2.5"
+                 [class.xl:col-span-2]="i === fields.length - 1 && fields.length % 2 === 1"
+                 [formGroupName]="i">
               <div class="flex items-center gap-2">
                 <span class="stat-glyph shrink-0"><app-icon name="template" /></span>
                 <span class="text-xs text-[color:var(--text-muted)] mono">#{{ i + 1 }}</span>
