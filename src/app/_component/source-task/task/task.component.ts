@@ -32,7 +32,8 @@ import {
     SourceTaskService,
     ConfigurationMakerService,
     AuthService,
-    TenantService
+    TenantService,
+    TaskFormService
 } from '@/_services';
 
 function noWhitespaceValidator(): ValidatorFn {
@@ -58,10 +59,12 @@ export class TaskComponent implements OnInit, OnDestroy {
     public sourceTaskStatus: any = STATUS_LIST;
     public sourceTaskForm: FormGroup;
     public currentTaskState = 'Add Task';
-    public PIPELINE_IDS = 'PIPELINE_IDS';
     public PIPELINE_HOME_PAGES = 'PIPELINE_HOME_PAGES';
     public TASK_GROUPS = 'TASK_GROUPS';
-    public pipelineIdList: any;
+    // A pipeline is defined by creating its form under Configuration > Pipeline Forms (next
+    // app) now, not by adding a PIPELINE_IDS lookup row -- so the option list comes from there
+    // instead of appSetting's lookupDatas. Each entry carries pipelineId/formName/description.
+    public pipelineFormList: any[] = [];
     public piplineHomePageList: any;
     public taskGroupList: any;
     public showBucketHelp: boolean = false;
@@ -79,7 +82,8 @@ export class TaskComponent implements OnInit, OnDestroy {
         private sourceTaskService: SourceTaskService,
         private xmlService: ConfigurationMakerService,
         private authService: AuthService,
-        private tenantService: TenantService) {
+        private tenantService: TenantService,
+        private taskFormService: TaskFormService) {
     }
 
     ngOnInit() {
@@ -88,6 +92,7 @@ export class TaskComponent implements OnInit, OnDestroy {
             this.taskDetailId = +params.get('taskDetailId');
         });
         this.appSetting();
+        this.loadPipelineForms();
         this.isPlatformAdmin = this.authService.currentUser?.userRole === 'PLATFORM_ADMIN';
         if (this.taskDetailId) {
             this.currentTaskState = 'Update Task';
@@ -99,6 +104,21 @@ export class TaskComponent implements OnInit, OnDestroy {
                 this.loadTenants();
             }
         }
+    }
+
+    /** The Pipeline dropdown's options -- see pipelineFormList's own comment. */
+    private loadPipelineForms(): void {
+        this.taskFormService.listPipelines()
+            .pipe(first())
+            .subscribe((response) => {
+                if (response.status === ApiCode.SUCCESS) {
+                    this.pipelineFormList = response.data || [];
+                } else {
+                    this.alertService.showError(response.message, this.ERROR);
+                }
+            }, (error) => {
+                this.alertService.showError(error, this.ERROR);
+            });
     }
 
     private loadTenants(): void {
@@ -177,24 +197,6 @@ export class TaskComponent implements OnInit, OnDestroy {
 					this.spinnerService.hide();
 
 					this.sourceTaskTypes = response.data.sourceTaskTypes.filter(sourceTask => sourceTask.status == 'Active');
-
-                    if (response.data.lookupDatas.find(el => el.lookupType === this.PIPELINE_IDS)) {
-                        this.settingService.fetchSubLookupByParentId(
-                            response.data.lookupDatas.find(el => el.lookupType === this.PIPELINE_IDS).lookupId)
-                        .pipe(first())
-                        .subscribe((response) => {
-                            if(response.status === ApiCode.SUCCESS) {
-                                this.spinnerService.hide();
-                                this.pipelineIdList = response.data.lookupDatas;
-                            } else {
-                                this.spinnerService.hide();
-                                this.alertService.showError(response.message, this.ERROR);
-                            }
-                        }, (error) => {
-                            this.spinnerService.hide();
-                            this.alertService.showError(error, this.ERROR);
-                        });
-                    }
 
                     if (response.data.lookupDatas.find(el => el.lookupType === this.PIPELINE_HOME_PAGES)) {
                         this.settingService.fetchSubLookupByParentId(

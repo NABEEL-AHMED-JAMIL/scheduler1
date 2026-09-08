@@ -10,7 +10,6 @@ import {
     QueueMessageComponent,
     SourceTaskComponent,
     SourceBatchActionComponent,
-    XmlConfigurationComponent,
     SubLookupComponent,
     JobHistoryActionComponent,
     JobLogComponent,
@@ -138,13 +137,6 @@ const routes: Routes = [
         path: 'setting/queueMessage',
         component: QueueMessageComponent,
         canActivate: [AuthGuard]
-    },
-    {
-
-        path: 'setting/lookpXml',
-        component: XmlConfigurationComponent,
-        canActivate: [AuthGuard, RoleGuard],
-        data: { roles: ['PLATFORM_ADMIN', 'TENANT_ADMIN'] }
     },
     {
 

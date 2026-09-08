@@ -172,12 +172,15 @@ export const routes: Routes = [
         canActivate: [roleGuard],
       },
       {
-        path: 'settings/forms',
+        path: 'settings/pipeline-forms',
         loadComponent: () =>
           import('./features/settings/forms/task-forms').then(m => m.TaskForms),
         data: { minRole: 'TENANT_ADMIN' },
         canActivate: [roleGuard],
       },
+      // Renamed from settings/forms once the feature became the pipeline catalogue rather than
+      // a general form builder -- kept as a redirect so an old bookmark or link still lands.
+      { path: 'settings/forms', redirectTo: 'settings/pipeline-forms' },
       {
         path: 'admin/tenant-requests',
         loadComponent: () =>

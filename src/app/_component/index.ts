@@ -5,7 +5,6 @@ export * from './job-history-action/job-history-action.component';
 export * from './setting/lookup/lookup.component';
 export * from './setting/sub-lookup/sub-lookup.component';
 export * from './setting/source-task-type/source-task-type.component';
-export * from './setting/xml-configuration/xml-configuration.component';
 export * from './setting/setting.component';
 export * from './setting/setting-lookup.component';
 export * from './setting/queue-message/queue-message.component';

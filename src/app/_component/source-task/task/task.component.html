@@ -68,11 +68,15 @@
                 <div class="row">
                     <div [ngClass]="isEditMode ? 'col-md-6' : 'col-md-12' ">
                         <div class="form-group">
-                            <label class="control-label" for="pipelineId">Pipeline TaskId</label>
+                            <label class="control-label" for="pipelineId">Pipeline</label>
                             <select class="form-control" formControlName="pipelineId">
-                                <option hidden value="" disabled selected>Select Pipeline Id</option>
-                                <option *ngFor="let pipelineId of pipelineIdList" [value]="pipelineId.lookupId">{{pipelineId.lookupType}}</option>
+                                <option hidden value="" disabled selected>Select a pipeline</option>
+                                <option *ngFor="let form of pipelineFormList" [value]="form.pipelineId"
+                                        [title]="form.description || ''">{{form.formName}} ({{form.pipelineId}})</option>
                             </select>
+                            <p class="help-block" *ngIf="!pipelineFormList?.length">
+                                No pipeline has a form yet — create one under Configuration &rsaquo; Pipeline Forms.
+                            </p>
                         </div>
                     </div>
                     <div class="col-md-6" *ngIf="isEditMode">

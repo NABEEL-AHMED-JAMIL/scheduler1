@@ -14,7 +14,7 @@ import { Icon } from './icon';
          reliably carry a Tailwind arbitrary value like w-[58rem], and silently applying
          neither left the card sized to its content. -->
     <div class="card shadow-2xl max-w-[calc(100vw-2rem)] max-h-[85vh] flex flex-col overflow-hidden"
-         [style.width]="size() === 'wide' ? '58rem' : '34rem'">
+         [style.width]="size() === 'xwide' ? 'min(92vw, 76rem)' : size() === 'wide' ? '58rem' : '34rem'">
       <div class="px-5 py-3.5 border-b shrink-0 border-subtle">
         <h2 class="text-base font-semibold">{{ heading() }}</h2>
         @if (subtitle()) {
@@ -52,8 +52,12 @@ export class FormDialog {
    * scrolling -- the Kafka profile is thirteen fields plus TLS material and a guide. The
    * form grid is container-query driven, so the extra width becomes extra columns on its
    * own, and max-w keeps it inside a tablet viewport.
+   *
+   * 'xwide' is for a form that builds a *list* of something rather than filling in fields --
+   * Pipeline Forms' field builder, where each row is its own card and the win from more width
+   * is fitting two cards across rather than more columns inside one.
    */
-  readonly size = input<'default' | 'wide'>('default');
+  readonly size = input<'default' | 'wide' | 'xwide'>('default');
   readonly cancelled = output<void>();
   readonly confirmed = output<void>();
 }

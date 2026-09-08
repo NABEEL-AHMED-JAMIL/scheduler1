@@ -26,7 +26,6 @@ export class TaskForms implements OnInit {
   private readonly toast = inject(ToastService);
 
   readonly forms = signal<TaskForm[]>([]);
-  readonly pipelines = signal<string[]>([]);
   readonly loading = signal(true);
   readonly error = signal('');
   readonly search = signal('');
@@ -68,7 +67,6 @@ export class TaskForms implements OnInit {
 
   ngOnInit(): void {
     this.load();
-    this.loadPipelines();
   }
 
   load(): void {
@@ -87,26 +85,6 @@ export class TaskForms implements OnInit {
     });
   }
 
-  /**
-   * pipelineId is free text on a task rather than a foreign key, so the only way to offer
-   * real choices is to read the ones already in use.
-   */
-  private loadPipelines(): void {
-    // listSourceTask is a POST taking an optional search body; an empty body means "everything".
-    this.http.post<ApiResponse<any[]>>(`${API_BASE}/sourceTask.json/listSourceTask`, {}).subscribe({
-      next: response => {
-        if (response.status !== API_SUCCESS) return;
-        const rows = response.data ?? [];
-        this.pipelines.set([...new Set(
-          (Array.isArray(rows) ? rows : [])
-            .map((task: any) => String(task.pipelineId ?? '').trim())
-            .filter(Boolean))].sort());
-      },
-      // Suggestions are a convenience; the field takes free text either way.
-      error: () => this.pipelines.set([]),
-    });
-  }
-
   fieldCount(form: TaskForm): number { return form.fields?.length ?? 0; }
 
   requiredCount(form: TaskForm): number {
@@ -114,12 +92,12 @@ export class TaskForms implements OnInit {
   }
 
   create(): void {
-    this.dialog.open<boolean>(TaskFormDialog, { data: { pipelines: this.pipelines() } })
+    this.dialog.open<boolean>(TaskFormDialog, { data: {} })
       .closed.subscribe(saved => { if (saved) this.load(); });
   }
 
   edit(form: TaskForm): void {
-    this.dialog.open<boolean>(TaskFormDialog, { data: { form, pipelines: this.pipelines() } })
+    this.dialog.open<boolean>(TaskFormDialog, { data: { form } })
       .closed.subscribe(saved => { if (saved) this.load(); });
   }
 
@@ -132,7 +110,7 @@ export class TaskForms implements OnInit {
       formName: `${form.formName} (copy)`,
       fields: (form.fields ?? []).map(field => ({ ...field, taskFormFieldId: undefined })),
     };
-    this.dialog.open<boolean>(TaskFormDialog, { data: { form: copy, pipelines: this.pipelines() } })
+    this.dialog.open<boolean>(TaskFormDialog, { data: { form: copy } })
       .closed.subscribe(saved => { if (saved) this.load(); });
   }
 

@@ -45,21 +45,18 @@ export const FIELD_TYPES = ['text', 'textarea', 'number', 'url', 'select', 'chec
   imports: [ReactiveFormsModule, Field, FormDialog, Icon],
   template: `
     <app-form-dialog
-        [heading]="isEdit() ? 'Edit form' : 'New form'"
-        subtitle="Describes the payload a pipeline expects, so a task can be filled in rather than hand-written."
-        [confirmLabel]="isEdit() ? 'Save changes' : 'Create form'"
-        [saving]="saving()" size="wide"
+        [heading]="isEdit() ? 'Edit pipeline form' : 'New pipeline'"
+        subtitle="A pipeline is defined by its id and the fields a task on it should fill in -- creating one here is what makes it choosable on Source Task, in place of a hand-written XML tag."
+        [confirmLabel]="isEdit() ? 'Save changes' : 'Create pipeline'"
+        [saving]="saving()" size="xwide"
         (cancelled)="ref.close(false)" (confirmed)="save()">
       <form [formGroup]="form" class="form-stack">
         <div class="form-grid">
-          <app-field label="Pipeline" for="pipelineId" [required]="true"
+          <app-field label="Pipeline ID" for="pipelineId" [required]="true"
                      [control]="form.get('pipelineId')" [submitted]="submitted()"
-                     hint="The pipelineId the worker routes on. One form per pipeline.">
+                     hint="The id the worker routes on, and what Source Task's Pipeline field will show. One form per pipeline.">
             <input id="pipelineId" class="input mono" formControlName="pipelineId"
-                   list="known-pipelines" placeholder="F768926" />
-            <datalist id="known-pipelines">
-              @for (id of data.pipelines; track id) { <option [value]="id"></option> }
-            </datalist>
+                   placeholder="F768926" />
           </app-field>
 
           <app-field label="Form name" for="formName" [required]="true"
@@ -95,7 +92,7 @@ export const FIELD_TYPES = ['text', 'textarea', 'number', 'url', 'select', 'chec
           </p>
         }
 
-        <div class="flex flex-col gap-2.5" formArrayName="fields">
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-2.5 items-start" formArrayName="fields">
           @for (row of fields.controls; track row; let i = $index) {
             <div class="card p-3 flex flex-col gap-2.5" [formGroupName]="i">
               <div class="flex items-center gap-2">
@@ -204,7 +201,7 @@ export const FIELD_TYPES = ['text', 'textarea', 'number', 'url', 'select', 'chec
 })
 export class TaskFormDialog {
   readonly ref = inject<DialogRef<boolean>>(DialogRef);
-  readonly data = inject<{ form?: TaskForm; pipelines: string[] }>(DIALOG_DATA);
+  readonly data = inject<{ form?: TaskForm }>(DIALOG_DATA);
   private readonly fb = inject(FormBuilder);
   private readonly http = inject(HttpClient);
   private readonly toast = inject(ToastService);

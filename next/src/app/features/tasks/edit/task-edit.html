@@ -34,13 +34,14 @@
           </app-field>
 
           <app-field label="Pipeline" for="pipeline" [control]="form.get('pipelineId')"
-                     [submitted]="submitted()">
+                     [submitted]="submitted()"
+                     [hint]="pipelines().length ? 'Picking one loads its form below, if it has one.'
+                                                 : 'No pipeline has a form yet — create one under Configuration › Pipeline Forms.'">
             <select id="pipeline" class="input" formControlName="pipelineId">
               <option value="">None</option>
-              @for (option of lookupOptions('PIPELINE_IDS'); track option.lookupId) {
-                <option [value]="option.lookupId" [title]="option.description || ''">
-                  {{ option.lookupType || option.lookupValue }}
-                  @if (option.lookupValue && option.lookupType) { ({{ option.lookupValue }}) }
+              @for (option of pipelines(); track option.taskFormId) {
+                <option [value]="option.pipelineId" [title]="option.description || ''">
+                  {{ option.formName }} ({{ option.pipelineId }})
                 </option>
               }
             </select>

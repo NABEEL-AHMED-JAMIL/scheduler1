@@ -14,8 +14,10 @@ import { TaskForm, TaskFormField } from '../../settings/forms/task-form-dialog';
 /** Tag keys the pipeline reads to locate storage; a typo in one fails silently at run time. */
 const STORAGE_TAG_KEYS = ['bucket', 'bucket_name', 'input_folder', 'output_folder'];
 
-/** The lookup parents whose sub-lookups fill the three dropdowns on this form. */
-const LOOKUP_TYPES = ['PIPELINE_IDS', 'TASK_GROUPS', 'PIPELINE_HOME_PAGES'];
+/** The lookup parents whose sub-lookups fill the two remaining lookup-backed dropdowns here.
+ *  Pipeline used to be a third one (PIPELINE_IDS) -- it now reads from Pipeline Forms instead,
+ *  since a pipeline is defined by creating its form, not by adding a lookup row. */
+const LOOKUP_TYPES = ['TASK_GROUPS', 'PIPELINE_HOME_PAGES'];
 
 @Component({
   selector: 'app-task-edit',
@@ -32,6 +34,11 @@ export class TaskEdit implements OnInit {
 
   readonly taskTypes = signal<any[]>([]);
   readonly lookups = signal<Record<string, any[]>>({});
+  /**
+   * The pipelines a form exists for -- Pipeline Forms is the catalogue now, not a lookup type.
+   * Creating a pipeline's form is what makes it choosable here; there is no other way to add one.
+   */
+  readonly pipelines = signal<TaskForm[]>([]);
   readonly saving = signal(false);
   readonly loading = signal(false);
   readonly submitted = signal(false);
@@ -108,6 +115,14 @@ export class TaskEdit implements OnInit {
         });
       },
       error: () => this.toast.error('Could not load the task settings.'),
+    });
+
+    this.http.get<ApiResponse<TaskForm[]>>(`${API_BASE}/taskForm.json/listPipelines`).subscribe({
+      next: response => {
+        if (response.status === API_SUCCESS) this.pipelines.set(response.data ?? []);
+      },
+      // Not fatal: the Pipeline field just offers nothing to pick until this loads or retries.
+      error: () => {},
     });
 
     // A pipeline chosen by hand loads its form straight away. Editing an existing task goes
