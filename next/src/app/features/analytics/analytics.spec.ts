@@ -2610,12 +2610,16 @@ describe('the filter tree reaches the request with its shape intact', () => {
     expect(canvas.show()).toContain('1 not finished, so not applied');
   });
 
-  it('says that these filters do not reach the Data tab’s preview', () => {
-    // The preview endpoint takes a page and a size and has no filter parameter. A chip claiming
-    // to filter a table it cannot reach would be worse than no chip.
+  it('says that these filters DO reach the Data tab, and only once they have been run', () => {
+    // This assertion has been retargeted twice rather than deleted, because the sentence it
+    // guards has been wrong twice. It first said the preview endpoint "has no filter to give
+    // it", then that nothing carried a chip from here to there; both were true when written and
+    // both outlived the code. What it guards now is the qualifier: the Data tab inherits what
+    // was RUN, so a note promising it inherits what is typed would be the same mistake again.
     const canvas = canvasWith();
 
-    expect(canvas.show()).toContain('narrow the Data tab');
+    expect(canvas.show()).toContain('once you run it');
+    expect(canvas.show()).toContain('Data tab');
   });
 });
 
@@ -4178,5 +4182,118 @@ describe('a filter survives leaving the Data tab and coming back', () => {
     grid.componentInstance.clearAll();
 
     expect(emitted).toEqual([[]]);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Cross-filtering: document 07's "clicking a result applies a filter to the data table".
+ *
+ * The three other targets that section lists were already met -- the charts and every subsequent
+ * dimension analysis draw from the narrowed result, and there are no KPI cards by design. The
+ * data table was the one real gap, and it is the one with the traps: what gets carried (what RAN,
+ * not what is typed), how it is carried (an OR group whole, not spread into an AND), and what the
+ * carried total is then allowed to mean.
+ *
+ * @author Nabeel Ahmed
+ */
+describe('cross-filtering into the Data tab', () => {
+  it('carries nothing before an analysis has run, however much is typed into the builder', () => {
+    const canvas = canvasWith();
+    canvas.studio.setFilters({
+      op: 'AND', clauses: [{ field: 'region', operator: 'EQ', value: 'east' }],
+    });
+
+    // Typed, not run. Narrowing the rows here would apply a predicate the reader has not
+    // pressed Run on and can see the effect of nowhere else.
+    expect(canvas.studio.inheritedDataFilters()).toEqual([]);
+    expect(canvas.studio.inheritedDataFilterCount()).toBe(0);
+  });
+
+  it('carries the filters an analysis actually ran with', () => {
+    const canvas = canvasWith();
+    canvas.studio.setFilters({
+      op: 'AND', clauses: [{ field: 'region', operator: 'EQ', value: 'east' }],
+    });
+    canvas.ran();
+
+    expect(canvas.studio.inheritedDataFilters())
+      .toEqual([{ field: 'region', operator: 'EQ', value: 'east' }]);
+  });
+
+  it('carries an OR group whole rather than spreading it into the ANDed list', () => {
+    // Spread, "(a OR b)" becomes "a AND b" -- a filter that admitted either now demands both,
+    // silently, and only for the Data tab. The rows would disagree with the analysis above them.
+    const canvas = canvasWith();
+    const either = {
+      op: 'OR' as const,
+      clauses: [
+        { field: 'region', operator: 'EQ' as const, value: 'east' },
+        { field: 'region', operator: 'EQ' as const, value: 'west' },
+      ],
+    };
+    canvas.studio.setFilters(either);
+    canvas.ran();
+
+    expect(canvas.studio.inheritedDataFilters()).toEqual([either]);
+    // Two predicates, one node.
+    expect(canvas.studio.inheritedDataFilterCount()).toBe(2);
+  });
+
+  it('compiles a null drill step to IS_NULL, not to an equality against null', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    canvas.studio.drillPath.set([{ dimension: 'region', value: null }]);
+
+    expect(canvas.studio.inheritedDataFilters())
+      .toEqual([{ field: 'region', operator: 'IS_NULL' }]);
+  });
+
+  it('compiles a valued drill step to an equality on the drilled column', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    canvas.studio.drillPath.set([{ dimension: 'region', value: 'east' }]);
+
+    expect(canvas.studio.inheritedDataFilters())
+      .toEqual([{ field: 'region', operator: 'EQ', value: 'east' }]);
+  });
+
+  it('sends the tab\u2019s own filters and the Canvas\u2019s together, ANDed', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    canvas.studio.drillPath.set([{ dimension: 'region', value: 'east' }]);
+    canvas.studio.gridFilters.set([{ field: 'amount', operator: 'GT', value: '10' }]);
+
+    canvas.studio.loadPage(0);
+
+    const shape: any = (canvas.studio as any).analytics.preview.mock.calls.at(-1)[5];
+    expect(shape.filters).toEqual([
+      { field: 'amount', operator: 'GT', value: '10' },
+      { field: 'region', operator: 'EQ', value: 'east' },
+    ]);
+  });
+
+  it('stops carrying anything once the reader turns it off', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    canvas.studio.drillPath.set([{ dimension: 'region', value: 'east' }]);
+    expect(canvas.studio.inheritedDataFilterCount()).toBe(1);
+
+    canvas.studio.toggleCrossFilterData();
+
+    expect(canvas.studio.inheritedDataFilters()).toEqual([]);
+  });
+
+  it('drops the inherited narrowing when the Canvas is cleared', () => {
+    // Or the Data tab keeps filtering by an analysis that no longer exists anywhere on screen.
+    const canvas = canvasWith();
+    canvas.ran();
+    expect(canvas.studio.analysedFilters()).not.toBeNull();
+
+    canvas.studio.openFile(REFUNDS);
+
+    expect(canvas.studio.analysedFilters()).toBeNull();
+    expect(canvas.studio.inheritedDataFilters()).toEqual([]);
   });
 });

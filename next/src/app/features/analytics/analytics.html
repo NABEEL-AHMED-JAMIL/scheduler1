@@ -333,6 +333,34 @@
                  counts the matches, and a matching count printed alone reads as the size of the
                  file — so the unfiltered size is handed over whenever this screen knows it, and
                  the grid says "filtered" in words when it does not. -->
+            <!-- Cross-filtering, made visible. Document 07 asks that clicking a result filters the
+                 data table; a table that had silently changed underneath the reader with nothing
+                 on screen saying why would meet the letter of that and be a worse screen. So the
+                 inherited narrowing is stated, in the Canvas's own chip wording, with the switch
+                 that removes it right beside the sentence. -->
+            @if (inheritedDataFilterCount()) {
+              <div class="card p-3 flex flex-wrap items-center gap-2 min-w-0" role="status">
+                <span class="text-xs text-[color:var(--text-muted)]">Narrowed by the Canvas</span>
+                @for (chip of filterChips(); track chip.key) {
+                  <span class="pill"
+                        [class.pill-brand]="chip.kind === 'clicked'"
+                        [class.pill-neutral]="chip.kind === 'drill'">{{ chip.label }}</span>
+                }
+                <button type="button" class="btn btn-ghost btn-xs ms-auto"
+                        [disabled]="loading()"
+                        (click)="toggleCrossFilterData()">Show all rows</button>
+              </div>
+            } @else if (analysisFiltered() || drillPath().length) {
+              <div class="flex flex-wrap items-center gap-2 min-w-0">
+                <p class="field-note text-[color:var(--text-muted)]">
+                  The Canvas is narrowed and this tab is not.
+                </p>
+                <button type="button" class="btn btn-ghost btn-xs"
+                        [disabled]="loading()"
+                        (click)="toggleCrossFilterData()">Narrow to match</button>
+              </div>
+            }
+
             <app-data-grid [columns]="gridColumns()"
                            [rows]="preview()?.rows ?? []"
                            [sort]="gridSort()"
@@ -1103,17 +1131,18 @@
               <app-filter-builder [model]="canvasFilters()" [columns]="columns()"
                                   (changed)="setFilters($event)" />
 
-              <!-- This used to end "that endpoint takes a page and a size and has no filter to
-                   give it", which was true when these filters were built and stopped being true
-                   when the Data tab gained server-side filtering. A note that describes a former
-                   limitation is worse than no note: it tells a reader the product cannot do
-                   something it can. The two narrowings are still separate — joining them is the
-                   cross-filtering 06 asks for and is not built — but the reason is now that
-                   nothing carries one to the other, not that there is nowhere to carry it to. -->
+              <!-- Twice rewritten, both times because it had outlived what it described: first
+                   "that endpoint takes a page and a size and has no filter to give it", true
+                   until the Data tab gained server-side filtering; then "nothing yet carries a
+                   chip from here to there", true until cross-filtering was built. A note that
+                   describes a former limitation is worse than no note — it tells a reader the
+                   product cannot do something it can. What is carried is the narrowing that was
+                   RUN, not the tree being typed above it, which is why this says "once you run
+                   it". -->
               <p class="field-note text-[color:var(--text-muted)]">
-                These narrow the analysis and everything drawn from it. They do
-                <span class="font-medium">not</span> narrow the Data tab's preview — that tab
-                keeps its own filters, and nothing yet carries a chip from here to there.
+                These narrow the analysis, everything drawn from it, and — once you run it — the
+                Data tab's rows. That tab keeps its own filters too; the two are ANDed, and it
+                says which of them are coming from here with a switch to turn them off.
               </p>
             </div>
 

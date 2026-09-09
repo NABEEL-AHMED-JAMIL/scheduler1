@@ -23,6 +23,7 @@ import {
   Aggregation, AnalysisColumn, AnalysisCrumb, AnalysisRequest, AnalysisResult, AnalyticsService,
   ColumnProfile, DatasetColumn, DatasetPreview, DatasetProfile, Drill, ExportFile, FilterClause,
   FilterGroup, FilterNode, PreviewShape, QueryResult, QueryRun, RegisteredDataset, SavedAnalysis,
+  isFilterGroup,
   SavedQuery, WriteBackResult,
 } from './analytics.service';
 
@@ -786,7 +787,11 @@ export class Analytics implements OnInit {
 
   /** Whether what the reader has asked for removes rows, as opposed to only reordering them. */
   private gridNarrowing(): boolean {
-    return !!this.gridSearch().trim() || this.gridFilters().length > 0;
+    return !!this.gridSearch().trim() || this.gridFilters().length > 0
+      // The Canvas's narrowing removes rows exactly like the tab's own does. Left out, the
+      // fallback would call a filtered count unfiltered whenever the ONLY narrowing was
+      // inherited -- and that number is what the pager divides into pages.
+      || this.inheritedDataFilters().length > 0;
   }
 
   /**
@@ -1078,7 +1083,13 @@ export class Analytics implements OnInit {
     const carried = this.preview();
     const knownTotal = carried?.totalRows;
     const sort = this.gridSort();
-    const filters = this.gridFilters();
+    // The tab's OWN filters, then the Canvas's. ANDed in that order so the reader's explicit
+    // grid filter reads first in any message the server sends back about them.
+    const filters: FilterNode[] = [...this.gridFilters(), ...this.inheritedDataFilters()];
+    // Captured from the same read that builds the request, and committed only when a page comes
+    // back. Stamping it here would mark the tab fresh on a request that failed, leaving the
+    // reader on the old rows with nothing willing to fetch the new ones.
+    const inheritedKey = JSON.stringify(this.inheritedDataFilters());
     const search = this.gridSearch().trim();
     // What THIS request narrows by, which is not what the carried total was counted under.
     const narrowing = !!search || filters.length > 0;
@@ -1105,6 +1116,9 @@ export class Analytics implements OnInit {
         // which, on the request that clears a filter, is the whole of the defect.
         const filtered = response.data.filtered ?? narrowing;
         this.preview.set({ ...response.data, filtered });
+        // The narrowing THIS page was fetched under. A reader who drilled again while it was in
+        // flight leaves the tab stale, which is correct: these rows are not that narrowing.
+        this.loadedDataFilterKey.set(inheritedKey);
         // The size of the FILE, remembered only from a response that counted the whole of it.
         // Without this the grid can print "1,204 matching" and never "1,204 of 250,000", because
         // the response carrying the filtered total has no way to say what it was filtered from.
@@ -1174,6 +1188,11 @@ export class Analytics implements OnInit {
    */
   showTab(tab: Tab): void {
     this.tab.set(tab);
+    // The Data tab follows the Canvas, but only when somebody is looking at it. Reloading it on
+    // every drill would spend a governor permit and a scan per analysis step for a tab the
+    // reader is not on; reloading it here spends one, once, and only if the narrowing has
+    // actually moved since the page in hand was fetched. Same bargain the profile makes.
+    if (tab === 'data' && this.dataPageIsStale()) { this.loadPage(0); return; }
     // The library is lazy for the same reason the profile is, though the cost is a database read
     // rather than a governor permit: neither is worth spending on a reader who opened a file to
     // look at its columns.
@@ -3016,6 +3035,88 @@ export class Analytics implements OnInit {
   readonly unfinishedFilterCount = computed(() =>
     this.builtFilterCount() - countFilterClauses(pruneFilters(this.canvasFilters())));
 
+  /**
+   * Whether the Canvas's narrowing also narrows the Data tab.
+   *
+   * On by default, because that is what document 07 means by cross-filtering: "clicking a result
+   * applies a filter to the data table". Off is offered because the opposite need is just as
+   * real -- having narrowed an analysis to one region, wanting to read the unfiltered rows to see
+   * what was excluded. The state is per-dataset and resets with it, not remembered across files:
+   * a filter silently inherited from a dataset closed an hour ago is a filter nobody can see.
+   */
+  readonly crossFilterData = signal(true);
+
+  /**
+   * The Canvas's narrowing, expressed in the vocabulary the preview endpoint speaks.
+   *
+   * Read from what was ANALYSED, never from the builder on screen. `canvasFilters()` is the tree
+   * the reader is currently editing -- possibly half-typed, and not applied to anything until
+   * they press Run. Inheriting that would narrow the rows in the Data tab by a predicate the
+   * reader has not run and cannot see the effect of anywhere else.
+   *
+   * Two sources:
+   *
+   *   analysedFilters   the group actually sent, builder tree and clicked chips together,
+   *                     carried WHOLE where it is an OR. Flattening `(a OR b)` into an ANDed
+   *                     list would turn a filter that admitted either into one that demands
+   *                     both, silently.
+   *   the drill path    compiled here rather than sent as a drillPath, because the preview
+   *                     endpoint has no drill concept -- it takes predicates. A null step
+   *                     becomes IS_NULL and not `= null`, matching what the analysis server
+   *                     does with the same step; an equality against null is never true, and
+   *                     the Data tab would show an empty page for a group the reader can see
+   *                     has rows in it.
+   */
+  readonly inheritedDataFilters = computed<FilterNode[]>(() => {
+    if (!this.crossFilterData()) return [];
+    const nodes: FilterNode[] = [];
+    const analysed = this.analysedFilters();
+    // Spread only an AND at the top, where spreading changes nothing. An OR goes in whole.
+    if (analysed && analysed.clauses.length) {
+      if (analysed.op === 'AND') nodes.push(...analysed.clauses);
+      else nodes.push(analysed);
+    }
+    this.drillPath().forEach(step => nodes.push(step.value === null
+      ? { field: step.dimension, operator: 'IS_NULL' }
+      : { field: step.dimension, operator: 'EQ', value: step.value }));
+    return nodes;
+  });
+
+  /** How many predicates the Canvas is contributing to the Data tab right now. */
+  readonly inheritedDataFilterCount = computed(() =>
+    this.inheritedDataFilters().reduce((total, node) =>
+      total + (isFilterGroup(node) ? countFilterClauses(node) : 1), 0));
+
+  /**
+   * What the page currently on screen was narrowed by, as a comparable string.
+   *
+   * Null until a page has been fetched. Compared rather than a dirty flag because the reader can
+   * drill and drill back out again while on another tab, arriving at the narrowing the loaded
+   * page already has -- a flag would order a pointless scan, and the whole point of doing this
+   * on arrival is to spend at most one.
+   */
+  private readonly loadedDataFilterKey = signal<string | null>(null);
+
+  private dataFilterKey(): string {
+    return JSON.stringify(this.inheritedDataFilters());
+  }
+
+  /** True when the Data tab is holding a page fetched under a different narrowing. */
+  private dataPageIsStale(): boolean {
+    return !!this.preview() && this.loadedDataFilterKey() !== this.dataFilterKey();
+  }
+
+  /**
+   * Turns the Canvas's narrowing on the Data tab on or off.
+   *
+   * Reloads only when the tab is the one being looked at; otherwise the next arrival picks it up
+   * through the same staleness check, so flicking the switch from the Canvas costs nothing.
+   */
+  toggleCrossFilterData(): void {
+    this.crossFilterData.update(on => !on);
+    if (this.tab() === 'data' && this.dataPageIsStale()) this.loadPage(0);
+  }
+
   /** Everything narrowing the result right now, as removable chips. */
   readonly filterChips = computed(() => {
     const chips: { key: string; label: string; kind: 'clicked' | 'drill'; index: number }[] = [];
@@ -3176,7 +3277,17 @@ export class Analytics implements OnInit {
   readonly crumbsMissing = computed(() =>
     !!this.drillPath().length && !this.crumbTrail().length);
 
+  /**
+   * The filter group the last analysis actually ran with, or null before any has run.
+   *
+   * Set in beginAnalysis rather than in each of the three callers, because that is the single
+   * point run, drill and drill-up all pass through -- and a fourth run path added later gets
+   * this for free instead of quietly inheriting a stale narrowing.
+   */
+  readonly analysedFilters = signal<FilterGroup | null>(null);
+
   private beginAnalysis(runId: string): void {
+    this.analysedFilters.set(this.activeFilters());
     this.analysing.set(true);
     this.analysisStopping.set(false);
     this.analysisRunId.set(runId);
@@ -3751,6 +3862,9 @@ export class Analytics implements OnInit {
     this.canvasFilters.set(emptyFilterGroup());
     this.crossFilters.set([]);
     this.drillPath.set([]);
+    // Or the Data tab keeps narrowing by the analysis that has just been thrown away.
+    this.analysedFilters.set(null);
+    this.crossFilterData.set(true);
     this.topNLimit.set(null);
     this.topNCustom.set('');
     this.topNOther.set(true);
@@ -3879,6 +3993,9 @@ export class Analytics implements OnInit {
     this.analysisError.set('');
     this.drillPath.set([]);
     this.crossFilters.set([]);
+    // Nothing has run yet -- the config is loaded, not analysed. Carrying the previous
+    // analysis's narrowing into the Data tab here would attribute it to this one.
+    this.analysedFilters.set(null);
     this.dimensions.set((config.dimensions ?? []).slice(0, this.maxDimensions));
     this.aggregation.set(config.measure?.aggregation ?? 'COUNT_ROWS');
     this.measureField.set(config.measure?.field ?? '');

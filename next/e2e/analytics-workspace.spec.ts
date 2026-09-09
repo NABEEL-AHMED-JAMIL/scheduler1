@@ -143,3 +143,34 @@ test('9 — the saved-analysis library is reachable from the menu, not just by t
     await expect(page).toHaveURL(/\/analytics\/dashboards/);
     await expect(page.getByText(/re-run every time it is opened/)).toBeVisible();
   });
+
+test('10 — a Canvas drill narrows the Data tab, and says so', async ({ page }) => {
+  // Document 07's "clicking a result applies a filter to the data table". The proof that it is
+  // the SERVER narrowing and not the page hiding rows is the count: 150,000 has to become the
+  // number of rows in one region, over the whole file, not a filtered view of the hundred in hand.
+  await openFixture(page);
+  await page.getByRole('button', { name: 'Canvas', exact: true }).click();
+  await page.locator('#a-dim-0').selectOption('region');
+  await page.getByRole('button', { name: /Run analysis/ }).click();
+  await expect(page.getByText(/by region/)).toBeVisible();
+
+  await page.locator('#a-drill-dim').selectOption('region');
+  await page.getByRole('button', { name: 'Drill', exact: true }).first().click();
+  await expect(page.getByText(/Filtered to/)).toBeVisible();
+
+  await page.getByRole('button', { name: 'Data', exact: true }).click();
+  await expect(page.getByText('Narrowed by the Canvas')).toBeVisible();
+  // The fixture holds five regions of 30,000 rows each. 30,000 is therefore the whole of one
+  // region and not a filtered view of the hundred the page was holding -- the difference between
+  // the server narrowing the dataset and the browser hiding rows, which is the entire claim.
+  // "of 150,000" is the second half: a narrowed count must still name what it was narrowed FROM.
+  await expect(page.locator('p', { hasText: /of 150,000 rows/ }))
+    .toHaveText('30,000 of 150,000 rows');
+  // 1,500 pages became 300: the pager divides the NARROWED total, and says which it is.
+  await expect(page.locator('span', { hasText: /rows a page/ }))
+    .toHaveText(/Page 1 of 300\s+·\s+100 rows a page\s+·\s+pages of the rows that match/);
+
+  // And the reader can put it back.
+  await page.getByRole('button', { name: 'Show all rows' }).click();
+  await expect(page.getByText('Narrowed by the Canvas')).toHaveCount(0);
+});

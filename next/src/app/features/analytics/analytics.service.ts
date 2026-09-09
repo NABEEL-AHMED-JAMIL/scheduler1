@@ -70,8 +70,16 @@ export interface PreviewShape {
   direction?: 'ASC' | 'DESC';
   /** Free text, matched case-insensitively against every text column over the whole dataset. */
   search?: string;
-  /** ANDed by the server. The Canvas's own clause vocabulary, compiled by the same compiler. */
-  filters?: FilterClause[];
+  /**
+   * ANDed by the server. The Canvas's own clause vocabulary, compiled by the same compiler.
+   *
+   * A `FilterNode`, not a `FilterClause`: an element may itself be a group, which is what lets
+   * the Canvas's builder -- where an OR is a real thing a reader can construct -- narrow this tab
+   * without being flattened. Spreading `(a OR b)` into an ANDed list would turn a filter that
+   * admitted either into one that demands both, and it would do it silently.
+   * AnalyticsRestApi.filtersOf already deserialises a group here; only this type was narrower.
+   */
+  filters?: FilterNode[];
   /** True when the `knownTotal` being sent was counted under a filter or a search. */
   knownTotalFiltered?: boolean;
 }
@@ -777,7 +785,10 @@ export class AnalyticsService {
     // Clauses go through clauseToWire, the one place that knows how an operand travels. A second
     // serialiser here is the second guess at a shape the contract does not spell out.
     const filters = shape?.filters ?? [];
-    if (filters.length) params['filters'] = JSON.stringify(filters.map(clauseToWire));
+    if (filters.length) {
+      params['filters'] = JSON.stringify(filters.map(node =>
+        isFilterGroup(node) ? filtersToWire(node) : clauseToWire(node)));
+    }
     // Unconditional rather than tied to knownTotal being present. The server ignores it without
     // one, and the failure this guards against is the flag being LEFT OFF a request that carries
     // a filtered total -- so there is no branch here that can omit it.
