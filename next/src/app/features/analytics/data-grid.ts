@@ -740,8 +740,12 @@ export class DataGrid {
     const columns = this.visibleColumns().length;
     const hidden = this.hiddenCount();
     const hiddenNote = hidden ? `, ${hidden} hidden` : '';
-    return `One page of dataset rows: ${this.rows().length} rows of ${columns} columns` +
-      `${hiddenNote}. ${this.countLabel()}. Sorting, searching and filtering run on the server.`;
+    // Pluralised, because this sentence is READ ALOUD. "1 rows of 1 columns" is the kind of
+    // thing a sighted reader never sees and a screen-reader user hears every time.
+    const rows = this.rows().length;
+    return `One page of dataset rows: ${rows} ${rows === 1 ? 'row' : 'rows'} of `
+      + `${columns} ${columns === 1 ? 'column' : 'columns'}`
+      + `${hiddenNote}. ${this.countLabel()}. Sorting, searching and filtering run on the server.`;
   });
 
   // -- sorting ----------------------------------------------------------------------------
