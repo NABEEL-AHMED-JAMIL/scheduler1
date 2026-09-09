@@ -42,3 +42,9 @@ __screenshots__/
 # System files
 .DS_Store
 Thumbs.db
+
+# A signed-in session is written here so the specs need not log in eleven times. It holds a real
+# access token, so it never goes near the repository -- the suite recreates it from E2E_PASSWORD.
+/e2e/.auth
+/test-results
+/playwright-report
