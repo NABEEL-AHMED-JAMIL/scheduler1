@@ -300,7 +300,17 @@ type Pending = '' | 'sort' | 'search' | 'filter';
                       }
                       <!-- Focusable, so a column can be resized without a pointer. A separator
                            rather than a button: it has a value and a range, and that is what a
-                           screen reader should hear when it lands on one. -->
+                           screen reader should hear when it lands on one.
+
+                           aria-valuenow FALLS BACK rather than being omitted. A column is
+                           automatically sized until somebody resizes it, so its width is undefined
+                           for every column on a freshly opened dataset -- and Angular drops an
+                           attribute bound to undefined, which left every one of these focusable
+                           separators without the aria-valuenow ARIA requires. axe called it, at
+                           critical, on six elements. aria-valuetext carries the truth to the
+                           listener ("automatic"), because a screen reader announces valuetext in
+                           preference to valuenow: the number satisfies the spec, the word is what
+                           the reader actually hears, and neither of them lies. -->
                       <span class="ml-auto w-1.5 h-4 shrink-0 rounded cursor-col-resize
                                    hover:bg-[color:var(--border-strong)]
                                    focus-visible:bg-[color:var(--color-brand-500)] focus:outline-none"
@@ -308,7 +318,9 @@ type Pending = '' | 'sort' | 'search' | 'filter';
                             [class.bg-[color:var(--color-brand-500)]]="resizing() === column.name"
                             [attr.aria-label]="'Resize ' + column.name +
                                                ' — arrow keys to size, delete to reset'"
-                            [attr.aria-valuenow]="column.width"
+                            [attr.aria-valuenow]="column.width ?? autoWidth"
+                            [attr.aria-valuetext]="column.width
+                              ? column.width + ' pixels' : 'automatic'"
                             [attr.aria-valuemin]="minWidth" [attr.aria-valuemax]="maxWidth"
                             (mousedown)="startResize($event, column.name)"
                             (dblclick)="resetWidth(column.name)"
@@ -502,6 +514,8 @@ export class DataGrid {
   protected readonly operators = GRID_OPERATORS;
   protected readonly minWidth = MIN_COLUMN_WIDTH;
   protected readonly maxWidth = MAX_COLUMN_WIDTH;
+  /** The number reported for an automatically sized column. See the separator's comment. */
+  protected readonly autoWidth = DEFAULT_CELL_MAX;
 
   private readonly host = inject(ElementRef);
   private readonly destroyRef = inject(DestroyRef);

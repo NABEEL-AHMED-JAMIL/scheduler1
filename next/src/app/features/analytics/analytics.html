@@ -204,7 +204,24 @@
                makes a reader read all ten to find the rows. Grouped, the row wraps AT the group
                boundaries, each cluster carries the reason it is a cluster, and "what will this
                cost me" is answered before the click rather than by waiting. -->
-          <div class="flex flex-wrap items-end gap-x-4 gap-y-1 border-b border-subtle -mb-1">
+          <!-- role="toolbar" with a roving tabindex, NOT role="tablist".
+
+               The keyboard win is the roving tabindex: ten buttons were ten tab stops, so
+               reaching the grid meant pressing Tab past every tab you did not want. One stop now,
+               and Left/Right/Home/End move between them.
+
+               Toolbar rather than tablist because a tablist owns its tabs directly and these sit
+               inside three role="group" boxes -- the grouping carries what each tab COSTS, which
+               is worth more here than the tablist role, and declaring a tablist whose DOM is not
+               one would be a worse lie than not declaring it.
+
+               MANUAL activation -- arrows move focus, Enter or Space opens. The automatic variant
+               is the more common choice and would be wrong here: four of these tabs trigger a
+               full scan of the dataset, so arrowing from Details to Canvas would spend three
+               governor permits on tabs the reader was only passing over. -->
+          <div class="flex flex-wrap items-end gap-x-4 gap-y-1 border-b border-subtle -mb-1"
+               role="toolbar" aria-label="Dataset views"
+               aria-orientation="horizontal">
             @for (group of tabGroups; track group.label) {
               <div class="flex flex-col min-w-0" role="group" [attr.aria-label]="group.label">
                 <span class="text-[10px] uppercase tracking-wider text-[color:var(--text-muted)]
@@ -223,6 +240,9 @@
                             [class.font-semibold]="tab() === item.id"
                             [class.border-[color:var(--chart-0)]]="tab() === item.id"
                             [attr.aria-current]="tab() === item.id ? 'true' : null"
+                            [id]="'a-tab-' + item.id"
+                            [attr.tabindex]="tab() === item.id ? 0 : -1"
+                            (keydown)="onTabStripKey($event, item.id)"
                             (click)="showTab(item.id)">{{ item.label }}</button>
                   }
                 </div>
@@ -1582,7 +1602,9 @@
                   <h3 class="text-xs uppercase tracking-wider text-[color:var(--text-muted)]">
                     Saved analyses
                   </h3>
-                  <button type="button" class="btn btn-ghost btn-xs" (click)="loadAnalyses()">
+                  <button type="button" class="btn btn-ghost btn-xs"
+                          aria-label="Refresh the saved analysis list"
+                          (click)="loadAnalyses()">
                     <app-icon name="refresh" />
                   </button>
                 </div>

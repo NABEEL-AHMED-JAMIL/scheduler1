@@ -1186,6 +1186,39 @@ export class Analytics implements OnInit {
    * and silently spending another permit per tab click is exactly the behaviour the governor
    * exists to stop.
    */
+  /**
+   * Left/Right/Home/End across the ten tabs, moving FOCUS and not the view.
+   *
+   * The strip carries a roving tabindex: the open tab is the only one with tabindex 0, so the
+   * whole strip is one Tab stop instead of ten and a reader heading for the grid is not walked
+   * past every view they did not want.
+   *
+   * Focus only. WAI-ARIA's automatic-activation variant would open each tab as focus landed on
+   * it, and four of these tabs are a full scan of the dataset behind a governor that admits four
+   * queries at a time across the JVM -- arrowing from Details to Canvas would spend three permits
+   * on tabs the reader was passing over. Enter and Space open, through the button's own click.
+   *
+   * Wraps around, and traverses the flat list rather than the three groups, because the groups
+   * describe cost rather than order: a reader arrowing right expects the next tab along the
+   * strip, which is the next one in reading order whichever box it sits in.
+   */
+  onTabStripKey(event: KeyboardEvent, current: Tab): void {
+    const keys = ['ArrowRight', 'ArrowLeft', 'Home', 'End'];
+    if (!keys.includes(event.key)) return;
+    const order = this.tabs;
+    const at = order.findIndex(item => item.id === current);
+    if (at < 0) return;
+    const next = event.key === 'Home' ? 0
+      : event.key === 'End' ? order.length - 1
+      : event.key === 'ArrowRight' ? (at + 1) % order.length
+      : (at - 1 + order.length) % order.length;
+    // Only now, so an unhandled key keeps its default. Scrolling the page with Home while the
+    // strip has focus is a reasonable thing to want everywhere the strip does not answer.
+    event.preventDefault();
+    // The roving tabindex means the target is currently -1, which is focusable programmatically.
+    document.getElementById('a-tab-' + order[next].id)?.focus();
+  }
+
   showTab(tab: Tab): void {
     this.tab.set(tab);
     // The Data tab follows the Canvas, but only when somebody is looking at it. Reloading it on
