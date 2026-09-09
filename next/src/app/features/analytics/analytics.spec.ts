@@ -1,11 +1,13 @@
+import { DataGrid } from './data-grid';
 import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { Dialog } from '@angular/cdk/dialog';
 import { Subject, of } from 'rxjs';
 import { Analytics, dateOnly, plainDecimal } from './analytics';
 import {
   AnalysisResult, AnalyticsService, ColumnProfile, DatasetPreview, DatasetProfile, FilterGroup,
-  QueryResult, QueryRun, SavedAnalysis, SavedQuery,
+  PreviewShape, QueryResult, QueryRun, SavedAnalysis, SavedQuery,
 } from './analytics.service';
 import { BucketSummary, ObjectSummary, StorageService } from '../objects/storage.service';
 
@@ -61,9 +63,19 @@ const SCHEMA = {
 function pageOf(over: Partial<DatasetPreview> = {}): DatasetPreview {
   return {
     columns: ['id', 'amount'], rows: [['1', '9.50']], page: 0, pageSize: 100,
-    totalRows: 250, multiFile: false, ...over,
+    totalRows: 250, multiFile: false, filtered: false, ...over,
   };
 }
+
+/**
+ * The shape a request carries when the reader has touched nothing.
+ *
+ * Spelled out rather than left off the assertions, because the ONE field on it that can be
+ * silently wrong is knownTotalFiltered -- and a test that ignored the shape argument would go on
+ * passing while it was omitted. `undefined` properties compare equal to absent ones here, so
+ * this is the whole of what a quiet request says.
+ */
+const PLAIN_SHAPE = { knownTotalFiltered: false };
 
 /**
  * A studio wired to stubbed services, already past ngOnInit.
@@ -83,6 +95,7 @@ function studioWith(over: { connections?: BucketSummary[]; objects?: ObjectSumma
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
     providers: [
+      provideRouter([]),
       { provide: StorageService, useValue: { buckets, listObjects } },
       { provide: AnalyticsService, useValue: { schema, preview, profile } },
     ],
@@ -378,7 +391,8 @@ describe('paging', () => {
     studio.nextPage();
 
     expect(preview).toHaveBeenCalledTimes(1);
-    expect(preview).toHaveBeenCalledWith('minio-main', 'daily/sales-2026.csv', 1, 250);
+    expect(preview).toHaveBeenCalledWith(
+      'minio-main', 'daily/sales-2026.csv', 1, 250, undefined, PLAIN_SHAPE);
   });
 
   it('will not run off the end', () => {
@@ -397,7 +411,8 @@ describe('paging', () => {
     studio.previousPage();
 
     expect(preview).toHaveBeenCalledTimes(1);
-    expect(preview).toHaveBeenCalledWith('minio-main', 'daily/sales-2026.csv', 1, 250);
+    expect(preview).toHaveBeenCalledWith(
+      'minio-main', 'daily/sales-2026.csv', 1, 250, undefined, PLAIN_SHAPE);
   });
 
   it('will not run off the front', () => {
@@ -424,7 +439,8 @@ describe('carrying the row count forward', () => {
     studio.openFile(CSV_FILE);
     answers.schema!.next(SERVER_RESPONSE(SCHEMA));
 
-    expect(preview).toHaveBeenCalledWith('minio-main', 'daily/sales-2026.csv', 0, undefined);
+    expect(preview).toHaveBeenCalledWith(
+      'minio-main', 'daily/sales-2026.csv', 0, undefined, undefined, PLAIN_SHAPE);
   });
 
   it('sends the total it is already holding on a page turn, so the server skips the COUNT', () => {
@@ -433,7 +449,8 @@ describe('carrying the row count forward', () => {
 
     studio.nextPage();
 
-    expect(preview).toHaveBeenCalledWith('minio-main', 'daily/sales-2026.csv', 1, 250);
+    expect(preview).toHaveBeenCalledWith(
+      'minio-main', 'daily/sales-2026.csv', 1, 250, undefined, PLAIN_SHAPE);
   });
 
   it('sends it turning back as well, which is the same dataset counted the same moment ago', () => {
@@ -442,7 +459,8 @@ describe('carrying the row count forward', () => {
 
     studio.previousPage();
 
-    expect(preview).toHaveBeenCalledWith('minio-main', 'daily/sales-2026.csv', 1, 250);
+    expect(preview).toHaveBeenCalledWith(
+      'minio-main', 'daily/sales-2026.csv', 1, 250, undefined, PLAIN_SHAPE);
   });
 
   it('forgets it when the dataset is reopened, because that count is a fresh one', () => {
@@ -452,7 +470,8 @@ describe('carrying the row count forward', () => {
     harness.studio.retry();
     harness.answers.schema!.next(SERVER_RESPONSE(SCHEMA));
 
-    expect(harness.preview).toHaveBeenCalledWith('minio-main', 'daily/sales-2026.csv', 0, undefined);
+    expect(harness.preview).toHaveBeenCalledWith(
+      'minio-main', 'daily/sales-2026.csv', 0, undefined, undefined, PLAIN_SHAPE);
   });
 
   it('carries the total the LAST response gave, not the one the first did', () => {
@@ -464,7 +483,8 @@ describe('carrying the row count forward', () => {
 
     harness.studio.nextPage();
 
-    expect(harness.preview).toHaveBeenCalledWith('minio-main', 'daily/sales-2026.csv', 2, 400);
+    expect(harness.preview).toHaveBeenCalledWith(
+      'minio-main', 'daily/sales-2026.csv', 2, 400, undefined, PLAIN_SHAPE);
   });
 });
 
@@ -764,7 +784,8 @@ describe('the three figures that are not exact', () => {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       providers: [
-        { provide: StorageService, useValue: { buckets, listObjects } },
+        provideRouter([]),
+      { provide: StorageService, useValue: { buckets, listObjects } },
         { provide: AnalyticsService, useValue: { schema, preview, profile } },
       ],
     });
@@ -777,8 +798,17 @@ describe('the three figures that are not exact', () => {
 
     return {
       studio,
-      /** Everything a person can read on the screen, with the template's whitespace collapsed. */
-      show(columns: ColumnProfile[], totalRows = 1000, tab: 'profile' | 'quality' = 'profile') {
+      /**
+       * Everything a person can read on the screen, with the template's whitespace collapsed.
+       *
+       * Defaults to COLUMNS rather than Profile, because that is where the per-column cards --
+       * and so the three hedged figures -- now live. Document 06 defines Profile as aggregate
+       * distributions and Columns as the per-column statistics, and the build had the two
+       * inverted. Every assertion in this block is about a figure on a card, so the tab it
+       * opens moved with the cards.
+       */
+      show(columns: ColumnProfile[], totalRows = 1000,
+           tab: 'columns' | 'profile' | 'quality' | 'compact' = 'columns') {
         studio.showTab(tab);
         answers.profile!.next(SERVER_RESPONSE(profileOf(columns, totalRows)));
         fixture.detectChanges();
@@ -866,8 +896,31 @@ describe('the three figures that are not exact', () => {
     const studio = renderedStudio();
     const text = studio.show([columnOf()]);
 
-    expect(studio.statLabels()).toEqual(['min', 'max', 'mean', 'std dev']);
+    // "quartiles" joined the list when 06's "percentile values where applicable" were finally
+    // written out: they had been on the card as the WIDTHS of the spread bar since it shipped
+    // and were never named, so a reader could see the shape and not read a quartile off it.
+    expect(studio.statLabels()).toEqual(['min', 'max', 'mean', 'std dev', 'quartiles']);
     expect(text).toContain('quartiles estimated');
+  });
+
+  it('names the three quartiles it draws, and calls every one of them estimated', () => {
+    // approx_quantile, not the quantile: on the measured column the exact first quartile was
+    // 21.0 and this reported 18.375. Writing them out without the word beside them would turn
+    // three estimates into three figures that look measured.
+    const text = renderedStudio().show([columnOf({
+      min: '0', approxQ25: '10', approxQ50: '20', approxQ75: '30', max: '40',
+    })]);
+
+    expect(text).toContain('10 · 20 · 30');
+    expect(text).toContain('(estimated)');
+  });
+
+  it('says how much of a column is distinct, carrying the sketch’s own hedge', () => {
+    // 06 asks for "distinct %". It is approxDistinct over the row count, so it inherits the
+    // HyperLogLog inexactness whole -- and a bare "40% of rows" would read as a measurement.
+    const text = renderedStudio().show([columnOf({ approxDistinct: 400 })], 1000);
+
+    expect(text).toContain('≈ 40% of rows');
   });
 
   it('says the quartiles are estimated where it draws them', () => {
@@ -1166,6 +1219,7 @@ function consoleWith(over: { objects?: ObjectSummary[]; confirms?: boolean } = {
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
     providers: [
+      provideRouter([]),
       { provide: StorageService, useValue: { buckets, listObjects } },
       {
         provide: AnalyticsService,
@@ -1685,9 +1739,23 @@ describe('the library: saving, loading and deleting a query', () => {
   });
 });
 
+/**
+ * The console with the ACTIVITY tab open, which is where run history lives now.
+ *
+ * It was the second card under the SQL library, which made the record of everything a workspace
+ * ran a footnote to the statements one person chose to keep. Document 02 names it as a tab; the
+ * fetch is lazy on arrival there, exactly as the library's is on arrival at SQL.
+ */
+function activityWith() {
+  const console = consoleWith();
+  console.studio.showTab('activity');
+  console.fixture.detectChanges();
+  return console;
+}
+
 describe('the run history', () => {
   it('says what ran, when, how long it took and how many rows came back', () => {
-    const console = consoleWith();
+    const console = activityWith();
     console.answers.runs!.next(SERVER_RESPONSE([runOf()]));
     const text = console.show();
 
@@ -1700,7 +1768,7 @@ describe('the run history', () => {
   it('draws a refusal as a refusal, not as a failure, and carries its sentence', () => {
     // The two are different events: FAILED reached the engine and broke there, REFUSED never
     // reached it. A history that drew both in red would hide the one worth looking at.
-    const console = consoleWith();
+    const console = activityWith();
     console.answers.runs!.next(SERVER_RESPONSE([
       runOf({
         analyticsQueryRunId: 42, runStatus: 'REFUSED', rowCount: null, durationMs: null,
@@ -1740,14 +1808,14 @@ describe('the run history', () => {
   });
 
   it('says the durations are the engine’s, not the wait the reader had', () => {
-    const console = consoleWith();
+    const console = activityWith();
     console.answers.runs!.next(SERVER_RESPONSE([runOf()]));
 
     expect(console.show()).toContain('wall clock inside the query engine');
   });
 
   it('says plainly when nothing has been run in the workspace', () => {
-    const console = consoleWith();
+    const console = activityWith();
     console.answers.runs!.next(SERVER_RESPONSE([]));
 
     expect(console.show()).toContain('Nothing has been run here yet.');
@@ -1755,16 +1823,34 @@ describe('the run history', () => {
 });
 
 describe('the console does not disturb the tabs beside it', () => {
-  it('opens a dataset on Overview, with SQL last in the strip', () => {
-    // Canvas sits before SQL and after Quality. The console stays last because it is the escape
-    // hatch for the questions a structured analysis cannot phrase, and an escape hatch belongs at
-    // the end of a strip rather than in the middle of it.
+  it('opens a dataset on Details, with the ten tabs document 02 names', () => {
+    // Canvas sits before SQL. The console is the escape hatch for the questions a structured
+    // analysis cannot phrase, and an escape hatch belongs at the end of a group rather than in
+    // the middle of it.
     const console = consoleWith();
-    expect(console.studio.tabs.map(tab => tab.id))
-      .toEqual(['overview', 'data', 'profile', 'quality', 'canvas', 'sql']);
+    expect(console.studio.tabs.map(tab => tab.id)).toEqual([
+      'overview', 'data', 'compact', 'columns', 'profile', 'quality',
+      'canvas', 'sql', 'charts', 'activity',
+    ]);
 
     console.studio.openFile(CSV_FILE);
     expect(console.studio.tab()).toBe('overview');
+  });
+
+  it('groups the ten rather than laying them out as one unreadable row', () => {
+    // Ten equal tabs wrap into a second line of undifferentiated words. Grouped, the row wraps
+    // at the boundaries and each cluster carries what it costs -- which is the axis they are
+    // grouped on, so a reader knows whether a click spends a query before they make it.
+    const console = consoleWith();
+    expect(console.studio.tabGroups.map(group => group.label))
+      .toEqual(['The file', 'Its columns', 'Questions']);
+    // Every tab is in exactly one group, and the flat list is built from them rather than kept
+    // beside them -- two lists is where the second one stops matching.
+    expect(console.studio.tabGroups.flatMap(group => group.tabs).length)
+      .toBe(console.studio.tabs.length);
+    expect(console.studio.tabGroups[1].tabs.map(tab => tab.id))
+      .toEqual(['compact', 'columns', 'profile', 'quality']);
+    expect(console.show()).toContain('Its columns');
   });
 
   it('clears a result when another file is opened, and keeps the statement', () => {
@@ -1816,11 +1902,18 @@ function categories(count: number): QueryResult {
     (_, index) => [`region-${index}`, String(index + 1)] as [string, string]));
 }
 
-/** A console holding the answer to one query, rendered. */
+/**
+ * A console holding the answer to one query, with the CHARTS tab open on it.
+ *
+ * The chart used to sit under the result table on the SQL tab, and document 02 and document 06
+ * both ask for a tab of its own. It draws from whatever the console last ran, so the harness
+ * runs the query first and then moves -- which is also the order a reader does it in.
+ */
 function charted(result: QueryResult) {
   const console = consoleWith();
   console.runs();
   console.answers.query!.next(SERVER_RESPONSE(result));
+  console.studio.showTab('charts');
   console.fixture.detectChanges();
   return console;
 }
@@ -2146,6 +2239,7 @@ describe('a top N is disclosed, never a quiet tail', () => {
 describe('the chart’s empty states are four different facts', () => {
   it('says a chart comes from a result before anything has been run', () => {
     const console = consoleWith();
+    console.studio.showTab('charts');
 
     expect(console.studio.chartDrawn()).toBe(false);
     expect(console.show()).toContain('Nothing has run yet — a chart is drawn from a result');
@@ -2278,6 +2372,7 @@ function canvasWith(over: { confirms?: boolean } = {}) {
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
     providers: [
+      provideRouter([]),
       { provide: StorageService, useValue: { buckets, listObjects } },
       {
         provide: AnalyticsService,
@@ -3341,5 +3436,716 @@ describe('the canvas does not disturb the tabs beside it', () => {
     expect(canvas.studio.analysisFiltered()).toBe(false);
     canvas.studio.crossFilter('region', 'north');
     expect(canvas.studio.analysisFiltered()).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * The Data tab, rendered, with a real DataGrid in it.
+ *
+ * The grid was built in the wave before this one and wired into nothing: sorting, filtering,
+ * search, column resize, visibility and copy-cell all existed and no user could reach any of
+ * them, because the Data tab was still the page-turner it shipped as. These tests are the
+ * connection between the two — what the grid emits, and what this screen then asks the server.
+ */
+function gridWith(over: Partial<DatasetPreview> = {}) {
+  const answers: { schema?: Subject<any>; preview?: Subject<any>; profile?: Subject<any> } = {};
+  const listObjects = vi.fn(() => of(SERVER_RESPONSE({ objects: [CSV_FILE] })));
+  const buckets = vi.fn(() => of(SERVER_RESPONSE([MINIO])));
+  const schema = vi.fn(() => (answers.schema = new Subject<any>()).asObservable());
+  // Declared WITH its parameters, so the mock's recorded calls are a tuple this file can index.
+  // The sixth is the shape, and the shape is what these tests are about.
+  const preview = vi.fn((_connection?: string, _path?: string, _page?: number,
+                         _knownTotal?: number, _pageSize?: number, _shape?: PreviewShape) =>
+    (answers.preview = new Subject<any>()).asObservable());
+  const profile = vi.fn(() => (answers.profile = new Subject<any>()).asObservable());
+
+  TestBed.resetTestingModule();
+  TestBed.configureTestingModule({
+    providers: [
+      provideRouter([]),
+      { provide: StorageService, useValue: { buckets, listObjects } },
+      { provide: AnalyticsService, useValue: { schema, preview, profile } },
+    ],
+  });
+  const fixture = TestBed.createComponent(Analytics);
+  fixture.detectChanges();
+  const studio = fixture.componentInstance;
+  studio.openFile(CSV_FILE);
+  answers.schema!.next(SERVER_RESPONSE(SCHEMA));
+  answers.preview!.next(SERVER_RESPONSE(pageOf(over)));
+  studio.showTab('data');
+  fixture.detectChanges();
+
+  return {
+    studio, fixture, answers, preview, profile,
+    /** Answers the request now in flight, so a test can chain one request onto another. */
+    answer(page: Partial<DatasetPreview> = {}): void {
+      answers.preview!.next(SERVER_RESPONSE(pageOf(page)));
+      fixture.detectChanges();
+    },
+    /** The shape argument of the most recent preview call — the sixth. */
+    lastShape(): PreviewShape {
+      const calls = preview.mock.calls;
+      return calls[calls.length - 1][5] ?? {};
+    },
+    lastKnownTotal(): number | undefined {
+      const calls = preview.mock.calls;
+      return calls[calls.length - 1][3];
+    },
+    lastPage(): number | undefined {
+      const calls = preview.mock.calls;
+      return calls[calls.length - 1][2];
+    },
+    show(): string {
+      fixture.detectChanges();
+      return ((fixture.nativeElement as HTMLElement).textContent ?? '').replace(/\s+/g, ' ');
+    },
+  };
+}
+
+describe('the grid is wired to the server, and never sorts the page it is holding', () => {
+  it('renders the rows through the grid rather than a table of its own', () => {
+    const grid = gridWith({ columns: ['id', 'amount'], rows: [['1', '9.50']] });
+
+    expect((grid.fixture.nativeElement as HTMLElement).querySelector('app-data-grid'))
+      .not.toBeNull();
+    // The grid's own toolbar, which is the half of the feature that was unreachable: search,
+    // filters and column visibility all existed and no user could get at any of them.
+    const text = grid.show();
+    expect(text).toContain('Search every text column');
+    expect(text).toContain('Filters');
+    // And its busy line, which is what makes a server-side sort trustworthy rather than merely
+    // applied — the old table said nothing at all about where the ordering came from.
+    expect(text).toContain('Sorting, searching and filtering all run on the server');
+  });
+
+  it('hands the grid the columns in the order the ROWS are in, carrying the schema’s types', () => {
+    // A row is indexed by position in the preview's own column list. Feeding the schema's order
+    // instead would put every cell under the wrong heading the moment the two disagreed.
+    const grid = gridWith({ columns: ['amount', 'id'] });
+
+    expect(grid.studio.gridColumns())
+      .toEqual([{ name: 'amount', type: 'DECIMAL(18,3)' }, { name: 'id', type: 'BIGINT' }]);
+  });
+
+  it('asks the SERVER to sort, from page 0, rather than reordering what it holds', () => {
+    const grid = gridWith({ page: 3, totalRows: 250 });
+    grid.studio.onGridSort({ column: 'amount', direction: 'DESC' });
+
+    expect(grid.lastPage()).toBe(0);
+    expect(grid.lastShape()).toMatchObject({ sort: 'amount', direction: 'DESC' });
+    // Page 3 of an unsorted file and page 3 of a sorted one hold different rows, so the page
+    // number cannot survive the sort.
+    expect(grid.studio.gridSort()).toEqual({ column: 'amount', direction: 'DESC' });
+  });
+
+  it('sends a search and a filter as the server’s own parameters, from page 0', () => {
+    const grid = gridWith({ page: 2 });
+    grid.studio.onGridSearch('north');
+
+    expect(grid.lastPage()).toBe(0);
+    expect(grid.lastShape()).toMatchObject({ search: 'north' });
+
+    grid.answer({ totalRows: 12, filtered: true });
+    grid.studio.onGridFilters([{ field: 'amount', operator: 'GT', value: '100' }]);
+
+    expect(grid.lastShape()).toMatchObject({
+      filters: [{ field: 'amount', operator: 'GT', value: '100' }],
+    });
+  });
+
+  it('drops the sort, the search and the filters when another file is opened', () => {
+    // A sort names a column of the file being closed and a filter names a value in it.
+    const grid = gridWith();
+    grid.studio.onGridSort({ column: 'amount', direction: 'ASC' });
+    grid.studio.onGridSearch('north');
+    grid.answer({ totalRows: 4, filtered: true });
+
+    grid.studio.openFile(CSV_FILE);
+
+    expect(grid.studio.gridSort()).toBeNull();
+    expect(grid.studio.gridSearch()).toBe('');
+    expect(grid.studio.gridFilters()).toEqual([]);
+    expect(grid.studio.datasetRows()).toBeNull();
+  });
+
+  it('reports a copy the clipboard refused, rather than saying nothing', () => {
+    const grid = gridWith();
+    grid.studio.onCopyCell({ row: 0, column: 'amount', value: '9.50', copied: false });
+
+    expect(grid.show()).toContain('would not let the page write to the clipboard');
+  });
+});
+
+describe('knownTotalFiltered: the flag that stops a dataset appearing to shrink', () => {
+  it('says false while nothing has narrowed the count it is carrying', () => {
+    const grid = gridWith({ totalRows: 250, filtered: false });
+    grid.studio.loadPage(1);
+
+    expect(grid.lastKnownTotal()).toBe(250);
+    expect(grid.lastShape()).toMatchObject({ knownTotalFiltered: false });
+  });
+
+  it('echoes the flag from the response the carried total came out of', () => {
+    // The server counted 12 rows UNDER a filter and said so. Every request that carries that
+    // number has to carry where it came from, or the server has no way to tell 12-of-250 from
+    // a file with 12 rows in it.
+    const grid = gridWith();
+    grid.studio.onGridSearch('north');
+    grid.answer({ totalRows: 12, filtered: true });
+
+    grid.studio.loadPage(1);
+
+    expect(grid.lastKnownTotal()).toBe(12);
+    expect(grid.lastShape()).toMatchObject({ knownTotalFiltered: true });
+  });
+
+  it('STILL says true on the request that clears the filter, which is the whole defect', () => {
+    // This is the one the backend test guards, and the one a careless client gets wrong. The
+    // request that clears a filter does not narrow, so the server takes its trusting branch and
+    // would reuse the carried total -- while the total in hand is the FILTERED one, counted a
+    // moment ago under the filter just removed. Reused, the pager offers one page of a dataset
+    // with three, and the file looks permanently smaller for having been filtered once.
+    //
+    // Deriving the flag from "am I narrowing now" would be right on every request except this
+    // one. It is read off the response the number came from instead.
+    const grid = gridWith({ totalRows: 250 });
+    grid.studio.onGridSearch('north');
+    grid.answer({ totalRows: 12, filtered: true });
+
+    grid.studio.onGridSearch('');
+
+    expect(grid.lastShape()).toMatchObject({ search: undefined, knownTotalFiltered: true });
+    expect(grid.lastKnownTotal()).toBe(12);
+  });
+
+  it('goes back to false once an unfiltered count has come back', () => {
+    const grid = gridWith({ totalRows: 250 });
+    grid.studio.onGridSearch('north');
+    grid.answer({ totalRows: 12, filtered: true });
+    grid.studio.onGridSearch('');
+    grid.answer({ totalRows: 250, filtered: false });
+
+    grid.studio.loadPage(1);
+
+    expect(grid.lastKnownTotal()).toBe(250);
+    expect(grid.lastShape()).toMatchObject({ knownTotalFiltered: false });
+  });
+
+  it('does not call a SORT a narrowing, because ordering removes no rows', () => {
+    const grid = gridWith({ totalRows: 250 });
+    grid.studio.onGridSort({ column: 'amount', direction: 'ASC' });
+    grid.answer({ totalRows: 250, filtered: false });
+    grid.studio.loadPage(1);
+
+    expect(grid.lastShape()).toMatchObject({ knownTotalFiltered: false });
+    expect(grid.studio.previewFiltered()).toBe(false);
+  });
+
+  it('remembers the size of the FILE, and never overwrites it with a filtered count', () => {
+    const grid = gridWith({ totalRows: 250, filtered: false });
+    expect(grid.studio.datasetRows()).toBe(250);
+
+    grid.studio.onGridSearch('north');
+    grid.answer({ totalRows: 12, filtered: true });
+
+    // The count the pager divides is the filtered one; the size of the file is not.
+    expect(grid.studio.rowCount()).toBe(12);
+    expect(grid.studio.datasetRows()).toBe(250);
+  });
+
+  it('prints the size of the file in the header, with the match count beside it', () => {
+    // The header used to print rowCount(), which becomes a count of matches the moment a filter
+    // goes on -- so filtering announced that the dataset had shrunk.
+    const grid = gridWith({ totalRows: 250, filtered: false });
+    grid.studio.onGridSearch('north');
+    grid.answer({ totalRows: 12, filtered: true });
+
+    const text = grid.show();
+    expect(text).toContain('250');
+    expect(text).toContain('12 match the filter');
+  });
+
+  it('falls back to what it asked for when a response carries no flag at all', () => {
+    // The flag is a primitive on the DTO and is always serialised today. This is about which way
+    // the screen falls when that stops being true: a search in hand means the count is a count
+    // of matches, whatever the response forgot to say.
+    const grid = gridWith();
+    grid.studio.onGridSearch('north');
+    grid.answer({ totalRows: 12, filtered: undefined as unknown as boolean });
+
+    expect(grid.studio.previewFiltered()).toBe(true);
+  });
+});
+
+describe('the pager tells the truth about the order it is paging', () => {
+  it('says pages follow the file’s own read order while nothing is sorted', () => {
+    const grid = gridWith({ totalRows: 250, pageSize: 100 });
+
+    expect(grid.show()).toContain('Pages follow the order the file is read in');
+  });
+
+  it('says pages follow the SERVER’S sort once one is applied', () => {
+    // The note claimed there was no ORDER BY because object storage has no row order. That is
+    // still true of an unsorted file and became false the moment a column could be sorted.
+    const grid = gridWith({ totalRows: 250, pageSize: 100 });
+    grid.studio.onGridSort({ column: 'amount', direction: 'ASC' });
+    grid.answer({ totalRows: 250, pageSize: 100 });
+
+    const text = grid.show();
+    expect(text).toContain('Pages follow the sort on');
+    expect(text).toContain('across every row in the dataset');
+    expect(text).not.toContain('Pages follow the order the file is read in');
+  });
+
+  it('says the pages are pages of the matching rows while a filter is on', () => {
+    const grid = gridWith({ totalRows: 250, pageSize: 100 });
+    grid.studio.onGridSearch('north');
+    grid.answer({ totalRows: 250, pageSize: 100, filtered: true });
+
+    expect(grid.show()).toContain('pages of the rows that match');
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+
+/** The studio on one of the four tabs that read the single SUMMARIZE scan. */
+function scanned(tab: 'compact' | 'columns' | 'profile' | 'quality',
+                 columns: ColumnProfile[], totalRows = 1000,
+                 page: Partial<DatasetPreview> = {}) {
+  const grid = gridWith(page);
+  grid.studio.showTab(tab);
+  grid.answers.profile!.next(SERVER_RESPONSE(profileOf(columns, totalRows)));
+  grid.fixture.detectChanges();
+  return grid;
+}
+
+describe('Profile and Columns are what document 06 says they are', () => {
+  it('scans once for all four of the tabs that read it', () => {
+    // The cost argument the tab grouping makes on screen has to be true.
+    const grid = gridWith();
+    grid.studio.showTab('compact');
+    grid.answers.profile!.next(SERVER_RESPONSE(profileOf([columnOf()])));
+    grid.studio.showTab('columns');
+    grid.studio.showTab('profile');
+    grid.studio.showTab('quality');
+
+    expect(grid.profile).toHaveBeenCalledTimes(1);
+  });
+
+  it('gives Columns the per-column detail, which is where the hedged figures are', () => {
+    const grid = scanned('columns', [columnOf({ name: 'amount' })]);
+    const text = grid.show();
+
+    expect(text).toContain('amount');
+    expect(text).toContain('distinct values (estimated)');
+    expect(text).toContain('quartiles estimated');
+  });
+
+  it('says out loud that top values and their frequency are not part of this scan', () => {
+    // 06 asks for them and SUMMARIZE does not return them: they need a GROUP BY of their own.
+    // Naming what is absent is the alternative to a card that quietly does not have it.
+    const grid = scanned('columns', [columnOf()]);
+
+    expect(grid.show()).toContain('how often each occurs are not here');
+  });
+
+  it('puts a column’s quality warnings on the column they are about', () => {
+    const grid = scanned('columns', [columnOf({
+      name: 'note', nullPercentage: 100, completeness: 0, approxDistinct: 0, allNull: true,
+    })]);
+
+    expect(grid.show()).toContain('Empty column');
+  });
+
+  it('gives Profile the aggregate view, which did not exist at all before', () => {
+    const grid = scanned('profile', [
+      columnOf({ name: 'amount', type: 'BIGINT' }),
+      columnOf({ name: 'total', type: 'BIGINT' }),
+      textColumn({ name: 'region' }),
+    ]);
+    const text = grid.show();
+
+    expect(text).toContain('What the columns are');
+    expect(text).toContain('How complete they are');
+    expect(text).toContain('How many different values they hold (estimated)');
+    // Two BIGINT columns and one VARCHAR, grouped on the short type.
+    expect(grid.studio.typeBands())
+      .toEqual([
+        { name: 'BIGINT', value: 2, detail: '2 columns are BIGINT.' },
+        { name: 'VARCHAR', value: 1, detail: '1 column is VARCHAR.' },
+      ]);
+  });
+
+  it('counts COLUMNS in every band, and says so where the band is read', () => {
+    // The whole risk of an aggregate view. "42% empty" over a file reads as a claim about cells,
+    // and nothing in this module has ever counted a cell.
+    const grid = scanned('profile', [
+      columnOf({ nullPercentage: 0, completeness: 100 }),
+      columnOf({ name: 'b', nullPercentage: 40, completeness: 60 }),
+      columnOf({ name: 'c', nullPercentage: 100, completeness: 0, approxDistinct: 0, allNull: true }),
+    ]);
+
+    expect(grid.studio.completenessBands().map(band => band.value)).toEqual([1, 0, 0, 1, 1]);
+    expect(grid.show()).toContain('A count of columns in each band, not of rows or values');
+  });
+
+  it('refuses to let the averaged percentage read as a share of the values in the file', () => {
+    const grid = scanned('profile', [
+      columnOf({ nullPercentage: 0, completeness: 100 }),
+      columnOf({ name: 'b', nullPercentage: 50, completeness: 50 }),
+    ]);
+
+    expect(grid.studio.averageFilled()).toBe(75);
+    expect(grid.show()).toContain('not the share of values in the file that are present');
+    expect(grid.show()).toContain('weights every column the same');
+  });
+
+  it('bands cardinality off the sketch, and labels the whole chart estimated', () => {
+    const grid = scanned('profile', [
+      columnOf({ name: 'flag', approxDistinct: 2 }),
+      columnOf({ name: 'id', approxDistinct: 990, keyLike: true }),
+    ]);
+
+    expect(grid.studio.cardinalityBands().find(band => band.name === 'Under 10')!.value).toBe(1);
+    expect(grid.studio.cardinalityBands()
+      .find(band => band.name === 'Almost every row different')!.value).toBe(1);
+    expect(grid.show()).toContain('rests on the distinct-value sketch rather than a count');
+  });
+});
+
+describe('the Compact view is dense, and every figure in it carries its own hedge', () => {
+  it('draws one row per column with 06’s seven fields', () => {
+    const grid = scanned('compact', [columnOf({ name: 'amount' }), textColumn({ name: 'region' })],
+      1000, { columns: ['amount', 'region'], rows: [['9.50', 'north']] });
+
+    expect(grid.studio.compactRows().map(row => row.name)).toEqual(['amount', 'region']);
+    const text = grid.show();
+    expect(text).toContain('Sample');
+    expect(text).toContain('Key metric');
+    expect(text).toContain('Quality');
+  });
+
+  it('takes the sample from the page in hand, and says that is what it is', () => {
+    const grid = scanned('compact', [columnOf({ name: 'amount' })], 1000,
+      { columns: ['amount'], rows: [['9.50'], ['12.00']] });
+
+    expect(grid.studio.compactRows()[0].sample).toBe('9.50');
+    expect(grid.studio.compactRows()[0].sampleKind).toBe('value');
+    expect(grid.show()).toContain('the first value on the page the Data tab is holding');
+  });
+
+  it('tells a null, a blank and an empty page apart', () => {
+    // The same distinction the grid draws in every cell: a null is the file having no value, a
+    // blank is the file having an empty one, and no rows is this screen having nothing to show.
+    const nulls = scanned('compact', [columnOf({ name: 'amount' })], 1000,
+      { columns: ['amount'], rows: [[null], [null]] });
+    expect(nulls.studio.compactRows()[0].sampleKind).toBe('null');
+
+    const blank = scanned('compact', [columnOf({ name: 'amount' })], 1000,
+      { columns: ['amount'], rows: [['   ']] });
+    expect(blank.studio.compactRows()[0].sampleKind).toBe('blank');
+
+    const none = scanned('compact', [columnOf({ name: 'amount' })], 1000,
+      { columns: ['amount'], rows: [] });
+    expect(none.studio.compactRows()[0].sampleKind).toBe('none');
+  });
+
+  it('writes N/A rather than a zero where a statistic does not apply', () => {
+    // 06 says so in as many words, and a zero would claim a fully populated column on a file
+    // where nothing was measured at all.
+    const grid = scanned('compact',
+      [columnOf({ nullPercentage: null, completeness: null, approxNullRows: null })], 0);
+    const row = grid.studio.compactRows()[0];
+
+    expect(row.nullLabel).toBe('N/A');
+    expect(row.distinctLabel).toBe('N/A');
+    expect(row.checked).toBe(false);
+    expect(row.quality).toBe('not checked');
+  });
+
+  it('never prints the distinct share without the mark that says it is a sketch', () => {
+    const grid = scanned('compact', [columnOf({ approxDistinct: 400 })], 1000);
+
+    expect(grid.studio.compactRows()[0].distinctLabel).toBe('≈ 40%');
+  });
+
+  it('picks the key metric from what the engine returned, not from a type name', () => {
+    const numeric = scanned('compact', [columnOf()]).studio.compactRows()[0];
+    expect(numeric.metricName).toBe('mean');
+    expect(numeric.metricEstimated).toBe(false);
+
+    // No mean, but quantiles: a DATE column. The median is approx_quantile, so it is marked.
+    const dated = scanned('compact', [columnOf({
+      name: 'booked_on', type: 'DATE', avg: null, std: null,
+      approxQ25: '2026-01-02', approxQ50: '2026-02-01', approxQ75: '2026-03-01',
+    })]).studio.compactRows()[0];
+    expect(dated.metricName).toBe('median');
+    expect(dated.metricEstimated).toBe(true);
+
+    const text = scanned('compact', [textColumn()]).studio.compactRows()[0];
+    expect(text.metricName).toBe('range');
+    expect(text.metricValue).toBe('alpha → zulu');
+  });
+
+  it('keeps "clear" and "not checked" apart, which is a clean bill of health or none', () => {
+    const clear = scanned('compact', [columnOf()]).studio.compactRows()[0];
+    expect(clear.quality).toBe('clear');
+    expect(clear.checked).toBe(true);
+
+    const flagged = scanned('compact', [columnOf({
+      name: 'note', nullPercentage: 100, completeness: 0, approxDistinct: 0, allNull: true,
+    })]).studio.compactRows()[0];
+    expect(flagged.level).toBe('crit');
+    expect(flagged.quality).toBe('Empty column');
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+
+describe('Charts is a tab, and the drift the old layout prevented is now said out loud', () => {
+  it('draws whatever the console last ran', () => {
+    const console = charted(resultOf({
+      columns: ['region', 'total'], rows: [['north', '900'], ['south', '400']], rowCount: 2,
+    }));
+
+    expect(console.studio.chartDrawn()).toBe(true);
+    expect(console.show()).toContain('"total" by "region"');
+  });
+
+  it('says the picture is of the PREVIOUS statement once the editor has moved on', () => {
+    // The chart used to sit under the result, and that geography was the safeguard: editing the
+    // SQL was visibly editing the thing above the picture. On a tab the two are never on screen
+    // together, so the drift has to be stated.
+    const console = charted(resultOf({
+      columns: ['region', 'total'], rows: [['north', '900']], rowCount: 1,
+    }));
+    expect(console.studio.chartStale()).toBe(false);
+
+    console.studio.sql.set('select region, avg(total) from dataset group by region');
+    const text = console.show();
+
+    expect(console.studio.chartStale()).toBe(true);
+    expect(text).toContain('This is a chart of the previous answer');
+    expect(text).toContain('of the previous statement');
+  });
+
+  it('shows the statement that actually ran, rather than asserting one has changed', () => {
+    const console = charted(resultOf({
+      columns: ['region', 'total'], rows: [['north', '900']], rowCount: 1,
+    }));
+    console.studio.sql.set('select 1');
+
+    expect(console.studio.ranSql()).toBe('select * from dataset');
+    expect(console.show()).toContain('select * from dataset');
+  });
+
+  it('has nothing to be stale about once the result is cleared', () => {
+    const console = charted(resultOf({
+      columns: ['region', 'total'], rows: [['north', '900']], rowCount: 1,
+    }));
+    console.studio.sql.set('select 1');
+    console.studio.openFile(REFUNDS);
+
+    expect(console.studio.ranSql()).toBe('');
+    expect(console.studio.chartStale()).toBe(false);
+  });
+
+  it('keeps saying a truncated chart is partial, on the tab as it did under the result', () => {
+    const console = charted(resultOf({
+      columns: ['region', 'total'], rows: [['north', '900']], rowCount: 1, truncated: true,
+    }));
+    const text = console.show();
+
+    expect(text).toContain('This chart is drawn from part of the answer');
+    expect(text).toContain('partial — part of the answer');
+  });
+});
+
+describe('Activity promotes the run history, and leads with the refusals', () => {
+  it('does not read the history because the SQL tab was opened', () => {
+    // It is the Activity tab's subject now. A workspace's whole history is not worth a database
+    // round trip to somebody who came to write a query.
+    const console = consoleWith();
+
+    expect(console.fetchRecentRuns).not.toHaveBeenCalled();
+  });
+
+  it('reads it once on arrival, and not again on a second visit', () => {
+    const console = consoleWith();
+    console.studio.showTab('activity');
+    console.answers.runs!.next(SERVER_RESPONSE([runOf()]));
+    console.studio.showTab('sql');
+    console.studio.showTab('activity');
+
+    expect(console.fetchRecentRuns).toHaveBeenCalledTimes(1);
+  });
+
+  it('counts refusals apart from failures, because they are different events', () => {
+    // A refusal never reached the engine: the statement gate or the governor turned it away.
+    // Counted with failures it would read as something that broke.
+    const console = activityWith();
+    console.answers.runs!.next(SERVER_RESPONSE([
+      runOf({ analyticsQueryRunId: 1, runStatus: 'REFUSED', errorMessage: 'A query may not write.' }),
+      runOf({ analyticsQueryRunId: 2, runStatus: 'REFUSED', errorMessage: 'A query may not attach.' }),
+      runOf({ analyticsQueryRunId: 3, runStatus: 'FAILED' }),
+      runOf({ analyticsQueryRunId: 4, runStatus: 'CANCELLED' }),
+      runOf({ analyticsQueryRunId: 5, runStatus: 'SUCCESS' }),
+    ]));
+    const text = console.show();
+
+    expect(console.studio.refusedRuns().length).toBe(2);
+    expect(console.studio.failedRuns().length).toBe(1);
+    expect(console.studio.stoppedRuns().length).toBe(1);
+    expect(text).toContain('2 refused');
+    expect(text).toContain('1 failed');
+    expect(text).toContain('1 stopped or timed out');
+    expect(text).toContain('never reached the engine');
+  });
+
+  it('says how many of the runs were against the file that is open', () => {
+    const console = activityWith();
+    console.answers.runs!.next(SERVER_RESPONSE([
+      runOf({ analyticsQueryRunId: 1 }),
+      runOf({ analyticsQueryRunId: 2, datasetPath: 'daily/other.csv' }),
+    ]));
+
+    expect(console.studio.runsHere().length).toBe(1);
+    expect(console.show()).toContain('1 against the file open here');
+  });
+
+  it('lands a statement in the console rather than running it where it cannot be read', () => {
+    const console = activityWith();
+    const before = console.query.mock.calls.length;
+    console.studio.openRunInConsole(runOf({ queryText: 'select count(*) from dataset' }));
+
+    expect(console.studio.sql()).toBe('select count(*) from dataset');
+    expect(console.studio.tab()).toBe('sql');
+    expect(console.query.mock.calls.length).toBe(before);
+  });
+});
+
+describe('the dashboard and the registry are reachable from the workspace', () => {
+  it('offers the dashboards by name from the Details tab', () => {
+    // Both halves of dashboard.ts shipped wired into nothing: a board had no route and no link,
+    // and the registry had no caller at all. This is the way in.
+    const grid = gridWith();
+    grid.studio.showTab('overview');
+    const text = grid.show();
+
+    const link = (grid.fixture.nativeElement as HTMLElement)
+      .querySelector('a[href="/analytics/dashboards"]');
+    expect(link).not.toBeNull();
+    expect(text).toContain('re-runs saved analyses and saved queries every time');
+  });
+
+  it('does not create the registry until somebody asks for it', () => {
+    // It reads the registry when it is made. Rendering it unconditionally would spend that read
+    // on every file open for a feature most readers never touch.
+    const grid = gridWith();
+    grid.studio.showTab('overview');
+    grid.fixture.detectChanges();
+
+    expect((grid.fixture.nativeElement as HTMLElement).querySelector('app-dataset-registry'))
+      .toBeNull();
+    expect(grid.studio.registryOpen()).toBe(false);
+  });
+
+  it('refuses to open a registered dataset under a connection it cannot read', () => {
+    // A registered name can outlive the connection it points at, and this screen refuses several
+    // kinds of connection the registry never checked. Opening it anyway would browse a tree that
+    // returns a refusal for every file in it.
+    const grid = gridWith();
+    grid.studio.openRegistered({
+      analyticsDatasetId: 1, datasetName: 'Archive', connectionAlias: 'partner-drop',
+      datasetPath: 'daily/old.csv',
+    });
+
+    expect(grid.studio.browseError()).toContain('not a connection Analytics Studio can read');
+    expect(grid.studio.path()).toBe('daily/sales-2026.csv');
+  });
+
+  it('opens one that IS readable, landing the rail in the folder it lives in', () => {
+    const grid = gridWith();
+    grid.studio.openRegistered({
+      analyticsDatasetId: 2, datasetName: 'Sales', connectionAlias: 'minio-main',
+      datasetPath: 'archive/2025/sales.csv',
+    });
+
+    expect(grid.studio.path()).toBe('archive/2025/sales.csv');
+    expect(grid.studio.prefix()).toBe('archive/2025/');
+    // No ObjectSummary came with it, so there is no size or modified date to claim.
+    expect(grid.studio.selected()).toBeNull();
+  });
+});
+
+describe('a response that forgets the flag cannot break the provenance chain', () => {
+  it('records the fallback, so the NEXT request still says the total was filtered', () => {
+    // The flag is a primitive on the DTO and is always serialised today. This is about which way
+    // the screen falls when that stops being true: without settling it on arrival, a filtered
+    // total would be carried forward marked unfiltered — and the server would then reuse it on
+    // the request that clears the filter, which is the exact defect knownTotalFiltered exists
+    // to prevent.
+    const grid = gridWith({ totalRows: 250 });
+    grid.studio.onGridSearch('north');
+    grid.answer({ totalRows: 12, filtered: undefined as unknown as boolean });
+
+    expect(grid.studio.previewFiltered()).toBe(true);
+    // And it did not mistake that 12 for the size of the file.
+    expect(grid.studio.datasetRows()).toBe(250);
+
+    grid.studio.onGridSearch('');
+    expect(grid.lastShape()).toMatchObject({ knownTotalFiltered: true });
+  });
+});
+
+describe('a filter survives leaving the Data tab and coming back', () => {
+  it('still shows what it is narrowed by, and can still be cleared', () => {
+    // The grid lives inside @if (tab() === 'data'), so a tab switch destroys it and a return
+    // rebuilds it empty. sort and search survived because they are inputs; filters were not, so
+    // the server went on filtering while the chip naming the filter and the Clear button that
+    // would have removed it both disappeared. The only ways out were retyping the filter in order
+    // to delete it, or reopening the file.
+    const console = consoleWith();
+    console.studio.showTab('data');
+    // 'amount' is a real column of this fixture — filtering a column the dataset does not have
+    // would make the grid correctly render nothing and the test pass for the wrong reason.
+    console.studio.onGridFilters([{ field: 'amount', operator: 'CONTAINS', value: '9' }] as never);
+
+    console.studio.showTab('overview');
+    console.studio.showTab('data');
+    console.fixture.detectChanges();
+
+    // The parent still holds it — that half was never the bug.
+    expect(console.studio.gridFilters().length).toBe(1);
+    // And the SCREEN says so, which is the half that broke. Read from the rendered DOM rather
+    // than from a signal: the defect was that the count went on reading as narrowed while the
+    // chip naming the filter and the Clear button both vanished, and only the DOM shows that.
+    const screen = (console.fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(screen).toContain('amount');
+    const clear = [...(console.fixture.nativeElement as HTMLElement)
+      .querySelectorAll('button')].some(b => (b.textContent ?? '').trim().startsWith('Clear'));
+    expect(clear).toBe(true);
+  });
+
+  it('clears filters the grid itself never emitted', () => {
+    // clearAll() used to guard on "am I holding any filters", which is false for a filter set by
+    // the parent — Quality drilling into its own findings, or the Canvas cross-filtering — and
+    // false again for one this instance lost to a tab switch. Clear became a no-op in exactly the
+    // cases a reader most needs it.
+    const grid = TestBed.createComponent(DataGrid);
+    const emitted: unknown[] = [];
+    grid.componentRef.setInput('columns', [{ name: 'region', type: 'VARCHAR' }]);
+    grid.componentRef.setInput('rows', []);
+    grid.componentRef.setInput('filters',
+      [{ field: 'region', operator: 'CONTAINS', value: 'west' }]);
+    grid.componentInstance.filtersChange.subscribe(v => emitted.push(v));
+    grid.detectChanges();
+
+    grid.componentInstance.clearAll();
+
+    expect(emitted).toEqual([[]]);
   });
 });

@@ -156,10 +156,23 @@
                are not numbers, and the tiles stood 101px tall to say four short things. Rows and
                columns keep some weight because they ARE the figures; the rest is metadata. -->
           <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
+            <!-- The size of the FILE, not of the current filter. rowCount() is what the pager
+                 divides and becomes a count of matches the moment the grid narrows, so a header
+                 built on it would announce that the dataset had shrunk. datasetRows() is only
+                 ever written from a response that counted the whole file. -->
             <div class="flex items-baseline gap-1.5">
-              <span class="text-lg font-semibold tabular leading-none">{{ compact(rowCount()) }}</span>
+              <span class="text-lg font-semibold tabular leading-none">
+                {{ compact(datasetRows() ?? rowCount()) }}
+              </span>
               <span class="text-xs text-[color:var(--text-muted)]">rows</span>
             </div>
+            @if (previewFiltered()) {
+              <!-- Said beside it rather than instead of it, so both numbers are on screen and
+                   neither can be read as the other. -->
+              <div class="flex items-baseline gap-1.5">
+                <span class="pill pill-brand">{{ rowCount().toLocaleString() }} match the filter</span>
+              </div>
+            }
             <div class="flex items-baseline gap-1.5">
               <span class="text-lg font-semibold tabular leading-none">{{ columnCount() }}</span>
               <span class="text-xs text-[color:var(--text-muted)]">columns</span>
@@ -183,17 +196,37 @@
             }
           </div>
 
-          <!-- showTab rather than tab.set: Profile and Quality share one scan, and it is asked
-               for when a reader opens the tab that needs it rather than on every file open. -->
-          <div class="flex gap-1 border-b border-subtle -mb-1 overflow-x-auto">
-            @for (item of tabs; track item.id) {
-              <button type="button"
-                      class="px-3 py-2 text-sm border-b-2 -mb-px transition-colors whitespace-nowrap"
-                      [class.border-transparent]="tab() !== item.id"
-                      [class.text-[color:var(--text-muted)]]="tab() !== item.id"
-                      [class.font-semibold]="tab() === item.id"
-                      [class.border-[color:var(--chart-0)]]="tab() === item.id"
-                      (click)="showTab(item.id)">{{ item.label }}</button>
+          <!-- showTab rather than tab.set: four of these tabs share one scan, and it is asked
+               for when a reader opens the first of them rather than on every file open.
+
+               TEN TABS, IN THREE GROUPS, and the grouping is by what each one costs — see
+               TabGroup. A flat row of ten wraps into a second line of undifferentiated words and
+               makes a reader read all ten to find the rows. Grouped, the row wraps AT the group
+               boundaries, each cluster carries the reason it is a cluster, and "what will this
+               cost me" is answered before the click rather than by waiting. -->
+          <div class="flex flex-wrap items-end gap-x-4 gap-y-1 border-b border-subtle -mb-1">
+            @for (group of tabGroups; track group.label) {
+              <div class="flex flex-col min-w-0" role="group" [attr.aria-label]="group.label">
+                <span class="text-[10px] uppercase tracking-wider text-[color:var(--text-muted)]
+                             px-3 leading-none" [title]="group.hint">{{ group.label }}</span>
+                <!-- Wraps INSIDE a group as well as between them. A group is an atomic flex item
+                     so the strip breaks at the boundaries first, which is the point; but a phone
+                     is narrower than four tabs, and the alternative to wrapping there is the page
+                     body scrolling sideways. -->
+                <div class="flex flex-wrap gap-1">
+                  @for (item of group.tabs; track item.id) {
+                    <button type="button"
+                            class="px-3 py-1.5 text-sm border-b-2 -mb-px transition-colors
+                                   whitespace-nowrap"
+                            [class.border-transparent]="tab() !== item.id"
+                            [class.text-[color:var(--text-muted)]]="tab() !== item.id"
+                            [class.font-semibold]="tab() === item.id"
+                            [class.border-[color:var(--chart-0)]]="tab() === item.id"
+                            [attr.aria-current]="tab() === item.id ? 'true' : null"
+                            (click)="showTab(item.id)">{{ item.label }}</button>
+                  }
+                </div>
+              </div>
             }
           </div>
         </div>
@@ -214,7 +247,14 @@
               </div>
               <div class="flex gap-2">
                 <dt class="text-[color:var(--text-muted)] min-w-24 shrink-0">Rows</dt>
-                <dd class="tabular">{{ rowCount().toLocaleString() }}</dd>
+                <dd class="tabular">
+                  {{ (datasetRows() ?? rowCount()).toLocaleString() }}
+                  @if (previewFiltered()) {
+                    <span class="text-xs text-[color:var(--text-muted)]">
+                      — {{ rowCount().toLocaleString() }} of them match the filter on the Data tab
+                    </span>
+                  }
+                </dd>
               </div>
               <div class="flex gap-2">
                 <dt class="text-[color:var(--text-muted)] min-w-24 shrink-0">Columns</dt>
@@ -233,6 +273,35 @@
                 only some of them are still included, and a row carries the file it came from.
               </p>
             }
+
+            <!-- The two things that outlive this visit, side by side, because they are the same
+                 kind of thing: a name for this file, and the board a saved analysis of it lands
+                 on. Both were built with no way in from the workspace at all. -->
+            <div class="flex flex-wrap items-center gap-2 border-t border-subtle pt-3">
+              <button type="button" class="btn btn-default btn-sm"
+                      [attr.aria-expanded]="registryOpen()"
+                      (click)="registryOpen.set(!registryOpen())">
+                <app-icon name="database" size="0.9em" />
+                {{ registryOpen() ? 'Hide the registry' : 'Name this dataset' }}
+              </button>
+              <a class="btn btn-default btn-sm" routerLink="/analytics/dashboards">
+                <app-icon name="chart" size="0.9em" />
+                Dashboards
+              </a>
+              <span class="field-note text-[color:var(--text-muted)] basis-full">
+                A registered dataset is a name for a connection and a path — registering reads no
+                rows and spends no query permit. A dashboard re-runs saved analyses and saved
+                queries every time it is opened, so a tile is never a stored picture of an old
+                answer.
+              </span>
+            </div>
+
+            @if (registryOpen()) {
+              <!-- Created on the click and not before: it reads the registry when it is made, and
+                   that read is not worth spending on every file open. -->
+              <app-dataset-registry [connection]="connection()" [path]="path()"
+                                    (opened)="openRegistered($event)" />
+            }
           </div>
         }
 
@@ -241,63 +310,85 @@
                while looking at the values in it, and the old Schema tab made that a round trip. -->
           <div class="dataset-split">
           <div class="min-w-0 flex flex-col gap-3">
-          <app-table-shell heading="Rows" [loading]="loading()" [error]="error()"
-                           [shown]="preview()?.rows?.length ?? 0"
-                           [total]="rowCount()"
-                           [isEmpty]="!loading() && !error() && !(preview()?.rows?.length)"
-                           emptyMessage="This dataset has no rows." emptyIcon="table"
-                           (retry)="retry()">
-            <table class="table-modern">
-              <thead>
-                <tr>
-                  @for (column of preview()?.columns ?? []; track column) {
-                    <th class="whitespace-nowrap">{{ column }}</th>
-                  }
-                </tr>
-              </thead>
-              <tbody>
-                @for (row of preview()?.rows ?? []; track $index) {
-                  <tr>
-                    @for (cell of row; track $index) {
-                      <!-- A null is not an empty string, and a reader has to be able to tell:
-                           one means the file had no value, the other means it had a blank. -->
-                      <td class="mono text-xs whitespace-nowrap max-w-64 truncate" [title]="cell ?? 'null'">
-                        @if (cell === null) {
-                          <span class="text-[color:var(--text-muted)] italic">null</span>
-                        } @else { {{ cell }} }
-                      </td>
-                    }
-                  </tr>
-                }
-              </tbody>
-            </table>
-          </app-table-shell>
-
-          @if (pageCount() > 1) {
-            <div class="flex flex-col gap-1">
-              <div class="flex items-center justify-between gap-3">
-                <span class="text-xs text-[color:var(--text-muted)]">
-                  Page {{ (preview()?.page ?? 0) + 1 }} of {{ pageCount().toLocaleString() }}
-                  · {{ preview()?.pageSize }} rows a page
-                </span>
-                <div class="flex gap-2">
-                  <button type="button" class="btn btn-default btn-sm"
-                          [disabled]="(preview()?.page ?? 0) === 0 || loading()"
-                          (click)="previousPage()">Previous</button>
-                  <button type="button" class="btn btn-default btn-sm"
-                          [disabled]="(preview()?.page ?? 0) + 1 >= pageCount() || loading()"
-                          (click)="nextPage()">Next</button>
-                </div>
+          @if (error()) {
+            <!-- The grid renders rows and says what the server is doing; it does not own the
+                 dataset, so a failure to READ the dataset is this screen's to report. -->
+            <div class="card p-4 flex items-start gap-3 min-w-0" role="alert">
+              <app-icon name="alert" size="1.25rem" class="icon-crit shrink-0 mt-0.5" />
+              <div class="min-w-0">
+                <h3 class="text-sm font-semibold text-crit-500">The rows could not be read</h3>
+                <p class="text-sm text-[color:var(--text-secondary)] mt-1">{{ error() }}</p>
+                <button type="button" class="btn btn-default btn-sm mt-3" (click)="retry()">
+                  Try again
+                </button>
               </div>
-              <!-- Said here and nowhere else: this is the only place a person is turning pages,
-                   and it is a fact about files rather than a warning about the reader. There is
-                   no ORDER BY because a file in object storage has no row order to sort by. -->
-              <p class="text-[11px] text-[color:var(--text-muted)]">
-                Pages follow the order the file is read in, not a sort — a file in object storage
-                has no order of its own. If the file changes between turns, a row can land on a
-                different page.
-              </p>
             </div>
+          } @else {
+            <!-- Sorting, searching and filtering are SERVER-SIDE and the grid never approximates
+                 one of them locally. A grid that sorts the array it happens to be holding gives
+                 the most convincing wrong answer available on this screen: the arrow says sorted,
+                 and the reader is looking at the largest values on page 3 of 400.
+
+                 datasetRows is the second half of the same rule. Once a filter is on, totalRows
+                 counts the matches, and a matching count printed alone reads as the size of the
+                 file — so the unfiltered size is handed over whenever this screen knows it, and
+                 the grid says "filtered" in words when it does not. -->
+            <app-data-grid [columns]="gridColumns()"
+                           [rows]="preview()?.rows ?? []"
+                           [sort]="gridSort()"
+                           [search]="gridSearch()"
+                           [filters]="gridFilters()"
+                           [loading]="loading()"
+                           [totalRows]="rowCount()"
+                           [filtered]="previewFiltered()"
+                           [datasetRows]="datasetRows()"
+                           [storageKey]="gridStorageKey()"
+                           (sortChange)="onGridSort($event)"
+                           (searchChange)="onGridSearch($event)"
+                           (filtersChange)="onGridFilters($event)"
+                           (copyCell)="onCopyCell($event)" />
+
+            @if (copyNote()) {
+              <p class="text-[11px] text-[color:var(--text-muted)]" role="status">
+                {{ copyNote() }}
+              </p>
+            }
+
+            @if (pageCount() > 1) {
+              <div class="flex flex-col gap-1">
+                <div class="flex items-center justify-between gap-3">
+                  <span class="text-xs text-[color:var(--text-muted)]">
+                    Page {{ (preview()?.page ?? 0) + 1 }} of {{ pageCount().toLocaleString() }}
+                    · {{ preview()?.pageSize }} rows a page
+                    @if (previewFiltered()) { · pages of the rows that match }
+                  </span>
+                  <div class="flex gap-2">
+                    <button type="button" class="btn btn-default btn-sm"
+                            [disabled]="(preview()?.page ?? 0) === 0 || loading()"
+                            (click)="previousPage()">Previous</button>
+                    <button type="button" class="btn btn-default btn-sm"
+                            [disabled]="(preview()?.page ?? 0) + 1 >= pageCount() || loading()"
+                            (click)="nextPage()">Next</button>
+                  </div>
+                </div>
+                <!-- Said here and nowhere else: this is the only place a person is turning pages,
+                     and it is a fact about files rather than a warning about the reader. The
+                     unsorted sentence is unchanged, because it is still true of an unsorted file
+                     — what changed is that there is now a way to ask for an order, and claiming
+                     there is no ORDER BY while one is applied would be the note going stale. -->
+                <p class="text-[11px] text-[color:var(--text-muted)]">
+                  @if (gridSort()) {
+                    Pages follow the sort on <span class="mono">{{ gridSort()!.column }}</span>,
+                    applied by the server across every row in the dataset — so page 2 really is
+                    the second page of that order and not the second page of the file.
+                  } @else {
+                    Pages follow the order the file is read in, not a sort — a file in object
+                    storage has no order of its own. Sort a column to give it one.
+                  }
+                  If the file changes between turns, a row can land on a different page.
+                </p>
+              </div>
+            }
           }
           </div>
 
@@ -325,18 +416,125 @@
           </div>
         }
 
-        @if (tab() === 'profile') {
-          <!-- Every hedge on this tab sits ON the figure it qualifies. Three of these numbers
+        @if (tab() === 'compact') {
+          <!-- Document 06's dense mode: one row per column, seven fields, nothing recomputed.
+               The point of it is a two-hundred-column file that can be read in one screen, so
+               every figure here carries its hedge INSIDE the cell — there is no room under a
+               table row for a sentence, and a bare "≈" is not a warning anybody reads. -->
+          <app-table-shell heading="Compact"
+                           [loading]="profileLoading()" [error]="profileError()"
+                           [shown]="compactRows().length" [total]="columnCount()"
+                           [isEmpty]="!profileLoading() && !profileError() && !compactRows().length"
+                           emptyMessage="This dataset has no columns to describe." emptyIcon="table"
+                           (retry)="loadProfile()">
+            <div toolbar class="text-xs text-[color:var(--text-muted)] min-w-0">
+              One line per column. Null and distinct are measured across the whole file;
+              <span class="font-medium">the sample is not</span> — it is the first value on the
+              page the Data tab is holding, so it moves with the page, the sort and the filter.
+            </div>
+
+            <table class="table-modern">
+              <thead>
+                <tr>
+                  <th class="whitespace-nowrap">Column</th>
+                  <th class="whitespace-nowrap">Type</th>
+                  <th class="whitespace-nowrap">Sample</th>
+                  <th class="whitespace-nowrap text-right">Null</th>
+                  <th class="whitespace-nowrap text-right">Distinct</th>
+                  <th class="whitespace-nowrap">Key metric</th>
+                  <th class="whitespace-nowrap">Quality</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of compactRows(); track row.name) {
+                  <tr>
+                    <td class="mono text-xs whitespace-nowrap max-w-64 truncate"
+                        [title]="row.name">{{ row.name }}</td>
+                    <td class="text-xs whitespace-nowrap">
+                      <span class="mono text-[10px] text-[color:var(--text-muted)] border
+                                   border-subtle rounded px-1"
+                            [title]="row.type">{{ row.shortType }}</span>
+                    </td>
+                    <!-- Three absences, kept apart. A null is the file having no value, a blank
+                         is the file having an empty one, and "no rows on this page" is this
+                         screen having nothing to show — and only the first two are about the
+                         data at all. -->
+                    <td class="mono text-xs whitespace-nowrap max-w-48 truncate"
+                        [title]="row.sample || row.sampleKind">
+                      @switch (row.sampleKind) {
+                        @case ('value') { {{ row.sample }} }
+                        @case ('null') {
+                          <span class="italic text-[color:var(--text-muted)]"
+                                title="Every row on this page has no value in this column.">null</span>
+                        }
+                        @case ('blank') {
+                          <span class="italic text-[color:var(--text-muted)]"
+                                title="The first value on this page is an empty string, which is not a null.">blank</span>
+                        }
+                        @default {
+                          <span class="text-[color:var(--text-muted)]"
+                                title="There are no rows on the page the Data tab is holding.">—</span>
+                        }
+                      }
+                    </td>
+                    <td class="text-xs tabular text-right whitespace-nowrap">{{ row.nullLabel }}</td>
+                    <!-- "≈" travels in the string: this rests on the HyperLogLog sketch, and a
+                         percentage without it would be read as a count of unique values. -->
+                    <td class="text-xs tabular text-right whitespace-nowrap"
+                        title="Estimated: the distinct count is a sketch, measured 3.7% low over a million values.">
+                      {{ row.distinctLabel }}
+                    </td>
+                    <td class="text-xs whitespace-nowrap max-w-56 truncate"
+                        [title]="row.metricName + ': ' + row.metricValue">
+                      <span class="text-[color:var(--text-muted)]">{{ row.metricName }}</span>
+                      <span class="mono">{{ row.metricValue }}</span>
+                      @if (row.metricEstimated) {
+                        <span class="text-[color:var(--text-muted)]">(est.)</span>
+                      }
+                    </td>
+                    <td class="text-xs whitespace-nowrap">
+                      <!-- "clear" and "not checked" are different answers, and the second is the
+                           one a header-only file gets. Drawing them the same way would report a
+                           clean bill of health on a column nothing examined. -->
+                      <span class="pill"
+                            [class.pill-crit]="row.level === 'crit'"
+                            [class.pill-warn]="row.level === 'warn'"
+                            [class.pill-neutral]="row.level === 'note' || !row.checked"
+                            [class.pill-ok]="!row.level && row.checked"
+                            [title]="row.qualityDetail">{{ row.quality }}</span>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </app-table-shell>
+        }
+
+        @if (tab() === 'columns') {
+          <!-- Document 06's Columns view: the per-column statistics. This used to be the tab
+               labelled "Profile", which left the aggregate view 06 asks for missing entirely and
+               handed a reader who wanted "what is this file made of" two hundred cards.
+
+               Every hedge on this tab sits ON the figure it qualifies. Three of these numbers
                are not exact, and a note at the bottom of the card would be read after the
                number had already been believed. -->
-          <app-table-shell heading="Column profile" [scrollRows]="false"
+          <app-table-shell heading="Columns" [scrollRows]="false"
                            [loading]="profileLoading()" [error]="profileError()"
                            [isEmpty]="!profileLoading() && !profileError() && !profileColumns().length"
                            emptyMessage="This dataset has no columns to profile." emptyIcon="table"
                            (retry)="loadProfile()">
             <div class="p-4 flex flex-col gap-3">
               <p class="text-xs text-[color:var(--text-muted)]">
-                Measured across the whole dataset, not the page on the Data tab.
+                Measured across the whole dataset, not the page on the Data tab. The same scan
+                feeds Compact, Profile and Quality — moving between them costs nothing.
+              </p>
+              <!-- Said once, at the top, rather than as an empty row on every card. 06 asks for
+                   top values and their frequency and SUMMARIZE does not return them: they need a
+                   GROUP BY of their own, which is a second scan and a second permit. Naming what
+                   is absent is the alternative to a card that quietly does not have it. -->
+              <p class="field-note text-[color:var(--text-muted)]">
+                The most common values in a column and how often each occurs are not here: that is
+                a second pass over the file, and this tab is one scan read four ways.
               </p>
 
               <!-- Two columns only from lg, where the storage rail has taken its 260px and the
@@ -406,6 +604,13 @@
                     <div class="flex flex-wrap items-baseline gap-x-1.5 text-xs">
                       <span class="tabular font-medium">≈ {{ compact(column.approxDistinct) }}</span>
                       <span class="text-[color:var(--text-muted)]">distinct values (estimated)</span>
+                      @if (column.distinctPercent !== null) {
+                        <!-- 06's "distinct %". It inherits the sketch's inexactness whole, so it
+                             carries the same "≈" the count above it does. -->
+                        <span class="text-[color:var(--text-muted)] tabular">
+                          · ≈ {{ percent(column.distinctPercent!) }}% of rows
+                        </span>
+                      }
                       @if (column.keyLike) {
                         <!-- A suggestion, and worded as one: proving uniqueness needs an exact
                              distinct count, which is a second scan nobody has paid for. -->
@@ -448,7 +653,41 @@
                         <dt class="text-[color:var(--text-muted)] whitespace-nowrap">std dev</dt>
                         <dd class="mono truncate">{{ column.stdLabel }}</dd>
                       }
+                      @if (column.medianLabel) {
+                        <!-- 06's "percentile values where applicable". They were already on the
+                             card as the widths of the spread bar and were never named, so a
+                             reader could see the shape and not read a single quartile off it.
+                             "estimated" is on the label rather than under the list, because
+                             approx_quantile reported 18.375 for a first quartile that was 21.0. -->
+                        <dt class="text-[color:var(--text-muted)] whitespace-nowrap">
+                          quartiles
+                        </dt>
+                        <dd class="mono truncate"
+                            title="25th, 50th and 75th percentile, from approx_quantile — estimated, not measured.">
+                          {{ column.q25Label || 'N/A' }} · {{ column.medianLabel }} ·
+                          {{ column.q75Label || 'N/A' }}
+                          <span class="text-[color:var(--text-muted)]">(estimated)</span>
+                        </dd>
+                      }
                     </dl>
+
+                    @if (findingsFor(column.name); as findings) {
+                      @if (findings.length) {
+                        <!-- 06's "quality warnings", on the column they are about. The Quality tab
+                             leads with these across the whole file; here they sit beside the
+                             statistics they were derived from, which is where somebody reading
+                             one column will look for them. -->
+                        <div class="flex flex-wrap gap-1">
+                          @for (finding of findings; track finding.title) {
+                            <span class="pill"
+                                  [class.pill-crit]="finding.level === 'crit'"
+                                  [class.pill-warn]="finding.level === 'warn'"
+                                  [class.pill-neutral]="finding.level === 'note'"
+                                  [title]="finding.detail">{{ finding.title }}</span>
+                          }
+                        </div>
+                      }
+                    }
 
                     @if (column.spread.length) {
                       <div>
@@ -487,6 +726,116 @@
                   </div>
                 }
               </div>
+            </div>
+          </app-table-shell>
+        }
+
+        @if (tab() === 'profile') {
+          <!-- Document 06's Profile view: "aggregate distributions and data-type summaries".
+               There was no aggregate view at all until now — the tab wearing this name rendered
+               the per-column cards, which are 06's Columns view and are on that tab now.
+
+               THE ONE RISK OF AN AGGREGATE VIEW IS THE UNIT. Every figure this screen has is per
+               column, and nothing in this module has ever counted a cell — so "42% empty" as a
+               headline over a file would be a claim about cells that nobody measured. Every band
+               below counts COLUMNS, and says so where it is read rather than in a note. -->
+          <app-table-shell heading="Profile" [scrollRows]="false"
+                           [loading]="profileLoading()" [error]="profileError()"
+                           [isEmpty]="profileEmpty()"
+                           emptyMessage="This dataset has no columns to summarise." emptyIcon="chart"
+                           (retry)="loadProfile()">
+            <div class="p-4 flex flex-col gap-4">
+
+              <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
+                <div class="flex items-baseline gap-1.5">
+                  <span class="text-lg font-semibold tabular leading-none">
+                    {{ compact(profile()?.totalRows ?? 0) }}
+                  </span>
+                  <span class="text-xs text-[color:var(--text-muted)]">rows scanned</span>
+                </div>
+                <div class="flex items-baseline gap-1.5">
+                  <span class="text-lg font-semibold tabular leading-none">
+                    {{ profileColumns().length }}
+                  </span>
+                  <span class="text-xs text-[color:var(--text-muted)]">columns</span>
+                </div>
+                @if (averageFilled() !== null) {
+                  <div class="flex items-baseline gap-1.5">
+                    <span class="text-lg font-semibold tabular leading-none">
+                      {{ percent(averageFilled()!) }}%
+                    </span>
+                    <span class="text-xs text-[color:var(--text-muted)]">
+                      filled, averaged over the columns
+                    </span>
+                  </div>
+                }
+              </div>
+
+              @if (averageFilled() !== null) {
+                <!-- Said next to the figure, not under the tab. A reader will assume this is the
+                     share of cells that have a value in them, and it is not: it is the mean of
+                     per-column percentages, so a column with two values counts as much as one
+                     with two million, and every percentage it averages was already rounded to
+                     two places by the engine. -->
+                <p class="field-note text-[color:var(--text-muted)]">
+                  That average weights every column the same, however wide or narrow it is, and
+                  it averages figures the engine had already rounded to two decimal places. It is
+                  not the share of values in the file that are present — nothing here has counted
+                  a single cell.
+                </p>
+              }
+
+              <div class="grid gap-4 sm:grid-cols-2">
+
+                <div class="rounded border border-subtle p-3 min-w-0">
+                  <h4 class="text-xs uppercase tracking-wider text-[color:var(--text-muted)]
+                             font-semibold mb-2">What the columns are</h4>
+                  <!-- Grouped on the short type: DECIMAL(18,3) and DECIMAL(10,2) are both
+                       DECIMAL here, because the question is what the file is made of and eleven
+                       decimal widths is noise against it. The full spelling is on the Columns
+                       card, where one column is being described. -->
+                  <app-ranked-bar [data]="typeBands()" [max]="typeBands().length" />
+                  <p class="mt-2 text-[11px] text-[color:var(--text-muted)]">
+                    Every column has exactly one type, so these do add up to the whole and the
+                    percentages are real shares. Types are the query engine's own.
+                  </p>
+                </div>
+
+                <div class="rounded border border-subtle p-3 min-w-0">
+                  <h4 class="text-xs uppercase tracking-wider text-[color:var(--text-muted)]
+                             font-semibold mb-2">How complete they are</h4>
+                  <!-- sorted off: the bands are an ordered scale from full to empty, and sorting
+                       them by size would scramble a reading order that means something. -->
+                  <app-ranked-bar [data]="completenessBands()" [sorted]="false"
+                                  [max]="completenessBands().length" />
+                  <p class="mt-2 text-[11px] text-[color:var(--text-muted)]">
+                    A count of <span class="font-medium">columns</span> in each band, not of rows
+                    or values. The thresholds are the ones the Quality tab raises findings at, so
+                    the two tabs cannot disagree about which columns are a problem.
+                  </p>
+                </div>
+
+                <div class="rounded border border-subtle p-3 min-w-0 sm:col-span-2">
+                  <h4 class="text-xs uppercase tracking-wider text-[color:var(--text-muted)]
+                             font-semibold mb-2">
+                    How many different values they hold (estimated)
+                  </h4>
+                  <app-ranked-bar [data]="cardinalityBands()" [sorted]="false"
+                                  [max]="cardinalityBands().length" />
+                  <p class="mt-2 text-[11px] text-[color:var(--text-muted)]">
+                    Every band here rests on the distinct-value sketch rather than a count, which
+                    is why the whole chart is labelled estimated rather than each bar. A sketch
+                    3.7% low will not move a column between "a handful" and "thousands"; it can
+                    move one across the line into "almost every row different", so that band is a
+                    suggestion and not a finding.
+                  </p>
+                </div>
+              </div>
+
+              <p class="field-note text-[color:var(--text-muted)]">
+                Duplicate rows are not counted anywhere on this screen — that needs its own pass
+                over the file. The per-column statistics behind all of this are on Columns.
+              </p>
             </div>
           </app-table-shell>
         }
@@ -1534,147 +1883,26 @@
                 </table>
               </app-table-shell>
 
-              <!-- ── a chart of that result ───────────────────────────────────────────── -->
-              <!-- Under the rows rather than on a tab of its own. A chart drawn from a result
-                   has to live beside the statement that produced it, or a reader edits the SQL,
-                   does not re-run it, and reads a picture of the answer to another question. -->
-              <app-table-shell heading="Chart" [scrollRows]="false"
-                               [loading]="running()"
-                               [showSubbar]="chartDrawn() && truncated()"
-                               [isEmpty]="!running() && !chartDrawn()"
-                               [emptyMessage]="chartEmptyMessage()" emptyIcon="chart">
-
-                <!-- The same strip the result table carries, said again here because it is a
-                     different claim. A short table is visibly short; a chart of ten thousand of
-                     forty thousand rows has exactly the shape, the confidence and the finish of
-                     a chart of all forty thousand. -->
-                <div subbar class="flex items-start gap-2 min-w-0" role="alert">
-                  <app-icon name="alert" size="1.1rem" class="icon-warn shrink-0 mt-0.5" />
-                  <p class="text-xs text-[color:var(--text-secondary)]">
-                    <span class="font-semibold">This chart is drawn from part of the answer.</span>
-                    The result stopped at the server's row ceiling, so rows that match your query
-                    are missing from every bar below. Nothing here can say how many, or which way
-                    they would move one. Narrow it with a <span class="mono">WHERE</span> or
-                    aggregate in SQL, and the chart will be of the whole answer.
-                  </p>
-                </div>
-
-                <div class="p-4 flex flex-col gap-3 min-w-0">
-
-                  <!-- Three pickers, and the kind carries its own reasons the way the connection
-                       picker does: a kind that cannot draw THESE columns stays listed and inert
-                       with the reason on it, because that reason is a fact about the reader's
-                       data rather than about the console. -->
-                  <div class="flex flex-wrap items-end gap-2 min-w-0">
-                    @if (chartLabelOptions().length) {
-                      <div class="flex flex-col gap-1 min-w-0">
-                        <label class="text-[11px] uppercase tracking-wider
-                                      text-[color:var(--text-muted)]"
-                               for="a-chart-label">Label</label>
-                        <select id="a-chart-label" class="input input-sm w-auto max-w-full"
-                                [value]="labelColumn()?.name ?? ''"
-                                (change)="chartLabelName.set($any($event.target).value)">
-                          <!-- [selected] on the OPTION, not only [value] on the select. Angular
-                               applies a host property binding before the @for below it has created
-                               anything, so the browser had nothing to select and fell back to the
-                               first option -- and since the expression never changed afterwards the
-                               binding never re-fired. The picker then named a different column from
-                               the one the chart was drawing, which on this screen is the whole
-                               problem: the control that says what a chart is OF disagreed with it. -->
-                          @for (column of chartLabelOptions(); track column.name) {
-                            <option [value]="column.name"
-                                    [selected]="column.name === labelColumn()?.name">{{ column.name }}</option>
-                          }
-                        </select>
-                      </div>
-                    }
-
-                    <div class="flex flex-col gap-1 min-w-0">
-                      <label class="text-[11px] uppercase tracking-wider
-                                    text-[color:var(--text-muted)]"
-                             for="a-chart-value">Value</label>
-                      <select id="a-chart-value" class="input input-sm w-auto max-w-full"
-                              [value]="valueColumn()?.name ?? ''"
-                              (change)="chartValueName.set($any($event.target).value)">
-                        @for (column of chartValueOptions(); track column.name) {
-                          <!-- How much of the column is actually numbers, on the option itself.
-                               A column that parses in nine rows out of nine thousand is offered
-                               and is almost certainly the wrong pick, and the count is the only
-                               thing that says so before the chart is drawn. -->
-                          <option [value]="column.name"
-                                  [selected]="column.name === valueColumn()?.name">
-                            {{ column.name }} · a number in
-                            {{ column.numbers.toLocaleString() }} of
-                            {{ column.rows.toLocaleString() }} rows
-                          </option>
-                        }
-                      </select>
-                    </div>
-
-                    <div class="flex flex-col gap-1 min-w-0 flex-1">
-                      <label class="text-[11px] uppercase tracking-wider
-                                    text-[color:var(--text-muted)]"
-                             for="a-chart-kind">Chart</label>
-                      <select id="a-chart-kind" class="input input-sm w-full"
-                              [value]="chartKind() ?? ''"
-                              (change)="chartKindName.set($any($event.target).value)">
-                        @for (option of chartKinds(); track option.id) {
-                          <option [value]="option.id" [disabled]="!!option.issue"
-                                  [selected]="option.id === chartKind()"
-                                  [title]="option.issue || option.label">
-                            {{ option.label }}{{ option.issue ? ' — ' + option.issue : '' }}
-                          </option>
-                        }
-                      </select>
-                    </div>
-                  </div>
-
-                  <div class="flex flex-wrap items-baseline gap-2 min-w-0">
-                    <h4 class="text-sm font-medium min-w-0 truncate">{{ chartCaption() }}</h4>
-                    @if (truncated()) {
-                      <!-- On the chart's own title, not only in the strip above it. This is the
-                           line that travels with the picture when somebody screenshots it. -->
-                      <span class="pill pill-warn">partial — part of the answer</span>
-                    }
-                  </div>
-
-                  @switch (chartKind()) {
-                    @case ('bar') {
-                      <app-bar-chart [data]="chartData()" [height]="220" />
-                    }
-                    @case ('ranked') {
-                      <!-- No percentages. A share of a total is only a share when the numbers add
-                           up to one, and this column is whatever the reader selected -- an
-                           average per region has no total for a row to be 12% of. -->
-                      <app-ranked-bar [data]="chartData()" [max]="rankedRows"
-                                      [showPercent]="false" />
-                    }
-                    @case ('donut') {
-                      <app-donut [data]="chartData()" [totalLabel]="valueColumn()?.name ?? ''" />
-                    }
-                    @case ('histogram') {
-                      <!-- noun="row", because these are rows of a query result and not the runs
-                           the reports page bins. dropBelow null keeps negative values on the
-                           axis: a refund or a loss is a measurement, not a sentinel. -->
-                      <app-histogram [values]="chartValues()" noun="row" nounPlural="rows"
-                                     [dropBelow]="null" [height]="200" [format]="chartNumber"
-                                     emptyMessage="Nothing in this column parses as a number." />
-                    }
-                  }
-
-                  <!-- What the picture cannot say about itself. Every line here is a row, a
-                       category or a whole tail that is not on the chart above. -->
-                  <ul class="flex flex-col gap-1 mt-1">
-                    @for (note of chartNotes(); track note) {
-                      <li class="text-[11px] text-[color:var(--text-muted)]">{{ note }}</li>
-                    }
-                  </ul>
-                </div>
-              </app-table-shell>
+              <!-- The chart of this result is on the Charts tab. It used to sit here, and the
+                   reason it could move is that `chartStale` now watches for the drift this
+                   arrangement prevented by geography — a reader editing the statement, not
+                   re-running it, and reading a picture of the previous answer. -->
+              @if (result()) {
+                <p class="text-xs text-[color:var(--text-muted)]">
+                  <button type="button" class="link-inline" (click)="showTab('charts')">
+                    Draw this result on the Charts tab
+                  </button>
+                  — it is drawn from whatever the console last ran, and says so when the statement
+                  above has changed since.
+                </p>
+              }
             }
 
             <!-- ── the library ────────────────────────────────────────────────────────── -->
-            <div class="grid gap-3 sm:grid-cols-2">
+            <!-- One card, not two. Run history was the second half of this row and is its own
+                 tab now: it is the record of everything this workspace ran, which is a bigger
+                 subject than the statements one person chose to keep. -->
+            <div class="grid gap-3">
 
               <div class="card p-3 flex flex-col gap-2 min-w-0">
                 <div class="flex items-baseline justify-between gap-2">
@@ -1739,96 +1967,321 @@
                 }
               </div>
 
-              <div class="card p-3 flex flex-col gap-2 min-w-0">
-                <div class="flex items-baseline justify-between gap-2">
-                  <h3 class="text-xs uppercase tracking-wider text-[color:var(--text-muted)]
-                             font-semibold">Recent runs</h3>
-                  <button type="button" class="link-inline text-xs" (click)="loadRuns()">
-                    refresh
-                  </button>
+            </div>
+          </div>
+        }
+
+        @if (tab() === 'charts') {
+          <!-- ── a chart of the current result ────────────────────────────────────── -->
+          <!-- This lived under the SQL result, and that GEOGRAPHY WAS THE SAFEGUARD: editing
+               the statement was visibly editing the thing right above the picture, so a chart
+               of the previous answer could not go unnoticed. 02 and 06 both want a tab, and a
+               tab takes the safeguard away — the query and the picture are never on screen
+               together, and a stale chart looks exactly as finished as a current one.
+
+               chartStale is what replaces it, and it is louder than the note it replaces
+               because it has to be: it is said in the subbar, on the chart's own title, and
+               with the statement that actually ran spelled out underneath. -->
+          <app-table-shell heading="Chart" [scrollRows]="false"
+                           [loading]="running()"
+                           [showSubbar]="chartDrawn() && (truncated() || chartStale())"
+                           [isEmpty]="!running() && !chartDrawn()"
+                           [emptyMessage]="chartEmptyMessage()" emptyIcon="chart">
+
+            <!-- The same strip the result table carries, said again here because it is a
+                 different claim. A short table is visibly short; a chart of ten thousand of
+                 forty thousand rows has exactly the shape, the confidence and the finish of
+                 a chart of all forty thousand. -->
+            <div subbar class="flex flex-col gap-2 min-w-0" role="alert">
+              @if (chartStale()) {
+                <!-- FIRST, above truncation, because it is the worse of the two: a truncated
+                     chart is part of the right answer and a stale one is the whole of the wrong
+                     one. The statement that produced it is spelled out rather than described,
+                     since "it has changed" is not something a reader can check. -->
+                <div class="flex items-start gap-2 min-w-0">
+                  <app-icon name="alert" size="1.1rem" class="icon-warn shrink-0 mt-0.5" />
+                  <div class="min-w-0">
+                    <p class="text-xs text-[color:var(--text-secondary)]">
+                      <span class="font-semibold">This is a chart of the previous answer.</span>
+                      The statement in the console has changed since this result came back, and
+                      nothing has been re-run — so the picture below is of the query as it was,
+                      not as it now reads. Run it again and the chart follows.
+                    </p>
+                    <pre class="mono text-[11px] text-[color:var(--text-muted)] mt-1 whitespace-pre-wrap
+                                max-h-24 overflow-auto">{{ ranSql() }}</pre>
+                    <button type="button" class="btn btn-primary btn-xs mt-1"
+                            [disabled]="!canRun()" (click)="run()">
+                      <app-icon name="play" />Run the statement that is there now
+                    </button>
+                  </div>
+                </div>
+              }
+              @if (truncated()) {
+                <div class="flex items-start gap-2 min-w-0">
+                  <app-icon name="alert" size="1.1rem" class="icon-warn shrink-0 mt-0.5" />
+                  <p class="text-xs text-[color:var(--text-secondary)]">
+                    <span class="font-semibold">This chart is drawn from part of the answer.</span>
+                    The result stopped at the server's row ceiling, so rows that match your query
+                    are missing from every bar below. Nothing here can say how many, or which way
+                    they would move one. Narrow it with a <span class="mono">WHERE</span> or
+                    aggregate in SQL, and the chart will be of the whole answer.
+                  </p>
+                </div>
+              }
+            </div>
+
+            <div class="p-4 flex flex-col gap-3 min-w-0">
+
+              <!-- Three pickers, and the kind carries its own reasons the way the connection
+                   picker does: a kind that cannot draw THESE columns stays listed and inert
+                   with the reason on it, because that reason is a fact about the reader's
+                   data rather than about the console. -->
+              <div class="flex flex-wrap items-end gap-2 min-w-0">
+                @if (chartLabelOptions().length) {
+                  <div class="flex flex-col gap-1 min-w-0">
+                    <label class="text-[11px] uppercase tracking-wider
+                                  text-[color:var(--text-muted)]"
+                           for="a-chart-label">Label</label>
+                    <select id="a-chart-label" class="input input-sm w-auto max-w-full"
+                            [value]="labelColumn()?.name ?? ''"
+                            (change)="chartLabelName.set($any($event.target).value)">
+                      <!-- [selected] on the OPTION, not only [value] on the select. Angular
+                           applies a host property binding before the @for below it has created
+                           anything, so the browser had nothing to select and fell back to the
+                           first option -- and since the expression never changed afterwards the
+                           binding never re-fired. The picker then named a different column from
+                           the one the chart was drawing, which on this screen is the whole
+                           problem: the control that says what a chart is OF disagreed with it. -->
+                      @for (column of chartLabelOptions(); track column.name) {
+                        <option [value]="column.name"
+                                [selected]="column.name === labelColumn()?.name">{{ column.name }}</option>
+                      }
+                    </select>
+                  </div>
+                }
+
+                <div class="flex flex-col gap-1 min-w-0">
+                  <label class="text-[11px] uppercase tracking-wider
+                                text-[color:var(--text-muted)]"
+                         for="a-chart-value">Value</label>
+                  <select id="a-chart-value" class="input input-sm w-auto max-w-full"
+                          [value]="valueColumn()?.name ?? ''"
+                          (change)="chartValueName.set($any($event.target).value)">
+                    @for (column of chartValueOptions(); track column.name) {
+                      <!-- How much of the column is actually numbers, on the option itself.
+                           A column that parses in nine rows out of nine thousand is offered
+                           and is almost certainly the wrong pick, and the count is the only
+                           thing that says so before the chart is drawn. -->
+                      <option [value]="column.name"
+                              [selected]="column.name === valueColumn()?.name">
+                        {{ column.name }} · a number in
+                        {{ column.numbers.toLocaleString() }} of
+                        {{ column.rows.toLocaleString() }} rows
+                      </option>
+                    }
+                  </select>
                 </div>
 
-                @if (runsError()) {
-                  <p class="text-xs text-crit-500" role="alert">{{ runsError() }}</p>
-                }
-
-                @if (runsLoading()) {
-                  <p class="text-xs text-[color:var(--text-muted)] py-4 text-center">Reading…</p>
-                } @else if (!recentRuns().length) {
-                  <p class="text-xs text-[color:var(--text-muted)] py-4 text-center">
-                    Nothing has been run here yet.
-                  </p>
-                } @else {
-                  <div class="scroll-table -mx-1 px-1 flex flex-col gap-1.5">
-                    @for (run of recentRuns(); track run.analyticsQueryRunId) {
-                      <div class="rounded border border-subtle p-2 flex flex-col gap-1 min-w-0">
-                        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
-                          <!-- Refused is not a kind of failure and is not drawn as one. Failed
-                               reached the engine and broke there; refused never reached it,
-                               because the gate or the governor turned it away. -->
-                          <!-- Every state gets its own word. The @default used to be "failed",
-                               so a query the user themselves stopped, and one the server timed
-                               out, were both reported to them as failures -- the exact conflation
-                               the comment above forbids for REFUSED, one state over. There is no
-                               default any more: an unrecognised state shows itself rather than
-                               being dressed as the nearest familiar one. -->
-                          <span class="pill"
-                                [class.pill-ok]="run.runStatus === 'SUCCESS'"
-                                [class.pill-crit]="run.runStatus === 'FAILED'"
-                                [class.pill-warn]="run.runStatus === 'REFUSED'
-                                                   || run.runStatus === 'TIMED_OUT'"
-                                [class.pill-neutral]="run.runStatus === 'CANCELLED'
-                                                      || run.runStatus === 'QUEUED'
-                                                      || run.runStatus === 'RUNNING'">
-                            @switch (run.runStatus) {
-                              @case ('SUCCESS') { ran }
-                              @case ('REFUSED') { refused }
-                              @case ('FAILED') { failed }
-                              @case ('CANCELLED') { stopped }
-                              @case ('TIMED_OUT') { timed out }
-                              @case ('QUEUED') { queued }
-                              @case ('RUNNING') { running }
-                              @default { {{ run.runStatus }} }
-                            }
-                          </span>
-                          <span class="text-[11px] text-[color:var(--text-muted)]">
-                            {{ runWhen(run) }}
-                          </span>
-                          @if (runTook(run)) {
-                            <span class="text-[11px] text-[color:var(--text-muted)] tabular">
-                              {{ runTook(run) }}
-                            </span>
-                          }
-                          @if (runRows(run)) {
-                            <span class="text-[11px] text-[color:var(--text-muted)] tabular">
-                              {{ runRows(run) }} rows
-                            </span>
-                          }
-                          <button type="button" class="btn btn-default btn-xs ml-auto"
-                                  (click)="reuseRun(run)">Use this SQL</button>
-                        </div>
-                        <p class="mono text-[11px] truncate"
-                           [title]="run.queryText">{{ run.queryText }}</p>
-                        <p class="mono text-[10px] text-[color:var(--text-muted)] truncate"
-                           [title]="run.datasetPath">
-                          {{ run.connectionAlias }}/{{ run.datasetPath }}
-                        </p>
-                        @if (run.errorMessage) {
-                          <p class="text-[11px] text-[color:var(--text-secondary)]">
-                            {{ run.errorMessage }}
-                          </p>
-                        }
-                      </div>
+                <div class="flex flex-col gap-1 min-w-0 flex-1">
+                  <label class="text-[11px] uppercase tracking-wider
+                                text-[color:var(--text-muted)]"
+                         for="a-chart-kind">Chart</label>
+                  <select id="a-chart-kind" class="input input-sm w-full"
+                          [value]="chartKind() ?? ''"
+                          (change)="chartKindName.set($any($event.target).value)">
+                    @for (option of chartKinds(); track option.id) {
+                      <option [value]="option.id" [disabled]="!!option.issue"
+                              [selected]="option.id === chartKind()"
+                              [title]="option.issue || option.label">
+                        {{ option.label }}{{ option.issue ? ' — ' + option.issue : '' }}
+                      </option>
                     }
-                  </div>
-                  <p class="field-note text-[color:var(--text-muted)]">
-                    Times are wall clock inside the query engine, so they leave out the network
-                    and any wait for a free slot. This is everything run in your workspace, not
-                    only what you saved.
-                  </p>
+                  </select>
+                </div>
+              </div>
+
+              <div class="flex flex-wrap items-baseline gap-2 min-w-0">
+                <h4 class="text-sm font-medium min-w-0 truncate">{{ chartCaption() }}</h4>
+                @if (truncated()) {
+                  <!-- On the chart's own title, not only in the strip above it. This is the
+                       line that travels with the picture when somebody screenshots it. -->
+                  <span class="pill pill-warn">partial — part of the answer</span>
+                }
+                @if (chartStale()) {
+                  <span class="pill pill-warn">of the previous statement</span>
                 }
               </div>
+
+              @switch (chartKind()) {
+                @case ('bar') {
+                  <app-bar-chart [data]="chartData()" [height]="220" />
+                }
+                @case ('ranked') {
+                  <!-- No percentages. A share of a total is only a share when the numbers add
+                       up to one, and this column is whatever the reader selected -- an
+                       average per region has no total for a row to be 12% of. -->
+                  <app-ranked-bar [data]="chartData()" [max]="rankedRows"
+                                  [showPercent]="false" />
+                }
+                @case ('donut') {
+                  <app-donut [data]="chartData()" [totalLabel]="valueColumn()?.name ?? ''" />
+                }
+                @case ('histogram') {
+                  <!-- noun="row", because these are rows of a query result and not the runs
+                       the reports page bins. dropBelow null keeps negative values on the
+                       axis: a refund or a loss is a measurement, not a sentinel. -->
+                  <app-histogram [values]="chartValues()" noun="row" nounPlural="rows"
+                                 [dropBelow]="null" [height]="200" [format]="chartNumber"
+                                 emptyMessage="Nothing in this column parses as a number." />
+                }
+              }
+
+              <!-- What the picture cannot say about itself. Every line here is a row, a
+                   category or a whole tail that is not on the chart above. -->
+              <ul class="flex flex-col gap-1 mt-1">
+                @for (note of chartNotes(); track note) {
+                  <li class="text-[11px] text-[color:var(--text-muted)]">{{ note }}</li>
+                }
+              </ul>
             </div>
+          </app-table-shell>
+        }
+
+        @if (tab() === 'activity') {
+          <div class="card p-3 flex flex-col gap-2 min-w-0">
+            <div class="flex items-baseline justify-between gap-2 flex-wrap">
+              <h3 class="text-sm font-semibold">Run history</h3>
+              <span class="text-xs text-[color:var(--text-muted)]">
+                Everything run in your workspace against any dataset, not only what you saved.
+              </span>
+              <button type="button" class="btn btn-default btn-sm ml-auto"
+                      [disabled]="runsLoading()" (click)="loadRuns()">
+                <app-icon name="refresh" />Refresh
+              </button>
+            </div>
+
+            @if (recentRuns().length) {
+              <!-- REFUSALS LEAD, because they are the interesting ones. A refusal is the
+                   statement gate or the governor declining a query BEFORE it reached the engine
+                   — most often a statement that tried to write, attach, or name a storage
+                   location of its own — so a run of them is a record of what was attempted here
+                   and not a list of things that broke. Counted apart from failures for exactly
+                   that reason, and apart from stops and timeouts, which are limits rather than
+                   faults. -->
+              <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+                <span class="text-[color:var(--text-muted)]">
+                  Last {{ recentRuns().length }}
+                  {{ recentRuns().length === 1 ? 'run' : 'runs' }}
+                  @if (path()) {
+                    · {{ runsHere().length }} against the file open here
+                  }
+                </span>
+                @if (refusedRuns().length) {
+                  <span class="pill pill-warn">{{ refusedRuns().length }} refused</span>
+                }
+                @if (failedRuns().length) {
+                  <span class="pill pill-crit">{{ failedRuns().length }} failed</span>
+                }
+                @if (stoppedRuns().length) {
+                  <span class="pill pill-neutral">
+                    {{ stoppedRuns().length }} stopped or timed out
+                  </span>
+                }
+              </div>
+              @if (refusedRuns().length) {
+                <p class="field-note text-[color:var(--text-muted)]">
+                  A refused query never reached the engine: the statement gate or the concurrency
+                  governor turned it away. The server's own sentence is on the row, unchanged —
+                  several of those are security refusals and a paraphrase would take away the one
+                  thing telling a reader which.
+                </p>
+              }
+            }
+
+            @if (runsError()) {
+              <p class="text-xs text-crit-500" role="alert">{{ runsError() }}</p>
+            }
+
+            @if (runsLoading()) {
+              <p class="text-xs text-[color:var(--text-muted)] py-4 text-center">Reading…</p>
+            } @else if (!recentRuns().length) {
+              <p class="text-xs text-[color:var(--text-muted)] py-4 text-center">
+                Nothing has been run here yet.
+              </p>
+            } @else {
+              <div class="scroll-table -mx-1 px-1 flex flex-col gap-1.5">
+                @for (run of recentRuns(); track run.analyticsQueryRunId) {
+                  <div class="rounded border border-subtle p-2 flex flex-col gap-1 min-w-0">
+                    <div class="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
+                      <!-- Refused is not a kind of failure and is not drawn as one. Failed
+                           reached the engine and broke there; refused never reached it,
+                           because the gate or the governor turned it away. -->
+                      <!-- Every state gets its own word. The @default used to be "failed",
+                           so a query the user themselves stopped, and one the server timed
+                           out, were both reported to them as failures -- the exact conflation
+                           the comment above forbids for REFUSED, one state over. There is no
+                           default any more: an unrecognised state shows itself rather than
+                           being dressed as the nearest familiar one. -->
+                      <span class="pill"
+                            [class.pill-ok]="run.runStatus === 'SUCCESS'"
+                            [class.pill-crit]="run.runStatus === 'FAILED'"
+                            [class.pill-warn]="run.runStatus === 'REFUSED'
+                                               || run.runStatus === 'TIMED_OUT'"
+                            [class.pill-neutral]="run.runStatus === 'CANCELLED'
+                                                  || run.runStatus === 'QUEUED'
+                                                  || run.runStatus === 'RUNNING'">
+                        @switch (run.runStatus) {
+                          @case ('SUCCESS') { ran }
+                          @case ('REFUSED') { refused }
+                          @case ('FAILED') { failed }
+                          @case ('CANCELLED') { stopped }
+                          @case ('TIMED_OUT') { timed out }
+                          @case ('QUEUED') { queued }
+                          @case ('RUNNING') { running }
+                          @default { {{ run.runStatus }} }
+                        }
+                      </span>
+                      <span class="text-[11px] text-[color:var(--text-muted)]">
+                        {{ runWhen(run) }}
+                      </span>
+                      @if (runTook(run)) {
+                        <span class="text-[11px] text-[color:var(--text-muted)] tabular">
+                          {{ runTook(run) }}
+                        </span>
+                      }
+                      @if (runRows(run)) {
+                        <span class="text-[11px] text-[color:var(--text-muted)] tabular">
+                          {{ runRows(run) }} rows
+                        </span>
+                      }
+                      <!-- Lands the statement in the console and goes there, because this
+                           tab is not somewhere a query can be read or run. It still does not
+                           RUN it: a row here may be one the engine refused or one that took
+                           thirty seconds, and a click that re-spends a permit on either is a
+                           control that punishes curiosity. -->
+                      <button type="button" class="btn btn-default btn-xs ml-auto"
+                              (click)="openRunInConsole(run)">Open in the console</button>
+                    </div>
+                    <p class="mono text-[11px] truncate"
+                       [title]="run.queryText">{{ run.queryText }}</p>
+                    <p class="mono text-[10px] text-[color:var(--text-muted)] truncate"
+                       [title]="run.datasetPath">
+                      {{ run.connectionAlias }}/{{ run.datasetPath }}
+                    </p>
+                    @if (run.errorMessage) {
+                      <p class="text-[11px] text-[color:var(--text-secondary)]">
+                        {{ run.errorMessage }}
+                      </p>
+                    }
+                  </div>
+                }
+              </div>
+              <p class="field-note text-[color:var(--text-muted)]">
+                Times are wall clock inside the query engine, so they leave out the network and
+                any wait for a free slot — the two differ most exactly when the module is busy.
+                A row count is absent rather than zero where a run never produced one.
+              </p>
+            }
           </div>
         }
 

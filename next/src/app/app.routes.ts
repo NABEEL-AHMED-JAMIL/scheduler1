@@ -133,6 +133,21 @@ export const routes: Routes = [
         path: 'analytics',
         loadComponent: () => import('./features/analytics/analytics').then(m => m.Analytics),
       },
+      {
+        // Under analytics/ so it has an address of its own: a dashboard is a page somebody
+        // assembles and comes back to, and until now it was reachable from nowhere at all --
+        // built, tested, and with no route and no link, which is the same "API-live, UI-dead"
+        // shape the run history and cancellation each hit before it.
+        //
+        // Ungated for the same reason as its parent, and the reasoning is worth repeating
+        // rather than inheriting silently: every board, widget and saved analysis is fetched
+        // through the analytics library endpoints, which scope every read to the calling
+        // tenant and user themselves. A minRole here would be a second, weaker statement of a
+        // rule the server already enforces per request -- and it would be the wrong one, since
+        // dashboards are read and built by the same TENANT_USER who may open a dataset.
+        path: 'analytics/dashboards',
+        loadComponent: () => import('./features/analytics/dashboard').then(m => m.Dashboards),
+      },
       { path: 'admin/storage', redirectTo: 'settings/storage-connections' },
       {
         // Deliberately open, unlike its Models sibling: fetchAllAgents is TENANT_USER and the

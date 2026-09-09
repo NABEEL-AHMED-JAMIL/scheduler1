@@ -10,8 +10,11 @@ import { BarChart } from '../../shared/charts/bar-chart';
 import { Donut } from '../../shared/charts/donut';
 import { Histogram } from '../../shared/charts/histogram';
 import { RankedBar } from '../../shared/charts/ranked-bar';
+import { RouterLink } from '@angular/router';
 import { BucketSummary, ObjectSummary, StorageService } from '../objects/storage.service';
 import { SqlEditor } from './sql-editor';
+import { DataGrid, GridColumn, GridCopy, GridSort } from './data-grid';
+import { DatasetRegistry } from './dashboard';
 import {
   FilterBuilder, countFilterClauses, describeClause, emptyFilterGroup, isNumericType,
   pruneFilters,
@@ -19,37 +22,64 @@ import {
 import {
   Aggregation, AnalysisColumn, AnalysisCrumb, AnalysisRequest, AnalysisResult, AnalyticsService,
   ColumnProfile, DatasetColumn, DatasetPreview, DatasetProfile, Drill, ExportFile, FilterClause,
-  FilterGroup, FilterNode, QueryResult, QueryRun, SavedAnalysis, SavedQuery, WriteBackResult,
+  FilterGroup, FilterNode, PreviewShape, QueryResult, QueryRun, RegisteredDataset, SavedAnalysis,
+  SavedQuery, WriteBackResult,
 } from './analytics.service';
 
 /**
- * The tabs a dataset is read through.
+ * The tabs a dataset is read through -- document 02's ten.
  *
- * THERE IS NO CHART TAB, and that is the decision rather than an omission. A chart here is drawn
- * from the console's result, and a tab would have put the picture on one screen and the query
- * that produced it on another -- so a reader could edit the SQL, forget to re-run it, switch
- * across and study a chart of the answer to a different question. It sits under the result table
- * instead, on the SQL tab, where changing the statement visibly clears both at once.
+ * Schema was once a tab and is not any more: the columns are what a reader checks WHILE looking
+ * at the rows, and a tab made the two mutually exclusive. They sit in a rail beside the data,
+ * where they can be read together.
  *
- * Schema was a third tab and is not any more: the columns are what a reader checks WHILE looking
- * at the rows, and a tab made the two mutually exclusive. They now sit in a rail beside the
- * data, where they can be read together.
+ * Profile and Quality are two readings of ONE request, and Columns and Compact are a third and a
+ * fourth. They are separate tabs because they answer different questions, but they must never be
+ * four scans: `profile()` is fetched once and all four derive from it.
  *
- * Profile and Quality are two readings of ONE request. They are separate tabs because they
- * answer different questions -- "what is in this column" against "which column is a problem" --
- * but they must never be two scans, so the request is made once and both derive from it.
+ * COLUMNS AND PROFILE USED TO BE THE SAME TAB WEARING THE WRONG NAME. Document 06 defines Profile
+ * as aggregate distributions and type summaries, and Columns as the ~14 per-column statistics.
+ * What shipped was the per-column detail under the label "Profile" and no aggregate view at all,
+ * so a reader who wanted "what is this file made of" was handed two hundred cards. They are now
+ * what 06 says they are, off the one scan that was already being made.
  *
  * Canvas is document 07: dimensions, a measure, a filter tree, drill-down and a pivot. It sits
  * BEFORE SQL rather than after it because it is the tab that does not require the reader to
  * write anything -- the console is the escape hatch for the questions a structured analysis
- * cannot phrase, and an escape hatch belongs at the end of the strip and not in the middle.
+ * cannot phrase, and an escape hatch belongs at the end of the group and not in the middle.
  *
- * SQL is last because it is the one tab that needs the other four first. A person writing a
- * statement against a file wants its columns, its types and its shape settled before they start,
- * and phase one deliberately shipped no editor at all until the sandbox that contains one had
- * been proven -- so the order of this strip is also the order the module was built in.
+ * CHARTS WAS DELIBERATELY NOT A TAB, and the reason it is one now comes with a guard. A chart
+ * here is drawn from the console's result, and putting the picture on one screen and the query
+ * that produced it on another lets a reader edit the SQL, forget to re-run it, switch across and
+ * study a chart of the answer to a different question. 02 and 06 both want the tab, so the tab
+ * exists -- and `chartStale` watches for exactly that drift and says so on the chart, which the
+ * old arrangement achieved by geography.
  */
-type Tab = 'overview' | 'data' | 'profile' | 'quality' | 'canvas' | 'sql';
+type Tab = 'overview' | 'compact' | 'data' | 'columns' | 'profile' | 'quality'
+  | 'canvas' | 'sql' | 'charts' | 'activity';
+
+/**
+ * One heading of the tab strip, and the reason ten tabs are not one row of ten.
+ *
+ * Ten equal tabs wrap into a second line of undifferentiated words, and a reader looking for
+ * "where do I see the rows" has to read all ten. They group, and they group by WHAT EACH ONE
+ * COSTS, which is the distinction this module has been organised around from the start:
+ *
+ *   The file      what the schema and a page of rows already paid for.
+ *   Its columns   the four readings of the single SUMMARIZE scan. One permit, spent once, on
+ *                 first arrival at any of them; the other three are free after that.
+ *   Questions     the tabs where the reader composes something the server then runs. Each one
+ *                 can spend a governor permit per press, and Activity is the record of that.
+ *
+ * That is also the order a dataset is actually read in, so the grouping costs nothing in
+ * navigation and buys a reader the answer to "what will this cost me" before they click.
+ */
+export interface TabGroup {
+  label: string;
+  /** Said on the group, because the grouping is a claim about cost and should be checkable. */
+  hint: string;
+  tabs: { id: Tab; label: string }[];
+}
 
 /** What a fresh console offers to run, so an empty editor is not also a blank page. */
 const STARTER_SQL = 'select *\nfrom dataset\nlimit 100';
@@ -138,6 +168,14 @@ export interface ColumnView {
   approxNullRows: number;
   /** A sketch, not a count. Always rendered with "≈" and the word "estimated" beside it. */
   approxDistinct: number;
+  /**
+   * approxDistinct as a share of the rows, which is 06's "distinct %".
+   *
+   * Null on a dataset with no rows rather than 0: there is no share of nothing, and a zero here
+   * would read as "no distinct values" on precisely the file that has no values at all. It
+   * inherits the sketch's inexactness whole and is never printed without it.
+   */
+  distinctPercent: number | null;
   /** The server's flags, carried through unchanged -- it derived them beside their statistics. */
   allNull: boolean;
   constant: boolean;
@@ -154,9 +192,79 @@ export interface ColumnView {
   maxLabel: string;
   avgLabel: string;
   stdLabel: string;
+  /**
+   * The three estimated quartiles, written out.
+   *
+   * 06 asks for "percentile values where applicable" and the spread bar draws them without ever
+   * naming one. They are approx_quantile and are labelled estimated wherever they appear; an
+   * empty string is how a column with no quantiles says so, which is most text columns.
+   */
+  q25Label: string;
+  medianLabel: string;
+  q75Label: string;
   /** Empty on every column with no numeric range to spread, which is most of them. */
   spread: QuartileSegment[];
   spreadSummary: string;
+}
+
+/**
+ * One row of the Compact view: 06's seven fields, one line per column.
+ *
+ * The dense mode is the only genuinely new view in this wave, and its job is to make a
+ * two-hundred-column file scannable in one screen -- so every field here is either exact or
+ * carries its hedge INSIDE the string, because a dense table has no room for a sentence under
+ * each figure and a bare "≈" is not a warning anybody reads.
+ *
+ * `sample` is the one field that is not from the profile scan, and it is the one to be careful
+ * about: it is the first value the CURRENT PAGE of the Data tab happens to hold, so it moves
+ * when the reader turns a page, sorts or filters. It is a specimen, not a statistic, and the tab
+ * says so above the table rather than leaving it to be assumed representative.
+ */
+export interface CompactRow {
+  name: string;
+  type: string;
+  shortType: string;
+  /** The specimen value, already rendered. Empty when the page in hand has none to show. */
+  sample: string;
+  /** 'null', 'blank', 'value' or 'none' -- so the template can tell three absences apart. */
+  sampleKind: 'value' | 'null' | 'blank' | 'none';
+  /** '' when the dataset has no rows and there is no percentage to give. */
+  nullLabel: string;
+  /** Always carries its "≈", because it is built on the HyperLogLog sketch. */
+  distinctLabel: string;
+  /**
+   * 06's "key metric": the one figure that says most about THIS column.
+   *
+   * Chosen by what the engine returned rather than by a type name, which is the same test the
+   * Profile card uses: a mean where there is one, the estimated median where there are quantiles
+   * but no mean, and the extremes otherwise. `metricName` travels with it so the number is never
+   * a bare figure with no idea what it measures.
+   */
+  metricName: string;
+  metricValue: string;
+  /** True where the metric is an approx_quantile rather than a measurement. */
+  metricEstimated: boolean;
+  /** The loudest quality finding on this column, or null where it raised nothing. */
+  level: 'crit' | 'warn' | 'note' | null;
+  quality: string;
+  qualityDetail: string;
+  /** False on a column the quality pass skipped -- which is not the same as one it cleared. */
+  checked: boolean;
+}
+
+/**
+ * One band of an aggregate distribution on the Profile tab: a count of COLUMNS, not of rows.
+ *
+ * The distinction is the whole risk of that tab. "42% empty" as a headline over a file reads as
+ * a statement about cells, and every figure Profile has to work from is per column -- so a band
+ * is labelled with what it counts and the tab says which of the two it is measuring.
+ */
+export interface ProfileBand {
+  name: string;
+  /** Columns in this band. */
+  value: number;
+  /** What puts a column here, in words, for the title attribute. */
+  detail: string;
 }
 
 /**
@@ -431,7 +539,10 @@ const DATE_ONLY_TYPE = /^DATE$/i;
  */
 @Component({
   selector: 'app-analytics',
-  imports: [Icon, TableShell, SqlEditor, BarChart, Donut, RankedBar, Histogram, FilterBuilder],
+  imports: [
+    Icon, TableShell, SqlEditor, BarChart, Donut, RankedBar, Histogram, FilterBuilder, DataGrid,
+    DatasetRegistry, RouterLink,
+  ],
   templateUrl: './analytics.html',
 })
 export class Analytics implements OnInit {
@@ -556,20 +667,45 @@ export class Analytics implements OnInit {
   readonly tab = signal<Tab>('overview');
 
   /**
-   * The tab strip, in the order a dataset is read in: what it is, the rows themselves, what is
-   * in each column, and which column is a problem.
+   * The tab strip, grouped. See TabGroup for why ten tabs are not one row of ten.
    *
-   * A list rather than four copies of the same six bindings in the template. Four copies is
-   * where the third one quietly stops matching the others.
+   * A list rather than ten copies of the same bindings in the template. Ten copies is where the
+   * third one quietly stops matching the others.
    */
-  readonly tabs: { id: Tab; label: string }[] = [
-    { id: 'overview', label: 'Overview' },
-    { id: 'data', label: 'Data' },
-    { id: 'profile', label: 'Profile' },
-    { id: 'quality', label: 'Quality' },
-    { id: 'canvas', label: 'Canvas' },
-    { id: 'sql', label: 'SQL' },
+  readonly tabGroups: TabGroup[] = [
+    {
+      label: 'The file',
+      hint: 'Already paid for by opening it — the schema and a page of rows.',
+      tabs: [
+        { id: 'overview', label: 'Details' },
+        { id: 'data', label: 'Data' },
+      ],
+    },
+    {
+      label: 'Its columns',
+      hint: 'Four readings of ONE scan of the whole file. The scan is made once, on the first '
+        + 'of these you open, and the other three are free after that.',
+      tabs: [
+        { id: 'compact', label: 'Compact' },
+        { id: 'columns', label: 'Columns' },
+        { id: 'profile', label: 'Profile' },
+        { id: 'quality', label: 'Quality' },
+      ],
+    },
+    {
+      label: 'Questions',
+      hint: 'Where you ask the server something. Each run is a real query against the file.',
+      tabs: [
+        { id: 'canvas', label: 'Canvas' },
+        { id: 'sql', label: 'SQL' },
+        { id: 'charts', label: 'Charts' },
+        { id: 'activity', label: 'Activity' },
+      ],
+    },
   ];
+
+  /** Every tab, flat, for the code that only needs the list and not the shape of the strip. */
+  readonly tabs: { id: Tab; label: string }[] = this.tabGroups.flatMap(group => group.tabs);
 
   readonly loading = signal(false);
   readonly error = signal('');
@@ -604,8 +740,168 @@ export class Analytics implements OnInit {
   readonly pageCount = computed(() => {
     const preview = this.preview();
     if (!preview || !preview.pageSize) return 0;
+    // The FILTERED total on purpose: this is what the pager divides, and a pager built on the
+    // size of the file would offer pages of a filtered result that come back empty.
     return Math.ceil(preview.totalRows / preview.pageSize);
   });
+
+  // ---- the data grid ---------------------------------------------------------------------
+
+  /**
+   * What the grid has asked the SERVER for. None of it is applied in the browser.
+   *
+   * Held here rather than inside DataGrid because the grid is presentational: it emits the
+   * intent and this screen turns it into a request. That split is what stops a sort looking
+   * applied while the rows on screen are still the previous page's, which is the most
+   * convincing wrong answer this screen could give.
+   */
+  readonly gridSort = signal<GridSort | null>(null);
+  readonly gridSearch = signal('');
+  readonly gridFilters = signal<FilterClause[]>([]);
+
+  /**
+   * The size of the dataset with nothing narrowing it, once something has counted it.
+   *
+   * Null until a response arrives that was NOT filtered, and that is the only thing ever written
+   * here: the moment a filter goes on, `preview().totalRows` becomes a count of the matches, and
+   * a screen that overwrote this with it would have no way back to the size of the file. It is
+   * what lets the grid print "1,204 of 250,000" instead of a bare "1,204" that reads as the whole
+   * dataset having shrunk.
+   */
+  readonly datasetRows = signal<number | null>(null);
+
+  /**
+   * Whether the rows and the total on screen are narrowed.
+   *
+   * The server's own flag, which is authoritative because the server is what applied the filter.
+   * The fallback is what THIS SCREEN asked for, used only when a response carries no flag at all
+   * -- and it errs the same way the flag would: a search or a filter in hand means the count is
+   * a count of matches, whatever the response forgot to say.
+   */
+  readonly previewFiltered = computed(() => {
+    const preview = this.preview();
+    if (!preview) return false;
+    return preview.filtered ?? this.gridNarrowing();
+  });
+
+  /** Whether what the reader has asked for removes rows, as opposed to only reordering them. */
+  private gridNarrowing(): boolean {
+    return !!this.gridSearch().trim() || this.gridFilters().length > 0;
+  }
+
+  /**
+   * The grid's columns: the preview's own order, carrying the schema's types.
+   *
+   * The preview's column list rather than the schema's, because the cells in a row are indexed by
+   * position in THAT list. Where the two agree -- which is every plain preview -- this is the
+   * same thing said twice; where they could ever disagree, the rows are what must win, or every
+   * cell in the grid would be under the wrong heading.
+   */
+  readonly gridColumns = computed<GridColumn[]>(() => {
+    const types = new Map(this.columns().map(column => [column.name, column.type]));
+    const names = this.preview()?.columns ?? this.columns().map(column => column.name);
+    return names.map(name => ({ name, type: types.get(name) ?? '' }));
+  });
+
+  /** Distinct per dataset: two files do not share a column layout. See DataGrid's storageKey. */
+  readonly gridStorageKey = computed(() =>
+    this.hasDataset() ? `${this.connection()}:${this.path()}` : '');
+
+  // ---- the dataset registry ---------------------------------------------------------------
+
+  /**
+   * Whether the registry panel is open, and why it is behind a disclosure at all.
+   *
+   * DatasetRegistry reads the registry on creation. Rendering it unconditionally would spend that
+   * read on every file open for a feature most readers never touch, and `@if` is what makes the
+   * cost follow the click -- the same bargain the profile scan and the query library already make
+   * on this screen. It is on the Details tab because naming a location is a fact about the file
+   * rather than a question asked of it.
+   */
+  readonly registryOpen = signal(false);
+
+  /**
+   * Opens a dataset somebody registered by name.
+   *
+   * The registry stores a connection alias and a path, and neither is guaranteed to still be
+   * readable from here: a name can outlive the connection it points at, and the picker on this
+   * screen refuses several kinds of connection the registry never checked. So the connection is
+   * put through the same gate pickConnection uses rather than being set directly, and a name that
+   * leads somewhere this screen cannot go says so instead of opening a blank pane.
+   */
+  openRegistered(dataset: RegisteredDataset): void {
+    const alias = dataset.connectionAlias;
+    const path = dataset.datasetPath;
+    if (!alias || !path) return;
+    if (!this.readableConnections().some(option => option.bucket === alias)) {
+      this.browseError.set(`"${dataset.datasetName}" is registered under ${alias}, which is not a `
+        + 'connection Analytics Studio can read from here.');
+      return;
+    }
+    if (alias !== this.connection()) {
+      this.connection.set(alias);
+      this.filter.set('');
+      this.clearDataset();
+    }
+    // The folder the file sits in, so the rail lands beside it rather than at the bucket root --
+    // a registered path is usually deep, and a reader who opens one wants its neighbours too.
+    const at = path.lastIndexOf('/');
+    this.prefix.set(at < 0 ? '' : path.slice(0, at + 1));
+    this.browse();
+    // The registry holds a path and never an ObjectSummary, so there is no size or modified date
+    // to show. selected() stays null, which is the same state a folder-as-dataset open leaves.
+    this.selected.set(null);
+    this.load(path);
+  }
+
+  /** The outcome of the last cell copy, said out loud because a clipboard write can be refused. */
+  readonly copyNote = signal('');
+
+  /**
+   * A cell was copied -- or was not, which is the half worth saying.
+   *
+   * DataGrid does the clipboard write itself and reports what happened; this only narrates it.
+   * A silent failure here is a reader pasting whatever was on the clipboard before.
+   */
+  onCopyCell(copy: GridCopy): void {
+    this.copyNote.set(copy.copied
+      ? `Copied ${copy.column}${copy.value === null ? ' (it is null, so nothing was copied)' : ''}.`
+      : `Your browser would not let the page write to the clipboard, so ${copy.column} `
+        + 'was not copied.');
+  }
+
+  /**
+   * A new sort, from a header click. Null is a real request: object storage has no row order.
+   *
+   * Every one of the three below goes back to page 0, and that is not tidiness. Page 7 of an
+   * unsorted file and page 7 of a sorted one hold different rows, and page 7 of a filter that
+   * matched forty rows does not exist at all -- so keeping the page number would ask the server
+   * for a window that is either meaningless or empty, and an empty answer reads as "the filter
+   * matched nothing".
+   */
+  onGridSort(sort: GridSort | null): void {
+    this.gridSort.set(sort);
+    this.loadPage(0);
+  }
+
+  onGridSearch(search: string): void {
+    this.gridSearch.set(search);
+    this.loadPage(0);
+  }
+
+  onGridFilters(filters: FilterClause[]): void {
+    this.gridFilters.set(filters);
+    this.loadPage(0);
+  }
+
+
+  private clearGridState(): void {
+    this.gridSort.set(null);
+    this.gridSearch.set('');
+    this.gridFilters.set([]);
+    this.datasetRows.set(null);
+    this.copyNote.set('');
+  }
 
   ngOnInit(): void {
     this.storage.buckets().subscribe({
@@ -723,6 +1019,10 @@ export class Analytics implements OnInit {
     // with no region column produces an analysis that fails at the server; carrying it into a
     // file that HAS a region column meaning something else produces one that does not.
     this.clearCanvas();
+    // A sort names a column of the file being closed and a filter names a value in it, so neither
+    // survives the open -- the same argument the Canvas's picks lose. datasetRows goes with them:
+    // it is the size of a different file.
+    this.clearGridState();
 
     const connection = this.connection();
     this.analytics.schema(connection, path).subscribe({
@@ -745,6 +1045,27 @@ export class Analytics implements OnInit {
     });
   }
 
+  /**
+   * One page of rows, in the order and the narrowing the grid asked for.
+   *
+   * <b>THE ONE THING HERE THAT PREVENTS A WRONG NUMBER RATHER THAN A SLOW ONE IS
+   * knownTotalFiltered.</b> Everything else in the shape is the reader's request; that flag is
+   * the PROVENANCE of the total travelling beside it, and it is read off the response that
+   * produced that total rather than derived from what is being asked for now. The two are
+   * different questions and the difference is the whole defect:
+   *
+   *   filter on   -> the server counts the matches, answers totalRows=1,204 with filtered=true.
+   *   filter off  -> this request does not narrow, so the server WOULD reuse a carried total.
+   *                  The total in hand is 1,204, counted under the filter that has just been
+   *                  removed. Reused, the pager offers two pages of a dataset with four hundred
+   *                  and the file appears to have permanently shrunk for having been filtered
+   *                  once -- rows the reader can no longer reach and nothing on screen saying so.
+   *
+   * So the flag echoes `preview().filtered`, which is the flag of the response the number came
+   * from, and the server refuses the total on exactly that request. Deriving it from
+   * `gridNarrowing()` instead would be right on every request except the one that matters, since
+   * clearing a filter is precisely when the screen is not narrowing and the number in hand is.
+   */
   loadPage(page: number): void {
     const path = this.path();
     if (!path) return;
@@ -754,15 +1075,40 @@ export class Analytics implements OnInit {
     // holding from the page before it. load() clears preview() before every fresh open, so this
     // is undefined exactly when nothing has counted the dataset yet, which is the one case where
     // sending a number would be inventing one.
-    const knownTotal = this.preview()?.totalRows;
-    this.analytics.preview(this.connection(), path, page, knownTotal).subscribe({
+    const carried = this.preview();
+    const knownTotal = carried?.totalRows;
+    const sort = this.gridSort();
+    const filters = this.gridFilters();
+    const search = this.gridSearch().trim();
+    // What THIS request narrows by, which is not what the carried total was counted under.
+    const narrowing = !!search || filters.length > 0;
+    const shape: PreviewShape = {
+      sort: sort?.column,
+      direction: sort?.direction,
+      search: search || undefined,
+      filters: filters.length ? filters : undefined,
+      // The flag of the response that produced knownTotal, not a description of this request.
+      knownTotalFiltered: !!carried?.filtered,
+    };
+    this.analytics.preview(this.connection(), path, page, knownTotal, undefined, shape).subscribe({
       next: response => {
         this.loading.set(false);
         if (response.status !== API_SUCCESS || !response.data) {
           this.error.set(response.message);
           return;
         }
-        this.preview.set(response.data);
+        // The flag is settled ONCE, here, and the rest of the screen reads it off the stored
+        // page. A response that carries no flag falls back to what this request asked for, and
+        // it falls the cautious way: a search in hand means the count is a count of matches,
+        // whatever the response forgot to say. Normalising at the point it arrives means the
+        // provenance sent back on the next request cannot disagree with what is on screen --
+        // which, on the request that clears a filter, is the whole of the defect.
+        const filtered = response.data.filtered ?? narrowing;
+        this.preview.set({ ...response.data, filtered });
+        // The size of the FILE, remembered only from a response that counted the whole of it.
+        // Without this the grid can print "1,204 matching" and never "1,204 of 250,000", because
+        // the response carrying the filtered total has no way to say what it was filtered from.
+        if (!filtered) this.datasetRows.set(response.data.totalRows);
       },
       error: err => {
         this.loading.set(false);
@@ -794,6 +1140,7 @@ export class Analytics implements OnInit {
     this.clearProfile();
     this.clearResult();
     this.clearCanvas();
+    this.clearGridState();
     // The second dataset is a path inside the connection that is being left behind, so it cannot
     // survive the change: the same key under a different connection is a different file, or no
     // file at all. Only pickConnection reaches here -- opening another file keeps the join.
@@ -803,7 +1150,16 @@ export class Analytics implements OnInit {
   // ---- profiling -----------------------------------------------------------------------
 
   /**
-   * Moves to a tab, fetching the profile the first time one of the two tabs that needs it is
+   * The four tabs that are readings of the one SUMMARIZE scan.
+   *
+   * A list rather than a chain of ORs in showTab, because it is the thing that has to stay true:
+   * add a fifth reading and forget to name it here and the tab renders its empty state forever,
+   * with nothing having been asked for and no error to explain it.
+   */
+  private static readonly SCAN_TABS: Tab[] = ['compact', 'columns', 'profile', 'quality'];
+
+  /**
+   * Moves to a tab, fetching the profile the first time one of the four tabs that needs it is
    * opened.
    *
    * Lazy on purpose. Opening a file already costs three sessions and three permits against a
@@ -822,12 +1178,18 @@ export class Analytics implements OnInit {
     // rather than a governor permit: neither is worth spending on a reader who opened a file to
     // look at its columns.
     if (tab === 'sql') { this.openLibrary(); return; }
+    // Run history on the same terms. It is the tab a reader opens to find out what happened, so
+    // it is fetched on arrival -- and only on arrival, because a workspace's whole history is not
+    // worth a database round trip to somebody reading a column list.
+    if (tab === 'activity') { this.openRuns(); return; }
     // The Canvas fetches its saved analyses on the same terms, and NOTHING ELSE: opening the tab
     // does not run an analysis. A GROUP BY over a hundred-megabyte file is a governor permit and
     // a full scan, and spending one because somebody clicked a tab is how a screen becomes
     // expensive to look at.
     if (tab === 'canvas') { this.openAnalyses(); return; }
-    if (tab !== 'profile' && tab !== 'quality') return;
+    // Charts draws the result the console already has. It runs nothing, which is the point of it
+    // being a tab rather than a second console.
+    if (!Analytics.SCAN_TABS.includes(tab)) return;
     if (this.profile() || this.profileLoading() || this.profileError()) return;
     this.loadProfile();
   }
@@ -916,6 +1278,9 @@ export class Analytics implements OnInit {
         rows,
         approxNullRows: column.approxNullRows ?? 0,
         approxDistinct: column.approxDistinct ?? 0,
+        // Null rather than 0 on an empty file: there is no share of nothing, and a zero would
+        // read as "no distinct values" on the one file where nothing was measured at all.
+        distinctPercent: rows ? ((column.approxDistinct ?? 0) / rows) * 100 : null,
         allNull: !!column.allNull,
         constant: !!column.constant,
         typeSurprise: column.typeSurprise ?? null,
@@ -931,6 +1296,11 @@ export class Analytics implements OnInit {
         maxLabel: text ? (column.max ?? '') : this.stat(column.max),
         avgLabel: this.stat(column.avg),
         stdLabel: this.stat(column.std),
+        // Written out as well as drawn. The spread bar has held these three since it shipped and
+        // never named one of them, so 06's "percentile values" were on screen as widths only.
+        q25Label: this.stat(column.approxQ25),
+        medianLabel: this.stat(column.approxQ50),
+        q75Label: this.stat(column.approxQ75),
         spread,
         spreadSummary: spread.length
           ? `About a quarter of the rows in each block, from ${this.stat(column.min)} through an `
@@ -1109,6 +1479,229 @@ export class Analytics implements OnInit {
     this.qualityChecked() ? 'Nothing needs attention.' : 'Nothing to check.');
 
   /**
+   * The loudest thing said about each column, by name.
+   *
+   * Findings are already sorted loudest-first, so the FIRST one per column is the worst one --
+   * which is what a single indicator in a dense row has to be. Built once as a map rather than
+   * searched per row, because Compact is one row per column on a file that can have two hundred.
+   */
+  private readonly findingsByColumn = computed(() => {
+    const grouped = new Map<string, QualityFinding[]>();
+    for (const finding of this.qualityFindings()) {
+      const existing = grouped.get(finding.column);
+      if (existing) existing.push(finding);
+      else grouped.set(finding.column, [finding]);
+    }
+    return grouped;
+  });
+
+  /** Findings are sorted loudest-first, so the head of each list is the worst one. */
+  private readonly worstFinding = computed(() => {
+    const worst = new Map<string, QualityFinding>();
+    for (const [column, findings] of this.findingsByColumn()) worst.set(column, findings[0]);
+    return worst;
+  });
+
+  /**
+   * Every finding on one column, for the Columns card to show beside the statistics.
+   *
+   * Off the grouped map rather than a filter per call. The template calls this once per card on
+   * every change-detection pass, and a filter would be columns times findings each time -- on a
+   * tab whose whole purpose is a file with two hundred columns in it.
+   */
+  findingsFor(column: string): QualityFinding[] {
+    return this.findingsByColumn().get(column) ?? [];
+  }
+
+  // ---- the compact view ------------------------------------------------------------------
+
+  /**
+   * The first value the CURRENT PAGE holds for a column, and which kind of nothing it is.
+   *
+   * A specimen, not a statistic. It comes from the page of rows the Data tab is holding, so it
+   * moves with the page, the sort and the filter -- and it is labelled that way on the tab
+   * rather than left to be read as "a typical value", which is a claim one page cannot make.
+   *
+   * The three absences are kept apart on purpose, the same distinction the grid draws in every
+   * cell: a null is the file having no value, a blank is the file having an empty one, and
+   * "none" is this page having no row to look at.
+   */
+  private sampleOf(name: string): { sample: string; kind: CompactRow['sampleKind'] } {
+    const preview = this.preview();
+    if (!preview) return { sample: '', kind: 'none' };
+    const index = preview.columns.indexOf(name);
+    if (index < 0 || !preview.rows.length) return { sample: '', kind: 'none' };
+    for (const row of preview.rows) {
+      const cell = row[index];
+      if (cell === null || cell === undefined) continue;
+      if (!String(cell).trim()) return { sample: '', kind: 'blank' };
+      return { sample: String(cell), kind: 'value' };
+    }
+    // Every row on this page had nothing in it, which is itself worth showing.
+    return { sample: '', kind: 'null' };
+  }
+
+  /**
+   * 06's dense mode: one row per column, seven fields, nothing recomputed.
+   *
+   * Everything here comes off the SUMMARIZE the other three column tabs are already reading,
+   * plus the page of rows the Data tab is already holding. The only decision made here is which
+   * figure earns the "key metric" slot, and it is made from what the engine RETURNED rather than
+   * from a type name -- a mean where there is one, an estimated median where there are quantiles
+   * and no mean, and the extremes otherwise. That is the same test the Profile card applies, and
+   * it is the honest one: whether a statistic exists is the engine's answer to whether it applies.
+   */
+  readonly compactRows = computed<CompactRow[]>(() => {
+    const worst = this.worstFinding();
+    return this.profileColumns().map(column => {
+      const { sample, kind } = this.sampleOf(column.name);
+      const finding = worst.get(column.name) ?? null;
+      const checked = !!column.rows && column.measured;
+
+      // Which figure says most about this column. avgLabel is present only where the engine
+      // returned a mean, medianLabel only where it returned quantiles -- so this asks the data
+      // rather than a list of type names that would need keeping in step with DuckDB.
+      let metricName = 'range';
+      let metricValue = column.minLabel || column.maxLabel
+        ? `${column.minLabel || '—'} → ${column.maxLabel || '—'}` : 'N/A';
+      let metricEstimated = false;
+      if (column.avgLabel) {
+        metricName = 'mean';
+        metricValue = column.avgLabel;
+      } else if (column.medianLabel) {
+        metricName = 'median';
+        metricValue = column.medianLabel;
+        metricEstimated = true;
+      }
+
+      return {
+        name: column.name,
+        type: column.type,
+        shortType: column.shortType,
+        sample,
+        sampleKind: kind,
+        // "N/A", never 0 -- 06 says so in as many words, and a zero here would claim a fully
+        // populated column on a file where nothing was measured.
+        nullLabel: column.measured ? `${this.percent(column.nullPercent)}%` : 'N/A',
+        distinctLabel: column.distinctPercent === null
+          ? 'N/A' : `≈ ${this.percent(column.distinctPercent)}%`,
+        metricName,
+        metricValue,
+        metricEstimated,
+        level: finding?.level ?? null,
+        quality: finding ? finding.title : (checked ? 'clear' : 'not checked'),
+        qualityDetail: finding ? finding.detail
+          : (checked ? 'Nothing on this column raised a finding.'
+            : 'This column was not examined: the dataset has no rows to measure it against.'),
+        checked,
+      };
+    });
+  });
+
+  // ---- the profile view: aggregates, not columns ------------------------------------------
+
+  /**
+   * How many columns the file has of each type -- 06's "data-type summaries".
+   *
+   * Grouped on the SHORT type, so DECIMAL(18,3) and DECIMAL(10,2) are both DECIMAL. The full
+   * spelling belongs on the Columns card, where one column is being described; here the question
+   * is what the file is made of, and eleven decimal widths is noise against that.
+   *
+   * Every column has exactly one type, so these counts do add up to the whole and a percentage
+   * of them is a real share -- which is not true of most of what this screen draws, and is why
+   * it is said here rather than assumed.
+   */
+  readonly typeBands = computed<ProfileBand[]>(() => {
+    const counts = new Map<string, number>();
+    for (const column of this.profileColumns()) {
+      counts.set(column.shortType, (counts.get(column.shortType) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+      .map(([name, value]) => ({
+        name, value,
+        detail: `${value} ${value === 1 ? 'column is' : 'columns are'} ${name}.`,
+      }))
+      .sort((a, b) => b.value - a.value || a.name.localeCompare(b.name));
+  });
+
+  /**
+   * Columns banded by how much of them is there.
+   *
+   * A COUNT OF COLUMNS in each band, and the tab says so twice -- because "42% empty" over a
+   * file reads as a statement about cells, and nothing on this screen has ever counted a cell.
+   * The bands are the same thresholds the Quality tab raises findings at, so the two tabs cannot
+   * disagree about which columns are a problem.
+   */
+  readonly completenessBands = computed<ProfileBand[]>(() => {
+    const bands: ProfileBand[] = [
+      { name: 'Nothing missing', value: 0, detail: 'No empty rows measured in these columns.' },
+      { name: 'Under 5% empty', value: 0, detail: 'A few rows with no value.' },
+      { name: '5–25% empty', value: 0, detail: 'Some values missing — the Quality tab lists these.' },
+      { name: 'Over 25% empty', value: 0, detail: 'Mostly empty.' },
+      { name: 'Entirely empty', value: 0, detail: '100% null and no distinct value: nothing in them.' },
+    ];
+    for (const column of this.profileColumns()) {
+      if (!column.measured) continue;
+      if (column.allNull) bands[4].value++;
+      else if (column.nullPercent >= 25) bands[3].value++;
+      else if (column.nullPercent >= 5) bands[2].value++;
+      else if (column.nullPercent > 0) bands[1].value++;
+      else bands[0].value++;
+    }
+    return bands;
+  });
+
+  /**
+   * Columns banded by how many different values they hold.
+   *
+   * EVERY BAND HERE RESTS ON THE HYPERLOGLOG SKETCH, so the whole chart is labelled estimated
+   * rather than each bar -- a distinct count measured 3.7% low on a million values will not move
+   * a column between "a handful" and "thousands", but it can and does move one across the line
+   * into "almost every row different", which is why that band is worded as a suggestion.
+   */
+  readonly cardinalityBands = computed<ProfileBand[]>(() => {
+    const bands: ProfileBand[] = [
+      { name: 'One value', value: 0, detail: 'Estimated at a single distinct value throughout.' },
+      { name: 'Under 10', value: 0, detail: 'A handful of values — a category or a flag.' },
+      { name: '10 to 1,000', value: 0, detail: 'A vocabulary rather than a category.' },
+      { name: 'Over 1,000', value: 0, detail: 'Many different values.' },
+      {
+        name: 'Almost every row different', value: 0,
+        detail: 'About as many distinct values as rows, so it may be a key. The distinct count '
+          + 'is an estimate, so this cannot prove uniqueness.',
+      },
+    ];
+    for (const column of this.profileColumns()) {
+      if (!column.rows) continue;
+      if (column.keyLike) bands[4].value++;
+      else if (column.approxDistinct <= 1) bands[0].value++;
+      else if (column.approxDistinct < 10) bands[1].value++;
+      else if (column.approxDistinct <= 1000) bands[2].value++;
+      else bands[3].value++;
+    }
+    return bands;
+  });
+
+  /**
+   * The mean of the per-column filled percentages, and it is NOT the share of cells that have a
+   * value.
+   *
+   * Two things separate it from that figure and both are on screen beside it: it weights every
+   * column equally regardless of how much data is in it, and each of the percentages it averages
+   * was already rounded to two places by the engine. It is a summary of the bands above, offered
+   * because a reader wants one number for "how complete is this file" -- and it says which
+   * number it is, because the one they will assume it is has never been counted here.
+   */
+  readonly averageFilled = computed<number | null>(() => {
+    const measured = this.profileColumns().filter(column => column.measured);
+    if (!measured.length) return null;
+    return measured.reduce((sum, column) => sum + column.filledPercent, 0) / measured.length;
+  });
+
+  /** Whether the aggregate tab has anything at all to draw. */
+  readonly profileEmpty = computed(() => !!this.profile() && !this.profileColumns().length);
+
+  /**
    * A percentage as the engine gave it, with a trailing ".00" dropped.
    *
    * Not rounded further. The engine's two decimal places are the whole of what is known about
@@ -1177,6 +1770,17 @@ export class Analytics implements OnInit {
   readonly sql = signal('');
   readonly running = signal(false);
   readonly result = signal<QueryResult | null>(null);
+
+  /**
+   * The statement that produced the result now in hand, and the reason Charts can be a tab.
+   *
+   * The chart used to sit under the result table, and that geography was the safeguard: editing
+   * the SQL and not re-running it was visibly editing the thing right above the picture. On its
+   * own tab the picture and the statement are never on screen together, so a reader can change
+   * the query, switch across, and study a chart of the answer to a question they no longer asked.
+   * Holding what actually ran is the only way to notice, and `chartStale` is where it is said.
+   */
+  readonly ranSql = signal('');
 
   /**
    * The server's sentence about a query that did not return rows.
@@ -1424,6 +2028,9 @@ export class Analytics implements OnInit {
     this.running.set(true);
     this.queryError.set('');
     this.result.set(null);
+    // What is being sent, recorded before the answer comes back. The Charts tab compares the
+    // editor against this to know whether the picture is of the statement now on screen.
+    this.ranSql.set(statement);
 
     // Named before it is sent, so there is something to cancel while it is in flight. The
     // endpoint is synchronous, so an id minted by the server would only reach this screen with
@@ -1533,6 +2140,9 @@ export class Analytics implements OnInit {
     this.result.set(null);
     this.queryError.set('');
     this.running.set(false);
+    // There is no result, so there is no statement that produced one. Left standing it would
+    // make the drift warning compare the editor against a query whose answer has been thrown away.
+    this.ranSql.set('');
   }
 
   // ---- a chart of the result -------------------------------------------------------------
@@ -1802,6 +2412,19 @@ export class Analytics implements OnInit {
   readonly chartDrawn = computed(() => !!this.result() && !!this.chartKind());
 
   /**
+   * The editor has moved on from the statement this chart is of.
+   *
+   * The safeguard the old layout got from geography. With the chart under the result, editing the
+   * SQL was visibly editing the thing directly above the picture; on its own tab the two are
+   * never on screen together, and a chart of the previous answer looks exactly as finished as a
+   * chart of the current one. Compared on the exact text rather than a normalised form: a change
+   * to whitespace inside a string literal is a change to the query, and this screen has no
+   * business deciding which edits do not count.
+   */
+  readonly chartStale = computed(() =>
+    !!this.result() && !this.running() && this.sql() !== this.ranSql());
+
+  /**
    * Why there is no chart, in the words of whatever is actually stopping it.
    *
    * The kind reasons live on the picker, and the picker is not rendered in an empty state -- so
@@ -1911,6 +2534,19 @@ export class Analytics implements OnInit {
     if (this.libraryAsked()) return;
     this.libraryAsked.set(true);
     this.loadSavedQueries();
+  }
+
+  /**
+   * Whether the run history has been asked for.
+   *
+   * Set inside loadRuns rather than here, so the fetch that follows every run counts as having
+   * asked -- otherwise a reader who ran three queries and then opened Activity would spend a
+   * fourth read to be handed the list this screen was already holding.
+   */
+  private readonly runsAsked = signal(false);
+
+  private openRuns(): void {
+    if (this.runsAsked()) return;
     this.loadRuns();
   }
 
@@ -1936,6 +2572,7 @@ export class Analytics implements OnInit {
   loadRuns(): void {
     this.runsLoading.set(true);
     this.runsError.set('');
+    this.runsAsked.set(true);
     this.analytics.fetchRecentRuns(25).subscribe({
       next: response => {
         this.runsLoading.set(false);
@@ -2140,6 +2777,52 @@ export class Analytics implements OnInit {
     return ms < 1000 ? `${ms} ms` : `${(ms / 1000).toLocaleString(undefined,
       { maximumFractionDigits: 1 })} s`;
   }
+
+  /**
+   * Puts a statement from the history in the console and goes there.
+   *
+   * The Activity tab is not where a query is written, so the row's control has to land the reader
+   * somewhere they can read and run it. It still does NOT run -- reuseRun's reason holds: a row
+   * here may be one the engine refused or one that took thirty seconds, and a single click that
+   * re-spends a governor permit on either is a control that punishes curiosity.
+   */
+  openRunInConsole(run: QueryRun): void {
+    this.reuseRun(run);
+    this.showTab('sql');
+  }
+
+  /**
+   * The runs the engine turned away, which are the interesting ones.
+   *
+   * REFUSED is not a kind of failure and this is not a count of things that broke. A refusal is
+   * the statement gate or the governor declining a query BEFORE it reached the engine -- most
+   * often a statement that tried to write, attach or name a storage location of its own -- so a
+   * run of them is a record of what this workspace attempted, which is the half of a history
+   * worth leading with. TIMED_OUT is counted apart for the same reason: it is a limit, not a bug.
+   */
+  readonly refusedRuns = computed(() =>
+    this.recentRuns().filter(run => run.runStatus === 'REFUSED'));
+
+  readonly failedRuns = computed(() =>
+    this.recentRuns().filter(run => run.runStatus === 'FAILED'));
+
+  readonly stoppedRuns = computed(() => this.recentRuns().filter(
+    run => run.runStatus === 'CANCELLED' || run.runStatus === 'TIMED_OUT'));
+
+  /**
+   * Only the runs against the dataset now open.
+   *
+   * Not a filter the reader applies -- a count, shown beside the total. The history is the whole
+   * workspace's on purpose (the server scopes it to the caller, not to a file), and a reader
+   * looking at one file wants to know which of these rows are about it before reading any of them.
+   */
+  readonly runsHere = computed(() => {
+    const connection = this.connection();
+    const path = this.path();
+    if (!path) return [];
+    return this.recentRuns().filter(
+      run => run.connectionAlias === connection && run.datasetPath === path);
+  });
 
   // ---- the canvas: dimensions, a measure, filters, drill and a pivot ----------------------
 

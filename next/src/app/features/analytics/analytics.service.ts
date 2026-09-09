@@ -27,8 +27,53 @@ export interface DatasetPreview {
   rows: (string | null)[][];
   page: number;
   pageSize: number;
+  /**
+   * What the pager has to page through: the whole dataset, or what the narrowing left of it.
+   *
+   * Which of the two depends entirely on {@link filtered}, and reading one without the other is
+   * the mistake DatasetPreviewDto's javadoc is written to prevent.
+   */
   totalRows: number;
   multiFile: boolean;
+  /**
+   * Whether a filter or a search removed rows before `totalRows` was counted.
+   *
+   * A SORT does not set it -- ordering moves rows without removing any -- so this is exactly the
+   * question "is that number the size of the file". It is also the flag that has to be echoed
+   * back as `knownTotalFiltered` on the next request; see {@link PreviewShape}.
+   */
+  filtered: boolean;
+}
+
+/**
+ * The order and the narrowing a grid is asking the server for, plus where its carried total
+ * came from.
+ *
+ * All of it is server-side and none of it is approximated in the browser, because a page is a
+ * window onto a file that may hold millions of rows: sorting the window sorts the wrong rows and
+ * looks right doing it.
+ *
+ * <b>knownTotalFiltered is the one field here that prevents a wrong number rather than a slow
+ * one.</b> The rest are the reader's request; this one is the provenance of the `knownTotal`
+ * travelling beside it. The server reuses a carried total whenever the new request does not
+ * narrow -- which is exactly the moment a filter is being CLEARED, while the client is still
+ * holding the total counted under that filter. Reused there, the pager would offer two pages of
+ * a dataset with four hundred, and the file would look permanently smaller for having been
+ * filtered once. A server cannot tell one number from another by looking at it, so the caller
+ * says where it came from: echo back the `filtered` flag of the response that produced the total
+ * being carried, and nothing else.
+ */
+export interface PreviewShape {
+  /** The column to order by, as the dataset spells it. Resolved against the schema server-side. */
+  sort?: string;
+  /** Only consulted when a sort column is named; the server defaults to ASC. */
+  direction?: 'ASC' | 'DESC';
+  /** Free text, matched case-insensitively against every text column over the whole dataset. */
+  search?: string;
+  /** ANDed by the server. The Canvas's own clause vocabulary, compiled by the same compiler. */
+  filters?: FilterClause[];
+  /** True when the `knownTotal` being sent was counted under a filter or a search. */
+  knownTotalFiltered?: boolean;
 }
 
 /**
@@ -540,6 +585,100 @@ export interface SavedAnalysis {
 }
 
 /**
+ * A page of saved results: a name, a sentence saying what it is for, and the widgets on it.
+ *
+ * Mirrors process.model.pojo.AnalyticsDashboard. `widgets` is @Transient on that row and is
+ * filled in only by fetchDashboardById -- the listing returns pages without their contents,
+ * because a list of twelve boards does not need every tile on every one of them.
+ */
+export interface Dashboard {
+  analyticsDashboardId?: number;
+  dashboardName: string;
+  dashboardDescription?: string | null;
+  dateCreated?: string;
+  dateUpdated?: string;
+  createdByName?: string;
+  /** Present on fetchDashboardById, in display order. Absent on the listing. */
+  widgets?: DashboardWidget[];
+}
+
+/**
+ * What a widget draws, and the whole of what this client will store in visualization_type.
+ *
+ * Four of the Canvas's five kinds. Pivot is deliberately not among them: the server composes a
+ * pivot grid only for a two-dimension analysis, so it is a property of the RESULT rather than a
+ * choice a widget can make in advance -- a board whose tile said "pivot" over an analysis that
+ * later grew a third dimension would be a saved choice the data no longer supports. A tile that
+ * needs a grid shows the table.
+ *
+ * The column is 32 characters and this client writes only these words into it, but the type is
+ * read as a plain string coming back: the row may have been written by something else, and a
+ * value this screen does not recognise is drawn as a table rather than as an error.
+ */
+export type WidgetVisualization = 'table' | 'ranked' | 'bar' | 'donut';
+
+/**
+ * One tile: a REFERENCE to a saved analysis or a saved query, and how to draw it.
+ *
+ * Mirrors process.model.pojo.AnalyticsDashboardWidget. Two things about that row govern this
+ * shape and both are load-bearing.
+ *
+ * EXACTLY ONE of analyticsAnalysisId and analyticsQueryId is set -- a check constraint says so,
+ * the service refuses both and neither with a sentence, and there is deliberately no third field
+ * naming which kind it is. Which one is set IS the kind.
+ *
+ * AND THERE IS NOWHERE HERE TO PUT A RESULT. That is the point of the type rather than an
+ * omission from it: a widget holds the question, never the answer. A stored answer would go
+ * stale the moment the file behind it changed and nothing on screen could tell, which is the one
+ * thing this module refuses to do.
+ */
+export interface DashboardWidget {
+  analyticsDashboardWidgetId?: number;
+  analyticsDashboardId: number;
+  widgetTitle: string;
+  /** Set for an analysis-backed widget; null for a query-backed one. Never both. */
+  analyticsAnalysisId?: number | null;
+  analyticsQueryId?: number | null;
+  /** Null means "no chart kind pinned here": a table, or the analysis's own choice. */
+  visualizationType?: string | null;
+  /**
+   * The rendering half as JSON, or null.
+   *
+   * Nothing this client writes uses it yet, and it is sent as null rather than as '{}' when
+   * empty -- the row's own javadoc calls an empty object stored to avoid a null "a null with
+   * extra steps". It is carried on the type because a widget round-trips through here on every
+   * edit, and dropping a column the server stored would silently clear whatever put it there.
+   */
+  widgetConfig?: string | null;
+  /** Where it sits, coarsely. The server defaults an absent one to 0. */
+  displayOrder?: number;
+  dateCreated?: string;
+  dateUpdated?: string;
+}
+
+/**
+ * A dataset somebody named and kept: one connection alias, and one path inside it.
+ *
+ * Mirrors process.model.pojo.AnalyticsDataset. THE BUCKET IS NOT ON IT and cannot be put on it
+ * -- the alias is looked up at the moment the dataset is opened, so a connection later repointed
+ * carries its registered datasets with it rather than leaving them reading the old bucket.
+ *
+ * datasetFormat is READ-ONLY here. The server takes it from the resolver, not from the wire,
+ * because a label a caller could set to anything is a listing that lies; registerDataset() below
+ * does not send it even when it is present on the object.
+ */
+export interface RegisteredDataset {
+  analyticsDatasetId?: number;
+  datasetName: string;
+  connectionAlias: string;
+  datasetPath: string;
+  /** CSV, TSV, JSON or PARQUET, as the resolver named it. Never sent. */
+  datasetFormat?: string;
+  dateCreated?: string;
+  createdByName?: string;
+}
+
+/**
  * The three analysis endpoints share one body, so they share one builder.
  *
  * Every optional part is omitted rather than sent null. `topN: null` and no topN at all are the
@@ -592,6 +731,7 @@ export class AnalyticsService {
   private readonly library = `${API_BASE}/analyticsLibrary.json`;
   private readonly exports = `${API_BASE}/analyticsExport.json`;
   private readonly workspace = `${API_BASE}/analyticsWorkspace.json`;
+  private readonly datasets = `${API_BASE}/analyticsDataset.json`;
 
   schema(connection: string, path: string): Observable<ApiResponse<DatasetSchema>> {
     return this.http.get<ApiResponse<DatasetSchema>>(`${this.base}/schema`, {
@@ -610,15 +750,39 @@ export class AnalyticsService {
    *
    * It is sent ONLY when the total came from a previous response. On a first load nothing has
    * counted the dataset yet, and a number invented here would come straight back as fact.
+   *
+   * `shape` carries the grid's sort, search and filters -- see {@link PreviewShape}, and note in
+   * particular that `knownTotalFiltered` travels with the total rather than being inferred from
+   * the shape, because the two describe different requests: the shape is what is being asked for
+   * now, the flag is what the carried number was counted under.
    */
-  preview(connection: string, path: string, page = 0, knownTotal?: number, pageSize?: number)
-      : Observable<ApiResponse<DatasetPreview>> {
+  preview(connection: string, path: string, page = 0, knownTotal?: number, pageSize?: number,
+          shape?: PreviewShape): Observable<ApiResponse<DatasetPreview>> {
     const params: Record<string, string> = { connection, path, page: String(page) };
     // Absent means "the server's own default". Sending a size it would only clamp is noise.
     if (pageSize) params['pageSize'] = String(pageSize);
     // Positive only, matching the server's own condition: an empty dataset legitimately totals
     // zero, and asserting that would turn "I have not counted" into "there is nothing here".
     if (knownTotal && knownTotal > 0) params['knownTotal'] = String(knownTotal);
+
+    const sort = shape?.sort?.trim();
+    if (sort) {
+      params['sort'] = sort;
+      // Only alongside a column. A direction on its own orders nothing and would read on the
+      // wire as a sort that was asked for and quietly dropped.
+      params['direction'] = shape?.direction === 'DESC' ? 'DESC' : 'ASC';
+    }
+    const search = shape?.search?.trim();
+    if (search) params['search'] = search;
+    // Clauses go through clauseToWire, the one place that knows how an operand travels. A second
+    // serialiser here is the second guess at a shape the contract does not spell out.
+    const filters = shape?.filters ?? [];
+    if (filters.length) params['filters'] = JSON.stringify(filters.map(clauseToWire));
+    // Unconditional rather than tied to knownTotal being present. The server ignores it without
+    // one, and the failure this guards against is the flag being LEFT OFF a request that carries
+    // a filtered total -- so there is no branch here that can omit it.
+    if (shape?.knownTotalFiltered) params['knownTotalFiltered'] = 'true';
+
     return this.http.get<ApiResponse<DatasetPreview>>(`${this.base}/preview`, { params });
   }
 
@@ -743,6 +907,157 @@ export class AnalyticsService {
   deleteAnalysis(analyticsAnalysisId: number): Observable<ApiResponse<void>> {
     return this.http.delete<ApiResponse<void>>(`${this.workspace}/deleteAnalysis`, {
       params: { analyticsAnalysisId: String(analyticsAnalysisId) },
+    });
+  }
+
+  // ---- the workspace: dashboards, and the widgets arranged on them ------------------------
+
+  /** Every board this workspace has, newest first, WITHOUT their widgets. */
+  fetchAllDashboards(): Observable<ApiResponse<Dashboard[]>> {
+    return this.http.get<ApiResponse<Dashboard[]>>(`${this.workspace}/fetchAllDashboards`);
+  }
+
+  /**
+   * One board with its widgets in display order.
+   *
+   * This is metadata and nothing else: it opens no session, takes no governor permit and reads
+   * no dataset. What the widgets POINT AT is run separately, one query at a time, by whoever is
+   * showing them -- see the dashboard component, which is where that cost is decided.
+   */
+  fetchDashboardById(analyticsDashboardId: number): Observable<ApiResponse<Dashboard>> {
+    return this.http.get<ApiResponse<Dashboard>>(`${this.workspace}/fetchDashboardById`, {
+      params: { analyticsDashboardId: String(analyticsDashboardId) },
+    });
+  }
+
+  /**
+   * Stores the board under a name, or updates the one the id names.
+   *
+   * Only the two fields a person decides are sent, for the reason saveAnalysis sends five: the
+   * service copies exactly those onto a row whose tenant and audit columns come from the
+   * signed-in context, and a tenantId on the wire here would be this client claiming an
+   * ownership it does not get to claim.
+   *
+   * The widgets are NOT sent. They are @Transient on that row and have their own endpoint; a
+   * list posted here would be read by nothing and would look, from this side, as though a save
+   * had persisted an arrangement it never touched.
+   */
+  saveDashboard(dashboard: Dashboard): Observable<ApiResponse<Dashboard>> {
+    const body: Record<string, unknown> = { dashboardName: dashboard.dashboardName };
+    // Sent only when there is one. A blank description and no description are the same intent to
+    // a reader, and the server trims an empty one to null anyway -- so sending '' would be this
+    // client asking for a write it does not mean.
+    if (dashboard.dashboardDescription) {
+      body['dashboardDescription'] = dashboard.dashboardDescription;
+    }
+    if (dashboard.analyticsDashboardId) body['analyticsDashboardId'] = dashboard.analyticsDashboardId;
+    return this.http.post<ApiResponse<Dashboard>>(`${this.workspace}/saveDashboard`, body);
+  }
+
+  /**
+   * Deletes the board and the widgets on it. What those widgets POINTED AT is untouched.
+   *
+   * Worth stating at the call site because the two are easy to conflate: a dashboard is an
+   * arrangement of saved work, not the owner of it, so deleting one removes the page and leaves
+   * every analysis and every saved query exactly where they were.
+   */
+  deleteDashboard(analyticsDashboardId: number): Observable<ApiResponse<void>> {
+    return this.http.delete<ApiResponse<void>>(`${this.workspace}/deleteDashboard`, {
+      params: { analyticsDashboardId: String(analyticsDashboardId) },
+    });
+  }
+
+  /**
+   * Puts a saved analysis or a saved query on a board, or edits a tile already there.
+   *
+   * EXACTLY ONE source id travels, and the caller decides which. Neither id is defaulted or
+   * inferred here: the server refuses both-and-neither with a sentence, and a client that
+   * quietly picked one when handed two would turn a caller's mistake into a tile silently
+   * showing something other than what was asked for.
+   *
+   * tenantId is not sent and would not be read. The service takes the owning tenant from the
+   * DASHBOARD rather than from the caller, which is what stops one workspace's analysis being
+   * hung on another workspace's page.
+   */
+  saveWidget(widget: DashboardWidget): Observable<ApiResponse<DashboardWidget>> {
+    const body: Record<string, unknown> = {
+      analyticsDashboardId: widget.analyticsDashboardId,
+      widgetTitle: widget.widgetTitle,
+      // Sent explicitly rather than left to the server's default of 0, so a board's order is
+      // this screen's arrangement and not a tie broken by row id.
+      displayOrder: widget.displayOrder ?? 0,
+    };
+    if (widget.analyticsAnalysisId) body['analyticsAnalysisId'] = widget.analyticsAnalysisId;
+    if (widget.analyticsQueryId) body['analyticsQueryId'] = widget.analyticsQueryId;
+    if (widget.visualizationType) body['visualizationType'] = widget.visualizationType;
+    // Only when there is one: see DashboardWidget.widgetConfig. An empty object here would be a
+    // null with extra steps, and dropping a config the server holds would clear it by accident.
+    if (widget.widgetConfig) body['widgetConfig'] = widget.widgetConfig;
+    if (widget.analyticsDashboardWidgetId) {
+      body['analyticsDashboardWidgetId'] = widget.analyticsDashboardWidgetId;
+    }
+    return this.http.post<ApiResponse<DashboardWidget>>(`${this.workspace}/saveWidget`, body);
+  }
+
+  /** Takes one tile off a board. The analysis or query it showed is untouched. */
+  deleteWidget(analyticsDashboardWidgetId: number): Observable<ApiResponse<void>> {
+    return this.http.delete<ApiResponse<void>>(`${this.workspace}/deleteWidget`, {
+      params: { analyticsDashboardWidgetId: String(analyticsDashboardWidgetId) },
+    });
+  }
+
+  // ---- the registry: datasets somebody named and kept -------------------------------------
+
+  /**
+   * Every dataset this workspace has registered, newest first.
+   *
+   * Metadata only. A registered dataset is a NAME for a location -- listing them reads no file,
+   * opens no session and costs no governor permit, which is what makes the registry usable as a
+   * starting point rather than as something to browse carefully.
+   */
+  fetchAllDatasets(): Observable<ApiResponse<RegisteredDataset[]>> {
+    return this.http.get<ApiResponse<RegisteredDataset[]>>(`${this.datasets}/fetchAllDatasets`);
+  }
+
+  /**
+   * One registered dataset, by the id the registry gave it.
+   *
+   * The id is new to this module and the server treats it carefully: a row the caller does not
+   * own is refused with the same sentence as a row that does not exist, so walking the id space
+   * tells a caller nothing about what other workspaces hold. There is nothing to interpret here
+   * -- a refusal is a refusal, and this client must not read one as "it exists but is theirs".
+   */
+  fetchDatasetById(analyticsDatasetId: number): Observable<ApiResponse<RegisteredDataset>> {
+    return this.http.get<ApiResponse<RegisteredDataset>>(`${this.datasets}/fetchDatasetById`, {
+      params: { analyticsDatasetId: String(analyticsDatasetId) },
+    });
+  }
+
+  /**
+   * Names a location, having first proved the caller can read it.
+   *
+   * THREE FIELDS TRAVEL and no others. The server copies exactly name, alias and path onto a row
+   * whose tenant and audit columns come from the signed-in context, and whose FORMAT comes from
+   * the resolver -- so datasetFormat is deliberately dropped here even when the object carries
+   * one, because a format the caller chose would be a label on a listing that the reader would
+   * take as measured.
+   *
+   * A refusal is the resolver's own sentence and is shown verbatim: it says the same thing for
+   * "no such connection" and "not yours", and paraphrasing it here would be this screen
+   * inventing a distinction the server spent effort refusing to make.
+   */
+  registerDataset(dataset: RegisteredDataset): Observable<ApiResponse<RegisteredDataset>> {
+    return this.http.post<ApiResponse<RegisteredDataset>>(`${this.datasets}/registerDataset`, {
+      datasetName: dataset.datasetName,
+      connectionAlias: dataset.connectionAlias,
+      datasetPath: dataset.datasetPath,
+    });
+  }
+
+  /** Forgets the name. The file it named is not touched -- this registry owns no data. */
+  deleteDataset(analyticsDatasetId: number): Observable<ApiResponse<void>> {
+    return this.http.delete<ApiResponse<void>>(`${this.datasets}/deleteDataset`, {
+      params: { analyticsDatasetId: String(analyticsDatasetId) },
     });
   }
 
