@@ -38,6 +38,7 @@
                   @for (child of item.children; track child.path) {
                     <a [routerLink]="child.path" (click)="openMenu.set(null)"
                        routerLinkActive="nav-child-active"
+                       [routerLinkActiveOptions]="{ exact: !!child.exact }"
                        class="nav-child">
                       <app-icon [name]="child.icon" size="1em" class="nav-child-icon" />
                       <span class="min-w-0">
@@ -134,7 +135,8 @@
               </div>
               @for (child of item.children; track child.path) {
                 <a [routerLink]="child.path" (click)="mobileOpen.set(false)"
-                   routerLinkActive="nav-child-active" class="nav-child">
+                   routerLinkActive="nav-child-active"
+                   [routerLinkActiveOptions]="{ exact: !!child.exact }" class="nav-child">
                   <app-icon [name]="child.icon" size="1em" class="nav-child-icon" />
                   <span class="min-w-0">
                     <span class="block text-sm leading-tight">{{ child.label }}</span>

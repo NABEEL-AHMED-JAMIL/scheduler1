@@ -16,6 +16,15 @@ interface NavChild {
   hint?: string;
   adminOnly?: boolean;
   platformOnly?: boolean;
+  /**
+   * Whether routerLinkActive must match the whole URL for this entry.
+   *
+   * Derived in `nav()`, never written by hand: an entry needs it exactly when some OTHER entry
+   * sits underneath it, because the default prefix match would then light both. Adding
+   * /analytics/dashboards beneath /analytics is what surfaced this -- hardcoding "/analytics is
+   * the exact one" would have fixed today's menu and left the next nested route to rediscover it.
+   */
+  exact?: boolean;
 }
 
 interface NavItem {
@@ -93,6 +102,12 @@ export class Shell {
           hint: 'Upload, preview and share objects' },
         { label: 'Analytics Studio', path: '/analytics', icon: 'chart',
           hint: 'Read a file as data, where it lives' },
+        // The saved-analysis library had a route and no way to reach it: /analytics/dashboards
+        // was reachable only by typing the address. It is a sibling rather than a child because
+        // the menu has one level of nesting, and a saved analysis is a thing you go TO, not a
+        // mode of the workspace.
+        { label: 'Saved Analyses', path: '/analytics/dashboards', icon: 'save',
+          hint: 'Analyses and queries you kept, re-run on open' },
       ],
     },
     {
@@ -159,11 +174,26 @@ export class Shell {
       .filter(item => !item.adminOnly || isAdmin)
       .map(item => ({
         ...item,
-        children: item.children?.filter(child =>
-          (!child.adminOnly || isAdmin) && (!child.platformOnly || isPlatform)),
+        children: this.withExactFlags(item.children?.filter(child =>
+          (!child.adminOnly || isAdmin) && (!child.platformOnly || isPlatform))),
       }))
       .filter(item => !item.children || item.children.length > 0);
   });
+
+  /**
+   * Marks every entry that another entry is nested under.
+   *
+   * Runs over the ROLE-FILTERED list rather than the whole menu: if the only route beneath
+   * /analytics were admin-only, a reader who cannot see it should get the ordinary prefix match
+   * on the parent, not an exact one that stops highlighting on a child page they can reach.
+   */
+  private withExactFlags(children?: NavChild[]): NavChild[] | undefined {
+    if (!children) return children;
+    return children.map(child => ({
+      ...child,
+      exact: children.some(other => other.path.startsWith(child.path + '/')),
+    }));
+  }
 
   toggleMenu(label: string): void {
     this.openMenu.update(current => (current === label ? null : label));

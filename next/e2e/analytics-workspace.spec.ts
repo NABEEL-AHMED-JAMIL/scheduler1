@@ -132,3 +132,14 @@ test('8 — dashboards say they re-run rather than caching a result', async ({ p
   await page.goto('/analytics/dashboards');
   await expect(page.getByText(/re-run every time it is opened/)).toBeVisible();
 });
+
+test('9 — the saved-analysis library is reachable from the menu, not just by typing its address',
+  async ({ page }) => {
+    // It had a route and no entry. A page you can only reach by knowing the URL is a page nobody
+    // reaches, and no unit test can see the difference -- the route existed and resolved fine.
+    await page.goto('/analytics');
+    await page.getByRole('button', { name: 'Object Browser' }).click();
+    await page.getByRole('link', { name: /Saved Analyses/ }).click();
+    await expect(page).toHaveURL(/\/analytics\/dashboards/);
+    await expect(page.getByText(/re-run every time it is opened/)).toBeVisible();
+  });
