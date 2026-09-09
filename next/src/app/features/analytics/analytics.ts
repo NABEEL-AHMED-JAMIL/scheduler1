@@ -2944,12 +2944,37 @@ export class Analytics implements OnInit {
    * Keeping the filters while dropping the dimensions they came from would leave the reader
    * filtered to "region = north" by a step they can no longer see or undo.
    */
+  /**
+   * What the server says the analysis is grouped by RIGHT NOW, which is not what it was built from.
+   *
+   * dimensions() is the ROOT: the list a reader picked, and the list the request carries. A drill
+   * does not change it — the drill path travels beside it and the server applies the substitution,
+   * which is what lets drill-up put the original dimension back.
+   *
+   * Conflating the two was a real defect. The response's dimensions were written straight back
+   * into dimensions(), so after one drill the root WAS the drilled column: clicking "All rows"
+   * then asked the server to restore a root that had already been overwritten, and a reader who
+   * drilled region into east by customer landed on all fifty thousand customers instead of the
+   * five regions they started from. The breadcrumb promised a return and delivered a different
+   * analysis.
+   *
+   * Empty until a run answers, and emptied whenever the root changes, because a grouping reported
+   * for a different analysis describes nothing.
+   */
+  readonly groupedBy = signal<string[]>([]);
+
+  /** What is on screen: the server's grouping where there is one, the root before the first run. */
+  readonly effectiveDimensions = computed(() =>
+    this.groupedBy().length ? this.groupedBy() : this.dimensions());
+
   setDimension(slot: number, name: string): void {
     const next = [...this.dimensions()];
     if (!name) next.splice(slot, 1);
     else if (slot >= next.length) next.push(name);
     else next[slot] = name;
     this.dimensions.set(next.slice(0, this.maxDimensions));
+    // The reported grouping described the analysis that just stopped existing.
+    this.groupedBy.set([]);
     this.clearDrills();
     // The drill controls name columns; a dimension list that changed may have taken one away.
     if (!next.includes(this.drillDimension())) this.drillDimension.set(next[next.length - 1] ?? '');
@@ -3097,7 +3122,9 @@ export class Analytics implements OnInit {
    */
   drillInto(value: string | null): void {
     const dimension = this.drillDimension();
-    if (!dimension || !this.dimensions().includes(dimension) || this.analysing()) return;
+    // Against the EFFECTIVE grouping: a reader drills through the column in front of them, which
+    // after one step is no longer in the root list.
+    if (!dimension || !this.effectiveDimensions().includes(dimension) || this.analysing()) return;
     const runId = 'ui-' + Date.now().toString(36) + '-'
       + Math.random().toString(36).slice(2, 8);
     this.beginAnalysis(runId);
@@ -3184,10 +3211,14 @@ export class Analytics implements OnInit {
         // pickers on one would empty an analysis that ran perfectly well.
         this.drillPath.set(response.data.drillPath ?? []);
         if (response.data.dimensions) {
-          this.dimensions.set(response.data.dimensions.slice(0, this.maxDimensions));
+          // Into groupedBy, NOT into dimensions. What comes back is the EFFECTIVE grouping after
+          // the drill path was applied; the root is what this client sent and must keep sending,
+          // or drill-up has nothing to restore from.
+          this.groupedBy.set(response.data.dimensions.slice(0, this.maxDimensions));
           // The next drill needs a dimension of its own to replace, and the one just used is gone.
-          if (!this.dimensions().includes(this.drillDimension())) {
-            this.drillDimension.set(this.dimensions()[this.dimensions().length - 1] ?? '');
+          if (!this.effectiveDimensions().includes(this.drillDimension())) {
+            const grouped = this.effectiveDimensions();
+            this.drillDimension.set(grouped[grouped.length - 1] ?? '');
           }
         }
         if (applied) applied();
@@ -3595,7 +3626,7 @@ export class Analytics implements OnInit {
   readonly canvasCaption = computed(() => {
     const measure = this.aggregationLabel()
       + (this.measureNeedsField() && this.measureField() ? ` of ${this.measureField()}` : '');
-    const dimensions = this.dimensions();
+    const dimensions = this.effectiveDimensions();
     return dimensions.length ? `${measure} by ${dimensions.join(' × ')}`
       : `${measure}, over every matching row`;
   });

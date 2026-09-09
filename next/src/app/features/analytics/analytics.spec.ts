@@ -2748,12 +2748,43 @@ describe('drill-down and drill-up, where the trail is echoed and never rebuilt',
     expect(canvas.studio.drillPath()).toEqual([]);
   });
 
-  it('takes the new dimensions and the new trail from the answer, not from a local guess', () => {
+  it('takes the new grouping and the new trail from the answer, not from a local guess', () => {
+    // The intent of this test was always right and its target was wrong. The server's answer says
+    // what is GROUPED now; it does not say what the analysis was built from. Writing it into
+    // dimensions() overwrote the root, so the next drill-up asked the server to restore something
+    // that had already been replaced.
     const canvas = drilling();
     canvas.answers.drill!.next(SERVER_RESPONSE(DRILLED));
 
-    expect(canvas.studio.dimensions()).toEqual(['city']);
+    expect(canvas.studio.groupedBy()).toEqual(['city']);
+    expect(canvas.studio.effectiveDimensions()).toEqual(['city']);
+    // The ROOT is untouched, which is the whole of the fix.
+    expect(canvas.studio.dimensions()).toEqual(['region']);
     expect(canvas.studio.drillPath()).toEqual([STEP]);
+  });
+
+  it('sends the root, not the drilled grouping, so drill-up has something to restore', () => {
+    // The defect in one assertion. After a drill the request carried dimensions: ['city'], so the
+    // server -- which derives the effective grouping from the root plus the trail -- had no root
+    // left to put back. Clicking "All rows" removed the filter and left the reader grouped by the
+    // column they had drilled INTO, which is not where they started.
+    const canvas = drilling();
+    canvas.answers.drill!.next(SERVER_RESPONSE(DRILLED));
+    canvas.studio.drillUp(1);
+
+    expect(canvas.sent().dimensions).toEqual(['region']);
+  });
+
+  it('forgets the reported grouping when the root itself is re-picked', () => {
+    // A grouping reported for an analysis that no longer exists describes nothing.
+    const canvas = drilling();
+    canvas.answers.drill!.next(SERVER_RESPONSE(DRILLED));
+    expect(canvas.studio.groupedBy()).toEqual(['city']);
+
+    canvas.studio.setDimension(0, 'status');
+
+    expect(canvas.studio.groupedBy()).toEqual([]);
+    expect(canvas.studio.effectiveDimensions()).toEqual(['status']);
   });
 
   it('echoes the trail back on the next request, unchanged', () => {
