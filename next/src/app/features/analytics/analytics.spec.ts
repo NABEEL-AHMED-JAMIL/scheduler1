@@ -2,10 +2,10 @@ import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { Dialog } from '@angular/cdk/dialog';
 import { Subject, of } from 'rxjs';
-import { Analytics } from './analytics';
+import { Analytics, dateOnly, plainDecimal } from './analytics';
 import {
-  AnalyticsService, ColumnProfile, DatasetPreview, DatasetProfile, QueryResult, QueryRun,
-  SavedQuery,
+  AnalysisResult, AnalyticsService, ColumnProfile, DatasetPreview, DatasetProfile, FilterGroup,
+  QueryResult, QueryRun, SavedAnalysis, SavedQuery,
 } from './analytics.service';
 import { BucketSummary, ObjectSummary, StorageService } from '../objects/storage.service';
 
@@ -1756,9 +1756,12 @@ describe('the run history', () => {
 
 describe('the console does not disturb the tabs beside it', () => {
   it('opens a dataset on Overview, with SQL last in the strip', () => {
+    // Canvas sits before SQL and after Quality. The console stays last because it is the escape
+    // hatch for the questions a structured analysis cannot phrase, and an escape hatch belongs at
+    // the end of a strip rather than in the middle of it.
     const console = consoleWith();
     expect(console.studio.tabs.map(tab => tab.id))
-      .toEqual(['overview', 'data', 'profile', 'quality', 'sql']);
+      .toEqual(['overview', 'data', 'profile', 'quality', 'canvas', 'sql']);
 
     console.studio.openFile(CSV_FILE);
     expect(console.studio.tab()).toBe('overview');
@@ -2178,5 +2181,1165 @@ describe('the chart’s empty states are four different facts', () => {
 
     expect(console.show()).toContain('A query may not write.');
     expect(console.show()).not.toContain('Nothing has run yet — a chart is drawn from a result');
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * The Canvas: document 07, and the tab where an aggregate can most easily be believed.
+ *
+ * Everything below is one of three questions.
+ *
+ * THE FIRST is whether the analysis this screen SENDS is the analysis it SHOWS. Dimensions in
+ * order, a measure that only carries a column when the aggregation is about one, and a drill trail
+ * that is echoed rather than rebuilt. That last one is the sharpest: the endpoints are stateless
+ * and the trail travels on every request, and the moment this client's idea of the accumulated
+ * filters differs from the server's, the figure and the breadcrumb over it describe two different
+ * questions with nothing on screen saying so.
+ *
+ * THE SECOND is the rendering rule, and it is a correctness rule rather than a cosmetic one. A
+ * measured defect on this deployment: sum(amount) comes back as "7.466125E7", which is 74,661,250,
+ * and a DATE comes back as a midnight the column cannot hold. Both are fixed on the string,
+ * because going via a float to make a total legible would quietly change it.
+ *
+ * THE THIRD is the honesty of the figure, and it is why this tab has more tests than the chart on
+ * the SQL tab. An aggregate hides its own uncertainty: a chart of ten of forty thousand rows looks
+ * exactly as finished as one of all forty thousand. Five ways that can be wrong are pinned here --
+ * the row ceiling, the rolled-up tail, a distinct count whose exactness differs from the same word
+ * on the Profile tab, a relative window that means a different week depending on when it ran, and
+ * rows a filter excluded being excluded rather than zero -- and each is asserted against the
+ * SCREEN, because the screen is where the claim is made.
+ */
+
+const CANVAS_SCHEMA = {
+  bucket: 'minio-main', path: 'daily/sales-2026.csv', format: 'CSV', multiFile: false,
+  columns: [
+    { name: 'region', type: 'VARCHAR' },
+    { name: 'status', type: 'VARCHAR' },
+    { name: 'city', type: 'VARCHAR' },
+    { name: 'amount', type: 'DECIMAL(18,3)' },
+    { name: 'booked_on', type: 'DATE' },
+  ],
+};
+
+function analysisOf(over: Partial<AnalysisResult> = {}): AnalysisResult {
+  return {
+    columns: [
+      { name: 'region', type: 'VARCHAR', role: 'DIMENSION' },
+      { name: 'amount_sum', type: 'DOUBLE', role: 'MEASURE' },
+    ],
+    rows: [['north', '12500.00'], ['south', '9800.00']],
+    rowCount: 2,
+    truncated: false,
+    dimensions: ['region'],
+    measure: 'amount_sum',
+    other: null,
+    crumbs: [{ label: 'All rows' }],
+    drillPath: [],
+    pivot: null,
+    queryId: 'ui-1',
+    durationMs: 42,
+    ...over,
+  };
+}
+
+/**
+ * The Canvas, rendered, with a dataset open and the tab showing.
+ *
+ * Rendered rather than driven through signals for the same reason the console harness is: the
+ * claims that matter most here are sentences -- "partial", "rolled into Other", "excluded, not
+ * zero" -- and a refactor that drops one of those leaves every signal assertion green.
+ */
+function canvasWith(over: { confirms?: boolean } = {}) {
+  const answers: {
+    schema?: Subject<any>; preview?: Subject<any>; analyze?: Subject<any>; drill?: Subject<any>;
+    drillUp?: Subject<any>; analyses?: Subject<any>; saveAnalysis?: Subject<any>;
+    deleteAnalysis?: Subject<any>; cancel?: Subject<any>;
+  } = {};
+
+  const listObjects = vi.fn(() => of(SERVER_RESPONSE({ objects: [CSV_FILE, REFUNDS] })));
+  const buckets = vi.fn(() => of(SERVER_RESPONSE([MINIO])));
+  const schema = vi.fn(() => (answers.schema = new Subject<any>()).asObservable());
+  const preview = vi.fn(() => (answers.preview = new Subject<any>()).asObservable());
+  const profile = vi.fn(() => new Subject<any>().asObservable());
+  const analyze = vi.fn((_request?: any) => (answers.analyze = new Subject<any>()).asObservable());
+  const drill = vi.fn((_request?: any, _into?: any) =>
+    (answers.drill = new Subject<any>()).asObservable());
+  const drillUp = vi.fn((_request?: any, _steps?: number) =>
+    (answers.drillUp = new Subject<any>()).asObservable());
+  const fetchAllAnalyses = vi.fn(() => (answers.analyses = new Subject<any>()).asObservable());
+  const saveAnalysis = vi.fn((_body?: any) =>
+    (answers.saveAnalysis = new Subject<any>()).asObservable());
+  const deleteAnalysis = vi.fn((_id?: number) =>
+    (answers.deleteAnalysis = new Subject<any>()).asObservable());
+  const cancel = vi.fn((_id?: string) => (answers.cancel = new Subject<any>()).asObservable());
+
+  TestBed.resetTestingModule();
+  TestBed.configureTestingModule({
+    providers: [
+      { provide: StorageService, useValue: { buckets, listObjects } },
+      {
+        provide: AnalyticsService,
+        useValue: {
+          schema, preview, profile, analyze, drill, drillUp, fetchAllAnalyses, saveAnalysis,
+          deleteAnalysis, cancel,
+        },
+      },
+      { provide: Dialog, useValue: { open: () => ({ closed: of(over.confirms ?? true) }) } },
+    ],
+  });
+
+  const fixture = TestBed.createComponent(Analytics);
+  fixture.detectChanges();
+  const studio = fixture.componentInstance;
+  studio.openFile(CSV_FILE);
+  answers.schema!.next(SERVER_RESPONSE(CANVAS_SCHEMA));
+  answers.preview!.next(SERVER_RESPONSE(pageOf()));
+  studio.showTab('canvas');
+  fixture.detectChanges();
+
+  return {
+    studio, fixture, answers,
+    analyze, drill, drillUp, fetchAllAnalyses, saveAnalysis, deleteAnalysis, cancel,
+    show(): string {
+      fixture.detectChanges();
+      return ((fixture.nativeElement as HTMLElement).textContent ?? '').replace(/\s+/g, ' ');
+    },
+    /** Picks a one-dimension sum and runs it, settling the request with `result`. */
+    ran(result: AnalysisResult = analysisOf()): void {
+      studio.setDimension(0, 'region');
+      studio.aggregation.set('SUM');
+      studio.measureField.set('amount');
+      studio.runAnalysis();
+      answers.analyze!.next(SERVER_RESPONSE(result));
+      fixture.detectChanges();
+    },
+    /** The body of the most recent analyze call. */
+    sent(): any {
+      return analyze.mock.calls[analyze.mock.calls.length - 1]?.[0];
+    },
+  };
+}
+
+describe('the analysis that is sent is the analysis that is shown', () => {
+  it('will not run a measure that needs a column until one is picked, and says why', () => {
+    const canvas = canvasWith();
+    canvas.studio.aggregation.set('SUM');
+
+    expect(canvas.studio.canAnalyse()).toBe(false);
+    expect(canvas.show()).toContain('Pick the column to measure');
+
+    canvas.studio.measureField.set('amount');
+    expect(canvas.studio.canAnalyse()).toBe(true);
+  });
+
+  it('runs Count rows with no column at all, and sends no field with it', () => {
+    // COUNT_ROWS is the one aggregation that is a question about rows rather than about a
+    // column. A field sent with it would appear in the record of what was asked while having had
+    // no part in the answer.
+    const canvas = canvasWith();
+    canvas.studio.setDimension(0, 'region');
+    canvas.studio.runAnalysis();
+
+    expect(canvas.sent().measure).toEqual({ aggregation: 'COUNT_ROWS' });
+  });
+
+  it('keeps the dimensions in the order they were picked', () => {
+    // Department × Status and Status × Department bucket the same rows and are not the same
+    // picture: the first dimension is the one a pivot puts down the side.
+    const canvas = canvasWith();
+    canvas.studio.setDimension(0, 'region');
+    canvas.studio.setDimension(1, 'status');
+    canvas.studio.runAnalysis();
+
+    expect(canvas.sent().dimensions).toEqual(['region', 'status']);
+  });
+
+  it('takes no dimensions at all as a real analysis rather than an unfinished one', () => {
+    // One figure over the matching rows, which is what a KPI is.
+    const canvas = canvasWith();
+    canvas.studio.runAnalysis();
+
+    expect(canvas.sent().dimensions).toEqual([]);
+    expect(canvas.studio.canvasCaption()).toContain('over every matching row');
+  });
+
+  it('compacts the list when a middle dimension is cleared, leaving no hole', () => {
+    const canvas = canvasWith();
+    canvas.studio.setDimension(0, 'region');
+    canvas.studio.setDimension(1, 'status');
+    canvas.studio.setDimension(2, 'city');
+    canvas.studio.setDimension(1, '');
+
+    expect(canvas.studio.dimensions()).toEqual(['region', 'city']);
+  });
+
+  it('stops at three dimensions', () => {
+    const canvas = canvasWith();
+    canvas.studio.setDimension(0, 'region');
+    canvas.studio.setDimension(1, 'status');
+    canvas.studio.setDimension(2, 'city');
+
+    expect(canvas.studio.dimensionSlots()).toEqual(['region', 'status', 'city']);
+    expect(canvas.studio.dimensionSlots()).toHaveLength(3);
+  });
+
+  it('does not offer a column that is already a dimension in another slot', () => {
+    const canvas = canvasWith();
+    canvas.studio.setDimension(0, 'region');
+
+    expect(canvas.studio.dimensionOptions(1).map(column => column.name)).not.toContain('region');
+  });
+
+  it('sends no filters key at all when nothing is filtering', () => {
+    // An empty group on the wire is a filter that means nothing, and a server reading it as one
+    // is a server deciding what "no clauses" implies.
+    const canvas = canvasWith();
+    canvas.studio.runAnalysis();
+
+    expect(canvas.sent().filters).toBeUndefined();
+  });
+
+  it('sends the Top-N and its Other bucket only when one is chosen', () => {
+    const canvas = canvasWith();
+    canvas.studio.runAnalysis();
+    expect(canvas.sent().topN).toBeUndefined();
+    // Settled before the second run: a run already in flight blocks another, which is the same
+    // rule the console keeps about spending a second governor permit on an impatient click.
+    canvas.answers.analyze!.next(SERVER_RESPONSE(analysisOf()));
+
+    canvas.studio.setTopN(25);
+    canvas.studio.runAnalysis();
+    expect(canvas.sent().topN).toEqual({ limit: 25, includeOther: true });
+  });
+
+  it('refuses a custom N that is not a usable number rather than sending it', () => {
+    const canvas = canvasWith();
+    canvas.studio.setCustomTopN('0');
+    expect(canvas.studio.topNLimit()).toBeNull();
+
+    canvas.studio.setCustomTopN('-5');
+    expect(canvas.studio.topNLimit()).toBeNull();
+
+    canvas.studio.setCustomTopN('120');
+    expect(canvas.studio.topNLimit()).toBe(120);
+  });
+
+  it('names the run before it is sent, so there is something to stop', () => {
+    const canvas = canvasWith();
+    canvas.studio.runAnalysis();
+
+    expect(canvas.sent().queryId).toMatch(/^ui-/);
+    expect(canvas.studio.canStopAnalysis()).toBe(true);
+
+    canvas.studio.stopAnalysis();
+    expect(canvas.cancel).toHaveBeenCalledWith(canvas.sent().queryId);
+  });
+
+  it('shows the server’s refusal in its own words', () => {
+    const canvas = canvasWith();
+    canvas.studio.runAnalysis();
+    canvas.answers.analyze!.next(SERVER_REFUSAL('amount holds VARCHAR, which cannot be summed.'));
+
+    expect(canvas.show()).toContain('amount holds VARCHAR, which cannot be summed.');
+    expect(canvas.show()).toContain('The analysis did not run');
+  });
+});
+
+describe('the filter tree reaches the request with its shape intact', () => {
+  it('sends a nested OR group as a group, not as a flattened list', () => {
+    const canvas = canvasWith();
+    canvas.studio.setFilters({
+      op: 'AND',
+      clauses: [
+        { field: 'status', operator: 'EQ', value: 'active' },
+        {
+          op: 'OR',
+          clauses: [
+            { field: 'region', operator: 'EQ', value: 'north' },
+            { field: 'region', operator: 'EQ', value: 'south' },
+          ],
+        },
+      ],
+    });
+    canvas.studio.runAnalysis();
+
+    expect(canvas.sent().filters).toEqual({
+      op: 'AND',
+      clauses: [
+        { field: 'status', operator: 'EQ', value: 'active' },
+        {
+          op: 'OR',
+          clauses: [
+            { field: 'region', operator: 'EQ', value: 'north' },
+            { field: 'region', operator: 'EQ', value: 'south' },
+          ],
+        },
+      ],
+    });
+  });
+
+  it('nests an OR tree rather than spreading it beside a clicked filter', () => {
+    // Spreading (a OR b) into a list joined by AND turns a filter that admitted either into one
+    // that demands both -- silently, and only when a chip happens to be present.
+    const canvas = canvasWith();
+    canvas.studio.setFilters({
+      op: 'OR',
+      clauses: [
+        { field: 'region', operator: 'EQ', value: 'north' },
+        { field: 'region', operator: 'EQ', value: 'south' },
+      ],
+    });
+    canvas.studio.crossFilter('status', 'active');
+
+    const filters = canvas.sent().filters;
+    expect(filters.op).toBe('AND');
+    expect(filters.clauses[0].op).toBe('OR');
+    expect(filters.clauses[1]).toEqual({ field: 'status', operator: 'EQ', value: 'active' });
+  });
+
+  it('does not send a condition that is still missing an operand, and says how many', () => {
+    const canvas = canvasWith();
+    canvas.studio.setFilters({
+      op: 'AND',
+      clauses: [
+        { field: 'region', operator: 'EQ', value: 'north' },
+        { field: 'amount', operator: 'BETWEEN', values: ['10'] },
+      ],
+    });
+    canvas.studio.runAnalysis();
+
+    expect(canvas.sent().filters.clauses).toHaveLength(1);
+    expect(canvas.studio.unfinishedFilterCount()).toBe(1);
+    expect(canvas.show()).toContain('1 not finished, so not applied');
+  });
+
+  it('says that these filters do not reach the Data tab’s preview', () => {
+    // The preview endpoint takes a page and a size and has no filter parameter. A chip claiming
+    // to filter a table it cannot reach would be worse than no chip.
+    const canvas = canvasWith();
+
+    expect(canvas.show()).toContain('narrow the Data tab');
+  });
+});
+
+describe('cross-filtering: clicking a result narrows everything drawn from it', () => {
+  it('adds a chip and re-runs the analysis', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    canvas.studio.crossFilter('region', 'north');
+
+    expect(canvas.sent().filters.clauses)
+      .toEqual([{ field: 'region', operator: 'EQ', value: 'north' }]);
+    expect(canvas.studio.filterChips().map(chip => chip.label)).toEqual(['region is "north"']);
+  });
+
+  it('shows the chip on screen, as something that can be taken off', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    canvas.studio.crossFilter('region', 'north');
+    canvas.answers.analyze!.next(SERVER_RESPONSE(analysisOf()));
+
+    expect(canvas.show()).toContain('Filtered to');
+    expect(canvas.show()).toContain('region is "north"');
+  });
+
+  it('removes the chip and re-runs without it', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    canvas.studio.crossFilter('region', 'north');
+    canvas.answers.analyze!.next(SERVER_RESPONSE(analysisOf()));
+    canvas.studio.removeChip({ kind: 'clicked', index: 0 });
+
+    expect(canvas.studio.crossFilters()).toEqual([]);
+    expect(canvas.sent().filters).toBeUndefined();
+  });
+
+  it('does not add the same filter twice when the same cell is clicked again', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    canvas.studio.crossFilter('region', 'north');
+    canvas.answers.analyze!.next(SERVER_RESPONSE(analysisOf()));
+    canvas.studio.crossFilter('region', 'north');
+
+    expect(canvas.studio.crossFilters()).toHaveLength(1);
+  });
+
+  it('filters a null group with IS NULL rather than an equality that is never true', () => {
+    // "= NULL" is never true, so an equality here would hand back an empty result for a group the
+    // reader can see has rows in it -- and they would read that emptiness as the answer.
+    const canvas = canvasWith();
+    canvas.ran(analysisOf({ rows: [[null, '100']] }));
+    canvas.studio.crossFilter('region', null);
+
+    expect(canvas.sent().filters.clauses)
+      .toEqual([{ field: 'region', operator: 'IS_NULL' }]);
+  });
+
+  it('leaves a chart mark inert when the label is several dimensions joined together', () => {
+    // "north · active" is not a value in any column, so filtering on it would match nothing
+    // while looking like it matched something.
+    const canvas = canvasWith();
+    canvas.studio.setDimension(0, 'region');
+    canvas.studio.setDimension(1, 'status');
+    canvas.studio.aggregation.set('SUM');
+    canvas.studio.measureField.set('amount');
+    canvas.studio.runAnalysis();
+    canvas.answers.analyze!.next(SERVER_RESPONSE(analysisOf({
+      columns: [
+        { name: 'region', type: 'VARCHAR', role: 'DIMENSION' },
+        { name: 'status', type: 'VARCHAR', role: 'DIMENSION' },
+        { name: 'amount_sum', type: 'DOUBLE', role: 'MEASURE' },
+      ],
+      rows: [['north', 'active', '100']],
+      dimensions: ['region', 'status'],
+    })));
+
+    expect(canvas.studio.markClickable()).toBe(false);
+    canvas.studio.crossFilterFromMark('north · active');
+    expect(canvas.studio.crossFilters()).toEqual([]);
+  });
+
+  it('says that the figures cover the matching rows, and that a missing one is not a zero', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    canvas.studio.crossFilter('region', 'north');
+    canvas.answers.analyze!.next(SERVER_RESPONSE(analysisOf()));
+
+    expect(canvas.show())
+      .toContain('absent from this result, which is not the same as its value being zero');
+  });
+});
+
+describe('drill-down and drill-up, where the trail is echoed and never rebuilt', () => {
+  const STEP = { dimension: 'region', value: 'north', nextDimension: 'city' };
+  const DRILLED = analysisOf({
+    columns: [
+      { name: 'city', type: 'VARCHAR', role: 'DIMENSION' },
+      { name: 'amount_sum', type: 'DOUBLE', role: 'MEASURE' },
+    ],
+    rows: [['leeds', '4000']],
+    dimensions: ['city'],
+    drillPath: [STEP],
+    crumbs: [{ label: 'All rows' }, { label: 'region: north', field: 'region', value: 'north' }],
+  });
+
+  function drilling() {
+    const canvas = canvasWith();
+    canvas.ran();
+    canvas.studio.drillNext.set('city');
+    canvas.studio.drillInto('north');
+    return canvas;
+  }
+
+  it('sends the whole analysis with the step, and lets the server compose it', () => {
+    const canvas = drilling();
+    const [request, into] = canvas.drill.mock.calls[0];
+
+    expect(into).toEqual({ dimension: 'region', value: 'north', nextDimension: 'city' });
+    expect(request.dimensions).toEqual(['region']);
+    expect(request.drillPath).toEqual([]);
+  });
+
+  it('does not narrow anything until the drill has actually succeeded', () => {
+    // Applying the composition first would leave the screen holding a narrowing that never
+    // happened if the request failed.
+    const canvas = drilling();
+    expect(canvas.studio.dimensions()).toEqual(['region']);
+
+    canvas.answers.drill!.next(SERVER_REFUSAL('The engine had no slot free.'));
+    expect(canvas.studio.dimensions()).toEqual(['region']);
+    expect(canvas.studio.drillPath()).toEqual([]);
+  });
+
+  it('takes the new dimensions and the new trail from the answer, not from a local guess', () => {
+    const canvas = drilling();
+    canvas.answers.drill!.next(SERVER_RESPONSE(DRILLED));
+
+    expect(canvas.studio.dimensions()).toEqual(['city']);
+    expect(canvas.studio.drillPath()).toEqual([STEP]);
+  });
+
+  it('echoes the trail back on the next request, unchanged', () => {
+    // The endpoints are stateless: the trail has to travel, and it travels as the server wrote it.
+    const canvas = drilling();
+    canvas.answers.drill!.next(SERVER_RESPONSE(DRILLED));
+    canvas.studio.runAnalysis();
+
+    expect(canvas.sent().drillPath).toEqual([STEP]);
+  });
+
+  it('does not repeat the drill’s own filters in the filter tree', () => {
+    // The server derives a drill's predicates from drillPath itself. Echoing them into `filters`
+    // as well would apply each one twice -- and a null step, which the server narrows with IS
+    // NULL, would be narrowed here with an equality that is never true.
+    const canvas = canvasWith();
+    canvas.ran();
+    canvas.studio.crossFilter('status', 'active');
+    canvas.answers.analyze!.next(SERVER_RESPONSE(analysisOf()));
+    canvas.studio.drillInto('north');
+    canvas.answers.drill!.next(SERVER_RESPONSE(DRILLED));
+    canvas.studio.runAnalysis();
+
+    expect(canvas.sent().filters.clauses)
+      .toEqual([{ field: 'status', operator: 'EQ', value: 'active' }]);
+    expect(canvas.sent().drillPath).toEqual([STEP]);
+  });
+
+  it('sends a null group as null, so the server narrows it with IS NULL', () => {
+    const canvas = canvasWith();
+    canvas.ran(analysisOf({ rows: [[null, '100']] }));
+    canvas.studio.drillInto(canvas.studio.drillValueOf(canvas.studio.analysisRows()[0]));
+
+    expect(canvas.drill.mock.calls[0][1].value).toBeNull();
+  });
+
+  it('renders the crumbs the server sent, and does not build its own', () => {
+    const canvas = drilling();
+    canvas.answers.drill!.next(SERVER_RESPONSE(analysisOf({
+      dimensions: ['city'],
+      drillPath: [STEP],
+      crumbs: [
+        { label: 'All users' },
+        { label: 'Department: Engineering', field: 'department', value: 'Engineering' },
+      ],
+    })));
+
+    // The labels are the server's words. "Department: Engineering" is nowhere in this component.
+    expect(canvas.show()).toContain('All users');
+    expect(canvas.show()).toContain('Department: Engineering');
+  });
+
+  it('labels a drill chip with the server’s crumb, so the two never word a step differently', () => {
+    const canvas = drilling();
+    canvas.answers.drill!.next(SERVER_RESPONSE(DRILLED));
+
+    expect(canvas.studio.filterChips().map(chip => chip.label)).toEqual(['region: north']);
+  });
+
+  it('asks the server to undo the steps rather than undoing them here', () => {
+    const canvas = drilling();
+    canvas.answers.drill!.next(SERVER_RESPONSE(DRILLED));
+    canvas.studio.drillUp(1);
+
+    expect(canvas.drillUp.mock.calls[0][1]).toBe(1);
+    expect(canvas.drillUp.mock.calls[0][0].drillPath).toEqual([STEP]);
+
+    canvas.answers.drillUp!.next(SERVER_RESPONSE(analysisOf()));
+    expect(canvas.studio.dimensions()).toEqual(['region']);
+    expect(canvas.studio.drillPath()).toEqual([]);
+  });
+
+  it('counts the steps to remove from the crumbs on screen, not from its own stack', () => {
+    const canvas = drilling();
+    canvas.answers.drill!.next(SERVER_RESPONSE(DRILLED));
+    canvas.studio.drillInto('leeds');
+    canvas.answers.drill!.next(SERVER_RESPONSE(analysisOf({
+      dimensions: [],
+      drillPath: [STEP, { dimension: 'city', value: 'leeds' }],
+      crumbs: [{ label: 'All rows' }, { label: 'region: north' }, { label: 'city: leeds' }],
+    })));
+
+    // Clicking "All rows" -- crumb 0 of three -- climbs out of both steps.
+    canvas.studio.crumbClick(0);
+    expect(canvas.drillUp.mock.calls[0][1]).toBe(2);
+  });
+
+  it('says so when it has drilled and the server sent no trail back', () => {
+    // A response with a drill path and no crumbs is a server not holding up its half of the
+    // contract. Inventing the labels here would hide exactly that.
+    const canvas = drilling();
+    canvas.answers.drill!.next(SERVER_RESPONSE(analysisOf({
+      dimensions: ['city'], drillPath: [STEP], crumbs: [],
+    })));
+
+    expect(canvas.studio.crumbsMissing()).toBe(true);
+    expect(canvas.show()).toContain('the server did not send a breadcrumb trail');
+  });
+
+  it('drops the trail when the dimensions it drilled through are re-picked', () => {
+    // A drill is a narrowing of one particular analysis. Sending its trail on with a fresh set of
+    // dimensions would leave a reader filtered by a step they can no longer see or undo.
+    const canvas = drilling();
+    canvas.answers.drill!.next(SERVER_RESPONSE(DRILLED));
+    expect(canvas.studio.drillPath()).toEqual([STEP]);
+
+    canvas.studio.setDimension(0, 'status');
+    expect(canvas.studio.drillPath()).toEqual([]);
+    canvas.studio.runAnalysis();
+    // Empty rather than absent here because these tests see the request object; the wire body
+    // omits an empty trail entirely, which is analysisBody's job and clauseToWire's neighbour.
+    expect(canvas.sent().drillPath).toEqual([]);
+  });
+});
+
+describe('a value on the wire is a string, and has to be a faithful one', () => {
+  it('expands scientific notation without going anywhere near a float', () => {
+    // The measured defect: sum(amount) came back as 7.466125E7 and a reader glancing at it sees
+    // seven point something.
+    expect(plainDecimal('7.466125E7')).toBe('74661250');
+    expect(plainDecimal('-1.5e3')).toBe('-1500');
+    expect(plainDecimal('1.23E-4')).toBe('0.000123');
+    expect(plainDecimal('5E0')).toBe('5');
+  });
+
+  it('leaves a plain decimal exactly as the engine wrote it, trailing zeros and all', () => {
+    // "12500.00" is a currency amount with two places. Normalising it to 12500 would throw away
+    // the scale the engine chose, and a round trip through Number would round a wide DECIMAL.
+    expect(plainDecimal('12500.00')).toBe('12500.00');
+    expect(plainDecimal('0.000000000000000001')).toBe('0.000000000000000001');
+    expect(plainDecimal('123456789012345678901234567890'))
+      .toBe('123456789012345678901234567890');
+  });
+
+  it('leaves anything that is not a number alone', () => {
+    expect(plainDecimal('north')).toBe('north');
+    expect(plainDecimal('')).toBe('');
+  });
+
+  it('trims a DATE’s phantom midnight, and only when it really is midnight', () => {
+    expect(dateOnly('2024-01-01 00:00:00.0')).toBe('2024-01-01');
+    expect(dateOnly('2024-01-01T00:00:00')).toBe('2024-01-01');
+    expect(dateOnly('2024-01-01 00:00')).toBe('2024-01-01');
+    // A time under a column typed DATE is a contradiction between the type and the value, and
+    // the right thing to do with a contradiction is show it.
+    expect(dateOnly('2024-01-01 09:30:00.0')).toBe('2024-01-01 09:30:00.0');
+  });
+
+  it('renders each cell as the column says it is, and no further', () => {
+    const canvas = canvasWith();
+
+    expect(canvas.studio.renderCell(
+      { name: 'amount_sum', type: 'DOUBLE', role: 'MEASURE' }, '7.466125E7')).toBe('74661250');
+    expect(canvas.studio.renderCell(
+      { name: 'booked_on', type: 'DATE', role: 'DIMENSION' }, '2024-01-01 00:00:00.0'))
+      .toBe('2024-01-01');
+    // A TIMESTAMP genuinely carries a time; trimming it would be the opposite error.
+    expect(canvas.studio.renderCell(
+      { name: 'seen_at', type: 'TIMESTAMP', role: 'DIMENSION' }, '2024-01-01 00:00:00.0'))
+      .toBe('2024-01-01 00:00:00.0');
+    expect(canvas.studio.renderCell(
+      { name: 'region', type: 'VARCHAR', role: 'DIMENSION' }, '007')).toBe('007');
+  });
+
+  it('draws the faithful value on the screen, not the wire form', () => {
+    const canvas = canvasWith();
+    canvas.ran(analysisOf({ rows: [['north', '7.466125E7']] }));
+
+    expect(canvas.show()).toContain('74661250');
+    expect(canvas.show()).not.toContain('7.466125E7');
+  });
+
+  it('keeps a null a null rather than turning it into an empty cell', () => {
+    const canvas = canvasWith();
+    canvas.ran(analysisOf({ rows: [[null, '100']] }));
+
+    expect(canvas.studio.analysisRows()[0].cells[0].isNull).toBe(true);
+    expect(canvas.show()).toContain('null');
+  });
+});
+
+describe('a partial answer says so on the figure, not in a footnote', () => {
+  it('marks a truncated result beside its count and again on the figure’s own title', () => {
+    const canvas = canvasWith();
+    canvas.ran(analysisOf({ truncated: true }));
+    const text = canvas.show();
+
+    expect(text).toContain('stopped at the limit — there may be more');
+    expect(text).toContain('partial — part of the answer');
+    expect(text).toContain('This is part of the answer.');
+  });
+
+  it('says the opposite when the result is whole', () => {
+    // The control. A screen that always hedged would be as useless as one that never did.
+    const canvas = canvasWith();
+    canvas.ran();
+    const text = canvas.show();
+
+    expect(text).toContain('every group that matched');
+    expect(text).not.toContain('partial — part of the answer');
+  });
+
+  it('shows the Other bucket rather than implying it', () => {
+    const canvas = canvasWith();
+    canvas.studio.setTopN(10);
+    canvas.ran(analysisOf({
+      rows: [['north', '12500.00'], ['Other', '3000.00']],
+      other: {
+        label: 'Other', values: ['east', 'west', 'central'], valueCount: 3, valuesTruncated: false,
+      },
+    }));
+    const text = canvas.show();
+
+    expect(text).toContain('3 rolled into');
+    expect(text).toContain('east, west, central');
+  });
+
+  it('reports the size of the bucket, not the length of the sample it was sent', () => {
+    // The server caps the list on a high-cardinality dimension and says so. Reporting the sample
+    // length as the bucket size would turn its own honesty about the cap into a smaller, wrong
+    // number.
+    const canvas = canvasWith();
+    canvas.studio.setTopN(10);
+    canvas.ran(analysisOf({
+      rows: [['north', '12500.00'], ['Other', '3000.00']],
+      other: {
+        label: 'Other', values: ['east', 'west'], valueCount: 4212, valuesTruncated: true,
+      },
+    }));
+    const text = canvas.show();
+
+    expect(text).toContain('4212 rolled into');
+    // Asserted on the note as well as the pill: they are two separate claims, and only one of
+    // them was reading valueCount when this was written.
+    expect(canvas.studio.canvasNotes().some(note => note.includes('4212 values were rolled into')))
+      .toBe(true);
+    expect(text).toContain('and more that are not listed');
+  });
+
+  it('will not let the rolled-up row be filtered to or drilled into', () => {
+    // "Other" is not a value in the data. It is the values the reader has not been shown.
+    const canvas = canvasWith();
+    canvas.studio.setTopN(10);
+    canvas.ran(analysisOf({
+      rows: [['north', '12500.00'], ['Other', '3000.00']],
+      other: { label: 'Other', values: ['east', 'west'], valueCount: 2, valuesTruncated: false },
+    }));
+
+    expect(canvas.studio.analysisRows()[0].isOther).toBe(false);
+    expect(canvas.studio.analysisRows()[1].isOther).toBe(true);
+  });
+
+  it('warns before the run that a Top-N with no Other loses the tail entirely', () => {
+    const canvas = canvasWith();
+    canvas.studio.setTopN(10);
+    canvas.studio.topNOther.set(false);
+
+    expect(canvas.show()).toContain('the tail will be missing, not summarised');
+  });
+
+  it('says that rows a filter excluded are excluded, not zero', () => {
+    const canvas = canvasWith();
+    canvas.studio.setFilters({
+      op: 'AND', clauses: [{ field: 'status', operator: 'EQ', value: 'active' }],
+    });
+    canvas.ran();
+
+    expect(canvas.show()).toContain('not the same as its value being zero');
+  });
+
+  it('says an empty result is an answer rather than a failure', () => {
+    const canvas = canvasWith();
+    canvas.studio.setFilters({
+      op: 'AND', clauses: [{ field: 'status', operator: 'EQ', value: 'nothing' }],
+    });
+    canvas.ran(analysisOf({ rows: [], rowCount: 0 }));
+
+    expect(canvas.show()).toContain('the rows are excluded, not zero');
+  });
+
+  it('counts a row whose measure will not parse out of the chart rather than as a zero', () => {
+    const canvas = canvasWith();
+    canvas.ran(analysisOf({ rows: [['north', '12500'], ['south', 'n/a']] }));
+    canvas.studio.canvasKindName.set('ranked');
+
+    expect(canvas.studio.canvasUnparsed()).toBe(1);
+    expect(canvas.show()).toContain('does not read as a number');
+  });
+
+  it('says when the ranked view is silently dropping a zero or a negative', () => {
+    // RankedBar filters out values at or below zero, and a dropped bar looks exactly like a
+    // category that was never in the data. A SUM over refunds is negative; a filtered group is
+    // zero. Both are real results here.
+    const canvas = canvasWith();
+    canvas.ran(analysisOf({ rows: [['north', '12500'], ['south', '-400'], ['east', '0']] }));
+    canvas.studio.canvasKindName.set('ranked');
+
+    expect(canvas.studio.canvasNonPositive()).toBe(2);
+    expect(canvas.show()).toContain('zero or below and the ranked view does not draw a bar');
+  });
+
+  it('says what a relative window actually resolved to', () => {
+    // "Last 7 days" is not reproducible from the request alone -- it depends on when it ran -- so
+    // two charts taken an hour either side of midnight legitimately differ. This is the only
+    // thing on screen that lets a reader see why.
+    const canvas = canvasWith();
+    canvas.ran(analysisOf({ resolvedWindows: { LAST_7_DAYS: '2024-03-01 to 2024-03-07' } }));
+
+    expect(canvas.show()).toContain('"LAST_7_DAYS" resolved to 2024-03-01 to 2024-03-07');
+  });
+});
+
+describe('a distinct count is labelled as whatever it actually is', () => {
+  function counted(measureColumn: string) {
+    const canvas = canvasWith();
+    canvas.studio.aggregation.set('DISTINCT_COUNT');
+    canvas.studio.measureField.set('region');
+    canvas.studio.setDimension(0, 'status');
+    canvas.studio.runAnalysis();
+    canvas.answers.analyze!.next(SERVER_RESPONSE(analysisOf({
+      columns: [
+        { name: 'status', type: 'VARCHAR', role: 'DIMENSION' },
+        { name: measureColumn, type: 'BIGINT', role: 'MEASURE' },
+      ],
+      rows: [['active', '12']],
+      dimensions: ['status'],
+      measure: measureColumn,
+    })));
+    return canvas;
+  }
+
+  it('says a grouped distinct count is exact, and that the Profile tab’s is not', () => {
+    // The same word means two different things on two tabs of this screen. The Canvas runs
+    // count(DISTINCT ...); the Profile tab reads SUMMARIZE's approx_unique, a HyperLogLog sketch
+    // measured 3.7% low over a million distinct values. A reader who has learnt to distrust one
+    // has no way of knowing the other is trustworthy unless it is said.
+    const canvas = counted('region_distinct_count');
+
+    expect(canvas.studio.distinctExactness()).toBe('exact');
+    expect(canvas.show()).toContain('This distinct count is exact');
+  });
+
+  it('follows the server’s own column name if it ever becomes an estimate', () => {
+    const canvas = counted('region_approx_distinct');
+
+    expect(canvas.studio.distinctExactness()).toBe('estimated');
+    expect(canvas.show()).toContain('estimated, not counted');
+    expect(canvas.show()).toContain('3.7% low');
+  });
+
+  it('will not claim either when the name says neither', () => {
+    const canvas = counted('regions');
+
+    expect(canvas.studio.distinctExactness()).toBe('unstated');
+    expect(canvas.show()).toContain('exactness not stated');
+    expect(canvas.show()).toContain('does not say whether this distinct count is exact');
+  });
+
+  it('says nothing about exactness for the aggregations where it does not arise', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+
+    expect(canvas.studio.distinctExactness()).toBe('');
+    expect(canvas.show()).not.toContain('exactness not stated');
+  });
+
+  it('hedges the median on the picker, before anything has been run', () => {
+    const canvas = canvasWith();
+    canvas.studio.aggregation.set('MEDIAN');
+
+    expect(canvas.show()).toContain('two middle values');
+  });
+});
+
+describe('the pivot: two dimensions, with the aggregate in the cells', () => {
+  const GRID = analysisOf({
+    columns: [
+      { name: 'region', type: 'VARCHAR', role: 'DIMENSION' },
+      { name: 'status', type: 'VARCHAR', role: 'DIMENSION' },
+      { name: 'amount_sum', type: 'DOUBLE', role: 'MEASURE' },
+    ],
+    rows: [['north', 'active', '100'], ['north', 'closed', '40'], ['south', 'active', '60']],
+    rowCount: 3,
+    dimensions: ['region', 'status'],
+    pivot: {
+      rowDimension: 'region', columnDimension: 'status', columnValues: ['active', 'closed'],
+      rows: [
+        { key: 'north', cells: ['100', '40'] },
+        { key: 'south', cells: ['60', null] },
+      ],
+      columnsTruncated: false,
+    },
+  });
+
+  function pivoted(result: AnalysisResult = GRID) {
+    const canvas = canvasWith();
+    canvas.studio.setDimension(0, 'region');
+    canvas.studio.setDimension(1, 'status');
+    canvas.studio.aggregation.set('SUM');
+    canvas.studio.measureField.set('amount');
+    canvas.studio.runAnalysis();
+    canvas.answers.analyze!.next(SERVER_RESPONSE(result));
+    canvas.studio.canvasKindName.set('pivot');
+    canvas.fixture.detectChanges();
+    return canvas;
+  }
+
+  it('draws the grid the server composed rather than rebuilding one', () => {
+    // Rebuilding it from the flat rows is a second implementation of the same rearrangement, and
+    // the two could disagree about which dimension is the row axis -- which transposes somebody's
+    // chart without saying so.
+    const canvas = pivoted();
+    const pivot = canvas.studio.pivot()!;
+
+    expect(pivot.rowDimension).toBe('region');
+    expect(pivot.columnDimension).toBe('status');
+    expect(pivot.columns).toEqual(['active', 'closed']);
+    expect(pivot.rows.map(row => row.label)).toEqual(['north', 'south']);
+  });
+
+  it('leaves a combination with no rows empty, and never calls it zero', () => {
+    const canvas = pivoted();
+
+    expect(canvas.studio.pivot()!.rows[1].values).toEqual(['60', null]);
+    expect(canvas.show()).toContain('An empty cell means no rows in that combination');
+  });
+
+  it('totals a row only when the parts add up to it', () => {
+    const canvas = pivoted();
+
+    expect(canvas.studio.pivot()!.additive).toBe(true);
+    expect(canvas.studio.pivot()!.rows[0].total).toBe(140);
+  });
+
+  it('offers no total at all for an average, rather than summing averages', () => {
+    const canvas = pivoted();
+    canvas.studio.aggregation.set('AVERAGE');
+
+    expect(canvas.studio.pivot()!.additive).toBe(false);
+    expect(canvas.studio.pivot()!.rows[0].total).toBeNull();
+    expect(canvas.studio.pivotTotalNote()).toContain('does not add up');
+  });
+
+  it('says why there is no grid when the column dimension is too wide for one', () => {
+    // A table five thousand columns wide is not a narrower version of the answer, it is an
+    // unusable one, so the server sends the reason instead of the grid.
+    const canvas = pivoted(analysisOf({
+      columns: [
+        { name: 'region', type: 'VARCHAR', role: 'DIMENSION' },
+        { name: 'status', type: 'VARCHAR', role: 'DIMENSION' },
+        { name: 'amount_sum', type: 'DOUBLE', role: 'MEASURE' },
+      ],
+      dimensions: ['region', 'status'],
+      pivot: {
+        rowDimension: 'region', columnDimension: 'status', columnValues: [], rows: null,
+        columnsTruncated: true,
+      },
+    }));
+
+    expect(canvas.studio.canvasKinds().find(kind => kind.id === 'pivot')!.issue)
+      .toContain('more values than a grid can carry');
+  });
+
+  it('is not offered at all when the server sent no grid', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    const pivot = canvas.studio.canvasKinds().find(kind => kind.id === 'pivot')!;
+
+    expect(pivot.issue).toContain('needs exactly two dimensions');
+    expect(canvas.studio.pivot()).toBeNull();
+  });
+});
+
+describe('the chart kinds offered depend on what the analysis can honestly show', () => {
+  it('refuses a ring of averages, because a share needs a total to be a share of', () => {
+    const canvas = canvasWith();
+    canvas.studio.aggregation.set('AVERAGE');
+    canvas.studio.measureField.set('amount');
+    canvas.studio.setDimension(0, 'region');
+    canvas.studio.runAnalysis();
+    canvas.answers.analyze!.next(SERVER_RESPONSE(analysisOf()));
+    const donut = canvas.studio.canvasKinds().find(kind => kind.id === 'donut')!;
+
+    expect(donut.issue).toContain('no total to divide');
+  });
+
+  it('refuses a ring that would have to include a negative slice', () => {
+    const canvas = canvasWith();
+    canvas.ran(analysisOf({ rows: [['north', '100'], ['south', '-40']] }));
+    const donut = canvas.studio.canvasKinds().find(kind => kind.id === 'donut')!;
+
+    expect(donut.issue).toContain('zero or below');
+  });
+
+  it('refuses a ring past the number of colours the palette can tell apart', () => {
+    const canvas = canvasWith();
+    canvas.ran(analysisOf({
+      rows: [['a', '1'], ['b', '2'], ['c', '3'], ['d', '4'], ['e', '5'], ['f', '6'], ['g', '7']],
+    }));
+    const donut = canvas.studio.canvasKinds().find(kind => kind.id === 'donut')!;
+
+    expect(donut.issue).toContain('six colours');
+  });
+
+  it('falls back visibly when the kind that was picked stops working', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    canvas.studio.canvasKindName.set('pivot');
+
+    // One dimension, so the pivot is unavailable and the picker moves rather than drawing
+    // nothing.
+    expect(canvas.studio.canvasKind()).toBe('table');
+  });
+
+  it('offers the table whenever there is any result at all', () => {
+    const canvas = canvasWith();
+    canvas.ran(analysisOf({ rows: [['north', 'n/a']] }));
+
+    expect(canvas.studio.canvasKinds().find(kind => kind.id === 'table')!.issue).toBe('');
+    expect(canvas.studio.canvasKind()).toBe('table');
+  });
+});
+
+describe('saving an analysis: the configuration, never the rows', () => {
+  it('sends the dimensions, measure, filters, sort and Top-N as one configuration', () => {
+    const canvas = canvasWith();
+    canvas.studio.setDimension(0, 'region');
+    canvas.studio.aggregation.set('SUM');
+    canvas.studio.measureField.set('amount');
+    canvas.studio.setTopN(25);
+    canvas.studio.setFilters({
+      op: 'AND', clauses: [{ field: 'status', operator: 'EQ', value: 'active' }],
+    });
+    canvas.studio.analysisName.set('Sales by region');
+    canvas.studio.saveAnalysis(false);
+
+    const body = canvas.saveAnalysis.mock.calls[0][0];
+    expect(body.analysisName).toBe('Sales by region');
+    expect(body.connectionAlias).toBe('minio-main');
+    expect(body.datasetPath).toBe('daily/sales-2026.csv');
+
+    const config = JSON.parse(body.analysisConfig);
+    expect(config.dimensions).toEqual(['region']);
+    expect(config.measure).toEqual({ aggregation: 'SUM', field: 'amount' });
+    expect(config.topN).toEqual({ limit: 25, includeOther: true });
+    expect(config.sort).toEqual({ by: 'MEASURE', direction: 'DESC' });
+    expect(config.filters.clauses)
+      .toEqual([{ field: 'status', operator: 'EQ', value: 'active' }]);
+  });
+
+  it('keeps the chart kind out of the configuration, because the row has a column for it', () => {
+    // AnalyticsAnalysis lifts visualization_type into its own column so a listing can show it
+    // without parsing, and its javadoc calls a value stored in two places "one row that can
+    // disagree with itself".
+    const canvas = canvasWith();
+    canvas.ran();
+    canvas.studio.canvasKindName.set('ranked');
+    canvas.studio.analysisName.set('Sales by region');
+    canvas.studio.saveAnalysis(false);
+
+    const body = canvas.saveAnalysis.mock.calls[0][0];
+    expect(body.visualizationType).toBe('ranked');
+    expect(JSON.parse(body.analysisConfig).visualizationType).toBeUndefined();
+  });
+
+  it('will not save without a name', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+
+    expect(canvas.studio.canSaveAnalysis()).toBe(false);
+    canvas.studio.analysisName.set('  ');
+    expect(canvas.studio.canSaveAnalysis()).toBe(false);
+  });
+
+  it('offers updating separately from saving a new one, never guessing between them', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    canvas.studio.analysisName.set('Sales by region');
+    canvas.studio.saveAnalysis(false);
+    expect(canvas.saveAnalysis.mock.calls[0][0].analyticsAnalysisId).toBeUndefined();
+
+    canvas.answers.saveAnalysis!.next(SERVER_RESPONSE({
+      analyticsAnalysisId: 9, analysisName: 'Sales by region', connectionAlias: 'minio-main',
+      datasetPath: 'daily/sales-2026.csv', analysisConfig: '{}',
+    } as SavedAnalysis));
+    canvas.studio.saveAnalysis(true);
+    expect(canvas.saveAnalysis.mock.calls[1][0].analyticsAnalysisId).toBe(9);
+  });
+
+  it('reopens an analysis onto the canvas without running it', () => {
+    // An analysis can be a full scan. Browsing the list should not spend a governor permit.
+    const canvas = canvasWith();
+    const before = canvas.analyze.mock.calls.length;
+    canvas.studio.openAnalysis({
+      analyticsAnalysisId: 3, analysisName: 'By status', connectionAlias: 'minio-main',
+      datasetPath: 'daily/sales-2026.csv', visualizationType: 'donut',
+      analysisConfig: JSON.stringify({
+        dimensions: ['status'],
+        measure: { aggregation: 'AVERAGE', field: 'amount' },
+        filters: { op: 'AND', clauses: [{ field: 'region', operator: 'EQ', value: 'north' }] },
+        topN: { limit: 50, includeOther: false },
+        sort: { by: 'DIMENSION', direction: 'ASC' },
+      }),
+    });
+
+    expect(canvas.analyze.mock.calls.length).toBe(before);
+    expect(canvas.studio.dimensions()).toEqual(['status']);
+    expect(canvas.studio.aggregation()).toBe('AVERAGE');
+    expect(canvas.studio.measureField()).toBe('amount');
+    expect(canvas.studio.topNLimit()).toBe(50);
+    expect(canvas.studio.topNOther()).toBe(false);
+    expect(canvas.studio.sortBy()).toBe('DIMENSION');
+    expect(canvas.studio.canvasKindName()).toBe('donut');
+    expect((canvas.studio.canvasFilters() as FilterGroup).clauses).toHaveLength(1);
+  });
+
+  it('refuses to half-restore an analysis whose configuration will not parse', () => {
+    // Half a restored analysis -- the dimensions but not the filters -- looks like the saved one
+    // and answers a different question.
+    const canvas = canvasWith();
+    canvas.studio.setDimension(0, 'region');
+    canvas.studio.openAnalysis({
+      analysisName: 'Broken', connectionAlias: 'minio-main', datasetPath: 'daily/sales-2026.csv',
+      analysisConfig: '{not json',
+    });
+
+    expect(canvas.studio.dimensions()).toEqual(['region']);
+    expect(canvas.show()).toContain('its saved configuration is not readable');
+  });
+
+  it('warns when the analysis on screen was saved against a different dataset', () => {
+    const canvas = canvasWith();
+    canvas.studio.openAnalysis({
+      analyticsAnalysisId: 4, analysisName: 'Elsewhere', connectionAlias: 'minio-main',
+      datasetPath: 'archive/2025.parquet', analysisConfig: '{}',
+    });
+
+    expect(canvas.show()).toContain('archive/2025.parquet');
+  });
+
+  it('fetches the saved list once, when the tab is opened, and never runs an analysis for it', () => {
+    const canvas = canvasWith();
+
+    expect(canvas.fetchAllAnalyses).toHaveBeenCalledTimes(1);
+    expect(canvas.analyze).not.toHaveBeenCalled();
+
+    canvas.studio.showTab('overview');
+    canvas.studio.showTab('canvas');
+    expect(canvas.fetchAllAnalyses).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('the canvas does not disturb the tabs beside it', () => {
+  it('clears its picks when another file is opened, because a dimension is a column name', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    expect(canvas.studio.dimensions()).toEqual(['region']);
+
+    canvas.studio.openFile(REFUNDS);
+    expect(canvas.studio.dimensions()).toEqual([]);
+    expect(canvas.studio.analysisResult()).toBeNull();
+    expect(canvas.studio.crossFilters()).toEqual([]);
+    expect(canvas.studio.canvasFilters().clauses).toEqual([]);
+    expect(canvas.studio.drillPath()).toEqual([]);
+  });
+
+  it('does not scan the profile just because the Canvas tab was opened', () => {
+    const canvas = canvasWith();
+
+    expect(canvas.studio.profileLoading()).toBe(false);
+    expect(canvas.studio.profile()).toBeNull();
+  });
+
+  it('keeps the storage rail’s own filter separate from the analysis filters', () => {
+    // Two things called "filtered" on one screen is how a template ends up asking one and
+    // meaning the other.
+    const canvas = canvasWith();
+    canvas.studio.filter.set('sales');
+
+    expect(canvas.studio.analysisFiltered()).toBe(false);
+    canvas.studio.crossFilter('region', 'north');
+    expect(canvas.studio.analysisFiltered()).toBe(true);
   });
 });

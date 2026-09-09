@@ -226,6 +226,350 @@ export interface QueryRun {
   dateCreated: string;
 }
 
+// ---- the analysis model, which is document 07 ----------------------------------------------
+
+/**
+ * The eight aggregations, and there are exactly eight.
+ *
+ * Not an open string. Document 07 names these and the server compiles each one to a specific
+ * SQL function behind the statement gate, so a ninth invented here would be a request the engine
+ * refuses -- and it would be refused at the far end of a round trip rather than at the picker.
+ *
+ * COUNT_ROWS is the one that ignores `field`, because counting rows is the only thing here that
+ * is not a question about a column. Every other one requires it, and a measure with no field is
+ * an incomplete analysis rather than a defaulted one: guessing a column would put a number on
+ * screen that nobody asked for and that reads exactly like one they did.
+ */
+export type Aggregation =
+  | 'COUNT_ROWS' | 'COUNT_NON_NULL' | 'DISTINCT_COUNT' | 'SUM'
+  | 'AVERAGE' | 'MINIMUM' | 'MAXIMUM' | 'MEDIAN';
+
+/** The fourteen operators document 07 lists, in the order it lists them. */
+export type FilterOperator =
+  | 'EQ' | 'NEQ' | 'CONTAINS' | 'STARTS_WITH' | 'GT' | 'LT' | 'BETWEEN'
+  | 'IN' | 'NOT_IN' | 'IS_NULL' | 'IS_NOT_NULL'
+  | 'DATE_RANGE' | 'RELATIVE_DATE' | 'NUMERIC_RANGE';
+
+/**
+ * One predicate over one column.
+ *
+ * The operand fields are deliberately separate from each other rather than one `unknown`: an
+ * operator decides how many operands it takes, and keeping "the one value" apart from "the list"
+ * means an operator change cannot silently reinterpret what was typed. Switching EQ to BETWEEN
+ * does not turn a single value into a lower bound behind the reader's back -- the second bound
+ * is simply missing, and a clause with a missing operand is not sent.
+ */
+export interface FilterClause {
+  field: string;
+  operator: FilterOperator;
+  /** The single operand. Unused by IS_NULL, IS_NOT_NULL and by every two-bound operator. */
+  value?: string | null;
+  /** IN, NOT_IN, and the two-bound operators as exactly [low, high]. See clauseToWire. */
+  values?: string[];
+}
+
+/**
+ * AND or OR over a mixed list of clauses and further groups -- 07's "nested AND/OR groups".
+ *
+ * The nesting is what makes this a builder rather than a filter bar: `a AND (b OR c)` cannot be
+ * written as a flat list of predicates, and every filter surface in this codebase up to now has
+ * been a flat implicit AND over a fixed field vocabulary.
+ */
+export interface FilterGroup {
+  op: 'AND' | 'OR';
+  clauses: FilterNode[];
+}
+
+export type FilterNode = FilterClause | FilterGroup;
+
+/**
+ * Which of the two a node is.
+ *
+ * Tests `clauses`, not `op`: a group has both an op and a list, a clause has neither, and the
+ * list is the half that cannot be confused with anything on a clause.
+ */
+export function isFilterGroup(node: FilterNode): node is FilterGroup {
+  return Array.isArray((node as FilterGroup).clauses);
+}
+
+/**
+ * How many operands an operator takes. The one table the builder and the wire format agree on.
+ *
+ * 'many' is IN and NOT_IN, where the count is whatever the reader typed. 2 is the three
+ * two-bound operators, which are three different operators rather than one BETWEEN because the
+ * server needs to know whether to read the bounds as text, as dates or as numbers -- a fact the
+ * operand values cannot carry on their own now that everything crosses the wire as a string.
+ */
+export const OPERAND_COUNT: Record<FilterOperator, 0 | 1 | 2 | 'many'> = {
+  EQ: 1, NEQ: 1, CONTAINS: 1, STARTS_WITH: 1, GT: 1, LT: 1,
+  BETWEEN: 2, NUMERIC_RANGE: 2, DATE_RANGE: 2,
+  IN: 'many', NOT_IN: 'many',
+  IS_NULL: 0, IS_NOT_NULL: 0,
+  RELATIVE_DATE: 1,
+};
+
+/**
+ * A clause as it goes on the wire, and THE ONE PLACE THIS CLIENT GUESSED PAST THE CONTRACT.
+ *
+ * The contract shows a single-operand clause and nothing else: `{field, operator, value}`. It
+ * does not say how IN carries a list or how BETWEEN carries two bounds, and the endpoint did not
+ * exist to read when this was written. The rule chosen here is the simplest one that covers all
+ * fourteen without a third field: ONE OPERAND TRAVELS AS `value`, MANY TRAVEL AS `values`, and a
+ * two-bound operator is exactly `values: [low, high]` in that order.
+ *
+ * It is a guess and it is isolated on purpose -- this function and its inverse are the only code
+ * that knows the shape, so a shipped DTO that spells it differently is one edit here rather than
+ * a search through the Canvas.
+ *
+ * Absent operands are dropped rather than sent empty, for the reason the join half is dropped in
+ * query(): an empty string is present, and a server reading presence as intent would see a
+ * BETWEEN with a blank bound as a bound of blank.
+ */
+export function clauseToWire(clause: FilterClause): Record<string, unknown> {
+  const wire: Record<string, unknown> = { field: clause.field, operator: clause.operator };
+  const operands = OPERAND_COUNT[clause.operator];
+  if (operands === 1 && clause.value) wire['value'] = clause.value;
+  if (operands === 2 || operands === 'many') {
+    const values = (clause.values ?? []).filter(v => v !== null && v !== undefined && v !== '');
+    if (values.length) wire['values'] = values;
+  }
+  return wire;
+}
+
+/** A group as it goes on the wire, recursively. Empty groups are dropped by the caller. */
+export function filtersToWire(group: FilterGroup): Record<string, unknown> {
+  return {
+    op: group.op,
+    clauses: group.clauses.map(node =>
+      isFilterGroup(node) ? filtersToWire(node) : clauseToWire(node)),
+  };
+}
+
+export interface Measure {
+  /** Absent only for COUNT_ROWS, which is a question about rows rather than about a column. */
+  field?: string;
+  aggregation: Aggregation;
+}
+
+/**
+ * Keep the largest `limit` categories and roll the rest into one bucket.
+ *
+ * includeOther is not a cosmetic switch. With it off, the tail is GONE from the result and the
+ * chart drawn from it is a chart of part of the data wearing the shape of all of it; with it on
+ * the remainder is one visible row that can be pointed at. The Canvas defaults it on and says
+ * out loud when a roll-up happened.
+ */
+export interface TopN { limit: number; includeOther: boolean; }
+
+export interface AnalysisSort { by: 'MEASURE' | 'DIMENSION'; direction: 'ASC' | 'DESC'; }
+
+/**
+ * A whole analysis: where to read, how to cut it, and what to measure.
+ *
+ * Named by connection and path like every other request on this API -- the bucket comes from the
+ * connection record server-side, so this shape cannot express "group somebody else's data".
+ *
+ * dimensions may be EMPTY, and that is a real analysis rather than a half-built one: no grouping
+ * is one number over the filtered rows, which is what a KPI is.
+ */
+export interface AnalysisRequest {
+  connection: string;
+  path: string;
+  /** One, two or three, in the order they group. Empty means no grouping at all. */
+  dimensions: string[];
+  measure: Measure;
+  filters?: FilterGroup;
+  topN?: TopN;
+  sort?: AnalysisSort;
+  /** Minted by the client, for the same reason query() mints one: so a run can be stopped. */
+  queryId?: string;
+  /**
+   * The drill steps already taken, oldest first, echoed back exactly as the server sent them.
+   *
+   * THE DRILL STATE LIVES HERE AND NOWHERE ELSE ON THIS SIDE. The endpoints are stateless, so the
+   * trail has to travel with every request -- and the server is the side that applied the filters
+   * and replaced the dimensions, so it is the side entitled to say what the trail is. This client
+   * carries the list from one response into the next request without interpreting it. Anything
+   * else is the client recomputing analytical state it never computed, and the first divergence
+   * shows up as a chart that disagrees with the breadcrumb above it.
+   */
+  drillPath?: Drill[];
+  /** The step /analyze/drill is being asked to take. Read by that endpoint and no other. */
+  into?: Drill;
+  /** How many steps /analyze/drill-up should undo. Read by that endpoint and no other. */
+  steps?: number;
+}
+
+/**
+ * One narrowing: the value that was clicked, and what to look at inside it.
+ *
+ * The same shape describes a step being taken and a step already taken, because they are the same
+ * thing at two moments -- which is why drillPath and `into` are the same type.
+ */
+export interface Drill {
+  dimension: string;
+  /**
+   * The clicked value, or NULL for the group that has no value in it.
+   *
+   * Null is a real operand here and not an absent one: the server drills a null group as IS NULL
+   * rather than as an equality, because "= NULL" is never true and would hand back an empty
+   * analysis for a group the reader can see has rows in it.
+   */
+  value: string | null;
+  /** Absent means "drop the drilled dimension without replacing it". */
+  nextDimension?: string;
+  /** True when the clicked row was the Top-N roll-up. The server refuses to drill into one. */
+  otherBucket?: boolean;
+}
+
+/**
+ * One column of an analysis result, WITH ITS TYPE -- which is the point.
+ *
+ * The SQL console's result carries bare column names and every value as text, and that is why
+ * `sum(amount)` reaches a reader as "7.466125E7" and a DATE as a midnight that is not in the
+ * data. A type on the column is what lets the Canvas render a number as a number and a date as a
+ * date, and it is what 09 means by "typed column metadata".
+ */
+export interface AnalysisColumn {
+  name: string;
+  /** The engine's own type name, e.g. VARCHAR, DOUBLE, DATE. */
+  type: string;
+  role: 'DIMENSION' | 'MEASURE';
+}
+
+/**
+ * One step of the drill trail, as the SERVER counted it.
+ *
+ * Rendered, never reconstructed. The client holds its own mirror of the drill stack because it
+ * has to compose the next request, but the trail on screen is the server's answer -- if the two
+ * ever disagree, the screen shows the disagreement instead of hiding it behind a local guess.
+ */
+export interface AnalysisCrumb { label: string; field?: string; value?: string; }
+
+/**
+ * The tail a Top-N rolled up: what the bucket is called, and which values went into it.
+ *
+ * `values` may be a SAMPLE. On a genuinely high-cardinality dimension the server caps the list and
+ * says so with valuesTruncated, and valueCount is the exact number in the bucket either way -- so
+ * a reader is never shown a partial list as though it were the whole roll-up.
+ */
+export interface OtherBucket {
+  label: string;
+  values: string[];
+  /** Distinct values in the bucket, whether or not they are all listed. */
+  valueCount: number;
+  /** True when `values` is a sample of valueCount rather than all of it. */
+  valuesTruncated: boolean;
+}
+
+/** One row of the pivot grid: the row dimension's value, and one cell per column value. */
+export interface PivotRow {
+  /** Null when the group is the one with no value in it. */
+  key: string | null;
+  /** Aligned to columnValues by position. A null cell has NO ROWS, which is not a zero. */
+  cells: (string | null)[];
+}
+
+/**
+ * The two-dimension result already shaped as a grid, composed server-side.
+ *
+ * Present when the analysis has exactly two dimensions and absent otherwise, so its PRESENCE is
+ * the answer to "can this be drawn as a grid". Rebuilding it here from the flat rows would be a
+ * second implementation of the same rearrangement, and the two could disagree about the order of
+ * the axes -- which transposes somebody's chart without saying so.
+ */
+export interface PivotGrid {
+  rowDimension: string;
+  columnDimension: string;
+  columnValues: string[];
+  /** Null when columnsTruncated: a grid too wide to read is not drawn at all. */
+  rows?: PivotRow[] | null;
+  /** True when the column dimension had more values than a grid can carry. */
+  columnsTruncated: boolean;
+}
+
+export interface AnalysisResult {
+  columns: AnalysisColumn[];
+  /** Strings on the wire, rendered faithfully on screen. See plainDecimal/dateOnly in analytics.ts. */
+  rows: (string | null)[][];
+  rowCount: number;
+  /** True when the result stopped at the server's row ceiling. A partial answer, said loudly. */
+  truncated: boolean;
+  /** The dimensions this analysis grouped by AFTER drilling, which is what the pickers show. */
+  dimensions?: string[];
+  /** The measure column's name, so nothing here has to work out which column it is. */
+  measure?: string;
+  other?: OtherBucket | null;
+  crumbs?: AnalysisCrumb[];
+  /** The trail as data, to be sent back unchanged on the next request. */
+  drillPath?: Drill[];
+  pivot?: PivotGrid | null;
+  /**
+   * What each relative-date window actually resolved to, as "2024-03-01 to 2024-03-07".
+   *
+   * The answer to the question a token could not settle on its own. "Last 7 days" is not
+   * reproducible from the request alone -- it depends on when it ran -- so two charts taken an
+   * hour either side of midnight legitimately differ, and this is what lets a reader see why.
+   */
+  resolvedWindows?: Record<string, string>;
+  queryId?: string;
+  status?: string;
+  durationMs?: number;
+}
+
+/**
+ * An analysis somebody named and kept.
+ *
+ * Mirrors process.model.pojo.AnalyticsAnalysis. Two things about that row govern what is sent
+ * here. The configuration is ONE JSON column, so dimensions, measure, filters, sort and top-N
+ * are serialised into analysisConfig rather than spread across fields. And visualizationType is
+ * lifted OUT of that JSON into its own column, so it must not also appear inside it -- the row's
+ * own javadoc calls two places to say the same thing "one row that can disagree with itself".
+ */
+export interface SavedAnalysis {
+  analyticsAnalysisId?: number;
+  analysisName: string;
+  connectionAlias: string;
+  datasetPath: string;
+  visualizationType?: string;
+  /** JSON: {dimensions, measure, filters, topN, sort}. Never the chart kind. */
+  analysisConfig: string;
+  dateCreated?: string;
+  dateUpdated?: string;
+  createdByName?: string;
+}
+
+/**
+ * The three analysis endpoints share one body, so they share one builder.
+ *
+ * Every optional part is omitted rather than sent null. `topN: null` and no topN at all are the
+ * same intent to a reader and two different values to a parser, and the one thing this module
+ * cannot afford is the server inferring something from a shape the client did not mean.
+ */
+function analysisBody(request: AnalysisRequest): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    connection: request.connection,
+    path: request.path,
+    dimensions: request.dimensions,
+    measure: request.measure.aggregation === 'COUNT_ROWS'
+      // COUNT_ROWS ignores field, so sending one would put a column name in the record of what
+      // was asked that had no part in the answer.
+      ? { aggregation: 'COUNT_ROWS' }
+      : { aggregation: request.measure.aggregation, field: request.measure.field },
+  };
+  if (request.filters && request.filters.clauses.length) {
+    body['filters'] = filtersToWire(request.filters);
+  }
+  if (request.topN) body['topN'] = { ...request.topN };
+  if (request.sort) body['sort'] = { ...request.sort };
+  if (request.queryId) body['queryId'] = request.queryId;
+  // Echoed, not rebuilt. Sent even on a plain /analyze, because a re-run of a drilled analysis
+  // is still the drilled analysis -- dropping the trail there would climb back out of it while
+  // the breadcrumb bar went on saying otherwise.
+  if (request.drillPath && request.drillPath.length) body['drillPath'] = request.drillPath;
+  return body;
+}
+
 /**
  * Analytics Studio's API: reading a dataset, querying one, and the library around both.
  *
@@ -247,6 +591,7 @@ export class AnalyticsService {
   private readonly base = `${API_BASE}/analytics.json`;
   private readonly library = `${API_BASE}/analyticsLibrary.json`;
   private readonly exports = `${API_BASE}/analyticsExport.json`;
+  private readonly workspace = `${API_BASE}/analyticsWorkspace.json`;
 
   schema(connection: string, path: string): Observable<ApiResponse<DatasetSchema>> {
     return this.http.get<ApiResponse<DatasetSchema>>(`${this.base}/schema`, {
@@ -319,6 +664,86 @@ export class AnalyticsService {
       body['path2'] = request.path2;
     }
     return this.http.post<ApiResponse<QueryResult>>(`${this.base}/query`, body);
+  }
+
+  // ---- the analysis: document 07's canvas ------------------------------------------------
+
+  /**
+   * Runs a STRUCTURED analysis -- dimensions, a measure, filters -- rather than a statement.
+   *
+   * The difference from query() is the whole security argument of document 07 and it is worth
+   * stating where the call is made: nothing on this path carries SQL. The client sends field
+   * names and operator names out of a closed vocabulary, and the server composes the statement
+   * itself behind the same gate and the same governor. A filter value is an operand, never a
+   * fragment, so there is no concatenation for it to escape from.
+   *
+   * The body is built here rather than sent as the caller's object because an incomplete filter
+   * must not travel: a group with no clauses is dropped, and clauseToWire drops empty operands.
+   * An empty group sent as `{op:'AND',clauses:[]}` is a filter that means nothing, and a server
+   * reading it as one is a server deciding what "no clauses" implies.
+   */
+  analyze(request: AnalysisRequest): Observable<ApiResponse<AnalysisResult>> {
+    return this.http.post<ApiResponse<AnalysisResult>>(
+      `${this.base}/analyze`, analysisBody(request));
+  }
+
+  /**
+   * Narrows the analysis by one step: the clicked value becomes a filter, and the next dimension
+   * replaces the drilled one.
+   *
+   * The SERVER composes that, not this client, which is why the whole analysis goes with the
+   * step rather than a pre-composed one. Two implementations of the same composition -- one to
+   * build the request and one to run it -- is exactly where a drill trail starts disagreeing
+   * with the rows under it.
+   */
+  drill(request: AnalysisRequest, into: Drill): Observable<ApiResponse<AnalysisResult>> {
+    const body = analysisBody(request);
+    // value is sent even when null -- see Drill.value. Only nextDimension is dropped when absent,
+    // because absent there means "drop the dimension" and '' would be a dimension named ''.
+    const step: Record<string, unknown> = { dimension: into.dimension, value: into.value ?? null };
+    if (into.nextDimension) step['nextDimension'] = into.nextDimension;
+    if (into.otherBucket) step['otherBucket'] = true;
+    body['into'] = step;
+    return this.http.post<ApiResponse<AnalysisResult>>(`${this.base}/analyze/drill`, body);
+  }
+
+  /** Removes that many trailing drill filters, restoring the dimensions they replaced. */
+  drillUp(request: AnalysisRequest, steps: number): Observable<ApiResponse<AnalysisResult>> {
+    const body = analysisBody(request);
+    body['steps'] = steps;
+    return this.http.post<ApiResponse<AnalysisResult>>(`${this.base}/analyze/drill-up`, body);
+  }
+
+  // ---- the workspace: analyses somebody named and kept ------------------------------------
+
+  fetchAllAnalyses(): Observable<ApiResponse<SavedAnalysis[]>> {
+    return this.http.get<ApiResponse<SavedAnalysis[]>>(`${this.workspace}/fetchAllAnalyses`);
+  }
+
+  /**
+   * Stores the analysis under a name, or updates the one the id names.
+   *
+   * Only the five fields a person decides are sent, for the reason saveQuery sends four: the
+   * service copies exactly those onto a row whose tenant and audit columns come from the signed-in
+   * context, and a tenantId on the wire here would be this client claiming an ownership it does
+   * not get to claim.
+   */
+  saveAnalysis(analysis: SavedAnalysis): Observable<ApiResponse<SavedAnalysis>> {
+    const body: Record<string, unknown> = {
+      analysisName: analysis.analysisName,
+      connectionAlias: analysis.connectionAlias,
+      datasetPath: analysis.datasetPath,
+      analysisConfig: analysis.analysisConfig,
+    };
+    if (analysis.visualizationType) body['visualizationType'] = analysis.visualizationType;
+    if (analysis.analyticsAnalysisId) body['analyticsAnalysisId'] = analysis.analyticsAnalysisId;
+    return this.http.post<ApiResponse<SavedAnalysis>>(`${this.workspace}/saveAnalysis`, body);
+  }
+
+  deleteAnalysis(analyticsAnalysisId: number): Observable<ApiResponse<void>> {
+    return this.http.delete<ApiResponse<void>>(`${this.workspace}/deleteAnalysis`, {
+      params: { analyticsAnalysisId: String(analyticsAnalysisId) },
+    });
   }
 
   // ---- the library: saved queries and the record of what ran -----------------------------

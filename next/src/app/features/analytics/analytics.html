@@ -561,6 +561,692 @@
           </app-table-shell>
         }
 
+        @if (tab() === 'canvas') {
+          <!-- Document 07's canvas. The whole tab is one idea: a reader says what to group by and
+               what to measure, and the SERVER composes the statement. Nothing on this tab carries
+               SQL, which is why a filter value here is an operand and not a fragment that could
+               escape into a query -- the console next door is where somebody writes their own.
+
+               Every figure on this tab is an aggregate, and an aggregate hides its own
+               uncertainty better than a table of rows does: a bar chart of ten of forty thousand
+               rows looks exactly as finished as a chart of all forty thousand. So the four things
+               that can be wrong about one are said ON it, never underneath it -- it stopped at
+               the row ceiling, a tail was rolled into Other, a distinct count may be a sketch,
+               and rows a filter excluded are excluded rather than zero. -->
+          <div class="flex flex-col gap-3 min-w-0">
+
+            <!-- ── what to analyse ──────────────────────────────────────────────────────── -->
+            <div class="card p-4 flex flex-col gap-3 min-w-0">
+              <div>
+                <h3 class="text-sm font-semibold">Build an analysis</h3>
+                <p class="field-note text-[color:var(--text-muted)]">
+                  Up to three dimensions and one measure, sent to the server as field names and
+                  operator names rather than as a statement. It composes the query itself, behind
+                  the same gate and the same governor the console runs through.
+                </p>
+              </div>
+
+              <!-- Dimensions, in ORDER. The order is not a preference: the first dimension is the
+                   one a pivot puts down the side and the one a chart labels its marks with, so
+                   Department × Status and Status × Department are two different pictures of the
+                   same buckets. A slot only appears once the one before it is filled. -->
+              <div class="flex flex-wrap items-end gap-2 min-w-0">
+                @for (slot of dimensionSlots(); track $index) {
+                  <div class="flex flex-col gap-1 min-w-0">
+                    <label class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]"
+                           [attr.for]="'a-dim-' + $index">
+                      {{ $index === 0 ? 'Dimension' : 'then by' }}
+                    </label>
+                    <select [id]="'a-dim-' + $index" class="input input-sm w-auto min-w-0 max-w-52"
+                            [value]="slot"
+                            (change)="setDimension($index, $any($event.target).value)">
+                      <option value="">
+                        {{ $index === 0 ? 'no grouping — one figure over every matching row' : 'none' }}
+                      </option>
+                      @for (column of dimensionOptions($index); track column.name) {
+                        <option [value]="column.name" [selected]="column.name === slot">
+                          {{ column.name }} · {{ shortType(column.type) }}
+                        </option>
+                      }
+                    </select>
+                  </div>
+                }
+              </div>
+
+              <div class="flex flex-wrap items-end gap-2 min-w-0">
+                <div class="flex flex-col gap-1 min-w-0">
+                  <label class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]"
+                         for="a-agg">Measure</label>
+                  <select id="a-agg" class="input input-sm w-auto min-w-0 max-w-52"
+                          [value]="aggregation()"
+                          (change)="aggregation.set($any($event.target).value)">
+                    @for (option of aggregations; track option.id) {
+                      <option [value]="option.id" [selected]="option.id === aggregation()">
+                        {{ option.label }}
+                      </option>
+                    }
+                  </select>
+                </div>
+
+                <!-- Not disabled and hidden by turns: Count rows is the one aggregation that is a
+                     question about rows rather than about a column, so the column picker goes
+                     away entirely rather than sitting there greyed out asking to be filled in. -->
+                @if (measureNeedsField()) {
+                  <div class="flex flex-col gap-1 min-w-0">
+                    <label class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]"
+                           for="a-measure-field">of column</label>
+                    <select id="a-measure-field" class="input input-sm w-auto min-w-0 max-w-52"
+                            [value]="measureField()"
+                            (change)="measureField.set($any($event.target).value)">
+                      <option value="">choose a column…</option>
+                      @for (column of columns(); track column.name) {
+                        <option [value]="column.name" [selected]="column.name === measureField()">
+                          {{ column.name }} · {{ shortType(column.type) }}
+                        </option>
+                      }
+                    </select>
+                  </div>
+                }
+
+                <div class="flex flex-col gap-1 min-w-0">
+                  <label class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]"
+                         for="a-sort">Sort by</label>
+                  <select id="a-sort" class="input input-sm w-auto min-w-0"
+                          [value]="sortBy() + '-' + sortDirection()"
+                          (change)="sortBy.set($any($event.target).value.split('-')[0]);
+                                    sortDirection.set($any($event.target).value.split('-')[1])">
+                    <option value="MEASURE-DESC" [selected]="sortBy() === 'MEASURE' && sortDirection() === 'DESC'">
+                      measure, largest first
+                    </option>
+                    <option value="MEASURE-ASC" [selected]="sortBy() === 'MEASURE' && sortDirection() === 'ASC'">
+                      measure, smallest first
+                    </option>
+                    <option value="DIMENSION-ASC" [selected]="sortBy() === 'DIMENSION' && sortDirection() === 'ASC'">
+                      dimension, A–Z
+                    </option>
+                    <option value="DIMENSION-DESC" [selected]="sortBy() === 'DIMENSION' && sortDirection() === 'DESC'">
+                      dimension, Z–A
+                    </option>
+                  </select>
+                </div>
+              </div>
+
+              @if (aggregationHedge()) {
+                <!-- On the picker, before anything runs. A hedge that only appears beside the
+                     answer arrives after the reader has decided what the answer is. -->
+                <p class="field-note text-[color:var(--text-muted)]">{{ aggregationHedge() }}</p>
+              }
+
+              <!-- Top-N. The Other bucket is on by default and is not a cosmetic switch: with it
+                   off the tail is simply gone, and a chart of the head has the shape and the
+                   confidence of a chart of everything. -->
+              <div class="flex flex-wrap items-center gap-2 min-w-0 pt-1 border-t border-subtle">
+                <span class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">
+                  Top-N
+                </span>
+                <div class="flex rounded overflow-hidden border border-subtle">
+                  <button type="button" class="px-2 py-1 text-xs transition-colors"
+                          [class.bg-sunken]="topNActive()"
+                          [class.pill-solid-brand]="!topNActive()"
+                          [attr.aria-pressed]="!topNActive()"
+                          (click)="setTopN(null)">All</button>
+                  @for (choice of topNChoices; track choice) {
+                    <button type="button" class="px-2 py-1 text-xs transition-colors"
+                            [class.bg-sunken]="topNLimit() !== choice"
+                            [class.pill-solid-brand]="topNLimit() === choice"
+                            [attr.aria-pressed]="topNLimit() === choice"
+                            (click)="setTopN(choice); topNCustom.set('')">{{ choice }}</button>
+                  }
+                </div>
+                <input class="input input-sm w-24" type="number" min="1" placeholder="custom"
+                       aria-label="A custom Top-N"
+                       [value]="topNCustom()"
+                       (change)="setCustomTopN($any($event.target).value)" />
+                @if (topNActive()) {
+                  <label class="flex items-center gap-1.5 text-xs">
+                    <input type="checkbox" [checked]="topNOther()"
+                           (change)="topNOther.set($any($event.target).checked)" />
+                    roll the rest into an Other bucket
+                  </label>
+                }
+                @if (topNActive() && !topNOther()) {
+                  <span class="pill pill-warn">the tail will be missing, not summarised</span>
+                }
+              </div>
+
+              <div class="flex flex-wrap items-center gap-2 min-w-0">
+                <button type="button" class="btn btn-primary btn-sm"
+                        [disabled]="!canAnalyse()" (click)="runAnalysis()">
+                  <app-icon name="play" />{{ analysing() ? 'Running…' : 'Run analysis' }}
+                </button>
+                <!-- The same stop control the console has, for the same reason: the analysis is a
+                     full scan through a governor that admits four at a time, and a reader who
+                     started the wrong one should be able to give the permit back. -->
+                @if (analysing()) {
+                  <button type="button" class="btn btn-default btn-sm"
+                          [disabled]="!canStopAnalysis()" (click)="stopAnalysis()">
+                    <app-icon name="stop" />{{ analysisStopping() ? 'Stopping…' : 'Stop' }}
+                  </button>
+                }
+                @if (analyseBlocker()) {
+                  <span class="text-xs text-[color:var(--text-muted)]">{{ analyseBlocker() }}</span>
+                }
+              </div>
+            </div>
+
+            <!-- ── the filter builder ───────────────────────────────────────────────────── -->
+            <div class="card p-4 flex flex-col gap-2 min-w-0">
+              <div class="flex flex-wrap items-baseline gap-2">
+                <h3 class="text-sm font-semibold">Filters</h3>
+                <span class="text-xs text-[color:var(--text-muted)]">
+                  fourteen operators, and groups that nest
+                </span>
+                @if (unfinishedFilterCount() > 0) {
+                  <!-- Said out loud rather than dropped quietly. A half-typed condition that is
+                       silently not sent is a predicate the reader believes is narrowing the rows
+                       they are about to read. -->
+                  <span class="pill pill-warn">
+                    {{ unfinishedFilterCount() }} not finished, so not applied
+                  </span>
+                }
+              </div>
+
+              <app-filter-builder [model]="canvasFilters()" [columns]="columns()"
+                                  (changed)="setFilters($event)" />
+
+              <p class="field-note text-[color:var(--text-muted)]">
+                These narrow the analysis and everything drawn from it. They do
+                <span class="font-medium">not</span> narrow the Data tab's preview — that endpoint
+                takes a page and a size and has no filter to give it, so a chip here would be
+                claiming to filter a table it cannot reach.
+              </p>
+            </div>
+
+            <!-- ── where the reader is: crumbs, then chips ──────────────────────────────── -->
+            @if (crumbTrail().length > 1 || crumbsMissing()) {
+              <div class="card p-3 flex flex-col gap-2 min-w-0">
+                @if (crumbTrail().length) {
+                  <!-- The SERVER's trail, rendered and not reconstructed. Every response carries
+                       it precisely so this screen never has to work out where it is from a stack
+                       of its own -- and if the two ever disagreed, this is the half that is
+                       right. -->
+                  <nav class="flex flex-wrap items-center gap-1 min-w-0" aria-label="Drill trail">
+                    @for (crumb of crumbTrail(); track $index) {
+                      @if ($index > 0) {
+                        <app-icon name="chevronRight" size="0.85em" class="icon-muted" />
+                      }
+                      <button type="button"
+                              class="text-xs px-1.5 py-0.5 rounded transition-colors"
+                              [class.font-semibold]="$index === crumbTrail().length - 1"
+                              [class.text-[color:var(--text-muted)]]="$index !== crumbTrail().length - 1"
+                              [disabled]="$index === crumbTrail().length - 1 || analysing()"
+                              (click)="crumbClick($index)">{{ crumb.label }}</button>
+                    }
+                  </nav>
+                }
+                @if (crumbsMissing()) {
+                  <p class="text-xs text-[color:var(--text-secondary)]">
+                    You have drilled {{ drillPath().length }}
+                    {{ drillPath().length === 1 ? 'step' : 'steps' }} in, and the server did not send
+                    a breadcrumb trail with this result. The steps are shown as chips below
+                    instead; the labels are this screen's own, not the server's.
+                  </p>
+                }
+              </div>
+            }
+
+            @if (filterChips().length) {
+              <!-- Removable chips, which is 07's own word for them. Stated rather than implied:
+                   every figure below describes the narrowed rows, and a reader who cannot see
+                   that a filter is on reads the numbers as the whole dataset. -->
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="text-xs text-[color:var(--text-muted)]">Filtered to</span>
+                @for (chip of filterChips(); track chip.key) {
+                  <button type="button" [disabled]="analysing()"
+                          [class.pill-brand]="chip.kind === 'clicked'"
+                          [class.pill-neutral]="chip.kind === 'drill'"
+                          class="pill"
+                          [title]="chip.kind === 'drill'
+                            ? 'Climb back out of this drill step'
+                            : 'Remove this filter'"
+                          (click)="removeChip(chip)">
+                    {{ chip.label }}<app-icon name="close" size="0.8em" />
+                  </button>
+                }
+                @if (crossFilters().length > 1) {
+                  <button type="button" class="btn btn-ghost btn-xs" [disabled]="analysing()"
+                          (click)="clearCrossFilters()">Clear clicked filters</button>
+                }
+              </div>
+            }
+
+            <!-- ── the result ───────────────────────────────────────────────────────────── -->
+            @if (analysisError()) {
+              <div class="card p-4 flex items-start gap-3 min-w-0" role="alert">
+                <app-icon name="alert" size="1.25rem" class="icon-crit shrink-0 mt-0.5" />
+                <div class="min-w-0">
+                  <h3 class="text-sm font-semibold text-crit-500">The analysis did not run</h3>
+                  <p class="text-sm text-[color:var(--text-secondary)] mt-1">{{ analysisError() }}</p>
+                  <p class="field-note text-[color:var(--text-muted)] mt-2">
+                    That is the server's own explanation, word for word. Some of these are
+                    refusals rather than faults — a dataset this account cannot reach, or a
+                    governor with no slot free.
+                  </p>
+                </div>
+              </div>
+            } @else {
+              <app-table-shell heading="Analysis" [scrollRows]="false"
+                               [loading]="analysing()"
+                               [showSubbar]="!!analysisResult() && analysisTruncated()"
+                               [isEmpty]="!analysing() && !analysisResult()"
+                               [emptyMessage]="canvasEmptyMessage()" emptyIcon="chart">
+
+                @if (analysisResult()) {
+                  <div toolbar class="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs min-w-0">
+                    <span class="text-sm font-semibold tabular">
+                      {{ analysisResult()!.rowCount.toLocaleString() }}
+                    </span>
+                    <span class="text-[color:var(--text-muted)]">
+                      {{ analysisResult()!.rowCount === 1 ? 'group' : 'groups' }}
+                    </span>
+                    @if (analysisTruncated()) {
+                      <span class="pill pill-warn">stopped at the limit — there may be more</span>
+                    } @else if (topNActive()) {
+                      <span class="text-[color:var(--text-muted)]">
+                        the top {{ topNLimit() }}{{ otherBucket() ? ', plus the rolled-up rest' : '' }}
+                      </span>
+                    } @else {
+                      <span class="text-[color:var(--text-muted)]">every group that matched</span>
+                    }
+                    @if (analysisResult()!.durationMs !== null
+                         && analysisResult()!.durationMs !== undefined) {
+                      <span class="text-[color:var(--text-muted)]">
+                        {{ analysisResult()!.durationMs }} ms in the engine
+                      </span>
+                    }
+                  </div>
+                }
+
+                <!-- The truncation warning, in the row above the figures and again on the figure
+                     itself. A table of groups that stopped at the ceiling is not a short answer,
+                     it is a wrong one, and it looks exactly as complete as a right one. -->
+                <div subbar class="flex items-start gap-2 min-w-0" role="alert">
+                  <app-icon name="alert" size="1.1rem" class="icon-warn shrink-0 mt-0.5" />
+                  <p class="text-xs text-[color:var(--text-secondary)]">
+                    <span class="font-semibold">This is part of the answer.</span>
+                    The result stopped at the server's row ceiling, so groups that match your
+                    filters are missing from every figure below. Nothing here can say how many, or
+                    which way they would move one. A Top-N or a tighter filter brings it back
+                    inside the ceiling.
+                  </p>
+                </div>
+
+                <!-- Guarded, because projected content is created in THIS view whether or not the
+                     shell is showing it: the empty and loading branches of app-table-shell hide
+                     this block but do not stop its bindings from being evaluated. -->
+                @if (analysisResult()) {
+                <div class="p-4 flex flex-col gap-3 min-w-0">
+
+                  <div class="flex flex-wrap items-end gap-2 min-w-0">
+                    <div class="flex flex-col gap-1 min-w-0 flex-1">
+                      <label class="text-[11px] uppercase tracking-wider
+                                    text-[color:var(--text-muted)]" for="a-canvas-kind">Show as</label>
+                      <select id="a-canvas-kind" class="input input-sm w-full"
+                              [value]="canvasKind() ?? ''"
+                              (change)="canvasKindName.set($any($event.target).value)">
+                        @for (option of canvasKinds(); track option.id) {
+                          <!-- Listed and inert with the reason on it, never quietly missing: a
+                               reader who cannot find the pivot needs to be told that a pivot
+                               needs two dimensions, not left to wonder. -->
+                          <option [value]="option.id" [disabled]="!!option.issue"
+                                  [selected]="option.id === canvasKind()"
+                                  [title]="option.issue || option.label">
+                            {{ option.label }}{{ option.issue ? ' — ' + option.issue : '' }}
+                          </option>
+                        }
+                      </select>
+                    </div>
+
+                    <!-- Drill controls. Two selects rather than a menu on every row: what a drill
+                         does -- which dimension it replaces, and what replaces it -- is one
+                         decision for the whole table, and repeating it per row would ask the same
+                         question once per group. -->
+                    @if (dimensions().length) {
+                      <div class="flex flex-col gap-1 min-w-0">
+                        <label class="text-[11px] uppercase tracking-wider
+                                      text-[color:var(--text-muted)]" for="a-drill-dim">Drill</label>
+                        <select id="a-drill-dim" class="input input-sm w-auto min-w-0 max-w-40"
+                                [value]="drillDimension()"
+                                (change)="drillDimension.set($any($event.target).value)">
+                          @for (name of dimensions(); track name) {
+                            <option [value]="name" [selected]="name === drillDimension()">{{ name }}</option>
+                          }
+                        </select>
+                      </div>
+                      <div class="flex flex-col gap-1 min-w-0">
+                        <label class="text-[11px] uppercase tracking-wider
+                                      text-[color:var(--text-muted)]" for="a-drill-next">then by</label>
+                        <select id="a-drill-next" class="input input-sm w-auto min-w-0 max-w-40"
+                                [value]="drillNext()"
+                                (change)="drillNext.set($any($event.target).value)">
+                          <option value="">nothing — just narrow</option>
+                          @for (column of columns(); track column.name) {
+                            @if (!dimensions().includes(column.name)) {
+                              <option [value]="column.name" [selected]="column.name === drillNext()">
+                                {{ column.name }}
+                              </option>
+                            }
+                          }
+                        </select>
+                      </div>
+                    }
+                  </div>
+
+                  <div class="flex flex-wrap items-baseline gap-2 min-w-0">
+                    <h4 class="text-sm font-medium min-w-0 truncate">{{ canvasCaption() }}</h4>
+                    @if (analysisTruncated()) {
+                      <!-- On the figure's own title. This is the line that travels with the
+                           picture when somebody screenshots it. -->
+                      <span class="pill pill-warn">partial — part of the answer</span>
+                    }
+                    @if (otherBucket()) {
+                      <span class="pill pill-neutral">
+                        {{ otherBucket()!.valueCount }} rolled into
+                        “{{ otherBucket()!.label }}”
+                      </span>
+                    }
+                    @if (distinctExactness() === 'unstated') {
+                      <span class="pill pill-warn">exactness not stated</span>
+                    }
+                    @if (distinctExactness() === 'estimated') {
+                      <span class="pill pill-warn">estimated, not counted</span>
+                    }
+                  </div>
+
+                  @if (!analysisResult()!.rows.length) {
+                    <p class="text-sm text-[color:var(--text-secondary)] py-6 text-center">
+                      {{ canvasEmptyMessage() }}
+                    </p>
+                  } @else {
+                    @switch (canvasKind()) {
+
+                      @case ('pivot') {
+                        @if (pivot()?.columnsTruncated) {
+                          <!-- A grid five thousand columns wide is not a narrower version of the
+                               answer, it is an unusable one, so the server sends the reason
+                               instead of the grid. Saying which control fixes it beats an empty
+                               frame. -->
+                          <p class="text-sm text-[color:var(--text-secondary)] py-6 text-center">
+                            {{ pivot()!.columnDimension }} has more values than a grid can carry,
+                            so no grid was built. A Top-N on it, or the table view, will show this
+                            result.
+                          </p>
+                        } @else if (pivot()) {
+                          <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                              <thead>
+                                <tr class="text-left text-[color:var(--text-muted)]">
+                                  <th class="px-2 py-1.5 font-medium whitespace-nowrap">
+                                    {{ pivot()!.rowDimension }} ↓ · {{ pivot()!.columnDimension }} →
+                                  </th>
+                                  @for (column of pivot()!.columns; track column) {
+                                    <th class="px-2 py-1.5 font-medium whitespace-nowrap tabular text-right">
+                                      {{ column || '(null)' }}
+                                    </th>
+                                  }
+                                  @if (pivot()!.additive) {
+                                    <th class="px-2 py-1.5 font-medium whitespace-nowrap text-right">Total</th>
+                                  }
+                                </tr>
+                              </thead>
+                              <tbody>
+                                @for (row of pivot()!.rows; track row.label) {
+                                  <tr class="border-t border-subtle">
+                                    <th scope="row" class="px-2 py-1.5 text-left font-normal whitespace-nowrap">
+                                      {{ row.label || '(null)' }}
+                                    </th>
+                                    @for (cell of row.values; track $index) {
+                                      <td class="px-2 py-1.5 text-right tabular whitespace-nowrap">
+                                        @if (cell === null) {
+                                          <!-- Empty, never zero. A combination with no rows and a
+                                               combination that measured zero are different facts,
+                                               and only one of them is a number. -->
+                                          <span class="text-[color:var(--text-muted)]" title="no rows in this combination">—</span>
+                                        } @else {
+                                          {{ cell }}
+                                        }
+                                      </td>
+                                    }
+                                    @if (pivot()!.additive) {
+                                      <td class="px-2 py-1.5 text-right tabular font-medium whitespace-nowrap">
+                                        {{ row.total === null ? '—' : row.total.toLocaleString() }}
+                                      </td>
+                                    }
+                                  </tr>
+                                }
+                              </tbody>
+                            </table>
+                          </div>
+                          @if (pivotTotalNote()) {
+                            <p class="field-note text-[color:var(--text-muted)]">{{ pivotTotalNote() }}</p>
+                          }
+                          <p class="field-note text-[color:var(--text-muted)]">
+                            An empty cell means no rows in that combination. It is not a zero, and
+                            it is not included in any total.
+                          </p>
+                        }
+                      }
+
+                      @case ('ranked') {
+                        <!-- No percentages. A share of a total is only a share when the parts add
+                             up to it, and the measure here is whatever the reader picked. -->
+                        <app-ranked-bar [data]="canvasPoints()" [max]="canvasPoints().length"
+                                        [showPercent]="false"
+                                        [clickable]="markClickable()"
+                                        (picked)="crossFilterFromMark($event.name)" />
+                      }
+
+                      @case ('bar') {
+                        <app-bar-chart [data]="canvasPoints()" [height]="220"
+                                       [clickable]="markClickable()"
+                                       (barClicked)="crossFilterFromMark($event.name)" />
+                      }
+
+                      @case ('donut') {
+                        <app-donut [data]="canvasPoints()"
+                                   [totalLabel]="measureColumn()?.name ?? ''" />
+                      }
+
+                      @default {
+                        <div class="overflow-x-auto">
+                          <table class="w-full text-sm">
+                            <thead>
+                              <tr class="text-left text-[color:var(--text-muted)]">
+                                @for (column of analysisResult()!.columns; track column.name) {
+                                  <th class="px-2 py-1.5 font-medium whitespace-nowrap"
+                                      [class.text-right]="column.role === 'MEASURE'">
+                                    {{ column.name }}
+                                    <!-- The type, said on the header. It is what decides how the
+                                         cells under it are written -- a number as a plain decimal
+                                         and a DATE as a date -- so it belongs where a reader can
+                                         check that decision. -->
+                                    <span class="mono text-[10px] text-[color:var(--text-muted)]">
+                                      {{ shortType(column.type) }}
+                                    </span>
+                                  </th>
+                                }
+                                @if (drillDimension()) { <th class="px-2 py-1.5"></th> }
+                              </tr>
+                            </thead>
+                            <tbody>
+                              @for (row of analysisRows(); track $index) {
+                                <tr class="border-t border-subtle">
+                                  @for (cell of row.cells; track $index) {
+                                    <td class="px-2 py-1.5 whitespace-nowrap"
+                                        [class.text-right]="cell.column.role === 'MEASURE'"
+                                        [class.tabular]="cell.column.role === 'MEASURE'">
+                                      @if (cell.isNull) {
+                                        <span class="text-[color:var(--text-muted)] italic">null</span>
+                                      } @else if (cell.column.role === 'DIMENSION' && !row.isOther) {
+                                        <!-- Cross-filtering: one click narrows the analysis and
+                                             everything drawn from it, because all of it comes
+                                             from the one result. The Other row is deliberately
+                                             not clickable -- "Other" is not a value in the data,
+                                             it is the values the reader has not been shown. -->
+                                        <button type="button"
+                                                class="text-left underline decoration-dotted
+                                                       underline-offset-2 hover:text-[color:var(--text-primary)]"
+                                                [disabled]="analysing()"
+                                                [title]="'Filter to ' + cell.column.name + ' = ' + cell.text"
+                                                (click)="crossFilter(cell.column.name, cell.raw)">
+                                          {{ cell.text }}
+                                        </button>
+                                      } @else {
+                                        {{ cell.text }}
+                                      }
+                                    </td>
+                                  }
+                                  @if (drillDimension()) {
+                                    <td class="px-2 py-1.5 text-right">
+                                      @if (!row.isOther) {
+                                        <button type="button" class="btn btn-ghost btn-xs"
+                                                [disabled]="analysing()"
+                                                [title]="'Narrow to this ' + drillDimension()
+                                                  + (drillNext() ? ', then group by ' + drillNext() : '')"
+                                                (click)="drillInto(drillValueOf(row))">
+                                          <app-icon name="chevronRight" />Drill
+                                        </button>
+                                      }
+                                    </td>
+                                  }
+                                </tr>
+                              }
+                            </tbody>
+                          </table>
+                        </div>
+                        @if (otherBucket()) {
+                          <p class="field-note text-[color:var(--text-muted)]">
+                            The “{{ otherBucket()!.label }}” row is
+                            {{ otherBucket()!.valueCount }} rolled-up
+                            {{ otherBucket()!.valueCount === 1 ? 'value' : 'values' }}, not a category in the data — so it cannot be
+                            filtered to or drilled into. A row whose value is literally
+                            “{{ otherBucket()!.label }}” cannot be told apart from it here, and is
+                            inert for the same reason.
+                          </p>
+                        }
+                      }
+                    }
+                  }
+
+                  <!-- What the figure cannot say about itself. Every line is a row, a category, a
+                       whole tail or a claim that is not on the picture above. -->
+                  @if (canvasNotes().length) {
+                    <ul class="flex flex-col gap-1 mt-1">
+                      @for (note of canvasNotes(); track note) {
+                        <li class="text-[11px] text-[color:var(--text-muted)]">{{ note }}</li>
+                      }
+                    </ul>
+                  }
+                </div>
+                }
+              </app-table-shell>
+            }
+
+            <!-- ── saved analyses ───────────────────────────────────────────────────────── -->
+            <div class="grid gap-3 sm:grid-cols-2">
+
+              <div class="card p-3 flex flex-col gap-2 min-w-0">
+                <h3 class="text-xs uppercase tracking-wider text-[color:var(--text-muted)]">
+                  Save this analysis
+                </h3>
+                <input class="input input-sm w-full" placeholder="Name this analysis"
+                       aria-label="Name this analysis"
+                       [value]="analysisName()"
+                       (input)="analysisName.set($any($event.target).value)" />
+                <div class="flex flex-wrap items-center gap-2">
+                  <button type="button" class="btn btn-primary btn-sm"
+                          [disabled]="!canSaveAnalysis()" (click)="saveAnalysis(false)">
+                    <app-icon name="save" />{{ savingAnalysis() ? 'Saving…' : 'Save as new' }}
+                  </button>
+                  <!-- Two buttons rather than one that guesses, exactly as the query library
+                       does: the same control silently forking or silently overwriting is the
+                       one that eventually loses somebody's work. -->
+                  @if (loadedAnalysis()?.analyticsAnalysisId) {
+                    <button type="button" class="btn btn-default btn-sm"
+                            [disabled]="!canSaveAnalysis()" (click)="saveAnalysis(true)">
+                      Update “{{ loadedAnalysis()!.analysisName }}”
+                    </button>
+                  }
+                </div>
+                @if (analysisSaveError()) {
+                  <p class="text-xs text-crit-500">{{ analysisSaveError() }}</p>
+                }
+                <p class="field-note text-[color:var(--text-muted)]">
+                  Stores the dataset, the dimensions, the measure, the filters, the sort, the
+                  Top-N and the chart kind — never any rows. Filters a drill added are kept as
+                  filters, so reopening lands on the narrowed analysis with no trail behind it.
+                </p>
+                @if (analysisFromElsewhere()) {
+                  <p class="text-xs text-[color:var(--text-secondary)]">
+                    {{ analysisFromElsewhere() }} It will run against the file that is open here.
+                  </p>
+                }
+              </div>
+
+              <div class="card p-3 flex flex-col gap-2 min-w-0">
+                <div class="flex items-baseline justify-between gap-2">
+                  <h3 class="text-xs uppercase tracking-wider text-[color:var(--text-muted)]">
+                    Saved analyses
+                  </h3>
+                  <button type="button" class="btn btn-ghost btn-xs" (click)="loadAnalyses()">
+                    <app-icon name="refresh" />
+                  </button>
+                </div>
+                @if (analysisOpenError()) {
+                  <!-- A reopen that failed, said whatever the list is doing. It used to share the
+                       list's own error signal and so was invisible while the list was loading --
+                       which is precisely when a stale row gets clicked. -->
+                  <p class="text-xs text-crit-500">{{ analysisOpenError() }}</p>
+                }
+                @if (analysesLoading()) {
+                  <p class="text-xs text-[color:var(--text-muted)]">Reading your analyses…</p>
+                } @else if (analysesError()) {
+                  <p class="text-xs text-crit-500">{{ analysesError() }}</p>
+                } @else if (!analyses().length) {
+                  <p class="text-xs text-[color:var(--text-muted)]">
+                    Nothing saved yet. A saved analysis reopens without storing a single row of
+                    the data it reads.
+                  </p>
+                } @else {
+                  <ul class="flex flex-col divide-y divide-[color:var(--border-subtle)]">
+                    @for (saved of analyses(); track saved.analyticsAnalysisId) {
+                      <li class="py-1.5 flex items-center gap-2 min-w-0">
+                        <button type="button" class="min-w-0 flex-1 text-left"
+                                [title]="saved.connectionAlias + '/' + saved.datasetPath"
+                                (click)="openAnalysis(saved)">
+                          <span class="block text-sm truncate">{{ saved.analysisName }}</span>
+                          <span class="block text-[11px] text-[color:var(--text-muted)] truncate">
+                            {{ saved.visualizationType || 'table' }} · {{ analysisWhen(saved) }}
+                          </span>
+                        </button>
+                        <button type="button" class="btn btn-ghost btn-xs"
+                                [attr.aria-label]="'Delete ' + saved.analysisName"
+                                (click)="removeAnalysis(saved)">
+                          <app-icon name="trash" />
+                        </button>
+                      </li>
+                    }
+                  </ul>
+                  <p class="field-note text-[color:var(--text-muted)]">
+                    Opening one puts it on the canvas without running it — an analysis can be a
+                    full scan, and browsing the list should not spend one.
+                  </p>
+                }
+              </div>
+            </div>
+          </div>
+        }
+
         @if (tab() === 'sql') {
           <div class="flex flex-col gap-3 min-w-0">
 
