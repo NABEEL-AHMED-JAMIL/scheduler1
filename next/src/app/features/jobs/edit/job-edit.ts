@@ -5,6 +5,7 @@ import {
   AbstractControl, FormBuilder, FormGroup, ReactiveFormsModule, ValidationErrors, Validators,
 } from '@angular/forms';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
+import { LIST_LIMIT } from '../../../core/api/list-limit';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { Field } from '../../../shared/ui/field';
 import { Icon } from '../../../shared/ui/icon';
@@ -87,7 +88,11 @@ export class JobEdit implements OnInit {
     FREQUENCIES.find(f => f.value === this.frequencyValue())?.unit ?? '');
 
   ngOnInit(): void {
-    this.http.post<ApiResponse<any[]>>(`${API_BASE}/sourceTask.json/listSourceTask`, {}).subscribe({
+    // Explicitly limited, because the endpoint's own default is ten: this dropdown is the only
+    // way to attach a job to a task, so without the limit the eleventh task onwards could not
+    // be chosen at all -- and the control gave no hint that anything was missing.
+    this.http.post<ApiResponse<any[]>>(`${API_BASE}/sourceTask.json/listSourceTask`, {},
+      { params: { limit: LIST_LIMIT } }).subscribe({
       next: response => {
         if (response.status === API_SUCCESS) this.tasks.set(response.data ?? []);
       },

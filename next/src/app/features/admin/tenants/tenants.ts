@@ -36,12 +36,23 @@ export interface Tenant {
   sourceTaskTypeCount: number;
   sourceTaskCount: number;
   sourceJobCount: number;
+  /**
+   * Distinct pipelines across this tenant's tasks.
+   *
+   * Breadth where sourceTaskCount is volume: the demo workspace has 19 tasks across 15
+   * pipelines. Kept beside the task count rather than given a column of its own -- it is a
+   * property OF those tasks, not a separate resource like a bucket or a Kafka profile, and
+   * ten of the twelve tenants have no tasks at all, so a seventh column would be mostly zeros.
+   */
+  pipelineCount: number;
 }
 
 interface ResourceCount {
   key: keyof Tenant;
   label: string;
   icon: string;
+  /** A second line under the count, when one number needs another to be read properly. */
+  sub?: (tenant: Tenant) => string;
 }
 
 @Component({
@@ -69,7 +80,14 @@ export class Tenants implements OnInit {
   readonly resources: ResourceCount[] = [
     { key: 'userCount', label: 'Users', icon: 'users' },
     { key: 'sourceJobCount', label: 'Jobs', icon: 'briefcase' },
-    { key: 'sourceTaskCount', label: 'Tasks', icon: 'list' },
+    {
+      key: 'sourceTaskCount', label: 'Tasks', icon: 'list',
+      // Only shown when it says something the task count does not. Equal numbers mean one task
+      // per pipeline, which the task count already told you; zero tasks means nothing to add.
+      sub: t => t.pipelineCount && t.pipelineCount !== t.sourceTaskCount
+        ? `${t.pipelineCount} pipeline${t.pipelineCount === 1 ? '' : 's'}`
+        : '',
+    },
     { key: 'sourceTaskTypeCount', label: 'Task types', icon: 'layers' },
     { key: 'bucketCount', label: 'Buckets', icon: 'cloud' },
     { key: 'kafkaProfileCount', label: 'Kafka', icon: 'server' },

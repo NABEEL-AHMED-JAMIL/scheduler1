@@ -238,7 +238,7 @@
           <span class="text-[color:var(--text-muted)] font-normal">({{ linkedFiltered().length }})</span>
         </h2>
         @if (linkedTasks().length) {
-          <div class="search-field max-w-52">
+          <div class="search-field max-w-56">
             <app-icon name="search" size="0.95em" />
             <input class="input" placeholder="Search task or group"
                    [value]="linkedSearch()" (input)="linkedSearch.set($any($event.target).value)" />

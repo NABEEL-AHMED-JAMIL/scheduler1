@@ -88,10 +88,7 @@
           <!-- Structure: a rule, then everything else in a padded column. p-0 on the article
                with padding on the inner div lets the rule bleed to the card's edges without
                negative margins fighting the padding. -->
-          <article class="card p-0 overflow-hidden flex flex-col transition-all duration-150
-                          hover:-translate-y-0.5
-                          hover:border-[color:var(--border-strong)]
-                          hover:shadow-[0_6px_20px_-8px_rgb(0_0_0/0.35)]"
+          <article class="card p-0 overflow-hidden flex flex-col"
                    [class.opacity-55]="busy() === user.appUserId">
             <!-- Privilege, readable before any text is. Quiet for a plain user so every card
                  keeps the same anatomy. -->
@@ -144,36 +141,20 @@
                 <div class="flex items-center gap-1.5 min-w-0">
                   <app-icon name="mail" size="0.9em" class="shrink-0 icon-info" />
                   <span class="mono truncate" [title]="user.username">{{ user.username }}</span>
-                  <!-- Always present rather than revealed on hover: a control that only exists
-                       under a pointer is unreachable by keyboard and invisible on a touch screen. -->
-                  <button type="button"
-                          class="shrink-0 ml-auto p-0.5 rounded text-[color:var(--text-muted)]
-                                 hover:text-brand-600 transition-colors"
-                          [attr.aria-label]="copiedKey() === user.appUserId + ':email'
-                            ? 'Address copied' : 'Copy ' + user.username"
-                          [title]="copiedKey() === user.appUserId + ':email' ? 'Copied' : 'Copy address'"
-                          (click)="copyContact(user.appUserId, 'email', user.username)">
-                    <app-icon [name]="copiedKey() === user.appUserId + ':email' ? 'check' : 'copy'"
-                              size="0.85em"
-                              [class]="copiedKey() === user.appUserId + ':email' ? 'icon-ok' : ''" />
-                  </button>
+                  <app-copy-button [value]="user.username" [pushRight]="true"
+                                   [copied]="copiedKey() === user.appUserId + ':email'"
+                                   copiedLabel="Address copied"
+                                   (copy)="copyContact(user.appUserId, 'email', user.username)" />
                 </div>
                 @if (user.phoneNumber) {
                   <div class="flex items-center gap-1.5 min-w-0">
                     <app-icon name="phone" size="0.9em" class="shrink-0 icon-info" />
-                    <a class="mono truncate hover:text-brand-600 transition-colors"
+                    <a class="mono truncate hover:text-[color:var(--accent-text)] transition-colors"
                        [href]="'tel:' + user.phoneNumber">{{ user.phoneNumber }}</a>
-                    <button type="button"
-                            class="shrink-0 ml-auto p-0.5 rounded text-[color:var(--text-muted)]
-                                   hover:text-brand-600 transition-colors"
-                            [attr.aria-label]="copiedKey() === user.appUserId + ':phone'
-                              ? 'Number copied' : 'Copy ' + user.phoneNumber"
-                            [title]="copiedKey() === user.appUserId + ':phone' ? 'Copied' : 'Copy number'"
-                            (click)="copyContact(user.appUserId, 'phone', user.phoneNumber)">
-                      <app-icon [name]="copiedKey() === user.appUserId + ':phone' ? 'check' : 'copy'"
-                                size="0.85em"
-                                [class]="copiedKey() === user.appUserId + ':phone' ? 'icon-ok' : ''" />
-                    </button>
+                    <app-copy-button [value]="user.phoneNumber" [pushRight]="true"
+                                     [copied]="copiedKey() === user.appUserId + ':phone'"
+                                     copiedLabel="Number copied"
+                                     (copy)="copyContact(user.appUserId, 'phone', user.phoneNumber)" />
                   </div>
                 }
               </div>

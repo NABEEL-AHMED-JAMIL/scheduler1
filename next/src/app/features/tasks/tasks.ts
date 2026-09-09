@@ -1,6 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
+import { LIST_LIMIT, isProbablyTruncated } from '../../core/api/list-limit';
 import { MineFilter, isMine } from '../../shared/ui/mine-filter';
 import { AuthService } from '../../core/auth/auth.service';
 import { RouterLink } from '@angular/router';
@@ -243,17 +244,75 @@ export class Tasks implements OnInit {
     this.loading.set(true);
     this.error.set('');
     // listSourceTask is a POST taking an optional search body; an empty body means "everything".
-    this.http.post<ApiResponse<SourceTask[]>>(`${API_BASE}/sourceTask.json/listSourceTask`, {}).subscribe({
+    // The LIMIT is not optional though: the endpoint is paged and defaults to ten, so this
+    // screen listed 10 of 21 tasks and paged those ten -- the pager showed "10 of 10" and the
+    // other eleven did not exist as far as the console was concerned.
+    this.http.post<ApiResponse<SourceTask[]>>(`${API_BASE}/sourceTask.json/listSourceTask`, {},
+      { params: { limit: LIST_LIMIT } }).subscribe({
       next: response => {
         this.loading.set(false);
-        if (response.status === API_SUCCESS) this.tasks.set(response.data ?? []);
-        else this.error.set(response.message);
+        if (response.status === API_SUCCESS) {
+          const rows = response.data ?? [];
+          this.tasks.set(rows);
+          if (isProbablyTruncated(rows.length)) {
+            this.toast.info(`Showing the first ${LIST_LIMIT} tasks. Narrow the search to see the rest.`);
+          }
+        } else this.error.set(response.message);
       },
       error: err => {
         this.loading.set(false);
         this.error.set(err?.error?.message || 'Could not load tasks.');
       },
     });
+  }
+
+  /**
+   * Whether a task has any storage worth showing.
+   *
+   * Not just `bucket`. <bucket> is optional on every pipeline in the object-storage family --
+   * absent means "the platform bucket" -- so keying the whole cell off it hid the input and
+   * output folders of every task that had not overridden it, and the column read "--" for
+   * tasks that plainly do read and write.
+   */
+  hasStorage(task: any): boolean {
+    return !!(task?.bucket || task?.inputFolder || task?.outputFolder);
+  }
+
+  /**
+   * Why a task shows no bucket of its own.
+   *
+   * source_task.bucket only ever records an explicit <bucket> tag in the payload
+   * (SourceTaskServiceImpl.applyDerivedLocation), and <bucket> is optional on every pipeline in
+   * the object-storage family -- leaving it out is the normal case, and the worker then resolves
+   * it to MINIO_BUCKET_NAME. Every task in this database is in that state, so the column showed
+   * folders with no bucket above them and read as "no bucket configured" for tasks that plainly
+   * have one.
+   *
+   * The name is deliberately not guessed at. The worker's default comes from its own environment,
+   * nothing in this database drives it, and no storage connection is flagged as the default -- so
+   * printing "etl-bucket" here would be a confident claim the console cannot actually stand
+   * behind, and would go silently wrong the day the worker is pointed somewhere else. Saying the
+   * bucket is inherited is the part that is true.
+   */
+  usesDefaultBucket(task: any): boolean {
+    return !task?.bucket && !!(task?.inputFolder || task?.outputFolder);
+  }
+
+  /**
+   * The read -> write line: "in -> out", "in ->", "-> out", or nothing at all.
+   *
+   * One side is legitimately missing on several pipelines -- Postgres to CSV has no input
+   * folder, CSV to Postgres has no output folder -- and the template used to fill the gap
+   * with a lone middot, which read as a rendering fault rather than as "not applicable".
+   * Keeping the arrow on the side that exists says the same thing without the noise.
+   */
+  storageFlow(task: any): string {
+    const from = (task?.inputFolder ?? '').trim();
+    const to = (task?.outputFolder ?? '').trim();
+    if (from && to) return `${from} \u2192 ${to}`;
+    if (from) return `${from} \u2192`;
+    if (to) return `\u2192 ${to}`;
+    return '';
   }
 
   /** "topic=scrapping-topic&partitions=[*]" -> "scrapping-topic" */

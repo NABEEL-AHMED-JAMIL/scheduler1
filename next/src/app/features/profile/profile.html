@@ -26,13 +26,9 @@
         <div class="relative inline-block">
           @if (avatarUrl()) {
             <img [src]="avatarUrl()" alt="Your profile picture"
-                 class="size-28 rounded-full object-cover mx-auto border-2 border-subtle"
-                 />
+                 class="avatar-img size-28 mx-auto border-2 border-subtle" />
           } @else {
-            <span class="size-28 rounded-full bg-brand-500 text-white grid place-items-center
-                         text-3xl font-semibold mx-auto">
-              {{ auth.initials() }}
-            </span>
+            <span class="avatar-initials size-28 text-3xl mx-auto">{{ auth.initials() }}</span>
           }
           @if (uploading()) {
             <span class="absolute inset-0 rounded-full grid place-items-center"
@@ -47,14 +43,8 @@
              when a long one wraps. break-all on the text only, so the icon is never split off. -->
         <p class="text-xs text-[color:var(--text-muted)] mono flex items-center justify-center gap-1">
           <span class="break-all">{{ me.username }}</span>
-          <button type="button"
-                  class="shrink-0 p-0.5 rounded hover:text-brand-600 transition-colors"
-                  [attr.aria-label]="emailCopied() ? 'Address copied' : 'Copy email address'"
-                  [title]="emailCopied() ? 'Copied' : 'Copy'"
-                  (click)="copyEmail()">
-            <app-icon [name]="emailCopied() ? 'check' : 'copy'" size="0.85em"
-                      [class]="emailCopied() ? 'icon-ok' : ''" />
-          </button>
+          <app-copy-button value="email address" [copied]="emailCopied()"
+                           copiedLabel="Address copied" (copy)="copyEmail()" />
         </p>
 
         <div class="flex items-center justify-center gap-2 mt-4">

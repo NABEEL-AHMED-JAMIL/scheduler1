@@ -36,7 +36,7 @@
     <ng-container toolbar>
       <app-view-toggle [(value)]="view" key="tenant-requests" cardsIcon="inbox" />
 
-      <div class="search-field max-w-64 min-w-0">
+      <div class="search-field max-w-56 min-w-0">
         <app-icon name="search" size="0.95em" />
         <input class="input min-w-0" placeholder="Search requests"
                [value]="search()"
@@ -61,10 +61,7 @@
         @for (r of paged(); track r.tenantRequestId) {
           <!-- p-0 with the padding on an inner column, so the status rule can bleed to the
                card's edges without negative margins fighting the padding. -->
-          <article class="card p-0 overflow-hidden flex flex-col transition-all duration-150
-                          hover:-translate-y-0.5
-                          hover:border-[color:var(--border-strong)]
-                          hover:shadow-[0_6px_20px_-8px_rgb(0_0_0/0.35)]">
+          <article class="card p-0 overflow-hidden flex flex-col">
             <!-- Where the request stands, readable before any text is. Amber is the only one
                  that means "do something", which is the whole job of this screen. -->
             <div class="h-1 shrink-0" [style.background]="statusAccent(r.status)"></div>
@@ -88,24 +85,13 @@
                 </div>
                 <div class="flex items-center gap-1.5 min-w-0">
                   <app-icon name="mail" size="0.9em" class="shrink-0 icon-info" />
-                  <a class="mono truncate hover:text-brand-600 transition-colors"
+                  <a class="mono truncate hover:text-[color:var(--accent-text)] transition-colors"
                      [href]="'mailto:' + r.contactEmail"
                      [title]="r.contactEmail">{{ r.contactEmail }}</a>
-                  <!-- Always present rather than revealed on hover: a control that only exists
-                       under a pointer is unreachable by keyboard and invisible on a touch
-                       screen. -->
-                  <button type="button"
-                          class="shrink-0 ml-auto p-0.5 rounded text-[color:var(--text-muted)]
-                                 hover:text-brand-600 transition-colors"
-                          [attr.aria-label]="copiedKey() === r.tenantRequestId + ':email'
-                            ? 'Address copied' : 'Copy ' + r.contactEmail"
-                          [title]="copiedKey() === r.tenantRequestId + ':email'
-                            ? 'Copied' : 'Copy address'"
-                          (click)="copyContact(r.tenantRequestId, 'email', r.contactEmail)">
-                    <app-icon [name]="copiedKey() === r.tenantRequestId + ':email' ? 'check' : 'copy'"
-                              size="0.85em"
-                              [class]="copiedKey() === r.tenantRequestId + ':email' ? 'icon-ok' : ''" />
-                  </button>
+                  <app-copy-button [value]="r.contactEmail" [pushRight]="true"
+                                   [copied]="copiedKey() === r.tenantRequestId + ':email'"
+                                   copiedLabel="Address copied"
+                                   (copy)="copyContact(r.tenantRequestId, 'email', r.contactEmail)" />
                 </div>
               </div>
 

@@ -1,6 +1,7 @@
 import { AfterViewInit, Component, DestroyRef, ElementRef, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Icon } from '../../shared/ui/icon';
+import { BrandMark } from '../../shared/ui/brand-mark';
 import { ThemeService } from '../../core/theme.service';
 
 interface Section { id: string; title: string; }
@@ -33,7 +34,7 @@ interface Step {
  */
 @Component({
   selector: 'app-docs',
-  imports: [RouterLink, Icon],
+  imports: [RouterLink, Icon, BrandMark],
   styles: [`
     :host { display: block; }
     .doc h2 { scroll-margin-top: 5rem; }
@@ -60,9 +61,8 @@ interface Step {
 
       <header class="sticky top-0 z-40 border-b bg-raised border-subtle">
         <div class="mx-auto w-full max-w-6xl px-5 h-14 flex items-center gap-3">
-          <a routerLink="/" class="flex items-center gap-2">
-            <div class="size-7 rounded-md bg-brand-500 grid place-items-center text-white text-sm font-bold">E</div>
-            <span class="font-semibold text-[15px] tracking-tight">ETL Console</span>
+          <a routerLink="/">
+            <app-brand-mark />
           </a>
           <span class="text-sm text-[color:var(--text-muted)] hidden sm:inline">Setup guide</span>
           <div class="ml-auto flex items-center gap-1.5">

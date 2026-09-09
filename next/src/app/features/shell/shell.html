@@ -2,9 +2,8 @@
   <header class="sticky top-0 z-40 border-b bg-raised border-subtle">
     <div class="mx-auto max-w-[1600px] px-4 h-14 flex items-center gap-1">
 
-      <a routerLink="/" class="flex items-center gap-2 mr-4 shrink-0">
-        <div class="size-7 rounded-md bg-brand-500 grid place-items-center text-white text-sm font-bold">E</div>
-        <span class="font-semibold text-[15px] tracking-tight hidden sm:block">ETL Console</span>
+      <a routerLink="/" class="mr-4">
+        <app-brand-mark [hideOnMobile]="true" />
       </a>
 
       <!-- Primary navigation -->
@@ -76,11 +75,9 @@
           <button type="button" (click)="toggleMenu('__user')"
                   class="flex items-center gap-2 px-1.5 py-1 rounded-md hover:bg-[color:var(--surface-sunken)]">
             @if (auth.avatarUrl()) {
-              <img [src]="auth.avatarUrl()" alt="" class="size-7 rounded-full object-cover" />
+              <img [src]="auth.avatarUrl()" alt="" class="avatar-img size-7" />
             } @else {
-              <span class="size-7 rounded-full bg-brand-500 text-white grid place-items-center text-[11px] font-semibold">
-                {{ auth.initials() }}
-              </span>
+              <span class="avatar-initials size-7 text-[11px]">{{ auth.initials() }}</span>
             }
             <span class="text-sm font-medium hidden sm:block">{{ auth.displayName() }}</span>
           </button>
@@ -97,6 +94,11 @@
                  class="flex items-center gap-2 px-3 py-1.5 text-sm text-[color:var(--text-secondary)]
                         hover:bg-[color:var(--surface-sunken)] hover:text-[color:var(--text-primary)]">
                 <app-icon name="user" size="0.95em" />Your profile
+              </a>
+              <a routerLink="/notifications" (click)="openMenu.set(null)"
+                 class="flex items-center gap-2 px-3 py-1.5 text-sm text-[color:var(--text-secondary)]
+                        hover:bg-[color:var(--surface-sunken)] hover:text-[color:var(--text-primary)]">
+                <app-icon name="bell" size="0.95em" />Notifications
               </a>
               <button type="button" (click)="auth.logout()"
                       class="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-[color:var(--text-secondary)]

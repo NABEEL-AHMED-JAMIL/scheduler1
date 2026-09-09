@@ -37,40 +37,23 @@
                      [submitted]="submitted()"
                      [hint]="pipelines().length ? 'Picking one loads its form below, if it has one.'
                                                  : 'No pipeline has a form yet — create one under Configuration › Pipeline Forms.'">
-            <select id="pipeline" class="input" formControlName="pipelineId">
-              <option value="">None</option>
-              @for (option of pipelines(); track option.taskFormId) {
-                <option [value]="option.pipelineId" [title]="option.description || ''">
-                  {{ option.formName }} ({{ option.pipelineId }})
-                </option>
-              }
-            </select>
+            <app-combobox id="pipeline" formControlName="pipelineId"
+                          placeholder="Search pipelines…" clearLabel="None"
+                          [options]="pipelineOptions()" />
           </app-field>
 
           <app-field label="Group" for="group" [control]="form.get('groupId')"
                      [submitted]="submitted()">
-            <select id="group" class="input" formControlName="groupId">
-              <option value="">None</option>
-              @for (option of lookupOptions('TASK_GROUPS'); track option.lookupId) {
-                <option [value]="option.lookupId" [title]="option.description || ''">
-                  {{ option.lookupType || option.lookupValue }}
-                  @if (option.lookupValue && option.lookupType) { ({{ option.lookupValue }}) }
-                </option>
-              }
-            </select>
+            <app-combobox id="group" formControlName="groupId"
+                          placeholder="Search groups…" clearLabel="None"
+                          [options]="lookupComboOptions('TASK_GROUPS')" />
           </app-field>
 
           <app-field label="Home page" for="homePage" [control]="form.get('homePageId')"
                      [submitted]="submitted()" hint="Where users land after this job completes.">
-            <select id="homePage" class="input" formControlName="homePageId">
-              <option value="">None</option>
-              @for (option of lookupOptions('PIPELINE_HOME_PAGES'); track option.lookupId) {
-                <option [value]="option.lookupId" [title]="option.description || ''">
-                  {{ option.lookupType || option.lookupValue }}
-                  @if (option.lookupValue && option.lookupType) { ({{ option.lookupValue }}) }
-                </option>
-              }
-            </select>
+            <app-combobox id="homePage" formControlName="homePageId"
+                          placeholder="Search home pages…" clearLabel="None"
+                          [options]="lookupComboOptions('PIPELINE_HOME_PAGES')" />
           </app-field>
 
           <app-field label="Status" for="taskStatus" [required]="true"
@@ -127,7 +110,7 @@
                   }
                   @case ('checkbox') {
                     <label class="flex items-center gap-2 text-sm">
-                      <input type="checkbox" [id]="'ff-' + controlName(field)"
+                      <input type="checkbox" class="checkbox" [id]="'ff-' + controlName(field)"
                              [formControlName]="controlName(field)"
                              (change)="syncFormToTags()" />
                       Yes
@@ -167,11 +150,11 @@
         </div>
       }
 
-      <div class="flex gap-2 mt-5 pt-4 border-t border-subtle">
+      <div class="form-actions">
+        <a routerLink="/tasks" class="btn btn-ghost"><app-icon name="close" />Cancel</a>
         <button type="submit" class="btn btn-primary" [disabled]="saving()">
           {{ saving() ? 'Saving…' : (isEdit() ? 'Save changes' : 'Create task') }}
         </button>
-        <a routerLink="/tasks" class="btn btn-ghost"><app-icon name="close" />Cancel</a>
       </div>
     </form>
   }

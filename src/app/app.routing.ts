@@ -15,8 +15,6 @@ import {
     JobLogComponent,
     LoginComponent,
     ObjectBrowserComponent,
-    PdfHighlighterComponent,
-    PdfHighlighterDetailComponent,
     AiAgentComponent,
     OllamaModelsComponent,
     ContentCleanerComponent,
@@ -165,21 +163,6 @@ const routes: Routes = [
     {
         path: 'notifications',
         component: NotificationCenterComponent,
-        canActivate: [AuthGuard]
-    },
-    {
-        path: 'pdfHighlighter',
-        component: PdfHighlighterComponent,
-        canActivate: [AuthGuard]
-    },
-    {
-        path: 'pdfHighlighter/new',
-        component: PdfHighlighterDetailComponent,
-        canActivate: [AuthGuard]
-    },
-    {
-        path: 'pdfHighlighter/:pdfHighlighterTaskId',
-        component: PdfHighlighterDetailComponent,
         canActivate: [AuthGuard]
     },
     {

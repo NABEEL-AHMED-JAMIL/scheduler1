@@ -23,8 +23,6 @@ export * from './login/login.component';
 
 export * from './object-browser/object-browser.component';
 
-export * from './pdf-highlighter/pdf-highlighter-detail/pdf-highlighter-detail.component';
-export * from './pdf-highlighter/pdf-highlighter.component';
 
 export * from './ai-agent/ai-agent.component';
 

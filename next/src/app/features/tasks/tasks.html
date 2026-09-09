@@ -29,7 +29,7 @@
                    (retry)="load()">
     <ng-container toolbar>
       <app-view-toggle [(value)]="view" key="tasks" cardsIcon="layers" />
-      <div class="search-field max-w-64">
+      <div class="search-field max-w-56">
         <app-icon name="search" size="0.95em" />
         <input class="input" placeholder="Search id, name, type or pipeline"
                [value]="search()" (input)="search.set($any($event.target).value); pager.reset()" />
@@ -104,10 +104,17 @@
               <!-- Where it reads and writes is the question a task card is usually opened for. -->
               <div class="flex gap-2 min-w-0">
                 <dt class="text-[color:var(--text-muted)] shrink-0 w-16">Storage</dt>
-                <dd class="mono truncate min-w-0">
-                  @if (task.bucket) {
-                    {{ task.bucket }}<span class="text-[color:var(--text-muted)]">
-                      · {{ task.inputFolder || '·' }} → {{ task.outputFolder || '·' }}</span>
+                <dd class="mono truncate min-w-0" [title]="storageFlow(task)">
+                  @if (hasStorage(task)) {
+                    @if (task.bucket) {
+                      {{ task.bucket }}
+                    } @else if (usesDefaultBucket(task)) {
+                      <span class="font-sans text-[color:var(--text-muted)] italic"
+                            title="This task sets no <bucket> tag, so it uses the platform's default bucket.">default bucket</span>
+                    }
+                    @if (storageFlow(task); as flow) {
+                      <span class="text-[color:var(--text-muted)]"> · {{ flow }}</span>
+                    }
                   } @else { — }
                 </dd>
               </div>
@@ -136,8 +143,10 @@
           <th>Topic</th>
           <th>Pipeline</th>
           <th>Storage</th>
-          <th>Created by</th>
-          <th>Updated by</th>
+          <!-- Metadata, not identity: hidden until there is width for it, so Status and the
+               row menu stay on screen instead of behind a horizontal scrollbar. -->
+          <th class="hidden 2xl:table-cell">Created by</th>
+          <th class="hidden 2xl:table-cell">Updated by</th>
           <th class="text-right">Status</th>
           <th class="w-16"></th>
         </tr>
@@ -167,19 +176,22 @@
             <td class="text-[color:var(--text-secondary)] max-w-40 truncate"
                 [title]="task.pipelineId">{{ task.pipelineId || '—' }}</td>
             <td class="text-[color:var(--text-secondary)]">
-              @if (task.bucket) {
-                <div class="mono">{{ task.bucket }}</div>
-                @if (task.inputFolder || task.outputFolder) {
-                  <div class="mono text-[color:var(--text-muted)]">
-                    {{ task.inputFolder || '·' }} → {{ task.outputFolder || '·' }}
-                  </div>
+              @if (hasStorage(task)) {
+                @if (task.bucket) {
+                  <div class="mono">{{ task.bucket }}</div>
+                } @else if (usesDefaultBucket(task)) {
+                  <div class="text-xs text-[color:var(--text-muted)] italic"
+                       title="This task sets no <bucket> tag, so it uses the platform's default bucket.">default bucket</div>
+                }
+                @if (storageFlow(task); as flow) {
+                  <div class="mono text-[color:var(--text-muted)]">{{ flow }}</div>
                 }
               } @else { — }
             </td>
-            <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
+            <td class="hidden 2xl:table-cell text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
               {{ task.createdByName || '—' }}
             </td>
-            <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
+            <td class="hidden 2xl:table-cell text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
               {{ task.updatedByName || '—' }}
             </td>
             <td class="text-right"><app-status [label]="task.taskStatus" [quiet]="true" /></td>
@@ -252,13 +264,17 @@
 
                   @if (linkedJobs()[task.taskDetailId]; as jobs) {
                     @if (jobs.length) {
-                      <div class="rounded border overflow-hidden border-subtle">
+                      <!-- A raised surface inside the drawer, not a transparent one: the
+                           table's sticky header is painted --surface-raised, so leaving the
+                           wrapper transparent put a white header on a grey body and the
+                           inner table read as floating at the same level as the outer one. -->
+                      <div class="rounded border overflow-hidden border-subtle bg-raised">
                         <div class="overflow-y-auto max-h-64">
                           <table class="table-modern">
                             <thead>
                               <tr>
                                 <th>Job</th>
-                                <th>Type</th>
+                                <th>Execution</th>
                                 <th>Last run</th>
                                 <th>Run status</th>
                                 <th class="text-right">State</th>

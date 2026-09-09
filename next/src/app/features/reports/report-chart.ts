@@ -1,7 +1,8 @@
 import {
   Component, DestroyRef, ElementRef, afterNextRender, computed, inject, input, signal,
 } from '@angular/core';
-import { Measure, Pivot, formatMeasure } from './pivot';
+import { COUNTING, Measure, Pivot, formatMeasure } from './pivot';
+import { compactNumber } from '../../shared/charts/number-format';
 
 export type ChartKind =
   | 'grouped' | 'stacked' | 'pct' | 'donut' | 'pie'
@@ -13,7 +14,30 @@ export const CHART_LABELS: Record<ChartKind, string> = {
   ranked: 'Ranked bars', heat: 'Heatmap', radar: 'Radar',
 };
 
-interface Segment { d: string; fill: string; hint: string; }
+/** yyyy-mm-dd, or the mm-dd short form the day chart uses on a within-one-year axis. */
+const ISO_DAY = /^(\d{4}-)?\d{2}-\d{2}$/;
+
+/**
+ * Math.max over an array, without spreading it.
+ *
+ * `Math.max(...matrix.flat(), 1)` passes one ARGUMENT per cell, and the engine's argument limit
+ * is around 124,000 -- a pivot of 400 tasks by 366 days is 146,400 cells and threw a
+ * RangeError that killed the whole chart rather than degrading it. The pivot is already capped
+ * at 50,000 RUNS, which says nothing about the cell count.
+ */
+function maxOf(values: number[], floor: number): number {
+  let max = floor;
+  for (const value of values) if (value > max) max = value;
+  return max;
+}
+
+function minOf(values: number[], fallback: number): number {
+  let min = fallback;
+  for (const value of values) if (value < min) min = value;
+  return min;
+}
+
+interface Segment { d: string; fill: string; hint: string; opacity?: number; }
 interface AxisLabel { x: number; y: number; anchor: string; text: string; full: string; }
 interface Bar { x: number; y: number; w: number; h: number; fill: string; hint: string; }
 
@@ -44,11 +68,21 @@ interface Bar { x: number; y: number; w: number; h: number; fill: string; hint: 
               [attr.fill]="bar.fill" rx="2"><title>{{ bar.hint }}</title></rect>
       }
       @for (seg of segments(); track $index) {
-        <path [attr.d]="seg.d" [attr.fill]="seg.fill"><title>{{ seg.hint }}</title></path>
+        <path [attr.d]="seg.d" [attr.fill]="seg.fill"
+              [attr.fill-opacity]="seg.opacity ?? null"><title>{{ seg.hint }}</title></path>
       }
       @for (stroke of strokes(); track $index) {
         <path [attr.d]="stroke.d" fill="none" [attr.stroke]="stroke.fill" stroke-width="2"
               stroke-linejoin="round" stroke-linecap="round"><title>{{ stroke.hint }}</title></path>
+      }
+      <!-- A polyline through ONE point paints nothing, so a line chart of a single day -- which
+           is exactly the current data -- rendered as an empty box with a full legend. Markers
+           also give every point a hit target and a readable value, which the line alone never
+           had: its only tooltip was the series name. -->
+      @for (dot of markers(); track $index) {
+        <circle [attr.cx]="dot.x" [attr.cy]="dot.y" [attr.r]="dot.r" [attr.fill]="dot.fill">
+          <title>{{ dot.hint }}</title>
+        </circle>
       }
       @for (label of barLabels(); track $index) {
         <text [attr.x]="label.x" [attr.y]="label.y" text-anchor="middle"
@@ -75,6 +109,8 @@ export class ReportChart {
   readonly measure = input.required<Measure>();
   readonly kind = input.required<ChartKind>();
   readonly colorFor = input.required<(label: string) => string>();
+  /** Which axis, if either, carries the Day dimension. */
+  readonly dayAxis = input<'row' | 'col' | 'none'>('none');
 
   /**
    * The drawing surface follows the card rather than a fixed box.
@@ -93,14 +129,46 @@ export class ReportChart {
   private readonly host = inject(ElementRef<HTMLElement>);
 
   constructor() {
-    // Measured after the first paint and again on resize, rather than through a
-    // ResizeObserver: the observer is the tidier tool but does not fire in every embedded
-    // browser, and a chart that silently keeps its starting guess is worse than one measured
-    // slightly less elegantly.
-    afterNextRender(() => this.remeasure());
-    const onResize = () => this.remeasure();
+    const host = this.host.nativeElement as HTMLElement;
+    // Inside afterNextRender so the first read happens once the element has a box; the observer
+    // set up alongside it catches every later change, including becoming visible.
+    afterNextRender(() => this.observeSize(host, () => this.remeasure()));
+  }
+
+  /**
+   * Re-measures whenever the element's own box changes, not only when the WINDOW does.
+   *
+   * A window-resize listener alone misses every case where the container changes size while the
+   * window does not: a collapsed section being opened, a sidebar toggling, a lazily-rendered
+   * tab. The reports builder is exactly that case -- it starts collapsed, so the chart first
+   * renders inside a [hidden] section at zero width, and opening it fires no resize at all. The
+   * chart then kept its starting guess for ever: a 1331px card drawing a 960px viewBox.
+   *
+   * ResizeObserver is the right tool and fires on the 0 -> N transition. The window listener is
+   * kept as well rather than replaced, because it costs nothing and covers any environment
+   * where the observer does not fire.
+   */
+  /**
+   * DestroyRef is captured as a FIELD, not injected where it is used.
+   *
+   * observeSize runs from inside an afterNextRender callback, which is outside Angular's
+   * injection context -- calling inject() there throws NG0203, which silently killed the
+   * observer setup and left the chart on its starting guess, the very bug this was added to
+   * fix. Field initialisers run during construction, where injection is legal.
+   */
+  private readonly destroyRef = inject(DestroyRef);
+
+  private observeSize(element: HTMLElement, onChange: () => void): void {
+    onChange();
+    const win = window as unknown as { ResizeObserver?: typeof ResizeObserver };
+    if (typeof win.ResizeObserver === 'function') {
+      const observer = new win.ResizeObserver(() => onChange());
+      observer.observe(element);
+      this.destroyRef.onDestroy(() => observer.disconnect());
+    }
+    const onResize = () => onChange();
     window.addEventListener('resize', onResize, { passive: true });
-    inject(DestroyRef).onDestroy(() => window.removeEventListener('resize', onResize));
+    this.destroyRef.onDestroy(() => window.removeEventListener('resize', onResize));
   }
 
   private remeasure(): void {
@@ -117,8 +185,8 @@ export class ReportChart {
   private readonly scaleMax = computed(() => {
     const p = this.pivot();
     if (this.kind() === 'pct') return 1;
-    if (this.kind() === 'stacked') return Math.max(...p.rowTotals, 1);
-    return Math.max(...p.matrix.flat(), 1);
+    if (this.kind() === 'stacked') return maxOf(p.rowTotals, 1);
+    return maxOf(p.matrix.flat(), 1);
   });
 
   protected readonly gridLines = computed(() => {
@@ -127,8 +195,13 @@ export class ReportChart {
     return [0, 1, 2, 3, 4].map(step => ({
       x1: this.pad.l, x2: this.pad.l + this.iw,
       y: this.pad.t + this.ih - (this.ih * step) / 4,
+      // Compact on the axis only. A tick reading "12,500" in a 68px gutter either overflows
+      // into the plot or forces the gutter wider at every other chart's expense; the exact
+      // figure is a tooltip and a table cell away.
       label: this.kind() === 'pct' ? `${step * 25}%`
-                                   : formatMeasure(Math.round((max * step) / 4), this.measure()),
+        : COUNTING.has(this.measure())
+          ? compactNumber(Math.round((max * step) / 4))
+          : formatMeasure(Math.round((max * step) / 4), this.measure()),
     }));
   });
 
@@ -178,13 +251,22 @@ export class ReportChart {
     return out;
   });
 
+  /** How many rows a ranked chart shows before it stops. */
+  private static readonly RANKED_TOP = 8;
+
+  /** Rows a ranked chart is not drawing, so the caller can say so instead of hiding it. */
+  readonly rankedHidden = computed(() =>
+    this.kind() === 'ranked'
+      ? Math.max(0, this.pivot().rowLabels.length - ReportChart.RANKED_TOP)
+      : 0);
+
   private rankedBars(): Bar[] {
     const p = this.pivot();
     const ranked = p.rowLabels
       .map((label, i) => ({ label, value: p.rowTotals[i] }))
       .sort((a, b) => b.value - a.value)
-      .slice(0, 8);
-    const max = Math.max(...ranked.map(r => r.value), 1);
+      .slice(0, ReportChart.RANKED_TOP);
+    const max = maxOf(ranked.map(r => r.value), 1);
     const left = 170, right = 70;
     const rowH = Math.min(30, (this.H - 20) / Math.max(ranked.length, 1));
     return ranked.map((r, i) => ({
@@ -200,7 +282,7 @@ export class ReportChart {
     const left = 170, top = 30;
     const cw = (this.W - left - 16) / Math.max(p.colLabels.length, 1);
     const ch = Math.min(30, (this.H - top - 14) / Math.max(p.rowLabels.length, 1));
-    const max = Math.max(...p.matrix.flat(), 1);
+    const max = maxOf(p.matrix.flat(), 1);
     const out: Bar[] = [];
     p.rowLabels.forEach((rowLabel, ri) => {
       p.colLabels.forEach((colLabel, ci) => {
@@ -257,10 +339,18 @@ export class ReportChart {
     return out;
   }
 
-  /** Days belong on the x axis whichever selector they were put in. */
+  /**
+   * Days belong on the x axis whichever selector they were put in.
+   *
+   * `dayAxis` is told to us rather than guessed. The guess was
+   * `colLabels[0]?.includes('-')`, and a hyphen is not a date: every task in the seeded
+   * catalogue is named like "report-history setting left blank", so putting tasks in the
+   * columns silently transposed the line chart and drew each task as a point on a time axis.
+   */
   private seriesLayout() {
     const p = this.pivot();
-    const flip = p.colLabels.length > p.rowLabels.length && p.colLabels[0]?.includes('-');
+    const flip = this.dayAxis() === 'col'
+      || (this.dayAxis() === 'none' && p.colLabels.length > p.rowLabels.length && ISO_DAY.test(p.colLabels[0] ?? ''));
     const xs = flip ? p.colLabels : p.rowLabels;
     const series = flip ? p.rowLabels : p.colLabels;
     const at = (si: number, xi: number) => flip ? p.matrix[si][xi] : p.matrix[xi][si];
@@ -271,11 +361,38 @@ export class ReportChart {
     const { xs, at } = this.seriesLayout();
     const max = this.scaleMax();
     const step = xs.length > 1 ? this.iw / (xs.length - 1) : 0;
+    // A lone point is centred rather than pinned to the axis, where it reads as a stray mark.
+    const offset = xs.length > 1 ? 0 : this.iw / 2;
     return xs.map((_, xi) => [
-      this.pad.l + step * xi,
+      this.pad.l + offset + step * xi,
       this.pad.t + this.ih - this.ih * (at(si, xi) / max),
     ] as [number, number]);
   }
+
+  /**
+   * One dot per plotted value on a line or area chart.
+   *
+   * Drawn large enough to see when a series has a single point (where the stroke is invisible)
+   * and small enough to read as a marker when it has many. Above ~120 points per series they
+   * are dropped: at that density they merge into a band and cost one node each.
+   */
+  protected readonly markers = computed(() => {
+    if (!['line', 'area'].includes(this.kind())) return [];
+    const { xs, series, at } = this.seriesLayout();
+    if (!xs.length || xs.length > 120) return [];
+    const lone = xs.length === 1;
+    const out: { x: number; y: number; r: number; fill: string; hint: string }[] = [];
+    series.forEach((label, si) => {
+      this.points(si).forEach((point, xi) => {
+        out.push({
+          x: point[0], y: point[1], r: lone ? 4.5 : 2.5,
+          fill: this.colorFor()(label),
+          hint: `${label} · ${xs[xi]}: ${formatMeasure(at(si, xi), this.measure())}`,
+        });
+      });
+    });
+    return out;
+  });
 
   private areaFills(): Segment[] {
     const { series } = this.seriesLayout();
@@ -285,7 +402,10 @@ export class ReportChart {
       return {
         d: `M${pts[0][0]},${base} ` + pts.map(q => `L${q[0]},${q[1]}`).join(' ') +
            ` L${pts[pts.length - 1][0]},${base} Z`,
-        fill: this.colorFor()(label), hint: label,
+        // Translucent, because these overlap by construction. At full opacity each series
+        // painted over the one before it, so an area chart of N series showed exactly one --
+        // the last -- and its legend listed N. The stroke drawn on top keeps each edge legible.
+        fill: this.colorFor()(label), opacity: 0.35, hint: label,
       };
     });
   }
@@ -294,7 +414,7 @@ export class ReportChart {
     const p = this.pivot();
     const cx = this.W / 2, cy = this.H / 2 + 4, R = Math.min(this.H * 0.36, 96);
     const n = Math.max(p.colLabels.length, 3);
-    const max = Math.max(...p.matrix.flat(), 1);
+    const max = maxOf(p.matrix.flat(), 1);
     return p.rowLabels.slice(0, 4).map((label, ri) => ({
       d: p.colLabels.map((_, i) => {
         const a = -Math.PI / 2 + (i / n) * Math.PI * 2;
@@ -410,7 +530,7 @@ export class ReportChart {
     if (this.kind() !== 'grouped' && this.kind() !== 'stacked') return [];
     const bars = this.bars();
     if (!bars.length) return [];
-    const narrowest = Math.min(...bars.map(b => b.w));
+    const narrowest = minOf(bars.map(b => b.w), Number.POSITIVE_INFINITY);
     if (narrowest < 34) return [];
     return bars
       .filter(b => b.h > 14)

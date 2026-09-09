@@ -133,54 +133,6 @@ export const STATUS_LIST: any = [
     }
 ];
 
-export interface PdfHighlighterTask {
-    pdfHighlighterTaskId?: any;
-    taskName?: any;
-    description?: any;
-    highlighterStatus?: any;
-    status?: any;
-    dateCreated?: any;
-    fileName?: any;
-    fileSize?: any;
-    fileContentType?: any;
-}
-
-export interface PdfHighlighterFieldSelector {
-    path?: any;
-    text?: any;
-    prefix?: any;
-    suffix?: any;
-}
-
-export interface PdfHighlighterField {
-    id?: any;
-    pdfHighlighterFieldId?: any;
-    label?: any;
-    page?: any;
-    x?: any;
-    y?: any;
-    width?: any;
-    height?: any;
-    displayOrder?: any;
-    selectorPath?: any;
-    selectorText?: any;
-    selectorPrefix?: any;
-    selectorSuffix?: any;
-    useXpathFirst?: any;
-    selector?: PdfHighlighterFieldSelector;
-}
-
-export const HIGHLIGHTER_STATUS_LIST: any = [
-    {
-        key: 'Draft',
-        value: 'Draft'
-    },
-    {
-        key: 'Ready',
-        value: 'Ready'
-    }
-];
-
 export interface BucketSummary {
     label?: any;
     bucket?: any;

@@ -5,6 +5,7 @@ import { Router, RouterLink } from '@angular/router';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { TableShell } from '../../../shared/ui/data-table';
 import { StatusPill } from '../../../shared/ui/status-pill';
+import { StatusFilterChip } from '../../../shared/ui/status-filter-chip';
 import { Icon } from '../../../shared/ui/icon';
 import { Donut } from '../../../shared/charts/donut';
 import { BarChart } from '../../../shared/charts/bar-chart';
@@ -31,7 +32,7 @@ interface JobQueue {
 
 @Component({
   selector: 'app-job-history',
-  imports: [JobAssistant, Icon, DatePipe, RouterLink, TableShell, StatusPill, Donut, BarChart, SplitBar],
+  imports: [JobAssistant, Icon, DatePipe, RouterLink, TableShell, StatusPill, StatusFilterChip, Donut, BarChart, SplitBar],
   templateUrl: './job-history.html',
 })
 export class JobHistory {

@@ -8,10 +8,12 @@ import { ToastService } from '../../shared/ui/toast.service';
 import { confirmWith } from '../../shared/ui/confirm';
 import { TableShell } from '../../shared/ui/data-table';
 import { StatusPill } from '../../shared/ui/status-pill';
+import { StatusFilterChip } from '../../shared/ui/status-filter-chip';
 import { Icon } from '../../shared/ui/icon';
 import { Donut } from '../../shared/charts/donut';
 import { RankedBar } from '../../shared/charts/ranked-bar';
 import { BarChart } from '../../shared/charts/bar-chart';
+import { daySeries } from '../../shared/charts/day-series';
 import { statusColor } from '../../shared/charts/status-color';
 import { SplitBar } from '../../shared/charts/split-bar';
 import { createPager } from '../../shared/ui/pager';
@@ -31,11 +33,21 @@ interface QueueRow {
 
 interface StatusStat { name: string; value: number; }
 
+/** One narrowing in force, named so it can be shown above the charts and removed from there. */
+interface ActiveFilter { key: string; label: string; value: string; }
+
 const STATUSES = ['Queue', 'Start', 'Running', 'Completed', 'Failed', 'Skip', 'Interrupt', 'Missed'];
+
+/**
+ * The outcomes that mean a run did not deliver, taken from the JobStatus enum's eight
+ * constants. Skip and Missed are deliberate or scheduler-side and are not counted as failures
+ * here, matching the Reports screen so the same runs cannot yield two failure rates.
+ */
+const FAILED = new Set(['Failed', 'Interrupt']);
 
 @Component({
   selector: 'app-queue',
-  imports: [Icon, DatePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Donut, RankedBar, BarChart, SplitBar, Pagination],
+  imports: [Icon, DatePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, StatusFilterChip, Donut, RankedBar, BarChart, SplitBar, Pagination],
   templateUrl: './queue.html',
 })
 export class Queue implements OnInit {
@@ -60,7 +72,20 @@ export class Queue implements OnInit {
     return date.toISOString().slice(0, 10);
   }
 
-  readonly filtered = computed(() => {
+  /**
+   * The messages every visualisation on this page describes. ONE computed, deliberately.
+   *
+   * The screen used to hold two populations at once. The table rendered this filtered list
+   * while `byJob`, `byDay`, `durations` and `flagSplit` all read the raw `rows()` behind it,
+   * and the donut read a server statistic that obeyed no filter at all -- so typing a job
+   * number narrowed the table to three rows and left every chart above it describing all
+   * fifty-two. Two answers about the same screen, side by side. Everything below reads
+   * `data()`, so a filter cannot reach some of them and miss the others.
+   *
+   * Only the search box is applied here: the date range and the status chips go into the
+   * fetchLogs body and reload, so `rows()` already obeys those two.
+   */
+  readonly data = computed(() => {
     const term = this.search().trim().toLowerCase();
     if (!term) return this.rows();
     return this.rows().filter(row =>
@@ -69,37 +94,84 @@ export class Queue implements OnInit {
       || (row.jobStatusMessage ?? '').toLowerCase().includes(term));
   });
 
+  // Left as <any> on purpose: strictTemplates type-checks a typed row against the DOM, and
+  // [title]="row.jobStatusMessage" is optional on QueueRow, so narrowing this widens the diff
+  // into the table markup for no gain here.
   readonly pager = createPager<any>();
-  readonly paged = computed(() => this.pager.slice(this.filtered()));
+  readonly paged = computed(() => this.pager.slice(this.data()));
 
-  goToPage(next: number): void { this.pager.goTo(next, this.filtered().length); }
+  goToPage(next: number): void { this.pager.goTo(next, this.data().length); }
   setPageSize(size: number): void { this.pager.setSize(size); }
 
-  readonly counts = computed(() => {
+  /** One definition of a status tally, so the chips and the ring cannot count differently. */
+  private static tally(rows: QueueRow[]): { status: string; count: number }[] {
     const map = new Map<string, number>();
-    for (const row of this.rows()) map.set(row.jobStatus, (map.get(row.jobStatus) ?? 0) + 1);
+    for (const row of rows) map.set(row.jobStatus, (map.get(row.jobStatus) ?? 0) + 1);
     return [...map.entries()].map(([status, count]) => ({ status, count }))
       .sort((a, b) => b.count - a.count);
+  }
+
+  /**
+   * The status chips, which are a filter CONTROL and so are counted over the fetched rows
+   * rather than over `data()`.
+   *
+   * Same reason the Reports pickers are built from its raw payload: a chip counted after the
+   * search box had been applied would vanish the instant the search excluded its last row --
+   * and a chip that vanishes while it is the SELECTED status takes with it the only control
+   * that can switch that status back off. Describing the narrowed population is the charts'
+   * job, and the strip above them says which narrowing is in force.
+   */
+  readonly counts = computed(() => Queue.tally(this.rows()));
+
+  /**
+   * The narrowing in force, stated above the charts rather than implied.
+   *
+   * The search box lives in the table toolbar BELOW the charts, so a reader looking at the
+   * ring had no way to see that a term was holding rows out of it. Every figure here now
+   * describes the narrowed set, which is only honest while the narrowing is visible.
+   */
+  readonly activeFilters = computed<ActiveFilter[]>(() => {
+    const list: ActiveFilter[] = [];
+    const term = this.search().trim();
+    if (term) list.push({ key: 'search', label: 'Search', value: term });
+    for (const status of this.selectedStatuses()) {
+      list.push({ key: `status:${status}`, label: 'Status', value: status });
+    }
+    return list;
   });
+
+  clearFilter(filter: ActiveFilter): void {
+    if (filter.key === 'search') {
+      this.search.set('');
+      this.pager.reset();
+      return;
+    }
+    // Statuses are applied by the server, so dropping one has to refetch rather than widen
+    // a predicate the browser holds.
+    this.toggleStatus(filter.value);
+  }
 
   readonly showInsights = signal(false);
-  /** The server's own breakdown for the range, which counts rows the table has filtered out. */
+  /**
+   * fetchLogs' second result set, `jobStatusStatistic`.
+   *
+   * Read QueryService.fetchJobQLog before trusting it: the isState branch carries no date
+   * clause, no job clause, no status clause and no `jq.status <> 'DELETE'`. It is every
+   * message this workspace has ever recorded for every ACTIVE or INACTIVE job, deleted runs
+   * included -- not the total for the selected range, which is what the donut used to plot it
+   * as. Pick the Failed chip and the table showed 4 rows while the ring above drew 48
+   * Completed and the caption called the screen 8% failed. It is kept only as an explicitly
+   * labelled all-time footnote and feeds no chart.
+   */
   readonly statusStats = signal<StatusStat[]>([]);
 
-  readonly statusMix = computed(() => {
-    const server = this.statusStats();
-    if (server.length) {
-      return server.map(s => ({
-        name: s.name.charAt(0) + s.name.slice(1).toLowerCase(),
-        value: s.value,
-      }));
-    }
-    return this.counts().map(c => ({ name: c.status, value: c.count }));
-  });
+  /** The outcome ring: the rows in view, and nothing the table is not also showing. */
+  readonly statusMix = computed(() =>
+    Queue.tally(this.data()).map(c => ({ name: c.status, value: c.count })));
 
   /** Two flags the queue records per message, as the old screen charted them. */
   readonly flagSplit = computed(() => {
-    const rows = this.rows();
+    const rows = this.data();
     const split = (key: 'runManual' | 'jobSend', label: string) => ({
       label,
       positive: rows.filter(r => r[key] === true).length,
@@ -117,7 +189,7 @@ export class Queue implements OnInit {
       { name: 'Over 10m', max: Infinity },
     ];
     const counts = new Map<string, number>();
-    for (const row of this.rows()) {
+    for (const row of this.data()) {
       if (!row.startTime || !row.endTime) continue;
       const seconds = (new Date(row.endTime).getTime() - new Date(row.startTime).getTime()) / 1000;
       if (!Number.isFinite(seconds) || seconds < 0) continue;
@@ -131,48 +203,60 @@ export class Queue implements OnInit {
 
   readonly byJob = computed(() => {
     const map = new Map<string, number>();
-    for (const row of this.rows()) {
+    for (const row of this.data()) {
       const key = String(row.jobId ?? '—');
       map.set(key, (map.get(key) ?? 0) + 1);
     }
     return [...map.entries()].map(([name, value]) => ({ name: `Job ${name}`, value }));
   });
 
-  /** Volume per day, oldest first, so the bars read left to right like a calendar. */
+  /**
+   * Volume per day, oldest first and gap-filled across the selected range.
+   *
+   * The gap-filling is the point. This used to emit only the days that had rows, so two bursts
+   * six days apart rendered as two neighbouring bars -- a shape that reads as steady daily
+   * traffic -- directly under a caption promising "oldest to newest across the selected range".
+   * Shared with the Reports day chart so the two cannot drift apart again.
+   */
   readonly byDay = computed(() => {
     const map = new Map<string, number>();
-    for (const row of this.rows()) {
+    for (const row of this.data()) {
       const day = (row.dateCreated ?? '').slice(0, 10);
       if (!day) continue;
       map.set(day, (map.get(day) ?? 0) + 1);
     }
-    return [...map.entries()]
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([day, value]) => ({
-        name: new Date(day + 'T00:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short' }),
-        value,
-      }));
+    const days = [...map.keys()].sort();
+    if (!days.length) return [];
+    const from = this.fromDate() && this.fromDate() <= days[0] ? this.fromDate() : days[0];
+    const last = days[days.length - 1];
+    const to = this.toDate() && this.toDate() >= last ? this.toDate() : last;
+    return daySeries(map, from, to).bars;
   });
 
-  readonly statisticTotal = computed(() =>
-    this.statusMix().reduce((sum, s) => sum + s.value, 0));
-
   /**
-   * The server counts the whole range but returns a capped slice of rows, so the donut and
-   * the table legitimately disagree. Saying so beats showing two totals and no explanation.
+   * What the server's range-blind statistic adds up to. Shown as an all-time footnote and
+   * never as this screen's total.
+   *
+   * The figure it replaces subtracted the row count from this same sum and the tooltip blamed
+   * a server row cap -- fetchJobQLog has no LIMIT, so nothing was ever capped. The gap is the
+   * date range and the filters, so that is what the label now says.
    */
-  readonly notListed = computed(() =>
-    Math.max(0, this.statisticTotal() - this.rows().length));
+  readonly allTimeTotal = computed(() =>
+    this.statusStats().reduce((sum, s) => sum + s.value, 0));
 
+  /** Of the messages in view. Reads from the same tally the ring draws. */
   readonly failureRate = computed(() => {
     const mix = this.statusMix();
     const total = mix.reduce((sum, s) => sum + s.value, 0);
     if (!total) return 0;
-    const failed = mix.filter(s => /fail|interrupt/i.test(s.name)).reduce((sum, s) => sum + s.value, 0);
+    const failed = mix.filter(s => FAILED.has(s.name)).reduce((sum, s) => sum + s.value, 0);
     return Math.round((failed / total) * 100);
   });
 
-  readonly hasInsights = computed(() => this.rows().length > 0);
+  /** Gated on the charted population, not the fetched one: a filter that empties the table
+   *  leaves nothing to chart either, and empty rings under a live "Charts" button read as a
+   *  broken screen rather than as an empty filter. */
+  readonly hasInsights = computed(() => this.data().length > 0);
 
   readonly outcomeColor = statusColor;
 
@@ -192,11 +276,13 @@ export class Queue implements OnInit {
       next: response => {
         this.loading.set(false);
         if (response.status !== API_SUCCESS) { this.error.set(response.message); return; }
-        const data = response.data as any;
+        // Named payload rather than data: `data()` is the filtered collection this screen
+        // renders from, and the two are emphatically not the same population.
+        const payload = response.data as any;
         // The payload is { jobStatusStatistic, sourceJobQueues }. This read "jobQueues",
         // which never matched, so the screen showed an empty table over hundreds of rows.
-        this.rows.set(Array.isArray(data) ? data : (data?.sourceJobQueues ?? []));
-        this.statusStats.set(Array.isArray(data) ? [] : (data?.jobStatusStatistic ?? []));
+        this.rows.set(Array.isArray(payload) ? payload : (payload?.sourceJobQueues ?? []));
+        this.statusStats.set(Array.isArray(payload) ? [] : (payload?.jobStatusStatistic ?? []));
       },
       error: err => {
         this.loading.set(false);

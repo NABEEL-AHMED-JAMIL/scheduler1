@@ -17,6 +17,12 @@ import { confirmWith } from '../../../shared/ui/confirm';
 import { createSort } from '../../../shared/ui/sort';
 import { KafkaDialog } from './kafka-dialog';
 
+/** As much of a tenant.json/listTenants row as this screen reads. */
+export interface TenantName {
+  tenantId: number;
+  tenantName: string;
+}
+
 export interface KafkaProfile {
   /** The author's id, so "Only mine" matches on identity rather than display text. */
   createdBy?: number | null;
@@ -26,6 +32,12 @@ export interface KafkaProfile {
   updatedByName?: string | null;
 
   kafkaConnectionProfileId: number;
+
+  /**
+   * Which workspace owns the row. Absent, not null, on the platform's own profiles -- the DTO is
+   * serialised NON_NULL -- so it has to be tested with `== null` rather than `=== null`.
+   */
+  tenantId?: number | null;
   profileName: string;
   environmentLabel?: string;
   bootstrapServers: string;
@@ -101,6 +113,50 @@ export class KafkaConnections implements OnInit {
 
   readonly onlyMine = signal(false);
 
+  /**
+   * Workspace names for the tenant ids sitting on the rows.
+   *
+   * fetchAllProfiles gives a platform admin every workspace's profiles and carries only a
+   * tenantId, so the screen listed six rows called "Globex Data PLAINTEXT" with nothing on them
+   * saying whose they were. The names come from listTenants, the same source Tenants and Users
+   * read; nothing here invents one for a tenant that list does not mention.
+   */
+  private readonly tenants = signal<TenantName[]>([]);
+
+  /** A tenant sees only its own profiles, so the column would be one repeated value for them. */
+  readonly canSeeWorkspace = this.auth.isPlatformAdmin;
+
+  workspaceName(profile: KafkaProfile): string {
+    if (profile.tenantId == null) {
+      return 'Platform';
+    }
+    return this.tenants().find(t => t.tenantId === profile.tenantId)?.tenantName
+      ?? `Tenant ${profile.tenantId}`;
+  }
+
+  /** Title for the workspace pill. A platform row is not a workspace; it is what the others fall back to. */
+  workspaceHint(profile: KafkaProfile): string {
+    return profile.tenantId == null
+      ? 'Platform-owned — the fallback for a workspace with no default of its own'
+      : `Workspace: ${this.workspaceName(profile)}`;
+  }
+
+  /**
+   * What the "default" pill on a row actually means, which depends on whose default it is.
+   *
+   * isDefault is per-workspace -- setAsDefault clears it inside one tenant and leaves every other
+   * tenant's alone -- so on a platform admin's list several rows carry it at once, and the fixed
+   * "Used by tasks with no explicit profile" read as though each of them were the only default
+   * there is.
+   */
+  defaultHint(profile: KafkaProfile): string {
+    if (!this.canSeeWorkspace()) {
+      return 'Used by tasks with no explicit profile';
+    }
+    return profile.tenantId == null
+      ? 'Platform default — used by a workspace that has no default of its own'
+      : `Default for ${this.workspaceName(profile)} — used by that workspace's tasks with no explicit profile`;
+  }
 
   readonly filtered = computed(() => {
     const term = this.search().trim().toLowerCase();
@@ -112,7 +168,10 @@ export class KafkaConnections implements OnInit {
       if (protocol && p.securityProtocol !== protocol) return false;
       if (status && p.status !== status) return false;
       if (!term) return true;
-      return `${p.profileName} ${p.environmentLabel ?? ''} ${p.bootstrapServers}`.toLowerCase().includes(term);
+      // Only a platform admin has a workspace column to read, so only their search matches on one.
+      const workspace = this.canSeeWorkspace() ? this.workspaceName(p) : '';
+      return `${p.profileName} ${p.environmentLabel ?? ''} ${p.bootstrapServers} ${workspace}`
+        .toLowerCase().includes(term);
     });
     return this.sort.apply(this.mine(rows), (row, key) => (row as any)[key]);
   });
@@ -127,7 +186,24 @@ export class KafkaConnections implements OnInit {
     };
   });
 
-  readonly defaultProfile = computed(() => this.profiles().find(p => p.isDefault) ?? null);
+  /**
+   * The default this screen is answerable for -- the tile, the "nothing is default" warning and
+   * the Clear default action all mean this one.
+   *
+   * Taking the first flagged row was right only while the list held one workspace. A platform
+   * admin's list holds a flagged row per tenant, ordered newest id first, so the tile credited
+   * whichever tenant most recently set one -- "Default: ETL Demo Broker" against a platform whose
+   * own default was a different profile entirely -- and the warning stayed quiet while the
+   * platform had no default at all. clearDefault() here clears the platform's row, so that is the
+   * row these read.
+   */
+  readonly defaultProfile = computed(() => {
+    const rows = this.profiles();
+    if (this.canSeeWorkspace()) {
+      return rows.find(p => p.isDefault && p.tenantId == null) ?? null;
+    }
+    return rows.find(p => p.isDefault) ?? null;
+  });
 
   ngOnInit(): void {
     this.route.queryParamMap.subscribe(params => {
@@ -135,7 +211,23 @@ export class KafkaConnections implements OnInit {
       const parsed = raw === null ? null : Number(raw);
       this.focusedProfileId.set(parsed !== null && Number.isFinite(parsed) ? parsed : null);
     });
+    this.loadTenants();
     this.load();
+  }
+
+  /**
+   * tenant.json is @PreAuthorize("hasRole('PLATFORM_ADMIN')") as a whole, so asking as anyone else
+   * buys a 403 for a column they are not shown. Failing to get the names leaves workspaceName on
+   * its "Tenant <id>" fallback rather than taking the profile list down with it.
+   */
+  private loadTenants(): void {
+    if (!this.canSeeWorkspace()) return;
+    this.http.get<ApiResponse<TenantName[]>>(`${API_BASE}/tenant.json/listTenants`).subscribe({
+      next: response => {
+        if (response.status === API_SUCCESS) this.tenants.set(response.data ?? []);
+      },
+      error: () => {},
+    });
   }
 
   load(): void {

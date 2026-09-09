@@ -82,7 +82,7 @@
         <option value="">All statuses</option>
         @for (status of statuses(); track status) { <option [value]="status">{{ status }}</option> }
       </select>
-      <div class="search-field max-w-52">
+      <div class="search-field max-w-56">
         <app-icon name="search" size="0.95em" />
         <input class="input" placeholder="Search id, job or task"
                [value]="search()" (input)="search.set($any($event.target).value); onFilterChange()" />
@@ -125,7 +125,7 @@
           <th class="w-8"></th>
           <th>Job</th>
           <th>Task</th>
-          <th>Type</th>
+          <th>Execution</th>
           <th>Schedule</th>
           <th>Next / last run</th>
           <th>Created</th>
@@ -430,7 +430,7 @@
         <span class="text-[color:var(--text-muted)] font-normal">#{{ job.jobId }}</span>
       </span>
       <a class="btn btn-ghost btn-sm" [routerLink]="['/jobs', job.jobId, 'assistant']"
-         title="Open the full page"><app-icon name="expand" />Full page</a>
+         title="Open the full page"><app-icon name="maximize" />Full page</a>
       <button type="button" class="btn btn-ghost btn-icon"
               (click)="assistantMinimised.set(!assistantMinimised())"
               [attr.aria-label]="assistantMinimised() ? 'Expand' : 'Minimise'">

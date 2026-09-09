@@ -5,6 +5,7 @@ import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angula
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { Field } from '../../shared/ui/field';
 import { Icon } from '../../shared/ui/icon';
+import { BrandMark } from '../../shared/ui/brand-mark';
 import { ThemeService } from '../../core/theme.service';
 
 /**
@@ -20,14 +21,13 @@ import { ThemeService } from '../../core/theme.service';
  */
 @Component({
   selector: 'app-request-workspace',
-  imports: [ReactiveFormsModule, RouterLink, Field, Icon],
+  imports: [ReactiveFormsModule, RouterLink, Field, Icon, BrandMark],
   template: `
     <div class="min-h-screen flex flex-col bg-page">
       <header class="border-b border-subtle">
         <div class="mx-auto w-full max-w-3xl px-5 h-14 flex items-center gap-3">
-          <a routerLink="/" class="flex items-center gap-2">
-            <div class="size-7 rounded-md bg-brand-500 grid place-items-center text-white text-sm font-bold">E</div>
-            <span class="font-semibold text-[15px] tracking-tight">ETL Console</span>
+          <a routerLink="/">
+            <app-brand-mark />
           </a>
           <div class="ml-auto flex items-center gap-1.5">
             <button type="button" class="btn btn-ghost btn-icon btn-sm"

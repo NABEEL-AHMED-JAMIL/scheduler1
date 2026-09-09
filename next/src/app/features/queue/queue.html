@@ -21,13 +21,32 @@
   @if (counts().length) {
     <div class="flex flex-wrap gap-2">
       @for (item of counts(); track item.status) {
-        <button type="button" class="card px-3.5 py-2 flex items-center gap-2 hover:shadow-md transition-shadow"
-                [class.ring-2]="selectedStatuses().includes(item.status)"
-                [class.ring-brand-500]="selectedStatuses().includes(item.status)"
-                (click)="toggleStatus(item.status)">
-          <app-status [label]="item.status" />
-          <span class="tabular font-semibold">{{ item.count }}</span>
+        <app-status-filter-chip [status]="item.status" [count]="item.count"
+                                 [selected]="selectedStatuses().includes(item.status)"
+                                 (toggle)="toggleStatus(item.status)" />
+      }
+    </div>
+  }
+
+  @if (activeFilters().length) {
+    <!-- Stated, not implied. The charts and the table describe the same narrowed set now, and
+         the search term that narrows them sits in the toolbar below the charts where a reader
+         looking at the ring cannot see it. -->
+    <div class="flex flex-wrap items-center gap-2">
+      <span class="text-xs text-[color:var(--text-muted)]">Filtered to</span>
+      @for (filter of activeFilters(); track filter.key) {
+        <button type="button" class="pill pill-brand" (click)="clearFilter(filter)"
+                [title]="'Remove the ' + filter.label + ' filter'">
+          {{ filter.label }}: {{ filter.value }}<app-icon name="close" size="0.8em" />
         </button>
+      }
+      <!-- Only when the two numbers differ. A status chip is applied by the SERVER, so rows()
+           is already narrowed by it and the strip would read "4 of 4 messages" -- a ratio that
+           says nothing and invites the reader to think the search did nothing. -->
+      @if (data().length !== rows().length) {
+        <span class="text-xs text-[color:var(--text-muted)]">
+          {{ data().length }} of {{ rows().length }} messages
+        </span>
       }
     </div>
   }
@@ -36,18 +55,18 @@
     <div class="grid gap-3 lg:grid-cols-3">
       <div class="card chart-card">
         <h3 class="chart-title">Outcomes</h3>
+        <p class="chart-sub">The same messages the table lists, filters included.</p>
         <app-donut [data]="statusMix()" totalLabel="messages"
                    [colorFor]="outcomeColor" />
         <p class="chart-sub mt-2 mb-0 flex items-center gap-1.5 flex-wrap">
           @if (failureRate()) {
-            <span>{{ failureRate() }}% failed.</span>
+            <span>{{ failureRate() }}% of these failed.</span>
           }
-          @if (notListed()) {
+          @if (allTimeTotal() > rows().length) {
             <span class="inline-flex items-center gap-1"
-                  [title]="'The server caps how many rows it returns, so ' + notListed()
-                           + ' of these are counted in the chart but not listed in the table below.'">
+                  [title]="'A server-side total that carries no date range and no filters: it counts every message this workspace has ever recorded, deleted runs included. The ring shows the messages in view instead.'">
               <app-icon name="info" size="0.85em" class="icon-muted" />
-              {{ rows().length }} listed below
+              {{ allTimeTotal() }} on record all time
             </span>
           }
         </p>
@@ -82,7 +101,7 @@
   }
 
   <app-table-shell heading="Queue" [loading]="loading()" [error]="error()"
-                   [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="rows().length"
+                   [isEmpty]="!data().length" [shown]="data().length" [total]="rows().length"
                    emptyMessage="Nothing in the queue for these filters."
                    emptyIcon="clock"
                    (retry)="load()">
@@ -91,7 +110,7 @@
              (change)="fromDate.set($any($event.target).value); load()" />
       <input type="date" class="input max-w-40" [value]="toDate()"
              (change)="toDate.set($any($event.target).value); load()" />
-      <div class="search-field max-w-52">
+      <div class="search-field max-w-56">
         <app-icon name="search" size="0.95em" />
         <input class="input" placeholder="Search job, run or message"
                [value]="search()" (input)="search.set($any($event.target).value); pager.reset()" />
@@ -153,7 +172,7 @@
       </tbody>
     </table>
 
-    <app-pagination pager [total]="filtered().length" [page]="pager.page()" [size]="pager.size()"
+    <app-pagination pager [total]="data().length" [page]="pager.page()" [size]="pager.size()"
                     (goTo)="goToPage($event)" (setSize)="setPageSize($event)" />
   </app-table-shell>
 </div>

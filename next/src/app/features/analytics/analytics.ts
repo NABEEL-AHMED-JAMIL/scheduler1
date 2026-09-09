@@ -1,0 +1,2015 @@
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Dialog } from '@angular/cdk/dialog';
+import { API_SUCCESS } from '../../core/api/api.config';
+import { Icon } from '../../shared/ui/icon';
+import { TableShell } from '../../shared/ui/data-table';
+import { confirmWith } from '../../shared/ui/confirm';
+import { formatSize } from '../../shared/ui/format-size';
+import { compactNumber } from '../../shared/charts/number-format';
+import { BarChart } from '../../shared/charts/bar-chart';
+import { Donut } from '../../shared/charts/donut';
+import { Histogram } from '../../shared/charts/histogram';
+import { RankedBar } from '../../shared/charts/ranked-bar';
+import { BucketSummary, ObjectSummary, StorageService } from '../objects/storage.service';
+import { SqlEditor } from './sql-editor';
+import {
+  AnalyticsService, ColumnProfile, DatasetColumn, DatasetPreview, DatasetProfile, ExportFile,
+  QueryResult, QueryRun, SavedQuery, WriteBackResult,
+} from './analytics.service';
+
+/**
+ * The tabs a dataset is read through.
+ *
+ * THERE IS NO CHART TAB, and that is the decision rather than an omission. A chart here is drawn
+ * from the console's result, and a tab would have put the picture on one screen and the query
+ * that produced it on another -- so a reader could edit the SQL, forget to re-run it, switch
+ * across and study a chart of the answer to a different question. It sits under the result table
+ * instead, on the SQL tab, where changing the statement visibly clears both at once.
+ *
+ * Schema was a third tab and is not any more: the columns are what a reader checks WHILE looking
+ * at the rows, and a tab made the two mutually exclusive. They now sit in a rail beside the
+ * data, where they can be read together.
+ *
+ * Profile and Quality are two readings of ONE request. They are separate tabs because they
+ * answer different questions -- "what is in this column" against "which column is a problem" --
+ * but they must never be two scans, so the request is made once and both derive from it.
+ *
+ * SQL is last because it is the one tab that needs the other four first. A person writing a
+ * statement against a file wants its columns, its types and its shape settled before they start,
+ * and phase one deliberately shipped no editor at all until the sandbox that contains one had
+ * been proven -- so the order of this strip is also the order the module was built in.
+ */
+type Tab = 'overview' | 'data' | 'profile' | 'quality' | 'sql';
+
+/** What a fresh console offers to run, so an empty editor is not also a blank page. */
+const STARTER_SQL = 'select *\nfrom dataset\nlimit 100';
+
+/**
+ * DuckDB types whose min and max are ALPHABETICAL rather than ordered by value.
+ *
+ * This is the third of the three things on this screen that surprise a reader, and the only one
+ * that is not about precision: on a VARCHAR column "9" is greater than "100", because the engine
+ * compares letter by letter. Columns matching this get their min and max labelled "first (A–Z)"
+ * and "last (A–Z)" instead. DATE and TIMESTAMP are deliberately NOT here -- their order is the
+ * order a reader expects.
+ */
+const TEXT_TYPE = /^(VARCHAR|CHAR|BPCHAR|TEXT|STRING)\b/i;
+
+/**
+ * A statistic as a number, or null when it is not one.
+ *
+ * SUMMARIZE hands every statistic back as text so that one column can carry a date, a word and
+ * an integer, so "does this parse" is the only honest test of whether arithmetic applies. A
+ * failure here is not an error: it is how a DATE column says it has no mean.
+ *
+ * The chart reads a query result's cells through this same function, for the same reason. Those
+ * arrive as text too, and a column called "amount" holding "n/a" is a column with a hole in it
+ * whatever its type name says.
+ */
+function asNumber(text: string | null | undefined): number | null {
+  if (text === null || text === undefined) return null;
+  const trimmed = text.trim();
+  // Number('') is 0, which would turn an absent statistic into a measured zero.
+  if (!trimmed) return null;
+  const value = Number(trimmed);
+  return Number.isFinite(value) ? value : null;
+}
+
+/**
+ * One quarter of a numeric column's rows, and the slice of the value range it occupies.
+ *
+ * This is the distribution the Profile tab draws, and it is drawn this way because it is the only
+ * shape the data actually contains. SUMMARIZE returns a five-number summary, not a sample, so
+ * there are no values here to bin -- anything with twelve bars on it would be twelve numbers this
+ * screen invented. Four blocks, each holding about a quarter of the rows, is the whole of what was
+ * measured, and it still shows what a reader came for: a quarter of the rows crammed into a thin
+ * block IS the crowd.
+ *
+ * "About" is load-bearing and is on the screen as well as in this comment. Only two of the five
+ * points are exact. min and max were measured; the three quartiles between them come from
+ * approx_quantile, which reported 18.375 for a first quartile that was really 21.0.
+ *
+ * The reason this is not app-histogram, which is the obvious reach: that component bins raw
+ * values it is handed, and this screen never has raw values -- feeding it a synthesised sample
+ * would draw a distribution the file does not have. Its bin tooltips also say "runs" in so many
+ * words, which on a column of sales amounts would be a false sentence on screen.
+ */
+export interface QuartileSegment {
+  from: number;
+  to: number;
+  /** Share of min→max this quarter spans, as a percentage width. */
+  width: number;
+  label: string;
+}
+
+/** A column as the Profile tab draws it: server figures, parsed only where parsing is safe. */
+export interface ColumnView {
+  name: string;
+  type: string;
+  shortType: string;
+  /**
+   * A type whose min and max are alphabetical, so they are labelled "first" and "last".
+   *
+   * There is deliberately no matching `numeric` flag. Whether a column has numbers in it is a
+   * question the engine already answered by returning a mean and three quartiles or not
+   * returning them, and a second list of type names here would be one more copy to keep in step
+   * with DuckDB.
+   */
+  text: boolean;
+  /** False only on a dataset with no rows, where there is no percentage to have. */
+  measured: boolean;
+  /** The engine's own figure, printed as given. */
+  nullPercent: number;
+  /** The engine's own complement of it. A bar width and a headline, not a count of anything. */
+  filledPercent: number;
+  /** TOTAL rows in the dataset. Exact, and the only figure on the card that is. */
+  rows: number;
+  /** Reconstructed from a rounded percentage -- always rendered with "about" in front of it. */
+  approxNullRows: number;
+  /** A sketch, not a count. Always rendered with "≈" and the word "estimated" beside it. */
+  approxDistinct: number;
+  /** The server's flags, carried through unchanged -- it derived them beside their statistics. */
+  allNull: boolean;
+  constant: boolean;
+  typeSurprise: 'NUMBER' | 'DATE' | null;
+  /** MIGHT be a unique key. A suggestion the card shows and the Quality tab does not flag. */
+  keyLike: boolean;
+  /** Raw, so the template can tell a null apart from a blank -- they are different facts. */
+  min: string | null;
+  max: string | null;
+  avg: string | null;
+  std: string | null;
+  /** Display forms. A text column keeps its raw value: "007" tidied to 7 is a different value. */
+  minLabel: string;
+  maxLabel: string;
+  avgLabel: string;
+  stdLabel: string;
+  /** Empty on every column with no numeric range to spread, which is most of them. */
+  spread: QuartileSegment[];
+  spreadSummary: string;
+}
+
+/**
+ * Something on one column worth a reader's attention, in the words the Quality tab says it in.
+ *
+ * A finding exists so the tab can LEAD with the problem rather than listing every column
+ * equally. A clean dataset produces none of these, and that is a sentence rather than an empty
+ * table.
+ */
+export interface QualityFinding {
+  column: string;
+  /** crit: the column carries nothing usable. warn: it is readable but mostly is not there. */
+  level: 'crit' | 'warn' | 'note';
+  /** Three or four words, so a column of them can be scanned. */
+  title: string;
+  /** The sentence under it, carrying the figure and -- where the figure is not exact -- its hedge. */
+  detail: string;
+}
+
+/**
+ * The extensions this reader accepts, which is a SECOND COPY of the list DatasetRef.Format.of
+ * owns on the server.
+ *
+ * It is one constant because two call sites need it -- the file list and the folder-as-dataset
+ * offer -- and a copy of a copy drifts twice as fast. The copy that can still drift is the
+ * server's, and analytics.spec.ts pins the two against each other, a test being the only thing
+ * that will notice the day a reader is added on one side only. Anchored at the end because the
+ * server splits on the LAST dot, so a sales.csv.gz is a gz to both of us.
+ */
+const READABLE_FILE = /\.(csv|tsv|json|jsonl|ndjson|parquet)$/i;
+
+/**
+ * The four ways the console will draw a result, each one a shared chart primitive and nothing
+ * new.
+ *
+ * There are deliberately only four, and there is deliberately no builder around them. /reports
+ * already owns a chart builder with ten kinds and three export destinations, and a second one
+ * here would be the duplication this module's own design notes warn about by name. What a chart
+ * is FOR on this screen is narrower than that: a person has just written a query and wants to
+ * see the shape of what came back, next to the rows it came from. Nothing is saved, nothing is
+ * laid out on a board, and nothing leaves the page -- the export stack beside it already does
+ * that, for the data rather than for a picture of it.
+ */
+export type ChartKind = 'bar' | 'ranked' | 'donut' | 'histogram';
+
+/**
+ * A chart kind with the reason it cannot be drawn, or '' when it can.
+ *
+ * The same shape connectionOptions() carries, and for the same reason: an option that is listed
+ * and inert with its reason on it teaches more than one that quietly disappears. A reader who
+ * cannot find "share of the total" needs to be told that a ring of 43 slices is not a chart,
+ * not left to wonder whether the console has one.
+ */
+export interface ChartKindOption {
+  id: ChartKind;
+  label: string;
+  issue: string;
+}
+
+/**
+ * One column of a result, measured by TRYING every cell in it.
+ *
+ * The result is columns and rows of text -- a DECIMAL or a TIMESTAMP has no JSON form that
+ * survives the trip unchanged, so the server renders every value server-side and the type names
+ * do not come with it. That leaves parsing as the only honest test of whether a column can be a
+ * length on a chart, and it is a better test than a type name would have been: a VARCHAR column
+ * of "1200", "980", "n/a" is drawable and a column typed DOUBLE whose every row is null is not.
+ */
+export interface ColumnReading {
+  name: string;
+  /** Position in the result's own column order, which is how a row is indexed. */
+  index: number;
+  rows: number;
+  /** Rows whose value parses as a finite number. */
+  numbers: number;
+  /** Rows with no value at all: a real null, or a cell holding only spaces. */
+  missing: number;
+  /** Rows holding something that is not a number. Unknown, and never zero. */
+  unparsed: number;
+  negative: number;
+  /** Distinct texts, which is what decides whether a ring can be read. */
+  distinct: number;
+  /** Distinct numbers. One repeated value has no distribution, however many rows carry it. */
+  distinctNumbers: number;
+}
+
+/** One mark on a categorical chart: a label, the numbers under it, and how many rows those were. */
+export interface ChartPoint {
+  name: string;
+  value: number;
+  rows: number;
+}
+
+/**
+ * Four presentation limits, kept together because they are all the same kind of decision.
+ *
+ * None is a fact about data; each one is a judgement about what can still be READ, which is why
+ * they sit beside the sentences that explain them rather than inside the chart components. The
+ * Quality tab's 25% and its six standard deviations are here for the same reason.
+ */
+// Six, not eight, for both of these: Donut and RankedBar colour their marks var(--chart-N % 6),
+// so a ring of eight drew slices 7 and 8 in the same colours as 1 and 2 and gave the legend two
+// names per swatch. A palette is a real limit on how many categories a chart can distinguish, and
+// picking a threshold past it makes the chart lie about which slice is which.
+const DONUT_SLICES = 6;
+const ORDERED_BARS = 60;
+const RANKED_ROWS = 6;
+const DISTRIBUTION_MIN = 8;
+
+/**
+ * Analytics Studio, phase one: pick a file in object storage and read it safely.
+ *
+ * The left rail is the same connection -> folder -> file walk the Object Browser does, and it
+ * uses that screen's own StorageService rather than a second copy of it. What is new begins when
+ * a file is selected: the schema and the rows come from the analytics API, which runs DuckDB
+ * against the object store directly, so a gigabyte file costs the browser one page of rows and
+ * costs Spring no streaming at all.
+ *
+ * Nothing here ever names a bucket or a URL. A dataset is a CONNECTION plus a path inside it,
+ * and the server decides which bucket that means -- so this component cannot express "read
+ * somewhere else with those credentials" even if it wanted to.
+ *
+ * PHASE TWO ADDS TWO TABS AND ONE PROBLEM. Profile and Quality both read a SUMMARIZE scan, and
+ * three of the figures in it are not exact: the distinct count is a sketch, the null percentage
+ * is rounded to two places so any row count taken from it is approximate, and min and max on a
+ * text column are alphabetical rather than ordered. This screen has refused to overclaim
+ * everywhere else -- the Azure gate, the unordered-paging note, the refusal it repeats verbatim
+ * rather than paraphrasing -- and a Profile tab printing "1,234 distinct" where it means "about
+ * 1,200" would be the first place it lied. So each of the three is hedged AT the number it
+ * qualifies rather than in a note under the table: "≈" and "estimated" beside a distinct count,
+ * "about" in front of every derived row count, and "first (A–Z)" / "last (A–Z)" as the labels on
+ * a text column's extremes.
+ *
+ * PHASE THREE ADDS THE SQL CONSOLE, AND A FOURTH FIGURE THAT IS NOT WHAT IT LOOKS LIKE. A query
+ * with no LIMIT of its own is wrapped in the server's row ceiling before it runs, so a result can
+ * stop at the ceiling rather than at the end of the data, and the count under it is then a count
+ * of what came back rather than of what matched. That is the same class of mistake as a distinct
+ * estimate printed as a count and an order of magnitude more dangerous: a reader handed ten
+ * thousand rows out of forty thousand and not told has a WRONG answer, not a short one, and will
+ * go and act on it. So truncation is said beside the count itself, in the row of numbers a person
+ * reads first, and not in a note under the table.
+ *
+ * The other rule the console keeps is the one this screen already kept about refusals. Several of
+ * the sentences the server sends back are the statement gate turning down a query that named a
+ * location of its own; they are security refusals, written for a reader, and they are shown word
+ * for word rather than folded into a "query failed" of this screen's own invention.
+ *
+ * PHASE FOUR DRAWS THE RESULT, AND A CHART IS THE EASIEST PLACE ON THIS WHOLE SCREEN TO LIE. The
+ * table under it at least shows a reader every row it is claiming; a bar chart compresses ten
+ * thousand rows into eight shapes and asks to be believed on the strength of how finished it
+ * looks. Three of those lies are available for free and each is refused here in the same way the
+ * three inexact figures above it are -- at the mark, not in a footnote:
+ *
+ *   A TRUNCATED RESULT. "Sales by region" over the first ten thousand of forty thousand rows is
+ *   not a slightly-off chart, it is a wrong one, and it looks exactly as confident as a right
+ *   one. The chart says it is partial beside its own title and again in a strip above it, every
+ *   time, and neither sentence guesses how many rows are missing because nothing here knows.
+ *
+ *   A ROW THAT DOES NOT PARSE. It is unknown, not zero. Coercing it would move a bar down by an
+ *   amount nobody measured, so those rows are left out and counted out loud instead.
+ *
+ *   TOO MANY CATEGORIES. Forty-three of them cannot be read, so the ranked view keeps the
+ *   largest few and says which -- rolling the rest into one "Other" rather than dropping the
+ *   tail and drawing what is left as if it were everything.
+ *
+ * @author Nabeel Ahmed
+ */
+@Component({
+  selector: 'app-analytics',
+  imports: [Icon, TableShell, SqlEditor, BarChart, Donut, RankedBar, Histogram],
+  templateUrl: './analytics.html',
+})
+export class Analytics implements OnInit {
+
+  private readonly storage = inject(StorageService);
+  private readonly analytics = inject(AnalyticsService);
+  private readonly dialog = inject(Dialog);
+
+  readonly humanSize = formatSize;
+  readonly compact = compactNumber;
+
+  // ---- the storage walk ----------------------------------------------------------------
+
+  readonly connections = signal<BucketSummary[]>([]);
+  readonly connection = signal<string>('');
+
+  /**
+   * Why Analytics Studio cannot read a connection the storage rail is offering, or '' when it
+   * can. One sentence, written to be read on the option itself.
+   *
+   * storage.json/buckets is the Object Browser's list, and the Object Browser reads more than
+   * this screen does: FTP and FTPS come back from it, and so do BUCKET_LIST lookup entries that
+   * have no storage_connection row behind them at all. The resolver knows about object-store
+   * connections and nothing else, so every one of those was a control that could be operated and
+   * could not work -- pick it, browse a whole tree, and be refused on every file with "Storage
+   * connection not found." about something sitting right there in the picker.
+   *
+   * They stay listed and go inert, which is the treatment an unreadable FILE already gets one
+   * level down, for the same reason: knowing the connection is there and why it cannot be read
+   * is more useful than it vanishing out of a picker the user configured themselves.
+   *
+   * AZURE is refused here even though it is an object store. The Azure path exists in
+   * DuckDbSessionFactory and has never been run against a real container -- a different DuckDB
+   * extension, a different secret shape, a different URL scheme, and none of the evidence that
+   * covers the S3 protocol. (That evidence is itself narrower than it sounds: every connection it
+   * was gathered from carries an explicit endpoint -- MinIO, and LocalStack for the S3-typed ones
+   * -- so AWS proper is unexercised too. The server's message no longer claims otherwise.)
+   * The server gates it this round with the same fact, so this says the
+   * same thing rather than offering a control the server will refuse. "yet" is doing real work
+   * in that sentence: unlike FTP, this one is expected to change.
+   */
+  connectionIssue(provider: string | null | undefined): string {
+    switch ((provider ?? '').trim().toUpperCase()) {
+      case 'S3':
+      case 'MINIO':
+        return '';
+      case 'AZURE':
+        return 'Analytics Studio has not been verified against Azure Blob yet.';
+      case 'FTP':
+      case 'FTPS':
+        return `Analytics Studio reads object storage; this connection is ${provider}.`;
+      default:
+        // A blank or unrecognised provider is either a connection with none recorded or a
+        // BUCKET_LIST lookup child, whose "provider" is really its free-text description.
+        return 'This bucket is not configured as an object-storage connection.';
+    }
+  }
+
+  /** The picker's rows: every connection the rail offers, each carrying its own verdict. */
+  readonly connectionOptions = computed(() => this.connections().map(item => ({
+    bucket: item.bucket,
+    label: item.label,
+    provider: item.provider,
+    issue: this.connectionIssue(item.provider),
+  })));
+
+  readonly readableConnections = computed(() => this.connectionOptions().filter(o => !o.issue));
+
+  /**
+   * Connections exist and not one of them can be read.
+   *
+   * Worth saying out loud, because the picker in that state looks identical to a broken one:
+   * every option greyed out and nothing selected.
+   */
+  readonly noReadableConnection = computed(
+    () => !!this.connectionOptions().length && !this.readableConnections().length);
+  readonly prefix = signal<string>('');
+  readonly entries = signal<ObjectSummary[]>([]);
+  readonly browsing = signal(false);
+  readonly browseError = signal('');
+
+  /**
+   * Filters the current folder by name.
+   *
+   * Local to the folder rather than a search across the bucket: listObjects returns one prefix
+   * at a time, so a bucket-wide search would be a different request the API does not offer.
+   * Saying "in this folder" on the control is what keeps that honest.
+   */
+  readonly filter = signal('');
+
+  /** The folder path as clickable segments, so a reader can jump back up without retyping. */
+  readonly crumbs = computed(() => {
+    const parts = this.prefix().split('/').filter(Boolean);
+    return parts.map((name, index) => ({ name, prefix: parts.slice(0, index + 1).join('/') + '/' }));
+  });
+
+  /** Folders first, then files, each alphabetical -- the order a file browser is expected in. */
+  private readonly matching = computed(() => {
+    const needle = this.filter().trim().toLowerCase();
+    const all = this.entries();
+    return needle ? all.filter(e => e.name.toLowerCase().includes(needle)) : all;
+  });
+
+  readonly folders = computed(() => this.matching().filter(e => e.folder));
+  readonly files = computed(() => this.matching().filter(e => !e.folder));
+  readonly filtered = computed(() => this.matching().length !== this.entries().length);
+
+  /**
+   * Whether a file is one this reader can open.
+   *
+   * The same extensions the backend accepts. Checked here as well so an unreadable file is
+   * visibly inert rather than offering a click that returns a refusal.
+   */
+  readable(key: string): boolean {
+    return READABLE_FILE.test(key);
+  }
+
+  // ---- the selected dataset ------------------------------------------------------------
+
+  readonly path = signal<string>('');
+  readonly selected = signal<ObjectSummary | null>(null);
+  readonly tab = signal<Tab>('overview');
+
+  /**
+   * The tab strip, in the order a dataset is read in: what it is, the rows themselves, what is
+   * in each column, and which column is a problem.
+   *
+   * A list rather than four copies of the same six bindings in the template. Four copies is
+   * where the third one quietly stops matching the others.
+   */
+  readonly tabs: { id: Tab; label: string }[] = [
+    { id: 'overview', label: 'Overview' },
+    { id: 'data', label: 'Data' },
+    { id: 'profile', label: 'Profile' },
+    { id: 'quality', label: 'Quality' },
+    { id: 'sql', label: 'SQL' },
+  ];
+
+  readonly loading = signal(false);
+  readonly error = signal('');
+  readonly columns = signal<DatasetColumn[]>([]);
+  readonly format = signal<string>('');
+  readonly multiFile = signal(false);
+  readonly preview = signal<DatasetPreview | null>(null);
+
+  /**
+   * The profile scan, which the Profile and Quality tabs share.
+   *
+   * Held separately from loading()/error() rather than folded into them because it is a
+   * different request with a different fate: the rows can be there while the profile has failed,
+   * and a reader on the Data tab should not be told the dataset could not be read because a tab
+   * they have not opened could not be scanned.
+   */
+  readonly profile = signal<DatasetProfile | null>(null);
+  readonly profileLoading = signal(false);
+  readonly profileError = signal('');
+
+  readonly hasDataset = computed(() => !!this.path());
+  readonly rowCount = computed(() => this.preview()?.totalRows ?? 0);
+  readonly columnCount = computed(() => this.columns().length);
+
+  /** The last path segment, or the pattern itself, which is what the header should say. */
+  readonly datasetName = computed(() => {
+    const path = this.path();
+    const at = path.lastIndexOf('/');
+    return at < 0 ? path : path.slice(at + 1);
+  });
+
+  readonly pageCount = computed(() => {
+    const preview = this.preview();
+    if (!preview || !preview.pageSize) return 0;
+    return Math.ceil(preview.totalRows / preview.pageSize);
+  });
+
+  ngOnInit(): void {
+    this.storage.buckets().subscribe({
+      next: response => {
+        if (response.status !== API_SUCCESS) { this.browseError.set(response.message); return; }
+        this.connections.set(response.data ?? []);
+        // Open on the first READABLE connection rather than an empty shell: the screen's whole
+        // job is reading data, and an empty picker shows nothing about what it does. First
+        // readable, not simply first, because the rail's order is the storage list's order and
+        // an FTP connection is as likely to lead it as anything else.
+        const first = this.readableConnections()[0];
+        if (first) this.pickConnection(first.bucket);
+      },
+      error: () => this.browseError.set('Could not load your storage connections.'),
+    });
+  }
+
+  // ---- browsing ------------------------------------------------------------------------
+
+  pickConnection(bucket: string): void {
+    // The option is already disabled, so nothing in the template can get here. This is the
+    // second door being locked as well: selecting an unreadable connection would browse a tree
+    // that refuses every file in it, which is the exact experience the option gating removes.
+    if (!this.readableConnections().some(option => option.bucket === bucket)) return;
+    this.connection.set(bucket);
+    this.prefix.set('');
+    this.filter.set('');
+    this.clearDataset();
+    this.browse();
+  }
+
+  openFolder(key: string): void {
+    this.prefix.set(key);
+    this.filter.set('');
+    this.browse();
+  }
+
+  goToCrumb(prefix: string): void {
+    this.prefix.set(prefix);
+    this.filter.set('');
+    this.browse();
+  }
+
+  goToRoot(): void {
+    this.prefix.set('');
+    this.filter.set('');
+    this.browse();
+  }
+
+  private browse(): void {
+    const connection = this.connection();
+    if (!connection) return;
+    this.browsing.set(true);
+    this.browseError.set('');
+    this.storage.listObjects(connection, this.prefix()).subscribe({
+      next: response => {
+        this.browsing.set(false);
+        if (response.status !== API_SUCCESS) { this.browseError.set(response.message); return; }
+        this.entries.set(response.data?.objects ?? []);
+      },
+      error: err => {
+        this.browsing.set(false);
+        this.browseError.set(err?.error?.message || 'Could not list this folder.');
+      },
+    });
+  }
+
+  // ---- opening a dataset ---------------------------------------------------------------
+
+  openFile(entry: ObjectSummary): void {
+    if (!this.readable(entry.key)) return;
+    this.selected.set(entry);
+    this.load(entry.key);
+  }
+
+  /**
+   * Reads the current folder as ONE dataset, by pattern.
+   *
+   * The case this exists for: a folder holding a file per day, or per partition, that is only
+   * meaningful read together. DuckDB unions them, so the row count and every column below cover
+   * every matching file rather than one of them.
+   */
+  openFolderAsDataset(extension: string): void {
+    this.selected.set(null);
+    this.load(`${this.prefix()}*.${extension}`);
+  }
+
+  /** Extensions present in this folder, so "read all of these together" only offers real ones. */
+  readonly folderFormats = computed(() => {
+    const seen = new Set<string>();
+    for (const file of this.files()) {
+      const match = READABLE_FILE.exec(file.key);
+      if (match) seen.add(match[1].toLowerCase());
+    }
+    return [...seen].sort();
+  });
+
+  private load(path: string): void {
+    this.path.set(path);
+    this.tab.set('overview');
+    this.loading.set(true);
+    this.error.set('');
+    this.columns.set([]);
+    this.preview.set(null);
+    // A profile describes one dataset and nothing else. Carrying the last one into this open
+    // would put another file's column statistics under this file's name.
+    this.clearProfile();
+    // The same argument, one tab along: a result table left standing under a new file's heading
+    // claims to be that file's answer. The SQL itself STAYS -- it is the reader's own work, and
+    // running the statement they just wrote against the next file is a normal thing to want.
+    this.clearResult();
+
+    const connection = this.connection();
+    this.analytics.schema(connection, path).subscribe({
+      next: response => {
+        if (response.status !== API_SUCCESS || !response.data) {
+          this.loading.set(false);
+          // The server's message is written for a reader, so it is shown rather than replaced.
+          this.error.set(response.message);
+          return;
+        }
+        this.columns.set(response.data.columns ?? []);
+        this.format.set(response.data.format);
+        this.multiFile.set(response.data.multiFile);
+        this.loadPage(0);
+      },
+      error: err => {
+        this.loading.set(false);
+        this.error.set(err?.error?.message || 'The dataset could not be read.');
+      },
+    });
+  }
+
+  loadPage(page: number): void {
+    const path = this.path();
+    if (!path) return;
+    this.loading.set(true);
+    // Carry the total forward. A page turn is TWO server queries -- a COUNT(*) and the page --
+    // against a governor that admits four at a time, and the count is one this screen is already
+    // holding from the page before it. load() clears preview() before every fresh open, so this
+    // is undefined exactly when nothing has counted the dataset yet, which is the one case where
+    // sending a number would be inventing one.
+    const knownTotal = this.preview()?.totalRows;
+    this.analytics.preview(this.connection(), path, page, knownTotal).subscribe({
+      next: response => {
+        this.loading.set(false);
+        if (response.status !== API_SUCCESS || !response.data) {
+          this.error.set(response.message);
+          return;
+        }
+        this.preview.set(response.data);
+      },
+      error: err => {
+        this.loading.set(false);
+        this.error.set(err?.error?.message || 'The dataset could not be read.');
+      },
+    });
+  }
+
+  nextPage(): void {
+    const preview = this.preview();
+    if (preview && preview.page + 1 < this.pageCount()) this.loadPage(preview.page + 1);
+  }
+
+  previousPage(): void {
+    const preview = this.preview();
+    if (preview && preview.page > 0) this.loadPage(preview.page - 1);
+  }
+
+  retry(): void {
+    if (this.path()) this.load(this.path());
+  }
+
+  private clearDataset(): void {
+    this.path.set('');
+    this.selected.set(null);
+    this.columns.set([]);
+    this.preview.set(null);
+    this.error.set('');
+    this.clearProfile();
+    this.clearResult();
+    // The second dataset is a path inside the connection that is being left behind, so it cannot
+    // survive the change: the same key under a different connection is a different file, or no
+    // file at all. Only pickConnection reaches here -- opening another file keeps the join.
+    this.clearSecond();
+  }
+
+  // ---- profiling -----------------------------------------------------------------------
+
+  /**
+   * Moves to a tab, fetching the profile the first time one of the two tabs that needs it is
+   * opened.
+   *
+   * Lazy on purpose. Opening a file already costs three sessions and three permits against a
+   * governor that admits four at a time across the whole JVM, and a profile is a full scan
+   * rather than a footer read. Charging every file open for a tab most readers never open is
+   * the wrong direction; charging the reader who opens it, once, is not.
+   *
+   * A failed scan is NOT retried by coming back to the tab. The error stays put with its own
+   * "Try again" beneath it, because a request that failed for load will fail again immediately
+   * and silently spending another permit per tab click is exactly the behaviour the governor
+   * exists to stop.
+   */
+  showTab(tab: Tab): void {
+    this.tab.set(tab);
+    // The library is lazy for the same reason the profile is, though the cost is a database read
+    // rather than a governor permit: neither is worth spending on a reader who opened a file to
+    // look at its columns.
+    if (tab === 'sql') { this.openLibrary(); return; }
+    if (tab !== 'profile' && tab !== 'quality') return;
+    if (this.profile() || this.profileLoading() || this.profileError()) return;
+    this.loadProfile();
+  }
+
+  loadProfile(): void {
+    const path = this.path();
+    if (!path) return;
+    this.profileLoading.set(true);
+    this.profileError.set('');
+    this.analytics.profile(this.connection(), path).subscribe({
+      next: response => {
+        this.profileLoading.set(false);
+        if (response.status !== API_SUCCESS || !response.data) {
+          // The server's refusal is written for a reader, so it is shown rather than replaced.
+          // Falls back like the transport branch below. An empty message here would leave
+          // profileError falsy, and a FAILED scan would render as the clean empty state -- the
+          // one failure mode where saying nothing is worse than saying the wrong thing.
+          this.profileError.set(response.message || 'The dataset could not be profiled.');
+          return;
+        }
+        this.profile.set(response.data);
+      },
+      error: err => {
+        this.profileLoading.set(false);
+        this.profileError.set(err?.error?.message || 'The dataset could not be profiled.');
+      },
+    });
+  }
+
+  private clearProfile(): void {
+    this.profile.set(null);
+    this.profileLoading.set(false);
+    this.profileError.set('');
+  }
+
+  /**
+   * The four quartile blocks of a numeric column, or none where there is no spread to draw.
+   *
+   * The five points are min, the three estimated quartiles and max, and each gap between them
+   * holds about a quarter of the rows. Whether they parse is the only test applied: a DATE column
+   * has quartiles and they are dates, a VARCHAR column has none at all, and both fall out here
+   * without this having to know which is which.
+   *
+   * A column whose every value is identical has a span of zero and gets nothing rather than four
+   * blocks of a division by zero -- "one value throughout" is the Quality tab's sentence, not a
+   * chart.
+   */
+  private spreadOf(column: ColumnProfile): QuartileSegment[] {
+    const points =
+      [column.min, column.approxQ25, column.approxQ50, column.approxQ75, column.max].map(asNumber);
+    if (points.some(point => point === null)) return [];
+    const edges = points as number[];
+    const span = edges[4] - edges[0];
+    if (!(span > 0)) return [];
+    return [0, 1, 2, 3].map(index => {
+      const from = edges[index];
+      const to = edges[index + 1];
+      return {
+        from, to,
+        width: ((to - from) / span) * 100,
+        label: `About a quarter of the values sit between ${this.number(from)} `
+          + `and ${this.number(to)}`,
+      };
+    });
+  }
+
+  /** The profile as the tab draws it, one entry per column in the order the file has them. */
+  readonly profileColumns = computed<ColumnView[]>(() => {
+    const rows = this.profile()?.totalRows ?? 0;
+    return (this.profile()?.columns ?? []).map(column => {
+      const measured = column.nullPercentage !== null && column.nullPercentage !== undefined;
+      const nullPercent = measured ? Number(column.nullPercentage) : 0;
+      const text = TEXT_TYPE.test(column.type ?? '');
+      const spread = this.spreadOf(column);
+      return {
+        name: column.name,
+        type: column.type,
+        shortType: this.shortType(column.type),
+        text,
+        measured,
+        nullPercent,
+        // The server's own complement rather than a second subtraction here, so the two figures
+        // cannot round apart and disagree by a hundredth on screen.
+        filledPercent: column.completeness === null || column.completeness === undefined
+          ? 100 - nullPercent : Number(column.completeness),
+        rows,
+        approxNullRows: column.approxNullRows ?? 0,
+        approxDistinct: column.approxDistinct ?? 0,
+        allNull: !!column.allNull,
+        constant: !!column.constant,
+        typeSurprise: column.typeSurprise ?? null,
+        keyLike: !!column.keyLike,
+        min: column.min,
+        max: column.max,
+        avg: column.avg,
+        std: column.std,
+        // A text column's extremes are shown exactly as the file holds them. Tidying "007" to 7
+        // would print a value that is not in the file, on the one column type where the string
+        // IS the value.
+        minLabel: text ? (column.min ?? '') : this.stat(column.min),
+        maxLabel: text ? (column.max ?? '') : this.stat(column.max),
+        avgLabel: this.stat(column.avg),
+        stdLabel: this.stat(column.std),
+        spread,
+        spreadSummary: spread.length
+          ? `About a quarter of the rows in each block, from ${this.stat(column.min)} through an `
+            + `estimated median of ${this.stat(column.approxQ50)} to ${this.stat(column.max)}.`
+          : '',
+      };
+    });
+  });
+
+  /**
+   * What the Quality tab leads with.
+   *
+   * The flags come from the server, which derived them beside the statistics they rest on; what
+   * is decided here is only how loudly each one is said and in what words. The thresholds that
+   * ARE here -- 25% for "mostly empty", six standard deviations for a far-out extreme -- are
+   * presentation decisions rather than facts about the data, so they live beside the sentences
+   * they choose between.
+   *
+   * Note the two things deliberately absent. DUPLICATE ROWS are not flagged, because SUMMARIZE
+   * cannot count them and ColumnProfileDto says so in as many words: it needs its own
+   * count(DISTINCT ...) scan, and a number invented for the tab to lead with would be the one
+   * thing this screen must not do. The tab says that out loud rather than staying quiet about it.
+   * KEY-LIKE columns are not flagged either -- an id column is not a problem, and putting one on
+   * every dataset's attention list would make "nothing needs attention" a state no file reaches.
+   * It is shown on the Profile card instead, where describing a column is the point.
+   */
+  readonly qualityFindings = computed<QualityFinding[]>(() => {
+    const findings: QualityFinding[] = [];
+    for (const column of this.profileColumns()) {
+      if (!column.rows || !column.measured) continue;
+
+      if (column.allNull) {
+        findings.push({
+          column: column.name, level: 'crit', title: 'Empty column',
+          detail: 'Nothing found in it: 100% of rows null, and not one distinct value. '
+            + 'Both signals agree, which is as close to certain as one scan gets.',
+        });
+        continue;
+      }
+
+      if (column.nullPercent >= 25) {
+        findings.push({
+          column: column.name, level: 'warn', title: 'Mostly empty',
+          detail: `${this.percent(column.nullPercent)}% of rows have no value — about `
+            + `${column.approxNullRows.toLocaleString()} of ${column.rows.toLocaleString()}.`,
+        });
+      } else if (column.nullPercent >= 5) {
+        findings.push({
+          column: column.name, level: 'note', title: 'Some values missing',
+          detail: `${this.percent(column.nullPercent)}% of rows have no value — about `
+            + `${column.approxNullRows.toLocaleString()} of ${column.rows.toLocaleString()}.`,
+        });
+      }
+
+      // "Every row that HAS a value" is the half of this that has to be on screen: a column of
+      // 'GB' with a third of its rows missing is constant, and a reader who assumes otherwise
+      // has just been told the wrong thing about a third of the file.
+      if (column.constant) {
+        findings.push({
+          column: column.name, level: 'warn', title: 'One value throughout',
+          detail: 'Estimated at a single distinct value, so every row that has a value probably '
+            + 'carries the same one. Rows with no value are not counted in that.',
+        });
+      }
+
+      // The type surprise gap 25 asks for by name, and the one place a text column's alphabetical
+      // ordering is a problem rather than a label. Hedged because the server decided it from the
+      // two extreme values alone: a column of leading-zero postcodes lands here too, and casting
+      // it to a number is exactly what would destroy it.
+      if (column.typeSurprise === 'NUMBER') {
+        findings.push({
+          column: column.name, level: 'note', title: 'Numbers read as text',
+          detail: `Read as ${column.type}, but its lowest and highest values are both numbers, so `
+            + 'sorting it goes alphabetically — "9" after "100". Judged from those two values '
+            + 'alone, so a column of leading-zero codes would look the same and should stay text.',
+        });
+      } else if (column.typeSurprise === 'DATE') {
+        findings.push({
+          column: column.name, level: 'note', title: 'Dates read as text',
+          detail: `Read as ${column.type}, but its lowest and highest values both look like `
+            + 'dates. Judged from those two values alone, so it is a question rather than a fault.',
+        });
+      }
+
+      const outlier = this.outlierOf(column);
+      if (outlier) findings.push(outlier);
+    }
+
+    // Loudest first, then the emptiest column, so the thing to look at is the thing at the top.
+    const order = { crit: 0, warn: 1, note: 2 };
+    return findings.sort((a, b) => order[a.level] - order[b.level]
+      || (this.nullOf(b.column) - this.nullOf(a.column))
+      || a.column.localeCompare(b.column));
+  });
+
+  /**
+   * A numeric column whose extreme sits implausibly far from its own mean.
+   *
+   * This is arithmetic on four figures the server calls exact -- min, max, avg and std -- and it
+   * is deliberately NOT called outlier detection. SUMMARIZE returns no rows, so nothing here can
+   * say whether that maximum is one stray or ten thousand of them, and the sentence on screen
+   * says so rather than implying a search that did not happen.
+   *
+   * Six standard deviations rather than the textbook three: this is a hint on a screen a reader
+   * scans, and at three every mildly skewed column -- a price, a duration, anything with a floor
+   * at zero and a long tail -- would raise one.
+   */
+  private outlierOf(column: ColumnView): QualityFinding | null {
+    const avg = asNumber(column.avg);
+    const std = asNumber(column.std);
+    if (avg === null || std === null || !(std > 0)) return null;
+
+    const high = asNumber(column.max);
+    const low = asNumber(column.min);
+    const above = high === null ? 0 : (high - avg) / std;
+    const below = low === null ? 0 : (avg - low) / std;
+    const worst = Math.max(above, below);
+    if (worst < 6) return null;
+
+    const far = above >= below ? column.maxLabel : column.minLabel;
+    const side = above >= below ? 'above' : 'below';
+    return {
+      column: column.name, level: 'note', title: 'An extreme far from the mean',
+      detail: `${far} sits ${Math.round(worst)} standard deviations ${side} the mean of `
+        + `${this.number(avg)}. The summary cannot say whether that is one stray row or many.`,
+    };
+  }
+
+  /** How empty a column is, by name -- the tie-break that puts the worst finding first. */
+  private nullOf(name: string): number {
+    return this.profileColumns().find(column => column.name === name)?.nullPercent ?? 0;
+  }
+
+  /**
+   * How many columns were actually EXAMINED, which is not the same as how many exist.
+   *
+   * This counted every column, so a header-only file -- a dataset with columns and no rows, which
+   * is the normal shape of a botched export and exactly the file this tab exists for -- reported
+   * "Checked 2 columns: none is empty, none is more than 5% empty..." having examined nothing.
+   * Five specific claims, every one of them false, and "none is empty" the precise opposite of the
+   * truth. The quality loop skips a column with no rows (`!column.rows` at :678); the count now
+   * agrees with the loop rather than with the schema.
+   */
+  readonly qualityChecked = computed(() =>
+    this.profileColumns().filter(column => column.rows && column.measured).length);
+
+  /** The columns that raised nothing, counted rather than listed. */
+  readonly qualityClearCount = computed(() => {
+    const flagged = new Set(this.qualityFindings().map(finding => finding.column));
+    return Math.max(0, this.qualityChecked() - flagged.size);
+  });
+
+  /**
+   * A dataset that was actually scanned, actually examined, and had nothing to say.
+   *
+   * Drives the tab's empty state. It was computed and never rendered -- three tests asserted it
+   * while the screen was driven by a looser expression that did not require a profile to exist,
+   * so "Nothing needs attention." could be reached before anything had been scanned. Requiring
+   * profile() AND qualityChecked() means the clean message can only appear after a scan that
+   * examined something.
+   */
+  readonly qualityClean = computed(() =>
+    !!this.profile() && !!this.qualityChecked() && !this.qualityFindings().length);
+
+  /**
+   * Scanned, with no findings to list -- for any of three different reasons.
+   *
+   * All three want an empty state rather than a table of nothing; they want DIFFERENT WORDS. A
+   * clean dataset, a dataset with no rows, and a dataset with no columns are three distinct facts,
+   * and the tab used to tell a reader the first one in all three cases.
+   */
+  readonly qualityEmpty = computed(() => !!this.profile() && !this.qualityFindings().length);
+
+  /** "Nothing wrong" and "nothing to look at" are not the same sentence. */
+  readonly qualityEmptyMessage = computed(() =>
+    this.qualityChecked() ? 'Nothing needs attention.' : 'Nothing to check.');
+
+  /**
+   * A percentage as the engine gave it, with a trailing ".00" dropped.
+   *
+   * Not rounded further. The engine's two decimal places are the whole of what is known about
+   * this figure, and printing "38%" where it measured 38.24 would throw away precision the
+   * screen is entitled to show.
+   */
+  percent(value: number): string {
+    return value.toFixed(2).replace(/\.?0+$/, '');
+  }
+
+  /** A measured value, with enough digits to be recognised and not a float's whole tail. */
+  number(value: number): string {
+    if (Number.isInteger(value)) return value.toLocaleString();
+    return value.toLocaleString(undefined,
+      { maximumFractionDigits: Math.abs(value) < 1 ? 4 : 2 });
+  }
+
+  /**
+   * A statistic as text, tidied only where it is safely a number.
+   *
+   * SUMMARIZE prints a mean at full double precision -- 402.14285714285717 -- which is sixteen
+   * digits of a figure the file has nowhere near sixteen digits of. Where the text parses it is
+   * written the way every other number on this screen is; where it does not, it is passed
+   * through untouched, because a date is already in the form its reader wants and a word has no
+   * other form.
+   */
+  stat(text: string | null | undefined): string {
+    const value = asNumber(text);
+    return value === null ? (text ?? '') : this.number(value);
+  }
+
+  /**
+   * The object's own timestamp, in the reader's locale.
+   *
+   * The storage API answers with a raw ISO string, which rendered as
+   * "2026-09-08T14:55:40.779Z" on the overview -- precise, and not what anybody reads a
+   * modified date for.
+   */
+  modifiedAt(): string {
+    const raw = this.selected()?.lastModified;
+    if (!raw) return '';
+    const at = new Date(raw);
+    return isNaN(at.getTime()) ? raw : at.toLocaleString();
+  }
+
+  /**
+   * A column's type, shortened for the rail.
+   *
+   * DuckDB spells a decimal as DECIMAL(18,3) and a nested type far longer than that, which wraps
+   * badly in a 200px column. The full type is kept in the title attribute.
+   */
+  shortType(type: string): string {
+    const at = type.indexOf('(');
+    return at < 0 ? type : type.slice(0, at);
+  }
+
+  // ---- the SQL console -----------------------------------------------------------------
+
+  /**
+   * The statement, held here rather than inside the editor.
+   *
+   * SqlEditor takes a value and emits a valueChange and knows nothing else about this screen, so
+   * loading a saved query, reusing one out of history and typing are the same operation from its
+   * side: something set this signal. That is the whole reason the editor is a component.
+   */
+  readonly sql = signal('');
+  readonly running = signal(false);
+  readonly result = signal<QueryResult | null>(null);
+
+  /**
+   * The server's sentence about a query that did not return rows.
+   *
+   * Kept apart from error(), which belongs to the dataset. A refused query does not mean the file
+   * could not be read, and putting the two in one signal would have a bad statement blank the
+   * Data tab.
+   */
+  readonly queryError = signal('');
+
+  /** The second dataset's path, or '' for a query over one. Always inside connection(). */
+  readonly secondPath = signal('');
+  readonly secondColumns = signal<DatasetColumn[]>([]);
+  readonly secondLoading = signal(false);
+  readonly secondError = signal('');
+
+  readonly savedQueries = signal<SavedQuery[]>([]);
+  readonly savedLoading = signal(false);
+  readonly savedError = signal('');
+
+  readonly recentRuns = signal<QueryRun[]>([]);
+  readonly runsLoading = signal(false);
+  readonly runsError = signal('');
+
+  readonly saveName = signal('');
+  readonly saving = signal(false);
+  readonly saveError = signal('');
+
+  /** The saved query the editor is holding, so Save can offer to update it rather than fork it. */
+  readonly loadedQuery = signal<SavedQuery | null>(null);
+
+  /** The row being renamed in place, and the name being typed onto it. */
+  readonly renamingId = signal<number | null>(null);
+  readonly renameName = signal('');
+
+  /**
+   * Whether the library has been asked for at all.
+   *
+   * A flag rather than "is the list empty", because an empty library is the normal state of a new
+   * workspace and asking that question would re-fetch on every visit to the tab for exactly the
+   * people who have nothing in it.
+   */
+  private readonly libraryAsked = signal(false);
+
+  /**
+   * The table names the editor completes from, which is the whole interface to a join.
+   *
+   * "dataset" and "dataset2" are not names this screen chose -- they are what the server exposes
+   * the two resolved datasets as, and they are the only handles the SQL gets. Feeding them here
+   * means completing a column after "dataset2." asks the second file, which is also the clearest
+   * way the screen can teach the naming: the editor answers with the right columns or it does not.
+   */
+  readonly editorSchema = computed<Record<string, string[]>>(() => {
+    const schema: Record<string, string[]> = { dataset: this.columns().map(c => c.name) };
+    if (this.secondPath()) schema['dataset2'] = this.secondColumns().map(c => c.name);
+    return schema;
+  });
+
+  readonly canRun = computed(() => !!this.sql().trim() && this.hasDataset() && !this.running());
+
+  /** True while the console is showing an answer that is not the whole answer. See QueryResult. */
+  /**
+   * Whether this result is partial.
+   *
+   * `!== false`, not `!!`. The screen's default for "the server did not say" must be the cautious
+   * answer, not the confident one: with `!!undefined` a missing flag printed "everything the query
+   * matched", which is the exact claim this tab exists to avoid making without evidence. The flag
+   * is a primitive boolean on the DTO so it is always serialised today -- this is about which way
+   * the screen falls when that stops being true.
+   */
+  readonly truncated = computed(() => {
+    const result = this.result();
+    return !!result && result.truncated !== false;
+  });
+
+  /**
+   * What the second dataset can be: the files the rail is showing, plus the folder patterns.
+   *
+   * Read off the rail rather than given a browser of its own, because the rail IS the browser and
+   * it is on screen the whole time this tab is open. A reader who wants a file from somewhere
+   * else walks there in the rail and this list follows them, which is one navigation model on the
+   * screen instead of two that can disagree about where they are. It follows the rail's FILTER
+   * too, for the same reason -- the filter box is six inches away, and a picker offering a file
+   * the list beside it is currently hiding is the two disagreeing.
+   *
+   * The dataset already open is excluded. Joining a file to itself is legal SQL and a real thing
+   * to want, but it is spelled by naming "dataset" twice in the statement, not by resolving and
+   * paying for the same file a second time.
+   */
+  readonly secondOptions = computed(() => {
+    const current = this.path();
+    const files = this.files()
+      .filter(entry => this.readable(entry.key))
+      .map(entry => ({ path: entry.key, label: entry.name }));
+    const folders = this.folderFormats()
+      .map(extension => ({
+        path: `${this.prefix()}*.${extension}`,
+        label: `all *.${extension} in this folder`,
+      }));
+    return [...files, ...folders].filter(option => option.path !== current);
+  });
+
+  /**
+   * A saved query that was written against a different file from the one open.
+   *
+   * It still runs -- the console sends the dataset that is open, not the one the row remembers --
+   * and that is exactly why it has to be said. A statement written against a sales export and run
+   * against a refunds export will usually fail on a missing column, but the case worth warning
+   * about is the one where both files have the columns it names and the answer is simply about
+   * the wrong data.
+   */
+  readonly loadedElsewhere = computed(() => {
+    const query = this.loadedQuery();
+    if (!query) return '';
+    const here = query.connectionAlias === this.connection() && query.datasetPath === this.path();
+    return here ? '' : `${query.connectionAlias}/${query.datasetPath}`;
+  });
+
+  /** Fills an empty console with something runnable, rather than leaving a blank page. */
+  useStarter(): void {
+    this.sql.set(STARTER_SQL);
+  }
+
+  // ---- taking the result away ------------------------------------------------------------
+
+  readonly exportFormat = signal<'csv' | 'tsv' | 'json'>('csv');
+  readonly exporting = signal(false);
+  readonly exportError = signal('');
+  /** What the last write-back put in the bucket, so the screen can name the object it made. */
+  readonly written = signal<WriteBackResult | null>(null);
+  readonly writeFolder = signal('');
+
+  /**
+   * Downloads the result as a file.
+   *
+   * The QUERY is sent, not the rows the browser is holding. A client that posted its own rows
+   * could post any rows, and the file would carry an application filename over data the
+   * application never produced. It costs a second execution and buys a file that means something.
+   */
+  downloadResult(): void {
+    const statement = this.sql();
+    if (!statement.trim() || !this.path() || this.exporting()) return;
+    this.exporting.set(true);
+    this.exportError.set('');
+    this.written.set(null);
+
+    const second = this.secondPath();
+    this.analytics.download({
+      connection: this.connection(), path: this.path(), sql: statement,
+      connection2: second ? this.connection() : undefined,
+      path2: second || undefined,
+      format: this.exportFormat(),
+    }).subscribe({
+      next: response => {
+        this.exporting.set(false);
+        if (response.status !== API_SUCCESS || !response.data) {
+          this.exportError.set(response.message || 'The result could not be exported.');
+          return;
+        }
+        this.save(response.data);
+      },
+      error: err => {
+        this.exporting.set(false);
+        this.exportError.set(err?.error?.message || 'The result could not be exported.');
+      },
+    });
+  }
+
+  /**
+   * Hands the file to the browser.
+   *
+   * The server sends base64 because the ResponseDto envelope is JSON and a CSV holding a quote,
+   * a newline or a non-ASCII byte does not survive being a JSON string unchanged. Decoded here
+   * through Uint8Array rather than atob alone, because atob yields one char per BYTE and building
+   * a Blob from that string would re-encode every byte above 127 as UTF-8 and corrupt the file.
+   */
+  private save(file: ExportFile): void {
+    const binary = atob(file.content);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const url = URL.createObjectURL(new Blob([bytes], { type: file.contentType }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = file.filename;
+    link.click();
+    URL.revokeObjectURL(url);
+
+    // The server already marks a partial export in the FILENAME and inside the file itself, so
+    // this is the third place it is said rather than the only one. Said here too because the
+    // file is about to leave the screen, and this is the last moment the reader is looking.
+    if (file.truncated) {
+      this.exportError.set(file.notice
+        || 'That file holds part of the answer, not all of it.');
+    }
+  }
+
+  /**
+   * Writes the result into the connection's own bucket.
+   *
+   * The bucket is never named here and cannot be: the server takes it from the connection record,
+   * the same way every read does. All this sends is a folder inside it.
+   */
+  writeResultBack(): void {
+    const statement = this.sql();
+    if (!statement.trim() || !this.path() || this.exporting()) return;
+    this.exporting.set(true);
+    this.exportError.set('');
+    this.written.set(null);
+
+    const second = this.secondPath();
+    this.analytics.writeBack({
+      connection: this.connection(), path: this.path(), sql: statement,
+      connection2: second ? this.connection() : undefined,
+      path2: second || undefined,
+      folder: this.writeFolder().trim() || undefined,
+      format: this.exportFormat(),
+    }).subscribe({
+      next: response => {
+        this.exporting.set(false);
+        if (response.status !== API_SUCCESS || !response.data) {
+          this.exportError.set(response.message || 'The result could not be written back.');
+          return;
+        }
+        this.written.set(response.data);
+        // Written, and the rail is now out of date about what is in that folder.
+        this.browse();
+      },
+      error: err => {
+        this.exporting.set(false);
+        this.exportError.set(err?.error?.message || 'The result could not be written back.');
+      },
+    });
+  }
+
+  /**
+   * Runs what is in the editor.
+   *
+   * The trimmed text is what gets checked for emptiness and the UNTRIMMED text is what gets sent,
+   * because the server stores the statement as submitted and a history row is only re-runnable if
+   * it is what somebody wrote.
+   */
+  run(): void {
+    const statement = this.sql();
+    if (!statement.trim() || !this.path() || this.running()) return;
+    this.running.set(true);
+    this.queryError.set('');
+    this.result.set(null);
+
+    // Named before it is sent, so there is something to cancel while it is in flight. The
+    // endpoint is synchronous, so an id minted by the server would only reach this screen with
+    // the rows -- by which point there is nothing left to stop.
+    const runId = 'ui-' + Date.now().toString(36) + '-'
+      + Math.random().toString(36).slice(2, 8);
+    this.runningId.set(runId);
+
+    const second = this.secondPath();
+    this.analytics.query({
+      connection: this.connection(), path: this.path(), sql: statement,
+      queryId: runId,
+      connection2: second ? this.connection() : undefined,
+      path2: second || undefined,
+    }).subscribe({
+      next: response => {
+        this.running.set(false);
+        this.runningId.set('');
+        this.stopping.set(false);
+        if (response.status !== API_SUCCESS || !response.data) {
+          // The server's own sentence, unchanged. Several of these are the statement gate
+          // refusing a query that named a location of its own, and a paraphrase would turn a
+          // specific security refusal into a generic failure the reader cannot act on.
+          this.queryError.set(response.message || 'The query could not be run.');
+        } else {
+          this.result.set(response.data);
+        }
+        // Refused, failed or fine, the server wrote a history row for it before answering.
+        this.loadRuns();
+      },
+      error: err => {
+        this.running.set(false);
+        this.runningId.set('');
+        this.stopping.set(false);
+        this.queryError.set(err?.error?.message || 'The query could not be run.');
+        this.loadRuns();
+      },
+    });
+  }
+
+  /** The id of the run in flight, so the stop control has something to name. */
+  readonly runningId = signal('');
+
+  /** True from pressing stop until the run answers. The request may still win the race. */
+  readonly stopping = signal(false);
+
+  readonly canStop = computed(() => this.running() && !!this.runningId() && !this.stopping());
+
+  /**
+   * Asks the server to stop the run in flight.
+   *
+   * Does NOT clear the result or stop waiting on its own. The query is synchronous, so the
+   * original request is still open and will answer -- with rows if it finished first, or with the
+   * engine's interruption if the cancel won. Letting the screen decide the outcome here would
+   * mean guessing at a race the server has already settled, and the history row is the record.
+   */
+  stop(): void {
+    const runId = this.runningId();
+    if (!runId || this.stopping()) return;
+    this.stopping.set(true);
+    this.analytics.cancel(runId).subscribe({
+      // Nothing to do on either path. A cancel that arrives late, names a finished run, or names
+      // nothing at all is answered identically by design -- the server will not say which, because
+      // telling them apart would confirm an id is live in another workspace.
+      next: () => {},
+      error: () => this.stopping.set(false),
+    });
+  }
+
+  /**
+   * Picks the second dataset, and reads its schema straight away.
+   *
+   * The schema call is not only for completion. It is also the earliest point at which "that file
+   * cannot be read" can be said -- before a statement is written against columns the reader
+   * guessed at, rather than as a refusal on the query they finally ran.
+   */
+  pickSecond(path: string): void {
+    this.secondPath.set(path);
+    this.secondColumns.set([]);
+    this.secondError.set('');
+    if (!path) return;
+    this.secondLoading.set(true);
+    this.analytics.schema(this.connection(), path).subscribe({
+      next: response => {
+        this.secondLoading.set(false);
+        if (response.status !== API_SUCCESS || !response.data) {
+          this.secondError.set(response.message || 'That dataset could not be read.');
+          return;
+        }
+        this.secondColumns.set(response.data.columns ?? []);
+      },
+      error: err => {
+        this.secondLoading.set(false);
+        this.secondError.set(err?.error?.message || 'That dataset could not be read.');
+      },
+    });
+  }
+
+  clearSecond(): void {
+    this.secondPath.set('');
+    this.secondColumns.set([]);
+    this.secondLoading.set(false);
+    this.secondError.set('');
+  }
+
+  private clearResult(): void {
+    this.result.set(null);
+    this.queryError.set('');
+    this.running.set(false);
+  }
+
+  // ---- a chart of the result -------------------------------------------------------------
+
+  /**
+   * What a reader picked, held BY NAME rather than by index or by column.
+   *
+   * A name survives the next query and an index does not: run the same statement with one more
+   * column in front and index 2 is a different column, silently, under a chart that still looks
+   * like the one being read a moment ago. A name that is no longer in the result falls back to
+   * the default below, which is visible -- the picker moves.
+   *
+   * '' means "whatever this result suggests", which is also the state every first run is in.
+   */
+  readonly chartLabelName = signal('');
+  readonly chartValueName = signal('');
+  readonly chartKindName = signal<ChartKind | ''>('');
+
+  /**
+   * Every column of the result, measured by parsing it.
+   *
+   * One pass per column over the rows the browser is already holding. It is recomputed only when
+   * result() changes, which is once per query, and the alternative -- asking the server what the
+   * column types were -- would be a second execution of the statement to learn something the
+   * rows in hand already say.
+   */
+  readonly chartColumns = computed<ColumnReading[]>(() => {
+    const result = this.result();
+    if (!result) return [];
+    const rows = result.rows ?? [];
+    return (result.columns ?? []).map((name, index) => {
+      const texts = new Set<string>();
+      const values = new Set<number>();
+      let missing = 0;
+      let unparsed = 0;
+      let negative = 0;
+      for (const row of rows) {
+        const cell = row[index];
+        // A null and a cell of spaces are both "no value here". Neither is a zero and neither
+        // is a category, so they are counted apart from text that simply is not a number.
+        //
+        // Read through String() rather than assuming one. The server declares rows as
+        // (string | null)[][] and a JSON number arriving instead threw "cell.trim is not a
+        // function" from inside a computed, which takes the whole tab down -- while the result
+        // table above renders the same value without complaint. Coerced rather than counted as
+        // missing, because a number IS a value: calling it absent would be the second wrong
+        // answer, and this screen's whole argument is that an unknown and a zero are different.
+        if (cell === null || cell === undefined) { missing++; continue; }
+        const text = String(cell);
+        if (!text.trim()) { missing++; continue; }
+        texts.add(text);
+        const value = asNumber(text);
+        if (value === null) { unparsed++; continue; }
+        values.add(value);
+        if (value < 0) negative++;
+      }
+      return {
+        name, index, rows: rows.length, missing, unparsed, negative,
+        numbers: rows.length - missing - unparsed,
+        distinct: texts.size, distinctNumbers: values.size,
+      };
+    });
+  });
+
+  /**
+   * The column whose values name the marks, or null when there is nothing to name them with.
+   *
+   * Null on a one-column result, deliberately: labelling a number with itself produces a chart
+   * of a column against itself, which draws and means nothing. That is the state the empty
+   * message and the kind reasons both have to be able to explain, and it is why this is a
+   * nullable column rather than an index defaulting to zero.
+   */
+  readonly labelColumn = computed<ColumnReading | null>(() => {
+    const columns = this.chartColumns();
+    if (columns.length < 2) return null;
+    const picked = columns.find(column => column.name === this.chartLabelName());
+    // A column with no numbers in it is a name. Where every column parses, the first one is
+    // taken, because `select region, month, sum(amount)` puts what a row IS before what it
+    // measures.
+    return picked ?? columns.find(column => !column.numbers) ?? columns[0];
+  });
+
+  /**
+   * The column drawn as a length, or null when nothing in the result parses.
+   *
+   * The LAST numeric column by default rather than the first, which is the other half of the
+   * same observation: an aggregate lands at the end of a select list and an id at the front, and
+   * a bar chart of an id is a chart of nothing at all.
+   */
+  readonly valueColumn = computed<ColumnReading | null>(() => {
+    const label = this.labelColumn()?.name;
+    const usable = this.chartColumns().filter(c => c.numbers > 0 && c.name !== label);
+    const picked = usable.find(column => column.name === this.chartValueName());
+    return picked ?? usable[usable.length - 1] ?? null;
+  });
+
+  /**
+   * The two pickers, each without the column the other is using.
+   *
+   * One column cannot be both. Picking it twice would group a value by itself and then add the
+   * duplicates together -- a chart of how often each number occurs, drawn as though it were a
+   * chart of the numbers, which is the distribution kind wearing the wrong label.
+   */
+  readonly chartLabelOptions = computed(() =>
+    this.chartColumns().filter(column => column.name !== this.valueColumn()?.name));
+
+  readonly chartValueOptions = computed(() =>
+    this.chartColumns().filter(c => c.numbers > 0 && c.name !== this.labelColumn()?.name));
+
+  /**
+   * The marks of a categorical chart, and everything that was left out getting there.
+   *
+   * ROWS SHARING A LABEL ARE ADDED TOGETHER, which is the one interpretation this screen makes
+   * of a reader's data, so it is returned as a count rather than done quietly: `merged` is how
+   * many rows disappeared into a label they shared, and the note under the chart says so
+   * whenever it is not zero. Adding is right for the counts and totals a group-by produces and
+   * wrong for an average, and only the reader knows which they wrote.
+   *
+   * It is not optional, either. Both the ring and the ranked bars track their marks by name, so
+   * two marks called "north" is a duplicate-key error rather than a chart -- and drawing the
+   * three kinds from three differently-grouped arrays would let switching kind change the total.
+   *
+   * The two exclusions are counted apart because they are different facts about the data: a row
+   * with no number in the value column is a measurement nobody has, and a row with nothing in
+   * the label column is a measurement of nothing nameable. Neither becomes a zero.
+   */
+  readonly chartCategories = computed(() => {
+    const label = this.labelColumn();
+    const value = this.valueColumn();
+    const rows = this.result()?.rows ?? [];
+    if (!label || !value) return { points: [] as ChartPoint[], noNumber: 0, noLabel: 0, merged: 0 };
+
+    const points = new Map<string, ChartPoint>();
+    let noNumber = 0;
+    let noLabel = 0;
+    let drawn = 0;
+    for (const row of rows) {
+      const amount = asNumber(row[value.index]);
+      if (amount === null) { noNumber++; continue; }
+      const name = (row[label.index] ?? '').trim();
+      if (!name) { noLabel++; continue; }
+      const existing = points.get(name);
+      if (existing) { existing.value += amount; existing.rows++; } else {
+        points.set(name, { name, value: amount, rows: 1 });
+      }
+      drawn++;
+    }
+    // Insertion order is the result's own order, which is what the ordered kind is FOR: a query
+    // ending in `order by month` has already said how its categories should read.
+    return { points: [...points.values()], noNumber, noLabel, merged: drawn - points.size };
+  });
+
+  /** The same marks for all three categorical kinds -- Bar, Slice and RankedItem agree on them. */
+  readonly chartData = computed<ChartPoint[]>(() => this.chartCategories().points);
+
+  /**
+   * How many rows a ranked bar lists, given to the chart AND to the sentence about it.
+   *
+   * One constant reaching both, because the disclosure is only true while the two agree: a
+   * template that said 8 to app-ranked-bar while the note said 6 would be a chart quietly
+   * dropping two categories under a line claiming it had not.
+   */
+  readonly rankedRows = RANKED_ROWS;
+
+  /** Every number in the value column, unsorted and unrounded, for the distribution to bin. */
+  readonly chartValues = computed<number[]>(() => {
+    const value = this.valueColumn();
+    if (!value) return [];
+    const values: number[] = [];
+    for (const row of this.result()?.rows ?? []) {
+      const parsed = asNumber(row[value.index]);
+      if (parsed !== null) values.push(parsed);
+    }
+    return values;
+  });
+
+  /**
+   * Why a distribution cannot be drawn, or '' when it can.
+   *
+   * The only kind that needs no label column, so it is also the only chart a one-column result
+   * can have -- which is worth knowing, because "select duration from dataset" is a perfectly
+   * normal thing to write.
+   */
+  private readonly distributionIssue = computed(() => {
+    const value = this.valueColumn();
+    if (!value) return this.noNumbersIssue();
+    if (value.numbers < DISTRIBUTION_MIN) {
+      return `Only ${value.numbers} ${value.numbers === 1 ? 'number' : 'numbers'} in `
+        + `"${value.name}" — too few to have a shape worth drawing.`;
+    }
+    if (value.distinctNumbers < 2) {
+      return `Every number in "${value.name}" is the same one, so there is no distribution.`;
+    }
+    return '';
+  });
+
+  /** The reason shared by every kind when the result has nothing to draw a length from. */
+  private noNumbersIssue(): string {
+    if (!this.result()) return 'Nothing has run yet.';
+    return this.chartColumns().length === 1
+      ? `Nothing in "${this.chartColumns()[0].name}" parses as a number.`
+      : 'No column in this result has numbers in it.';
+  }
+
+  /**
+   * The four kinds, each carrying the reason it cannot draw THESE columns.
+   *
+   * Listed and inert rather than filtered away, the same treatment an unreadable connection and
+   * an unreadable file already get on this screen: the reason a ring is not on offer is a fact
+   * about the reader's own data, and it is more useful than the option silently not being there.
+   *
+   * A negative value stops all three of the categorical kinds at once, and that is not a
+   * limitation being worked around -- it is the truth about drawing a quantity as a length.
+   * app-bar-chart floors a bar at zero height and app-ranked-bar drops the row outright, so a
+   * loss of -400 would appear as an absence beside a profit of 400. The distribution stays
+   * available and puts it on the axis where it belongs.
+   */
+  readonly chartKinds = computed<ChartKindOption[]>(() => {
+    const label = this.labelColumn();
+    const value = this.valueColumn();
+    const points = this.chartCategories().points;
+
+    let categorical = '';
+    if (!value) {
+      categorical = this.noNumbersIssue();
+    } else if (!label) {
+      categorical = 'This result has one column, so there is nothing to label its values with.';
+    } else if (!points.length) {
+      categorical = `No row has both a label in "${label.name}" and a number in "${value.name}".`;
+    } else if (value.negative) {
+      categorical = `"${value.name}" holds ${value.negative} negative `
+        + `${value.negative === 1 ? 'value' : 'values'}, and a length cannot be negative. `
+        + 'The distribution can show them.';
+    }
+
+    const many = points.length;
+    return [
+      {
+        id: 'bar', label: 'Bars, in the order the query returned them',
+        issue: categorical || (many > ORDERED_BARS
+          ? `${many} categories cannot stand side by side with their names on them.` : ''),
+      },
+      { id: 'ranked', label: 'Ranked bars, largest first', issue: categorical },
+      {
+        id: 'donut', label: 'Share of the total',
+        issue: categorical || (many > DONUT_SLICES
+          ? `A ring of ${many} slices cannot be read; ${DONUT_SLICES} is the most this draws.`
+          : ''),
+      },
+      { id: 'histogram', label: 'Distribution of one column', issue: this.distributionIssue() },
+    ];
+  });
+
+  /**
+   * The kind actually drawn: the one picked, or the first that these columns support.
+   *
+   * A fallback rather than a stored default, because the columns move under the pick. A reader
+   * who chose a ring over six categories and then ran a query returning four hundred would
+   * otherwise be looking at a control that says "share of the total" over an empty frame.
+   */
+  readonly chartKind = computed<ChartKind | null>(() => {
+    const kinds = this.chartKinds();
+    const picked = kinds.find(kind => kind.id === this.chartKindName() && !kind.issue);
+    return (picked ?? kinds.find(kind => !kind.issue))?.id ?? null;
+  });
+
+  readonly chartDrawn = computed(() => !!this.result() && !!this.chartKind());
+
+  /**
+   * Why there is no chart, in the words of whatever is actually stopping it.
+   *
+   * The kind reasons live on the picker, and the picker is not rendered in an empty state -- so
+   * they are gathered here instead. "No chart" with no reason beside it reads as a screen that
+   * failed, and the true answer is usually about the data: a query that matched nothing, or a
+   * result of names with no numbers anywhere in it.
+   */
+  readonly chartEmptyMessage = computed(() => {
+    const result = this.result();
+    if (!result) return 'Nothing has run yet — a chart is drawn from a result, not from the file.';
+    if (!result.rows?.length) return 'That query matched no rows, so there is nothing to draw.';
+    return [...new Set(this.chartKinds().map(kind => kind.issue).filter(Boolean))].join(' ');
+  });
+
+  /** What the chart claims to be, in one line above it. */
+  readonly chartCaption = computed(() => {
+    const value = this.valueColumn();
+    if (!value) return '';
+    if (this.chartKind() === 'histogram') return `How "${value.name}" is spread`;
+    return `"${value.name}" by "${this.labelColumn()?.name}"`;
+  });
+
+  /**
+   * What this chart is NOT showing, in the reader's own numbers.
+   *
+   * Every line here exists because the chart above it cannot say the thing itself. A bar has no
+   * way to mention the rows that never became a bar, and a ring cannot say that its slices were
+   * added up out of four hundred rows -- so a picture that has quietly narrowed, merged or
+   * ranked its input looks identical to one that drew everything it was given. Truncation is the
+   * exception and is NOT in this list: it is louder than a note, because it is the one that
+   * makes the whole chart wrong rather than partial.
+   */
+  readonly chartNotes = computed<string[]>(() => {
+    const kind = this.chartKind();
+    const value = this.valueColumn();
+    if (!kind || !value) return [];
+    const notes: string[] = [];
+    const rows = value.rows.toLocaleString();
+    const { points, noNumber, noLabel, merged } = this.chartCategories();
+    const distribution = kind === 'histogram';
+
+    if (distribution) {
+      notes.push(`Drawn from ${value.numbers.toLocaleString()} of the ${rows} rows in this result.`);
+    } else {
+      const drawn = value.rows - noNumber - noLabel;
+      notes.push(`Drawn from ${drawn.toLocaleString()} of the ${rows} rows in this result, `
+        + `as ${points.length.toLocaleString()} ${points.length === 1 ? 'category' : 'categories'}.`);
+    }
+
+    const skipped = distribution ? value.rows - value.numbers : noNumber;
+    if (skipped) {
+      notes.push(`${skipped.toLocaleString()} ${skipped === 1 ? 'row has' : 'rows have'} no number `
+        + `in "${value.name}" — left out rather than counted as zero, because an unknown value is `
+        + 'not a zero.');
+    }
+
+    if (!distribution && noLabel) {
+      notes.push(`${noLabel.toLocaleString()} ${noLabel === 1 ? 'row has' : 'rows have'} nothing in `
+        + `"${this.labelColumn()?.name}" to be called, so ${noLabel === 1 ? 'it is' : 'they are'} `
+        + 'not on the chart either.');
+    }
+
+    if (!distribution && merged) {
+      notes.push(`${merged.toLocaleString()} of the rows drawn shared a label with another one; `
+        + 'their numbers were added together. That is right for a count or a total and wrong for '
+        + 'an average.');
+    }
+
+    if (kind === 'ranked') {
+      // Counted over the rows RankedBar will actually rank, not over every point. It filters
+      // value > 0 BEFORE taking its top N, so its universe is smaller than this one -- and with
+      // three zero categories among ten, this said "Showing the 8 largest of 10 ... the rest are
+      // added together as one Other row" above a chart of seven rows and no Other row at all. A
+      // disclosure that is wrong is worse than none, because it is read as having been checked.
+      const ranked = points.filter(point => point.value > 0).length;
+      if (ranked > RANKED_ROWS) {
+        notes.push(`Showing the ${RANKED_ROWS} largest of ${ranked.toLocaleString()}. `
+          + 'The rest are added together as one "Other" row rather than dropped.');
+      }
+      const flat = points.filter(point => !point.value).length;
+      if (flat) {
+        notes.push(`${flat} ${flat === 1 ? 'category adds' : 'categories add'} up to zero, and a `
+          + 'ranked bar has no row for a zero.');
+      }
+    }
+
+    if (kind === 'donut') {
+      notes.push(`Each slice is a share of the sum of "${value.name}". A ring asserts that the `
+        + 'parts add up to a whole, which is true of counts and totals and false of averages.');
+    }
+
+    return notes;
+  });
+
+  /**
+   * How an axis value is written under the distribution.
+   *
+   * The component's own default rounds to a whole number, which is right for a duration in
+   * seconds and destroys a column of rates: every bin edge between 0 and 1 would be labelled
+   * "0" or "1". number() is what the rest of this screen writes a measured value with.
+   */
+  readonly chartNumber = (value: number): string => this.number(value);
+
+  // ---- the library ---------------------------------------------------------------------
+
+  private openLibrary(): void {
+    if (this.libraryAsked()) return;
+    this.libraryAsked.set(true);
+    this.loadSavedQueries();
+    this.loadRuns();
+  }
+
+  loadSavedQueries(): void {
+    this.savedLoading.set(true);
+    this.savedError.set('');
+    this.analytics.fetchAllQueries().subscribe({
+      next: response => {
+        this.savedLoading.set(false);
+        if (response.status !== API_SUCCESS) {
+          this.savedError.set(response.message || 'Your saved queries could not be loaded.');
+          return;
+        }
+        this.savedQueries.set(response.data ?? []);
+      },
+      error: err => {
+        this.savedLoading.set(false);
+        this.savedError.set(err?.error?.message || 'Your saved queries could not be loaded.');
+      },
+    });
+  }
+
+  loadRuns(): void {
+    this.runsLoading.set(true);
+    this.runsError.set('');
+    this.analytics.fetchRecentRuns(25).subscribe({
+      next: response => {
+        this.runsLoading.set(false);
+        if (response.status !== API_SUCCESS) {
+          this.runsError.set(response.message || 'The run history could not be loaded.');
+          return;
+        }
+        this.recentRuns.set(response.data ?? []);
+      },
+      error: err => {
+        this.runsLoading.set(false);
+        this.runsError.set(err?.error?.message || 'The run history could not be loaded.');
+      },
+    });
+  }
+
+  /** Stores what is in the editor as a NEW saved query, under the name that was typed. */
+  saveAsNew(): void {
+    if (!this.saveName().trim() || !this.sql().trim() || !this.path()) return;
+    this.store({
+      queryName: this.saveName().trim(),
+      connectionAlias: this.connection(),
+      datasetPath: this.path(),
+      // Exactly as typed. The row ceiling belongs to the engine's configuration on the day it
+      // runs, so a saved query must not carry a tidied or rewritten copy of itself.
+      queryText: this.sql(),
+    });
+  }
+
+  /**
+   * Writes the editor's text back over the saved query it came from.
+   *
+   * Separate from saveAsNew rather than inferred from whether a query is loaded. Guessing would
+   * mean the same button silently overwrites somebody's saved work on one visit and forks it on
+   * the next, and the two are not recoverable from each other.
+   */
+  updateLoaded(): void {
+    const loaded = this.loadedQuery();
+    if (!loaded?.analyticsQueryId || !this.sql().trim()) return;
+    this.store({
+      analyticsQueryId: loaded.analyticsQueryId,
+      queryName: this.saveName().trim() || loaded.queryName,
+      connectionAlias: this.connection(),
+      datasetPath: this.path(),
+      queryText: this.sql(),
+    });
+  }
+
+  private store(query: SavedQuery): void {
+    this.saving.set(true);
+    this.saveError.set('');
+    this.analytics.saveQuery(query).subscribe({
+      next: response => {
+        this.saving.set(false);
+        if (response.status !== API_SUCCESS || !response.data) {
+          this.saveError.set(response.message || 'The query could not be saved.');
+          return;
+        }
+        // The row the server built, not the payload that was sent: it carries the id a new save
+        // was given, and it is what Update has to point at from here on.
+        this.loadedQuery.set(response.data);
+        this.saveName.set(response.data.queryName ?? query.queryName);
+        this.loadSavedQueries();
+      },
+      error: err => {
+        this.saving.set(false);
+        this.saveError.set(err?.error?.message || 'The query could not be saved.');
+      },
+    });
+  }
+
+  /**
+   * Puts a saved query back in the editor.
+   *
+   * It does NOT move the dataset to the one the row names. A saved query is a statement, and the
+   * dataset it runs against is whatever is open -- which is the behaviour that lets one query be
+   * pointed at this month's file. Where those disagree, loadedElsewhere says so on screen rather
+   * than this quietly reopening a file the reader did not ask for.
+   */
+  loadSaved(query: SavedQuery): void {
+    this.sql.set(query.queryText ?? '');
+    this.saveName.set(query.queryName ?? '');
+    this.loadedQuery.set(query);
+    this.clearResult();
+    this.saveError.set('');
+  }
+
+  startRename(query: SavedQuery): void {
+    this.renamingId.set(query.analyticsQueryId ?? null);
+    this.renameName.set(query.queryName ?? '');
+  }
+
+  cancelRename(): void {
+    this.renamingId.set(null);
+    this.renameName.set('');
+  }
+
+  applyRename(): void {
+    const id = this.renamingId();
+    const name = this.renameName().trim();
+    if (!id || !name) return;
+    this.analytics.renameQuery(id, name).subscribe({
+      next: response => {
+        this.cancelRename();
+        if (response.status !== API_SUCCESS) {
+          this.savedError.set(response.message || 'The query could not be renamed.');
+          return;
+        }
+        // The one in the editor carries its own copy of the name; a rename that left the header
+        // saying the old one would be the screen disagreeing with itself.
+        const loaded = this.loadedQuery();
+        if (loaded?.analyticsQueryId === id) {
+          this.loadedQuery.set({ ...loaded, queryName: name });
+          this.saveName.set(name);
+        }
+        this.loadSavedQueries();
+      },
+      error: err => {
+        this.cancelRename();
+        this.savedError.set(err?.error?.message || 'The query could not be renamed.');
+      },
+    });
+  }
+
+  /**
+   * Deletes a saved query, behind the same confirmation every other destructive control here has.
+   *
+   * The body says what deleting does NOT do, because the pair is easy to get wrong: the history
+   * rows this query produced survive it -- the server unhooks them rather than removing them --
+   * and somebody deleting a query to erase a record would otherwise think they had.
+   */
+  async removeSaved(query: SavedQuery): Promise<void> {
+    const id = query.analyticsQueryId;
+    if (!id) return;
+    const confirmed = await confirmWith(this.dialog, {
+      title: 'Delete this saved query?',
+      body: `"${query.queryName}" will be removed. The record of the times it was run stays in `
+        + 'the history below.',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!confirmed) return;
+    this.analytics.deleteQuery(id).subscribe({
+      next: response => {
+        if (response.status !== API_SUCCESS) {
+          this.savedError.set(response.message || 'The query could not be deleted.');
+          return;
+        }
+        if (this.loadedQuery()?.analyticsQueryId === id) this.loadedQuery.set(null);
+        this.loadSavedQueries();
+      },
+      error: err => {
+        this.savedError.set(err?.error?.message || 'The query could not be deleted.');
+      },
+    });
+  }
+
+  /**
+   * Puts a statement from the history back in the editor, without running it.
+   *
+   * Without running it on purpose. A row in this list may be one the engine refused or one that
+   * took thirty seconds, and a single click that re-spends a governor permit on either is a
+   * control that punishes curiosity.
+   */
+  reuseRun(run: QueryRun): void {
+    this.sql.set(run.queryText ?? '');
+    this.loadedQuery.set(null);
+    this.saveName.set('');
+    this.clearResult();
+  }
+
+  /**
+   * A run's row count, or '' where there was none.
+   *
+   * A method rather than a template expression because zero is a real answer and null is not the
+   * same one: a query that matched nothing returns 0 rows, a refusal returns no count at all, and
+   * `@if (run.rowCount)` would draw both as the second.
+   */
+  runRows(run: QueryRun): string {
+    const rows = run.rowCount;
+    return rows === null || rows === undefined ? '' : rows.toLocaleString();
+  }
+
+  /** A run's timestamp in the reader's locale, falling back to the raw text if it will not parse. */
+  runWhen(run: QueryRun): string {
+    const raw = run.dateCreated;
+    if (!raw) return '';
+    const at = new Date(raw);
+    return isNaN(at.getTime()) ? raw : at.toLocaleString();
+  }
+
+  /**
+   * How long a run took INSIDE the engine, which is not how long the person waited.
+   *
+   * The server measures wall clock around the query and nothing else, so this figure excludes the
+   * network and the queue in front of it. It is labelled on screen rather than presented as the
+   * response time, because the two differ most exactly when the module is under load.
+   */
+  runTook(run: QueryRun): string {
+    const ms = run.durationMs;
+    if (ms === null || ms === undefined) return '';
+    return ms < 1000 ? `${ms} ms` : `${(ms / 1000).toLocaleString(undefined,
+      { maximumFractionDigits: 1 })} s`;
+  }
+}

@@ -27,16 +27,22 @@ const HOURS = Array.from({ length: 24 }, (_, i) => i);
               {{ row.day.slice(0, 3) }}
             </span>
             @for (cell of row.cells; track cell.hour) {
+              <!-- ring-offset asked for var(--surface): a token this app never defines (only
+                   --surface-page/-raised/-sunken/-inset/-code/-inverse exist). An invalid
+                   --tw-ring-offset-color invalidates the whole composed box-shadow, so hover,
+                   focus AND selection drew NOTHING, in either theme -- the cell had no
+                   selection affordance at all. The three states now share --focus-ring and
+                   separate by weight: a 1px hint on hover, 2px for focus and for selection. -->
               <button type="button"
                       class="aspect-square w-full rounded-[3px] relative
-                             ring-offset-1 ring-offset-[color:var(--surface)]
+                             ring-offset-1 ring-offset-[color:var(--surface-raised)]
+                             ring-[color:var(--focus-ring)]
                              transition-[box-shadow,opacity]
-                             hover:ring-2 hover:ring-brand-400
-                             focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500
+                             hover:ring-1
+                             focus-visible:outline-none focus-visible:ring-2
                              disabled:cursor-default"
                       [style.background]="background(cell.value)"
                       [class.ring-2]="isSelected(row.day, cell.hour)"
-                      [class.ring-brand-600]="isSelected(row.day, cell.hour)"
                       [disabled]="!cell.value"
                       (mouseenter)="hovered.set({ day: row.day, cell })"
                       (mouseleave)="hovered.set(null)"

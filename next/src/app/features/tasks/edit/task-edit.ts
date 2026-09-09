@@ -7,6 +7,7 @@ import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } fr
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { Field } from '../../../shared/ui/field';
+import { Combobox, ComboboxOption } from '../../../shared/ui/combobox';
 import { Icon } from '../../../shared/ui/icon';
 import { TaskForm, TaskFormField } from '../../settings/forms/task-form-dialog';
 
@@ -17,7 +18,7 @@ const LOOKUP_TYPES = ['TASK_GROUPS', 'PIPELINE_HOME_PAGES'];
 
 @Component({
   selector: 'app-task-edit',
-  imports: [Icon, ReactiveFormsModule, RouterLink, Field],
+  imports: [Icon, ReactiveFormsModule, RouterLink, Field, Combobox],
   templateUrl: './task-edit.html',
 })
 export class TaskEdit implements OnInit {
@@ -57,6 +58,16 @@ export class TaskEdit implements OnInit {
 
   /** Which pipeline the currently loaded form belongs to, so the same fetch is not repeated. */
   private loadedFormPipeline: string | null = null;
+
+  /**
+   * The tenant that owns the task being edited, sent with the form lookup.
+   *
+   * Only a platform admin can see across tenants, and two tenants may each hold a form for the
+   * same pipeline id -- the id is the worker's routing key, not a unique name. Without saying
+   * which tenant's task this is, the server had to guess, and picking the wrong one wrote that
+   * form's fields into this task's tags on save.
+   */
+  private taskTenantId: number | null = null;
 
   readonly isEdit = computed(() => !!this.taskDetailId());
 
@@ -155,6 +166,7 @@ export class TaskEdit implements OnInit {
           groupId: task.groupId,
           taskPayload: task.taskPayload,
         }, { emitEvent: false });
+        this.taskTenantId = task.tenantId ?? null;
         const existing = task.xmlTagsInfo ?? task.tagsInfo ?? [];
         this.tags.clear();
         for (const tag of existing) this.pushTagRow(tag);
@@ -179,6 +191,33 @@ export class TaskEdit implements OnInit {
   lookupOptions(type: string): any[] { return this.lookups()[type] ?? []; }
 
   /**
+   * Pre-shaped rows for the Pipeline/Group/Home page combo-boxes.
+   *
+   * `Combobox` takes plain `{value, label, hint}` data rather than accessor functions -- binding
+   * a component input directly to a function-typed class property crashes this Angular version's
+   * template compiler ("Expected i18n meta to be a Message, but got: Function"), confirmed by
+   * bisection, not assumed. Shaping the data here instead sidesteps it entirely.
+   */
+  readonly pipelineOptions = computed<ComboboxOption[]>(() => this.pipelines().map(p => ({
+    value: p.pipelineId ?? '',
+    label: `${p.formName} (${p.pipelineId})`,
+    hint: p.description ?? '',
+  })));
+
+  private toLookupOption(opt: any): ComboboxOption {
+    const name = opt.lookupType || opt.lookupValue || '';
+    return {
+      value: String(opt.lookupId ?? ''),
+      label: opt.lookupValue && opt.lookupType ? `${name} (${opt.lookupValue})` : name,
+      hint: opt.description ?? '',
+    };
+  }
+
+  lookupComboOptions(type: string): ComboboxOption[] {
+    return this.lookupOptions(type).map(o => this.toLookupOption(o));
+  }
+
+  /**
    * Fetches the form the chosen pipeline expects, if it has one.
    *
    * A pipeline with no form is the normal case and comes back as a success with null data, so
@@ -193,8 +232,10 @@ export class TaskEdit implements OnInit {
       return;
     }
     this.formLoading.set(true);
+    const params: Record<string, string> = { pipelineId };
+    if (this.taskTenantId != null) params['tenantId'] = String(this.taskTenantId);
     this.http.get<ApiResponse<TaskForm>>(`${API_BASE}/taskForm.json/formForPipeline`,
-      { params: { pipelineId } }).subscribe({
+      { params }).subscribe({
       next: response => {
         this.formLoading.set(false);
         // Guard against a slow response for a pipeline the user has since moved off.

@@ -160,7 +160,7 @@
       <thead>
         <tr>
           <th class="w-8">
-            <input type="checkbox" class="accent-brand-600 cursor-pointer"
+            <input type="checkbox" class="checkbox"
                    [checked]="allShownSelected()"
                    [attr.aria-label]="allShownSelected() ? 'Clear selection' : 'Select all shown'"
                    (change)="toggleAll()" />
@@ -181,7 +181,7 @@
         @for (c of filtered(); track c.storageConnectionId) {
           <tr [class.opacity-55]="testing() === c.storageConnectionId">
             <td>
-              <input type="checkbox" class="accent-brand-600 cursor-pointer"
+              <input type="checkbox" class="checkbox"
                      [checked]="isSelected(c.storageConnectionId)"
                      [attr.aria-label]="'Select ' + c.connectionName"
                      (change)="toggleSelected(c.storageConnectionId)" />

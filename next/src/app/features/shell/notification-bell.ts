@@ -68,7 +68,7 @@ interface Note {
                       <span class="flex items-center gap-1.5">
                         <span class="text-sm font-medium truncate">{{ note.title }}</span>
                         @if (!note.read) {
-                          <span class="size-1.5 rounded-full bg-brand-500 shrink-0"></span>
+                          <span class="size-1.5 rounded-full bg-[color:var(--accent-text)] shrink-0"></span>
                         }
                       </span>
                       @if (note.message) {

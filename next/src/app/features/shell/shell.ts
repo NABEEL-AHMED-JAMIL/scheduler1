@@ -5,6 +5,7 @@ import { LowerCasePipe } from '@angular/common';
 import { AuthService } from '../../core/auth/auth.service';
 import { ThemeService } from '../../core/theme.service';
 import { Icon } from '../../shared/ui/icon';
+import { BrandMark } from '../../shared/ui/brand-mark';
 import { NotificationBell } from './notification-bell';
 
 interface NavChild {
@@ -27,7 +28,7 @@ interface NavItem {
 
 @Component({
   selector: 'app-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, LowerCasePipe, Icon, NotificationBell],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, LowerCasePipe, Icon, BrandMark, NotificationBell],
   templateUrl: './shell.html',
 })
 export class Shell {
@@ -41,7 +42,7 @@ export class Shell {
   /**
    * Only `openMenu` drove a dropdown trigger's highlight, so a section with no menu open --
    * which is how the nav looks the rest of the time -- never showed which one you were in.
-   * The two leaf links (Dashboard, Object Browser) get this for free from `routerLinkActive`;
+   * The leaf links (Dashboard) get this for free from `routerLinkActive`;
    * a dropdown trigger has no `[routerLink]` of its own to hang that off, so its own current
    * route is tracked here instead.
    */
@@ -83,7 +84,17 @@ export class Shell {
           hint: 'Group and measure your runs' },
       ],
     },
-    { label: 'Object Browser', path: '/objects', icon: 'folder' },
+    {
+      // Both screens are the same bucket, seen two ways: one browses the objects, the other
+      // reads what is inside them. They share a storage service, so they share a menu.
+      label: 'Object Browser',
+      children: [
+        { label: 'Browse files', path: '/objects', icon: 'folder',
+          hint: 'Upload, preview and share objects' },
+        { label: 'Analytics Studio', path: '/analytics', icon: 'chart',
+          hint: 'Read a file as data, where it lives' },
+      ],
+    },
     {
       label: 'Tools',
       children: [
@@ -119,7 +130,7 @@ export class Shell {
           hint: 'Define a pipeline and its form instead of a lookup row' },
         { label: 'Lookups', path: '/settings/lookup', icon: 'list', adminOnly: true,
           hint: 'Shared key and value data' },
-        { label: 'Storage Connections', path: '/admin/storage', icon: 'cloud', adminOnly: true,
+        { label: 'Storage Connections', path: '/settings/storage-connections', icon: 'cloud', adminOnly: true,
           hint: 'S3, Azure, MinIO, FTP' },
       ],
     },

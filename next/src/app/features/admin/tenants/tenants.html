@@ -96,6 +96,9 @@
                 <td class="text-right tabular"
                     [class.text-[color:var(--text-muted)]]="!$any(tenant)[res.key]">
                   {{ $any(tenant)[res.key] || 0 }}
+                  @if (res.sub && res.sub(tenant); as sub) {
+                    <div class="text-[10px] text-[color:var(--text-muted)] leading-tight">{{ sub }}</div>
+                  }
                 </td>
               }
               <td class="whitespace-nowrap text-[color:var(--text-secondary)]">
@@ -180,6 +183,9 @@
                     <span class="text-[10px] uppercase tracking-wide leading-none text-[color:var(--text-muted)]">
                       {{ res.label }}
                     </span>
+                    @if (res.sub && res.sub(tenant); as sub) {
+                      <span class="text-[10px] leading-none text-[color:var(--text-muted)]">{{ sub }}</span>
+                    }
                   </div>
                 }
               </div>
@@ -191,7 +197,7 @@
                 <div class="mt-2 flex items-center gap-2"
                      [title]="shareOf(tenant, 'userCount') + '% of the largest workspace by people'">
                   <div class="h-1 flex-1 rounded-full overflow-hidden bg-sunken">
-                    <div class="h-full rounded-full bg-brand-500 transition-all"
+                    <div class="h-full rounded-full bg-[color:var(--chart-0)] transition-all"
                          [style.width.%]="shareOf(tenant, 'userCount')"></div>
                   </div>
                   <span class="text-[10px] tabular text-[color:var(--text-muted)] shrink-0">

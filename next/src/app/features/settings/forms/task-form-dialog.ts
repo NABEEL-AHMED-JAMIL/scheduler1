@@ -178,7 +178,7 @@ export const FIELD_TYPES = ['text', 'textarea', 'number', 'url', 'select', 'chec
               }
 
               <label class="flex items-center gap-2 text-sm">
-                <input type="checkbox" formControlName="required" />
+                <input type="checkbox" class="checkbox" formControlName="required" />
                 Required
               </label>
             </div>
@@ -297,6 +297,43 @@ export class TaskFormDialog {
       const parent = field.tagParent?.trim();
       if (parent && !keys.has(parent)) {
         return `"${field.label.trim()}" nests under <${parent}>, which no field creates.`;
+      }
+    }
+    return this.findNestingCycle(rows);
+  }
+
+  /**
+   * Refuses a set of fields whose nesting loops back on itself.
+   *
+   * Existing before this: the parent dropdown offers every *other* field, so A under B and B
+   * under A is two clicks away, and nothing rejected it -- both parents exist, which was the
+   * only thing checked. A cycle has no root, so `preview` (which walks down from the fields with
+   * no parent) rendered neither field, and the form saved happily with tags that the XML
+   * generator then nests inside each other in an order nobody asked for. Silent on both sides,
+   * so it is caught here by name.
+   */
+  private findNestingCycle(rows: TaskFormField[]): string | null {
+    const parentOf = new Map<string, string>();
+    for (const field of rows) {
+      const key = field.tagKey.trim();
+      const parent = field.tagParent?.trim();
+      if (parent) parentOf.set(key, parent);
+    }
+    for (const start of parentOf.keys()) {
+      const path: string[] = [start];
+      const seen = new Set<string>([start]);
+      let current = parentOf.get(start);
+      while (current) {
+        if (seen.has(current)) {
+          path.push(current);
+          return path.length === 2 && path[0] === path[1]
+            ? `<${start}> is set to nest under itself.`
+            : `These fields nest in a loop: ${path.map(t => `<${t}>`).join(' under ')}. `
+              + 'One of them has to sit at the top level.';
+        }
+        seen.add(current);
+        path.push(current);
+        current = parentOf.get(current);
       }
     }
     return null;

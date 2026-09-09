@@ -65,11 +65,30 @@
             <app-icon [name]="listening() ? 'stop' : 'mic'" [class.pulse]="listening()" />
           </button>
         }
-        <button type="button" class="btn btn-primary btn-sm" [disabled]="!question().trim()"
+        <button type="button" class="btn btn-primary btn-sm"
+                [disabled]="!question().trim() || asking()"
                 (click)="ask(question())">
-          <app-icon name="send" />Ask
+          <app-icon name="send" [class.spin]="asking()" />{{ asking() ? 'Asking…' : 'Ask' }}
         </button>
       </div>
+
+      <!-- Only shown when an agent exists. Everything above answers from the job's own record
+           with no provider at all; the agent is what picks up the questions those patterns do
+           not match, so with none configured there is nothing here to choose. -->
+      @if (agents().length) {
+        <div class="flex items-center gap-2 mb-2.5">
+          <label class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]"
+                 [attr.for]="'assistant-agent-' + jobId()">Anything else, ask</label>
+          <select class="input max-w-52 shrink-0" [attr.id]="'assistant-agent-' + jobId()"
+                  [value]="agentId()"
+                  (change)="agentId.set(+$any($event.target).value || null)">
+            @for (agent of agents(); track agent.aiAgentId) {
+              <option [value]="agent.aiAgentId">{{ agent.agentName }}</option>
+            }
+            <option [value]="0">No agent — job data only</option>
+          </select>
+        </div>
+      }
 
       <div class="flex items-center gap-1.5"
            [class.flex-wrap]="!compact()"
@@ -125,6 +144,26 @@
                 @if (turn.answer.refused) { <app-icon name="alert" size="0.9em" class="icon-warn mr-1" /> }
                 {{ block.text }}
               </p>
+            }
+
+            <!-- Drawn unlike every other block on purpose: the rest of this transcript is the
+                 job's own record and cannot be wrong, while this is a model's prose and can be.
+                 The agent's name rides with it so the reader knows who is talking. -->
+            @case ('ai') {
+              @if (turn.answer.pending) {
+                <p class="text-sm text-[color:var(--text-muted)] flex items-center gap-2">
+                  <span class="spinner [--spinner-size:0.9rem]" aria-hidden="true"></span>
+                  Asking {{ block.agent }}…
+                </p>
+              } @else {
+                <div class="rounded-lg border border-subtle bg-sunken px-3 py-2.5">
+                  <p class="text-sm leading-relaxed whitespace-pre-wrap">{{ block.text }}</p>
+                  <p class="text-[11px] text-[color:var(--text-muted)] mt-2 flex items-center gap-1">
+                    <app-icon name="chat" size="0.85em" />
+                    Answered by {{ block.agent }} — generated, not read from the job record.
+                  </p>
+                </div>
+              }
             }
 
             @case ('facts') {

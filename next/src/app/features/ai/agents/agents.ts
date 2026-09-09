@@ -1,5 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { of } from 'rxjs';
+import { catchError, map } from 'rxjs/operators';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { MineFilter, isMine } from '../../../shared/ui/mine-filter';
 import { AuthService } from '../../../core/auth/auth.service';
@@ -65,7 +67,16 @@ export class Agents implements OnInit {
       || (a.model ?? '').toLowerCase().includes(term));
   });
 
-  ngOnInit(): void { this.load(); this.loadProviders(); }
+  /*
+   * Providers are only fetched for someone who can actually create or edit an agent. The
+   * lookup endpoint behind them is TENANT_ADMIN-only, so calling it for every visitor fired a
+   * 403 in the console of a TENANT_USER who was doing nothing wrong -- the page is deliberately
+   * open to them for reading, and the list it would have filled feeds only the write dialogs.
+   */
+  ngOnInit(): void {
+    this.load();
+    if (this.auth.canManageAgents()) this.loadProviders();
+  }
 
   load(): void {
     this.loading.set(true);
@@ -90,10 +101,19 @@ export class Agents implements OnInit {
     this.http.get<ApiResponse<any>>(`${API_BASE}/setting.json/appSetting`).subscribe({
       next: response => {
         if (response.status !== API_SUCCESS) return;
-        const lookup = (response.data?.lookupDatas ?? [])
+        const parent = (response.data?.lookupDatas ?? [])
           .find((l: any) => l.lookupType === 'AI_PROVIDER');
-        const values = (lookup?.children ?? []).map((c: any) => c.lookupValue).filter(Boolean);
-        this.providers.set(values.length ? values : ['OpenAI', 'Anthropic', 'Ollama']);
+        // appSetting returns only the parent lookup row -- there is no "children" on it (see the
+        // same fix in task-edit.ts), so the real list has to be fetched separately per parent id.
+        if (!parent) { this.providers.set(['OpenAI', 'Anthropic', 'Ollama']); return; }
+        this.http.get<ApiResponse<any>>(`${API_BASE}/setting.json/fetchSubLookupByParentId`,
+          { params: { parentLookUpId: parent.lookupId } }).pipe(
+          map(sub => (sub?.data?.lookupDatas ?? []) as any[]),
+          catchError(() => of([] as any[])),
+        ).subscribe(children => {
+          const values = children.map((c: any) => c.lookupValue).filter(Boolean);
+          this.providers.set(values.length ? values : ['OpenAI', 'Anthropic', 'Ollama']);
+        });
       },
       error: () => this.providers.set(['OpenAI', 'Anthropic', 'Ollama']),
     });

@@ -64,3 +64,43 @@ describe('Tenants status-change guard', () => {
     expect(tenants.busy()).toBe(null);
   });
 });
+
+/**
+ * The pipeline count sits under the task count rather than in a column of its own, and it is
+ * only drawn when it says something the task count did not.
+ *
+ * The distinction it exists to make: the demo workspace has 19 tasks across 15 pipelines, so
+ * four pipelines carry two tasks each. Nothing else on the screen separates "nineteen tasks all
+ * doing one thing" from "nineteen tasks doing fifteen different things" -- source_task_type is
+ * a single service row and reads 1 either way.
+ */
+describe('Tenants pipeline count', () => {
+  const tasksResource = () => {
+    const found = tenantsFor(vi.fn()).resources.find(r => r.key === 'sourceTaskCount');
+    if (!found) throw new Error('the Tasks resource is gone');
+    return found;
+  };
+  const sub = (sourceTaskCount: number, pipelineCount: number) =>
+    tasksResource().sub?.({ sourceTaskCount, pipelineCount } as any) ?? '';
+
+  it('names the pipelines when they differ from the task count', () => {
+    expect(sub(19, 15)).toBe('15 pipelines');
+  });
+
+  it('says nothing when every task is its own pipeline, which the task count already said', () => {
+    expect(sub(15, 15)).toBe('');
+  });
+
+  it('says nothing for a workspace with no tasks, rather than printing "0 pipelines"', () => {
+    expect(sub(0, 0)).toBe('');
+  });
+
+  it('reads as singular for one pipeline', () => {
+    expect(sub(4, 1)).toBe('1 pipeline');
+  });
+
+  it('hangs off Tasks, not a column of its own', () => {
+    const withSub = tenantsFor(vi.fn()).resources.filter(r => r.sub);
+    expect(withSub.map(r => r.key)).toEqual(['sourceTaskCount']);
+  });
+});

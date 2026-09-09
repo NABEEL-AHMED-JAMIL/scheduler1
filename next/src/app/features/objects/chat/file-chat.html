@@ -75,8 +75,13 @@
                  beside the last line of a long message, not floating at the top. -->
             <div class="flex justify-end items-end gap-2">
               <div class="max-w-[85%] flex flex-col items-end gap-1">
-                <div class="rounded-lg rounded-br-sm px-3 py-2 text-sm
-                            whitespace-pre-wrap break-words bg-brand-500 text-white">
+                <!-- The primary-button pair, not raw brand-500: after the monochrome rebrand
+                     brand-500 sits at 1.21:1 against the dark panel, so the bubble outline that
+                     tells the user's turn from the assistant's disappeared and the thread read
+                     as one column. These two tokens are the ones defined to invert in dark. -->
+                <div class="rounded-lg rounded-br-sm px-3 py-2 text-sm whitespace-pre-wrap
+                            break-words bg-[color:var(--btn-primary-bg)]
+                            text-[color:var(--btn-primary-fg)]">
                   {{ message.text }}
                 </div>
                 @if (message.at) {

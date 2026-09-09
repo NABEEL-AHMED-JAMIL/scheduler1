@@ -116,12 +116,24 @@ export const routes: Routes = [
         loadComponent: () => import('./features/tasks/tasks').then(m => m.Tasks),
       },
       {
-        path: 'admin/storage',
+        // Lives under settings/ rather than admin/ because it groups with the rest of the
+        // Configuration menu (Kafka Connections, Lookups, Pipeline Forms) -- infrastructure
+        // setup, not the Administration menu's people/tenant management. The old admin/storage
+        // path is kept as a redirect below so an old bookmark or link still lands.
+        path: 'settings/storage-connections',
         loadComponent: () =>
           import('./features/admin/storage/storage-connections').then(m => m.StorageConnections),
         data: { minRole: 'TENANT_ADMIN' },
         canActivate: [roleGuard],
       },
+      {
+        // Open to TENANT_USER, like the Object Browser it reads from and for the same reason:
+        // which connections a caller may reach is settled per request against each connection's
+        // own tenant, not by a role on the route.
+        path: 'analytics',
+        loadComponent: () => import('./features/analytics/analytics').then(m => m.Analytics),
+      },
+      { path: 'admin/storage', redirectTo: 'settings/storage-connections' },
       {
         // Deliberately open, unlike its Models sibling: fetchAllAgents is TENANT_USER and the
         // objects screen depends on it. Only add/update/delete need TENANT_ADMIN, so the gate

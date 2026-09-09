@@ -1,55 +1,67 @@
 @import "tailwindcss";
 
 /* ---------------------------------------------------------------------------
-   Design tokens.
+   Design tokens -- the Compass palette.
 
-   Rebrand from the product's original indigo (then briefly teal, then gold) to
-   Tailwind's own default Blue, on Tailwind's own default Slate neutrals -- real
-   published palette values throughout, not hand-derived hues, for the
-   familiar, polished look those two scales have on their own.
+   Rebranded onto Tailwind Plus's "Compass" template, whose scheme was read off
+   the live preview rather than guessed at: Inter on its variable axis for every
+   weight, Geist Mono for code, and Tailwind's own default *gray* ramp -- the
+   measured values there are #030712 for headings, #364153 for body text and
+   #6a7282 for muted, which are gray-950/700/500 exactly.
 
-   Every load-bearing pair below was re-measured against WCAG 2 contrast
-   (relative luminance, not eyeballed) exactly as the previous two palettes
-   were. Two real consequences of using the official scale as-is, rather than
-   tuning a custom one to fit: Tailwind's blue-500 itself only reaches 3.68:1
-   for white text -- short of AA -- so brand-500 here (the shade a filled
-   button keeps) is slotted to blue-600 instead, and every step from there
-   down is likewise shifted one below its Tailwind number (brand-900 is
-   blue-950). And Slate's own 400/500 steps leave a real gap on the sunken
-   surface (400 measures 2.34:1, 500 only 4.34:1 -- both short of 4.5), so
-   ink-450 is the one custom value here, interpolated 20% from slate-500
-   toward slate-600 to actually clear it.
+   The defining choice, and the one that changes this app most, is that Compass
+   carries NO accent hue at all. Emphasis comes from weight and contrast, and a
+   primary action is a near-black pill rather than a coloured one. So the whole
+   brand-* ramp below is monochrome. It is kept as a ramp, rather than deleted,
+   because ~180 usages across the app reference these steps by name; re-pointing
+   them is what makes the rebrand a palette change instead of a rewrite.
 
-   Semantic colours are deliberately separate from the accent: ok/warn/crit
-   keep their original green/amber/rose, which read correctly against every
-   accent this product has had.
+   Compass draws its rules as the text colour at 10% alpha. Composited over the
+   page that lands on #e6e7e9 -- which is gray-200 to within a rounding step --
+   so --border-subtle keeps pointing at ink-200 and gets the same tone without
+   becoming translucent. That matters: `bg-subtle` is used as a *fill* in seven
+   places, and an alpha border would have quietly turned each into a tint of
+   whatever happened to be behind it.
+
+   Every load-bearing pair was re-measured against WCAG 2 contrast (relative
+   luminance, not eyeballed), as the previous palettes were. The one custom value
+   is ink-450: gray-500 measures 4.39:1 on the sunken surface a hovered row
+   switches to -- under AA -- so ink-450 is interpolated 10% from gray-500 toward
+   gray-600, the lightest step that clears it (4.59:1).
+
+   Semantic colours stay their own hues. Compass has no equivalent because it has
+   no state to report; a console does, and ok/warn/crit are the one place where
+   colour carries meaning that weight cannot.
    --------------------------------------------------------------------------- */
 @theme {
-  --color-ink-50:  #f8fafc;
-  --color-ink-100: #f1f5f9;
-  --color-ink-200: #e2e8f0;
-  --color-ink-300: #cbd5e1;
-  --color-ink-400: #94a3b8;
-  /* Between 400 and 500: the lightest muted step that still clears 4.5:1 on the sunken
-     surface, which is what a hovered table row switches to. Measured: 4.75:1. */
-  --color-ink-450: #5e6e84;
-  --color-ink-500: #64748b;
-  --color-ink-600: #475569;
-  --color-ink-700: #334155;
-  --color-ink-800: #1e293b;
-  --color-ink-900: #0f172a;
-  --color-ink-950: #020617;
+  --color-ink-50:  #f9fafb;
+  --color-ink-100: #f3f4f6;
+  --color-ink-200: #e5e7eb;
+  --color-ink-300: #d1d5dc;
+  --color-ink-400: #99a1af;
+  /* Between gray-500 and gray-600: the lightest muted step that still clears 4.5:1 on the
+     sunken surface, which is what a hovered table row switches to. Measured: 4.59:1. */
+  --color-ink-450: #676f7f;
+  --color-ink-500: #6a7282;
+  --color-ink-600: #4a5565;
+  --color-ink-700: #364153;
+  --color-ink-800: #1e2939;
+  --color-ink-900: #101828;
+  --color-ink-950: #030712;
 
-  --color-brand-50:  #eff6ff;
-  --color-brand-100: #dbeafe;
-  --color-brand-200: #bfdbfe;
-  --color-brand-300: #93c5fd;
-  --color-brand-400: #60a5fa;
-  --color-brand-500: #2563eb;
-  --color-brand-600: #1d4ed8;
-  --color-brand-700: #1e40af;
-  --color-brand-800: #1e3a8a;
-  --color-brand-900: #172554;
+  /* Monochrome, because Compass is. Each step is still named for the job it does, not for a
+     hue: 500 is the filled button (white on it, 14.67:1), 600 is accent text in light
+     (17.75:1 on a card), 300 is accent text in dark (6.82:1 on one), 50 is the soft chip. */
+  --color-brand-50:  #f3f4f6;
+  --color-brand-100: #e5e7eb;
+  --color-brand-200: #d1d5dc;
+  --color-brand-300: #99a1af;
+  --color-brand-400: #4a5565;
+  --color-brand-500: #1e2939;
+  --color-brand-600: #101828;
+  --color-brand-700: #0a0f1c;
+  --color-brand-800: #060b16;
+  --color-brand-900: #030712;
 
   --color-ok-100: #dcf3e6;
   --color-ok-500: #1d7a44;
@@ -67,7 +79,7 @@
   --color-crit-400: #f2748c;
 
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
   --radius-card: 0.625rem;
 
@@ -108,8 +120,8 @@
        OS, not the page. Without this they stay light on the dark theme, which is why a date
        field read as a white Bootstrap control sitting on a dark form. */
     color-scheme: light;
-    --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235e6e84' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-    --date-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235e6e84' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='16' rx='2'/%3E%3Cpath d='M3 10h18M8 3v4M16 3v4'/%3E%3C/svg%3E");
+    --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23676f7f' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    --date-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23676f7f' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='16' rx='2'/%3E%3Cpath d='M3 10h18M8 3v4M16 3v4'/%3E%3C/svg%3E");
 
     --surface-page:    var(--color-ink-50);
     --surface-raised:  #ffffff;
@@ -119,20 +131,22 @@
        reads as a shade rather than nothing -- most visibly a table's total row. This is the
        same idea at a whisper: near the page's own tint, a third of the way to it in
        lightness. Interactive states keep ink-100, because a hover has to actually register. */
-    --surface-inset:   #f6f8fb;
-    /* A code block is a well, not a card. It was painted with --surface-raised, which is white
-       -- lighter than the inset panel it usually sits in -- so a payload appeared to float
-       above the very area it belongs to, and an expanded row read as three near-identical
-       whites with no depth to it. This goes the other way: below the panel, not above it. */
-    --surface-code:    var(--color-ink-100);
+    --surface-inset:   #f7f8f9;
+    /* A code block is a well, not a card -- it belongs *below* the surface it sits on.
+       It was ink-100, which is exactly --surface-sunken, so inside an expanded table row the
+       payload was the same colour as the drawer behind it and only a hairline told them apart.
+       One step deeper gives the drawer -> well relationship an actual shade to read. Safe at
+       this depth because every bg-code surface in the app carries primary text (14.33:1 here);
+       nothing puts muted text on one, which ink-200 would not have cleared. */
+    --surface-code:    var(--color-ink-200);
     /* Brand-tinted hover, as a token because a hardcoded light tint is unreadable on dark:
        pill-neutral's own text over a raw bg-brand-50 measures well under 4.5 in dark mode. */
     --hover-brand-bg:  var(--color-brand-50);
     --hover-brand-fg:  var(--color-brand-700);
     /* Overlay scrollbars stay invisible until the pointer moves, so a list that scrolls
        inside its own box looks like a list that simply stops. These make the track visible. */
-    --scrollbar-thumb:       #cbd5e1;
-    --scrollbar-thumb-hover: #94a3b8;
+    --scrollbar-thumb:       #d1d5dc;
+    --scrollbar-thumb-hover: #99a1af;
     --surface-inverse: var(--color-ink-900);
     --border-subtle:   var(--color-ink-200);
     --border-strong:   var(--color-ink-300);
@@ -147,12 +161,34 @@
     --text-inverse:    #ffffff;
     --accent-text:     var(--color-brand-600);
     --accent-soft:     var(--color-brand-50);
+    /* The primary button is a near-black pill on a light ground, which is Compass's own
+       treatment. It has to invert in dark -- see the html.dark block. */
+    --btn-primary-bg:     var(--color-brand-500);
+    --btn-primary-fg:     #ffffff;
+    --btn-primary-hover:  var(--color-brand-600);
+    --btn-primary-active: var(--color-brand-700);
+
+    /* Keyboard focus. Was hard-coded to brand-500, which the monochrome rebrand turned into a
+       near-black -- fine here, invisible on the dark theme's near-black page (1.37:1). A ring
+       has to contrast with the ground it is drawn on, so it flips with the theme. */
+    --focus-ring: var(--color-ink-900);
+
+    /* The pill family. neutral and brand are a binary in several places -- kafka-tls-section
+       swaps one class for the other to mean off/on -- so they must never share a background.
+       After the rebrand they did: brand-50 and ink-100 both resolve to #f3f4f6, so "Private CA"
+       looked identical whether it was set or not. brand is now a step darker with a defined
+       edge, which reads as "set" without borrowing a hue the palette no longer has. */
+    --pill-neutral-bg:     var(--color-ink-100);
+    --pill-neutral-fg:     var(--color-ink-600);
+    --pill-brand-bg:       var(--color-ink-200);
+    --pill-brand-fg:       var(--color-ink-900);
+    --pill-brand-border:   var(--color-ink-400);
   }
 
   html.dark {
     color-scheme: dark;
-    --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-    --date-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='16' rx='2'/%3E%3Cpath d='M3 10h18M8 3v4M16 3v4'/%3E%3C/svg%3E");
+    --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2399a1af' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    --date-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2399a1af' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='16' rx='2'/%3E%3Cpath d='M3 10h18M8 3v4M16 3v4'/%3E%3C/svg%3E");
     --surface-page:    var(--color-ink-950);
     --surface-raised:  var(--color-ink-900);
     /* Dark has no cast problem -- everything is already this hue -- so sunken and inset both
@@ -165,8 +201,8 @@
     /* The same mix the dark pills use, so a hover matches the chips around it. */
     --hover-brand-bg:  color-mix(in oklab, var(--color-brand-500) 22%, var(--surface-raised));
     --hover-brand-fg:  var(--color-brand-300);
-    --scrollbar-thumb:       #334155;
-    --scrollbar-thumb-hover: #475569;
+    --scrollbar-thumb:       #364153;
+    --scrollbar-thumb-hover: #4a5565;
     --surface-inverse: var(--color-ink-100);
     --border-subtle:   var(--color-ink-800);
     --border-strong:   var(--color-ink-700);
@@ -182,6 +218,29 @@
        rendered as a bright chip on a dark bar. Mixed from the accent instead, so it stays a
        tint of the same hue at a weight that belongs on this ground. */
     --accent-soft:     color-mix(in oklab, var(--color-brand-500) 26%, var(--surface-raised));
+    /*
+     * Inverted, and it has to be. The accent is monochrome now, so a primary button in light is
+     * a near-black pill -- and painting that same near-black on this theme's near-black page
+     * left the button measuring 1.37:1 against its own background: the label floated with no
+     * button visible under it. Monochrome systems answer this by swapping the pill, not by
+     * tinting it, so here it is a light fill with dark text: 19.27:1 against the page, and the
+     * same 19.27:1 for the label on the fill.
+     */
+    --btn-primary-bg:     var(--color-ink-50);
+    --btn-primary-fg:     var(--color-ink-950);
+    --btn-primary-hover:  var(--color-ink-200);
+    --btn-primary-active: var(--color-ink-300);
+
+    --focus-ring: var(--color-ink-50);
+
+    /* Same pair, inverted. neutral used --surface-sunken here, which on this theme is the page
+       colour itself, so a neutral pill had no chip shape at all -- it was text on the page.
+       Both now sit above the ground they are drawn on. */
+    --pill-neutral-bg:     var(--color-ink-800);
+    --pill-neutral-fg:     var(--color-ink-300);
+    --pill-brand-bg:       var(--color-ink-700);
+    --pill-brand-fg:       var(--color-ink-50);
+    --pill-brand-border:   var(--color-ink-500);
   }
 
   html, body {
@@ -203,11 +262,20 @@
   /* A component host is an unknown element, so it defaults to display:inline -- where
      vertical margin silently does nothing. .form-stack sets margin-top on its children,
      which meant the rule applied and had no effect at all until these were blockified.
-     (Grid children are blockified by the grid, which is why .form-grid never showed it.) */
-  app-field, app-form-dialog, app-table-shell, app-stat-tile { display: block; }
+     (Grid children are blockified by the grid, which is why .form-grid never showed it.)
+
+     app-segmented joined the list on 2026-09-07 for the same reason, found the same way: it is
+     the first child of `.card p-4 space-y-4` on both Tools screens, and Tailwind v4's space-y
+     puts `margin-block-end` on every child but the last -- so the gap it was supposed to open
+     under the control was computed and then silently dropped, leaving the Bucket/File labels
+     sitting flush against the tabs. `.seg` inside it is inline-flex and still shrink-wraps, so
+     blockifying the host changes the spacing and nothing else. Components that are meant to sit
+     inline in running text (app-icon, app-status, app-copy-button) deliberately stay out of
+     this rule. */
+  app-field, app-form-dialog, app-table-shell, app-stat-tile, app-segmented { display: block; }
 
   :focus-visible {
-    outline: 2px solid var(--color-brand-500);
+    outline: 2px solid var(--focus-ring);
     outline-offset: 2px;
     border-radius: 3px;
   }
@@ -259,8 +327,11 @@
    * headers, which is why so little on screen read as pressable.
    */
   .btn-primary {
-    @apply bg-brand-500 text-white hover:bg-brand-600 active:bg-brand-700;
+    background: var(--btn-primary-bg);
+    color: var(--btn-primary-fg);
   }
+  .btn-primary:hover  { background: var(--btn-primary-hover); }
+  .btn-primary:active { background: var(--btn-primary-active); }
   .btn-default {
     @apply border text-[color:var(--text-primary)]
            hover:bg-[color:var(--surface-sunken)];
@@ -320,7 +391,7 @@
     @apply w-4 h-4 rounded align-middle cursor-pointer;
   }
   .checkbox:disabled { @apply cursor-not-allowed opacity-40; }
-  .checkbox:focus-visible { outline: 2px solid var(--color-brand-500); outline-offset: 2px; }
+  .checkbox:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 
   .row-selected > td { background: var(--surface-sunken); }
 
@@ -340,8 +411,23 @@
      growing the page, so the toolbar, breadcrumb and column headers stay put. Without this
      a bucket of 200 files pushed every bit of context off the top of the screen. */
   .scroll-table {
-    max-height: min(62vh, 40rem);
+    /*
+     * Sized off what is actually left below the box, not off a fixed fraction of the viewport.
+     * 62vh took no account of the chrome above it: on a 1002px window the Source Tasks listing
+     * capped at 621px with 169px of empty page underneath, and spent that budget slicing the
+     * last row in half rather than showing it. Subtracting a chrome allowance from the viewport
+     * height tracks the space that is really there, and the floor keeps the box usable on a
+     * short window, where the page scrolls as before.
+     */
+    max-height: max(20rem, calc(100dvh - 13rem));
     @apply overflow-auto;
+  }
+  /* The same problem for the Document Converter's folder picker, which is a wrapping row of
+     buttons rather than a table: etl-avatar lists one folder per user id, so a level could run
+     to hundreds of buttons and push Supported formats and Recent conversions off the screen. */
+  .folder-picker {
+    max-height: 13rem;
+    @apply overflow-y-auto;
   }
   .scroll-table thead th {
     position: sticky;
@@ -522,6 +608,25 @@
     @apply border rounded-[var(--radius-card)];
   }
 
+  /*
+   * Re-scopes a nested form layout to this card's own width. Without it a .form-grid inside a
+   * card only sees the nearest ancestor with container-type set -- the outer <form> -- so a
+   * field-card nested a few levels down in a wide dialog inherited the *dialog's* width,
+   * tripped the 62rem three-column breakpoint meant for a full-width form, and rendered two
+   * fields with a phantom empty third column.
+   *
+   * Scoped with :has() rather than applied to every .card, and that is the whole point.
+   * container-type: inline-size also applies inline-size *containment*, which makes a box's
+   * width independent of its contents -- so every card that sizes to fit rather than filling
+   * its parent collapsed to its own padding. The status filter chip is one: a `.card` button
+   * whose width is its label, it rendered as a 30px empty box with "Completed 1" spilling out
+   * of it. Only the two @container consumers in this file (.form-grid and .tls-with-guide)
+   * need a query container, and they only ever appear inside form cards.
+   */
+  .card:has(.form-grid, .tls-with-guide) {
+    container-type: inline-size;
+  }
+
   .input {
     background: var(--surface-raised);
     border-color: var(--border-subtle);
@@ -630,8 +735,15 @@
   .pill {
     @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5
            text-[11px] font-semibold whitespace-nowrap;
+    /* Transparent, not absent. Only .pill-brand draws an edge, and several places swap
+       .pill-brand for .pill-neutral to mean on/off -- without a border reserved on every
+       variant the chip would change size as it toggled. */
+    border: 1px solid transparent;
   }
-  .pill-neutral { @apply bg-[color:var(--surface-sunken)] text-[color:var(--text-secondary)]; }
+  .pill-neutral {
+    background: var(--pill-neutral-bg);
+    color: var(--pill-neutral-fg);
+  }
   /* Both halves move together: a background change without its matching foreground is what
      left a light hover carrying light text. */
   /* A component element does not inherit its parent's flex context. Without this the host
@@ -648,7 +760,11 @@
     background: var(--hover-brand-bg);
     color: var(--hover-brand-fg);
   }
-  .pill-brand   { @apply bg-brand-50 text-brand-700; }
+  .pill-brand {
+    background: var(--pill-brand-bg);
+    color: var(--pill-brand-fg);
+    border-color: var(--pill-brand-border);
+  }
   .pill-ok      { @apply bg-ok-100 text-ok-500; }
   /* warn-500 on warn-100 measures 4.47:1 -- the one pill under the line. */
   .pill-warn    { @apply bg-warn-100; color: var(--color-warn-600); }
@@ -901,13 +1017,19 @@
   .mono { font-family: var(--font-mono); @apply text-xs; }
 }
 
-html.dark .pill-brand { @apply bg-brand-900/50 text-brand-300; }
+/* .pill-brand and .pill-neutral are theme-aware through their own tokens now, so the
+   hand-written dark override they used to need is gone. */
 html.dark .pill-ok    { background: color-mix(in oklab, var(--color-ok-500) 22%, transparent); @apply text-ok-400; }
 html.dark .pill-warn  { background: color-mix(in oklab, var(--color-warn-500) 22%, transparent); @apply text-warn-400; }
 html.dark .pill-crit  { background: color-mix(in oklab, var(--color-crit-500) 22%, transparent); @apply text-crit-400; }
 /* Dark keeps the filled chips filled -- that contrast against the soft ones is the whole
    point -- but lifts each fill so it reads against a navy row rather than sinking into it. */
-html.dark .pill-solid-brand { background: var(--color-brand-500); color: #ffffff; }
+/* Inverted on this theme, for the same reason the primary button is: brand-500 is a
+   near-black, which now collides exactly with .pill-neutral's dark background (both ink-800)
+   -- Running would have been indistinguishable from a neutral chip beside it. ink-300 keeps
+   the "filled, louder than its soft partner" relationship without going full white, which is
+   too loud for a status in a dense table. */
+html.dark .pill-solid-brand { background: var(--color-ink-300); color: var(--color-ink-950); }
 html.dark .pill-solid-crit  { background: #d24a63; color: #1a0508; }
 html.dark .pill-solid-warn  { background: var(--color-warn-400); color: #241202; }
 html.dark .pill-solid-ok    { background: var(--color-ok-400); color: #05200f; }
@@ -1067,7 +1189,7 @@ html.dark .btn-intent-crit:focus app-icon { color: var(--color-crit-400); }
  * close enough to read as the same series.
  */
 :root {
-  --chart-0: #2563eb;   /* brand   5.17 on white */
+  --chart-0: #1e2939;   /* brand  14.67 on white -- monochrome, tracking the accent */
   --chart-1: #0369a1;   /* info    5.93 */
   --chart-2: #1d7a44;   /* ok      5.36 */
   --chart-3: #b45309;   /* warn    5.02 */
@@ -1090,7 +1212,7 @@ html.dark .btn-intent-crit:focus app-icon { color: var(--color-crit-400); }
   --series-ok-soft:    #2f9d5b;  --series-ok:    #166534;
   --series-warn-soft:  #d97706;  --series-warn:  #8a3d07;
   --series-crit-soft:  #e05c74;  --series-crit:  #a01b34;
-  --series-muted:      #64748b;
+  --series-muted:      #6a7282;
 }
 
 html.dark {
@@ -1098,9 +1220,9 @@ html.dark {
   --series-ok-soft:    #2f9d5b;  --series-ok:    #6ee7a0;
   --series-warn-soft:  #b97a2a;  --series-warn:  #f0c088;
   --series-crit-soft:  #c4485f;  --series-crit:  #f79bab;
-  --series-muted:      #94a3b8;
+  --series-muted:      #99a1af;
 
-  --chart-0: #3b82f6;   /* brand   4.85 on the raised surface */
+  --chart-0: #d1d5dc;   /* brand  12.05 on the raised surface -- monochrome */
   --chart-1: #38bdf8;   /* info    7.98 */
   --chart-2: #4ec27f;   /* ok      7.61 */
   --chart-3: #e0a25c;   /* warn    7.73 */
@@ -1117,6 +1239,23 @@ html.dark {
      across a 1244px page, and viewport breakpoints would give the dialog three 154px columns.
      The container must be an ancestor -- an element cannot query itself -- so the form owns it. */
   form, .form-section { container-type: inline-size; }
+
+  /* Whether the columns rail fits beside the rows is a question about THIS column's width, not
+     the window's: the storage rail takes 260px off the left before the dataset column exists, so
+     a 1261px window is really a 945px column -- and below the page's own lg breakpoint the same
+     column is full width again. A viewport breakpoint would have to guess which. An element
+     cannot query itself, so the column owns the container and the split reads it. */
+  .dataset-column { container-type: inline-size; }
+  .dataset-split { @apply grid gap-3; }
+  @container (min-width: 700px) {
+    .dataset-split { grid-template-columns: minmax(0, 1fr) 220px; }
+  }
+
+  /* Profile cards, reading the same container as .dataset-split above and for the same reason. */
+  .profile-grid { @apply grid gap-3; }
+  @container (min-width: 700px) {
+    .profile-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
 
   /* Form rhythm, defined once.
 
@@ -1169,6 +1308,16 @@ html.dark {
   .page-head       { @apply flex flex-wrap items-end justify-between gap-3 mb-1; }
   .page-title      { @apply text-2xl font-semibold tracking-tight; }
   .page-subtitle   { @apply text-sm text-[color:var(--text-secondary)] mt-1; }
+
+  /*
+   * One step below the page heading, for a screen built out of named sections rather than one
+   * flat list of cards. Sized between .page-title and a card's own h3 so the three levels read
+   * as a hierarchy: page, section, card. The sub-line is where a section states what its
+   * numbers actually mean -- which population, which caveat -- so it is a real part of the
+   * component rather than decoration.
+   */
+  .section-title   { @apply text-base font-semibold tracking-tight; }
+  .section-sub     { @apply text-xs text-[color:var(--text-muted)] mt-0.5 max-w-3xl; }
 }
 
 @layer components {

@@ -8,6 +8,7 @@ import { TableShell } from '../../shared/ui/data-table';
 import { StatTile } from '../../shared/ui/stat-tile';
 import { StatusPill } from '../../shared/ui/status-pill';
 import { Icon } from '../../shared/ui/icon';
+import { CopyButton } from '../../shared/ui/copy-button';
 import { ViewToggle } from '../../shared/ui/view-toggle';
 import { ToastService } from '../../shared/ui/toast.service';
 import { copyText } from '../../shared/ui/clipboard.util';
@@ -40,7 +41,7 @@ interface TenantRequest {
  */
 @Component({
   selector: 'app-tenant-requests',
-  imports: [TableShell, StatTile, StatusPill, Icon, ViewToggle, DatePipe, Pagination],
+  imports: [TableShell, StatTile, StatusPill, Icon, CopyButton, ViewToggle, DatePipe, Pagination],
   templateUrl: './tenant-requests.html',
   styles: [`
     /* An open row and its panel are one thing, so the border between them is dropped and the

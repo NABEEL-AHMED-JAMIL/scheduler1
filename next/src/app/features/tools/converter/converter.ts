@@ -88,6 +88,22 @@ export class Converter implements OnInit {
   /** Folders at this level, so a document nested inside one can be reached. */
   readonly folders = computed(() => this.objects().filter(o => o.folder));
 
+  /**
+   * Narrows the folder list by name.
+   *
+   * A bucket whose folders are one-per-something -- etl-avatar has one per user id, and lists
+   * over a hundred at the root -- rendered as a wall of buttons nobody could find anything in.
+   * The filter only appears once there are enough folders for scanning to be the slower option.
+   */
+  readonly folderFilter = signal('');
+  readonly filteredFolders = computed(() => {
+    const q = this.folderFilter().trim().toLowerCase();
+    const all = this.folders();
+    return q ? all.filter(f => (f.name ?? '').toLowerCase().includes(q)) : all;
+  });
+  /** Below this, a filter box is more clutter than help and scanning is faster. */
+  readonly folderFilterWorthIt = computed(() => this.folders().length > 12);
+
   /** Breadcrumb segments for the current prefix, each with the prefix to jump back to. */
   readonly crumbs = computed(() => {
     const parts = this.prefix().split('/').filter(Boolean);
@@ -166,6 +182,9 @@ export class Converter implements OnInit {
   private browse(prefix: string, append = false): void {
     this.prefix.set(prefix);
     this.selectedKey.set('');
+    // A filter typed for one level would otherwise hide everything in the next one; "load more"
+    // keeps it, since that is the same level still being read.
+    if (!append) this.folderFilter.set('');
     this.loadingObjects.set(true);
     // Only the newest listing may write: clicking through folders quickly would otherwise let
     // a slow response for an abandoned one replace the level actually being viewed.

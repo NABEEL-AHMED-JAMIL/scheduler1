@@ -1,6 +1,7 @@
 import { Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Icon } from '../../shared/ui/icon';
+import { BrandMark } from '../../shared/ui/brand-mark';
 import { ConsolePreview } from './console-preview';
 import { ThemeService } from '../../core/theme.service';
 
@@ -14,7 +15,7 @@ import { ThemeService } from '../../core/theme.service';
  */
 @Component({
   selector: 'app-landing',
-  imports: [RouterLink, Icon, ConsolePreview],
+  imports: [RouterLink, Icon, BrandMark, ConsolePreview],
   styles: [`
     :host { display: block; }
 
@@ -66,8 +67,7 @@ import { ThemeService } from '../../core/theme.service';
       <div class="hero">
         <header>
           <div class="mx-auto w-full max-w-6xl px-5 h-16 flex items-center gap-3">
-            <div class="size-7 rounded-md bg-brand-500 grid place-items-center text-white text-sm font-bold">E</div>
-            <span class="font-semibold text-[15px] tracking-tight">ETL Console</span>
+            <app-brand-mark />
             <div class="ml-auto flex items-center gap-1.5">
               <a routerLink="/docs" class="btn btn-ghost btn-sm hidden sm:inline-flex"
                  style="color: inherit;">Setup guide</a>
@@ -101,7 +101,7 @@ import { ThemeService } from '../../core/theme.service';
               <a routerLink="/request-workspace" class="btn btn-default btn-sm">
                 Request a workspace
               </a>
-              <a routerLink="/docs" class="link-inline text-sm" style="color: #c4c9f9;">
+              <a routerLink="/docs" class="link-inline hero-eyebrow text-sm">
                 Read the setup guide
               </a>
             </div>

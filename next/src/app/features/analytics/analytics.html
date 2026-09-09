@@ -1,0 +1,1152 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Analytics Studio</h1>
+      <p class="page-subtitle">
+        Read a file where it already lives. Nothing is copied into another database — the query
+        engine reads the object store directly, so the browser only ever receives a page.
+      </p>
+    </div>
+  </div>
+
+  <!-- Three columns on a wide screen, stacked below it. The rail is the same connection ->
+       folder -> file walk the Object Browser does, and uses that screen's own service. -->
+  <div class="grid gap-3 lg:grid-cols-[260px_minmax(0,1fr)]">
+
+    <!-- ── the storage rail ─────────────────────────────────────────────────────────── -->
+    <div class="card p-3 flex flex-col gap-2 min-w-0 self-start">
+      <div>
+        <label class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]"
+               for="a-conn">Connection</label>
+        <select id="a-conn" class="input w-full mt-1" [value]="connection()"
+                (change)="pickConnection($any($event.target).value)">
+          <!-- A connection this reader cannot use is shown but inert, exactly as an unreadable
+               file is below: this list is the Object Browser's, and it offers FTP, FTPS and
+               legacy bucket entries that the analytics reader has no way to open. The reason
+               travels with the option so nobody has to click one to find out. -->
+          @for (item of connectionOptions(); track item.bucket) {
+            <option [value]="item.bucket" [disabled]="!!item.issue"
+                    [title]="item.issue || item.bucket">
+              {{ item.label }} · {{ item.provider }}{{ item.issue ? ' — ' + item.issue : '' }}
+            </option>
+          }
+        </select>
+        @if (noReadableConnection()) {
+          <p class="field-note text-[color:var(--text-muted)]">
+            None of your storage connections is one this reader can open. Each is listed above
+            with the reason on it.
+          </p>
+        }
+      </div>
+
+      <div class="flex flex-wrap items-center gap-1 text-xs min-w-0">
+        <button type="button" class="link-inline" (click)="goToRoot()">root</button>
+        @for (crumb of crumbs(); track crumb.prefix) {
+          <span class="text-[color:var(--text-muted)]">/</span>
+          <button type="button" class="link-inline truncate max-w-28"
+                  (click)="goToCrumb(crumb.prefix)">{{ crumb.name }}</button>
+        }
+      </div>
+
+      <div class="search-field w-full">
+        <app-icon name="search" size="0.9em" />
+        <input class="input w-full" type="search" [value]="filter()"
+               placeholder="Filter this folder"
+               aria-label="Filter the files and folders listed here"
+               (input)="filter.set($any($event.target).value)" />
+      </div>
+
+      @if (browseError()) {
+        <p class="text-xs text-crit-500" role="alert">{{ browseError() }}</p>
+      }
+
+      <div class="scroll-table -mx-1 px-1">
+        @if (browsing()) {
+          <p class="text-xs text-[color:var(--text-muted)] py-4 text-center">Reading…</p>
+        } @else {
+          @for (folder of folders(); track folder.key) {
+            <button type="button"
+                    class="w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm text-left
+                           hover:bg-[color:var(--surface-sunken)]
+                           focus:outline-none focus:ring-2 focus:ring-[color:var(--focus-ring)]"
+                    (click)="openFolder(folder.key)">
+              <app-icon name="folder" size="0.9em" class="icon-muted shrink-0" />
+              <span class="truncate">{{ folder.name }}</span>
+            </button>
+          }
+          @for (file of files(); track file.key) {
+            <!-- A file this reader cannot open is shown but inert, rather than hidden: knowing
+                 the file is there and unreadable is more useful than it vanishing. -->
+            <button type="button"
+                    class="w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm text-left
+                           focus:outline-none focus:ring-2 focus:ring-[color:var(--focus-ring)]"
+                    [class.hover:bg-[color:var(--surface-sunken)]]="readable(file.key)"
+                    [class.opacity-45]="!readable(file.key)"
+                    [class.cursor-default]="!readable(file.key)"
+                    [class.font-semibold]="path() === file.key"
+                    [disabled]="!readable(file.key)"
+                    [title]="readable(file.key) ? file.key : 'Analytics Studio does not read this file type'"
+                    (click)="openFile(file)">
+              <app-icon name="file" size="0.9em" class="icon-muted shrink-0" />
+              <span class="truncate flex-1">{{ file.name }}</span>
+              @if (file.size) {
+                <span class="mono text-[10px] text-[color:var(--text-muted)] shrink-0">
+                  {{ humanSize(file.size) }}
+                </span>
+              }
+            </button>
+          }
+          @if (!folders().length && !files().length) {
+            <!-- "nothing here" and "nothing matched" are different facts, and a reader who has
+                 typed a filter needs to be told which one they are looking at. -->
+            <p class="text-xs text-[color:var(--text-muted)] py-4 text-center">
+              @if (!connection()) { Pick a connection to browse it. }
+              @else if (filtered()) { Nothing in this folder matches "{{ filter() }}". }
+              @else { This folder is empty. }
+            </p>
+          }
+        }
+      </div>
+
+      @if (folderFormats().length) {
+        <div class="border-t border-subtle pt-2 flex flex-col gap-1">
+          <!-- The case this exists for: a folder holding one file per day or per partition,
+               which is only meaningful read together. -->
+          <span class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">
+            Read the folder as one dataset
+          </span>
+          <div class="flex flex-wrap gap-1.5">
+            @for (extension of folderFormats(); track extension) {
+              <button type="button" class="btn btn-default btn-xs"
+                      (click)="openFolderAsDataset(extension)">
+                all *.{{ extension }}
+              </button>
+            }
+          </div>
+        </div>
+      }
+    </div>
+
+    <!-- ── the dataset ──────────────────────────────────────────────────────────────── -->
+    <div class="dataset-column min-w-0 flex flex-col gap-3">
+
+      @if (!hasDataset()) {
+        <div class="card p-12 text-center">
+          <app-icon name="chart" size="1.75em" class="icon-muted" />
+          <p class="mt-3 text-sm text-[color:var(--text-secondary)]">Pick a file to read it.</p>
+          <p class="mt-1 text-xs text-[color:var(--text-muted)]">
+            CSV, TSV, JSON and Parquet. A whole folder can be read as one dataset.
+          </p>
+        </div>
+      } @else {
+
+        <div class="card p-4 flex flex-col gap-3">
+          <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <h2 class="text-base font-semibold truncate max-w-full"
+                [title]="path()">{{ datasetName() }}</h2>
+            @if (format()) { <span class="pill pill-neutral">{{ format() }}</span> }
+            @if (multiFile()) { <span class="pill pill-brand">folder dataset</span> }
+            <span class="mono text-xs text-[color:var(--text-muted)] truncate">
+              {{ connection() }}/{{ path() }}
+            </span>
+          </div>
+
+          <!-- A strip, not four stat tiles. app-stat-tile is built for a headline figure, and
+               three of these are not: "CSV" and "208 B" rendered at 20px read as numbers that
+               are not numbers, and the tiles stood 101px tall to say four short things. Rows and
+               columns keep some weight because they ARE the figures; the rest is metadata. -->
+          <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
+            <div class="flex items-baseline gap-1.5">
+              <span class="text-lg font-semibold tabular leading-none">{{ compact(rowCount()) }}</span>
+              <span class="text-xs text-[color:var(--text-muted)]">rows</span>
+            </div>
+            <div class="flex items-baseline gap-1.5">
+              <span class="text-lg font-semibold tabular leading-none">{{ columnCount() }}</span>
+              <span class="text-xs text-[color:var(--text-muted)]">columns</span>
+            </div>
+            @if (selected()?.size) {
+              <div class="flex items-baseline gap-1.5">
+                <span class="text-sm font-medium mono">{{ humanSize(selected()!.size!) }}</span>
+                <span class="text-xs text-[color:var(--text-muted)]">on disk</span>
+              </div>
+            }
+            @if (modifiedAt()) {
+              <div class="flex items-baseline gap-1.5">
+                <span class="text-sm font-medium">{{ modifiedAt() }}</span>
+                <span class="text-xs text-[color:var(--text-muted)]">modified</span>
+              </div>
+            }
+            @if (multiFile()) {
+              <span class="text-xs text-[color:var(--text-muted)]">
+                counted across every matching file
+              </span>
+            }
+          </div>
+
+          <!-- showTab rather than tab.set: Profile and Quality share one scan, and it is asked
+               for when a reader opens the tab that needs it rather than on every file open. -->
+          <div class="flex gap-1 border-b border-subtle -mb-1 overflow-x-auto">
+            @for (item of tabs; track item.id) {
+              <button type="button"
+                      class="px-3 py-2 text-sm border-b-2 -mb-px transition-colors whitespace-nowrap"
+                      [class.border-transparent]="tab() !== item.id"
+                      [class.text-[color:var(--text-muted)]]="tab() !== item.id"
+                      [class.font-semibold]="tab() === item.id"
+                      [class.border-[color:var(--chart-0)]]="tab() === item.id"
+                      (click)="showTab(item.id)">{{ item.label }}</button>
+            }
+          </div>
+        </div>
+
+        @if (tab() === 'overview') {
+          <div class="card p-4 flex flex-col gap-3">
+            <div>
+              <h3 class="text-sm font-semibold">What this is</h3>
+              <p class="field-note text-[color:var(--text-muted)]">
+                Read straight from {{ connection() }} by the query engine. The file is not copied,
+                imported or cached anywhere.
+              </p>
+            </div>
+            <dl class="grid sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+              <div class="flex gap-2">
+                <dt class="text-[color:var(--text-muted)] min-w-24 shrink-0">Location</dt>
+                <dd class="mono text-xs break-all">{{ connection() }}/{{ path() }}</dd>
+              </div>
+              <div class="flex gap-2">
+                <dt class="text-[color:var(--text-muted)] min-w-24 shrink-0">Rows</dt>
+                <dd class="tabular">{{ rowCount().toLocaleString() }}</dd>
+              </div>
+              <div class="flex gap-2">
+                <dt class="text-[color:var(--text-muted)] min-w-24 shrink-0">Columns</dt>
+                <dd class="tabular">{{ columnCount() }}</dd>
+              </div>
+              @if (modifiedAt()) {
+                <div class="flex gap-2">
+                  <dt class="text-[color:var(--text-muted)] min-w-24 shrink-0">Modified</dt>
+                  <dd class="text-xs">{{ modifiedAt() }}</dd>
+                </div>
+              }
+            </dl>
+            @if (multiFile()) {
+              <p class="field-note text-[color:var(--text-muted)]">
+                Every figure here covers all the files the pattern matches. Columns that appear in
+                only some of them are still included, and a row carries the file it came from.
+              </p>
+            }
+          </div>
+        }
+
+        @if (tab() === 'data') {
+          <!-- Rows and columns side by side. The question "what type is this column" is asked
+               while looking at the values in it, and the old Schema tab made that a round trip. -->
+          <div class="dataset-split">
+          <div class="min-w-0 flex flex-col gap-3">
+          <app-table-shell heading="Rows" [loading]="loading()" [error]="error()"
+                           [shown]="preview()?.rows?.length ?? 0"
+                           [total]="rowCount()"
+                           [isEmpty]="!loading() && !error() && !(preview()?.rows?.length)"
+                           emptyMessage="This dataset has no rows." emptyIcon="table"
+                           (retry)="retry()">
+            <table class="table-modern">
+              <thead>
+                <tr>
+                  @for (column of preview()?.columns ?? []; track column) {
+                    <th class="whitespace-nowrap">{{ column }}</th>
+                  }
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of preview()?.rows ?? []; track $index) {
+                  <tr>
+                    @for (cell of row; track $index) {
+                      <!-- A null is not an empty string, and a reader has to be able to tell:
+                           one means the file had no value, the other means it had a blank. -->
+                      <td class="mono text-xs whitespace-nowrap max-w-64 truncate" [title]="cell ?? 'null'">
+                        @if (cell === null) {
+                          <span class="text-[color:var(--text-muted)] italic">null</span>
+                        } @else { {{ cell }} }
+                      </td>
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </app-table-shell>
+
+          @if (pageCount() > 1) {
+            <div class="flex flex-col gap-1">
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-xs text-[color:var(--text-muted)]">
+                  Page {{ (preview()?.page ?? 0) + 1 }} of {{ pageCount().toLocaleString() }}
+                  · {{ preview()?.pageSize }} rows a page
+                </span>
+                <div class="flex gap-2">
+                  <button type="button" class="btn btn-default btn-sm"
+                          [disabled]="(preview()?.page ?? 0) === 0 || loading()"
+                          (click)="previousPage()">Previous</button>
+                  <button type="button" class="btn btn-default btn-sm"
+                          [disabled]="(preview()?.page ?? 0) + 1 >= pageCount() || loading()"
+                          (click)="nextPage()">Next</button>
+                </div>
+              </div>
+              <!-- Said here and nowhere else: this is the only place a person is turning pages,
+                   and it is a fact about files rather than a warning about the reader. There is
+                   no ORDER BY because a file in object storage has no row order to sort by. -->
+              <p class="text-[11px] text-[color:var(--text-muted)]">
+                Pages follow the order the file is read in, not a sort — a file in object storage
+                has no order of its own. If the file changes between turns, a row can land on a
+                different page.
+              </p>
+            </div>
+          }
+          </div>
+
+          <aside class="card p-3 flex flex-col gap-1 self-start min-w-0">
+            <div class="flex items-baseline justify-between gap-2">
+              <h3 class="text-xs uppercase tracking-wider text-[color:var(--text-muted)] font-semibold">
+                Columns
+              </h3>
+              <span class="text-xs tabular text-[color:var(--text-muted)]">{{ columnCount() }}</span>
+            </div>
+            @for (column of columns(); track column.name) {
+              <div class="flex items-center gap-2 py-1 min-w-0">
+                <span class="mono text-xs truncate flex-1" [title]="column.name">{{ column.name }}</span>
+                <span class="text-[10px] mono text-[color:var(--text-muted)] border border-subtle
+                             rounded px-1 shrink-0" [title]="column.type">{{ shortType(column.type) }}</span>
+              </div>
+            }
+            @if (!columns().length) {
+              <p class="text-xs text-[color:var(--text-muted)] py-2">No columns detected.</p>
+            }
+            <p class="field-note text-[color:var(--text-muted)] mt-1">
+              Types are the query engine's own, inferred from the file.
+            </p>
+          </aside>
+          </div>
+        }
+
+        @if (tab() === 'profile') {
+          <!-- Every hedge on this tab sits ON the figure it qualifies. Three of these numbers
+               are not exact, and a note at the bottom of the card would be read after the
+               number had already been believed. -->
+          <app-table-shell heading="Column profile" [scrollRows]="false"
+                           [loading]="profileLoading()" [error]="profileError()"
+                           [isEmpty]="!profileLoading() && !profileError() && !profileColumns().length"
+                           emptyMessage="This dataset has no columns to profile." emptyIcon="table"
+                           (retry)="loadProfile()">
+            <div class="p-4 flex flex-col gap-3">
+              <p class="text-xs text-[color:var(--text-muted)]">
+                Measured across the whole dataset, not the page on the Data tab.
+              </p>
+
+              <!-- Two columns only from lg, where the storage rail has taken its 260px and the
+                   remaining width is still enough for a card to hold a min, a max and a spread
+                   bar without the values truncating. -->
+              <!-- Container query, not lg:. This sits inside .dataset-column, whose whole reason
+                   for existing is that the 260px storage rail makes the window a bad proxy for
+                   this column's width. lg:grid-cols-2 was worse than merely inconsistent, it was
+                   inverted: at 1023px the rail stacks and this column is full width, giving ONE
+                   column; at 1024px the rail takes its 260px back and it gives TWO. Fewest
+                   columns at the widest space. -->
+              <div class="profile-grid">
+                @for (column of profileColumns(); track column.name) {
+                  <div class="rounded border border-subtle p-3 flex flex-col gap-2.5 min-w-0">
+
+                    <div class="flex items-baseline gap-2 min-w-0">
+                      <span class="mono text-sm truncate flex-1"
+                            [title]="column.name">{{ column.name }}</span>
+                      <span class="text-[10px] mono text-[color:var(--text-muted)] border
+                                   border-subtle rounded px-1 shrink-0"
+                            [title]="column.type">{{ column.shortType }}</span>
+                    </div>
+
+                    <!-- Completeness. The percentage is the engine's own figure and is printed
+                         as given; the row count beside it is derived from that percentage after
+                         rounding, so it says "about" and always will. -->
+                    @if (column.measured) {
+                      <div>
+                        <div class="flex flex-wrap items-baseline justify-between gap-x-3 text-xs">
+                          <span class="tabular font-medium">
+                            {{ percent(column.filledPercent) }}% filled
+                          </span>
+                          @if (column.nullPercent > 0) {
+                            <span class="text-[color:var(--text-muted)]">
+                              about {{ column.approxNullRows.toLocaleString() }}
+                              of {{ column.rows.toLocaleString() }} rows empty
+                            </span>
+                          } @else {
+                            <!-- "100% filled" was printed bare. The engine rounds this figure to
+                                 two decimal places, so one empty row in ten million rounds to
+                                 0.00 and the card claimed a completeness it had not measured.
+                                 The hedge is small because the odds are, but it is the same
+                                 rounding the all-empty case already refuses to trust alone. -->
+                            <span class="text-[color:var(--text-muted)]"
+                                  title="Completeness is measured to two decimal places, so on a
+                                         very large file a handful of empty rows can round away.">
+                              none measured empty
+                            </span>
+                          }
+                        </div>
+                        <div class="mt-1 h-1.5 rounded-full overflow-hidden bg-sunken">
+                          <span class="block h-full rounded-full"
+                                [style.width.%]="column.filledPercent"
+                                [style.background]="column.nullPercent >= 25
+                                                    ? 'var(--chart-3)' : 'var(--chart-2)'"></span>
+                        </div>
+                      </div>
+                    } @else {
+                      <p class="text-xs text-[color:var(--text-muted)]">
+                        No rows, so there is nothing to measure completeness against.
+                      </p>
+                    }
+
+                    <!-- The distinct count is a HyperLogLog sketch, measured 3.7% low over a
+                         million values. It never appears without the "≈" and the word beside
+                         it, because "1,234 distinct" would be read as a count. -->
+                    <div class="flex flex-wrap items-baseline gap-x-1.5 text-xs">
+                      <span class="tabular font-medium">≈ {{ compact(column.approxDistinct) }}</span>
+                      <span class="text-[color:var(--text-muted)]">distinct values (estimated)</span>
+                      @if (column.keyLike) {
+                        <!-- A suggestion, and worded as one: proving uniqueness needs an exact
+                             distinct count, which is a second scan nobody has paid for. -->
+                        <span class="pill pill-neutral"
+                              title="About as many distinct values as rows. The distinct count is an estimate, so this cannot prove uniqueness.">
+                          may be a key
+                        </span>
+                      }
+                    </div>
+
+                    <!-- min and max, or "first" and "last" where they are alphabetical. A text
+                         column compares letter by letter, so calling its extremes min and max
+                         is what makes "9" being the largest value look like a bug. -->
+                    <dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-0.5 text-xs">
+                      <dt class="text-[color:var(--text-muted)] whitespace-nowrap">
+                        {{ column.text ? 'first (A–Z)' : 'min' }}
+                      </dt>
+                      <dd class="mono truncate" [title]="column.min ?? 'null'">
+                        @if (column.min === null) {
+                          <span class="italic text-[color:var(--text-muted)]">null</span>
+                        } @else if (column.min === '') {
+                          <span class="italic text-[color:var(--text-muted)]">blank</span>
+                        } @else { {{ column.minLabel }} }
+                      </dd>
+                      <dt class="text-[color:var(--text-muted)] whitespace-nowrap">
+                        {{ column.text ? 'last (A–Z)' : 'max' }}
+                      </dt>
+                      <dd class="mono truncate" [title]="column.max ?? 'null'">
+                        @if (column.max === null) {
+                          <span class="italic text-[color:var(--text-muted)]">null</span>
+                        } @else if (column.max === '') {
+                          <span class="italic text-[color:var(--text-muted)]">blank</span>
+                        } @else { {{ column.maxLabel }} }
+                      </dd>
+                      @if (column.avgLabel) {
+                        <dt class="text-[color:var(--text-muted)] whitespace-nowrap">mean</dt>
+                        <dd class="mono truncate">{{ column.avgLabel }}</dd>
+                      }
+                      @if (column.stdLabel) {
+                        <dt class="text-[color:var(--text-muted)] whitespace-nowrap">std dev</dt>
+                        <dd class="mono truncate">{{ column.stdLabel }}</dd>
+                      }
+                    </dl>
+
+                    @if (column.spread.length) {
+                      <div>
+                        <div class="flex items-baseline justify-between gap-2 text-[11px]
+                                    text-[color:var(--text-muted)]">
+                          <span>Spread</span>
+                          <!-- Said here rather than under the card: the block widths ARE the
+                               quartiles, and three of the five edges are approx_quantile. -->
+                          <span>quartiles estimated</span>
+                        </div>
+                        <div class="mt-1 flex h-2 rounded overflow-hidden" role="img"
+                             [attr.aria-label]="column.spreadSummary">
+                          @for (segment of column.spread; track $index) {
+                            <!-- A zero-wide quarter is the most interesting one on the bar:
+                                 a quarter of the rows sharing a single value. It keeps two
+                                 pixels so it does not vanish into its neighbours. -->
+                            <span class="h-full" [style.width.%]="segment.width"
+                                  [style.minWidth.px]="2"
+                                  [style.background]="'var(--chart-1)'"
+                                  [style.opacity]="$index === 1 || $index === 2 ? 1 : 0.45"
+                                  [title]="segment.label"></span>
+                          }
+                        </div>
+                        <p class="mt-1 text-[11px] text-[color:var(--text-muted)]">
+                          Each block holds about a quarter of the rows, placed between min and
+                          max. The solid middle is the half nearest the median.
+                        </p>
+                      </div>
+                    } @else {
+                      <!-- No numbers to spread. Saying so beats an empty chart frame, which
+                           reads as a chart that failed to draw. -->
+                      <p class="text-[11px] text-[color:var(--text-muted)]">
+                        No distribution to draw — this column has no numeric range.
+                      </p>
+                    }
+                  </div>
+                }
+              </div>
+            </div>
+          </app-table-shell>
+        }
+
+        @if (tab() === 'quality') {
+          <!-- Leads with what needs attention. A column that is 40% empty or estimated at one
+               value is the point of the tab; the columns with nothing wrong are counted at the
+               bottom rather than listed as equals above it. -->
+          <app-table-shell heading="Data quality" [scrollRows]="false"
+                           [loading]="profileLoading()" [error]="profileError()"
+                           [isEmpty]="qualityEmpty()"
+                           [emptyMessage]="qualityEmptyMessage()" emptyIcon="check"
+                           (retry)="loadProfile()">
+            <div empty-action>
+              @if (qualityClean()) {
+                <!-- What was checked, stated exactly, so "clean" means something a reader can
+                     hold the screen to rather than a green tick. -->
+                <p class="text-xs text-[color:var(--text-muted)] max-w-lg mx-auto">
+                  Checked {{ qualityChecked() }}
+                  {{ qualityChecked() === 1 ? 'column' : 'columns' }}: none is empty, none is more
+                  than 5% empty, none is estimated at a single repeated value, none looks like
+                  numbers or dates read as text, and no extreme sits more than six standard
+                  deviations from its own mean.
+                </p>
+                <p class="text-xs text-[color:var(--text-muted)] max-w-lg mx-auto mt-2">
+                  Duplicate rows are not part of this check — counting them needs its own pass
+                  over the data.
+                </p>
+              } @else if (profile() && !profile()!.totalRows) {
+                <p class="text-xs text-[color:var(--text-muted)]">
+                  This dataset has no rows, so there was nothing to check. The columns are still
+                  listed on Schema and Profile.
+                </p>
+              } @else {
+                <p class="text-xs text-[color:var(--text-muted)]">
+                  This dataset has no columns to check.
+                </p>
+              }
+            </div>
+
+            <div class="p-4 flex flex-col gap-2">
+              <p class="text-xs text-[color:var(--text-muted)]">
+                {{ qualityFindings().length }}
+                {{ qualityFindings().length === 1 ? 'thing' : 'things' }} to look at, across
+                {{ qualityChecked() }} {{ qualityChecked() === 1 ? 'column' : 'columns' }}.
+                @if (qualityClearCount()) {
+                  The other {{ qualityClearCount() }} raised nothing.
+                }
+              </p>
+
+              @for (finding of qualityFindings(); track finding.column + finding.title) {
+                <div class="flex items-start gap-3 rounded border border-subtle p-3 min-w-0">
+                  <span class="pill shrink-0"
+                        [class.pill-crit]="finding.level === 'crit'"
+                        [class.pill-warn]="finding.level === 'warn'"
+                        [class.pill-neutral]="finding.level === 'note'">{{ finding.title }}</span>
+                  <div class="min-w-0 flex-1">
+                    <p class="mono text-xs truncate"
+                       [title]="finding.column">{{ finding.column }}</p>
+                    <p class="text-xs text-[color:var(--text-secondary)] mt-0.5">
+                      {{ finding.detail }}
+                    </p>
+                  </div>
+                </div>
+              }
+
+              <p class="field-note text-[color:var(--text-muted)]">
+                Duplicate rows are not part of this check — counting them needs its own pass over
+                the data.
+              </p>
+            </div>
+          </app-table-shell>
+        }
+
+        @if (tab() === 'sql') {
+          <div class="flex flex-col gap-3 min-w-0">
+
+            <!-- ── the console ────────────────────────────────────────────────────────── -->
+            <div class="card p-4 flex flex-col gap-3 min-w-0">
+
+              <!-- The naming IS the interface. A person writing a join has to know that the two
+                   files are called dataset and dataset2 before they can write anything at all,
+                   and the server accepts no other way of naming them, so it is stated at the top
+                   of the tab rather than in a hint under the editor. -->
+              <div class="flex flex-col gap-2 min-w-0">
+                <h3 class="text-sm font-semibold">What your SQL can name</h3>
+
+                <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs min-w-0">
+                  <span class="pill pill-brand mono">dataset</span>
+                  <span class="mono truncate max-w-full"
+                        [title]="path()">{{ connection() }}/{{ path() }}</span>
+                  <span class="text-[color:var(--text-muted)] tabular">
+                    {{ columnCount() }} {{ columnCount() === 1 ? 'column' : 'columns' }}
+                  </span>
+                </div>
+
+                @if (secondPath()) {
+                  <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs min-w-0">
+                    <span class="pill pill-brand mono">dataset2</span>
+                    <span class="mono truncate max-w-full"
+                          [title]="secondPath()">{{ connection() }}/{{ secondPath() }}</span>
+                    @if (secondLoading()) {
+                      <span class="text-[color:var(--text-muted)]">Reading…</span>
+                    } @else if (secondError()) {
+                      <!-- Said here, before a statement is written against columns that were
+                           guessed at, rather than as a refusal on the query they finally ran. -->
+                      <span class="text-crit-500" role="alert">{{ secondError() }}</span>
+                    } @else {
+                      <span class="text-[color:var(--text-muted)] tabular">
+                        {{ secondColumns().length }}
+                        {{ secondColumns().length === 1 ? 'column' : 'columns' }}
+                      </span>
+                    }
+                    <button type="button" class="link-inline" (click)="clearSecond()">remove</button>
+                  </div>
+                } @else {
+                  <div class="flex flex-wrap items-center gap-2 text-xs min-w-0">
+                    <label class="text-[color:var(--text-muted)]" for="a-second">
+                      Join a second dataset
+                    </label>
+                    <!-- Fed by the rail, which is on screen the whole time this tab is open. A
+                         picker with a file browser of its own would be a second way to be
+                         somewhere, and the two would disagree. -->
+                    <select id="a-second" class="input text-xs max-w-full" [value]="secondPath()"
+                            (change)="pickSecond($any($event.target).value)">
+                      <option value="">No second dataset</option>
+                      @for (option of secondOptions(); track option.path) {
+                        <option [value]="option.path">{{ option.label }}</option>
+                      }
+                    </select>
+                    @if (!secondOptions().length) {
+                      <span class="text-[color:var(--text-muted)]">
+                        Nothing else in this folder can be read as one — walk to another folder in
+                        the rail and it will be offered here.
+                      </span>
+                    }
+                  </div>
+                }
+
+                <p class="field-note text-[color:var(--text-muted)]">
+                  Write <span class="mono">dataset</span>@if (secondPath()) {
+                  and <span class="mono">dataset2</span>} in your SQL. Those are the names these
+                  files have inside the query — there is no bucket, URL or path to write, and a
+                  statement that names a location of its own is refused.
+                </p>
+              </div>
+
+              <app-sql-editor [value]="sql()" (valueChange)="sql.set($event)"
+                              [schema]="editorSchema()" defaultTable="dataset"
+                              [disabled]="running()"
+                              placeholderText="select * from dataset limit 100"
+                              ariaLabel="SQL to run against this dataset"
+                              (run)="run()" />
+
+              <div class="flex flex-wrap items-center gap-2 min-w-0">
+                <button type="button" class="btn btn-primary btn-sm"
+                        [disabled]="!canRun()" (click)="run()">
+                  <app-icon name="play" />{{ running() ? 'Running…' : 'Run' }}
+                </button>
+                <!-- The stop control. The backend's cancellation was built and tested and no user
+                     could reach it: the client never named the run, so there was nothing to stop.
+                     Shown only while something is in flight rather than sitting disabled beside
+                     Run, because a permanently greyed stop button teaches people it does nothing. -->
+                @if (running()) {
+                  <button type="button" class="btn btn-default btn-sm"
+                          [disabled]="!canStop()" (click)="stop()">
+                    <app-icon name="close" size="0.9em" />{{ stopping() ? 'Stopping…' : 'Stop' }}
+                  </button>
+                }
+                <span class="text-[11px] text-[color:var(--text-muted)]">⌘ / Ctrl + Enter</span>
+                @if (stopping()) {
+                  <span class="text-[11px] text-[color:var(--text-muted)]">
+                    Asked the engine to stop. The query may still finish first — the history row
+                    below will say which happened.
+                  </span>
+                }
+                @if (!sql().trim()) {
+                  <button type="button" class="btn btn-default btn-sm" (click)="useStarter()">
+                    Start from <span class="mono">select * from dataset</span>
+                  </button>
+                }
+
+                <div class="flex flex-wrap items-center gap-2 ml-auto min-w-0">
+                  <input class="input text-xs w-48 max-w-full" type="text" [value]="saveName()"
+                         placeholder="Name this query"
+                         aria-label="A name to save this query under"
+                         (input)="saveName.set($any($event.target).value)" />
+                  <button type="button" class="btn btn-default btn-sm"
+                          [disabled]="saving() || !saveName().trim() || !sql().trim()"
+                          (click)="saveAsNew()">
+                    <app-icon name="save" />Save as new
+                  </button>
+                  @if (loadedQuery()) {
+                    <!-- Two buttons rather than one that guesses. The same control silently
+                         overwriting somebody's saved work on one visit and forking it on the next
+                         is not recoverable from either side. -->
+                    <button type="button" class="btn btn-default btn-sm"
+                            [disabled]="saving() || !sql().trim()" (click)="updateLoaded()">
+                      Update “{{ loadedQuery()!.queryName }}”
+                    </button>
+                  }
+                </div>
+              </div>
+
+              @if (saveError()) {
+                <p class="text-xs text-crit-500" role="alert">{{ saveError() }}</p>
+              }
+
+              @if (loadedElsewhere()) {
+                <!-- It still runs against the dataset that is OPEN, which is what makes one saved
+                     query usable on this month's file. The case worth warning about is the one
+                     where both files carry the columns it names and the answer is simply about
+                     the wrong data. -->
+                <p class="field-note text-[color:var(--text-muted)]">
+                  This query was saved against <span class="mono">{{ loadedElsewhere() }}</span>.
+                  Running it here reads <span class="mono">{{ connection() }}/{{ path() }}</span>
+                  instead.
+                </p>
+              }
+            </div>
+
+            <!-- ── the result ─────────────────────────────────────────────────────────── -->
+            @if (queryError()) {
+              <!-- The server's sentence, unchanged and unparaphrased. Several of these are the
+                   statement gate refusing a query rather than the engine failing on one, and a
+                   generic "query failed" would take away the only thing telling the reader
+                   which of those happened. -->
+              <div class="card p-4 flex items-start gap-3 min-w-0" role="alert">
+                <app-icon name="alert" size="1.25rem" class="icon-crit shrink-0 mt-0.5" />
+                <div class="min-w-0">
+                  <h3 class="text-sm font-semibold text-crit-500">The query did not run</h3>
+                  <p class="text-sm text-[color:var(--text-secondary)] mt-1">{{ queryError() }}</p>
+                  <p class="field-note text-[color:var(--text-muted)] mt-2">
+                    That is the server's own explanation, word for word. Some of these are
+                    refusals rather than faults: a statement that writes, attaches or names a
+                    location of its own is turned down by design.
+                  </p>
+                </div>
+              </div>
+            } @else {
+              <app-table-shell heading="Result" [loading]="running()"
+                               [showSubbar]="truncated()"
+                               [isEmpty]="!running() && !result()"
+                               emptyMessage="Nothing has run yet." emptyIcon="terminal">
+
+                @if (result()) {
+                  <div toolbar class="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs min-w-0">
+                    <span class="text-sm font-semibold tabular">
+                      {{ result()!.rowCount.toLocaleString() }}
+                    </span>
+                    <span class="text-[color:var(--text-muted)]">
+                      {{ result()!.rowCount === 1 ? 'row' : 'rows' }}
+                    </span>
+                    <!-- Beside the count, not under the table. The count is the figure a reader
+                         takes away, and a caveat further down the page is read after it has
+                         already been believed. -->
+                    @if (truncated()) {
+                      <span class="pill pill-warn">stopped at the limit — there may be more</span>
+                    } @else {
+                      <span class="text-[color:var(--text-muted)]">
+                        everything the query matched
+                      </span>
+                    }
+                  </div>
+                }
+
+                <!-- Taking the result away. Deliberately below the truncation warning and not
+                     beside the row count: a reader should meet "this is partial" before they meet
+                     the button that turns it into a file somebody else will read as whole. -->
+                @if (result()) {
+                  <div class="flex flex-wrap items-center gap-2 px-3 py-2 border-t border-subtle">
+                    <span class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">
+                      Take it away
+                    </span>
+                    <select class="input input-sm w-auto" [value]="exportFormat()"
+                            aria-label="File format"
+                            (change)="exportFormat.set($any($event.target).value)">
+                      <option value="csv">CSV</option>
+                      <option value="tsv">TSV</option>
+                      <option value="json">JSON</option>
+                    </select>
+                    <button type="button" class="btn btn-default btn-sm"
+                            [disabled]="exporting() || running()"
+                            (click)="downloadResult()">
+                      <app-icon name="download" size="0.9em" /> Download
+                    </button>
+
+                    <span class="w-px h-5 bg-[color:var(--border-subtle)] mx-1"></span>
+
+                    <input class="input input-sm w-40" [value]="writeFolder()"
+                           placeholder="folder (optional)"
+                           aria-label="Folder inside this connection's bucket"
+                           (input)="writeFolder.set($any($event.target).value)" />
+                    <button type="button" class="btn btn-default btn-sm"
+                            [disabled]="exporting() || running()"
+                            (click)="writeResultBack()">
+                      <app-icon name="cloud" size="0.9em" /> Write back
+                    </button>
+                    <span class="field-note text-[color:var(--text-muted)] basis-full">
+                      A write goes into this connection's own bucket — the one it already reads
+                      from. There is nowhere else to send it, and no undo once it is there.
+                    </span>
+
+                    @if (exporting()) {
+                      <span class="text-xs text-[color:var(--text-muted)] basis-full">
+                        Running the query again to build the file…
+                      </span>
+                    }
+                    @if (written(); as file) {
+                      <p class="text-xs basis-full text-[color:var(--text-secondary)]">
+                        Wrote <span class="mono">{{ file.path }}</span> —
+                        {{ file.rowCount.toLocaleString() }}
+                        {{ file.rowCount === 1 ? 'row' : 'rows' }}@if (file.truncated) {,
+                        <span class="font-semibold">and it is part of the answer, not all of it</span>}.
+                      </p>
+                    }
+                    @if (exportError()) {
+                      <p class="text-xs text-crit-500 basis-full" role="alert">{{ exportError() }}</p>
+                    }
+                  </div>
+                }
+
+                <div subbar class="flex items-start gap-2 min-w-0" role="alert">
+                  <app-icon name="alert" size="1.1rem" class="icon-warn shrink-0 mt-0.5" />
+                  <p class="text-xs text-[color:var(--text-secondary)]">
+                    <span class="font-semibold">This is part of the answer, not all of it.</span>
+                    The result filled the server's row ceiling and stopped there, so rows that
+                    match your query are missing from the table below. Nothing here can say how
+                    many. Add a <span class="mono">LIMIT</span> of your own, narrow it with a
+                    <span class="mono">WHERE</span>, or aggregate rather than list — but do not
+                    read a total off these rows.
+                  </p>
+                </div>
+
+                <table class="table-modern">
+                  <thead>
+                    <tr>
+                      @for (column of result()?.columns ?? []; track column) {
+                        <th class="whitespace-nowrap">{{ column }}</th>
+                      }
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (row of result()?.rows ?? []; track $index) {
+                      <tr>
+                        @for (cell of row; track $index) {
+                          <!-- A null is not an empty string, the same distinction the Data tab
+                               draws: one means no value, the other means a blank one. -->
+                          <td class="mono text-xs whitespace-nowrap max-w-64 truncate"
+                              [title]="cell ?? 'null'">
+                            @if (cell === null) {
+                              <span class="text-[color:var(--text-muted)] italic">null</span>
+                            } @else { {{ cell }} }
+                          </td>
+                        }
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </app-table-shell>
+
+              <!-- ── a chart of that result ───────────────────────────────────────────── -->
+              <!-- Under the rows rather than on a tab of its own. A chart drawn from a result
+                   has to live beside the statement that produced it, or a reader edits the SQL,
+                   does not re-run it, and reads a picture of the answer to another question. -->
+              <app-table-shell heading="Chart" [scrollRows]="false"
+                               [loading]="running()"
+                               [showSubbar]="chartDrawn() && truncated()"
+                               [isEmpty]="!running() && !chartDrawn()"
+                               [emptyMessage]="chartEmptyMessage()" emptyIcon="chart">
+
+                <!-- The same strip the result table carries, said again here because it is a
+                     different claim. A short table is visibly short; a chart of ten thousand of
+                     forty thousand rows has exactly the shape, the confidence and the finish of
+                     a chart of all forty thousand. -->
+                <div subbar class="flex items-start gap-2 min-w-0" role="alert">
+                  <app-icon name="alert" size="1.1rem" class="icon-warn shrink-0 mt-0.5" />
+                  <p class="text-xs text-[color:var(--text-secondary)]">
+                    <span class="font-semibold">This chart is drawn from part of the answer.</span>
+                    The result stopped at the server's row ceiling, so rows that match your query
+                    are missing from every bar below. Nothing here can say how many, or which way
+                    they would move one. Narrow it with a <span class="mono">WHERE</span> or
+                    aggregate in SQL, and the chart will be of the whole answer.
+                  </p>
+                </div>
+
+                <div class="p-4 flex flex-col gap-3 min-w-0">
+
+                  <!-- Three pickers, and the kind carries its own reasons the way the connection
+                       picker does: a kind that cannot draw THESE columns stays listed and inert
+                       with the reason on it, because that reason is a fact about the reader's
+                       data rather than about the console. -->
+                  <div class="flex flex-wrap items-end gap-2 min-w-0">
+                    @if (chartLabelOptions().length) {
+                      <div class="flex flex-col gap-1 min-w-0">
+                        <label class="text-[11px] uppercase tracking-wider
+                                      text-[color:var(--text-muted)]"
+                               for="a-chart-label">Label</label>
+                        <select id="a-chart-label" class="input input-sm w-auto max-w-full"
+                                [value]="labelColumn()?.name ?? ''"
+                                (change)="chartLabelName.set($any($event.target).value)">
+                          <!-- [selected] on the OPTION, not only [value] on the select. Angular
+                               applies a host property binding before the @for below it has created
+                               anything, so the browser had nothing to select and fell back to the
+                               first option -- and since the expression never changed afterwards the
+                               binding never re-fired. The picker then named a different column from
+                               the one the chart was drawing, which on this screen is the whole
+                               problem: the control that says what a chart is OF disagreed with it. -->
+                          @for (column of chartLabelOptions(); track column.name) {
+                            <option [value]="column.name"
+                                    [selected]="column.name === labelColumn()?.name">{{ column.name }}</option>
+                          }
+                        </select>
+                      </div>
+                    }
+
+                    <div class="flex flex-col gap-1 min-w-0">
+                      <label class="text-[11px] uppercase tracking-wider
+                                    text-[color:var(--text-muted)]"
+                             for="a-chart-value">Value</label>
+                      <select id="a-chart-value" class="input input-sm w-auto max-w-full"
+                              [value]="valueColumn()?.name ?? ''"
+                              (change)="chartValueName.set($any($event.target).value)">
+                        @for (column of chartValueOptions(); track column.name) {
+                          <!-- How much of the column is actually numbers, on the option itself.
+                               A column that parses in nine rows out of nine thousand is offered
+                               and is almost certainly the wrong pick, and the count is the only
+                               thing that says so before the chart is drawn. -->
+                          <option [value]="column.name"
+                                  [selected]="column.name === valueColumn()?.name">
+                            {{ column.name }} · a number in
+                            {{ column.numbers.toLocaleString() }} of
+                            {{ column.rows.toLocaleString() }} rows
+                          </option>
+                        }
+                      </select>
+                    </div>
+
+                    <div class="flex flex-col gap-1 min-w-0 flex-1">
+                      <label class="text-[11px] uppercase tracking-wider
+                                    text-[color:var(--text-muted)]"
+                             for="a-chart-kind">Chart</label>
+                      <select id="a-chart-kind" class="input input-sm w-full"
+                              [value]="chartKind() ?? ''"
+                              (change)="chartKindName.set($any($event.target).value)">
+                        @for (option of chartKinds(); track option.id) {
+                          <option [value]="option.id" [disabled]="!!option.issue"
+                                  [selected]="option.id === chartKind()"
+                                  [title]="option.issue || option.label">
+                            {{ option.label }}{{ option.issue ? ' — ' + option.issue : '' }}
+                          </option>
+                        }
+                      </select>
+                    </div>
+                  </div>
+
+                  <div class="flex flex-wrap items-baseline gap-2 min-w-0">
+                    <h4 class="text-sm font-medium min-w-0 truncate">{{ chartCaption() }}</h4>
+                    @if (truncated()) {
+                      <!-- On the chart's own title, not only in the strip above it. This is the
+                           line that travels with the picture when somebody screenshots it. -->
+                      <span class="pill pill-warn">partial — part of the answer</span>
+                    }
+                  </div>
+
+                  @switch (chartKind()) {
+                    @case ('bar') {
+                      <app-bar-chart [data]="chartData()" [height]="220" />
+                    }
+                    @case ('ranked') {
+                      <!-- No percentages. A share of a total is only a share when the numbers add
+                           up to one, and this column is whatever the reader selected -- an
+                           average per region has no total for a row to be 12% of. -->
+                      <app-ranked-bar [data]="chartData()" [max]="rankedRows"
+                                      [showPercent]="false" />
+                    }
+                    @case ('donut') {
+                      <app-donut [data]="chartData()" [totalLabel]="valueColumn()?.name ?? ''" />
+                    }
+                    @case ('histogram') {
+                      <!-- noun="row", because these are rows of a query result and not the runs
+                           the reports page bins. dropBelow null keeps negative values on the
+                           axis: a refund or a loss is a measurement, not a sentinel. -->
+                      <app-histogram [values]="chartValues()" noun="row" nounPlural="rows"
+                                     [dropBelow]="null" [height]="200" [format]="chartNumber"
+                                     emptyMessage="Nothing in this column parses as a number." />
+                    }
+                  }
+
+                  <!-- What the picture cannot say about itself. Every line here is a row, a
+                       category or a whole tail that is not on the chart above. -->
+                  <ul class="flex flex-col gap-1 mt-1">
+                    @for (note of chartNotes(); track note) {
+                      <li class="text-[11px] text-[color:var(--text-muted)]">{{ note }}</li>
+                    }
+                  </ul>
+                </div>
+              </app-table-shell>
+            }
+
+            <!-- ── the library ────────────────────────────────────────────────────────── -->
+            <div class="grid gap-3 sm:grid-cols-2">
+
+              <div class="card p-3 flex flex-col gap-2 min-w-0">
+                <div class="flex items-baseline justify-between gap-2">
+                  <h3 class="text-xs uppercase tracking-wider text-[color:var(--text-muted)]
+                             font-semibold">Saved queries</h3>
+                  <span class="text-xs tabular text-[color:var(--text-muted)]">
+                    {{ savedQueries().length }}
+                  </span>
+                </div>
+
+                @if (savedError()) {
+                  <!-- With a way back. The library is fetched once, on the first visit to this
+                       tab, so a failure with no retry beside it would leave the card dead for
+                       the rest of the session. -->
+                  <p class="text-xs text-crit-500" role="alert">
+                    {{ savedError() }}
+                    <button type="button" class="link-inline ml-1"
+                            (click)="loadSavedQueries()">Try again</button>
+                  </p>
+                }
+
+                @if (savedLoading()) {
+                  <p class="text-xs text-[color:var(--text-muted)] py-4 text-center">Reading…</p>
+                } @else if (!savedQueries().length) {
+                  <p class="text-xs text-[color:var(--text-muted)] py-4 text-center">
+                    Nothing saved yet. Name a query above and it will be here next time.
+                  </p>
+                } @else {
+                  @for (query of savedQueries(); track query.analyticsQueryId) {
+                    <div class="rounded border border-subtle p-2 flex flex-col gap-1 min-w-0">
+                      @if (renamingId() === query.analyticsQueryId) {
+                        <div class="flex flex-wrap items-center gap-1.5 min-w-0">
+                          <input class="input text-xs flex-1 min-w-32" type="text"
+                                 [value]="renameName()" aria-label="A new name for this query"
+                                 (input)="renameName.set($any($event.target).value)" />
+                          <button type="button" class="btn btn-primary btn-xs"
+                                  [disabled]="!renameName().trim()"
+                                  (click)="applyRename()">Save</button>
+                          <button type="button" class="btn btn-default btn-xs"
+                                  (click)="cancelRename()">Cancel</button>
+                        </div>
+                      } @else {
+                        <div class="flex flex-wrap items-center gap-1.5 min-w-0">
+                          <span class="text-sm truncate flex-1 min-w-0"
+                                [class.font-semibold]="loadedQuery()?.analyticsQueryId
+                                                       === query.analyticsQueryId"
+                                [title]="query.queryText">{{ query.queryName }}</span>
+                          <button type="button" class="btn btn-default btn-xs"
+                                  (click)="loadSaved(query)">Load</button>
+                          <button type="button" class="btn btn-ghost btn-xs"
+                                  (click)="startRename(query)">Rename</button>
+                          <button type="button" class="btn btn-ghost btn-xs"
+                                  (click)="removeSaved(query)">Delete</button>
+                        </div>
+                        <p class="mono text-[10px] text-[color:var(--text-muted)] truncate"
+                           [title]="query.datasetPath">
+                          {{ query.connectionAlias }}/{{ query.datasetPath }}
+                        </p>
+                      }
+                    </div>
+                  }
+                }
+              </div>
+
+              <div class="card p-3 flex flex-col gap-2 min-w-0">
+                <div class="flex items-baseline justify-between gap-2">
+                  <h3 class="text-xs uppercase tracking-wider text-[color:var(--text-muted)]
+                             font-semibold">Recent runs</h3>
+                  <button type="button" class="link-inline text-xs" (click)="loadRuns()">
+                    refresh
+                  </button>
+                </div>
+
+                @if (runsError()) {
+                  <p class="text-xs text-crit-500" role="alert">{{ runsError() }}</p>
+                }
+
+                @if (runsLoading()) {
+                  <p class="text-xs text-[color:var(--text-muted)] py-4 text-center">Reading…</p>
+                } @else if (!recentRuns().length) {
+                  <p class="text-xs text-[color:var(--text-muted)] py-4 text-center">
+                    Nothing has been run here yet.
+                  </p>
+                } @else {
+                  <div class="scroll-table -mx-1 px-1 flex flex-col gap-1.5">
+                    @for (run of recentRuns(); track run.analyticsQueryRunId) {
+                      <div class="rounded border border-subtle p-2 flex flex-col gap-1 min-w-0">
+                        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
+                          <!-- Refused is not a kind of failure and is not drawn as one. Failed
+                               reached the engine and broke there; refused never reached it,
+                               because the gate or the governor turned it away. -->
+                          <!-- Every state gets its own word. The @default used to be "failed",
+                               so a query the user themselves stopped, and one the server timed
+                               out, were both reported to them as failures -- the exact conflation
+                               the comment above forbids for REFUSED, one state over. There is no
+                               default any more: an unrecognised state shows itself rather than
+                               being dressed as the nearest familiar one. -->
+                          <span class="pill"
+                                [class.pill-ok]="run.runStatus === 'SUCCESS'"
+                                [class.pill-crit]="run.runStatus === 'FAILED'"
+                                [class.pill-warn]="run.runStatus === 'REFUSED'
+                                                   || run.runStatus === 'TIMED_OUT'"
+                                [class.pill-neutral]="run.runStatus === 'CANCELLED'
+                                                      || run.runStatus === 'QUEUED'
+                                                      || run.runStatus === 'RUNNING'">
+                            @switch (run.runStatus) {
+                              @case ('SUCCESS') { ran }
+                              @case ('REFUSED') { refused }
+                              @case ('FAILED') { failed }
+                              @case ('CANCELLED') { stopped }
+                              @case ('TIMED_OUT') { timed out }
+                              @case ('QUEUED') { queued }
+                              @case ('RUNNING') { running }
+                              @default { {{ run.runStatus }} }
+                            }
+                          </span>
+                          <span class="text-[11px] text-[color:var(--text-muted)]">
+                            {{ runWhen(run) }}
+                          </span>
+                          @if (runTook(run)) {
+                            <span class="text-[11px] text-[color:var(--text-muted)] tabular">
+                              {{ runTook(run) }}
+                            </span>
+                          }
+                          @if (runRows(run)) {
+                            <span class="text-[11px] text-[color:var(--text-muted)] tabular">
+                              {{ runRows(run) }} rows
+                            </span>
+                          }
+                          <button type="button" class="btn btn-default btn-xs ml-auto"
+                                  (click)="reuseRun(run)">Use this SQL</button>
+                        </div>
+                        <p class="mono text-[11px] truncate"
+                           [title]="run.queryText">{{ run.queryText }}</p>
+                        <p class="mono text-[10px] text-[color:var(--text-muted)] truncate"
+                           [title]="run.datasetPath">
+                          {{ run.connectionAlias }}/{{ run.datasetPath }}
+                        </p>
+                        @if (run.errorMessage) {
+                          <p class="text-[11px] text-[color:var(--text-secondary)]">
+                            {{ run.errorMessage }}
+                          </p>
+                        }
+                      </div>
+                    }
+                  </div>
+                  <p class="field-note text-[color:var(--text-muted)]">
+                    Times are wall clock inside the query engine, so they leave out the network
+                    and any wait for a free slot. This is everything run in your workspace, not
+                    only what you saved.
+                  </p>
+                }
+              </div>
+            </div>
+          </div>
+        }
+
+      }
+    </div>
+  </div>
+</div>

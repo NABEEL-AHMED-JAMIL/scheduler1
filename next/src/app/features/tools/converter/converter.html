@@ -61,14 +61,36 @@
         </div>
 
         @if (folders().length) {
-          <div class="flex flex-wrap gap-1.5">
-            @for (folder of folders(); track folder.key) {
+          @if (folderFilterWorthIt()) {
+            <div class="search-field max-w-56">
+              <app-icon name="search" size="0.95em" />
+              <input class="input" placeholder="Filter folders"
+                     [value]="folderFilter()"
+                     (input)="folderFilter.set($any($event.target).value)" />
+            </div>
+          }
+
+          <!-- A bucket can hold hundreds of folders at one level (etl-avatar has one per user),
+               which as a plain wrapping row pushed the rest of the screen off the bottom. -->
+          <div class="folder-picker flex flex-wrap gap-1.5">
+            @for (folder of filteredFolders(); track folder.key) {
               <button type="button" class="btn btn-default btn-sm"
                       (click)="openFolder(folder.key)">
                 <app-icon name="folder" size="0.85em" class="icon-info" />{{ folder.name }}
               </button>
             }
+            @if (!filteredFolders().length) {
+              <p class="text-xs text-[color:var(--text-muted)]">
+                No folder here matches "{{ folderFilter() }}".
+              </p>
+            }
           </div>
+
+          @if (folderFilterWorthIt()) {
+            <p class="text-xs text-[color:var(--text-muted)]">
+              {{ filteredFolders().length }} of {{ folders().length }} folders
+            </p>
+          }
         }
 
         @if (nextToken()) {

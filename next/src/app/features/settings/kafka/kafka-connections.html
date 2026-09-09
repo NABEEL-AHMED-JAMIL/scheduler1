@@ -21,7 +21,8 @@
       { label: 'Profiles',  value: summary().total,    foot: summary().active + ' active', icon: 'server', tone: 'info' },
       { label: 'Tested OK', value: summary().testedOk, foot: 'last test passed', icon: 'plug', tone: 'ok' },
       { label: 'Failing',   value: summary().failing,  foot: 'need attention', icon: 'xCircle', tone: 'crit' },
-      { label: 'Default',   value: defaultProfile() ? 1 : 0, foot: defaultProfile()?.profileName || 'none set', icon: 'zap', tone: 'info' }
+      { label: canSeeWorkspace() ? 'Platform default' : 'Default', value: defaultProfile() ? 1 : 0,
+        foot: defaultProfile()?.profileName || 'none set', icon: 'zap', tone: 'info' }
     ]; track tile.label) {
       <app-stat-tile [label]="tile.label" [value]="tile.value" [icon]="tile.icon" [tone]="$any(tile.tone)" [foot]="tile.foot" />
     }
@@ -42,7 +43,12 @@
   @if (!defaultProfile() && profiles().length) {
     <div class="card flex flex-wrap items-center gap-2 px-4 py-2.5 text-sm">
       <app-icon name="alert" class="icon-warn" />
-      <span>No profile is marked default — a task without an explicit profile has no broker to reach.</span>
+      @if (canSeeWorkspace()) {
+        <span>No platform-owned profile is marked default — a task in a workspace that has no default
+              of its own has no broker to reach.</span>
+      } @else {
+        <span>No profile is marked default — a task without an explicit profile has no broker to reach.</span>
+      }
     </div>
   }
 
@@ -66,7 +72,8 @@
       </select>
       <div class="search-field max-w-56">
         <app-icon name="search" size="0.95em" />
-        <input class="input" placeholder="Search name, label or broker"
+        <input class="input"
+               [placeholder]="canSeeWorkspace() ? 'Search name, label, broker or workspace' : 'Search name, label or broker'"
                [value]="search()" (input)="search.set($any($event.target).value)" />
       </div>
       <app-mine-filter [(only)]="onlyMine" />
@@ -88,11 +95,21 @@
                 <h3 class="font-semibold truncate flex items-center gap-1.5" [title]="p.profileName">
                   <span class="truncate">{{ p.profileName }}</span>
                   @if (p.isDefault) {
-                    <span class="pill pill-brand shrink-0" title="Used by tasks with no explicit profile">
+                    <span class="pill pill-brand shrink-0" [title]="defaultHint(p)">
                       <app-icon name="check" size="0.85em" />default
                     </span>
                   }
                 </h3>
+                @if (canSeeWorkspace()) {
+                  <span class="pill pill-neutral mt-0.5" [title]="workspaceHint(p)">
+                    @if (p.tenantId == null) {
+                      <app-icon name="globe" size="0.8em" class="opacity-70" />
+                    } @else {
+                      <app-icon name="building" size="0.8em" class="opacity-70" />
+                    }
+                    {{ workspaceName(p) }}
+                  </span>
+                }
                 @if (p.environmentLabel) {
                   <p class="text-xs text-[color:var(--text-muted)] truncate">{{ p.environmentLabel }}</p>
                 }
@@ -182,6 +199,7 @@
               </span>
             </th>
           }
+          @if (canSeeWorkspace()) { <th>Workspace</th> }
           <th>Created by</th>
           <th>Updated by</th>
           <th class="text-right">State</th>
@@ -195,7 +213,7 @@
               <div class="font-medium flex items-center gap-1.5">
                 {{ p.profileName }}
                 @if (p.isDefault) {
-                  <span class="pill pill-brand" title="Used by tasks with no explicit profile">
+                  <span class="pill pill-brand" [title]="defaultHint(p)">
                     <app-icon name="check" size="0.85em" />default
                   </span>
                 }
@@ -228,6 +246,18 @@
                 </div>
               }
             </td>
+            @if (canSeeWorkspace()) {
+              <td>
+                <span class="pill pill-neutral" [title]="workspaceHint(p)">
+                  @if (p.tenantId == null) {
+                    <app-icon name="globe" size="0.8em" class="opacity-70" />
+                  } @else {
+                    <app-icon name="building" size="0.8em" class="opacity-70" />
+                  }
+                  {{ workspaceName(p) }}
+                </span>
+              </td>
+            }
             <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
               {{ p.createdByName || '—' }}
             </td>

@@ -49,6 +49,14 @@ export interface RunStats {
 /** One block of an answer. The component decides how each is drawn. */
 export type AnswerBlock =
   | { kind: 'text'; text: string }
+  /**
+   * Prose written by a configured AI agent rather than composed from this job's record.
+   *
+   * It is a separate kind, not a 'text' block, because the reader has to be able to tell the
+   * two apart: every other block is the job's own data and cannot be wrong, while this one is
+   * a model's answer and can be. The component draws it with the agent's name attached.
+   */
+  | { kind: 'ai'; text: string; agent: string }
   | { kind: 'facts'; rows: { label: string; value: string }[] }
   | { kind: 'stats' }
   | { kind: 'chart' }
@@ -58,6 +66,8 @@ export interface Answer {
   blocks: AnswerBlock[];
   /** Shown when the assistant declines, so the reason is never a mystery. */
   refused?: boolean;
+  /** An agent was asked and has not replied yet. The turn renders a spinner until it does. */
+  pending?: boolean;
 }
 
 const HUMAN_STATUS: Record<string, string> = {

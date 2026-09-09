@@ -3,297 +3,400 @@
     <div>
       <h1 class="page-title">Reports</h1>
       <p class="page-subtitle">
-        Group your runs by any two dimensions, measure them how you like, and take the result
-        with you.
+        What your runs did in this range — how many succeeded, which tasks are struggling,
+        and what failed.
       </p>
     </div>
     <div class="flex items-center gap-2">
+      <button type="button" class="btn btn-ghost btn-sm" (click)="toggleBuilder()"
+              [attr.aria-expanded]="showBuilder()">
+        <app-icon [name]="showBuilder() ? 'chevronDown' : 'chevronRight'" />Build your own view
+      </button>
       <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
         <app-icon name="refresh" [class.spin]="loading()" />Refresh
       </button>
     </div>
   </div>
 
-  <!-- range -->
+  <!-- Range. Kept as the app's two native date inputs rather than a new picker component:
+       every other screen does it this way, and matching costs nothing. -->
   <div class="card px-4 py-3">
     <div class="flex flex-wrap items-end gap-3">
       <div>
         <label class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]"
                for="r-from">From</label>
         <input id="r-from" type="date" class="input max-w-40 mt-1" [value]="startDate()"
-               (change)="startDate.set($any($event.target).value); load()" />
+               (change)="setStart($any($event.target).value)" />
       </div>
       <div>
         <label class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]"
                for="r-to">To</label>
         <input id="r-to" type="date" class="input max-w-40 mt-1" [value]="endDate()"
-               (change)="endDate.set($any($event.target).value); load()" />
+               (change)="setEnd($any($event.target).value)" />
       </div>
-      <span class="pill pill-neutral">{{ data().rows.length }} runs</span>
+      @if (!loading() && !error()) {
+        <span class="pill pill-neutral mb-1.5">{{ counts().total }} runs</span>
+      }
+      <div class="ml-auto flex flex-wrap items-end gap-2">
+        <!-- Every one of these narrows data(), which is what the tiles, all three charts, the
+             task table and the pivot builder all read. There is one predicate, so there is no
+             way for a filter to reach some of the page and not the rest. -->
+        <div>
+          <label class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]"
+                 for="r-f-task">Task</label>
+          <select id="r-f-task" class="input max-w-44 mt-1" [value]="taskFilter()"
+                  (change)="taskFilter.set($any($event.target).value)">
+            <option value="">All tasks</option>
+            @for (option of taskOptions(); track option) { <option [value]="option">{{ option }}</option> }
+          </select>
+        </div>
+        <div>
+          <label class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]"
+                 for="r-f-job">Job</label>
+          <select id="r-f-job" class="input max-w-44 mt-1" [value]="jobFilter()"
+                  (change)="jobFilter.set($any($event.target).value)">
+            <option value="">All jobs</option>
+            @for (option of jobOptions(); track option) { <option [value]="option">{{ option }}</option> }
+          </select>
+        </div>
+        <div>
+          <label class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]"
+                 for="r-f-status">Outcome</label>
+          <select id="r-f-status" class="input max-w-36 mt-1" [value]="statusFilter()"
+                  (change)="statusFilter.set($any($event.target).value)">
+            <option value="">All outcomes</option>
+            @for (option of statusOptions(); track option) { <option [value]="option">{{ option }}</option> }
+          </select>
+        </div>
+        @if (showTenantFilter()) {
+          <div>
+            <label class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]"
+                   for="r-f-tenant">Workspace</label>
+            <select id="r-f-tenant" class="input max-w-44 mt-1" [value]="tenantFilter()"
+                    (change)="tenantFilter.set($any($event.target).value)">
+              <option value="">All workspaces</option>
+              @for (option of tenantOptions(); track option) { <option [value]="option">{{ option }}</option> }
+            </select>
+          </div>
+        }
+        <div>
+          <label class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]"
+                 for="r-f-owner">Owner</label>
+          <select id="r-f-owner" class="input max-w-40 mt-1" [value]="ownerFilter()"
+                  (change)="ownerFilter.set($any($event.target).value)">
+            <option value="">All owners</option>
+            @for (option of ownerOptions(); track option) { <option [value]="option">{{ option }}</option> }
+          </select>
+        </div>
+      </div>
       @if (truncated()) {
-        <span class="pill pill-warn" title="Narrow the range to include the rest">
+        <span class="pill pill-warn mb-1.5">
           <app-icon name="alert" size="0.85em" />capped
         </span>
+        <p class="w-full text-xs text-crit-500 mt-1">
+          Only the most recent runs were read. Every figure below describes that sample, not
+          the whole range — narrow the dates for exact numbers.
+        </p>
       }
     </div>
   </div>
 
+  @if (activeFilters().length) {
+    <!-- Stated, not implied. Every figure below describes the narrowed set, and a reader who
+         cannot see that a filter is on will read the numbers as the whole range. -->
+    <div class="flex flex-wrap items-center gap-2">
+      <span class="text-xs text-[color:var(--text-muted)]">Filtered to</span>
+      @for (filter of activeFilters(); track filter.key) {
+        <button type="button" class="pill pill-brand" (click)="clearFilter(filter.key)"
+                [title]="'Remove the ' + filter.label + ' filter'">
+          {{ filter.label }}: {{ filter.value }}<app-icon name="close" size="0.8em" />
+        </button>
+      }
+      <button type="button" class="btn btn-ghost btn-xs" (click)="clearFilters()">Clear all</button>
+      <span class="text-xs text-[color:var(--text-muted)]">
+        {{ counts().total }} of {{ rawData().rows.length }} runs
+      </span>
+    </div>
+  }
+
   @if (loading()) {
-    <div class="card p-12 text-center">
-      <div class="spinner mx-auto mb-3" role="status" aria-label="Loading"></div>
+    <div class="card p-12 text-center" role="status" aria-live="polite">
+      <div class="spinner mx-auto mb-3" aria-hidden="true"></div>
       <p class="text-sm text-[color:var(--text-muted)]">Reading your runs…</p>
     </div>
   } @else if (error()) {
     <div class="card p-10 text-center">
       <app-icon name="alert" size="1.75em" class="icon-crit" />
-      <p class="mt-2 text-sm text-crit-500">{{ error() }}</p>
-      <button type="button" class="btn btn-default btn-sm mt-4" (click)="load()">Try again</button>
+      <p class="mt-2 text-sm text-crit-500" role="alert">{{ error() }}</p>
+      <!-- A bad date range is not a failed request, and retrying it cannot succeed: the offer
+           to "Try again" sent the reader round the same loop until they noticed the dates
+           themselves. Only a request that actually failed gets a retry; a bad range gets the
+           one control that resolves it. -->
+      @if (rangeValid()) {
+        <button type="button" class="btn btn-default btn-sm mt-4" (click)="load()">Try again</button>
+      } @else {
+        <button type="button" class="btn btn-default btn-sm mt-4" (click)="resetRange()">
+          Reset to the last 30 days
+        </button>
+      }
     </div>
   } @else if (!hasRows()) {
     <div class="card p-12 text-center">
       <app-icon name="chart" size="1.75em" class="icon-muted" />
-      <p class="mt-3 text-sm text-[color:var(--text-secondary)]">No runs in this range.</p>
-      <p class="mt-1 text-xs text-[color:var(--text-muted)]">Widen the dates to see more.</p>
+      <p class="mt-3 text-sm text-[color:var(--text-secondary)]">No runs started in this range.</p>
+      <p class="mt-1 text-xs text-[color:var(--text-muted)]">
+        Widen the dates, or run a job from the Jobs screen to see it here.
+      </p>
     </div>
   } @else {
 
-    <!-- shape -->
-    <div class="card px-4 py-3">
-      <div class="flex flex-wrap items-end gap-3">
-        <div>
-          <label class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]"
-                 for="r-rows">Rows</label>
-          <select id="r-rows" class="input max-w-44 mt-1"
-                  (change)="setRowDim($any($event.target).value)">
-            @for (dimension of dimensions; track dimension.key) {
-              <option [value]="dimension.key"
-                      [selected]="dimension.key === rowDim().key">{{ dimension.label }}</option>
-            }
-          </select>
-        </div>
-        <button type="button" class="btn btn-ghost btn-sm mb-1" (click)="swap()"
-                title="Swap rows and columns">⇄</button>
-        <div>
-          <label class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]"
-                 for="r-cols">Columns</label>
-          <select id="r-cols" class="input max-w-44 mt-1"
-                  (change)="setColDim($any($event.target).value)">
-            @for (dimension of dimensions; track dimension.key) {
-              <option [value]="dimension.key"
-                      [selected]="dimension.key === colDim().key">{{ dimension.label }}</option>
-            }
-          </select>
-        </div>
-        <div>
-          <label class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]"
-                 for="r-measure">Measure</label>
-          <select id="r-measure" class="input max-w-52 mt-1"
-                  (change)="setMeasure($any($event.target).value)">
-            @for (group of measureGroups; track group.label) {
-              <optgroup [label]="group.label">
-                @for (option of group.measures; track option) {
-                  <option [value]="option"
-                          [selected]="option === measure()">{{ measureLabels[option] }}</option>
-                }
-              </optgroup>
-            }
-          </select>
-        </div>
-
-        <div class="flex items-center gap-2 ml-auto">
-          <button type="button" class="btn btn-default btn-sm"
-                  [disabled]="exporting()" (click)="export('csv')">
-            <app-icon name="download" />CSV
-          </button>
-          <button type="button" class="btn btn-default btn-sm"
-                  [disabled]="exporting()" (click)="export('xlsx')">
-            <app-icon name="table" [class.spin]="exporting() === 'xlsx'" />
-            {{ exporting() === 'xlsx' ? 'Building…' : 'Excel' }}
-          </button>
-          <button type="button" class="btn btn-default btn-sm"
-                  [disabled]="exporting()" (click)="saveToBucket('csv')"
-                  title="Write this report into a bucket">
-            <app-icon name="cloud" [class.spin]="exporting() === 'bucket'" />
-            {{ exporting() === 'bucket' ? 'Saving…' : 'Save' }}
-          </button>
-          <button type="button" class="btn btn-default btn-sm"
-                  [disabled]="exporting()" (click)="submit('csv')"
-                  title="Post this report to a configured endpoint">
-            <app-icon name="send" [class.spin]="exporting() === 'submit'" />
-            {{ exporting() === 'submit' ? 'Submitting…' : 'Submit' }}
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- chart -->
-    <div class="card">
-      <div class="flex flex-wrap items-center gap-1.5 px-4 py-2.5 border-b border-subtle"
-          >
-        <h2 class="text-sm font-semibold mr-2">Chart</h2>
-        @for (option of chartKinds; track option) {
-          <button type="button" class="btn btn-xs"
-                  [class.btn-default]="chart() === option"
-                  [class.btn-ghost]="chart() !== option"
-                  (click)="chart.set(option)">{{ chartLabels[option] }}</button>
-        }
-      </div>
-      <div class="p-4">
-        <app-report-chart [pivot]="pivot()" [measure]="measure()" [kind]="chart()"
-                          [colorFor]="colourFor" />
-        <div class="flex flex-wrap items-center gap-3 mt-3 text-xs">
-          @for (label of legend(); track label) {
-            <span class="inline-flex items-center gap-1.5">
-              <span class="inline-block size-2.5 rounded-sm"
-                    [style.background]="colourFor(label)"></span>{{ label }}
-            </span>
+    <!-- ── Overview ───────────────────────────────────────────────────────────────────── -->
+    <section class="space-y-3">
+      <div>
+          <h2 class="section-title">Overview</h2>
+        <p class="section-sub">Every run that started between the two dates above.
+          @if (showTenantFilter() && !tenantFilter()) {
+            <strong>These totals combine {{ tenantOptions().length }} workspaces</strong> —
+            pick one above to separate them.
           }
+        </p>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <app-stat-tile label="Runs started" [value]="counts().total" icon="play"
+                       [foot]="runsDelta()" />
+        <app-stat-tile label="Failed" [value]="counts().failed" icon="alert"
+                       [tone]="counts().failed ? 'crit' : 'muted'" />
+        <!-- A dash, not a zero, when nothing has settled: 0% in red says everything failed,
+             which is the opposite of "nothing has finished yet". -->
+        <app-stat-tile label="Success rate" icon="check"
+                       [value]="settled() ? successRate() + '%' : '—'"
+                       [tone]="!settled() ? 'muted'
+                               : successRate() >= 90 ? 'ok'
+                               : successRate() >= 70 ? 'warn' : 'crit'"
+                       [foot]="successFoot()" />
+        <app-stat-tile label="Median duration" [value]="humanSeconds(medianDuration())"
+                       icon="clock" [foot]="durationFoot()" />
+      </div>
+    </section>
+
+    <!-- ── Shape ──────────────────────────────────────────────────────────────────────── -->
+    <section class="space-y-3">
+      <div>
+        <h2 class="section-title">Outcomes and timing</h2>
+        <p class="section-sub">
+          How the runs came out, how long they took, and when they happened.
+        </p>
+      </div>
+      <!-- min-w-0 on each card, not decoration: a grid item's automatic minimum is its
+           min-content width, so at phone width the donut's legend row pushed the auto track
+           to 411px inside a 343px grid and the whole PAGE scrolled sideways. -->
+      <div class="grid gap-3 lg:grid-cols-3">
+        <div class="card p-4 min-w-0">
+          <h3 class="text-sm font-semibold">Outcome mix</h3>
+          <p class="field-note text-[color:var(--text-muted)] mb-3">
+            Only outcomes that occurred. Skipped and missed runs never start, so they cannot
+            appear here.
+          </p>
+          <app-donut [data]="outcomeMix()" totalLabel="runs" [colorFor]="statusColor" />
+        </div>
+
+        <div class="card p-4 min-w-0">
+          <h3 class="text-sm font-semibold">Duration spread</h3>
+          <p class="field-note text-[color:var(--text-muted)] mb-3">
+            Queued to finished. There is no execution-start timestamp, so the dispatcher's wait
+            is inside every figure — the once-a-minute poll is most of the spread below.
+            @if (untimed()) { {{ untimed() }} run(s) with no recorded end time are excluded. }
+          </p>
+          <app-histogram [values]="durations()" [format]="formatSeconds" [height]="132"
+                         emptyMessage="No run has finished in this range yet." />
+        </div>
+
+        <div class="card p-4 min-w-0">
+          <h3 class="text-sm font-semibold">Runs by day</h3>
+          <p class="field-note text-[color:var(--text-muted)] mb-3">
+            @if (activeDays() <= 1) {
+              All of these runs happened on one day — there is no trend to read yet.
+            } @else {
+              Runs on {{ activeDays() }} of {{ runsByDay().length }} days. Days with no runs are
+              shown as gaps, not skipped.
+            }
+            @if (daysCapped()) { Showing the most recent {{ runsByDay().length }} days. }
+            Stacked by outcome; pick a bar to narrow the range to that day.
+            @if (undatedRuns()) {
+              {{ undatedRuns() }} run(s) have no recorded day and are not plotted.
+            }
+          </p>
+          <app-bar-chart [data]="runsByDay()" [height]="132" [clickable]="true"
+                         (barClicked)="focusDay($event)"
+                         emptyMessage="No runs to plot in this range." />
         </div>
       </div>
-    </div>
+    </section>
 
-    <!-- the grid -->
-    <app-table-shell [heading]="title()" [shown]="pivot().rowLabels.length"
-                     [total]="pivot().rowLabels.length" [isEmpty]="false">
-      <ng-container toolbar>
-        <span class="text-xs text-[color:var(--text-muted)]">
-          Click any number to see the runs behind it
-        </span>
-      </ng-container>
-
-      <table class="table-modern">
-        <thead>
-          <tr>
-            <th class="min-w-48">
-              <div class="font-semibold">{{ rowDim().label }}</div>
-              <div class="text-[10px] uppercase tracking-wide text-[color:var(--text-muted)]">
-                dimension
-              </div>
-            </th>
-            @for (colLabel of pivot().colLabels; track colLabel; let ci = $index) {
-              <th class="min-w-36 align-top">
-                <div class="flex items-baseline gap-1.5">
-                  <span class="font-semibold">{{ colLabel }}</span>
-                </div>
-                <!-- The distribution behind the column, so its shape reads before the rows do. -->
-                @if (isCounting()) {
-                  <div class="flex h-1.5 rounded-full overflow-hidden mt-2 mb-1 bg-sunken"
-                      >
-                    @for (part of columnMix(ci); track part.label) {
-                      <span [style.width.%]="part.pct" [style.background]="toneFor(part.label)"
-                            [title]="part.label + ': ' + part.count"></span>
-                    }
-                  </div>
-                  <div class="text-[10px] text-[color:var(--text-muted)] font-normal">
-                    {{ columnCompletion(ci) }}% completed · {{ columnCount(ci) }} runs
-                  </div>
-                } @else {
-                  <div class="flex items-end gap-px h-7 mt-2 mb-1">
-                    @for (bin of columnHistogram(ci); track $index) {
-                      <span class="flex-1 rounded-t-sm" [style.height.%]="bin.height"
-                            [style.background]="'var(--series-brand)'" [title]="bin.hint"></span>
-                    }
-                  </div>
-                  <div class="text-[10px] text-[color:var(--text-muted)] font-normal">
-                    {{ columnCount(ci) }} runs
-                  </div>
-                }
-              </th>
-            }
-            <th class="text-right min-w-28">
-              <div class="font-semibold">All</div>
-              <div class="text-[10px] uppercase tracking-wide text-[color:var(--text-muted)]">
-                total
-              </div>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (rowLabel of pivot().rowLabels; track rowLabel; let ri = $index) {
+    <!-- ── Task health ────────────────────────────────────────────────────────────────── -->
+    <section class="space-y-3">
+      <div>
+        <h2 class="section-title">Task health</h2>
+        <p class="section-sub">
+          Median and Slowest are queued-to-finished, so the dispatcher's wait is inside them —
+          the builder's Execution measures have it taken out.
+          Every task that ran, worst first.
+          @if (unhealthyTasks()) {
+            <strong>{{ unhealthyTasks() }}</strong> of {{ taskHealth().length }} had a failure.
+          } @else {
+            Nothing failed in this range.
+          }
+        </p>
+      </div>
+      <app-table-shell heading="Tasks" [shown]="taskHealth().length" [total]="taskHealth().length"
+                       [isEmpty]="!taskHealth().length"
+                       emptyMessage="No task ran in this range." emptyIcon="chart">
+        <table class="table-modern">
+          <thead>
             <tr>
-              <td class="font-medium max-w-64">
-                <span class="truncate block" [title]="rowLabel">{{ rowLabel }}</span>
-              </td>
-              @for (colLabel of pivot().colLabels; track colLabel; let ci = $index) {
-                <td class="text-right tabular !p-0">
-                  <button type="button"
-                          class="w-full h-full px-4 py-2.5 text-right tabular rounded-sm hover-brand
-                                 focus:outline-none focus:ring-2 focus:ring-brand-500
-                                 disabled:hover:bg-transparent"
-                          [class.text-[color:var(--text-muted)]]="!pivot().matrix[ri][ci]"
-                          [disabled]="!pivot().matrix[ri][ci]"
-                          [title]="rowLabel + ' · ' + colLabel"
-                          (click)="drill(ri, ci)">
-                    {{ format(pivot().matrix[ri][ci]) }}
-                  </button>
-                </td>
-              }
-              <td class="text-right tabular font-semibold !p-0">
-                <button type="button"
-                        class="w-full h-full px-4 py-2.5 text-right tabular font-semibold
-                               rounded-sm hover-brand focus:outline-none focus:ring-2 focus:ring-brand-500"
-                        (click)="drillRow(ri)">{{ format(pivot().rowTotals[ri]) }}</button>
-              </td>
+              <th>Task</th>
+              <th class="text-right hidden lg:table-cell" title="Distinct jobs that drove this task">Jobs</th>
+              <th class="text-right">Runs</th>
+              <th class="text-right">Failed</th>
+              <th class="text-right">Success</th>
+              <th class="text-right">Median</th>
+              <th class="text-right hidden xl:table-cell" title="Slowest finished run">Slowest</th>
+              <th class="hidden md:table-cell">Last run</th>
+              <th class="text-right">State</th>
             </tr>
-          }
-          <tr class="border-t-2 border-strong">
-            <td class="font-semibold bg-raised">All</td>
-            @for (colLabel of pivot().colLabels; track colLabel; let ci = $index) {
-              <td class="text-right tabular font-semibold !p-0 bg-raised"
-                 >
-                <button type="button"
-                        class="w-full h-full px-4 py-2.5 text-right tabular font-semibold
-                               rounded-sm hover-brand focus:outline-none focus:ring-2 focus:ring-brand-500"
-                        (click)="drillColumn(ci)">{{ format(pivot().colTotals[ci]) }}</button>
-              </td>
+          </thead>
+          <tbody>
+            @for (task of taskHealth(); track task.task) {
+              <tr>
+                <td class="max-w-64">
+                  <button type="button" class="link-inline font-medium text-left max-w-full block"
+                          (click)="focusTask(task.task)"
+                          [title]="taskFilter() === task.task
+                                   ? 'Remove the filter on ' + task.task
+                                   : 'Filter the whole page to ' + task.task">
+                    <span class="block truncate">{{ task.task }}</span></button>
+                  <div class="text-xs text-[color:var(--text-muted)]">{{ task.why }}</div>
+                </td>
+                <td class="text-right tabular hidden lg:table-cell">{{ task.jobs }}</td>
+                <td class="text-right tabular">{{ task.runs }}</td>
+                <td class="text-right tabular"
+                    [class.text-crit-500]="task.failures > 0">{{ task.failures }}</td>
+                <td class="text-right tabular">
+                  {{ task.successRate >= 0 ? task.successRate + '%' : '—' }}
+                </td>
+                <td class="text-right tabular mono text-xs">
+                  {{ task.median >= 0 ? humanSeconds(task.median) : '—' }}
+                </td>
+                <td class="text-right tabular mono text-xs hidden xl:table-cell">
+                  {{ task.slowest >= 0 ? humanSeconds(task.slowest) : '—' }}
+                </td>
+                <td class="hidden md:table-cell mono text-xs
+                           text-[color:var(--text-muted)]">{{ task.lastDay || '—' }}</td>
+                <td class="text-right">
+                  <span class="pill"
+                        [class.pill-ok]="task.tone === 'ok'"
+                        [class.pill-warn]="task.tone === 'warn'"
+                        [class.pill-crit]="task.tone === 'crit'"
+                        [title]="task.why">{{ task.state }}</span>
+                </td>
+              </tr>
             }
-            <td class="text-right tabular font-semibold px-4 py-2.5 bg-raised"
-               >{{ format(pivot().grand) }}</td>
-          </tr>
-        </tbody>
-      </table>
-    </app-table-shell>
+          </tbody>
+        </table>
+      </app-table-shell>
+    </section>
+
+    <!-- ── Failures ───────────────────────────────────────────────────────────────────── -->
+    @if (counts().failed) {
+      <section class="space-y-3">
+        <div>
+          <h2 class="section-title">What failed, and why</h2>
+          <p class="section-sub">
+            The error each failed run reported. Open a job for its full run history, or a run
+            for the lines the pipeline wrote while it was failing.
+          </p>
+        </div>
+        <!-- [total] is the same population as [shown]. It used to be counts().failed, which
+             comes from the runs feed while the rows come from fetchLogs: the two filter on
+             different date columns, so the header could read "(5 of 4)". -->
+        <app-table-shell heading="Failed runs" [loading]="failuresLoading()"
+                         [error]="failuresError()" [shown]="visibleFailures().length"
+                         [total]="visibleFailures().length" [isEmpty]="!visibleFailures().length"
+                         emptyMessage="No failure detail was returned for this range."
+                         emptyIcon="alert" (retry)="retryFailures()">
+          <table class="table-modern">
+            <thead>
+              <tr>
+                <th>Job</th>
+                <th>Error</th>
+                <th class="hidden lg:table-cell">When</th>
+                <th class="text-right hidden md:table-cell">Took</th>
+                <th class="text-right">Outcome</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (failure of visibleFailures(); track failure.jobQueueId) {
+                <tr>
+                  <!-- The drill-through is a real control in the cell, not a click handler on
+                       the row. A bare (click) on a <tr> is reachable by mouse only: no tab
+                       stop, no focus ring, nothing announced. -->
+                  <td class="max-w-52">
+                    <!-- (click) belongs on the BUTTON. It was on the inner span, so the button
+                         took focus and Enter/Space did nothing -- the exact mouse-only defect
+                         the comment above says this markup exists to avoid. -->
+                    <button type="button" class="link-inline font-medium text-left max-w-full block"
+                            (click)="openJobHistory(failure.jobId)"
+                            [title]="'Open the run history for ' + failure.job">
+                      <span class="block truncate">{{ failure.job }}</span></button>
+                    <div class="text-xs text-[color:var(--text-muted)] truncate"
+                         [title]="failure.task">{{ failure.task || '#' + failure.jobQueueId }}</div>
+                  </td>
+                  <td class="max-w-md">
+                    <div class="mono text-xs text-[color:var(--text-secondary)] line-clamp-2"
+                         [title]="failure.message">{{ failure.message }}</div>
+                  </td>
+                  <td class="hidden lg:table-cell mono text-xs
+                             text-[color:var(--text-muted)] whitespace-nowrap">{{ failure.when }}</td>
+                  <td class="text-right hidden md:table-cell mono text-xs">
+                    {{ failure.seconds >= 0 ? humanSeconds(failure.seconds) : '—' }}
+                  </td>
+                  <td class="text-right">
+                    <div class="flex items-center justify-end gap-2">
+                      <app-status [label]="failure.status" />
+                      <!-- Only rendered when the run has an id to open. Every run in this
+                           system now has audit lines, but a control that can open nothing must
+                           not be drawn as though it can. -->
+                      @if (failure.jobId && failure.jobQueueId) {
+                        <button type="button" class="btn btn-ghost btn-xs"
+                                (click)="openRunLogs(failure)"
+                                [title]="'Open the run log for #' + failure.jobQueueId">
+                          <app-icon name="history" size="0.85em" />Logs
+                        </button>
+                      }
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </app-table-shell>
+      </section>
+    }
+
+    <!-- ── The builder ────────────────────────────────────────────────────────────────
+         [hidden], not @if. An @if DESTROYS the component, so collapsing the builder threw away
+         the reader's dimensions, measure, chart kind and open drill-down; reopening it dropped
+         them back to Task x Job / Runs / Grouped bars. It also refetched nothing, since the
+         data is an input -- so the only thing the destroy achieved was losing the work. -->
+    <section class="space-y-3" [hidden]="!showBuilder()">
+        <div>
+          <h2 class="section-title">Build your own view</h2>
+          <p class="section-sub">
+            Group these same runs by any two dimensions, measure them how you like, and export
+            the result.
+          </p>
+        </div>
+        <app-report-pivot [data]="data()" [startDate]="startDate()" [endDate]="endDate()" />
+    </section>
   }
 </div>
-
-@if (drillRows().length) {
-  <div class="fixed inset-x-0 bottom-0 z-40 card shadow-2xl flex flex-col"
-       style="max-height: 56vh; border-radius: 12px 12px 0 0;">
-    <div class="flex items-center gap-2.5 px-4 py-3 border-b border-subtle"
-        >
-      <h2 class="text-sm font-semibold">{{ drillTitle() }}</h2>
-      <span class="pill pill-neutral">{{ drillRows().length }} runs</span>
-      <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="closeDrill()">
-        <app-icon name="close" />Close
-      </button>
-    </div>
-    <div class="overflow-auto">
-      <table class="table-modern">
-        <thead>
-          <tr><th>Run</th><th>Job</th><th>Task</th><th>Owner</th><th>Day</th>
-              <th class="text-right">Duration</th><th class="text-right">Outcome</th></tr>
-        </thead>
-        <tbody>
-          @for (run of drillRows().slice(0, 300); track runIdOf(run)) {
-            <tr>
-              <td class="mono text-[color:var(--text-muted)]">#{{ runIdOf(run) }}</td>
-              <td class="max-w-56"><span class="truncate block">{{ jobOf(run) }}</span></td>
-              <td class="max-w-48 text-[color:var(--text-secondary)]">
-                <span class="truncate block">{{ labelOf(run, 0) }}</span>
-              </td>
-              <td class="text-[color:var(--text-secondary)]">{{ labelOf(run, 2) }}</td>
-              <td class="mono text-[color:var(--text-secondary)]">{{ labelOf(run, 3) }}</td>
-              <td class="text-right tabular">{{ durationOf(run) }}</td>
-              <td class="text-right"><app-status [label]="labelOf(run, 1)" /></td>
-            </tr>
-          }
-          @if (drillRows().length > 300) {
-            <tr><td colspan="7" class="text-center text-xs text-[color:var(--text-muted)]">
-              … and {{ drillRows().length - 300 }} more
-            </td></tr>
-          }
-        </tbody>
-      </table>
-    </div>
-  </div>
-}

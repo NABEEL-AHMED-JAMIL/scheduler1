@@ -8,6 +8,7 @@ import { ToastService } from '../../shared/ui/toast.service';
 import { copyText } from '../../shared/ui/clipboard.util';
 import { PhoneInput } from '../../shared/ui/phone-input';
 import { Icon } from '../../shared/ui/icon';
+import { CopyButton } from '../../shared/ui/copy-button';
 import { StatusPill } from '../../shared/ui/status-pill';
 import { StorageService } from '../objects/storage.service';
 import { Donut } from '../../shared/charts/donut';
@@ -61,7 +62,7 @@ const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 
 @Component({
   selector: 'app-profile',
-  imports: [PhoneInput, Icon, DatePipe, RouterLink, StatusPill, Donut],
+  imports: [PhoneInput, Icon, CopyButton, DatePipe, RouterLink, StatusPill, Donut],
   templateUrl: './profile.html',
 })
 export class Profile implements OnInit {

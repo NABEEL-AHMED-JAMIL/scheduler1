@@ -5,10 +5,11 @@ import { AuthService } from '../../core/auth/auth.service';
 import { API_SUCCESS } from '../../core/api/api.config';
 import { ConsolePreview } from '../landing/console-preview';
 import { Icon } from '../../shared/ui/icon';
+import { BrandMark } from '../../shared/ui/brand-mark';
 
 @Component({
   selector: 'app-login',
-  imports: [ConsolePreview, Icon, ReactiveFormsModule],
+  imports: [ConsolePreview, Icon, BrandMark, ReactiveFormsModule],
   templateUrl: './login.html',
 })
 export class Login {

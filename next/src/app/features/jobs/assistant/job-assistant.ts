@@ -85,6 +85,35 @@ export class JobAssistant {
   readonly presets = PRESETS;
   readonly outcomeColor = statusColor;
 
+  /**
+   * The configured AI agents, and the one this assistant will hand a question it cannot answer
+   * from the job's own record.
+   *
+   * Until this existed the whole server-side assistant -- SourceJobRestApi.askAssistant, its
+   * context builder, its scope prompt, its per-agent key resolution -- was unreachable: nothing
+   * in the shipped bundle referenced it, so every question the seven local patterns missed got
+   * "Try one of the buttons above" while a working model sat one unwired call away.
+   */
+  readonly agents = signal<{ aiAgentId: number; agentName: string }[]>([]);
+  readonly agentId = signal<number | null>(null);
+  readonly asking = signal(false);
+
+  private loadAgents(): void {
+    this.http.get<ApiResponse<{ aiAgentId: number; agentName: string }[]>>(
+      `${API_BASE}/aiAgent.json/fetchAllAgents`).subscribe({
+      // No agent configured is a normal state, not an error: the local answers below are the
+      // product on their own, and the picker simply does not appear.
+      next: response => {
+        if (response.status !== API_SUCCESS) return;
+        this.agents.set(response.data ?? []);
+        if (this.agentId() === null && this.agents().length) {
+          this.agentId.set(this.agents()[0].aiAgentId);
+        }
+      },
+      error: () => { /* same: the assistant still answers everything it knows locally */ },
+    });
+  }
+
   readonly facts = computed<JobFacts | null>(() => {
     const job = this.detail();
     if (!job) return null;
@@ -147,6 +176,7 @@ export class JobAssistant {
       this.question.set('');
       this.runs.set([]);
       this.load();
+      if (!this.agents().length) this.loadAgents();
     });
   }
 
@@ -188,9 +218,79 @@ export class JobAssistant {
     if (!asked || !facts) return;
 
     const scoped = classify(asked, facts.jobId);
-    const answer = answerFor(scoped.intent, facts, this.runs(), scoped.mentionedJobId);
-    this.turns.update(list => [{ id: ++this.turnId, question: asked, answer, at: new Date() }, ...list]);
     this.question.set('');
+
+    /*
+     * The local answer wins whenever it has one, and the agent only gets what falls through.
+     *
+     * That order is the point. A question the patterns match is answered from the job's own
+     * record -- exact numbers, no provider needed, nothing a model could get wrong -- and only
+     * 'unknown' means the assistant genuinely had nothing to say. 'out-of-scope' is NOT handed
+     * over either: the rule that this assistant discusses one job is enforced in code here, and
+     * delegating it to a prompt would make it something a question could talk its way past.
+     */
+    if (scoped.intent !== 'unknown' || !this.agentId()) {
+      const answer = answerFor(scoped.intent, facts, this.runs(), scoped.mentionedJobId);
+      this.turns.update(list =>
+        [{ id: ++this.turnId, question: asked, answer, at: new Date() }, ...list]);
+      return;
+    }
+    this.askAgent(asked, facts.jobId);
+  }
+
+  /**
+   * Hands one question to the configured agent. The job's facts are NOT sent: the server
+   * gathers them from the id itself, so a caller cannot pass off another job's data as context.
+   */
+  private askAgent(asked: string, jobId: number): void {
+    const turn = ++this.turnId;
+    const agent = this.agents().find(a => a.aiAgentId === this.agentId());
+    const agentName = agent?.agentName ?? 'the agent';
+    this.turns.update(list => [{
+      id: turn, question: asked, at: new Date(),
+      answer: { pending: true, blocks: [{ kind: 'ai', text: '', agent: agentName }] },
+    }, ...list]);
+    this.asking.set(true);
+
+    const settle = (blocks: Answer['blocks'], refused = false) =>
+      this.turns.update(list => list.map(t =>
+        t.id === turn ? { ...t, answer: { blocks, refused } } : t));
+
+    this.http.post<ApiResponse<string>>(`${API_BASE}/sourceJob.json/askAssistant`, {
+      jobId, aiAgentId: this.agentId(), message: asked, history: this.history(),
+    }).subscribe({
+      next: response => {
+        this.asking.set(false);
+        // A business failure arrives as HTTP 200 with status ERROR, so the body decides.
+        if (response.status !== API_SUCCESS || !response.data) {
+          settle([{ kind: 'text', text: response.message || 'The agent did not reply.' }], true);
+          return;
+        }
+        settle([{ kind: 'ai', text: String(response.data), agent: agentName }]);
+      },
+      error: err => {
+        this.asking.set(false);
+        settle([{ kind: 'text', text: err?.error?.message || 'The agent could not be reached.' }], true);
+      },
+    });
+  }
+
+  /**
+   * The last few turns as plain alternating lines, oldest first -- `turns` is newest-first for
+   * rendering, so it is reversed here. Capped because the whole thing rides in one prompt.
+   */
+  private history(): string[] {
+    return this.turns()
+      .filter(t => !t.answer.pending)
+      .slice(0, 6)
+      .reverse()
+      .flatMap(t => [
+        `User: ${t.question}`,
+        `Assistant: ${t.answer.blocks
+          .map(b => (b.kind === 'text' || b.kind === 'ai') ? b.text : '')
+          .filter(Boolean).join(' ')}`,
+      ])
+      .filter(line => !line.endsWith(': '));
   }
 
   askPreset(intent: Intent, question: string): void {

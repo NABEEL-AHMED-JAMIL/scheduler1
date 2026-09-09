@@ -15,6 +15,7 @@ import { confirmWith } from '../../../shared/ui/confirm';
 import { TableShell } from '../../../shared/ui/data-table';
 import { StatusPill } from '../../../shared/ui/status-pill';
 import { Icon } from '../../../shared/ui/icon';
+import { CopyButton } from '../../../shared/ui/copy-button';
 import { ViewToggle } from '../../../shared/ui/view-toggle';
 import { Avatar } from '../../../shared/ui/avatar';
 import { createSort } from '../../../shared/ui/sort';
@@ -64,7 +65,7 @@ export interface AppUser {
 
 @Component({
   selector: 'app-users',
-  imports: [MineFilter, ViewToggle, StatTile, DatePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Icon, Avatar, Pagination],
+  imports: [MineFilter, ViewToggle, StatTile, DatePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Icon, CopyButton, Avatar, Pagination],
   templateUrl: './users.html',
 })
 export class Users implements OnInit {

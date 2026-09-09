@@ -187,13 +187,9 @@
   @if (summary().length) {
     <div class="flex flex-wrap gap-2">
       @for (item of summary(); track item.status) {
-        <button type="button" class="card px-3.5 py-2 flex items-center gap-2 hover:shadow-md transition-shadow"
-                [class.ring-2]="statusFilter() === item.status"
-                [class.ring-brand-500]="statusFilter() === item.status"
-                (click)="statusFilter.set(statusFilter() === item.status ? '' : item.status)">
-          <app-status [label]="item.status" />
-          <span class="tabular font-semibold">{{ item.count }}</span>
-        </button>
+        <app-status-filter-chip [status]="item.status" [count]="item.count"
+                                 [selected]="statusFilter() === item.status"
+                                 (toggle)="statusFilter.set(statusFilter() === item.status ? '' : item.status)" />
       }
     </div>
   }
@@ -393,7 +389,7 @@
       </span>
       <a class="btn btn-ghost btn-sm" [routerLink]="['/jobs', jobId(), 'assistant']"
          title="Open the full page">
-        <app-icon name="expand" />Full page
+        <app-icon name="maximize" />Full page
       </a>
       <button type="button" class="btn btn-ghost btn-icon"
               (click)="assistantMinimised.set(!assistantMinimised())"

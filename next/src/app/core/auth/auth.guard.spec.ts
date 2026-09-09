@@ -135,7 +135,7 @@ describe('route table', () => {
     walk(routes, r => { if (r.data?.minRole) byPath[r.path] = r.data.minRole; });
     expect(byPath['admin/tenants']).toBe('PLATFORM_ADMIN');
     expect(byPath['admin/tenant-requests']).toBe('PLATFORM_ADMIN');
-    for (const p of ['admin/users', 'admin/storage', 'settings/lookup', 'settings/task-types',
+    for (const p of ['admin/users', 'settings/storage-connections', 'settings/lookup', 'settings/task-types',
                      'ai/models']) {
       expect(byPath[p]).toBe('TENANT_ADMIN');
     }
