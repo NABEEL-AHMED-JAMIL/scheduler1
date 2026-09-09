@@ -1103,11 +1103,17 @@
               <app-filter-builder [model]="canvasFilters()" [columns]="columns()"
                                   (changed)="setFilters($event)" />
 
+              <!-- This used to end "that endpoint takes a page and a size and has no filter to
+                   give it", which was true when these filters were built and stopped being true
+                   when the Data tab gained server-side filtering. A note that describes a former
+                   limitation is worse than no note: it tells a reader the product cannot do
+                   something it can. The two narrowings are still separate — joining them is the
+                   cross-filtering 06 asks for and is not built — but the reason is now that
+                   nothing carries one to the other, not that there is nowhere to carry it to. -->
               <p class="field-note text-[color:var(--text-muted)]">
                 These narrow the analysis and everything drawn from it. They do
-                <span class="font-medium">not</span> narrow the Data tab's preview — that endpoint
-                takes a page and a size and has no filter to give it, so a chip here would be
-                claiming to filter a table it cannot reach.
+                <span class="font-medium">not</span> narrow the Data tab's preview — that tab
+                keeps its own filters, and nothing yet carries a chip from here to there.
               </p>
             </div>
 
