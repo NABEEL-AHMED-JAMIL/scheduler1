@@ -969,3 +969,176 @@ describe('the two rendering rules that exist twice in this feature', () => {
     expect(dateOnly('2024-01-01 09:30:00')).toBe('2024-01-01 09:30:00');
   });
 });
+
+/**
+ * The seven widget kinds added on 2026-09-09, and the results each one must REFUSE.
+ *
+ * Getting a chart to draw is the easy half. Every assertion here is about a result the kind could
+ * technically render and would render a lie from, and the reason has to reach the reader: this
+ * feature lists an unavailable kind with the reason on it rather than quietly omitting it.
+ */
+describe('the kinds a result is not allowed to be drawn as', () => {
+
+  const twoRows = () => analysisResult();
+  const manyRows = (count: number) => analysisResult({
+    rows: Array.from({ length: count }, (_, at) => [`g${at}`, String(100 + at)]),
+    rowCount: count,
+  });
+
+  it('offers a single figure only when there is a single figure', () => {
+    // The most confidently wrong thing this list could do: draw the first of forty groups as a
+    // headline. It is the right SHAPE for an answer, which is exactly why it would be believed.
+    expect(analysisView(manyRows(40), 'SUM').issues.kpi).toContain('needs one row');
+
+    const one = analysisView(analysisResult({ rows: [['north', '1200']], rowCount: 1 }), 'SUM');
+    expect(one.issues.kpi).toBe('');
+  });
+
+  it('refuses a line over rank-ordered points, and says to sort by the dimension', () => {
+    // Joining points that are in biggest-first order draws a curve that descends left to right
+    // whatever the data did. A reader sees a trend that is an artefact of the sort.
+    const ranked = analysisView(manyRows(12), 'SUM', { sortedBy: 'MEASURE' });
+    expect(ranked.issues.line).toContain('show the sort rather than a trend');
+    expect(ranked.issues.area).toContain('show the sort rather than a trend');
+
+    const ordered = analysisView(manyRows(12), 'SUM', { sortedBy: 'DIMENSION' });
+    expect(ordered.issues.line).toBe('');
+    expect(ordered.issues.area).toBe('');
+  });
+
+  it('refuses a line of one point', () => {
+    const single = analysisView(analysisResult({ rows: [['north', '1200']], rowCount: 1 }),
+      'SUM', { sortedBy: 'DIMENSION' });
+    expect(single.issues.line).toContain('at least two points');
+  });
+
+  it('refuses a filled area over negatives, but allows the bare line', () => {
+    // A fill reads as magnitude accumulated up from a baseline. Below it that reading inverts and
+    // the shading covers the wrong side of the axis.
+    const refunds = analysisView(analysisResult({
+      rows: [['jan', '1200'], ['feb', '-400'], ['mar', '900']], rowCount: 3,
+    }), 'SUM', { sortedBy: 'DIMENSION' });
+
+    expect(refunds.issues.area).toContain('measures up from a baseline');
+    expect(refunds.issues.line).toBe('');
+  });
+
+  it('refuses a stack without a second dimension to divide the bars by', () => {
+    const flat = analysisView(twoRows(), 'SUM', { sortedBy: 'DIMENSION', dimensionCount: 1 });
+    expect(flat.issues.stacked).toContain('needs a second dimension');
+
+    const crossed = analysisView(twoRows(), 'SUM', { sortedBy: 'DIMENSION', dimensionCount: 2 });
+    expect(crossed.issues.stacked).toBe('');
+  });
+
+  it('refuses a stack of averages, because they do not add up', () => {
+    // The same rule the ring already keeps, and for the same reason: a stack asserts that its
+    // parts make the whole.
+    const averages = analysisView(twoRows(), 'AVERAGE', { dimensionCount: 2 });
+    expect(averages.issues.stacked).toContain('does not add up');
+  });
+
+  it('refuses a histogram of a handful of figures', () => {
+    // With six groups a distribution is a bar chart that has thrown its labels away.
+    expect(analysisView(manyRows(6), 'SUM').issues.histogram).toContain('says less than the bars');
+    expect(analysisView(manyRows(20), 'SUM').issues.histogram).toBe('');
+  });
+
+  it('refuses a scatter against a categorical dimension', () => {
+    // Both axes have to be quantities. Spacing categories evenly along x would draw a shape that
+    // says something about the alphabet.
+    expect(analysisView(manyRows(10), 'SUM').issues.scatter).toContain('is a category');
+
+    const numeric = analysisView(analysisResult({
+      rows: [['1', '1200'], ['2', '800'], ['3', '400']], rowCount: 3,
+    }), 'SUM');
+    expect(numeric.issues.scatter).toBe('');
+  });
+
+  it('compares exactly two figures, not one and not three', () => {
+    expect(analysisView(manyRows(3), 'SUM').issues.comparison).toContain('exactly two rows');
+    expect(analysisView(twoRows(), 'SUM').issues.comparison).toBe('');
+  });
+
+  it('still refuses everything categorical when there is nothing to draw', () => {
+    // The pre-existing rule, re-checked against the new kinds: a result with no drawable marks
+    // gives every chart the same reason, and only the table survives.
+    const empty = analysisView(analysisResult({ rows: [], rowCount: 0 }), 'SUM');
+    expect(empty.issues.table).toBe('');
+    for (const kind of ['line', 'area', 'stacked', 'histogram', 'scatter', 'comparison'] as const) {
+      expect(empty.issues[kind], kind).not.toBe('');
+    }
+  });
+});
+
+/**
+ * Two bugs the new kinds exposed in code that already worked for four.
+ *
+ * Both are the same shape: a list written when there were four kinds, which kept working and
+ * kept being wrong once there were eleven. Neither would have failed a test that only ever asked
+ * about tables, bars, rings and rankings.
+ */
+describe('what the tile draws, and what it says it drew', () => {
+
+  it('draws a kind the picker offered, instead of falling back to the table', () => {
+    // drawn() named the four kinds it knew. Every kind added after it was accepted by the picker,
+    // stored on the widget, shown as selected -- and silently drawn as a table. The picker and
+    // the drawing disagreed, and the picker was the one telling the truth.
+    const harness = boardWith({ widgets: [widgetOn({ visualizationType: 'line' })] });
+    const view = analysisView(analysisResult({
+      rows: [['jan', '10'], ['feb', '20'], ['mar', '30']], rowCount: 3,
+    }), 'SUM', { sortedBy: 'DIMENSION' });
+
+    expect(harness.board.drawn(widgetOn({ visualizationType: 'line' }), view)).toBe('line');
+  });
+
+  it('still falls back to the table when the kind cannot honestly draw this result', () => {
+    // Deliberate and staying: a saved widget outlives the data it was built on, and a tile whose
+    // analysis has since returned forty groups should show them rather than an empty ring.
+    const harness = boardWith({ widgets: [widgetOn({ visualizationType: 'line' })] });
+    const ranked = analysisView(analysisResult({
+      rows: [['a', '30'], ['b', '20']], rowCount: 2,
+    }), 'SUM', { sortedBy: 'MEASURE' });
+
+    expect(harness.board.drawn(widgetOn({ visualizationType: 'line' }), ranked)).toBe('table');
+  });
+
+  it('counts what the DRAWN kind renders, not what the table would', () => {
+    // "8 of 24 rows shown" under a chart with twenty-four bars in it tells a reader they are
+    // seeing a third of the data while they are seeing all of it.
+    const harness = boardWith({ widgets: [widgetOn()] });
+    const view = analysisView(analysisResult({
+      rows: Array.from({ length: 24 }, (_, at) => [`m${at}`, String(at + 1)]),
+      rowCount: 24,
+    }), 'SUM');
+
+    expect(harness.board.counted(view, 'table')).toBe('8 of 24 rows shown');
+    expect(harness.board.counted(view, 'bar')).toBe('24 rows');
+    expect(harness.board.counted(view, 'ranked')).toBe('24 rows');
+  });
+
+  it('says no rows when there are none, whatever kind is drawn', () => {
+    const harness = boardWith({ widgets: [widgetOn()] });
+    const empty = analysisView(analysisResult({ rows: [], rowCount: 0 }), 'SUM');
+
+    expect(harness.board.counted(empty, 'table')).toBe('No rows.');
+    expect(harness.board.counted(empty, 'bar')).toBe('No rows.');
+  });
+});
+
+describe('what a single-figure tile says it showed', () => {
+  it('counts the one row it renders, not the marks it does not have', () => {
+    // An analysis with no dimension produces no marks, so counting marks printed
+    // "0 of 1 rows shown" under a tile displaying that row in 30-point type.
+    const harness = boardWith({ widgets: [widgetOn({ visualizationType: 'kpi' })] });
+    const single = analysisView(analysisResult({
+      columns: [{ name: 'amount_sum', type: 'DECIMAL(18,3)', role: 'MEASURE' }],
+      rows: [['103909527.58']],
+      rowCount: 1,
+      measure: 'amount_sum',
+    }), 'SUM');
+
+    expect(single.marks).toEqual([]);
+    expect(harness.board.counted(single, 'kpi')).toBe('1 row');
+  });
+});

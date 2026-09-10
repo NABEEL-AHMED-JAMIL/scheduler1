@@ -623,7 +623,9 @@ export interface Dashboard {
  * read as a plain string coming back: the row may have been written by something else, and a
  * value this screen does not recognise is drawn as a table rather than as an error.
  */
-export type WidgetVisualization = 'table' | 'ranked' | 'bar' | 'donut';
+export type WidgetVisualization =
+  | 'table' | 'ranked' | 'bar' | 'donut'
+  | 'kpi' | 'line' | 'area' | 'stacked' | 'histogram' | 'scatter' | 'comparison';
 
 /**
  * One tile: a REFERENCE to a saved analysis or a saved query, and how to draw it.

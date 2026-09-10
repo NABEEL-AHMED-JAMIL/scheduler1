@@ -96,3 +96,72 @@ test('opening a report re-runs it instead of showing a stored answer', async ({ 
 
   expect(analyses.length, 'opening a dashboard must re-run its widgets').toBeGreaterThan(0);
 });
+
+/**
+ * The seven widget kinds added on 2026-09-09, driven through the picker on real results.
+ *
+ * The unit tests pin which kinds a result may be drawn as; these prove the picker offers exactly
+ * those, and that choosing one actually changes what is drawn. That gap is not theoretical --
+ * drawn() named the four kinds it knew, so for a while the picker offered eleven, stored the
+ * choice, showed it as selected, and drew a table.
+ */
+test('the picker offers every kind, and disables the ones this result cannot honestly be',
+  async ({ page }) => {
+    await openLibrary(page);
+    await page.getByRole('button', { name: '01 Overall KPI summary' }).click();
+    await expect(page.getByText('Total revenue', { exact: true })).toBeVisible();
+    await page.waitForTimeout(4000);
+
+    const picker = page.locator('select').filter({ hasText: 'Table' }).first();
+    const kinds = await picker.locator('option').evaluateAll(options => options.map(option => ({
+      value: (option as HTMLOptionElement).value,
+      disabled: (option as HTMLOptionElement).disabled,
+    })));
+
+    expect(kinds).toHaveLength(11);
+    const enabled = kinds.filter(kind => !kind.disabled).map(kind => kind.value);
+    // One row, one column, no dimension: a single figure and a table, and nothing else honestly.
+    expect(enabled.sort()).toEqual(['kpi', 'table']);
+  });
+
+test('a single-figure tile draws the figure, and says it showed one row', async ({ page }) => {
+  await openLibrary(page);
+  await page.getByRole('button', { name: '01 Overall KPI summary' }).click();
+  await expect(page.getByText('Total revenue', { exact: true })).toBeVisible();
+  await page.waitForTimeout(4000);
+
+  await page.locator('select').filter({ hasText: 'Table' }).first().selectOption('kpi');
+
+  // Grouped, not raw: the engine returns 103909527.57999787 over the CSV.
+  await expect(page.getByText('103,909,527.58')).toBeVisible();
+  // "0 of 1 rows shown" was the first version of this: a no-dimension analysis has no marks.
+  await expect(page.getByText('0 of 1 rows shown')).toHaveCount(0);
+});
+
+test('a dimension-ordered series offers a line; a rank-ordered one refuses with a reason',
+  async ({ page }) => {
+    // The rule that stops a line being drawn through rank-ordered points, where it would slope
+    // the same way whatever the data did.
+    await openLibrary(page);
+    await page.getByRole('button', { name: '03 Monthly trend' }).click();
+    await expect(page.getByText('Revenue by month', { exact: true })).toBeVisible();
+    await page.waitForTimeout(6000);
+
+    const ordered = page.locator('select').filter({ hasText: 'Bars in order' }).first();
+    await expect(ordered.locator('option[value="line"]')).toBeEnabled();
+    await expect(ordered.locator('option[value="stacked"]')).toBeDisabled();
+    await expect(ordered.locator('option[value="stacked"]'))
+      .toHaveAttribute('title', /second dimension/);
+  });
+
+test('a two-dimension cross-tab is the one that may be stacked', async ({ page }) => {
+  await openLibrary(page);
+  await page.getByRole('button', { name: '07 Category against region' }).click();
+  await expect(page.getByText('Revenue by category and region', { exact: true })).toBeVisible();
+  await page.waitForTimeout(6000);
+
+  const picker = page.locator('select').filter({ hasText: 'Table' }).first();
+  await expect(picker.locator('option[value="stacked"]')).toBeEnabled();
+  // Sorted biggest-first, so a line through them would draw the sort.
+  await expect(picker.locator('option[value="line"]')).toBeDisabled();
+});

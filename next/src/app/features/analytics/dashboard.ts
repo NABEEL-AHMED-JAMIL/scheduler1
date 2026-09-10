@@ -4,9 +4,14 @@ import { Subscription } from 'rxjs';
 import { API_SUCCESS } from '../../core/api/api.config';
 import { Icon } from '../../shared/ui/icon';
 import { confirmWith } from '../../shared/ui/confirm';
-import { BarChart } from '../../shared/charts/bar-chart';
+import { BarChart, Bar, BarSegment } from '../../shared/charts/bar-chart';
 import { Donut } from '../../shared/charts/donut';
 import { readableCell } from '../../shared/charts/number-format';
+import { KpiCard } from '../../shared/charts/kpi-card';
+import { LineChart, Point } from '../../shared/charts/line-chart';
+import { ScatterPlot, ScatterPoint } from '../../shared/charts/scatter-plot';
+import { Comparison, ComparisonSide } from '../../shared/charts/comparison';
+import { Histogram } from '../../shared/charts/histogram';
 import { RankedBar } from '../../shared/charts/ranked-bar';
 import { isNumericType } from './filter-builder';
 import {
@@ -177,6 +182,26 @@ export interface WidgetView {
  * group a filter emptied is zero. The rows stay in the table and the note says the chart is
  * missing them.
  */
+/**
+ * What the ANALYSIS asked for, which the result alone cannot say.
+ *
+ * Whether a line may be drawn is a fact about the sort, and whether a stack may be is a fact about
+ * how many dimensions were grouped -- neither of which is visible in a list of rows. The response
+ * carries the numbers; this carries the question, and it comes from the saved configuration for
+ * the same reason the aggregation does.
+ */
+export interface ResultShape {
+  sortedBy?: 'MEASURE' | 'DIMENSION';
+  dimensionCount?: number;
+  rowCount?: number;
+  columnCount?: number;
+}
+
+/** Whether a dimension label is a number, which is what a scatter needs of its x axis. */
+function isNumericLabel(label: string): boolean {
+  return /^-?\d+(\.\d+)?$/.test(label.trim());
+}
+
 function nonPositiveNote(marks: Mark[]): string | null {
   const count = marks.filter(mark => mark.value <= 0).length;
   if (!count) return null;
@@ -192,12 +217,77 @@ function nonPositiveNote(marks: Mark[]): string | null {
  * ring is not on offer is a fact about the reader's own analysis, and it teaches more than the
  * option quietly not being there.
  */
-function issuesFor(marks: Mark[], reason: string, additive: boolean, aggregationLabel: string)
-    : Record<WidgetVisualization, string> {
+function issuesFor(marks: Mark[], reason: string, additive: boolean, aggregationLabel: string,
+    shape: ResultShape = {}): Record<WidgetVisualization, string> {
+
   const categorical = marks.length ? '' : reason;
   const negative = marks.filter(mark => mark.value <= 0).length;
+  const rankOrdered = shape.sortedBy === 'MEASURE';
+  const numericDimension = marks.length > 0 && marks.every(mark => isNumericLabel(mark.name));
   return {
     table: '',
+    /*
+     * A single figure, and only when there IS a single figure. Drawing the first row of forty
+     * as a headline is the most confidently wrong thing this list could do -- it looks like an
+     * answer, it is the right shape for an answer, and it is one group out of forty.
+     */
+    kpi: marks.length === 1 || (shape.rowCount === 1 && shape.columnCount === 1)
+      ? ''
+      : `A single figure needs one row, and this returned ${shape.rowCount ?? marks.length}.`,
+    /*
+     * A line asserts the gaps between its points mean something, so the points have to be in the
+     * dimension's own order. Sorted by measure they are in rank order, and joining them draws a
+     * curve that slopes the same way whatever the data did.
+     */
+    line: categorical
+      || (rankOrdered
+        ? 'These are ordered biggest-first, so a line between them would show the sort rather '
+          + 'than a trend. Sort by the dimension to draw one.'
+        : marks.length < 2 ? 'A line needs at least two points.' : ''),
+    area: categorical
+      || (rankOrdered
+        ? 'These are ordered biggest-first, so a filled area would show the sort rather than a '
+          + 'trend. Sort by the dimension to draw one.'
+        : marks.length < 2
+          ? 'A line needs at least two points.'
+          : negative
+            // A fill reads as accumulated magnitude from a baseline; below it the reading inverts.
+            ? `${negative} of these figures is zero or below, and a filled area measures up from `
+              + 'a baseline.'
+            : ''),
+    /*
+     * A stack claims its parts add up to the whole. That needs a second dimension to be the
+     * parts, and a measure that has a total at all -- an average of averages is not one.
+     */
+    stacked: categorical
+      || (!additive
+        ? `A stack adds its parts into a whole, and ${aggregationLabel} does not add up.`
+        : (shape.dimensionCount ?? 1) < 2
+          ? 'A stack needs a second dimension to divide each bar by.'
+          : negative
+            ? `${negative} of these figures is zero or below, and a stack cannot show one.`
+            : ''),
+    /*
+     * A histogram bins the MEASURE values to show their shape. With a handful of groups there is
+     * no shape -- it is a bar chart that has thrown its labels away.
+     */
+    histogram: categorical
+      || (marks.length < HISTOGRAM_FLOOR
+        ? `A distribution of ${marks.length} figures says less than the bars themselves do.`
+        : ''),
+    /*
+     * Both axes have to be quantities. The measure supplies one; the dimension only supplies the
+     * other if it is itself a number.
+     */
+    scatter: categorical
+      || (!numericDimension
+        ? 'A scatter puts two numbers against each other, and this dimension is a category.'
+        : marks.length < 2 ? 'A scatter needs at least two points.' : ''),
+    /* Two figures, compared. Not three, and not one. */
+    comparison: categorical
+      || (marks.length !== 2
+        ? `Comparing two figures needs exactly two rows, and this returned ${marks.length}.`
+        : ''),
     ranked: categorical,
     bar: categorical || (marks.length > ORDERED_BARS
       ? `${marks.length} bars is past what this chart can label.` : ''),
@@ -220,7 +310,8 @@ function issuesFor(marks: Mark[], reason: string, additive: boolean, aggregation
  * response carries the numbers and not the question: whether a ring may divide them is a fact
  * about what was asked for, and it has to be known even when the result has no rows at all.
  */
-export function analysisView(result: AnalysisResult, aggregation: Aggregation | null): WidgetView {
+export function analysisView(result: AnalysisResult, aggregation: Aggregation | null,
+    shape: ResultShape = {}): WidgetView {
   const columns = result.columns ?? [];
   const allRows = result.rows ?? [];
   const named = result.measure ? columns.find(column => column.name === result.measure) : undefined;
@@ -293,7 +384,8 @@ export function analysisView(result: AnalysisResult, aggregation: Aggregation | 
     marks,
     notes,
     issues: issuesFor(marks, reason, !aggregation || ADDITIVE.includes(aggregation),
-      (aggregation ?? '').toLowerCase().replace(/_/g, ' ') || 'this measure'),
+      (aggregation ?? '').toLowerCase().replace(/_/g, ' ') || 'this measure',
+      { ...shape, rowCount: result.rowCount ?? allRows.length, columnCount: columns.length }),
     ranAt: Date.now(),
   };
 }
@@ -426,11 +518,21 @@ interface SavedAnalysisConfig {
 }
 
 const KINDS: { id: WidgetVisualization; label: string }[] = [
+  { id: 'kpi', label: 'Single figure' },
   { id: 'table', label: 'Table' },
   { id: 'ranked', label: 'Ranked bars' },
   { id: 'bar', label: 'Bars in order' },
+  { id: 'stacked', label: 'Stacked bars' },
+  { id: 'line', label: 'Line over the dimension' },
+  { id: 'area', label: 'Filled area' },
   { id: 'donut', label: 'Share of the total' },
+  { id: 'histogram', label: 'Distribution of the figures' },
+  { id: 'scatter', label: 'Scatter of two numbers' },
+  { id: 'comparison', label: 'Two figures compared' },
 ];
+
+/** Below this many groups a histogram is a bar chart with the labels taken off. */
+const HISTOGRAM_FLOOR = 8;
 
 /**
  * A minted run id, scoped to the caller by the server's own registry key.
@@ -475,7 +577,8 @@ function mintQueryId(widgetId: number): string {
  */
 @Component({
   selector: 'app-dashboards',
-  imports: [Icon, BarChart, Donut, RankedBar],
+  imports: [Icon, BarChart, Donut, RankedBar, KpiCard, LineChart, ScatterPlot,
+    Comparison, Histogram],
   template: `
     <div class="space-y-4 min-w-0">
 
@@ -734,6 +837,31 @@ function mintQueryId(widgetId: number): string {
                         }
 
                         @switch (drawn(widget, view)) {
+                          @case ('kpi') {
+                            <app-kpi-card [value]="kpiValue(view)" [label]="kpiLabel(view)"
+                                          [caption]="kpiCaption(view)" />
+                          }
+                          @case ('line') {
+                            <app-line-chart [data]="points(view)" />
+                          }
+                          @case ('area') {
+                            <app-line-chart [data]="points(view)" [filled]="true" />
+                          }
+                          @case ('stacked') {
+                            <app-bar-chart [data]="stacks(view)" [height]="180" />
+                          }
+                          @case ('histogram') {
+                            <app-histogram [values]="figures(view)" [height]="180" />
+                          }
+                          @case ('scatter') {
+                            <app-scatter-plot [data]="scatterPoints(view)"
+                                              [xLabel]="dimensionName(view)"
+                                              [yLabel]="measureName(view)" />
+                          }
+                          @case ('comparison') {
+                            <app-comparison [first]="sides(view).first"
+                                            [second]="sides(view).second" />
+                          }
                           @case ('ranked') {
                             <!-- No percentages: a share of a total is only a share when the parts
                                  add up to it, and the measure here is whatever was saved. -->
@@ -787,7 +915,7 @@ function mintQueryId(widgetId: number): string {
                           }
                         }
 
-                        <p class="field-note text-[color:var(--text-muted)]">{{ counted(view) }}</p>
+                        <p class="field-note text-[color:var(--text-muted)]">{{ counted(view, drawn(widget, view)) }}</p>
                         @for (note of view.notes; track note) {
                           <p class="field-note text-[color:var(--text-muted)]">{{ note }}</p>
                         }
@@ -817,6 +945,96 @@ export class Dashboards implements OnInit, OnDestroy {
   /** A result cell, formatted for reading. The raw value stays in the cell's title. */
   protected readable(cell: string): string {
     return readableCell(cell);
+  }
+
+  // ---- turning one result into whatever the chosen kind needs -------------------------------
+  //
+  // Every one of these reads the SAME view. A widget kind is a way of looking at one answer, not
+  // a different question, and a tile that re-queried when its picker moved would let two kinds of
+  // the same analysis disagree.
+
+  /** The measure column's name, humanised: amount_sum reads as "amount sum". */
+  protected measureName(view: WidgetView): string {
+    const last = view.columns[view.columns.length - 1] ?? '';
+    return last.replace(/_/g, ' ');
+  }
+
+  protected dimensionName(view: WidgetView): string {
+    return (view.columns[0] ?? '').replace(/_/g, ' ');
+  }
+
+  /**
+   * The figure for a single-figure tile.
+   *
+   * The LAST column, because an analysis with no dimensions returns just the measure and one with
+   * dimensions returns them first -- and issuesFor only offers this kind when there is one row.
+   */
+  protected kpiValue(view: WidgetView): string {
+    const row = view.rows[0] ?? [];
+    return row[row.length - 1] ?? '—';
+  }
+
+  protected kpiLabel(view: WidgetView): string {
+    return this.measureName(view);
+  }
+
+  /** Names the group when there is one, so a one-row filtered result says what it is of. */
+  protected kpiCaption(view: WidgetView): string {
+    if (view.columns.length < 2) return '';
+    const row = view.rows[0] ?? [];
+    return row.slice(0, -1).filter(Boolean).join(' · ');
+  }
+
+  protected points(view: WidgetView): Point[] {
+    return view.marks.map(mark => ({ label: mark.name, value: mark.value }));
+  }
+
+  protected figures(view: WidgetView): number[] {
+    return view.marks.map(mark => mark.value);
+  }
+
+  /**
+   * One bar per first dimension, split into a segment per second.
+   *
+   * The mark names arrive already joined -- "Electronics · North" -- so the split is on that
+   * separator. A mark with no separator cannot be divided and becomes a bar with no segments,
+   * which draws as a solid bar rather than disappearing.
+   */
+  protected stacks(view: WidgetView): Bar[] {
+    const byOuter = new Map<string, BarSegment[]>();
+    for (const mark of view.marks) {
+      const cut = mark.name.indexOf(' · ');
+      const outer = cut < 0 ? mark.name : mark.name.slice(0, cut);
+      const inner = cut < 0 ? '' : mark.name.slice(cut + 3);
+      const segments = byOuter.get(outer) ?? [];
+      segments.push({
+        label: inner || outer,
+        value: mark.value,
+        color: `var(--chart-${segments.length % 6})`,
+      });
+      byOuter.set(outer, segments);
+    }
+    return Array.from(byOuter, ([name, segments]) => ({
+      name,
+      value: segments.reduce((total, segment) => total + segment.value, 0),
+      segments: segments.length > 1 ? segments : undefined,
+    }));
+  }
+
+  protected scatterPoints(view: WidgetView): ScatterPoint[] {
+    return view.marks.map(mark => ({
+      label: mark.name,
+      x: Number(mark.name),
+      y: mark.value,
+    }));
+  }
+
+  protected sides(view: WidgetView): { first: ComparisonSide; second: ComparisonSide } {
+    const [first, second] = view.marks;
+    return {
+      first: { label: first?.name ?? '', value: first?.value ?? 0 },
+      second: { label: second?.name ?? '', value: second?.value ?? 0 },
+    };
   }
 
   readonly dashboards = signal<Dashboard[]>([]);
@@ -1228,20 +1446,46 @@ export class Dashboards implements OnInit, OnDestroy {
    * since grown forty categories shows the rows and says why the ring is unavailable, which is a
    * fact about the data rather than a fault of the board.
    */
+  /**
+   * The kind actually drawn: what the widget asked for, or the table when it cannot be honoured.
+   *
+   * The membership test reads KINDS rather than naming the kinds, which is the bug this line
+   * used to have. It listed the four that existed when it was written, so every kind added after
+   * it was accepted by the picker, stored on the widget, shown as selected -- and silently drawn
+   * as a table. The picker and the drawing disagreed, and the picker was the one telling the
+   * truth. A list that must be edited in two places to add one kind is a list that will be
+   * edited in one.
+   *
+   * Falling back to the table when a kind CANNOT draw this result is deliberate and stays: a
+   * saved widget outlives the data it was built on, and a tile whose analysis has since returned
+   * forty groups should show them rather than an empty ring.
+   */
   drawn(widget: DashboardWidget, view: WidgetView): WidgetVisualization {
     const asked = (widget.visualizationType ?? 'table') as WidgetVisualization;
-    if (asked !== 'table' && asked !== 'ranked' && asked !== 'bar' && asked !== 'donut') {
+    if (!KINDS.some(kind => kind.id === asked)) {
       return 'table';
     }
     return view.issues[asked] ? 'table' : asked;
   }
 
-  /** How much of the result is on the tile, said plainly. */
-  counted(view: WidgetView): string {
+  /**
+   * How much of the result is on the tile, said plainly -- and it depends on what is drawn.
+   *
+   * The table shows eight rows; the charts draw every mark. Counting the table's rows either way
+   * put "8 of 24 rows shown" under a bar chart with twenty-four bars in it, which tells a reader
+   * they are looking at a third of the data while they are looking at all of it. The opposite
+   * mistake is worse, so this counts what the drawn kind actually renders.
+   */
+  counted(view: WidgetView, kind: WidgetVisualization): string {
     if (!view.rowCount) return 'No rows.';
-    const shown = view.rows.length;
+    // A single figure renders the whole result and has no marks at all -- an analysis with no
+    // dimension produces none. Counting marks there printed "0 of 1 rows shown" under a tile
+    // displaying that one row in 30-point type.
+    const shown = kind === 'table' ? view.rows.length
+      : kind === 'kpi' ? Math.min(1, view.rowCount)
+      : view.marks.length;
     return shown < view.rowCount
-      ? `${shown} of ${view.rowCount.toLocaleString()} rows shown`
+      ? `${shown.toLocaleString()} of ${view.rowCount.toLocaleString()} rows shown`
       : `${view.rowCount.toLocaleString()} ${view.rowCount === 1 ? 'row' : 'rows'}`;
   }
 
@@ -1399,7 +1643,10 @@ export class Dashboards implements OnInit, OnDestroy {
             return;
           }
           this.settle(id, epoch, { state: 'done', error: '', queryId,
-            view: analysisView(response.data, aggregation) });
+            view: analysisView(response.data, aggregation, {
+              sortedBy: config.sort?.by ?? 'MEASURE',
+              dimensionCount: (config.dimensions ?? []).length,
+            }) });
         },
         error: err => {
           this.settle(id, epoch, { state: 'failed', view: null, queryId,
