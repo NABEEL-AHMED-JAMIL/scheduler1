@@ -12,6 +12,7 @@ import { LineChart, Point } from '../../shared/charts/line-chart';
 import { ScatterPlot, ScatterPoint } from '../../shared/charts/scatter-plot';
 import { Comparison, ComparisonSide } from '../../shared/charts/comparison';
 import { Histogram } from '../../shared/charts/histogram';
+import { ResultSummary } from '../../shared/charts/result-summary';
 import { RankedBar } from '../../shared/charts/ranked-bar';
 import { isNumericType } from './filter-builder';
 import {
@@ -158,6 +159,14 @@ function mergeMarks(pairs: Mark[]): { marks: Mark[]; merged: number } {
  */
 export interface WidgetView {
   columns: string[];
+  /**
+   * Whether the measure has a total worth dividing.
+   *
+   * Carried on the view rather than re-derived, because two things need it -- the ring's refusal
+   * and the dimension summary's top-share fact -- and a second derivation is a second chance to
+   * disagree about whether an average adds up.
+   */
+  additive: boolean;
   /** At most WIDGET_ROWS of them. A null cell is a real null, not an empty string. */
   rows: (string | null)[][];
   /** Rows in the WHOLE result. `rows.length` is what fitted on the tile. */
@@ -283,6 +292,28 @@ function issuesFor(marks: Mark[], reason: string, additive: boolean, aggregation
       || (!numericDimension
         ? 'A scatter puts two numbers against each other, and this dimension is a category.'
         : marks.length < 2 ? 'A scatter needs at least two points.' : ''),
+    /*
+     * Describing the groups needs groups. It states a top SHARE, so like the ring it is only
+     * offered where the measure has a total to divide -- and the component withholds that one
+     * fact rather than the whole tile when it does not.
+     */
+    dimensionSummary: categorical
+      || (marks.length < 2
+        ? 'Describing a set of groups needs more than one of them.' : ''),
+    /*
+     * A trend summary states first, last and the change between them, which only means anything
+     * if the points are in the dimension's own order. The same rule the line keeps, for the same
+     * reason: against a rank-ordered result "first" is just the biggest.
+     */
+    trendSummary: categorical
+      || (rankOrdered
+        ? 'These are ordered biggest-first, so "first" and "last" would describe the sort rather '
+          + 'than the series. Sort by the dimension to summarise a trend.'
+        : marks.length < 2 ? 'A trend needs at least two points.' : ''),
+    /* A spread of one figure has no spread. */
+    distributionSummary: categorical
+      || (marks.length < 3
+        ? `A spread of ${marks.length} needs more figures to describe.` : ''),
     /* Two figures, compared. Not three, and not one. */
     comparison: categorical
       || (marks.length !== 2
@@ -381,6 +412,7 @@ export function analysisView(result: AnalysisResult, aggregation: Aggregation | 
       .map(row => columns.map((column, index) => renderCell(column, row[index] ?? null))),
     rowCount: result.rowCount ?? allRows.length,
     truncated: !!result.truncated,
+    additive: !aggregation || ADDITIVE.includes(aggregation),
     marks,
     notes,
     issues: issuesFor(marks, reason, !aggregation || ADDITIVE.includes(aggregation),
@@ -483,6 +515,9 @@ export function queryView(result: QueryResult): WidgetView {
     rows: allRows.slice(0, WIDGET_ROWS).map(row => row.map(cell => cell ?? null)),
     rowCount: result.rowCount ?? allRows.length,
     truncated: !!result.truncated,
+    // A saved query does not say whether its figures add up, which is why the ring is refused
+    // above. The dimension summary withholds its top-share fact on the same grounds.
+    additive: false,
     marks,
     notes,
     issues,
@@ -529,6 +564,9 @@ const KINDS: { id: WidgetVisualization; label: string }[] = [
   { id: 'histogram', label: 'Distribution of the figures' },
   { id: 'scatter', label: 'Scatter of two numbers' },
   { id: 'comparison', label: 'Two figures compared' },
+  { id: 'dimensionSummary', label: 'Summary of the groups' },
+  { id: 'trendSummary', label: 'Summary of the trend' },
+  { id: 'distributionSummary', label: 'Summary of the spread' },
 ];
 
 /** Below this many groups a histogram is a bar chart with the labels taken off. */
@@ -578,7 +616,7 @@ function mintQueryId(widgetId: number): string {
 @Component({
   selector: 'app-dashboards',
   imports: [Icon, BarChart, Donut, RankedBar, KpiCard, LineChart, ScatterPlot,
-    Comparison, Histogram],
+    Comparison, Histogram, ResultSummary],
   template: `
     <div class="space-y-4 min-w-0">
 
@@ -793,9 +831,26 @@ function mintQueryId(widgetId: number): string {
                       </p>
                     }
                     @case ('running') {
-                      <p class="text-xs text-[color:var(--text-secondary)] py-4 text-center">
-                        Running…
-                      </p>
+                      <!-- A skeleton rather than a word, and it is deliberately NOT a spinner.
+                           A tile that keeps its height while it works stops the board reflowing
+                           under a reader as each widget lands -- these run one at a time, so a
+                           six-widget board would otherwise jump six times while somebody is
+                           trying to read the first tile.
+
+                           aria-busy and the visually-hidden sentence carry the same fact to a
+                           screen reader, which gets nothing at all from a shimmer. -->
+                      <div class="py-3 flex flex-col gap-2" aria-busy="true"
+                           [attr.aria-label]="'Running ' + widget.widgetTitle">
+                        <span class="sr-only">Running {{ widget.widgetTitle }}…</span>
+                        @for (line of skeletonLines; track line) {
+                          <!-- .pulse, not Tailwind's animate-pulse: this project's own class
+                               already turns itself off under prefers-reduced-motion and settles
+                               at 0.75 opacity, and a second animation that ignores that setting
+                               would undo it on this one screen. -->
+                          <span class="block h-3 rounded bg-sunken pulse"
+                                [style.width.%]="line" aria-hidden="true"></span>
+                        }
+                      </div>
                     }
                     @case ('failed') {
                       <p class="text-xs text-crit-500 py-2">{{ run.error }}</p>
@@ -858,6 +913,19 @@ function mintQueryId(widgetId: number): string {
                                               [xLabel]="dimensionName(view)"
                                               [yLabel]="measureName(view)" />
                           }
+                          @case ('dimensionSummary') {
+                            <app-result-summary [data]="view.marks" mode="dimension"
+                                                [additive]="additive(view)"
+                                                [dimensionLabel]="dimensionName(view)" />
+                          }
+                          @case ('trendSummary') {
+                            <app-result-summary [data]="view.marks" mode="trend"
+                                                [dimensionLabel]="dimensionName(view)" />
+                          }
+                          @case ('distributionSummary') {
+                            <app-result-summary [data]="view.marks" mode="distribution"
+                                                [dimensionLabel]="dimensionName(view)" />
+                          }
                           @case ('comparison') {
                             <app-comparison [first]="sides(view).first"
                                             [second]="sides(view).second" />
@@ -865,8 +933,11 @@ function mintQueryId(widgetId: number): string {
                           @case ('ranked') {
                             <!-- No percentages: a share of a total is only a share when the parts
                                  add up to it, and the measure here is whatever was saved. -->
+                            <!-- formatValue, because the raw figures reach these labels too: a
+                                 ranked bar was reading "1267.19353428047" beside its bar for the
+                                 same reason the table cells were. -->
                             <app-ranked-bar [data]="view.marks" [max]="view.marks.length"
-                                            [showPercent]="false" />
+                                            [showPercent]="false" [formatValue]="figure" />
                           }
                           @case ('bar') {
                             <app-bar-chart [data]="view.marks" [height]="180" />
@@ -942,6 +1013,22 @@ export class Dashboards implements OnInit, OnDestroy {
 
   readonly kinds = KINDS;
 
+  /**
+   * The widths of a running tile's placeholder lines, as percentages.
+   *
+   * Uneven on purpose: four identical bars read as a table that has finished loading badly, and
+   * a ragged right edge is what makes a skeleton legible as a placeholder rather than as content.
+   */
+  protected readonly skeletonLines = [92, 74, 84, 58];
+
+  /**
+   * A chart's value label, formatted the way the table formats a cell.
+   *
+   * A bound arrow rather than a method, because it is passed AS a function to the chart -- a
+   * method reference would lose `this` the moment the chart called it.
+   */
+  protected readonly figure = (value: number): string => readableCell(String(value));
+
   /** A result cell, formatted for reading. The raw value stays in the cell's title. */
   protected readable(cell: string): string {
     return readableCell(cell);
@@ -954,6 +1041,11 @@ export class Dashboards implements OnInit, OnDestroy {
   // the same analysis disagree.
 
   /** The measure column's name, humanised: amount_sum reads as "amount sum". */
+  /** Whether this result's measure has a total. Read off the view; see WidgetView.additive. */
+  protected additive(view: WidgetView): boolean {
+    return view.additive;
+  }
+
   protected measureName(view: WidgetView): string {
     const last = view.columns[view.columns.length - 1] ?? '';
     return last.replace(/_/g, ' ');

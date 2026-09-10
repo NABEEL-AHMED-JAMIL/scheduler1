@@ -118,7 +118,8 @@ test('the picker offers every kind, and disables the ones this result cannot hon
       disabled: (option as HTMLOptionElement).disabled,
     })));
 
-    expect(kinds).toHaveLength(11);
+    // Fourteen: the original four, seven chart kinds, and three summaries.
+    expect(kinds).toHaveLength(14);
     const enabled = kinds.filter(kind => !kind.disabled).map(kind => kind.value);
     // One row, one column, no dimension: a single figure and a table, and nothing else honestly.
     expect(enabled.sort()).toEqual(['kpi', 'table']);

@@ -76,10 +76,24 @@ export class RankedBar {
     const head = ordered.slice(0, limit);
     const tail = ordered.slice(limit);
 
-    const shown = [...head];
+    /*
+     * formatValue applies to EVERY row, not only to the rolled-up one.
+     *
+     * It used to reach the Other row alone, so a caller that passed a formatter and no per-item
+     * `display` got its raw numbers back on every real row -- an analytics tile was reading
+     * "1267.19353428047" beside its bar while the Other row underneath read properly. An input
+     * called formatValue that formats one row in eight is worse than no input, because the call
+     * site looks correct.
+     *
+     * An explicit `display` still wins, which is what keeps the object browser's file sizes as
+     * they are: that caller sets display per item AND passes a formatter for the roll-up.
+     */
+    const format = this.formatValue();
+    const shown = head.map(item => format && item.display === undefined
+      ? { ...item, display: format(item.value) }
+      : item);
     if (tail.length) {
       const rolled = tail.reduce((sum, d) => sum + d.value, 0);
-      const format = this.formatValue();
       shown.push({
         name: `Other (${tail.length})`,
         value: rolled,

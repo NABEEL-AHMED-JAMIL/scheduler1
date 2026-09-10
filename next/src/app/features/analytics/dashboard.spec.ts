@@ -1142,3 +1142,49 @@ describe('what a single-figure tile says it showed', () => {
     expect(harness.board.counted(single, 'kpi')).toBe('1 row');
   });
 });
+
+describe('the three summary kinds', () => {
+  const series = (count: number) => analysisResult({
+    rows: Array.from({ length: count }, (_, at) => [`m${at}`, String(100 + at * 10)]),
+    rowCount: count,
+  });
+
+  it('describes the groups only when there is more than one', () => {
+    expect(analysisView(series(1), 'SUM').issues.dimensionSummary)
+      .toContain('more than one of them');
+    expect(analysisView(series(6), 'SUM').issues.dimensionSummary).toBe('');
+  });
+
+  it('refuses a trend summary over rank-ordered points', () => {
+    // Against a biggest-first result "first" is just the biggest, so first-against-last would
+    // describe the sort. Same rule the line keeps, and for the same reason.
+    expect(analysisView(series(6), 'SUM', { sortedBy: 'MEASURE' }).issues.trendSummary)
+      .toContain('describe the sort rather than the series');
+    expect(analysisView(series(6), 'SUM', { sortedBy: 'DIMENSION' }).issues.trendSummary).toBe('');
+  });
+
+  it('refuses to describe a spread of fewer than three figures', () => {
+    expect(analysisView(series(2), 'SUM').issues.distributionSummary).toContain('needs more');
+    expect(analysisView(series(3), 'SUM').issues.distributionSummary).toBe('');
+  });
+
+  it('carries whether the measure adds up, so a top share is only claimed when there is a total', () => {
+    // The summary states "top share of the total". An average of averages has no total, and the
+    // component withholds that one fact rather than the whole tile.
+    expect(analysisView(series(6), 'SUM').additive).toBe(true);
+    expect(analysisView(series(6), 'AVERAGE').additive).toBe(false);
+    expect(analysisView(series(6), 'MEDIAN').additive).toBe(false);
+  });
+
+  it('never claims a saved query adds up', () => {
+    // A saved query does not say whether its figures are a total, which is why the ring is
+    // refused for one. The summary withholds the share on the same grounds.
+    const view = queryView({
+      columns: [{ name: 'region', type: 'VARCHAR' }, { name: 'total', type: 'BIGINT' }],
+      rows: [['north', '10'], ['south', '20']],
+      rowCount: 2,
+      truncated: false,
+    } as any);
+    expect(view.additive).toBe(false);
+  });
+});

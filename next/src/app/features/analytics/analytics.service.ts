@@ -625,7 +625,8 @@ export interface Dashboard {
  */
 export type WidgetVisualization =
   | 'table' | 'ranked' | 'bar' | 'donut'
-  | 'kpi' | 'line' | 'area' | 'stacked' | 'histogram' | 'scatter' | 'comparison';
+  | 'kpi' | 'line' | 'area' | 'stacked' | 'histogram' | 'scatter' | 'comparison'
+  | 'dimensionSummary' | 'trendSummary' | 'distributionSummary';
 
 /**
  * One tile: a REFERENCE to a saved analysis or a saved query, and how to draw it.
