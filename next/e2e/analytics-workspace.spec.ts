@@ -180,3 +180,34 @@ test('10 — a Canvas drill narrows the Data tab, and says so', async ({ page })
   await page.getByRole('button', { name: 'Show all rows' }).click();
   await expect(page.getByText('Narrowed by the Canvas')).toHaveCount(0);
 });
+
+test('11 — a date column can be bucketed by month, and the heading says so', async ({ page }) => {
+  // The gap that limited this module most: grouping a DATE column gave one bucket per day, so
+  // "revenue by month" -- the grain a business reads -- was not expressible at all.
+  await page.goto('/analytics');
+  await page.locator('select').first().selectOption('etl-bucket');
+  await page.getByRole('button', { name: /analytics-samples/ }).click();
+  await page.getByRole('button', { name: /orders\.csv/ }).click();
+  await expect(page.getByText(/250K/)).toBeVisible();
+  await page.getByRole('button', { name: 'Canvas', exact: true }).click();
+
+  // A text column is offered no bucket: the server refuses a grain on one, rightly, and the
+  // picker must not walk anybody into that.
+  await page.locator('#a-dim-0').selectOption('region');
+  await expect(page.locator('#a-grain-0')).toHaveCount(0);
+
+  await page.locator('#a-dim-0').selectOption('order_date');
+  await expect(page.locator('#a-grain-0')).toBeVisible();
+  await page.locator('#a-grain-0').selectOption('MONTH');
+  await page.locator('#a-agg').selectOption('SUM');
+  await page.locator('#a-measure-field').selectOption('amount');
+  await page.getByRole('button', { name: /Run analysis/ }).click();
+
+  // Two years of orders: 24 months, not 730 days.
+  await expect(page.locator('tbody tr')).toHaveCount(24);
+  await expect(page.locator('thead th').first()).toContainText('order_date_month');
+  // The heading has to carry the grain too. A row labelled 2024-07-01 under "by order_date"
+  // reads as one day's takings rather than July's.
+  await expect(page.locator('h4', { hasText: /Sum of amount by order_date by month/ }))
+    .toBeVisible();
+});

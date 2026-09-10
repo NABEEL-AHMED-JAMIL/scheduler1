@@ -16,13 +16,15 @@ import { SqlEditor } from './sql-editor';
 import { DataGrid, GridColumn, GridCopy, GridSort } from './data-grid';
 import { DatasetRegistry } from './dashboard';
 import {
-  FilterBuilder, countFilterClauses, describeClause, emptyFilterGroup, isNumericType,
+  FilterBuilder, countFilterClauses, describeClause, emptyFilterGroup, isDateType,
+  isNumericType,
   pruneFilters,
 } from './filter-builder';
 import {
   Aggregation, AnalysisColumn, AnalysisCrumb, AnalysisRequest, AnalysisResult, AnalyticsService,
   ColumnProfile, DatasetColumn, DatasetPreview, DatasetProfile, Drill, ExportFile, FilterClause,
-  FilterGroup, FilterNode, PreviewShape, QueryResult, QueryRun, RegisteredDataset, SavedAnalysis,
+  FilterGroup, FilterNode, Grain, PreviewShape, QueryResult, QueryRun, RegisteredDataset,
+  SavedAnalysis,
   isFilterGroup,
   SavedQuery, WriteBackResult,
 } from './analytics.service';
@@ -2892,6 +2894,24 @@ export class Analytics implements OnInit {
    * view of it rather than the state itself.
    */
   readonly dimensions = signal<string[]>([]);
+
+  /**
+   * How each dimension is bucketed, index-aligned with dimensions(). Null means by its own values.
+   *
+   * Kept as its own signal rather than folded into the dimension list, because the two are edited
+   * by two different controls and every consumer of dimensions() would otherwise have to know
+   * about grains. setDimension keeps them the same length.
+   */
+  readonly dimensionGrains = signal<(Grain | null)[]>([]);
+
+  /** The grains a reader can pick, with the words a reader uses for them. */
+  readonly grains: { id: Grain; label: string }[] = [
+    { id: 'DAY', label: 'by day' },
+    { id: 'WEEK', label: 'by week' },
+    { id: 'MONTH', label: 'by month' },
+    { id: 'QUARTER', label: 'by quarter' },
+    { id: 'YEAR', label: 'by year' },
+  ];
   readonly aggregation = signal<Aggregation>('COUNT_ROWS');
   readonly measureField = signal('');
 
@@ -3021,16 +3041,55 @@ export class Analytics implements OnInit {
 
   setDimension(slot: number, name: string): void {
     const next = [...this.dimensions()];
-    if (!name) next.splice(slot, 1);
-    else if (slot >= next.length) next.push(name);
-    else next[slot] = name;
+    // The grains move with their slots. A dimension removed takes its grain with it; a dimension
+    // REPLACED loses its grain, because the new column is not necessarily temporal and inheriting
+    // "by month" onto a region would be a bucketing nobody asked for.
+    const grains = [...this.dimensionGrains()];
+    if (!name) {
+      next.splice(slot, 1);
+      grains.splice(slot, 1);
+    } else if (slot >= next.length) {
+      next.push(name);
+      grains.push(null);
+    } else {
+      next[slot] = name;
+      grains[slot] = null;
+    }
     this.dimensions.set(next.slice(0, this.maxDimensions));
+    this.dimensionGrains.set(grains.slice(0, this.maxDimensions));
     // The reported grouping described the analysis that just stopped existing.
     this.groupedBy.set([]);
     this.clearDrills();
     // The drill controls name columns; a dimension list that changed may have taken one away.
     if (!next.includes(this.drillDimension())) this.drillDimension.set(next[next.length - 1] ?? '');
     if (next.includes(this.drillNext())) this.drillNext.set('');
+  }
+
+  /** Whether a column can be bucketed by a calendar at all. */
+  isTemporal(name: string): boolean {
+    const column = this.columns().find(candidate => candidate.name === name);
+    return !!column && isDateType(column.type);
+  }
+
+  /** The grain on one slot, or '' for none -- which is what the picker's blank option means. */
+  grainAt(slot: number): string {
+    return this.dimensionGrains()[slot] ?? '';
+  }
+
+  /**
+   * Buckets one dimension by a calendar grain, or stops bucketing it.
+   *
+   * Changing it clears the reported grouping and the drill trail for the same reason changing the
+   * dimension does: both describe the analysis that has just stopped existing, and leaving them
+   * would put a breadcrumb over a different question.
+   */
+  setGrain(slot: number, grain: string): void {
+    const grains = [...this.dimensionGrains()];
+    while (grains.length < this.dimensions().length) grains.push(null);
+    grains[slot] = (grain || null) as Grain | null;
+    this.dimensionGrains.set(grains);
+    this.groupedBy.set([]);
+    this.clearDrills();
   }
 
   /**
@@ -3195,6 +3254,7 @@ export class Analytics implements OnInit {
       connection: this.connection(),
       path: this.path(),
       dimensions: this.dimensions(),
+      grains: this.dimensionGrains(),
       measure: this.measureNeedsField()
         ? { aggregation: this.aggregation(), field: this.measureField() }
         : { aggregation: this.aggregation() },
@@ -3771,9 +3831,29 @@ export class Analytics implements OnInit {
     const measure = this.aggregationLabel()
       + (this.measureNeedsField() && this.measureField() ? ` of ${this.measureField()}` : '');
     const dimensions = this.effectiveDimensions();
-    return dimensions.length ? `${measure} by ${dimensions.join(' × ')}`
+    return dimensions.length
+      ? `${measure} by ${dimensions.map((name, at) => this.dimensionLabel(name, at)).join(' × ')}`
       : `${measure}, over every matching row`;
   });
+
+  /**
+   * A dimension as the heading names it, with its bucket where it has one.
+   *
+   * <b>The grain has to be in the words, not only in the column header.</b> A monthly grouping
+   * renders its buckets as the first of each month, so a heading reading "Sum of amount by
+   * order_date" over a row labelled 2024-07-01 tells a reader they are looking at one day's
+   * takings when they are looking at July's. That is the exact confusion the response carries
+   * grains to prevent, and the heading is where most readers meet it first.
+   *
+   * The grain is read from the ANSWER where the server sent one, and falls back to what is
+   * picked -- so the heading describes the result on screen rather than the controls above it,
+   * which may already have been changed.
+   */
+  dimensionLabel(name: string, at: number): string {
+    const answered = this.analysisResult()?.grains ?? null;
+    const grain = answered ? answered[at] : this.dimensionGrains()[at];
+    return grain ? `${name} by ${grain.toLowerCase()}` : name;
+  }
 
   /**
    * What the figure cannot say about itself.

@@ -4297,3 +4297,131 @@ describe('cross-filtering into the Data tab', () => {
     expect(canvas.studio.inheritedDataFilters()).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Calendar grain: grouping a date column by month, quarter, week or year.
+ *
+ * Before this, grouping a DATE column gave one bucket per day -- two years of orders is 730 groups
+ * with no way to fold them -- so the grain a business reads was not expressible at all.
+ *
+ * @author Nabeel Ahmed
+ */
+describe('bucketing a date dimension by a calendar grain', () => {
+
+  it('carries a null per dimension when nothing is grained', () => {
+    const canvas = canvasWith();
+    canvas.studio.setDimension(0, 'region');
+    canvas.studio.runAnalysis();
+
+    // Nulls rather than absent HERE because these tests see the request object; the wire body
+    // omits the list entirely when nothing is grained, which is analysisBody's job -- the same
+    // split the drill-trail test above records. A list of nulls on the wire would be a request
+    // that LOOKS grained to anything reading it back.
+    expect(canvas.sent().grains).toEqual([null]);
+  });
+
+  it('sends the grain index-aligned with the dimensions', () => {
+    // Not canvas.ran(), which picks region as dimension 0 for its own purposes.
+    const canvas = canvasWith();
+    canvas.studio.setDimension(0, 'booked_on');
+    canvas.studio.setGrain(0, 'MONTH');
+    canvas.studio.aggregation.set('SUM');
+    canvas.studio.measureField.set('amount');
+    canvas.studio.runAnalysis();
+
+    expect(canvas.sent().dimensions).toEqual(['booked_on']);
+    expect(canvas.sent().grains).toEqual(['MONTH']);
+  });
+
+  it('keeps the two lists the same length when a dimension is added or removed', () => {
+    // The property everything downstream relies on. A grain left behind by a removed dimension
+    // would bucket whichever column slid into its slot.
+    const canvas = canvasWith();
+    canvas.studio.setDimension(0, 'booked_on');
+    canvas.studio.setGrain(0, 'MONTH');
+    canvas.studio.setDimension(1, 'region');
+
+    expect(canvas.studio.dimensionGrains()).toHaveLength(2);
+    expect(canvas.studio.dimensionGrains()[0]).toBe('MONTH');
+    expect(canvas.studio.dimensionGrains()[1]).toBeNull();
+
+    canvas.studio.setDimension(0, '');
+    expect(canvas.studio.dimensions()).toEqual(['region']);
+    expect(canvas.studio.dimensionGrains()).toEqual([null]);
+  });
+
+  it('drops the grain when the dimension in that slot is replaced', () => {
+    // The new column is not necessarily temporal, and inheriting "by month" onto a region would
+    // be a bucketing nobody asked for -- and one the server would refuse.
+    const canvas = canvasWith();
+    canvas.studio.setDimension(0, 'booked_on');
+    canvas.studio.setGrain(0, 'MONTH');
+
+    canvas.studio.setDimension(0, 'region');
+
+    expect(canvas.studio.dimensionGrains()).toEqual([null]);
+  });
+
+  it('offers a bucket only for a column that has a calendar in it', () => {
+    // Offering "by month" against a text column would be offering an error: the server refuses
+    // it, rightly, and the picker should not walk anybody into that.
+    const canvas = canvasWith();
+    expect(canvas.studio.isTemporal('booked_on')).toBe(true);
+    expect(canvas.studio.isTemporal('region')).toBe(false);
+    expect(canvas.studio.isTemporal('nothing-called-this')).toBe(false);
+  });
+
+  it('clears the drill trail when the grain changes', () => {
+    // Both describe the analysis that has just stopped existing. A breadcrumb left over a
+    // different question is worse than no breadcrumb.
+    const canvas = canvasWith();
+    canvas.studio.setDimension(0, 'booked_on');
+    canvas.studio.drillPath.set([{ dimension: 'booked_on', value: '2024-03-01' }]);
+
+    canvas.studio.setGrain(0, 'QUARTER');
+
+    expect(canvas.studio.drillPath()).toEqual([]);
+  });
+});
+
+describe('the heading says what a bucket is', () => {
+  it('names the grain, so a month is not read as the first of the month', () => {
+    // A monthly grouping renders its buckets as the first of each month, so "Sum of amount by
+    // order_date" over a row labelled 2024-07-01 tells a reader they are looking at one day's
+    // takings when they are looking at July's.
+    const canvas = canvasWith();
+    canvas.studio.setDimension(0, 'booked_on');
+    canvas.studio.setGrain(0, 'MONTH');
+    canvas.studio.aggregation.set('SUM');
+    canvas.studio.measureField.set('amount');
+
+    expect(canvas.studio.canvasCaption()).toBe('Sum of amount by booked_on by month');
+  });
+
+  it('says nothing extra when there is no bucket', () => {
+    const canvas = canvasWith();
+    canvas.studio.setDimension(0, 'region');
+    canvas.studio.aggregation.set('SUM');
+    canvas.studio.measureField.set('amount');
+
+    expect(canvas.studio.canvasCaption()).toBe('Sum of amount by region');
+  });
+
+  it('describes the ANSWER rather than the controls, once one has come back', () => {
+    // The picker above may already have been changed. A heading that tracked it would relabel
+    // figures that were computed a different way.
+    const canvas = canvasWith();
+    canvas.studio.setDimension(0, 'booked_on');
+    canvas.studio.setGrain(0, 'MONTH');
+    canvas.studio.aggregation.set('SUM');
+    canvas.studio.measureField.set('amount');
+    canvas.studio.analysisResult.set({
+      columns: [], rows: [], rowCount: 0, truncated: false,
+      dimensions: ['booked_on'], grains: ['QUARTER'],
+    } as any);
+
+    expect(canvas.studio.canvasCaption()).toContain('by quarter');
+  });
+});

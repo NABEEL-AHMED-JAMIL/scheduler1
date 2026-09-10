@@ -293,6 +293,18 @@ export interface QueryRun {
  * an incomplete analysis rather than a defaulted one: guessing a column would put a number on
  * screen that nobody asked for and that reads exactly like one they did.
  */
+/**
+ * Calendar buckets a date or timestamp dimension can be grouped by.
+ *
+ * Grouping a DATE column by its own values gives one bucket per day, so two years of orders is
+ * 730 groups with no way to fold them. These are the grains a business reads.
+ *
+ * The server takes these names verbatim and refuses anything else with a 400, so this union is
+ * the whole vocabulary -- there is no free-text grain and there must not be, because the name is
+ * interpolated into date_trunc() rather than bound as a parameter.
+ */
+export type Grain = 'DAY' | 'WEEK' | 'MONTH' | 'QUARTER' | 'YEAR';
+
 export type Aggregation =
   | 'COUNT_ROWS' | 'COUNT_NON_NULL' | 'DISTINCT_COUNT' | 'SUM'
   | 'AVERAGE' | 'MINIMUM' | 'MAXIMUM' | 'MEDIAN';
@@ -430,6 +442,15 @@ export interface AnalysisRequest {
   path: string;
   /** One, two or three, in the order they group. Empty means no grouping at all. */
   dimensions: string[];
+  /**
+   * How each dimension is bucketed, index-aligned with `dimensions`. A null entry groups by the
+   * column's own values, which is what everything did before grains existed.
+   *
+   * Index-aligned rather than keyed by column because a drill replaces a dimension BY INDEX --
+   * the grain has to travel with the slot, or a drill carries the previous dimension's bucketing
+   * onto the new one.
+   */
+  grains?: (Grain | null)[];
   measure: Measure;
   filters?: FilterGroup;
   topN?: TopN;
@@ -550,6 +571,15 @@ export interface AnalysisResult {
   truncated: boolean;
   /** The dimensions this analysis grouped by AFTER drilling, which is what the pickers show. */
   dimensions?: string[];
+  /**
+   * The grain each dimension was bucketed at, index-aligned with `dimensions`. Absent when
+   * nothing was grained.
+   *
+   * Sent because the ROWS cannot say it: a month bucket renders as the first of that month, which
+   * is indistinguishable from a day that happens to be the first. A screen showing "2024-03-01"
+   * has no way to know whether it stands for one day or thirty-one without this.
+   */
+  grains?: (Grain | null)[] | null;
   /** The measure column's name, so nothing here has to work out which column it is. */
   measure?: string;
   other?: OtherBucket | null;
@@ -707,6 +737,12 @@ function analysisBody(request: AnalysisRequest): Record<string, unknown> {
       ? { aggregation: 'COUNT_ROWS' }
       : { aggregation: request.measure.aggregation, field: request.measure.field },
   };
+  // Only when something is actually grained. A list of nulls would be a request that LOOKS
+  // grained to anything reading it back, and it is the same rule every other optional part here
+  // follows: send what was asked for, not a placeholder for what was not.
+  if (request.grains && request.grains.some(grain => !!grain)) {
+    body['grains'] = request.grains;
+  }
   if (request.filters && request.filters.clauses.length) {
     body['filters'] = filtersToWire(request.filters);
   }

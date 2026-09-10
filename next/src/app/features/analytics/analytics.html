@@ -1007,6 +1007,29 @@
                       }
                     </select>
                   </div>
+                  <!-- Only where there is a calendar to bucket by. Offering "by month" against a
+                       text column would be offering an error: the server refuses a grain on a
+                       column with no calendar in it, and it is the right refusal, but the picker
+                       should not walk anybody into it. -->
+                  @if (slot && isTemporal(slot)) {
+                    <div class="flex flex-col gap-1 min-w-0">
+                      <label class="text-[11px] uppercase tracking-wider
+                                    text-[color:var(--text-muted)]"
+                             [attr.for]="'a-grain-' + $index">Bucket</label>
+                      <select [id]="'a-grain-' + $index" class="input input-sm w-auto min-w-0"
+                              [value]="grainAt($index)"
+                              (change)="setGrain($index, $any($event.target).value)">
+                        <!-- The default stays "every value", which is what this did before grains
+                             existed and is still right for a column of a few distinct dates. -->
+                        <option value="">every value</option>
+                        @for (grain of grains; track grain.id) {
+                          <option [value]="grain.id" [selected]="grain.id === grainAt($index)">
+                            {{ grain.label }}
+                          </option>
+                        }
+                      </select>
+                    </div>
+                  }
                 }
               </div>
 
