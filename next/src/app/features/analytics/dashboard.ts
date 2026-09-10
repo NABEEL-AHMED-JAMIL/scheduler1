@@ -14,10 +14,14 @@ import { Comparison, ComparisonSide } from '../../shared/charts/comparison';
 import { Histogram } from '../../shared/charts/histogram';
 import { ResultSummary } from '../../shared/charts/result-summary';
 import { RankedBar } from '../../shared/charts/ranked-bar';
-import { isNumericType } from './filter-builder';
+import {
+  FilterBuilder, countFilterClauses, describeClause, emptyFilterGroup, isNumericType,
+  pruneFilters,
+} from './filter-builder';
 import {
   Aggregation, AnalysisColumn, AnalysisRequest, AnalysisResult, AnalysisSort, AnalyticsService,
-  Dashboard, DashboardWidget, FilterGroup, QueryResult, RegisteredDataset, SavedAnalysis,
+  Dashboard, DashboardWidget, DatasetColumn, FilterGroup, QueryResult, RegisteredDataset,
+  SavedAnalysis,
   SavedQuery, TopN, WidgetVisualization,
 } from './analytics.service';
 
@@ -191,6 +195,38 @@ export interface WidgetView {
  * group a filter emptied is zero. The rows stay in the table and the note says the chart is
  * missing them.
  */
+/**
+ * A widget's own saved filters and the board's, combined into what is actually sent.
+ *
+ * <b>ANDed and NESTED, never flattened.</b> This is the rule the server already applies to drill
+ * narrowings, and its reasoning is the argument here word for word: spreading a saved
+ * `region = north OR region = south` into a top-level AND alongside a board condition turns it
+ * into `region = north OR (region = south AND <board>)` -- a different question wearing the same
+ * words. Both halves keep their own brackets.
+ *
+ * <b>Both halves are pruned first, and an empty half is dropped entirely rather than nested.</b>
+ * The server refuses a group with no conditions in it outright -- "A filter group needs at least
+ * one condition in it" -- so wrapping an empty board filter would turn every tile on the board
+ * into an error the moment somebody opened the bar and typed nothing.
+ *
+ * Exported and pure so the rule can be tested without a component, which is where the OR case
+ * belongs: it has no visible symptom, and a tile narrowed by the wrong predicate draws a
+ * perfectly ordinary chart of the wrong rows.
+ */
+export function combineFilters(saved: FilterGroup | undefined,
+    board: FilterGroup | null): FilterGroup | undefined {
+
+  const own = saved ? pruneFilters(saved) : null;
+  const bar = board ? pruneFilters(board) : null;
+  const haveOwn = !!own && own.clauses.length > 0;
+  const haveBar = !!bar && bar.clauses.length > 0;
+
+  if (!haveOwn && !haveBar) return undefined;
+  if (!haveBar) return own!;
+  if (!haveOwn) return bar!;
+  return { op: 'AND', clauses: [own!, bar!] };
+}
+
 /**
  * What the ANALYSIS asked for, which the result alone cannot say.
  *
@@ -616,7 +652,7 @@ function mintQueryId(widgetId: number): string {
 @Component({
   selector: 'app-dashboards',
   imports: [Icon, BarChart, Donut, RankedBar, KpiCard, LineChart, ScatterPlot,
-    Comparison, Histogram, ResultSummary],
+    Comparison, Histogram, ResultSummary, FilterBuilder],
   template: `
     <div class="space-y-4 min-w-0">
 
@@ -747,6 +783,75 @@ function mintQueryId(widgetId: number): string {
             </p>
           }
 
+          <!-- ---- the board filter --------------------------------------------------------- -->
+          @if (boardDatasets().length) {
+            <div class="border-t border-subtle pt-3 space-y-2">
+              @if (!filterOpen()) {
+                <button type="button" class="btn btn-default btn-sm" (click)="filterOpen.set(true)">
+                  <app-icon name="filter" />
+                  Filter this board
+                  @if (boardFilterCount()) {
+                    <span class="pill pill-brand ml-1">{{ boardFilterCount() }} on</span>
+                  }
+                </button>
+              } @else {
+                <div class="flex flex-wrap items-end gap-2 min-w-0">
+                  <div class="flex flex-col gap-1 min-w-0">
+                    <label class="text-[11px] uppercase tracking-wider
+                                  text-[color:var(--text-muted)]" for="b-filter-dataset">
+                      Filter the widgets that read
+                    </label>
+                    <!-- ONE dataset. A condition naming a column another file does not have is a
+                         hard refusal from the server, so an unscoped board filter would turn half
+                         a board into error tiles. -->
+                    <select id="b-filter-dataset" class="input input-sm w-auto min-w-0 max-w-full"
+                            [value]="boardFilterOn()"
+                            (change)="chooseFilterDataset($any($event.target).value)">
+                      <option value="">nothing yet — pick a dataset</option>
+                      @for (dataset of boardDatasets(); track dataset.key) {
+                        <option [value]="dataset.key"
+                                [selected]="dataset.key === boardFilterOn()">
+                          {{ dataset.label }}
+                        </option>
+                      }
+                    </select>
+                  </div>
+                  <button type="button" class="btn btn-ghost btn-sm ms-auto"
+                          (click)="filterOpen.set(false)">Hide</button>
+                </div>
+
+                @if (boardColumnsLoading()) {
+                  <p class="field-note text-[color:var(--text-muted)]">
+                    Reading that dataset's columns. It costs one of the four queries this server
+                    runs at a time, which is why it is only read when you open this.
+                  </p>
+                } @else if (boardColumnsError()) {
+                  <p class="text-xs text-crit-500">{{ boardColumnsError() }}</p>
+                } @else if (boardFilterOn()) {
+                  <app-filter-builder [model]="boardFilter()" [columns]="boardColumns()"
+                                      (changed)="boardFilter.set($event)" />
+                  <div class="flex flex-wrap items-center gap-2">
+                    @if (unfinishedBoardFilters()) {
+                      <span class="pill pill-warn">
+                        {{ unfinishedBoardFilters() }} not finished, so not applied
+                      </span>
+                    }
+                    <!-- An explicit press. Ten widgets is ten governed queries, and a bar that
+                         re-ran as somebody typed would be the denial of service the serial queue
+                         above exists to prevent. -->
+                    <button type="button" class="btn btn-primary btn-sm"
+                            [disabled]="running()" (click)="applyBoardFilter()">
+                      Apply to the board
+                    </button>
+                    <span class="field-note text-[color:var(--text-muted)]">
+                      Nothing re-runs until you press this.
+                    </span>
+                  </div>
+                }
+              }
+            </div>
+          }
+
           <!-- ---- adding a widget ---------------------------------------------------------- -->
           <div class="border-t border-subtle pt-3 space-y-2">
             @if (!addOpen()) {
@@ -845,6 +950,18 @@ function mintQueryId(widgetId: number): string {
 
                 <p class="field-note text-[color:var(--text-muted)] truncate"
                    [title]="sourceOf(widget)">{{ sourceOf(widget) }}</p>
+
+                <!-- Whether the board filter reached THIS tile, said on the tile. A board that
+                     looks uniformly narrowed and is not is the failure the dataset scoping exists
+                     to prevent, and silence on the tiles it missed is exactly how that failure
+                     would look. -->
+                @if (boardFilterCount()) {
+                  @if (boardFilterNote(widget); as note) {
+                    <p class="field-note text-[color:var(--text-muted)] truncate" [title]="note">
+                      {{ note }}
+                    </p>
+                  }
+                }
 
                 @if (runs()[widget.analyticsDashboardWidgetId!]; as run) {
                   @switch (run.state) {
@@ -1058,6 +1175,116 @@ export class Dashboards implements OnInit, OnDestroy {
    */
   protected readonly figure = (value: number): string => readableCell(String(value));
 
+  /** The key a dataset is identified by in the bar. A NUL cannot occur in either half. */
+  private static datasetKey(connection: string, path: string): string {
+    return connection + '\u0000' + path;
+  }
+
+  /**
+   * The board filter, but only for a widget that reads the dataset it was written against.
+   *
+   * Null everywhere else, which is what keeps a board of mixed datasets from filling with
+   * refusals. The tile says why it was not narrowed rather than staying silent -- a board that
+   * looks uniformly narrowed and is not is the failure this whole scoping exists to prevent.
+   */
+  private boardFilterFor(saved: SavedAnalysis): FilterGroup | null {
+    const on = this.boardFilterOn();
+    if (!on) return null;
+    return Dashboards.datasetKey(saved.connectionAlias, saved.datasetPath) === on
+      ? this.boardFilter() : null;
+  }
+
+  /** Every distinct dataset the board's analysis-backed widgets read. */
+  readonly boardDatasets = computed(() => {
+    const seen = new Map<string, { key: string; label: string }>();
+    for (const widget of this.widgets()) {
+      const saved = this.analyses().find(
+        candidate => candidate.analyticsAnalysisId === widget.analyticsAnalysisId);
+      if (!saved) continue;
+      const key = Dashboards.datasetKey(saved.connectionAlias, saved.datasetPath);
+      if (!seen.has(key)) {
+        seen.set(key, { key, label: saved.connectionAlias + '/' + saved.datasetPath });
+      }
+    }
+    return Array.from(seen.values());
+  });
+
+  /**
+   * Chooses which dataset the bar filters, and fetches its columns.
+   *
+   * LAZILY, and only on a change: a schema read is a governed DuckDB session and one of the four
+   * permits this JVM has, so fetching one per board open would spend a permit on a bar nobody
+   * touched. Changing the dataset CLEARS the filter, because the columns a condition may name
+   * have just changed underneath it.
+   */
+  chooseFilterDataset(key: string): void {
+    if (key === this.boardFilterOn()) return;
+    this.boardFilterOn.set(key);
+    this.boardFilter.set(emptyFilterGroup());
+    this.boardColumns.set([]);
+    this.boardColumnsError.set('');
+    if (!key) return;
+
+    const cut = key.indexOf('\u0000');
+    const connection = key.slice(0, cut);
+    const path = key.slice(cut + 1);
+    this.boardColumnsLoading.set(true);
+    this.analytics.schema(connection, path).subscribe({
+      next: response => {
+        this.boardColumnsLoading.set(false);
+        if (response.status !== API_SUCCESS || !response.data) {
+          this.boardColumnsError.set(response.message || 'That dataset could not be read.');
+          return;
+        }
+        this.boardColumns.set(response.data.columns ?? []);
+      },
+      error: err => {
+        this.boardColumnsLoading.set(false);
+        this.boardColumnsError.set(err?.error?.message || 'That dataset could not be read.');
+      },
+    });
+  }
+
+  /**
+   * Applies the bar to the board.
+   *
+   * An explicit press, never on every keystroke. Ten widgets is ten governed queries, and a bar
+   * that re-ran as somebody typed would be the denial of service this component's serial queue
+   * exists to prevent. It reuses runAll() rather than growing a second queue.
+   */
+  applyBoardFilter(): void {
+    this.runAll();
+  }
+
+  /**
+   * What this tile has to say about the board filter, or '' when there is nothing to say.
+   *
+   * Three outcomes, and the two that are not "narrowed" are the ones worth a sentence:
+   *
+   *   narrowed          the conditions, in the same words the Canvas uses for a chip.
+   *   another dataset   named, because "why is this tile different" is otherwise unanswerable
+   *                     from the screen.
+   *   a saved query     the query endpoint takes SQL and nothing else. There is no filter to give
+   *                     it, and composing a WHERE around somebody's own statement is precisely
+   *                     the string-building the structured path exists to avoid.
+   */
+  boardFilterNote(widget: DashboardWidget): string {
+    if (!this.boardFilterCount()) return '';
+    if (widget.analyticsQueryId) {
+      return 'The board filter is not applied here: this tile runs a saved statement, and that '
+        + 'endpoint takes SQL and nothing else.';
+    }
+    const saved = this.analyses().find(
+      candidate => candidate.analyticsAnalysisId === widget.analyticsAnalysisId);
+    if (!saved) return '';
+    if (Dashboards.datasetKey(saved.connectionAlias, saved.datasetPath) !== this.boardFilterOn()) {
+      const on = this.boardFilterOn().replace('\u0000', '/');
+      return `The board filter is on ${on}. This tile reads `
+        + `${saved.connectionAlias}/${saved.datasetPath}, so it is not narrowed.`;
+    }
+    return 'Board filter: ' + this.boardFilterWords().join(' · ');
+  }
+
   /** A result cell, formatted for reading. The raw value stays in the cell's title. */
   protected readable(cell: string): string {
     return readableCell(cell);
@@ -1172,6 +1399,49 @@ export class Dashboards implements OnInit, OnDestroy {
 
   /** Narrows the list by name. Only offered past eight reports; see the template. */
   readonly listFilter = signal('');
+
+  // ---- the board filter ---------------------------------------------------------------------
+  //
+  // SESSION-ONLY, deliberately, and it is the smaller honest change by a wide margin. Persisting
+  // it costs a migration, a column, an entity field, a validator and two client shapes -- and it
+  // would narrow the board silently for the next person who opens it, when a dashboard is
+  // described in its own schema as "the one thing here made to be shown to somebody who did not
+  // build it". Every board opens showing everything; narrowing is something the reader did and
+  // can see they did. If a narrowed board should be shareable later, the URL is the next step,
+  // not a column.
+
+  readonly boardFilter = signal<FilterGroup>(emptyFilterGroup());
+
+  /**
+   * The dataset the bar's conditions are written against, as "connection\u0000path".
+   *
+   * <b>Scoped to ONE dataset, because a filter cannot be applied blind.</b> A board's widgets may
+   * read different files, and a condition naming a column another file does not have is a hard
+   * refusal from the server -- "This dataset has no column called region" -- so an unscoped board
+   * filter would turn half a board into error tiles. Every tile on the chosen dataset is narrowed;
+   * every other tile says on its face that it was not, and why.
+   */
+  readonly boardFilterOn = signal('');
+
+  /** The chosen dataset's columns, fetched once when the bar is opened. */
+  readonly boardColumns = signal<DatasetColumn[]>([]);
+  readonly boardColumnsLoading = signal(false);
+  readonly boardColumnsError = signal('');
+  readonly filterOpen = signal(false);
+
+  /** Conditions typed but not finished, and therefore not sent. Said rather than swallowed. */
+  readonly unfinishedBoardFilters = computed(() =>
+    countFilterClauses(this.boardFilter())
+      - countFilterClauses(pruneFilters(this.boardFilter())));
+
+  /** How many board conditions are actually being applied. */
+  readonly boardFilterCount = computed(() =>
+    countFilterClauses(pruneFilters(this.boardFilter())));
+
+  /** The board filter in words, for the line under a narrowed tile. */
+  readonly boardFilterWords = computed(() =>
+    pruneFilters(this.boardFilter()).clauses
+      .map(node => (node as any).clauses ? '(a group)' : describeClause(node as any)));
 
   readonly visibleDashboards = computed(() => {
     const needle = this.listFilter().trim().toLowerCase();
@@ -1775,7 +2045,12 @@ export class Dashboards implements OnInit, OnDestroy {
         measure: { aggregation, field: config.measure?.field },
         queryId,
       };
-      if (config.filters) request.filters = config.filters;
+      /*
+       * The saved filters and the board's, ANDed. boardFilterFor returns null unless this widget
+       * reads the dataset the bar is written against -- see boardFilterOn.
+       */
+      const applied = combineFilters(config.filters, this.boardFilterFor(saved));
+      if (applied) request.filters = applied;
       if (config.topN) request.topN = config.topN;
       if (config.sort) request.sort = config.sort;
       this.inFlight = this.analytics.analyze(request).subscribe({

@@ -216,3 +216,58 @@ test('opening a report collapses the list, so the report is what you see', async
     .evaluate(node => node.getBoundingClientRect().top);
   expect(top).toBeLessThan(900);
 });
+
+
+/**
+ * The board filter: one set of conditions over every widget that reads the same dataset.
+ *
+ * The assertion that matters is the LAST one -- that the figures actually moved. A filter bar that
+ * renders, accepts a condition and narrows nothing looks identical to one that works, right up
+ * until somebody trusts a number from it.
+ */
+test('a board filter narrows every tile on its dataset, and says nothing ran until asked',
+  async ({ page }) => {
+    await openLibrary(page);
+    // Report 07's tiles are tables, so a figure is a cell with the raw value in its title -- the
+    // most direct thing to compare before and after.
+    await page.getByRole('button', { name: '07 Category against region' }).click();
+    await expect(page.getByText('Revenue by category and region', { exact: true })).toBeVisible();
+    await page.waitForTimeout(16000);
+
+    // A FIGURE, not the first cell -- the first cell of a cross-tab is the dimension label, and
+    // "Electronics" is still Electronics after any filter. The measure is the last column.
+    const figure = page.locator('tbody tr').first().locator('td span[title]').last();
+    const before = await figure.getAttribute('title');
+
+    await page.getByRole('button', { name: /Filter this board/ }).click();
+    await expect(page.locator('#b-filter-dataset')).toBeVisible();
+    await page.locator('#b-filter-dataset').selectOption({ index: 1 });
+    await expect(page.locator('app-filter-builder')).toBeVisible();
+
+    // Nothing may run while the bar is being edited. Ten widgets is ten governed queries against
+    // a server that runs four at a time.
+    const analyses: string[] = [];
+    page.on('request', request => {
+      if (request.url().includes('/analytics.json/analyze')) analyses.push(request.url());
+    });
+
+    await page.getByRole('button', { name: 'Condition', exact: true }).click();
+    await page.waitForTimeout(500);
+    const builder = page.locator('app-filter-builder');
+    await builder.getByLabel('Column for condition 1').selectOption('status');
+    await builder.getByLabel('Operator for condition 1').selectOption('EQ');
+    await builder.getByLabel('Value for condition 1').fill('Completed');
+    await page.waitForTimeout(1500);
+
+    expect(analyses.length, 'editing the bar must run nothing').toBe(0);
+
+    await page.getByRole('button', { name: 'Apply to the board' }).click();
+    await page.waitForTimeout(12000);
+
+    expect(analyses.length, 'applying must re-run the board').toBeGreaterThan(0);
+    // The figures moved: completed orders are a strict subset of all of them.
+    const after = await figure.getAttribute('title');
+    expect(after).not.toEqual(before);
+    // And every tile says which conditions produced what it is showing.
+    await expect(page.getByText(/Board filter:/).first()).toBeVisible();
+  });

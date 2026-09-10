@@ -4,8 +4,7 @@ import { HttpClient } from '@angular/common/http';
 import { Dialog } from '@angular/cdk/dialog';
 import { Subject, of } from 'rxjs';
 import {
-  Dashboards, DatasetRegistry, analysisView, dateOnly, plainDecimal, queryView,
-} from './dashboard';
+  Dashboards, DatasetRegistry, analysisView, dateOnly, plainDecimal, queryView, combineFilters } from './dashboard';
 import { dateOnly as studioDateOnly, plainDecimal as studioPlainDecimal } from './analytics';
 import {
   AnalysisResult, AnalyticsService, Dashboard, DashboardWidget, QueryResult, RegisteredDataset,
@@ -176,12 +175,15 @@ function stubbedApi(over: BoardOptions = {}) {
   });
   const cancel = vi.fn(() => of(SERVER_RESPONSE(undefined)));
 
+  // The board filter reads a dataset's columns once, when its bar is opened, so the builder has a
+  // vocabulary to offer. Never settled here: what these tests care about is that nothing RUNS.
+  const schema = vi.fn(() => new Subject<any>().asObservable());
   const api = {
     analyze, query, cancel, fetchAllDashboards, fetchDashboardById, fetchAllAnalyses,
-    fetchAllQueries, saveDashboard, deleteDashboard, saveWidget, deleteWidget,
+    fetchAllQueries, saveDashboard, deleteDashboard, saveWidget, deleteWidget, schema,
   };
   return {
-    api, analyzes, queryRuns, analyze, query, cancel, fetchDashboardById, saveWidget,
+    api, analyzes, queryRuns, analyze, query, cancel, fetchDashboardById, saveWidget, schema,
     deleteWidget, saveDashboard, deleteDashboard,
     /** Settles whichever request is currently out, as a success. */
     finishAnalysis(result: AnalysisResult = analysisResult()) {
@@ -1228,5 +1230,118 @@ describe('finding a report among many', () => {
 
     harness.board.listFilter.set('   ');
     expect(harness.board.visibleDashboards()).toHaveLength(2);
+  });
+});
+
+
+/**
+ * The board filter: one set of conditions over every widget that reads the same dataset.
+ *
+ * The combination rule is tested as a pure function because its failure has NO VISIBLE SYMPTOM --
+ * a tile narrowed by the wrong predicate draws a perfectly ordinary chart of the wrong rows.
+ */
+describe('combining a board filter with a widget own filters', () => {
+
+  const north = { field: 'region', operator: 'EQ' as const, value: 'north' };
+  const south = { field: 'region', operator: 'EQ' as const, value: 'south' };
+  const march = { field: 'month', operator: 'EQ' as const, value: '3' };
+
+  it('sends exactly what it always did when there is no board filter', () => {
+    const saved = { op: 'AND' as const, clauses: [north] };
+    expect(combineFilters(saved, null)).toEqual(saved);
+    expect(combineFilters(saved, { op: 'AND', clauses: [] })).toEqual(saved);
+  });
+
+  it('sends the board filter alone when the widget has none of its own', () => {
+    const board = { op: 'AND' as const, clauses: [march] };
+    expect(combineFilters(undefined, board)).toEqual(board);
+  });
+
+  it('emits nothing at all when both are empty', () => {
+    // Not an empty group: the server refuses one outright -- "A filter group needs at least one
+    // condition in it" -- so wrapping nothing would turn every tile into an error the moment
+    // somebody opened the bar and typed nothing.
+    expect(combineFilters(undefined, null)).toBeUndefined();
+    expect(combineFilters({ op: 'AND', clauses: [] }, { op: 'AND', clauses: [] }))
+      .toBeUndefined();
+  });
+
+  it('keeps an OR group WHOLE, which is the one that has no visible symptom', () => {
+    // Spreading "region = north OR region = south" into a top-level AND alongside the board's
+    // condition turns it into "north OR (south AND march)" -- a different question wearing the
+    // same words, drawn as a perfectly ordinary chart.
+    const either = { op: 'OR' as const, clauses: [north, south] };
+    const board = { op: 'AND' as const, clauses: [march] };
+
+    const combined = combineFilters(either, board);
+
+    expect(combined).toEqual({ op: 'AND', clauses: [either, board] });
+    expect(combined!.clauses[0]).toEqual(either);
+  });
+
+  it('prunes both halves, so a half-typed condition cannot reach the wire', () => {
+    // A BETWEEN with one bound is not a predicate. The server would refuse the group it sat in.
+    const halfTyped = {
+      op: 'AND' as const,
+      clauses: [north, { field: 'amount', operator: 'BETWEEN' as const, values: ['10'] }],
+    };
+    const combined = combineFilters(halfTyped, { op: 'AND', clauses: [] });
+    expect(combined).toEqual({ op: 'AND', clauses: [north] });
+  });
+});
+
+describe('what the board filter costs, and what it says', () => {
+
+  it('running nothing is the point: editing the bar issues no query at all', () => {
+    // The invariant this component exists to protect. Ten widgets is ten governed queries against
+    // a server that runs four at a time, and a bar that re-ran as somebody typed would be exactly
+    // the denial of service the serial queue was built to prevent. It has no symptom until a
+    // board is big.
+    const harness = boardWith({ widgets: [widgetOn()] });
+    harness.board.openDashboard(BOARD);
+    const before = harness.api.analyze.mock.calls.length;
+
+    harness.board.boardFilter.set({
+      op: 'AND', clauses: [{ field: 'region', operator: 'EQ', value: 'north' }],
+    });
+    harness.board.boardFilter.set({
+      op: 'AND', clauses: [{ field: 'region', operator: 'EQ', value: 'south' }],
+    });
+
+    expect(harness.api.analyze.mock.calls.length).toBe(before);
+  });
+
+  it('changing the dataset clears the filter, because the columns just changed', () => {
+    // A condition naming a column the new dataset does not have is a hard refusal from the
+    // server, landing on every tile at once.
+    const harness = boardWith({ widgets: [widgetOn()] });
+    harness.board.boardFilterOn.set('minio-main a.csv');
+    harness.board.boardFilter.set({
+      op: 'AND', clauses: [{ field: 'region', operator: 'EQ', value: 'north' }],
+    });
+
+    harness.board.chooseFilterDataset('minio-main b.csv');
+
+    expect(harness.board.boardFilter().clauses).toEqual([]);
+  });
+
+  it('says nothing when no board filter is on', () => {
+    const harness = boardWith({ widgets: [widgetOn()] });
+    expect(harness.board.boardFilterNote(widgetOn())).toBe('');
+  });
+
+  it('tells a saved-query tile that there is no filter to give it', () => {
+    // The query endpoint takes SQL and nothing else, and composing a WHERE around somebody own
+    // statement is precisely the string-building the structured path exists to avoid.
+    const harness = boardWith({ widgets: [widgetOn()] });
+    harness.board.boardFilterOn.set('minio-main a.csv');
+    harness.board.boardFilter.set({
+      op: 'AND', clauses: [{ field: 'region', operator: 'EQ', value: 'north' }],
+    });
+
+    const note = harness.board.boardFilterNote(
+      widgetOn({ analyticsAnalysisId: undefined, analyticsQueryId: 5 }));
+
+    expect(note).toContain('takes SQL and nothing else');
   });
 });
