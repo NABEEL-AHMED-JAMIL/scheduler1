@@ -6,6 +6,7 @@ import { Icon } from '../../shared/ui/icon';
 import { confirmWith } from '../../shared/ui/confirm';
 import { BarChart } from '../../shared/charts/bar-chart';
 import { Donut } from '../../shared/charts/donut';
+import { readableCell } from '../../shared/charts/number-format';
 import { RankedBar } from '../../shared/charts/ranked-bar';
 import { isNumericType } from './filter-builder';
 import {
@@ -765,7 +766,16 @@ function mintQueryId(widgetId: number): string {
                                                  certainly not a zero. -->
                                             <span class="text-[color:var(--text-muted)]" title="null">—</span>
                                           } @else {
-                                            {{ cell }}
+                                            <!-- Formatted for reading, with the raw value one
+                                                 hover away. A revenue tile read
+                                                 "103909527.57999787" before this: seventeen
+                                                 significant figures, the last eight of them an
+                                                 artefact of the CSV reader typing money as
+                                                 DOUBLE. Rounding it in the title as well would
+                                                 hide that from anyone reconciling against
+                                                 another system, which is the one job that needs
+                                                 the unrounded number. -->
+                                            <span [title]="cell">{{ readable(cell) }}</span>
                                           }
                                         </td>
                                       }
@@ -803,6 +813,11 @@ export class Dashboards implements OnInit, OnDestroy {
   private readonly dialog = inject(Dialog);
 
   readonly kinds = KINDS;
+
+  /** A result cell, formatted for reading. The raw value stays in the cell's title. */
+  protected readable(cell: string): string {
+    return readableCell(cell);
+  }
 
   readonly dashboards = signal<Dashboard[]>([]);
   readonly loading = signal(false);

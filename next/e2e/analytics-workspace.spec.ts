@@ -4,6 +4,12 @@ import { readFileSync } from 'fs';
 /**
  * The flow recorded in .ai/spec/E2E-FLOW.md, automated.
  *
+ * <b>A note on selectors.</b> Several assertions here are scoped to a specific element rather
+ * than to page text, and they had to be: the Canvas lists every saved analysis by name, and once
+ * the report catalogues were seeded that list held 133 of them. A page-wide match on "by region"
+ * then found twenty-seven saved analyses as well as the heading it meant. The looser version was
+ * only ever correct in an empty workspace, which is not a state anybody's actually is in.
+ *
  * Each test is one of that document's numbered steps, and the assertions are its "what proves it"
  * column. They read the SCREEN rather than component state on purpose: both defects this suite
  * exists because of were about what the assembled page says, and both were invisible to 1,065
@@ -96,17 +102,17 @@ test('5 — a drill narrows, and the breadcrumb takes you back where you started
 
   await page.locator('#a-dim-0').selectOption('region');
   await page.getByRole('button', { name: /Run analysis/ }).click();
-  await expect(page.getByText(/by region/)).toBeVisible();
+  await expect(page.locator('h4', { hasText: /by region/ })).toBeVisible();
 
   await page.locator('#a-drill-next').selectOption('customer');
   await page.locator('#a-drill-dim').selectOption('region');
   await page.getByRole('button', { name: 'Drill', exact: true }).first().click();
-  await expect(page.getByText(/by customer/)).toBeVisible();
-  await expect(page.getByText(/Filtered to/)).toBeVisible();
+  await expect(page.locator('h4', { hasText: /by customer/ })).toBeVisible();
+  await expect(page.getByText('Filtered to', { exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: 'All rows', exact: true }).click();
-  await expect(page.getByText(/by region/)).toBeVisible();
-  await expect(page.getByText(/Filtered to/)).toHaveCount(0);
+  await expect(page.locator('h4', { hasText: /by region/ })).toBeVisible();
+  await expect(page.getByText('Filtered to', { exact: true })).toHaveCount(0);
 });
 
 test('6 — Quality names what it checked instead of showing a green tick', async ({ page }) => {
@@ -152,11 +158,11 @@ test('10 — a Canvas drill narrows the Data tab, and says so', async ({ page })
   await page.getByRole('button', { name: 'Canvas', exact: true }).click();
   await page.locator('#a-dim-0').selectOption('region');
   await page.getByRole('button', { name: /Run analysis/ }).click();
-  await expect(page.getByText(/by region/)).toBeVisible();
+  await expect(page.locator('h4', { hasText: /by region/ })).toBeVisible();
 
   await page.locator('#a-drill-dim').selectOption('region');
   await page.getByRole('button', { name: 'Drill', exact: true }).first().click();
-  await expect(page.getByText(/Filtered to/)).toBeVisible();
+  await expect(page.getByText('Filtered to', { exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: 'Data', exact: true }).click();
   await expect(page.getByText('Narrowed by the Canvas')).toBeVisible();

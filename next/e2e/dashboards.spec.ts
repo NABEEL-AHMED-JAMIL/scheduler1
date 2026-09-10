@@ -59,8 +59,9 @@ for (const report of REPORTS) {
 
     // The heading, so a report that opened the WRONG one cannot pass by widget count alone.
     await expect(page.getByRole('heading', { name: report.name })).toBeVisible();
-    // One title only this report carries.
-    await expect(page.getByText(report.tell)).toBeVisible();
+    // exact, because every tile also renders a provenance line -- "Saved analysis · <title> ·
+    // <connection>/<path>" -- and a substring match hits both that and the title itself.
+    await expect(page.getByText(report.tell, { exact: true })).toBeVisible();
   });
 }
 
@@ -71,7 +72,7 @@ test('a widget draws a result rather than an error', async ({ page }) => {
   await openLibrary(page);
   await page.getByRole('button', { name: 'Executive summary' }).click();
 
-  await expect(page.getByText('Total revenue')).toBeVisible();
+  await expect(page.getByText('Total revenue', { exact: true })).toBeVisible();
   // Nothing on a healthy report says any of this.
   await expect(page.getByText(/could not be read|does not exist|was refused/)).toHaveCount(0);
 });
@@ -88,7 +89,9 @@ test('opening a report re-runs it instead of showing a stored answer', async ({ 
   });
 
   await page.getByRole('button', { name: 'Sales by region' }).click();
-  await expect(page.getByText('Revenue by region')).toBeVisible();
+  // exact: the board also renders "Running 1 of 6 - Revenue by region." while it works, and a
+  // "Saved analysis - ..." provenance line under every tile.
+  await expect(page.getByText('Revenue by region', { exact: true })).toBeVisible();
   await page.waitForTimeout(3000);
 
   expect(analyses.length, 'opening a dashboard must re-run its widgets').toBeGreaterThan(0);
