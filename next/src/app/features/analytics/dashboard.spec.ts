@@ -1188,3 +1188,45 @@ describe('the three summary kinds', () => {
     expect(view.additive).toBe(false);
   });
 });
+
+describe('finding a report among many', () => {
+  it('collapses the list when a report is opened', () => {
+    // Twenty-eight entries at full height pushed every widget below the fold, so opening a
+    // report showed a list of reports.
+    const harness = boardWith({ widgets: [widgetOn()] });
+    expect(harness.board.listOpen()).toBe(true);
+
+    harness.board.openDashboard(BOARD);
+
+    expect(harness.board.listOpen()).toBe(false);
+  });
+
+  it('narrows by name and by description', () => {
+    const harness = boardWith({ widgets: [widgetOn()] });
+    harness.board.dashboards.set([
+      { analyticsDashboardId: 1, dashboardName: '01 Overall KPI summary',
+        dashboardDescription: 'the whole file in six numbers' },
+      { analyticsDashboardId: 2, dashboardName: '15 Regional analysis',
+        dashboardDescription: 'one region at a time' },
+    ] as any);
+
+    harness.board.listFilter.set('regional');
+    expect(harness.board.visibleDashboards().map(d => d.analyticsDashboardId)).toEqual([2]);
+
+    // The description is searched too: people remember what a report was for more often than
+    // they remember what somebody called it.
+    harness.board.listFilter.set('six numbers');
+    expect(harness.board.visibleDashboards().map(d => d.analyticsDashboardId)).toEqual([1]);
+  });
+
+  it('shows everything when the filter is empty or blank', () => {
+    const harness = boardWith({ widgets: [widgetOn()] });
+    harness.board.dashboards.set([
+      { analyticsDashboardId: 1, dashboardName: 'a' },
+      { analyticsDashboardId: 2, dashboardName: 'b' },
+    ] as any);
+
+    harness.board.listFilter.set('   ');
+    expect(harness.board.visibleDashboards()).toHaveLength(2);
+  });
+});

@@ -660,9 +660,32 @@ function mintQueryId(widgetId: number): string {
             No dashboards yet. A dashboard holds saved analyses and saved queries side by side;
             build one of those first and it can go on a page here.
           </p>
+        } @else if (!listOpen()) {
+          <!-- Collapsed once a board is open, because the reason somebody clicked a report is to
+               look at it. Twenty-eight entries at full height pushed every widget below the fold,
+               so opening a report showed a list of reports. -->
+          <p class="text-xs text-[color:var(--text-muted)]">
+            {{ dashboards().length }} reports.
+            <button type="button" class="link-inline" (click)="listOpen.set(true)">Show the list</button>
+          </p>
         } @else {
-          <ul class="space-y-1">
-            @for (item of dashboards(); track item.analyticsDashboardId) {
+          @if (dashboards().length > 8) {
+            <!-- A filter rather than a longer list. At twenty-eight, finding one by eye is the
+                 slowest part of opening it. -->
+            <input type="search" class="input input-sm w-full" [value]="listFilter()"
+                   (input)="listFilter.set($any($event.target).value)"
+                   placeholder="Filter these {{ dashboards().length }} reports by name"
+                   aria-label="Filter reports by name" />
+          }
+          @if (!visibleDashboards().length) {
+            <p class="text-xs text-[color:var(--text-muted)] py-2">
+              No report's name contains "{{ listFilter() }}".
+            </p>
+          }
+          <!-- Capped and scrolled, so the list can never be taller than the thing it is for.
+               Its own scroller, never the page's: the board below has to stay reachable. -->
+          <ul class="space-y-1 max-h-80 overflow-y-auto">
+            @for (item of visibleDashboards(); track item.analyticsDashboardId) {
               <li class="flex items-center gap-2 min-w-0 border-t border-subtle pt-1">
                 <button type="button" class="btn btn-ghost btn-sm min-w-0 flex-1 justify-start"
                         [class.font-semibold]="item.analyticsDashboardId === board()?.analyticsDashboardId"
@@ -863,8 +886,14 @@ function mintQueryId(widgetId: number): string {
                     }
                     @default {
                       @if (run.view; as view) {
-                        <div class="flex items-baseline gap-2 flex-wrap">
-                          <select class="input input-sm w-auto" aria-label="How to draw this widget"
+                        <div class="flex items-baseline gap-2 flex-wrap min-w-0">
+                          <!-- max-w-full and min-w-0, because w-auto sizes a select to its WIDEST
+                               option and the options now carry the reason a kind is unavailable
+                               -- a sentence. The tile overflowed its own card. The dropdown is
+                               free to be wider than the control when it opens, which is where
+                               those sentences need to be readable. -->
+                          <select class="input input-sm w-auto max-w-full min-w-0 truncate"
+                                  aria-label="How to draw this widget"
                                   [value]="drawn(widget, view)"
                                   (change)="setVisualization(widget, $any($event.target).value)">
                             <!-- Listed and inert with the reason on it, never quietly missing: a
@@ -1133,6 +1162,25 @@ export class Dashboards implements OnInit, OnDestroy {
   readonly loading = signal(false);
   readonly error = signal('');
 
+  /**
+   * Whether the report list is showing.
+   *
+   * Open until a board is opened, then collapsed. The list is how you FIND a report; once you
+   * have one, it is twenty-eight rows between you and the thing you asked for.
+   */
+  readonly listOpen = signal(true);
+
+  /** Narrows the list by name. Only offered past eight reports; see the template. */
+  readonly listFilter = signal('');
+
+  readonly visibleDashboards = computed(() => {
+    const needle = this.listFilter().trim().toLowerCase();
+    if (!needle) return this.dashboards();
+    return this.dashboards().filter(item =>
+      (item.dashboardName ?? '').toLowerCase().includes(needle)
+      || (item.dashboardDescription ?? '').toLowerCase().includes(needle));
+  });
+
   readonly newName = signal('');
   readonly newDescription = signal('');
   readonly creating = signal(false);
@@ -1320,6 +1368,9 @@ export class Dashboards implements OnInit, OnDestroy {
   openDashboard(item: Dashboard): void {
     const id = item.analyticsDashboardId;
     if (!id) return;
+    // Collapse the list. Opening a report should show the report, not leave twenty-eight rows
+    // between the reader and the thing they clicked. "Show the list" brings it straight back.
+    this.listOpen.set(false);
     this.loadBoard(id, 'all');
   }
 

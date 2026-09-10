@@ -166,3 +166,53 @@ test('a two-dimension cross-tab is the one that may be stacked', async ({ page }
   // Sorted biggest-first, so a line through them would draw the sort.
   await expect(picker.locator('option[value="line"]')).toBeDisabled();
 });
+
+/**
+ * Layout guards. Cheap to check, and the kind of thing that regresses silently.
+ *
+ * The overflow one is not hypothetical: the kind picker is `w-auto`, which sizes a select to its
+ * WIDEST option, and the options carry the reason a kind is unavailable -- a whole sentence. The
+ * tile overflowed its own card the moment those reasons were added.
+ */
+test('nothing on an open board overflows its card, and the page never scrolls sideways',
+  async ({ page }) => {
+    await openLibrary(page);
+    await page.getByRole('button', { name: '01 Overall KPI summary' }).click();
+    await expect(page.getByText('Total revenue', { exact: true })).toBeVisible();
+    await page.waitForTimeout(5000);
+
+    const overflowing = await page.evaluate(() => {
+      const bad: string[] = [];
+      document.querySelectorAll('select, table').forEach(element => {
+        const card = element.closest('.card');
+        if (!card) return;
+        // A table is allowed to be wider than its card IF it sits in its own scroller.
+        const scroller = element.closest('[class*="overflow-x"]');
+        if (scroller) return;
+        if (element.getBoundingClientRect().right > card.getBoundingClientRect().right + 1) {
+          bad.push(element.tagName.toLowerCase());
+        }
+      });
+      return bad;
+    });
+    expect(overflowing, 'these overflow their card').toEqual([]);
+
+    const sideways = await page.evaluate(() =>
+      document.documentElement.scrollWidth > document.documentElement.clientWidth);
+    expect(sideways, 'the page body scrolls horizontally').toBe(false);
+  });
+
+test('opening a report collapses the list, so the report is what you see', async ({ page }) => {
+  // Twenty-eight entries at full height pushed every widget below the fold.
+  await openLibrary(page);
+  await expect(page.getByRole('button', { name: '01 Overall KPI summary' })).toBeVisible();
+
+  await page.getByRole('button', { name: '01 Overall KPI summary' }).click();
+
+  await expect(page.getByText(/\d+ reports\./)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Show the list' })).toBeVisible();
+  // The first tile is now within the first screenful.
+  const top = await page.locator('.card').filter({ hasText: 'Total revenue' }).first()
+    .evaluate(node => node.getBoundingClientRect().top);
+  expect(top).toBeLessThan(900);
+});
