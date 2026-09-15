@@ -482,11 +482,18 @@
               One line per column. Null and distinct are measured across the whole file;
               <span class="font-medium">the sample is not</span> — it is the first value on the
               page the Data tab is holding, so it moves with the page, the sort and the filter.
+              <!-- Came with the cards from the tab they used to have. The cost argument is the
+                   reason the measurement is per column and on demand, so it belongs wherever the
+                   button that spends it is. -->
+              Open a row for the full statistics. The most common values in a column, and how
+              often each occurs, are a SECOND pass over the file — so each row asks for its own
+              when you press Measure values, rather than every column paying for one up front.
             </div>
 
             <table class="table-modern">
               <thead>
                 <tr>
+                  <th class="w-6"><span class="sr-only">Expand</span></th>
                   <th class="whitespace-nowrap">Column</th>
                   <th class="whitespace-nowrap">Type</th>
                   <th class="whitespace-nowrap">Sample</th>
@@ -498,7 +505,16 @@
               </thead>
               <tbody>
                 @for (row of compactRows(); track row.name) {
-                  <tr>
+                  <!-- The whole row opens the card. A dense table is scanned, and asking a reader
+                       to hit a 16px chevron in a row they are already pointing at is the kind of
+                       target that gets missed twice before it is hit once. -->
+                  <tr class="cursor-pointer hover:bg-[color:var(--surface-sunken)]"
+                      (click)="toggleColumn(row.name)"
+                      [attr.aria-expanded]="isColumnOpen(row.name)">
+                    <td class="align-middle">
+                      <app-icon [name]="isColumnOpen(row.name) ? 'chevronDown' : 'chevronRight'"
+                                size="0.85em" class="icon-muted" />
+                    </td>
                     <td class="mono text-xs whitespace-nowrap max-w-64 truncate"
                         [title]="row.name">{{ row.name }}</td>
                     <td class="text-xs whitespace-nowrap">
@@ -555,59 +571,26 @@
                             [title]="row.qualityDetail">{{ row.quality }}</span>
                     </td>
                   </tr>
+                  @if (isColumnOpen(row.name)) {
+                    <tr>
+                      <!-- colspan covers the disclosure cell and the seven fields beside it. -->
+                      <td colspan="8" class="p-0">
+                        @if (columnViewFor(row.name); as column) {
+                          <div class="p-3 bg-[color:var(--surface-sunken)]">
+                            <app-column-card [column]="column"
+                                             [findings]="findingsFor(row.name)"
+                                             [connection]="connection()" [path]="path()" />
+                          </div>
+                        }
+                      </td>
+                    </tr>
+                  }
                 }
               </tbody>
             </table>
           </app-table-shell>
         }
 
-        @if (tab() === 'columns') {
-          <!-- Document 06's Columns view: the per-column statistics. This used to be the tab
-               labelled "Profile", which left the aggregate view 06 asks for missing entirely and
-               handed a reader who wanted "what is this file made of" two hundred cards.
-
-               Every hedge on this tab sits ON the figure it qualifies. Three of these numbers
-               are not exact, and a note at the bottom of the card would be read after the
-               number had already been believed. -->
-          <app-table-shell heading="Columns" [scrollRows]="false"
-                           [loading]="profileLoading()" [error]="profileError()"
-                           [isEmpty]="!profileLoading() && !profileError() && !profileColumns().length"
-                           emptyMessage="This dataset has no columns to profile." emptyIcon="table"
-                           (retry)="loadProfile()">
-            <div class="p-4 flex flex-col gap-3">
-              <p class="text-xs text-[color:var(--text-muted)]">
-                Measured across the whole dataset, not the page on the Data tab. The same scan
-                feeds Compact, Profile and Quality — moving between them costs nothing.
-              </p>
-              <!-- Said once, at the top, rather than as an empty row on every card. 06 asks for
-                   top values and their frequency and SUMMARIZE does not return them: they need a
-                   GROUP BY of their own, which is a second scan and a second permit. Naming what
-                   is absent is the alternative to a card that quietly does not have it. -->
-              <p class="field-note text-[color:var(--text-muted)]">
-                This tab is one scan read four ways. The most common values in a column, and how
-                often each occurs, are a SECOND pass over the file — so each card asks for its own
-                when you press Measure values, rather than every column paying for one up front.
-              </p>
-
-              <!-- Two columns only from lg, where the storage rail has taken its 260px and the
-                   remaining width is still enough for a card to hold a min, a max and a spread
-                   bar without the values truncating. -->
-              <!-- Container query, not lg:. This sits inside .dataset-column, whose whole reason
-                   for existing is that the 260px storage rail makes the window a bad proxy for
-                   this column's width. lg:grid-cols-2 was worse than merely inconsistent, it was
-                   inverted: at 1023px the rail stacks and this column is full width, giving ONE
-                   column; at 1024px the rail takes its 260px back and it gives TWO. Fewest
-                   columns at the widest space. -->
-              <div class="profile-grid">
-                @for (column of profileColumns(); track column.name) {
-                  <app-column-card [column]="column"
-                                   [findings]="findingsFor(column.name)"
-                                   [connection]="connection()" [path]="path()" />
-                }
-              </div>
-            </div>
-          </app-table-shell>
-        }
 
         @if (tab() === 'profile') {
           <!-- Document 06's Profile view: "aggregate distributions and data-type summaries".

@@ -62,7 +62,7 @@ import {
  * exists -- and `chartStale` watches for exactly that drift and says so on the chart, which the
  * old arrangement achieved by geography.
  */
-type Tab = 'overview' | 'compact' | 'data' | 'columns' | 'profile' | 'quality'
+type Tab = 'overview' | 'compact' | 'data' | 'profile' | 'quality'
   | 'canvas' | 'sql' | 'charts' | 'activity';
 
 /**
@@ -731,11 +731,14 @@ export class Analytics implements OnInit {
     },
     {
       label: 'Its columns',
-      hint: 'Four readings of ONE scan of the whole file. The scan is made once, on the first '
-        + 'of these you open, and the other three are free after that.',
+      hint: 'Three readings of ONE scan of the whole file. The scan is made once, on the first '
+        + 'of these you open, and the other two are free after that.',
       tabs: [
+        // 'columns' was here and is gone. It drew one CARD per column from the same scan this
+        // table reads, so the two were one view of one measurement wearing two tabs -- and a
+        // reader who wanted a figure had to guess which. Compact keeps the dense row, which is
+        // what a two-hundred-column file needs, and opens the card underneath it.
         { id: 'compact', label: 'Compact' },
-        { id: 'columns', label: 'Columns' },
         { id: 'profile', label: 'Profile' },
         { id: 'quality', label: 'Quality' },
       ],
@@ -1308,7 +1311,7 @@ export class Analytics implements OnInit {
    * add a fifth reading and forget to name it here and the tab renders its empty state forever,
    * with nothing having been asked for and no error to explain it.
    */
-  private static readonly SCAN_TABS: Tab[] = ['compact', 'columns', 'profile', 'quality'];
+  private static readonly SCAN_TABS: Tab[] = ['compact', 'profile', 'quality'];
 
   /**
    * Moves to a tab, fetching the profile the first time one of the four tabs that needs it is
@@ -1699,6 +1702,32 @@ export class Analytics implements OnInit {
    * every change-detection pass, and a filter would be columns times findings each time -- on a
    * tab whose whole purpose is a file with two hundred columns in it.
    */
+  /**
+   * Which columns are open in the Compact table.
+   *
+   * A SET rather than one name, so a reader can put two columns side by side and compare them --
+   * which is most of the reason anyone opens one at all, and the thing the two separate tabs
+   * could never do.
+   */
+  readonly openColumns = signal<ReadonlySet<string>>(new Set());
+
+  isColumnOpen(name: string): boolean {
+    return this.openColumns().has(name);
+  }
+
+  toggleColumn(name: string): void {
+    this.openColumns.update(open => {
+      const next = new Set(open);
+      if (!next.delete(name)) next.add(name);
+      return next;
+    });
+  }
+
+  /** The full view of one column, for the card an expanded row carries. */
+  columnViewFor(name: string): ColumnView | null {
+    return this.profileColumns().find(column => column.name === name) ?? null;
+  }
+
   findingsFor(column: string): QualityFinding[] {
     return this.findingsByColumn().get(column) ?? [];
   }

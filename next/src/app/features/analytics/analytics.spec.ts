@@ -810,17 +810,20 @@ describe('the three figures that are not exact', () => {
       /**
        * Everything a person can read on the screen, with the template's whitespace collapsed.
        *
-       * Defaults to COLUMNS rather than Profile, because that is where the per-column cards --
-       * and so the three hedged figures -- now live. Document 06 defines Profile as aggregate
-       * distributions and Columns as the per-column statistics, and the build had the two
-       * inverted. Every assertion in this block is about a figure on a card, so the tab it
-       * opens moved with the cards.
+       * Opens COMPACT and expands every column, because that is where the per-column cards --
+       * and so the three hedged figures -- now live. They had their own tab, which drew the same
+       * scan this table reads; the card moved under the row it describes and the tab went. Every
+       * assertion in this block is about a figure on a card, so the harness follows it.
        */
       show(columns: ColumnProfile[], totalRows = 1000,
-           tab: 'columns' | 'profile' | 'quality' | 'compact' = 'columns') {
+           tab: 'profile' | 'quality' | 'compact' = 'compact') {
         studio.showTab(tab);
         answers.profile!.next(SERVER_RESPONSE(profileOf(columns, totalRows)));
         fixture.detectChanges();
+        if (tab === 'compact') {
+          for (const column of columns) studio.toggleColumn(column.name);
+          fixture.detectChanges();
+        }
         return ((fixture.nativeElement as HTMLElement).textContent ?? '').replace(/\s+/g, ' ');
       },
       /** The statistic labels on the profile cards, which is where "min" is or is not said. */
@@ -1843,7 +1846,7 @@ describe('the console does not disturb the tabs beside it', () => {
     // the middle of it.
     const console = consoleWith();
     expect(console.studio.tabs.map(tab => tab.id)).toEqual([
-      'overview', 'data', 'compact', 'columns', 'profile', 'quality',
+      'overview', 'data', 'compact', 'profile', 'quality',
       'canvas', 'sql', 'charts', 'activity',
     ]);
 
@@ -1865,7 +1868,9 @@ describe('the console does not disturb the tabs beside it', () => {
     expect(console.studio.tabGroups.flatMap(group => group.tabs).length)
       .toBe(console.studio.tabs.length);
     expect(console.studio.tabGroups[1].tabs.map(tab => tab.id))
-      .toEqual(['compact', 'columns', 'profile', 'quality']);
+      // 'columns' drew the same scan this table reads, one card per column. The card
+      // moved under the Compact row it describes and the tab went with it.
+      .toEqual(['compact', 'profile', 'quality']);
     expect(console.show()).toContain('Its columns');
   });
 
@@ -3888,7 +3893,7 @@ describe('the pager tells the truth about the order it is paging', () => {
 // ---------------------------------------------------------------------------------------------
 
 /** The studio on one of the four tabs that read the single SUMMARIZE scan. */
-function scanned(tab: 'compact' | 'columns' | 'profile' | 'quality',
+function scanned(tab: 'compact' | 'profile' | 'quality',
                  columns: ColumnProfile[], totalRows = 1000,
                  page: Partial<DatasetPreview> = {}) {
   const grid = gridWith(page);
@@ -3898,21 +3903,34 @@ function scanned(tab: 'compact' | 'columns' | 'profile' | 'quality',
   return grid;
 }
 
+/**
+ * Compact, with one column's card open.
+ *
+ * The per-column detail used to be its own tab. It is the same card, rendered under the Compact
+ * row it belongs to, so the assertions about what that card says are unchanged -- only the way
+ * a reader reaches it is.
+ */
+function columnOpened(name: string, columns: ColumnProfile[], totalRows = 1000) {
+  const grid = scanned('compact', columns, totalRows);
+  grid.studio.toggleColumn(name);
+  grid.fixture.detectChanges();
+  return grid;
+}
+
 describe('Profile and Columns are what document 06 says they are', () => {
-  it('scans once for all four of the tabs that read it', () => {
+  it('scans once for all three of the tabs that read it', () => {
     // The cost argument the tab grouping makes on screen has to be true.
     const grid = gridWith();
     grid.studio.showTab('compact');
     grid.answers.profile!.next(SERVER_RESPONSE(profileOf([columnOf()])));
-    grid.studio.showTab('columns');
     grid.studio.showTab('profile');
     grid.studio.showTab('quality');
 
     expect(grid.profile).toHaveBeenCalledTimes(1);
   });
 
-  it('gives Columns the per-column detail, which is where the hedged figures are', () => {
-    const grid = scanned('columns', [columnOf({ name: 'amount' })]);
+  it('gives an opened column the per-column detail, which is where the hedged figures are', () => {
+    const grid = columnOpened('amount', [columnOf({ name: 'amount' })]);
     const text = grid.show();
 
     expect(text).toContain('amount');
@@ -3923,7 +3941,7 @@ describe('Profile and Columns are what document 06 says they are', () => {
   it('says top values are a second pass, and offers to buy it per column', () => {
     // 06 asks for them and SUMMARIZE does not return them: they need a GROUP BY of their own.
     // Naming what is absent is the alternative to a card that quietly does not have it.
-    const grid = scanned('columns', [columnOf()]);
+    const grid = columnOpened('a_column', [columnOf({ name: 'a_column' })]);
 
     // Reworded with the counted distribution. The second pass is still a second pass, but it is
     // now BUYABLE per column rather than simply absent -- saying it is "not here" directly above
@@ -3933,7 +3951,7 @@ describe('Profile and Columns are what document 06 says they are', () => {
   });
 
   it('puts a column’s quality warnings on the column they are about', () => {
-    const grid = scanned('columns', [columnOf({
+    const grid = columnOpened('note', [columnOf({
       name: 'note', nullPercentage: 100, completeness: 0, approxDistinct: 0, allNull: true,
     })]);
 
@@ -5221,3 +5239,50 @@ describe('clicking the dataset that is already open', () => {
 });
 
 
+
+/**
+ * Compact rows open into the card the Columns tab used to hold.
+ *
+ * The two tabs drew ONE scan two ways -- a dense row each and a card each -- so a reader wanting
+ * a figure had to guess which tab had it. Compact keeps the row, which is what a two-hundred-
+ * column file needs, and the card opens underneath the row it describes.
+ */
+describe('opening a column from the Compact table', () => {
+  const COLUMNS = [columnOf({ name: 'amount' }), columnOf({ name: 'quantity' })];
+
+  it('starts with every row closed, so a wide file still opens as one screen', () => {
+    const grid = scanned('compact', COLUMNS);
+    expect(grid.studio.isColumnOpen('amount')).toBe(false);
+    expect(grid.show()).not.toContain('quartiles estimated');
+  });
+
+  it('opens the card for the row that was clicked', () => {
+    const grid = columnOpened('amount', COLUMNS);
+    expect(grid.studio.isColumnOpen('amount')).toBe(true);
+    expect(grid.show()).toContain('quartiles estimated');
+  });
+
+  it('closes it again on a second click', () => {
+    const grid = columnOpened('amount', COLUMNS);
+    grid.studio.toggleColumn('amount');
+    expect(grid.studio.isColumnOpen('amount')).toBe(false);
+  });
+
+  it('holds two columns open at once, which two tabs could never do', () => {
+    // The reason anyone opens one at all is usually to compare it with another.
+    const grid = columnOpened('amount', COLUMNS);
+    grid.studio.toggleColumn('quantity');
+    expect(grid.studio.isColumnOpen('amount')).toBe(true);
+    expect(grid.studio.isColumnOpen('quantity')).toBe(true);
+  });
+
+  it('gives the card the view of the column it belongs to', () => {
+    const grid = scanned('compact', COLUMNS);
+    expect(grid.studio.columnViewFor('quantity')?.name).toBe('quantity');
+    expect(grid.studio.columnViewFor('not_a_column')).toBeNull();
+  });
+
+  it('offers the measurement from the opened row', () => {
+    expect(columnOpened('amount', COLUMNS).show()).toContain('Measure values');
+  });
+});
