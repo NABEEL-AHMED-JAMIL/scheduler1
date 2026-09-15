@@ -88,6 +88,11 @@ export class JobEdit implements OnInit {
     taskDetailId: [null, Validators.required],
     executionType: ['Auto', Validators.required],
     priority: [1, [Validators.required, Validators.min(1), Validators.max(9)]],
+    // Both mirror the CHECK constraints the database enforces and the ranges SourceJobServiceImpl
+    // validates. 1 attempt means no retry, which is what every job created before this existed
+    // carries, so the default here leaves behaviour unchanged unless somebody opts in.
+    maxAttempts: [1, [Validators.required, Validators.min(1), Validators.max(10)]],
+    retryBackoffSeconds: [60, [Validators.required, Validators.min(1), Validators.max(3600)]],
     jobStatus: ['Active', Validators.required],
     completeJob: [false],
     failJob: [false],
@@ -109,6 +114,10 @@ export class JobEdit implements OnInit {
   readonly isScheduled = computed(() => this.executionValue() !== 'Manual');
   private readonly executionValue = signal('Auto');
 
+  /** Backoff only means anything once there is a second attempt to wait before. */
+  readonly retryEnabled = computed(() => Number(this.maxAttemptsValue()) > 1);
+  private readonly maxAttemptsValue = signal(1);
+
   readonly frequencyValue = signal('Daily');
   readonly unit = computed(() =>
     FREQUENCIES.find(f => f.value === this.frequencyValue())?.unit ?? '');
@@ -127,6 +136,7 @@ export class JobEdit implements OnInit {
 
     this.form.get('executionType')!.valueChanges.subscribe(v => this.executionValue.set(v));
     this.scheduler.get('frequency')!.valueChanges.subscribe(v => this.frequencyValue.set(v));
+    this.form.get('maxAttempts')!.valueChanges.subscribe(v => this.maxAttemptsValue.set(Number(v)));
 
     if (this.isEdit()) this.loadJob();
   }
@@ -148,6 +158,10 @@ export class JobEdit implements OnInit {
           taskDetailId: job.taskDetail?.taskDetailId ?? null,
           executionType: job.execution,
           priority: job.priority,
+          // Older jobs predate these columns and come back without them; falling back to the
+          // no-retry default keeps the form showing what the job actually does.
+          maxAttempts: job.maxAttempts ?? 1,
+          retryBackoffSeconds: job.retryBackoffSeconds ?? 60,
           jobStatus: job.jobStatus,
           completeJob: job.completeJob,
           failJob: job.failJob,
@@ -234,6 +248,8 @@ export class JobEdit implements OnInit {
       taskDetail: { taskDetailId: value.taskDetailId },
       execution: value.executionType,
       priority: value.priority,
+      maxAttempts: value.maxAttempts,
+      retryBackoffSeconds: value.retryBackoffSeconds,
       jobStatus: value.jobStatus,
       completeJob: value.completeJob,
       failJob: value.failJob,

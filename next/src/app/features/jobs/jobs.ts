@@ -56,6 +56,10 @@ export interface SourceJob {
   jobRunningStatus: string;
   execution?: string;
   priority?: number;
+  /** Total attempts a run may make, including the first; 1 (the default) means no retry. */
+  maxAttempts?: number;
+  /** Base seconds before a retry; the wait doubles per attempt. */
+  retryBackoffSeconds?: number;
   lastJobRun?: string;
   dateCreated?: string;
   assignedUsername?: string;

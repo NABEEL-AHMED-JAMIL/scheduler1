@@ -49,6 +49,22 @@
             <input id="priority" type="number" min="1" max="9" class="input" formControlName="priority" placeholder="1 = highest" />
           </app-field>
 
+          <app-field label="Attempts" for="maxAttempts" [required]="true"
+                     [control]="form.get('maxAttempts')" [submitted]="submitted()"
+                     hint="1 means a failed run is not retried.">
+            <input id="maxAttempts" type="number" min="1" max="10" class="input"
+                   formControlName="maxAttempts" placeholder="1 = no retry" />
+          </app-field>
+
+          @if (retryEnabled()) {
+            <app-field label="Retry after" for="retryBackoffSeconds" [required]="true"
+                       [control]="form.get('retryBackoffSeconds')" [submitted]="submitted()"
+                       hint="Seconds before the next try. The wait doubles each attempt, up to an hour.">
+              <input id="retryBackoffSeconds" type="number" min="1" max="3600" class="input"
+                     formControlName="retryBackoffSeconds" placeholder="60" />
+            </app-field>
+          }
+
           <app-field label="State" for="jobStatus" [required]="true"
                      [control]="form.get('jobStatus')" [submitted]="submitted()">
             <select id="jobStatus" class="input" formControlName="jobStatus">
