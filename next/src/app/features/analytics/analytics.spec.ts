@@ -3920,12 +3920,16 @@ describe('Profile and Columns are what document 06 says they are', () => {
     expect(text).toContain('quartiles estimated');
   });
 
-  it('says out loud that top values and their frequency are not part of this scan', () => {
+  it('says top values are a second pass, and offers to buy it per column', () => {
     // 06 asks for them and SUMMARIZE does not return them: they need a GROUP BY of their own.
     // Naming what is absent is the alternative to a card that quietly does not have it.
     const grid = scanned('columns', [columnOf()]);
 
-    expect(grid.show()).toContain('how often each occurs are not here');
+    // Reworded with the counted distribution. The second pass is still a second pass, but it is
+    // now BUYABLE per column rather than simply absent -- saying it is "not here" directly above
+    // a button that fetches it would be the screen contradicting itself.
+    expect(grid.show()).toContain('a SECOND pass over the file');
+    expect(grid.show()).toContain('Measure values');
   });
 
   it('puts a column’s quality warnings on the column they are about', () => {
