@@ -36,14 +36,35 @@
             None of your storage connections is one this reader can open. Each is listed above
             with the reason on it.
           </p>
+        } @else if (unreadableConnectionCount(); as unavailable) {
+          <!-- The partial case. Without this the list looks like an ordinary seven until it is
+               opened and five of them are greyed; the reason is already on each option. -->
+          <p class="field-note text-[color:var(--text-muted)]">
+            {{ unavailable }} other connection{{ unavailable === 1 ? '' : 's' }}
+            {{ unavailable === 1 ? 'is' : 'are' }} listed but cannot be read here — open the list
+            to see why.
+          </p>
         }
       </div>
 
-      <div class="flex flex-wrap items-center gap-1 text-xs min-w-0">
-        <button type="button" class="link-inline" (click)="goToRoot()">root</button>
-        @for (crumb of crumbs(); track crumb.prefix) {
+      <!-- The trail, folded to fit 260px. Every crumb used to render at max-w-28 with no title
+           on it, so a path of three folders became three truncated halves of three names and
+           there was no way to read any of them. The whole row now carries the full location. -->
+      <div class="flex flex-wrap items-center gap-1 text-xs min-w-0" [title]="fullPath()">
+        <button type="button" class="link-inline shrink-0" (click)="goToRoot()">root</button>
+        @if (foldedCrumbs().length) {
           <span class="text-[color:var(--text-muted)]">/</span>
-          <button type="button" class="link-inline truncate max-w-28"
+          <!-- Stands in for the folders between root and here. It is a button rather than a
+               label: the one you most often want out of a deep path is its parent, and this
+               jumps to the last folded one. -->
+          <button type="button" class="link-inline shrink-0"
+                  [title]="foldedCrumbs().length + ' more: ' + foldedPath()"
+                  (click)="goToCrumb(foldedCrumbs()[foldedCrumbs().length - 1].prefix)">…</button>
+        }
+        @for (crumb of visibleCrumbs(); track crumb.prefix) {
+          <span class="text-[color:var(--text-muted)]">/</span>
+          <button type="button" class="link-inline truncate max-w-32"
+                  [title]="crumb.name"
                   (click)="goToCrumb(crumb.prefix)">{{ crumb.name }}</button>
         }
       </div>

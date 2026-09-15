@@ -5286,3 +5286,74 @@ describe('opening a column from the Compact table', () => {
     expect(columnOpened('amount', COLUMNS).show()).toContain('Measure values');
   });
 });
+
+/**
+ * The connection block, in a 260px rail.
+ *
+ * Both of these are about what the rail could not SAY. A crumb rendered at max-w-28 with no
+ * title on it, so a folder called healthcare-claims-sql-pipeline showed as roughly half of
+ * itself and there was nowhere to read the rest; and the picker looked like an ordinary list
+ * until it was opened and most of it turned out to be greyed.
+ */
+describe('finding your way around in the storage rail', () => {
+  function railAt(prefix: string) {
+    const harness = studioWith({ objects: [] });
+    harness.studio.goToCrumb(prefix);
+    return harness.studio;
+  }
+
+  it('shows a shallow path whole, with nothing folded', () => {
+    const studio = railAt('etl-demo/');
+    expect(studio.visibleCrumbs().map(c => c.name)).toEqual(['etl-demo']);
+    expect(studio.foldedCrumbs()).toEqual([]);
+  });
+
+  it('keeps two crumbs at the depth the rail can hold', () => {
+    const studio = railAt('etl-demo/F768932/');
+    expect(studio.visibleCrumbs().map(c => c.name)).toEqual(['etl-demo', 'F768932']);
+    expect(studio.foldedCrumbs()).toEqual([]);
+  });
+
+  it('folds the middle of a deeper path and keeps where you are', () => {
+    // Three buttons and their separators do not fit 260px, so all three truncated and the
+    // reader got three halves of three names.
+    const studio = railAt('etl-demo/F768932/out/');
+    expect(studio.visibleCrumbs().map(c => c.name)).toEqual(['F768932', 'out']);
+    expect(studio.foldedCrumbs().map(c => c.name)).toEqual(['etl-demo']);
+  });
+
+  it('names what it folded, so the ellipsis is not a mystery', () => {
+    const studio = railAt('a/b/c/d/');
+    expect(studio.foldedPath()).toBe('a / b');
+    expect(studio.visibleCrumbs().map(c => c.name)).toEqual(['c', 'd']);
+  });
+
+  it('the folded crumb steps to the parent rather than all the way out', () => {
+    // root is its own button beside it, so both destinations are one click.
+    const studio = railAt('a/b/c/d/');
+    const folded = studio.foldedCrumbs();
+    expect(folded[folded.length - 1].prefix).toBe('a/b/');
+  });
+
+  it('carries the whole location, which the trail itself cannot show', () => {
+    const studio = railAt('etl-demo/F768932/out/');
+    expect(studio.fullPath()).toContain('etl-demo/F768932/out');
+  });
+
+  it('says how many connections are listed but unreadable', () => {
+    // The all-refused case was already said out loud; the partial case was not said at all.
+    const harness = studioWith({ connections: [MINIO, S3, FTP, AZURE] });
+    expect(harness.studio.unreadableConnectionCount()).toBe(2);
+  });
+
+  it('says nothing when every connection can be read', () => {
+    const harness = studioWith({ connections: [MINIO, S3] });
+    expect(harness.studio.unreadableConnectionCount()).toBe(0);
+  });
+
+  it('says nothing when NONE can be read, because that has its own sentence', () => {
+    const harness = studioWith({ connections: [FTP, AZURE] });
+    expect(harness.studio.unreadableConnectionCount()).toBe(0);
+    expect(harness.studio.noReadableConnection()).toBe(true);
+  });
+});

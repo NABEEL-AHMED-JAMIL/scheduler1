@@ -667,6 +667,23 @@ export class Analytics implements OnInit {
    */
   readonly noReadableConnection = computed(
     () => !!this.connectionOptions().length && !this.readableConnections().length);
+
+  /**
+   * How many connections this reader cannot open, when SOME still can be.
+   *
+   * The all-refused case above is already said out loud. The partial case was not said at all:
+   * the picker looks like an ordinary list of seven until you open it and find five of them
+   * greyed. Saying it under the control turns "why is this list so short" into a fact, and the
+   * reason is already on each option for anyone who opens it.
+   *
+   * Zero when every connection is readable -- there is nothing to report then, and a line saying
+   * "0 unavailable" is noise on the common case.
+   */
+  readonly unreadableConnectionCount = computed(() => {
+    const all = this.connectionOptions().length;
+    const readable = this.readableConnections().length;
+    return readable && readable < all ? all - readable : 0;
+  });
   readonly prefix = signal<string>('');
   readonly entries = signal<ObjectSummary[]>([]);
   readonly browsing = signal(false);
@@ -685,6 +702,43 @@ export class Analytics implements OnInit {
   readonly crumbs = computed(() => {
     const parts = this.prefix().split('/').filter(Boolean);
     return parts.map((name, index) => ({ name, prefix: parts.slice(0, index + 1).join('/') + '/' }));
+  });
+
+  /**
+   * How many crumbs are shown before the trail is folded.
+   *
+   * The rail is 260px. A path of three folders puts three buttons and their separators on a line
+   * that narrow, so every one of them truncates and the reader ends up with three halves of three
+   * names -- which says less than one whole name would. Beyond this many, the middle is folded
+   * and the ends are kept: the root, because it is how you get out, and the last two, because
+   * that is where you are and what you would step back to.
+   */
+  private static readonly CRUMBS_SHOWN = 2;
+
+  /**
+   * The trail as it is drawn: the last few crumbs, and whether anything was folded out of it.
+   *
+   * The folded ones are not lost -- `foldedPath` names them for the title on the ellipsis, and
+   * root is always its own button beside it, so nothing between here and the top is unreachable
+   * in one click plus one.
+   */
+  readonly visibleCrumbs = computed(() => {
+    const all = this.crumbs();
+    return all.length > Analytics.CRUMBS_SHOWN ? all.slice(-Analytics.CRUMBS_SHOWN) : all;
+  });
+
+  readonly foldedCrumbs = computed(() => {
+    const all = this.crumbs();
+    return all.length > Analytics.CRUMBS_SHOWN ? all.slice(0, -Analytics.CRUMBS_SHOWN) : [];
+  });
+
+  /** The folded folders, for the title on the ellipsis that stands in for them. */
+  readonly foldedPath = computed(() => this.foldedCrumbs().map(crumb => crumb.name).join(' / '));
+
+  /** Where the reader is, in full. The trail truncates; this is what the title says. */
+  readonly fullPath = computed(() => {
+    const path = this.prefix().replace(/\/$/, '');
+    return path ? `${this.connection()}/${path}` : this.connection();
   });
 
   /** Folders first, then files, each alphabetical -- the order a file browser is expected in. */
