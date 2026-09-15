@@ -60,8 +60,15 @@ export interface GroupedSeries {
                        one, because "no rows" and "zero" are different answers. -->
                   <div class="flex-1 h-3.5 rounded-sm bg-[color:var(--surface-sunken)] relative">
                     @if (bar.value !== null) {
+                      <!-- minWidth 2px is what makes a ZERO visible. Without it a measured zero
+                           and a pair with no rows draw the same nothing, and the only thing
+                           telling them apart is the number at the end of the row -- which is
+                           precisely the distinction this chart is supposed to make in its
+                           geometry. The Profile tab's spread bar does the same for a
+                           zero-wide quarter, for the same reason. -->
                       <div class="h-full rounded-sm transition-[width]"
                            [style.width.%]="bar.percent"
+                           [style.minWidth.px]="2"
                            [style.background]="bar.color"
                            [attr.title]="bar.name + ': ' + bar.display"></div>
                     }
@@ -118,9 +125,11 @@ export class GroupedBar {
         return {
           name: entry.name,
           value,
-          // A zero is a real answer and gets a visible sliver, so it reads as "measured and it
-          // was nothing" rather than as the blank a missing pair draws.
-          percent: value === null || top <= 0 ? 0 : Math.max((value / top) * 100, value > 0 ? 1 : 0),
+          // A zero stays 0% here and is made visible by the 2px floor on the element instead --
+          // a percentage floor would scale with the rail and read as a small VALUE, while a
+          // fixed hairline reads as a mark. The distinction that matters is zero against
+          // no-rows, and a missing pair draws no element at all.
+          percent: value === null || top <= 0 ? 0 : (value / top) * 100,
           display: value === null ? '—' : compactNumber(value),
           color: chartColor(seriesIndex % CHART_SLOTS),
         };
