@@ -793,32 +793,88 @@
                           }
                         </div>
                         @if (distributionBars(column.name).length) {
-                          <div class="mt-1 flex flex-col gap-0.5">
-                            @for (bar of distributionBars(column.name); track $index) {
-                              <div class="flex items-center gap-1.5">
-                                <span class="text-[10px] mono truncate w-20 shrink-0
-                                             text-[color:var(--text-muted)]"
-                                      [title]="bar.label">{{ bar.label }}</span>
-                                <div class="flex-1 h-2.5 rounded-sm
-                                            bg-[color:var(--surface-sunken)]">
-                                  <!-- An empty bin keeps NO width. A gap in a distribution is
-                                       where there are no values, and a sliver would draw a
-                                       continuous shape over a hole. -->
-                                  @if (bar.rows > 0) {
-                                    <div class="h-full rounded-sm"
-                                         [style.width.%]="bar.percent"
-                                         [style.background]="'var(--chart-1)'"
-                                         [title]="bar.title"></div>
-                                  }
-                                </div>
-                                <span class="text-[10px] tabular w-12 text-right shrink-0
-                                             text-[color:var(--text-muted)]">{{ bar.rows }}</span>
-                              </div>
+                          <!-- Which drawings this column's values can honestly carry. A kind that
+                               would misrepresent them is offered DISABLED with the sentence
+                               saying why, rather than hidden -- the same rule the dashboard's
+                               widget picker follows. -->
+                          <div class="mt-1 flex flex-wrap gap-1">
+                            @for (kind of distributionKindsFor(column.name); track kind.id) {
+                              <button type="button" class="btn btn-ghost btn-xs"
+                                      [class.btn-active]="kindOf(column.name) === kind.id"
+                                      [disabled]="!!kind.reason"
+                                      [title]="kind.reason || ('Draw as ' + kind.label)"
+                                      (click)="chooseDistributionKind(column.name, kind.id)">
+                                {{ kind.label }}
+                              </button>
                             }
                           </div>
+
+                          @switch (kindOf(column.name)) {
+                            @case ('share') {
+                              <app-donut [data]="distributionSlices(column.name)"
+                                         totalLabel="rows" />
+                            }
+                            @case ('curve') {
+                              <app-line-chart [data]="distributionPoints(column.name)"
+                                              [height]="110" />
+                            }
+                            @case ('area') {
+                              <app-line-chart [data]="distributionPoints(column.name)"
+                                              [filled]="true" [height]="110" />
+                            }
+                            @case ('table') {
+                              <div class="mt-1 overflow-x-auto">
+                                <table class="w-full text-[11px]">
+                                  <thead>
+                                    <tr class="text-left text-[color:var(--text-muted)]">
+                                      <th class="py-0.5 font-medium">
+                                        {{ measured.exactValues ? 'Value' : 'From' }}
+                                      </th>
+                                      <th class="py-0.5 font-medium text-right">Rows</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    @for (bar of distributionBars(column.name); track $index) {
+                                      <tr>
+                                        <td class="mono py-0.5 truncate"
+                                            [title]="bar.title">{{ bar.label }}</td>
+                                        <td class="tabular py-0.5 text-right">{{ bar.rows }}</td>
+                                      </tr>
+                                    }
+                                  </tbody>
+                                </table>
+                              </div>
+                            }
+                            @default {
+                              <div class="mt-1 flex flex-col gap-0.5">
+                                @for (bar of distributionBars(column.name); track $index) {
+                                  <div class="flex items-center gap-1.5">
+                                    <span class="text-[10px] mono truncate w-20 shrink-0
+                                                 text-[color:var(--text-muted)]"
+                                          [title]="bar.label">{{ bar.label }}</span>
+                                    <div class="flex-1 h-2.5 rounded-sm
+                                                bg-[color:var(--surface-sunken)]">
+                                      <!-- An empty bin keeps NO width. A gap in a distribution is
+                                           where there are no values, and a sliver would draw a
+                                           continuous shape over a hole. -->
+                                      @if (bar.rows > 0) {
+                                        <div class="h-full rounded-sm"
+                                             [style.width.%]="bar.percent"
+                                             [style.background]="'var(--chart-1)'"
+                                             [title]="bar.title"></div>
+                                      }
+                                    </div>
+                                    <span class="text-[10px] tabular w-12 text-right shrink-0
+                                                 text-[color:var(--text-muted)]">{{ bar.rows }}</span>
+                                  </div>
+                                }
+                              </div>
+                            }
+                          }
+
                           <p class="mt-1 text-[11px] text-[color:var(--text-muted)]">
                             {{ measured.exactValues
-                               ? 'One bar per distinct value, commonest first — counted, not estimated.'
+                               ? 'One mark per distinct value, commonest first — counted, not estimated.'
                                : 'Equal-width bins across the range — counted, not estimated.' }}
                           </p>
                         } @else {

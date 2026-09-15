@@ -9,6 +9,7 @@ import { formatSize } from '../../shared/ui/format-size';
 import { compactNumber, readableCell } from '../../shared/charts/number-format';
 import { BarChart } from '../../shared/charts/bar-chart';
 import { Donut } from '../../shared/charts/donut';
+import { LineChart } from '../../shared/charts/line-chart';
 import { Histogram } from '../../shared/charts/histogram';
 import { RankedBar } from '../../shared/charts/ranked-bar';
 import { RouterLink } from '@angular/router';
@@ -584,11 +585,22 @@ const DATE_ONLY_TYPE = /^DATE$/i;
  *
  * @author Nabeel Ahmed
  */
+/** How a measured column may be drawn. */
+export type DistributionKind = 'bars' | 'share' | 'curve' | 'area' | 'table';
+
+/**
+ * Above this many slices a ring stops being readable and the bars say it better.
+ *
+ * Eight rather than the twelve a distribution can hold: a ring has to carry its legend beside it,
+ * and past eight rows that legend is taller than the ring it explains.
+ */
+const SHARE_SLICE_CEILING = 8;
+
 @Component({
   selector: 'app-analytics',
   imports: [
     Icon, TableShell, SqlEditor, BarChart, Donut, RankedBar, Histogram, FilterBuilder, DataGrid,
-    DatasetRegistry, RouterLink,
+    DatasetRegistry, RouterLink, LineChart,
   ],
   templateUrl: './analytics.html',
 })
@@ -1395,6 +1407,88 @@ export class Analytics implements OnInit {
   /** The column with a measurement in flight, so two cannot be requested at once. */
   readonly measuring = signal<string | null>(null);
   readonly distributionErrors = signal<Record<string, string>>({});
+
+  /**
+   * How each measured column is drawn. One kind per column, because a reader comparing two
+   * columns is comparing the DATA, and a screen that drew them differently by default would put
+   * the difference in the drawing instead.
+   */
+  readonly distributionKind = signal<Record<string, DistributionKind>>({});
+
+  /**
+   * Which drawings this column's values can honestly carry, and why the others cannot.
+   *
+   * The same shape as the dashboard's widget gate and for the same reason: a kind that would
+   * misrepresent the data is offered DISABLED with the sentence explaining it, rather than
+   * hidden. A reader who wonders why there is no pie here deserves the answer on the control.
+   */
+  distributionKindsFor(name: string): { id: DistributionKind; label: string; reason: string }[] {
+    const measured = this.distributions()[name];
+    const bins = measured?.bins ?? [];
+    const categories = !!measured?.exactValues;
+    const negatives = bins.some(bin => bin.rows < 0);
+
+    return [
+      { id: 'bars', label: 'Bars', reason: bins.length ? '' : 'Nothing was counted.' },
+      {
+        id: 'share', label: 'Share of rows',
+        // A ring divides a whole into parts, which is what a set of CATEGORIES is. Equal-width
+        // bins of a range are not parts of a whole in any sense a reader gains from: they are
+        // positions on an axis, and a ring throws that axis away.
+        reason: !bins.length ? 'Nothing was counted.'
+          : !categories ? 'These are positions on a numeric range, not parts of a whole — a ring '
+            + 'would throw the axis away.'
+          : bins.length > SHARE_SLICE_CEILING
+            ? `A ring of ${bins.length} slices is harder to read than the bars.`
+            : '',
+      },
+      {
+        id: 'curve', label: 'Curve',
+        // A line claims the points are in an order and that between two of them there are values.
+        // True of bins across a range; false of categories, where the order is just the counts.
+        reason: !bins.length ? 'Nothing was counted.'
+          : categories ? 'These are categories, so a line between them would draw the sort order '
+            + 'rather than a shape in the data.'
+          : bins.length < 2 ? 'A curve needs at least two bins.' : '',
+      },
+      {
+        id: 'area', label: 'Filled curve',
+        reason: !bins.length ? 'Nothing was counted.'
+          : categories ? 'These are categories, so a filled shape between them would measure the '
+            + 'sort order rather than the data.'
+          : bins.length < 2 ? 'A curve needs at least two bins.'
+          : negatives ? 'A filled area measures up from a baseline.' : '',
+      },
+      { id: 'table', label: 'Counts', reason: bins.length ? '' : 'Nothing was counted.' },
+    ];
+  }
+
+  /** The kind this column is drawn as: whatever was chosen, else the first one it can carry. */
+  kindOf(name: string): DistributionKind {
+    const chosen = this.distributionKind()[name];
+    if (chosen) return chosen;
+    const offered = this.distributionKindsFor(name).find(kind => !kind.reason);
+    return offered ? offered.id : 'bars';
+  }
+
+  chooseDistributionKind(name: string, kind: DistributionKind): void {
+    this.distributionKind.update(all => ({ ...all, [name]: kind }));
+  }
+
+  /** The bars as a ring's slices. Only reachable for a value-by-value column -- see the gate. */
+  distributionSlices(name: string): { name: string; value: number }[] {
+    return this.distributionBars(name).map(bar => ({ name: bar.label, value: bar.rows }));
+  }
+
+  /**
+   * The bars as points on a curve.
+   *
+   * Only reachable for a BINNED column, where the bins are equal-width steps along a range, so
+   * the line between two points stands for values that exist rather than for a gap.
+   */
+  distributionPoints(name: string): { label: string; value: number }[] {
+    return this.distributionBars(name).map(bar => ({ label: bar.label, value: bar.rows }));
+  }
 
   measureValuesOf(name: string): void {
     if (this.measuring() || this.distributions()[name]) return;

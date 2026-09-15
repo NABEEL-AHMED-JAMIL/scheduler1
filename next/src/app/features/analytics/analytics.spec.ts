@@ -5288,3 +5288,92 @@ describe('a column measured rather than estimated', () => {
     expect(harness.studio.distributionBars('never_asked')).toEqual([]);
   });
 });
+
+/**
+ * Which drawings a measured column can honestly carry.
+ *
+ * The bars were the only drawing, and "more charts, chosen on the data" is the ask. The gate is
+ * the interesting half: a ring and a line each make a CLAIM, and the claim is false for one of
+ * the two kinds of distribution this produces. A kind that would misrepresent the column is
+ * offered disabled with its reason, never silently hidden.
+ */
+describe('drawing a measured column', () => {
+  function studioWithDistribution(measured: any) {
+    const harness = studioWith({ objects: [FOLDER, CSV_FILE, TEXT_FILE] });
+    harness.studio.distributions.set({ col: measured });
+    return harness.studio;
+  }
+
+  const CATEGORIES = {
+    name: 'col', exactValues: true,
+    bins: [{ value: 'North', rows: 9 }, { value: 'South', rows: 3 }],
+  };
+  const BINNED = {
+    name: 'col', exactValues: false,
+    bins: [{ from: '0', to: '10', rows: 4 }, { from: '10', to: '20', rows: 7 },
+           { from: '20', to: '30', rows: 2 }],
+  };
+  const reasonFor = (studio: any, id: string) =>
+    studio.distributionKindsFor('col').find((k: any) => k.id === id).reason;
+
+  it('offers a ring for categories, which really are parts of a whole', () => {
+    expect(reasonFor(studioWithDistribution(CATEGORIES), 'share')).toBe('');
+  });
+
+  it('refuses a ring over a numeric range, and says why', () => {
+    // Equal-width bins are positions on an axis. A ring throws the axis away.
+    expect(reasonFor(studioWithDistribution(BINNED), 'share'))
+      .toContain('positions on a numeric range');
+  });
+
+  it('refuses a ring with too many slices to read', () => {
+    const many = {
+      name: 'col', exactValues: true,
+      bins: Array.from({ length: 12 }, (_, i) => ({ value: 'v' + i, rows: 1 })),
+    };
+    expect(reasonFor(studioWithDistribution(many), 'share')).toContain('harder to read');
+  });
+
+  it('offers a curve over binned values, where a line stands for values that exist', () => {
+    expect(reasonFor(studioWithDistribution(BINNED), 'curve')).toBe('');
+    expect(reasonFor(studioWithDistribution(BINNED), 'area')).toBe('');
+  });
+
+  it('refuses a curve over categories, which have no order but the sort', () => {
+    expect(reasonFor(studioWithDistribution(CATEGORIES), 'curve'))
+      .toContain('draw the sort order');
+  });
+
+  it('always offers the bars and the counts, whatever the column is', () => {
+    for (const measured of [CATEGORIES, BINNED]) {
+      const studio = studioWithDistribution(measured);
+      expect(reasonFor(studio, 'bars')).toBe('');
+      expect(reasonFor(studio, 'table')).toBe('');
+    }
+  });
+
+  it('defaults to the first kind the column can carry', () => {
+    expect(studioWithDistribution(BINNED).kindOf('col')).toBe('bars');
+  });
+
+  it('remembers the kind a reader picked for that column', () => {
+    const studio = studioWithDistribution(BINNED);
+    studio.chooseDistributionKind('col', 'curve');
+    expect(studio.kindOf('col')).toBe('curve');
+    // and not for a different column
+    expect(studio.kindOf('other')).toBe('bars');
+  });
+
+  it('shapes the same counts for a ring and for a curve', () => {
+    const studio = studioWithDistribution(BINNED);
+    expect(studio.distributionSlices('col')).toEqual([
+      { name: '0', value: 4 }, { name: '10', value: 7 }, { name: '20', value: 2 }]);
+    expect(studio.distributionPoints('col')).toEqual([
+      { label: '0', value: 4 }, { label: '10', value: 7 }, { label: '20', value: 2 }]);
+  });
+
+  it('offers nothing at all for a column that was measured and had no values', () => {
+    const studio = studioWithDistribution({ name: 'col', exactValues: false, bins: [] });
+    expect(studio.distributionKindsFor('col').every((k: any) => !!k.reason)).toBe(true);
+  });
+});
