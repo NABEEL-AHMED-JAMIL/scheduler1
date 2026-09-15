@@ -167,6 +167,17 @@
                           [class.icon-ok]="copiedIndex() === $index" size="0.85em" />
                 {{ copiedIndex() === $index ? 'Copied' : 'Copy' }}
               </button>
+              <!-- Emailing belongs on EVERY answer, not only on one that happened to carry a
+                   fenced file. It first sat on the attachment chip row, inside
+                   @if (message.files?.length), so an ordinary reply -- which is most of them --
+                   offered no way to send it anywhere at all. -->
+              <button type="button" class="btn btn-default btn-sm"
+                      [disabled]="!!emailing()"
+                      (click)="emailAnswer(message.text, $index)"
+                      title="Email this answer as a PDF attachment">
+                <app-icon name="send" [busy]="emailing() === 'answer-' + $index" size="0.85em" />
+                {{ emailing() === 'answer-' + $index ? 'Sending…' : 'Email' }}
+              </button>
               @if ($index === messages().length - 1) {
                 <button type="button" class="btn btn-default btn-sm"
                         [disabled]="sending() || preparing() || agentId() === null"

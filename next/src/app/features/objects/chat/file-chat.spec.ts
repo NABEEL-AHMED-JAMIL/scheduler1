@@ -625,3 +625,61 @@ describe('a chat a reader does not have to be watching', () => {
     expect(document.activeElement).toBe(composer);
   });
 });
+
+/**
+ * Emailing an answer out of the chat.
+ *
+ * The first version of this put the Email button on the attachment chip row, inside
+ * `@if (message.files?.length)`. That row only exists when the model's reply happens to carry a
+ * downloadable fence -- which most replies do not -- so the ordinary case, "send me what you just
+ * told me", had no button anywhere on screen and nothing ever reached /emailExport. It was
+ * reported as "for the chatbot its not send", and it was: there was nothing to press.
+ *
+ * These tests pin the button to the MESSAGE ACTIONS row, where every answer has one.
+ */
+describe('emailing an answer', () => {
+  afterEach(() => sessionStorage.clear());
+
+  it('offers Email on a plain answer that carries no downloadable file', async () => {
+    const panel = openPanel();
+    panel.fixture.detectChanges();
+    panel.chat.messages.set([
+      { role: 'user', text: 'what is this?', at: 1 },
+      { role: 'assistant', text: 'A signed supply contract.', at: 2 },
+    ]);
+    panel.fixture.detectChanges();
+
+    // No `files` on that message at all -- the exact shape the old placement could not reach.
+    expect(panel.button('Email')).toBeDefined();
+  });
+
+  it('sends the answer text to emailExport as markdown, converted to pdf', () => {
+    const panel = openPanel();
+    panel.fixture.detectChanges();
+    panel.chat.emailAnswer('## Findings\n\nThe contract renews in March.', 0);
+
+    const call = panel.posts.find(p => p.url.includes('emailExport'));
+    expect(call).toBeDefined();
+    expect(call!.body.content).toContain('The contract renews in March.');
+    expect(call!.body.sourceFormat).toBe('md');
+    expect(call!.body.targetFormat).toBe('pdf');
+    // The stub Dialog closes with `true`, so recipientEmail is whatever that yields -- what
+    // matters here is that the request is made at all, which it previously never was.
+    expect(call!.url).toContain('/fileChat.json/emailExport');
+  });
+
+  it('does not post an empty answer', () => {
+    const panel = openPanel();
+    panel.fixture.detectChanges();
+    panel.chat.emailAnswer('   ', 0);
+    expect(panel.posts.find(p => p.url.includes('emailExport'))).toBeUndefined();
+  });
+
+  it('refuses a second send while one is in flight', () => {
+    const panel = openPanel();
+    panel.fixture.detectChanges();
+    panel.chat.emailing.set('answer-0');
+    panel.chat.emailAnswer('anything', 1);
+    expect(panel.posts.find(p => p.url.includes('emailExport'))).toBeUndefined();
+  });
+});

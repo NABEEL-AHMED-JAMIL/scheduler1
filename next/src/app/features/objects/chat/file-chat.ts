@@ -624,6 +624,49 @@ export class FileChat implements OnInit, OnDestroy {
    * the rule, the 20 MiB ceiling and the delivery, because a second copy of any of those is the
    * one that drifts.
    */
+  /**
+   * Emails one answer, converted to PDF.
+   *
+   * Separate from emailExport(file) because the two send different things: that one sends a file
+   * the model produced, this one sends the reply itself. Most replies are not files, and the
+   * first version of this feature only offered emailing on the ones that were -- so the ordinary
+   * case, "send me what you just told me", had no button anywhere.
+   *
+   * Markdown is the source format because that is what the model writes and what the bubble
+   * renders; the server converts it through the same LibreOffice path the download uses.
+   */
+  emailAnswer(text: string, index?: number): void {
+    const answer = (text ?? '').trim();
+    if (!answer || this.emailing()) return;
+    const token = `answer-${index ?? this.messages().findIndex(m => m.text === text)}`;
+    this.dialog.open<ShareResult>(ShareDialog, {
+      hasBackdrop: true,
+      data: {
+        count: 1,
+        title: 'Email this answer',
+        subtitle: 'Converted to a PDF and sent as an attachment.',
+      },
+    }).closed.subscribe(result => {
+      if (!result) return;
+      this.emailing.set(token);
+      this.http.post<ApiResponse>(`${API_BASE}/fileChat.json/emailExport`, {
+        content: answer, sourceFormat: 'md', targetFormat: 'pdf',
+        recipientEmail: result.recipientEmail, message: result.message,
+      }).subscribe({
+        next: response => {
+          this.emailing.set(null);
+          response.status === API_SUCCESS
+            ? this.toast.success(`Sent to ${result.recipientEmail}.`)
+            : this.toast.error(response.message || 'The email could not be sent.');
+        },
+        error: err => {
+          this.emailing.set(null);
+          this.toast.error(err?.error?.message || 'The email could not be sent.');
+        },
+      });
+    });
+  }
+
   emailExport(file: ChatFile): void {
     if (this.emailing() || this.converting()) return;
     const pending = file.pendingExport;
