@@ -1349,12 +1349,18 @@ html.dark {
      column is full width again. A viewport breakpoint would have to guess which. An element
      cannot query itself, so the column owns the container and the split reads it. */
   .dataset-column { container-type: inline-size; }
-  .dataset-split { @apply grid gap-3; }
-  @container (min-width: 700px) {
-    .dataset-split { grid-template-columns: minmax(0, 1fr) 220px; }
-  }
-
-  /* Profile cards, reading the same container as .dataset-split above and for the same reason. */
+  /*
+   * Profile cards, in a container query rather than a viewport one.
+   *
+   * The reason is the 260px storage rail: it makes the WINDOW a bad proxy for how wide this
+   * column actually is. lg:grid-cols-2 was not merely inconsistent here, it was inverted -- at
+   * 1023px the rail stacks and this column is full width, giving ONE card across; at 1024px the
+   * rail takes its 260px back and it gives TWO. Fewest columns at the widest space.
+   *
+   * This paragraph used to sit on .dataset-split, which laid the Data tab's rows beside a
+   * read-only schema rail. The rail is gone -- it listed each column and its type, which is the
+   * first two cells of every Compact row -- so the rule went with it and its reasoning moved here.
+   */
   .profile-grid { @apply grid gap-3; }
   @container (min-width: 700px) {
     .profile-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

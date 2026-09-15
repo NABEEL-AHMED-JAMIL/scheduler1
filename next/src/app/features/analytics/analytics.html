@@ -329,9 +329,11 @@
         }
 
         @if (tab() === 'data') {
-          <!-- Rows and columns side by side. The question "what type is this column" is asked
-               while looking at the values in it, and the old Schema tab made that a round trip. -->
-          <div class="dataset-split">
+          <!-- Rows, full width. There was a schema rail beside them listing each column and its
+               type, which is the first two cells of every Compact row -- and Compact now opens
+               the whole card for a column under that row. Two lists of the same names, one of
+               them read-only, is a reader choosing which to trust. The grid's own Columns
+               control is a different thing and stays: that one HIDES columns. -->
           <div class="min-w-0 flex flex-col gap-3">
           @if (error()) {
             <!-- The grid renders rows and says what the server is doing; it does not own the
@@ -441,29 +443,7 @@
               </div>
             }
           }
-          </div>
 
-          <aside class="card p-3 flex flex-col gap-1 self-start min-w-0">
-            <div class="flex items-baseline justify-between gap-2">
-              <h3 class="text-xs uppercase tracking-wider text-[color:var(--text-muted)] font-semibold">
-                Columns
-              </h3>
-              <span class="text-xs tabular text-[color:var(--text-muted)]">{{ columnCount() }}</span>
-            </div>
-            @for (column of columns(); track column.name) {
-              <div class="flex items-center gap-2 py-1 min-w-0">
-                <span class="mono text-xs truncate flex-1" [title]="column.name">{{ column.name }}</span>
-                <span class="text-[10px] mono text-[color:var(--text-muted)] border border-subtle
-                             rounded px-1 shrink-0" [title]="column.type">{{ shortType(column.type) }}</span>
-              </div>
-            }
-            @if (!columns().length) {
-              <p class="text-xs text-[color:var(--text-muted)] py-2">No columns detected.</p>
-            }
-            <p class="field-note text-[color:var(--text-muted)] mt-1">
-              Types are the query engine's own, inferred from the file.
-            </p>
-          </aside>
           </div>
         }
 
