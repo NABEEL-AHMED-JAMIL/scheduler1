@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { ToastService } from '../../../shared/ui/toast.service';
@@ -7,18 +7,21 @@ import { BucketSummary, ObjectSummary, StorageService } from '../../objects/stor
 import { Icon } from '../../../shared/ui/icon';
 import { Segmented, SegmentOption } from '../../../shared/ui/segmented';
 import { FileDropzone } from '../../../shared/ui/file-dropzone';
+import { ReadAloudService } from '../../../shared/ui/read-aloud.service';
+import { ReadAlongText } from '../../../shared/ui/read-along-text';
 
 const AUDIO_EXTENSIONS = ['mp3', 'm4a'];
 
 @Component({
   selector: 'app-transcript',
-  imports: [Icon, Segmented, FileDropzone],
+  imports: [Icon, Segmented, FileDropzone, ReadAlongText],
   templateUrl: './transcript.html',
 })
-export class Transcript implements OnInit {
+export class Transcript implements OnInit, OnDestroy {
   private readonly http = inject(HttpClient);
   private readonly storage = inject(StorageService);
   private readonly toast = inject(ToastService);
+  readonly reader = inject(ReadAloudService);
 
   readonly mode = signal<'upload' | 'bucket'>('upload');
   readonly modeOptions: SegmentOption<'upload' | 'bucket'>[] = [
@@ -219,6 +222,97 @@ export class Transcript implements OnInit {
         bucket: this.bucket(), key: this.selectedKey(), timestamps: this.timestamps(),
       }).subscribe(done);
     }
+  }
+
+  // ---- Read along -------------------------------------------------------------------------
+  //
+  // A transcript is usually read to check it against the audio, and doing that by eye means
+  // holding your place in a wall of text while listening. Reading it back with the word being
+  // spoken marked lets the text keep your place for you.
+
+  /** What the voice reads: one passage per segment, so the highlight lands on the right one. */
+  readonly passages = computed(() => this.segments().map(segment => segment.text));
+
+  /** Which segment is being spoken, or -1. Compared against $index to mark just that one. */
+  readonly readingIndex = computed(() => this.reader.progress()?.passage ?? -1);
+
+  /**
+   * The word being spoken, as an offset into its own segment.
+   *
+   * Handed to the one segment that is active rather than to all of them, so a word boundary
+   * re-renders a single passage instead of every passage on screen.
+   */
+  readonly readingAt = computed(() => {
+    const progress = this.reader.progress();
+    return progress ? { charIndex: progress.charIndex, charLength: progress.charLength } : null;
+  });
+
+  /** Ids are strings because that is what app-segmented is keyed on; parsed back in setSpeed. */
+  readonly speeds: SegmentOption<string>[] = [
+    { id: '0.75', label: '0.75x' },
+    { id: '1',    label: '1x' },
+    { id: '1.5',  label: '1.5x' },
+  ];
+
+  /** The chosen speed as the segmented control's own id, so the right segment reads as active. */
+  readonly speedId = computed(() => String(this.reader.rate()));
+
+  constructor() {
+    // Follows the voice down the page. Keyed on the segment, not the word, so the container is
+    // not fighting the reader for the scroll position several times a second.
+    effect(() => {
+      const index = this.readingIndex();
+      if (index < 0) return;
+      // Deferred a frame: on the first passage the highlight is being rendered by this same
+      // change, and the element is not yet in the document to scroll to.
+      requestAnimationFrame(() => {
+        // Smooth only where motion is welcome. Following a reading scrolls once per passage,
+        // which for anyone who has asked for less movement is exactly the kind of repeated
+        // animated scroll that setting exists to turn off.
+        const calm = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+        document.querySelector(`[data-read-index="${index}"]`)
+          ?.scrollIntoView({ block: 'nearest', behavior: calm ? 'auto' : 'smooth' });
+      });
+    });
+
+    // A reading is about this transcript. Extracting another one, or clearing it, leaves the
+    // voice reading text that is no longer on screen -- with nothing on screen to stop it by,
+    // since the controls only appear when there is a transcript.
+    effect(() => {
+      if (!this.transcript()) this.reader.stop();
+    });
+  }
+
+  /**
+   * Stops the voice on the way out.
+   *
+   * The reader is provided at the root, so it outlives this screen: without this, navigating
+   * away mid-reading leaves a disembodied voice reading a transcript that is no longer anywhere
+   * on screen, and nothing left to stop it with.
+   */
+  ngOnDestroy(): void {
+    this.reader.stop();
+  }
+
+  /** Play, pause or resume, depending on where the reading has got to. */
+  toggleReading(): void {
+    if (this.reader.state() === 'playing') { this.reader.pause(); return; }
+    if (this.reader.state() === 'paused') { this.reader.resume(); return; }
+    this.reader.play(this.passages());
+  }
+
+  /** Start reading from a chosen segment, so a passage can be re-heard without replaying all. */
+  readFrom(index: number): void {
+    this.reader.play(this.passages(), index);
+  }
+
+  setSpeed(id: string): void {
+    const rate = Number(id);
+    if (!Number.isFinite(rate) || rate <= 0) return;
+    this.reader.rate.set(rate);
+    // Applied to the passage being spoken rather than only to the next one: a speed control
+    // that does nothing until the current sentence ends reads as a broken control.
+    this.reader.restartCurrentPassage();
   }
 
   /** A timestamp is worth copying on its own -- it is how you cite a moment in the audio. */

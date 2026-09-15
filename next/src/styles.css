@@ -487,6 +487,29 @@
   html.dark .ts-mark { color: var(--color-brand-300); }
   .ts-text { color: var(--text-primary); @apply text-sm min-w-0; }
 
+  /* Read-along: the word being spoken, and the passage it sits in.
+     A highlighter is dark ink on yellow in both themes -- inverting it for dark mode would make
+     the one thing meant to draw the eye the dimmest thing on the line. The surrounding text is
+     light there, so the mark pops rather than clashing. */
+  .read-mark {
+    background: #fde047;
+    color: #1c1917;
+    /* Cloned so a word broken across two lines is boxed on both, instead of the second half
+       losing its background entirely. */
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+    @apply rounded-[3px] px-px;
+  }
+  html.dark .read-mark { background: #facc15; }
+
+  /* The passage being read, tinted so it stays findable in the gap between words and while
+     paused -- the mark alone disappears at both. Kept faint: it is a place-keeper, not a
+     second highlight competing with the first. */
+  .ts-reading { background: color-mix(in srgb, #fde047 14%, transparent); }
+  html.dark .ts-reading { background: color-mix(in srgb, #facc15 16%, transparent); }
+  tr.ts-reading > td { background: color-mix(in srgb, #fde047 14%, transparent); }
+  html.dark tr.ts-reading > td { background: color-mix(in srgb, #facc15 16%, transparent); }
+
   .upload-row { @apply flex flex-wrap items-center gap-2; }
   .upload-row input[type="file"] { @apply flex-1 min-w-48 text-xs py-1; }
 
