@@ -939,10 +939,15 @@ describe('the three figures that are not exact', () => {
     expect(text).toContain('Each block holds about a quarter of the rows');
   });
 
-  it('shows what IS true about a column with no distribution, not an empty chart frame', () => {
+  it('shows what IS true about a column with no numeric spread, not an empty chart frame', () => {
     const text = renderedStudio().show([textColumn()]);
 
-    expect(text).toContain('No distribution to draw');
+    // The wording changed with the counted distribution. "No distribution to draw" is no longer
+    // true of a text column: the quartile STRIP cannot be drawn for one, but its values can be
+    // counted, and the button to do it sits directly beneath this line. Telling a reader there
+    // is nothing to see, above the control that shows it to them, is worse than saying nothing.
+    expect(text).toContain('No numeric range to spread');
+    expect(text).toContain('Measure values');
     expect(text).toContain('distinct values (estimated)');
     expect(text).toContain('% filled');
   });
@@ -5208,5 +5213,74 @@ describe('clicking the dataset that is already open', () => {
     harness.studio.openFile(TEXT_FILE);
     expect(harness.schema.mock.calls.length).toBe(before);
     expect(harness.studio.path()).toBe(CSV_FILE.key);
+  });
+});
+
+/**
+ * The counted distribution, which the Profile tab did not have.
+ *
+ * That tab has shown mean, deviation and three APPROXIMATE quartiles since it was written, under
+ * a comment arguing that with only five points there is nothing to bin. The argument was right,
+ * and this removes its premise rather than overriding it: these bars are counted server-side.
+ * The DTOs behind them were written months ago and referenced by nothing at all.
+ */
+describe('a column measured rather than estimated', () => {
+  function studioWithDistribution(measured: any) {
+    const harness = studioWith({ objects: [FOLDER, CSV_FILE, TEXT_FILE] });
+    harness.studio.distributions.set({ amount: measured });
+    return harness.studio;
+  }
+
+  it('scales every bar against the tallest, not against the total', () => {
+    const studio = studioWithDistribution({
+      name: 'amount', exactValues: false,
+      bins: [{ from: '0', to: '10', rows: 5 }, { from: '10', to: '20', rows: 10 }],
+    });
+    const bars = studio.distributionBars('amount');
+    expect(bars.map(b => b.percent)).toEqual([50, 100]);
+  });
+
+  it('gives an empty bin no width at all', () => {
+    // A gap in a distribution is where there are NO values. A sliver would draw a continuous
+    // shape over a hole, which is the one thing a distribution must not do.
+    const studio = studioWithDistribution({
+      name: 'amount', exactValues: false,
+      bins: [{ from: '0', to: '10', rows: 4 }, { from: '10', to: '20', rows: 0 }],
+    });
+    expect(studio.distributionBars('amount')[1].percent).toBe(0);
+  });
+
+  it('labels a binned bar by where it starts, not by both edges', () => {
+    // The bars are contiguous, so printing both edges repeats every number twice across the row.
+    const studio = studioWithDistribution({
+      name: 'amount', exactValues: false,
+      bins: [{ from: '0', to: '10', rows: 1 }, { from: '10', to: '20', rows: 1 }],
+    });
+    expect(studio.distributionBars('amount').map(b => b.label)).toEqual(['0', '10']);
+  });
+
+  it('labels a value-by-value bar with the value itself', () => {
+    const studio = studioWithDistribution({
+      name: 'amount', exactValues: true,
+      bins: [{ value: 'North', rows: 9 }, { value: 'South', rows: 3 }],
+    });
+    expect(studio.distributionBars('amount').map(b => b.label)).toEqual(['North', 'South']);
+  });
+
+  it('carries both edges into the tooltip even though the label shows one', () => {
+    const studio = studioWithDistribution({
+      name: 'amount', exactValues: false, bins: [{ from: '0', to: '10', rows: 7 }],
+    });
+    expect(studio.distributionBars('amount')[0].title).toBe('0 to 10: 7 row(s)');
+  });
+
+  it('draws nothing for a column that was measured and had no values', () => {
+    const studio = studioWithDistribution({ name: 'amount', exactValues: false, bins: [] });
+    expect(studio.distributionBars('amount')).toEqual([]);
+  });
+
+  it('draws nothing for a column nobody has measured yet', () => {
+    const harness = studioWith({ objects: [FOLDER, CSV_FILE, TEXT_FILE] });
+    expect(harness.studio.distributionBars('never_asked')).toEqual([]);
   });
 });

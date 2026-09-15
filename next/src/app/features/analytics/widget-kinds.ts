@@ -25,6 +25,7 @@ export const KINDS: { id: WidgetVisualization; label: string }[] = [
   { id: 'stacked', label: 'Stacked bars' },
   { id: 'shareStacked', label: 'Share within each group' },
   { id: 'pivot', label: 'Cross-tab grid' },
+  { id: 'groupedBar', label: 'Bars side by side' },
   { id: 'line', label: 'Line over the dimension' },
   { id: 'area', label: 'Filled area' },
   { id: 'cumulative', label: 'Running total' },

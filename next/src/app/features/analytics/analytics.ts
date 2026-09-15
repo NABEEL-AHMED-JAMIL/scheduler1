@@ -23,6 +23,7 @@ import {
 } from './filter-builder';
 import {
   Aggregation, AnalysisColumn, AnalysisCrumb, AnalysisRequest, AnalysisResult, AnalyticsService,
+  ColumnDistribution,
   ColumnProfile, Dashboard, DatasetColumn, DatasetPreview, DatasetProfile, Drill, ExportFile,
   FilterClause,
   FilterGroup, FilterNode, Grain, PreviewShape, QueryResult, QueryRun, RegisteredDataset,
@@ -1380,6 +1381,70 @@ export class Analytics implements OnInit {
     if (!Analytics.SCAN_TABS.includes(tab)) return;
     if (this.profile() || this.profileLoading() || this.profileError()) return;
     this.loadProfile();
+  }
+
+  /**
+   * Counted distributions, by column name, for the columns a reader has actually opened.
+   *
+   * Not part of the profile scan and deliberately so: that is one SUMMARIZE over the whole file,
+   * and measuring every column's distribution up front would be a second full pass to answer
+   * questions nobody has asked. Cost follows the click -- the same bargain the registry panel and
+   * the query library already make on this screen.
+   */
+  readonly distributions = signal<Record<string, ColumnDistribution>>({});
+  /** The column with a measurement in flight, so two cannot be requested at once. */
+  readonly measuring = signal<string | null>(null);
+  readonly distributionErrors = signal<Record<string, string>>({});
+
+  measureValuesOf(name: string): void {
+    if (this.measuring() || this.distributions()[name]) return;
+    const path = this.path();
+    if (!path) return;
+    this.measuring.set(name);
+    this.distributionErrors.update(all => {
+      const next = { ...all };
+      delete next[name];
+      return next;
+    });
+    this.analytics.distribution(this.connection(), path, name).subscribe({
+      next: response => {
+        this.measuring.set(null);
+        if (response.status === API_SUCCESS && response.data) {
+          this.distributions.update(all => ({ ...all, [name]: response.data! }));
+        } else {
+          this.distributionErrors.update(all => ({ ...all, [name]: response.message }));
+        }
+      },
+      error: err => {
+        this.measuring.set(null);
+        this.distributionErrors.update(all => ({
+          ...all, [name]: err?.error?.message || 'That column could not be measured.',
+        }));
+      },
+    });
+  }
+
+  /**
+   * One column's bars, scaled to the tallest.
+   *
+   * The label is the value for a value-by-value drawing and the lower bound for a binned one --
+   * a bin is labelled by where it STARTS because the bars are contiguous, so printing both edges
+   * on every bar would repeat each number twice across the row.
+   */
+  distributionBars(name: string): { label: string; rows: number; percent: number; title: string }[] {
+    const measured = this.distributions()[name];
+    if (!measured || !measured.bins?.length) return [];
+    const tallest = Math.max(...measured.bins.map(bin => bin.rows), 0);
+    return measured.bins.map(bin => ({
+      label: measured.exactValues ? (bin.value ?? '(none)') : (bin.from ?? ''),
+      rows: bin.rows,
+      // A bar with no rows keeps no width at all: an empty bin is a real gap in the data and
+      // giving it a sliver would draw a shape over a hole.
+      percent: tallest > 0 ? (bin.rows / tallest) * 100 : 0,
+      title: measured.exactValues
+        ? `${bin.value ?? '(none)'}: ${bin.rows} row(s)`
+        : `${bin.from} to ${bin.to}: ${bin.rows} row(s)`,
+    }));
   }
 
   loadProfile(): void {

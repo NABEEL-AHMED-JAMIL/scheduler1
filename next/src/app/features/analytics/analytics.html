@@ -768,8 +768,75 @@
                       <!-- No numbers to spread. Saying so beats an empty chart frame, which
                            reads as a chart that failed to draw. -->
                       <p class="text-[11px] text-[color:var(--text-muted)]">
-                        No distribution to draw — this column has no numeric range.
+                        No numeric range to spread — measure it below to see its values counted.
                       </p>
+                    }
+
+                    <!-- The COUNTED distribution, beside the estimated strip above.
+                         Behind a click because it is two more statements against the file, and
+                         the comment on the strip is right that three approximate quartiles are
+                         not something to bin: these bars are counted instead of inferred. -->
+                    @if (distributions()[column.name]; as measured) {
+                      <div>
+                        <div class="flex items-baseline justify-between gap-2 text-[11px]
+                                    text-[color:var(--text-muted)]">
+                          <span>{{ measured.exactValues ? 'Values' : 'Distribution' }}</span>
+                          @if (measured.mostCommon) {
+                            <span class="truncate"
+                                  [title]="'The single commonest value in this column'">
+                              most common: {{ measured.mostCommon }}
+                              @if (measured.mostCommonRows) {
+                                ({{ measured.mostCommonRows }})
+                              }
+                            </span>
+                          }
+                        </div>
+                        @if (distributionBars(column.name).length) {
+                          <div class="mt-1 flex flex-col gap-0.5">
+                            @for (bar of distributionBars(column.name); track $index) {
+                              <div class="flex items-center gap-1.5">
+                                <span class="text-[10px] mono truncate w-20 shrink-0
+                                             text-[color:var(--text-muted)]"
+                                      [title]="bar.label">{{ bar.label }}</span>
+                                <div class="flex-1 h-2.5 rounded-sm
+                                            bg-[color:var(--surface-sunken)]">
+                                  <!-- An empty bin keeps NO width. A gap in a distribution is
+                                       where there are no values, and a sliver would draw a
+                                       continuous shape over a hole. -->
+                                  @if (bar.rows > 0) {
+                                    <div class="h-full rounded-sm"
+                                         [style.width.%]="bar.percent"
+                                         [style.background]="'var(--chart-1)'"
+                                         [title]="bar.title"></div>
+                                  }
+                                </div>
+                                <span class="text-[10px] tabular w-12 text-right shrink-0
+                                             text-[color:var(--text-muted)]">{{ bar.rows }}</span>
+                              </div>
+                            }
+                          </div>
+                          <p class="mt-1 text-[11px] text-[color:var(--text-muted)]">
+                            {{ measured.exactValues
+                               ? 'One bar per distinct value, commonest first — counted, not estimated.'
+                               : 'Equal-width bins across the range — counted, not estimated.' }}
+                          </p>
+                        } @else {
+                          <p class="mt-1 text-[11px] text-[color:var(--text-muted)]">
+                            Nothing to draw — this column has no values in it.
+                          </p>
+                        }
+                      </div>
+                    } @else if (distributionErrors()[column.name]; as failed) {
+                      <p class="text-[11px] text-crit-500" role="alert">{{ failed }}</p>
+                    } @else {
+                      <button type="button" class="btn btn-default btn-xs self-start"
+                              [disabled]="!!measuring()"
+                              (click)="measureValuesOf(column.name)"
+                              title="Two statements against the file: how its values are spread, and which is commonest">
+                        <app-icon name="chart" size="0.85em"
+                                  [busy]="measuring() === column.name" />
+                        {{ measuring() === column.name ? 'Measuring…' : 'Measure values' }}
+                      </button>
                     }
                   </div>
                 }

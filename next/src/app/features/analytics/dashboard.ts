@@ -15,6 +15,7 @@ import { Histogram } from '../../shared/charts/histogram';
 import { ResultSummary } from '../../shared/charts/result-summary';
 import { RankedBar } from '../../shared/charts/ranked-bar';
 import { CHART_SLOTS, chartColor } from '../../shared/charts/status-color';
+import { GroupedBar, GroupedSeries } from '../../shared/charts/grouped-bar';
 import { WidgetTable, WidgetTableDialog, WidgetTableData } from './widget-table';
 import { KINDS } from './widget-kinds';
 import {
@@ -588,6 +589,26 @@ function issuesFor(marks: Mark[], reason: string, additive: boolean | 'unknown',
       : shape.pivotTruncated
         ? 'That second dimension has more values than a grid can carry across the page.'
         : '',
+    /*
+     * Gated on the grid exactly as the cross-tab is, and DELIBERATELY NOT on canTotal.
+     *
+     * That is the whole reason this kind exists. A stack and a share both refuse a measure that
+     * does not add up -- an average, a minimum, a distinct count -- because stacking claims the
+     * parts compose the whole. Clustered bars claim nothing of the sort: each bar is measured
+     * from the same zero on a shared scale, so they compare without totalling. Before this,
+     * "average order value by region and category" could be drawn as no chart at all and fell
+     * through to a grid of numbers.
+     *
+     * Negatives ARE refused, for the reason the plain bars refuse them: length is measured from
+     * zero here and there is no axis for a bar running the other way.
+     */
+    groupedBar: !shape.hasPivot
+      ? 'Bars side by side need exactly two dimensions -- one for the groups, one for the bars.'
+      : shape.pivotTruncated
+        ? 'That second dimension has more values than a row of bars can carry.'
+        : negative
+          ? `${negative} of these figures is zero or below, and a bar is measured up from zero.`
+          : '',
     histogram: categorical
       || (marks.length < HISTOGRAM_FLOOR
         ? `A distribution of ${marks.length} figures says less than the bars themselves do.`
@@ -1067,7 +1088,7 @@ function mintQueryId(widgetId: number): string {
 @Component({
   selector: 'app-dashboards',
   imports: [Icon, BarChart, Donut, RankedBar, KpiCard, LineChart, ScatterPlot,
-    Comparison, Histogram, ResultSummary, FilterBuilder, WidgetTable],
+    Comparison, Histogram, ResultSummary, FilterBuilder, WidgetTable, GroupedBar],
   template: `
     <div class="space-y-4 min-w-0">
 
@@ -1479,6 +1500,12 @@ function mintQueryId(widgetId: number): string {
                           @case ('area') {
                             <app-line-chart [data]="points(view)" [filled]="true"
                                             [height]="heightOf(widget)" [format]="figure" />
+                          }
+                          @case ('groupedBar') {
+                            @if (view.pivot; as grid) {
+                              <app-grouped-bar [groupNames]="pivotGroupNames(grid)"
+                                               [series]="pivotSeries(grid)" />
+                            }
                           }
                           @case ('pivot') {
                             @if (view.pivot; as grid) {
@@ -2920,6 +2947,36 @@ export class Dashboards implements OnInit, OnDestroy {
   }
 
   // ---- small renderings -------------------------------------------------------------------
+
+  /**
+   * The cluster labels for a grouped bar chart: the row dimension's values.
+   *
+   * A null key is the group with no value in it, which the grid carries as null rather than as
+   * an empty string so it cannot be confused with a real category called nothing.
+   */
+  pivotGroupNames(grid: PivotGrid): string[] {
+    return (grid.rows ?? []).map(row => row.key ?? '(no value)');
+  }
+
+  /**
+   * One series per COLUMN value, each carrying that column's figure for every row.
+   *
+   * The grid is row-major and the chart is series-major, so this is a transpose. A null cell
+   * stays null all the way through -- it means that pair had no rows, which a zero would
+   * misreport as "measured, and it was nothing".
+   */
+  pivotSeries(grid: PivotGrid): GroupedSeries[] {
+    const rows = grid.rows ?? [];
+    return grid.columnValues.map((column, columnIndex) => ({
+      name: column,
+      values: rows.map(row => {
+        const cell = row.cells[columnIndex];
+        if (cell === null || cell === undefined || cell === '') return null;
+        const value = Number(cell);
+        return Number.isFinite(value) ? value : null;
+      }),
+    }));
+  }
 
   /** A timestamp in the reader's locale, or the raw text when it will not parse. */
   when(raw: string | undefined): string {

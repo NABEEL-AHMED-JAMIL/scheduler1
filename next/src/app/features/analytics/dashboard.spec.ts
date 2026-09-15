@@ -7,6 +7,7 @@ import {
   Dashboards, DatasetRegistry, analysisView, dateOnly, plainDecimal, queryView, combineFilters } from './dashboard';
 import { dateOnly as studioDateOnly, plainDecimal as studioPlainDecimal } from './analytics';
 import { CHART_SLOTS } from '../../shared/charts/status-color';
+import { KIND_IDS } from './widget-kinds';
 import {
   AnalysisResult, AnalyticsService, Dashboard, DashboardWidget, FilterGroup, QueryResult,
   RegisteredDataset, SavedAnalysis, SavedQuery,
@@ -2057,5 +2058,65 @@ describe('a saved filter stored as a bare clause', () => {
 
   it('nothing saved is still nothing', () => {
     expect(combineFilters(undefined, null)).toBeUndefined();
+  });
+});
+
+/**
+ * Bars side by side, and the hole in the board they fill.
+ *
+ * A two-dimension result whose measure does not ADD UP had no chart at all. Both stacked kinds
+ * refuse an average, a minimum or a distinct count -- correctly, because a stack claims its parts
+ * compose the whole -- so "average order value by region and category" fell through to the
+ * cross-tab, which answers "what is each figure" rather than "how do these compare". Clustered
+ * bars make no claim about a total, so they are offered exactly where the stack is refused.
+ */
+describe('bars side by side', () => {
+  const GRID = {
+    rowDimension: 'region',
+    columnDimension: 'category',
+    columnValues: ['Apparel', 'Electronics'],
+    columnsTruncated: false,
+    rows: [
+      { key: 'North', cells: ['120.5', '340'] },
+      { key: 'South', cells: ['90', null] },      // null = that pair had NO ROWS
+      { key: null,    cells: ['10', '20'] },      // the group with no value in it
+    ],
+  };
+
+  // The suite's own harness, rather than a second way of building the same component.
+  const board = () => boardWith().board;
+
+  it('is offered in the picker', () => {
+    expect(KIND_IDS).toContain('groupedBar');
+  });
+
+  it('turns the grid rows into cluster labels', () => {
+    expect(board().pivotGroupNames(GRID as any)).toEqual(['North', 'South', '(no value)']);
+  });
+
+  it('transposes the grid into one series per column value', () => {
+    const series = board().pivotSeries(GRID as any);
+    expect(series.map(s => s.name)).toEqual(['Apparel', 'Electronics']);
+    expect(series[0].values).toEqual([120.5, 90, 10]);
+  });
+
+  it('keeps a pair with no rows as null rather than folding it to zero', () => {
+    // A zero says "measured, and it was nothing". This pair was never measured, and the chart
+    // draws no bar for it at all.
+    const series = board().pivotSeries(GRID as any);
+    expect(series[1].values).toEqual([340, null, 20]);
+  });
+
+  it('reads a non-numeric cell as absent rather than NaN', () => {
+    const odd = { ...GRID, rows: [{ key: 'North', cells: ['n/a', '5'] }] };
+    const series = board().pivotSeries(odd as any);
+    expect(series[0].values).toEqual([null]);
+    expect(series[1].values).toEqual([5]);
+  });
+
+  it('survives a grid the server refused to compose', () => {
+    const truncated = { ...GRID, rows: null };
+    expect(board().pivotGroupNames(truncated as any)).toEqual([]);
+    expect(board().pivotSeries(truncated as any).every(s => s.values.length === 0)).toBe(true);
   });
 });

@@ -113,6 +113,32 @@ export interface PreviewShape {
  * the amount columns and turn every date into NaN, so the parse happens per column in the
  * component, where a failure to parse is itself an answer.
  */
+/** One bar of a column's distribution. A `value` and no range means it was drawn value-by-value. */
+export interface DistributionBin {
+  /** Half-open [from, to); the last bar is closed at the top so the maximum falls inside it. */
+  from?: string | null;
+  to?: string | null;
+  rows: number;
+  /** The value this bar stands for, when the column was drawn value-by-value. */
+  value?: string | null;
+}
+
+/**
+ * What a column's values look like, counted.
+ *
+ * Fetched per column rather than with the profile: the profile is one SUMMARIZE over the whole
+ * file, and a second full scan to answer a question nobody has asked yet would be a fourth permit
+ * against a ceiling of four. Cost follows the click.
+ */
+export interface ColumnDistribution {
+  name: string;
+  bins: DistributionBin[];
+  /** Each bin is one distinct value rather than a range, so label it with the value itself. */
+  exactValues: boolean;
+  mostCommon?: string | null;
+  mostCommonRows?: number | null;
+}
+
 export interface ColumnProfile {
   name: string;
   /** DuckDB's own type name, the same spelling DatasetColumn carries. */
@@ -676,7 +702,8 @@ export interface Dashboard {
 export type WidgetVisualization =
   | 'table' | 'ranked' | 'rankedShare' | 'bar' | 'donut'
   | 'kpi' | 'line' | 'area' | 'cumulative' | 'stacked' | 'shareStacked' | 'histogram' | 'scatter'
-  | 'comparison' | 'pivot' | 'dimensionSummary' | 'trendSummary' | 'distributionSummary';
+  | 'comparison' | 'pivot' | 'groupedBar'
+  | 'dimensionSummary' | 'trendSummary' | 'distributionSummary';
 
 /**
  * One tile: a REFERENCE to a saved analysis or a saved query, and how to draw it.
@@ -866,6 +893,14 @@ export class AnalyticsService {
   profile(connection: string, path: string): Observable<ApiResponse<DatasetProfile>> {
     return this.http.get<ApiResponse<DatasetProfile>>(`${this.base}/profile`, {
       params: { connection, path },
+    });
+  }
+
+  /** One column's counted distribution. Two statements against the file, not a full scan. */
+  distribution(connection: string, path: string, column: string):
+    Observable<ApiResponse<ColumnDistribution>> {
+    return this.http.get<ApiResponse<ColumnDistribution>>(`${this.base}/distribution`, {
+      params: { connection, path, column },
     });
   }
 
