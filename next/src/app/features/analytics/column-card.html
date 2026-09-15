@@ -1,0 +1,299 @@
+<div class="rounded border border-subtle p-3 flex flex-col gap-2.5 min-w-0">
+
+  <div class="flex items-baseline gap-2 min-w-0">
+    <span class="mono text-sm truncate flex-1"
+          [title]="column().name">{{ column().name }}</span>
+    <span class="text-[10px] mono text-[color:var(--text-muted)] border
+                 border-subtle rounded px-1 shrink-0"
+          [title]="column().type">{{ column().shortType }}</span>
+  </div>
+
+  <!-- Completeness. The percentage is the engine's own figure and is printed
+       as given; the row count beside it is derived from that percentage after
+       rounding, so it says "about" and always will. -->
+  @if (column().measured) {
+    <div>
+      <div class="flex flex-wrap items-baseline justify-between gap-x-3 text-xs">
+        <span class="tabular font-medium">
+          {{ percent(column().filledPercent) }}% filled
+        </span>
+        @if (column().nullPercent > 0) {
+          <span class="text-[color:var(--text-muted)]">
+            about {{ column().approxNullRows.toLocaleString() }}
+            of {{ column().rows.toLocaleString() }} rows empty
+          </span>
+        } @else {
+          <!-- "100% filled" was printed bare. The engine rounds this figure to
+               two decimal places, so one empty row in ten million rounds to
+               0.00 and the card claimed a completeness it had not measured.
+               The hedge is small because the odds are, but it is the same
+               rounding the all-empty case already refuses to trust alone. -->
+          <span class="text-[color:var(--text-muted)]"
+                title="Completeness is measured to two decimal places, so on a
+                       very large file a handful of empty rows can round away.">
+            none measured empty
+          </span>
+        }
+      </div>
+      <div class="mt-1 h-1.5 rounded-full overflow-hidden bg-sunken">
+        <span class="block h-full rounded-full"
+              [style.width.%]="column().filledPercent"
+              [style.background]="column().nullPercent >= 25
+                                  ? 'var(--chart-3)' : 'var(--chart-2)'"></span>
+      </div>
+    </div>
+  } @else {
+    <p class="text-xs text-[color:var(--text-muted)]">
+      No rows, so there is nothing to measure completeness against.
+    </p>
+  }
+
+  <!-- The distinct count is a HyperLogLog sketch, measured 3.7% low over a
+       million values. It never appears without the "≈" and the word beside
+       it, because "1,234 distinct" would be read as a count. -->
+  <div class="flex flex-wrap items-baseline gap-x-1.5 text-xs">
+    <span class="tabular font-medium">≈ {{ compact(column().approxDistinct) }}</span>
+    <span class="text-[color:var(--text-muted)]">distinct values (estimated)</span>
+    @if (column().distinctPercent !== null) {
+      <!-- 06's "distinct %". It inherits the sketch's inexactness whole, so it
+           carries the same "≈" the count above it does. -->
+      <span class="text-[color:var(--text-muted)] tabular">
+        · ≈ {{ percent(column().distinctPercent!) }}% of rows
+      </span>
+    }
+    @if (column().keyLike) {
+      <!-- A suggestion, and worded as one: proving uniqueness needs an exact
+           distinct count, which is a second scan nobody has paid for. -->
+      <span class="pill pill-neutral"
+            title="About as many distinct values as rows. The distinct count is an estimate, so this cannot prove uniqueness.">
+        may be a key
+      </span>
+    }
+  </div>
+
+  <!-- min and max, or "first" and "last" where they are alphabetical. A text
+       column compares letter by letter, so calling its extremes min and max
+       is what makes "9" being the largest value look like a bug. -->
+  <dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-0.5 text-xs">
+    <dt class="text-[color:var(--text-muted)] whitespace-nowrap">
+      {{ column().text ? 'first (A–Z)' : 'min' }}
+    </dt>
+    <dd class="mono truncate" [title]="column().min ?? 'null'">
+      @if (column().min === null) {
+        <span class="italic text-[color:var(--text-muted)]">null</span>
+      } @else if (column().min === '') {
+        <span class="italic text-[color:var(--text-muted)]">blank</span>
+      } @else { {{ column().minLabel }} }
+    </dd>
+    <dt class="text-[color:var(--text-muted)] whitespace-nowrap">
+      {{ column().text ? 'last (A–Z)' : 'max' }}
+    </dt>
+    <dd class="mono truncate" [title]="column().max ?? 'null'">
+      @if (column().max === null) {
+        <span class="italic text-[color:var(--text-muted)]">null</span>
+      } @else if (column().max === '') {
+        <span class="italic text-[color:var(--text-muted)]">blank</span>
+      } @else { {{ column().maxLabel }} }
+    </dd>
+    @if (column().avgLabel) {
+      <dt class="text-[color:var(--text-muted)] whitespace-nowrap">mean</dt>
+      <dd class="mono truncate">{{ column().avgLabel }}</dd>
+    }
+    @if (column().stdLabel) {
+      <dt class="text-[color:var(--text-muted)] whitespace-nowrap">std dev</dt>
+      <dd class="mono truncate">{{ column().stdLabel }}</dd>
+    }
+    @if (column().medianLabel) {
+      <!-- 06's "percentile values where applicable". They were already on the
+           card as the widths of the spread bar and were never named, so a
+           reader could see the shape and not read a single quartile off it.
+           "estimated" is on the label rather than under the list, because
+           approx_quantile reported 18.375 for a first quartile that was 21.0. -->
+      <dt class="text-[color:var(--text-muted)] whitespace-nowrap">
+        quartiles
+      </dt>
+      <dd class="mono truncate"
+          title="25th, 50th and 75th percentile, from approx_quantile — estimated, not measured.">
+        {{ column().q25Label || 'N/A' }} · {{ column().medianLabel }} ·
+        {{ column().q75Label || 'N/A' }}
+        <span class="text-[color:var(--text-muted)]">(estimated)</span>
+      </dd>
+    }
+  </dl>
+
+  @if (findings(); as found) {
+    @if (found.length) {
+      <!-- 06's "quality warnings", on the column they are about. The Quality tab
+           leads with these across the whole file; here they sit beside the
+           statistics they were derived from, which is where somebody reading
+           one column will look for them. -->
+      <div class="flex flex-wrap gap-1">
+        @for (finding of found; track finding.title) {
+          <span class="pill"
+                [class.pill-crit]="finding.level === 'crit'"
+                [class.pill-warn]="finding.level === 'warn'"
+                [class.pill-neutral]="finding.level === 'note'"
+                [title]="finding.detail">{{ finding.title }}</span>
+        }
+      </div>
+    }
+  }
+
+  @if (column().spread.length) {
+    <div>
+      <div class="flex items-baseline justify-between gap-2 text-[11px]
+                  text-[color:var(--text-muted)]">
+        <span>Spread</span>
+        <!-- Said here rather than under the card: the block widths ARE the
+             quartiles, and three of the five edges are approx_quantile. -->
+        <span>quartiles estimated</span>
+      </div>
+      <div class="mt-1 flex h-2 rounded overflow-hidden" role="img"
+           [attr.aria-label]="column().spreadSummary">
+        @for (segment of column().spread; track $index) {
+          <!-- A zero-wide quarter is the most interesting one on the bar:
+               a quarter of the rows sharing a single value. It keeps two
+               pixels so it does not vanish into its neighbours. -->
+          <span class="h-full" [style.width.%]="segment.width"
+                [style.minWidth.px]="2"
+                [style.background]="'var(--chart-1)'"
+                [style.opacity]="$index === 1 || $index === 2 ? 1 : 0.45"
+                [title]="segment.label"></span>
+        }
+      </div>
+      <p class="mt-1 text-[11px] text-[color:var(--text-muted)]">
+        Each block holds about a quarter of the rows, placed between min and
+        max. The solid middle is the half nearest the median.
+      </p>
+    </div>
+  } @else {
+    <!-- No numbers to spread. Saying so beats an empty chart frame, which
+         reads as a chart that failed to draw. -->
+    <p class="text-[11px] text-[color:var(--text-muted)]">
+      No numeric range to spread — measure it below to see its values counted.
+    </p>
+  }
+
+  <!-- The COUNTED distribution, beside the estimated strip above.
+       Behind a click because it is two more statements against the file, and
+       the comment on the strip is right that three approximate quartiles are
+       not something to bin: these bars are counted instead of inferred. -->
+  @if (distribution(); as measured) {
+    <div>
+      <div class="flex items-baseline justify-between gap-2 text-[11px]
+                  text-[color:var(--text-muted)]">
+        <span>{{ measured.exactValues ? 'Values' : 'Distribution' }}</span>
+        @if (measured.mostCommon) {
+          <span class="truncate"
+                [title]="'The single commonest value in this column'">
+            most common: {{ measured.mostCommon }}
+            @if (measured.mostCommonRows) {
+              ({{ measured.mostCommonRows }})
+            }
+          </span>
+        }
+      </div>
+      @if (bars().length) {
+        <!-- Which drawings this column's values can honestly carry. A kind that
+             would misrepresent them is offered DISABLED with the sentence
+             saying why, rather than hidden -- the same rule the dashboard's
+             widget picker follows. -->
+        <div class="mt-1 flex flex-wrap gap-1">
+          @for (option of kinds(); track option.id) {
+            <button type="button" class="btn btn-ghost btn-xs"
+                    [class.btn-active]="kind() === option.id"
+                    [disabled]="!!option.reason"
+                    [title]="option.reason || ('Draw as ' + option.label)"
+                    (click)="chooseKind(option.id)">
+              {{ option.label }}
+            </button>
+          }
+        </div>
+
+        @switch (kind()) {
+          @case ('share') {
+            <app-donut [data]="slices()"
+                       totalLabel="rows" />
+          }
+          @case ('curve') {
+            <app-line-chart [data]="points()"
+                            [height]="110" />
+          }
+          @case ('area') {
+            <app-line-chart [data]="points()"
+                            [filled]="true" [height]="110" />
+          }
+          @case ('table') {
+            <div class="mt-1 overflow-x-auto">
+              <table class="w-full text-[11px]">
+                <thead>
+                  <tr class="text-left text-[color:var(--text-muted)]">
+                    <th class="py-0.5 font-medium">
+                      {{ measured.exactValues ? 'Value' : 'From' }}
+                    </th>
+                    <th class="py-0.5 font-medium text-right">Rows</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (bar of bars(); track $index) {
+                    <tr>
+                      <td class="mono py-0.5 truncate"
+                          [title]="bar.title">{{ bar.label }}</td>
+                      <td class="tabular py-0.5 text-right">{{ bar.rows }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+          @default {
+            <div class="mt-1 flex flex-col gap-0.5">
+              @for (bar of bars(); track $index) {
+                <div class="flex items-center gap-1.5">
+                  <span class="text-[10px] mono truncate w-20 shrink-0
+                               text-[color:var(--text-muted)]"
+                        [title]="bar.label">{{ bar.label }}</span>
+                  <div class="flex-1 h-2.5 rounded-sm
+                              bg-[color:var(--surface-sunken)]">
+                    <!-- An empty bin keeps NO width. A gap in a distribution is
+                         where there are no values, and a sliver would draw a
+                         continuous shape over a hole. -->
+                    @if (bar.rows > 0) {
+                      <div class="h-full rounded-sm"
+                           [style.width.%]="bar.percent"
+                           [style.background]="'var(--chart-1)'"
+                           [title]="bar.title"></div>
+                    }
+                  </div>
+                  <span class="text-[10px] tabular w-12 text-right shrink-0
+                               text-[color:var(--text-muted)]">{{ bar.rows }}</span>
+                </div>
+              }
+            </div>
+          }
+        }
+
+        <p class="mt-1 text-[11px] text-[color:var(--text-muted)]">
+          {{ measured.exactValues
+             ? 'One mark per distinct value, commonest first — counted, not estimated.'
+             : 'Equal-width bins across the range — counted, not estimated.' }}
+        </p>
+      } @else {
+        <p class="mt-1 text-[11px] text-[color:var(--text-muted)]">
+          Nothing to draw — this column has no values in it.
+        </p>
+      }
+    </div>
+  } @else if (error(); as failed) {
+    <p class="text-[11px] text-crit-500" role="alert">{{ failed }}</p>
+  } @else {
+    <button type="button" class="btn btn-default btn-xs self-start"
+            [disabled]="measuring()"
+            (click)="measure()"
+            title="Two statements against the file: how its values are spread, and which is commonest">
+      <app-icon name="chart" size="0.85em"
+                [busy]="measuring()" />
+      {{ measuring() ? 'Measuring…' : 'Measure values' }}
+    </button>
+  }
+</div>
