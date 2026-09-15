@@ -275,7 +275,7 @@
           @if (activityLoading()) {
             <p class="text-sm text-[color:var(--text-muted)]">Loading&hellip;</p>
           } @else if (runs().length) {
-            <ul class="divide-y border-subtle">
+            <ul class="divide-y divide-[color:var(--border-subtle)]">
               @for (run of runs(); track run.jobQueueId) {
                 <li class="py-2.5 flex flex-col gap-1">
                   <div class="flex items-center gap-2 min-w-0">

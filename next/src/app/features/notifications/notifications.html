@@ -45,7 +45,11 @@
       }
     </ng-container>
 
-    <ul class="divide-y border-subtle">
+    <!-- divide-y supplies the 1px; its COLOUR is set on .notification-row, because a
+         divide-[color:...] utility is emitted inside :where() at specificity 0,0,0 and loses
+         to that class's border-transparent. `border-subtle` used to sit here and coloured the
+         UL's own border, which has no width -- so nothing was ever drawn. -->
+    <ul class="divide-y">
       @for (item of paged(); track item.notificationId) {
         <li class="notification-row" [class.is-unread]="!item.read"
             [style.--tone]="toneOf(item)">
@@ -82,7 +86,7 @@
             }
 
             @if (targetOf(item); as target) {
-              <button type="button" class="btn btn-ghost btn-sm"
+              <button type="button" class="btn btn-default btn-sm"
                       [title]="'Open ' + target"
                       (click)="open(item)">
                 Open<app-icon name="chevronRight" size="0.85em" />

@@ -90,7 +90,7 @@
               }
 
               @if (expanded().has($any(lookup.lookupId)) && lookup.children?.length) {
-                <ul class="mt-2 rounded border divide-y text-xs border-subtle"
+                <ul class="mt-2 rounded border divide-y divide-[color:var(--border-subtle)] text-xs border-subtle"
                    >
                   @for (child of lookup.children; track child.lookupId) {
                     <li class="px-2.5 py-1.5 flex items-baseline gap-2 border-subtle"

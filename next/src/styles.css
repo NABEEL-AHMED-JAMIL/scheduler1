@@ -1178,6 +1178,20 @@ html.dark .btn-intent-crit:focus app-icon { color: var(--color-crit-400); }
      themes, so an unread row went white-on-dark. */
   .notification-row {
     @apply flex items-start gap-3 px-4 py-3 border-l-2 border-transparent transition-colors;
+    /*
+     * The separator between rows, and it has to be set HERE rather than on the list.
+     *
+     * The list carries divide-y, which gives every row but the last a 1px bottom border. Its
+     * COLOUR would normally come from a divide-[color:...] utility -- except Tailwind v4 emits
+     * those inside :where(), which is specificity 0,0,0 on purpose, and `border-transparent`
+     * above is 0,1,0. The row won, every separator was drawn transparent, and the list read as
+     * one undivided block. Colouring the bottom edge on the row itself is the only place the
+     * cascade actually lands.
+     *
+     * border-transparent stays: it is the resting state of the left accent stripe that
+     * .is-unread turns on, and only the left edge has a width to show it.
+     */
+    border-bottom-color: var(--border-subtle);
   }
   .notification-row:hover { background: var(--surface-sunken); }
   .notification-row.is-unread {
