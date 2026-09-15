@@ -60,7 +60,10 @@
         <p class="text-xs text-crit-500" role="alert">{{ browseError() }}</p>
       }
 
-      <div class="scroll-table -mx-1 px-1">
+      <!-- mt-2 ON TOP of the rail's gap-2. The filter is a control and the list below it is
+           content; at one gap they read as one block, and the first file sits close enough
+           to the input to look like a suggestion dropped out of it. -->
+      <div class="scroll-table -mx-1 px-1 mt-2">
         @if (browsing()) {
           <p class="text-xs text-[color:var(--text-muted)] py-4 text-center">Reading…</p>
         } @else {
