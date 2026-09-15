@@ -18,12 +18,13 @@ import { CHART_SLOTS, chartColor } from '../../shared/charts/status-color';
 import { WidgetTable, WidgetTableDialog, WidgetTableData } from './widget-table';
 import { KINDS } from './widget-kinds';
 import {
-  FilterBuilder, countFilterClauses, describeClause, emptyFilterGroup, isNumericType,
-  pruneFilters,
+  FilterBuilder, asFilterGroup, countFilterClauses, describeClause, emptyFilterGroup,
+  isNumericType, pruneFilters,
 } from './filter-builder';
 import {
   Aggregation, AnalysisColumn, AnalysisRequest, AnalysisResult, AnalysisSort, AnalyticsService,
-  Dashboard, DashboardWidget, DatasetColumn, FilterGroup, Grain, PivotGrid, QueryResult,
+  Dashboard, DashboardWidget, DatasetColumn, FilterGroup, FilterNode, Grain, PivotGrid,
+  QueryResult,
   RegisteredDataset,
   SavedAnalysis,
   SavedQuery, TopN, WidgetVisualization,
@@ -364,10 +365,13 @@ export interface WidgetView {
  * belongs: it has no visible symptom, and a tile narrowed by the wrong predicate draws a
  * perfectly ordinary chart of the wrong rows.
  */
-export function combineFilters(saved: FilterGroup | undefined,
+export function combineFilters(saved: FilterNode | undefined,
     board: FilterGroup | null): FilterGroup | undefined {
 
-  const own = saved ? pruneFilters(saved) : null;
+  // `saved` is whatever was written into analysis_config, which for a single condition is the
+  // bare clause rather than a group of one. asFilterGroup makes both shapes safe to walk.
+  const savedGroup = asFilterGroup(saved);
+  const own = savedGroup ? pruneFilters(savedGroup) : null;
   const bar = board ? pruneFilters(board) : null;
   const haveOwn = !!own && own.clauses.length > 0;
   const haveBar = !!bar && bar.clauses.length > 0;
@@ -2763,7 +2767,27 @@ export class Dashboards implements OnInit, OnDestroy {
       return;
     }
     this.runningId.set(id);
-    this.run(widget, id, epoch);
+    /*
+     * A tile that throws must fail alone.
+     *
+     * run() marks the tile running and only then builds the request, so anything that throws
+     * between those two points -- a saved configuration in a shape a reader here did not expect,
+     * a column that has since been renamed -- unwound out of the queue with the tile still
+     * marked running and next() never reached. The board stopped dead: one tile on "Running…"
+     * for ever and every tile behind it on "Waiting its turn", with nothing on screen saying
+     * anything had gone wrong. That is exactly what dashboard "15 Regional analysis" did.
+     *
+     * The JSON.parse inside run() was already guarded this carefully; everything after it was
+     * not. This makes the guarantee structural rather than a list of the failures somebody
+     * happened to think of: whatever one tile does, the other tiles still run.
+     */
+    try {
+      this.run(widget, id, epoch);
+    } catch (thrown) {
+      const reason = thrown instanceof Error ? thrown.message : String(thrown);
+      this.settle(id, epoch, { state: 'failed', view: null, queryId: '',
+        error: `"${widget.widgetTitle}" could not be prepared: ${reason}` });
+    }
   }
 
   private run(widget: DashboardWidget, id: number, epoch: number): void {

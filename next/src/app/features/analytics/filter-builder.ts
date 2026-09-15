@@ -115,6 +115,27 @@ export function clauseComplete(clause: FilterClause): boolean {
  * direction, so the Canvas shows the count of what it is actually sending beside the count of
  * what is on screen, and they differ visibly while a clause is unfinished.
  */
+/**
+ * A saved `filters` value as a GROUP, whatever shape it was stored in.
+ *
+ * A saved analysis whose filter is a single condition is stored as the bare clause --
+ * {"field":"region","operator":"EQ","value":"North"} -- not as a group wrapping one. That is a
+ * perfectly reasonable thing for a writer to emit and it is what the seeded reports contain, but
+ * every reader here is typed `FilterGroup` and goes straight for `.clauses`. On dashboard "15
+ * Regional analysis" that produced `TypeError: clauses is not iterable` while building the
+ * request for "North: revenue by category" -- thrown before any HTTP call, so the tile sat on
+ * "Running…" for ever and the three tiles behind it never left "Waiting its turn".
+ *
+ * Returns undefined for nothing at all, so callers keep their existing "no filters" path.
+ */
+export function asFilterGroup(raw: FilterNode | null | undefined): FilterGroup | undefined {
+  if (!raw) return undefined;
+  if (isFilterGroup(raw)) return raw;
+  // A lone clause is an implicit AND of one. OR would read identically for a single condition,
+  // but AND is what a second condition should join, so it is the honest default.
+  return { op: 'AND', clauses: [raw] };
+}
+
 export function pruneFilters(group: FilterGroup): FilterGroup {
   const clauses: FilterNode[] = [];
   for (const node of group.clauses) {

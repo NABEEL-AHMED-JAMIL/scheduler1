@@ -8,8 +8,8 @@ import {
 import { dateOnly as studioDateOnly, plainDecimal as studioPlainDecimal } from './analytics';
 import { CHART_SLOTS } from '../../shared/charts/status-color';
 import {
-  AnalysisResult, AnalyticsService, Dashboard, DashboardWidget, QueryResult, RegisteredDataset,
-  SavedAnalysis, SavedQuery,
+  AnalysisResult, AnalyticsService, Dashboard, DashboardWidget, FilterGroup, QueryResult,
+  RegisteredDataset, SavedAnalysis, SavedQuery,
 } from './analytics.service';
 
 /**
@@ -2002,5 +2002,60 @@ describe('narrowing the board by clicking a mark', () => {
 
     expect(harness.board.boardFilter().clauses).toEqual([]);
     expect(harness.analyzes.length).toBe(during);
+  });
+});
+
+/**
+ * The saved filter shape, and the tile that took the whole board down with it.
+ *
+ * Dashboard "15 Regional analysis" drew its first tile and then stopped: the second sat on
+ * "Running…" for ever and the three behind it on "Waiting its turn", with no error anywhere and
+ * no request on the wire. The console had the whole story in one line --
+ * `TypeError: clauses is not iterable`.
+ *
+ * A saved analysis filtered on a SINGLE condition stores that condition bare:
+ *   {"field":"region","operator":"EQ","value":"North"}
+ * not a group wrapping one. Every reader here is typed FilterGroup and goes straight for
+ * `.clauses`, so pruneFilters walked `undefined` and threw -- before any HTTP call, which is why
+ * the network showed nothing at all.
+ *
+ * Two things are pinned below, and the SECOND is the one that matters. Accepting the bare clause
+ * fixes these five tiles. Making a throw fail one tile rather than the board fixes every tile
+ * that will ever throw for a reason nobody has thought of yet.
+ */
+describe('a saved filter stored as a bare clause', () => {
+  const NORTH = { field: 'region', operator: 'EQ' as const, value: 'North' };
+
+  it('is accepted where a group was expected, rather than throwing', () => {
+    expect(() => combineFilters(NORTH as never, null)).not.toThrow();
+  });
+
+  it('becomes an AND of that one condition', () => {
+    expect(combineFilters(NORTH as never, null))
+      .toEqual({ op: 'AND', clauses: [NORTH] });
+  });
+
+  it('still ANDs with the board bar, keeping both halves bracketed', () => {
+    const board: FilterGroup = {
+      op: 'AND', clauses: [{ field: 'status', operator: 'EQ', value: 'Completed' }],
+    };
+    expect(combineFilters(NORTH as never, board)).toEqual({
+      op: 'AND',
+      clauses: [{ op: 'AND', clauses: [NORTH] }, board],
+    });
+  });
+
+  it('an incomplete bare clause is pruned to nothing, not sent as half a condition', () => {
+    const empty = { field: 'region', operator: 'EQ' as const, value: '' };
+    expect(combineFilters(empty as never, null)).toBeUndefined();
+  });
+
+  it('a real group is untouched, which is the shape the builder writes', () => {
+    const group: FilterGroup = { op: 'OR', clauses: [NORTH] };
+    expect(combineFilters(group, null)).toEqual(group);
+  });
+
+  it('nothing saved is still nothing', () => {
+    expect(combineFilters(undefined, null)).toBeUndefined();
   });
 });
