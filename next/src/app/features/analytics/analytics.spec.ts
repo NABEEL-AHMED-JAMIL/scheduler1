@@ -52,6 +52,15 @@ const CSV_FILE: ObjectSummary = {
   name: 'sales-2026.csv', key: 'daily/sales-2026.csv', folder: false, size: 4096,
   lastModified: '2026-09-08T14:55:40.779Z',
 };
+// A SECOND readable file. Two tests below describe opening "another file" and passed CSV_FILE --
+// the one already open -- so what they actually exercised was a re-click on the current row. That
+// only cleared anything because openFile used to reload unconditionally, so the day that became a
+// no-op (which is what a click on the current selection should always have been) both tests failed
+// for a behaviour neither of them was about.
+const OTHER_CSV: ObjectSummary = {
+  name: 'sales-2025.csv', key: 'daily/sales-2025.csv', folder: false, size: 2048,
+  lastModified: '2025-09-08T14:55:40.779Z',
+};
 const TEXT_FILE: ObjectSummary = { name: 'notes.txt', key: 'daily/notes.txt', folder: false };
 const FOLDER: ObjectSummary = { name: 'archive', key: 'archive/', folder: true };
 
@@ -1833,7 +1842,9 @@ describe('the console does not disturb the tabs beside it', () => {
       'canvas', 'sql', 'charts', 'activity',
     ]);
 
-    console.studio.openFile(CSV_FILE);
+    // Another file, not the one already open: opening a dataset lands on Details, and re-clicking
+    // the current row is deliberately inert.
+    console.studio.openFile(OTHER_CSV);
     expect(console.studio.tab()).toBe('overview');
   });
 
@@ -3723,7 +3734,7 @@ describe('the grid is wired to the server, and never sorts the page it is holdin
     grid.studio.onGridSearch('north');
     grid.answer({ totalRows: 4, filtered: true });
 
-    grid.studio.openFile(CSV_FILE);
+    grid.studio.openFile(OTHER_CSV);
 
     expect(grid.studio.gridSort()).toBeNull();
     expect(grid.studio.gridSearch()).toBe('');
@@ -5119,5 +5130,83 @@ describe('the saved-analysis library', () => {
 
     expect(canvas.studio.libraryVisible().length).toBe(3);
     expect(canvas.studio.libraryHidden()).toBe(0);
+  });
+});
+
+/**
+ * Clicking the file that is already open.
+ *
+ * Reported from the screen: with Canvas open, a click on the highlighted row in the left list
+ * threw the reader back to Details. That is the visible half. The rest of load() ran too --
+ * the Canvas picks, the SQL result, the computed profile and the grid's sort and filter were all
+ * cleared, and schema and preview were re-issued for a path that had not changed, which is two
+ * of the four permits the query governor has.
+ *
+ * Every one of those is the right thing to do when the dataset CHANGES. None of them is the
+ * right thing to do when it does not, and a misclick is how most people found out.
+ */
+describe('clicking the dataset that is already open', () => {
+  it('does not re-read a file whose path has not changed', () => {
+    const harness = opened();
+    const schemaCallsAfterOpen = harness.schema.mock.calls.length;
+    const previewCallsAfterOpen = harness.preview.mock.calls.length;
+
+    harness.studio.openFile(CSV_FILE);
+
+    expect(harness.schema).toHaveBeenCalledTimes(schemaCallsAfterOpen);
+    expect(harness.preview).toHaveBeenCalledTimes(previewCallsAfterOpen);
+  });
+
+  it('leaves the reader on the tab they were on', () => {
+    const harness = opened();
+    harness.studio.tab.set('canvas');
+
+    harness.studio.openFile(CSV_FILE);
+
+    expect(harness.studio.tab()).toBe('canvas');
+  });
+
+  it('keeps the columns and the page already on screen', () => {
+    const harness = opened();
+    const columns = harness.studio.columns();
+    expect(columns.length).toBeGreaterThan(0);
+
+    harness.studio.openFile(CSV_FILE);
+
+    expect(harness.studio.columns()).toEqual(columns);
+    expect(harness.studio.preview()).not.toBeNull();
+    expect(harness.studio.loading()).toBe(false);
+  });
+
+  it('still opens a DIFFERENT file, which is the case the guard must not break', () => {
+    const harness = opened();
+    const before = harness.schema.mock.calls.length;
+
+    harness.studio.openFile(OTHER_CSV);
+
+    expect(harness.schema.mock.calls.length).toBe(before + 1);
+    expect(harness.studio.path()).toBe('daily/sales-2025.csv');
+    expect(harness.studio.tab()).toBe('overview');
+  });
+
+  it('fills in the entry when the path was opened without going through the list', () => {
+    // A deep link sets the path directly, so `selected` is empty while the file is open and the
+    // details card has no entry to read. Clicking the row must supply it -- without reloading.
+    const harness = opened();
+    harness.studio.selected.set(null);
+    const before = harness.schema.mock.calls.length;
+
+    harness.studio.openFile(CSV_FILE);
+
+    expect(harness.studio.selected()?.key).toBe(CSV_FILE.key);
+    expect(harness.schema.mock.calls.length).toBe(before);
+  });
+
+  it('still refuses a file it cannot read', () => {
+    const harness = opened();
+    const before = harness.schema.mock.calls.length;
+    harness.studio.openFile(TEXT_FILE);
+    expect(harness.schema.mock.calls.length).toBe(before);
+    expect(harness.studio.path()).toBe(CSV_FILE.key);
   });
 });

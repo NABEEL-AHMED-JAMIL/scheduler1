@@ -1044,6 +1044,33 @@ export class Analytics implements OnInit {
 
   openFile(entry: ObjectSummary): void {
     if (!this.readable(entry.key)) return;
+
+    /*
+     * Clicking the file that is ALREADY open does nothing.
+     *
+     * load() is written for a CHANGE of dataset, and every single thing it discards is correct
+     * to discard when the dataset changes and pure loss when it does not: it sends the reader
+     * back to Details from whichever tab they were on, clears the Canvas picks, the SQL result,
+     * the computed profile and the grid's sort and filter, and then spends TWO more server
+     * queries -- schema and preview -- re-reading a file whose bytes have not moved. Against a
+     * four-permit query governor that is half the ceiling, and it also cancels whatever Canvas
+     * widget was still in flight.
+     *
+     * So a misclick on the highlighted row silently threw away a profile that had itself cost a
+     * permit to compute, and a Canvas the reader had built up pick by pick. Every file list in
+     * every tool treats a click on the current selection as a no-op; this one treated it as
+     * "start over".
+     *
+     * `selected` is still filled in, because it can legitimately be empty while this file is
+     * open: a deep link sets the path without ever going through the list, and the details card
+     * reads the entry rather than the path. Set only when it actually differs, so re-clicking
+     * does not hand every computed that reads it a new object reference to recompute from.
+     */
+    if (this.path() === entry.key) {
+      if (this.selected()?.key !== entry.key) this.selected.set(entry);
+      return;
+    }
+
     this.selected.set(entry);
     this.load(entry.key);
   }
