@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { statusColor } from './status-color';
+import { statusColor, CHART_SLOTS } from './status-color';
 
 /**
  * One mapping, used everywhere.
@@ -40,8 +40,15 @@ describe('status colours', () => {
   });
 
   it('wraps the categorical palette rather than running off the end', () => {
-    expect(statusColor('anything', 6)).toBe('var(--chart-0)');
-    expect(statusColor('anything', 13)).toBe('var(--chart-1)');
+    // Against CHART_SLOTS rather than a literal: the palette grew from six to eight, and a
+    // spec that restates the old number passes while the last two colours are never drawn.
+    expect(statusColor('anything', CHART_SLOTS)).toBe('var(--chart-0)');
+    expect(statusColor('anything', CHART_SLOTS * 2 + 1)).toBe('var(--chart-1)');
+  });
+
+  it('keeps a negative index in range instead of naming a token that does not exist', () => {
+    // `var(--chart--2)` is not a token; it resolves to nothing and the mark is drawn invisible.
+    expect(statusColor('anything', -2)).toBe(`var(--chart-${CHART_SLOTS - 2})`);
   });
 
   it('treats an absent status as categorical rather than throwing', () => {

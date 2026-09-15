@@ -18,11 +18,37 @@ const FREQUENCIES = [
   { value: 'Monthly', label: 'Monthly',         unit: 'months' },
 ];
 
+/**
+ * The day codes the engine actually parses.
+ *
+ * These were '1'..'7'. Nothing else in the system speaks that: ProcessTimeUtil maps MON..SUN,
+ * the legacy console writes MON..SUN, and the jobs list renders MON..SUN. So every weekly
+ * schedule created here stored days the engine read as none at all and ran once a week on
+ * whatever weekday its start date fell on -- while this screen, matching values against its own
+ * private table, went on displaying the days that were picked. The console was the only thing
+ * that believed them.
+ */
 const DAYS = [
-  { value: '1', label: 'Mon' }, { value: '2', label: 'Tue' }, { value: '3', label: 'Wed' },
-  { value: '4', label: 'Thu' }, { value: '5', label: 'Fri' }, { value: '6', label: 'Sat' },
-  { value: '7', label: 'Sun' },
+  { value: 'MON', label: 'Mon' }, { value: 'TUE', label: 'Tue' }, { value: 'WED', label: 'Wed' },
+  { value: 'THU', label: 'Thu' }, { value: 'FRI', label: 'Fri' }, { value: 'SAT', label: 'Sat' },
+  { value: 'SUN', label: 'Sun' },
 ];
+
+/**
+ * Reads a stored days_of_week entry in either vocabulary.
+ *
+ * Rows written by this screen before the fix above hold '1'..'7', and they are not going to be
+ * migrated away underneath a running scheduler, so opening one has to re-select the right chips
+ * rather than silently clearing them and saving an empty week back.
+ */
+const LEGACY_DAY_CODES: Record<string, string> = {
+  '1': 'MON', '2': 'TUE', '3': 'WED', '4': 'THU', '5': 'FRI', '6': 'SAT', '7': 'SUN',
+};
+
+function normaliseDayCode(code: string): string {
+  const trimmed = code.trim().toUpperCase();
+  return LEGACY_DAY_CODES[trimmed] ?? trimmed;
+}
 
 /** An end date before the start date would silently never run. */
 function endAfterStart(group: AbstractControl): ValidationErrors | null {
@@ -139,7 +165,9 @@ export class JobEdit implements OnInit {
             dayOfMonth: job.scheduler.dayOfMonth,
           });
           this.frequencyValue.set(job.scheduler.frequency);
-          this.selectedDays.set((job.scheduler.daysOfWeek ?? '').split(',').filter(Boolean));
+          this.selectedDays.set(((job.scheduler.daysOfWeek ?? '') as string).split(',')
+            .filter(Boolean).map(normaliseDayCode)
+            .filter((code: string) => DAYS.some(day => day.value === code)));
         }
       },
       error: err => {

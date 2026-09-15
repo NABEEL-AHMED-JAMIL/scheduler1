@@ -14,13 +14,17 @@ import { Comparison, ComparisonSide } from '../../shared/charts/comparison';
 import { Histogram } from '../../shared/charts/histogram';
 import { ResultSummary } from '../../shared/charts/result-summary';
 import { RankedBar } from '../../shared/charts/ranked-bar';
+import { CHART_SLOTS, chartColor } from '../../shared/charts/status-color';
+import { WidgetTable, WidgetTableDialog, WidgetTableData } from './widget-table';
+import { KINDS } from './widget-kinds';
 import {
   FilterBuilder, countFilterClauses, describeClause, emptyFilterGroup, isNumericType,
   pruneFilters,
 } from './filter-builder';
 import {
   Aggregation, AnalysisColumn, AnalysisRequest, AnalysisResult, AnalysisSort, AnalyticsService,
-  Dashboard, DashboardWidget, DatasetColumn, FilterGroup, QueryResult, RegisteredDataset,
+  Dashboard, DashboardWidget, DatasetColumn, FilterGroup, Grain, PivotGrid, QueryResult,
+  RegisteredDataset,
   SavedAnalysis,
   SavedQuery, TopN, WidgetVisualization,
 } from './analytics.service';
@@ -33,20 +37,109 @@ import {
  * chart would be three conversions of the same two fields, and the first divergence between them
  * would be a tile whose ring and whose bars disagree about a total.
  */
-export interface Mark { name: string; value: number; }
+/**
+ * One dimension's RAW value behind a mark, with the column it came from.
+ *
+ * Raw and not rendered. `name` on a Mark is what the tile DRAWS -- dates shortened, decimals
+ * trimmed, several dimensions joined with a middle dot -- and none of that is a filter operand.
+ * "2024-03-01" drawn from a TIMESTAMP is not the string the column holds, and "north · retail"
+ * is not any column's value at all.
+ */
+export interface MarkOperand { field: string; value: string | null; }
+
+/**
+ * A drawable figure and, when it can be, the row it identifies.
+ *
+ * `operands` is absent whenever this mark does NOT identify exactly one group -- see markOperands
+ * and mergeMarks for the three ways that happens. Absent means "cannot be narrowed on", and the
+ * board reads it that way rather than guessing.
+ */
+export interface Mark {
+  name: string;
+  value: number;
+  operands?: MarkOperand[];
+  /**
+   * The same fact as "operands is absent", under the name the CHARTS read.
+   *
+   * Two names for one thing, and the alternative was worse: RankedBar and BarChart are shared
+   * components used by the object browser and the reports screen, and teaching them what a filter
+   * operand is to disable one row would couple them to the analytics filter model. So they get a
+   * plain boolean, and it is set in ONE statement -- at the end of mergeMarks, where operands are
+   * finally settled -- rather than at each of the places that decide to withhold them.
+   */
+  inert?: boolean;
+}
 
 /** Rows a tile shows. The count printed under them is the WHOLE result's, never this. */
 const WIDGET_ROWS = 8;
+
+/**
+ * The half of a tile that is about presentation rather than about which question it asks.
+ *
+ * Carried in the widget's existing `widget_config` TEXT column, which the schema, the POJO and
+ * this client already round-trip on every edit and which nothing had ever written a byte into.
+ * The V34 column comment nominates it for exactly this -- a finer layout "belongs in
+ * widget_config until something server-side needs to read it" -- and nothing server-side reads
+ * a height or a caption, so no migration and no backend change is involved.
+ */
+interface WidgetConfig {
+  /** Drawing height in px for the chart kinds that take one. Absent means WIDGET_HEIGHT. */
+  height?: number;
+  /** A sentence the author writes under the tile. Absent means none; it is never invented. */
+  caption?: string;
+}
+
+/** What a tile is drawn at when its author has not said otherwise. */
+const WIDGET_HEIGHT = 180;
+/**
+ * The bounds a typed height is held to.
+ *
+ * The hard floor is lower than this: BarChart reserves 32px for a value line and a label and
+ * then floors its track at 18 (bar-chart.ts), so below about 50 the bars stop shrinking while
+ * the container keeps shrinking and the overflow escapes upward over the chart-kind select. 120
+ * is the practical floor -- the histogram's own default -- and leaves a drawing that can still
+ * be read. The ceiling is a screenful: past this a single tile pushes every other tile off the
+ * board, which is a worse outcome than a slightly cramped chart.
+ */
+const WIDGET_HEIGHT_MIN = 120;
+const WIDGET_HEIGHT_MAX = 600;
+
+/**
+ * Reads a tile's presentation settings.
+ *
+ * Total: a widget written before this existed, a null, an empty string, a half-written value
+ * and a JSON document of some entirely different shape all mean "no settings", because a tile
+ * that throws while being drawn takes the whole board with it.
+ */
+function widgetConfigOf(widget: DashboardWidget): WidgetConfig {
+  if (!widget.widgetConfig) return {};
+  try {
+    const parsed = JSON.parse(widget.widgetConfig);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as WidgetConfig : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Serialises settings back, or null when there is nothing to keep -- never the string '{}'. */
+function widgetConfigString(config: WidgetConfig): string | null {
+  const kept: WidgetConfig = {};
+  if (config.height && config.height !== WIDGET_HEIGHT) kept.height = config.height;
+  if (config.caption && config.caption.trim()) kept.caption = config.caption.trim();
+  return Object.keys(kept).length ? JSON.stringify(kept) : null;
+}
 
 /**
  * Six slices, sixty bars.
  *
  * The same two limits the Canvas keeps and for the same reasons, which are facts about the
  * palette and the label width rather than about a dashboard: Donut and RankedBar colour their
- * marks `var(--chart-N % 6)`, so a seventh slice repeats the first one's colour and the legend
- * then has two names against one swatch. Sixty bars is where a name under a bar stops fitting.
+ * marks from the categorical ramp, so a slice past the last slot repeats the first one's colour
+ * and the legend then has two names against one swatch. The limit therefore IS the slot count --
+ * CHART_SLOTS -- rather than a number copied beside it that can fall out of step with the
+ * palette. Sixty bars is where a name under a bar stops fitting.
  */
-const DONUT_SLICES = 6;
+const DONUT_SLICES = CHART_SLOTS;
 const ORDERED_BARS = 60;
 
 /**
@@ -141,12 +234,35 @@ function mergeMarks(pairs: Mark[]): { marks: Mark[]; merged: number } {
   const byName = new Map<string, Mark>();
   for (const pair of pairs) {
     const existing = byName.get(pair.name);
-    if (existing) existing.value += pair.value;
-    else byName.set(pair.name, { name: pair.name, value: pair.value });
+    if (existing) {
+      existing.value += pair.value;
+      // A merged mark no longer identifies one group, so it cannot be narrowed on. Two rows drew
+      // the same label because their raw values RENDER the same -- two timestamps in one day,
+      // "1.0" and "1.00" -- and filtering on either would return a figure that is not the one on
+      // screen. Dropped rather than picked between: see MarkOperand.
+      delete existing.operands;
+    } else {
+      byName.set(pair.name, pair.operands
+        ? { name: pair.name, value: pair.value, operands: pair.operands }
+        : { name: pair.name, value: pair.value });
+    }
   }
   // Insertion order is the result's own order, which is what "bars in order" is for: a saved
   // analysis sorted by month has already said how its categories should read.
-  return { marks: [...byName.values()], merged: pairs.length - byName.size };
+  //
+  // `inert` is stamped here and nowhere else -- see Mark.inert. This is the last point at which
+  // operands can be withheld, so it is the only point at which "withheld" is settled.
+  //
+  // Only when SOMETHING here can be narrowed, which is what the word means: "this row alone does
+  // not respond, on a chart where the others do". Where nothing can -- a grained result, or a
+  // saved statement's result, which has no operands anywhere by construction -- the chart is
+  // un-buttoned whole and a per-row flag would say nothing.
+  const found = [...byName.values()];
+  const anyNarrowable = found.some(mark => !!mark.operands?.length);
+  const marks = anyNarrowable
+    ? found.map(mark => mark.operands?.length ? mark : { ...mark, inert: true })
+    : found;
+  return { marks, merged: pairs.length - byName.size };
 }
 
 /**
@@ -171,7 +287,42 @@ export interface WidgetView {
    * disagree about whether an average adds up.
    */
   additive: boolean;
-  /** At most WIDGET_ROWS of them. A null cell is a real null, not an empty string. */
+  /**
+   * Which columns hold a MEASURE, index-aligned with `columns`.
+   *
+   * Carried because the table formats its cells and a dimension must not be formatted. readable()
+   * groups an integer -- 250000 into 250,000, which is the whole point of it over a money column
+   * -- and applied to a dimension it rewrote the data: a year column grouped by `order_year`
+   * printed 2,024 in the table while the chart beside it, which never touches readableCell,
+   * printed 2024. The same pass zero-strips a padded code held as text, so a store "007" read 7.
+   *
+   * All true on the saved-query path, where the server sends no roles at all and a numeric column
+   * is as likely to be a figure as a label. That is the behaviour that path already had.
+   */
+  measureColumn: boolean[];
+  /**
+   * Whether a Top-N discarded its tail, so these rows are not the whole of anything.
+   *
+   * On the VIEW as well as on the shape because the template needs it: the dimension summary is
+   * still worth drawing -- the group count and the spread are true -- but its top-share fact is
+   * not, and ResultSummary already takes an `additive` input that governs exactly that fact.
+   */
+  topNTrimmed: boolean;
+  /**
+   * The two-dimension result already shaped as a grid, composed server-side.
+   *
+   * Carried rather than recomposed. The server builds this for EVERY two-dimension analysis --
+   * keyed on the roll-up row indices so a real "Other" category and the Top-N bucket cannot
+   * collide -- and the dashboard read it zero times, so a cross-tab could only be shown as the
+   * long form: one row per (region, category) pair, which is the shape the grid exists to spare
+   * a reader. Null whenever the server sent none, which is its way of saying this result is not
+   * two-dimensional.
+   */
+  pivot: PivotGrid | null;
+  /**
+   * EVERY row the run returned, not the handful the tile draws -- tileRows() makes that cut.
+   * A null cell is a real null, not an empty string.
+   */
   rows: (string | null)[][];
   /** Rows in the WHOLE result. `rows.length` is what fitted on the tile. */
   rowCount: number;
@@ -237,6 +388,36 @@ export function combineFilters(saved: FilterGroup | undefined,
  */
 export interface ResultShape {
   sortedBy?: 'MEASURE' | 'DIMENSION';
+  /**
+   * Which way that sort ran.
+   *
+   * Carried because the AXIS alone does not say whether a line may be drawn. A result sorted by
+   * its dimension DESCENDING is in the dimension's own order and still runs backwards, and the
+   * gate below used to see only `sortedBy === 'DIMENSION'` and offer the line. "dimension, Z-A"
+   * is one click and an entirely reasonable choice for a date -- newest first, which is how
+   * anybody wanting the latest month at the top of the table beside it would sort -- and the tile
+   * then drew time running right to left and printed "Change -40.0% ... down" over a year that
+   * rose 67%.
+   */
+  sortDirection?: 'ASC' | 'DESC';
+  /**
+   * Whether a Top-N DISCARDED its tail rather than rolling it into an Other bucket.
+   *
+   * The one fact about a result that the result itself cannot carry: with includeOther off the
+   * server emits no roll-up row, so `other` is null and `rollupRows` is null, and five rows of a
+   * forty-region dataset are indistinguishable from a dataset with five regions. Every share
+   * drawn from them is then a share of the retained subset wearing the shape of a share of the
+   * whole -- a ring whose legend reads "north 34%" where north is 11% of the data, and a
+   * dimension summary that prints "of 2,100,000", naming a number that is not the total.
+   *
+   * The setting that makes the percentages wrong also makes the chart available: with the bucket
+   * ON, a limit of 6 returns 7 rows and the ring is refused for having too many slices.
+   */
+  topNTrimmed?: boolean;
+  /** Whether the server composed a cross-tab grid for this result -- its own "is this 2-D". */
+  hasPivot?: boolean;
+  /** Whether it refused to, because the column dimension was too wide to draw. */
+  pivotTruncated?: boolean;
   dimensionCount?: number;
   rowCount?: number;
   columnCount?: number;
@@ -250,8 +431,14 @@ function isNumericLabel(label: string): boolean {
 function nonPositiveNote(marks: Mark[]): string | null {
   const count = marks.filter(mark => mark.value <= 0).length;
   if (!count) return null;
-  return `${count} ${count === 1 ? 'figure is' : 'figures are'} zero or below, and the ranked `
-    + 'view does not draw a bar for those. They are in the table.';
+  // Names the BEHAVIOUR, not one chart. This note is pushed whatever kind is drawn, and it used
+  // to say "the ranked view does not draw a bar for those" -- so a reader looking at "Bars in
+  // order", where the two loss-making lines sat flush to the baseline and looked exactly like a
+  // line that broke even, was told to go and look at a different chart. Switching to ranked
+  // found the same rows missing and a sentence that still did not apply.
+  return `${count} ${count === 1 ? 'figure is' : 'figures are'} zero or below. A bar has no `
+    + 'length to draw for those -- ranked leaves them out, and "bars in order" draws them flat '
+    + 'against the baseline. They are in the table.';
 }
 
 /**
@@ -262,13 +449,55 @@ function nonPositiveNote(marks: Mark[]): string | null {
  * ring is not on offer is a fact about the reader's own analysis, and it teaches more than the
  * option quietly not being there.
  */
-function issuesFor(marks: Mark[], reason: string, additive: boolean, aggregationLabel: string,
-    shape: ResultShape = {}): Record<WidgetVisualization, string> {
+function issuesFor(marks: Mark[], reason: string, additive: boolean | 'unknown',
+    aggregationLabel: string, shape: ResultShape = {}): Record<WidgetVisualization, string> {
 
   const categorical = marks.length ? '' : reason;
+  /*
+   * Three states, not two, because two different facts arrive at the totalling gate.
+   *
+   * An ANALYSIS names its aggregation, so this screen knows a mean does not add up and can say
+   * so. A saved STATEMENT names nothing -- `select avg(amount)` and `select sum(amount)` return
+   * the identical shape -- so on that path additivity is UNKNOWN. Both must close the gate, and
+   * they must close it with different words: printing "this measure does not add up" over a
+   * statement asserts as fact something no code on that path can see, which is the same class of
+   * quiet overclaim the gate exists to prevent.
+   *
+   * `!additive` cannot express that, because the string 'unknown' is truthy -- which is exactly
+   * how the saved-query path came to pass `true` here and be offered every share chart.
+   */
+  const canTotal = additive === true;
+  const noSum = additive === 'unknown'
+    ? 'a saved query does not say whether its figures add up'
+    : `${aggregationLabel} does not add up`;
+  const noTotal = additive === 'unknown'
+    ? 'a saved query does not say whether its figures add up to one'
+    : `${aggregationLabel} has no total to divide`;
   const negative = marks.filter(mark => mark.value <= 0).length;
   const rankOrdered = shape.sortedBy === 'MEASURE';
+  // Sorted by the dimension, but backwards. Not rank order -- the points ARE in the dimension's
+  // own order -- and still not drawable as a line, because that order is reversed. Kept apart
+  // from rankOrdered so each can say the thing the reader actually has to change.
+  const reversed = shape.sortedBy === 'DIMENSION' && shape.sortDirection === 'DESC';
+  // A share needs the whole to divide. A Top-N that threw its tail away has not got one, and
+  // nothing in the result says so -- see ResultShape.topNTrimmed.
+  const NO_WHOLE = 'This is a Top-N with the rest discarded, so these rows are not the whole of '
+    + 'anything. Turn the Other bucket on to show a share.';
+  const BACKWARDS = 'These are ordered newest-first, so a line would run backwards through the '
+    + 'dimension. Sort the dimension ascending to draw one.';
   const numericDimension = marks.length > 0 && marks.every(mark => isNumericLabel(mark.name));
+  /*
+   * Two dimensions flattened into one list of marks.
+   *
+   * `stacked` and `shareStacked` already read dimensionCount; the line, the area and the trend
+   * summary did not, two lines above them. A 2-D result reaches them as interleaved categories --
+   * Jan/north, Jan/south, Feb/north, Feb/south -- so the line was offered, drawn, and ran as a
+   * sawtooth between two series that have nothing to do with each other, while the trend summary
+   * stated a "change" between the first and last of that interleaving.
+   */
+  const multiDimension = (shape.dimensionCount ?? 1) > 1;
+  const TWO_DIMENSIONS = 'These rows carry two dimensions, so the points interleave two series '
+    + 'and a line would zigzag between them. Use the cross-tab or a stack, or drop a dimension.';
   return {
     table: '',
     /*
@@ -285,15 +514,23 @@ function issuesFor(marks: Mark[], reason: string, additive: boolean, aggregation
      * curve that slopes the same way whatever the data did.
      */
     line: categorical
-      || (rankOrdered
+      || (multiDimension
+        ? TWO_DIMENSIONS
+        : rankOrdered
         ? 'These are ordered biggest-first, so a line between them would show the sort rather '
           + 'than a trend. Sort by the dimension to draw one.'
-        : marks.length < 2 ? 'A line needs at least two points.' : ''),
+        : reversed
+          ? BACKWARDS
+          : marks.length < 2 ? 'A line needs at least two points.' : ''),
     area: categorical
-      || (rankOrdered
+      || (multiDimension
+        ? TWO_DIMENSIONS
+        : rankOrdered
         ? 'These are ordered biggest-first, so a filled area would show the sort rather than a '
           + 'trend. Sort by the dimension to draw one.'
-        : marks.length < 2
+        : reversed
+          ? BACKWARDS
+          : marks.length < 2
           ? 'A line needs at least two points.'
           : negative
             // A fill reads as accumulated magnitude from a baseline; below it the reading inverts.
@@ -305,8 +542,8 @@ function issuesFor(marks: Mark[], reason: string, additive: boolean, aggregation
      * parts, and a measure that has a total at all -- an average of averages is not one.
      */
     stacked: categorical
-      || (!additive
-        ? `A stack adds its parts into a whole, and ${aggregationLabel} does not add up.`
+      || (!canTotal
+        ? `A stack adds its parts into a whole, and ${noSum}.`
         : (shape.dimensionCount ?? 1) < 2
           ? 'A stack needs a second dimension to divide each bar by.'
           : negative
@@ -316,6 +553,37 @@ function issuesFor(marks: Mark[], reason: string, additive: boolean, aggregation
      * A histogram bins the MEASURE values to show their shape. With a handful of groups there is
      * no shape -- it is a bar chart that has thrown its labels away.
      */
+    /*
+     * The same shape as a stack, and one refusal fewer plus one more.
+     *
+     * Fewer: a NEGATIVE part is refused by the plain stack because it cannot be drawn upwards
+     * from a baseline, and that refusal applies here for the same reason -- so it is kept.
+     * More: normalising divides by each bar's own total, so a group summing to zero has no share
+     * to show and would divide by nothing. The plain stack draws that group as a flat bar
+     * honestly; this one cannot.
+     */
+    shareStacked: categorical
+      || (!canTotal
+        ? `A share within a group divides that group's total, and ${noTotal}.`
+        : (shape.dimensionCount ?? 1) < 2
+          ? 'Showing the mix inside each bar needs a second dimension to be the mix.'
+          : negative
+            ? `${negative} of these figures is zero or below, and a share of a group cannot `
+              + 'include one.'
+            : ''),
+    /*
+     * The grid the server composed, or the reason there is none.
+     *
+     * Gated on the GRID rather than on the dimension count, because its presence is the server's
+     * own answer to "is this two-dimensional" -- and because the server refuses to build one that
+     * is too wide to read, which is a judgement this screen should not second-guess. A result
+     * whose columns were truncated arrives with rows null and says so in its own words.
+     */
+    pivot: !shape.hasPivot
+      ? 'A cross-tab needs exactly two dimensions -- one for the rows and one for the columns.'
+      : shape.pivotTruncated
+        ? 'That second dimension has more values than a grid can carry across the page.'
+        : '',
     histogram: categorical
       || (marks.length < HISTOGRAM_FLOOR
         ? `A distribution of ${marks.length} figures says less than the bars themselves do.`
@@ -342,10 +610,18 @@ function issuesFor(marks: Mark[], reason: string, additive: boolean, aggregation
      * reason: against a rank-ordered result "first" is just the biggest.
      */
     trendSummary: categorical
-      || (rankOrdered
+      || (multiDimension
+        ? 'These rows carry two dimensions, so "first" and "last" would be two points of an '
+          + 'interleaving rather than the ends of a series.'
+        : rankOrdered
         ? 'These are ordered biggest-first, so "first" and "last" would describe the sort rather '
           + 'than the series. Sort by the dimension to summarise a trend.'
-        : marks.length < 2 ? 'A trend needs at least two points.' : ''),
+        : reversed
+          // The worst of the three to get wrong, because it states a NUMBER. Over a year that
+          // rose 67% it printed "First: December ... Last: January ... Change -40.0%, down".
+          ? 'These are ordered newest-first, so "first" and "last" are the wrong way round. '
+            + 'Sort the dimension ascending to summarise a trend.'
+          : marks.length < 2 ? 'A trend needs at least two points.' : ''),
     /* A spread of one figure has no spread. */
     distributionSummary: categorical
       || (marks.length < 3
@@ -356,18 +632,116 @@ function issuesFor(marks: Mark[], reason: string, additive: boolean, aggregation
         ? `Comparing two figures needs exactly two rows, and this returned ${marks.length}.`
         : ''),
     ranked: categorical,
+    /*
+     * Ranked bars that also state each row's share of the total.
+     *
+     * The ring is the only share chart this board had, and it refuses past the colours the
+     * palette can tell apart -- so "what share of revenue does each of these forty customers
+     * carry" had no chart at all. Bars carry their own labels, so the colour limit is not a limit
+     * here; what IS required is that the parts genuinely make a whole, which is the same set of
+     * conditions the ring already tests, minus the slice count.
+     */
+    rankedShare: categorical
+      || (shape.topNTrimmed
+        ? NO_WHOLE
+        : !canTotal
+        ? `A share divides a total, and ${noTotal}.`
+        : negative
+          ? `${negative} of these figures is zero or below, and a share of a total cannot `
+            + 'include one.'
+          : ''),
+    /*
+     * A running total along the dimension.
+     *
+     * Same ordering rule as the line and for the same reason -- a cumulative curve over rank
+     * order climbs steeply then flattens whatever the data did, which looks like a finding and is
+     * an artefact of the sort. It also has to be a measure that adds up: accumulating an average
+     * produces a number that is not a quantity of anything.
+     */
+    cumulative: categorical
+      || (multiDimension
+        ? TWO_DIMENSIONS
+        : !canTotal
+        ? `A running total accumulates its rows, and ${noSum}.`
+        : rankOrdered
+          ? 'These are ordered biggest-first, so a running total would climb steeply and then '
+            + 'flatten because of the sort rather than because of the data. Sort by the dimension.'
+          : reversed
+            ? BACKWARDS
+            : marks.length < 2 ? 'A running total needs at least two points.' : ''),
+    /*
+     * A negative is NOT refused here, unlike the area and the stack, and the difference is the
+     * baseline. A filled area measures up from one, so below it the reading inverts; a stack
+     * claims its parts make a whole, which a negative part cannot. A plain bar makes neither
+     * claim -- it is a length against a shared axis, and a zero-length bar for a negative figure
+     * is not a wrong statement, only an incomplete one. The note above says so in words, which is
+     * the part that was missing: the figure was flush to the baseline and the footnote blamed a
+     * different chart.
+     */
     bar: categorical || (marks.length > ORDERED_BARS
       ? `${marks.length} bars is past what this chart can label.` : ''),
     donut: categorical
-      || (!additive
-        ? `A ring divides a total, and ${aggregationLabel} has no total to divide.`
+      || (shape.topNTrimmed
+        ? NO_WHOLE
+        : !canTotal
+        ? `A ring divides a total, and ${noTotal}.`
         : negative
           // A ring asserts that its parts make the whole. A negative part is a share of nothing,
           // and a zero one draws as invisible while still being counted into the total.
           ? `${negative} of these figures is zero or below, and a share of a total cannot include one.`
           : marks.length > DONUT_SLICES
-            ? `${marks.length} slices is past the six colours this palette can tell apart.` : ''),
+            ? `${marks.length} slices is past the ${DONUT_SLICES} colours this palette can tell apart.` : ''),
   };
+}
+
+/**
+ * Whether a dimension's drawn values can be compared to its column with `=`.
+ *
+ * The one that cannot is a GRAINED date, and it is the reason this function exists rather than a
+ * `!!` somewhere. A month bucket renders as the first of that month, so an `=` against the column
+ * would ask for the 1st and get a thirtieth of the bar that was clicked -- a chart that answers
+ * the wrong question while looking exactly right. AnalysisResult carries `grains` index-aligned
+ * with `dimensions` precisely so a screen can tell those apart, and this is a screen telling them
+ * apart.
+ *
+ * A dimension the response did not list is refused too: without a name in `dimensions` there is
+ * no grain slot to read, and "absent" is not the same as "not grained".
+ */
+function narrowableDimension(result: AnalysisResult, field: string): boolean {
+  const at = (result.dimensions ?? []).indexOf(field);
+  if (at < 0) return false;
+  return !(result.grains ?? [])[at];
+}
+
+/**
+ * The raw values behind one drawn mark, or null when they cannot stand as operands.
+ *
+ * Null on a null value, and that is not fussiness: `field = null` is never true in SQL, so an
+ * `EQ` clause built from a null would narrow every tile on the board to nothing while looking
+ * like an ordinary filter. `IS NULL` is the operator that means it, and the board filter's
+ * builder has one -- but a null-valued mark is drawn as "(null)" alongside real values, and the
+ * distinction is worth more than the click.
+ */
+function markOperands(columns: AnalysisColumn[], dimensionAt: number[],
+    row: (string | null)[], otherLabel: string): MarkOperand[] | null {
+
+  const operands: MarkOperand[] = [];
+  for (const index of dimensionAt) {
+    const value = row[index];
+    if (value === null || value === undefined || value === '') return null;
+    // The rolled-up row is not a category and must not behave like one. "Other" is not a value in
+    // the data -- it is this many values the reader has not been shown -- so `sub_category =
+    // 'Other'` narrows the whole board to nothing while looking like an ordinary filter. The
+    // server refuses to DRILL into it for the same reason, in the same words.
+    //
+    // The LABEL is the fallback and not the test: AnalysisResult.rollupRows names these rows by
+    // index, and this branch only runs against a response that did not send it. A dataset is
+    // entitled to hold a value genuinely spelled "Other", and matching the label makes such a row
+    // inert -- wrong, but wrong in the harmless direction.
+    if (otherLabel && value === otherLabel) return null;
+    operands.push({ field: columns[index].name, value });
+  }
+  return operands.length ? operands : null;
 }
 
 /**
@@ -394,7 +768,12 @@ export function analysisView(result: AnalysisResult, aggregation: Aggregation | 
 
   const pairs: Mark[] = [];
   if (measureAt >= 0 && dimensionAt.length) {
-    for (const row of allRows) {
+    const narrowable = dimensionAt.every(index => narrowableDimension(result, columns[index].name));
+    // By index when the server said which rows they are, by label only when it did not. See
+    // markOperands, and AnalysisResult.rollupRows for why the difference is worth a field.
+    const rolled = result.rollupRows ? new Set(result.rollupRows) : null;
+    const otherLabel = rolled ? '' : (result.other?.label ?? '');
+    for (const [at, row] of allRows.entries()) {
       const value = asNumber(row[measureAt]);
       // Rows whose measure does not read as a number are LEFT OUT and counted, never coerced to
       // zero: a bar shortened by an amount nobody measured is worse than a bar that is not there.
@@ -402,7 +781,9 @@ export function analysisView(result: AnalysisResult, aggregation: Aggregation | 
       const name = dimensionAt
         .map(index => renderCell(columns[index], row[index]) || '(null)')
         .join(' · ');
-      pairs.push({ name, value });
+      const operands = narrowable && !rolled?.has(at)
+        ? markOperands(columns, dimensionAt, row, otherLabel) : null;
+      pairs.push(operands ? { name, value, operands } : { name, value });
     }
   }
   const { marks, merged } = mergeMarks(pairs);
@@ -420,6 +801,14 @@ export function analysisView(result: AnalysisResult, aggregation: Aggregation | 
   if (merged > 0) {
     notes.push(`${merged} ${merged === 1 ? 'row shares' : 'rows share'} a label with another and `
       + 'was added into it.');
+  }
+  if (shape.topNTrimmed) {
+    // Said on the tile because nothing in the RESULT says it. With the Other bucket off the
+    // server emits no roll-up row, so five rows of a forty-region dataset look exactly like a
+    // dataset with five regions -- and every figure here is correct while the set is not the
+    // whole set.
+    notes.push('This is a Top-N with the rest discarded, so these are the top rows and not the '
+      + 'whole of anything. Percentages of them are not shares of the dataset.');
   }
   const dropped = nonPositiveNote(marks);
   if (dropped) notes.push(dropped);
@@ -444,7 +833,15 @@ export function analysisView(result: AnalysisResult, aggregation: Aggregation | 
 
   return {
     columns: columns.map(column => column.name),
-    rows: allRows.slice(0, WIDGET_ROWS)
+    measureColumn: columns.map(column => column.role === 'MEASURE'),
+    topNTrimmed: !!shape.topNTrimmed,
+    pivot: result.pivot ?? null,
+    // EVERY row, not the handful the tile draws. They already crossed the wire and were already
+    // parsed; slicing here threw away rows 9..N on the same tick they arrived, and the only way
+    // left to read row 9 was to leave the board, re-open the dataset by hand and spend a second
+    // permit re-running the identical query. tileRows() does the cutting for the tile now, so
+    // the expanded view can read what the run actually returned.
+    rows: allRows
       .map(row => columns.map((column, index) => renderCell(column, row[index] ?? null))),
     rowCount: result.rowCount ?? allRows.length,
     truncated: !!result.truncated,
@@ -467,9 +864,13 @@ export function analysisView(result: AnalysisResult, aggregation: Aggregation | 
  * same reason: a VARCHAR column of "1200", "980" is drawable, and a column typed DOUBLE whose
  * every row is null is not, so a type name would be the worse test even if one had travelled.
  *
- * A ring is refused outright on this path. Whether a saved statement's figures add up to a total
- * is not knowable from here -- `select avg(amount)` and `select sum(amount)` return the same
- * shape -- and a ring drawn over averages divides a total that does not exist.
+ * EVERY totalling kind is refused outright on this path, not only the ring. Whether a saved
+ * statement's figures add up to a total is not knowable from here -- `select avg(amount)` and
+ * `select sum(amount)` return the same shape -- and that one unknown disqualifies the stack, the
+ * share within a group, the ranked share and the running total exactly as much as it disqualifies
+ * the ring. This used to say "a ring", and the code matched the sentence rather than the reason:
+ * it told issuesFor the figures were additive and then took the ring back out afterwards, so a
+ * column of averages was still offered "share of the total" as ranked bars carrying percentages.
  */
 export function queryView(result: QueryResult): WidgetView {
   const columns = result.columns ?? [];
@@ -540,19 +941,35 @@ export function queryView(result: QueryResult): WidgetView {
       ? `"${value.name}" holds ${value.negative} negative `
         + `${value.negative === 1 ? 'value' : 'values'}, and a length cannot be negative.`
       : 'No row has both a label and a number.';
+  // 'unknown', which is the same thing the view declares below as `additive: false` -- and the
+  // argument here used to be a flat `true`. That told issuesFor the figures add up, so every kind
+  // gated on additivity was offered over a statement that may return averages: ranked share drew
+  // percentages of a "total" that was a sum of means, and the stack, the share within a group and
+  // the running total were offered on the same false premise. Only the ring was taken back out,
+  // one line below, which is why the hole was invisible -- the kind the comments talk about was
+  // the one kind that was actually closed.
   const issues = issuesFor(
-    value && value.negative ? [] : marks, reason, true, 'this measure');
-  issues.donut = issues.donut
-    || 'A saved query does not say whether its figures add up to a total, so a ring cannot '
-      + 'claim they do.';
+    value && value.negative ? [] : marks, reason, 'unknown', 'this measure');
 
   return {
     columns,
-    rows: allRows.slice(0, WIDGET_ROWS).map(row => row.map(cell => cell ?? null)),
+    // All true: this path has no roles to read. The server renders every value to text before a
+    // query result leaves, so a column of digits here is as likely to be a figure as a label and
+    // there is nothing to tell them apart with. That is the behaviour this path already had.
+    measureColumn: columns.map(() => true),
+    // A saved statement has no Top-N this screen knows about; whatever it discards it discards
+    // in SQL, where nothing here can see it. The share charts are withheld anyway, by the
+    // 'unknown' additivity passed to issuesFor above -- which is what this comment claimed all
+    // along while the argument said `true`.
+    topNTrimmed: false,
+    // A saved statement returns rows and nothing about their shape, so there is no grid to carry.
+    pivot: null,
+    rows: allRows.map(row => row.map(cell => cell ?? null)),
     rowCount: result.rowCount ?? allRows.length,
     truncated: !!result.truncated,
-    // A saved query does not say whether its figures add up, which is why the ring is refused
-    // above. The dimension summary withholds its top-share fact on the same grounds.
+    // A saved query does not say whether its figures add up, which is why every totalling kind is
+    // refused above. The dimension summary withholds its top-share fact on the same grounds, and
+    // reads this flag to do it -- so the two must agree, and this is the value issuesFor is given.
     additive: false,
     marks,
     notes,
@@ -582,28 +999,22 @@ export interface WidgetRun {
 /** What a saved analysis's one JSON column holds. Written by the Canvas, read here. */
 interface SavedAnalysisConfig {
   dimensions?: string[];
+  /**
+   * The calendar grain each dimension was bucketed at, index-aligned with `dimensions`.
+   *
+   * A board tile that does not send these runs a DIFFERENT analysis from the one that was saved:
+   * the server groups by the raw TIMESTAMP, so "revenue by month" comes back as one row per
+   * distinct instant. Usually with no banner either -- truncation needs 50,000 rows and a year of
+   * orders is often fewer -- so the tile simply shows eight timestamps under a title that says
+   * "Monthly revenue", and the bar and donut kinds go inert on the cardinality.
+   */
+  grains?: (Grain | null)[];
   measure?: { aggregation?: Aggregation; field?: string };
   filters?: FilterGroup;
   topN?: TopN | null;
   sort?: AnalysisSort | null;
 }
 
-const KINDS: { id: WidgetVisualization; label: string }[] = [
-  { id: 'kpi', label: 'Single figure' },
-  { id: 'table', label: 'Table' },
-  { id: 'ranked', label: 'Ranked bars' },
-  { id: 'bar', label: 'Bars in order' },
-  { id: 'stacked', label: 'Stacked bars' },
-  { id: 'line', label: 'Line over the dimension' },
-  { id: 'area', label: 'Filled area' },
-  { id: 'donut', label: 'Share of the total' },
-  { id: 'histogram', label: 'Distribution of the figures' },
-  { id: 'scatter', label: 'Scatter of two numbers' },
-  { id: 'comparison', label: 'Two figures compared' },
-  { id: 'dimensionSummary', label: 'Summary of the groups' },
-  { id: 'trendSummary', label: 'Summary of the trend' },
-  { id: 'distributionSummary', label: 'Summary of the spread' },
-];
 
 /** Below this many groups a histogram is a bar chart with the labels taken off. */
 const HISTOGRAM_FLOOR = 8;
@@ -652,7 +1063,7 @@ function mintQueryId(widgetId: number): string {
 @Component({
   selector: 'app-dashboards',
   imports: [Icon, BarChart, Donut, RankedBar, KpiCard, LineChart, ScatterPlot,
-    Comparison, Histogram, ResultSummary, FilterBuilder],
+    Comparison, Histogram, ResultSummary, FilterBuilder, WidgetTable],
   template: `
     <div class="space-y-4 min-w-0">
 
@@ -844,7 +1255,8 @@ function mintQueryId(widgetId: number): string {
                       Apply to the board
                     </button>
                     <span class="field-note text-[color:var(--text-muted)]">
-                      Nothing re-runs until you press this.
+                      Editing here re-runs nothing until you press this. Clicking a bar on a tile
+                      fills this in and applies at once — one click, one pass of the board.
                     </span>
                   </div>
                 }
@@ -897,6 +1309,13 @@ function mintQueryId(widgetId: number): string {
                     </option>
                   }
                 </select>
+                <input class="input input-sm w-28" type="number" placeholder="Height"
+                       aria-label="Drawing height in pixels"
+                       [attr.min]="heightMin" [attr.max]="heightMax" [attr.step]="10"
+                       [value]="addHeight()" (input)="addHeight.set($any($event.target).value)" />
+                <input class="input input-sm w-64" placeholder="Caption (optional)"
+                       aria-label="Caption shown under this widget"
+                       [value]="addCaption()" (input)="addCaption.set($any($event.target).value)" />
                 <button type="button" class="btn btn-primary btn-sm"
                         [disabled]="!canAdd()" (click)="addWidget()">Add</button>
                 <button type="button" class="btn btn-ghost btn-sm" (click)="addOpen.set(false)">
@@ -1042,26 +1461,110 @@ function mintQueryId(widgetId: number): string {
                             <app-kpi-card [value]="kpiValue(view)" [label]="kpiLabel(view)"
                                           [caption]="kpiCaption(view)" />
                           }
+                          <!-- [format] on all three line kinds, for the reason the stack below
+                               spells out: LineChart falls back to compactNumber, whose sub-1000
+                               branch is Math.round and whose 1000+ branch is one decimal place.
+                               The point tooltip is the ONLY numeric readout a line has, so a
+                               series of 1235, 1240, 1260 read "1.2K" three times -- and the same
+                               dataset drawn as bars beside it, which does pass figure, read the
+                               faithful values. Two tiles over one result disagreed. -->
                           @case ('line') {
-                            <app-line-chart [data]="points(view)" />
+                            <app-line-chart [data]="points(view)" [height]="heightOf(widget)"
+                                            [format]="figure" />
                           }
                           @case ('area') {
-                            <app-line-chart [data]="points(view)" [filled]="true" />
+                            <app-line-chart [data]="points(view)" [filled]="true"
+                                            [height]="heightOf(widget)" [format]="figure" />
+                          }
+                          @case ('pivot') {
+                            @if (view.pivot; as grid) {
+                              <!-- The grid the server composed. Scrolls inside its own container
+                                   so a wide cross-tab never makes the PAGE scroll sideways. -->
+                              <div class="overflow-x-auto">
+                                <table class="w-full text-xs">
+                                  <thead>
+                                    <tr class="text-left text-[color:var(--text-muted)]">
+                                      <th class="px-2 py-1 font-medium whitespace-nowrap">
+                                        {{ grid.rowDimension }}
+                                      </th>
+                                      @for (column of grid.columnValues; track column) {
+                                        <th class="px-2 py-1 font-medium whitespace-nowrap text-right">
+                                          {{ column }}
+                                        </th>
+                                      }
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    @for (row of pivotRows(grid); track $index) {
+                                      <tr class="border-t border-subtle">
+                                        <td class="px-2 py-1 whitespace-nowrap">
+                                          @if (row.key === null) {
+                                            <span class="text-[color:var(--text-muted)]"
+                                                  title="null">—</span>
+                                          } @else {
+                                            {{ row.key }}
+                                          }
+                                        </td>
+                                        @for (cell of row.cells; track $index) {
+                                          <td class="px-2 py-1 whitespace-nowrap tabular text-right">
+                                            @if (cell === null) {
+                                              <!-- NO ROWS in that combination, which is not a
+                                                   zero. A grid that printed 0 here would assert a
+                                                   measurement nobody made. -->
+                                              <span class="text-[color:var(--text-muted)]"
+                                                    title="no rows">—</span>
+                                            } @else {
+                                              <span [title]="cell">{{ readable(cell) }}</span>
+                                            }
+                                          </td>
+                                        }
+                                      </tr>
+                                    }
+                                  </tbody>
+                                </table>
+                              </div>
+                            }
+                          }
+                          @case ('shareStacked') {
+                            <!-- Every bar full height, so the eye compares the MIX between groups
+                                 rather than their sizes. compactNumber would print "100" over
+                                 each one, which says nothing; the percentage is in each segment's
+                                 tooltip where it belongs. -->
+                            <app-bar-chart [data]="shareStacks(view)" [height]="heightOf(widget)"
+                                           [hideValues]="true" [format]="percentOfGroup" />
                           }
                           @case ('stacked') {
-                            <app-bar-chart [data]="stacks(view)" [height]="180" />
+                            <!-- [format], because BarChart otherwise falls back to compactNumber
+                                 and its sub-1000 branch is Math.round: an average of 500.43 is
+                                 labelled "500", and a set of rates at 0.42/0.38/0.11 all label
+                                 "0" over three visibly different bars. The rounding reaches the
+                                 tooltip too, so the exact figure was unreachable from the tile. -->
+                            <app-bar-chart [data]="stacks(view)" [height]="heightOf(widget)"
+                                           [format]="figure" />
                           }
                           @case ('histogram') {
-                            <app-histogram [values]="figures(view)" [height]="180" />
+                            <!-- The four inputs Histogram declares for exactly this caller. Its
+                                 own docstring names Analytics Studio as the reason they exist:
+                                 the values are groups rather than runs, and a negative figure is
+                                 a refund or a loss and belongs on the chart. Unbound, the tile
+                                 said "17 runs" under 20 groups and rounded a rate of 0.08 to 0. -->
+                            <app-histogram [values]="figures(view)" [height]="heightOf(widget)"
+                                           noun="group" nounPlural="groups"
+                                           [dropBelow]="null" [format]="figure" />
                           }
                           @case ('scatter') {
-                            <app-scatter-plot [data]="scatterPoints(view)"
+                            <app-scatter-plot [data]="scatterPoints(view)" [height]="heightOf(widget)"
                                               [xLabel]="dimensionName(view)"
                                               [yLabel]="measureName(view)" />
                           }
                           @case ('dimensionSummary') {
+                            <!-- additive AND a whole to divide. A Top-N that threw its tail away
+                                 leaves rows that are not the whole of anything, so "top share
+                                 34.2% of 2,100,000" names a number that is not the total. The
+                                 group count and the spread beside it are still true, which is why
+                                 the kind is drawn and only the share is withheld. -->
                             <app-result-summary [data]="view.marks" mode="dimension"
-                                                [additive]="additive(view)"
+                                                [additive]="additive(view) && !view.topNTrimmed"
                                                 [dimensionLabel]="dimensionName(view)" />
                           }
                           @case ('trendSummary') {
@@ -1083,56 +1586,61 @@ function mintQueryId(widgetId: number): string {
                                  ranked bar was reading "1267.19353428047" beside its bar for the
                                  same reason the table cells were. -->
                             <app-ranked-bar [data]="view.marks" [max]="view.marks.length"
-                                            [showPercent]="false" [formatValue]="figure" />
+                                            [showPercent]="false" [formatValue]="figure"
+                                            [clickable]="narrows(widget, view)"
+                                            (picked)="narrowTo(widget, $any($event))" />
+                          }
+                          @case ('rankedShare') {
+                            <!-- The same bars, now stating each row's share. showPercent is only
+                                 ever true where the parts genuinely make a whole: issuesFor
+                                 refuses this kind over a Top-N with its tail thrown away, over a
+                                 measure that does not add up, and over a negative figure. -->
+                            <app-ranked-bar [data]="view.marks" [max]="view.marks.length"
+                                            [showPercent]="true" [formatValue]="figure"
+                                            [clickable]="narrows(widget, view)"
+                                            (picked)="narrowTo(widget, $any($event))" />
+                          }
+                          @case ('cumulative') {
+                            <!-- A running total is the worst of the three to round: the whole
+                                 point of the curve is the figure it reaches, and compactNumber
+                                 renders a closing total of 1,247,830 as "1.2M". -->
+                            <app-line-chart [data]="cumulativePoints(view)"
+                                            [height]="heightOf(widget)" [format]="figure" />
                           }
                           @case ('bar') {
-                            <app-bar-chart [data]="view.marks" [height]="180" />
+                            <app-bar-chart [data]="view.marks" [height]="heightOf(widget)"
+                                           [format]="figure"
+                                           [clickable]="narrows(widget, view)"
+                                           (barClicked)="narrowTo(widget, $any($event))" />
                           }
                           @case ('donut') {
-                            <app-donut [data]="view.marks" [totalLabel]="''" />
+                            <app-donut [data]="view.marks" [totalLabel]="''"
+                                       [format]="figure" />
                           }
                           @default {
-                            <div class="overflow-x-auto">
-                              <table class="w-full text-xs">
-                                <thead>
-                                  <tr class="text-left text-[color:var(--text-muted)]">
-                                    @for (column of view.columns; track column) {
-                                      <th class="px-2 py-1 font-medium whitespace-nowrap">{{ column }}</th>
-                                    }
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  @for (row of view.rows; track $index) {
-                                    <tr class="border-t border-subtle">
-                                      @for (cell of row; track $index) {
-                                        <td class="px-2 py-1 whitespace-nowrap tabular">
-                                          @if (cell === null) {
-                                            <!-- A real null, which is not an empty string and is
-                                                 certainly not a zero. -->
-                                            <span class="text-[color:var(--text-muted)]" title="null">—</span>
-                                          } @else {
-                                            <!-- Formatted for reading, with the raw value one
-                                                 hover away. A revenue tile read
-                                                 "103909527.57999787" before this: seventeen
-                                                 significant figures, the last eight of them an
-                                                 artefact of the CSV reader typing money as
-                                                 DOUBLE. Rounding it in the title as well would
-                                                 hide that from anyone reconciling against
-                                                 another system, which is the one job that needs
-                                                 the unrounded number. -->
-                                            <span [title]="cell">{{ readable(cell) }}</span>
-                                          }
-                                        </td>
-                                      }
-                                    </tr>
-                                  }
-                                </tbody>
-                              </table>
-                            </div>
+                            <app-widget-table [columns]="view.columns"
+                                              [rows]="tileRows(view)"
+                                              [measureColumn]="view.measureColumn" />
                           }
                         }
 
-                        <p class="field-note text-[color:var(--text-muted)]">{{ counted(view, drawn(widget, view)) }}</p>
+                        @if (captionOf(widget); as caption) {
+                          <!-- The author's own line, above the machine facts so those stay last.
+                               Its job is what the top of the tile cannot say -- the caveat, the
+                               as-of, what the reader should conclude -- not a restatement of the
+                               title and source already shown above. -->
+                          <p class="text-xs text-[color:var(--text-secondary)]">{{ caption }}</p>
+                        }
+                        <p class="field-note text-[color:var(--text-muted)] flex items-center gap-2 flex-wrap">
+                          <span>{{ counted(view, drawn(widget, view)) }}</span>
+                          @if (hasMoreRows(view)) {
+                            <!-- The sentence beside this used to be a dead end: it told the
+                                 reader sixteen rows existed that they could not see, and there
+                                 was no route to them anywhere on the board. -->
+                            <button type="button" class="btn btn-ghost btn-sm"
+                                    (click)="expandTable(widget, view)">Show all rows</button>
+                          }
+                        </p>
                         @for (note of view.notes; track note) {
                           <p class="field-note text-[color:var(--text-muted)]">{{ note }}</p>
                         }
@@ -1158,6 +1666,8 @@ export class Dashboards implements OnInit, OnDestroy {
   private readonly dialog = inject(Dialog);
 
   readonly kinds = KINDS;
+  readonly heightMin = WIDGET_HEIGHT_MIN;
+  readonly heightMax = WIDGET_HEIGHT_MAX;
 
   /**
    * The widths of a running tile's placeholder lines, as percentages.
@@ -1174,6 +1684,17 @@ export class Dashboards implements OnInit, OnDestroy {
    * method reference would lose `this` the moment the chart called it.
    */
   protected readonly figure = (value: number): string => readableCell(String(value));
+
+  /**
+   * A segment of a 100% stack, written as the percentage it is.
+   *
+   * One decimal place, because the parts of a group routinely differ by less than a whole point
+   * and rounding them all to integers makes two visibly different segments read the same. The
+   * bar's own total formats as "100%", which is true and is why the figure above the bar is
+   * suppressed rather than formatted differently.
+   */
+  protected readonly percentOfGroup = (value: number): string =>
+    `${Math.round(value * 10) / 10}%`;
 
   /** The key a dataset is identified by in the bar. A NUL cannot occur in either half. */
   private static datasetKey(connection: string, path: string): string {
@@ -1285,9 +1806,84 @@ export class Dashboards implements OnInit, OnDestroy {
     return 'Board filter: ' + this.boardFilterWords().join(' · ');
   }
 
-  /** A result cell, formatted for reading. The raw value stays in the cell's title. */
-  protected readable(cell: string): string {
-    return readableCell(cell);
+  /** The dataset a widget reads, as a board-filter key, or '' when it is not an analysis. */
+  private datasetKeyFor(widget: DashboardWidget): string {
+    if (widget.analyticsQueryId) return '';
+    const saved = this.analyses().find(
+      candidate => candidate.analyticsAnalysisId === widget.analyticsAnalysisId);
+    return saved ? Dashboards.datasetKey(saved.connectionAlias, saved.datasetPath) : '';
+  }
+
+  /**
+   * Whether clicking a mark on THIS tile can narrow the board.
+   *
+   * Drives the chart's own `clickable`, so a bar that cannot narrow is not a button at all --
+   * neither a mouse target nor a tab stop. A chart that accepted every click and then explained
+   * itself afterwards would be teaching the reader which bars are real by making them fail.
+   *
+   * <b>Some of the marks is enough, and the inert ones are inert individually.</b> Requiring all
+   * of them was the first shape of this and it was wrong: a Top-N result carries one rolled-up
+   * "Other" row that is legitimately not a category, so "every mark or nothing" would have taken
+   * the feature away from most of the reports that have it. The Canvas already makes exactly this
+   * row inert on its own, one row at a time, with a note under the table saying why -- and a tile
+   * whose note says "14 values were rolled into Other" is a tile that has already explained which
+   * bar will not click.
+   */
+  narrows(widget: DashboardWidget, view: WidgetView): boolean {
+    if (!this.datasetKeyFor(widget)) return false;
+    return view.marks.some(mark => !!mark.operands?.length);
+  }
+
+  /**
+   * Narrows the whole board to the group that was clicked.
+   *
+   * The click IS the apply, and that is not a contradiction of the rule beside applyBoardFilter.
+   * That rule exists because a bar that re-ran as somebody typed would be ten governed queries per
+   * keystroke; one deliberate click is one apply, which is the same cost as pressing the button
+   * next to it.
+   *
+   * It fills the bar rather than filtering behind it, and opens the bar to show it did: the reader
+   * ends up looking at an ordinary board filter they can read, edit, extend or clear, instead of a
+   * hidden narrowing whose only trace is that the numbers moved. Every tile on another dataset
+   * then says on its face that it was NOT narrowed, which is the same promise the bar already
+   * makes.
+   *
+   * A click while the board is running is ignored: runAll() abandons the run in flight, so a
+   * second click during a ten-widget pass would throw away nine answers to ask a question the
+   * reader has not finished asking.
+   */
+  narrowTo(widget: DashboardWidget, mark: Mark): void {
+    const operands = mark.operands;
+    // Defensive rather than expected -- `narrows` above already un-buttons these -- but the Other
+    // row a chart rolls up on its own has no operands and reaches here if a max is ever set.
+    if (!operands?.length || this.running()) return;
+    const key = this.datasetKeyFor(widget);
+    if (!key) return;
+
+    // Switching datasets CLEARS the filter and fetches the new columns, which is exactly what
+    // should happen: the conditions that were there named columns this dataset may not have.
+    if (key !== this.boardFilterOn()) this.chooseFilterDataset(key);
+    this.boardFilter.set({
+      op: 'AND',
+      clauses: operands.map(operand => ({
+        field: operand.field,
+        operator: 'EQ' as const,
+        value: operand.value ?? '',
+      })),
+    });
+    this.filterOpen.set(true);
+    this.runAll();
+  }
+
+  /**
+   * A result cell, formatted for reading. The raw value stays in the cell's title.
+   *
+   * Only a MEASURE is formatted. A dimension is a label even when it is spelled with digits, and
+   * grouping one rewrites it: `order_year` read 2,024 in this table and 2024 on the chart beside
+   * it, from the same row of the same result.
+   */
+  protected readable(cell: string, isMeasure = true): string {
+    return isMeasure ? readableCell(cell) : cell;
   }
 
   // ---- turning one result into whatever the chosen kind needs -------------------------------
@@ -1337,6 +1933,21 @@ export class Dashboards implements OnInit, OnDestroy {
     return view.marks.map(mark => ({ label: mark.name, value: mark.value }));
   }
 
+  /**
+   * The same series accumulated, so each point is the total up to and including that row.
+   *
+   * No second query: this is the marks already drawn, added up. The kind is refused over a
+   * rank-ordered or reversed result, so the order these are accumulated in is the dimension's
+   * own -- accumulating a rank order would draw the shape of the sort.
+   */
+  protected cumulativePoints(view: WidgetView): Point[] {
+    let running = 0;
+    return view.marks.map(mark => {
+      running += mark.value;
+      return { label: mark.name, value: running };
+    });
+  }
+
   protected figures(view: WidgetView): number[] {
     return view.marks.map(mark => mark.value);
   }
@@ -1349,24 +1960,64 @@ export class Dashboards implements OnInit, OnDestroy {
    * which draws as a solid bar rather than disappearing.
    */
   protected stacks(view: WidgetView): Bar[] {
+    return this.stackedBars(view, false);
+  }
+
+  /**
+   * The same stacks, each scaled to fill its bar.
+   *
+   * "Share within each group" rather than "composition": every bar is the same height and the
+   * segments read as percentages of their own group, which is the question a stack of raw totals
+   * cannot answer. North being twice the size of south makes north's bar twice as tall, and that
+   * height difference is exactly what stops a reader comparing the MIX between them.
+   *
+   * Each bar's value is set to 100 so every bar reaches the top, and each segment carries its own
+   * percentage -- BarChart divides a segment by its bar's total, so the parts land in the right
+   * proportions and the tooltip reads in percent.
+   */
+  protected shareStacks(view: WidgetView): Bar[] {
+    return this.stackedBars(view, true);
+  }
+
+  /**
+   * One bar per outer dimension value, segmented by the inner one.
+   *
+   * <b>Segment colour is keyed on the CATEGORY, not on its position in the bar.</b> It used to be
+   * `var(--chart-${segments.length % 6})` -- the index within each bar -- so "returned" was
+   * chart-0 in a group where it happened to come first and chart-2 in the next one. The legend a
+   * reader builds in their head from the first bar was then wrong for every other bar, which is
+   * worse than no colour at all: the chart looks like it encodes something and encodes position.
+   */
+  private stackedBars(view: WidgetView, asShare: boolean): Bar[] {
     const byOuter = new Map<string, BarSegment[]>();
+    const colourOf = new Map<string, string>();
     for (const mark of view.marks) {
       const cut = mark.name.indexOf(' · ');
       const outer = cut < 0 ? mark.name : mark.name.slice(0, cut);
       const inner = cut < 0 ? '' : mark.name.slice(cut + 3);
+      const label = inner || outer;
+      if (!colourOf.has(label)) {
+        colourOf.set(label, chartColor(colourOf.size));
+      }
       const segments = byOuter.get(outer) ?? [];
-      segments.push({
-        label: inner || outer,
-        value: mark.value,
-        color: `var(--chart-${segments.length % 6})`,
-      });
+      segments.push({ label, value: mark.value, color: colourOf.get(label)! });
       byOuter.set(outer, segments);
     }
-    return Array.from(byOuter, ([name, segments]) => ({
-      name,
-      value: segments.reduce((total, segment) => total + segment.value, 0),
-      segments: segments.length > 1 ? segments : undefined,
-    }));
+    return Array.from(byOuter, ([name, segments]) => {
+      const total = segments.reduce((sum, segment) => sum + segment.value, 0);
+      if (!asShare || total <= 0) {
+        return {
+          name,
+          value: total,
+          segments: segments.length > 1 ? segments : undefined,
+        };
+      }
+      const shares = segments.map(segment => ({
+        ...segment,
+        value: (segment.value / total) * 100,
+      }));
+      return { name, value: 100, segments: shares.length > 1 ? shares : undefined };
+    });
   }
 
   protected scatterPoints(view: WidgetView): ScatterPoint[] {
@@ -1479,6 +2130,9 @@ export class Dashboards implements OnInit, OnDestroy {
   readonly addKindOfSource = signal<'analysis' | 'query'>('analysis');
   readonly addSourceId = signal('');
   readonly addVisualization = signal<WidgetVisualization>('table');
+  /** Blank means "the default height" -- stored as absent rather than as the default value. */
+  readonly addHeight = signal('');
+  readonly addCaption = signal('');
   readonly adding = signal(false);
   readonly addError = signal('');
 
@@ -1742,6 +2396,8 @@ export class Dashboards implements OnInit, OnDestroy {
     this.addTitle.set('');
     this.addSourceId.set('');
     this.addVisualization.set('table');
+    this.addHeight.set('');
+    this.addCaption.set('');
   }
 
   pickSourceKind(kind: string): void {
@@ -1767,6 +2423,12 @@ export class Dashboards implements OnInit, OnDestroy {
       analyticsAnalysisId: this.addKindOfSource() === 'analysis' ? sourceId : null,
       analyticsQueryId: this.addKindOfSource() === 'query' ? sourceId : null,
       visualizationType: this.addVisualization(),
+      // Null when the author typed neither, so an untouched tile stores no config rather than
+      // a document restating the defaults.
+      widgetConfig: widgetConfigString({
+        height: this.addHeight() ? Number(this.addHeight()) : undefined,
+        caption: this.addCaption(),
+      }),
       displayOrder: this.widgets().length,
     }).subscribe({
       next: response => {
@@ -1873,6 +2535,78 @@ export class Dashboards implements OnInit, OnDestroy {
    * saved widget outlives the data it was built on, and a tile whose analysis has since returned
    * forty groups should show them rather than an empty ring.
    */
+  /**
+   * Opens every row of a result the tile could only show the first few of.
+   *
+   * Reads runs()[id].view and nothing else. No request is issued and no permit is taken: these
+   * rows arrived with the run that drew the tile. Nothing is written back to the widget either --
+   * a widget stores a reference and never a result, and this does not make the board a cache;
+   * the rows die with the open board exactly as they did before.
+   */
+  expandTable(widget: DashboardWidget, view: WidgetView): void {
+    this.dialog.open(WidgetTableDialog, {
+      hasBackdrop: true,
+      data: {
+        title: widget.widgetTitle,
+        columns: view.columns,
+        rows: view.rows,
+        measureColumn: view.measureColumn,
+        rowCount: view.rowCount,
+        // Carried through, not dropped: an expanded table is the one place a result the server
+        // cut short would otherwise read as the whole thing.
+        truncated: view.truncated,
+        notes: view.notes,
+      } as WidgetTableData,
+    });
+  }
+
+  /**
+   * The grid rows the tile draws.
+   *
+   * The cross-tab was the one kind with no limit at all: every other branch cut to WIDGET_ROWS or
+   * to a mark count, and this drew whatever the server composed -- so a board with one cross-tab
+   * over a few hundred groups had a single tile hundreds of rows tall, pushing every other tile
+   * off the screen. The whole grid is still one click away, like every other table here.
+   */
+  pivotRows(grid: PivotGrid): NonNullable<PivotGrid['rows']> {
+    return (grid.rows ?? []).slice(0, WIDGET_ROWS);
+  }
+
+  /**
+   * The rows the tile itself draws.
+   *
+   * The cut moved here from the view builders so that view.rows is the whole result. A tile is a
+   * postcard and eight rows is what fits on it; everything else is one click away rather than
+   * gone.
+   */
+  tileRows(view: WidgetView): (string | null)[][] {
+    return view.rows.slice(0, WIDGET_ROWS);
+  }
+
+  /** Whether this result has rows the tile is not showing. */
+  hasMoreRows(view: WidgetView): boolean {
+    return view.rows.length > WIDGET_ROWS;
+  }
+
+  /**
+   * How tall this tile's drawing is, in px.
+   *
+   * Clamped on read rather than trusted, because the stored value is a JSON document a widget
+   * carries around and nothing server-side validates: a height of 4, of 40000, or of "tall"
+   * reaches this method exactly as a legitimate one does.
+   */
+  heightOf(widget: DashboardWidget): number {
+    const asked = widgetConfigOf(widget).height;
+    if (typeof asked !== 'number' || !Number.isFinite(asked)) return WIDGET_HEIGHT;
+    return Math.min(WIDGET_HEIGHT_MAX, Math.max(WIDGET_HEIGHT_MIN, Math.round(asked)));
+  }
+
+  /** The author's own sentence under a tile, or '' when they wrote none. Never invented. */
+  captionOf(widget: DashboardWidget): string {
+    const caption = widgetConfigOf(widget).caption;
+    return typeof caption === 'string' ? caption.trim() : '';
+  }
+
   drawn(widget: DashboardWidget, view: WidgetView): WidgetVisualization {
     const asked = (widget.visualizationType ?? 'table') as WidgetVisualization;
     if (!KINDS.some(kind => kind.id === asked)) {
@@ -1894,7 +2628,25 @@ export class Dashboards implements OnInit, OnDestroy {
     // A single figure renders the whole result and has no marks at all -- an analysis with no
     // dimension produces none. Counting marks there printed "0 of 1 rows shown" under a tile
     // displaying that one row in 30-point type.
-    const shown = kind === 'table' ? view.rows.length
+    // view.rows is now the WHOLE result, so a table's shown count is the tile's cut and not the
+    // length of the array. Reading rows.length here would have printed "500 of 500 rows" under a
+    // tile displaying eight of them.
+    //
+    /*
+     * A cross-tab is counted in its own units.
+     *
+     * It has no marks, so this printed "0 of 24 rows shown" under a grid that was showing all
+     * twenty-four. Counting it in source rows is no better: the grid's rows are GROUPS, and a
+     * cross-tab of four regions over six months says nothing about the 150,000 rows behind it.
+     */
+    if (kind === 'pivot') {
+      const groups = view.pivot?.rows?.length ?? 0;
+      const drawnGroups = Math.min(groups, WIDGET_ROWS);
+      return drawnGroups < groups
+        ? `${drawnGroups.toLocaleString()} of ${groups.toLocaleString()} groups shown`
+        : `${groups.toLocaleString()} ${groups === 1 ? 'group' : 'groups'}`;
+    }
+    const shown = kind === 'table' ? Math.min(view.rows.length, WIDGET_ROWS)
       : kind === 'kpi' ? Math.min(1, view.rowCount)
       : view.marks.length;
     return shown < view.rowCount
@@ -2053,6 +2805,12 @@ export class Dashboards implements OnInit, OnDestroy {
       if (applied) request.filters = applied;
       if (config.topN) request.topN = config.topN;
       if (config.sort) request.sort = config.sort;
+      // Only when something is actually grained -- the same rule the request builder applies, and
+      // for the same reason: a list of nulls is a request that LOOKS grained to anything reading
+      // it back. A config saved before grains existed has no key here at all.
+      if (config.grains && config.grains.some(grain => !!grain)) {
+        request.grains = config.grains;
+      }
       this.inFlight = this.analytics.analyze(request).subscribe({
         next: response => {
           if (response.status !== API_SUCCESS || !response.data) {
@@ -2063,6 +2821,13 @@ export class Dashboards implements OnInit, OnDestroy {
           this.settle(id, epoch, { state: 'done', error: '', queryId,
             view: analysisView(response.data, aggregation, {
               sortedBy: config.sort?.by ?? 'MEASURE',
+              // The direction travels with the axis. Without it a dimension sorted Z-A looked
+              // the same to the gate as one sorted A-Z, and the tile offered a line that ran
+              // backwards through time.
+              sortDirection: config.sort?.direction ?? 'DESC',
+              topNTrimmed: !!config.topN && config.topN.includeOther === false,
+              hasPivot: !!response.data.pivot && !!response.data.pivot.rows,
+              pivotTruncated: !!response.data.pivot?.columnsTruncated,
               dimensionCount: (config.dimensions ?? []).length,
             }) });
         },
@@ -2084,6 +2849,15 @@ export class Dashboards implements OnInit, OnDestroy {
       connection: saved.connectionAlias,
       path: saved.datasetPath,
       sql: saved.queryText,
+      // The SECOND dataset, forwarded so a tile over a saved JOIN runs the query that was saved.
+      //
+      // This line is its own bug, not a consequence of the save path's. Even after the Studio
+      // learned to store a second dataset and the table learned to hold one, a tile read the
+      // first pair off the row and posted a one-dataset body -- so the engine registered no
+      // `dataset2` and the widget sat permanently red with a DuckDB catalog error. Sent as a
+      // pair, because the server refuses a half.
+      connection2: saved.secondDatasetPath ? saved.secondConnectionAlias : undefined,
+      path2: saved.secondDatasetPath || undefined,
       queryId,
     }).subscribe({
       next: response => {

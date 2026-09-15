@@ -11,6 +11,8 @@ export interface Bar {
   value: number;
   meta?: unknown;
   color?: string;
+  /** This bar alone does not respond to a click. See RankedItem.inert. */
+  inert?: boolean;
   /**
    * Composition of this bar, drawn as a stack instead of a solid fill.
    *
@@ -27,8 +29,38 @@ export interface Bar {
  * constants carry a little headroom so a slightly wider name does not immediately collide.
  * They are the only place the layout encodes "how much room does text need".
  */
+/**
+ * Fallback widths, used only until the component has been measured.
+ *
+ * These used to be the WHOLE rule, and a fixed number of pixels cannot answer "does this text
+ * fit" because it does not know what the text says. A 24-bar revenue chart has 37px of pitch, so
+ * values were drawn -- and the value is "4,398,765.46", which needs about 75px. Twenty-four of
+ * them overlapped into an unreadable band across the top of the chart. The same arithmetic put
+ * "CUST-00111" labels, about 65px wide, at a 34px threshold along the bottom.
+ */
 const LABEL_PX = 34;
 const VALUE_PX = 22;
+
+/**
+ * Width of one character at the 10px type these labels are drawn in.
+ *
+ * Measured against the rendered font rather than assumed: digits in `tabular` are 6.0px and the
+ * mixed-case names on the axis average slightly less, so 6.0 is the honest number for the widest
+ * case and errs toward hiding a label rather than toward drawing two on top of each other.
+ */
+const CHAR_PX = 6;
+
+/** Breathing room either side, so two labels never touch even when both just fit. */
+const LABEL_GUTTER = 8;
+
+/** The pixels the widest of these strings needs. */
+function widestText(texts: string[]): number {
+  let widest = 0;
+  for (const text of texts) {
+    widest = Math.max(widest, (text ?? '').length);
+  }
+  return widest * CHAR_PX + LABEL_GUTTER;
+}
 
 /** Chrome reserved above and below the bar itself: value line plus axis line, or axis alone. */
 const RESERVE_WITH_VALUES = 32;
@@ -54,12 +86,20 @@ const RESERVE_AXIS_ONLY = 18;
            [attr.role]="clickable() ? null : 'img'"
            [attr.aria-label]="clickable() ? null : summary()">
         @for (bar of bars(); track $index) {
+          <!-- aria-hidden below follows CLICKABLE only, never inert. An inert bar is one that
+               cannot be filtered on -- a Top-N roll-up, a merged label, a null group -- and it is
+               still a bar with a name and a figure that a sighted reader can see. It used to be
+               hidden along with being disabled, which removed its name and value from the
+               accessibility tree; and because a clickable chart carries no role="img" summary
+               either, there was no fallback text at all. A screen-reader user was read N-1 bars
+               and never told the largest one existed. A disabled button already announces as
+               unavailable, which is the part worth saying. -->
           <button type="button"
                   class="flex-1 min-w-0 max-w-16 h-full flex flex-col justify-end items-center gap-1
                          rounded transition-colors hover:bg-[color:var(--surface-sunken)]
                          focus:outline-none focus:ring-2 focus:ring-[color:var(--focus-ring)]"
-                  [disabled]="!clickable()"
-                  [attr.tabindex]="clickable() ? 0 : -1"
+                  [disabled]="!clickable() || !!bar.inert"
+                  [attr.tabindex]="clickable() && !bar.inert ? 0 : -1"
                   [attr.aria-hidden]="clickable() ? null : 'true'"
                   [title]="bar.hint"
                   (click)="barClicked.emit(bar)">
@@ -85,7 +125,15 @@ const RESERVE_AXIS_ONLY = 18;
                 }
               </span>
             } @else {
-              <span class="w-full rounded-t transition-[height]"
+              <!-- A dashed top edge is the axis-break motif, and it is doing the same job here:
+                   this bar is taller than the scale and has been cut, so a flat rounded cap
+                   would claim it is exactly as tall as the tallest real bar. Only the Top-N
+                   roll-up reaches this in practice. -->
+              <span class="w-full transition-[height]"
+                    [class.rounded-t]="!bar.clipped"
+                    [class.border-t-2]="bar.clipped"
+                    [class.border-dashed]="bar.clipped"
+                    [style.borderTopColor]="'var(--surface-raised)'"
                     [style.background]="bar.color || 'var(--chart-0)'"
                     [style.height.px]="bar.px"></span>
             }
@@ -104,6 +152,30 @@ const RESERVE_AXIS_ONLY = 18;
           </button>
         }
       </div>
+
+      @if (legend().length) {
+        <!--
+          The key to the colours, which did not exist.
+
+          A stack paints one colour per category and that mapping was stated nowhere a reader
+          could see it: only inside each bar's title attribute, which needs a mouse, never
+          appears on a touch screen, and is not read out in order. So the chart encoded its second
+          dimension in colour alone -- the thing WCAG 1.4.1 is about -- and a reader could see
+          six bands without being able to name one of them.
+
+          aria-hidden because the same names and figures are already in the chart's own
+          description, and a screen reader does not need the swatches read out a second time.
+        -->
+        <ul class="flex flex-wrap gap-x-3 gap-y-1 mt-2 list-none" aria-hidden="true">
+          @for (entry of legend(); track entry.label) {
+            <li class="flex items-center gap-1.5 text-[10px] text-[color:var(--text-muted)]">
+              <span class="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
+                    [style.background]="entry.color"></span>
+              <span class="whitespace-nowrap">{{ entry.label }}</span>
+            </li>
+          }
+        </ul>
+      }
     } @else {
       <p class="text-xs text-[color:var(--text-muted)] py-6 text-center">{{ emptyMessage() }}</p>
     }
@@ -186,7 +258,28 @@ export class BarChart {
     if (width > 0) this.measured.set(width);
   }
 
-  readonly maxValue = computed(() => Math.max(0, ...this.data().map(d => d.value ?? 0)));
+  /**
+   * The value the tallest bar stands for -- taken from the bars the chart is ABOUT.
+   *
+   * A Top-N result carries an "Other" roll-up holding everything the cut discarded, and on a
+   * "Top 10 customers" chart that bar was 101,025,562 against ten real bars of about 300,000. It
+   * set the scale, so all ten rendered as three-pixel slivers and the chart answered nothing: the
+   * one bar that is explicitly NOT one of the ten decided how the ten looked.
+   *
+   * The roll-up is already marked inert -- see Mark.inert, stamped by the analytics board -- so
+   * the information needed to leave it out of the scale was there and simply unused. It is still
+   * drawn and still carries its true figure; it is drawn CLIPPED, which is a statement about the
+   * axis rather than about the data.
+   *
+   * Falls back to every bar when they are all inert, because a scale of zero draws nothing at all
+   * and "every bar is a roll-up" is a real, if odd, result rather than an empty one.
+   */
+  readonly maxValue = computed(() => {
+    const data = this.data();
+    const scaled = data.filter(bar => !bar.inert);
+    const measured = scaled.length ? scaled : data;
+    return Math.max(0, ...measured.map(bar => bar.value ?? 0));
+  });
 
   /**
    * Space between bars: 4px normally, 1px once that gutter would cost more than the bars.
@@ -210,20 +303,40 @@ export class BarChart {
    * Reads data().length rather than bars().length: bars() needs this to size its track, and
    * going through bars() would be a cycle. The two counts are the same.
    */
+  /**
+   * Suppresses the figure above each bar even where there is room for it.
+   *
+   * For a chart whose bars are all the same height ON PURPOSE -- a 100% stack -- where the
+   * number above every bar is the same "100" and says nothing at all. The per-segment figures are
+   * still in the tooltip, which is where the reading actually happens on that chart.
+   */
+  readonly hideValues = input(false);
+
   protected readonly showValues = computed(() => {
+    if (this.hideValues()) return false;
     const count = this.data().length;
     if (!count) return false;
     const pitch = this.pitch();
-    return pitch ? pitch >= VALUE_PX : count <= 24;
+    if (!pitch) return count <= 24;
+    // Against the WIDEST value actually formatted, not a constant. A dashboard tile passes the
+    // faithful formatter, so these are "4,398,765.46" and not "4.4M"; whether they fit is a fact
+    // about the string, and the previous 22px threshold was true of "4.4M" and nothing else.
+    const format = this.format();
+    const widest = widestText(this.data().map(bar => format(bar.value)));
+    return pitch >= Math.max(VALUE_PX, widest);
   });
 
-  /** Label every Nth group, where N is however many bars a label is wide. */
+  /** Label every Nth group, where N is however many bars the WIDEST label is wide. */
   private readonly every = computed(() => {
     const count = this.data().length;
     if (count < 2) return 1;
     const pitch = this.pitch();
     if (!pitch) return count > 16 ? Math.ceil(count / 8) : 1;
-    return Math.max(1, Math.ceil(LABEL_PX / pitch));
+    // The widest label decides the spacing for all of them: thinning to fit the average leaves
+    // the long ones overlapping their neighbours, which is what "CUST-00111 CUST-00319CUST-00315"
+    // along the bottom of a Top-10 chart was.
+    const needed = Math.max(LABEL_PX, widestText(this.data().map(bar => bar.name)));
+    return Math.max(1, Math.ceil(needed / pitch));
   });
 
   readonly bars = computed(() => {
@@ -276,9 +389,16 @@ export class BarChart {
        * different one from "no data": a job whose runs all round to 0.0 minutes used to hit
        * the empty state and print "nothing to show" beside a caption saying the runs exist.
        */
-      const px = max > 0 && bar.value > 0 ? Math.max(Math.round((bar.value / max) * track), 3) : 0;
+      const px = max > 0 && bar.value > 0
+        ? Math.min(Math.max(Math.round((bar.value / max) * track), 3), track)
+        : 0;
+      // Taller than the axis it is drawn against: the roll-up, almost always. Flagged so the bar
+      // can say it was cut rather than quietly pretending to be exactly as tall as the tallest
+      // real bar, which would be a different and untrue statement.
+      const clipped = max > 0 && bar.value > max;
       return {
         ...bar,
+        clipped,
         newGroup: index === 0 || bar.name !== data[index - 1].name,
         labelled,
         // The two outermost labels are pulled inward so they sit over the plot rather than
@@ -310,12 +430,34 @@ export class BarChart {
   }
 
   private hintFor(bar: Bar, format: (value: number) => string): string {
-    const head = `${bar.name}: ${format(bar.value)}`;
+    const head = `${bar.name}: ${format(bar.value)}`
+      + (bar.value > this.maxValue() ? ' \u2014 taller than this chart\u2019s scale, drawn cut' : '');
     const parts = (bar.segments ?? []).filter(part => part.value > 0);
     return parts.length
       ? head + ' — ' + parts.map(part => `${part.label} ${format(part.value)}`).join(', ')
       : head;
   }
+
+  /**
+   * One entry per distinct segment label, in the order the stacks introduce them.
+   *
+   * Empty for a plain bar chart -- there is nothing to key, the bars are already labelled -- so
+   * the legend costs an unstacked chart no space at all. The colour is taken from the first
+   * segment carrying that label rather than from the position, which is the same rule the stack
+   * itself follows: colour is keyed on the CATEGORY, so one category is one colour in every bar.
+   */
+  protected readonly legend = computed(() => {
+    const entries: { label: string; color: string }[] = [];
+    const seen = new Set<string>();
+    for (const bar of this.data()) {
+      for (const part of bar.segments ?? []) {
+        if (part.value <= 0 || seen.has(part.label)) continue;
+        seen.add(part.label);
+        entries.push({ label: part.label, color: part.color });
+      }
+    }
+    return entries;
+  });
 
   /** What a screen reader is told about a chart nobody can click into. */
   protected readonly summary = computed(() => {

@@ -1,4 +1,5 @@
 import { Component, computed, input, output } from '@angular/core';
+import { CHART_SLOTS, chartColor } from './status-color';
 
 export interface RankedItem {
   name: string;
@@ -7,6 +8,15 @@ export interface RankedItem {
   display?: string;
   color?: string;
   key?: string;
+  /**
+   * This row alone does not respond to a click, on a chart where the others do.
+   *
+   * For the row that is not a category: a rolled-up "Other", a bucket two rows were merged into.
+   * Making the WHOLE chart inert because one row is would take the feature away from every Top-N
+   * result, which is most of them; letting that row through would act on a value the data does
+   * not contain. The caller says which rows those are and why, on the tile.
+   */
+  inert?: boolean;
 }
 
 /**
@@ -24,8 +34,8 @@ export interface RankedItem {
         @for (row of rows(); track row.name) {
           <li>
             <button type="button" class="w-full text-left group block"
-                    [class.cursor-default]="!clickable()"
-                    [disabled]="!clickable()"
+                    [class.cursor-default]="!clickable() || row.inert"
+                    [disabled]="!clickable() || !!row.inert"
                     [title]="row.name + ': ' + (row.display || row.value)"
                     (click)="picked.emit(row)">
               <span class="flex items-center gap-2 text-[11px] leading-none">
@@ -42,7 +52,7 @@ export interface RankedItem {
                 <span class="block h-full rounded-full transition-[width] duration-300"
                       [style.width.%]="row.width"
                       [style.background]="row.color"
-                      [class.group-hover:brightness-110]="clickable()"></span>
+                      [class.group-hover:brightness-110]="clickable() && !row.inert"></span>
               </span>
             </button>
           </li>
@@ -64,8 +74,10 @@ export class RankedBar {
   readonly formatValue = input<((value: number) => string) | null>(null);
   readonly picked = output<RankedItem>();
 
-  private readonly palette = ['var(--chart-0)', 'var(--chart-1)', 'var(--chart-2)',
-                              'var(--chart-3)', 'var(--chart-5)', 'var(--chart-4)'];
+  /* Built from the palette rather than hand-listed, so a colour added to styles.css is drawn
+     here without anyone remembering to extend an array. The old list also skipped a slot --
+     it ran 0,1,2,3,5,4 -- so two neighbouring bars were the two closest hues in the ramp. */
+  private readonly palette = Array.from({ length: CHART_SLOTS }, (_, slot) => chartColor(slot));
 
   readonly rows = computed(() => {
     const source = this.data().filter(d => (d.value ?? 0) > 0);

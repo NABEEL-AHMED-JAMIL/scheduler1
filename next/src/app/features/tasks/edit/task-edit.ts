@@ -9,7 +9,7 @@ import { ToastService } from '../../../shared/ui/toast.service';
 import { Field } from '../../../shared/ui/field';
 import { Combobox, ComboboxOption } from '../../../shared/ui/combobox';
 import { Icon } from '../../../shared/ui/icon';
-import { TaskForm, TaskFormField } from '../../settings/forms/task-form-dialog';
+import { FieldChoice, TaskForm, TaskFormField, parseFieldChoices } from '../../settings/forms/task-form-dialog';
 
 /** The lookup parents whose sub-lookups fill the two remaining lookup-backed dropdowns here.
  *  Pipeline used to be a third one (PIPELINE_IDS) -- it now reads from Pipeline Forms instead,
@@ -352,9 +352,29 @@ export class TaskEdit implements OnInit {
     }
   }
 
-  /** Choices for a select field. The author writes them one per line. */
-  fieldChoices(field: TaskFormField): string[] {
-    return (field.fieldOptions ?? '').split('\n').map(o => o.trim()).filter(Boolean);
+  /**
+   * Choices for a select field, as the value the tag carries and the label shown for it.
+   *
+   * The author writes them one per line, and on each line an optional first `=` separates the
+   * two -- `lines=JSON Lines (one object per line)`. This used to return plain strings and the
+   * template bound the same one to both `[value]` and the option's text, which is why a dropdown
+   * could either read sensibly or send something the worker understood, never both. A line with
+   * no `=` is unchanged from that behaviour: the whole line is still value and label alike, which
+   * is what keeps every task saved against an older form opening on its own answer.
+   *
+   * The trailing entry is a repair for the case where it does not: a tag already holding a value
+   * that matches no choice (a renamed choice, or one of the comma-separated rows the ETL demo
+   * seeder wrote) rendered as a completely blank dropdown, and the obvious fix -- picking
+   * something, anything -- overwrote an answer the operator never saw. Carrying it as a labelled
+   * option shows what the task actually holds instead of hiding it.
+   */
+  fieldChoices(field: TaskFormField): FieldChoice[] {
+    const choices = parseFieldChoices(field.fieldOptions);
+    const current = String(this.formData.get(this.controlName(field))?.value ?? '').trim();
+    if (current && !choices.some(choice => choice.value === current)) {
+      return [...choices, { value: current, label: `${current} (not one of the choices)` }];
+    }
+    return choices;
   }
 
   save(): void {

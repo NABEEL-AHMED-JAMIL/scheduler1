@@ -7,11 +7,12 @@ import { statusColor } from '../../shared/charts/status-color';
 import { Icon } from '../../shared/ui/icon';
 import { StatusPill } from '../../shared/ui/status-pill';
 import { TableShell } from '../../shared/ui/data-table';
-import { CHART_LABELS, ChartKind, ReportChart } from './report-chart';
+import { CHART_LABELS, ChartKind, RADAR_ROWS, ReportChart } from './report-chart';
 import { ReportDestinationDialog } from './report-destination-dialog';
 import {
   DIMENSIONS, Dimension, dimensionFor, MEASURE_GROUPS, MEASURE_LABELS, Measure, RunData, RunRow,
-  COUNTING, EXECUTION, JOB_NAME, RUN_ID, SECONDS, buildPivot, formatMeasure, humanSeconds, ADDITIVE} from './pivot';
+  COUNTING, EXECUTION, EXEC_SECONDS, JOB_NAME, NO_DURATION, RUN_ID, SECONDS, buildPivot,
+  formatMeasure, humanSeconds, ADDITIVE} from './pivot';
 
 const EMPTY: RunData = { task: [], status: [], owner: [], day: [], job: [], tenant: [], rows: [] };
 
@@ -141,11 +142,17 @@ export class ReportPivot {
     return statusColor(label, Math.max(0, known.indexOf(label)));
   };
 
+  /** How many rows the radar draws, for the note beside it. Owned by the chart; see RADAR_ROWS. */
+  readonly radarRows = RADAR_ROWS;
+
   /** Which labels the legend describes depends on how the chart reads the grid. */
   readonly legend = computed(() => {
     const pivot = this.pivot();
     if (this.chart() === 'ranked' || this.chart() === 'heat') return [];
-    if (this.chart() === 'radar') return pivot.rowLabels.slice(0, 4);
+    // RADAR_ROWS rather than a second bare 4. The chart decides how many shapes it can separate,
+    // and a legend counting to its own number would name a series that is not drawn the moment
+    // either number moved.
+    if (this.chart() === 'radar') return pivot.rowLabels.slice(0, RADAR_ROWS);
     return pivot.colLabels;
   });
 
@@ -181,20 +188,31 @@ export class ReportPivot {
   format(value: number): string { return formatMeasure(value, this.measure()); }
 
   /**
+   * Whether the pivot knows this cell has no runs behind it at all.
+   *
+   * Split out of cellText because three things now need the same answer: the text, the drill
+   * button's disabled state, and the export. Deliberately false when cellRows is missing
+   * entirely rather than empty -- an un-built pivot should print its numbers, not dash out the
+   * whole grid.
+   */
+  cellIsEmpty(ri: number, ci: number): boolean {
+    const runs = this.pivot().cellRows?.[ri]?.[ci];
+    return !!runs && runs.length === 0;
+  }
+
+  /**
    * A cell's text, with "no runs here" distinguished from "the runs here took no time".
    *
-   * aggregate() returns 0 for an empty set because the charts divide by the maximum and cannot
-   * take a negative, so 0 is doing double duty. The grid has something the charts do not --
-   * cellRows, the actual runs behind each cell -- so it can tell the two apart and print the
-   * dash the rest of the page uses for absent data. Without this the Execution measures, which
-   * are genuinely sub-second, made every empty cell read "0s" as though a run had happened
-   * instantly.
+   * The grid has something the charts do not -- cellRows, the actual runs behind each cell --
+   * so it can tell the two apart and print the dash the rest of the page uses for absent data.
+   * Without this the Execution measures, which are genuinely sub-second, made every empty cell
+   * read "0s" as though a run had happened instantly. It is no longer the only guard: aggregate()
+   * now answers NO_DURATION for a sample it could not measure, which covers the case this one
+   * cannot see -- a cell with plenty of runs, none of which was ever timed.
    */
   cellText(ri: number, ci: number): string {
-    const p = this.pivot();
-    const runs = p.cellRows?.[ri]?.[ci];
-    if (runs && runs.length === 0) return '—';
-    return this.format(p.matrix[ri][ci]);
+    if (this.cellIsEmpty(ri, ci)) return '—';
+    return this.format(this.pivot().matrix[ri][ci]);
   }
 
   /** Proportions inside one column, for the distribution strip in its header. */
@@ -211,9 +229,27 @@ export class ReportPivot {
   /** A duration histogram for a column, when the measure is a duration rather than a tally. */
   columnHistogram(colIndex: number): { height: number; hint: string }[] {
     const inCol = this.data().rows.filter(r => r[this.colDim().idx] === colIndex);
-    const seconds = inCol.map(r => r[SECONDS]).filter(v => v >= 0);
+    // The column aggregate() reads, for the measure that is actually selected. SECONDS was
+    // hard-coded here while the cells below branch on EXECUTION, so under "Mean execution" a
+    // column's numbers read 0.23s and the sparkline drawn in that column's own header binned the
+    // queued-to-finished durations, with tooltips saying "12 runs near 41s" -- a 180x
+    // disagreement inside one table cell, on a view that carries a whole paragraph warning the
+    // reader not to mix the two clocks. It was also a different POPULATION, not just a different
+    // clock: a run whose pickup was never recorded has -1 in exec_seconds and a real duration in
+    // seconds, so it was binned in the header and excluded from the numbers above it.
+    const column = EXECUTION.has(this.measure()) ? EXEC_SECONDS : SECONDS;
+    const seconds = inCol.map(r => r[column] ?? NO_DURATION).filter(v => v >= 0);
     const bins = new Array(12).fill(0);
-    if (!seconds.length) return bins.map(() => ({ height: 0, hint: 'no runs' }));
+    if (!seconds.length) {
+      // Nothing to bin has two causes and they are not the same fact. A column can hold plenty
+      // of runs and still have no measurement on the clock in use -- every run still in flight,
+      // or every pickup unrecorded -- and calling that "no runs" contradicts the "N runs"
+      // caption printed directly under this strip.
+      return bins.map(() => ({
+        height: 0,
+        hint: inCol.length ? 'no run here has a recorded duration' : 'no runs',
+      }));
+    }
     const max = seconds.reduce((a, b) => (b > a ? b : a), 1);
     seconds.forEach(s => { bins[Math.min(11, Math.floor((s / max) * 12))]++; });
     const peak = bins.reduce((a, b) => (b > a ? b : a), 1);
@@ -271,7 +307,7 @@ export class ReportPivot {
    * The grid as the server needs it: header row, one array per row, totals included.
    * Built here so every destination exports precisely what is on screen.
    */
-  private grid(): { title: string; columns: string[]; rows: (string | number)[][] } {
+  private grid(): { title: string; columns: string[]; rows: (string | number | null)[][] } {
     const pivot = this.pivot();
     // The range belongs in the exported title. A spreadsheet outlives the screen it came from,
     // and "Runs by task and outcome" alone does not say which fortnight it describes.
@@ -283,7 +319,7 @@ export class ReportPivot {
       rows: [
         ...pivot.rowLabels.map((label, ri) => [
           label,
-          ...pivot.matrix[ri].map(v => this.exportValue(v)),
+          ...pivot.matrix[ri].map((value, ci) => this.exportValue(value, this.cellIsEmpty(ri, ci))),
           this.exportValue(pivot.rowTotals[ri]),
         ]),
         ['All', ...pivot.colTotals.map(v => this.exportValue(v)), this.exportValue(pivot.grand)],
@@ -291,8 +327,28 @@ export class ReportPivot {
     };
   }
 
-  /** Counts export as numbers so a sheet can total them; durations export as seconds. */
-  private exportValue(value: number): number { return value; }
+  /**
+   * Counts export as numbers so a sheet can total them; durations export as seconds; and a cell
+   * the grid prints as a dash exports as an EMPTY cell, never as 0.
+   *
+   * This was `return value`, read straight off the matrix, under a comment promising that every
+   * destination exports precisely what is on screen -- and the screen has not rendered the
+   * matrix since cellText() learned to dash out a cell with no runs behind it. So a "Shortest
+   * run" report wrote 0 into every gap, and a reader who ran MIN() down the Failed column of the
+   * spreadsheet got 0s as the fastest failure: a duration no run ever had. All four export paths
+   * (CSV, Excel, Save, Submit) are built from the one toCsv() on the server, so they carried
+   * identical wrong bytes. escape() renders null as an empty field, which is what a gap is, so
+   * nothing on the server has to change.
+   *
+   * Two things become a gap. A cell with no runs in it, which the caller passes in because only
+   * it knows -- for a COUNTING measure that cell measures a truthful 0, and exporting the 0
+   * while the screen shows a dash is still the file disagreeing with the screen. And a negative,
+   * which is aggregate()'s no-data sentinel; that one covers the totals too, where there is no
+   * cellRows to consult.
+   */
+  private exportValue(value: number, isEmpty = false): number | null {
+    return isEmpty || value < 0 ? null : value;
+  }
 
   export(format: 'csv' | 'xlsx'): void {
     this.send({ ...this.grid(), format, destination: 'download' }, format, response => {

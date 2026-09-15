@@ -45,6 +45,17 @@ export type RunRow =
   [number, number, number, number, number, string, number, number?, number?, number?];
 
 export const SECONDS = 4;
+/**
+ * What a duration is when there is no duration: the query's own sentinel, given a name.
+ *
+ * `case when x.exec_start is null or q.end_time is null then -1` is what QueryService emits for
+ * a run it could not time, and a run that is still in flight is timed by nobody -- start_time is
+ * stamped at ENQUEUE, so Queue, Start and Running rows reach this page carrying -1 in both
+ * duration columns. It is exported because aggregate() now hands it back out: a sample with
+ * nothing measurable in it has the same answer as a single unmeasured run, and every renderer in
+ * the app already reads a negative as "no data".
+ */
+export const NO_DURATION = -1;
 export const JOB_NAME = 5;
 export const RUN_ID = 6;
 /** Sent by the server. */
@@ -177,14 +188,26 @@ export function percentile(sorted: number[], q: number): number {
  * A run with no recorded duration contributes nothing to the duration measures rather than
  * counting as zero: a skipped run did not take no time, it did not run. Counting it would drag
  * every average toward zero and make the minimum meaningless.
+ *
+ * When that leaves nothing at all -- an empty cell, or a group whose every run is still in
+ * flight -- the answer is NO_DURATION, not 0. Returning 0 there stated that the group finished
+ * instantly, and it was not a corner case: the DEFAULT Task x Outcome grid under any duration
+ * measure printed "0s" in every Queue, Start and Running cell AND under those columns' totals,
+ * because an unfinished run carries -1 in both duration columns. The grid's own dash only ever
+ * rescued cells with no runs in them, so a column of real-but-untimed runs read as a column of
+ * instant ones. The counting measures are untouched: no runs really is a count of zero.
+ *
+ * Callers that need a non-negative number for geometry clamp it -- report-chart.ts does, since
+ * a bar scaled from -1 hangs below its own axis. Everything that PRINTS it already renders a
+ * negative as a dash.
  */
 export function aggregate(rows: RunRow[], measure: Measure): number {
   if (measure === 'count') return rows.length;
   if (measure === 'distinct') return new Set(rows.map(r => r[3])).size;
 
   const column = EXECUTION.has(measure) ? EXEC_SECONDS : SECONDS;
-  const seconds = rows.map(r => r[column] ?? -1).filter(v => v >= 0);
-  if (!seconds.length) return 0;
+  const seconds = rows.map(r => r[column] ?? NO_DURATION).filter(v => v >= 0);
+  if (!seconds.length) return NO_DURATION;
   const sorted = [...seconds].sort((a, b) => a - b);
   const total = seconds.reduce((a, b) => a + b, 0);
   const mean = total / seconds.length;

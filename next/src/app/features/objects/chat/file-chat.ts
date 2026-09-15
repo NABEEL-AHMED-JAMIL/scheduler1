@@ -1,4 +1,4 @@
-import { Component, OnInit, effect, inject, input, output, signal, viewChild, ElementRef } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, effect, inject, input, output, signal, viewChild, ElementRef } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { ToastService } from '../../../shared/ui/toast.service';
@@ -11,6 +11,7 @@ import { Dialog } from '@angular/cdk/dialog';
 import { confirmWith } from '../../../shared/ui/confirm';
 import { copyText } from '../../../shared/ui/clipboard.util';
 import { ChatFile, parseDownloadableFiles, stripExportFences } from './chat-export';
+import { ShareDialog, ShareResult } from '../dialogs/share-dialog';
 import { Subscription } from 'rxjs';
 
 interface ChatMessage {
@@ -34,6 +35,28 @@ export function targetFileTypesList(targetFileTypes: string | undefined): string
   return (targetFileTypes ?? '').split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
 }
 
+/**
+ * Spellings of one format, folded to a single name.
+ *
+ * jpg and jpeg are the same picture, and an agent configured for one silently refused the other:
+ * the check is an exact match on the extension, so a .jpeg with a "jpg" agent got "This agent
+ * only handles jpg files". Handled as a table rather than as a special case for jpeg, because
+ * every pair here has the same shape and the next one added should not need new code.
+ *
+ * The backend folds the same pairs in FileChatServiceImpl.acceptsFileType -- it is the side that
+ * actually enforces this, so the two lists have to agree or the picker offers a file the server
+ * then refuses.
+ */
+const SAME_FORMAT: Record<string, string> = {
+  jpeg: 'jpg', tiff: 'tif', htm: 'html', yml: 'yaml', mpeg: 'mpg',
+};
+
+/** The name a format answers to, whichever of its spellings was used. */
+export function canonicalType(type: string): string {
+  const lower = (type ?? '').trim().toLowerCase();
+  return SAME_FORMAT[lower] ?? lower;
+}
+
 export function fileExtension(fileName: string): string {
   const dot = fileName.lastIndexOf('.');
   return dot === -1 || dot === fileName.length - 1 ? '' : fileName.slice(dot + 1).toLowerCase();
@@ -43,9 +66,9 @@ export function fileExtension(fileName: string): string {
     worst case a ".csv.gz" file hides an agent that would actually have been allowed, never the
     other way around, and the backend is what actually enforces this regardless. */
 export function agentAcceptsFile(agent: Agent, fileName: string): boolean {
-  const types = targetFileTypesList(agent.targetFileTypes);
+  const types = targetFileTypesList(agent.targetFileTypes).map(canonicalType);
   if (!types.length) return true;
-  const ext = fileExtension(fileName);
+  const ext = canonicalType(fileExtension(fileName));
   return !!ext && types.includes(ext);
 }
 
@@ -54,7 +77,7 @@ export function agentAcceptsFile(agent: Agent, fileName: string): boolean {
   imports: [Icon, Markdown, Avatar, DecimalPipe],
   templateUrl: './file-chat.html',
 })
-export class FileChat implements OnInit {
+export class FileChat implements OnInit, OnDestroy {
   readonly bucket = input.required<string>();
   readonly fileKey = input.required<string>();
   readonly fileName = input.required<string>();
@@ -84,6 +107,24 @@ export class FileChat implements OnInit {
   readonly copiedIndex = signal<number | null>(null);
   readonly listening = signal(false);
   readonly converting = signal<string | null>(null);
+
+  /**
+   * What a screen reader is told when a reply lands.
+   *
+   * An answer arriving is a purely visual event otherwise: a bubble appears at the bottom of a
+   * scrolling list that nothing directs the reader to, so somebody not watching the panel has no
+   * way of knowing the question was answered at all. Polite rather than assertive -- an answer is
+   * worth waiting a beat for, not worth cutting off whatever is being read.
+   *
+   * Only the panel's own turns are announced: the reader's own message was just typed by them,
+   * and echoing it back is noise on every send.
+   */
+  readonly announcement = computed(() => {
+    const list = this.messages();
+    const last = list[list.length - 1];
+    if (!last || last.role === 'user') return '';
+    return last.role === 'error' ? `Error: ${last.text}` : last.text;
+  });
 
   /**
    * How long an *unintentionally* abandoned conversation survives.
@@ -178,6 +219,10 @@ export class FileChat implements OnInit {
           return;
         }
       }
+      // Closing the panel is not on its own enough to end what the panel started: the browser
+      // keeps the recording indicator lit until the recognition is actually stopped, and a reply
+      // still in flight lands against a session endSession is about to drop.
+      this.release();
       // Order matters: stop the effect re-saving on the way out, then clear, then close. Clearing
       // first and letting the effect fire again would write the transcript straight back.
       this.persist.destroy();
@@ -191,6 +236,50 @@ export class FileChat implements OnInit {
     }
   }
 
+  /**
+   * Everything the panel is still holding, let go of.
+   *
+   * Both ways out run this. close() is the tidy exit, but a route change, the parent dropping the
+   * panel or a reload never reach it -- and neither of the two things held here stops on its own:
+   * the microphone stays open (with the browser's recording indicator lit, on a panel that is no
+   * longer on screen) and the reply keeps running to completion against a session that has ended,
+   * only to push an answer into a transcript nobody can see.
+   */
+  private release(): void {
+    this.stopDictation();
+    this.abandonInFlight();
+  }
+
+  ngOnDestroy(): void {
+    this.release();
+  }
+
+  /**
+   * Ends the reply in progress without writing anything to the transcript -- the difference from
+   * stop(), which is the reader deliberately abandoning an answer and wants to see that it was.
+   */
+  private abandonInFlight(): void {
+    this.inFlight?.unsubscribe();
+    this.settle();
+  }
+
+  /** abort() rather than stop(): stop() delivers whatever was heard so far, firing onresult
+      against a panel that is going away; abort() drops it. Both throw on a recognition that
+      never actually started (permission refused before onstart), and there is nothing left to
+      release at that point, so the failure is the outcome we wanted anyway. */
+  private stopDictation(): void {
+    const recognition = this.recognition;
+    this.recognition = null;
+    this.listening.set(false);
+    if (!recognition) return;
+    try {
+      if (typeof recognition.abort === 'function') recognition.abort();
+      else recognition.stop?.();
+    } catch {
+      // Nothing was listening; the indicator is already off.
+    }
+  }
+
   /** Held so the request can be abandoned; see stop(). */
   private inFlight: Subscription | null = null;
   private recognition: any = null;
@@ -200,28 +289,66 @@ export class FileChat implements OnInit {
     typeof window !== 'undefined' &&
     !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
 
+  /**
+   * The tick has to mean the clipboard actually changed.
+   *
+   * copyText reports whether the copy happened, and it genuinely does fail: a deployment served
+   * over plain HTTP has no Clipboard API at all, an unfocused document is refused, and the
+   * execCommand fallback can be refused too. The tick used to appear either way, so an answer
+   * somebody copied to paste into a ticket arrived as whatever was on the clipboard before, with
+   * nothing on screen having suggested a problem. The code-block copy inside a reply
+   * (Markdown.copyBlock) was fixed for exactly this; this one, on the whole answer, was missed.
+   */
   copyMessage(index: number, text: string): void {
-    copyText(text).then(() => {
+    copyText(text).then(copied => {
+      if (!copied) {
+        this.toast.error('Could not copy that answer. Select it and copy it by hand.');
+        return;
+      }
       this.copiedIndex.set(index);
-      setTimeout(() => this.copiedIndex.set(null), 1500);
+      // Only clear if nothing else was copied since, or copying a second answer inside the window
+      // would have the first one's timer wipe the tick off the second.
+      setTimeout(() => { if (this.copiedIndex() === index) this.copiedIndex.set(null); }, 1500);
     });
   }
 
   /**
    * Drops the last exchange and asks again. The failed or unwanted reply is removed first so
    * the model is not handed its own bad answer as context for the retry.
+   *
+   * Nothing is committed until the send is known to be going ahead. The shortened transcript used
+   * to be written first and send()'s guards ran afterwards, so a retry send() then refused took
+   * the question with it: with no agent selected -- which is precisely what loadAgents leaves
+   * behind when nothing is usable, since the auto-select only runs over a non-empty list -- the
+   * reader pressed Retry and the sentence they wanted asked again vanished, held nowhere else.
    */
   retry(): void {
-    if (this.sending()) return;
     const history = [...this.messages()];
     while (history.length && history[history.length - 1].role !== 'user') history.pop();
     const last = history.pop();
-    if (!last) return;
+    const message = (last?.text ?? '').trim();
+    if (this.cannotSend(message)) return;
     this.messages.set(history);
-    this.send(last.text);
+    this.send(message);
   }
 
   private readonly scroller = viewChild<ElementRef<HTMLElement>>('scroller');
+  private readonly composer = viewChild<ElementRef<HTMLTextAreaElement>>('composer');
+
+  /**
+   * Focus goes back to the message box after a send, so the next question can simply be typed.
+   *
+   * It only ever moves when the send came from somewhere else -- a suggestion chip, or the Send
+   * button, which disables itself the moment the draft is cleared and drops focus to the document
+   * body when it does. A keyboard or screen-reader user was then outside the conversation with no
+   * indication of where they were, and had to tab back in past the whole panel.
+   */
+  private focusComposer(): void {
+    // Moved now rather than from a queued callback: the box is already on screen, and taking
+    // focus before the next render means the Send button disabling itself under the pointer is
+    // no longer the thing that decides where focus ends up.
+    this.composer()?.nativeElement.focus();
+  }
 
   readonly suggestions = [
     'Summarise this file',
@@ -317,20 +444,48 @@ export class FileChat implements OnInit {
     });
   }
 
-  send(text?: string): void {
-    const message = (text ?? this.draft()).trim();
-    if (!message || this.sending()) return;
+  /**
+   * Why a question cannot be put to an agent right now, reported to the reader once.
+   *
+   * Separate from send() so retry() can ask BEFORE it edits the transcript instead of finding out
+   * from inside send(), after the question it was about to re-ask has already been deleted.
+   */
+  private cannotSend(message: string): boolean {
+    if (!message || this.sending()) return true;
     if (this.agentId() === null) {
       this.toast.error('Choose an agent first.');
-      return;
+      return true;
     }
+    return false;
+  }
+
+  send(text?: string): void {
+    const message = (text ?? this.draft()).trim();
+    if (this.cannotSend(message)) return;
+
+    // Only the recent turns are sent -- the file itself dominates the context window. Built
+    // BEFORE the new question is appended below, so the question travels once, in the request's
+    // own message field, rather than also arriving as the last history turn.
+    //
+    // The field is text, not content: FileChatHistoryItemDto carries role and text and is
+    // annotated to ignore unknown properties, so a differently-named field is discarded by
+    // Jackson without a word and every turn deserializes with a null text. appendHistory then
+    // writes its "Recent conversation so far:" header and skips every turn under it, leaving the
+    // model a dangling header and no conversation at all -- so "expand on the second one" had
+    // nothing to refer back to.
+    //
+    // Error turns are dropped because they are this panel's own text, not the person's:
+    // "Stopped." and "The AI didn't respond: ..." are written here, and appendHistory labels
+    // every non-assistant role "User", so they would be replayed to the model as things the user
+    // actually said. This mirrors what the legacy Object Browser chat has always sent.
+    const history = this.messages()
+      .filter(m => m.role === 'user' || m.role === 'assistant')
+      .slice(-8)
+      .map(m => ({ role: m.role, text: m.text }));
 
     this.messages.update(list => [...list, { role: 'user', text: message, at: Date.now() }]);
     this.draft.set('');
     this.sending.set(true);
-
-    // Only the recent turns are sent -- the file itself dominates the context window.
-    const history = this.messages().slice(-8).map(m => ({ role: m.role, content: m.text }));
 
     this.inFlight = this.http.post<ApiResponse<string>>(`${API_BASE}/fileChat.json/sendMessage`, {
       bucket: this.bucket(), key: this.fileKey(), aiAgentId: this.agentId(), message, history,
@@ -360,6 +515,8 @@ export class FileChat implements OnInit {
             at: Date.now() }]);
       },
     });
+
+    this.focusComposer();
   }
 
   private settle(): void {
@@ -379,8 +536,7 @@ export class FileChat implements OnInit {
    */
   stop(): void {
     if (!this.inFlight) return;
-    this.inFlight.unsubscribe();
-    this.settle();
+    this.abandonInFlight();
     this.messages.update(list => [...list, { role: 'error', text: 'Stopped.', at: Date.now() }]);
   }
 
@@ -447,6 +603,61 @@ export class FileChat implements OnInit {
         this.converting.set(null);
         this.toast.error('Could not convert this file.');
       },
+    });
+  }
+
+  /** Which file currently has an email in flight, so two cannot be sent at once. */
+  readonly emailing = signal<string | null>(null);
+
+  /**
+   * The same export, sent to an address instead of to this browser.
+   *
+   * It exists because the download is not always a way out: a reader on a locked-down machine,
+   * or one reading on a phone, can see the answer and have no way to keep it. The server does
+   * the conversion either way -- this changes only where the bytes go.
+   *
+   * The recipient is collected in the app's own dialog, NOT window.prompt: a browser prompt in
+   * the middle of a designed panel reads as a fault, and this app already owns a share dialog
+   * that asks for exactly an address and a note.
+   *
+   * No address validation beyond an obviously-incomplete check lives here. FileShareService owns
+   * the rule, the 20 MiB ceiling and the delivery, because a second copy of any of those is the
+   * one that drifts.
+   */
+  emailExport(file: ChatFile): void {
+    if (this.emailing() || this.converting()) return;
+    const pending = file.pendingExport;
+    const format = pending ? pending.targetFormat : fileExtension(file.filename);
+    this.dialog.open<ShareResult>(ShareDialog, {
+      hasBackdrop: true,
+      data: {
+        count: 1,
+        title: `Email this ${format.toUpperCase()}`,
+        subtitle: pending
+          ? `The reply is converted to .${format} and sent as an attachment.`
+          : `${file.filename} is sent as an attachment.`,
+      },
+    }).closed.subscribe(result => {
+      if (!result) return;
+      this.emailing.set(file.filename);
+      this.http.post<ApiResponse>(`${API_BASE}/fileChat.json/emailExport`, {
+        content: file.content,
+        sourceFormat: pending ? pending.sourceFormat : 'txt',
+        targetFormat: pending ? pending.targetFormat : 'pdf',
+        recipientEmail: result.recipientEmail,
+        message: result.message,
+      }).subscribe({
+        next: response => {
+          this.emailing.set(null);
+          response.status === API_SUCCESS
+            ? this.toast.success(`Sent to ${result.recipientEmail}.`)
+            : this.toast.error(response.message || 'The email could not be sent.');
+        },
+        error: err => {
+          this.emailing.set(null);
+          this.toast.error(err?.error?.message || 'The email could not be sent.');
+        },
+      });
     });
   }
 

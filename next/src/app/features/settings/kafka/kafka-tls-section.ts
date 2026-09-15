@@ -388,7 +388,7 @@ const STORE_FIELDS: Record<'truststore' | 'keystore', StoreFields> = {
           </div>
           <button type="button" class="btn btn-default btn-sm shrink-0"
                   [disabled]="slot(need.id).busy" (click)="picker.click()">
-            <app-icon name="upload" [class.spin]="slot(need.id).busy" />
+            <app-icon name="upload" [busy]="slot(need.id).busy" />
             {{ pickLabel(need) }}
           </button>
           <!-- Hidden because the native control cannot be styled and reports a path nobody needs;

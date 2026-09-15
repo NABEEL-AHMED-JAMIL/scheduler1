@@ -156,6 +156,88 @@ describe('authInterceptor', () => {
     expect(seen).toEqual(['cleared']);
   });
 
+  /*
+   * A retry is the SAME request, and the response handling above is not optional for it.
+   *
+   * The token expiring while the profile screen is open makes changeOwnPassword the call that
+   * meets the 401, so the one response that ever tells the console the debt is settled is the
+   * one that arrives on the retry. Sending the retry past the response map left the password
+   * changed on the server and passwordChangeGuard still holding the session on the profile
+   * screen, with nothing left to change that could clear it.
+   */
+  it('clears the password debt when the change succeeds on the retry after a refresh', () => {
+    const seen: string[] = [];
+    let calls = 0;
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [{
+        provide: AuthService,
+        useValue: {
+          accessToken: 'expired',
+          refresh: () => of({ status: 'SUCCESS', message: 'ok' } as ApiResponse<unknown>),
+          logout: () => undefined,
+          passwordChanged: () => seen.push('cleared'),
+        },
+      }],
+    });
+
+    TestBed.runInInjectionContext(() => authInterceptor(
+      new HttpRequest('PUT', '/api/v1/appUser.json/changeOwnPassword', {}),
+      (() => {
+        calls++;
+        return calls === 1
+          ? throwError(() => new HttpErrorResponse({ status: 401 }))
+          : of(new HttpResponse({ status: 200, body: { status: 'SUCCESS', message: 'ok' } }));
+      }) as any,
+    )).subscribe();
+
+    expect(calls).toBe(2);
+    expect(seen).toEqual(['cleared']);
+  });
+
+  /*
+   * The same point from the other end of the queue: the requests that waited on the refresh are
+   * replayed too, and a body of null reaching a caller is the crash withUsableBody was written
+   * to prevent. A refresh is exactly when a burst of calls all get their answer from a replay,
+   * so leaving the replays unmapped aimed the fix away from the moment it was needed.
+   */
+  it('gives a replayed request the same empty-body handling as a first attempt', () => {
+    const refresh$ = new Subject<ApiResponse<unknown>>();
+    let calls = 0;
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [{
+        provide: AuthService,
+        useValue: {
+          accessToken: 'expired',
+          refresh: () => refresh$,
+          logout: () => undefined,
+        },
+      }],
+    });
+
+    // The first two calls meet the expired token; everything after it answers 200 with no body.
+    const send = (url: string) => TestBed.runInInjectionContext(() => authInterceptor(
+      new HttpRequest('GET', url),
+      ((request: HttpRequest<unknown>) => {
+        calls++;
+        return calls <= 2
+          ? throwError(() => new HttpErrorResponse({ status: 401, url: request.url }))
+          : of(new HttpResponse({ status: 200, body: null }));
+      }) as any,
+    ));
+
+    const bodies: unknown[] = [];
+    // The first starts the refresh; the second queues behind it and is replayed from the queue.
+    send('/api/v1/dashboard.json/jobs').subscribe({ next: (event: any) => bodies.push(event.body) });
+    send('/api/v1/dashboard.json/tasks').subscribe({ next: (event: any) => bodies.push(event.body) });
+    refresh$.next({ status: 'SUCCESS', message: 'ok' });
+    refresh$.complete();
+
+    expect(bodies.length).toBe(2);
+    bodies.forEach(body => expect((body as { status?: string } | null)?.status).toBe('ERROR'));
+  });
+
   // The refresh worked; the endpoint behind it is simply broken. Signing out here threw away
   // whatever the person had on screen over a fault that had nothing to do with their session.
   it('keeps the session when the retried request fails for its own reasons', () => {

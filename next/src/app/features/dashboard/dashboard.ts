@@ -217,7 +217,13 @@ export class Dashboard implements OnInit {
       // Column keys are lowercase; the API and the UI both expect the capitalised status.
       queryParams['jobStatus'] = status.charAt(0).toUpperCase() + status.slice(1);
     }
-    this.router.navigate(['/jobs', row.jobId, 'history'], { queryParams });
+    // A row that does not name its job goes to the cross-job view rather than into the path as
+    // the word "undefined". Without this, a breakdown row missing its id produced
+    // /jobs/undefined/history -- a real URL that renders, reads "undefined" back out of the path
+    // and hands it to every link on the page. The paramless route already means "this hour across
+    // every job", which is the honest reading of a row that cannot say which job it is.
+    this.router.navigate(row.jobId ? ['/jobs', row.jobId, 'history'] : ['/jobs', 'history'],
+      { queryParams });
   }
 
   /**

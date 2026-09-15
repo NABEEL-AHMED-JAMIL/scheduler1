@@ -57,3 +57,50 @@ describe('Dashboard breakdown totals', () => {
     expect(totalPct).toBeCloseTo(100, 5);
   });
 });
+
+/**
+ * The word "undefined" must never reach a URL.
+ *
+ * A breakdown row whose jobId is missing produced /jobs/undefined/history -- a URL that renders
+ * perfectly well, reads the literal string "undefined" back out of the path, and then hands it to
+ * every link on that screen, which is how /jobs/undefined/runs/5524/logs came to exist. The
+ * paramless route already means "this hour, across every job", which is the honest reading of a
+ * row that cannot say which job it is.
+ */
+describe('drilling into an hour from the breakdown', () => {
+  function dashboardRecording() {
+    const navigated: unknown[][] = [];
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: DashboardService, useValue: {} },
+        { provide: HttpClient, useValue: {} },
+        { provide: ToastService, useValue: { success: () => {}, error: () => {}, info: () => {} } },
+        { provide: Router, useValue: { navigate: (path: unknown[]) => { navigated.push(path); } } },
+      ],
+    });
+    return { dashboard: TestBed.runInInjectionContext(() => new Dashboard()), navigated };
+  }
+
+  it('puts the job in the path when the row names one', () => {
+    const { dashboard, navigated } = dashboardRecording();
+    dashboard.openCount(row({ jobId: 42, jobName: 'Nightly load', completed: 3 }), 'Completed', 3);
+    expect(navigated[0]).toEqual(['/jobs', 42, 'history']);
+  });
+
+  it('falls back to the cross-job view rather than writing undefined into the path', () => {
+    const { dashboard, navigated } = dashboardRecording();
+    dashboard.openCount(
+      row({ jobId: undefined as unknown as number, jobName: 'Nightly load', completed: 3 }),
+      'Completed', 3);
+
+    expect(navigated[0]).toEqual(['/jobs', 'history']);
+    expect(JSON.stringify(navigated[0])).not.toContain('undefined');
+  });
+
+  it('still refuses to navigate on a zero count, which would land on an empty page', () => {
+    const { dashboard, navigated } = dashboardRecording();
+    dashboard.openCount(row({ jobId: 42, jobName: 'Nightly load' }), 'Completed', 0);
+    expect(navigated).toEqual([]);
+  });
+});

@@ -162,6 +162,18 @@ export class JobAssistant {
 
   constructor() {
     /*
+     * Loaded here, once, and deliberately NOT from inside the effect below.
+     *
+     * The effect used to end `if (!this.agents().length) this.loadAgents()`, which made `agents`
+     * one of its dependencies: the moment the agent request landed and set the signal, the effect
+     * ran a second time. Every page load fetched the job detail and the whole run history twice,
+     * and -- because the effect also clears them -- an answer already on screen and whatever the
+     * reader had half-typed were wiped at whichever moment that response happened to arrive. The
+     * list is the same for every job, so it does not belong in a per-job effect at all.
+     */
+    this.loadAgents();
+
+    /*
      * Reload whenever the job changes, not only on first construction.
      *
      * As a page this component was built fresh per route, so ngOnInit was enough. In the panel
@@ -176,7 +188,6 @@ export class JobAssistant {
       this.question.set('');
       this.runs.set([]);
       this.load();
-      if (!this.agents().length) this.loadAgents();
     });
   }
 
@@ -191,8 +202,10 @@ export class JobAssistant {
       { params: { jobId } }).subscribe({
       next: response => {
         if (ticket !== this.loadTicket) return;
-        if (response.status === API_SUCCESS) this.detail.set(response.data ?? null);
-        else this.error.set(response.message);
+        if (response.status === API_SUCCESS && response.data) this.detail.set(response.data);
+        // A success with no body is still nothing to show. Left as-is it rendered neither the
+        // assistant nor an error -- an empty page with no Try again on it.
+        else this.error.set(response.message || 'This job could not be read.');
         this.loading.set(false);
       },
       error: err => {
@@ -215,7 +228,9 @@ export class JobAssistant {
   ask(text: string): void {
     const facts = this.facts();
     const asked = (text ?? '').trim();
-    if (!asked || !facts) return;
+    // The Ask button disables itself while a question is in flight; Enter did not, so holding
+    // the key sent a stack of requests the shared `asking` flag could only settle once.
+    if (!asked || !facts || this.asking()) return;
 
     const scoped = classify(asked, facts.jobId);
     this.question.set('');
@@ -284,13 +299,17 @@ export class JobAssistant {
       .filter(t => !t.answer.pending)
       .slice(0, 6)
       .reverse()
-      .flatMap(t => [
-        `User: ${t.question}`,
-        `Assistant: ${t.answer.blocks
+      .map(t => ({
+        question: t.question,
+        said: t.answer.blocks
           .map(b => (b.kind === 'text' || b.kind === 'ai') ? b.text : '')
-          .filter(Boolean).join(' ')}`,
-      ])
-      .filter(line => !line.endsWith(': '));
+          .filter(Boolean).join(' '),
+      }))
+      // A turn whose answer was only a table or a chart has no prose to replay. Dropping the
+      // whole pair rather than the empty line keeps the transcript alternating -- filtering by
+      // line left the question behind it, so the model read two User turns in a row.
+      .filter(t => t.said)
+      .flatMap(t => [`User: ${t.question}`, `Assistant: ${t.said}`]);
   }
 
   askPreset(intent: Intent, question: string): void {

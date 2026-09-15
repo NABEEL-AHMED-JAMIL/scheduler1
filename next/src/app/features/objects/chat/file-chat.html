@@ -34,7 +34,17 @@
       @if (preparing()) {
         <p class="text-center text-sm text-[color:var(--text-muted)] py-8">Reading the file…</p>
       } @else if (prepareError()) {
-        <p class="text-center text-sm text-crit-500 py-8">{{ prepareError() }}</p>
+        <!-- The error is shown, but it is not an exit. When no agent matches this file's type
+             loadAgents deliberately offers every usable one and selects the first, so the agent
+             the backend would have accepted is usually sitting in the picker above; disabling the
+             composer on this error also removed the only reason to go and change it, and left the
+             reader looking at a dropdown they could see but could not act on. -->
+        <div class="text-center py-8 space-y-1">
+          <p class="text-sm text-crit-500">{{ prepareError() }}</p>
+          @if (agents().length > 1) {
+            <p class="text-xs text-[color:var(--text-muted)]">Choosing another agent above may work.</p>
+          }
+        </div>
       } @else {
         <!-- The server has always known when a file overruns what the model can read, and the
              UI has always dropped it. Someone asking "summarise this" deserves to know the
@@ -97,8 +107,13 @@
                style="background: color-mix(in oklab, var(--color-crit-500) 12%, transparent);">
             <app-icon name="alert" class="icon-crit mt-0.5 shrink-0" size="0.9em" />
             <span class="text-crit-500 min-w-0 break-words">{{ message.text }}</span>
+            <!-- Also disabled while there is nothing to send to: retry() drops the failed
+                 exchange before asking again, so a Retry that cannot go anywhere is a button
+                 offering to delete the question. -->
             <button type="button" class="btn btn-ghost btn-sm ml-auto shrink-0"
-                    [disabled]="sending()" (click)="retry()">
+                    [disabled]="sending() || preparing() || agentId() === null"
+                    [title]="agentId() === null ? 'Choose an agent first' : 'Ask again'"
+                    (click)="retry()">
               <app-icon name="refresh" />Retry
             </button>
           </div>
@@ -132,6 +147,16 @@
                               class="icon-info" size="0.85em" />
                     {{ converting() === file.filename ? 'Converting…' : file.filename }}
                   </button>
+                  <!-- The second way out. A download is no use to a reader on a machine that
+                       blocks them, or on a phone; the server converts identically either way. -->
+                  <button type="button" class="btn btn-ghost btn-sm"
+                          [disabled]="!!emailing() || !!converting()"
+                          (click)="emailExport(file)"
+                          [title]="'Email ' + file.filename + ' as an attachment'">
+                    <app-icon name="send" [busy]="emailing() === file.filename"
+                              class="icon-info" size="0.85em" />
+                    {{ emailing() === file.filename ? 'Sending…' : 'Email' }}
+                  </button>
                 }
               </div>
             }
@@ -143,8 +168,10 @@
                 {{ copiedIndex() === $index ? 'Copied' : 'Copy' }}
               </button>
               @if ($index === messages().length - 1) {
-                <button type="button" class="btn btn-default btn-sm" [disabled]="sending()"
-                        (click)="retry()" title="Ask again">
+                <button type="button" class="btn btn-default btn-sm"
+                        [disabled]="sending() || preparing() || agentId() === null"
+                        (click)="retry()"
+                        [title]="agentId() === null ? 'Choose an agent first' : 'Ask again'">
                   <app-icon name="refresh" size="0.85em" />Regenerate
                 </button>
               }
@@ -179,14 +206,17 @@
     }
 
     <div class="flex gap-2 px-3.5 py-2.5 border-t shrink-0 border-subtle">
-      <textarea class="input resize-none text-sm" rows="1" placeholder="Message"
+      <!-- Only `preparing()` disables these two. A prepare that came back with an error is not a
+           dead end -- changing agent re-runs prepare() and can clear it -- and locking the
+           composer on it took away the reason to bother. -->
+      <textarea #composer class="input resize-none text-sm" rows="1" placeholder="Message"
                 [value]="draft()" (input)="draft.set($any($event.target).value)"
                 (keydown)="onKeydown($event)"
-                [disabled]="preparing() || !!prepareError()"></textarea>
+                [disabled]="preparing()"></textarea>
       @if (voiceSupported) {
         <button type="button" class="btn btn-ghost btn-icon btn-sm self-end"
                 [class.btn-intent-crit]="listening()"
-                [disabled]="preparing() || !!prepareError()"
+                [disabled]="preparing()"
                 (click)="toggleMic()"
                 [attr.aria-label]="listening() ? 'Stop dictating' : 'Dictate a message'"
                 [title]="listening() ? 'Listening — click to stop' : 'Dictate a message'">
@@ -197,4 +227,10 @@
               [disabled]="sending() || !draft().trim()" (click)="send()">Send</button>
     </div>
   }
+
+  <!-- An answer arriving is otherwise a purely visual event: a bubble appears at the foot of a
+       scrolling list, and nothing tells a reader who is not watching the panel that the question
+       was answered at all. Outside the minimised check on purpose -- a reply that lands while the
+       panel is collapsed is exactly the one nobody can see. -->
+  <div class="sr-only" role="status" aria-live="polite" aria-atomic="true">{{ announcement() }}</div>
 </div>

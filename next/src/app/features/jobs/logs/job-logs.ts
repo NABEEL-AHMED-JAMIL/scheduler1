@@ -8,6 +8,8 @@ import { StickToBottom } from '../../../shared/ui/stick-to-bottom';
 import { Icon } from '../../../shared/ui/icon';
 import { RankedBar } from '../../../shared/charts/ranked-bar';
 import { StatusPill } from '../../../shared/ui/status-pill';
+import { JobEventsService } from '../../../core/socket/job-events.service';
+import { Subscription } from 'rxjs';
 
 interface AuditLog {
   jobAuditLogId?: number;
@@ -33,6 +35,11 @@ export class JobLogs implements OnInit, OnDestroy {
   }
 
   private readonly http = inject(HttpClient);
+  private readonly jobEvents = inject(JobEventsService);
+  private socket: Subscription | null = null;
+
+  /** True when the run's own lines are arriving over the socket rather than by polling. */
+  readonly socketLive = this.jobEvents.connected;
 
   readonly logs = signal<AuditLog[]>([]);
   readonly loading = signal(true);
@@ -73,15 +80,41 @@ export class JobLogs implements OnInit, OnDestroy {
   readonly autoRefreshing = computed(() => this.live() && this.stillRunning());
 
   constructor() {
-    // Re-arms after every load, and stops on its own once the run reaches a terminal status.
+    // Starts and stops the poll when the reader toggles Live, or when the run reaches a terminal
+    // status. It does NOT re-arm the timer between polls -- see arm().
     effect(() => {
       const on = this.autoRefreshing();
       this.clearTimer();
-      if (on) this.timer = setTimeout(() => this.refresh(), 5000);
+      if (on) this.arm();
     });
   }
 
-  ngOnDestroy(): void { this.clearTimer(); }
+  /**
+   * Schedules the next poll.
+   *
+   * This used to live in the effect above, whose comment claimed it "re-arms after every load".
+   * It did not. An effect re-runs when a signal it read reports a NEW VALUE, and the only signal
+   * it reads is autoRefreshing() -- live() && stillRunning() -- which stays true for the whole of
+   * a running job. Every load replaced run() with a fresh object, stillRunning() recomputed to
+   * the same true, the computed therefore notified nobody, and the effect never ran again. So the
+   * screen polled exactly once, five seconds after it opened, and then sat still under a badge
+   * saying Live -- which is the behaviour being reported.
+   *
+   * Re-arming from the completion of each load is what the comment always described: the next
+   * poll is scheduled when the previous one has come back, so the timer cannot stack up behind a
+   * slow response either.
+   */
+  private arm(): void {
+    this.clearTimer();
+    if (!this.autoRefreshing()) return;
+    this.timer = setTimeout(() => this.refresh(), 5000);
+  }
+
+  ngOnDestroy(): void {
+    this.clearTimer();
+    this.socket?.unsubscribe();
+    this.socket = null;
+  }
 
   private clearTimer(): void {
     if (this.timer) { clearTimeout(this.timer); this.timer = null; }
@@ -231,7 +264,42 @@ export class JobLogs implements OnInit, OnDestroy {
     return this.logs().filter(log => (log.logsDetail ?? '').toLowerCase().includes(term));
   });
 
-  ngOnInit(): void { this.load(); }
+  ngOnInit(): void {
+    this.load();
+    this.listen();
+  }
+
+  /**
+   * The server has always published every log line as it was written -- JobEventPublisher.publishLog,
+   * called from all three NotifyService write paths -- and nothing on this side ever subscribed.
+   * The screen said "live" while polling on a five-second timer, so a line could sit unseen for
+   * five seconds and a finished run kept being re-fetched until a poll happened to notice.
+   *
+   * Lines are appended as they arrive. The next poll calls logs.set with the server's own list,
+   * which replaces whatever was appended, so a line that arrives twice cannot persist as a
+   * duplicate -- the socket is an early view of the same rows, not a second source of truth.
+   */
+  private listen(): void {
+    this.socket = this.jobEvents.events.subscribe(event => {
+      if (Number(event.jobId) !== Number(this.jobId())) return;
+
+      if (event.type === 'job.log' && Number(event.jobQueueId) === Number(this.jobQueueId())) {
+        this.logs.update(list => [...list, {
+          jobId: Number(this.jobId()),
+          jobQueueId: Number(this.jobQueueId()),
+          logsDetail: event.message ?? '',
+          dateCreated: event.at ?? new Date().toISOString(),
+        }]);
+        return;
+      }
+
+      // A status push is also what tells this screen the run has ended. stillRunning() reads
+      // the run's status, so without this the poll kept re-arming against a finished run.
+      if (event.type === 'job.status' && event.jobRunningStatus) {
+        this.run.update(run => (run ? { ...run, jobStatus: event.jobRunningStatus } : run));
+      }
+    });
+  }
 
   /** `quiet` keeps the list on screen during an auto-refresh instead of blanking it. */
   load(quiet = false): void {
@@ -265,11 +333,16 @@ export class JobLogs implements OnInit, OnDestroy {
         } else {
           this.error.set(response.message);
         }
+        // The next poll is scheduled from here, when this one has actually come back.
+        this.arm();
       },
       error: err => {
         this.loading.set(false);
         this.refreshing.set(false);
         this.error.set(err?.error?.message || 'Could not load the logs.');
+        // A failed poll still re-arms: a run does not stop producing lines because one request
+        // was refused, and giving up here is how a screen goes quiet without saying so.
+        this.arm();
       },
     });
   }

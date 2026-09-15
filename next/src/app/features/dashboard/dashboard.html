@@ -162,7 +162,7 @@
                         >
                       @for (segment of segmentsFor(row); track segment.key) {
                         <span [style.width.%]="segment.pct"
-                              [style.background]="'var(--chart-' + $index % 6 + ')'"
+                              [style.background]="outcomeColor(segment.key)"
                               [title]="segment.key + ': ' + segment.count"></span>
                       }
                     </div>
@@ -216,7 +216,7 @@
                     <div class="flex h-2 rounded-full overflow-hidden bg-sunken">
                       @for (segment of segmentsFor(totals); track segment.key) {
                         <span [style.width.%]="segment.pct"
-                              [style.background]="'var(--chart-' + $index % 6 + ')'"
+                              [style.background]="outcomeColor(segment.key)"
                               [title]="segment.key + ': ' + segment.count"></span>
                       }
                     </div>

@@ -4,6 +4,7 @@ import {
 import { HttpClient } from '@angular/common/http';
 import { Router, RouterLink } from '@angular/router';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
+import { instantMs } from '../../core/instant';
 import { Icon } from '../../shared/ui/icon';
 import { notificationTarget } from '../notifications/notification-links';
 
@@ -16,6 +17,12 @@ interface Note {
   dateCreated: string;
   linkUrl?: string;
 }
+
+/** How many rows the dropdown lists before handing over to the full notifications page. */
+const PANEL_ROWS = 8;
+
+/** How many rows the dropdown fetches to pick those from. */
+const FETCH_ROWS = 20;
 
 /**
  * The bell the old app had in its header.
@@ -85,6 +92,14 @@ interface Note {
             </ul>
           }
 
+          <!-- The badge counts the whole mailbox; this panel holds eight rows. Without this line
+               a badge reading 30 over a panel showing nothing unread looks like a bug. -->
+          @if (hiddenUnread()) {
+            <p class="px-3 pt-2 text-[11px] text-center text-[color:var(--text-muted)]">
+              {{ hiddenUnread() }} more unread not shown here.
+            </p>
+          }
+
           <a routerLink="/notifications" (click)="open.set(false)"
              class="block px-3 py-2 text-sm text-center border-t text-accent hover:underline border-subtle"
             >
@@ -102,8 +117,38 @@ export class NotificationBell implements OnInit, OnDestroy {
 
   readonly open = signal(false);
   readonly items = signal<Note[]>([]);
-  readonly unread = computed(() => this.items().filter(n => !n.read).length);
-  readonly recent = computed(() => this.items().slice(0, 8));
+
+  /**
+   * The badge, as the server counts it.
+   *
+   * This used to be a tally of the unread rows among the twenty this component fetches, so a
+   * user with more than twenty unread saw a badge that stopped at twenty and disagreed with the
+   * dashboard tile -- which reads the endpoint below. Same number, same source, one truth.
+   */
+  readonly unread = signal(0);
+
+  /**
+   * What the panel lists: unread first, then the newest read rows to fill the space.
+   *
+   * Taking the newest eight whatever their state meant the badge and the panel could describe
+   * different sets -- unread items that were not among the eight newest left the badge lit over
+   * a panel with nothing unread in it, which reads as a broken badge. Both groups keep the
+   * dateCreated-desc order the endpoint returns them in.
+   */
+  readonly recent = computed(() => {
+    const rows = this.items();
+    return rows.filter(note => !note.read)
+      .concat(rows.filter(note => note.read))
+      .slice(0, PANEL_ROWS);
+  });
+
+  /**
+   * Unread notifications the badge counts that the panel has no room to show -- older than the
+   * fetched window, or past PANEL_ROWS. Said out loud rather than left as a silent gap, so the
+   * badge's number is always accounted for by something on screen.
+   */
+  readonly hiddenUnread = computed(() =>
+    Math.max(0, this.unread() - this.recent().filter(note => !note.read).length));
 
   private timer: any = null;
 
@@ -140,8 +185,16 @@ export class NotificationBell implements OnInit, OnDestroy {
   }
 
   private load(): void {
+    // The count comes from the server rather than from the rows below, because the rows below are
+    // one small window onto the mailbox and the badge is a statement about all of it.
+    this.http.get<ApiResponse<number>>(`${API_BASE}/notification.json/unreadCount`).subscribe({
+      next: response => {
+        if (response.status === API_SUCCESS) this.unread.set(Number(response.data ?? 0));
+      },
+      error: () => {},
+    });
     this.http.get<ApiResponse<any>>(`${API_BASE}/notification.json/list`,
-      { params: { page: '1', limit: '20' } }).subscribe({
+      { params: { page: '1', limit: String(FETCH_ROWS) } }).subscribe({
       next: response => {
         if (response.status !== API_SUCCESS) return;
         const data = response.data as any;
@@ -157,8 +210,13 @@ export class NotificationBell implements OnInit, OnDestroy {
     if (!note.read) {
       this.http.post<ApiResponse>(`${API_BASE}/notification.json/markRead/${note.notificationId}`, null)
         .subscribe({
-          next: () => this.items.update(list =>
-            list.map(n => (n.notificationId === note.notificationId ? { ...n, read: true } : n))),
+          next: () => {
+            this.items.update(list =>
+              list.map(n => (n.notificationId === note.notificationId ? { ...n, read: true } : n)));
+            // The badge is the server's number now, so it no longer falls on its own when a row
+            // flips to read; it has to be moved here or it stays put until the next poll.
+            this.unread.update(count => Math.max(0, count - 1));
+          },
           error: () => {},
         });
     }
@@ -168,7 +226,10 @@ export class NotificationBell implements OnInit, OnDestroy {
 
   markAllRead(): void {
     this.http.post<ApiResponse>(`${API_BASE}/notification.json/markAllRead`, null).subscribe({
-      next: () => this.items.update(list => list.map(n => ({ ...n, read: true }))),
+      next: () => {
+        this.items.update(list => list.map(n => ({ ...n, read: true })));
+        this.unread.set(0);
+      },
       error: () => {},
     });
   }
@@ -193,9 +254,17 @@ export class NotificationBell implements OnInit, OnDestroy {
     }
   }
 
-  ago(iso: string): string {
-    const then = new Date(iso).getTime();
-    if (!Number.isFinite(then)) return '';
+  /**
+   * How long ago a notification arrived.
+   *
+   * Through instantMs, not new Date(). dateCreated is a Java LocalDateTime and carries no offset,
+   * so new Date() read the server's wall clock as the reader's own: a notification a minute old
+   * showed as "5h ago" -- or as a time in the future -- for anyone outside the server's zone,
+   * and the bell is exactly where a stale-looking timestamp is most alarming. See core/instant.ts.
+   */
+  ago(text: string): string {
+    const then = instantMs(text);
+    if (then === null) return '';
     const mins = Math.round((Date.now() - then) / 60000);
     if (mins < 1) return 'just now';
     if (mins < 60) return `${mins}m ago`;

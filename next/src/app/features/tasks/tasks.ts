@@ -109,9 +109,17 @@ export class Tasks implements OnInit {
       return;
     }
     this.linkedLoading.set(task.taskDetailId);
+    // LIST_LIMIT, because this endpoint now really pages. It accepted `page` and `limit` and
+    // ignored both, so posting neither returned every linked job by accident; it honours them
+    // now, and PagingUtil defaults an ABSENT limit to ten. Without this the expander would have
+    // silently shown 10 of N -- the third time that default has cost this application a screen,
+    // after the Tasks list and the job editor's task dropdown. See core/api/list-limit.ts.
     this.http.post<ApiResponse<LinkedJob[]>>(
       `${API_BASE}/sourceTask.json/fetchAllLinkJobsWithSourceTaskId`, {},
-      { params: { sourceTaskId: String(task.taskDetailId) } }).subscribe({
+      { params: {
+        sourceTaskId: String(task.taskDetailId),
+        limit: String(LIST_LIMIT),
+      } }).subscribe({
       next: response => {
         this.linkedLoading.set(null);
         if (response.status === API_SUCCESS) {
@@ -180,10 +188,25 @@ export class Tasks implements OnInit {
     });
   }
 
+  /**
+   * The tick has to mean the clipboard actually changed.
+   *
+   * copyText returns whether the copy happened, and it genuinely fails: a deployment served over
+   * plain HTTP has no Clipboard API, an unfocused document is refused by the browser, and the
+   * legacy execCommand fallback can be refused too. Showing "Copied" regardless sent people off to
+   * paste a task payload into a ticket or a config file and paste whatever was on the clipboard
+   * before instead -- silently the wrong JSON, with nothing on screen having suggested a problem.
+   */
   copyPayload(task: SourceTask): void {
-    copyText(task.taskPayload ?? '').then(() => {
+    copyText(task.taskPayload ?? '').then(copied => {
+      if (!copied) {
+        this.toast.error('Could not copy the payload. Select it in the panel and copy it by hand.');
+        return;
+      }
       this.copiedId.set(task.taskDetailId);
-      setTimeout(() => this.copiedId.set(null), 1500);
+      // Only clear the tick if this is still the row that was copied, or a slow copy landing late
+      // would wipe the tick off a second, faster one.
+      setTimeout(() => { if (this.copiedId() === task.taskDetailId) this.copiedId.set(null); }, 1500);
     });
   }
 

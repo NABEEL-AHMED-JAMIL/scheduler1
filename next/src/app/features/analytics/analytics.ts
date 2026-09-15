@@ -1,11 +1,12 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Dialog } from '@angular/cdk/dialog';
+import { forkJoin, of } from 'rxjs';
 import { API_SUCCESS } from '../../core/api/api.config';
 import { Icon } from '../../shared/ui/icon';
 import { TableShell } from '../../shared/ui/data-table';
 import { confirmWith } from '../../shared/ui/confirm';
 import { formatSize } from '../../shared/ui/format-size';
-import { compactNumber } from '../../shared/charts/number-format';
+import { compactNumber, readableCell } from '../../shared/charts/number-format';
 import { BarChart } from '../../shared/charts/bar-chart';
 import { Donut } from '../../shared/charts/donut';
 import { Histogram } from '../../shared/charts/histogram';
@@ -22,7 +23,8 @@ import {
 } from './filter-builder';
 import {
   Aggregation, AnalysisColumn, AnalysisCrumb, AnalysisRequest, AnalysisResult, AnalyticsService,
-  ColumnProfile, DatasetColumn, DatasetPreview, DatasetProfile, Drill, ExportFile, FilterClause,
+  ColumnProfile, Dashboard, DatasetColumn, DatasetPreview, DatasetProfile, Drill, ExportFile,
+  FilterClause,
   FilterGroup, FilterNode, Grain, PreviewShape, QueryResult, QueryRun, RegisteredDataset,
   SavedAnalysis,
   isFilterGroup,
@@ -359,6 +361,20 @@ export interface ChartPoint {
   name: string;
   value: number;
   rows: number;
+  /**
+   * The RAW value behind this mark, for a click that narrows the analysis.
+   *
+   * `name` is what the chart draws -- dates shortened, decimals trimmed, a null written as
+   * "(null)" -- and none of that is a filter operand. Clicking used to send the drawn label
+   * straight into an `EQ`, so a Top-N roll-up asked for `sub_category = 'Other'`, a value the
+   * data does not contain, and the analysis emptied itself while looking like an ordinary
+   * cross-filter.
+   *
+   * Undefined means this mark cannot be narrowed on at all; `inert` is the same fact under the
+   * name the shared chart components read, since they know nothing about filters.
+   */
+  operand?: string | null;
+  inert?: boolean;
 }
 
 /**
@@ -429,6 +445,33 @@ const ADDITIVE: Aggregation[] = ['COUNT_ROWS', 'COUNT_NON_NULL', 'SUM'];
 
 /** 07's three named Top-N sizes. A fourth, custom, is typed rather than picked. */
 const TOP_N_CHOICES = [10, 25, 50];
+
+/**
+ * The analysis that produced the result on screen, as it was at the moment it was sent.
+ *
+ * <b>The Canvas describes its figures, and a description read off a live picker describes a
+ * different analysis the moment the picker moves.</b> Every sentence around the result -- how many
+ * groups and whether they are all of them, whether a row has a total, whether a distinct count is
+ * exact, what the heading calls the measure -- is a claim ABOUT THESE ROWS, and the rows do not
+ * change when a control does. Two measured examples of the drift this holds still:
+ *
+ *   Top-N 25, run, then click "All" without running. The same twenty-five rows were relabelled
+ *   "25 groups — every group that matched", which is a partial answer presented as the complete
+ *   one -- the exact claim the whole tab is written never to make.
+ *
+ *   A two-dimension pivot of AVERAGE, run, then the Measure picker moved to Sum. The grid grew a
+ *   Total column of sums of averages and the note saying averages do not add up disappeared,
+ *   while every cell in it was still an average.
+ *
+ * Held as one object rather than a signal per field because it is one fact -- what ran -- and a
+ * field left out of the snapshot is a field that silently keeps drifting.
+ */
+export interface AnalysedAnalysis {
+  filters: FilterGroup;
+  aggregation: Aggregation;
+  field: string;
+  topN: { limit: number; includeOther: boolean } | null;
+}
 
 /** How the analysis result is drawn. 'table' is always available; the rest have conditions. */
 export type CanvasKind = 'table' | 'pivot' | 'ranked' | 'bar' | 'donut';
@@ -958,18 +1001,39 @@ export class Analytics implements OnInit {
     this.browse();
   }
 
+  /**
+   * Which folder listing is the current one.
+   *
+   * A reader walking down a tree clicks faster than a bucket answers, and listObjects has no
+   * ordering guarantee: the listing for the folder they left can arrive after the listing for the
+   * folder they are in, and the last response to land wins. That leaves the rail showing the
+   * contents of a folder nobody is looking at, under the crumbs of the folder they opened -- so a
+   * file they can see is not in the folder the header names, and clicking it opens a path that
+   * does not exist.
+   *
+   * A counter rather than an in-flight subscription to unsubscribe from, because the two are not
+   * the same guarantee: cancelling the HTTP call still races with a response already decoded, and
+   * this compares what came back against what is wanted now.
+   */
+  private browseEpoch = 0;
+
   private browse(): void {
     const connection = this.connection();
     if (!connection) return;
     this.browsing.set(true);
     this.browseError.set('');
+    const epoch = ++this.browseEpoch;
     this.storage.listObjects(connection, this.prefix()).subscribe({
       next: response => {
+        // A listing for a folder that has since been left. Dropped whole -- including the
+        // spinner, which belongs to the request that is still out.
+        if (epoch !== this.browseEpoch) return;
         this.browsing.set(false);
         if (response.status !== API_SUCCESS) { this.browseError.set(response.message); return; }
         this.entries.set(response.data?.objects ?? []);
       },
       error: err => {
+        if (epoch !== this.browseEpoch) return;
         this.browsing.set(false);
         this.browseError.set(err?.error?.message || 'Could not list this folder.');
       },
@@ -1006,8 +1070,39 @@ export class Analytics implements OnInit {
     return [...seen].sort();
   });
 
+  /**
+   * Which dataset the schema on screen is supposed to belong to.
+   *
+   * The same guard browseEpoch carries, one level down and with worse consequences. Opening a
+   * second file while the first is still being read is ordinary -- a large Parquet footer takes
+   * longer than a small CSV -- and nothing made the responses arrive in the order they were
+   * asked for. The superseded schema then overwrote columns(), format() and multiFile(), so the
+   * workspace listed the columns of a dataset that is no longer open: every picker on the Canvas,
+   * the SQL editor's completions and the grid's column list all described a file the header was
+   * not naming, and a request built from any of them was refused by a server that could see the
+   * mismatch the screen could not.
+   */
+  private schemaEpoch = 0;
+
+  /**
+   * Which PAGE request is the current one, which is a different race from the schema's.
+   *
+   * The schema guard stops a superseded DESCRIBE from relabelling the columns; it does nothing
+   * about the rows. Two page requests are in flight whenever a reader turns a page, changes a
+   * sort or a filter, or opens a second file before the first has finished -- and the preview
+   * endpoint has no more ordering guarantee than listObjects does, so the slower one can land
+   * last and leave the grid holding rows nobody asked for under a pager and a total that were
+   * counted for the other request.
+   *
+   * Bumped by load() as well, so a page fetched for the file being closed is dropped rather than
+   * written into the dataset that has just been opened.
+   */
+  private pageEpoch = 0;
+
   private load(path: string): void {
     this.path.set(path);
+    // Anything already in flight for the previous dataset is now superseded, rows included.
+    this.pageEpoch++;
     this.tab.set('overview');
     this.loading.set(true);
     this.error.set('');
@@ -1032,8 +1127,13 @@ export class Analytics implements OnInit {
     this.clearGridState();
 
     const connection = this.connection();
+    const epoch = ++this.schemaEpoch;
     this.analytics.schema(connection, path).subscribe({
       next: response => {
+        // The schema of a dataset that has since been closed. Dropped entirely rather than
+        // applied to the one that is open -- including the error, which would otherwise report
+        // the previous file's failure over the current file's rows.
+        if (epoch !== this.schemaEpoch) return;
         if (response.status !== API_SUCCESS || !response.data) {
           this.loading.set(false);
           // The server's message is written for a reader, so it is shown rather than replaced.
@@ -1046,6 +1146,7 @@ export class Analytics implements OnInit {
         this.loadPage(0);
       },
       error: err => {
+        if (epoch !== this.schemaEpoch) return;
         this.loading.set(false);
         this.error.set(err?.error?.message || 'The dataset could not be read.');
       },
@@ -1092,6 +1193,7 @@ export class Analytics implements OnInit {
     // back. Stamping it here would mark the tab fresh on a request that failed, leaving the
     // reader on the old rows with nothing willing to fetch the new ones.
     const inheritedKey = JSON.stringify(this.inheritedDataFilters());
+    const epoch = ++this.pageEpoch;
     const search = this.gridSearch().trim();
     // What THIS request narrows by, which is not what the carried total was counted under.
     const narrowing = !!search || filters.length > 0;
@@ -1105,6 +1207,10 @@ export class Analytics implements OnInit {
     };
     this.analytics.preview(this.connection(), path, page, knownTotal, undefined, shape).subscribe({
       next: response => {
+        // A page for a request that has since been replaced -- another page, another narrowing,
+        // or another dataset. Dropped whole, the spinner with it: the request that superseded
+        // this one is still out, and clearing its spinner here would say the rows had arrived.
+        if (epoch !== this.pageEpoch) return;
         this.loading.set(false);
         if (response.status !== API_SUCCESS || !response.data) {
           this.error.set(response.message);
@@ -1127,6 +1233,7 @@ export class Analytics implements OnInit {
         if (!filtered) this.datasetRows.set(response.data.totalRows);
       },
       error: err => {
+        if (epoch !== this.pageEpoch) return;
         this.loading.set(false);
         this.error.set(err?.error?.message || 'The dataset could not be read.');
       },
@@ -1953,6 +2060,21 @@ export class Analytics implements OnInit {
     return here ? '' : `${query.connectionAlias}/${query.datasetPath}`;
   });
 
+  /**
+   * Whether the statement asks for the second dataset while no second dataset is picked.
+   *
+   * Said before the save rather than after it. A query naming `dataset2` with no second file
+   * selected is storable and unrunnable, and the reader finds out on a later visit -- or worse,
+   * a colleague does, from a dashboard tile showing a DuckDB catalog error about a view they
+   * never created. The engine now refuses that run in words; this is the same fact one step
+   * earlier, where it is still cheap to fix.
+   *
+   * Matched as a whole word for the reason the engine's own check is: `dataset2_id` is a column
+   * name, not a request for the view.
+   */
+  readonly joinWithoutSecond = computed(() =>
+    !this.secondPath() && /\bdataset2\b/i.test(this.sql()));
+
   /** Fills an empty console with something runnable, rather than leaving a blank page. */
   useStarter(): void {
     this.sql.set(STARTER_SQL);
@@ -2582,6 +2704,16 @@ export class Analytics implements OnInit {
    */
   readonly chartNumber = (value: number): string => this.number(value);
 
+  /**
+   * A figure written for reading, for the pivot's row totals.
+   *
+   * Named apart from `readable(key)` above, which answers a different question entirely -- whether
+   * a file can be opened. The totals used to go through a bare toLocaleString, whose ECMA-402
+   * default is three fraction digits, so they rounded silently in a cell with no title to read
+   * the exact number from.
+   */
+  readonly readableFigure = (value: number): string => readableCell(String(value));
+
   // ---- the library ---------------------------------------------------------------------
 
   private openLibrary(): void {
@@ -2650,10 +2782,32 @@ export class Analytics implements OnInit {
       queryName: this.saveName().trim(),
       connectionAlias: this.connection(),
       datasetPath: this.path(),
+      ...this.secondDataset(),
       // Exactly as typed. The row ceiling belongs to the engine's configuration on the day it
       // runs, so a saved query must not carry a tidied or rewritten copy of itself.
       queryText: this.sql(),
     });
+  }
+
+  /**
+   * The second dataset as the save payload wants it, or nothing at all.
+   *
+   * Spread into both save paths so the two cannot drift, which is exactly how this went wrong:
+   * run(), preview() and downloadResult() each carried the second dataset and the two SAVE calls
+   * did not, so a join ran perfectly and was stored as half of itself. The reader found out later
+   * and somewhere else -- reopening the query registered no `dataset2` and the engine answered
+   * with a catalog error about a view they had never heard of.
+   *
+   * The connection is the FIRST dataset's, which is not an oversight: the picker offers a second
+   * file within the connection already open, and copyTo refuses a target on any other connection
+   * for the same reason. Written here rather than inferred at save time so the pairing is visible
+   * in one place.
+   */
+  private secondDataset(): Pick<SavedQuery, 'secondConnectionAlias' | 'secondDatasetPath'> {
+    const second = this.secondPath();
+    return second
+      ? { secondConnectionAlias: this.connection(), secondDatasetPath: second }
+      : {};
   }
 
   /**
@@ -2671,6 +2825,7 @@ export class Analytics implements OnInit {
       queryName: this.saveName().trim() || loaded.queryName,
       connectionAlias: this.connection(),
       datasetPath: this.path(),
+      ...this.secondDataset(),
       queryText: this.sql(),
     });
   }
@@ -2705,11 +2860,23 @@ export class Analytics implements OnInit {
    * dataset it runs against is whatever is open -- which is the behaviour that lets one query be
    * pointed at this month's file. Where those disagree, loadedElsewhere says so on screen rather
    * than this quietly reopening a file the reader did not ask for.
+   *
+   * <b>The SECOND dataset is restored, and the asymmetry with the first is deliberate.</b> The
+   * first is a file the reader chose and can see in the picker; the second is named only inside
+   * the statement, as `dataset2`, so leaving it alone does not mean "keep what is open" -- it
+   * means the join silently reads whatever second file happened to be selected, or fails on a
+   * view that was never registered. Of the two, the first is the one that returns a WRONG answer
+   * rather than an error, which is why this is the one place the rule above does not apply.
    */
   loadSaved(query: SavedQuery): void {
     this.sql.set(query.queryText ?? '');
     this.saveName.set(query.queryName ?? '');
     this.loadedQuery.set(query);
+    if (query.secondDatasetPath) {
+      this.pickSecond(query.secondDatasetPath);
+    } else {
+      this.secondPath.set('');
+    }
     this.clearResult();
     this.saveError.set('');
   }
@@ -2960,8 +3127,48 @@ export class Analytics implements OnInit {
   readonly drillNext = signal('');
 
   readonly analyses = signal<SavedAnalysis[]>([]);
+
+  /**
+   * How many saved analyses the library shows before it is asked for more.
+   *
+   * It showed all of them, and on this workspace that is 135 rows of about 50px -- a 6,799px
+   * panel that made the whole Canvas tab 7,900px, nearly nine screenfuls, with the analysis
+   * result stranded above it. A library is something a reader searches, not something they
+   * scroll; the same bargain the jobs screen already makes with its Recent runs strip.
+   */
+  private static readonly LIBRARY_PREVIEW = 8;
+
+  readonly librarySearch = signal('');
+  readonly libraryShowAll = signal(false);
+
+  /** The saved analyses that match the search, newest first as the server returns them. */
+  readonly libraryMatches = computed(() => {
+    const term = this.librarySearch().trim().toLowerCase();
+    if (!term) return this.analyses();
+    return this.analyses().filter(saved =>
+      (saved.analysisName ?? '').toLowerCase().includes(term)
+      || (saved.datasetPath ?? '').toLowerCase().includes(term));
+  });
+
+  /** What the list actually draws: the first few, or everything once asked. */
+  readonly libraryVisible = computed(() =>
+    this.libraryShowAll()
+      ? this.libraryMatches()
+      : this.libraryMatches().slice(0, Analytics.LIBRARY_PREVIEW));
+
+  readonly libraryHidden = computed(() =>
+    Math.max(0, this.libraryMatches().length - this.libraryVisible().length));
   readonly analysesLoading = signal(false);
   readonly analysesError = signal('');
+
+  /**
+   * What the server reported about a delete that SUCCEEDED, in its own words.
+   *
+   * Apart from analysesError because it is not a failure, and a sentence a reader has to decide is
+   * good news or bad news is a sentence in the wrong colour. It carries the one fact nothing on
+   * this side can work out -- how many dashboard tiles the cascade took with the row.
+   */
+  readonly analysesNotice = signal('');
   /**
    * Why the last reopen failed, held apart from analysesError.
    *
@@ -2997,11 +3204,71 @@ export class Analytics implements OnInit {
     return picked.length < this.maxDimensions ? [...picked, ''] : picked;
   });
 
-  /** Columns still available for a given slot: everything not already used by another slot. */
-  dimensionOptions(slot: number): DatasetColumn[] {
+  /**
+   * Columns still available for a given slot: everything not already used by another slot.
+   *
+   * <b>Plus the name this slot already holds, inert, when the open dataset has no such column.</b>
+   * Reopening a saved analysis restores its dimensions without checking them against columns(),
+   * which is right -- the request still carries them, and running it against a file that does
+   * have them is what a saved analysis is for. What was wrong is that no option matched, so the
+   * select rendered with nothing selected: the screen said "no grouping" while the request said
+   * dimensions: ['region'], and the Bucket picker vanished beside it because isTemporal is false
+   * for a column that is not in columns(). A control has to show what will be sent, even when
+   * what will be sent is going to be refused.
+   *
+   * Listed and inert with the reason on it, which is the treatment an unreadable connection and a
+   * chart kind that cannot draw this result already get.
+   */
+  dimensionOptions(slot: number): { name: string; type: string; missing: boolean }[] {
     const taken = new Set(this.dimensions().filter((_, at) => at !== slot));
-    return this.columns().filter(column => !taken.has(column.name));
+    const options = this.columns()
+      .filter(column => !taken.has(column.name))
+      .map(column => ({ name: column.name, type: column.type, missing: false }));
+    const picked = this.dimensions()[slot] ?? '';
+    if (picked && !options.some(option => option.name === picked)) {
+      options.unshift({ name: picked, type: '', missing: true });
+    }
+    return options;
   }
+
+  /**
+   * The measure column picker's options, under the same rule as dimensionOptions.
+   *
+   * The measure survives a reopen exactly as the dimensions do, so it goes blank exactly as they
+   * did -- the select read "choose a column…" while the request carried amount, and the Run
+   * control was enabled because measureField() is not empty. A blank picker over a non-empty
+   * request is the one state that cannot be reasoned about from the screen.
+   */
+  measureFieldOptions(): { name: string; type: string; missing: boolean }[] {
+    const options = this.columns()
+      .map(column => ({ name: column.name, type: column.type, missing: false }));
+    const picked = this.measureField();
+    if (picked && !options.some(option => option.name === picked)) {
+      options.unshift({ name: picked, type: '', missing: true });
+    }
+    return options;
+  }
+
+  /**
+   * Fields the analysis on screen names that the open dataset does not have.
+   *
+   * Reported rather than left for the server to refuse one at a time. The pickers now SHOW these
+   * names, which is the first half; this is the sentence that says why they are struck out and
+   * what will happen on Run, so the reader is not left to read a column-not-found message and
+   * work backwards to which control it came from.
+   *
+   * Gated on a loaded analysis and on a schema having arrived. Every other path through this
+   * screen clears the canvas when a file is opened, so a dimension that is not a column can only
+   * have come from a reopen -- and an empty columns() means the schema is still in flight, where
+   * "not a column of this dataset" would be a claim nothing has checked.
+   */
+  readonly analysisFieldsMissing = computed<string[]>(() => {
+    if (!this.loadedAnalysis() || !this.columns().length) return [];
+    const have = new Set(this.columns().map(column => column.name));
+    const named = [...this.dimensions()];
+    if (this.measureNeedsField() && this.measureField()) named.push(this.measureField());
+    return named.filter(name => !have.has(name));
+  });
 
   /**
    * Sets, replaces or clears one dimension slot.
@@ -3035,9 +3302,45 @@ export class Analytics implements OnInit {
    */
   readonly groupedBy = signal<string[]>([]);
 
+  /**
+   * Whether groupedBy() is an ANSWER or merely empty, which are two different states.
+   *
+   * A drill with nothing in "then by" DROPS the dimension it went through rather than replacing
+   * it, so the server legitimately answers "grouped by nothing at all" -- and an empty list read
+   * as "nothing has answered yet" falls back to the root, which is a column the analysis is no
+   * longer grouped by. The drill picker built on that offers it, the server refuses it by name,
+   * and the control looks broken rather than inapplicable.
+   *
+   * Beside groupedBy rather than folded into it as a nullable list: every reader of groupedBy
+   * wants a list, and one of them wanting a tri-state is not a reason to make all of them check.
+   * The two are written together in every place either is written.
+   */
+  private readonly groupingAnswered = signal(false);
+
+  /**
+   * Adopts the grouping an answer reported, which is the only thing allowed to set it.
+   *
+   * A pair rather than two loose writes because the pair is the invariant: groupedBy() on its own
+   * cannot say the difference between "the server answered, and it is grouped by nothing" and
+   * "nothing has answered yet", and those two fall back to opposite things. Writing one without
+   * the other left groupingAnswered permanently false -- effectiveDimensions then answered with
+   * the ROOT for every reader, so after a drill the Drill picker offered the column the analysis
+   * had just stopped being grouped by and the server refused it by name.
+   */
+  private adoptGrouping(dimensions: string[]): void {
+    this.groupedBy.set(dimensions);
+    this.groupingAnswered.set(true);
+  }
+
+  /** Forgets it again, wherever the analysis it described has stopped existing. */
+  private forgetGrouping(): void {
+    this.groupedBy.set([]);
+    this.groupingAnswered.set(false);
+  }
+
   /** What is on screen: the server's grouping where there is one, the root before the first run. */
   readonly effectiveDimensions = computed(() =>
-    this.groupedBy().length ? this.groupedBy() : this.dimensions());
+    this.groupingAnswered() ? this.groupedBy() : this.dimensions());
 
   setDimension(slot: number, name: string): void {
     const next = [...this.dimensions()];
@@ -3058,7 +3361,7 @@ export class Analytics implements OnInit {
     this.dimensions.set(next.slice(0, this.maxDimensions));
     this.dimensionGrains.set(grains.slice(0, this.maxDimensions));
     // The reported grouping described the analysis that just stopped existing.
-    this.groupedBy.set([]);
+    this.forgetGrouping();
     this.clearDrills();
     // The drill controls name columns; a dimension list that changed may have taken one away.
     if (!next.includes(this.drillDimension())) this.drillDimension.set(next[next.length - 1] ?? '');
@@ -3088,7 +3391,7 @@ export class Analytics implements OnInit {
     while (grains.length < this.dimensions().length) grains.push(null);
     grains[slot] = (grain || null) as Grain | null;
     this.dimensionGrains.set(grains);
-    this.groupedBy.set([]);
+    this.forgetGrouping();
     this.clearDrills();
   }
 
@@ -3313,12 +3616,20 @@ export class Analytics implements OnInit {
    * A NULL value is passed through as null rather than skipped. The group with no value in it is
    * a group a reader can see rows in, and the server narrows it with IS NULL; turning it into an
    * empty string here would drill into a value the data does not contain.
+   *
+   * UNDEFINED is the opposite of that and is refused. It means the row could not name a value for
+   * the drill dimension, and the one thing it must never do is collapse into null -- which would
+   * quietly drill into the no-value group instead of into the row that was clicked.
    */
-  drillInto(value: string | null): void {
+  drillInto(value: string | null | undefined): void {
+    if (value === undefined) return;
     const dimension = this.drillDimension();
     // Against the EFFECTIVE grouping: a reader drills through the column in front of them, which
     // after one step is no longer in the root list.
     if (!dimension || !this.effectiveDimensions().includes(dimension) || this.analysing()) return;
+    // The control is already withheld where this is non-empty. Locked on this side as well,
+    // because the button governs the mouse and this governs what the code does with the event --
+    // the same two doors pickConnection locks against an unreadable connection.
     const runId = 'ui-' + Date.now().toString(36) + '-'
       + Math.random().toString(36).slice(2, 8);
     this.beginAnalysis(runId);
@@ -3371,16 +3682,61 @@ export class Analytics implements OnInit {
     !!this.drillPath().length && !this.crumbTrail().length);
 
   /**
-   * The filter group the last analysis actually ran with, or null before any has run.
+   * What the last analysis actually ran with, or null before any has run.
    *
    * Set in beginAnalysis rather than in each of the three callers, because that is the single
    * point run, drill and drill-up all pass through -- and a fourth run path added later gets
-   * this for free instead of quietly inheriting a stale narrowing.
+   * this for free instead of quietly inheriting a stale narrowing. See AnalysedAnalysis for why
+   * the figure's own sentences are read from here and not from the controls above it.
    */
-  readonly analysedFilters = signal<FilterGroup | null>(null);
+  readonly analysed = signal<AnalysedAnalysis | null>(null);
+
+  /** The filter group the last analysis actually ran with, or null before any has run. */
+  readonly analysedFilters = computed<FilterGroup | null>(() => this.analysed()?.filters ?? null);
+
+  /**
+   * The aggregation the figures on screen were computed with.
+   *
+   * Falls back to the picker only while nothing has run, where the picker IS the analysis being
+   * described -- the median's hedge and the caption are both shown before the first Run.
+   */
+  readonly analysedAggregation = computed<Aggregation>(() =>
+    this.analysed()?.aggregation ?? this.aggregation());
+
+  /**
+   * The column those figures measured, or '' where the aggregation is a question about rows.
+   *
+   * The same fallback, with the same guard the snapshot applies: "Count rows of amount" would
+   * name a column that had no part in the figure, and a reader who picks a column and then
+   * switches to Count rows leaves one sitting in the picker.
+   */
+  readonly analysedField = computed(() => {
+    const analysed = this.analysed();
+    if (analysed) return analysed.field;
+    return this.measureNeedsField() ? this.measureField() : '';
+  });
+
+  /**
+   * The Top-N the result on screen was cut with, which is not the Top-N control's current value.
+   *
+   * The picker's own value stays the picker's, because the warning under it -- "the tail will be
+   * missing, not summarised" -- is about the analysis that is about to be run.
+   */
+  readonly analysedTopN = computed<{ limit: number; includeOther: boolean } | null>(() => {
+    const analysed = this.analysed();
+    if (analysed) return analysed.topN;
+    const limit = this.topNLimit();
+    return limit === null ? null : { limit, includeOther: this.topNOther() };
+  });
 
   private beginAnalysis(runId: string): void {
-    this.analysedFilters.set(this.activeFilters());
+    const limit = this.topNLimit();
+    this.analysed.set({
+      filters: this.activeFilters(),
+      aggregation: this.aggregation(),
+      field: this.measureNeedsField() ? this.measureField() : '',
+      topN: limit === null ? null : { limit, includeOther: this.topNOther() },
+    });
     this.analysing.set(true);
     this.analysisStopping.set(false);
     this.analysisRunId.set(runId);
@@ -3418,7 +3774,7 @@ export class Analytics implements OnInit {
           // Into groupedBy, NOT into dimensions. What comes back is the EFFECTIVE grouping after
           // the drill path was applied; the root is what this client sent and must keep sending,
           // or drill-up has nothing to restore from.
-          this.groupedBy.set(response.data.dimensions.slice(0, this.maxDimensions));
+          this.adoptGrouping(response.data.dimensions.slice(0, this.maxDimensions));
           // The next drill needs a dimension of its own to replace, and the one just used is gone.
           if (!this.effectiveDimensions().includes(this.drillDimension())) {
             const grouped = this.effectiveDimensions();
@@ -3483,14 +3839,55 @@ export class Analytics implements OnInit {
    * RAW, not rendered. The rendered form is what a reader sees -- a plain decimal, a date without
    * its phantom midnight -- and sending it back as a filter operand would ask the server to match
    * a string it did not produce.
+   *
+   * <b>Found by INDEX, never by matching the column header.</b> A dimension has two names in a
+   * response and they are not the same string: `dimensions` carries the SCHEMA field name, which
+   * is the identity a drill step and a filter use, while the DIMENSION-role columns carry the
+   * ALIAS, which is the field name plus its grain. Group booked_on by month and the column is
+   * headed booked_on_month while the drill picker holds booked_on, so a match on the header found
+   * nothing -- and "nothing" was then returned as `null`, which is not absence but the name of a
+   * real group. Clicking Drill on the March row therefore ran a drill into the rows where
+   * booked_on IS NULL: normally no rows at all, reported as "The analysis returned no rows" under
+   * the breadcrumb "booked_on: (none)", with nothing on screen saying the click had not been
+   * honoured.
+   *
+   * The two outcomes are kept apart for exactly that reason. `null` is the group with no value in
+   * it, which the server narrows with IS NULL; `undefined` is "this row cannot name a value for
+   * that dimension at all", which is not something to drill into but something to refuse.
    */
-  drillValueOf(row: { cells: { column?: AnalysisColumn; raw: string | null }[] }): string | null {
-    const dimension = this.drillDimension();
-    const cell = row.cells.find(entry => entry.column?.name === dimension);
-    // null, not '': the group with no value in it is drilled as IS NULL server-side, and an
-    // empty string here would drill into a value the data does not contain.
-    return cell ? cell.raw : null;
+  drillValueOf(
+    row: { cells: { column?: AnalysisColumn; raw: string | null }[] },
+  ): string | null | undefined {
+    const at = (this.analysisResult()?.dimensions ?? []).indexOf(this.drillDimension());
+    if (at < 0) return undefined;
+    // The contract's own ordering: "Dimension cells first in the order the dimensions were
+    // given, then the measure", so the nth DIMENSION cell is the nth entry of `dimensions`.
+    const cell = row.cells.filter(entry => entry.column?.role === 'DIMENSION')[at];
+    return cell ? cell.raw : undefined;
   }
+
+  /** The calendar grain the ANSWER reports for one dimension, or null where it carries none. */
+  grainOf(dimension: string): Grain | null {
+    const result = this.analysisResult();
+    const at = (result?.dimensions ?? []).indexOf(dimension);
+    if (at < 0) return null;
+    return (result!.grains ?? [])[at] ?? null;
+  }
+
+  /**
+   * Why the Drill control is not offered on this result, or '' when it is.
+   *
+   * A bucketed dimension is the one case, and it is the same argument that makes a grained chart
+   * mark inert: the row says March and MEANS March, while a drill step travels as a value and the
+   * server compiles it to an equality on the raw column. Drilling the March row would therefore
+   * narrow to the single instant the bucket is labelled with -- the first of the month, at
+   * midnight -- and hand back one day's takings under a breadcrumb reading "booked_on: March".
+   * A wrong answer wearing the right label is worse than a control that says why it is not here.
+   *
+   * This is a refusal rather than a repair because the repair is not on this side: the step would
+   * have to compile as a bucket window (date_trunc(grain, col) = value, or a half-open day range)
+   * and only the server composes the statement.
+   */
 
   /**
    * Whether a chart mark can be cross-filtered.
@@ -3500,12 +3897,41 @@ export class Analytics implements OnInit {
    * on it would be a filter that matches nothing while looking like it matched something. The
    * marks are inert there rather than wrong, and the table underneath still filters per cell.
    */
-  readonly markClickable = computed(() => this.dimensionColumns().length === 1);
+  /**
+   * Whether ANY mark on this chart can narrow the analysis.
+   *
+   * One dimension, because a click sets one condition -- and at least one mark carrying a raw
+   * operand, so a wholly un-narrowable chart (every row grained, say) is not a button at all.
+   * Individual marks that cannot be narrowed carry `inert` and are disabled one at a time, the
+   * way the roll-up row already is in the table beside the chart.
+   */
+  readonly markClickable = computed(() =>
+    this.dimensionColumns().length === 1
+    && this.canvasPoints().some(point => point.operand !== undefined));
 
-  crossFilterFromMark(name: string): void {
-    const first = this.dimensionColumns()[0];
-    if (!first || !this.markClickable()) return;
-    this.crossFilter(first.name, name);
+  /**
+   * Narrows the analysis to the group that was clicked.
+   *
+   * Takes the whole MARK rather than its name. The name is what the chart drew, and sending it
+   * into an equality asked the data for a string it does not contain whenever the label was not
+   * the value -- a Top-N roll-up, a "(null)" written for an absent cell. The analysis came back
+   * empty, drawn as an ordinary result, with a chip above it naming a category that never
+   * existed.
+   *
+   * A mark with no operand is refused here as well as being un-buttoned on the chart, because
+   * `inert` governs the mouse and this governs what the code does with the event.
+   */
+  crossFilterFromMark(mark: ChartPoint): void {
+    if (!this.dimensionColumns().length || !this.markClickable() || mark.inert) return;
+    if (mark.operand === undefined) return;
+    // The SCHEMA field name, off `dimensions`, and not the column's header. The header is the
+    // alias, which carries the grain -- the last place in this file where the two were confused
+    // sent booked_on_month to a server that rightly has no such column. A grained mark is inert
+    // long before it reaches here, so today the two strings agree; they agree by coincidence,
+    // and a coincidence is not a thing to leave a filter operand resting on.
+    const field = (this.analysisResult()?.dimensions ?? [])[0] ?? '';
+    if (!field) return;
+    this.crossFilter(field, mark.operand);
   }
 
   removeChip(chip: { kind: 'clicked' | 'drill'; index: number }): void {
@@ -3586,12 +4012,56 @@ export class Analytics implements OnInit {
     const result = this.analysisResult();
     if (!result) return [];
     const columns = result.columns ?? [];
-    const otherLabel = result.other?.label ?? '';
-    return (result.rows ?? []).map(row => {
+    // By index when the server named these rows -- AnalysisResult.rollupRows -- and by label only
+    // against a response that did not. The comment below is what the label alone could manage.
+    const rolled = result.rollupRows ? new Set(result.rollupRows) : null;
+    const otherLabel = rolled ? '' : (result.other?.label ?? '');
+    /*
+     * The SCHEMA field each column stands for, or '' where a click on it cannot become a filter.
+     *
+     * A dimension column is headed with its ALIAS, which is the field name plus its grain, while
+     * `dimensions` carries the field name the dataset actually has -- and the two are index
+     * aligned with the DIMENSION-role columns, in the order the dimensions were given. Reading
+     * the header instead sent booked_on_month as a field name, and the analysis was replaced by
+     * "This dataset has no column called booked_on_month." The chip stayed in crossFilters(), so
+     * every later Run, drill and drill-up was refused the same way until the reader worked out
+     * that the chip above the message was what had broken it.
+     *
+     * A GRAINED dimension resolves to '' rather than to its field name, which makes the cell
+     * inert exactly as the roll-up row is. The cell says March and means March; an equality on
+     * booked_on would ask for the first of the month, which is the wrong answer rather than a
+     * refused one -- the same rule that already makes a grained chart mark inert.
+     */
+    const names = result.dimensions ?? [];
+    const grains = result.grains ?? [];
+    let dimensionAt = 0;
+    const fields = columns.map(column => {
+      if (column?.role !== 'DIMENSION') return '';
+      const at = dimensionAt++;
+      return grains[at] ? '' : (names[at] ?? '');
+    });
+    return (result.rows ?? []).map((row, at) => {
       const cells = row.map((raw, index) => ({
         column: columns[index],
         raw,
-        text: this.renderCell(columns[index], raw),
+        /** The field a click on this cell filters on, or '' where it cannot be clicked. */
+        field: fields[index] ?? '',
+        /*
+         * MEASURE cells are made readable; dimensions are left exactly as they are.
+         *
+         * The Canvas printed the server's text verbatim while a dashboard tile of the SAME saved
+         * analysis ran it through readableCell, so one screen read 20781905.520000000000000 and
+         * the other 20,781,905.52 -- and for an AVERAGE, which still comes back as a DOUBLE,
+         * 1267.1935342804701 against 1,267.19. Two screens of one analysis disagreeing about a
+         * number is worse than either format on its own.
+         *
+         * Only measures, for the reason the dashboard learned the same lesson: readableCell
+         * groups an integer, and grouping a DIMENSION rewrites it -- a year column reads 2,024.
+         * The raw value stays on `raw`, which the cross-filter uses and the title shows.
+         */
+        text: columns[index]?.role === 'MEASURE'
+          ? readableCell(this.renderCell(columns[index], raw) ?? '')
+          : this.renderCell(columns[index], raw),
         isNull: raw === null || raw === undefined,
       }));
       return {
@@ -3600,19 +4070,41 @@ export class Analytics implements OnInit {
         // cross-filtered to and it cannot be drilled into, because "Other" is not a value in the
         // data -- it is this many values the reader has not been shown.
         //
-        // Matched on the LABEL, which is the only signal in the response, and the server's own
-        // Drill type says why that is imperfect: a dataset is perfectly entitled to contain the
-        // value "Other". The failure is one-directional and conservative -- a real row spelled
-        // like the roll-up goes inert, never the reverse -- and the note under the table says so
-        // rather than leaving a reader to wonder why one row will not click.
-        isOther: !!otherLabel && cells.some(
-          cell => cell.column?.role === 'DIMENSION' && cell.raw === otherLabel),
+        // Matched by INDEX where the response says which rows they are, which is exact. The
+        // label match below it is the fallback, and the server's own Drill type says why it was
+        // only ever a fallback: a dataset is perfectly entitled to contain the value "Other". That
+        // failure is one-directional and conservative -- a real row spelled like the roll-up goes
+        // inert, never the reverse -- and the note under the table says so rather than leaving a
+        // reader to wonder why one row will not click.
+        isOther: rolled ? rolled.has(at) : (!!otherLabel && cells.some(
+          cell => cell.column?.role === 'DIMENSION' && cell.raw === otherLabel)),
       };
     });
   });
 
   readonly analysisTruncated = computed(() => !!this.analysisResult()?.truncated);
   readonly otherBucket = computed(() => this.analysisResult()?.other ?? null);
+
+  /**
+   * Why a bucketed dimension's cells do not click, said under the table.
+   *
+   * The roll-up row has carried its reason since it was made inert; a grained cell now needs the
+   * same sentence for the same reason. A cell that will not click and says nothing reads as a
+   * broken table rather than as a refusal, and the refusal here is the honest half: the cell
+   * stands for a whole bucket, so narrowing to it as a value would ask for the single instant the
+   * bucket happens to be labelled with.
+   */
+  readonly grainedCellNote = computed(() => {
+    const result = this.analysisResult();
+    if (!result) return '';
+    const grains = result.grains ?? [];
+    const bucketed = (result.dimensions ?? []).filter((_, at) => !!grains[at]);
+    if (!bucketed.length) return '';
+    return `${bucketed.join(', ')} ${bucketed.length === 1 ? 'is' : 'are'} bucketed, so a cell `
+      + 'under it stands for a whole bucket rather than for one value — it cannot be filtered to '
+      + 'or drilled into, because an equality would ask for the single instant the bucket is '
+      + 'labelled with. Take the bucket off to click through these.';
+  });
 
   /**
    * Whether the distinct count on screen is exact, and this screen does not assume it either way.
@@ -3630,7 +4122,10 @@ export class Analytics implements OnInit {
    * reported as UNSTATED rather than rounded up to either answer.
    */
   readonly distinctExactness = computed<'estimated' | 'exact' | 'unstated' | ''>(() => {
-    if (this.aggregation() !== 'DISTINCT_COUNT' || !this.analysisResult()) return '';
+    // The ANALYSED aggregation, because this labels the column that came back. Read off the
+    // picker, moving it to Sum after running a distinct count took the "exact" mark off a result
+    // that is still, on screen, a distinct count.
+    if (this.analysedAggregation() !== 'DISTINCT_COUNT' || !this.analysisResult()) return '';
     const name = this.measureColumn()?.name ?? '';
     if (/approx/i.test(name)) return 'estimated';
     if (/(^|_)distinct_count$/i.test(name) || /exact/i.test(name)) return 'exact';
@@ -3656,8 +4151,14 @@ export class Analytics implements OnInit {
     }
   });
 
-  /** Aggregations whose parts add up, which is what a total or a share is allowed to assume. */
-  readonly additive = computed(() => ADDITIVE.includes(this.aggregation()));
+  /**
+   * Whether the figures on screen add up, which is what a total or a share is allowed to assume.
+   *
+   * Off the ANALYSED aggregation and never the picker. A pivot of averages that was relabelled by
+   * a picker moving to Sum grew a Total column of sums of averages -- every cell in it still an
+   * average, and the note saying so gone -- which is the one number this screen exists to refuse.
+   */
+  readonly additive = computed(() => ADDITIVE.includes(this.analysedAggregation()));
 
   // ---- the pivot -------------------------------------------------------------------------
 
@@ -3710,8 +4211,16 @@ export class Analytics implements OnInit {
     : `Rows have no total: ${this.aggregationLabel()} does not add up. The ${this.aggregationLabel().toLowerCase()} `
       + 'of a row is not the sum of the cells in it, so no figure is offered rather than a wrong one.');
 
-  aggregationLabel(): string {
-    return AGGREGATIONS.find(a => a.id === this.aggregation())?.label ?? this.aggregation();
+  /**
+   * The words a reader picks an aggregation by.
+   *
+   * Defaults to the ANALYSED aggregation rather than the picker's, because every caller is
+   * writing a sentence about the result on screen -- the heading over it, the reason a ring is
+   * refused for it, the reason its rows carry no total. Before anything has run the two are the
+   * same value, which is what makes the caption right on an empty canvas as well.
+   */
+  aggregationLabel(id: Aggregation = this.analysedAggregation()): string {
+    return AGGREGATIONS.find(a => a.id === id)?.label ?? id;
   }
 
   // ---- a chart of the analysis -----------------------------------------------------------
@@ -3734,14 +4243,41 @@ export class Analytics implements OnInit {
       .filter(entry => entry.column.role === 'DIMENSION')
       .map(entry => entry.index);
     if (measureAt < 0 || !dimensionAt.length) return [];
+    /*
+     * What may be clicked, decided once for the whole result rather than per mark.
+     *
+     * A click narrows on ONE dimension -- markClickable requires exactly one -- so a mark can
+     * stand for a filter only when that dimension's raw value identifies exactly one group. Two
+     * things stop it: a GRAIN, because a bar labelled 2024-03-01 stands for the whole of March
+     * and an equality would return the first of the month; and the Top-N ROLL-UP row, because
+     * "Other" is not a value in the data but a name for the values the reader has not been shown.
+     * The roll-up rows are matched by the indices the server sends, which is exact, rather than
+     * by the label, which a real category is entitled to share.
+     */
+    const grains = result.grains ?? [];
+    const dimensionNames = result.dimensions ?? [];
+    const grained = dimensionAt.some(index => {
+      const at = dimensionNames.indexOf(columns[index].name);
+      return at < 0 || !!grains[at];
+    });
+    const rolled = result.rollupRows ? new Set(result.rollupRows) : null;
+    const otherLabel = rolled ? '' : (result.other?.label ?? '');
+
     const points: ChartPoint[] = [];
-    for (const row of result.rows ?? []) {
+    const rows = result.rows ?? [];
+    for (let at = 0; at < rows.length; at++) {
+      const row = rows[at];
       const value = asNumber(row[measureAt]);
       if (value === null) continue;
       const name = dimensionAt
         .map(index => this.renderCell(columns[index], row[index]) || '(null)')
         .join(' · ');
-      points.push({ name, value, rows: 1 });
+      const raw = row[dimensionAt[0]];
+      const isRollUp = rolled ? rolled.has(at) : (!!otherLabel && raw === otherLabel);
+      const narrowable = !grained && !isRollUp && dimensionAt.length === 1;
+      points.push(narrowable
+        ? { name, value, rows: 1, operand: raw }
+        : { name, value, rows: 1, inert: true });
     }
     return points;
   });
@@ -3826,11 +4362,23 @@ export class Analytics implements OnInit {
     return kinds.find(kind => !kind.issue)?.id ?? null;
   });
 
+  /**
+   * What the result on screen is grouped by, as the ANSWER reported it.
+   *
+   * Beside effectiveDimensions rather than instead of it, because the two answer different
+   * questions. effectiveDimensions is where the READER is -- it is what the drill controls are
+   * built from, and re-picking a dimension moves it immediately, which is right for a control
+   * describing the analysis about to be run. This is what the ROWS are grouped by, and re-picking
+   * a dimension does not regroup rows that are already on screen.
+   */
+  readonly resultDimensions = computed<string[]>(() =>
+    this.analysisResult()?.dimensions ?? this.effectiveDimensions());
+
   /** What the figure claims to be, in one line above it. */
   readonly canvasCaption = computed(() => {
-    const measure = this.aggregationLabel()
-      + (this.measureNeedsField() && this.measureField() ? ` of ${this.measureField()}` : '');
-    const dimensions = this.effectiveDimensions();
+    const field = this.analysedField();
+    const measure = this.aggregationLabel() + (field ? ` of ${field}` : '');
+    const dimensions = this.resultDimensions();
     return dimensions.length
       ? `${measure} by ${dimensions.map((name, at) => this.dimensionLabel(name, at)).join(' × ')}`
       : `${measure}, over every matching row`;
@@ -3884,9 +4432,12 @@ export class Analytics implements OnInit {
       notes.push(`${count} ${count === 1 ? 'value was' : 'values were'} rolled into `
         + `"${other.label}"${listed ? ': ' + listed : ''}`
         + (other.valuesTruncated ? ', and more that are not listed.' : '.'));
-    } else if (this.topNActive() && !this.topNOther()) {
-      notes.push(`Top ${this.topNLimit()} with no Other bucket: anything outside the top `
-        + `${this.topNLimit()} is absent from this result entirely, not summarised in it.`);
+    } else if (this.analysedTopN() && !this.analysedTopN()!.includeOther) {
+      // The Top-N this result was cut with, not the control's current value: moving the control
+      // without running does not put the tail back into rows that were already returned.
+      const cut = this.analysedTopN()!;
+      notes.push(`Top ${cut.limit} with no Other bucket: anything outside the top `
+        + `${cut.limit} is absent from this result entirely, not summarised in it.`);
     }
 
     const drawn = this.canvasKind() !== 'table' && this.canvasKind() !== 'pivot';
@@ -3901,15 +4452,19 @@ export class Analytics implements OnInit {
         + 'and the ranked view does not draw a bar for those. They are in the table.');
     }
 
-    if (this.analysisFiltered()) {
-      notes.push(`${countFilterClauses(this.activeFilters())} filters are on. Every figure here `
+    const ran = this.analysedFilters();
+    if (ran && ran.clauses.length) {
+      notes.push(`${countFilterClauses(ran)} filters are on. Every figure here `
         + 'is over the rows that match them — a category with no matching rows is absent from '
         + 'this result, which is not the same as its value being zero.');
     }
 
     if (this.distinctNote()) notes.push(this.distinctNote());
-    if (this.aggregationHedge() && this.aggregation() === 'MEDIAN') {
-      notes.push(this.aggregationHedge());
+    // The hedge belonging to the aggregation that RAN. The picker's hedge is shown beside the
+    // picker, where it describes the analysis about to be run rather than the one on screen.
+    if (this.analysedAggregation() === 'MEDIAN') {
+      const hedge = AGGREGATIONS.find(a => a.id === 'MEDIAN')?.hedge ?? '';
+      if (hedge) notes.push(hedge);
     }
 
     // What "last 7 days" actually meant, in dates. A relative window is not reproducible from the
@@ -3932,7 +4487,10 @@ export class Analytics implements OnInit {
     if (this.analyseBlocker()) return this.analyseBlocker();
     if (!this.analysisResult()) return 'Nothing has run yet.';
     if (!this.analysisResult()!.rows?.length) {
-      return this.analysisFiltered()
+      // The filters that RAN. An empty result explained by a filter typed after it came back
+      // would blame the wrong thing for the emptiness.
+      const ran = this.analysedFilters();
+      return ran && ran.clauses.length
         ? 'No rows match these filters. That is an answer: the rows are excluded, not zero.'
         : 'The analysis returned no rows.';
     }
@@ -3970,13 +4528,28 @@ export class Analytics implements OnInit {
    */
   private clearCanvas(): void {
     this.dimensions.set([]);
+    /*
+     * The grains go with the dimensions they bucket, and forgetting that was a trap with no way
+     * out of it on screen.
+     *
+     * A grain is only ever reachable through the Bucket picker, and that picker is rendered only
+     * beside a TEMPORAL dimension. A MONTH left in slot 0 by the file being closed therefore
+     * survived into a file whose slot 0 is a VARCHAR: every Run was refused with "region holds
+     * VARCHAR, which has no calendar in it", while nothing on screen showed a bucket was set and
+     * no control could clear one. The only escape was re-picking the same dimension a second
+     * time, which is not an escape anybody finds.
+     */
+    this.dimensionGrains.set([]);
+    // And the grouping the SERVER reported, which named columns of the file being closed.
+    this.forgetGrouping();
     this.aggregation.set('COUNT_ROWS');
     this.measureField.set('');
     this.canvasFilters.set(emptyFilterGroup());
     this.crossFilters.set([]);
     this.drillPath.set([]);
-    // Or the Data tab keeps narrowing by the analysis that has just been thrown away.
-    this.analysedFilters.set(null);
+    // Or the Data tab keeps narrowing by the analysis that has just been thrown away, and the
+    // figure's own sentences keep describing a measure that was run against another file.
+    this.analysed.set(null);
     this.crossFilterData.set(true);
     this.topNLimit.set(null);
     this.topNCustom.set('');
@@ -4038,27 +4611,104 @@ export class Analytics implements OnInit {
    */
   readonly analysisConfig = computed(() => JSON.stringify({
     dimensions: this.dimensions(),
+    /*
+     * The GRAINS, index-aligned with the dimensions above.
+     *
+     * Saved because a date dimension without one is a different analysis, not a slightly rougher
+     * version of the same one: the server groups by the raw TIMESTAMP and returns one row per
+     * distinct instant. A reader who built twenty-four clean monthly bars, saved them, and
+     * reopened them got tens of thousands of groups under the title they had chosen -- and
+     * usually no warning at all, because truncation needs 50,000 rows and a year of orders is
+     * often fewer.
+     *
+     * Written even when every entry is null. The request builder drops an all-null list on the
+     * wire, which is right for a request; a stored CONFIG is a record of what was chosen, and an
+     * absent key there cannot be told apart from a config saved before grains existed.
+     */
+    grains: this.dimensionGrains(),
     measure: this.analysisRequest().measure,
-    filters: this.activeFilters(),
+    filters: this.savedFilters(),
     topN: this.analysisRequest().topN ?? null,
     sort: this.analysisRequest().sort ?? null,
   }));
+
+  /**
+   * The filters a SAVE records: the built tree, the clicked chips AND the drill steps.
+   *
+   * activeFilters() deliberately leaves the drill steps out, because the ANALYSIS request carries
+   * drillPath beside the filters and the server derives the predicates from it -- echoing them
+   * into `filters` as well would apply each one twice. A saved config has no drillPath beside it,
+   * so the same omission there is not a de-duplication, it is a loss.
+   *
+   * It was a measured one. A reader ran "Sum of amount by region", clicked the north row to drill
+   * into it, and saved the view as "North by city". dimensions is the ROOT, which a drill never
+   * changes, and the filters were the un-drilled ones -- so the stored analysis was "Sum of
+   * amount by region" over every region, and both the reopened canvas and every dashboard tile
+   * built on it showed the whole country under a title promising one part of it. The Save control
+   * says "Filters a drill added are kept as filters, so reopening lands on the narrowed analysis
+   * with no trail behind it", which is the behaviour this composes and the code did not have.
+   *
+   * Compiled exactly as inheritedDataFilters compiles them for the Data tab: a null step is
+   * IS_NULL and not an equality against null, which is never true. An OR tree from the builder is
+   * NESTED rather than spread, for the reason activeFilters gives -- spreading "(a OR b)" into an
+   * ANDed list turns a filter that admitted either into one that demands both.
+   */
+  private readonly savedFilters = computed<FilterGroup>(() => {
+    const active = this.activeFilters();
+    const steps: FilterNode[] = [];
+    this.drillPath().forEach(step => steps.push(step.value === null
+      ? { field: step.dimension, operator: 'IS_NULL' }
+      : { field: step.dimension, operator: 'EQ', value: step.value }));
+    if (!steps.length) return active;
+    const base: FilterNode[] = !active.clauses.length ? []
+      : active.op === 'AND' ? active.clauses : [active];
+    return { op: 'AND', clauses: [...base, ...steps] };
+  });
 
   readonly canSaveAnalysis = computed(() =>
     !!this.analysisName().trim() && this.hasDataset() && !this.savingAnalysis()
     && (!this.measureNeedsField() || !!this.measureField()));
 
+  /**
+   * Saves the analysis as a new row, or updates the one that is loaded.
+   *
+   * <b>AN UPDATE KEEPS THE DATASET THE SAVED ANALYSIS ALREADY NAMES.</b> Both fields used to come
+   * from whatever happened to be open, and reopening a saved analysis does not open its dataset --
+   * it puts the configuration on the canvas and says which file it was saved against. So a reader
+   * with archive/2025.parquet open, clicking "Sales by region" to look at it and fixing a typo in
+   * its name, silently repointed a row whose analysisConfig names sales-2026.csv's columns at a
+   * file that does not have them: the dashboard tile that ran it yesterday now fails on an unknown
+   * column, and nothing records which file it used to read. A rename is a rename.
+   *
+   * Save as new is the opposite and takes the OPEN dataset, because that is what "new" means here:
+   * the same cut, recorded against the file in front of the reader. The two controls are already
+   * separate for exactly this reason -- one that guessed between them is the one that eventually
+   * loses somebody's work -- and analysisFromElsewhere() says on screen which file an Update will
+   * keep.
+   */
   saveAnalysis(update = false): void {
     if (!this.canSaveAnalysis()) return;
     this.savingAnalysis.set(true);
     this.analysisSaveError.set('');
     const existing = this.loadedAnalysis();
+    const updating = update && !!existing?.analyticsAnalysisId;
     this.analytics.saveAnalysis({
-      analyticsAnalysisId: update ? existing?.analyticsAnalysisId : undefined,
+      analyticsAnalysisId: updating ? existing!.analyticsAnalysisId : undefined,
       analysisName: this.analysisName().trim(),
-      connectionAlias: this.connection(),
-      datasetPath: this.path(),
-      visualizationType: this.canvasKind() ?? 'table',
+      connectionAlias: updating ? (existing!.connectionAlias || this.connection()) : this.connection(),
+      datasetPath: updating ? (existing!.datasetPath || this.path()) : this.path(),
+      /*
+       * What the reader PICKED, falling back to the effective kind only where they have picked
+       * nothing at all.
+       *
+       * canvasKind() answers "what can be drawn for the result on screen", and every kind it
+       * offers carries the issue "Nothing has run yet." while analysisResult() is null -- so it
+       * is null on exactly the path openAnalysis puts a reader on, which restores the saved kind
+       * and deliberately does not run. Recording canvasKind() there wrote "table" over a donut
+       * somebody had chosen, for no better reason than that they renamed it without re-running
+       * it. What to DRAW and what to RECORD are two different questions.
+       */
+      visualizationType: this.canvasKindName() || this.canvasKind() || 'table',
       analysisConfig: this.analysisConfig(),
     }).subscribe({
       next: response => {
@@ -4090,7 +4740,8 @@ export class Analytics implements OnInit {
    */
   openAnalysis(saved: SavedAnalysis): void {
     let config: {
-      dimensions?: string[]; measure?: { aggregation?: Aggregation; field?: string };
+      dimensions?: string[]; grains?: (Grain | null)[];
+      measure?: { aggregation?: Aggregation; field?: string };
       filters?: FilterGroup; topN?: { limit: number; includeOther: boolean } | null;
       sort?: { by: 'MEASURE' | 'DIMENSION'; direction: 'ASC' | 'DESC' } | null;
     };
@@ -4106,10 +4757,29 @@ export class Analytics implements OnInit {
     this.analysisError.set('');
     this.drillPath.set([]);
     this.crossFilters.set([]);
+    // The grouping reported for whatever was last run here. Nothing has run for THIS analysis,
+    // so the pickers below are the only account of what it is grouped by.
+    this.forgetGrouping();
     // Nothing has run yet -- the config is loaded, not analysed. Carrying the previous
     // analysis's narrowing into the Data tab here would attribute it to this one.
-    this.analysedFilters.set(null);
-    this.dimensions.set((config.dimensions ?? []).slice(0, this.maxDimensions));
+    this.analysed.set(null);
+    const restored = (config.dimensions ?? []).slice(0, this.maxDimensions);
+    this.dimensions.set(restored);
+    /*
+     * The grains, set from the saved config and CLEARED when it has none.
+     *
+     * This assignment bypasses setDimension, which is the only function that keeps the two lists
+     * index-aligned -- so leaving the signal alone did not mean "no grain", it meant "whatever
+     * grain was in that slot from the reader's previous canvas work". Reopening an ungrained
+     * analysis while a MONTH sat in slot 0 applied MONTH to whatever column now occupies it: a
+     * hard refusal from the server if that column has no calendar in it, and a silent
+     * re-bucketing if it does.
+     *
+     * Padded to the dimension count for the same index-alignment reason, so a config saved with
+     * fewer grains than dimensions cannot leave a trailing slot reading from the old array.
+     */
+    const savedGrains = config.grains ?? [];
+    this.dimensionGrains.set(restored.map((_, at) => savedGrains[at] ?? null));
     this.aggregation.set(config.measure?.aggregation ?? 'COUNT_ROWS');
     this.measureField.set(config.measure?.field ?? '');
     this.canvasFilters.set(config.filters ?? emptyFilterGroup());
@@ -4141,22 +4811,42 @@ export class Analytics implements OnInit {
     return `"${saved.analysisName}" was saved against ${saved.connectionAlias}/${saved.datasetPath}.`;
   });
 
+  /**
+   * Deletes a saved analysis, after naming what ELSE goes with it.
+   *
+   * The dialog used to name only what is not affected -- "the dataset it reads is untouched" --
+   * which reads as a complete account of the consequences and is not one. The row is the parent of
+   * every dashboard widget built on it, and the delete cascades: the widgets are removed outright,
+   * with their titles and their layout, from dashboards the owner of this list may not even be
+   * able to see. Three tiles disappearing from somebody else's screen is not a detail to discover
+   * afterwards.
+   *
+   * The server counts them and says so in its message. That message was being dropped on the
+   * success branch -- the only branch it is ever sent on -- so the one place the count existed
+   * was a response nobody read. It is shown, in the server's own words, because it is the only
+   * thing that knows the number.
+   */
   async removeAnalysis(saved: SavedAnalysis): Promise<void> {
     const id = saved.analyticsAnalysisId;
     if (!id) return;
     const confirmed = await confirmWith(this.dialog, {
       title: 'Delete this analysis?',
-      body: `"${saved.analysisName}" will be removed. The dataset it reads is untouched.`,
+      body: `"${saved.analysisName}" will be removed, and so will any dashboard tile showing `
+        + 'it — on every dashboard, including ones you cannot see. The dataset it reads is '
+        + 'untouched.',
       confirmLabel: 'Delete',
       danger: true,
     });
     if (!confirmed) return;
+    this.analysesNotice.set('');
     this.analytics.deleteAnalysis(id).subscribe({
       next: response => {
         if (response.status !== API_SUCCESS) {
           this.analysesError.set(response.message || 'The analysis could not be deleted.');
           return;
         }
+        // The server's own sentence, which is the only account of how many tiles went with it.
+        this.analysesNotice.set(response.message || '');
         if (this.loadedAnalysis()?.analyticsAnalysisId === id) this.loadedAnalysis.set(null);
         this.loadAnalyses();
       },

@@ -86,17 +86,30 @@
           <div>
             <div class="detail-head">Schedule</div>
             @if (job.scheduler; as s) {
-              <dl class="detail-list">
-                <dt>Frequency</dt>
-                <dd>{{ s.frequency || '—' }}@if (s.intervalValue && s.intervalValue !== '1') { · every {{ s.intervalValue }} }</dd>
-                <dt>Starts</dt><dd>{{ s.startDate || '—' }}{{ s.startTime ? ' at ' + s.startTime.slice(0,5) : '' }}</dd>
-                <dt>Ends</dt><dd>{{ s.endDate || 'no end date' }}</dd>
-                <dt>Next run</dt>
-                <dd>
-                  @if (s.expired) { <span class="text-warn-500">Expired</span> }
-                  @else { {{ s.nextRunAt ? (s.nextRunAt | date:'d MMM, HH:mm') : '—' }} }
-                </dd>
-              </dl>
+              <!--
+                A job switched from Auto to Manual keeps this row -- the editor posts no schedulers
+                block for a Manual job, so it survives with the next_run_at it had at the moment of
+                the switch, and the dispatcher passes over it on execution rather than expiring it.
+                Rendering the timetable regardless put a Next run against a moment that never
+                arrives, beside a Last run that never moves again. Execution decides first.
+              -->
+              @if (job.execution === 'Manual') {
+                <p class="text-xs text-[color:var(--text-muted)]">
+                  Runs on demand only. Its timetable is held, and resumes if this job is set back to Auto.
+                </p>
+              } @else {
+                <dl class="detail-list">
+                  <dt>Frequency</dt>
+                  <dd>{{ s.frequency || '—' }}@if (s.intervalValue && s.intervalValue !== '1') { · every {{ s.intervalValue }} }</dd>
+                  <dt>Starts</dt><dd>{{ s.startDate || '—' }}{{ s.startTime ? ' at ' + s.startTime.slice(0,5) : '' }}</dd>
+                  <dt>Ends</dt><dd>{{ s.endDate || 'no end date' }}</dd>
+                  <dt>Next run</dt>
+                  <dd>
+                    @if (s.expired) { <span class="text-warn-500">Expired</span> }
+                    @else { {{ s.nextRunAt ? (s.nextRunAt | date:'d MMM, HH:mm') : '—' }} }
+                  </dd>
+                </dl>
+              }
             } @else {
               <p class="text-xs text-[color:var(--text-muted)]">Runs on demand only.</p>
             }
@@ -346,8 +359,19 @@
             </td>
             <td class="text-right"><app-status [label]="run.jobStatus" /></td>
             <td class="text-right">
-              <a class="btn btn-ghost btn-sm"
-                 [routerLink]="['/jobs', jobId(), 'runs', run.jobQueueId, 'logs']"><app-icon name="file" />Logs</a>
+              <!-- run.jobId, not jobId(). This screen serves TWO routes: jobs/:jobId/history for
+                   one job, and jobs/history for the dashboard's TOTAL row, which drills into an
+                   hour ACROSS EVERY JOB and therefore has no id in the path. On that view every
+                   row belongs to a different job, so the screen-level id was never the right one
+                   -- it produced /jobs//runs/5524/logs there, and /jobs/undefined/runs/5524/logs
+                   for anyone who reached the screen through a link whose own id was missing. The
+                   column two cells to the left has always linked by run.jobId; this one did not.
+                   Withheld entirely on the row where the run does not name its job, because a
+                   Logs button that cannot say whose logs is worse than no button. -->
+              @if (run.jobId) {
+                <a class="btn btn-ghost btn-sm"
+                   [routerLink]="['/jobs', run.jobId, 'runs', run.jobQueueId, 'logs']"><app-icon name="file" />Logs</a>
+              }
             </td>
           </tr>
 

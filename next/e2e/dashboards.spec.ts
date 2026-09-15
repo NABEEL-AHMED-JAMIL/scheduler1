@@ -1,5 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 import { readFileSync } from 'fs';
+import { KIND_IDS } from '../src/app/features/analytics/widget-kinds';
 
 /**
  * The five seeded reports, opened the way a person opens them.
@@ -118,8 +119,11 @@ test('the picker offers every kind, and disables the ones this result cannot hon
       disabled: (option as HTMLOptionElement).disabled,
     })));
 
-    // Fourteen: the original four, seven chart kinds, and three summaries.
-    expect(kinds).toHaveLength(14);
+    // Against the list the picker is built from, not a number written here. This said
+    // "Fourteen: the original four, seven chart kinds, and three summaries" and was already wrong
+    // by two -- shareStacked and pivot had been added and the sentence was not -- so the spec
+    // failed on whatever change happened to run next and read as that change's regression.
+    expect(kinds.map(kind => kind.value)).toEqual(KIND_IDS);
     const enabled = kinds.filter(kind => !kind.disabled).map(kind => kind.value);
     // One row, one column, no dimension: a single figure and a table, and nothing else honestly.
     expect(enabled.sort()).toEqual(['kpi', 'table']);
@@ -270,4 +274,48 @@ test('a board filter narrows every tile on its dataset, and says nothing ran unt
     expect(after).not.toEqual(before);
     // And every tile says which conditions produced what it is showing.
     await expect(page.getByText(/Board filter:/).first()).toBeVisible();
+  });
+
+test('clicking a bar narrows the board, and the rolled-up bar is not a button',
+  async ({ page }) => {
+    // Report 05 is five RANKED tiles over sub_category with a Top 10, which is the shape this
+    // needs both halves of: ten real bars that identify one group each, and one rolled-up "Other"
+    // standing for the fourteen the reader has not been shown. `sub_category = 'Other'` would
+    // narrow the whole board to nothing while looking like an ordinary filter, so that bar is
+    // inert -- INDIVIDUALLY inert, on a chart whose other bars work.
+    await openLibrary(page);
+    await page.getByRole('button', { name: '05 Top 10 sub-categories' }).click();
+    await expect(page.getByText('Top 10 by revenue', { exact: true })).toBeVisible();
+    await page.waitForTimeout(20000);
+
+    const tile = page.locator('.card', { hasText: 'Top 10 by revenue' }).last();
+    const bars = tile.locator('app-ranked-bar button');
+    await expect(bars.first()).toBeEnabled();
+
+    // The roll-up, refused. Skipped rather than failed if this dataset's top ten happens to be
+    // everything -- the assertion is about the roll-up, and inventing one would test nothing.
+    const rolled = tile.locator('app-ranked-bar button', { hasText: /^Other/ });
+    if (await rolled.count()) {
+      await expect(rolled.first()).toBeDisabled();
+    }
+
+    const clicked = (await bars.first().getAttribute('title')) ?? '';
+    const value = clicked.split(':')[0].trim();
+    expect(value.length, 'the bar should carry its own label in the title').toBeGreaterThan(0);
+
+    await bars.first().click();
+
+    // The bar opened and carries the clicked value as an ordinary, editable condition -- not a
+    // hidden narrowing whose only trace is that the numbers moved.
+    const builder = page.locator('app-filter-builder');
+    await expect(builder).toBeVisible();
+    await expect(builder.getByLabel('Column for condition 1')).toHaveValue('sub_category');
+    await expect(builder.getByLabel('Value for condition 1')).toHaveValue(value);
+
+    await page.waitForTimeout(20000);
+
+    // Every tile on the dataset says which conditions produced what it is showing.
+    await expect(page.getByText(/Board filter:/).first()).toBeVisible();
+    // And the click really narrowed: one sub-category is one bar, on every tile.
+    await expect(tile.locator('app-ranked-bar button')).toHaveCount(1);
   });

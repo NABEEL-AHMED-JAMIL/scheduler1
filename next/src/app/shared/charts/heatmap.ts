@@ -111,7 +111,12 @@ export class Heatmap {
     if (!value) return 'var(--surface-sunken)';
     // Square-root keeps quiet hours distinguishable from empty ones when one hour dominates.
     const intensity = Math.sqrt(value / this.max());
-    return `color-mix(in srgb, var(--color-brand-500) ${Math.round(15 + intensity * 85)}%, transparent)`;
+    // --heat, NOT --color-brand-500. That token is a near-black since the monochrome rebrand, so
+    // mixing it with transparent over a near-black page gave the same black square at every
+    // intensity: the whole grid, and the Less-to-More legend with it, was invisible in dark mode
+    // while the caption underneath reported 83 runs in the busiest hour. --heat is defined per
+    // theme and runs toward the light on a dark ground.
+    return `color-mix(in srgb, var(--heat) ${Math.round(15 + intensity * 85)}%, transparent)`;
   }
 
   isSelected(day: string, hour: number): boolean {

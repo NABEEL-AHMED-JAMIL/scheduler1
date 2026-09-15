@@ -27,7 +27,7 @@
       <button type="button" class="btn btn-default btn-sm" [disabled]="!runs().length || exporting()"
               [title]="runs().length ? 'Download this job\'s runs as an Excel workbook' : 'There are no runs to export yet'"
               (click)="exportRuns('xlsx')">
-        <app-icon name="table" [class.spin]="exporting() === 'xlsx'" />
+        <app-icon name="table" [busy]="exporting() === 'xlsx'" />
         {{ exporting() === 'xlsx' ? 'Building…' : 'Excel' }}
       </button>
     </div>
@@ -68,7 +68,7 @@
         <button type="button" class="btn btn-primary btn-sm"
                 [disabled]="!question().trim() || asking()"
                 (click)="ask(question())">
-          <app-icon name="send" [class.spin]="asking()" />{{ asking() ? 'Asking…' : 'Ask' }}
+          <app-icon name="send" [busy]="asking()" />{{ asking() ? 'Asking…' : 'Ask' }}
         </button>
       </div>
 

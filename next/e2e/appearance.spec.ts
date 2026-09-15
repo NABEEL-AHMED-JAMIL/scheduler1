@@ -83,7 +83,14 @@ test('a dashboard fits a phone too', async ({ page }) => {
 test('the workspace has no WCAG A/AA violations in DARK mode either', async ({ page }) => {
   // The usual way a palette breaks: tokens redefined under a media query, and only the light half
   // ever looked at.
-  await page.emulateMedia({ colorScheme: 'dark' });
+  //
+  // reducedMotion because axe is run the instant a tab is clicked, and `transition-colors` means
+  // the element it measures may still be part-way between two states. That produced an
+  // intermittent failure naming colours that are in neither theme -- #7d828a on #989da4 for a
+  // pill whose settled values are ink-300 on ink-950, about 16:1. The app now honours the
+  // preference for every transition, so asking for it here measures the colours a reader
+  // actually sees rather than a frame of the animation.
+  await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
   await openFixture(page);
 
   for (const tab of ['Details', 'Data', 'Compact', 'Quality', 'Canvas']) {
@@ -95,7 +102,7 @@ test('the workspace has no WCAG A/AA violations in DARK mode either', async ({ p
 });
 
 test('a dashboard has no WCAG A/AA violations in dark mode', async ({ page }) => {
-  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
   await page.goto('/analytics/dashboards');
   await page.getByRole('button', { name: '04 Category distribution' }).click();
   await expect(page.getByText('Revenue share by category', { exact: true })).toBeVisible();

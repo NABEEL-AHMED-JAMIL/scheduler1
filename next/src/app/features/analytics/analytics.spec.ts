@@ -2368,6 +2368,10 @@ function canvasWith(over: { confirms?: boolean } = {}) {
   const deleteAnalysis = vi.fn((_id?: number) =>
     (answers.deleteAnalysis = new Subject<any>()).asObservable());
   const cancel = vi.fn((_id?: string) => (answers.cancel = new Subject<any>()).asObservable());
+  // Recorded rather than stubbed blind: the whole point of a destructive confirmation is the
+  // sentence in it, and a dialog nobody can read back is a dialog no test can hold to account.
+  const dialogOpen = vi.fn((_component?: any, _config?: any) =>
+    ({ closed: of(over.confirms ?? true) }));
 
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
@@ -2381,7 +2385,7 @@ function canvasWith(over: { confirms?: boolean } = {}) {
           deleteAnalysis, cancel,
         },
       },
-      { provide: Dialog, useValue: { open: () => ({ closed: of(over.confirms ?? true) }) } },
+      { provide: Dialog, useValue: { open: dialogOpen } },
     ],
   });
 
@@ -2397,6 +2401,12 @@ function canvasWith(over: { confirms?: boolean } = {}) {
   return {
     studio, fixture, answers,
     analyze, drill, drillUp, fetchAllAnalyses, saveAnalysis, deleteAnalysis, cancel,
+    /** What the confirm dialog was opened with, so a warning can be asserted as a sentence. */
+    dialogOpen,
+    /** The body of the most recent confirmation, which is where a consequence has to be named. */
+    confirmBody(): string {
+      return dialogOpen.mock.calls[dialogOpen.mock.calls.length - 1]?.[1]?.data?.body ?? '';
+    },
     show(): string {
       fixture.detectChanges();
       return ((fixture.nativeElement as HTMLElement).textContent ?? '').replace(/\s+/g, ' ');
@@ -2696,7 +2706,88 @@ describe('cross-filtering: clicking a result narrows everything drawn from it', 
     })));
 
     expect(canvas.studio.markClickable()).toBe(false);
-    canvas.studio.crossFilterFromMark('north · active');
+    // The whole mark now, not its drawn name: the name is what the chart printed, and over two
+    // dimensions it is two values joined by a middle dot, which is no column's value at all.
+    canvas.studio.crossFilterFromMark(canvas.studio.canvasPoints()[0]);
+    expect(canvas.studio.crossFilters()).toEqual([]);
+  });
+
+  it('clicking a mark filters on the RAW value, not the label the chart drew', () => {
+    const canvas = canvasWith();
+    canvas.studio.dimensions.set(['booked_on']);
+    canvas.studio.aggregation.set('SUM');
+    canvas.studio.measureField.set('amount');
+    canvas.studio.runAnalysis();
+    canvas.answers.analyze!.next(SERVER_RESPONSE(analysisOf({
+      columns: [
+        { name: 'booked_on', type: 'DATE', role: 'DIMENSION' },
+        { name: 'amount_sum', type: 'DOUBLE', role: 'MEASURE' },
+      ],
+      rows: [['2024-03-01 00:00', '100']],
+      dimensions: ['booked_on'],
+      grains: [null],
+    })));
+
+    // The chart DRAWS "2024-03-01" -- renderCell cuts a midnight timestamp to its date -- and the
+    // column holds "2024-03-01 00:00". Filtering on what was drawn asks for a string the data
+    // does not contain.
+    expect(canvas.studio.canvasPoints()[0].name).toBe('2024-03-01');
+    canvas.studio.crossFilterFromMark(canvas.studio.canvasPoints()[0]);
+
+    expect(canvas.studio.crossFilters())
+      .toEqual([{ field: 'booked_on', operator: 'EQ', value: '2024-03-01 00:00' }]);
+  });
+
+  it('refuses to narrow on the Top-N roll-up, which is not a value in the data', () => {
+    const canvas = canvasWith();
+    canvas.studio.dimensions.set(['region']);
+    canvas.studio.aggregation.set('SUM');
+    canvas.studio.measureField.set('amount');
+    canvas.studio.runAnalysis();
+    canvas.answers.analyze!.next(SERVER_RESPONSE(analysisOf({
+      columns: [
+        { name: 'region', type: 'VARCHAR', role: 'DIMENSION' },
+        { name: 'amount_sum', type: 'DOUBLE', role: 'MEASURE' },
+      ],
+      rows: [['north', '100'], ['Other', '40']],
+      dimensions: ['region'],
+      other: { label: 'Other', values: ['south'], valueCount: 3, valuesTruncated: false },
+      rollupRows: [1],
+    })));
+
+    const [real, rollUp] = canvas.studio.canvasPoints();
+    expect(real.operand).toBe('north');
+    // Inert individually, on a chart whose other bars work -- the same treatment the roll-up row
+    // already gets in the table beside it.
+    expect(rollUp.inert).toBe(true);
+    canvas.studio.crossFilterFromMark(rollUp);
+    expect(canvas.studio.crossFilters()).toEqual([]);
+
+    // And the real bar still narrows, so this refuses the roll-up rather than the chart.
+    canvas.studio.crossFilterFromMark(real);
+    expect(canvas.studio.crossFilters())
+      .toEqual([{ field: 'region', operator: 'EQ', value: 'north' }]);
+  });
+
+  it('refuses to narrow a grained date, whose bar stands for a whole bucket', () => {
+    const canvas = canvasWith();
+    canvas.studio.dimensions.set(['booked_on']);
+    canvas.studio.aggregation.set('SUM');
+    canvas.studio.measureField.set('amount');
+    canvas.studio.runAnalysis();
+    canvas.answers.analyze!.next(SERVER_RESPONSE(analysisOf({
+      columns: [
+        { name: 'booked_on', type: 'TIMESTAMP', role: 'DIMENSION' },
+        { name: 'amount_sum', type: 'DOUBLE', role: 'MEASURE' },
+      ],
+      rows: [['2024-03-01 00:00:00', '100'], ['2024-04-01 00:00:00', '90']],
+      dimensions: ['booked_on'],
+      grains: ['MONTH'],
+    })));
+
+    // The bar says March and MEANS March. An equality would hand back the first of the month.
+    expect(canvas.studio.markClickable()).toBe(false);
+    canvas.studio.crossFilterFromMark(canvas.studio.canvasPoints()[0]);
     expect(canvas.studio.crossFilters()).toEqual([]);
   });
 
@@ -2957,7 +3048,13 @@ describe('a value on the wire is a string, and has to be a faithful one', () => 
     const canvas = canvasWith();
     canvas.ran(analysisOf({ rows: [['north', '7.466125E7']] }));
 
-    expect(canvas.show()).toContain('74661250');
+    // Grouped, because a MEASURE cell now goes through readableCell the way a dashboard tile's
+    // always did. The Canvas used to print the server's text verbatim while a board tile of the
+    // SAME saved analysis grouped it, so one screen read 20781905.520000000000000 and the other
+    // 20,781,905.52 -- two screens of one analysis disagreeing about a number.
+    expect(canvas.show()).toContain('74,661,250');
+    // And the wire form is still gone, which is what this test was written for: plainDecimal
+    // expands the exponent before readableCell ever sees it.
     expect(canvas.show()).not.toContain('7.466125E7');
   });
 
@@ -3224,12 +3321,40 @@ describe('the pivot: two dimensions, with the aggregate in the cells', () => {
   });
 
   it('offers no total at all for an average, rather than summing averages', () => {
-    const canvas = pivoted();
+    // The intent of this test was always right and its setup was a shortcut. It used to run the
+    // pivot as a SUM and then move the Measure picker to AVERAGE, which asserted that the totals
+    // track the PICKER -- and that is the defect, not the fix: the cells on screen are still the
+    // sums that were computed, so a picker moved to Average had been removing a total that was
+    // perfectly real. The grid is now described by the analysis that produced it, so the average
+    // has to be the analysis that ran.
+    const canvas = canvasWith();
+    canvas.studio.setDimension(0, 'region');
+    canvas.studio.setDimension(1, 'status');
     canvas.studio.aggregation.set('AVERAGE');
+    canvas.studio.measureField.set('amount');
+    canvas.studio.runAnalysis();
+    canvas.answers.analyze!.next(SERVER_RESPONSE(GRID));
+    canvas.studio.canvasKindName.set('pivot');
+    canvas.fixture.detectChanges();
 
     expect(canvas.studio.pivot()!.additive).toBe(false);
     expect(canvas.studio.pivot()!.rows[0].total).toBeNull();
     expect(canvas.studio.pivotTotalNote()).toContain('does not add up');
+  });
+
+  it('keeps the total a SUM earned when the Measure picker moves off it', () => {
+    // The other half of the same rule, and the defect that made it necessary: moving the picker
+    // to Average grew nothing and removed a real total, while moving it the other way -- an
+    // AVERAGE pivot relabelled Sum -- grew a Total column of sums of averages and silently
+    // dropped the note saying averages do not add up. Every cell under it was still an average.
+    const canvas = pivoted();
+    expect(canvas.studio.pivot()!.rows[0].total).toBe(140);
+
+    canvas.studio.aggregation.set('AVERAGE');
+
+    expect(canvas.studio.pivot()!.additive).toBe(true);
+    expect(canvas.studio.pivot()!.rows[0].total).toBe(140);
+    expect(canvas.studio.pivotTotalNote()).toBe('');
   });
 
   it('says why there is no grid when the column dimension is too wide for one', () => {
@@ -4423,5 +4548,576 @@ describe('the heading says what a bucket is', () => {
     } as any);
 
     expect(canvas.studio.canvasCaption()).toContain('by quarter');
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * A bucketed dimension has TWO names in a response, and telling them apart is the whole of this.
+ *
+ * `dimensions` carries the schema field name -- the identity a filter and a drill step use -- while
+ * the DIMENSION-role columns are headed with the ALIAS, which is that name plus its grain. Group
+ * booked_on by month and the two are booked_on and booked_on_month. Every defect below came from
+ * one of them being used where the other was meant, and each one failed SILENTLY: a drill into the
+ * wrong group, a filter naming a column the dataset does not have.
+ *
+ * @author Nabeel Ahmed
+ */
+describe('a bucketed dimension is not the column it was bucketed from', () => {
+  /** What the server sends back for "Sum of amount by booked_on, by month". */
+  const BY_MONTH = analysisOf({
+    columns: [
+      { name: 'booked_on_month', type: 'DATE', role: 'DIMENSION' },
+      { name: 'amount_sum', type: 'DOUBLE', role: 'MEASURE' },
+    ],
+    rows: [['2024-03-01 00:00:00', '412900'], ['2024-04-01 00:00:00', '318400']],
+    rowCount: 2,
+    dimensions: ['booked_on'],
+    grains: ['MONTH'],
+    measure: 'amount_sum',
+  });
+
+  function monthly() {
+    const canvas = canvasWith();
+    canvas.studio.setDimension(0, 'booked_on');
+    canvas.studio.setGrain(0, 'MONTH');
+    canvas.studio.aggregation.set('SUM');
+    canvas.studio.measureField.set('amount');
+    canvas.studio.runAnalysis();
+    canvas.answers.analyze!.next(SERVER_RESPONSE(BY_MONTH));
+    canvas.fixture.detectChanges();
+    return canvas;
+  }
+
+  it('reads a drill value out of the row by position, never by matching the header', () => {
+    // The defect in one assertion. Matching the header looked for a cell whose column is called
+    // booked_on and found none, because the column is called booked_on_month -- and "none" was
+    // returned as null, which is not absence but the name of a real group.
+    const canvas = monthly();
+
+    expect(canvas.studio.drillValueOf(canvas.studio.analysisRows()[0]))
+      .toBe('2024-03-01 00:00:00');
+  });
+
+  it('tells "no such dimension here" apart from "this row is the null group"', () => {
+    const canvas = canvasWith();
+    canvas.ran(analysisOf({ rows: [[null, '100']] }));
+
+    // The group with no value in it, which IS drillable: the server narrows it with IS NULL.
+    expect(canvas.studio.drillValueOf(canvas.studio.analysisRows()[0])).toBeNull();
+
+    canvas.studio.drillDimension.set('city');
+    // Not a dimension of this result at all. Undefined rather than null, because null here would
+    // drill into the no-value group of a column the result is not even grouped by.
+    expect(canvas.studio.drillValueOf(canvas.studio.analysisRows()[0])).toBeUndefined();
+  });
+
+  it('drills a bucketed dimension, because the server now narrows to the whole bucket', () => {
+    // This screen used to REFUSE the drill, and that refusal was the honest stop-gap while the
+    // server compiled every step as an equality on the raw column -- drilling the March row handed
+    // back the first of March under a breadcrumb saying March. AnalysisQueryBuilder.bucketWindow
+    // now compiles a grained step as a DATE_RANGE over the whole bucket, so refusing here would
+    // withhold a drill that works. The step still travels as the bucket's start; what changed is
+    // what the server does with it.
+    const canvas = monthly();
+    const before = canvas.drill.mock.calls.length;
+
+    canvas.studio.drillInto('2024-03-01 00:00:00');
+
+    expect(canvas.drill.mock.calls.length).toBe(before + 1);
+    expect(canvas.drill.mock.calls[before][1]).toMatchObject({
+      dimension: 'booked_on',
+      value: '2024-03-01 00:00:00',
+    });
+  });
+
+  it('gives a dimension cell the schema field name, index-aligned with the dimensions', () => {
+    const canvas = canvasWith();
+    canvas.studio.setDimension(0, 'region');
+    canvas.studio.setDimension(1, 'booked_on');
+    canvas.studio.setGrain(1, 'MONTH');
+    canvas.studio.aggregation.set('SUM');
+    canvas.studio.measureField.set('amount');
+    canvas.studio.runAnalysis();
+    canvas.answers.analyze!.next(SERVER_RESPONSE(analysisOf({
+      columns: [
+        { name: 'region', type: 'VARCHAR', role: 'DIMENSION' },
+        { name: 'booked_on_month', type: 'DATE', role: 'DIMENSION' },
+        { name: 'amount_sum', type: 'DOUBLE', role: 'MEASURE' },
+      ],
+      rows: [['north', '2024-03-01 00:00:00', '100']],
+      rowCount: 1,
+      dimensions: ['region', 'booked_on'],
+      grains: [null, 'MONTH'],
+    })));
+
+    const cells = canvas.studio.analysisRows()[0].cells;
+    expect(cells[0].field).toBe('region');
+    // Bucketed, so inert: the cell says March and means March, and an equality on booked_on asks
+    // for the first of the month. Empty rather than 'booked_on_month', which is the alias and is
+    // what the click used to send -- "This dataset has no column called booked_on_month", with
+    // the chip left on so every later Run, drill and drill-up failed the same way.
+    expect(cells[1].field).toBe('');
+    expect(cells[2].field).toBe('');
+  });
+
+  it('says why a bucketed cell will not click, rather than leaving a dead cell', () => {
+    const canvas = monthly();
+
+    expect(canvas.studio.analysisRows()[0].cells[0].field).toBe('');
+    expect(canvas.show()).toContain('cannot be filtered to or drilled into');
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Every sentence on the Canvas is a claim about the ROWS on screen, and the rows do not move when
+ * a picker does.
+ *
+ * The figure and the controls that built it are on screen together, which is the arrangement that
+ * makes a stale description invisible: a reader who nudges a control is looking at the control, and
+ * the sentence above the result relabels itself under their eye. Each test here changes a picker
+ * WITHOUT pressing Run and asserts that the description does not follow it.
+ *
+ * @author Nabeel Ahmed
+ */
+describe('the Canvas describes the answer, not the controls above it', () => {
+  it('goes on calling a Top-N result a Top-N after the control is set back to All', () => {
+    const canvas = canvasWith();
+    canvas.studio.setTopN(25);
+    canvas.ran();
+    expect(canvas.show()).toContain('the top 25');
+
+    canvas.studio.setTopN(null);
+
+    // The same twenty-five rows are still there. Calling them "every group that matched" presents
+    // a partial answer as the complete one, which is the claim this tab exists never to make.
+    expect(canvas.show()).toContain('the top 25');
+    expect(canvas.show()).not.toContain('every group that matched');
+  });
+
+  it('names the measure that RAN in the heading, not the one now in the picker', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    expect(canvas.studio.canvasCaption()).toBe('Sum of amount by region');
+
+    canvas.studio.aggregation.set('AVERAGE');
+
+    expect(canvas.studio.canvasCaption()).toBe('Sum of amount by region');
+  });
+
+  it('keeps the exactness mark on a distinct count when the picker moves off it', () => {
+    const canvas = canvasWith();
+    canvas.studio.aggregation.set('DISTINCT_COUNT');
+    canvas.studio.measureField.set('region');
+    canvas.studio.setDimension(0, 'status');
+    canvas.studio.runAnalysis();
+    canvas.answers.analyze!.next(SERVER_RESPONSE(analysisOf({
+      columns: [
+        { name: 'status', type: 'VARCHAR', role: 'DIMENSION' },
+        { name: 'region_distinct_count', type: 'BIGINT', role: 'MEASURE' },
+      ],
+      rows: [['active', '12']],
+      rowCount: 1,
+      dimensions: ['status'],
+      measure: 'region_distinct_count',
+    })));
+    expect(canvas.studio.distinctExactness()).toBe('exact');
+
+    canvas.studio.aggregation.set('SUM');
+
+    // The column on screen is still a count(DISTINCT ...). Dropping the mark left a figure whose
+    // exactness the reader had been told, and then untold, without the figure changing.
+    expect(canvas.studio.distinctExactness()).toBe('exact');
+  });
+
+  it('counts the filters the result was computed over, not the ones typed since', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    expect(canvas.studio.canvasNotes().some(note => note.includes('filters are on'))).toBe(false);
+
+    canvas.studio.setFilters({
+      op: 'AND', clauses: [{ field: 'status', operator: 'EQ', value: 'active' }],
+    });
+
+    // Typed, not run. "Every figure here is over the rows that match them" about rows computed
+    // without the filter is a false statement about the numbers rather than a stale label.
+    expect(canvas.studio.canvasNotes().some(note => note.includes('filters are on'))).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+
+describe('the Drill picker offers the column the analysis is grouped by NOW', () => {
+  const STEP = { dimension: 'region', value: 'north', nextDimension: 'city' };
+  const DRILLED = analysisOf({
+    columns: [
+      { name: 'city', type: 'VARCHAR', role: 'DIMENSION' },
+      { name: 'amount_sum', type: 'DOUBLE', role: 'MEASURE' },
+    ],
+    rows: [['leeds', '4000']],
+    rowCount: 1,
+    dimensions: ['city'],
+    drillPath: [STEP],
+    crumbs: [{ label: 'All rows' }, { label: 'region: north', field: 'region', value: 'north' }],
+  });
+
+  function drilled() {
+    const canvas = canvasWith();
+    canvas.ran();
+    canvas.studio.drillNext.set('city');
+    canvas.studio.drillInto('north');
+    canvas.answers.drill!.next(SERVER_RESPONSE(DRILLED));
+    canvas.fixture.detectChanges();
+    return canvas;
+  }
+
+  function optionsOf(canvas: ReturnType<typeof canvasWith>, id: string): string[] {
+    const select = (canvas.fixture.nativeElement as HTMLElement)
+      .querySelector(id) as HTMLSelectElement;
+    return Array.from(select.options).map(option => option.value);
+  }
+
+  it('lists the drilled-INTO column rather than the root it came from', () => {
+    const canvas = drilled();
+
+    // 'region' was the only option here while the control's bound value was 'city': a select
+    // displaying one column and holding another, and a Drill button that then did nothing at all.
+    expect(optionsOf(canvas, '#a-drill-dim')).toEqual(['city']);
+    expect(canvas.studio.drillDimension()).toBe('city');
+  });
+
+  it('offers the root again under "then by", because it is no longer grouped by it', () => {
+    const canvas = drilled();
+    const options = optionsOf(canvas, '#a-drill-next');
+
+    expect(options).toContain('region');
+    expect(options).not.toContain('city');
+  });
+
+  it('drills again through the column that is actually on the table', () => {
+    const canvas = drilled();
+    canvas.studio.drillInto('leeds');
+
+    expect(canvas.drill.mock.calls[1][1]).toEqual({ dimension: 'city', value: 'leeds' });
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+
+describe('what a saved analysis records is what was on screen', () => {
+  it('drops a calendar bucket when another dataset is opened', () => {
+    // The Bucket picker is rendered only beside a temporal dimension, so a MONTH left in slot 0
+    // of a file whose slot 0 holds a VARCHAR is a permanent refusal with no control on screen to
+    // undo it -- the reader has to re-pick the same dimension twice to escape.
+    const canvas = canvasWith();
+    canvas.studio.setDimension(0, 'booked_on');
+    canvas.studio.setGrain(0, 'MONTH');
+    expect(canvas.studio.dimensionGrains()).toEqual(['MONTH']);
+
+    canvas.studio.openFile(REFUNDS);
+
+    expect(canvas.studio.dimensionGrains()).toEqual([]);
+  });
+
+  it('saves the drill as filters, which is what the Save control promises', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    canvas.studio.drillPath.set([{ dimension: 'region', value: 'north' }]);
+    canvas.studio.analysisName.set('North by city');
+    canvas.studio.saveAnalysis(false);
+
+    // Without this the stored analysis was "Sum of amount by region" over EVERY region -- the
+    // root a drill never changes, with the drill's own narrowing nowhere in the row -- under a
+    // title promising one region, on the canvas and on every dashboard tile built from it.
+    expect(JSON.parse(canvas.saveAnalysis.mock.calls[0][0].analysisConfig).filters.clauses)
+      .toEqual([{ field: 'region', operator: 'EQ', value: 'north' }]);
+  });
+
+  it('compiles a null drill step to IS_NULL in the saved filters too', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    canvas.studio.drillPath.set([{ dimension: 'region', value: null }]);
+    canvas.studio.analysisName.set('No region');
+    canvas.studio.saveAnalysis(false);
+
+    expect(JSON.parse(canvas.saveAnalysis.mock.calls[0][0].analysisConfig).filters.clauses)
+      .toEqual([{ field: 'region', operator: 'IS_NULL' }]);
+  });
+
+  it('records the chart kind the reader chose when nothing has been run since', () => {
+    const canvas = canvasWith();
+    canvas.studio.openAnalysis({
+      analyticsAnalysisId: 12, analysisName: 'Share by region', connectionAlias: 'minio-main',
+      datasetPath: 'daily/sales-2026.csv', visualizationType: 'donut',
+      analysisConfig: JSON.stringify({
+        dimensions: ['region'], measure: { aggregation: 'SUM', field: 'amount' },
+      }),
+    });
+    // openAnalysis deliberately does not run it, so every kind carries "Nothing has run yet."
+    // and canvasKind() -- which answers what to DRAW -- has nothing to fall back to.
+    expect(canvas.studio.canvasKind()).toBeNull();
+
+    canvas.studio.analysisName.set('Share by region');
+    canvas.studio.saveAnalysis(true);
+
+    // 'table' here overwrote a donut for no better reason than that somebody renamed it.
+    expect(canvas.saveAnalysis.mock.calls[0][0].visualizationType).toBe('donut');
+  });
+
+  it('keeps an updated analysis pointed at the dataset it was saved against', () => {
+    const canvas = canvasWith();
+    canvas.studio.openAnalysis({
+      analyticsAnalysisId: 4, analysisName: 'Sales by region', connectionAlias: 'minio-main',
+      datasetPath: 'archive/2025.parquet', visualizationType: 'table',
+      analysisConfig: JSON.stringify({
+        dimensions: ['region'], measure: { aggregation: 'SUM', field: 'amount' },
+      }),
+    });
+    canvas.studio.analysisName.set('Sales by region, renamed');
+    canvas.studio.saveAnalysis(true);
+
+    // A rename is a rename. Sending the open file here repointed a row whose stored config names
+    // another file's columns: the dashboard tile that ran it yesterday fails on an unknown column
+    // and nothing records which file it used to read.
+    const body = canvas.saveAnalysis.mock.calls[0][0];
+    expect(body.datasetPath).toBe('archive/2025.parquet');
+    expect(body.connectionAlias).toBe('minio-main');
+  });
+
+  it('records the OPEN dataset when it is saved as a new analysis', () => {
+    // The control. Save as new means this cut against the file in front of the reader.
+    const canvas = canvasWith();
+    canvas.studio.openAnalysis({
+      analyticsAnalysisId: 4, analysisName: 'Sales by region', connectionAlias: 'minio-main',
+      datasetPath: 'archive/2025.parquet', visualizationType: 'table',
+      analysisConfig: JSON.stringify({
+        dimensions: ['region'], measure: { aggregation: 'SUM', field: 'amount' },
+      }),
+    });
+    canvas.studio.analysisName.set('Sales by region, here');
+    canvas.studio.saveAnalysis(false);
+
+    const body = canvas.saveAnalysis.mock.calls[0][0];
+    expect(body.analyticsAnalysisId).toBeUndefined();
+    expect(body.datasetPath).toBe('daily/sales-2026.csv');
+  });
+
+  it('shows a restored field the open dataset does not have, rather than an empty picker', () => {
+    const canvas = canvasWith();
+    canvas.studio.openAnalysis({
+      analyticsAnalysisId: 5, analysisName: 'From elsewhere', connectionAlias: 'minio-main',
+      datasetPath: 'archive/2025.parquet', visualizationType: 'table',
+      analysisConfig: JSON.stringify({
+        dimensions: ['nowhere'], measure: { aggregation: 'SUM', field: 'amount' },
+      }),
+    });
+
+    // The select's options come from the OPEN dataset, so no option matched and the control
+    // rendered with nothing selected -- the screen said "no grouping" while the request still
+    // carried dimensions: ['nowhere'].
+    const shown = canvas.studio.dimensionOptions(0).find(option => option.name === 'nowhere');
+    expect(shown?.missing).toBe(true);
+    expect(canvas.studio.analysisFieldsMissing()).toEqual(['nowhere']);
+    expect(canvas.show()).toContain('not a column of this dataset');
+    expect(canvas.show()).toContain('Run will be refused');
+  });
+
+  it('names the dashboard tiles a delete takes with it, before it is confirmed', async () => {
+    const canvas = canvasWith();
+    await canvas.studio.removeAnalysis({
+      analyticsAnalysisId: 7, analysisName: 'Q3 draft', connectionAlias: 'minio-main',
+      datasetPath: 'daily/sales-2026.csv', analysisConfig: '{}',
+    });
+
+    // It used to name only what is NOT affected, which reads as a complete account of the
+    // consequences and is not one: the widget rows cascade, on dashboards this reader may not
+    // even be able to see.
+    expect(canvas.confirmBody()).toContain('any dashboard tile showing it');
+    expect(canvas.confirmBody()).toContain('The dataset it reads is untouched');
+  });
+
+  it('shows what a delete actually removed, in the server’s own words', async () => {
+    const canvas = canvasWith();
+    await canvas.studio.removeAnalysis({
+      analyticsAnalysisId: 7, analysisName: 'Q3 draft', connectionAlias: 'minio-main',
+      datasetPath: 'daily/sales-2026.csv', analysisConfig: '{}',
+    });
+    canvas.answers.deleteAnalysis!.next({
+      status: 'SUCCESS',
+      message: 'Saved analysis deleted with 1003, and 3 dashboard widget(s) that showed it.',
+      data: true,
+    });
+
+    // The count exists in exactly one place -- the response -- and it was being dropped on the
+    // one branch it is ever sent on.
+    expect(canvas.show()).toContain('3 dashboard widget(s) that showed it');
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Two requests in flight at once, which is what clicking faster than a bucket answers produces.
+ *
+ * None of these endpoints promises an order, and the last response to land wins. Each test here
+ * settles the SECOND request first and the first one after it -- the ordering that actually
+ * happens when a large Parquet footer queues behind the four-permit governor while a small CSV
+ * goes straight through -- and asserts that the superseded answer is dropped rather than applied
+ * to the thing that replaced it.
+ *
+ * @author Nabeel Ahmed
+ */
+describe('a superseded response never overwrites the one that replaced it', () => {
+  function racing() {
+    const listings: Subject<any>[] = [];
+    const schemas: Subject<any>[] = [];
+    const pages: Subject<any>[] = [];
+    const held = (into: Subject<any>[]) => {
+      const subject = new Subject<any>();
+      into.push(subject);
+      return subject.asObservable();
+    };
+
+    const buckets = vi.fn(() => of(SERVER_RESPONSE([MINIO])));
+    const listObjects = vi.fn(() => held(listings));
+    const schema = vi.fn(() => held(schemas));
+    const preview = vi.fn(() => held(pages));
+    const profile = vi.fn(() => new Subject<any>().asObservable());
+    const analyze = vi.fn(() => new Subject<any>().asObservable());
+    const drill = vi.fn(() => new Subject<any>().asObservable());
+    const drillUp = vi.fn(() => new Subject<any>().asObservable());
+    const fetchAllAnalyses = vi.fn(() => new Subject<any>().asObservable());
+    const saveAnalysis = vi.fn(() => new Subject<any>().asObservable());
+    const deleteAnalysis = vi.fn(() => new Subject<any>().asObservable());
+    const cancel = vi.fn(() => new Subject<any>().asObservable());
+
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([]),
+        { provide: StorageService, useValue: { buckets, listObjects } },
+        {
+          provide: AnalyticsService,
+          useValue: {
+            schema, preview, profile, analyze, drill, drillUp, fetchAllAnalyses, saveAnalysis,
+            deleteAnalysis, cancel,
+          },
+        },
+        { provide: Dialog, useValue: { open: () => ({ closed: of(true) }) } },
+      ],
+    });
+
+    const fixture = TestBed.createComponent(Analytics);
+    fixture.detectChanges();
+    const studio = fixture.componentInstance;
+    // The rail's first listing, which is not part of any race being tested here.
+    listings[0].next(SERVER_RESPONSE({ objects: [CSV_FILE, REFUNDS, FOLDER] }));
+    return { studio, fixture, listings, schemas, pages };
+  }
+
+  it('keeps the OPEN dataset’s columns when a slower schema lands after it', () => {
+    const race = racing();
+    race.studio.openFile(CSV_FILE);
+    race.studio.openFile(REFUNDS);
+
+    race.schemas[1].next(SERVER_RESPONSE(SECOND_SCHEMA));
+    race.schemas[0].next(SERVER_RESPONSE(CANVAS_SCHEMA));
+
+    // Applied, this listed the first file's columns against the second file's rows: the Columns
+    // tab, the Canvas pickers and the grid's column model all described a file the header was not
+    // naming, and any request built from one of them was refused by a server that could see the
+    // mismatch the screen could not.
+    expect(race.studio.path()).toBe('daily/refunds-2026.csv');
+    expect(race.studio.columns().map(column => column.name)).toEqual(['id', 'refunded']);
+  });
+
+  it('keeps the folder the reader is in when a slower listing lands after it', () => {
+    const race = racing();
+    race.studio.openFolder('big/');
+    race.studio.openFolder('small/');
+
+    race.listings[2].next(SERVER_RESPONSE({ objects: [REFUNDS] }));
+    race.listings[1].next(SERVER_RESPONSE({ objects: [CSV_FILE, TEXT_FILE] }));
+
+    // Applied, the rail showed the contents of the folder that was left under the crumbs of the
+    // folder the reader is in -- and "read all of these together" then built a glob over the
+    // CURRENT prefix with an extension from the PREVIOUS folder.
+    expect(race.studio.prefix()).toBe('small/');
+    expect(race.studio.entries().map(entry => entry.key)).toEqual(['daily/refunds-2026.csv']);
+  });
+
+  it('keeps the page the grid asked for last when an earlier one answers after it', () => {
+    const race = racing();
+    race.studio.openFile(CSV_FILE);
+    race.schemas[0].next(SERVER_RESPONSE(CANVAS_SCHEMA));
+    race.pages[0].next(SERVER_RESPONSE(pageOf({ page: 0 })));
+
+    race.studio.loadPage(1);
+    race.studio.loadPage(2);
+    race.pages[2].next(SERVER_RESPONSE(pageOf({ page: 2, rows: [['3', '30.00']] })));
+    race.pages[1].next(SERVER_RESPONSE(pageOf({ page: 1, rows: [['2', '20.00']] })));
+
+    // The pager, the sort and the inherited narrowing all describe the request that was made
+    // last; rows from an earlier one land under all three of them.
+    expect(race.studio.preview()!.page).toBe(2);
+    expect(race.studio.preview()!.rows).toEqual([['3', '30.00']]);
+  });
+});
+
+/**
+ * The saved-analysis library, which was the whole of the Canvas tab's height problem.
+ *
+ * It drew every saved analysis. On a workspace with 135 of them that is a 6,799px panel sitting
+ * under the result, and it made the tab 7,908px -- 8.8 screenfuls at 1440x900 -- with the answer
+ * stranded above it. The two-column layout helped by 500px; this is the other 6,000.
+ */
+describe('the saved-analysis library', () => {
+  const saved = (n: number) => Array.from({ length: n }, (_, at) => ({
+    analyticsAnalysisId: at + 1,
+    analysisName: `Analysis ${at + 1}`,
+    connectionAlias: 'etl-bucket',
+    datasetPath: at % 2 ? 'analytics-samples/orders.csv' : 'analytics-samples/returns.csv',
+    visualizationType: 'table',
+  })) as any[];
+
+  it('draws a handful, not all of them', () => {
+    const canvas = canvasWith();
+    canvas.studio.analyses.set(saved(135));
+
+    expect(canvas.studio.libraryVisible().length).toBe(8);
+    expect(canvas.studio.libraryHidden()).toBe(127);
+  });
+
+  it('shows the rest when asked, so nothing is unreachable', () => {
+    const canvas = canvasWith();
+    canvas.studio.analyses.set(saved(135));
+
+    canvas.studio.libraryShowAll.set(true);
+
+    expect(canvas.studio.libraryVisible().length).toBe(135);
+    expect(canvas.studio.libraryHidden()).toBe(0);
+  });
+
+  it('searches by name and by dataset, because 135 is past scrolling', () => {
+    const canvas = canvasWith();
+    canvas.studio.analyses.set(saved(135));
+
+    canvas.studio.librarySearch.set('Analysis 42');
+    expect(canvas.studio.libraryMatches().map(a => a.analysisName)).toEqual(['Analysis 42']);
+
+    canvas.studio.librarySearch.set('returns.csv');
+    // Every other fixture row is the returns dataset.
+    expect(canvas.studio.libraryMatches().length).toBe(68);
+  });
+
+  it('leaves a small library alone entirely', () => {
+    const canvas = canvasWith();
+    canvas.studio.analyses.set(saved(3));
+
+    expect(canvas.studio.libraryVisible().length).toBe(3);
+    expect(canvas.studio.libraryHidden()).toBe(0);
   });
 });

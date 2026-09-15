@@ -1,4 +1,5 @@
 import { Component, computed, input } from '@angular/core';
+import { chartColor } from './status-color';
 
 export interface Slice { name: string; value: number; }
 
@@ -25,7 +26,7 @@ export interface Slice { name: string; value: number; }
                       [attr.stroke]="segment.color"
                       [attr.stroke-dasharray]="segment.dash"
                       [attr.stroke-dashoffset]="-segment.offset">
-                <title>{{ segment.name }}: {{ segment.value }}</title>
+                <title>{{ segment.name }}: {{ segment.display }}</title>
               </circle>
             }
           </svg>
@@ -47,7 +48,7 @@ export interface Slice { name: string; value: number; }
               <span class="capitalize truncate text-[color:var(--text-secondary)]">
                 {{ segment.name.toLowerCase() }}
               </span>
-              <span class="ml-auto tabular font-medium shrink-0">{{ segment.value }}</span>
+              <span class="ml-auto tabular font-medium shrink-0">{{ segment.display }}</span>
               <span class="tabular text-[color:var(--text-muted)] w-8 text-right shrink-0">
                 {{ segment.percent }}%
               </span>
@@ -65,24 +66,63 @@ export class Donut {
   readonly totalLabel = input('total');
   /** Optional fixed colours by name, so a status keeps its colour across charts. */
   readonly colorFor = input<((name: string, index: number) => string) | null>(null);
+  /**
+   * How a slice's value is written in the legend and the tooltip.
+   *
+   * Null renders the number as it arrives, which is what every caller got before this existed --
+   * and over money read out of a CSV that meant a legend row reading 103909527.57999787, the
+   * trailing digits an artefact of the reader typing the column as DOUBLE. RankedBar's own source
+   * records the identical symptom as a bug it had already fixed; the ring beside it had no input
+   * to fix it with.
+   *
+   * This used to add "The ring's CENTRE was always fine, because compactTotal formats it", which
+   * was true of three of compactTotal's four branches. Below a thousand it formatted nothing and
+   * printed the sum as it arrived, so a ring over a small money column showed the float artefact
+   * in the middle while the legend rows beside it read properly. compactTotal now rounds that
+   * branch too -- to its own precision rather than to this formatter's, because the centre is
+   * sized for about five characters and a grouped, unabbreviated total does not fit in it.
+   */
+  readonly format = input<((value: number) => string) | null>(null);
 
   readonly total = computed(() => this.data().reduce((sum, d) => sum + (d.value ?? 0), 0));
 
   /** The centre of a 72px ring cannot hold six digits. */
   readonly compactTotal = computed(() => {
     const total = this.total();
-    if (total < 1000) return `${total}`;
+    /*
+     * Two decimal places below a thousand, where this used to be a bare `${total}`.
+     *
+     * That was the one branch of the four that formatted nothing, so the artefact the legend rows
+     * were given a formatter to cure was still alive in the middle of the same ring: a set of
+     * slices summing to 103.90000000000002 -- the trailing digits an artefact of the reader
+     * typing the column as DOUBLE -- printed all eighteen characters inside a 104px circle.
+     *
+     * Rounded here rather than handed to the caller's `format`, because the constraint in the
+     * centre is the RING and not the caller. readableCell renders 103909527.58 as
+     * "103,909,527.58", which is exactly right in a legend row and does not fit in a space that
+     * holds about five characters -- which is why the branches below compact at all. Two places
+     * keep money and rates whole and drop the float noise, which is the whole of the defect.
+     */
+    if (total < 1000) return `${Math.round(total * 100) / 100}`;
     if (total < 1_000_000) return `${(total / 1000).toFixed(total < 10_000 ? 1 : 0)}k`;
     return `${(total / 1_000_000).toFixed(1)}M`;
   });
 
-  readonly ariaLabel = computed(() =>
-    this.data().map(d => `${d.name}: ${d.value}`).join(', '));
+  readonly ariaLabel = computed(() => {
+    // Formatted too. A screen reader hearing "one hundred three million nine hundred nine
+    // thousand five hundred twenty seven point five seven nine nine nine..." is being read the
+    // float's rounding error, digit by digit.
+    const format = this.format();
+    return this.data()
+      .map(d => `${d.name}: ${format ? format(d.value) : d.value}`)
+      .join(', ');
+  });
 
   readonly segments = computed(() => {
     const total = this.total();
     if (!total) return [];
     const custom = this.colorFor();
+    const format = this.format();
     let offset = 0;
     return this.data().map((slice, index) => {
       const pct = (slice.value / total) * 100;
@@ -90,10 +130,13 @@ export class Donut {
       const segment = {
         name: slice.name,
         value: slice.value,
+        // What the legend and the tooltip actually print. The raw value stays on the object
+        // because the percentage and the ring geometry are computed from it.
+        display: format ? format(slice.value) : `${slice.value}`,
         percent: Math.round(pct),
         dash,
         offset,
-        color: custom ? custom(slice.name, index) : `var(--chart-${index % 6})`,
+        color: custom ? custom(slice.name, index) : chartColor(index),
       };
       offset += pct;
       return segment;

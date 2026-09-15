@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  DIMENSIONS, Measure, RunData, RunRow, aggregate, buildPivot, formatMeasure,
+  DIMENSIONS, Measure, NO_DURATION, RunData, RunRow, aggregate, buildPivot, formatMeasure,
   humanSeconds, percentile,
   ADDITIVE,
   EXECUTION
@@ -61,17 +61,37 @@ describe('measures', () => {
     expect(aggregate(repeated, 'mode')).toBe(5);
   });
 
-  it('returns zero rather than NaN when nothing has a duration', () => {
+  /*
+   * These two pinned a 0 for "nothing to measure", and 0 is a duration. A run that is still in
+   * flight carries -1 in both duration columns -- start_time is stamped at ENQUEUE, so Queue,
+   * Start and Running rows arrive here untimed -- and returning 0 for a group made entirely of
+   * them reported that the group finished instantly. The default Task x Outcome grid under any
+   * duration measure printed "0s" down the whole Running column and under its total, with no
+   * dash to rescue it: the grid's dash only ever covered cells with no runs IN them.
+   */
+  it('reports no duration, not a zero one, when nothing has a duration', () => {
     const none: RunRow[] = [[0,0,0,0,-1,'x',1]] as RunRow[];
     for (const m of ['sum','avg','median','min','max','range','stddev','mode'] as Measure[]) {
-      expect(aggregate(none, m)).toBe(0);
+      expect(aggregate(none, m)).toBe(NO_DURATION);
     }
   });
 
   it('handles an empty set without throwing', () => {
-    for (const m of ['count','distinct','sum','avg','median','p90'] as Measure[]) {
+    // A count of no runs is a truthful zero; a duration of no runs is not.
+    for (const m of ['count','distinct'] as Measure[]) {
       expect(aggregate([], m)).toBe(0);
     }
+    for (const m of ['sum','avg','median','p90'] as Measure[]) {
+      expect(aggregate([], m)).toBe(NO_DURATION);
+    }
+  });
+
+  it('keeps a real instant run distinguishable from an unmeasured one', () => {
+    // The whole point of the sentinel: 0s and "—" must not be the same answer.
+    const instant: RunRow[] = [[0,0,0,0,0,'x',1]] as RunRow[];
+    const untimed: RunRow[] = [[0,0,0,0,-1,'x',2]] as RunRow[];
+    expect(humanSeconds(aggregate(instant, 'median'))).toBe('0s');
+    expect(humanSeconds(aggregate(untimed, 'median'))).toBe('—');
   });
 });
 
@@ -136,6 +156,26 @@ describe('the grid', () => {
     expect(p.cellRows[0][0].map(r => r[6])).toEqual([1, 2]);
     expect(p.cellRows[1][1]).toEqual([]);
   });
+
+  /*
+   * The shape the DEFAULT view takes on live data: Task x Outcome under a duration measure, with
+   * a group whose runs are all still in flight. Beta's single run never finished, so its cell,
+   * its row total and anything else measured over it have nothing to measure -- and that is not
+   * the same fact as "it finished instantly", which is what a 0 here said. The grid's own dash
+   * could not save it either: the dash only covers a cell with no runs IN it, and this cell has
+   * a run.
+   */
+  it('does not report a group of unfinished runs as having taken no time', () => {
+    const p = buildPivot(data, dim('task'), dim('status'), 'median');
+    expect(p.rowLabels[1]).toBe('Beta');
+    expect(p.cellRows[1][0].length).toBe(1);        // there IS a run here
+    expect(p.matrix[1][0]).toBe(NO_DURATION);       // it just was never timed
+    expect(p.rowTotals[1]).toBe(NO_DURATION);
+    expect(humanSeconds(p.matrix[1][0])).toBe('—');
+    // Alpha's runs were timed, so nothing about them changes.
+    expect(p.matrix[0][0]).toBe(15);
+    expect(p.colTotals[0]).toBe(15);
+  });
 });
 
 describe('formatting', () => {
@@ -187,8 +227,11 @@ describe('execution measures', () => {
   });
 
   it('reports nothing rather than zero when no run has a recorded pickup', () => {
+    // The test was named for the behaviour it wanted and asserted the behaviour it had: 0, which
+    // humanSeconds renders as "0s" and a reader reads as a run that took no time at all.
     const none = [[0, 0, 0, 0, 50, 'job', 5, 0, -1]] as RunRow[];
-    expect(aggregate(none, 'execMedian')).toBe(0);
+    expect(aggregate(none, 'execMedian')).toBe(NO_DURATION);
+    expect(humanSeconds(aggregate(none, 'execMedian'))).toBe('—');
   });
 
   it('is not additive, so a chart may not total it', () => {

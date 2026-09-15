@@ -7,7 +7,14 @@ import { ToastService } from '../../../shared/ui/toast.service';
 import { Field } from '../../../shared/ui/field';
 import { FormDialog } from '../../../shared/ui/form-dialog';
 
-const FILE_TYPES = ['pdf', 'docx', 'txt', 'md', 'csv', 'json', 'xml', 'png', 'jpg', 'mp3', 'm4a'];
+/*
+ * jpeg sits beside jpg because that is how the files are actually named, and a reader who cannot
+ * find their own extension in the list assumes it is unsupported. They are the same format:
+ * canonicalType() in file-chat.ts folds them, and the server does the same, so ticking either one
+ * accepts both and the two boxes cannot disagree.
+ */
+const FILE_TYPES = ['pdf', 'docx', 'txt', 'md', 'csv', 'json', 'xml',
+  'png', 'jpg', 'jpeg', 'webp', 'mp3', 'm4a'];
 
 const ENDPOINT_PLACEHOLDER: Record<string, string> = {
   OpenAI: 'https://api.openai.com/v1',

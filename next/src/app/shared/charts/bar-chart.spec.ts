@@ -3,8 +3,14 @@ import { TestBed } from '@angular/core/testing';
 import { Component, signal } from '@angular/core';
 import { BarChart, Bar } from './bar-chart';
 
-@Component({ imports: [BarChart], template: `<app-bar-chart [data]="data()" [height]="104" />` })
-class Host { readonly data = signal<Bar[]>([]); }
+@Component({
+  imports: [BarChart],
+  template: `<app-bar-chart [data]="data()" [height]="104" [format]="format()" />`,
+})
+class Host {
+  readonly data = signal<Bar[]>([]);
+  readonly format = signal<(value: number) => string>((value: number) => String(value));
+}
 
 function barsFor(data: Bar[]) {
   // Reset first: configureTestingModule throws once the module has been instantiated, so a
@@ -122,5 +128,166 @@ describe('BarChart axis labels', () => {
     const labelled = bars.filter(b => b.labelled);
     expect(labelled).toHaveLength(2);
     expect(labelled.map(b => b.name)).toEqual(['7 Sep', '8 Sep']);
+  });
+});
+
+describe('the key to a stack\'s colours', () => {
+  /** The chart instance, so the legend it derives can be read directly. */
+  function chartFor(data: Bar[]): BarChart {
+    TestBed.resetTestingModule();
+    const fixture = TestBed.configureTestingModule({ imports: [Host] }).createComponent(Host);
+    fixture.componentInstance.data.set(data);
+    fixture.detectChanges();
+    return fixture.debugElement.children[0].componentInstance as BarChart;
+  }
+
+  const stacked: Bar[] = [
+    { name: 'north', value: 400, segments: [
+      { label: 'shipped', value: 300, color: 'var(--chart-0)' },
+      { label: 'returned', value: 100, color: 'var(--chart-1)' },
+    ] },
+    { name: 'south', value: 100, segments: [
+      // Deliberately the other way round: the legend must key on the LABEL, not on position.
+      { label: 'returned', value: 50, color: 'var(--chart-1)' },
+      { label: 'shipped', value: 50, color: 'var(--chart-0)' },
+    ] },
+  ];
+
+  it('names every category once, with the colour that category is drawn in', () => {
+    // Without this the mapping existed only in each bar's title attribute: a mouse-only,
+    // one-at-a-time affordance, so the chart encoded its second dimension in colour alone.
+    expect((chartFor(stacked) as any).legend()).toEqual([
+      { label: 'shipped', color: 'var(--chart-0)' },
+      { label: 'returned', color: 'var(--chart-1)' },
+    ]);
+  });
+
+  it('says nothing about a chart that has no segments to key', () => {
+    // A plain bar chart labels its own bars, so a legend there would be a second copy of the
+    // axis. It must cost that chart no space at all.
+    expect((chartFor([{ name: 'x', value: 10 }, { name: 'y', value: 4 }]) as any).legend())
+      .toEqual([]);
+  });
+
+  it('leaves out a category with nothing in it, which is what the stack draws', () => {
+    // segments are filtered to value > 0 before they are drawn; a swatch for a band that is not
+    // on the chart is a key to nothing.
+    const withEmpty: Bar[] = [{ name: 'north', value: 300, segments: [
+      { label: 'shipped', value: 300, color: 'var(--chart-0)' },
+      { label: 'cancelled', value: 0, color: 'var(--chart-2)' },
+    ] }];
+    expect((chartFor(withEmpty) as any).legend()).toEqual([
+      { label: 'shipped', color: 'var(--chart-0)' },
+    ]);
+  });
+});
+
+/**
+ * A chart of a known pixel width, so the fit rules can be exercised at all.
+ *
+ * `measured` is set by a ResizeObserver and stays 0 under jsdom, which means every existing test
+ * here runs the "not measured yet" fallback and none of them touches the width arithmetic. That
+ * is how a chart could ship drawing twenty-four overlapping money labels across its own top edge.
+ */
+function chartAt(width: number, data: Bar[], format?: (value: number) => string) {
+  TestBed.resetTestingModule();
+  const fixture = TestBed.configureTestingModule({ imports: [Host] }).createComponent(Host);
+  fixture.componentInstance.data.set(data);
+  if (format) fixture.componentInstance.format.set(format);
+  fixture.detectChanges();
+  const chart = fixture.debugElement.children[0].componentInstance as BarChart;
+  (chart as any).measured.set(width);
+  fixture.detectChanges();
+  return chart;
+}
+
+const money = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2 });
+
+describe('whether a label fits where it is about to be drawn', () => {
+
+  /** Twenty-four months of revenue, the shape that produced the smear. */
+  const revenue: Bar[] = Array.from({ length: 24 }, (_, at) => ({
+    name: `2024-${String((at % 12) + 1).padStart(2, '0')}`,
+    value: 4_398_765.46 + at,
+  }));
+
+  it('withholds the figures when the formatted value is wider than a bar', () => {
+    // 900px over 24 bars is 37.5px of pitch, and "4,398,765.46" needs about 80. The old rule
+    // asked only whether the pitch cleared a flat 22px, which is true of "4.4M" and of nothing
+    // else -- so it drew all twenty-four on top of each other.
+    const chart = chartAt(900, revenue, money);
+    expect((chart as any).showValues()).toBe(false);
+  });
+
+  it('draws them when the SAME bars carry a value that does fit', () => {
+    // The bars have not changed; only the formatter has. Whether a figure fits is a fact about
+    // the string, which is the whole correction.
+    const chart = chartAt(900, revenue, (n: number) => `${Math.round(n / 100_000) / 10}M`);
+    expect((chart as any).showValues()).toBe(true);
+  });
+
+  it('thins the axis by the WIDEST label, not by an assumed one', () => {
+    // Ten-character customer ids need about 68px; at 700px over 11 bars each slot is 63.6. The
+    // flat 34px assumption drew every one of them, which is "CUST-00111 CUST-00319CUST-00315"
+    // running together along the bottom of the Top-10 chart.
+    const customers: Bar[] = Array.from({ length: 11 }, (_, at) => ({
+      name: `CUST-00${String(at + 1).padStart(3, '0')}`,
+      value: 300_000 - at,
+    }));
+
+    const cramped = chartAt(700, customers);
+    expect(cramped.bars().filter(bar => bar.labelled).length).toBeLessThan(11);
+
+    // Given room, every label is drawn: the rule is about fit, not a blanket thinning.
+    const roomy = chartAt(1600, customers);
+    expect(roomy.bars().every(bar => bar.labelled)).toBe(true);
+  });
+
+  it('keeps short labels on every bar at a pitch that would hide long ones', () => {
+    const short: Bar[] = Array.from({ length: 11 }, (_, at) => ({ name: `Q${at}`, value: 10 + at }));
+    expect(chartAt(700, short).bars().every(bar => bar.labelled)).toBe(true);
+  });
+});
+
+describe('a roll-up bar that dwarfs the data', () => {
+  /** What "Top 10 customers" actually holds: ten real rows, and everything else in one bar. */
+  const topTen: Bar[] = [
+    // A real spread across the ten. The live board's ten differ by 0.03%, which rounds to one
+    // pixel however the scale is chosen -- a fixture like that cannot tell the two scales apart.
+    ...Array.from({ length: 10 }, (_, at) => ({ name: `CUST-${at}`, value: 300_000 - at * 25_000 })),
+    { name: 'Other', value: 101_025_562, inert: true },
+  ];
+
+  it('scales to the bars the chart is about, not to the roll-up', () => {
+    // The roll-up set the scale, so all ten real bars rendered at the 3px floor and the chart
+    // answered nothing -- the one bar explicitly NOT one of the ten decided how the ten looked.
+    const chart = chartAt(900, topTen);
+    expect(chart.maxValue()).toBe(300_000);
+
+    const real = chart.bars().filter(bar => !bar.inert);
+    // The tallest real bar now uses the full track instead of three pixels.
+    expect(Math.max(...real.map(bar => bar.px))).toBeGreaterThan(40);
+    // And the ten are told apart, which is the whole point of a ranked chart.
+    expect(new Set(real.map(bar => bar.px)).size).toBeGreaterThan(1);
+  });
+
+  it('still draws the roll-up, and says it was cut rather than faking its height', () => {
+    const chart = chartAt(900, topTen);
+    const other = chart.bars().find(bar => bar.name === 'Other')!;
+
+    expect(other.px).toBeGreaterThan(0);
+    expect(other.clipped).toBe(true);
+    expect(other.hint).toContain('101025562');
+    expect(other.hint).toContain('drawn cut');
+    // A real bar is not cut, so the marking means something.
+    expect(chart.bars().find(bar => bar.name === 'CUST-0')!.clipped).toBe(false);
+  });
+
+  it('falls back to every bar when they are all roll-ups, rather than scaling to nothing', () => {
+    const allInert: Bar[] = [
+      { name: 'Other', value: 50, inert: true },
+      { name: 'Rest', value: 100, inert: true },
+    ];
+    expect(chartAt(900, allInert).maxValue()).toBe(100);
   });
 });

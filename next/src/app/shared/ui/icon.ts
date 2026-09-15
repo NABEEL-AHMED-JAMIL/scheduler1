@@ -98,14 +98,36 @@ const PATHS: Record<string, string> = {
          [attr.aria-hidden]="label() ? null : 'true'"
          [attr.role]="label() ? 'img' : null"
          [attr.aria-label]="label() || null">
-      @for (segment of segments(); track $index) {
-        <path [attr.d]="segment" />
+      @if (busy()) {
+        <!-- A ring, not the glyph spinning. styles.css already records the rule this follows:
+             "a rotating arrow reads as an action rather than a wait". A spinning refresh arrow
+             is the one honest exception -- it IS the action -- but a spinning trash can, a
+             spinning download arrow or a spinning paper plane read as the operation happening
+             over and over. The gap in the arc is what makes rotation visible; a closed circle
+             would look still. -->
+        <circle cx="12" cy="12" r="9" stroke-opacity="0.25" />
+        <path d="M21 12a9 9 0 0 0-9-9" class="origin-center" />
+      } @else {
+        @for (segment of segments(); track $index) {
+          <path [attr.d]="segment" />
+        }
       }
     </svg>
   `,
 })
 export class Icon {
   readonly name = input.required<string>();
+
+  /**
+   * Draws a spinner ring in place of the named glyph while this control's own work is running.
+   *
+   * Preferred over putting `[class.spin]` on the icon, which rotates whatever glyph is there:
+   * twenty-two controls did that and span a trash can, a download arrow, a paper plane, a tick.
+   * The name still has to be given, because it is what the control shows the rest of the time
+   * and swapping the element out entirely would lose the button's size and alignment.
+   */
+  readonly busy = input(false);
+
   readonly size = input('1em');
   readonly strokeWidth = input(1.9);
   readonly label = input('');

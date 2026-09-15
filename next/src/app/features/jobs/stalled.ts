@@ -10,6 +10,8 @@
  * can be tested at an exact age instead of by waiting half an hour.
  */
 
+import { instantMs } from '../../core/instant';
+
 /** A run has been dispatched and has not yet reported a verdict. */
 export const IN_FLIGHT = ['queue', 'start', 'running'];
 
@@ -29,13 +31,17 @@ export function isInFlight(job: StallCandidate): boolean {
 /**
  * How long the run has been in flight, or null when that cannot be said: it is not in flight,
  * it has no start time, the start time is unparseable, or it starts in the future. A future
- * start is a clock disagreement between the app and the database, not a stall, and calling it
- * one would flag every job on a host whose timezone drifts.
+ * start is a real clock disagreement between the app and the database, not a stall, and calling
+ * it one would flag every job on a host whose clock drifts.
  */
 export function inFlightFor(job: StallCandidate, now: number = Date.now()): number | null {
   if (!isInFlight(job) || !job.lastJobRun) return null;
-  const started = new Date(job.lastJobRun).getTime();
-  if (!Number.isFinite(started)) return null;
+  // Through instantOf, which reads an offset-less timestamp in the zone the server pins rather
+  // than in the reader's own. `new Date(...)` reads it as the reader's local time, which is right
+  // only for a viewer sitting in the same zone as the server and silently hours out for anyone
+  // else -- and an age that is hours too large is exactly what this function reports a stall on.
+  const started = instantMs(job.lastJobRun);
+  if (started === null) return null;
   const elapsed = now - started;
   return elapsed < 0 ? null : elapsed;
 }

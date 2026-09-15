@@ -94,7 +94,7 @@
 
     <button type="button" class="btn btn-primary" [disabled]="!canExtract() || extracting()"
             (click)="extract()">
-      <app-icon name="volume" [class.spin]="extracting()" />
+      <app-icon name="volume" [busy]="extracting()" />
       {{ extracting() ? 'Extracting…' : 'Extract transcript' }}
     </button>
 

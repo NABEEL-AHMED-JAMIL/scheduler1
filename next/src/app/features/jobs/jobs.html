@@ -99,11 +99,11 @@
         <span class="text-xs font-medium">{{ selected().size }} selected</span>
         <button type="button" class="btn btn-default btn-sm btn-intent-ok"
                 [disabled]="bulkBusy()" (click)="runSelected()">
-          <app-icon name="play" [class.spin]="bulkBusy()" />Run selected
+          <app-icon name="play" [busy]="bulkBusy()" />Run selected
         </button>
         <button type="button" class="btn btn-ghost btn-sm btn-intent-crit"
                 [disabled]="bulkBusy()" (click)="deleteSelected()">
-          <app-icon name="trash" [class.spin]="bulkBusy()" />Delete selected
+          <app-icon name="trash" [busy]="bulkBusy()" />Delete selected
         </button>
         <button type="button" class="btn btn-ghost btn-sm ml-auto"
                 [disabled]="bulkBusy()" (click)="clearSelection()">
@@ -190,13 +190,13 @@
               }
             </td>
             <td class="whitespace-nowrap">
-              @if (job.scheduler?.nextRunAt && !job.scheduler.expired) {
+              @if (nextRun(job); as nextRunAt) {
                 <div class="text-[color:var(--text-secondary)]">
-                  Next {{ job.scheduler!.nextRunAt | date:'d MMM, HH:mm' }}
+                  Next {{ nextRunAt | date:'d MMM, HH:mm' }}
                 </div>
               }
               <div class="text-xs text-[color:var(--text-muted)]">
-                {{ job.lastJobRun ? ('Last ' + (job.lastJobRun | date:'d MMM, HH:mm')) : 'Never run' }}
+                {{ job.lastJobRun ? ('Last ' + (when(job.lastJobRun) | date:'d MMM, HH:mm')) : 'Never run' }}
               </div>
             </td>
             <td class="text-[color:var(--text-secondary)] whitespace-nowrap">
@@ -230,8 +230,8 @@
                   <button cdkMenuItem class="menu-item" [disabled]="isInFlight(job)"
                           [title]="isInFlight(job) ? 'This job is already queued or running' : ''"
                           (cdkMenuItemTriggered)="runNow(job)"><app-icon name="play" />Run now</button>
-                  <button cdkMenuItem class="menu-item" [disabled]="isInFlight(job) || !job.scheduler"
-                          [title]="!job.scheduler ? 'Only scheduled jobs have a next run' : ''"
+                  <button cdkMenuItem class="menu-item" [disabled]="isInFlight(job) || !canSkipNext(job)"
+                          [title]="!canSkipNext(job) ? 'Only scheduled jobs have a next run' : ''"
                           (cdkMenuItemTriggered)="skipNext(job)"><app-icon name="skip" />Skip next run</button>
                   <div class="my-1 border-t border-subtle"></div>
                   <a cdkMenuItem class="menu-item" [routerLink]="['/jobs', job.jobId, 'edit']"><app-icon name="edit" />Edit</a>

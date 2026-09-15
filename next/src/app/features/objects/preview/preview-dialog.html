@@ -31,7 +31,7 @@
         </button>
         <button type="button" class="btn btn-primary btn-sm"
                 [disabled]="saving() || draft() === text()" (click)="save()">
-          <app-icon name="check" [class.spin]="saving()" />{{ saving() ? 'Saving…' : 'Save' }}
+          <app-icon name="check" [busy]="saving()" />{{ saving() ? 'Saving…' : 'Save' }}
         </button>
       } @else {
         <button type="button" class="btn btn-default btn-sm" (click)="copy()">

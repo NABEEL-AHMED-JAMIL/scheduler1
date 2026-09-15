@@ -99,15 +99,43 @@
         <button type="button" class="btn btn-default btn-sm" (click)="newFolder()"
                 [disabled]="actionBusy()">New folder</button>
 
-        <label class="btn btn-default btn-sm cursor-pointer">
+        <!-- Two inputs rather than one: webkitdirectory is a property of the INPUT, not of the
+             click, so a single control cannot offer both a file picker and a folder picker. The
+             browser also words the dialogs differently, which is the clearer of the two. -->
+        <label class="btn btn-default btn-sm cursor-pointer"
+               [class.opacity-60]="uploading()" [class.pointer-events-none]="uploading()">
           Upload
-          <input type="file" class="hidden" (change)="onUpload($event)" />
+          <input type="file" multiple class="hidden" (change)="onUpload($event)" />
+        </label>
+
+        <label class="btn btn-default btn-sm cursor-pointer"
+               [class.opacity-60]="uploading()" [class.pointer-events-none]="uploading()"
+               title="Every file inside the folder, keeping its sub-folders">
+          Upload folder
+          <input type="file" webkitdirectory multiple class="hidden" (change)="onUpload($event)" />
         </label>
 
         <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
           {{ loading() ? 'Loading…' : 'Refresh' }}
         </button>
       </div>
+
+      @if (uploading()) {
+        <!-- A folder can be hundreds of files, and a spinner that says only "working" leaves the
+             reader unable to tell a slow upload from a stuck one. -->
+        <div class="flex items-center gap-3 text-xs text-[color:var(--text-muted)]">
+          <div class="h-1 flex-1 rounded-full bg-sunken overflow-hidden">
+            <div class="h-full rounded-full transition-[width]"
+                 [style.background]="'var(--heat)'"
+                 [style.width.%]="(uploadDone() / uploadTotal()) * 100"></div>
+          </div>
+          <span class="tabular shrink-0">
+            {{ uploadDone() }} of {{ uploadTotal() }} uploaded@if (uploadFailures().length) {
+              <span class="text-crit-500">, {{ uploadFailures().length }} failed</span>
+            }
+          </span>
+        </div>
+      }
 
       <!-- Filter bar -->
       <div class="flex flex-wrap items-center gap-3 px-4 py-2.5 border-b text-sm border-subtle"

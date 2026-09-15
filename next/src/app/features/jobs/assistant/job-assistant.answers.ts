@@ -131,13 +131,26 @@ export function humanDuration(seconds: number | null): string {
   return `${Math.floor(seconds / 3600)}h ${Math.round((seconds % 3600) / 60)}m`;
 }
 
+/**
+ * What the timetable means, with execution read before the schedule row rather than after it.
+ *
+ * A job switched from Auto to Manual keeps its Scheduler row: the editor posts no schedulers
+ * block for a Manual job, so updateSourceJob leaves the row alone, and findDueSchedulers passes
+ * over it on `source_job.execution = 'Auto'` instead of expiring it -- deliberately, so that
+ * switching back to Auto resumes the timetable rather than losing it. But
+ * fetchSourceJobDetailWithSourceJobId attaches that row to the DTO with no execution check, so
+ * reading the schedule first the assistant answered "It runs every 2 weeks at 09:00" about a job
+ * the dispatcher will never pick up. Execution is what the dispatcher actually reads, so it is
+ * what is answered from here.
+ */
 function scheduleSentence(facts: JobFacts): string {
   const s = facts.schedule;
-  if (!s) {
-    return facts.execution === 'Manual'
-      ? 'It runs only when someone triggers it — there is no schedule.'
-      : 'No schedule is attached to this job.';
+  if (facts.execution === 'Manual') {
+    return s
+      ? 'It runs only when someone triggers it — its stored timetable is held, and would resume if this job were set back to Auto.'
+      : 'It runs only when someone triggers it — there is no schedule.';
   }
+  if (!s) return 'No schedule is attached to this job.';
   const every = s.intervalValue && s.intervalValue !== '1' ? `every ${s.intervalValue} ` : '';
   const unit = { Mint: 'minutes', Hr: 'hours', Daily: 'days', Weekly: 'weeks', Monthly: 'months' }[s.frequency ?? ''] ?? s.frequency;
   const at = s.startTime ? ` at ${String(s.startTime).slice(0, 5)}` : '';
@@ -165,6 +178,20 @@ export function answerFor(intent: Intent, facts: JobFacts, runs: JobRun[],
         }],
       };
 
+    /*
+     * It reads; it does not act. Said here rather than left to fall through to the guide,
+     * because "unknown" is handed to the configured AI agent -- and a model asked to trigger a
+     * job has no way to do it and every incentive to sound as though it did.
+     */
+    case 'action':
+      return {
+        refused: true,
+        blocks: [{
+          kind: 'text',
+          text: `I can only read job #${facts.jobId}. Running, pausing, editing and deleting it are done from the job's own page — I cannot do them from here.`,
+        }],
+      };
+
     case 'summary': {
       const rows = [
         { label: 'Job', value: `#${facts.jobId} · ${facts.jobName}` },
@@ -174,6 +201,11 @@ export function answerFor(intent: Intent, facts: JobFacts, runs: JobRun[],
         { label: 'Writes to', value: targetPath(facts) },
         { label: 'Runs recorded', value: String(stats.total) },
       ];
+      // Gathered into JobFacts since it was written and displayed nowhere, so "what is the
+      // priority" had no local answer and was spent on a model round-trip.
+      if (facts.priority !== undefined && facts.priority !== null) {
+        rows.push({ label: 'Priority', value: String(facts.priority) });
+      }
       if (facts.assignedUsername) rows.push({ label: 'Assigned to', value: facts.assignedUsername });
       return {
         blocks: [
@@ -196,12 +228,18 @@ export function answerFor(intent: Intent, facts: JobFacts, runs: JobRun[],
 
     case 'schedule': {
       const s = facts.schedule;
+      // Whether a next run can be asserted at all is an execution question, not a schedule one:
+      // the held row still carries the next_run_at it had when the job was made Manual, and
+      // printing that as "Next run" names a moment that never arrives. See scheduleSentence.
+      const onDemand = facts.execution === 'Manual';
       const rows: { label: string; value: string }[] = [];
       if (s) {
         rows.push({ label: 'Frequency', value: `${s.frequency ?? '—'}${s.intervalValue ? ` · every ${s.intervalValue}` : ''}` });
         if (s.startDate) rows.push({ label: 'Starts', value: `${s.startDate}${s.startTime ? ` at ${String(s.startTime).slice(0, 5)}` : ''}` });
         if (s.endDate) rows.push({ label: 'Ends', value: s.endDate });
-        rows.push({ label: 'Next run', value: s.expired ? 'Expired — no further runs' : (s.nextRunAt ?? 'Not scheduled') });
+        rows.push({ label: 'Next run', value: onDemand
+          ? 'On demand — nothing is scheduled'
+          : (s.expired ? 'Expired — no further runs' : (s.nextRunAt ?? 'Not scheduled')) });
       }
       if (facts.lastJobRun) rows.push({ label: 'Last run', value: humanMoment(facts.lastJobRun) });
       return { blocks: [{ kind: 'text', text: scheduleSentence(facts) }, ...(rows.length ? [{ kind: 'facts' as const, rows }] : [])] };

@@ -52,18 +52,34 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const withToken = (token: string | null) =>
     token ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } }) : req;
 
-  return next(withToken(auth.accessToken)).pipe(
-    map(event => {
-      if (!(event instanceof HttpResponse)) return event;
-      const response = withUsableBody(event);
-      // Noticed here rather than in the screen that made the call: the guard keeps the session
-      // on the profile page until the flag clears, and the response that clears it on the
-      // server is the only thing the console ever hears about it.
-      if (req.url.includes(CHANGE_PASSWORD_CALL) && isSuccessEnvelope(response)) {
-        auth.passwordChanged();
-      }
-      return response;
-    }),
+  /**
+   * One attempt at this request, carrying the response handling that belongs to it.
+   *
+   * Every send goes through here -- the first one, the retry the refresh makes, and the replays
+   * of the requests that queued behind that refresh -- because none of the handling below is
+   * optional for any of them. Those retries used to call `next()` bare, so a request that
+   * happened to be the one meeting an expired token silently lost both halves of it: an empty
+   * or non-JSON body reached the caller as null, which is the crash withUsableBody exists to
+   * prevent, and a changeOwnPassword that succeeded on the retry never told AuthService, so
+   * passwordChangeGuard went on holding the session on the profile screen with the debt already
+   * settled on the server and nothing left to settle it again.
+   */
+  const attempt = (token: string | null) =>
+    next(withToken(token)).pipe(
+      map(event => {
+        if (!(event instanceof HttpResponse)) return event;
+        const response = withUsableBody(event);
+        // Noticed here rather than in the screen that made the call: the guard keeps the session
+        // on the profile page until the flag clears, and the response that clears it on the
+        // server is the only thing the console ever hears about it.
+        if (req.url.includes(CHANGE_PASSWORD_CALL) && isSuccessEnvelope(response)) {
+          auth.passwordChanged();
+        }
+        return response;
+      })
+    );
+
+  return attempt(auth.accessToken).pipe(
     catchError((error: HttpErrorResponse) => {
       if (error.status !== 401 || isAuthCall) {
         return throwError(() => error);
@@ -72,7 +88,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
       if (refreshInFlight) {
         return newToken$.pipe(
           take(1),
-          switchMap(token => next(withToken(token)))
+          switchMap(token => attempt(token))
         );
       }
 
@@ -112,7 +128,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
           const token = auth.accessToken;
           refreshed = true;
           settle(token);
-          return next(withToken(token));
+          return attempt(token);
         }),
         catchError(failure => {
           if (refreshed) {

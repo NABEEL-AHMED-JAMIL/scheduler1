@@ -3,6 +3,28 @@ import { STALLED_AFTER_MS, isInFlight, isStalled, inFlightFor, stalledFor } from
 
 const NOW = new Date('2026-08-24T12:00:00Z').getTime();
 const ago = (ms: number) => new Date(NOW - ms).toISOString();
+/**
+ * The same instant in the format the API actually sends: Java LocalDateTime, no offset, written
+ * in the zone ModelApplication pins (America/Chicago).
+ *
+ * Every case here used `ago()` and therefore a Z-suffixed string, which the REST API never
+ * produces — so nothing exercised the naive path the jobs list is actually fed. Building it by
+ * stripping the Z off an ISO string would be wrong in the other direction: that yields a UTC wall
+ * clock, and reading it as Chicago moves it five hours.
+ */
+const agoAsTheApiSendsIt = (ms: number) => {
+  const format = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Chicago', hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  });
+  const parts: Record<string, string> = {};
+  for (const part of format.formatToParts(new Date(NOW - ms))) {
+    if (part.type !== 'literal') parts[part.type] = part.value;
+  }
+  return `${parts['year']}-${parts['month']}-${parts['day']}`
+    + `T${String(Number(parts['hour']) % 24).padStart(2, '0')}:${parts['minute']}:${parts['second']}`;
+};
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 
@@ -24,6 +46,19 @@ describe('stall detection', () => {
 
   it('flags a run once it passes the threshold', () => {
     expect(isStalled({ jobRunningStatus: 'Start', lastJobRun: ago(31 * MINUTE) }, NOW)).toBe(true);
+  });
+
+  it('flags it just the same when the time arrives in the API\'s own format', () => {
+    // Read as local time on any host west of UTC this start looked like the future, inFlightFor
+    // returned null on its negative-elapsed guard, and isStalled answered false for every job in
+    // flight -- the safety net was off everywhere and nothing said so.
+    expect(isStalled({ jobRunningStatus: 'Start', lastJobRun: agoAsTheApiSendsIt(31 * MINUTE) }, NOW))
+      .toBe(true);
+  });
+
+  it('reports the same age whichever of the two formats it is given', () => {
+    expect(inFlightFor({ jobRunningStatus: 'Running', lastJobRun: agoAsTheApiSendsIt(45 * MINUTE) }, NOW))
+      .toBe(inFlightFor({ jobRunningStatus: 'Running', lastJobRun: ago(45 * MINUTE) }, NOW));
   });
 
   it('treats the threshold itself as not yet stalled', () => {

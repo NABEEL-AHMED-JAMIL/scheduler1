@@ -40,6 +40,141 @@ export interface TaskForm {
 /** The set the server accepts; anything else is silently stored as text. */
 export const FIELD_TYPES = ['text', 'textarea', 'number', 'url', 'select', 'checkbox', 'date'];
 
+/**
+ * One entry in a select: what the task stores, and what the operator reads.
+ *
+ * These were the same string until 2026-09-14. A dropdown's only storage is the free-text
+ * `field_options` column, one choice per line, and `<option [value]="choice">{{ choice }}</option>`
+ * bound that one line to both halves -- so an author had to choose between a cryptic dropdown
+ * (type the worker's token) and an unparseable payload (type the human label). Nothing else in
+ * the platform reads the column, which is why the split could be made here rather than in a new
+ * table or a new column.
+ */
+export interface FieldChoice {
+  /** What lands in the task's XML tag, and what the worker receives. */
+  value: string;
+  /** What the operator picks from. Falls back to the value when the author wrote only one. */
+  label: string;
+}
+
+/**
+ * Splits the stored text into one trimmed line per choice.
+ *
+ * The comma branch is a read-side tolerance for data the ETL demo seeder wrote
+ * (`etl_demo_catalogue.py`, nine select fields, e.g. `options="records,lines"`). That string was
+ * posted verbatim and stored verbatim, and a newline-only split turned the whole thing into a
+ * single choice reading "records,lines" -- which no default ever matched, so the dropdown opened
+ * blank and the only thing in it was junk. The guard is deliberately narrow so it cannot eat a
+ * legitimate single choice: it needs exactly one line, no `=` on it (an author writing the
+ * value/label form is not writing a comma list), and no whitespace anywhere in it. That last
+ * condition is what keeps a real one-line choice like `Doe, John` intact -- machine-written token
+ * lists never carry a space, and human labels almost always do.
+ */
+function choiceLines(raw: string): string[] {
+  const lines = raw.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+  if (lines.length === 1 && !lines[0].includes('=') && lines[0].includes(',')
+      && !/\s/.test(lines[0])) {
+    return lines[0].split(',').map(line => line.trim()).filter(Boolean);
+  }
+  return lines;
+}
+
+/**
+ * Reads the stored choices for a select.
+ *
+ * The format is one choice per line, and on each line the FIRST `=` optionally separates the
+ * stored value from the displayed label. Two properties made that the format worth having over a
+ * JSON array or a second column:
+ *
+ * It is a strict superset of what is already in the database, so nothing had to be migrated. A
+ * line with no `=` is the legacy case and is returned exactly as it was read, as both halves --
+ * which is not a nicety but a hard requirement: `task-edit.ts` seeds a select from the task's
+ * already-saved tag and deletes that tag when the control comes back blank, so the day a legacy
+ * option stops resolving to itself is the day every existing task on that pipeline opens blank
+ * and silently drops its answer on save.
+ *
+ * And splitting at the first `=` only, with the whole remainder taken as the label, means a label
+ * may contain `=`, `:` or `,` freely -- `eq=Equals (a = b)` reads correctly with no escaping. The
+ * one thing the format cannot represent is a `=` inside a *value*; rather than invent an escape
+ * character (which would have to reinterpret backslashes already sitting in legacy rows, trading
+ * a rare break for a rarer one), the dialog refuses that input by name and the restriction is
+ * written down in V36's column comment.
+ */
+export function parseFieldChoices(fieldOptions: string | null | undefined): FieldChoice[] {
+  return choiceLines(fieldOptions ?? '').map(line => {
+    const separator = line.indexOf('=');
+    // Legacy branch: no separator at all, or a line starting with one (an empty value is not a
+    // value). Either way the whole line is what it has always been -- value and label alike.
+    if (separator <= 0) return { value: line, label: line };
+    const value = line.slice(0, separator).trim();
+    const label = line.slice(separator + 1).trim();
+    return { value, label: label || value };
+  });
+}
+
+/**
+ * Writes choices back in the format above.
+ *
+ * A choice whose label equals its value is written as a bare line rather than `x=x`, so a form
+ * whose options were plain before and were never edited round-trips to byte-identical text. That
+ * matters more than it looks: the alternative rewrites every legacy row on the first unrelated
+ * save, which would make a diff of the column useless for telling apart "somebody changed the
+ * choices" from "somebody opened the form".
+ */
+export function serializeFieldChoices(choices: FieldChoice[]): string {
+  return choices
+    .map(choice => ({
+      value: String(choice?.value ?? '').trim(),
+      label: String(choice?.label ?? '').trim(),
+    }))
+    .filter(choice => choice.value || choice.label)
+    .map(choice => {
+      // Either half alone is a complete choice; the missing one is the other.
+      const value = choice.value || choice.label;
+      const label = choice.label || choice.value;
+      return label === value ? value : `${value}=${label}`;
+    })
+    .join('\n');
+}
+
+/**
+ * The rules a select's choices have to satisfy, mirroring TaskFormServiceImpl.validate.
+ *
+ * All three describe a form that saves happily today and then misbehaves on somebody else's
+ * screen, which is why they are rules and not hints. A select with no choices offers the operator
+ * nothing but "None", and if it is also required the task can never be made valid. Two choices
+ * sharing a value mean the second is unreachable -- and the task screen tracks its options by
+ * index precisely because this used to collide. A default that is not among the values is the
+ * quiet one: the control is seeded with it, `required` passes because a non-empty string is
+ * non-empty, no <option> matches so the dropdown paints blank, and the operator saves a value
+ * they were never shown.
+ *
+ * Takes the wire shape rather than the form group so both sides check the same bytes.
+ */
+export function validateSelectChoices(rows: TaskFormField[]): string | null {
+  for (const field of rows) {
+    if (field.fieldType !== 'select') continue;
+    const name = field.label?.trim() || field.tagKey?.trim() || 'dropdown';
+    const choices = parseFieldChoices(field.fieldOptions);
+    if (!choices.length) {
+      return `The "${name}" dropdown has no choices. Add at least one, or change its type.`;
+    }
+    const values = new Set<string>();
+    for (const choice of choices) {
+      if (values.has(choice.value)) {
+        return `"${name}" offers "${choice.value}" twice. Each choice needs its own value.`;
+      }
+      values.add(choice.value);
+    }
+    const fallback = (field.defaultValue ?? '').trim();
+    if (fallback && !values.has(fallback)) {
+      return `"${name}" defaults to "${fallback}", which is not one of its choices. `
+        + 'A task would open on a blank dropdown and still send that value.';
+    }
+  }
+  return null;
+}
+
 @Component({
   selector: 'app-task-form-dialog',
   imports: [ReactiveFormsModule, Field, FormDialog, Icon],
@@ -156,10 +291,29 @@ export const FIELD_TYPES = ['text', 'textarea', 'number', 'url', 'select', 'chec
               </div>
 
               <div class="form-grid">
-                <app-field label="Default value" [for]="'defaultValue' + i"
-                           [control]="row.get('defaultValue')" [submitted]="submitted()">
-                  <input [id]="'defaultValue' + i" class="input mono" formControlName="defaultValue" />
-                </app-field>
+                @if (row.get('fieldType')?.value === 'select') {
+                  <!-- A dropdown's default has to BE one of its choices, and typing it by hand
+                       was how it stopped being one: rename a choice and the default silently
+                       keeps the old spelling, which then matches no <option>, so every new task
+                       renders that field blank while still holding -- and sending -- the stale
+                       value. Picking it from the choices themselves removes the class of
+                       mistake; validate() still rejects a stale one on an untouched form. -->
+                  <app-field label="Default value" [for]="'defaultValue' + i"
+                             [control]="row.get('defaultValue')" [submitted]="submitted()"
+                             hint="The choice a new task starts on.">
+                    <select [id]="'defaultValue' + i" class="input" formControlName="defaultValue">
+                      <option value="">(none)</option>
+                      @for (choice of defaultValueOptions(i); track $index) {
+                        <option [value]="choice.value">{{ choice.label }}</option>
+                      }
+                    </select>
+                  </app-field>
+                } @else {
+                  <app-field label="Default value" [for]="'defaultValue' + i"
+                             [control]="row.get('defaultValue')" [submitted]="submitted()">
+                    <input [id]="'defaultValue' + i" class="input mono" formControlName="defaultValue" />
+                  </app-field>
+                }
 
                 <app-field label="Help text" [for]="'helpText' + i"
                            [control]="row.get('helpText')" [submitted]="submitted()">
@@ -169,12 +323,48 @@ export const FIELD_TYPES = ['text', 'textarea', 'number', 'url', 'select', 'chec
               </div>
 
               @if (row.get('fieldType')?.value === 'select') {
-                <app-field label="Choices" [for]="'fieldOptions' + i"
-                           [control]="row.get('fieldOptions')" [submitted]="submitted()"
-                           hint="One per line.">
-                  <textarea [id]="'fieldOptions' + i" class="input mono" rows="3"
-                            formControlName="fieldOptions"></textarea>
-                </app-field>
+                <div class="flex flex-col gap-1.5">
+                  <div class="flex items-center justify-between gap-2">
+                    <span class="label">Choices</span>
+                    <button type="button" class="btn btn-default btn-sm" (click)="addChoice(i)">
+                      <app-icon name="plus" />Add choice
+                    </button>
+                  </div>
+                  <!-- This was one textarea hinted "One per line.", and the line was both halves
+                       at once. Two boxes per row because the two halves answer to different
+                       people: the value is the worker's contract and the label is the operator's
+                       reading of it, and neither should have to be spelled the other's way. -->
+                  <p class="field-note text-[color:var(--text-muted)]">
+                    The value is what the task stores and the worker receives. The label is what
+                    the operator picks from — leave it empty to show the value itself.
+                  </p>
+
+                  @if (!choicesArray(i).length) {
+                    <p class="field-note text-crit-500 flex items-start gap-1.5" role="alert">
+                      <app-icon name="alert" size="0.9em" class="mt-px shrink-0" />
+                      <span>A dropdown with no choices offers the operator nothing but “None”.</span>
+                    </p>
+                  }
+
+                  <div class="flex flex-col gap-1.5" formArrayName="choices">
+                    @for (choice of choicesArray(i).controls; track choice; let c = $index) {
+                      <div class="flex items-center gap-1.5" [formGroupName]="c">
+                        <input class="input mono flex-1" formControlName="value"
+                               placeholder="lines"
+                               [attr.aria-label]="'Choice ' + (c + 1) + ' value'" />
+                        <span class="text-[color:var(--text-muted)] text-xs shrink-0"
+                              aria-hidden="true">shows as</span>
+                        <input class="input flex-1" formControlName="label"
+                               placeholder="JSON Lines (one object per line)"
+                               [attr.aria-label]="'Choice ' + (c + 1) + ' label'" />
+                        <button type="button" class="btn btn-ghost btn-icon btn-sm"
+                                aria-label="Remove choice" (click)="removeChoice(i, c)">
+                          <app-icon name="trash" class="icon-crit" />
+                        </button>
+                      </div>
+                    }
+                  </div>
+                </div>
               }
 
               <label class="flex items-center gap-2 text-sm">
@@ -244,11 +434,69 @@ export class TaskFormDialog {
       required: [field?.required ?? false],
       defaultValue: [field?.defaultValue ?? ''],
       helpText: [field?.helpText ?? ''],
-      fieldOptions: [field?.fieldOptions ?? ''],
+      /*
+       * The choices, parsed out of the stored text once on open and written back out in rows().
+       * The raw `fieldOptions` control this replaced is gone deliberately rather than kept in
+       * parallel: two representations of the same thing is how the textarea and the rows would
+       * drift, and the parse is a strict superset of the stored format, so a form whose choices
+       * are plain lines and are never touched still serializes back to the same bytes.
+       */
+      choices: this.fb.array(
+        parseFieldChoices(field?.fieldOptions).map(choice => this.choiceGroup(choice))),
     });
     // A tag rename changes what other rows can nest under, and the preview.
     group.valueChanges.subscribe(() => this.revision.update(n => n + 1));
     return group;
+  }
+
+  private choiceGroup(choice?: FieldChoice): FormGroup {
+    return this.fb.group({
+      value: [choice?.value ?? ''],
+      label: [choice?.label ?? ''],
+    });
+  }
+
+  /** The choice rows of one field. Always present, even while the type is not `select`. */
+  choicesArray(index: number): FormArray {
+    return this.fields.at(index).get('choices') as FormArray;
+  }
+
+  addChoice(index: number): void {
+    this.choicesArray(index).push(this.choiceGroup());
+    this.revision.update(n => n + 1);
+  }
+
+  removeChoice(index: number, choiceIndex: number): void {
+    this.choicesArray(index).removeAt(choiceIndex);
+    this.revision.update(n => n + 1);
+  }
+
+  /** One field's choices as value/label pairs, with each half standing in for a missing other. */
+  private choicesFor(index: number): FieldChoice[] {
+    this.revision();
+    return this.choicesArray(index).controls
+      .map(row => {
+        const value = String(row.get('value')?.value ?? '').trim();
+        const label = String(row.get('label')?.value ?? '').trim();
+        return { value: value || label, label: label || value };
+      })
+      .filter(choice => choice.value);
+  }
+
+  /**
+   * What the Default value dropdown offers for a select.
+   *
+   * A default that is not among the choices is carried as a last entry rather than dropped, so
+   * that opening an older form shows the stale value instead of an empty box that looks like a
+   * deliberate "(none)". Saving is still refused until it is resolved -- see validate().
+   */
+  defaultValueOptions(index: number): FieldChoice[] {
+    const choices = this.choicesFor(index);
+    const current = String(this.fields.at(index).get('defaultValue')?.value ?? '').trim();
+    if (current && !choices.some(choice => choice.value === current)) {
+      return [...choices, { value: current, label: `${current} (not one of the choices)` }];
+    }
+    return choices;
   }
 
   addField(): void {
@@ -299,7 +547,34 @@ export class TaskFormDialog {
         return `"${field.label.trim()}" nests under <${parent}>, which no field creates.`;
       }
     }
+    const choiceProblem = validateSelectChoices(rows);
+    if (choiceProblem) return choiceProblem;
     return this.findNestingCycle(rows);
+  }
+
+  /**
+   * Refuses a choice whose value carries the separator the format is built on.
+   *
+   * Checked against the boxes rather than the serialized text because by then it is already too
+   * late to see: a value of `a=b` written out as a line reads back as value `a`, label `b`, so
+   * the shared rule in validateSelectChoices -- which parses what the server will be sent -- can
+   * only ever see the truncation, never the intent. Refused by name here instead of escaped,
+   * because an escape character would have to reinterpret backslashes that are already sitting
+   * in legacy rows, which trades a rare break for a rarer and much more surprising one.
+   */
+  private validateChoiceInputs(): string | null {
+    for (let i = 0; i < this.fields.length; i++) {
+      const row = this.fields.at(i);
+      if (row.get('fieldType')?.value !== 'select') continue;
+      const name = String(row.get('label')?.value ?? '').trim() || `Field #${i + 1}`;
+      for (const choice of this.choicesArray(i).controls) {
+        if (String(choice.get('value')?.value ?? '').includes('=')) {
+          return `A choice on "${name}" has "=" in its value. "=" is what separates a choice's `
+            + 'value from its label, so it cannot appear in the value itself.';
+        }
+      }
+    }
+    return null;
   }
 
   /**
@@ -351,7 +626,16 @@ export class TaskFormDialog {
         required: !!value.required,
         defaultValue: value.defaultValue || null,
         helpText: value.helpText || null,
-        fieldOptions: value.fieldType === 'select' ? (value.fieldOptions || null) : null,
+        /*
+         * Sent whatever the type currently reads. This used to be nulled for anything but
+         * `select`, and because saveForm replaces the field list wholesale (it clears the rows
+         * and rebuilds them, with orphanRemoval deleting the old ones), a save committed while a
+         * field's type happened to read `text` DELETED its choices with no warning and no undo --
+         * and the choices editor is hidden for a non-select, so nothing on screen said what was
+         * at stake. Carrying an unused string in a nullable TEXT column costs nothing, and the
+         * task screen already ignores it for every type but select.
+         */
+        fieldOptions: serializeFieldChoices(this.choicesFor(index)) || null,
         position: index,
       };
     });
@@ -383,6 +667,13 @@ export class TaskFormDialog {
     if (this.form.get('pipelineId')?.invalid || this.form.get('formName')?.invalid) {
       this.form.markAllAsTouched();
       this.toast.error('Check the highlighted fields.');
+      return;
+    }
+    // Before rows(), because serializing the choices is what hides this particular mistake.
+    const inputProblem = this.validateChoiceInputs();
+    if (inputProblem) {
+      this.form.markAllAsTouched();
+      this.toast.error(inputProblem);
       return;
     }
     const rows = this.rows();

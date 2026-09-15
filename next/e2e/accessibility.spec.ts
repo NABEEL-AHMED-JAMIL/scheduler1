@@ -59,6 +59,11 @@ function describeAll(violations: Awaited<ReturnType<typeof scan>>): string {
 }
 
 test('the dataset workspace has no WCAG A/AA violations on any tab', async ({ page }) => {
+  // axe runs the instant each tab is clicked, so without this it can measure an element part-way
+  // through a `transition-colors` and report a contrast ratio between two colours that exist in
+  // neither state. That produced an intermittent failure here and in appearance.spec.ts naming
+  // #7d828a on #989da4 for a pill whose settled values are about 16:1 apart.
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await openFixture(page);
 
   const tabs = ['Details', 'Data', 'Compact', 'Columns', 'Profile',

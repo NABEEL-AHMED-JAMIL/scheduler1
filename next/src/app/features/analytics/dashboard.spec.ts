@@ -6,6 +6,7 @@ import { Subject, of } from 'rxjs';
 import {
   Dashboards, DatasetRegistry, analysisView, dateOnly, plainDecimal, queryView, combineFilters } from './dashboard';
 import { dateOnly as studioDateOnly, plainDecimal as studioPlainDecimal } from './analytics';
+import { CHART_SLOTS } from '../../shared/charts/status-color';
 import {
   AnalysisResult, AnalyticsService, Dashboard, DashboardWidget, QueryResult, RegisteredDataset,
   SavedAnalysis, SavedQuery,
@@ -483,11 +484,14 @@ describe('what a tile is allowed to claim', () => {
   it('allows a ring over a sum, and refuses one over too many slices', () => {
     expect(analysisView(analysisResult(), 'SUM').issues.donut).toBe('');
 
+    // One past the palette, whatever the palette currently holds. Seven slices used to be the
+    // refusal; the ramp now has eight slots, so seven is drawable and only the ninth is not.
+    const tooMany = CHART_SLOTS + 1;
     const many = analysisView(analysisResult({
-      rows: Array.from({ length: 7 }, (_, at) => [`region-${at}`, '10']),
-      rowCount: 7,
+      rows: Array.from({ length: tooMany }, (_, at) => [`region-${at}`, '10']),
+      rowCount: tooMany,
     }), 'SUM');
-    expect(many.issues.donut).toContain('six colours');
+    expect(many.issues.donut).toContain(`${CHART_SLOTS} colours`);
   });
 
   it('refuses a ring that would have to include a figure of zero or below', () => {
@@ -565,13 +569,43 @@ describe('what a tile is allowed to claim', () => {
     expect(view.notes.join(' ')).toContain('resolved to 2026-03-01 to 2026-03-07');
   });
 
-  it('shows only a tile\'s worth of rows and counts the whole result under them', () => {
+  it('keeps every row it was given, so the rows past the tile are still reachable', () => {
     const view = analysisView(analysisResult({
       rows: Array.from({ length: 30 }, (_, at) => [`r${at}`, '1']),
       rowCount: 30,
     }), 'SUM');
-    expect(view.rows.length).toBe(8);
+
+    // The view used to slice to eight here, which threw rows 9..30 away on the tick they
+    // arrived -- they had already crossed the wire and been parsed. Reading row 9 then meant
+    // leaving the board and spending a second permit on the identical query. The tile still
+    // draws eight; the cut belongs to the tile, not to the result.
+    expect(view.rows.length).toBe(30);
     expect(view.rowCount).toBe(30);
+  });
+
+  it('draws only a tile\'s worth, and counts the whole result under them', () => {
+    const board = TestBed.runInInjectionContext(() => new Dashboards());
+    const view = analysisView(analysisResult({
+      rows: Array.from({ length: 30 }, (_, at) => [`r${at}`, '1']),
+      rowCount: 30,
+    }), 'SUM');
+
+    expect(board.tileRows(view).length).toBe(8);
+    expect(board.hasMoreRows(view)).toBe(true);
+    // The sentence under the tile counts what is DRAWN against the whole result -- not the
+    // length of the rows array, which is now the whole result itself.
+    expect(board.counted(view, 'table')).toBe('8 of 30 rows shown');
+  });
+
+  it('does not offer a way out of a result the tile is already showing whole', () => {
+    const view = analysisView(analysisResult({
+      rows: Array.from({ length: 3 }, (_, at) => [`r${at}`, '1']),
+      rowCount: 3,
+    }), 'SUM');
+    const board = TestBed.runInInjectionContext(() => new Dashboards());
+
+    expect(board.hasMoreRows(view)).toBe(false);
+    expect(board.counted(view, 'table')).toBe('3 rows');
   });
 });
 
@@ -595,6 +629,44 @@ describe('a tile over a saved query, which has no types to read', () => {
     const view = queryView(queryResult());
     expect(view.issues.donut).toContain('does not say whether its figures add up');
     expect(view.issues.ranked).toBe('');
+  });
+
+  /**
+   * `select region, avg(order_value) ...` and `select region, sum(order_value) ...` return the
+   * identical shape, so additivity is UNKNOWN on this path -- and that one unknown disqualifies
+   * every kind that totals, not only the ring. The ring alone used to be taken back out, one line
+   * after issuesFor had been told the figures add up, so a column of four regional averages was
+   * offered "Ranked bars with share" and printed 23% / 18% / 47% / 12% of a 515 that is a sum of
+   * means: a denominator that exists nowhere in the data.
+   */
+  it('refuses every kind that totals, not only the ring', () => {
+    const averages = queryView(queryResult({
+      columns: ['region', 'avg_order'],
+      rows: [['north', '120'], ['south', '95'], ['east', '240'], ['west', '60']],
+      rowCount: 4,
+    }));
+
+    for (const kind of ['donut', 'rankedShare', 'cumulative', 'stacked', 'shareStacked'] as const) {
+      expect(averages.issues[kind], kind).toContain('does not say whether its figures add up');
+    }
+    // The kinds that claim nothing about a total are untouched: a length against a shared axis is
+    // drawable whether or not the lengths add up to anything.
+    expect(averages.issues.ranked).toBe('');
+    expect(averages.issues.bar).toBe('');
+  });
+
+  it('draws the table instead when a tile was saved as a share chart', () => {
+    const averages = queryView(queryResult({
+      columns: ['region', 'avg_order'],
+      rows: [['north', '120'], ['south', '95'], ['east', '240'], ['west', '60']],
+      rowCount: 4,
+    }));
+    const board = boardWith().board;
+
+    // The refusal has to reach the drawing, not only the picker: a widget saved as rankedShare
+    // before the gate existed would otherwise still render percentages of a total of averages.
+    expect(board.drawn(widgetOn({ visualizationType: 'rankedShare' }), averages)).toBe('table');
+    expect(board.drawn(widgetOn({ visualizationType: 'ranked' }), averages)).toBe('ranked');
   });
 
   it('adds rows that share a label together and says how many that swallowed', () => {
@@ -725,6 +797,105 @@ describe('the board on screen', () => {
     const rendered = renderedBoard({ widgets: [widgetOn({ visualizationType: 'table' })] });
     expect(rendered.text()).toContain('Saved analysis · Revenue by region');
     expect(rendered.text()).toContain('minio-main/daily/sales-2026.csv');
+  });
+});
+
+/**
+ * A line tile has no y axis. Each point's hover text is the ONLY place a figure appears on it, so
+ * whatever formats that text is the whole numeric readout of the chart.
+ *
+ * Unbound, LineChart falls back to compactNumber, whose sub-1000 branch is String(Math.round) --
+ * so a series of monthly averages at 4.35, 4.12 and 3.98 hovered as "4", "4" and "4" while the
+ * line visibly fell, and a set of rates at 0.42/0.38/0.11 read "0" three times. The bar and
+ * stacked tiles over the same result pass `figure` and read faithfully, so two tiles over one
+ * result disagreed. The exact figure was unreachable from the line.
+ */
+describe('the only numeric readout a line tile has', () => {
+
+  /**
+   * Sorted by the DIMENSION, which is the only sort a line, an area or a running total is offered
+   * over -- joining rank-ordered points draws the shape of the sort. Both fixtures group by month
+   * so all three kinds are on the table.
+   */
+  const AVERAGE_BY_MONTH: SavedAnalysis = {
+    ...ANALYSIS,
+    analyticsAnalysisId: 31,
+    analysisName: 'Average rating by month',
+    analysisConfig: JSON.stringify({
+      dimensions: ['month'],
+      measure: { aggregation: 'AVERAGE', field: 'rating' },
+      sort: { by: 'DIMENSION', direction: 'ASC' },
+    }),
+  };
+
+  const TOTAL_BY_MONTH: SavedAnalysis = {
+    ...ANALYSIS,
+    analyticsAnalysisId: 32,
+    analysisName: 'Revenue by month',
+    analysisConfig: JSON.stringify({
+      dimensions: ['month'],
+      measure: { aggregation: 'SUM', field: 'amount' },
+      sort: { by: 'DIMENSION', direction: 'ASC' },
+    }),
+  };
+
+  /** Monthly averages, which is where the rounding is the whole of the answer. */
+  const RATINGS = analysisResult({
+    columns: [
+      { name: 'month', type: 'VARCHAR', role: 'DIMENSION' },
+      { name: 'avg_rating', type: 'DOUBLE', role: 'MEASURE' },
+    ],
+    rows: [['2026-01', '4.35'], ['2026-02', '4.12'], ['2026-03', '3.98']],
+    rowCount: 3,
+    measure: 'avg_rating',
+  });
+
+  function pointText(rendered: ReturnType<typeof renderedBoard>): string[] {
+    rendered.fixture.detectChanges();
+    return Array.from((rendered.fixture.nativeElement as HTMLElement)
+      .querySelectorAll('app-line-chart circle title'))
+      .map(node => (node.textContent ?? '').replace(/\s+/g, ' ').trim());
+  }
+
+  it('states each point of a line faithfully, rather than rounding it to nothing', () => {
+    const rendered = renderedBoard({
+      widgets: [widgetOn({ analyticsAnalysisId: 31, visualizationType: 'line' })],
+      analyses: [AVERAGE_BY_MONTH],
+    });
+    rendered.finishAnalysis(RATINGS);
+
+    expect(pointText(rendered))
+      .toEqual(['2026-01: 4.35', '2026-02: 4.12', '2026-03: 3.98']);
+  });
+
+  it('does the same for the filled variant, which is the same chart', () => {
+    const rendered = renderedBoard({
+      widgets: [widgetOn({ analyticsAnalysisId: 31, visualizationType: 'area' })],
+      analyses: [AVERAGE_BY_MONTH],
+    });
+    rendered.finishAnalysis(RATINGS);
+
+    expect(pointText(rendered))
+      .toEqual(['2026-01: 4.35', '2026-02: 4.12', '2026-03: 3.98']);
+  });
+
+  it('states the total a running total reaches, which is the point of the curve', () => {
+    // The worst of the three to round: compactNumber renders a closing total of 350.75 as "351",
+    // and a real one of 1,247,830 as "1.2M".
+    const rendered = renderedBoard({
+      widgets: [widgetOn({ analyticsAnalysisId: 32, visualizationType: 'cumulative' })],
+      analyses: [TOTAL_BY_MONTH],
+    });
+    rendered.finishAnalysis(analysisResult({
+      columns: [
+        { name: 'month', type: 'VARCHAR', role: 'DIMENSION' },
+        { name: 'sum_amount', type: 'DECIMAL(18,3)', role: 'MEASURE' },
+      ],
+      rows: [['2026-01', '100.5'], ['2026-02', '250.25']],
+      rowCount: 2,
+    }));
+
+    expect(pointText(rendered)).toEqual(['2026-01: 100.5', '2026-02: 350.75']);
   });
 });
 
@@ -1031,6 +1202,57 @@ describe('the kinds a result is not allowed to be drawn as', () => {
 
     const crossed = analysisView(twoRows(), 'SUM', { sortedBy: 'DIMENSION', dimensionCount: 2 });
     expect(crossed.issues.stacked).toBe('');
+  });
+
+  it('refuses a line, an area and a trend over two dimensions, which interleave two series', () => {
+    // stacked and shareStacked read dimensionCount two lines below these and these did not, so a
+    // 2-D result was offered a line -- and the marks arrive interleaved (jan/north, jan/south,
+    // feb/north, feb/south), which draws a sawtooth between two unrelated series. The trend
+    // summary was worse: it stated a "change" between two points of that interleaving.
+    const crossed = analysisView(twoRows(), 'SUM', { sortedBy: 'DIMENSION', dimensionCount: 2 });
+
+    expect(crossed.issues.line).toContain('two dimensions');
+    expect(crossed.issues.area).toContain('two dimensions');
+    expect(crossed.issues.trendSummary).toContain('two dimensions');
+
+    // One dimension is still a line, which is the point of the guard being on the count.
+    const flat = analysisView(twoRows(), 'SUM', { sortedBy: 'DIMENSION', dimensionCount: 1 });
+    expect(flat.issues.line).toBe('');
+  });
+
+  it('offers a share over ranked bars where the ring refuses only for want of colours', () => {
+    // The ring was the only share chart, and it stops at the palette. Bars label themselves, so
+    // "what share does each of these forty rows carry" now has a chart.
+    const many = analysisView(manyRows(40), 'SUM', { sortedBy: 'MEASURE' });
+    expect(many.issues.donut).toContain('colours this palette can tell apart');
+    expect(many.issues.rankedShare).toBe('');
+  });
+
+  it('refuses a share over rows that are not the whole of anything', () => {
+    const trimmed = analysisView(manyRows(10), 'SUM', { sortedBy: 'MEASURE', topNTrimmed: true });
+    expect(trimmed.issues.rankedShare).toContain('not the whole of anything');
+
+    const averages = analysisView(manyRows(10), 'AVERAGE', { sortedBy: 'MEASURE' });
+    expect(averages.issues.rankedShare).toContain('no total to divide');
+  });
+
+  it('accumulates a running total in the dimension\'s own order', () => {
+    const view = analysisView(analysisResult({
+      rows: [['jan', '100'], ['feb', '250'], ['mar', '50']], rowCount: 3,
+    }), 'SUM', { sortedBy: 'DIMENSION' });
+    const board = TestBed.runInInjectionContext(() => new Dashboards());
+
+    expect(view.issues.cumulative).toBe('');
+    expect((board as any).cumulativePoints(view).map((p: any) => p.value)).toEqual([100, 350, 400]);
+  });
+
+  it('refuses a running total over a rank order, which draws the shape of the sort', () => {
+    const ranked = analysisView(manyRows(10), 'SUM', { sortedBy: 'MEASURE' });
+    expect(ranked.issues.cumulative).toContain('biggest-first');
+
+    // And over a measure that does not add up: accumulating averages is not a quantity.
+    const averages = analysisView(manyRows(10), 'AVERAGE', { sortedBy: 'DIMENSION' });
+    expect(averages.issues.cumulative).toContain('does not add up');
   });
 
   it('refuses a stack of averages, because they do not add up', () => {
@@ -1343,5 +1565,442 @@ describe('what the board filter costs, and what it says', () => {
       widgetOn({ analyticsAnalysisId: undefined, analyticsQueryId: 5 }));
 
     expect(note).toContain('takes SQL and nothing else');
+  });
+});
+
+describe('stacked bars and the share within each group', () => {
+
+  function crossTab() {
+    return analysisView(analysisResult({
+      columns: [
+        { name: 'region', type: 'VARCHAR', role: 'DIMENSION' },
+        { name: 'status', type: 'VARCHAR', role: 'DIMENSION' },
+        { name: 'amount_sum', type: 'DOUBLE', role: 'MEASURE' },
+      ],
+      rows: [
+        ['north', 'shipped', '300'], ['north', 'returned', '100'],
+        ['south', 'returned', '50'], ['south', 'shipped', '50'],
+      ],
+      dimensions: ['region', 'status'],
+    }), 'SUM', { dimensionCount: 2 });
+  }
+
+  it('counts a cross-tab in groups, not in the source rows behind them', () => {
+    const board = TestBed.runInInjectionContext(() => new Dashboards());
+    // The grid is composed by the SERVER and arrives on the result; nothing here derives it.
+    const view = analysisView(analysisResult({
+      rows: [['north', 'shipped', '300'], ['south', 'shipped', '50']],
+      dimensions: ['region', 'status'],
+      pivot: {
+        rowDimension: 'region', columnDimension: 'status',
+        columnValues: ['shipped', 'returned'],
+        rows: [
+          { key: 'north', cells: ['300', '100'] },
+          { key: 'south', cells: ['50', null] },
+        ],
+        columnsTruncated: false,
+      },
+    }), 'SUM', { dimensionCount: 2, hasPivot: true });
+
+    // The grid is what a cross-tab shows. Counting marks printed "0 of N rows shown" under a grid
+    // that was showing everything, and counting source rows would describe the rows the grid was
+    // built from rather than the cells on screen.
+    expect(view.pivot?.rows?.length).toBe(2);
+    expect(board.counted(view, 'pivot')).toBe('2 groups');
+
+    // And the tile caps the grid like every other table here, rather than growing without bound.
+    expect(board.pivotRows(view.pivot!).length).toBe(2);
+  });
+
+  it('gives one category the same colour in every bar', () => {
+    // The colour used to be the segment's INDEX within its own bar, so "returned" was chart-0 in
+    // south (where it happens to come first) and chart-1 in north. The legend a reader builds
+    // from the first bar is then wrong for every other bar -- worse than no colour, because the
+    // chart looks like it encodes something and encodes position.
+    const board = boardWith({ widgets: [widgetOn()] }).board;
+    const bars = (board as any).stacks(crossTab());
+
+    const colourIn = (name: string, label: string) =>
+      bars.find((bar: any) => bar.name === name).segments
+        .find((segment: any) => segment.label === label).color;
+
+    expect(colourIn('north', 'returned')).toBe(colourIn('south', 'returned'));
+    expect(colourIn('north', 'shipped')).not.toBe(colourIn('north', 'returned'));
+  });
+
+  it('normalises each bar to its own total for the share view', () => {
+    const board = boardWith({ widgets: [widgetOn()] }).board;
+    const bars = (board as any).shareStacks(crossTab());
+
+    // Every bar full height, so the eye compares the MIX rather than the size.
+    expect(bars.map((bar: any) => bar.value)).toEqual([100, 100]);
+    const north = bars.find((bar: any) => bar.name === 'north');
+    expect(north.segments.find((s: any) => s.label === 'shipped').value).toBe(75);
+    expect(north.segments.find((s: any) => s.label === 'returned').value).toBe(25);
+    // South is half the size of north and its mix is 50/50, which is the fact a stack of raw
+    // totals cannot show.
+    const south = bars.find((bar: any) => bar.name === 'south');
+    expect(south.segments.map((s: any) => s.value)).toEqual([50, 50]);
+  });
+
+  it('leaves a group that sums to nothing alone rather than dividing by it', () => {
+    const board = boardWith({ widgets: [widgetOn()] }).board;
+    const view = analysisView(analysisResult({
+      columns: [
+        { name: 'region', type: 'VARCHAR', role: 'DIMENSION' },
+        { name: 'status', type: 'VARCHAR', role: 'DIMENSION' },
+        { name: 'amount_sum', type: 'DOUBLE', role: 'MEASURE' },
+      ],
+      rows: [['north', 'shipped', '0'], ['north', 'returned', '0']],
+      dimensions: ['region', 'status'],
+    }), 'SUM', { dimensionCount: 2 });
+
+    const bars = (board as any).shareStacks(view);
+    expect(bars[0].value).toBe(0);
+  });
+});
+
+describe('which kinds a result may honestly be drawn as', () => {
+
+  it('refuses a line, an area and a trend over a dimension sorted backwards', () => {
+    // "dimension, Z-A" is one click and an entirely reasonable choice for a date -- newest first,
+    // which is how anybody wanting the latest month at the top of the table would sort. The gate
+    // saw only the AXIS, called it dimension-ordered, and offered all three: time ran right to
+    // left, and the trend summary printed "Change -40.0% ... down" over a year that rose 67%.
+    const backwards = analysisView(analysisResult({
+      rows: [['2024-12', '1000000'], ['2024-01', '600000']],
+      dimensions: ['order_month'],
+    }), 'SUM', { sortedBy: 'DIMENSION', sortDirection: 'DESC' });
+
+    expect(backwards.issues.line).toContain('backwards');
+    expect(backwards.issues.area).toContain('backwards');
+    expect(backwards.issues.trendSummary).toContain('the wrong way round');
+
+    // Ascending is the same result read the right way, and draws.
+    const forwards = analysisView(analysisResult({
+      rows: [['2024-01', '600000'], ['2024-12', '1000000']],
+      dimensions: ['order_month'],
+    }), 'SUM', { sortedBy: 'DIMENSION', sortDirection: 'ASC' });
+
+    expect(forwards.issues.line).toBe('');
+    expect(forwards.issues.trendSummary).toBe('');
+  });
+
+  it('refuses a share when the Top-N threw its tail away', () => {
+    // With includeOther off the server emits no roll-up row, so five rows of a forty-region
+    // dataset are indistinguishable from a dataset with five regions. Every percentage drawn from
+    // them is a share of the retained subset wearing the shape of a share of the whole.
+    const trimmed = analysisView(analysisResult(), 'SUM', { topNTrimmed: true });
+
+    expect(trimmed.issues.donut).toContain('not the whole of anything');
+    expect(trimmed.topNTrimmed).toBe(true);
+    // And the tile says so in its own words, because nothing in the RESULT says it.
+    expect(trimmed.notes.join(' ')).toContain('not shares of the dataset');
+
+    // The same rows with the bucket ON are a whole, and the ring is offered.
+    expect(analysisView(analysisResult(), 'SUM').issues.donut).toBe('');
+  });
+
+  it('offers the cross-tab only when the server composed a grid', () => {
+    const flat = analysisView(analysisResult(), 'SUM', { hasPivot: false });
+    expect(flat.issues.pivot).toContain('exactly two dimensions');
+
+    const wide = analysisView(analysisResult(), 'SUM',
+      { hasPivot: false, pivotTruncated: true });
+    expect(wide.issues.pivot).toContain('exactly two dimensions');
+
+    const grid = analysisView(analysisResult(), 'SUM', { hasPivot: true });
+    expect(grid.issues.pivot).toBe('');
+  });
+});
+
+describe('formatting a result cell', () => {
+
+  it('groups a measure and leaves a dimension exactly as it is', () => {
+    // The defect: readable() groups an integer, which is right for money and rewrites a label.
+    // A year column printed "2,024" in this table while the chart beside it -- which never
+    // touches readableCell -- printed "2024", from the same row of the same result.
+    const view = analysisView(analysisResult({
+      columns: [
+        { name: 'order_year', type: 'BIGINT', role: 'DIMENSION' },
+        { name: 'amount_sum', type: 'DOUBLE', role: 'MEASURE' },
+      ],
+      rows: [['2024', '250000']],
+      dimensions: ['order_year'],
+    }), 'SUM');
+
+    expect(view.measureColumn).toEqual([false, true]);
+  });
+
+  it('marks every column of a saved query as formattable, because it has no roles to read', () => {
+    // Not an oversight. The server renders every value to text before a query result leaves, so a
+    // column of digits here could be a figure or a label and nothing distinguishes them.
+    const view = queryView(queryResult());
+
+    expect(view.measureColumn).toEqual([true, true]);
+  });
+});
+
+/**
+ * Clicking a bar to narrow every other tile.
+ *
+ * The feature is one gesture and three refusals, and the refusals are the half worth testing. A
+ * mark is only a filter operand when it names exactly one group of the underlying rows, and there
+ * are three ordinary ways it does not: the dimension was bucketed by a date grain, so the drawn
+ * "2024-03-01" stands for a whole month; two rows RENDERED to the same label and were added
+ * together, so the bar is not any one row's; or the value is null, which no `=` will ever match.
+ *
+ * Each of those produces a chart that would look completely correct and answer a different
+ * question, which is why the check is on the operands rather than on the drawn label -- and why
+ * `narrows` un-buttons the chart instead of explaining itself after the click.
+ */
+describe('narrowing the board by clicking a mark', () => {
+
+  it('carries the raw value behind each mark, not the rendered one', () => {
+    const view = analysisView(analysisResult({
+      columns: [
+        { name: 'region', type: 'VARCHAR', role: 'DIMENSION' },
+        { name: 'sum_amount', type: 'DECIMAL(18,3)', role: 'MEASURE' },
+      ],
+      rows: [['north', '1200.500'], ['south', '800.000']],
+      dimensions: ['region'],
+    }), 'SUM');
+
+    expect(view.marks.map(mark => mark.operands)).toEqual([
+      [{ field: 'region', value: 'north' }],
+      [{ field: 'region', value: 'south' }],
+    ]);
+  });
+
+  it('refuses a grained date, whose bar stands for a whole bucket', () => {
+    // The bar says "2024-03-01" and MEANS March. `booked_on = '2024-03-01'` would hand back the
+    // first of the month -- a thirtieth of the bar that was clicked, drawn as an ordinary chart.
+    const view = analysisView(analysisResult({
+      columns: [
+        { name: 'booked_on', type: 'TIMESTAMP', role: 'DIMENSION' },
+        { name: 'sum_amount', type: 'DECIMAL(18,3)', role: 'MEASURE' },
+      ],
+      rows: [['2024-03-01 00:00:00', '1200'], ['2024-04-01 00:00:00', '900']],
+      dimensions: ['booked_on'],
+      grains: ['MONTH'],
+    }), 'SUM');
+
+    expect(view.marks.length).toBe(2);
+    expect(view.marks.every(mark => mark.operands === undefined)).toBe(true);
+  });
+
+  it('allows the same column when nothing grained it', () => {
+    // The positive control for the test above: a refusal that applied to every date column would
+    // pass that assertion while taking the feature away from half the boards that could use it.
+    const view = analysisView(analysisResult({
+      columns: [
+        { name: 'booked_on', type: 'DATE', role: 'DIMENSION' },
+        { name: 'sum_amount', type: 'DECIMAL(18,3)', role: 'MEASURE' },
+      ],
+      rows: [['2024-03-01', '1200'], ['2024-03-02', '900']],
+      dimensions: ['booked_on'],
+      grains: [null],
+    }), 'SUM');
+
+    expect(view.marks[0].operands).toEqual([{ field: 'booked_on', value: '2024-03-01' }]);
+  });
+
+  it('drops the operands of a mark two rows were merged into', () => {
+    // A numeric dimension whose values arrive in two spellings. DuckDB writes a DOUBLE in
+    // scientific notation once it is large enough, so "1E2" and "100" are the same number written
+    // differently, and plainDecimal renders both as "100" -- correctly, and into ONE bar. That bar
+    // is neither row's: `bucket = '1E2'` and `bucket = '100'` each return half of what is drawn.
+    // The case the grain check cannot catch, because nothing here was grained.
+    const view = analysisView(analysisResult({
+      columns: [
+        { name: 'bucket', type: 'DOUBLE', role: 'DIMENSION' },
+        { name: 'sum_amount', type: 'DECIMAL(18,3)', role: 'MEASURE' },
+      ],
+      rows: [['1E2', '100'], ['100', '150'], ['200', '90']],
+      dimensions: ['bucket'],
+      grains: [null],
+    }), 'SUM');
+
+    const merged = view.marks.find(mark => mark.value === 250);
+    expect(merged).toBeDefined();
+    expect(merged!.name).toBe('100');
+    expect(merged!.operands).toBeUndefined();
+    // And the row that was not merged keeps its own, so the check is on the merge and not on the
+    // column type.
+    expect(view.marks.find(mark => mark.value === 90)!.operands)
+      .toEqual([{ field: 'bucket', value: '200' }]);
+  });
+
+  it('refuses a null dimension, which no equals will ever match', () => {
+    const view = analysisView(analysisResult({
+      columns: [
+        { name: 'region', type: 'VARCHAR', role: 'DIMENSION' },
+        { name: 'sum_amount', type: 'DECIMAL(18,3)', role: 'MEASURE' },
+      ],
+      rows: [['north', '1200'], [null, '800']],
+      dimensions: ['region'],
+    }), 'SUM');
+
+    expect(view.marks.find(mark => mark.name === '(null)')!.operands).toBeUndefined();
+  });
+
+  it('refuses the rolled-up Other row, which is not a value in the data', () => {
+    // A Top-N result carries one row standing for everything outside the top N. It is not a
+    // category: `sub_category = 'Other'` narrows the board to nothing. The server refuses to DRILL
+    // into it for the same reason, and this is the same refusal one screen earlier.
+    const view = analysisView(analysisResult({
+      columns: [
+        { name: 'sub_category', type: 'VARCHAR', role: 'DIMENSION' },
+        { name: 'sum_amount', type: 'DECIMAL(18,3)', role: 'MEASURE' },
+      ],
+      rows: [['Cameras', '1200'], ['Other', '800']],
+      dimensions: ['sub_category'],
+      other: { label: 'Other', values: ['Lenses', 'Tripods'], valueCount: 14,
+               valuesTruncated: false },
+    }), 'SUM');
+
+    expect(view.marks.find(mark => mark.name === 'Other')!.operands).toBeUndefined();
+    // The real category beside it still clicks, so this refuses the roll-up rather than the chart.
+    expect(view.marks.find(mark => mark.name === 'Cameras')!.operands)
+      .toEqual([{ field: 'sub_category', value: 'Cameras' }]);
+  });
+
+  it('prefers the row indices the server sends over matching the label', () => {
+    // A dataset that genuinely contains a sub-category called "Other", beside a roll-up that is
+    // also called "Other". The label cannot tell them apart -- the server keeps these indices for
+    // that reason, and its pivot builder once lost a measured 500 out of a 740 total to exactly
+    // this collision. With the indices, the real row clicks and the roll-up does not.
+    const view = analysisView(analysisResult({
+      columns: [
+        { name: 'sub_category', type: 'VARCHAR', role: 'DIMENSION' },
+        { name: 'sum_amount', type: 'DECIMAL(18,3)', role: 'MEASURE' },
+      ],
+      rows: [['Cameras', '1200'], ['Other', '500'], ['Other', '240']],
+      dimensions: ['sub_category'],
+      other: { label: 'Other', values: ['Lenses'], valueCount: 14, valuesTruncated: false },
+      rollupRows: [2],
+    }), 'SUM');
+
+    // Row 1 is the dataset's own "Other" and row 2 is the roll-up. They render to one label and
+    // are therefore ONE bar -- merged, so it is inert for that reason as well, and the count is
+    // what proves the two rows were both seen.
+    expect(view.marks.map(mark => mark.name)).toEqual(['Cameras', 'Other']);
+    expect(view.marks[0].operands).toEqual([{ field: 'sub_category', value: 'Cameras' }]);
+    expect(view.marks[1].operands).toBeUndefined();
+  });
+
+  it('clicks a real row that the label match alone would have refused', () => {
+    // The half the fallback gets wrong, and the reason the field is worth sending: a real
+    // sub-category spelled "Other", in a result where the roll-up is a DIFFERENT row.
+    const view = analysisView(analysisResult({
+      columns: [
+        { name: 'sub_category', type: 'VARCHAR', role: 'DIMENSION' },
+        { name: 'sum_amount', type: 'DECIMAL(18,3)', role: 'MEASURE' },
+      ],
+      rows: [['Other', '500'], ['Everything else', '240']],
+      dimensions: ['sub_category'],
+      other: { label: 'Everything else', values: ['Lenses'], valueCount: 14,
+               valuesTruncated: false },
+      rollupRows: [1],
+    }), 'SUM');
+
+    expect(view.marks[0].operands).toEqual([{ field: 'sub_category', value: 'Other' }]);
+    expect(view.marks[1].operands).toBeUndefined();
+  });
+
+  it('keeps every dimension of a multi-dimension mark, in column order', () => {
+    const view = analysisView(analysisResult({
+      columns: [
+        { name: 'region', type: 'VARCHAR', role: 'DIMENSION' },
+        { name: 'category', type: 'VARCHAR', role: 'DIMENSION' },
+        { name: 'sum_amount', type: 'DECIMAL(18,3)', role: 'MEASURE' },
+      ],
+      rows: [['north', 'tools', '1200']],
+      dimensions: ['region', 'category'],
+    }), 'SUM');
+
+    // The drawn name joins them and is not any column's value; the operands are both columns.
+    expect(view.marks[0].name).toBe('north · tools');
+    expect(view.marks[0].operands).toEqual([
+      { field: 'region', value: 'north' },
+      { field: 'category', value: 'tools' },
+    ]);
+  });
+
+  it('marks the un-narrowable bar inert, and leaves the rest of the chart clickable', () => {
+    // Requiring EVERY mark was the first shape of this and it was wrong: a Top-N result carries
+    // one rolled-up row that is legitimately not a category, so "all or nothing" would have taken
+    // the feature away from most of the reports that have it.
+    const harness = boardWith({ widgets: [widgetOn()] });
+    const mixed = analysisView(analysisResult({
+      rows: [['north', '1200'], [null, '800']],
+      dimensions: ['region'],
+    }), 'SUM');
+
+    expect(harness.board.narrows(widgetOn(), mixed)).toBe(true);
+    expect(mixed.marks.find(mark => mark.name === 'north')!.inert).toBeUndefined();
+    // The chart reads `inert`, never `operands` -- it is a shared component and knows nothing
+    // about filters.
+    expect(mixed.marks.find(mark => mark.name === '(null)')!.inert).toBe(true);
+  });
+
+  it('un-buttons a chart on which NOTHING can be narrowed', () => {
+    const harness = boardWith({ widgets: [widgetOn()] });
+    const grained = analysisView(analysisResult({
+      columns: [
+        { name: 'booked_on', type: 'DATE', role: 'DIMENSION' },
+        { name: 'sum_amount', type: 'DECIMAL(18,3)', role: 'MEASURE' },
+      ],
+      rows: [['2024-03-01', '1200'], ['2024-04-01', '900']],
+      dimensions: ['booked_on'],
+      grains: ['MONTH'],
+    }), 'SUM');
+
+    expect(harness.board.narrows(widgetOn(), grained)).toBe(false);
+  });
+
+  it('un-buttons a saved-query tile, which has no dataset to filter', () => {
+    const harness = boardWith({ widgets: [widgetOn()] });
+    const view = analysisView(analysisResult({ dimensions: ['region'] }), 'SUM');
+
+    expect(harness.board.narrows(
+      widgetOn({ analyticsAnalysisId: undefined, analyticsQueryId: 21 }), view)).toBe(false);
+  });
+
+  it('fills the board filter from the clicked mark and runs the board', () => {
+    const harness = boardWith({ widgets: [widgetOn()] });
+    harness.board.openDashboard(BOARD);
+    // Opening a board runs it. Settled first, because a click DURING a run is ignored on purpose
+    // and the test below is the one that says so.
+    harness.finishAnalysis();
+    const view = analysisView(analysisResult({ dimensions: ['region'] }), 'SUM');
+    const before = harness.analyzes.length;
+
+    harness.board.narrowTo(widgetOn(), view.marks[0]);
+
+    expect(harness.board.boardFilter().clauses)
+      .toEqual([{ field: 'region', operator: 'EQ', value: 'north' }]);
+    // On the tile's own dataset, not on whatever the bar happened to be showing before.
+    // The key is the pair joined by a NUL, which is the one separator a bucket key cannot hold.
+    expect(harness.board.boardFilterOn())
+      .toBe(ANALYSIS.connectionAlias + '\u0000' + ANALYSIS.datasetPath);
+    // Opened, so the reader ends up looking at a filter they can read, edit and clear -- rather
+    // than at numbers that moved for a reason with no trace on the screen.
+    expect(harness.board.filterOpen()).toBe(true);
+    expect(harness.analyzes.length).toBeGreaterThan(before);
+  });
+
+  it('ignores a click while the board is running', () => {
+    // runAll() abandons the run in flight. A second click during a ten-widget pass would throw
+    // away nine answers to ask a question the reader has not finished asking.
+    const harness = boardWith({ widgets: [widgetOn()] });
+    harness.board.openDashboard(BOARD);
+    const view = analysisView(analysisResult({ dimensions: ['region'] }), 'SUM');
+    const during = harness.analyzes.length;
+
+    harness.board.narrowTo(widgetOn(), view.marks[0]);
+
+    expect(harness.board.boardFilter().clauses).toEqual([]);
+    expect(harness.analyzes.length).toBe(during);
   });
 });

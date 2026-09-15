@@ -180,3 +180,95 @@ describe('TaskEdit -- payload generated from the pipeline form on save', () => {
     expect(post).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * A select's choices used to be one string bound to both an <option>'s value and its text, so
+ * the author had to choose between a dropdown the operator can read and a token the worker can
+ * parse. These tests pin down both halves of the split -- that the label is what shows and the
+ * value is what reaches the tag -- and, just as importantly, that a form written before the
+ * split still resolves each line to itself. That last one is not cosmetic: buildFormControls
+ * seeds a select from the tag the task already saved, and syncFormToTags DELETES that tag when
+ * the control comes back blank, so a legacy option that stopped matching its own saved value
+ * would empty the field and drop the answer on the next save.
+ */
+describe('TaskEdit -- a select field\'s choices', () => {
+  function formWith(fieldOptions: string | null, defaultValue: string | null = null) {
+    return {
+      taskFormId: 9, pipelineId: 'F768930', formName: 'CSV to JSON demo',
+      fields: [{ tagKey: 'format', tagParent: null, label: 'JSON shape', fieldType: 'select',
+                 required: false, defaultValue, helpText: null, fieldOptions, position: 0 }],
+    };
+  }
+
+  function loaded(def: any) {
+    const { component } = taskEditWith(url => {
+      if (url.endsWith('/setting.json/appSetting')) {
+        return of({ status: API_SUCCESS, data: { sourceTaskTypes: [], lookupDatas: [] } });
+      }
+      if (url.endsWith('/taskForm.json/listPipelines')) return of({ status: API_SUCCESS, data: [def] });
+      if (url.endsWith('/taskForm.json/formForPipeline')) return of({ status: API_SUCCESS, data: def });
+      throw new Error(`unexpected GET ${url}`);
+    });
+    component.ngOnInit();
+    component.form.get('pipelineId')!.setValue('F768930');
+    return component;
+  }
+
+  it('shows the label and stores the value for a value=label choice', () => {
+    const component = loaded(formWith('records=JSON array\nlines=JSON Lines', 'records'));
+    const field = component.formFields()[0];
+
+    expect(component.fieldChoices(field)).toEqual([
+      { value: 'records', label: 'JSON array' },
+      { value: 'lines', label: 'JSON Lines' },
+    ]);
+  });
+
+  it('writes the VALUE of the choice the operator picked, never its label', () => {
+    // The whole point of the feature, end to end: the operator reads "JSON Lines" and the worker
+    // receives "lines". Before the split the tag carried whichever of the two the author
+    // sacrificed. Deliberately routed through fieldChoices rather than setting "lines" directly:
+    // the option's [value] is what the browser writes into the control, so picking the choice by
+    // the label on screen is the only version of this that can fail when the split is missing.
+    const component = loaded(formWith('records=JSON array\nlines=JSON Lines', 'records'));
+    const onScreen = component.fieldChoices(component.formFields()[0])
+      .find(choice => choice.label === 'JSON Lines');
+
+    component.formData.get('|format')!.setValue(onScreen!.value);
+    component.syncFormToTags();
+
+    expect(component.form.getRawValue().tags)
+      .toEqual([{ tagKey: 'format', tagParent: '', tagValue: 'lines' }]);
+  });
+
+  it('resolves a legacy line to itself as both halves', () => {
+    const component = loaded(formWith('records\nlines', 'records'));
+    expect(component.fieldChoices(component.formFields()[0])).toEqual([
+      { value: 'records', label: 'records' },
+      { value: 'lines', label: 'lines' },
+    ]);
+    // And the seeded default still matches an option, so the dropdown is not blank on open.
+    expect(component.formData.get('|format')!.value).toBe('records');
+  });
+
+  it('splits the comma-separated options the ETL demo seeder wrote', () => {
+    // These rendered as ONE option reading "records,lines" that the field's own default never
+    // matched, so the dropdown opened blank and the only thing in it corrupted the task.
+    const component = loaded(formWith('records,lines', 'records'));
+    expect(component.fieldChoices(component.formFields()[0])).toEqual([
+      { value: 'records', label: 'records' },
+      { value: 'lines', label: 'lines' },
+    ]);
+  });
+
+  it('carries a saved answer that matches no choice rather than rendering blank', () => {
+    // A renamed choice leaves the task holding a value no <option> has. Angular then paints the
+    // select empty while the control still holds -- and still sends -- the old value.
+    const component = loaded(formWith('records\nlines', 'daily'));
+    expect(component.fieldChoices(component.formFields()[0])).toEqual([
+      { value: 'records', label: 'records' },
+      { value: 'lines', label: 'lines' },
+      { value: 'daily', label: 'daily (not one of the choices)' },
+    ]);
+  });
+});

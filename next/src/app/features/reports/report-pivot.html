@@ -55,19 +55,19 @@
       </button>
       <button type="button" class="btn btn-default btn-sm"
               [disabled]="exporting()" (click)="export('xlsx')">
-        <app-icon name="table" [class.spin]="exporting() === 'xlsx'" />
+        <app-icon name="table" [busy]="exporting() === 'xlsx'" />
         {{ exporting() === 'xlsx' ? 'Building…' : 'Excel' }}
       </button>
       <button type="button" class="btn btn-default btn-sm"
               [disabled]="exporting()" (click)="saveToBucket('csv')"
               title="Write this report into a bucket">
-        <app-icon name="cloud" [class.spin]="exporting() === 'bucket'" />
+        <app-icon name="cloud" [busy]="exporting() === 'bucket'" />
         {{ exporting() === 'bucket' ? 'Saving…' : 'Save' }}
       </button>
       <button type="button" class="btn btn-default btn-sm"
               [disabled]="exporting()" (click)="submit('csv')"
               title="Post this report to a configured endpoint">
-        <app-icon name="send" [class.spin]="exporting() === 'submit'" />
+        <app-icon name="send" [busy]="exporting() === 'submit'" />
         {{ exporting() === 'submit' ? 'Submitting…' : 'Submit' }}
       </button>
     </div>
@@ -111,6 +111,17 @@
       <p class="field-note text-[color:var(--text-muted)] mt-2">
         Showing the top 8 of {{ pivot().rowLabels.length }} rows by total.
         {{ chartRef.rankedHidden() }} more are in the table below.
+      </p>
+    }
+    @if (chartRef.radarHidden()) {
+      <!-- A radar can only carry a few shapes before they stop being separable, so it draws the
+           first few rows. Said out loud for the same reason the ranked note is: a chart that
+           quietly answers a smaller question than the one the grid above it was set up to ask
+           looks exactly like a chart that answered it. The web is also scaled to these rows, so
+           the outer ring means the largest of THESE and not of the pivot. -->
+      <p class="field-note text-[color:var(--text-muted)] mt-2">
+        Showing the first {{ radarRows }} of {{ pivot().rowLabels.length }} rows, scaled to those
+        rows. {{ chartRef.radarHidden() }} more are in the table below.
       </p>
     }
     <div class="flex flex-wrap items-center gap-3 mt-3 text-xs">
@@ -188,12 +199,17 @@
           </td>
           @for (colLabel of pivot().colLabels; track colLabel; let ci = $index) {
             <td class="text-right tabular !p-0">
+              <!-- Disabled on whether the cell HAS RUNS, not on whether its number is zero.
+                   Those parted company in both directions: a cell whose runs all finished inside
+                   a second measures a real 0, so the runs that did happen could not be opened;
+                   and an unmeasurable cell now measures -1, which is truthy, so the control
+                   would have offered a drawer with nothing in it. -->
               <button type="button"
                       class="w-full h-full px-4 py-2.5 text-right tabular rounded-sm hover-brand
                              focus:outline-none focus:ring-2 focus:ring-[color:var(--focus-ring)]
                              disabled:hover:bg-transparent"
-                      [class.text-[color:var(--text-muted)]]="!pivot().matrix[ri][ci]"
-                      [disabled]="!pivot().matrix[ri][ci]"
+                      [class.text-[color:var(--text-muted)]]="cellIsEmpty(ri, ci)"
+                      [disabled]="cellIsEmpty(ri, ci)"
                       [title]="rowLabel + ' · ' + colLabel"
                       (click)="drill(ri, ci)">
                 {{ cellText(ri, ci) }}

@@ -970,7 +970,21 @@
                that can be wrong about one are said ON it, never underneath it -- it stopped at
                the row ceiling, a tail was rolled into Other, a distinct count may be a sketch,
                and rows a filter excluded are excluded rather than zero. -->
-          <div class="flex flex-col gap-3 min-w-0">
+          <!--
+            TWO COLUMNS ON A WIDE SCREEN, and this is the whole of the layout decision.
+
+            Build, Filters and the result were one stacked column, which measured 7,908px at
+            1440x900 -- 8.8 screenfuls -- and put the answer below the fold of the controls that
+            produced it. Changing one dimension meant scrolling down to read the result and back
+            up to change the next, on a screen that was 60% empty to the right the whole time.
+
+            The controls stick, because they are a form a reader returns to between runs rather
+            than something read once. Single column below xl: 380px of controls beside a result
+            leaves neither of them enough room, and the stack is the honest answer there.
+          -->
+          <div class="grid gap-3 min-w-0 xl:grid-cols-[minmax(340px,380px)_minmax(0,1fr)] xl:items-start">
+
+            <div class="flex flex-col gap-3 min-w-0 xl:sticky xl:top-3">
 
             <!-- ── what to analyse ──────────────────────────────────────────────────────── -->
             <div class="card p-4 flex flex-col gap-3 min-w-0">
@@ -1000,9 +1014,15 @@
                       <option value="">
                         {{ $index === 0 ? 'no grouping — one figure over every matching row' : 'none' }}
                       </option>
+                      <!-- A name this dataset does not have is listed and inert rather than
+                           missing, or the control shows "no grouping" while the request still
+                           carries the column. -->
                       @for (column of dimensionOptions($index); track column.name) {
-                        <option [value]="column.name" [selected]="column.name === slot">
-                          {{ column.name }} · {{ shortType(column.type) }}
+                        <option [value]="column.name" [selected]="column.name === slot"
+                                [disabled]="column.missing">
+                          {{ column.name }}{{ column.missing
+                            ? ' — not a column of this dataset'
+                            : ' · ' + shortType(column.type) }}
                         </option>
                       }
                     </select>
@@ -1033,6 +1053,21 @@
                 }
               </div>
 
+              <!-- Said once here rather than discovered one server refusal at a time. A reopened
+                   analysis keeps the column names it was saved with, and the pickers above now
+                   show them; this is what happens when Run is pressed. -->
+              @if (analysisFieldsMissing().length) {
+                <p class="text-xs text-[color:var(--text-secondary)]" role="alert">
+                  {{ analysisFieldsMissing().length }}
+                  {{ analysisFieldsMissing().length === 1 ? 'field' : 'fields' }} this analysis
+                  names {{ analysisFieldsMissing().length === 1 ? 'is' : 'are' }} not
+                  {{ analysisFieldsMissing().length === 1 ? 'a column' : 'columns' }} of the open
+                  dataset: {{ analysisFieldsMissing().join(', ') }}. They are still what will be
+                  sent, so Run will be refused until they are re-picked or the dataset they belong
+                  to is opened.
+                </p>
+              }
+
               <div class="flex flex-wrap items-end gap-2 min-w-0">
                 <div class="flex flex-col gap-1 min-w-0">
                   <label class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]"
@@ -1059,9 +1094,12 @@
                             [value]="measureField()"
                             (change)="measureField.set($any($event.target).value)">
                       <option value="">choose a column…</option>
-                      @for (column of columns(); track column.name) {
-                        <option [value]="column.name" [selected]="column.name === measureField()">
-                          {{ column.name }} · {{ shortType(column.type) }}
+                      @for (column of measureFieldOptions(); track column.name) {
+                        <option [value]="column.name" [selected]="column.name === measureField()"
+                                [disabled]="column.missing">
+                          {{ column.name }}{{ column.missing
+                            ? ' — not a column of this dataset'
+                            : ' · ' + shortType(column.type) }}
                         </option>
                       }
                     </select>
@@ -1247,7 +1285,10 @@
               </div>
             }
 
+            </div>
+
             <!-- ── the result ───────────────────────────────────────────────────────────── -->
+            <div class="flex flex-col gap-3 min-w-0">
             @if (analysisError()) {
               <div class="card p-4 flex items-start gap-3 min-w-0" role="alert">
                 <app-icon name="alert" size="1.25rem" class="icon-crit shrink-0 mt-0.5" />
@@ -1276,11 +1317,15 @@
                     <span class="text-[color:var(--text-muted)]">
                       {{ analysisResult()!.rowCount === 1 ? 'group' : 'groups' }}
                     </span>
+                    <!-- analysedTopN(), never the Top-N control. This line is a claim about the
+                         rows below it: clicking "All" without pressing Run left the same
+                         twenty-five rows on screen labelled "every group that matched", which is
+                         a partial answer presented as the complete one. -->
                     @if (analysisTruncated()) {
                       <span class="pill pill-warn">stopped at the limit — there may be more</span>
-                    } @else if (topNActive()) {
+                    } @else if (analysedTopN()) {
                       <span class="text-[color:var(--text-muted)]">
-                        the top {{ topNLimit() }}{{ otherBucket() ? ', plus the rolled-up rest' : '' }}
+                        the top {{ analysedTopN()!.limit }}{{ otherBucket() ? ', plus the rolled-up rest' : '' }}
                       </span>
                     } @else {
                       <span class="text-[color:var(--text-muted)]">every group that matched</span>
@@ -1337,15 +1382,24 @@
                     <!-- Drill controls. Two selects rather than a menu on every row: what a drill
                          does -- which dimension it replaces, and what replaces it -- is one
                          decision for the whole table, and repeating it per row would ask the same
-                         question once per group. -->
-                    @if (dimensions().length) {
+                         question once per group.
+
+                         Both are built from effectiveDimensions(), which is what the analysis is
+                         grouped by NOW, never from dimensions(), which is the root it was built
+                         from. A drill replaces a dimension, so after one step the root names a
+                         column that is no longer on the table: offering it here put the picker's
+                         bound value outside its own option list -- it displayed the root while
+                         holding the drilled column -- and picking the one option there was left
+                         the Drill button inert, because drillInto refuses a dimension the
+                         analysis is not grouped by and the server refuses it again by name. -->
+                    @if (effectiveDimensions().length) {
                       <div class="flex flex-col gap-1 min-w-0">
                         <label class="text-[11px] uppercase tracking-wider
                                       text-[color:var(--text-muted)]" for="a-drill-dim">Drill</label>
                         <select id="a-drill-dim" class="input input-sm w-auto min-w-0 max-w-40"
                                 [value]="drillDimension()"
                                 (change)="drillDimension.set($any($event.target).value)">
-                          @for (name of dimensions(); track name) {
+                          @for (name of effectiveDimensions(); track name) {
                             <option [value]="name" [selected]="name === drillDimension()">{{ name }}</option>
                           }
                         </select>
@@ -1358,7 +1412,7 @@
                                 (change)="drillNext.set($any($event.target).value)">
                           <option value="">nothing — just narrow</option>
                           @for (column of columns(); track column.name) {
-                            @if (!dimensions().includes(column.name)) {
+                            @if (!effectiveDimensions().includes(column.name)) {
                               <option [value]="column.name" [selected]="column.name === drillNext()">
                                 {{ column.name }}
                               </option>
@@ -1445,8 +1499,14 @@
                                       </td>
                                     }
                                     @if (pivot()!.additive) {
-                                      <td class="px-2 py-1.5 text-right tabular font-medium whitespace-nowrap">
-                                        {{ row.total === null ? '—' : row.total.toLocaleString() }}
+                                      <!-- toLocaleString's ECMA-402 default is three fraction
+                                           digits, so a row total silently rounded and the cell
+                                           carried no title to read the exact figure from. The
+                                           cells in the same row already go through readableCell;
+                                           the total beside them now does too. -->
+                                      <td class="px-2 py-1.5 text-right tabular font-medium whitespace-nowrap"
+                                          [title]="row.total === null ? 'no rows' : row.total">
+                                        {{ row.total === null ? '—' : readableFigure(row.total) }}
                                       </td>
                                     }
                                   </tr>
@@ -1470,17 +1530,18 @@
                         <app-ranked-bar [data]="canvasPoints()" [max]="canvasPoints().length"
                                         [showPercent]="false"
                                         [clickable]="markClickable()"
-                                        (picked)="crossFilterFromMark($event.name)" />
+                                        (picked)="crossFilterFromMark($any($event))" />
                       }
 
                       @case ('bar') {
                         <app-bar-chart [data]="canvasPoints()" [height]="220"
+                                       [format]="chartNumber"
                                        [clickable]="markClickable()"
-                                       (barClicked)="crossFilterFromMark($event.name)" />
+                                       (barClicked)="crossFilterFromMark($any($event))" />
                       }
 
                       @case ('donut') {
-                        <app-donut [data]="canvasPoints()"
+                        <app-donut [data]="canvasPoints()" [format]="chartNumber"
                                    [totalLabel]="measureColumn()?.name ?? ''" />
                       }
 
@@ -1502,7 +1563,9 @@
                                     </span>
                                   </th>
                                 }
-                                @if (drillDimension()) { <th class="px-2 py-1.5"></th> }
+                                @if (drillDimension()) {
+                                  <th class="px-2 py-1.5"></th>
+                                }
                               </tr>
                             </thead>
                             <tbody>
@@ -1514,18 +1577,26 @@
                                         [class.tabular]="cell.column.role === 'MEASURE'">
                                       @if (cell.isNull) {
                                         <span class="text-[color:var(--text-muted)] italic">null</span>
-                                      } @else if (cell.column.role === 'DIMENSION' && !row.isOther) {
+                                      } @else if (cell.field && !row.isOther) {
                                         <!-- Cross-filtering: one click narrows the analysis and
                                              everything drawn from it, because all of it comes
                                              from the one result. The Other row is deliberately
                                              not clickable -- "Other" is not a value in the data,
-                                             it is the values the reader has not been shown. -->
+                                             it is the values the reader has not been shown.
+
+                                             cell.field, never cell.column.name: the header is the
+                                             SQL alias and carries the grain with it, so a
+                                             bucketed column sent a field name the dataset does
+                                             not have. It is '' for a bucketed cell as well, which
+                                             is what makes that cell inert -- the cell says March
+                                             and means March, and an equality would ask for the
+                                             first of the month. -->
                                         <button type="button"
                                                 class="text-left underline decoration-dotted
                                                        underline-offset-2 hover:text-[color:var(--text-primary)]"
                                                 [disabled]="analysing()"
-                                                [title]="'Filter to ' + cell.column.name + ' = ' + cell.text"
-                                                (click)="crossFilter(cell.column.name, cell.raw)">
+                                                [title]="'Filter to ' + cell.field + ' = ' + cell.text"
+                                                (click)="crossFilter(cell.field, cell.raw)">
                                           {{ cell.text }}
                                         </button>
                                       } @else {
@@ -1535,7 +1606,10 @@
                                   }
                                   @if (drillDimension()) {
                                     <td class="px-2 py-1.5 text-right">
-                                      @if (!row.isOther) {
+                                      <!-- Withheld on a row that cannot name a value for the
+                                           drill dimension at all, rather than offered and then
+                                           turned into a drill into the no-value group. -->
+                                      @if (!row.isOther && drillValueOf(row) !== undefined) {
                                         <button type="button" class="btn btn-ghost btn-xs"
                                                 [disabled]="analysing()"
                                                 [title]="'Narrow to this ' + drillDimension()
@@ -1556,9 +1630,18 @@
                             The “{{ otherBucket()!.label }}” row is
                             {{ otherBucket()!.valueCount }} rolled-up
                             {{ otherBucket()!.valueCount === 1 ? 'value' : 'values' }}, not a category in the data — so it cannot be
-                            filtered to or drilled into. A row whose value is literally
-                            “{{ otherBucket()!.label }}” cannot be told apart from it here, and is
-                            inert for the same reason.
+                            filtered to or drilled into. A row whose value is genuinely
+                            “{{ otherBucket()!.label }}” is a category like any other and still
+                            can be: the server names the rolled-up rows by position, so the two
+                            are told apart by which row they are rather than by what they are
+                            called.
+                          </p>
+                        }
+                        <!-- The same courtesy the roll-up row gets: a cell that will not click
+                             says why, or it reads as a broken table. -->
+                        @if (grainedCellNote()) {
+                          <p class="field-note text-[color:var(--text-muted)]">
+                            {{ grainedCellNote() }}
                           </p>
                         }
                       }
@@ -1616,6 +1699,13 @@
                 @if (analysisFromElsewhere()) {
                   <p class="text-xs text-[color:var(--text-secondary)]">
                     {{ analysisFromElsewhere() }} It will run against the file that is open here.
+                    <!-- Which of the two buttons moves the dataset, said before either is
+                         pressed. An Update that quietly repointed a saved analysis at whatever
+                         was open left a row whose stored columns belong to a different file. -->
+                    @if (loadedAnalysis()?.analyticsAnalysisId) {
+                      Updating it keeps it pointed at the file it was saved against; “Save as new”
+                      records the one open here.
+                    }
                   </p>
                 }
               </div>
@@ -1637,6 +1727,12 @@
                        which is precisely when a stale row gets clicked. -->
                   <p class="text-xs text-crit-500">{{ analysisOpenError() }}</p>
                 }
+                <!-- What a delete actually removed, in the server's own words: it is the only
+                     side that counts the dashboard tiles the cascade took with the row. Not in
+                     the error colour, because it is not a failure. -->
+                @if (analysesNotice()) {
+                  <p class="text-xs text-[color:var(--text-secondary)]">{{ analysesNotice() }}</p>
+                }
                 @if (analysesLoading()) {
                   <p class="text-xs text-[color:var(--text-muted)]">Reading your analyses…</p>
                 } @else if (analysesError()) {
@@ -1647,8 +1743,22 @@
                     the data it reads.
                   </p>
                 } @else {
+                  <!-- Searchable and capped. Every saved analysis used to be drawn, which on a
+                       workspace with 135 of them was a 6,799px panel below the result. -->
+                  @if (analyses().length > 8) {
+                    <input type="search" class="input input-sm w-full"
+                           placeholder="Find a saved analysis by name or dataset"
+                           aria-label="Find a saved analysis"
+                           [value]="librarySearch()"
+                           (input)="librarySearch.set($any($event.target).value)" />
+                  }
+                  @if (!libraryVisible().length) {
+                    <p class="text-xs text-[color:var(--text-muted)]">
+                      Nothing saved here matches “{{ librarySearch() }}”.
+                    </p>
+                  }
                   <ul class="flex flex-col divide-y divide-[color:var(--border-subtle)]">
-                    @for (saved of analyses(); track saved.analyticsAnalysisId) {
+                    @for (saved of libraryVisible(); track saved.analyticsAnalysisId) {
                       <li class="py-1.5 flex items-center gap-2 min-w-0">
                         <button type="button" class="min-w-0 flex-1 text-left"
                                 [title]="saved.connectionAlias + '/' + saved.datasetPath"
@@ -1666,12 +1776,22 @@
                       </li>
                     }
                   </ul>
+                  @if (libraryHidden()) {
+                    <button type="button" class="btn btn-ghost btn-xs self-start"
+                            (click)="libraryShowAll.set(true)">
+                      Show {{ libraryHidden() }} more
+                    </button>
+                  } @else if (libraryShowAll() && libraryMatches().length > 8) {
+                    <button type="button" class="btn btn-ghost btn-xs self-start"
+                            (click)="libraryShowAll.set(false)">Show fewer</button>
+                  }
                   <p class="field-note text-[color:var(--text-muted)]">
                     Opening one puts it on the canvas without running it — an analysis can be a
                     full scan, and browsing the list should not spend one.
                   </p>
                 }
               </div>
+            </div>
             </div>
           </div>
         }
@@ -1805,6 +1925,17 @@
                   }
                 </div>
               </div>
+
+              @if (joinWithoutSecond()) {
+                <!-- Before the save, not after it. A statement naming dataset2 with no second
+                     dataset picked saves perfectly well and cannot be run, and the person who
+                     finds that out is usually not the person who saved it. -->
+                <p class="text-xs text-warn-600">
+                  This query reads <span class="mono">dataset2</span>, but no second dataset is
+                  picked. Saving it now stores a query that cannot run — pick the second file
+                  above, and it is saved with the query.
+                </p>
+              }
 
               @if (saveError()) {
                 <p class="text-xs text-crit-500" role="alert">{{ saveError() }}</p>
@@ -2194,7 +2325,7 @@
 
               @switch (chartKind()) {
                 @case ('bar') {
-                  <app-bar-chart [data]="chartData()" [height]="220" />
+                  <app-bar-chart [data]="chartData()" [height]="220" [format]="chartNumber" />
                 }
                 @case ('ranked') {
                   <!-- No percentages. A share of a total is only a share when the numbers add
@@ -2204,7 +2335,8 @@
                                   [showPercent]="false" />
                 }
                 @case ('donut') {
-                  <app-donut [data]="chartData()" [totalLabel]="valueColumn()?.name ?? ''" />
+                  <app-donut [data]="chartData()" [format]="chartNumber"
+                             [totalLabel]="valueColumn()?.name ?? ''" />
                 }
                 @case ('histogram') {
                   <!-- noun="row", because these are rows of a query result and not the runs

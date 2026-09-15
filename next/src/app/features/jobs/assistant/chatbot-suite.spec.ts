@@ -132,6 +132,24 @@ describe('assistant answers', () => {
     expect(text).toMatch(/only when someone triggers it/i);
   });
 
+  it('does not read a held timetable as the schedule a manual job runs on', () => {
+    // A job switched from Auto to Manual keeps its Scheduler row -- the editor posts no schedulers
+    // block for one, and the dispatcher passes over it on execution rather than expiring it -- but
+    // the detail endpoint attaches that row regardless. Answering from the schedule first promised
+    // a run at a moment the dispatcher will never reach.
+    const held = {
+      ...facts, execution: 'Manual',
+      schedule: { ...facts.schedule!, nextRunAt: '2026-09-15T09:00:00' },
+    };
+    const answer = answerFor('schedule', held, runs);
+    const text = (answer.blocks[0] as any).text;
+    expect(text).toMatch(/only when someone triggers it/i);
+    expect(text).not.toMatch(/it runs days/i);
+    const rows = (answer.blocks.find(b => b.kind === 'facts') as any).rows;
+    expect(rows.find((r: any) => r.label === 'Next run').value).toMatch(/on demand/i);
+    expect(rows.find((r: any) => r.label === 'Next run').value).not.toContain('2026-09-15');
+  });
+
   it.each([
     [null, 'unknown'], [0, '0s'], [59, '59s'], [60, '1m 0s'], [3600, '1h 0m'],
   ])('humanDuration(%s) is %s', (input, expected) => {

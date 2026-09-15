@@ -8,6 +8,7 @@ export interface Point {
 
 /** How wide the drawing is in its own coordinates. Scaled by CSS, so the number is arbitrary. */
 const WIDTH = 600;
+/** The drawing's own height when the caller does not give one. */
 const HEIGHT = 160;
 const PAD_LEFT = 4;
 const PAD_BOTTOM = 18;
@@ -38,8 +39,8 @@ const PAD_BOTTOM = 18;
     @if (!data().length) {
       <p class="field-note text-[color:var(--text-muted)]">{{ emptyMessage() }}</p>
     } @else {
-      <svg [attr.viewBox]="'0 0 ' + width + ' ' + height" class="w-full"
-           [style.height.px]="height" role="img" [attr.aria-label]="summary()"
+      <svg [attr.viewBox]="'0 0 ' + width + ' ' + height()" class="w-full"
+           [style.height.px]="height()" role="img" [attr.aria-label]="summary()"
            preserveAspectRatio="none">
         @if (filled()) {
           <path [attr.d]="areaPath()" [attr.fill]="colour()" fill-opacity="0.16" />
@@ -70,7 +71,14 @@ export class LineChart {
   readonly format = input<(value: number) => string>(compactNumber);
 
   protected readonly width = WIDTH;
-  protected readonly height = HEIGHT;
+  /**
+   * How tall to draw, in the SVG's own coordinates.
+   *
+   * An input rather than the module constant it was, so a dashboard tile whose author asked for
+   * a taller widget gets one. The viewBox follows it -- with preserveAspectRatio="none" a fixed
+   * viewBox and a changed CSS height would stretch the strokes rather than draw more chart.
+   */
+  readonly height = input(HEIGHT);
 
   /**
    * The points in drawing coordinates.
@@ -89,7 +97,7 @@ export class LineChart {
     const low = Math.min(...values);
     const high = Math.max(...values);
     const span = high - low || 1;
-    const usable = this.height - PAD_BOTTOM;
+    const usable = this.height() - PAD_BOTTOM;
     const step = points.length > 1 ? (WIDTH - PAD_LEFT * 2) / (points.length - 1) : 0;
 
     return points.map((point, at) => ({
@@ -106,7 +114,7 @@ export class LineChart {
   protected readonly areaPath = computed(() => {
     const marks = this.marks();
     if (!marks.length) return '';
-    const floor = this.height - PAD_BOTTOM;
+    const floor = this.height() - PAD_BOTTOM;
     return `${this.linePath()} L${marks[marks.length - 1].x} ${floor} L${marks[0].x} ${floor} Z`;
   });
 

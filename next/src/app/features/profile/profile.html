@@ -153,7 +153,7 @@
             <div class="flex gap-2 mt-4">
               <button type="button" class="btn btn-primary btn-sm"
                       [disabled]="savingName()" (click)="saveName()">
-                <app-icon name="save" [class.spin]="savingName()" />
+                <app-icon name="save" [busy]="savingName()" />
                 {{ savingName() ? 'Saving…' : 'Save details' }}
               </button>
               <button type="button" class="btn btn-ghost btn-sm"
@@ -223,7 +223,7 @@
           <div class="mt-4">
             <button type="button" class="btn btn-primary btn-sm"
                     [disabled]="savingPassword() || !canChangePassword()" (click)="changePassword()">
-              <app-icon name="key" [class.spin]="savingPassword()" />
+              <app-icon name="key" [busy]="savingPassword()" />
               {{ savingPassword() ? 'Changing…' : 'Change password' }}
             </button>
           </div>

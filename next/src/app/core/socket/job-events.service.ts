@@ -14,17 +14,21 @@ export interface JobEvent {
    * is exactly the failure the socket exists to avoid, so the set is spelled out and the
    * compiler is left able to say so.
    *
-   * Only `job.status` reaches a client today. `job.log` is published by the server and consumed
-   * nowhere here; `job.deleted`, `job.toggled` and `job.updated` are declared by
-   * JobEventPublisher.publishChanged, which has **no callers anywhere in the backend** -- so the
-   * branches for them in the jobs table are unreachable, and an edit, toggle or delete made in one
-   * tab stays invisible in another until a manual refresh, on a screen that says it is live.
+   * All five now carry traffic, which was not true when this comment was first written:
    *
-   * They are kept in the union because that is the contract the server is expected to fill; the
-   * fix is on the server (call publishChanged from add/update/toggle/delete in
-   * SourceJobServiceImpl), and is planned in .ai/synthesis/source-jobs.md. Narrowing this type
-   * catches a typo on THIS side only -- publishChanged takes a bare Java String with no shared
-   * constant, so a misspelling there is still invisible to the compiler.
+   * - `job.status` is published from BulkAction.changeJobStatus, the one method every writer of a
+   *   job's status goes through. It used to be published only from the worker callback, so the
+   *   eight transitions the platform makes itself -- Queue on enqueue, Start when the engine picks
+   *   the job up, Interrupt, and the engine's own Failed -- changed the row and told nobody.
+   * - `job.log` is consumed by the run-logs screen, which appends each line as it arrives. The
+   *   server had always published these and nothing subscribed, so that screen polled on a
+   *   five-second timer while calling itself live.
+   * - `job.deleted`, `job.toggled` and `job.updated` come from JobEventPublisher.publishChanged,
+   *   which had no caller anywhere in the backend. SourceJobServiceImpl now announces from
+   *   create, update, toggle and delete, so those branches in the jobs table are reachable.
+   *
+   * Narrowing this type catches a typo on THIS side only -- publishChanged takes a bare Java
+   * String with no shared constant, so a misspelling there is still invisible to the compiler.
    */
   type: 'job.status' | 'job.log' | 'job.deleted' | 'job.toggled' | 'job.updated';
   jobId: number;

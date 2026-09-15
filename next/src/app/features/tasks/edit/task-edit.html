@@ -103,8 +103,11 @@
                             [formControlName]="controlName(field)"
                             (change)="syncFormToTags()">
                       <option value="">None</option>
-                      @for (choice of fieldChoices(field); track choice) {
-                        <option [value]="choice">{{ choice }}</option>
+                      <!-- Tracked by index rather than by the choice itself: a form is free to
+                           offer two options with the same label, and tracking on the string
+                           collided on Angular's duplicate-key check. -->
+                      @for (choice of fieldChoices(field); track $index) {
+                        <option [value]="choice.value">{{ choice.label }}</option>
                       }
                     </select>
                   }

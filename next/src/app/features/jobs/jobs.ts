@@ -17,6 +17,7 @@ import { NotifyDialog } from './notify-dialog';
 import { JobAction, jobActionRequest } from './job-actions';
 import { parseTopicPartition } from '../../shared/ui/topic';
 import { JobEvent, JobEventsService } from '../../core/socket/job-events.service';
+import { instantOf } from '../../core/instant';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { BarChart, Bar } from '../../shared/charts/bar-chart';
 import { statusColor } from '../../shared/charts/status-color';
@@ -281,6 +282,17 @@ export class Jobs implements OnInit {
     });
   }
 
+  /**
+   * A timestamp from the API as a real instant, for the date pipe.
+   *
+   * The pipe was given the raw string, which has no offset, so it was rendered as though the UTC
+   * wall-clock time the container wrote were local -- "Last run" showed a time hours ahead of
+   * now. See core/instant.ts.
+   */
+  when(text: string | null | undefined): Date | null {
+    return instantOf(text);
+  }
+
   private applyEvent(event: JobEvent): void {
     if (event.type === 'job.deleted') {
       this.jobs.update(list => list.filter(job => job.jobId !== event.jobId));
@@ -497,10 +509,52 @@ export class Jobs implements OnInit {
 
   readonly stalledCount = computed(() => this.jobs().filter(job => this.isStalled(job)).length);
 
+  /**
+   * Whether this row's stored schedule is one the engine will actually act on.
+   *
+   * A job switched from Auto to Manual keeps its scheduler row: the editor sends no `schedulers`
+   * block for a Manual job, so updateSourceJob leaves the row alone, and SchedulerRepository
+   * .findDueSchedulers excludes it with `source_job.execution = 'Auto'` rather than expiring it --
+   * deliberately, so switching back to Auto resumes the timetable instead of losing it. The row
+   * therefore keeps a live-looking frequency and a next_run_at the dispatcher will never reach,
+   * and both were rendered as plain fact.
+   */
+  private scheduleIsLive(job: SourceJob): boolean {
+    return !!job.scheduler && job.execution !== 'Manual';
+  }
+
+  /**
+   * The next run this row may assert, or null when there is none to assert.
+   *
+   * The template asked `job.scheduler?.nextRunAt && !expired` directly, so a Manual job went on
+   * printing "Next 14 Sep, 02:00" from the schedule it no longer runs on -- a time that simply
+   * never arrives, beside a Last run that never moves again.
+   */
+  nextRun(job: SourceJob): string | null {
+    if (!this.scheduleIsLive(job)) return null;
+    const schedule = job.scheduler!;
+    return schedule.nextRunAt && !schedule.expired ? schedule.nextRunAt : null;
+  }
+
+  /**
+   * Whether Skip next run can do anything for this job.
+   *
+   * It was enabled on the presence of a scheduler row alone, so a Manual job that kept one
+   * offered the action and SourceJobServiceImpl.skipNextSourceJob answered "SourceJob skip only
+   * work with 'auto' source job." -- an error for a menu item the list had just said was
+   * available. There is nothing to skip when nothing is scheduled to run.
+   */
+  canSkipNext(job: SourceJob): boolean {
+    return this.scheduleIsLive(job);
+  }
+
   /** Human summary of a schedule: "Daily every 2 at 00:01" and what is next. */
   scheduleSummary(job: SourceJob): string {
+    // Manual reads the same whether the row kept a schedule or never had one, because what it
+    // does is the same either way: it runs when somebody presses Run now.
+    if (job.execution === 'Manual') return 'On demand';
     const schedule = job.scheduler;
-    if (!schedule) return job.execution === 'Manual' ? 'On demand' : '—';
+    if (!schedule) return '—';
     const parts: string[] = [schedule.frequency ?? ''];
     if (schedule.intervalValue && schedule.intervalValue !== '1') parts.push(`every ${schedule.intervalValue}`);
     // A weekly schedule pinned to weekdays, and a monthly one pinned to a date, run on
@@ -514,10 +568,19 @@ export class Jobs implements OnInit {
     return parts.filter(Boolean).join(' ');
   }
 
+  /**
+   * Both vocabularies the column holds, because one of them was never meant to be there.
+   *
+   * The job editor shipped writing '1'..'7' where everything else writes MON..SUN, so those rows
+   * matched nothing here and the list dropped the days from the schedule summary entirely -- a
+   * "Weekly on Mon, Wed" job read simply as "Weekly", which is also what it had degraded into
+   * running. The editor writes MON..SUN now; these rows outlive the fix, so they are still read.
+   */
   private weekdayLabel(daysOfWeek?: string): string {
     if (!daysOfWeek) return '';
     const names: Record<string, string> = {
       MON: 'Mon', TUE: 'Tue', WED: 'Wed', THU: 'Thu', FRI: 'Fri', SAT: 'Sat', SUN: 'Sun',
+      1: 'Mon', 2: 'Tue', 3: 'Wed', 4: 'Thu', 5: 'Fri', 6: 'Sat', 7: 'Sun',
     };
     return daysOfWeek.split(',')
       .map(code => names[code.trim().toUpperCase()])
@@ -538,6 +601,10 @@ export class Jobs implements OnInit {
   scheduleNote(job: SourceJob): { text: string; tone: 'warn' | 'muted' } | null {
     const schedule = job.scheduler;
     if (!schedule) return null;
+    // The schedule is still in the row and switching back to Auto resumes it, so say that it is
+    // held rather than hiding it -- an operator who set one up needs to know it survived. Expired
+    // and Ends-on notes are about a timetable that is running, which this one is not.
+    if (job.execution === 'Manual') return { text: 'Schedule kept, paused while Manual', tone: 'muted' };
     if (schedule.expired) return { text: 'Expired — no further runs', tone: 'warn' };
     if (schedule.lastFlight) return { text: 'Final run scheduled', tone: 'warn' };
     if (schedule.endDate) return { text: `Ends ${schedule.endDate}`, tone: 'muted' };

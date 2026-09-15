@@ -7,7 +7,7 @@ import { ToastService } from '../../shared/ui/toast.service';
 import { statusColor } from '../../shared/charts/status-color';
 import { Donut } from '../../shared/charts/donut';
 import { BarChart, Bar } from '../../shared/charts/bar-chart';
-import { MAX_DAYS, daySeries } from '../../shared/charts/day-series';
+import { DaySeries, daySeries } from '../../shared/charts/day-series';
 import { Histogram } from '../../shared/charts/histogram';
 import { Icon } from '../../shared/ui/icon';
 import { StatTile } from '../../shared/ui/stat-tile';
@@ -15,10 +15,14 @@ import { StatusPill } from '../../shared/ui/status-pill';
 import { TableShell } from '../../shared/ui/data-table';
 import { ReportPivot } from './report-pivot';
 import {
-  EXEC_SECONDS, JOB_NAME, RUN_ID, TENANT_IDX, RunData, RunRow, SECONDS, aggregate, humanSeconds, withJobDimension,
+  EXEC_SECONDS, JOB_NAME, NO_DURATION, RUN_ID, TENANT_IDX, RunData, RunRow, SECONDS, aggregate,
+  humanSeconds, withJobDimension,
 } from './pivot';
 
 const EMPTY: RunData = { task: [], status: [], owner: [], day: [], job: [], tenant: [], rows: [] };
+
+/** No axis at all, which is not the same as an axis that was cut short. */
+const NO_DAYS: DaySeries = { bars: [], capped: false };
 
 /**
  * Which outcomes count as what.
@@ -33,8 +37,10 @@ const EMPTY: RunData = { task: [], status: [], owner: [], day: [], job: [], tena
 const FAILED = new Set(['Failed', 'Interrupt']);
 const IN_FLIGHT = new Set(['Queue', 'Start', 'Running']);
 
-/** A run that has not ended carries -1 rather than a duration. */
-const NO_DURATION = -1;
+// NO_DURATION -- the -1 a run that has not ended carries instead of a duration -- is imported
+// from pivot.ts rather than declared again here. aggregate() now HANDS IT BACK for a sample it
+// could not measure, so the two files exchange the sentinel, and two private copies of a value
+// that has to agree is how they eventually stop agreeing.
 
 
 interface TaskHealth {
@@ -279,7 +285,19 @@ export class Reports implements OnInit {
   readonly timedRuns = computed(() => this.rows().filter(r => r[SECONDS] !== NO_DURATION));
   readonly durations = computed(() => this.timedRuns().map(r => r[SECONDS]));
   readonly untimed = computed(() => this.rows().length - this.timedRuns().length);
-  readonly medianDuration = computed(() => aggregate(this.timedRuns(), 'median'));
+  /**
+   * The median of the runs that have a duration -- and nothing at all when none of them does.
+   *
+   * The guard its execution twin below has always carried, finally given to the tile that needed
+   * it more. Unguarded this read "Median duration 0s" whenever timedRuns() was empty, which is
+   * one click away on any ordinary report: pick Outcome = Running and every surviving row carries
+   * -1, because end_time is still null. The page then said two contradictory things about the
+   * same runs fifty pixels apart, the histogram beside it being correctly captioned "No run has
+   * finished in this range yet". The foot did mutter "12 with no end time" underneath, but small
+   * print does not un-assert a headline figure of zero.
+   */
+  readonly medianDuration = computed(() =>
+    this.timedRuns().length ? aggregate(this.timedRuns(), 'median') : NO_DURATION);
 
   /**
    * The same runs, timed from the moment the worker picked them up.
@@ -391,9 +409,9 @@ export class Reports implements OnInit {
    * an unfilled series draws a straight line across a gap and implies activity that never
    * happened.
    */
-  readonly runsByDay = computed<Bar[]>(() => {
+  private readonly dayChart = computed<DaySeries>(() => {
     const data = this.data();
-    if (!data.rows.length) return [];
+    if (!data.rows.length) return NO_DAYS;
     const counts = new Map<string, number>();
     // Composition per day as well as volume. The page already knows each run's outcome, and a
     // plain daily total answers "how much" while hiding "how did it go" -- a day of 20 runs
@@ -414,27 +432,43 @@ export class Reports implements OnInit {
     // the axis quietly began at the first busy day and ended at the last, so an empty fortnight
     // either side simply vanished.
     const days = [...counts.keys()].sort();
-    if (!days.length) return [];
+    if (!days.length) return NO_DAYS;
     // Bounded by the SELECTED range, not by the days that happen to have runs. Bounding it by
     // the data made the caption a lie: it promised "days with no runs are shown as gaps" while
     // the axis quietly began at the first busy day and ended at the last, so an empty fortnight
     // either side simply vanished. daySeries() also owns the cap direction and the year label.
     const from = this.startDate() <= days[0] ? this.startDate() : days[0];
     const to = this.endDate() >= days[days.length - 1] ? this.endDate() : days[days.length - 1];
-    return daySeries(counts, from, to).bars.map(bar => {
-      const forDay = byOutcome.get(String(bar.meta));
-      if (!forDay) return bar;
-      return {
-        ...bar,
-        segments: [...forDay.entries()]
-          .sort((a, b) => a[0].localeCompare(b[0]))
-          .map(([label, value]) => ({ label, value, color: statusColor(label) })),
-      };
-    });
+    const series = daySeries(counts, from, to);
+    return {
+      // Kept, not re-derived. See daysCapped() below.
+      capped: series.capped,
+      bars: series.bars.map(bar => {
+        const forDay = byOutcome.get(String(bar.meta));
+        if (!forDay) return bar;
+        return {
+          ...bar,
+          segments: [...forDay.entries()]
+            .sort((a, b) => a[0].localeCompare(b[0]))
+            .map(([label, value]) => ({ label, value, color: statusColor(label) })),
+        };
+      }),
+    };
   });
 
-  /** True when the axis was shortened to its cap and the oldest days are not drawn. */
-  readonly daysCapped = computed(() => this.runsByDay().length >= MAX_DAYS);
+  readonly runsByDay = computed<Bar[]>(() => this.dayChart().bars);
+
+  /**
+   * True when the axis was shortened to its cap and the oldest days are not drawn.
+   *
+   * daySeries() has always returned this; it was being thrown away and guessed back from the bar
+   * count as `length >= MAX_DAYS`. The two part company at exactly MAX_DAYS, which is one real
+   * range rather than a theoretical one: 2024-01-01 to 2024-12-31 is 366 days in a leap year, so
+   * daySeries drew all 366 and capped nothing while the card printed "Showing the most recent
+   * 366 days." underneath -- a warning that exists only to say older days are missing, saying it
+   * when none were.
+   */
+  readonly daysCapped = computed(() => this.dayChart().capped);
 
   /**
    * Days that actually carry a run -- not the number of slots on the axis.
@@ -537,23 +571,58 @@ export class Reports implements OnInit {
   readonly unhealthyTasks = computed(() => this.taskHealth().filter(t => t.failures > 0).length);
 
   /**
+   * run id -> the workspace it belongs to, taken from the RAW payload.
+   *
+   * Raw rather than data(), and that is the whole point of it existing separately from
+   * runIndex(): this is the lookup that decides whether a failure survives the workspace filter,
+   * so building it from rows the workspace filter has already narrowed would make every failure
+   * belong to whichever workspace is selected. The runs feed covers the same range as fetchLogs
+   * and is keyed by the same job_queue_id, and it is the only thing on the page that knows which
+   * workspace a run id belongs to -- fetchLogs' projection is job_queue columns only.
+   */
+  private readonly tenantOfRun = computed(() => {
+    const raw = this.rawData();
+    const names = raw.tenant ?? [];
+    const index = new Map<number, string>();
+    for (const row of raw.rows) index.set(row[RUN_ID], names[row[TENANT_IDX] ?? -1] ?? '');
+    return index;
+  });
+
+  /**
    * The failure rows the filters leave standing.
    *
    * The table is fed by fetchLogs rather than the runs feed, so it does not inherit data()'s
    * narrowing for free -- and a page that filtered its charts to one task while still listing
    * every other task's failures underneath would be worse than not filtering at all.
+   *
+   * Workspace was the one filter this never honoured, and for a platform admin -- whose
+   * tenantClause() is empty, so the runs feed merges every workspace -- it was the filter that
+   * mattered most. Picking Workspace = Acme narrowed the Failed tile to Acme's 3 failures while
+   * the table underneath went on listing all 27 and its own header went on counting them, with
+   * the "Filtered to Workspace: Acme" chip on screen throughout. Worse, the foreign rows rendered
+   * anonymously: their job and task are joined through runIndex(), which IS built from the
+   * narrowed rows, so they showed "—" and a bare "#4713" while padding a count the tile above
+   * them contradicted. The early return had to take tenant too, or a workspace chosen on its own
+   * left the table completely unfiltered.
+   *
+   * A failure the runs feed does not carry at all cannot be attributed to a workspace, so it is
+   * dropped while a workspace is selected rather than shown under one it may not belong to --
+   * that unattributable row is exactly the contradiction being fixed.
    */
   readonly visibleFailures = computed(() => {
     const task = this.taskFilter(), job = this.jobFilter();
     const status = this.statusFilter(), owner = this.ownerFilter();
-    if (!task && !job && !status) return this.failures();
+    const tenant = this.tenantFilter();
+    if (!task && !job && !status && !tenant) return this.failures();
     // owner is not on a failure row; a filtered owner cannot be honoured here, so the table is
     // left alone for it rather than silently emptied.
     void owner;
+    const workspaces = this.tenantOfRun();
     return this.failures().filter(f =>
       (!task || f.task === task) &&
       (!job || f.job === job) &&
-      (!status || f.status === status));
+      (!status || f.status === status) &&
+      (!tenant || workspaces.get(f.jobQueueId) === tenant));
   });
 
   // ---- loading ------------------------------------------------------------------------
@@ -633,7 +702,21 @@ export class Reports implements OnInit {
   retryFailures(): void { this.loadFailures(); }
 
   private loadFailures(): void {
-    if (!this.counts().failed) { this.failures.set([]); return; }
+    /*
+     * The UNFILTERED feed decides whether to fetch, because the fetch is unfiltered.
+     *
+     * This tested counts(), which reads the filtered data(). The request below carries only the
+     * date range -- no task, job, status, owner or workspace -- so a filter that happened to
+     * exclude every failure skipped the fetch AND cleared the table. Clearing is the half that
+     * bites: loadFailures runs on reload, so the detail stayed empty for every other filter until
+     * the next reload, and nothing on screen said the table was stale rather than empty.
+     *
+     * What the reader SEES is narrowed afterwards by visibleFailures(), which is where the filter
+     * belongs -- one predicate over rows already in hand.
+     */
+    const raw = this.rawData();
+    const anyFailed = raw.rows.some(row => FAILED.has(String(raw.status[row[1]] ?? '')));
+    if (!anyFailed) { this.failures.set([]); return; }
     this.failuresLoading.set(true);
     this.failuresError.set('');
     this.http.post<ApiResponse<{ sourceJobQueues?: QueueLog[] }>>(

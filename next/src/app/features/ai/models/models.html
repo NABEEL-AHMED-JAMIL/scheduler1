@@ -62,7 +62,7 @@
              [disabled]="!!pulling()" />
       <button type="button" class="btn btn-primary whitespace-nowrap"
               [disabled]="!!pulling() || !pullName().trim()" (click)="pull()">
-        <app-icon name="download" [class.spin]="!!pulling()" />
+        <app-icon name="download" [busy]="!!pulling()" />
         {{ pulling() ? 'Pulling…' : 'Pull' }}
       </button>
     </div>
@@ -116,7 +116,7 @@
                     } @else {
                       <button type="button" class="btn btn-default btn-sm"
                               [disabled]="!!pulling()" (click)="pullNamed(m.name)">
-                        <app-icon name="download" [class.spin]="pulling() === m.name" />
+                        <app-icon name="download" [busy]="pulling() === m.name" />
                         {{ pulling() === m.name ? 'Pulling…' : 'Pull' }}
                       </button>
                     }

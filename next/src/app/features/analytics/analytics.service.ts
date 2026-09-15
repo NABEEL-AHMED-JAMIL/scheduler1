@@ -236,6 +236,16 @@ export interface SavedQuery {
   queryName: string;
   connectionAlias: string;
   datasetPath: string;
+  /**
+   * The SECOND dataset, when the statement joins two files.
+   *
+   * Set as a pair or not at all -- the server refuses a half, and so does the table. They were
+   * missing, and a saved join therefore kept its JOIN text and one of its two inputs: reopening
+   * it registered no `dataset2`, and the engine answered with a catalog error naming a view the
+   * reader had never created.
+   */
+  secondConnectionAlias?: string;
+  secondDatasetPath?: string;
   queryText: string;
   dateCreated?: string;
   dateUpdated?: string;
@@ -583,6 +593,16 @@ export interface AnalysisResult {
   /** The measure column's name, so nothing here has to work out which column it is. */
   measure?: string;
   other?: OtherBucket | null;
+  /**
+   * Which rows are the Top-N roll-up, by index into `rows`. Absent when none are.
+   *
+   * The exact answer to a question the label could only guess at: a dataset is entitled to hold a
+   * value genuinely spelled "Other", and a screen that told them apart by matching the label had
+   * to fail one way on purpose. The server keeps these indices anyway -- its pivot builder keys on
+   * them, after a real "Other" collided with the roll-up there and a measured 500 vanished from a
+   * 740 total -- so this is a fact being sent rather than a fact being computed.
+   */
+  rollupRows?: number[] | null;
   crumbs?: AnalysisCrumb[];
   /** The trail as data, to be sent back unchanged on the next request. */
   drillPath?: Drill[];
@@ -654,9 +674,9 @@ export interface Dashboard {
  * value this screen does not recognise is drawn as a table rather than as an error.
  */
 export type WidgetVisualization =
-  | 'table' | 'ranked' | 'bar' | 'donut'
-  | 'kpi' | 'line' | 'area' | 'stacked' | 'histogram' | 'scatter' | 'comparison'
-  | 'dimensionSummary' | 'trendSummary' | 'distributionSummary';
+  | 'table' | 'ranked' | 'rankedShare' | 'bar' | 'donut'
+  | 'kpi' | 'line' | 'area' | 'cumulative' | 'stacked' | 'shareStacked' | 'histogram' | 'scatter'
+  | 'comparison' | 'pivot' | 'dimensionSummary' | 'trendSummary' | 'distributionSummary';
 
 /**
  * One tile: a REFERENCE to a saved analysis or a saved query, and how to draw it.
@@ -1120,10 +1140,15 @@ export class AnalyticsService {
   /**
    * Stores the query under a name, or updates the one the id names.
    *
-   * Only the four fields a person decides are sent. The server copies exactly those onto a row
-   * whose tenant and audit columns come from the signed-in context, so anything else put on the
-   * wire here would be read by nothing -- and sending a tenantId would be this client claiming an
+   * Only the fields a person decides are sent. The server copies exactly those onto a row whose
+   * tenant and audit columns come from the signed-in context, so anything else put on the wire
+   * here would be read by nothing -- and sending a tenantId would be this client claiming an
    * ownership it does not get to claim.
+   *
+   * The second dataset is sent as a PAIR or not at all. It used to be sent never, which is why a
+   * saved join came back as half a join; and sending one half would be refused by the server and
+   * by the table, both of which treat a location with no connection as unresolvable rather than
+   * as a smaller query.
    */
   saveQuery(query: SavedQuery): Observable<ApiResponse<SavedQuery>> {
     const body: Record<string, unknown> = {
@@ -1132,6 +1157,10 @@ export class AnalyticsService {
       datasetPath: query.datasetPath,
       queryText: query.queryText,
     };
+    if (query.secondConnectionAlias && query.secondDatasetPath) {
+      body['secondConnectionAlias'] = query.secondConnectionAlias;
+      body['secondDatasetPath'] = query.secondDatasetPath;
+    }
     if (query.analyticsQueryId) body['analyticsQueryId'] = query.analyticsQueryId;
     return this.http.post<ApiResponse<SavedQuery>>(`${this.library}/saveQuery`, body);
   }

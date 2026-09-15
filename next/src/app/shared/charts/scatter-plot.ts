@@ -34,11 +34,11 @@ const PAD = 26;
     @if (!data().length) {
       <p class="field-note text-[color:var(--text-muted)]">{{ emptyMessage() }}</p>
     } @else {
-      <svg [attr.viewBox]="'0 0 ' + width + ' ' + height" class="w-full"
-           [style.height.px]="height" role="img" [attr.aria-label]="summary()">
-        <line [attr.x1]="pad" [attr.y1]="height - pad" [attr.x2]="width - 4"
-              [attr.y2]="height - pad" stroke="var(--border-subtle)" stroke-width="1" />
-        <line [attr.x1]="pad" y1="4" [attr.x2]="pad" [attr.y2]="height - pad"
+      <svg [attr.viewBox]="'0 0 ' + width + ' ' + height()" class="w-full"
+           [style.height.px]="height()" role="img" [attr.aria-label]="summary()">
+        <line [attr.x1]="pad" [attr.y1]="height() - pad" [attr.x2]="width - 4"
+              [attr.y2]="height() - pad" stroke="var(--border-subtle)" stroke-width="1" />
+        <line [attr.x1]="pad" y1="4" [attr.x2]="pad" [attr.y2]="height() - pad"
               stroke="var(--border-subtle)" stroke-width="1" />
         @for (dot of dots(); track dot.label) {
           <circle [attr.cx]="dot.cx" [attr.cy]="dot.cy" r="3.5" [attr.fill]="colour()"
@@ -46,11 +46,15 @@ const PAD = 26;
             <title>{{ dot.label }}: {{ dot.shownX }}, {{ dot.shownY }}</title>
           </circle>
         }
-        <text [attr.x]="pad" [attr.y]="height - 6" font-size="10"
+        <!-- The FORMATTED bounds, not the raw ones. bounds().highX is the number the geometry
+             divides by, and printing it put "1267.19353428047" on an axis in 10px type -- the
+             trailing digits an artefact of the CSV reader typing the column as DOUBLE. The two
+             label fields beside it were computed for this and rendered nowhere. -->
+        <text [attr.x]="pad" [attr.y]="height() - 6" font-size="10"
               fill="var(--text-muted)">{{ bounds().lowX }}</text>
-        <text [attr.x]="width - 4" [attr.y]="height - 6" font-size="10" text-anchor="end"
-              fill="var(--text-muted)">{{ bounds().highX }}</text>
-        <text x="2" y="12" font-size="10" fill="var(--text-muted)">{{ bounds().highY }}</text>
+        <text [attr.x]="width - 4" [attr.y]="height() - 6" font-size="10" text-anchor="end"
+              fill="var(--text-muted)">{{ bounds().highXLabel }}</text>
+        <text x="2" y="12" font-size="10" fill="var(--text-muted)">{{ bounds().highYLabel }}</text>
       </svg>
       <p class="text-[10px] text-[color:var(--text-muted)] text-center">
         {{ xLabel() }} across, {{ yLabel() }} up
@@ -68,7 +72,14 @@ export class ScatterPlot {
   readonly format = input<(value: number) => string>(compactNumber);
 
   protected readonly width = WIDTH;
-  protected readonly height = HEIGHT;
+  /**
+   * How tall to draw, in the SVG's own coordinates.
+   *
+   * An input rather than the module constant it was, so a dashboard tile whose author asked for
+   * a taller widget gets one. The axes and their labels are positioned from it, so the whole
+   * drawing grows rather than the same drawing being stretched.
+   */
+  readonly height = input(HEIGHT);
   protected readonly pad = PAD;
 
   protected readonly bounds = computed(() => {
@@ -89,14 +100,14 @@ export class ScatterPlot {
     const spanX = highX || 1;
     const spanY = highY || 1;
     const usableWidth = WIDTH - PAD - 8;
-    const usableHeight = HEIGHT - PAD - 8;
+    const usableHeight = this.height() - PAD - 8;
 
     return this.data().map(point => ({
       label: point.label,
       shownX: this.format()(point.x),
       shownY: this.format()(point.y),
       cx: PAD + (point.x / spanX) * usableWidth,
-      cy: HEIGHT - PAD - (point.y / spanY) * usableHeight,
+      cy: this.height() - PAD - (point.y / spanY) * usableHeight,
     }));
   });
 

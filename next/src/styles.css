@@ -51,7 +51,9 @@
 
   /* Monochrome, because Compass is. Each step is still named for the job it does, not for a
      hue: 500 is the filled button (white on it, 14.67:1), 600 is accent text in light
-     (17.75:1 on a card), 300 is accent text in dark (6.82:1 on one), 50 is the soft chip. */
+     (17.75:1 on a card), 50 is the soft chip. 300 was accent text in dark and is not any more --
+     it measured the same as --text-muted, so the active nav item was dimmer than the inactive
+     ones; dark accent text is --color-ink-50, the strongest step there is. */
   --color-brand-50:  #f3f4f6;
   --color-brand-100: #e5e7eb;
   --color-brand-200: #d1d5dc;
@@ -212,12 +214,24 @@
     --text-secondary:  var(--color-ink-300);
     --text-muted:      var(--color-ink-400);
     --text-inverse:    var(--color-ink-950);
-    /* brand-300 measures 9.90:1 on the raised surface where brand-600 managed 2.66:1. */
-    --accent-text:     var(--color-brand-300);
+    /*
+     * The STRONGEST text on this ground, not a mid step of the ramp.
+     *
+     * With a hue to carry it, an accent can sit at any weight and still read as "this one". The
+     * brand is monochrome now, so the only thing left to say "this one" is contrast -- and
+     * brand-300 (#99a1af) is byte-identical to --text-muted and measures 6.82:1 on the header,
+     * against 12.05:1 for the --text-secondary used by every INACTIVE label beside it. The item
+     * you are on was the dimmest word in the navigation, which is the emphasis exactly backwards.
+     */
+    --accent-text:     var(--color-ink-50);
     /* brand-50 is a near-white blue tint and was never redefined here, so the active nav item
        rendered as a bright chip on a dark bar. Mixed from the accent instead, so it stays a
        tint of the same hue at a weight that belongs on this ground. */
-    --accent-soft:     color-mix(in oklab, var(--color-brand-500) 26%, var(--surface-raised));
+    /* Mixed from ink rather than from the accent: 26% of brand-500 -- itself a near-black --
+       into a near-black surface computes to #141c2c, which is 1.04:1 against the header and so
+       is not a chip at all, just a slightly different black. A monochrome system marks a
+       selected row on a dark ground by lifting it toward the light, not by darkening it. */
+    --accent-soft:     color-mix(in oklab, var(--color-ink-50) 12%, var(--surface-raised));
     /*
      * Inverted, and it has to be. The accent is monochrome now, so a primary button in light is
      * a near-black pill -- and painting that same near-black on this theme's near-black page
@@ -602,9 +616,22 @@
     @apply shrink-0 grid place-items-center rounded-lg w-8 h-8 text-base;
   }
 
+  /*
+   * A card's edge is the only thing that says where one card stops and the next begins, and it
+   * was not visible: --surface-raised sits 1.05:1 from the page in light and 1.13:1 in dark, and
+   * --border-subtle managed 1.24:1 against the card it outlines. Three near-identical tones
+   * stacked on each other, so a board of tiles read as one undivided field.
+   *
+   * --border-strong rather than --border-subtle takes that to 1.47:1 in light and 1.60:1 in dark
+   * -- perceptible, still quiet. Deliberately NOT the 3:1 that WCAG 1.4.11 asks of a meaningful
+   * boundary: at this scale 3:1 is a hard outline around every tile, which is a different design
+   * rather than a fix to this one. The grouping is also carried by spacing and by each card's own
+   * heading, so the border is not the sole cue. Changing the token itself would have moved every
+   * table rule and divider in the application; only the card is restated here.
+   */
   .card {
     background: var(--surface-raised);
-    border-color: var(--border-subtle);
+    border-color: var(--border-strong);
     @apply border rounded-[var(--radius-card)];
   }
 
@@ -986,6 +1013,25 @@
   }
 
   /*
+   * Everything else that moves, for a reader who has asked the operating system for less of it.
+   *
+   * Three named animations honoured the preference and nothing else did, so a person with
+   * vestibular sensitivity still got every colour fade, width tween and height transition in the
+   * application -- and those are the bulk of the motion here, not the three spinners.
+   *
+   * 0.01ms rather than 0s on purpose: a zero-duration transition never fires transitionend, and
+   * a listener waiting on one would hang. This keeps the event and removes the movement.
+   */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  /*
    * Top-of-page progress bar for route changes. A thin brand-coloured bar that grows across
    * the top while the next page resolves and fills to 100% as it lands -- the same idiom
    * GitHub and YouTube use, so it reads as "loading" without a blocking overlay. Width is
@@ -1180,21 +1226,58 @@ html.dark .btn-intent-crit:focus app-icon { color: var(--color-crit-400); }
  * slowest runs, disk share. Statuses never come from here: they come from statusColor(), so a
  * Failed segment is the same red as a Failed pill.
  *
- * These are per-theme, which the single fixed set could not be. Measured against the surface
- * each is drawn on, the old palette swung from 6.29 to 2.15 across the six on white, and
- * inverted on dark (2.72 to 7.96) -- so whichever theme you were in, some series had all but
- * disappeared. Every value below clears 4.0 on its own background, and the six are drawn from
- * the app's own hue families so a chart's amber is the same amber as a warning elsewhere.
- * Slot 5 is fuchsia rather than the violet it was: violet sat 44 units from brand in slot 0,
- * close enough to read as the same series.
+ * The previous set was the status ramp wearing a different name: --chart-2 was byte-identical
+ * to --color-ok-500, --chart-3 to --color-warn-500, --chart-4 to --color-crit-500 and --chart-0
+ * to --color-brand-500. Its comment presented that as a feature -- "a chart's amber is the same
+ * amber as a warning elsewhere" -- but a categorical slot carries no such meaning, so a duration
+ * bucket labelled "30s-2m" was painted the exact green of the Completed pill in the table under
+ * it, and "2-10m" the Missed amber. A reader cannot be expected to know which greens mean
+ * something. These eight sit on the two hue arcs the status families leave free -- 176-268
+ * (jade/teal/cyan/blue) and 298-348 (indigo/purple/plum) -- every one at least 12 CIEDE2000 from
+ * the nearest semantic token.
+ *
+ * SPREAD ACROSS THE WHOLE WHEEL, roughly 45 degrees apart, which is a correction.
+ *
+ * The previous set was built to two constraints at once -- stay at least 12 CIEDE2000 from every
+ * semantic token, AND keep hues 20-24 degrees apart for colour-blind separation -- and satisfying
+ * both drove five of the eight into the blue-green arc (180, 200, 220, 240, 260). The arithmetic
+ * was right and the result was unusable: a six-slice ring came out teal, plum, jade, blue,
+ * magenta, cyan, four of them blue-green, and read as "mostly teal" at 104px. A palette whose
+ * slices a reader cannot tell apart has failed, whatever its CIEDE2000 numbers say.
+ *
+ * So the ordering constraint is relaxed: a chart colour may now sit in the same hue FAMILY as a
+ * status colour, as long as it is not that colour. The defect this palette was created to fix was
+ * --chart-2 being byte-identical to --color-ok-500, so that a duration bucket was painted the
+ * exact green of a Completed pill. A different green in a chart is not that defect. None of the
+ * sixteen values below equals any semantic token.
+ *
+ * Lightness still varies across the ramp, which is what carries separation for the ~8% of men with
+ * red-green CVD; orange against lime is the weakest pair for a deuteranope and they are four slots
+ * apart, so a six-category chart never draws both.
+ *
+ * Ratios are WCAG 2.x, against the surface each is actually drawn on: light on --surface-raised
+ * #ffffff (a .card), dark on #101828. Eight rather than six because three call sites index this
+ * ramp with no upper bound on categories, so a seventh category silently repeated the first.
  */
 :root {
-  --chart-0: #1e2939;   /* brand  14.67 on white -- monochrome, tracking the accent */
-  --chart-1: #0369a1;   /* info    5.93 */
-  --chart-2: #1d7a44;   /* ok      5.36 */
-  --chart-3: #b45309;   /* warn    5.02 */
-  --chart-4: #bb2d48;   /* crit    5.86 */
-  --chart-5: #a21caf;   /* fuchsia 6.32 */
+  /*
+   * The sequential ramp, for a heat scale where intensity means "more of the same thing" rather
+   * than "a different thing". Separate from the categorical slots above on purpose: the heatmap
+   * used --color-brand-500 and the monochrome rebrand made that a near-black, so
+   * color-mix(near-black, transparent) over a near-black page produced a grid of identical black
+   * squares in dark mode at every intensity, legend included. It read as "no activity" on a
+   * dashboard reporting 83 runs in its busiest hour.
+   */
+  --heat: #2563eb;
+
+  --chart-0: #2563eb;   /* blue    5.17 on white */
+  --chart-1: #be1d63;   /* rose    5.92 */
+  --chart-2: #0f766e;   /* teal    5.47 */
+  --chart-3: #7e22ce;   /* violet  6.98 */
+  --chart-4: #c2410c;   /* orange  5.18 */
+  --chart-5: #0e7490;   /* cyan    5.36 */
+  --chart-6: #4d7c0f;   /* lime    4.99 */
+  --chart-7: #4338ca;   /* indigo  7.90 */
 }
 
 /*
@@ -1222,12 +1305,18 @@ html.dark {
   --series-crit-soft:  #c4485f;  --series-crit:  #f79bab;
   --series-muted:      #99a1af;
 
-  --chart-0: #d1d5dc;   /* brand  12.05 on the raised surface -- monochrome */
-  --chart-1: #38bdf8;   /* info    7.98 */
-  --chart-2: #4ec27f;   /* ok      7.61 */
-  --chart-3: #e0a25c;   /* warn    7.73 */
-  --chart-4: #f2748c;   /* crit    6.23 */
-  --chart-5: #e879f9;   /* fuchsia 6.95 */
+  /* Same eight hues, lifted for the navy card. Ratios against --surface-raised #101828. */
+  /* Lifted, not darkened: on this ground a heat scale has to run toward the light. */
+  --heat: #60a5fa;
+
+  --chart-0: #60a5fa;   /* blue    6.98 on the raised surface */
+  --chart-1: #f472b6;   /* rose    6.70 */
+  --chart-2: #2dd4bf;   /* teal    9.53 */
+  --chart-3: #c084fc;   /* violet  6.72 */
+  --chart-4: #fb923c;   /* orange  7.84 */
+  --chart-5: #22d3ee;   /* cyan    9.82 */
+  --chart-6: #a3e635;   /* lime   11.77 */
+  --chart-7: #a5b4fc;   /* indigo  8.90 */
 }
 
 @layer components {
