@@ -91,6 +91,15 @@ export class AuthService {
   readonly canManageUsers = computed(() => this.hasAtLeast('TENANT_ADMIN'));
   /** tenant.json -- a tenant spans the platform, so only a platform admin touches one. */
   readonly canManageTenants = computed(() => this.hasAtLeast('PLATFORM_ADMIN'));
+  /**
+   * ollama.json pullModel/deleteModel. Listing them stays TENANT_ADMIN.
+   *
+   * There is one Ollama server for the whole platform and no tenant dimension to a model, so
+   * deleting one stops every workspace configured against it, not just the caller's. Both writes
+   * moved to PLATFORM_ADMIN on the server; this is the matching half, so the buttons are not
+   * offered to somebody who would get a 403 for pressing them.
+   */
+  readonly canManageModels = computed(() => this.hasAtLeast('PLATFORM_ADMIN'));
 
   readonly displayName = computed(() => {
     const user = this.currentUser();

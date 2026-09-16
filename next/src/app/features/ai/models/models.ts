@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Dialog } from '@angular/cdk/dialog';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { ToastService } from '../../../shared/ui/toast.service';
+import { AuthService } from '../../../core/auth/auth.service';
 import { confirmWith } from '../../../shared/ui/confirm';
 import { TableShell } from '../../../shared/ui/data-table';
 import { Icon } from '../../../shared/ui/icon';
@@ -61,6 +62,16 @@ export class Models implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly toast = inject(ToastService);
   private readonly dialog = inject(Dialog);
+  private readonly auth = inject(AuthService);
+
+  /**
+   * Whether this account may change the catalogue, as opposed to read it.
+   *
+   * One Ollama server serves every workspace and a model has no tenant, so deleting one stops
+   * whichever other workspaces were configured against it. Both writes are PLATFORM_ADMIN on the
+   * server; this is what keeps the buttons off the screen for everyone who would be refused.
+   */
+  readonly canManage = this.auth.canManageModels;
 
   readonly models = signal<OllamaModel[]>([]);
   readonly loading = signal(true);

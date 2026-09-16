@@ -55,20 +55,29 @@
   }
 
   <div class="card p-4">
-    <label class="label" for="pull">Pull a model</label>
-    <div class="flex gap-2 max-w-lg">
-      <input id="pull" class="input" placeholder="e.g. qwen3:14b"
-             [value]="pullName()" (input)="pullName.set($any($event.target).value)"
-             [disabled]="!!pulling()" />
-      <button type="button" class="btn btn-primary whitespace-nowrap"
-              [disabled]="!!pulling() || !pullName().trim()" (click)="pull()">
-        <app-icon name="download" [busy]="!!pulling()" />
-        {{ pulling() ? 'Pulling…' : 'Pull' }}
-      </button>
-    </div>
-    <p class="text-xs text-[color:var(--text-muted)] mt-2">
-      Downloads run on the server and can take several minutes for a large model.
-    </p>
+    <!-- Only the pull control is gated; browsing the catalogue below stays open to anyone who
+         can reach this screen, because knowing what exists is how an agent gets configured. -->
+    @if (canManage()) {
+      <label class="label" for="pull">Pull a model</label>
+      <div class="flex gap-2 max-w-lg">
+        <input id="pull" class="input" placeholder="e.g. qwen3:14b"
+               [value]="pullName()" (input)="pullName.set($any($event.target).value)"
+               [disabled]="!!pulling()" />
+        <button type="button" class="btn btn-primary whitespace-nowrap"
+                [disabled]="!!pulling() || !pullName().trim()" (click)="pull()">
+          <app-icon name="download" [busy]="!!pulling()" />
+          {{ pulling() ? 'Pulling…' : 'Pull' }}
+        </button>
+      </div>
+      <p class="text-xs text-[color:var(--text-muted)] mt-2">
+        Downloads run on the server and can take several minutes for a large model.
+      </p>
+    } @else {
+      <p class="text-sm text-[color:var(--text-secondary)]">
+        Models are shared by every workspace, so adding and removing them is a platform
+        administrator's decision. Browse what is available below.
+      </p>
+    }
 
     <button type="button" class="btn btn-ghost btn-sm mt-3"
             (click)="showCatalogue.set(!showCatalogue())">
@@ -114,11 +123,15 @@
                     @if (m.installed) {
                       <span class="pill pill-ok"><app-icon name="check" size="0.85em" />Installed</span>
                     } @else {
-                      <button type="button" class="btn btn-default btn-sm"
-                              [disabled]="!!pulling()" (click)="pullNamed(m.name)">
-                        <app-icon name="download" [busy]="pulling() === m.name" />
-                        {{ pulling() === m.name ? 'Pulling…' : 'Pull' }}
-                      </button>
+                      @if (canManage()) {
+                        <button type="button" class="btn btn-default btn-sm"
+                                [disabled]="!!pulling()" (click)="pullNamed(m.name)">
+                          <app-icon name="download" [busy]="pulling() === m.name" />
+                          {{ pulling() === m.name ? 'Pulling…' : 'Pull' }}
+                        </button>
+                      } @else {
+                        <span class="text-[color:var(--text-muted)] text-xs">Not installed</span>
+                      }
                     }
                   </td>
                 </tr>
@@ -160,8 +173,12 @@
               {{ formatSize(model.size) }}
             </td>
             <td class="text-right">
-              <button type="button" class="btn btn-ghost btn-sm btn-intent-crit"
-                      (click)="remove(model)"><app-icon name="trash" />Delete</button>
+              @if (canManage()) {
+                <button type="button" class="btn btn-ghost btn-sm btn-intent-crit"
+                        (click)="remove(model)"><app-icon name="trash" />Delete</button>
+              } @else {
+                <span class="text-[color:var(--text-muted)] text-xs">—</span>
+              }
             </td>
           </tr>
         }
