@@ -328,16 +328,20 @@ export class Docs implements AfterViewInit {
     {
       id: 'task-type', title: 'Register the task type',
       intro: 'A task type names the downstream consumer that does the work and the Kafka topic '
-           + 'that reaches it. Many tasks can share a type.',
+           + 'that reaches it. Many tasks can share a type, and every task type belongs to one '
+           + 'workspace — a workspace needs its own before it can describe any task.',
       where: 'Configuration → Source Task Types',
       fields: [
         { name: 'Service name', required: true, note: 'The consumer, as you refer to it. For example ETL Scrapping Pipeline.' },
         { name: 'Topic', required: true, note: 'Letters and hyphens only. Digits, dots and underscores are rejected.' },
         { name: 'Partition', required: false, note: '* for every partition, or one index from 0 to 10. A comma-separated list is not supported.' },
+        { name: 'Workspace', required: true, note: 'Which workspace owns it. A tenant administrator gets their own and is not asked; a platform administrator has to say.' },
         { name: 'Kafka connection', required: false, note: 'Leave unset to publish to the tenant’s default cluster.' },
       ],
-      notes: ['Kafka routing is a per-tenant override, so it is set by a tenant administrator. '
-            + 'A platform administrator publishes unscoped.'],
+      notes: ['Kafka routing is a per-tenant override, so it is set by a tenant administrator.',
+              'Task types do not cross workspaces. A platform administrator creating one has to '
+            + 'name the workspace it is for — there is no way to make one that everybody shares, '
+            + 'because a shared task type showed its Kafka topic name to every other workspace.'],
     },
     {
       id: 'task', title: 'Describe the task',
@@ -365,13 +369,20 @@ export class Docs implements AfterViewInit {
         { name: 'Task', required: true, note: 'The task from step 4.' },
         { name: 'Execution', required: true, note: 'Auto follows the schedule. Manual runs only when someone starts it.' },
         { name: 'Priority', required: false, note: '1 to 9, or 99 and 100.' },
+        { name: 'Attempts', required: false, note: '1 by default, which means a failed run is not retried. Up to 10.' },
+        { name: 'Retry after', required: false, note: 'Seconds before the next try, shown only once attempts is above 1. The wait doubles each attempt, up to an hour.' },
         { name: 'Assigned to', required: false, note: 'Who hears about it. Defaults to whoever created the job.' },
         { name: 'Frequency and interval', required: true, note: 'See the reference below.' },
         { name: 'Start date and time', required: true, note: 'When the timetable begins. It does not have to be the first run.' },
         { name: 'End date', required: false, note: 'The schedule expires after this date and stops on its own.' },
       ],
       notes: ['The start date says when a schedule begins, not which days it runs. A Mon/Thu '
-            + 'schedule created on a Tuesday takes its first run that Thursday.'],
+            + 'schedule created on a Tuesday takes its first run that Thursday.',
+              'Attempts above 1 retries a run that failed for a passing reason — a source briefly '
+            + 'unreachable, a broker that would not take the message — before anyone is told it '
+            + 'failed. One failure email is sent, once the attempts are used up, rather than one '
+            + 'per attempt. A job whose backoff outlasts its own interval skips its next slot: it '
+            + 'finishes the slot it is on before starting the next.'],
     },
     {
       id: 'watch', title: 'Watch it run',
