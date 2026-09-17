@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -10,6 +10,7 @@ import { UserRole } from '../../../core/auth/auth.models';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { AppUser, Users } from './users';
 import { UserDialog } from './user-dialog';
+import { AccessProfilesService } from '../access-profiles/access-profiles.service';
 
 /**
  * What the users screen offers has to be what the server will accept.
@@ -56,7 +57,7 @@ function dialogFor(role: UserRole, user?: Record<string, unknown>, accessProfile
       { provide: AuthService, useValue: authFor(role) },
       { provide: DIALOG_DATA, useValue: { user, tenants: [], canPickTenant: role === 'PLATFORM_ADMIN', accessProfiles } },
       { provide: DialogRef, useValue: { close: () => {} } },
-      { provide: HttpClient, useValue: { post: () => of({}), put: () => of({}) } },
+      { provide: HttpClient, useValue: { post: () => of({}), put: () => of({}), get: () => of({ status: 'SUCCESS', message: '', data: [] }) } },
       { provide: ToastService, useValue: { success: () => {}, error: () => {} } },
     ],
   });
@@ -141,6 +142,18 @@ describe('UserDialog access profile picker', () => {
     const dialog = dialogFor('PLATFORM_ADMIN', undefined, profiles);
     dialog.form.get('userRole')!.setValue('TENANT_ADMIN');
     expect(dialog.offersProfile()).toBe(false);
+  });
+
+  it('fetches the picked workspace\'s profiles for a platform admin', () => {
+    const dialog = dialogFor('PLATFORM_ADMIN', undefined, []);
+    const api = TestBed.inject(AccessProfilesService) as any;
+    api.list = vi.fn((tenantId: number) => of({ status: 'SUCCESS', message: '', data: tenantId === 7 ? profiles : [] }));
+    dialog.form.get('tenantId')!.setValue(7);
+    expect(api.list).toHaveBeenCalledWith(7);
+    expect(dialog.accessProfiles().map((p: any) => p.profileName)).toEqual(['Operator', 'Analyst']);
+    expect(dialog.offersProfile()).toBe(true);
+    dialog.form.get('tenantId')!.setValue(null);
+    expect(dialog.accessProfiles()).toEqual([]);
   });
 
   it('starts an edit on the profile the person already holds', () => {

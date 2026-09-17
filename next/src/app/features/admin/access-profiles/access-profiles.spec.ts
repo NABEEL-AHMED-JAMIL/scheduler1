@@ -2,7 +2,9 @@ import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { DIALOG_DATA, Dialog, DialogRef } from '@angular/cdk/dialog';
 import { of } from 'rxjs';
+import { HttpClient } from '@angular/common/http';
 import { ToastService } from '../../../shared/ui/toast.service';
+import { AuthService } from '../../../core/auth/auth.service';
 import { PageCatalogueEntry } from '../../../core/auth/page-keys';
 import { AccessProfile, AccessProfileDraft, AccessProfilesService } from './access-profiles.service';
 import { AccessProfileDialog } from './access-profile-dialog';
@@ -100,7 +102,7 @@ describe('AccessProfileDialog', () => {
   });
 });
 
-function screenWith(profiles: AccessProfile[], api: Partial<AccessProfilesService> = {}) {
+function screenWith(profiles: AccessProfile[], api: Record<string, unknown> = {}, platformAdmin = false) {
   TestBed.resetTestingModule();
   const service = {
     pages: () => of({ status: 'SUCCESS', message: '', data: PAGES }),
@@ -114,6 +116,8 @@ function screenWith(profiles: AccessProfile[], api: Partial<AccessProfilesServic
       { provide: AccessProfilesService, useValue: service },
       { provide: Dialog, useValue: { open: vi.fn(() => ({ closed: of(false) })) } },
       { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } },
+      { provide: AuthService, useValue: { isPlatformAdmin: () => platformAdmin } },
+      { provide: HttpClient, useValue: { get: () => of({ status: 'SUCCESS', message: '', data: [{ tenantId: 5, tenantName: 'Acme' }] }) } },
     ],
   });
   const screen = TestBed.runInInjectionContext(() => new AccessProfiles());
@@ -151,5 +155,29 @@ describe('AccessProfiles screen', () => {
     await screen.remove(screen.profiles()[0]);
     expect(service.delete).toHaveBeenCalledWith(1);
     expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('still held by 2 people'));
+  });
+
+  /** A platform admin has no workspace of its own: nothing lists until one is picked, and the pick travels to the dialog. */
+  it('makes a platform admin choose a workspace first, and hands it to the dialog', () => {
+    const list = vi.fn(() => of({ status: 'SUCCESS', message: '', data: [profile(1, 'Operator', ['jobs'], true)] }));
+    const { screen } = screenWith([], { list }, true);
+    expect(screen.canPickTenant()).toBe(true);
+    expect(screen.tenants().map(t => t.tenantName)).toEqual(['Acme']);
+    expect(list).not.toHaveBeenCalled();
+
+    screen.pickTenant('5');
+    expect(list).toHaveBeenCalledWith(5);
+    expect(screen.profiles().map(p => p.profileName)).toEqual(['Operator']);
+
+    const dialog = TestBed.inject(Dialog) as any;
+    screen.add();
+    expect(dialog.open.mock.calls[0][1].data.tenantId).toBe(5);
+  });
+
+  it('never shows a tenant admin the picker, and lists its own workspace at once', () => {
+    const list = vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] }));
+    const { screen } = screenWith([], { list }, false);
+    expect(screen.canPickTenant()).toBe(false);
+    expect(list).toHaveBeenCalledWith(null);
   });
 });

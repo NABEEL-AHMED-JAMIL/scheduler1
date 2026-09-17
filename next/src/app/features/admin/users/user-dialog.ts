@@ -9,7 +9,7 @@ import { FormDialog } from '../../../shared/ui/form-dialog';
 import { PhoneInput } from '../../../shared/ui/phone-input';
 import { AuthService } from '../../../core/auth/auth.service';
 import { ROLE_META, UserRole } from '../../../core/auth/auth.models';
-import { AccessProfile } from '../access-profiles/access-profiles.service';
+import { AccessProfile, AccessProfilesService } from '../access-profiles/access-profiles.service';
 
 /**
  * The picker's options, taken from the table that already names every role rather than said a
@@ -104,10 +104,18 @@ export class UserDialog {
    * workspace has made any -- a picker with nothing but "Default" in it says nothing.
    */
   readonly offersProfile = computed(() =>
-    this.role() === 'TENANT_USER' && (this.data.accessProfiles?.length ?? 0) > 0);
+    this.role() === 'TENANT_USER' && this.accessProfiles().length > 0);
+
+  /**
+   * The profiles on offer. A tenant admin's arrive with the dialog; a platform admin's follow the
+   * tenant it picks, because profiles belong to a workspace and the picker cannot know which
+   * until the form says so.
+   */
+  readonly accessProfiles = signal<AccessProfile[]>(this.data.accessProfiles ?? []);
+  private readonly profilesApi = inject(AccessProfilesService);
 
   readonly defaultProfileName = computed(() =>
-    this.data.accessProfiles?.find(p => p.defaultProfile)?.profileName ?? '');
+    this.accessProfiles().find(p => p.defaultProfile)?.profileName ?? '');
 
   /** A platform admin spans every tenant, so a tenant choice would be meaningless. */
   readonly needsTenant = computed(() => this.role() !== 'PLATFORM_ADMIN');
@@ -141,6 +149,17 @@ export class UserDialog {
   constructor() {
     // The select is fed from ROLES, so the only values it can emit are the three role literals.
     this.form.get('userRole')!.valueChanges.subscribe((value: UserRole) => this.role.set(value));
+    if (this.data.canPickTenant) {
+      const load = (tenantId: number | null) => {
+        if (!tenantId) { this.accessProfiles.set([]); return; }
+        this.profilesApi.list(tenantId).subscribe({
+          next: r => this.accessProfiles.set(r.status === API_SUCCESS ? (r.data ?? []) : []),
+          error: () => this.accessProfiles.set([]),
+        });
+      };
+      load(this.form.getRawValue().tenantId ?? null);
+      this.form.get('tenantId')!.valueChanges.subscribe(load);
+    }
   }
 
   save(): void {

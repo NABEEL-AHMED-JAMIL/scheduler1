@@ -14,6 +14,8 @@ export interface AccessProfileDialogData {
   pages: PageCatalogueEntry[];
   /** Whether any profile exists yet: the first one becomes the default whatever the box says. */
   first: boolean;
+  /** The workspace, when the caller is a platform admin choosing one; a tenant admin's is its own. */
+  tenantId?: number | null;
 }
 
 interface PageSection {
@@ -171,6 +173,7 @@ export class AccessProfileDialog {
     this.saving.set(true);
     this.profiles.save({
       pageAccessProfileId: this.data.profile?.pageAccessProfileId,
+      tenantId: this.data.tenantId ?? null,
       profileName: value.profileName.trim(),
       description: value.description?.trim() || null,
       defaultProfile: !!value.defaultProfile,

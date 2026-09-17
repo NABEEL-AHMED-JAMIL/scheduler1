@@ -2,7 +2,9 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Dialog } from '@angular/cdk/dialog';
 import { RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
-import { API_SUCCESS } from '../../../core/api/api.config';
+import { HttpClient } from '@angular/common/http';
+import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
+import { AuthService } from '../../../core/auth/auth.service';
 import { PageCatalogueEntry } from '../../../core/auth/page-keys';
 import { Icon } from '../../../shared/ui/icon';
 import { StatTile } from '../../../shared/ui/stat-tile';
@@ -28,6 +30,16 @@ export class AccessProfiles implements OnInit {
   private readonly api = inject(AccessProfilesService);
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
+  private readonly http = inject(HttpClient);
+  readonly auth = inject(AuthService);
+
+  /**
+   * A platform admin has no workspace of its own, so it picks one; the screen is empty until it
+   * does. A tenant admin never sees the picker -- its workspace is the only one it can reach.
+   */
+  readonly canPickTenant = computed(() => this.auth.isPlatformAdmin());
+  readonly tenants = signal<{ tenantId: number; tenantName: string }[]>([]);
+  readonly tenantId = signal<number | null>(null);
 
   readonly profiles = signal<AccessProfile[]>([]);
   readonly pages = signal<PageCatalogueEntry[]>([]);
@@ -47,13 +59,30 @@ export class AccessProfiles implements OnInit {
   });
 
   ngOnInit(): void {
+    if (this.canPickTenant()) {
+      this.http.get<ApiResponse<any[]>>(`${API_BASE}/tenant.json/listTenants`).subscribe({
+        next: response => {
+          if (response.status === API_SUCCESS) this.tenants.set(response.data ?? []);
+        },
+      });
+      // Nothing to list until a workspace is chosen, but the catalogue is worth having ready.
+      this.api.pages().subscribe({ next: r => { if (r.status === API_SUCCESS) this.pages.set(r.data ?? []); } });
+      return;
+    }
     this.load();
+  }
+
+  pickTenant(value: string): void {
+    const id = Number(value);
+    this.tenantId.set(Number.isFinite(id) && id > 0 ? id : null);
+    this.profiles.set([]);
+    if (this.tenantId()) this.load();
   }
 
   load(): void {
     this.loading.set(true);
     this.error.set('');
-    forkJoin({ pages: this.api.pages(), profiles: this.api.list() }).subscribe({
+    forkJoin({ pages: this.api.pages(), profiles: this.api.list(this.tenantId()) }).subscribe({
       next: ({ pages, profiles }) => {
         this.loading.set(false);
         if (pages.status === API_SUCCESS) this.pages.set(pages.data ?? []);
@@ -81,7 +110,7 @@ export class AccessProfiles implements OnInit {
   }
 
   private dialogData(profile?: AccessProfile): AccessProfileDialogData {
-    return { profile, pages: this.pages(), first: this.profiles().length === 0 };
+    return { profile, pages: this.pages(), first: this.profiles().length === 0, tenantId: this.tenantId() };
   }
 
   add(): void {

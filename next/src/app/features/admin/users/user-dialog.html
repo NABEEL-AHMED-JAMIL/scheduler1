@@ -93,7 +93,7 @@
                  hint="Which pages they can open. Profiles are set up under Administration › Access profiles.">
         <select id="pageAccessProfileId" class="input" formControlName="pageAccessProfileId">
           <option [ngValue]="null">Workspace default{{ defaultProfileName() ? ' (' + defaultProfileName() + ')' : '' }}</option>
-          @for (profile of data.accessProfiles; track profile.pageAccessProfileId) {
+          @for (profile of accessProfiles(); track profile.pageAccessProfileId) {
             <option [ngValue]="profile.pageAccessProfileId">{{ profile.profileName }}</option>
           }
         </select>

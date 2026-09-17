@@ -23,6 +23,8 @@ export interface AccessProfile {
 /** What the dialog sends: the id only on an edit. */
 export interface AccessProfileDraft {
   pageAccessProfileId?: number;
+  /** Only a platform admin sends one; a tenant admin's is its own and the server ignores this. */
+  tenantId?: number | null;
   profileName: string;
   description: string | null;
   defaultProfile: boolean;
@@ -46,8 +48,10 @@ export class AccessProfilesService {
     return this.http.get<ApiResponse<PageCatalogueEntry[]>>(`${this.base}/pages`);
   }
 
-  list(): Observable<ApiResponse<AccessProfile[]>> {
-    return this.http.get<ApiResponse<AccessProfile[]>>(`${this.base}/listProfiles`);
+  /** A tenant admin lists its own workspace; a platform admin names one. */
+  list(tenantId?: number | null): Observable<ApiResponse<AccessProfile[]>> {
+    return this.http.get<ApiResponse<AccessProfile[]>>(`${this.base}/listProfiles`,
+      { params: tenantId ? { tenantId } : {} });
   }
 
   save(draft: AccessProfileDraft): Observable<ApiResponse<AccessProfile>> {

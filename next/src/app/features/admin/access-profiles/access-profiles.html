@@ -8,10 +8,20 @@
       </p>
     </div>
     <div class="flex items-center gap-2">
-      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
+      @if (canPickTenant()) {
+        <select class="input max-w-56" [value]="tenantId() ?? ''" (change)="pickTenant($any($event.target).value)"
+                aria-label="Workspace" data-testid="tenant-picker">
+          <option value="">Choose a workspace…</option>
+          @for (tenant of tenants(); track tenant.tenantId) {
+            <option [value]="tenant.tenantId">{{ tenant.tenantName }}</option>
+          }
+        </select>
+      }
+      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading() || (canPickTenant() && !tenantId())">
         <app-icon name="refresh" [class.spin]="loading()" />Refresh
       </button>
-      <button type="button" class="btn btn-primary btn-sm" (click)="add()" data-testid="new-profile">
+      <button type="button" class="btn btn-primary btn-sm" (click)="add()" data-testid="new-profile"
+              [disabled]="canPickTenant() && !tenantId()">
         <app-icon name="plus" />New profile
       </button>
     </div>
@@ -26,7 +36,15 @@
     <app-stat-tile label="Pages" [value]="stats().pages" icon="template" tone="info" foot="can be granted or withheld" />
   </div>
 
-  @if (error()) {
+  @if (canPickTenant() && !tenantId()) {
+    <div class="card p-10 text-center">
+      <app-icon name="globe" size="2rem" class="block mx-auto mb-3 text-[color:var(--text-muted)]" />
+      <h2 class="text-base font-semibold">Choose a workspace</h2>
+      <p class="text-sm text-[color:var(--text-secondary)] mt-1 max-w-md mx-auto">
+        Access profiles belong to a workspace. Pick one above to see and edit its profiles.
+      </p>
+    </div>
+  } @else if (error()) {
     <div class="card p-4 text-sm text-[color:var(--color-crit-500)]">{{ error() }}</div>
   } @else if (!loading() && profiles().length === 0) {
     <div class="card p-10 text-center">
