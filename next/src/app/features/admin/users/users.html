@@ -55,7 +55,7 @@
         }
       </select>
       @if (profileOptions().length || anyOnDefault()) {
-        <select class="input max-w-44" [value]="profileFilter()" aria-label="Access profile"
+        <select class="input max-w-44" [value]="profileFilter()" aria-label="Filter by access profile"
                 (change)="profileFilter.set($any($event.target).value); pager.reset()">
           <option value="">All access</option>
           @if (anyOnDefault()) { <option value="default">On the default</option> }
