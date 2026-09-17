@@ -118,7 +118,11 @@ export class UserDialog {
     // them. getRawValue still includes it, so the server receives the unchanged value.
     tenantId: [{ value: this.data.user?.tenantId ?? null,
                  disabled: !!this.data.user && this.data.user.tenantId != null }],
-    status: [this.data.user?.status ?? 'Active'],
+    // No status here. addUser always creates an Active account and updateUser never reads the
+    // field, so the picker this form used to carry saved nothing -- an administrator could set
+    // Inactive, press Save, and watch the row stay Active. Activate/Deactivate on the row is the
+    // one path, and it is the one with the rules (you cannot deactivate yourself, the unread
+    // counter is dropped with the account).
   });
 
   constructor() {

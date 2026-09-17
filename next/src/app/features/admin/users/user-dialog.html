@@ -86,12 +86,5 @@
         A platform admin spans every tenant, so no tenant is assigned.
       </p>
     }
-
-    <app-field label="Status" for="userStatus" [control]="form.get('status')" [submitted]="submitted()">
-      <select id="userStatus" class="input" formControlName="status">
-        <option value="Active">Active</option>
-        <option value="Inactive">Inactive</option>
-      </select>
-    </app-field>
   </form>
 </app-form-dialog>
