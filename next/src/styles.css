@@ -1506,15 +1506,19 @@ html.dark {
    inverse surface, so it is a shade darker than the card in light and a shade lighter in dark
    rather than the page colour showing through in either. */
 .access-grid { table-layout: fixed; min-width: 100%; }
-.access-grid .access-grid-person { width: 15.5rem; min-width: 15.5rem; text-align: left; position: sticky; left: 0; z-index: 1; background: var(--surface-raised); }
-.access-grid .access-grid-profile { width: 11rem; min-width: 11rem; }
-.access-grid thead th { background: var(--surface-raised); vertical-align: bottom; }
-.access-grid .access-grid-section {
-  text-align: center; font-size: 10px; letter-spacing: .1em; color: var(--text-muted);
-  padding: 0.55rem 0.5rem 0.2rem; border-left: 1px solid var(--border-subtle); border-bottom: 0;
+.access-grid .access-grid-person { width: 14rem; min-width: 14rem; text-align: left; position: sticky; left: 0; z-index: 1; background: var(--surface-raised); }
+.access-grid .access-grid-profile { width: 10.5rem; min-width: 10.5rem; }
+.access-grid thead th { background: var(--surface-raised); vertical-align: middle; }
+/* Band one: the menu sections. A hairline under the whole row, blank left cells included. */
+.access-grid .access-grid-head-sections th {
+  height: 1.9rem; padding: 0 0.5rem; border-bottom: 1px solid var(--border-subtle);
+  font-size: 10px; letter-spacing: .1em; color: var(--text-muted);
 }
+.access-grid .access-grid-section { text-align: center; border-left: 1px solid var(--border-subtle); }
+/* Band two: every column's name, one height, labels allowed two lines. */
+.access-grid .access-grid-head-columns th { height: 2.6rem; padding: 0.2rem 0.5rem; }
 .access-grid .access-grid-page {
-  width: 5.5rem; min-width: 5.5rem; text-align: center; padding: 0.2rem 0.35rem 0.6rem;
+  width: 5rem; min-width: 5rem; text-align: center; padding: 0.2rem 0.3rem;
   text-transform: none; letter-spacing: 0; font-size: 11px; font-weight: 500; color: var(--text-secondary); white-space: normal; line-height: 1.2;
 }
 .access-grid .access-grid-cell { text-align: center; padding: 0; }

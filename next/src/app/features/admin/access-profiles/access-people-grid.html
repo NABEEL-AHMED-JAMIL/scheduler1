@@ -2,15 +2,20 @@
   <div class="overflow-x-auto">
     <table class="table-modern access-grid">
       <thead>
-        <!-- Two header rows: the menu section spanning its pages, then the pages. -->
-        <tr>
-          <th class="access-grid-person" rowspan="2">Person</th>
-          <th class="access-grid-profile" rowspan="2">Profile</th>
+        <!-- Two full-width bands: the menu sections, then every column's name. The left cells of
+             the top band are blank on purpose -- Person and Profile belong to no section -- but
+             they share the band and its hairline, so the header reads as two rows, not a
+             right-hand block hanging off an empty corner. -->
+        <tr class="access-grid-head-sections">
+          <th class="access-grid-person" aria-hidden="true"></th>
+          <th class="access-grid-profile" aria-hidden="true"></th>
           @for (group of groupsOfColumns(); track group.section) {
             <th class="access-grid-section" [attr.colspan]="group.pages.length">{{ group.section }}</th>
           }
         </tr>
-        <tr>
+        <tr class="access-grid-head-columns">
+          <th class="access-grid-person">Person</th>
+          <th class="access-grid-profile">Profile</th>
           @for (page of pages(); track page.key) {
             <th class="access-grid-page" [class.access-grid-first]="isFirstOfSection($index)">
               <span>{{ page.label }}</span>
