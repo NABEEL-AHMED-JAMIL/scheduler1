@@ -17,13 +17,13 @@
     </app-field>
       <app-field label="Name" for="name" [required]="true"
                  [control]="form.get('connectionName')" [submitted]="submitted()">
-        <input id="name" class="input" formControlName="connectionName" placeholder="ETL Bucket" />
+        <input id="name" class="input" formControlName="connectionName" placeholder="Reports archive" />
       </app-field>
 
       <app-field label="Alias" for="alias" [required]="true"
                  [control]="form.get('alias')" [submitted]="submitted()"
                  hint="How jobs and tasks refer to this. Letters, numbers, . _ - only.">
-        <input id="alias" class="input mono" formControlName="alias" placeholder="etl-bucket" />
+        <input id="alias" class="input mono" formControlName="alias" placeholder="reports-archive" />
       </app-field>
 
     <app-field class="sm:col-span-2" label="Description" for="description" [control]="form.get('description')"

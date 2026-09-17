@@ -4,14 +4,15 @@ import { Observable } from 'rxjs';
 import { API_BASE, ApiResponse } from '../../../core/api/api.config';
 
 /**
- * Where the server puts every Kafka file.
+ * Where the server puts every Kafka file: the platform's config bucket.
  *
  * Named here only so the screen can say out loud where an upload goes, which is the one thing
- * about the storage a person filling this form has to be told. It mirrors
- * KafkaSecretService.SECRET_BUCKET; nothing sends it, because the bucket is the server's answer
- * and never a choice made in the browser.
+ * about the storage a person filling this form has to be told. It mirrors the server's
+ * app.config.bucket default (KafkaSecretService.secretBucket()); nothing sends it, because the
+ * bucket is the server's answer and never a choice made in the browser, and every upload comes
+ * back naming the bucket it actually landed in.
  */
-export const KAFKA_SECRET_BUCKET = 'etl-bucket';
+export const KAFKA_SECRET_BUCKET = 'etl-config';
 
 /** The folder inside that bucket, for the same reason. Mirrors KafkaSecretPath.ROOT. */
 export const KAFKA_SECRET_ROOT = 'kafka-secrets';

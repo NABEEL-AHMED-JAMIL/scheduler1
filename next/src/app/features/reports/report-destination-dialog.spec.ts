@@ -19,10 +19,14 @@ function dialogFor(kind: ReportDestinationOptions['kind']) {
  * blocking the tab, and the one input flow in the app that didn't go through a real dialog.
  */
 describe('ReportDestinationDialog', () => {
-  it('defaults bucket/folder to sensible values and is valid without typing anything', () => {
+  it('defaults the folder but not the bucket, so Save waits for a bucket of the workspace\'s own', () => {
+    // There is no platform bucket to fall back on: the one the platform keeps is for pictures
+    // and Kafka key material, and a report belongs in a connection the workspace added itself.
     const dialog = dialogFor('bucket');
-    expect(dialog.bucket()).toBe('etl-bucket');
+    expect(dialog.bucket()).toBe('');
     expect(dialog.folder()).toBe('reports');
+    expect(dialog.valid()).toBe(false);
+    dialog.bucket.set('reports-archive');
     expect(dialog.valid()).toBe(true);
   });
 
@@ -34,11 +38,12 @@ describe('ReportDestinationDialog', () => {
 
   it('falls back to "reports" if the folder is submitted blank', () => {
     const dialog = dialogFor('bucket');
+    dialog.bucket.set('reports-archive');
     dialog.folder.set('  ');
     let result: any;
     (dialog.ref as any).close = (value: any) => { result = value; };
     dialog.submit({ preventDefault: () => {} } as Event);
-    expect(result).toEqual({ bucket: 'etl-bucket', folder: 'reports', submitUrl: '' });
+    expect(result).toEqual({ bucket: 'reports-archive', folder: 'reports', submitUrl: '' });
   });
 
   it('starts invalid for a submit-endpoint with no URL typed', () => {

@@ -32,7 +32,7 @@ export interface ReportDestinationResult {
           </p>
 
           <label class="label mt-3" for="bucket">Bucket</label>
-          <input id="bucket" class="input" cdkFocusInitial placeholder="etl-bucket"
+          <input id="bucket" class="input" cdkFocusInitial placeholder="reports-bucket"
                  [value]="bucket()" (input)="bucket.set($any($event.target).value)" />
 
           <label class="label mt-3" for="folder">Folder</label>
@@ -62,7 +62,8 @@ export class ReportDestinationDialog {
   readonly ref = inject<DialogRef<ReportDestinationResult>>(DialogRef);
   readonly data = inject<ReportDestinationOptions>(DIALOG_DATA);
 
-  readonly bucket = signal('etl-bucket');
+  /** Blank rather than a platform default: reports go in a bucket the workspace added itself. */
+  readonly bucket = signal('');
   readonly folder = signal('reports');
   readonly submitUrl = signal('');
 

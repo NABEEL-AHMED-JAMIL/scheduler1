@@ -21,7 +21,7 @@ import { profilePayload } from './kafka-profile-form';
  * is exactly what the change listener passes them.
  */
 
-const SECRET_BUCKET = 'etl-bucket';
+const SECRET_BUCKET = 'etl-config';
 const KEY = 'kafka-secrets/42/9f2c/2026-08-31';
 
 /** A response of the shape the API envelope carries. */
@@ -621,7 +621,7 @@ describe('what the screen says about the files', () => {
     });
     // In the section itself, not behind the guide toggle: it is the question a first-time
     // uploader stops on, and the guide is shut when the dialog opens.
-    expect(text()).toContain('etl-bucket');
+    expect(text()).toContain('etl-config');
     expect(text()).toContain('kafka-secrets/');
     expect(text()).toContain('You do not choose a location');
     expect(text()).toContain('none of it is listed in the object browser');
