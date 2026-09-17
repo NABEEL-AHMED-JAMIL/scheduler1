@@ -5,6 +5,7 @@ import { of } from 'rxjs';
 import { HttpClient } from '@angular/common/http';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { AuthService } from '../../../core/auth/auth.service';
+import { ActivatedRoute } from '@angular/router';
 import { PageCatalogueEntry } from '../../../core/auth/page-keys';
 import { AccessProfile, AccessProfileDraft, AccessProfilesService } from './access-profiles.service';
 import { AccessProfileDialog } from './access-profile-dialog';
@@ -117,6 +118,7 @@ function screenWith(profiles: AccessProfile[], api: Record<string, unknown> = {}
       { provide: Dialog, useValue: { open: vi.fn(() => ({ closed: of(false) })) } },
       { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } },
       { provide: AuthService, useValue: { isPlatformAdmin: () => platformAdmin } },
+      { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: { get: () => null } } } },
       { provide: HttpClient, useValue: { get: () => of({ status: 'SUCCESS', message: '', data: [{ tenantId: 5, tenantName: 'Acme' }] }) } },
     ],
   });

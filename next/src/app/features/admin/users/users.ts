@@ -55,6 +55,10 @@ export interface AppUser {
   position?: string | null;
   pageAccessProfileId?: number | null;
   pageAccessProfileName?: string | null;
+  /** From the server's batched summary: pages the person opens, exceptions they carry. */
+  pageCount?: number | null;
+  pageExceptionCount?: number | null;
+  defaultProfileName?: string | null;
   userRole: string;
   status: string;
   tenantId?: number;
@@ -95,6 +99,8 @@ export class Users implements OnInit {
   readonly roleFilter = signal('');
   readonly statusFilter = signal('');
   readonly tenantFilter = signal('');
+  /** '' = any, 'default' = on the workspace default, else a profile name. */
+  readonly profileFilter = signal('');
   /** Which contact line was just copied, as '<userId>:<field>'. One signal rather than one
       per row, since only the most recent copy needs confirming. */
   readonly copiedKey = signal<string | null>(null);
@@ -118,10 +124,19 @@ export class Users implements OnInit {
   readonly roles = computed(() =>
     [...new Set(this.users().map(u => u.userRole).filter(Boolean))].sort());
 
+  /** The profiles actually in use on the list, so the filter never offers an empty result. */
+  readonly profileOptions = computed(() =>
+    [...new Set(this.users().filter(u => u.userRole === 'TENANT_USER').map(u => u.pageAccessProfileName).filter(Boolean))].sort() as string[]);
+  readonly anyOnDefault = computed(() =>
+    this.users().some(u => u.userRole === 'TENANT_USER' && !u.pageAccessProfileName));
+
+  /** The catalogue's size, for "4 of 10 pages": an admin's count is the whole catalogue. */
+  readonly totalPages = computed(() => Math.max(0, ...this.users().map(u => u.pageCount ?? 0)));
+
   // Every control that narrows the list belongs here, including Only mine. Leaving it out meant
   // somebody could filter down to nothing, press Clear, and still see nothing.
   readonly hasFilters = computed(() =>
-    !!(this.search() || this.roleFilter() || this.statusFilter() || this.tenantFilter()
+    !!(this.search() || this.roleFilter() || this.statusFilter() || this.tenantFilter() || this.profileFilter()
        || this.focusedTenantId() !== null || this.onlyMine()));
 
   /** Tenants that actually have users, so the filter never offers an empty result. */
@@ -146,6 +161,7 @@ export class Users implements OnInit {
     const term = this.search().trim().toLowerCase();
     const role = this.roleFilter();
     const status = this.statusFilter();
+    const profile = this.profileFilter();
     const focusedTenant = this.focusedTenantId();
     const tenant = this.tenantFilter();
     const rows = this.users().filter(user => {
@@ -153,6 +169,10 @@ export class Users implements OnInit {
       if (tenant && String(user.tenantId) !== tenant) return false;
       if (role && user.userRole !== role) return false;
       if (status && user.status !== status) return false;
+      if (profile) {
+        if (user.userRole !== 'TENANT_USER') return false;
+        if (profile === 'default' ? !!user.pageAccessProfileName : user.pageAccessProfileName !== profile) return false;
+      }
       if (!term) return true;
       // Phone lost its own column when identity was merged into one cell, so search is the only
       // way to reach it. Separators come off both sides, since a stored +12025550143 would
@@ -417,6 +437,7 @@ export class Users implements OnInit {
     this.roleFilter.set('');
     this.statusFilter.set('');
     this.tenantFilter.set('');
+    this.profileFilter.set('');
     this.onlyMine.set(false);
     // The tenant focus counts towards hasFilters, so leaving it behind meant Clear left the list
     // filtered and the button on screen -- it looked broken because it was. It lives in the URL,
@@ -476,6 +497,30 @@ export class Users implements OnInit {
       of the three rather than crashing the cell it is drawn in. */
   private metaFor(role: string) {
     return isUserRole(role) ? ROLE_META[role] : ROLE_META.TENANT_USER;
+  }
+
+  /**
+   * The access line a row shows: which profile (or the default), how many pages that comes to,
+   * and whether any exception was made for this person. An admin opens everything, and that
+   * is said plainly rather than as "10 of 10".
+   */
+  accessLabel(user: AppUser): string {
+    if (user.userRole !== 'TENANT_USER') return 'All pages';
+    if (user.pageAccessProfileName) return user.pageAccessProfileName;
+    return user.defaultProfileName ? `Default · ${user.defaultProfileName}` : 'Default';
+  }
+
+  accessDetail(user: AppUser): string {
+    if (user.userRole !== 'TENANT_USER' || user.pageCount == null) return '';
+    const total = this.totalPages();
+    return total ? `${user.pageCount} of ${total} pages` : `${user.pageCount} pages`;
+  }
+
+  /** Straight to this person's row in the People × pages grid. */
+  openPageAccess(user: AppUser): void {
+    void this.router.navigate(['/admin/access-profiles'], {
+      queryParams: { view: 'people', q: user.username, tenantId: this.canPickTenant() ? user.tenantId : null },
+    });
   }
 
   /** Ring around the avatar: the same fact the status pill carries, said in the portrait. */

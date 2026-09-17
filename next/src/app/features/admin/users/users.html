@@ -54,6 +54,16 @@
           <option [value]="role">{{ roleLabel(role) }}</option>
         }
       </select>
+      @if (profileOptions().length || anyOnDefault()) {
+        <select class="input max-w-44" [value]="profileFilter()" aria-label="Access profile"
+                (change)="profileFilter.set($any($event.target).value); pager.reset()">
+          <option value="">All access</option>
+          @if (anyOnDefault()) { <option value="default">On the default</option> }
+          @for (name of profileOptions(); track name) {
+            <option [value]="name">{{ name }}</option>
+          }
+        </select>
+      }
       @if (canPickTenant() && tenantOptions().length > 1) {
         <select class="input max-w-44" [value]="tenantFilter()"
                 (change)="tenantFilter.set($any($event.target).value); pager.reset()">
@@ -120,11 +130,6 @@
                   }
                   <div class="flex flex-wrap items-center gap-1.5 mt-2">
                     <span [class]="rolePill(user.userRole)">{{ roleLabel(user.userRole) }}</span>
-                    @if (user.userRole === 'TENANT_USER' && user.pageAccessProfileName) {
-                      <span class="pill pill-neutral" [title]="'Access profile: ' + user.pageAccessProfileName">
-                        <app-icon name="shield" size="0.8em" class="opacity-70" />{{ user.pageAccessProfileName }}
-                      </span>
-                    }
                     @if (user.tenantName) {
                       <span class="pill pill-neutral" [title]="'Workspace: ' + user.tenantName">
                         <app-icon name="building" size="0.8em" class="opacity-70" />{{ user.tenantName }}
@@ -163,6 +168,20 @@
                   </div>
                 }
               </div>
+
+              <!-- Access: the profile and what it comes to, on its own line rather than as one
+                   more chip -- it is the fact an admin came here to check. -->
+              @if (user.userRole === 'TENANT_USER') {
+                <button type="button" class="flex items-center gap-2 rounded-md px-2.5 py-1.5 bg-sunken text-left w-full group"
+                        (click)="openPageAccess(user)" [title]="'Open in the People × pages grid'">
+                  <app-icon name="shield" size="0.95em" class="shrink-0 opacity-70" />
+                  <span class="text-sm font-medium group-hover:underline">{{ accessLabel(user) }}</span>
+                  <span class="text-xs text-[color:var(--text-muted)]">{{ accessDetail(user) }}</span>
+                  @if (user.pageExceptionCount) {
+                    <span class="ml-auto pill pill-warn">{{ user.pageExceptionCount }} {{ user.pageExceptionCount === 1 ? 'exception' : 'exceptions' }}</span>
+                  }
+                </button>
+              }
 
               <!-- Workload, when there is any. Kept as tiles: three figures compared against each
                    other read better in a row than as three sentences. -->
@@ -257,6 +276,7 @@
           @for (column of [
             { key: 'fullName',    label: 'Person' },
             { key: 'userRole',    label: 'Role' },
+            { key: 'pageAccessProfileName', label: 'Access' },
             { key: 'tenantName',  label: 'Tenant' },
             { key: 'lastLoginAt', label: 'Last sign-in' }
           ]; track column.key) {
@@ -321,15 +341,33 @@
                  decides what this person reaches. -->
             <td class="max-w-44">
               <span [class]="rolePill(user.userRole)">{{ roleLabel(user.userRole) }}</span>
-              @if (user.userRole === 'TENANT_USER') {
-                <div class="text-xs mt-0.5 truncate" [title]="user.pageAccessProfileName ? 'Access profile: ' + user.pageAccessProfileName : 'On the workspace default access profile'">
-                  <app-icon name="shield" size="0.8em" class="opacity-70" />
-                  {{ user.pageAccessProfileName || 'Default access' }}
-                </div>
-              }
               @if (user.position) {
                 <div class="text-xs text-[color:var(--text-muted)] truncate mt-0.5"
                      [title]="user.position">{{ user.position }}</div>
+              }
+            </td>
+
+            <!-- What the person can open: the profile (or the default) and what it comes to, with
+                 any exception made for them alone called out -- that is the one thing an admin
+                 scanning the list cannot infer from the profile's name. -->
+            <td class="max-w-48">
+              @if (user.userRole === 'TENANT_USER') {
+                <button type="button" class="text-left group" (click)="openPageAccess(user)"
+                        [title]="'Open ' + (user.fullName || user.username) + ' in the People × pages grid'">
+                  <span class="inline-flex items-center gap-1.5 font-medium group-hover:underline">
+                    <app-icon name="shield" size="0.85em" class="opacity-70" />{{ accessLabel(user) }}
+                  </span>
+                  <span class="block text-xs text-[color:var(--text-muted)]">
+                    {{ accessDetail(user) }}
+                    @if (user.pageExceptionCount) {
+                      <span class="inline-flex items-center gap-1 text-[color:var(--color-warn-600)]">
+                        · <span class="inline-block w-1.5 h-1.5 rounded-full bg-[color:var(--color-warn-500)]"></span>{{ user.pageExceptionCount }} {{ user.pageExceptionCount === 1 ? 'exception' : 'exceptions' }}
+                      </span>
+                    }
+                  </span>
+                </button>
+              } @else {
+                <span class="text-[color:var(--text-muted)] text-sm">All pages</span>
               }
             </td>
 
@@ -418,6 +456,11 @@
                   <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="edit(user)">
                     <app-icon name="edit" />Edit
                   </button>
+                  @if (user.userRole === 'TENANT_USER') {
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="openPageAccess(user)">
+                      <app-icon name="shield" />Page access
+                    </button>
+                  }
                   <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="resetPassword(user)">
                     <app-icon name="key" />Reset password
                   </button>

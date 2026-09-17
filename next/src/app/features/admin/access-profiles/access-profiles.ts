@@ -1,7 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Dialog } from '@angular/cdk/dialog';
 import { HttpClient } from '@angular/common/http';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { forkJoin } from 'rxjs';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
@@ -38,6 +38,7 @@ export class AccessProfiles implements OnInit {
   private readonly toast = inject(ToastService);
   private readonly http = inject(HttpClient);
   readonly auth = inject(AuthService);
+  private readonly route = inject(ActivatedRoute);
 
   /**
    * A platform admin has no workspace of its own, so it picks one; the screen is empty until it
@@ -79,11 +80,18 @@ export class AccessProfiles implements OnInit {
   readonly needsWorkspace = computed(() => this.canPickTenant() && !this.tenantId());
 
   ngOnInit(): void {
+    // A link from the Users screen lands on one person's row: the grid view, their name in the
+    // filter, and -- for a platform admin -- their workspace already picked.
+    const params = this.route.snapshot.queryParamMap;
+    if (params.get('view') === 'people') this.view.set('people');
+    this.search.set(params.get('q') ?? '');
+    const linkedTenant = Number(params.get('tenantId'));
     if (this.canPickTenant()) {
       this.http.get<ApiResponse<Tenant[]>>(`${API_BASE}/tenant.json/listTenants`).subscribe({
         next: response => { if (response.status === API_SUCCESS) this.tenants.set(response.data ?? []); },
       });
       this.api.pages().subscribe({ next: r => { if (r.status === API_SUCCESS) this.pages.set(r.data ?? []); } });
+      if (Number.isFinite(linkedTenant) && linkedTenant > 0) this.pickTenant(String(linkedTenant));
       return;
     }
     this.load();
