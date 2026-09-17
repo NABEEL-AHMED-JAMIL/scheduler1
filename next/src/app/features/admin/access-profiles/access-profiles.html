@@ -29,7 +29,8 @@
   <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
     <app-stat-tile label="Profiles" [value]="stats().profiles" icon="layers" tone="info"
                    [foot]="stats().profiles === 0 ? 'none yet — everyone sees every page' : 'in this workspace'" />
-    <app-stat-tile label="People assigned" [value]="stats().assigned" icon="users" tone="info" foot="hold a profile of their own" />
+    <app-stat-tile label="People assigned" [value]="stats().assigned" icon="users" tone="info"
+                   [foot]="stats().onDefault ? stats().onDefault + ' more on the default' : 'hold a profile of their own'" />
     <app-stat-tile label="Default" [value]="stats().defaultName || '—'" icon="shield" tone="info"
                    [foot]="stats().defaultName ? 'for anyone without their own' : 'no default: unassigned users see everything'" />
     <app-stat-tile label="Pages" [value]="stats().pages" icon="template" tone="info" foot="can be granted or withheld" />
@@ -144,14 +145,22 @@
               }
             </div>
 
-            <!-- Who holds it -->
+            <!-- Who it covers: assigned people, and on the default the people who land on it
+                 with no profile of their own -- said separately, because "by default" is the
+                 part that changes when a new default is picked. -->
             <div class="flex items-center justify-between gap-2 px-4 py-2.5 border-t border-[color:var(--border-subtle)] text-xs text-[color:var(--text-muted)]">
-              <span class="truncate">
-                @if (card.profile.userCount === 0) {
-                  Nobody holds it yet
+              <span class="truncate" [title]="card.coverage.names.join(', ')">
+                @if (card.coverage.total === 0) {
+                  No one on it yet
                 } @else {
-                  <span class="font-medium text-[color:var(--text-primary)]">{{ card.profile.userCount }} {{ card.profile.userCount === 1 ? 'person' : 'people' }}</span>
-                  · {{ (card.profile.userNames ?? []).slice(0, 3).join(', ') }}{{ card.profile.userCount > 3 ? ', …' : '' }}
+                  <span class="font-medium text-[color:var(--text-primary)]">{{ card.coverage.total }} {{ card.coverage.total === 1 ? 'person' : 'people' }}</span>
+                  @if (card.coverage.byDefault && card.coverage.assigned) {
+                    · {{ card.coverage.assigned }} assigned, {{ card.coverage.byDefault }} by default
+                  } @else if (card.coverage.byDefault) {
+                    · all by default
+                  } @else {
+                    · {{ card.coverage.names.slice(0, 3).join(', ') }}{{ card.coverage.total > 3 ? ', …' : '' }}
+                  }
                 }
               </span>
               <button type="button" class="hover:underline shrink-0" (click)="showPeople()">See in grid ›</button>

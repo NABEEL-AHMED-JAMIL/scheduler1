@@ -128,11 +128,21 @@ function screenWith(profiles: AccessProfile[], api: Record<string, unknown> = {}
 }
 
 describe('AccessProfiles screen', () => {
+  it('counts the people the default covers, not only the ones assigned to it', () => {
+    const operator = { ...profile(1, 'Operator', ['jobs'], true, 1), userNames: ['Olivia Bennett'], defaultUserCount: 4, defaultUserNames: ['Alex Morgan', 'Ava Patel', 'Liam Foster', 'Noah Kim'] };
+    const analyst = profile(2, 'Analyst', ['jobs', 'reports'], false, 0);
+    const { screen } = screenWith([operator, analyst]);
+    const [op, an] = screen.cards();
+    expect(op.coverage).toEqual({ total: 5, assigned: 1, byDefault: 4, names: ['Olivia Bennett', 'Alex Morgan', 'Ava Patel', 'Liam Foster', 'Noah Kim'] });
+    expect(an.coverage.total).toBe(0);
+    expect(screen.stats().onDefault).toBe(4);
+  });
+
   it('loads the catalogue and the profiles together and sums the people on them', () => {
     const { screen } = screenWith([profile(1, 'Operator', ['jobs'], true, 3), profile(2, 'Analyst', ['jobs', 'reports'], false, 1)]);
     expect(screen.loading()).toBe(false);
     expect(screen.profiles().map(p => p.profileName)).toEqual(['Operator', 'Analyst']);
-    expect(screen.stats()).toEqual({ profiles: 2, assigned: 4, defaultName: 'Operator', pages: 7 });
+    expect(screen.stats()).toEqual({ profiles: 2, assigned: 4, onDefault: 0, defaultName: 'Operator', pages: 7 });
   });
 
   it('lays a card\'s pages out by menu section, opened and withheld, in catalogue order', () => {

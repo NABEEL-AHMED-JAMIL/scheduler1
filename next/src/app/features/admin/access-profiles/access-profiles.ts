@@ -65,16 +65,30 @@ export class AccessProfiles implements OnInit {
     return {
       profiles: list.length,
       assigned: list.reduce((n, p) => n + (p.userCount ?? 0), 0),
+      onDefault: list.find(p => p.defaultProfile)?.defaultUserCount ?? 0,
       defaultName: list.find(p => p.defaultProfile)?.profileName ?? '',
       pages: this.pages().length,
     };
   });
+
+  /**
+   * Who a card should say it covers. Assigned people always; on the default, the people who land
+   * on it with no profile of their own as well -- "1 person" on a default four more land on
+   * understated it by four, and made the grid and the cards disagree.
+   */
+  coverage(profile: AccessProfile): { total: number; assigned: number; byDefault: number; names: string[] } {
+    const assigned = profile.userCount ?? 0;
+    const byDefault = profile.defaultProfile ? (profile.defaultUserCount ?? 0) : 0;
+    const names = [...(profile.userNames ?? []), ...(profile.defaultProfile ? (profile.defaultUserNames ?? []) : [])];
+    return { total: assigned + byDefault, assigned, byDefault, names };
+  }
 
   /** Each card's pages by section, worked out once per profile list rather than per render. */
   readonly cards = computed(() => this.profiles().map(profile => ({
     profile,
     sections: this.sectionsFor(profile),
     opened: profile.pageKeys.length,
+    coverage: this.coverage(profile),
   })));
 
   readonly needsWorkspace = computed(() => this.canPickTenant() && !this.tenantId());

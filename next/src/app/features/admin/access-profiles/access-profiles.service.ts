@@ -14,6 +14,9 @@ export interface AccessProfile {
   pageKeys: PageKey[];
   userCount: number;
   userNames?: string[];
+  /** Default profile only: the people who land on it with no profile of their own. */
+  defaultUserCount?: number | null;
+  defaultUserNames?: string[] | null;
   dateCreated?: string;
   dateUpdated?: string;
   createdByName?: string | null;
