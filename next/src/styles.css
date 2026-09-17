@@ -1498,3 +1498,32 @@ html.dark {
   background-clip: content-box;
 }
 ::-webkit-scrollbar-corner { background: transparent; }
+
+/* ---- Access profiles: the people × pages grid ---------------------------------------------
+   The grid is read in two directions at once, so the columns are grouped under their menu
+   section and each section starts with a divider; the marks are small filled squares rather
+   than bare glyphs, because a "·" for withheld was invisible against the row. */
+.access-grid { table-layout: fixed; min-width: 100%; }
+.access-grid .access-grid-person { width: 15.5rem; min-width: 15.5rem; text-align: left; position: sticky; left: 0; z-index: 1; background: var(--surface-raised); }
+.access-grid .access-grid-profile { width: 11rem; min-width: 11rem; }
+.access-grid .access-grid-section {
+  text-align: center; font-size: 10px; letter-spacing: .08em; padding: 0.4rem 0.5rem 0.25rem;
+  background: var(--surface-inset); border-left: 1px solid var(--border-subtle); border-bottom: 0;
+}
+.access-grid .access-grid-page {
+  width: 5.5rem; min-width: 5.5rem; text-align: center; padding: 0.35rem 0.35rem 0.6rem; vertical-align: bottom;
+  text-transform: none; letter-spacing: 0; font-size: 11px; color: var(--text-secondary); white-space: normal; line-height: 1.2;
+}
+.access-grid .access-grid-cell { text-align: center; padding: 0; }
+.access-grid .access-grid-first { border-left: 1px solid var(--border-subtle); }
+.access-grid .access-grid-group td { background: var(--surface-inset); }
+.access-grid .access-grid-group .access-grid-person { background: var(--surface-inset); }
+.access-grid tbody tr:hover .access-grid-person { background: var(--surface-sunken); }
+.access-grid tbody tr.access-grid-group:hover td { background: var(--surface-inset); }
+.access-cell { width: 100%; height: 2.75rem; display: inline-flex; align-items: center; justify-content: center; border-radius: 0; }
+.access-cell:hover:not(:disabled) { background: var(--surface-sunken); }
+.access-cell:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.access-mark { display: inline-flex; align-items: center; justify-content: center; width: 1.35rem; height: 1.35rem; border-radius: 0.375rem; }
+.access-mark-on  { background: var(--color-ok-100); color: var(--color-ok-500); }
+.access-mark-off { background: transparent; color: var(--border-strong); }
+html.dark .access-mark-on { background: color-mix(in oklab, var(--color-ok-500) 25%, transparent); color: var(--color-ok-400); }

@@ -199,7 +199,6 @@ export class Users implements OnInit {
     });
     this.load();
     this.loadTenants();
-    this.loadAccessProfiles();
   }
 
   clearTenantFocus(): void {
@@ -263,25 +262,33 @@ export class Users implements OnInit {
     });
   }
 
-  private loadAccessProfiles(): void {
-    if (this.canPickTenant()) return;
+  /**
+   * Fetched the first time a dialog needs them, not on every visit to the list: most visits
+   * never open one. A platform admin's dialog fetches per tenant on its own.
+   */
+  private accessProfilesLoaded = false;
+  private withAccessProfiles(open: (profiles: AccessProfile[]) => void): void {
+    if (this.canPickTenant() || this.accessProfilesLoaded) { open(this.accessProfiles()); return; }
     this.profilesApi.list().subscribe({
       next: response => {
         if (response.status === API_SUCCESS) this.accessProfiles.set(response.data ?? []);
+        this.accessProfilesLoaded = true;
+        open(this.accessProfiles());
       },
+      error: () => open([]),
     });
   }
 
   create(): void {
-    this.dialog.open<boolean>(UserDialog, {
-      data: { tenants: this.tenants(), canPickTenant: this.canPickTenant(), accessProfiles: this.accessProfiles() }, hasBackdrop: true,
-    }).closed.subscribe(saved => { if (saved) this.load(); });
+    this.withAccessProfiles(accessProfiles => this.dialog.open<boolean>(UserDialog, {
+      data: { tenants: this.tenants(), canPickTenant: this.canPickTenant(), accessProfiles }, hasBackdrop: true,
+    }).closed.subscribe(saved => { if (saved) this.load(); }));
   }
 
   edit(user: AppUser): void {
-    this.dialog.open<boolean>(UserDialog, {
-      data: { user, tenants: this.tenants(), canPickTenant: this.canPickTenant(), accessProfiles: this.accessProfiles() }, hasBackdrop: true,
-    }).closed.subscribe(saved => { if (saved) this.load(); });
+    this.withAccessProfiles(accessProfiles => this.dialog.open<boolean>(UserDialog, {
+      data: { user, tenants: this.tenants(), canPickTenant: this.canPickTenant(), accessProfiles }, hasBackdrop: true,
+    }).closed.subscribe(saved => { if (saved) this.load(); }));
   }
 
   /**

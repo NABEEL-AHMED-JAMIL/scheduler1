@@ -1,0 +1,115 @@
+<div class="card overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="table-modern access-grid">
+      <thead>
+        <!-- Two header rows: the menu section spanning its pages, then the pages. -->
+        <tr>
+          <th class="access-grid-person" rowspan="2">Person</th>
+          <th class="access-grid-profile" rowspan="2">Profile</th>
+          @for (group of groupsOfColumns(); track group.section) {
+            <th class="access-grid-section" [attr.colspan]="group.pages.length">{{ group.section }}</th>
+          }
+        </tr>
+        <tr>
+          @for (page of pages(); track page.key) {
+            <th class="access-grid-page" [class.access-grid-first]="isFirstOfSection($index)">
+              <span>{{ page.label }}</span>
+            </th>
+          }
+        </tr>
+      </thead>
+      <tbody>
+        @for (group of groups(); track group.key) {
+          <!-- The profile's own row: what everyone beneath it gets. -->
+          <tr class="access-grid-group">
+            <td class="access-grid-person">
+              <div class="flex items-center gap-2 whitespace-nowrap">
+                <app-icon name="shield" size="0.95rem" class="opacity-70 shrink-0" />
+                <span class="font-semibold truncate">{{ group.title }}</span>
+              </div>
+              <div class="text-xs text-[color:var(--text-muted)] mt-0.5 truncate" [title]="group.subtitle">
+                {{ group.rows.length }} {{ group.rows.length === 1 ? 'person' : 'people' }}{{ group.subtitle ? ' · ' + group.subtitle : '' }}
+              </div>
+            </td>
+            <td class="access-grid-profile"></td>
+            @for (open of group.opens; track $index) {
+              <td class="access-grid-cell" [class.access-grid-first]="isFirstOfSection($index)">
+                <span class="access-mark" [class.access-mark-on]="open" [class.access-mark-off]="!open">
+                  @if (open) { <app-icon name="check" size="0.85rem" /> } @else { <app-icon name="minus" size="0.85rem" /> }
+                </span>
+              </td>
+            }
+          </tr>
+          @for (row of group.rows; track row.person.appUserId) {
+            <tr [class.opacity-55]="busy() === row.person.appUserId" [attr.data-person]="row.person.username">
+              <td class="access-grid-person">
+                <div class="flex items-center gap-2.5 pl-6">
+                  <app-avatar [appUserId]="row.person.avatarKey ? row.person.appUserId : null" [name]="row.person.fullName" [size]="1.9" />
+                  <div class="min-w-0">
+                    <div class="font-medium truncate leading-tight">{{ row.person.fullName }}</div>
+                    <div class="text-xs text-[color:var(--text-muted)] truncate">{{ row.person.position || row.person.username }}</div>
+                  </div>
+                </div>
+              </td>
+              <td class="access-grid-profile">
+                <select class="input py-1 text-xs" (change)="pick(row.person, $any($event.target).value)"
+                        [disabled]="busy() === row.person.appUserId" [attr.aria-label]="'Profile for ' + row.person.fullName">
+                  <option value="" [selected]="row.person.pageAccessProfileId == null">Default{{ defaultProfile() ? ' · ' + defaultProfile()!.profileName : '' }}</option>
+                  @for (profile of profiles(); track profile.pageAccessProfileId) {
+                    <option [value]="profile.pageAccessProfileId" [selected]="profile.pageAccessProfileId === row.person.pageAccessProfileId">{{ profile.profileName }}</option>
+                  }
+                </select>
+              </td>
+              @for (cell of row.cells; track cell.page.key) {
+                <td class="access-grid-cell" [class.access-grid-first]="isFirstOfSection($index)">
+                  <button type="button" class="access-cell" [cdkMenuTriggerFor]="cellMenu"
+                          [disabled]="busy() === row.person.appUserId"
+                          [attr.aria-label]="row.person.fullName + ' — ' + cell.page.label + (cell.open ? ': opens' : ': withheld')"
+                          [attr.data-cell]="row.person.username + '|' + cell.page.key" [attr.data-open]="cell.open"
+                          [title]="cell.alternatives.length ? 'Click to change' : 'No profile changes this'">
+                    <span class="access-mark" [class.access-mark-on]="cell.open" [class.access-mark-off]="!cell.open">
+                      @if (cell.open) { <app-icon name="check" size="0.85rem" /> } @else { <app-icon name="minus" size="0.85rem" /> }
+                    </span>
+                  </button>
+                  <ng-template #cellMenu>
+                    <div cdkMenu class="card shadow-xl py-1 min-w-60 text-sm">
+                      <div class="px-3 py-2 text-xs text-[color:var(--text-secondary)] border-b border-[color:var(--border-subtle)]">
+                        <span class="font-semibold text-[color:var(--text-primary)]">{{ cell.page.label }}</span>
+                        is {{ cell.open ? 'open' : 'withheld' }} for {{ firstName(row.person) }}
+                        via <span class="font-medium">{{ row.person.pageAccessProfileName || 'the default' }}</span>.
+                      </div>
+                      @if (cell.alternatives.length) {
+                        <div class="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--text-muted)]">
+                          {{ cell.open ? 'Withhold it by switching to' : 'Open it by switching to' }}
+                        </div>
+                        @for (profile of cell.alternatives; track profile.pageAccessProfileId) {
+                          <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="assign.emit({ person: row.person, profile })">
+                            <app-icon [name]="cell.open ? 'minus' : 'check'" />{{ profile.profileName }}
+                            <span class="ml-auto text-xs text-[color:var(--text-muted)]">{{ profile.pageKeys.length }} pages</span>
+                          </button>
+                        }
+                      } @else {
+                        <div class="px-3 py-2 text-xs text-[color:var(--text-muted)]">Every profile agrees on this page.</div>
+                      }
+                    </div>
+                  </ng-template>
+                </td>
+              }
+            </tr>
+          }
+        }
+        @if (shown() === 0) {
+          <tr><td [attr.colspan]="pages().length + 2" class="text-center text-[color:var(--text-muted)] py-10">
+            @if (search()) { Nobody matches “{{ search() }}”. } @else { No tenant users in this workspace yet. }
+          </td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  <div class="flex flex-wrap items-center gap-x-5 gap-y-1 px-4 py-2.5 border-t border-[color:var(--border-subtle)] text-xs text-[color:var(--text-muted)]">
+    <span class="inline-flex items-center gap-1.5"><span class="access-mark access-mark-on"><app-icon name="check" size="0.8rem" /></span> opens</span>
+    <span class="inline-flex items-center gap-1.5"><span class="access-mark access-mark-off"><app-icon name="minus" size="0.8rem" /></span> withheld</span>
+    <span>Click a cell to switch the person to a profile that changes it, or pick a profile in the row.</span>
+    <span class="ml-auto">Admins are not listed — they open everything.</span>
+  </div>
+</div>

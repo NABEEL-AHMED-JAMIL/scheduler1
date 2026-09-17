@@ -1,8 +1,9 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Dialog } from '@angular/cdk/dialog';
-import { RouterLink } from '@angular/router';
-import { forkJoin } from 'rxjs';
 import { HttpClient } from '@angular/common/http';
+import { RouterLink } from '@angular/router';
+import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
+import { forkJoin } from 'rxjs';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { AuthService } from '../../../core/auth/auth.service';
 import { PageCatalogueEntry } from '../../../core/auth/page-keys';
@@ -11,21 +12,24 @@ import { StatTile } from '../../../shared/ui/stat-tile';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { confirmWith } from '../../../shared/ui/confirm';
 import { AccessPerson, AccessProfile, AccessProfilesService } from './access-profiles.service';
-import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
-import { Avatar } from '../../../shared/ui/avatar';
 import { AccessProfileDialog, AccessProfileDialogData } from './access-profile-dialog';
+import { AccessPeopleGrid } from './access-people-grid';
+
+/** A profile's pages arranged the way the menu arranges them, for the card. */
+interface CardSection { section: string; opens: string[]; withholds: string[]; }
+
+interface Tenant { tenantId: number; tenantName: string; }
 
 /**
  * Administration > Access profiles: the named page bundles a workspace hands its tenant users.
  *
- * Cards rather than a table, because a profile is read as a whole -- "what does an Analyst
- * get?" -- and a row of ten tick marks does not answer that at a glance the way a list of page
- * chips does. The people on each profile are named on the card, so "who is affected if I
- * change this" is answered before the edit, not after.
+ * Two readings of the same facts. The cards answer "what does an Analyst get" -- a profile's
+ * pages laid out by menu section, with who holds it. The grid (AccessPeopleGrid) answers "what
+ * does Olivia get". The profile is the single source of truth for both, so they cannot disagree.
  */
 @Component({
   selector: 'app-access-profiles',
-  imports: [Icon, StatTile, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, Avatar],
+  imports: [Icon, StatTile, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, AccessPeopleGrid],
   templateUrl: './access-profiles.html',
 })
 export class AccessProfiles implements OnInit {
@@ -40,28 +44,20 @@ export class AccessProfiles implements OnInit {
    * does. A tenant admin never sees the picker -- its workspace is the only one it can reach.
    */
   readonly canPickTenant = computed(() => this.auth.isPlatformAdmin());
-  readonly tenants = signal<{ tenantId: number; tenantName: string }[]>([]);
+  readonly tenants = signal<Tenant[]>([]);
   readonly tenantId = signal<number | null>(null);
 
   readonly profiles = signal<AccessProfile[]>([]);
   readonly pages = signal<PageCatalogueEntry[]>([]);
-
-  /**
-   * Two ways of reading the same facts. Cards answer "what does Analyst get"; the grid answers
-   * "what does Olivia get" -- people down the side, pages across the top, one cell per pair,
-   * derived from the profile each person holds. A cell is not a switch of its own: clicking it
-   * offers the profiles that would change the answer, because the profile IS the model and a
-   * grid that quietly diverged from it would be two truths.
-   */
-  readonly view = signal<'profiles' | 'people'>('profiles');
   readonly people = signal<AccessPerson[]>([]);
-  readonly peopleLoading = signal(false);
-  /** The person whose assignment is in flight. */
-  readonly assigning = signal<number | null>(null);
+  readonly view = signal<'profiles' | 'people'>('profiles');
+  readonly search = signal('');
   readonly loading = signal(false);
+  readonly peopleLoading = signal(false);
   readonly error = signal('');
-  /** The profile whose menu action is in flight, so its buttons go quiet. */
+  /** The profile, or the person, whose action is in flight. */
   readonly busy = signal<number | null>(null);
+  readonly assigning = signal<number | null>(null);
 
   readonly stats = computed(() => {
     const list = this.profiles();
@@ -73,14 +69,20 @@ export class AccessProfiles implements OnInit {
     };
   });
 
+  /** Each card's pages by section, worked out once per profile list rather than per render. */
+  readonly cards = computed(() => this.profiles().map(profile => ({
+    profile,
+    sections: this.sectionsFor(profile),
+    opened: profile.pageKeys.length,
+  })));
+
+  readonly needsWorkspace = computed(() => this.canPickTenant() && !this.tenantId());
+
   ngOnInit(): void {
     if (this.canPickTenant()) {
-      this.http.get<ApiResponse<any[]>>(`${API_BASE}/tenant.json/listTenants`).subscribe({
-        next: response => {
-          if (response.status === API_SUCCESS) this.tenants.set(response.data ?? []);
-        },
+      this.http.get<ApiResponse<Tenant[]>>(`${API_BASE}/tenant.json/listTenants`).subscribe({
+        next: response => { if (response.status === API_SUCCESS) this.tenants.set(response.data ?? []); },
       });
-      // Nothing to list until a workspace is chosen, but the catalogue is worth having ready.
       this.api.pages().subscribe({ next: r => { if (r.status === API_SUCCESS) this.pages.set(r.data ?? []); } });
       return;
     }
@@ -92,43 +94,39 @@ export class AccessProfiles implements OnInit {
     this.tenantId.set(Number.isFinite(id) && id > 0 ? id : null);
     this.profiles.set([]);
     this.people.set([]);
-    if (this.tenantId()) {
-      this.load();
-      if (this.view() === 'people') this.loadPeople();
-    }
-  }
-
-  load(): void {
-    this.loading.set(true);
-    this.error.set('');
-    forkJoin({ pages: this.api.pages(), profiles: this.api.list(this.tenantId()) }).subscribe({
-      next: ({ pages, profiles }) => {
-        this.loading.set(false);
-        if (pages.status === API_SUCCESS) this.pages.set(pages.data ?? []);
-        if (profiles.status === API_SUCCESS) {
-          this.profiles.set(profiles.data ?? []);
-        } else {
-          this.error.set(profiles.message || 'Access profiles could not be loaded.');
-        }
-      },
-      error: err => {
-        this.loading.set(false);
-        this.error.set(err?.error?.message || 'Access profiles could not be loaded.');
-      },
-    });
-  }
-
-  showPeople(): void {
-    this.view.set('people');
-    this.loadPeople();
+    if (this.tenantId()) this.load();
   }
 
   showProfiles(): void {
     this.view.set('profiles');
   }
 
+  showPeople(): void {
+    this.view.set('people');
+    if (this.people().length === 0) this.loadPeople();
+  }
+
+  load(): void {
+    if (this.needsWorkspace()) return;
+    this.loading.set(true);
+    this.error.set('');
+    forkJoin({ pages: this.api.pages(), profiles: this.api.list(this.tenantId()) }).subscribe({
+      next: ({ pages, profiles }) => {
+        this.loading.set(false);
+        if (pages.status === API_SUCCESS) this.pages.set(pages.data ?? []);
+        if (profiles.status === API_SUCCESS) this.profiles.set(profiles.data ?? []);
+        else this.error.set(profiles.message || 'Access profiles could not be loaded.');
+      },
+      error: err => {
+        this.loading.set(false);
+        this.error.set(err?.error?.message || 'Access profiles could not be loaded.');
+      },
+    });
+    if (this.view() === 'people') this.loadPeople();
+  }
+
   loadPeople(): void {
-    if (this.canPickTenant() && !this.tenantId()) return;
+    if (this.needsWorkspace()) return;
     this.peopleLoading.set(true);
     this.api.people(this.tenantId()).subscribe({
       next: response => {
@@ -143,58 +141,17 @@ export class AccessProfiles implements OnInit {
     });
   }
 
-  opens(person: AccessPerson, page: PageCatalogueEntry): boolean {
-    return person.pageKeys.includes(page.key);
-  }
-
-  /** The profiles that would flip this cell: the ones whose answer for the page differs. */
-  alternativesFor(person: AccessPerson, page: PageCatalogueEntry): AccessProfile[] {
-    const has = this.opens(person, page);
-    return this.profiles().filter(p => p.pageKeys.includes(page.key) !== has);
-  }
-
-  /** The pages of the default profile, for the grid's first row. */
-  readonly defaultProfile = computed(() => this.profiles().find(p => p.defaultProfile) ?? null);
-
-  assign(person: AccessPerson, profile: AccessProfile | null): void {
-    const target = profile?.pageAccessProfileId ?? null;
-    if (target === person.pageAccessProfileId) return;
-    this.assigning.set(person.appUserId);
-    this.api.assign(person.appUserId, target).subscribe({
-      next: response => {
-        this.assigning.set(null);
-        if (response.status === API_SUCCESS) {
-          this.toast.success(response.message || 'Profile changed.');
-          const updated = response.data;
-          this.people.update(rows => rows.map(row => row.appUserId === person.appUserId && updated
-            ? { ...row, pageAccessProfileId: updated.pageAccessProfileId, pageAccessProfileName: updated.pageAccessProfileName, pageKeys: updated.pageKeys }
-            : row));
-          // Holder counts on the cards moved too.
-          this.api.list(this.tenantId()).subscribe({ next: r => { if (r.status === API_SUCCESS) this.profiles.set(r.data ?? []); } });
-        } else {
-          this.toast.error(response.message);
-        }
-      },
-      error: err => {
-        this.assigning.set(null);
-        this.toast.error(err?.error?.message || 'The profile could not be changed.');
-      },
-    });
-  }
-
-  assignById(person: AccessPerson, value: string): void {
-    const id = Number(value);
-    this.assign(person, id > 0 ? (this.profiles().find(p => p.pageAccessProfileId === id) ?? null) : null);
-  }
-
-  /** The page labels a profile opens, in catalogue order, for the card. */
-  labelsFor(profile: AccessProfile): string[] {
-    return this.pages().filter(p => profile.pageKeys.includes(p.key)).map(p => p.label);
-  }
-
-  /** And the ones it does not, so the card also says what is missing. */
-  missingFor(profile: AccessProfile): string[] {
-    return this.pages().filter(p => !profile.pageKeys.includes(p.key)).map(p => p.label);
+  private sectionsFor(profile: AccessProfile): CardSection[] {
+    const sections: CardSection[] = [];
+    for (const page of this.pages()) {
+      let section = sections.find(s => s.section === page.section);
+      if (!section) {
+        section = { section: page.section, opens: [], withholds: [] };
+        sections.push(section);
+      }
+      (profile.pageKeys.includes(page.key) ? section.opens : section.withholds).push(page.label);
+    }
+    return sections;
   }
 
   private dialogData(profile?: AccessProfile): AccessProfileDialogData {
@@ -257,6 +214,40 @@ export class AccessProfiles implements OnInit {
       error: err => {
         this.busy.set(null);
         this.toast.error(err?.error?.message || 'The access profile could not be deleted.');
+      },
+    });
+  }
+
+  /**
+   * One person onto one profile. The row is redrawn from the server's answer, and the two
+   * holder counts move locally -- the cards do not need refetching for a number this screen
+   * already knows how to change.
+   */
+  assign({ person, profile }: { person: AccessPerson; profile: AccessProfile | null }): void {
+    const target = profile?.pageAccessProfileId ?? null;
+    if (target === person.pageAccessProfileId) return;
+    this.assigning.set(person.appUserId);
+    this.api.assign(person.appUserId, target).subscribe({
+      next: response => {
+        this.assigning.set(null);
+        if (response.status !== API_SUCCESS || !response.data) {
+          this.toast.error(response.message);
+          return;
+        }
+        this.toast.success(response.message || 'Profile changed.');
+        const updated = response.data;
+        this.people.update(rows => rows.map(row => row.appUserId === person.appUserId
+          ? { ...row, pageAccessProfileId: updated.pageAccessProfileId, pageAccessProfileName: updated.pageAccessProfileName, pageKeys: updated.pageKeys }
+          : row));
+        this.profiles.update(list => list.map(p => {
+          if (p.pageAccessProfileId === person.pageAccessProfileId) return { ...p, userCount: Math.max(0, p.userCount - 1) };
+          if (p.pageAccessProfileId === target) return { ...p, userCount: p.userCount + 1 };
+          return p;
+        }));
+      },
+      error: err => {
+        this.assigning.set(null);
+        this.toast.error(err?.error?.message || 'The profile could not be changed.');
       },
     });
   }

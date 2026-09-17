@@ -174,13 +174,12 @@ export class Shell {
   /**
    * Menus the current role -- and, for a tenant user, their access profile -- can actually
    * reach, so nothing renders that would 403. A section whose every page is out of reach is
-   * dropped whole rather than left as an empty heading; `pageKeys` is read here so the menu
-   * recomputes when a token refresh brings a changed profile.
+   * dropped whole rather than left as an empty heading. canOpen reads the stored session, so the
+   * menu recomputes on its own when a token refresh brings a changed profile.
    */
   readonly nav = computed(() => {
     const isAdmin = this.auth.isTenantAdmin();
     const isPlatform = this.auth.isPlatformAdmin();
-    this.auth.pageKeys();
     return this.allNav
       .filter(item => !item.adminOnly || isAdmin)
       .map(item => ({
