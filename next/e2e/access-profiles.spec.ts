@@ -88,7 +88,7 @@ test.describe('access profiles', () => {
     await expect(row).toBeVisible();
     await row.getByRole('button', { name: 'Actions' }).click();
     await adminPage.getByRole('menuitem', { name: /Edit/ }).click();
-    const picker = adminPage.getByLabel('Access profile');
+    const picker = adminPage.locator('#pageAccessProfileId');
     await expect(picker).toBeVisible();
     await picker.selectOption({ label: PROFILE });
     await adminPage.getByRole('button', { name: 'Save changes' }).click();
