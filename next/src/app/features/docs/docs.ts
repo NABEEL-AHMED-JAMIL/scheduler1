@@ -325,6 +325,8 @@ export class Docs implements AfterViewInit {
         'A withheld page leaves the menu, a direct link to it lands on a page that says so and offers "Request access", '
           + 'which notifies every admin of the workspace — and the server refuses the calls behind it whatever the browser shows.',
         'A profile that people still hold cannot be deleted; move them first. Changing a profile\'s pages notifies everyone on it.',
+        'The People × pages grid on the same screen shows a checkbox per person per page. Tick one to make an exception for that person alone; '
+          + 'it is marked so it is never mistaken for the profile, and "reset to profile" clears it.',
       ],
     },
     {

@@ -82,7 +82,8 @@
         <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]">Loading people…</div>
       } @else {
         <app-access-people-grid [people]="people()" [profiles]="profiles()" [pages]="pages()"
-                                [search]="search()" [busy]="assigning()" (assign)="assign($event)" />
+                                [search]="search()" [busy]="assigning()" (assign)="assign($event)"
+                                (toggle)="toggle($event)" (reset)="resetExceptions($event)" />
       }
     } @else {
       <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4" data-testid="profile-cards">

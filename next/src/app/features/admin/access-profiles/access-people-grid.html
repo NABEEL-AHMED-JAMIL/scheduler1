@@ -59,40 +59,28 @@
                     <option [value]="profile.pageAccessProfileId" [selected]="profile.pageAccessProfileId === row.person.pageAccessProfileId">{{ profile.profileName }}</option>
                   }
                 </select>
+                @if (row.exceptions) {
+                  <button type="button" class="mt-1 text-[11px] text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] hover:underline inline-flex items-center gap-1"
+                          (click)="reset.emit(row.person)" [disabled]="busy() === row.person.appUserId"
+                          [attr.data-reset]="row.person.username">
+                    <span class="access-exception-dot"></span>{{ row.exceptions }} {{ row.exceptions === 1 ? 'exception' : 'exceptions' }} · reset to profile
+                  </button>
+                }
               </td>
               @for (cell of row.cells; track cell.page.key) {
-                <td class="access-grid-cell" [class.access-grid-first]="isFirstOfSection($index)">
-                  <button type="button" class="access-cell" [cdkMenuTriggerFor]="cellMenu"
-                          [disabled]="busy() === row.person.appUserId"
-                          [attr.aria-label]="row.person.fullName + ' — ' + cell.page.label + (cell.open ? ': opens' : ': withheld')"
-                          [attr.data-cell]="row.person.username + '|' + cell.page.key" [attr.data-open]="cell.open"
-                          [title]="cell.alternatives.length ? 'Click to change' : 'No profile changes this'">
-                    <span class="access-mark" [class.access-mark-on]="cell.open" [class.access-mark-off]="!cell.open">
-                      @if (cell.open) { <app-icon name="check" size="0.85rem" /> } @else { <app-icon name="minus" size="0.85rem" /> }
-                    </span>
-                  </button>
-                  <ng-template #cellMenu>
-                    <div cdkMenu class="card shadow-xl py-1 min-w-60 text-sm">
-                      <div class="px-3 py-2 text-xs text-[color:var(--text-secondary)] border-b border-[color:var(--border-subtle)]">
-                        <span class="font-semibold text-[color:var(--text-primary)]">{{ cell.page.label }}</span>
-                        is {{ cell.open ? 'open' : 'withheld' }} for {{ firstName(row.person) }}
-                        via <span class="font-medium">{{ row.person.pageAccessProfileName || 'the default' }}</span>.
-                      </div>
-                      @if (cell.alternatives.length) {
-                        <div class="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--text-muted)]">
-                          {{ cell.open ? 'Withhold it by switching to' : 'Open it by switching to' }}
-                        </div>
-                        @for (profile of cell.alternatives; track profile.pageAccessProfileId) {
-                          <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="assign.emit({ person: row.person, profile })">
-                            <app-icon [name]="cell.open ? 'minus' : 'check'" />{{ profile.profileName }}
-                            <span class="ml-auto text-xs text-[color:var(--text-muted)]">{{ profile.pageKeys.length }} pages</span>
-                          </button>
-                        }
-                      } @else {
-                        <div class="px-3 py-2 text-xs text-[color:var(--text-muted)]">Every profile agrees on this page.</div>
-                      }
-                    </div>
-                  </ng-template>
+                <td class="access-grid-cell" [class.access-grid-first]="isFirstOfSection($index)"
+                    [class.access-cell-exception]="cell.exception">
+                  <label class="access-cell" [title]="cell.exception
+                        ? (cell.open ? 'Opened for ' + row.person.fullName + ' — the profile withholds it' : 'Withheld from ' + row.person.fullName + ' — the profile opens it')
+                        : (cell.open ? 'Open, as the profile says' : 'Withheld, as the profile says')">
+                    <input type="checkbox" class="checkbox" [checked]="cell.open"
+                           [disabled]="busy() === row.person.appUserId"
+                           (change)="onToggle(row.person, cell.page, $any($event.target).checked)"
+                           [attr.aria-label]="cell.page.label + ' for ' + row.person.fullName"
+                           [attr.data-cell]="row.person.username + '|' + cell.page.key" [attr.data-open]="cell.open"
+                           [attr.data-exception]="cell.exception" />
+                    @if (cell.exception) { <span class="access-exception-dot" aria-hidden="true"></span> }
+                  </label>
                 </td>
               }
             </tr>
@@ -107,9 +95,10 @@
     </table>
   </div>
   <div class="flex flex-wrap items-center gap-x-5 gap-y-1 px-4 py-2.5 border-t border-[color:var(--border-subtle)] text-xs text-[color:var(--text-muted)]">
-    <span class="inline-flex items-center gap-1.5"><span class="access-mark access-mark-on"><app-icon name="check" size="0.8rem" /></span> opens</span>
-    <span class="inline-flex items-center gap-1.5"><span class="access-mark access-mark-off"><app-icon name="minus" size="0.8rem" /></span> withheld</span>
-    <span>Click a cell to switch the person to a profile that changes it, or pick a profile in the row.</span>
+    <span class="inline-flex items-center gap-1.5"><input type="checkbox" class="checkbox" checked disabled aria-hidden="true" /> open</span>
+    <span class="inline-flex items-center gap-1.5"><input type="checkbox" class="checkbox" disabled aria-hidden="true" /> withheld</span>
+    <span class="inline-flex items-center gap-1.5"><span class="access-exception-dot"></span> exception to the profile</span>
+    <span>Tick a box to open or withhold that page for that person; the profile row above shows the baseline.</span>
     <span class="ml-auto">Admins are not listed — they open everything.</span>
   </div>
 </div>

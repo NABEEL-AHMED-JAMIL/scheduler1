@@ -1,5 +1,4 @@
 import { Component, computed, input, output } from '@angular/core';
-import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { PageCatalogueEntry } from '../../../core/auth/page-keys';
 import { Icon } from '../../../shared/ui/icon';
 import { Avatar } from '../../../shared/ui/avatar';
@@ -11,12 +10,14 @@ interface ColumnGroup { section: string; pages: PageCatalogueEntry[]; }
 /** One cell, worked out once per render rather than per change-detection pass. */
 interface Cell {
   page: PageCatalogueEntry;
+  /** What the person actually gets: profile, adjusted by any exception. */
   open: boolean;
-  /** The profiles that would flip this cell -- what the cell's menu offers. */
-  alternatives: AccessProfile[];
+  /** What the profile alone says, so an exception can be shown as one. */
+  profileSays: boolean;
+  exception: boolean;
 }
 
-interface PersonRow { person: AccessPerson; cells: Cell[]; }
+interface PersonRow { person: AccessPerson; cells: Cell[]; exceptions: number; }
 
 /** People sharing a profile, under one header that shows the profile's own pattern. */
 interface ProfileGroup {
@@ -37,13 +38,15 @@ interface ProfileGroup {
  * the group header carries the profile's pattern, so a person's row is read as "same as the
  * header" unless the eye catches a difference, which is exactly when there is something to see.
  *
- * A cell is a view of a profile, not a switch of its own: clicking it offers the profiles that
- * would change the answer, and picking one is an assignment. Everything here is precomputed in
- * one `computed`, so the template binds to values rather than calling helpers per cell.
+ * A cell is a checkbox that means what it says: tick it and that page opens for that person.
+ * The profile is the baseline; a tick that differs from it is stored as an exception and shown
+ * with a marker, and ticking back to what the profile says clears it. Everything here is
+ * precomputed in one `computed`, so the template binds to values rather than calling helpers
+ * per cell.
  */
 @Component({
   selector: 'app-access-people-grid',
-  imports: [CdkMenu, CdkMenuItem, CdkMenuTrigger, Icon, Avatar],
+  imports: [Icon, Avatar],
   templateUrl: './access-people-grid.html',
 })
 export class AccessPeopleGrid {
@@ -57,6 +60,10 @@ export class AccessPeopleGrid {
 
   /** A person and the profile to put them on; null profile means the workspace default. */
   readonly assign = output<{ person: AccessPerson; profile: AccessProfile | null }>();
+  /** One checkbox changed: open or withhold this page for this person. */
+  readonly toggle = output<{ person: AccessPerson; page: PageCatalogueEntry; allowed: boolean }>();
+  /** Drop every exception a person carries. */
+  readonly reset = output<AccessPerson>();
 
   readonly groupsOfColumns = computed<ColumnGroup[]>(() => {
     const groups: ColumnGroup[] = [];
@@ -103,13 +110,13 @@ export class AccessPeopleGrid {
     };
 
     for (const person of this.filtered()) {
-      groupFor(person).rows.push({
-        person,
-        cells: pages.map(page => {
-          const open = person.pageKeys.includes(page.key);
-          return { page, open, alternatives: profiles.filter(p => p.pageKeys.includes(page.key) !== open) };
-        }),
+      const group = groupFor(person);
+      const cells = pages.map((page, i) => {
+        const open = person.pageKeys.includes(page.key);
+        const profileSays = group.opens[i];
+        return { page, open, profileSays, exception: open !== profileSays };
       });
+      group.rows.push({ person, cells, exceptions: cells.filter(c => c.exception).length });
     }
     // Default first, then profiles in the order the cards use (by name).
     return [...byProfile.values()].sort((a, b) =>
@@ -137,8 +144,8 @@ export class AccessPeopleGrid {
     return index > 0 && this.sectionStarts().has(index);
   }
 
-  firstName(person: AccessPerson): string {
-    return person.fullName.split(' ')[0];
+  onToggle(person: AccessPerson, page: PageCatalogueEntry, checked: boolean): void {
+    this.toggle.emit({ person, page, allowed: checked });
   }
 
 }

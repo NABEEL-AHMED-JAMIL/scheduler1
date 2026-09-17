@@ -59,13 +59,25 @@ describe('AccessPeopleGrid', () => {
     expect(groups[1].opens).toEqual([true, true, true, false, false]);
   });
 
-  it('offers, per cell, exactly the profiles that would change it', () => {
+  it('marks a cell as an exception when the person differs from their profile', () => {
+    // Olivia is on Operator (jobs, queue) but has reports opened and queue withheld for her alone.
+    const g = grid([person(44, 'Olivia Bennett', 1, 'Operator', ['jobs', 'reports'])]);
+    const row = g.groups()[0].rows[0];
+    expect(row.cells.map(c => [c.page.key, c.open, c.exception])).toEqual([
+      ['jobs', true, false], ['queue', false, true], ['reports', true, true], ['objects', false, false], ['tools-converter', false, false],
+    ]);
+    expect(row.exceptions).toBe(2);
+  });
+
+  it('emits a toggle with what the checkbox now says, and a reset for the row', () => {
     const g = grid([person(44, 'Olivia Bennett', 1, 'Operator', ['jobs', 'queue'])]);
-    const cells = g.groups()[0].rows[0].cells;
-    expect(cells[2].open).toBe(false);
-    expect(cells[2].alternatives.map(p => p.profileName)).toEqual(['Analyst', 'Compliance']); // reports
-    expect(cells[1].alternatives.map(p => p.profileName)).toEqual(['Compliance']);            // queue
-    expect(cells[0].alternatives).toEqual([]);                                                // jobs: everyone has it
+    const toggles: unknown[] = []; const resets: unknown[] = [];
+    g.toggle.subscribe(e => toggles.push(e)); g.reset.subscribe(e => resets.push(e));
+    const olivia = g.groups()[0].rows[0].person;
+    g.onToggle(olivia, PAGES[2], true);
+    expect(toggles).toEqual([{ person: olivia, page: PAGES[2], allowed: true }]);
+    g.reset.emit(olivia);
+    expect(resets).toEqual([olivia]);
   });
 
   it('filters people by name, email or position without losing the grouping', () => {

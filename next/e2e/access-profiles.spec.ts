@@ -55,6 +55,7 @@ test.describe('access profiles', () => {
     if (!adminSession) return;
     const headers = { Authorization: `Bearer ${adminSession.token}` };
     // Put the person back on whatever they had, then the profile can go.
+    await request.delete(`${api}/pageAccess.json/clearPageAccess?appUserId=${memberRow.appUserId}`, { headers });
     await request.put(`${api}/appUser.json/updateUser`, { headers, data: { ...memberRow, pageAccessProfileId: memberRow.pageAccessProfileId ?? null } });
     if (createdProfileId) {
       await request.delete(`${api}/pageAccess.json/deleteProfile?pageAccessProfileId=${createdProfileId}`, { headers });
@@ -125,6 +126,31 @@ test.describe('access profiles', () => {
     expect(refused.status()).toBe(403);
     expect((await refused.json()).message).toContain('not part of your access');
     await memberPage.context().close();
+
+    // --- the admin ticks one box in the grid: an exception on top of the profile
+    const gridPage = await pageAs(browser, adminSession);
+    await gridPage.goto('/admin/access-profiles');
+    await gridPage.getByTestId('view-people').click();
+    const box = gridPage.locator(`[data-cell="${member.username}|analytics"]`);
+    await expect(box).toHaveAttribute('data-open', 'false');
+    await box.check();
+    await expect(box).toHaveAttribute('data-exception', 'true');
+    await expect(gridPage.locator(`[data-reset="${member.username}"]`)).toContainText('1 exception');
+
+    // The person now opens it -- sign-in, route and API agree -- while the profile is unchanged.
+    const afterTick = await signIn(request, member.username!, member.password!);
+    expect(afterTick.data['pageKeys']).toEqual(['reports', 'analytics']);
+    const allowed = await request.get(`${api}/analytics.json/listQueries`, {
+      headers: { Authorization: `Bearer ${afterTick.token}` }, failOnStatusCode: false });
+    expect(allowed.status()).not.toBe(403);
+
+    // Reset puts them back on the profile alone.
+    await gridPage.locator(`[data-reset="${member.username}"]`).click();
+    await expect(box).toHaveAttribute('data-open', 'false');
+    await expect(gridPage.locator(`[data-reset="${member.username}"]`)).toHaveCount(0);
+    const afterReset = await signIn(request, member.username!, member.password!);
+    expect(afterReset.data['pageKeys']).toEqual(['reports']);
+    await gridPage.context().close();
 
     // The admin heard the request.
     const bell = await request.get(`${api}/notification.json/list?unreadOnly=true&page=0&limit=5`,

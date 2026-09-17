@@ -31,6 +31,9 @@ export interface AccessPerson {
   pageAccessProfileId: number | null;
   pageAccessProfileName: string | null;
   pageKeys: PageKey[];
+  /** Pages opened for this person beyond their profile, and withheld despite it. */
+  allowedExceptions?: PageKey[];
+  withheldExceptions?: PageKey[];
 }
 
 /** What the dialog sends: the id only on an edit. */
@@ -87,6 +90,17 @@ export class AccessProfilesService {
   assign(appUserId: number, pageAccessProfileId: number | null): Observable<ApiResponse<AccessPerson>> {
     return this.http.put<ApiResponse<AccessPerson>>(`${this.base}/assignProfile`, null,
       { params: pageAccessProfileId ? { appUserId, pageAccessProfileId } : { appUserId } });
+  }
+
+  /** One page for one person: an exception to their profile, or back to it. */
+  setPageAccess(appUserId: number, pageKey: PageKey, allowed: boolean): Observable<ApiResponse<AccessPerson>> {
+    return this.http.put<ApiResponse<AccessPerson>>(`${this.base}/setPageAccess`, null,
+      { params: { appUserId, pageKey, allowed } });
+  }
+
+  /** Every exception the person carries, gone. */
+  clearPageAccess(appUserId: number): Observable<ApiResponse<AccessPerson>> {
+    return this.http.delete<ApiResponse<AccessPerson>>(`${this.base}/clearPageAccess`, { params: { appUserId } });
   }
 
   setDefault(pageAccessProfileId: number): Observable<ApiResponse<AccessProfile>> {

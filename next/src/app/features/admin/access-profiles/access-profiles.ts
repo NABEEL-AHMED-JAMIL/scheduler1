@@ -251,4 +251,43 @@ export class AccessProfiles implements OnInit {
       },
     });
   }
+
+  /** One checkbox: open or withhold a page for a person. The row is redrawn from the answer. */
+  toggle({ person, page, allowed }: { person: AccessPerson; page: PageCatalogueEntry; allowed: boolean }): void {
+    this.assigning.set(person.appUserId);
+    this.api.setPageAccess(person.appUserId, page.key, allowed).subscribe({
+      next: response => this.applyPersonAnswer(person, response, 'The page could not be changed.'),
+      error: err => {
+        this.assigning.set(null);
+        this.toast.error(err?.error?.message || 'The page could not be changed.');
+      },
+    });
+  }
+
+  resetExceptions(person: AccessPerson): void {
+    this.assigning.set(person.appUserId);
+    this.api.clearPageAccess(person.appUserId).subscribe({
+      next: response => this.applyPersonAnswer(person, response, 'The exceptions could not be cleared.'),
+      error: err => {
+        this.assigning.set(null);
+        this.toast.error(err?.error?.message || 'The exceptions could not be cleared.');
+      },
+    });
+  }
+
+  private applyPersonAnswer(person: AccessPerson, response: ApiResponse<AccessPerson>, fallback: string): void {
+    this.assigning.set(null);
+    if (response.status !== API_SUCCESS || !response.data) {
+      this.toast.error(response.message || fallback);
+      // Nothing changed server-side, so the checkbox must not stay where the click left it.
+      this.people.update(rows => rows.map(row => row.appUserId === person.appUserId ? { ...row } : row));
+      return;
+    }
+    this.toast.success(response.message);
+    const updated = response.data;
+    this.people.update(rows => rows.map(row => row.appUserId === person.appUserId
+      ? { ...row, pageKeys: updated.pageKeys, allowedExceptions: updated.allowedExceptions, withheldExceptions: updated.withheldExceptions,
+          pageAccessProfileId: updated.pageAccessProfileId, pageAccessProfileName: updated.pageAccessProfileName }
+      : row));
+  }
 }

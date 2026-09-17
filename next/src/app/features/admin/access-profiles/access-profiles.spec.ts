@@ -201,4 +201,23 @@ describe('AccessProfiles screen', () => {
     expect(screen.canPickTenant()).toBe(false);
     expect(list).toHaveBeenCalledWith(null);
   });
+
+  it('applies the server\'s answer after a checkbox toggle, and reverts the box on a refusal', () => {
+    const operator = profile(1, 'Operator', ['jobs'], true, 1);
+    const olivia = { appUserId: 44, fullName: 'Olivia Bennett', username: 'o@a', status: 'Active', pageAccessProfileId: 1, pageAccessProfileName: 'Operator', pageKeys: ['jobs'] as any };
+    const setPageAccess = vi.fn((_id: number, key: string, allowed: boolean) => of(key === 'reports'
+      ? { status: 'SUCCESS', message: 'Reports is now open for Olivia Bennett (an exception to their profile).', data: { ...olivia, pageKeys: ['jobs', 'reports'], allowedExceptions: ['reports'], withheldExceptions: [] } }
+      : { status: 'ERROR', message: 'Unknown page.' }));
+    const { screen, toast } = screenWith([operator], { setPageAccess, people: () => of({ status: 'SUCCESS', message: '', data: [olivia] }) });
+    screen.showPeople();
+
+    screen.toggle({ person: screen.people()[0], page: PAGES[3], allowed: true });
+    expect(setPageAccess).toHaveBeenCalledWith(44, 'reports', true);
+    expect(screen.people()[0].pageKeys).toEqual(['jobs', 'reports']);
+    expect(screen.people()[0].allowedExceptions).toEqual(['reports']);
+
+    screen.toggle({ person: screen.people()[0], page: PAGES[0], allowed: false });
+    expect(toast.error).toHaveBeenCalledWith('Unknown page.');
+    expect(screen.people()[0].pageKeys).toEqual(['jobs', 'reports']);
+  });
 });
