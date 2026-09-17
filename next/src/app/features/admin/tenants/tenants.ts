@@ -13,6 +13,7 @@ import { Icon } from '../../../shared/ui/icon';
 import { ViewToggle } from '../../../shared/ui/view-toggle';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { ToastService } from '../../../shared/ui/toast.service';
+import { copyText } from '../../../shared/ui/clipboard.util';
 import { confirmWith } from '../../../shared/ui/confirm';
 import { createSort } from '../../../shared/ui/sort';
 import { TenantDialog } from './tenant-dialog';
@@ -45,6 +46,9 @@ export interface Tenant {
    * ten of the twelve tenants have no tasks at all, so a seventh column would be mostly zeros.
    */
   pipelineCount: number;
+  /** The workspace's first active tenant admin -- who to contact about it. */
+  adminName?: string | null;
+  adminEmail?: string | null;
 }
 
 interface ResourceCount {
@@ -66,6 +70,9 @@ export class Tenants implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
+
+  /** The tenant whose code was just copied; drives the tick on its chip for a moment. */
+  readonly copiedId = signal<number | null>(null);
   private readonly router = inject(Router);
 
   readonly tenants = signal<Tenant[]>([]);
@@ -313,5 +320,26 @@ export class Tenants implements OnInit {
     }
     const myId = this.auth.user()?.appUserId ?? null;
     return rows.filter(row => isMine(row, myId));
+  }
+
+  /**
+   * The code is what people type into scripts, bucket names and IAM policies, so it is a
+   * click-to-copy chip rather than plain text. The tick only shows when the clipboard really
+   * changed -- copyText reports that -- so nobody pastes yesterday's clipboard into a policy.
+   */
+  /** The people × pages grid, already scoped to this tenant. */
+  viewAccessProfiles(tenant: Tenant): void {
+    this.router.navigate(['/admin/access-profiles'], { queryParams: { view: 'people', tenantId: tenant.tenantId } });
+  }
+
+  copyCode(tenant: Tenant): void {
+    copyText(tenant.tenantCode ?? '').then(copied => {
+      if (!copied) {
+        this.toast.error('Could not copy the code. Select it and copy it by hand.');
+        return;
+      }
+      this.copiedId.set(tenant.tenantId);
+      setTimeout(() => { if (this.copiedId() === tenant.tenantId) this.copiedId.set(null); }, 1500);
+    });
   }
 }

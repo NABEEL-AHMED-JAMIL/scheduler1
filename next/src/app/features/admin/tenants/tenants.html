@@ -74,13 +74,13 @@
         <thead>
           <tr>
             <th>Tenant</th>
-            <th>Code</th>
+            <th>Admin</th>
             @for (res of resources; track res.key) {
-              <th class="text-right">{{ res.label }}</th>
+              <th class="text-center">{{ res.label }}</th>
             }
             <th>Created</th>
-          <th>Created by</th>
-          <th>Updated by</th>
+            <th>Created by</th>
+            <th>Updated by</th>
             <th class="text-right">State</th>
             <th class="w-12"><span class="sr-only">Actions</span></th>
           </tr>
@@ -88,12 +88,30 @@
         <tbody>
           @for (tenant of filtered(); track tenant.tenantId) {
             <tr [class.opacity-70]="tenant.status !== 'Active'">
-              <td class="max-w-64">
+              <td class="max-w-72">
                 <div class="font-medium truncate" [title]="tenant.tenantName">{{ tenant.tenantName }}</div>
+                <button type="button" class="tenant-code" (click)="copyCode(tenant)"
+                        [class.is-copied]="copiedId() === tenant.tenantId"
+                        [attr.aria-label]="'Copy tenant code ' + tenant.tenantCode"
+                        [title]="copiedId() === tenant.tenantId ? 'Copied' : 'Copy code'">
+                  <span class="mono">{{ tenant.tenantCode }}</span>
+                  <app-icon [name]="copiedId() === tenant.tenantId ? 'check' : 'copy'" size="0.85em" />
+                </button>
               </td>
-              <td><span class="mono text-[color:var(--text-secondary)]">{{ tenant.tenantCode }}</span></td>
+              <td class="max-w-56">
+                @if (tenant.adminName || tenant.adminEmail) {
+                  <div class="truncate text-[color:var(--text-secondary)]" [title]="tenant.adminEmail || ''">
+                    {{ tenant.adminName || tenant.adminEmail }}
+                  </div>
+                  @if (tenant.adminName && tenant.adminEmail) {
+                    <div class="truncate text-[11px] text-[color:var(--text-muted)]">{{ tenant.adminEmail }}</div>
+                  }
+                } @else {
+                  <span class="text-[color:var(--text-muted)]" title="No active tenant admin -- nobody can manage this workspace's users">—</span>
+                }
+              </td>
               @for (res of resources; track res.key) {
-                <td class="text-right tabular"
+                <td class="text-center tabular"
                     [class.text-[color:var(--text-muted)]]="!$any(tenant)[res.key]">
                   {{ $any(tenant)[res.key] || 0 }}
                   @if (res.sub && res.sub(tenant); as sub) {
@@ -122,6 +140,13 @@
                     <button cdkMenuItem class="menu-item" [disabled]="!tenant.userCount"
                             (cdkMenuItemTriggered)="viewUsers(tenant)">
                       <app-icon name="users" class="icon-info" />Users
+                    </button>
+                    <button cdkMenuItem class="menu-item" [disabled]="!tenant.userCount"
+                            (cdkMenuItemTriggered)="viewAccessProfiles(tenant)">
+                      <app-icon name="shield" class="icon-info" />Access profiles
+                    </button>
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="copyCode(tenant)">
+                      <app-icon name="copy" />Copy code
                     </button>
                     <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="editTenant(tenant)">
                       <app-icon name="edit" />Edit
@@ -153,12 +178,24 @@
             <div class="min-w-0">
               <h3 class="truncate text-sm font-semibold">{{ tenant.tenantName }}</h3>
               <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[color:var(--text-muted)]">
-                <code class="mono rounded px-1.5 py-0.5 text-[color:var(--text-secondary)] bg-sunken"
-                     >{{ tenant.tenantCode }}</code>
+                <button type="button" class="tenant-code" (click)="copyCode(tenant)"
+                          [class.is-copied]="copiedId() === tenant.tenantId"
+                          [attr.aria-label]="'Copy tenant code ' + tenant.tenantCode"
+                          [title]="copiedId() === tenant.tenantId ? 'Copied' : 'Copy code'">
+                    <span class="mono">{{ tenant.tenantCode }}</span>
+                    <app-icon [name]="copiedId() === tenant.tenantId ? 'check' : 'copy'" size="0.85em" />
+                  </button>
                 @if (tenant.dateCreated) {
                   <span>since {{ tenant.dateCreated | date: 'mediumDate' }}</span>
                 }
               </div>
+              @if (tenant.adminName || tenant.adminEmail) {
+                <div class="mt-1.5 flex items-center gap-1.5 text-[11px] text-[color:var(--text-secondary)]"
+                     [title]="'Tenant admin' + (tenant.adminEmail ? ' — ' + tenant.adminEmail : '')">
+                  <app-icon name="shield" size="0.9em" class="icon-muted" />
+                  <span class="truncate">{{ tenant.adminName || tenant.adminEmail }}</span>
+                </div>
+              }
             </div>
             <app-status [label]="tenant.status" [quiet]="true" />
           </div>
@@ -217,6 +254,10 @@
                     [disabled]="!tenant.userCount"
                     [title]="tenant.userCount ? 'Show the users in this tenant' : 'This tenant has no users yet'">
               <app-icon name="users" [class.icon-info]="!!tenant.userCount" />Users
+            </button>
+            <button type="button" class="btn btn-ghost btn-sm" (click)="viewAccessProfiles(tenant)"
+                    [disabled]="!tenant.userCount" title="Who in this tenant can open which pages">
+              <app-icon name="shield" [class.icon-info]="!!tenant.userCount" />Access
             </button>
             <button type="button" class="btn btn-ghost btn-sm" (click)="editTenant(tenant)">
               <app-icon name="edit" />Edit

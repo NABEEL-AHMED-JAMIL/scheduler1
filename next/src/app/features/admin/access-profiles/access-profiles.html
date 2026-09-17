@@ -9,11 +9,14 @@
     </div>
     <div class="flex items-center gap-2">
       @if (canPickTenant()) {
-        <select class="input max-w-56" [value]="tenantId() ?? ''" (change)="pickTenant($any($event.target).value)"
+        <!-- [selected] on the options, not [value] on the select: the select's value is applied
+             before the options exist, so a deep-linked tenantId showed "Choose a workspace…"
+             above a grid that had already loaded that tenant's people. -->
+        <select class="input max-w-56" (change)="pickTenant($any($event.target).value)"
                 aria-label="Workspace" data-testid="tenant-picker">
-          <option value="">Choose a workspace…</option>
+          <option value="" [selected]="!tenantId()">Choose a workspace…</option>
           @for (tenant of tenants(); track tenant.tenantId) {
-            <option [value]="tenant.tenantId">{{ tenant.tenantName }}</option>
+            <option [value]="tenant.tenantId" [selected]="tenant.tenantId === tenantId()">{{ tenant.tenantName }}</option>
           }
         </select>
       }
