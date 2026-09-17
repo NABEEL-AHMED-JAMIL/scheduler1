@@ -8,6 +8,14 @@
       </p>
     </div>
     <div class="flex items-center gap-2">
+      <div class="seg" role="group" aria-label="View">
+        <button type="button" class="seg-btn" [class.seg-on]="view() === 'profiles'" (click)="showProfiles()" data-testid="view-profiles">
+          <app-icon name="layers" />Profiles
+        </button>
+        <button type="button" class="seg-btn" [class.seg-on]="view() === 'people'" (click)="showPeople()" data-testid="view-people">
+          <app-icon name="users" />People × pages
+        </button>
+      </div>
       @if (canPickTenant()) {
         <select class="input max-w-56" [value]="tenantId() ?? ''" (change)="pickTenant($any($event.target).value)"
                 aria-label="Workspace" data-testid="tenant-picker">
@@ -46,6 +54,105 @@
     </div>
   } @else if (error()) {
     <div class="card p-4 text-sm text-[color:var(--color-crit-500)]">{{ error() }}</div>
+  } @else if (view() === 'people') {
+    <div class="card overflow-x-auto" data-testid="people-grid">
+      <table class="table-modern">
+        <thead>
+          <tr>
+            <th class="text-left min-w-56 sticky left-0 bg-[color:var(--surface-raised)]">Person</th>
+            <th class="text-left min-w-40">Profile</th>
+            @for (page of pages(); track page.key) {
+              <th class="text-center px-2 align-bottom">
+                <div class="text-[10px] font-normal text-[color:var(--text-muted)] uppercase tracking-wide">{{ page.section }}</div>
+                <div class="text-xs font-semibold leading-tight">{{ page.label }}</div>
+              </th>
+            }
+          </tr>
+        </thead>
+        <tbody>
+          @if (defaultProfile(); as fallback) {
+            <tr class="bg-[color:var(--surface-inset)]">
+              <td class="sticky left-0 bg-[color:var(--surface-inset)]">
+                <div class="font-medium">Workspace default</div>
+                <div class="text-xs text-[color:var(--text-muted)]">what anyone without a profile gets</div>
+              </td>
+              <td><span class="pill pill-brand">{{ fallback.profileName }}</span></td>
+              @for (page of pages(); track page.key) {
+                <td class="text-center">
+                  @if (fallback.pageKeys.includes(page.key)) {
+                    <app-icon name="check" size="1rem" class="icon-ok inline-block" />
+                  } @else {
+                    <span class="text-[color:var(--border-strong)]">·</span>
+                  }
+                </td>
+              }
+            </tr>
+          }
+          @for (person of people(); track person.appUserId) {
+            <tr [class.opacity-55]="assigning() === person.appUserId" [attr.data-person]="person.username">
+              <td class="sticky left-0 bg-[color:var(--surface-raised)]">
+                <div class="flex items-center gap-2.5">
+                  <app-avatar [appUserId]="person.avatarKey ? person.appUserId : null" [name]="person.fullName" [size]="2" />
+                  <div class="min-w-0">
+                    <div class="font-medium truncate">{{ person.fullName }}</div>
+                    <div class="text-xs text-[color:var(--text-muted)] truncate">{{ person.position || person.username }}</div>
+                  </div>
+                </div>
+              </td>
+              <td>
+                <!-- [selected] on the option rather than [value] on the select: the select's value
+                     is applied before the @for has rendered its options, so an explicit profile
+                     read as "Default" on first paint. -->
+                <select class="input max-w-44 py-1 text-xs"
+                        (change)="assignById(person, $any($event.target).value)"
+                        [disabled]="assigning() === person.appUserId" [attr.aria-label]="'Profile for ' + person.fullName">
+                  <option value="" [selected]="person.pageAccessProfileId == null">Default{{ defaultProfile() ? ' (' + defaultProfile()!.profileName + ')' : '' }}</option>
+                  @for (profile of profiles(); track profile.pageAccessProfileId) {
+                    <option [value]="profile.pageAccessProfileId" [selected]="profile.pageAccessProfileId === person.pageAccessProfileId">{{ profile.profileName }}</option>
+                  }
+                </select>
+              </td>
+              @for (page of pages(); track page.key) {
+                <td class="text-center p-0">
+                  <button type="button" class="w-full h-11 hover:bg-[color:var(--surface-sunken)] transition-colors"
+                          [cdkMenuTriggerFor]="cellMenu" [disabled]="assigning() === person.appUserId"
+                          [attr.aria-label]="person.fullName + ' — ' + page.label + (opens(person, page) ? ': opens' : ': withheld')"
+                          [attr.data-cell]="person.username + '|' + page.key" [attr.data-open]="opens(person, page)">
+                    @if (opens(person, page)) {
+                      <app-icon name="check" size="1rem" class="icon-ok inline-block" />
+                    } @else {
+                      <span class="text-[color:var(--border-strong)]">·</span>
+                    }
+                  </button>
+                  <ng-template #cellMenu>
+                    <div cdkMenu class="card shadow-xl py-1 min-w-56 text-sm">
+                      <div class="px-3 py-1.5 text-xs text-[color:var(--text-muted)]">
+                        {{ page.label }} is {{ opens(person, page) ? 'open' : 'withheld' }} for {{ person.fullName.split(' ')[0] }}
+                        via {{ person.pageAccessProfileName || 'the default' }}.
+                        @if (alternativesFor(person, page).length) { Switch to: } @else { No profile changes that. }
+                      </div>
+                      @for (profile of alternativesFor(person, page); track profile.pageAccessProfileId) {
+                        <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="assign(person, profile)">
+                          <app-icon [name]="opens(person, page) ? 'close' : 'check'" />{{ profile.profileName }}
+                          <span class="ml-auto text-xs text-[color:var(--text-muted)]">{{ profile.pageKeys.length }} pages</span>
+                        </button>
+                      }
+                    </div>
+                  </ng-template>
+                </td>
+              }
+            </tr>
+          }
+          @if (!peopleLoading() && people().length === 0) {
+            <tr><td [attr.colspan]="pages().length + 2" class="text-center text-[color:var(--text-muted)] py-8">No tenant users in this workspace yet.</td></tr>
+          }
+        </tbody>
+      </table>
+      <div class="flex items-center gap-2 px-4 py-2.5 border-t border-[color:var(--border-subtle)] text-xs text-[color:var(--text-muted)]">
+        <app-icon name="info" size="0.9em" />
+        A cell shows what the person's profile opens. Click one to switch them to a profile that changes it, or pick a profile in the row. Admins are not listed — they open everything.
+      </div>
+    </div>
   } @else if (!loading() && profiles().length === 0) {
     <div class="card p-10 text-center">
       <app-icon name="shield" size="2rem" class="block mx-auto mb-3 text-[color:var(--text-muted)]" />

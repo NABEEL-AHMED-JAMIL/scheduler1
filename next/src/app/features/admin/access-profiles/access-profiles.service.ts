@@ -20,6 +20,19 @@ export interface AccessProfile {
   updatedByName?: string | null;
 }
 
+/** A tenant user as the grid shows them: who they are, what they hold, what that opens. */
+export interface AccessPerson {
+  appUserId: number;
+  fullName: string;
+  username: string;
+  position?: string | null;
+  status: string;
+  avatarKey?: string | null;
+  pageAccessProfileId: number | null;
+  pageAccessProfileName: string | null;
+  pageKeys: PageKey[];
+}
+
 /** What the dialog sends: the id only on an edit. */
 export interface AccessProfileDraft {
   pageAccessProfileId?: number;
@@ -62,6 +75,18 @@ export class AccessProfilesService {
 
   delete(pageAccessProfileId: number): Observable<ApiResponse> {
     return this.http.delete<ApiResponse>(`${this.base}/deleteProfile`, { params: { pageAccessProfileId } });
+  }
+
+  /** The workspace's tenant users with their effective pages -- the grid's rows. */
+  people(tenantId?: number | null): Observable<ApiResponse<AccessPerson[]>> {
+    return this.http.get<ApiResponse<AccessPerson[]>>(`${this.base}/listPeople`,
+      { params: tenantId ? { tenantId } : {} });
+  }
+
+  /** One person onto one profile; null puts them back on the workspace default. */
+  assign(appUserId: number, pageAccessProfileId: number | null): Observable<ApiResponse<AccessPerson>> {
+    return this.http.put<ApiResponse<AccessPerson>>(`${this.base}/assignProfile`, null,
+      { params: pageAccessProfileId ? { appUserId, pageAccessProfileId } : { appUserId } });
   }
 
   setDefault(pageAccessProfileId: number): Observable<ApiResponse<AccessProfile>> {

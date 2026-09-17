@@ -6,7 +6,7 @@ import { HttpClient } from '@angular/common/http';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { AuthService } from '../../../core/auth/auth.service';
 import { PageCatalogueEntry } from '../../../core/auth/page-keys';
-import { AccessProfile, AccessProfileDraft, AccessProfilesService } from './access-profiles.service';
+import { AccessPerson, AccessProfile, AccessProfileDraft, AccessProfilesService } from './access-profiles.service';
 import { AccessProfileDialog } from './access-profile-dialog';
 import { AccessProfiles } from './access-profiles';
 
@@ -179,5 +179,65 @@ describe('AccessProfiles screen', () => {
     const { screen } = screenWith([], { list }, false);
     expect(screen.canPickTenant()).toBe(false);
     expect(list).toHaveBeenCalledWith(null);
+  });
+
+  // ---- the People × pages grid
+
+  const person = (id: number, name: string, profileId: number | null, profileName: string | null, keys: string[]): AccessPerson =>
+    ({ appUserId: id, fullName: name, username: name.toLowerCase().replace(' ', '.') + '@a.example', status: 'Active',
+       pageAccessProfileId: profileId, pageAccessProfileName: profileName, pageKeys: keys as any });
+
+  function gridWith(profiles: AccessProfile[], people: AccessPerson[]) {
+    const assign = vi.fn((appUserId: number, profileId: number | null) => of({ status: 'SUCCESS', message: 'moved',
+      data: { appUserId, pageAccessProfileId: profileId, pageAccessProfileName: profiles.find(p => p.pageAccessProfileId === profileId)?.profileName ?? null,
+              pageKeys: profiles.find(p => p.pageAccessProfileId === profileId)?.pageKeys ?? profiles.find(p => p.defaultProfile)?.pageKeys ?? [] } }));
+    const built = screenWith(profiles, { people: () => of({ status: 'SUCCESS', message: '', data: people }), assign });
+    built.screen.showPeople();
+    return { ...built, assign };
+  }
+
+  it('shows people with what their profile opens, and the default row first', () => {
+    const operator = profile(1, 'Operator', ['jobs', 'queue'], true, 1);
+    const analyst = profile(2, 'Analyst', ['jobs', 'queue', 'reports'], false, 0);
+    const { screen } = gridWith([operator, analyst], [person(44, 'Olivia Bennett', 1, 'Operator', ['jobs', 'queue'])]);
+    expect(screen.view()).toBe('people');
+    expect(screen.defaultProfile()?.profileName).toBe('Operator');
+    const olivia = screen.people()[0];
+    expect(screen.opens(olivia, PAGES[0])).toBe(true);   // jobs
+    expect(screen.opens(olivia, PAGES[3])).toBe(false);  // reports
+  });
+
+  it('offers, for a cell, exactly the profiles that would change it', () => {
+    const operator = profile(1, 'Operator', ['jobs', 'queue'], true);
+    const analyst = profile(2, 'Analyst', ['jobs', 'queue', 'reports']);
+    const compliance = profile(3, 'Compliance', ['jobs', 'reports']);
+    const { screen } = gridWith([operator, analyst, compliance], [person(44, 'Olivia Bennett', 1, 'Operator', ['jobs', 'queue'])]);
+    const olivia = screen.people()[0];
+    // Reports is withheld: the two profiles that open it.
+    expect(screen.alternativesFor(olivia, PAGES[3]).map(p => p.profileName)).toEqual(['Analyst', 'Compliance']);
+    // Queue is open: only Compliance lacks it.
+    expect(screen.alternativesFor(olivia, PAGES[2]).map(p => p.profileName)).toEqual(['Compliance']);
+    // Jobs is in every profile: nothing changes it.
+    expect(screen.alternativesFor(olivia, PAGES[0])).toEqual([]);
+  });
+
+  it('assigns from a cell and updates the row from the server\'s answer', () => {
+    const operator = profile(1, 'Operator', ['jobs', 'queue'], true);
+    const analyst = profile(2, 'Analyst', ['jobs', 'queue', 'reports']);
+    const { screen, assign } = gridWith([operator, analyst], [person(44, 'Olivia Bennett', 1, 'Operator', ['jobs', 'queue'])]);
+    screen.assign(screen.people()[0], analyst);
+    expect(assign).toHaveBeenCalledWith(44, 2);
+    expect(screen.people()[0].pageAccessProfileName).toBe('Analyst');
+    expect(screen.opens(screen.people()[0], PAGES[3])).toBe(true);
+  });
+
+  it('assigns the default from the row picker and does nothing when nothing changes', () => {
+    const operator = profile(1, 'Operator', ['jobs', 'queue'], true);
+    const { screen, assign } = gridWith([operator], [person(44, 'Olivia Bennett', 1, 'Operator', ['jobs', 'queue'])]);
+    screen.assignById(screen.people()[0], '');
+    expect(assign).toHaveBeenCalledWith(44, null);
+    assign.mockClear();
+    screen.assignById(screen.people()[0], '');
+    expect(assign).not.toHaveBeenCalled();
   });
 });
