@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { anonymousOnly, authGuard, passwordChangeGuard, roleGuard } from './core/auth/auth.guard';
+import { anonymousOnly, authGuard, pageGuard, passwordChangeGuard, roleGuard } from './core/auth/auth.guard';
 import { Shell } from './features/shell/shell';
 
 export const routes: Routes = [
@@ -60,27 +60,39 @@ export const routes: Routes = [
       {
         path: 'jobs',
         loadComponent: () => import('./features/jobs/jobs').then(m => m.Jobs),
+        data: { pageKey: 'jobs' },
+        canActivate: [pageGuard],
       },
       {
         path: 'jobs/new',
         loadComponent: () => import('./features/jobs/edit/job-edit').then(m => m.JobEdit),
+        data: { pageKey: 'jobs' },
+        canActivate: [pageGuard],
       },
       {
         path: 'jobs/:jobId/edit',
         loadComponent: () => import('./features/jobs/edit/job-edit').then(m => m.JobEdit),
+        data: { pageKey: 'jobs' },
+        canActivate: [pageGuard],
       },
       {
         path: 'jobs/:jobId/assistant',
         loadComponent: () =>
           import('./features/jobs/assistant/job-assistant').then(m => m.JobAssistant),
+        data: { pageKey: 'jobs' },
+        canActivate: [pageGuard],
       },
       {
         path: 'jobs/:jobId/runs/:jobQueueId/logs',
         loadComponent: () => import('./features/jobs/logs/job-logs').then(m => m.JobLogs),
+        data: { pageKey: 'jobs' },
+        canActivate: [pageGuard],
       },
       {
         path: 'queue',
         loadComponent: () => import('./features/queue/queue').then(m => m.Queue),
+        data: { pageKey: 'queue' },
+        canActivate: [pageGuard],
       },
       {
         // Same screen without a job: the dashboard's TOTAL row drills into an hour across
@@ -88,11 +100,15 @@ export const routes: Routes = [
         path: 'jobs/history',
         loadComponent: () =>
           import('./features/jobs/history/job-history').then(m => m.JobHistory),
+        data: { pageKey: 'jobs' },
+        canActivate: [pageGuard],
       },
       {
         path: 'jobs/:jobId/history',
         loadComponent: () =>
           import('./features/jobs/history/job-history').then(m => m.JobHistory),
+        data: { pageKey: 'jobs' },
+        canActivate: [pageGuard],
       },
       {
         // The editor is nothing but writes, and addSourceTask/updateSourceTask are TENANT_ADMIN.
@@ -100,20 +116,22 @@ export const routes: Routes = [
         // payload and only be told no when they pressed Save, with the work lost.
         path: 'tasks/new',
         loadComponent: () => import('./features/tasks/edit/task-edit').then(m => m.TaskEdit),
-        data: { minRole: 'TENANT_ADMIN' },
-        canActivate: [roleGuard],
+        data: { pageKey: 'tasks', minRole: 'TENANT_ADMIN' },
+        canActivate: [pageGuard, roleGuard],
       },
       {
         path: 'tasks/:taskDetailId/edit',
         loadComponent: () => import('./features/tasks/edit/task-edit').then(m => m.TaskEdit),
-        data: { minRole: 'TENANT_ADMIN' },
-        canActivate: [roleGuard],
+        data: { pageKey: 'tasks', minRole: 'TENANT_ADMIN' },
+        canActivate: [pageGuard, roleGuard],
       },
       {
         // The list itself stays open: listSourceTask is TENANT_USER on purpose, and a job
         // points at a task, so seeing them is part of reading the console.
         path: 'tasks',
         loadComponent: () => import('./features/tasks/tasks').then(m => m.Tasks),
+        data: { pageKey: 'tasks' },
+        canActivate: [pageGuard],
       },
       {
         // Lives under settings/ rather than admin/ because it groups with the rest of the
@@ -132,6 +150,8 @@ export const routes: Routes = [
         // own tenant, not by a role on the route.
         path: 'analytics',
         loadComponent: () => import('./features/analytics/analytics').then(m => m.Analytics),
+        data: { pageKey: 'analytics' },
+        canActivate: [pageGuard],
       },
       {
         // Under analytics/ so it has an address of its own: a dashboard is a page somebody
@@ -147,6 +167,8 @@ export const routes: Routes = [
         // dashboards are read and built by the same TENANT_USER who may open a dataset.
         path: 'analytics/dashboards',
         loadComponent: () => import('./features/analytics/dashboard').then(m => m.Dashboards),
+        data: { pageKey: 'analytics-dashboards' },
+        canActivate: [pageGuard],
       },
       { path: 'admin/storage', redirectTo: 'settings/storage-connections' },
       {
@@ -155,10 +177,19 @@ export const routes: Routes = [
         // belongs on those controls (auth.canManageAgents) rather than on the page.
         path: 'ai/agents',
         loadComponent: () => import('./features/ai/agents/agents').then(m => m.Agents),
+        data: { pageKey: 'ai-agents' },
+        canActivate: [pageGuard],
       },
       {
         path: 'admin/users',
         loadComponent: () => import('./features/admin/users/users').then(m => m.Users),
+        data: { minRole: 'TENANT_ADMIN' },
+        canActivate: [roleGuard],
+      },
+      {
+        path: 'admin/access-profiles',
+        loadComponent: () =>
+          import('./features/admin/access-profiles/access-profiles').then(m => m.AccessProfiles),
         data: { minRole: 'TENANT_ADMIN' },
         canActivate: [roleGuard],
       },
@@ -186,10 +217,14 @@ export const routes: Routes = [
       {
         path: 'tools/converter',
         loadComponent: () => import('./features/tools/converter/converter').then(m => m.Converter),
+        data: { pageKey: 'tools-converter' },
+        canActivate: [pageGuard],
       },
       {
         path: 'tools/transcript',
         loadComponent: () => import('./features/tools/transcript/transcript').then(m => m.Transcript),
+        data: { pageKey: 'tools-transcript' },
+        canActivate: [pageGuard],
       },
       {
         path: 'settings/task-types',
@@ -223,7 +258,8 @@ export const routes: Routes = [
       {
         path: 'jobs/bulk',
         loadComponent: () => import('./features/bulk/bulk-transfer').then(m => m.BulkTransfer),
-        data: { kind: 'job' },
+        data: { pageKey: 'jobs', kind: 'job' },
+        canActivate: [pageGuard],
       },
       {
         // Unlike its jobs twin, every call this page makes -- template, export and upload --
@@ -231,13 +267,15 @@ export const routes: Routes = [
         // which it does anything for a tenant user.
         path: 'tasks/bulk',
         loadComponent: () => import('./features/bulk/bulk-transfer').then(m => m.BulkTransfer),
-        data: { kind: 'task', minRole: 'TENANT_ADMIN' },
-        canActivate: [roleGuard],
+        data: { pageKey: 'tasks', kind: 'task', minRole: 'TENANT_ADMIN' },
+        canActivate: [pageGuard, roleGuard],
       },
       {
         path: 'reports',
         loadComponent: () =>
           import('./features/reports/reports').then(m => m.Reports),
+        data: { pageKey: 'reports' },
+        canActivate: [pageGuard],
       },
       {
         path: 'settings/kafka',
@@ -261,8 +299,8 @@ export const routes: Routes = [
         // storage calls, every one of which comes back refused.
         path: 'objects',
         loadComponent: () => import('./features/objects/objects').then(m => m.Objects),
-        data: { minRole: 'TENANT_USER' },
-        canActivate: [roleGuard],
+        data: { pageKey: 'objects', minRole: 'TENANT_USER' },
+        canActivate: [pageGuard, roleGuard],
       },
     ],
   },

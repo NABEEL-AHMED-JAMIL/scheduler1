@@ -6,6 +6,7 @@ import { AuthService } from '../../core/auth/auth.service';
 import { ThemeService } from '../../core/theme.service';
 import { Icon } from '../../shared/ui/icon';
 import { BrandMark } from '../../shared/ui/brand-mark';
+import { PageKey } from '../../core/auth/page-keys';
 import { NotificationBell } from './notification-bell';
 
 interface NavChild {
@@ -16,6 +17,8 @@ interface NavChild {
   hint?: string;
   adminOnly?: boolean;
   platformOnly?: boolean;
+  /** The access-profile page this entry is; absent for pages a profile cannot take away. */
+  pageKey?: PageKey;
   /**
    * Whether routerLinkActive must match the whole URL for this entry.
    *
@@ -77,19 +80,19 @@ export class Shell {
     {
       label: 'Pipelines',
       children: [
-        { label: 'Source Jobs', path: '/jobs', icon: 'briefcase',
+        { label: 'Source Jobs', path: '/jobs', pageKey: 'jobs', icon: 'briefcase',
           hint: 'Scheduled work and its runs' },
         // Deliberately not adminOnly: listSourceTask is TENANT_USER, and a job points at a
         // task, so reading the list is part of reading the console. Only writing one is
         // TENANT_ADMIN, and those controls are gated inside the page on auth.canManageTasks --
         // the same computed this menu's adminOnly entries resolve through.
-        { label: 'Source Tasks', path: '/tasks', icon: 'list',
+        { label: 'Source Tasks', path: '/tasks', pageKey: 'tasks', icon: 'list',
           hint: 'What a job does, and where' },
-        { label: 'Queue', path: '/queue', icon: 'clock',
+        { label: 'Queue', path: '/queue', pageKey: 'queue', icon: 'clock',
           hint: 'What is in flight right now' },
         // Beside the runs it summarises, rather than under Tools: this reads pipeline data
         // rather than being a general-purpose instrument.
-        { label: 'Reports', path: '/reports', icon: 'chart',
+        { label: 'Reports', path: '/reports', pageKey: 'reports', icon: 'chart',
           hint: 'Group and measure your runs' },
       ],
     },
@@ -98,15 +101,15 @@ export class Shell {
       // reads what is inside them. They share a storage service, so they share a menu.
       label: 'Object Browser',
       children: [
-        { label: 'Browse files', path: '/objects', icon: 'folder',
+        { label: 'Browse files', path: '/objects', pageKey: 'objects', icon: 'folder',
           hint: 'Upload, preview and share objects' },
-        { label: 'Analytics Studio', path: '/analytics', icon: 'chart',
+        { label: 'Analytics Studio', path: '/analytics', pageKey: 'analytics', icon: 'chart',
           hint: 'Read a file as data, where it lives' },
         // The saved-analysis library had a route and no way to reach it: /analytics/dashboards
         // was reachable only by typing the address. It is a sibling rather than a child because
         // the menu has one level of nesting, and a saved analysis is a thing you go TO, not a
         // mode of the workspace.
-        { label: 'Saved Analyses', path: '/analytics/dashboards', icon: 'save',
+        { label: 'Saved Analyses', path: '/analytics/dashboards', pageKey: 'analytics-dashboards', icon: 'save',
           hint: 'Analyses and queries you kept, re-run on open' },
       ],
     },
@@ -114,9 +117,9 @@ export class Shell {
       label: 'Tools',
       children: [
         // The things that take a file and give one back.
-        { label: 'Document Converter', path: '/tools/converter', icon: 'file',
+        { label: 'Document Converter', path: '/tools/converter', pageKey: 'tools-converter', icon: 'file',
           hint: 'Convert between formats' },
-        { label: 'Audio Transcript', path: '/tools/transcript', icon: 'volume',
+        { label: 'Audio Transcript', path: '/tools/transcript', pageKey: 'tools-transcript', icon: 'volume',
           hint: 'Speech to text' },
       ],
     },
@@ -127,7 +130,7 @@ export class Shell {
         // object browser's file chat depends on it, so the list is readable by everyone and
         // only New agent, Edit and Delete are gated (auth.canManageAgents). Models below is a
         // genuine admin screen -- every call it makes is TENANT_ADMIN -- and keeps its flag.
-        { label: 'AI Agents', path: '/ai/agents', icon: 'sparkle',
+        { label: 'AI Agents', path: '/ai/agents', pageKey: 'ai-agents', icon: 'sparkle',
           hint: 'Provider, model and instructions' },
         { label: 'Models', path: '/ai/models', icon: 'server', adminOnly: true,
           hint: 'Local Ollama models' },
@@ -155,6 +158,8 @@ export class Shell {
       children: [
         { label: 'Users', path: '/admin/users', icon: 'users', adminOnly: true,
           hint: 'Who can sign in, and as what' },
+        { label: 'Access profiles', path: '/admin/access-profiles', icon: 'shield', adminOnly: true,
+          hint: 'Which pages your tenant users can open.' },
         { label: 'Tenants', path: '/admin/tenants', icon: 'globe', platformOnly: true,
           hint: 'Isolated workspaces' },
         // Platform, not admin: listRequests, approve and reject all carry
@@ -166,16 +171,23 @@ export class Shell {
     },
   ];
 
-  /** Menus the current role can actually reach, so nothing renders that would 403. */
+  /**
+   * Menus the current role -- and, for a tenant user, their access profile -- can actually
+   * reach, so nothing renders that would 403. A section whose every page is out of reach is
+   * dropped whole rather than left as an empty heading; `pageKeys` is read here so the menu
+   * recomputes when a token refresh brings a changed profile.
+   */
   readonly nav = computed(() => {
     const isAdmin = this.auth.isTenantAdmin();
     const isPlatform = this.auth.isPlatformAdmin();
+    this.auth.pageKeys();
     return this.allNav
       .filter(item => !item.adminOnly || isAdmin)
       .map(item => ({
         ...item,
         children: this.withExactFlags(item.children?.filter(child =>
-          (!child.adminOnly || isAdmin) && (!child.platformOnly || isPlatform))),
+          (!child.adminOnly || isAdmin) && (!child.platformOnly || isPlatform)
+          && (!child.pageKey || this.auth.canOpen(child.pageKey)))),
       }))
       .filter(item => !item.children || item.children.length > 0);
   });

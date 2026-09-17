@@ -9,6 +9,7 @@ import { FormDialog } from '../../../shared/ui/form-dialog';
 import { PhoneInput } from '../../../shared/ui/phone-input';
 import { AuthService } from '../../../core/auth/auth.service';
 import { ROLE_META, UserRole } from '../../../core/auth/auth.models';
+import { AccessProfile } from '../access-profiles/access-profiles.service';
 
 /**
  * The picker's options, taken from the table that already names every role rather than said a
@@ -32,7 +33,7 @@ const ROLES = Object.entries(ROLE_META).map(([value, meta]) => ({
 })
 export class UserDialog {
   readonly ref = inject<DialogRef<boolean>>(DialogRef);
-  readonly data = inject<{ user?: any; tenants: any[]; canPickTenant: boolean }>(DIALOG_DATA);
+  readonly data = inject<{ user?: any; tenants: any[]; canPickTenant: boolean; accessProfiles?: AccessProfile[] }>(DIALOG_DATA);
   private readonly fb = inject(FormBuilder);
   private readonly http = inject(HttpClient);
   private readonly toast = inject(ToastService);
@@ -98,6 +99,16 @@ export class UserDialog {
       mistyped one used to compile happily and simply never match. */
   readonly role = signal<UserRole>(this.data.user?.userRole ?? 'TENANT_USER');
 
+  /**
+   * Whether to offer the access-profile picker: only a tenant user holds one, and only when the
+   * workspace has made any -- a picker with nothing but "Default" in it says nothing.
+   */
+  readonly offersProfile = computed(() =>
+    this.role() === 'TENANT_USER' && (this.data.accessProfiles?.length ?? 0) > 0);
+
+  readonly defaultProfileName = computed(() =>
+    this.data.accessProfiles?.find(p => p.defaultProfile)?.profileName ?? '');
+
   /** A platform admin spans every tenant, so a tenant choice would be meaningless. */
   readonly needsTenant = computed(() => this.role() !== 'PLATFORM_ADMIN');
   readonly roleHint = computed(() => ROLES.find(r => r.value === this.role())?.hint ?? '');
@@ -118,6 +129,8 @@ export class UserDialog {
     // them. getRawValue still includes it, so the server receives the unchanged value.
     tenantId: [{ value: this.data.user?.tenantId ?? null,
                  disabled: !!this.data.user && this.data.user.tenantId != null }],
+    // Null is "the workspace default", which is also what the server reads an absent id as.
+    pageAccessProfileId: [this.data.user?.pageAccessProfileId ?? null],
     // No status here. addUser always creates an Active account and updateUser never reads the
     // field, so the picker this form used to carry saved nothing -- an administrator could set
     // Inactive, press Save, and watch the row stay Active. Activate/Deactivate on the row is the
@@ -152,6 +165,9 @@ export class UserDialog {
     payload.phoneNumber = this.phone() || null;
     if (!payload.password) delete payload.password;
     if (!this.needsTenant()) payload.tenantId = null;
+    // Only a tenant user carries a profile; the server ignores it on an admin, but sending null
+    // keeps the request honest about what the form showed.
+    if (!this.offersProfile()) payload.pageAccessProfileId = null;
 
     this.saving.set(true);
     const request = this.isEdit()

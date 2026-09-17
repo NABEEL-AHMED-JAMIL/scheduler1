@@ -1,0 +1,66 @@
+import { Injectable, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable } from 'rxjs';
+import { API_BASE, ApiResponse } from '../../../core/api/api.config';
+import { PageCatalogueEntry, PageKey } from '../../../core/auth/page-keys';
+
+/** An access profile as /pageAccess.json serves it. */
+export interface AccessProfile {
+  pageAccessProfileId: number;
+  tenantId?: number;
+  profileName: string;
+  description?: string | null;
+  defaultProfile: boolean;
+  pageKeys: PageKey[];
+  userCount: number;
+  userNames?: string[];
+  dateCreated?: string;
+  dateUpdated?: string;
+  createdByName?: string | null;
+  updatedByName?: string | null;
+}
+
+/** What the dialog sends: the id only on an edit. */
+export interface AccessProfileDraft {
+  pageAccessProfileId?: number;
+  profileName: string;
+  description: string | null;
+  defaultProfile: boolean;
+  pageKeys: PageKey[];
+}
+
+/**
+ * Access profiles: which console pages a tenant user may open, kept as named bundles.
+ *
+ * One service rather than HttpClient calls spread over the screen and the user dialog, because
+ * both need the same list and the same catalogue, and the user dialog's picker must never
+ * quietly drift from what the profiles screen shows.
+ */
+@Injectable({ providedIn: 'root' })
+export class AccessProfilesService {
+  private readonly http = inject(HttpClient);
+  private readonly base = `${API_BASE}/pageAccess.json`;
+
+  /** The fixed page catalogue, from the server so the editor offers exactly what it accepts. */
+  pages(): Observable<ApiResponse<PageCatalogueEntry[]>> {
+    return this.http.get<ApiResponse<PageCatalogueEntry[]>>(`${this.base}/pages`);
+  }
+
+  list(): Observable<ApiResponse<AccessProfile[]>> {
+    return this.http.get<ApiResponse<AccessProfile[]>>(`${this.base}/listProfiles`);
+  }
+
+  save(draft: AccessProfileDraft): Observable<ApiResponse<AccessProfile>> {
+    return draft.pageAccessProfileId
+      ? this.http.put<ApiResponse<AccessProfile>>(`${this.base}/updateProfile`, draft)
+      : this.http.post<ApiResponse<AccessProfile>>(`${this.base}/addProfile`, draft);
+  }
+
+  delete(pageAccessProfileId: number): Observable<ApiResponse> {
+    return this.http.delete<ApiResponse>(`${this.base}/deleteProfile`, { params: { pageAccessProfileId } });
+  }
+
+  setDefault(pageAccessProfileId: number): Observable<ApiResponse<AccessProfile>> {
+    return this.http.put<ApiResponse<AccessProfile>>(`${this.base}/setDefaultProfile`, null, { params: { pageAccessProfileId } });
+  }
+}

@@ -46,6 +46,42 @@ describe('shell navigation', () => {
   const children = () =>
     shell.nav().flatMap(item => item.children ?? []);
 
+  it('tags every page an access profile can withhold, and nothing a profile cannot', () => {
+    const tagged = children().filter(child => child.pageKey).map(child => child.path).sort();
+    expect(tagged).toEqual([
+      '/ai/agents', '/analytics', '/analytics/dashboards', '/jobs', '/objects', '/queue',
+      '/reports', '/tasks', '/tools/converter', '/tools/transcript',
+    ]);
+    expect(children().find(child => child.path === '/dashboard')?.pageKey).toBeUndefined();
+  });
+
+  it('drops the pages a tenant user cannot open, and a whole section when none of it is left', () => {
+    // A tenant user on an "Operator" profile: pipelines only. Stored before the shell is built,
+    // because AuthService reads the session in its field initialiser.
+    const claims = btoa(JSON.stringify({ sub: 'olivia@example.com', appUserId: 44, userRole: 'TENANT_USER' }))
+      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    localStorage.setItem('etl_auth_user', JSON.stringify({
+      username: 'olivia@example.com', userRole: 'TENANT_USER', appUserId: 44,
+      accessToken: `header.${claims}.unsigned`, refreshToken: 'r', pageKeys: ['jobs', 'queue'],
+    }));
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [provideZonelessChangeDetection(), provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
+    });
+    const restricted = TestBed.createComponent(Shell).componentInstance;
+    const paths = restricted.nav().flatMap(item => item.children ?? []).map(child => child.path);
+
+    expect(paths).toContain('/jobs');
+    expect(paths).toContain('/queue');
+    expect(paths).not.toContain('/reports');
+    expect(paths).not.toContain('/tools/converter');
+    expect(restricted.nav().map(item => item.label)).not.toContain('Tools');
+    expect(restricted.nav().map(item => item.label)).not.toContain('Assistants');
+    // Dashboard is not a page a profile can take away.
+    expect(restricted.nav().find(item => item.path === '/dashboard')).toBeDefined();
+    localStorage.removeItem('etl_auth_user');
+  });
+
   it('offers the saved-analysis library, which had a route and no way to reach it', () => {
     const saved = children().find(child => child.path === '/analytics/dashboards');
     expect(saved).toBeDefined();

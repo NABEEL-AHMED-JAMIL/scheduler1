@@ -86,5 +86,18 @@
         A platform admin spans every tenant, so no tenant is assigned.
       </p>
     }
+
+    @if (offersProfile()) {
+      <app-field label="Access profile" for="pageAccessProfileId"
+                 [control]="form.get('pageAccessProfileId')" [submitted]="submitted()"
+                 hint="Which pages they can open. Profiles are set up under Administration › Access profiles.">
+        <select id="pageAccessProfileId" class="input" formControlName="pageAccessProfileId">
+          <option [ngValue]="null">Workspace default{{ defaultProfileName() ? ' (' + defaultProfileName() + ')' : '' }}</option>
+          @for (profile of data.accessProfiles; track profile.pageAccessProfileId) {
+            <option [ngValue]="profile.pageAccessProfileId">{{ profile.profileName }}</option>
+          }
+        </select>
+      </app-field>
+    }
   </form>
 </app-form-dialog>

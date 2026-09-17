@@ -4,6 +4,7 @@ import { Router } from '@angular/router';
 import { Observable, tap } from 'rxjs';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../api/api.config';
 import { AuthUser, ROLE_RANK, UserRole, isUserRole } from './auth.models';
+import { PageKey } from './page-keys';
 
 const STORAGE_KEY = 'etl_auth_user';
 
@@ -91,6 +92,26 @@ export class AuthService {
   readonly canManageUsers = computed(() => this.hasAtLeast('TENANT_ADMIN'));
   /** tenant.json -- a tenant spans the platform, so only a platform admin touches one. */
   readonly canManageTenants = computed(() => this.hasAtLeast('PLATFORM_ADMIN'));
+
+  /**
+   * Whether this person may open a page the access profiles govern.
+   *
+   * Admins always may -- the roles gate their pages and a profile cannot take anything from
+   * them -- and a session with no page list (stored before profiles existed) is read as
+   * unrestricted rather than as empty: the server still refuses what it should, and a menu
+   * that vanished on upgrade would look like a break, not a rule. The list itself comes from
+   * sign-in and from every token refresh, so a changed profile reaches the menu within the
+   * access token's lifetime without anyone signing out.
+   */
+  canOpen(page: PageKey): boolean {
+    if (this.hasAtLeast('TENANT_ADMIN')) return true;
+    const keys = this.currentUser()?.pageKeys;
+    if (!keys) return true;
+    return keys.includes(page);
+  }
+
+  /** The same answer as a signal, for templates that want to react to a refresh. */
+  readonly pageKeys = computed(() => this.currentUser()?.pageKeys ?? null);
   /**
    * ollama.json pullModel/deleteModel. Listing them stays TENANT_ADMIN.
    *

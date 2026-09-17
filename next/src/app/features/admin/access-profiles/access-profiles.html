@@ -1,0 +1,102 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Access profiles</h1>
+      <p class="page-subtitle">
+        A named bundle of pages for your tenant users. Give each person one under Users; anyone
+        without one gets the default. Admins always open everything.
+      </p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
+        <app-icon name="refresh" [class.spin]="loading()" />Refresh
+      </button>
+      <button type="button" class="btn btn-primary btn-sm" (click)="add()" data-testid="new-profile">
+        <app-icon name="plus" />New profile
+      </button>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+    <app-stat-tile label="Profiles" [value]="stats().profiles" icon="layers" tone="info"
+                   [foot]="stats().profiles === 0 ? 'none yet — everyone sees every page' : 'in this workspace'" />
+    <app-stat-tile label="People assigned" [value]="stats().assigned" icon="users" tone="info" foot="hold a profile" />
+    <app-stat-tile label="Default" [value]="stats().defaultName || '—'" icon="shield" tone="info"
+                   [foot]="stats().defaultName ? 'for anyone without their own' : 'no default: unassigned users see everything'" />
+    <app-stat-tile label="Pages" [value]="stats().pages" icon="template" tone="info" foot="can be granted or withheld" />
+  </div>
+
+  @if (error()) {
+    <div class="card p-4 text-sm text-[color:var(--color-crit-500)]">{{ error() }}</div>
+  } @else if (!loading() && profiles().length === 0) {
+    <div class="card p-10 text-center">
+      <app-icon name="shield" size="2rem" class="block mx-auto mb-3 text-[color:var(--text-muted)]" />
+      <h2 class="text-base font-semibold">No access profiles yet</h2>
+      <p class="text-sm text-[color:var(--text-secondary)] mt-1 max-w-md mx-auto">
+        Every tenant user currently opens every page. Create the first profile — it becomes the
+        default — and people without one of their own move onto it.
+      </p>
+      <button type="button" class="btn btn-primary btn-sm mt-4" (click)="add()">
+        <app-icon name="plus" />New profile
+      </button>
+    </div>
+  } @else {
+    <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4" data-testid="profile-cards">
+      @for (profile of profiles(); track profile.pageAccessProfileId) {
+        <div class="card p-4 flex flex-col gap-3" [attr.data-profile]="profile.profileName">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <h2 class="text-base font-semibold truncate">{{ profile.profileName }}</h2>
+                @if (profile.defaultProfile) {
+                  <span class="pill pill-brand">Default</span>
+                }
+              </div>
+              @if (profile.description) {
+                <p class="text-sm text-[color:var(--text-secondary)] mt-0.5">{{ profile.description }}</p>
+              }
+            </div>
+            <div class="flex items-center gap-1 shrink-0">
+              <button type="button" class="btn btn-ghost btn-xs" (click)="edit(profile)" [disabled]="busy() === profile.pageAccessProfileId">
+                <app-icon name="edit" />Edit
+              </button>
+              @if (!profile.defaultProfile) {
+                <button type="button" class="btn btn-ghost btn-xs" (click)="setDefault(profile)" [disabled]="busy() === profile.pageAccessProfileId">
+                  <app-icon name="shield" />Make default
+                </button>
+              }
+              <button type="button" class="btn btn-ghost btn-xs btn-circle-danger" (click)="remove(profile)"
+                      [disabled]="busy() === profile.pageAccessProfileId" title="Delete">
+                <app-icon name="trash" />
+              </button>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap gap-1.5">
+            @for (label of labelsFor(profile); track label) {
+              <span class="pill pill-neutral">{{ label }}</span>
+            }
+            @for (label of missingFor(profile); track label) {
+              <span class="pill line-through text-[color:var(--text-muted)]" style="border-color: var(--border-subtle)">{{ label }}</span>
+            }
+            @if (profile.pageKeys.length === 0) {
+              <span class="text-xs text-[color:var(--text-muted)]">Opens nothing beyond the dashboard.</span>
+            }
+          </div>
+
+          <div class="flex items-center justify-between text-xs text-[color:var(--text-muted)] pt-1 border-t border-[color:var(--border-subtle)]">
+            <span>
+              @if (profile.userCount === 0) {
+                Nobody holds it yet
+              } @else {
+                {{ profile.userCount }} {{ profile.userCount === 1 ? 'person' : 'people' }} ·
+                {{ (profile.userNames ?? []).slice(0, 3).join(', ') }}{{ profile.userCount > 3 ? ', …' : '' }}
+              }
+            </span>
+            <a routerLink="/admin/users" class="hover:underline">Users ›</a>
+          </div>
+        </div>
+      }
+    </div>
+  }
+</div>

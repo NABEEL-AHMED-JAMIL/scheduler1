@@ -309,6 +309,25 @@ export class Docs implements AfterViewInit {
       notes: ['Give each tenant at least two administrators, so nobody is locked out when one is away.'],
     },
     {
+      id: 'access', title: 'Decide which pages each person opens',
+      intro: 'Roles say how much somebody may do; an access profile says which pages a tenant '
+           + 'user sees at all. It is a named bundle of pages — "Operator", "Analyst" — and each '
+           + 'person holds one. Optional: a workspace that never makes a profile keeps showing '
+           + 'every page to everyone, exactly as before.',
+      where: 'Administration → Access profiles, then the Access profile field under Administration → Users',
+      fields: [
+        { name: 'Profile name', required: true, note: 'Unique within the workspace. Pick the job it describes, not the person.' },
+        { name: 'Pages', required: false, note: 'Tick what the profile opens. Dashboard, Profile and Notifications are always open; Configuration and Administration stay admin-only regardless.' },
+        { name: 'Default', required: false, note: 'The bundle anyone without a profile of their own gets. The first profile you make becomes it.' },
+      ],
+      notes: [
+        'Admins are never restricted: a profile only ever applies to a tenant user.',
+        'A withheld page leaves the menu, a direct link to it lands on a page that says so and offers "Request access", '
+          + 'which notifies every admin of the workspace — and the server refuses the calls behind it whatever the browser shows.',
+        'A profile that people still hold cannot be deleted; move them first. Changing a profile\'s pages notifies everyone on it.',
+      ],
+    },
+    {
       id: 'storage', title: 'Connect the storage',
       intro: 'A connection tells the console where a job may read from and write to. Add one '
            + 'before creating tasks, because a task names the bucket it writes into.',
@@ -436,7 +455,7 @@ export class Docs implements AfterViewInit {
   readonly roles = [
     { name: 'PLATFORM_ADMIN', note: 'Every tenant, the settings that apply across all of them, and the workspace requests waiting for a decision.' },
     { name: 'TENANT_ADMIN', note: 'Everything inside one tenant, including its users, connections and forms.' },
-    { name: 'TENANT_USER', note: 'The pipelines: tasks, jobs, runs, logs and reports within their tenant.' },
+    { name: 'TENANT_USER', note: 'The pipelines: tasks, jobs, runs, logs and reports within their tenant — narrowed further by their access profile, when the workspace uses them.' },
   ];
 
   readonly outcomes = [

@@ -20,6 +20,7 @@ import { ViewToggle } from '../../../shared/ui/view-toggle';
 import { Avatar } from '../../../shared/ui/avatar';
 import { createSort } from '../../../shared/ui/sort';
 import { UserDialog } from './user-dialog';
+import { AccessProfile, AccessProfilesService } from '../access-profiles/access-profiles.service';
 import { PromptDialog } from '../../objects/dialogs/prompt-dialog';
 import { createPager } from '../../../shared/ui/pager';
 import { Pagination } from '../../../shared/ui/pagination';
@@ -52,6 +53,8 @@ export interface AppUser {
   fullName?: string;
   /** Job title. Separate from userRole, which is the permission level. */
   position?: string | null;
+  pageAccessProfileId?: number | null;
+  pageAccessProfileName?: string | null;
   userRole: string;
   status: string;
   tenantId?: number;
@@ -70,6 +73,7 @@ export interface AppUser {
 })
 export class Users implements OnInit {
   private readonly http = inject(HttpClient);
+  private readonly profilesApi = inject(AccessProfilesService);
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
   private readonly auth = inject(AuthService);
@@ -79,6 +83,12 @@ export class Users implements OnInit {
   readonly users = signal<AppUser[]>([]);
   readonly stats = signal<Record<number, UserStatistic>>({});
   readonly tenants = signal<any[]>([]);
+  /**
+   * The workspace's access profiles, for the dialog's picker. Loaded only for a tenant admin:
+   * profiles belong to a workspace, and a platform admin has none to list -- so a platform
+   * admin creates people onto the workspace default and the workspace's own admin picks.
+   */
+  readonly accessProfiles = signal<AccessProfile[]>([]);
   readonly loading = signal(true);
   readonly error = signal('');
   readonly search = signal('');
@@ -189,6 +199,7 @@ export class Users implements OnInit {
     });
     this.load();
     this.loadTenants();
+    this.loadAccessProfiles();
   }
 
   clearTenantFocus(): void {
@@ -252,15 +263,24 @@ export class Users implements OnInit {
     });
   }
 
+  private loadAccessProfiles(): void {
+    if (this.canPickTenant()) return;
+    this.profilesApi.list().subscribe({
+      next: response => {
+        if (response.status === API_SUCCESS) this.accessProfiles.set(response.data ?? []);
+      },
+    });
+  }
+
   create(): void {
     this.dialog.open<boolean>(UserDialog, {
-      data: { tenants: this.tenants(), canPickTenant: this.canPickTenant() }, hasBackdrop: true,
+      data: { tenants: this.tenants(), canPickTenant: this.canPickTenant(), accessProfiles: this.accessProfiles() }, hasBackdrop: true,
     }).closed.subscribe(saved => { if (saved) this.load(); });
   }
 
   edit(user: AppUser): void {
     this.dialog.open<boolean>(UserDialog, {
-      data: { user, tenants: this.tenants(), canPickTenant: this.canPickTenant() }, hasBackdrop: true,
+      data: { user, tenants: this.tenants(), canPickTenant: this.canPickTenant(), accessProfiles: this.accessProfiles() }, hasBackdrop: true,
     }).closed.subscribe(saved => { if (saved) this.load(); });
   }
 

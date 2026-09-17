@@ -2,6 +2,7 @@ import { inject } from '@angular/core';
 import { CanActivateChildFn, CanActivateFn, CanMatchFn, Router } from '@angular/router';
 import { AuthService } from './auth.service';
 import { UserRole } from './auth.models';
+import { PageKey } from './page-keys';
 
 export const authGuard: CanActivateFn = (_route, state) => {
   const auth = inject(AuthService);
@@ -37,6 +38,25 @@ export const roleGuard: CanActivateFn = (route) => {
   const minimum = route.data?.['minRole'] as UserRole | undefined;
   if (minimum && !auth.hasAtLeast(minimum)) {
     return router.createUrlTree(['/unauthorized']);
+  }
+  return true;
+};
+
+/**
+ * The access-profile counterpart of roleGuard: a route names the page it is (`pageKey` in its
+ * data), and the person's profile decides. Same placement rule -- on the route carrying the
+ * data, never a parent. Sends the person to /unauthorized with the page named, so that screen
+ * can say which page it was and offer to ask for it.
+ *
+ * Courtesy, like roleGuard: the server refuses the page's API calls on its own.
+ */
+export const pageGuard: CanActivateFn = (route) => {
+  const auth = inject(AuthService);
+  const router = inject(Router);
+
+  const page = route.data?.['pageKey'] as PageKey | undefined;
+  if (page && !auth.canOpen(page)) {
+    return router.createUrlTree(['/unauthorized'], { queryParams: { page } });
   }
   return true;
 };

@@ -120,6 +120,11 @@
                   }
                   <div class="flex flex-wrap items-center gap-1.5 mt-2">
                     <span [class]="rolePill(user.userRole)">{{ roleLabel(user.userRole) }}</span>
+                    @if (user.userRole === 'TENANT_USER' && user.pageAccessProfileName) {
+                      <span class="pill pill-neutral" [title]="'Access profile: ' + user.pageAccessProfileName">
+                        <app-icon name="shield" size="0.8em" class="opacity-70" />{{ user.pageAccessProfileName }}
+                      </span>
+                    }
                     @if (user.tenantName) {
                       <span class="pill pill-neutral" [title]="'Workspace: ' + user.tenantName">
                         <app-icon name="building" size="0.8em" class="opacity-70" />{{ user.tenantName }}
@@ -311,9 +316,17 @@
               </div>
             </td>
 
-            <!-- Permission role above, job title below: two facts about standing, read together. -->
+            <!-- Permission role above, job title below: two facts about standing, read together.
+                 A tenant user's access profile sits with them: it is the third thing that
+                 decides what this person reaches. -->
             <td class="max-w-44">
               <span [class]="rolePill(user.userRole)">{{ roleLabel(user.userRole) }}</span>
+              @if (user.userRole === 'TENANT_USER') {
+                <div class="text-xs mt-0.5 truncate" [title]="user.pageAccessProfileName ? 'Access profile: ' + user.pageAccessProfileName : 'On the workspace default access profile'">
+                  <app-icon name="shield" size="0.8em" class="opacity-70" />
+                  {{ user.pageAccessProfileName || 'Default access' }}
+                </div>
+              }
               @if (user.position) {
                 <div class="text-xs text-[color:var(--text-muted)] truncate mt-0.5"
                      [title]="user.position">{{ user.position }}</div>

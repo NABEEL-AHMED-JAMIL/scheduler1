@@ -64,4 +64,13 @@ export interface AuthUser {
    * one-time password stayed usable for as long as nobody opened that screen.
    */
   mustChangePassword?: boolean;
+  /**
+   * The pages this person may open, as the server resolved them at sign-in: their access
+   * profile, else the workspace default, else every page. Absent on a session stored before
+   * profiles existed, which reads as "every page" until the next sign-in or token refresh --
+   * the server refuses anything it should not have served anyway.
+   */
+  pageKeys?: string[];
+  /** The access profile's name, for the header and the profile screen; null when on the default. */
+  pageAccessProfileName?: string | null;
 }

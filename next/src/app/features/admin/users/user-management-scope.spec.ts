@@ -49,12 +49,12 @@ function rowFor(appUserId: number, userRole: string): AppUser {
   return { appUserId, username: 'someone@example.com', userRole, status: 'Active', tenantId: 1 };
 }
 
-function dialogFor(role: UserRole, user?: Record<string, unknown>): UserDialog {
+function dialogFor(role: UserRole, user?: Record<string, unknown>, accessProfiles: unknown[] = []): UserDialog {
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
     providers: [
       { provide: AuthService, useValue: authFor(role) },
-      { provide: DIALOG_DATA, useValue: { user, tenants: [], canPickTenant: role === 'PLATFORM_ADMIN' } },
+      { provide: DIALOG_DATA, useValue: { user, tenants: [], canPickTenant: role === 'PLATFORM_ADMIN', accessProfiles } },
       { provide: DialogRef, useValue: { close: () => {} } },
       { provide: HttpClient, useValue: { post: () => of({}), put: () => of({}) } },
       { provide: ToastService, useValue: { success: () => {}, error: () => {} } },
@@ -113,5 +113,38 @@ describe('UserDialog role picker', () => {
   it('offers a platform admin all three on somebody else, whatever they are now', () => {
     expect(grantable(dialogFor('PLATFORM_ADMIN', { appUserId: 77, userRole: 'TENANT_ADMIN' })))
       .toEqual(['TENANT_USER', 'TENANT_ADMIN', 'PLATFORM_ADMIN']);
+  });
+});
+
+/**
+ * The access-profile picker in the user dialog: offered for a tenant user when the workspace
+ * has profiles, and never for an admin -- a profile means nothing on one.
+ */
+describe('UserDialog access profile picker', () => {
+  const profiles = [
+    { pageAccessProfileId: 1, profileName: 'Operator', defaultProfile: true, pageKeys: ['jobs'], userCount: 0 },
+    { pageAccessProfileId: 2, profileName: 'Analyst', defaultProfile: false, pageKeys: ['jobs', 'reports'], userCount: 0 },
+  ];
+
+  it('offers the picker for a tenant user when profiles exist, naming the default', () => {
+    const dialog = dialogFor('TENANT_ADMIN', undefined, profiles);
+    expect(dialog.offersProfile()).toBe(true);
+    expect(dialog.defaultProfileName()).toBe('Operator');
+    expect(dialog.form.get('pageAccessProfileId')!.value).toBeNull();
+  });
+
+  it('hides the picker when the workspace has no profiles yet', () => {
+    expect(dialogFor('TENANT_ADMIN', undefined, []).offersProfile()).toBe(false);
+  });
+
+  it('hides the picker as soon as the role is an admin one', () => {
+    const dialog = dialogFor('PLATFORM_ADMIN', undefined, profiles);
+    dialog.form.get('userRole')!.setValue('TENANT_ADMIN');
+    expect(dialog.offersProfile()).toBe(false);
+  });
+
+  it('starts an edit on the profile the person already holds', () => {
+    const dialog = dialogFor('TENANT_ADMIN', { appUserId: 44, userRole: 'TENANT_USER', tenantId: 1, pageAccessProfileId: 2 }, profiles);
+    expect(dialog.form.get('pageAccessProfileId')!.value).toBe(2);
   });
 });
