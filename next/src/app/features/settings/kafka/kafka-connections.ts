@@ -132,7 +132,7 @@ export class KafkaConnections implements OnInit {
    * that profile's own client. Kept per row so a page of a hundred topics can be checked one
    * at a time and the answers stay put; cleared when another profile is picked.
    */
-  readonly topicTests = signal<Record<number, { ok: boolean; message: string }>>({});
+  readonly topicTests = signal<Record<number, { ok: boolean; message: string; unread?: boolean }>>({});
   readonly testingTopic = signal<number | null>(null);
   testTopic(profile: KafkaProfile, type: TaskType): void {
     const topic = this.topicOf(type.queueTopicPartition);
@@ -143,7 +143,10 @@ export class KafkaConnections implements OnInit {
       { params: { topicName: topic, kafkaConnectionProfileId: String(profile.kafkaConnectionProfileId) } }).subscribe({
       next: r => {
         this.testingTopic.set(null);
-        this.topicTests.update(m => ({ ...m, [id]: { ok: r.status === API_SUCCESS, message: r.message } }));
+        // Reachable but read by nobody is the case that strands a run at Start; it passes the
+        // test and is shown as a warning, not as a tick.
+        const unread = r.status === API_SUCCESS && /no consumer is reading/.test(r.message || '');
+        this.topicTests.update(m => ({ ...m, [id]: { ok: r.status === API_SUCCESS, message: r.message, unread } }));
       },
       error: err => {
         this.testingTopic.set(null);

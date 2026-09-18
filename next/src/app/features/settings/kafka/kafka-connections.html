@@ -319,7 +319,7 @@
                           }
                         </div>
                         @if (topicTests()[row.type.sourceTaskTypeId!]; as test) {
-                          <div class="text-[11px] mt-0.5 truncate" [class]="test.ok ? 'text-ok-500' : 'text-crit-500'" [title]="test.message">
+                          <div class="text-[11px] mt-0.5 truncate" [class]="test.unread ? 'text-warn-600' : test.ok ? 'text-ok-500' : 'text-crit-500'" [title]="test.message">
                             {{ test.message }}
                           </div>
                         }
@@ -355,9 +355,9 @@
                                   [title]="topicTests()[row.type.sourceTaskTypeId!]?.message || 'Check that this topic exists on ' + p.profileName"
                                   [disabled]="testingTopic() === row.type.sourceTaskTypeId"
                                   (click)="testTopic(p, row.type)">
-                            <app-icon [name]="topicTests()[row.type.sourceTaskTypeId!]?.ok === true ? 'check' : topicTests()[row.type.sourceTaskTypeId!]?.ok === false ? 'xCircle' : 'plug'"
+                            <app-icon [name]="topicTests()[row.type.sourceTaskTypeId!]?.unread ? 'alert' : topicTests()[row.type.sourceTaskTypeId!]?.ok === true ? 'check' : topicTests()[row.type.sourceTaskTypeId!]?.ok === false ? 'xCircle' : 'plug'"
                                       size="0.9em" [busy]="testingTopic() === row.type.sourceTaskTypeId"
-                                      [class]="topicTests()[row.type.sourceTaskTypeId!]?.ok === true ? 'icon-ok' : topicTests()[row.type.sourceTaskTypeId!]?.ok === false ? 'icon-crit' : ''" />
+                                      [class]="topicTests()[row.type.sourceTaskTypeId!]?.unread ? 'icon-warn' : topicTests()[row.type.sourceTaskTypeId!]?.ok === true ? 'icon-ok' : topicTests()[row.type.sourceTaskTypeId!]?.ok === false ? 'icon-crit' : ''" />
                           </button>
                           <button type="button" class="btn-circle btn-circle-info" title="Edit topic" aria-label="Edit topic"
                                   (click)="editTopic(row.type)"><app-icon name="edit" size="0.9em" /></button>

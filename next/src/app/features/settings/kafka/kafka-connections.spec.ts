@@ -65,7 +65,10 @@ function screenFor(isPlatformAdmin: boolean, profiles: KafkaProfile[], tenants =
       {
         provide: HttpClient,
         useValue: {
-          get: (url: string) => of({
+          get: (url: string) => url.includes('testTopic')
+            // What the server says of a topic nobody consumes: a pass, with a warning in it.
+            ? of({ status: 'SUCCESS', message: 'Topic "x" is reachable -- 1 partition(s) -- but no consumer is reading it right now. A run dispatched to it will wait until a worker subscribes.' })
+            : of({
             status: 'SUCCESS', message: '',
             data: url.includes('listTenants') ? tenants : profiles,
           }),
@@ -174,5 +177,16 @@ describe('kafkaEnvironment', () => {
     expect(kafkaEnvironment('')).toBeNull();
     expect(kafkaEnvironment('   ')).toBeNull();
     expect(kafkaEnvironment(undefined)).toBeNull();
+  });
+});
+
+describe('the topic test', () => {
+  it('shows a reachable topic that nobody reads as a warning, not a tick', () => {
+    const screen = screenFor(false, [GLOBEX_DEFAULT]);
+    screen.testTopic(GLOBEX_DEFAULT as any, { sourceTaskTypeId: 42, serviceName: 'Claims', queueTopicPartition: 'topic=x&partitions=[*]' } as any);
+    const result = screen.topicTests()[42];
+    expect(result.ok).toBe(true);
+    expect(result.unread).toBe(true);
+    expect(result.message).toContain('no consumer is reading');
   });
 });
