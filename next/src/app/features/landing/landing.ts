@@ -239,9 +239,9 @@ export class Landing {
     { icon: 'database', title: 'Queries on a timetable',
       body: 'Register a database, save a query, preview it, and have it run to a bucket on a '
           + 'schedule of its own.' },
-    { icon: 'inbox', title: 'Forms that configure work',
-      body: 'Build a form, share its link, and turn what comes back into a task’s configuration '
-          + 'without hand-writing XML.' },
+    { icon: 'inbox', title: 'Pipelines that configure work',
+      body: 'Define a pipeline once — its id, the topic it publishes on, the fields it asks for — '
+          + 'and every task on it is filled in field by field instead of hand-written XML.' },
     { icon: 'shield', title: 'Separated by tenant',
       body: 'Every job, task, bucket and user belongs to a tenant. Roles decide how much a '
           + 'person may do, and access profiles decide which pages they see — with a per-person '

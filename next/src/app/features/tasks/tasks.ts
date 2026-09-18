@@ -72,9 +72,41 @@ export class Tasks implements OnInit {
   readonly onlyMine = signal(false);
 
 
+  /** Narrow by topic, then by one of that topic's pipelines. Options come from the tasks themselves. */
+  readonly topicFilter = signal('');
+  readonly pipelineFilter = signal('');
+  readonly topicOptions = computed(() => {
+    const seen = new Map<string, string>();
+    for (const t of this.tasks()) {
+      const id = t.sourceTaskType?.sourceTaskTypeId;
+      if (id != null && !seen.has(String(id))) seen.set(String(id), t.sourceTaskType?.serviceName ?? `#${id}`);
+    }
+    return [...seen].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+  });
+  readonly pipelineOptions = computed(() => {
+    const topic = this.topicFilter();
+    const seen = new Set<string>();
+    for (const t of this.tasks()) {
+      if (topic && String(t.sourceTaskType?.sourceTaskTypeId ?? '') !== topic) continue;
+      if (t.pipelineId) seen.add(t.pipelineId);
+    }
+    return [...seen].sort().map(id => ({ id, name: id }));
+  });
+  setTopicFilter(value: string): void {
+    this.topicFilter.set(value);
+    // A pipeline that is not on the newly chosen topic cannot stay selected.
+    if (this.pipelineFilter() && !this.pipelineOptions().some(p => p.id === this.pipelineFilter())) this.pipelineFilter.set('');
+    this.pager.reset();
+  }
+  clearFilters(): void { this.search.set(''); this.topicFilter.set(''); this.pipelineFilter.set(''); this.pager.reset(); }
+
   readonly filtered = computed(() => {
     const term = this.search().trim().toLowerCase();
-    const rows = this.mine(this.tasks());
+    const topic = this.topicFilter();
+    const pipeline = this.pipelineFilter();
+    let rows = this.mine(this.tasks());
+    if (topic) rows = rows.filter(t => String(t.sourceTaskType?.sourceTaskTypeId ?? '') === topic);
+    if (pipeline) rows = rows.filter(t => t.pipelineId === pipeline);
     if (!term) return rows;
     return rows.filter(task =>
       String(task.taskDetailId).includes(term)

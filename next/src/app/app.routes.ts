@@ -135,7 +135,7 @@ export const routes: Routes = [
       },
       {
         // Lives under settings/ rather than admin/ because it groups with the rest of the
-        // Configuration menu (Kafka Connections, Lookups, Pipeline Forms) -- infrastructure
+        // Configuration menu (Kafka & Topics, Lookups, Pipelines) -- infrastructure
         // setup, not the Administration menu's people/tenant management. The old admin/storage
         // path is kept as a redirect below so an old bookmark or link still lands.
         path: 'settings/storage-connections',
@@ -230,15 +230,16 @@ export const routes: Routes = [
       // address still lands somewhere useful, with a ?profileId= link keeping its meaning.
       { path: 'settings/task-types', redirectTo: 'settings/kafka' },
       {
-        path: 'settings/pipeline-forms',
+        path: 'settings/pipelines',
         loadComponent: () =>
-          import('./features/settings/forms/task-forms').then(m => m.TaskForms),
+          import('./features/settings/pipelines/pipelines').then(m => m.Pipelines),
         data: { minRole: 'TENANT_ADMIN' },
         canActivate: [roleGuard],
       },
       // Renamed from settings/forms once the feature became the pipeline catalogue rather than
       // a general form builder -- kept as a redirect so an old bookmark or link still lands.
-      { path: 'settings/forms', redirectTo: 'settings/pipeline-forms' },
+      { path: 'settings/forms', redirectTo: 'settings/pipelines' },
+      { path: 'settings/pipeline-forms', redirectTo: 'settings/pipelines' },
       {
         path: 'admin/tenant-requests',
         loadComponent: () =>

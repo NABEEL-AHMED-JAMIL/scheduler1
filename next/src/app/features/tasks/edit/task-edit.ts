@@ -1,4 +1,5 @@
 import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { HttpClient } from '@angular/common/http';
 import { forkJoin, of } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
@@ -9,10 +10,10 @@ import { ToastService } from '../../../shared/ui/toast.service';
 import { Field } from '../../../shared/ui/field';
 import { Combobox, ComboboxOption } from '../../../shared/ui/combobox';
 import { Icon } from '../../../shared/ui/icon';
-import { FieldChoice, TaskForm, TaskFormField, parseFieldChoices } from '../../settings/forms/task-form-dialog';
+import { FieldChoice, Pipeline, PipelineField, parseFieldChoices } from '../../settings/pipelines/pipeline-dialog';
 
 /** The lookup parents whose sub-lookups fill the two remaining lookup-backed dropdowns here.
- *  Pipeline used to be a third one (PIPELINE_IDS) -- it now reads from Pipeline Forms instead,
+ *  Pipeline used to be a third one (PIPELINE_IDS) -- it now reads from Pipelines instead,
  *  since a pipeline is defined by creating its form, not by adding a lookup row. */
 const LOOKUP_TYPES = ['TASK_GROUPS', 'PIPELINE_HOME_PAGES'];
 
@@ -32,10 +33,10 @@ export class TaskEdit implements OnInit {
   readonly taskTypes = signal<any[]>([]);
   readonly lookups = signal<Record<string, any[]>>({});
   /**
-   * The pipelines a form exists for -- Pipeline Forms is the catalogue now, not a lookup type.
+   * The pipelines a form exists for -- Pipelines is the catalogue now, not a lookup type.
    * Creating a pipeline's form is what makes it choosable here; there is no other way to add one.
    */
-  readonly pipelines = signal<TaskForm[]>([]);
+  readonly pipelines = signal<Pipeline[]>([]);
   readonly saving = signal(false);
   readonly loading = signal(false);
   readonly submitted = signal(false);
@@ -49,12 +50,12 @@ export class TaskEdit implements OnInit {
    * what the server stores and what `xmlCreateChecker` still turns into the payload -- they are
    * just no longer a screen the operator sees or touches; the form's fields are the only surface.
    */
-  readonly taskFormDef = signal<TaskForm | null>(null);
+  readonly pipelineDef = signal<Pipeline | null>(null);
   readonly formLoading = signal(false);
 
   /** The fields in the order their author put them in; `position` is not guaranteed sorted. */
   readonly formFields = computed(() =>
-    [...(this.taskFormDef()?.fields ?? [])].sort((a, b) => a.position - b.position));
+    [...(this.pipelineDef()?.fields ?? [])].sort((a, b) => a.position - b.position));
 
   /** Which pipeline the currently loaded form belongs to, so the same fetch is not repeated. */
   private loadedFormPipeline: string | null = null;
@@ -124,7 +125,7 @@ export class TaskEdit implements OnInit {
       error: () => this.toast.error('Could not load the task settings.'),
     });
 
-    this.http.get<ApiResponse<TaskForm[]>>(`${API_BASE}/taskForm.json/listPipelines`).subscribe({
+    this.http.get<ApiResponse<Pipeline[]>>(`${API_BASE}/pipeline.json/listPipelines`).subscribe({
       next: response => {
         if (response.status === API_SUCCESS) this.pipelines.set(response.data ?? []);
       },
@@ -136,6 +137,15 @@ export class TaskEdit implements OnInit {
     // through loadTask instead, which has to wait for the tags before it can prefill.
     this.form.get('pipelineId')!.valueChanges.subscribe(pipelineId => {
       this.loadFormForPipeline((pipelineId ?? '').trim());
+    });
+
+    // The topic decides which pipelines may be picked. Changing it to one the current pipeline
+    // does not publish on clears the pipeline rather than leaving a pair that cannot dispatch.
+    this.form.get('sourceTaskTypeId')!.valueChanges.subscribe(topicId => {
+      const current = (this.form.get('pipelineId')!.value ?? '').trim();
+      if (!current) return;
+      const stillValid = this.pipelines().some(p => p.pipelineId === current && p.sourceTaskTypeId === topicId);
+      if (!stillValid) this.form.patchValue({ pipelineId: '' });
     });
 
     if (this.isEdit()) this.loadTask();
@@ -198,11 +208,29 @@ export class TaskEdit implements OnInit {
    * template compiler ("Expected i18n meta to be a Message, but got: Function"), confirmed by
    * bisection, not assumed. Shaping the data here instead sidesteps it entirely.
    */
-  readonly pipelineOptions = computed<ComboboxOption[]>(() => this.pipelines().map(p => ({
+  /** The chosen topic, as a signal, so the pipeline list can follow it. */
+  readonly selectedTopicId = toSignal(this.form.get('sourceTaskTypeId')!.valueChanges,
+    { initialValue: this.form.get('sourceTaskTypeId')!.value as number | null });
+
+  /** Only the pipelines that publish on the chosen topic; nothing until a topic is chosen. */
+  readonly pipelinesForTopic = computed<Pipeline[]>(() => {
+    const topic = this.selectedTopicId();
+    if (topic == null) return [];
+    return this.pipelines().filter(p => p.sourceTaskTypeId === topic);
+  });
+
+  readonly pipelineOptions = computed<ComboboxOption[]>(() => this.pipelinesForTopic().map(p => ({
     value: p.pipelineId ?? '',
-    label: `${p.formName} (${p.pipelineId})`,
+    label: `${p.pipelineName} (${p.pipelineId})`,
     hint: p.description ?? '',
   })));
+
+  /** What the Pipeline field says under itself, given where the person is in the two-step pick. */
+  readonly pipelineHint = computed(() => {
+    if (this.selectedTopicId() == null) return 'Pick a topic first; its pipelines appear here.';
+    if (!this.pipelinesForTopic().length) return 'No pipeline publishes on this topic yet — add one under Configuration › Pipelines.';
+    return 'Picking one loads its form below, if it has one.';
+  });
 
   private toLookupOption(opt: any): ComboboxOption {
     const name = opt.lookupType || opt.lookupValue || '';
@@ -234,7 +262,7 @@ export class TaskEdit implements OnInit {
     this.formLoading.set(true);
     const params: Record<string, string> = { pipelineId };
     if (this.taskTenantId != null) params['tenantId'] = String(this.taskTenantId);
-    this.http.get<ApiResponse<TaskForm>>(`${API_BASE}/taskForm.json/formForPipeline`,
+    this.http.get<ApiResponse<Pipeline>>(`${API_BASE}/pipeline.json/definition`,
       { params }).subscribe({
       next: response => {
         this.formLoading.set(false);
@@ -244,7 +272,7 @@ export class TaskEdit implements OnInit {
           this.clearForm();
           return;
         }
-        this.taskFormDef.set(response.data);
+        this.pipelineDef.set(response.data);
         this.buildFormControls();
         // The payload is generated from the form's answers on save now, not hand-written --
         // required only falls to the box itself when there is no form driving it.
@@ -259,7 +287,7 @@ export class TaskEdit implements OnInit {
   }
 
   private clearForm(): void {
-    this.taskFormDef.set(null);
+    this.pipelineDef.set(null);
     for (const name of Object.keys(this.formData.controls)) {
       this.formData.removeControl(name, { emitEvent: false });
     }
@@ -269,7 +297,7 @@ export class TaskEdit implements OnInit {
   }
 
   /** Stable control name for a field. Two fields can share a tagKey under different parents. */
-  controlName(field: TaskFormField): string {
+  controlName(field: PipelineField): string {
     return `${field.tagParent ?? ''}|${field.tagKey}`;
   }
 
@@ -294,7 +322,7 @@ export class TaskEdit implements OnInit {
     this.syncFormToTags();
   }
 
-  private findTag(field: TaskFormField): string | null {
+  private findTag(field: PipelineField): string | null {
     const parent = (field.tagParent ?? '').trim();
     for (const group of this.tags.controls) {
       const value = group.getRawValue();
@@ -368,7 +396,7 @@ export class TaskEdit implements OnInit {
    * something, anything -- overwrote an answer the operator never saw. Carrying it as a labelled
    * option shows what the task actually holds instead of hiding it.
    */
-  fieldChoices(field: TaskFormField): FieldChoice[] {
+  fieldChoices(field: PipelineField): FieldChoice[] {
     const choices = parseFieldChoices(field.fieldOptions);
     const current = String(this.formData.get(this.controlName(field))?.value ?? '').trim();
     if (current && !choices.some(choice => choice.value === current)) {
@@ -381,7 +409,7 @@ export class TaskEdit implements OnInit {
     this.submitted.set(true);
     // Belt and braces: the fields sync as they are typed, but a value restored by the browser
     // or set programmatically would not have fired an input event.
-    if (this.taskFormDef()) {
+    if (this.pipelineDef()) {
       this.syncFormToTags();
       // The payload is generated from the form's own answers below, never from whatever the
       // (hidden) box last held, so its own validity does not gate a form-driven save.

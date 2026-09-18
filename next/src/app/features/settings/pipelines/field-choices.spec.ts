@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
-  FieldChoice, TaskFormField,
+  FieldChoice, PipelineField,
   parseFieldChoices, serializeFieldChoices, validateSelectChoices,
-} from './task-form-dialog';
+} from './pipeline-dialog';
 
 /**
  * A select's choices are one free-text column, `task_form_field.field_options`, and until
@@ -162,7 +162,7 @@ describe('serializeFieldChoices', () => {
 });
 
 describe('validateSelectChoices', () => {
-  function select(overrides: Partial<TaskFormField> = {}): TaskFormField[] {
+  function select(overrides: Partial<PipelineField> = {}): PipelineField[] {
     return [{
       tagKey: 'format', label: 'JSON shape', fieldType: 'select', required: false,
       position: 0, fieldOptions: 'records\nlines', defaultValue: null, ...overrides,

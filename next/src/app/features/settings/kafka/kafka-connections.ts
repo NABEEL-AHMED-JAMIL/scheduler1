@@ -2,7 +2,7 @@ import { Component, OnInit, computed, effect, inject, signal, untracked } from '
 import { KAFKA_ENVIRONMENTS, kafkaEnvironment } from './kafka-environment';
 import { HttpClient } from '@angular/common/http';
 import { DatePipe } from '@angular/common';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
@@ -70,7 +70,7 @@ export interface KafkaProfile {
 
 @Component({
   selector: 'app-kafka-connections',
-  imports: [MineFilter, StatTile, DatePipe, StatusPill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger, CopyButton],
+  imports: [MineFilter, StatTile, DatePipe, StatusPill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger, CopyButton, RouterLink],
   templateUrl: './kafka-connections.html',
 })
 export class KafkaConnections implements OnInit {
@@ -161,9 +161,25 @@ export class KafkaConnections implements OnInit {
     });
   }
 
+  /** How many pipelines publish on each topic, so the row can say and link to them. */
+  private readonly pipelinesByTopic = signal<Record<number, number>>({});
+  pipelineCount(type: TaskType): number { return this.pipelinesByTopic()[type.sourceTaskTypeId!] ?? 0; }
+
   private loadTopics(): void {
     this.http.get<ApiResponse<any>>(`${API_BASE}/setting.json/appSetting`).subscribe({
       next: r => { if (r.status === API_SUCCESS) this.taskTypes.set(r.data?.sourceTaskTypes ?? []); },
+      error: () => {},
+    });
+    this.http.get<ApiResponse<{ sourceTaskTypeId?: number | null; status?: string }[]>>(`${API_BASE}/pipeline.json/list`).subscribe({
+      next: r => {
+        if (r.status !== API_SUCCESS) return;
+        const counts: Record<number, number> = {};
+        for (const p of r.data ?? []) {
+          if (p.sourceTaskTypeId == null || p.status === 'Delete') continue;
+          counts[p.sourceTaskTypeId] = (counts[p.sourceTaskTypeId] ?? 0) + 1;
+        }
+        this.pipelinesByTopic.set(counts);
+      },
       error: () => {},
     });
   }

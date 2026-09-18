@@ -378,14 +378,15 @@ export class Docs implements AfterViewInit {
       where: 'Pipelines → Source Tasks → New task',
       fields: [
         { name: 'Task name', required: true, note: 'Name it for the work, not the schedule. One task often feeds several jobs.' },
-        { name: 'Topic', required: true, note: 'The topic registered in the previous step.' },
-        { name: 'Pipeline', required: false, note: 'The pipelineId the worker routes on. It decides which handler runs.' },
+        { name: 'Topic', required: true, note: 'Pick it first: where the task publishes. Only this topic’s pipelines are offered next.' },
+        { name: 'Pipeline', required: false, note: 'One of the pipelines on that topic — the id the worker routes on, and the form the task is filled in with. Changing the topic clears a pipeline that is not on it.' },
         { name: 'Bucket', required: false, note: 'Where output lands. This is the connection added in step 2.' },
         { name: 'Payload', required: true, note: 'The configuration the worker receives, as XML tags.' },
       ],
       notes: ['You do not have to write the XML by hand. Enter the payload as tag rows and use '
-            + '"Show the XML these tags make" on this screen to preview it, or fill in a Task '
-            + 'Form (Configuration → Task Forms) if the pipeline has one defined.'],
+            + '"Show the XML these tags make" on this screen to preview it, or pick a pipeline '
+            + 'and fill in its form (defined under Configuration → Pipelines).',
+              'The Source Tasks list filters the same way: choose a topic, then one of its pipelines.'],
     },
     {
       id: 'job', title: 'Put the task on a timetable',
@@ -449,8 +450,8 @@ export class Docs implements AfterViewInit {
       intro: 'None of these are needed to run a pipeline, but each removes work once you are '
            + 'past the basics.',
       notes: [
-        'Task Forms — describe what a pipeline expects once, so its tasks are filled in field by '
-        + 'field rather than as raw tags.',
+        'Pipelines — describe what a pipeline expects once, and the topic it publishes on, so its '
+        + 'tasks are filled in field by field rather than as raw tags.',
         'Lookups — shared key and value data the forms and pipelines read from.',
       ],
     },

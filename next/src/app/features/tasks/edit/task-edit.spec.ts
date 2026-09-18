@@ -46,20 +46,20 @@ const appSettingWithPipelineIdsLookup = of({
 });
 
 describe('TaskEdit pipeline selection', () => {
-  it('populates the Pipeline field from taskForm.json/listPipelines, not a lookup', () => {
+  it('populates the Pipeline field from pipeline.json/listPipelines, not a lookup', () => {
     const pipelines = [
-      { taskFormId: 1, pipelineId: 'F768926', formName: 'Hurricanes ETL' },
-      { taskFormId: 2, pipelineId: 'F768927', formName: 'MP3 Noise Processing' },
+      { pipelineKey: 1, pipelineId: 'F768926', pipelineName: 'Hurricanes ETL' },
+      { pipelineKey: 2, pipelineId: 'F768927', pipelineName: 'MP3 Noise Processing' },
     ];
     const { component, get } = taskEditWith(url => {
       if (url.endsWith('/setting.json/appSetting')) return appSettingWithPipelineIdsLookup;
-      if (url.endsWith('/taskForm.json/listPipelines')) {
+      if (url.endsWith('/pipeline.json/listPipelines')) {
         return of({ status: API_SUCCESS, data: pipelines });
       }
       if (url.endsWith('/setting.json/fetchSubLookupByParentId')) {
         return of({ status: API_SUCCESS, data: { lookupDatas: [] } });
       }
-      if (url.endsWith('/taskForm.json/formForPipeline')) {
+      if (url.endsWith('/pipeline.json/definition')) {
         return of({ status: API_SUCCESS, data: null });
       }
       throw new Error(`unexpected GET ${url}`);
@@ -68,17 +68,17 @@ describe('TaskEdit pipeline selection', () => {
     component.ngOnInit();
 
     expect(component.pipelines()).toEqual(pipelines);
-    expect(get).toHaveBeenCalledWith(`${API_BASE}/taskForm.json/listPipelines`);
+    expect(get).toHaveBeenCalledWith(`${API_BASE}/pipeline.json/listPipelines`);
   });
 
   it('never asks the lookup API for a PIPELINE_IDS sub-lookup', () => {
     const { component, get } = taskEditWith(url => {
       if (url.endsWith('/setting.json/appSetting')) return appSettingWithPipelineIdsLookup;
-      if (url.endsWith('/taskForm.json/listPipelines')) return of({ status: API_SUCCESS, data: [] });
+      if (url.endsWith('/pipeline.json/listPipelines')) return of({ status: API_SUCCESS, data: [] });
       if (url.endsWith('/setting.json/fetchSubLookupByParentId')) {
         return of({ status: API_SUCCESS, data: { lookupDatas: [] } });
       }
-      if (url.endsWith('/taskForm.json/formForPipeline')) return of({ status: API_SUCCESS, data: null });
+      if (url.endsWith('/pipeline.json/definition')) return of({ status: API_SUCCESS, data: null });
       throw new Error(`unexpected GET ${url}`);
     });
 
@@ -100,8 +100,8 @@ describe('TaskEdit pipeline selection', () => {
       if (url.endsWith('/setting.json/appSetting')) {
         return of({ status: API_SUCCESS, data: { sourceTaskTypes: [], lookupDatas: [] } });
       }
-      if (url.endsWith('/taskForm.json/listPipelines')) return of({ status: API_SUCCESS, data: [] });
-      if (url.endsWith('/taskForm.json/formForPipeline')) return of({ status: API_SUCCESS, data: null });
+      if (url.endsWith('/pipeline.json/listPipelines')) return of({ status: API_SUCCESS, data: [] });
+      if (url.endsWith('/pipeline.json/definition')) return of({ status: API_SUCCESS, data: null });
       throw new Error(`unexpected GET ${url}`);
     });
     component.ngOnInit();
@@ -111,7 +111,7 @@ describe('TaskEdit pipeline selection', () => {
     // so nothing here should coerce or reinterpret it before it reaches formForPipeline.
     component.form.get('pipelineId')!.setValue('F768926');
 
-    expect(get).toHaveBeenCalledWith(`${API_BASE}/taskForm.json/formForPipeline`,
+    expect(get).toHaveBeenCalledWith(`${API_BASE}/pipeline.json/definition`,
       { params: { pipelineId: 'F768926' } });
   });
 });
@@ -127,7 +127,7 @@ describe('TaskEdit pipeline selection', () => {
  */
 describe('TaskEdit -- payload generated from the pipeline form on save', () => {
   const oneFieldForm = {
-    taskFormId: 9, pipelineId: 'F768926', formName: 'Hurricanes ETL',
+    pipelineKey: 9, pipelineId: 'F768926', pipelineName: 'Hurricanes ETL',
     fields: [{ tagKey: 'search_term', tagParent: null, label: 'Search term',
                fieldType: 'text', required: true, position: 0 }],
   };
@@ -137,8 +137,8 @@ describe('TaskEdit -- payload generated from the pipeline form on save', () => {
       if (url.endsWith('/setting.json/appSetting')) {
         return of({ status: API_SUCCESS, data: { sourceTaskTypes: [], lookupDatas: [] } });
       }
-      if (url.endsWith('/taskForm.json/listPipelines')) return of({ status: API_SUCCESS, data: [oneFieldForm] });
-      if (url.endsWith('/taskForm.json/formForPipeline')) return of({ status: API_SUCCESS, data: oneFieldForm });
+      if (url.endsWith('/pipeline.json/listPipelines')) return of({ status: API_SUCCESS, data: [oneFieldForm] });
+      if (url.endsWith('/pipeline.json/definition')) return of({ status: API_SUCCESS, data: oneFieldForm });
       throw new Error(`unexpected GET ${url}`);
     }, (url, body) => {
       if (url.endsWith('/setting.json/xmlCreateChecker')) {
@@ -167,7 +167,7 @@ describe('TaskEdit -- payload generated from the pipeline form on save', () => {
       if (url.endsWith('/setting.json/appSetting')) {
         return of({ status: API_SUCCESS, data: { sourceTaskTypes: [], lookupDatas: [] } });
       }
-      if (url.endsWith('/taskForm.json/listPipelines')) return of({ status: API_SUCCESS, data: [] });
+      if (url.endsWith('/pipeline.json/listPipelines')) return of({ status: API_SUCCESS, data: [] });
       throw new Error(`unexpected GET ${url}`);
     });
     component.ngOnInit();
@@ -194,7 +194,7 @@ describe('TaskEdit -- payload generated from the pipeline form on save', () => {
 describe('TaskEdit -- a select field\'s choices', () => {
   function formWith(fieldOptions: string | null, defaultValue: string | null = null) {
     return {
-      taskFormId: 9, pipelineId: 'F768930', formName: 'CSV to JSON demo',
+      pipelineKey: 9, pipelineId: 'F768930', pipelineName: 'CSV to JSON demo',
       fields: [{ tagKey: 'format', tagParent: null, label: 'JSON shape', fieldType: 'select',
                  required: false, defaultValue, helpText: null, fieldOptions, position: 0 }],
     };
@@ -205,8 +205,8 @@ describe('TaskEdit -- a select field\'s choices', () => {
       if (url.endsWith('/setting.json/appSetting')) {
         return of({ status: API_SUCCESS, data: { sourceTaskTypes: [], lookupDatas: [] } });
       }
-      if (url.endsWith('/taskForm.json/listPipelines')) return of({ status: API_SUCCESS, data: [def] });
-      if (url.endsWith('/taskForm.json/formForPipeline')) return of({ status: API_SUCCESS, data: def });
+      if (url.endsWith('/pipeline.json/listPipelines')) return of({ status: API_SUCCESS, data: [def] });
+      if (url.endsWith('/pipeline.json/definition')) return of({ status: API_SUCCESS, data: def });
       throw new Error(`unexpected GET ${url}`);
     });
     component.ngOnInit();
@@ -270,5 +270,50 @@ describe('TaskEdit -- a select field\'s choices', () => {
       { value: 'lines', label: 'lines' },
       { value: 'daily', label: 'daily (not one of the choices)' },
     ]);
+  });
+});
+
+describe('TaskEdit -- the pipeline follows the topic', () => {
+  const pipelines = [
+    { pipelineKey: 1, pipelineId: 'F768926', pipelineName: 'Hurricanes ETL', sourceTaskTypeId: 10 },
+    { pipelineKey: 2, pipelineId: 'F768927', pipelineName: 'MP3 Noise Processing', sourceTaskTypeId: 20 },
+    { pipelineKey: 3, pipelineId: 'F768928', pipelineName: 'Claims files', sourceTaskTypeId: 10 },
+  ];
+  const withEverything = () => taskEditWith(url => {
+    if (url.endsWith('/setting.json/appSetting')) return appSettingWithPipelineIdsLookup;
+    if (url.endsWith('/pipeline.json/listPipelines')) return of({ status: API_SUCCESS, data: pipelines });
+    if (url.endsWith('/setting.json/fetchSubLookupByParentId')) return of({ status: API_SUCCESS, data: { lookupDatas: [] } });
+    if (url.endsWith('/pipeline.json/definition')) return of({ status: API_SUCCESS, data: null });
+    throw new Error(`unexpected GET ${url}`);
+  });
+
+  it('offers no pipeline until a topic is chosen, then only that topic\'s', () => {
+    const { component } = withEverything();
+    component.ngOnInit();
+
+    expect(component.pipelineOptions()).toEqual([]);
+    expect(component.pipelineHint()).toContain('Pick a topic first');
+
+    component.form.patchValue({ sourceTaskTypeId: 10 });
+    expect(component.pipelineOptions().map(o => o.value)).toEqual(['F768926', 'F768928']);
+
+    component.form.patchValue({ sourceTaskTypeId: 30 });
+    expect(component.pipelineOptions()).toEqual([]);
+    expect(component.pipelineHint()).toContain('No pipeline publishes on this topic');
+  });
+
+  it('clears a pipeline that does not publish on the newly chosen topic', () => {
+    const { component } = withEverything();
+    component.ngOnInit();
+    component.form.patchValue({ sourceTaskTypeId: 10 });
+    component.form.patchValue({ pipelineId: 'F768926' });
+
+    // Same topic: the pipeline stays.
+    component.form.patchValue({ sourceTaskTypeId: 10 });
+    expect(component.form.get('pipelineId')!.value).toBe('F768926');
+
+    // A topic F768926 does not publish on: the pair could not dispatch, so the pipeline goes.
+    component.form.patchValue({ sourceTaskTypeId: 20 });
+    expect(component.form.get('pipelineId')!.value).toBe('');
   });
 });

@@ -3,7 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { HttpClient } from '@angular/common/http';
 import { of } from 'rxjs';
-import { TaskForm, TaskFormDialog } from './task-form-dialog';
+import { Pipeline, PipelineDialog } from './pipeline-dialog';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { API_SUCCESS } from '../../../core/api/api.config';
 
@@ -21,7 +21,7 @@ import { API_SUCCESS } from '../../../core/api/api.config';
  * them all saved without complaint before this and produced a blank <select> on somebody else's
  * screen, hours later, with nothing pointing back at the form that caused it.
  */
-function dialogFor(form?: TaskForm) {
+function dialogFor(form?: Pipeline) {
   const post = vi.fn(() => of({ status: API_SUCCESS, message: 'saved' }));
   const toast = { success: vi.fn(), error: vi.fn(), info: () => {} };
   const close = vi.fn();
@@ -34,15 +34,15 @@ function dialogFor(form?: TaskForm) {
       { provide: ToastService, useValue: toast },
     ],
   });
-  const dialog = TestBed.runInInjectionContext(() => new TaskFormDialog());
+  const dialog = TestBed.runInInjectionContext(() => new PipelineDialog());
   return { dialog, post, toast, close };
 }
 
-function selectForm(fieldOptions: string | null, defaultValue: string | null = null): TaskForm {
+function selectForm(fieldOptions: string | null, defaultValue: string | null = null): Pipeline {
   return {
-    taskFormId: 7, pipelineId: 'F768930', formName: 'CSV to JSON demo',
+    pipelineKey: 7, pipelineId: 'F768930', pipelineName: 'CSV to JSON demo',
     fields: [{
-      taskFormFieldId: 71, tagKey: 'format', tagParent: null, label: 'JSON shape',
+      pipelineFieldId: 71, tagKey: 'format', tagParent: null, label: 'JSON shape',
       fieldType: 'select', required: false, defaultValue, helpText: null,
       fieldOptions, position: 0,
     }],
@@ -50,11 +50,11 @@ function selectForm(fieldOptions: string | null, defaultValue: string | null = n
 }
 
 /** The field list the dialog would POST, without going through save()'s validation. */
-function payloadFields(dialog: TaskFormDialog): any[] {
+function payloadFields(dialog: PipelineDialog): any[] {
   return (dialog as any).rows();
 }
 
-describe('TaskFormDialog -- choices are edited as value and label', () => {
+describe('PipelineDialog -- choices are edited as value and label', () => {
   it('splits an existing value/label choice into its two boxes', () => {
     const { dialog } = dialogFor(selectForm('records=JSON array\nlines=JSON Lines', 'records'));
     expect(dialog.choicesArray(0).getRawValue()).toEqual([
@@ -100,7 +100,7 @@ describe('TaskFormDialog -- choices are edited as value and label', () => {
   });
 });
 
-describe('TaskFormDialog -- the Default value dropdown', () => {
+describe('PipelineDialog -- the Default value dropdown', () => {
   it('offers the parsed choices, showing labels and storing values', () => {
     const { dialog } = dialogFor(selectForm('records=JSON array\nlines=JSON Lines'));
     expect(dialog.defaultValueOptions(0)).toEqual([
@@ -128,7 +128,7 @@ describe('TaskFormDialog -- the Default value dropdown', () => {
   });
 });
 
-describe('TaskFormDialog -- choices survive a save made while the type is not select', () => {
+describe('PipelineDialog -- choices survive a save made while the type is not select', () => {
   it('keeps the choices when the field is saved as text', () => {
     /*
      * The payload used to null fieldOptions for anything but a select, and saveForm replaces
@@ -150,9 +150,9 @@ describe('TaskFormDialog -- choices survive a save made while the type is not se
   });
 });
 
-describe('TaskFormDialog -- what save() refuses', () => {
-  function readyToSave(dialog: TaskFormDialog): void {
-    dialog.form.patchValue({ pipelineId: 'F768930', formName: 'CSV to JSON demo' });
+describe('PipelineDialog -- what save() refuses', () => {
+  function readyToSave(dialog: PipelineDialog): void {
+    dialog.form.patchValue({ pipelineId: 'F768930', pipelineName: 'CSV to JSON demo' });
   }
 
   it('saves a well-formed select', () => {

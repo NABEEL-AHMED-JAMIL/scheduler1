@@ -29,14 +29,26 @@
                    (retry)="load()">
     <ng-container toolbar>
       <app-view-toggle [(value)]="view" key="tasks" cardsIcon="layers" />
+      <!-- Topic first, then the pipelines on it -- the same two-step pick the task editor uses,
+           so the list can be narrowed the way tasks are actually organised. -->
+      <select class="input max-w-48" [value]="topicFilter()" aria-label="Topic"
+              (change)="setTopicFilter($any($event.target).value)">
+        <option value="">All topics</option>
+        @for (t of topicOptions(); track t.id) { <option [value]="t.id">{{ t.name }}</option> }
+      </select>
+      <select class="input max-w-52" [value]="pipelineFilter()" aria-label="Pipeline"
+              (change)="pipelineFilter.set($any($event.target).value); pager.reset()">
+        <option value="">{{ topicFilter() ? 'All pipelines on this topic' : 'All pipelines' }}</option>
+        @for (p of pipelineOptions(); track p.id) { <option [value]="p.id">{{ p.name }}</option> }
+      </select>
       <div class="search-field max-w-56">
         <app-icon name="search" size="0.95em" />
-        <input class="input" placeholder="Search id, name, type or pipeline"
+        <input class="input" placeholder="Search id, name, topic or pipeline"
                [value]="search()" (input)="search.set($any($event.target).value); pager.reset()" />
       </div>
       <app-mine-filter [(only)]="onlyMine" />
-      @if (search()) {
-        <button type="button" class="btn btn-ghost btn-sm" (click)="search.set('')"><app-icon name="close" />Clear</button>
+      @if (search() || topicFilter() || pipelineFilter()) {
+        <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()"><app-icon name="close" />Clear</button>
       }
     </ng-container>
 

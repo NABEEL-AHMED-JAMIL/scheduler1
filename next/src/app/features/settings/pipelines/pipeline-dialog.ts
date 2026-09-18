@@ -7,9 +7,10 @@ import { ToastService } from '../../../shared/ui/toast.service';
 import { Field } from '../../../shared/ui/field';
 import { FormDialog } from '../../../shared/ui/form-dialog';
 import { Icon } from '../../../shared/ui/icon';
+import { parseTopicPartition } from '../../../shared/ui/topic';
 
-export interface TaskFormField {
-  taskFormFieldId?: number;
+export interface PipelineField {
+  pipelineFieldId?: number;
   tagKey: string;
   tagParent?: string | null;
   label: string;
@@ -21,20 +22,24 @@ export interface TaskFormField {
   position: number;
 }
 
-export interface TaskForm {
+export interface Pipeline {
   /** The editor's name; the author was already carried. */
   updatedByName?: string | null;
 
-  taskFormId?: number;
+  pipelineKey?: number;
   pipelineId: string;
-  formName: string;
+  pipelineName: string;
+  /** The topic (source task type) it publishes on; the server names it on the way out. */
+  sourceTaskTypeId?: number | null;
+  topicName?: string | null;
+  kafkaTopic?: string | null;
   description?: string | null;
-  formStatus?: string;
+  status?: string;
   dateCreated?: string;
   createdBy?: number;
   createdByName?: string | null;
   /** Absent, not null, when the server has nothing: its DTOs omit null fields. */
-  fields?: TaskFormField[];
+  fields?: PipelineField[];
 }
 
 /** The set the server accepts; anything else is silently stored as text. */
@@ -138,7 +143,7 @@ export function serializeFieldChoices(choices: FieldChoice[]): string {
 }
 
 /**
- * The rules a select's choices have to satisfy, mirroring TaskFormServiceImpl.validate.
+ * The rules a select's choices have to satisfy, mirroring PipelineServiceImpl.validate.
  *
  * All three describe a form that saves happily today and then misbehaves on somebody else's
  * screen, which is why they are rules and not hints. A select with no choices offers the operator
@@ -151,7 +156,7 @@ export function serializeFieldChoices(choices: FieldChoice[]): string {
  *
  * Takes the wire shape rather than the form group so both sides check the same bytes.
  */
-export function validateSelectChoices(rows: TaskFormField[]): string | null {
+export function validateSelectChoices(rows: PipelineField[]): string | null {
   for (const field of rows) {
     if (field.fieldType !== 'select') continue;
     const name = field.label?.trim() || field.tagKey?.trim() || 'dropdown';
@@ -176,12 +181,12 @@ export function validateSelectChoices(rows: TaskFormField[]): string | null {
 }
 
 @Component({
-  selector: 'app-task-form-dialog',
+  selector: 'app-pipeline-dialog',
   imports: [ReactiveFormsModule, Field, FormDialog, Icon],
   template: `
     <app-form-dialog
-        [heading]="isEdit() ? 'Edit pipeline form' : 'New pipeline'"
-        subtitle="A pipeline is defined by its id and the fields a task on it should fill in -- creating one here is what makes it choosable on Source Task, in place of a hand-written XML tag."
+        [heading]="isEdit() ? 'Edit pipeline' : 'New pipeline'"
+        subtitle="A pipeline is its id, the topic it publishes on, and the fields a task on it fills in -- creating one here is what makes it choosable on Source Task, in place of a hand-written XML tag."
         [confirmLabel]="isEdit() ? 'Save changes' : 'Create pipeline'"
         [saving]="saving()" size="xwide"
         (cancelled)="ref.close(false)" (confirmed)="save()">
@@ -194,12 +199,23 @@ export function validateSelectChoices(rows: TaskFormField[]): string | null {
                    placeholder="F768926" />
           </app-field>
 
-          <app-field label="Form name" for="formName" [required]="true"
-                     [control]="form.get('formName')" [submitted]="submitted()">
-            <input id="formName" class="input" formControlName="formName"
+          <app-field label="Name" for="pipelineName" [required]="true"
+                     [control]="form.get('pipelineName')" [submitted]="submitted()">
+            <input id="pipelineName" class="input" formControlName="pipelineName"
                    placeholder="Hurricane season collection" />
           </app-field>
         </div>
+
+        <app-field label="Topic" for="pipelineTopic" [required]="true"
+                   [control]="form.get('sourceTaskTypeId')" [submitted]="submitted()"
+                   hint="The Kafka topic this pipeline's messages go out on. Many pipelines can share one; a task picks the topic first, then the pipeline.">
+          <select id="pipelineTopic" class="input" formControlName="sourceTaskTypeId">
+            <option [ngValue]="null">Choose a topic…</option>
+            @for (t of data.topics ?? []; track t.sourceTaskTypeId) {
+              <option [ngValue]="t.sourceTaskTypeId">{{ t.serviceName }}@if (kafkaTopicOf(t)) { — {{ kafkaTopicOf(t) }} }@if (t.kafkaConnectionProfileName) { ({{ t.kafkaConnectionProfileName }}) }</option>
+            }
+          </select>
+        </app-field>
 
         <app-field label="Description" for="formDescription"
                    [control]="form.get('description')" [submitted]="submitted()">
@@ -394,9 +410,10 @@ export function validateSelectChoices(rows: TaskFormField[]): string | null {
     </app-form-dialog>
   `,
 })
-export class TaskFormDialog {
+export class PipelineDialog {
   readonly ref = inject<DialogRef<boolean>>(DialogRef);
-  readonly data = inject<{ form?: TaskForm }>(DIALOG_DATA);
+  readonly data = inject<{ form?: Pipeline; topics?: { sourceTaskTypeId: number; serviceName: string; queueTopicPartition?: string; kafkaConnectionProfileName?: string }[] }>(DIALOG_DATA);
+  kafkaTopicOf(t: { queueTopicPartition?: string }): string { return parseTopicPartition(t.queueTopicPartition).topic; }
   private readonly fb = inject(FormBuilder);
   private readonly http = inject(HttpClient);
   private readonly toast = inject(ToastService);
@@ -404,17 +421,18 @@ export class TaskFormDialog {
   readonly fieldTypes = FIELD_TYPES;
   readonly saving = signal(false);
   readonly submitted = signal(false);
-  readonly isEdit = computed(() => !!this.data.form?.taskFormId);
+  readonly isEdit = computed(() => !!this.data.form?.pipelineKey);
 
   /** Bumped on every structural edit so the preview and parent lists recompute. */
   private readonly revision = signal(0);
 
   readonly form: FormGroup = this.fb.group({
-    taskFormId: [this.data.form?.taskFormId ?? null],
+    pipelineKey: [this.data.form?.pipelineKey ?? null],
     pipelineId: [this.data.form?.pipelineId ?? '', Validators.required],
-    formName: [this.data.form?.formName ?? '', Validators.required],
+    pipelineName: [this.data.form?.pipelineName ?? '', Validators.required],
+    sourceTaskTypeId: [this.data.form?.sourceTaskTypeId ?? null, Validators.required],
     description: [this.data.form?.description ?? ''],
-    formStatus: [this.data.form?.formStatus ?? 'Active'],
+    status: [this.data.form?.status ?? 'Active'],
     fields: this.fb.array(
       (this.data.form?.fields ?? [])
         .slice()
@@ -424,9 +442,9 @@ export class TaskFormDialog {
 
   get fields(): FormArray { return this.form.get('fields') as FormArray; }
 
-  private fieldGroup(field?: Partial<TaskFormField>): FormGroup {
+  private fieldGroup(field?: Partial<PipelineField>): FormGroup {
     const group = this.fb.group({
-      taskFormFieldId: [field?.taskFormFieldId ?? null],
+      pipelineFieldId: [field?.pipelineFieldId ?? null],
       tagKey: [field?.tagKey ?? '', Validators.required],
       tagParent: [field?.tagParent ?? ''],
       label: [field?.label ?? '', Validators.required],
@@ -530,7 +548,7 @@ export class TaskFormDialog {
    * Mirrors the server's checks so a problem is named here rather than after a round trip.
    * The messages are deliberately the server's own.
    */
-  private validate(rows: TaskFormField[]): string | null {
+  private validate(rows: PipelineField[]): string | null {
     if (!rows.length) return 'A form needs at least one field.';
     const keys = new Set<string>();
     for (const field of rows) {
@@ -587,7 +605,7 @@ export class TaskFormDialog {
    * generator then nests inside each other in an order nobody asked for. Silent on both sides,
    * so it is caught here by name.
    */
-  private findNestingCycle(rows: TaskFormField[]): string | null {
+  private findNestingCycle(rows: PipelineField[]): string | null {
     const parentOf = new Map<string, string>();
     for (const field of rows) {
       const key = field.tagKey.trim();
@@ -614,11 +632,11 @@ export class TaskFormDialog {
     return null;
   }
 
-  private rows(): TaskFormField[] {
+  private rows(): PipelineField[] {
     return this.fields.controls.map((row, index) => {
       const value = row.getRawValue();
       return {
-        taskFormFieldId: value.taskFormFieldId ?? undefined,
+        pipelineFieldId: value.pipelineFieldId ?? undefined,
         tagKey: String(value.tagKey ?? '').trim(),
         tagParent: String(value.tagParent ?? '').trim() || null,
         label: String(value.label ?? '').trim(),
@@ -664,7 +682,7 @@ export class TaskFormDialog {
 
   save(): void {
     this.submitted.set(true);
-    if (this.form.get('pipelineId')?.invalid || this.form.get('formName')?.invalid) {
+    if (this.form.get('pipelineId')?.invalid || this.form.get('pipelineName')?.invalid) {
       this.form.markAllAsTouched();
       this.toast.error('Check the highlighted fields.');
       return;
@@ -685,17 +703,18 @@ export class TaskFormDialog {
     }
 
     const value = this.form.getRawValue();
-    const payload: TaskForm = {
-      taskFormId: value.taskFormId ?? undefined,
+    const payload: Pipeline = {
+      pipelineKey: value.pipelineKey ?? undefined,
       pipelineId: String(value.pipelineId).trim(),
-      formName: String(value.formName).trim(),
+      pipelineName: String(value.pipelineName).trim(),
+      sourceTaskTypeId: value.sourceTaskTypeId,
       description: value.description || null,
-      formStatus: value.formStatus,
+      status: value.status,
       fields: rows,
     };
 
     this.saving.set(true);
-    this.http.post<ApiResponse>(`${API_BASE}/taskForm.json/saveForm`, payload).subscribe({
+    this.http.post<ApiResponse>(`${API_BASE}/pipeline.json/save`, payload).subscribe({
       next: response => {
         this.saving.set(false);
         if (response.status === API_SUCCESS) {

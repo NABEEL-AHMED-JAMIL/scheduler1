@@ -54,7 +54,7 @@ export class FormDialog {
    * own, and max-w keeps it inside a tablet viewport.
    *
    * 'xwide' is for a form that builds a *list* of something rather than filling in fields --
-   * Pipeline Forms' field builder, where each row is its own card and the win from more width
+   * Pipelines' field builder, where each row is its own card and the win from more width
    * is fitting two cards across rather than more columns inside one.
    */
   readonly size = input<'default' | 'wide' | 'xwide'>('default');

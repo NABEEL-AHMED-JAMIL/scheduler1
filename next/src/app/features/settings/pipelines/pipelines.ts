@@ -12,31 +12,37 @@ import { Icon } from '../../../shared/ui/icon';
 import { ViewToggle } from '../../../shared/ui/view-toggle';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { confirmWith } from '../../../shared/ui/confirm';
-import { TaskForm, TaskFormDialog } from './task-form-dialog';
+import { Pipeline, PipelineDialog } from './pipeline-dialog';
+import { ActivatedRoute, RouterLink } from '@angular/router';
+import { parseTopicPartition } from '../../../shared/ui/topic';
 
 @Component({
-  selector: 'app-task-forms',
-  imports: [MineFilter, ViewToggle, StatTile, TableShell, StatusPill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger],
-  templateUrl: './task-forms.html',
+  selector: 'app-pipelines',
+  imports: [MineFilter, ViewToggle, StatTile, TableShell, StatusPill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink],
+  templateUrl: './pipelines.html',
 })
-export class TaskForms implements OnInit {
+export class Pipelines implements OnInit {
   readonly view = signal<'table' | 'cards'>('table');
   private readonly http = inject(HttpClient);
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
 
-  readonly forms = signal<TaskForm[]>([]);
+  readonly forms = signal<Pipeline[]>([]);
   readonly loading = signal(true);
   readonly error = signal('');
   readonly search = signal('');
 
-  readonly hasFilters = computed(() => !!this.search().trim());
+  /** The topics the caller can see, for the filter and for the dialog's picker. */
+  readonly topics = signal<{ sourceTaskTypeId: number; serviceName: string; queueTopicPartition?: string; status?: string; kafkaConnectionProfileName?: string }[]>([]);
+  readonly topicFilter = signal('');
+  readonly hasFilters = computed(() => !!this.search().trim() || !!this.topicFilter());
+  private readonly route = inject(ActivatedRoute);
 
   private readonly auth = inject(AuthService);
 
   /**
    * A new form always belongs to one tenant. A platform admin has none, so
-   * TaskFormServiceImpl.saveForm files their new form under the seeded "default" tenant instead
+   * PipelineServiceImpl.saveForm files their new form under the seeded "default" tenant instead
    * of refusing it -- only that tenant's users can use it. Surfaced here so a platform admin
    * knows where to find (or sign in as, to fully manage) what they are about to create.
    */
@@ -49,10 +55,13 @@ export class TaskForms implements OnInit {
 
   readonly filtered = computed(() => {
     const term = this.search().trim().toLowerCase();
-    const rows = this.mine(this.forms());
+    const topic = this.topicFilter();
+    let rows = this.mine(this.forms());
+    if (topic === 'none') rows = rows.filter(f => f.sourceTaskTypeId == null);
+    else if (topic) rows = rows.filter(f => String(f.sourceTaskTypeId) === topic);
     if (!term) return rows;
     return rows.filter(form =>
-      `${form.formName ?? ''} ${form.pipelineId ?? ''} ${form.description ?? ''}`
+      `${form.pipelineName ?? ''} ${form.pipelineId ?? ''} ${form.description ?? ''} ${form.topicName ?? ''} ${form.kafkaTopic ?? ''}`
         .toLowerCase().includes(term));
   });
 
@@ -60,19 +69,32 @@ export class TaskForms implements OnInit {
     const list = this.forms();
     return {
       total: list.length,
+      active: list.filter(f => f.status === 'Active').length,
       fields: list.reduce((sum, form) => sum + (form.fields?.length ?? 0), 0),
-      pipelines: new Set(list.map(form => form.pipelineId)).size,
+      topics: new Set(list.map(f => f.sourceTaskTypeId).filter(id => id != null)).size,
+      untopped: list.filter(f => f.sourceTaskTypeId == null).length,
     };
   });
 
   ngOnInit(): void {
+    const topic = this.route.snapshot.queryParamMap.get('topic');
+    if (topic) this.topicFilter.set(topic);
     this.load();
+    this.http.get<ApiResponse<any>>(`${API_BASE}/setting.json/appSetting`).subscribe({
+      next: r => {
+        if (r.status !== API_SUCCESS) return;
+        this.topics.set((r.data?.sourceTaskTypes ?? []).filter((t: any) => t.status !== 'Delete'));
+      },
+      error: () => {},
+    });
   }
+
+  kafkaTopicOf(t: { queueTopicPartition?: string }): string { return parseTopicPartition(t.queueTopicPartition).topic; }
 
   load(): void {
     this.loading.set(true);
     this.error.set('');
-    this.http.get<ApiResponse<TaskForm[]>>(`${API_BASE}/taskForm.json/listForms`).subscribe({
+    this.http.get<ApiResponse<Pipeline[]>>(`${API_BASE}/pipeline.json/list`).subscribe({
       next: response => {
         this.loading.set(false);
         if (response.status !== API_SUCCESS) { this.error.set(response.message); return; }
@@ -85,46 +107,46 @@ export class TaskForms implements OnInit {
     });
   }
 
-  fieldCount(form: TaskForm): number { return form.fields?.length ?? 0; }
+  fieldCount(form: Pipeline): number { return form.fields?.length ?? 0; }
 
-  requiredCount(form: TaskForm): number {
+  requiredCount(form: Pipeline): number {
     return (form.fields ?? []).filter(field => field.required).length;
   }
 
   create(): void {
-    this.dialog.open<boolean>(TaskFormDialog, { data: {} })
+    this.dialog.open<boolean>(PipelineDialog, { data: { topics: this.topics() } })
       .closed.subscribe(saved => { if (saved) this.load(); });
   }
 
-  edit(form: TaskForm): void {
-    this.dialog.open<boolean>(TaskFormDialog, { data: { form } })
+  edit(form: Pipeline): void {
+    this.dialog.open<boolean>(PipelineDialog, { data: { form, topics: this.topics() } })
       .closed.subscribe(saved => { if (saved) this.load(); });
   }
 
-  duplicate(form: TaskForm): void {
+  duplicate(form: Pipeline): void {
     // A copy has to claim a different pipeline: one live form per pipeline is a unique index.
-    const copy: TaskForm = {
+    const copy: Pipeline = {
       ...form,
-      taskFormId: undefined,
+      pipelineKey: undefined,
       pipelineId: '',
-      formName: `${form.formName} (copy)`,
-      fields: (form.fields ?? []).map(field => ({ ...field, taskFormFieldId: undefined })),
+      pipelineName: `${form.pipelineName} (copy)`,
+      fields: (form.fields ?? []).map(field => ({ ...field, pipelineFieldId: undefined })),
     };
-    this.dialog.open<boolean>(TaskFormDialog, { data: { form: copy } })
+    this.dialog.open<boolean>(PipelineDialog, { data: { form: copy, topics: this.topics() } })
       .closed.subscribe(saved => { if (saved) this.load(); });
   }
 
-  async remove(form: TaskForm): Promise<void> {
+  async remove(form: Pipeline): Promise<void> {
     const ok = await confirmWith(this.dialog, {
-      title: `Delete ${form.formName}?`,
+      title: `Delete ${form.pipelineName}?`,
       body: 'Tasks on this pipeline keep working — a form only describes their payload, it does '
         + 'not store it. They go back to being edited as raw tags.',
       confirmLabel: 'Delete form',
       danger: true,
     });
     if (!ok) return;
-    this.http.delete<ApiResponse>(`${API_BASE}/taskForm.json/deleteForm`,
-      { params: new HttpParams().set('taskFormId', String(form.taskFormId)) }).subscribe({
+    this.http.delete<ApiResponse>(`${API_BASE}/pipeline.json/delete`,
+      { params: new HttpParams().set('pipelineKey', String(form.pipelineKey)) }).subscribe({
       next: response => {
         if (response.status === API_SUCCESS) { this.toast.success(response.message); this.load(); }
         else this.toast.error(response.message);

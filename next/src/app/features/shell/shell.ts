@@ -142,8 +142,8 @@ export class Shell {
       children: [
         { label: 'Kafka & Topics', path: '/settings/kafka', icon: 'server', adminOnly: true,
           hint: 'Brokers, credentials and the topics that publish through them' },
-        { label: 'Pipeline Forms', path: '/settings/pipeline-forms', icon: 'template', adminOnly: true,
-          hint: 'Define a pipeline and its form instead of a lookup row' },
+        { label: 'Pipelines', path: '/settings/pipelines', icon: 'template', adminOnly: true,
+          hint: 'Each pipeline, the topic it publishes on, and its form' },
         { label: 'Lookups', path: '/settings/lookup', icon: 'list', adminOnly: true,
           hint: 'Shared key and value data' },
         { label: 'Storage Connections', path: '/settings/storage-connections', icon: 'cloud', adminOnly: true,

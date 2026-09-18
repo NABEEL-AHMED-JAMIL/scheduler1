@@ -1,11 +1,11 @@
 <div class="page">
   <div class="page-head">
     <div>
-      <h1 class="page-title">Pipeline Forms</h1>
+      <h1 class="page-title">Pipelines</h1>
       <p class="page-subtitle">
-        Every pipeline a task can target is defined here — its id, and the fields a task on it
-        expects, filled in field by field instead of hand-written as an XML tag. Source Task's
-        Pipeline picker offers exactly what's defined on this page, nothing else.
+        Every pipeline a task can run — its id, the topic it publishes on, and the fields a task
+        on it fills in instead of hand-writing XML. A topic carries many pipelines; on a task you
+        pick the topic first, then one of its pipelines.
       </p>
     </div>
     <div class="flex items-center gap-2 ml-auto">
@@ -22,18 +22,19 @@
     <div class="card flex flex-wrap items-center gap-2 px-4 py-2.5 text-sm">
       <app-icon name="info" class="text-[color:var(--text-muted)]" />
       <span>
-        A pipeline form belongs to one tenant. One you create here is filed under the default
-        tenant — only that tenant's users can use it. Sign in as a specific tenant to create one
+        A pipeline belongs to one workspace. One you create here is filed under the default
+        workspace — only its users can use it. Sign in as a specific workspace to create one
         for them instead.
       </span>
     </div>
   }
 
-  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
     @for (tile of [
-      { label: 'Pipelines', value: summary().pipelines, foot: 'defined', icon: 'send', tone: 'info' },
-      { label: 'Forms',     value: summary().total,     foot: 'one per pipeline', icon: 'template', tone: 'info' },
-      { label: 'Fields',    value: summary().fields,    foot: 'across all pipelines', icon: 'list', tone: 'info' }
+      { label: 'Pipelines', value: summary().total,    foot: summary().active + ' active', icon: 'send', tone: 'info' },
+      { label: 'Topics',    value: summary().topics,   foot: 'they publish on', icon: 'layers', tone: 'info' },
+      { label: 'Fields',    value: summary().fields,   foot: 'across all pipelines', icon: 'list', tone: 'info' },
+      { label: 'No topic',  value: summary().untopped, foot: summary().untopped ? 'assign one to use them' : 'every pipeline has one', icon: 'alert', tone: summary().untopped ? 'warn' : 'muted' }
     ]; track tile.label) {
       <app-stat-tile [label]="tile.label" [value]="tile.value" [icon]="tile.icon"
                      [tone]="$any(tile.tone)" [foot]="tile.foot" />
@@ -48,7 +49,13 @@
                    emptyIcon="template"
                    (retry)="load()">
     <ng-container toolbar>
-      <app-view-toggle [(value)]="view" key="task-forms" cardsIcon="template" />
+      <app-view-toggle [(value)]="view" key="pipelines" cardsIcon="template" />
+      <select class="input max-w-52" [value]="topicFilter()" aria-label="Topic"
+              (change)="topicFilter.set($any($event.target).value)">
+        <option value="">All topics</option>
+        @for (t of topics(); track t.sourceTaskTypeId) { <option [value]="t.sourceTaskTypeId">{{ t.serviceName }}</option> }
+        @if (summary().untopped) { <option value="none">No topic</option> }
+      </select>
       <div class="search-field max-w-56">
         <app-icon name="search" size="0.95em" />
         <input class="input" placeholder="Search name, pipeline or description"
@@ -64,16 +71,23 @@
 
     @if (view() === 'cards') {
       <div class="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
-        @for (form of filtered(); track form.taskFormId) {
+        @for (form of filtered(); track form.pipelineKey) {
           <article class="card p-4 flex flex-col gap-3">
             <div class="flex items-start gap-2.5">
               <span class="stat-glyph shrink-0"><app-icon name="template" /></span>
               <div class="min-w-0 flex-1">
-                <h3 class="font-semibold truncate" [title]="form.formName">{{ form.formName }}</h3>
+                <h3 class="font-semibold truncate" [title]="form.pipelineName">{{ form.pipelineName }}</h3>
                 <p class="mono text-[color:var(--text-muted)]">{{ form.pipelineId }}</p>
+                @if (form.topicName) {
+                  <span class="pill pill-neutral mt-1" [title]="'Publishes on ' + (form.kafkaTopic || form.topicName)">
+                    <app-icon name="layers" size="0.8em" class="opacity-70" />{{ form.topicName }}
+                  </span>
+                } @else {
+                  <span class="pill pill-warn mt-1" title="Assign a topic; a task cannot pick this pipeline until then">no topic</span>
+                }
               </div>
               <div class="shrink-0 flex items-center gap-1">
-                <app-status [label]="form.formStatus" [quiet]="true" />
+                <app-status [label]="form.status" [quiet]="true" />
                 <button type="button" class="btn btn-ghost btn-icon btn-sm"
                         [cdkMenuTriggerFor]="cardMenu" aria-label="Actions">
                   <app-icon name="dots" size="1.05em" />
@@ -114,7 +128,7 @@
 
             @if (form.fields?.length) {
               <div class="flex flex-wrap gap-1">
-                @for (field of form.fields.slice(0, 6); track field.taskFormFieldId) {
+                @for (field of form.fields.slice(0, 6); track field.pipelineFieldId) {
                   <span class="pill pill-neutral mono" [title]="field.label">{{ field.tagKey }}</span>
                 }
                 @if (form.fields.length > 6) {
@@ -129,8 +143,9 @@
       <table class="table-modern">
         <thead>
           <tr>
-            <th>Form</th>
             <th>Pipeline</th>
+            <th>Id</th>
+            <th>Topic</th>
             <th>Fields</th>
             <th>Created by</th>
             <th>Updated by</th>
@@ -139,10 +154,10 @@
           </tr>
         </thead>
         <tbody>
-          @for (form of filtered(); track form.taskFormId) {
+          @for (form of filtered(); track form.pipelineKey) {
             <tr>
               <td>
-                <div class="font-medium">{{ form.formName }}</div>
+                <div class="font-medium">{{ form.pipelineName }}</div>
                 @if (form.description) {
                   <div class="text-xs text-[color:var(--text-muted)] line-clamp-1">
                     {{ form.description }}
@@ -150,6 +165,15 @@
                 }
               </td>
               <td class="mono text-accent">{{ form.pipelineId }}</td>
+              <td>
+                @if (form.topicName) {
+                  <a class="link-inline" [routerLink]="['/settings/kafka']" [queryParams]="{ topic: form.sourceTaskTypeId }"
+                     [title]="'Publishes on ' + (form.kafkaTopic || '') + ' — open on Kafka & Topics'">{{ form.topicName }}</a>
+                  @if (form.kafkaTopic) { <div class="mono text-xs text-[color:var(--text-muted)]">{{ form.kafkaTopic }}</div> }
+                } @else {
+                  <span class="pill pill-warn" title="Assign a topic; a task cannot pick this pipeline until then">no topic</span>
+                }
+              </td>
               <td>
                 {{ fieldCount(form) }}
                 <span class="text-[color:var(--text-muted)] text-xs">
@@ -160,7 +184,7 @@
               <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
                 {{ form.updatedByName || '—' }}
               </td>
-              <td><app-status [label]="form.formStatus" [quiet]="true" /></td>
+              <td><app-status [label]="form.status" [quiet]="true" /></td>
               <td>
                 <button type="button" class="btn btn-ghost btn-icon btn-sm"
                         [cdkMenuTriggerFor]="rowMenu" aria-label="Actions">

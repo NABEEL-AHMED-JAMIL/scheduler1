@@ -288,6 +288,7 @@
                   <tr>
                     <th>Name</th>
                     <th>Kafka topic</th>
+                    <th class="text-right">Pipelines</th>
                     <th class="text-right">Tasks</th>
                     <th class="text-right">State</th>
                     <th class="w-20"><span class="sr-only">Actions</span></th>
@@ -317,6 +318,15 @@
                           <div class="text-[11px] mt-0.5 truncate" [class]="test.ok ? 'text-ok-500' : 'text-crit-500'" [title]="test.message">
                             {{ test.message }}
                           </div>
+                        }
+                      </td>
+                      <td class="text-right tabular">
+                        @if (pipelineCount(row.type); as n) {
+                          <a class="link-inline" [routerLink]="['/settings/pipelines']" [queryParams]="{ topic: row.type.sourceTaskTypeId }"
+                             title="Open the pipelines on this topic">{{ n }}</a>
+                        } @else {
+                          <a class="text-[color:var(--text-muted)] hover:underline" [routerLink]="['/settings/pipelines']" [queryParams]="{ topic: row.type.sourceTaskTypeId }"
+                             title="No pipeline publishes on this topic yet — add one">0</a>
                         }
                       </td>
                       <td class="text-right tabular" [class.text-[color:var(--text-muted)]]="!row.type.totalTaskLink">{{ row.type.totalTaskLink || 0 }}</td>

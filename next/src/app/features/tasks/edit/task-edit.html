@@ -24,7 +24,7 @@
 
           <app-field label="Topic" for="taskType" [required]="true"
                      [control]="form.get('sourceTaskTypeId')" [submitted]="submitted()"
-                     hint="Decides which consumer and Kafka topic this reaches.">
+                     hint="Where this task publishes. Pick it first; the pipelines on it come next.">
             <select id="taskType" class="input" formControlName="sourceTaskTypeId">
               <option [ngValue]="null">Select a topic</option>
               @for (type of taskTypes(); track type.sourceTaskTypeId) {
@@ -34,11 +34,10 @@
           </app-field>
 
           <app-field label="Pipeline" for="pipeline" [control]="form.get('pipelineId')"
-                     [submitted]="submitted()"
-                     [hint]="pipelines().length ? 'Picking one loads its form below, if it has one.'
-                                                 : 'No pipeline has a form yet — create one under Configuration › Pipeline Forms.'">
+                     [submitted]="submitted()" [hint]="pipelineHint()">
             <app-combobox id="pipeline" formControlName="pipelineId"
-                          placeholder="Search pipelines…" clearLabel="None"
+                          [placeholder]="selectedTopicId() == null ? 'Pick a topic first' : 'Search this topic’s pipelines…'"
+                          clearLabel="None"
                           [options]="pipelineOptions()" />
           </app-field>
 
@@ -73,11 +72,11 @@
         <div class="form-section">
           <p class="text-sm text-[color:var(--text-muted)]">Checking for a form&hellip;</p>
         </div>
-      } @else if (taskFormDef(); as def) {
+      } @else if (pipelineDef(); as def) {
         <div class="form-section">
           <div class="flex items-start gap-2 mb-3">
             <div class="mr-auto">
-              <h2 class="form-section-title mb-0">{{ def.formName }}</h2>
+              <h2 class="form-section-title mb-0">{{ def.pipelineName }}</h2>
               @if (def.description) {
                 <p class="text-sm text-[color:var(--text-muted)] mt-0.5">{{ def.description }}</p>
               }
@@ -145,7 +144,7 @@
           <h2 class="form-section-title">Task payload</h2>
           <app-field label="XML configuration" for="payload" [required]="true"
                      [control]="form.get('taskPayload')" [submitted]="submitted()"
-                     hint="This pipeline has no form, so this is sent to the consumer as-is. Create a form under Configuration › Pipeline Forms to fill this in field by field instead.">
+                     hint="This pipeline has no form, so this is sent to the consumer as-is. Define the pipeline’s fields under Configuration › Pipelines to fill this in field by field instead.">
             <textarea id="payload" class="input mono text-xs resize-y min-h-40"
                       formControlName="taskPayload"
                       placeholder="&lt;pipeline&gt;...&lt;/pipeline&gt;"></textarea>
