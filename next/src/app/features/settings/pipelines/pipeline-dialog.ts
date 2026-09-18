@@ -20,6 +20,7 @@ export interface PipelineField {
   promptName?: string | null;
   variableMap?: string | null;
   onError?: 'fail' | 'continue' | null;
+  runIn?: 'server' | 'worker' | null;
   tagKey: string;
   tagParent?: string | null;
   label: string;
@@ -369,11 +370,11 @@ export function validateSelectChoices(rows: PipelineField[]): string | null {
                   <div class="min-w-0 flex-1 text-sm">
                     @if (row.get('promptId')?.value) {
                       <span class="font-medium">{{ row.get('promptName')?.value || 'Prompt ' + row.get('promptId')?.value }}</span>
-                      <span class="text-[color:var(--text-muted)]"> · {{ mappedCount(i) }} variable(s) mapped · on failure: {{ row.get('onError')?.value === 'continue' ? 'continue empty' : 'fail the run' }}</span>
+                      <span class="text-[color:var(--text-muted)]"> · {{ mappedCount(i) }} variable(s) mapped · {{ row.get('runIn')?.value === 'worker' ? 'in the worker' : 'before dispatch' }} · on failure: {{ row.get('onError')?.value === 'continue' ? 'continue empty' : 'fail the run' }}</span>
                     } @else {
                       <span class="text-warn-600">No prompt chosen yet.</span>
                     }
-                    <div class="text-xs text-[color:var(--text-muted)]">The answer is written to &lt;{{ row.get('tagKey')?.value || '…' }}&gt; before the task is dispatched; a task shows this as a read-only step.</div>
+                    <div class="text-xs text-[color:var(--text-muted)]">The answer is written to &lt;{{ row.get('tagKey')?.value || '…' }}&gt; {{ row.get('runIn')?.value === 'worker' ? 'by the worker as the task runs' : 'before the task is dispatched' }}; a task shows this as a read-only step.</div>
                   </div>
                   <button type="button" class="btn btn-default btn-sm shrink-0" (click)="configureAiStep(i)">
                     <app-icon name="edit" />{{ row.get('promptId')?.value ? 'Change' : 'Configure' }}
@@ -504,6 +505,7 @@ export class PipelineDialog {
       promptName: [field?.promptName ?? ''],
       variableMap: [field?.variableMap ?? ''],
       onError: [field?.onError ?? 'fail'],
+      runIn: [field?.runIn ?? 'server'],
       /*
        * The choices, parsed out of the stored text once on open and written back out in rows().
        * The raw `fieldOptions` control this replaced is gone deliberately rather than kept in
@@ -582,12 +584,12 @@ export class PipelineDialog {
     const above = this.fields.controls.slice(0, index)
       .map(g => ({ tagKey: String(g.get('tagKey')!.value ?? '').trim(), label: String(g.get('label')!.value ?? '').trim() }))
       .filter(f => f.tagKey);
-    let current: Partial<AiStepConfig> = { promptId: row.get('promptId')!.value, onError: row.get('onError')!.value || 'fail' };
+    let current: Partial<AiStepConfig> = { promptId: row.get('promptId')!.value, onError: row.get('onError')!.value || 'fail', runIn: row.get('runIn')!.value || 'server' };
     try { current.variableMap = JSON.parse(row.get('variableMap')!.value || '{}'); } catch { current.variableMap = {}; }
     this.dialog.open<AiStepConfig | undefined>(AiStepPanel, sidePanelConfig({ tagKey: String(row.get('tagKey')!.value ?? '').trim() || '…', fieldsAbove: above, current }))
       .closed.subscribe(result => {
         if (!result) return;
-        row.patchValue({ promptId: result.promptId, variableMap: JSON.stringify(result.variableMap), onError: result.onError, required: false });
+        row.patchValue({ promptId: result.promptId, variableMap: JSON.stringify(result.variableMap), onError: result.onError, runIn: result.runIn, required: false });
         this.namePrompt(row, result.promptId);
       });
   }
@@ -657,7 +659,8 @@ export class PipelineDialog {
         if (!field.promptId) return `The AI step <${field.tagKey.trim()}> has no prompt. Configure it first.`;
         let map: Record<string, string> = {};
         try { map = JSON.parse(field.variableMap || '{}'); } catch { map = {}; }
-        for (const [variable, source] of Object.entries(map)) {
+        for (const [variable, raw] of Object.entries(map)) {
+          const source = (raw || '').replace(/^file:/, '');
           if (source && !above.has(source)) return `The AI step <${field.tagKey.trim()}> reads <${source}> for {{${variable}}}, which is not above it.`;
         }
       }
@@ -754,6 +757,7 @@ export class PipelineDialog {
         promptId: value.fieldType === 'ai' ? (value.promptId ?? null) : null,
         variableMap: value.fieldType === 'ai' ? (value.variableMap || null) : null,
         onError: value.fieldType === 'ai' ? (value.onError || 'fail') : null,
+        runIn: value.fieldType === 'ai' ? (value.runIn || 'server') : null,
       };
     });
   }

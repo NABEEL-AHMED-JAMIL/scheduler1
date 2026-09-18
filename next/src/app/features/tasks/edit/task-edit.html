@@ -100,7 +100,7 @@
                   <div class="min-w-0 flex-1">
                     <div class="text-sm font-medium">{{ field.label }} <span class="pill pill-brand ml-1">AI step</span></div>
                     <div class="text-xs text-[color:var(--text-secondary)] mt-0.5">
-                      Runs <b>{{ field.promptName || 'a prompt' }}</b> before dispatch and writes the answer to
+                      Runs <b>{{ field.promptName || 'a prompt' }}</b> {{ field.runIn === 'worker' ? 'in the worker' : 'before dispatch' }} and writes the answer to
                       <span class="mono">&lt;{{ field.tagKey }}&gt;</span>@if (aiStepReads(field); as reads) { , reading {{ reads }} }.
                       @if (field.onError === 'continue') { If it fails the run continues with the tag empty. } @else { If it fails, the run fails. }
                     </div>

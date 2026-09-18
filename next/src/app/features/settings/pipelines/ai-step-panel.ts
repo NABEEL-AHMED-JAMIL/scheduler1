@@ -11,8 +11,11 @@ import { Prompt } from '../../ai/prompts/prompt-model';
 /** What the panel hands back when the person is done. */
 export interface AiStepConfig {
   promptId: number | null;
+  /** prompt variable → source tag, or "file:<tag>" when the tag names an object the worker reads. */
   variableMap: Record<string, string>;
   onError: 'fail' | 'continue';
+  /** "server": before dispatch (default). "worker": the consumer runs it, and may read a file. */
+  runIn: 'server' | 'worker';
 }
 
 /**
@@ -25,7 +28,7 @@ export interface AiStepConfig {
   selector: 'app-ai-step-panel',
   imports: [SidePanel, Icon, Combobox, RouterLink],
   template: `
-    <app-side-panel [heading]="'AI step · <' + data.tagKey + '>'" subtitle="Runs before dispatch; the answer is written to this tag.">
+    <app-side-panel [heading]="'AI step · <' + data.tagKey + '>'" [subtitle]="runIn() === 'worker' ? 'The worker runs it as the task runs; the answer is written to this tag.' : 'Runs before dispatch; the answer is written to this tag.'">
       <div class="form-stack">
         <div>
           <label class="label" for="aiStepPrompt">Prompt</label>
@@ -40,6 +43,18 @@ export interface AiStepConfig {
 
         @if (prompt(); as p) {
           <div>
+            <label class="label" for="aiStepRunIn">Runs</label>
+            <select id="aiStepRunIn" class="input" [value]="runIn()" (change)="setRunIn($any($event.target).value)">
+              <option value="server">Before dispatch, on the server</option>
+              <option value="worker">In the worker, as the task runs</option>
+            </select>
+            <p class="text-xs text-[color:var(--text-muted)] mt-1">
+              @if (runIn() === 'worker') { The worker resolves the variables — including a file a field names — and asks the console to run the prompt; the key stays on the server. }
+              @else { The answer is in the task's document before the worker receives it; the worker needs no change. }
+            </p>
+          </div>
+
+          <div>
             <span class="label">Variables</span>
             <p class="text-xs text-[color:var(--text-muted)] mb-1.5">Each of the prompt's variables reads one field above this step.</p>
             @if (!p.variables.length) {
@@ -53,10 +68,21 @@ export interface AiStepConfig {
                       <td><span class="mono">{{ '{{' }}{{ v.name }}{{ '}}' }}</span>@if (v.required) { <span class="text-crit-500" title="required"> *</span> }
                         @if (v.description) { <div class="text-xs text-[color:var(--text-muted)]">{{ v.description }}</div> }</td>
                       <td>
-                        <select class="input" [value]="map()[v.name] || ''" (change)="setSource(v.name, $any($event.target).value)">
-                          <option value="">{{ v.required ? '— pick a field —' : '(not sent)' }}</option>
-                          @for (f of data.fieldsAbove; track f.tagKey) { <option [value]="f.tagKey">{{ f.label }} &lt;{{ f.tagKey }}&gt;</option> }
-                        </select>
+                        <div class="flex flex-col gap-1">
+                          <!-- selected on the option, not value on the select: the options render
+                               after the select's value would be set, and the browser then resets it. -->
+                          <select class="input min-w-0 flex-1" (change)="setSource(v.name, $any($event.target).value)">
+                            <option value="" [selected]="!tagOf(v.name)">{{ v.required ? '— pick a field —' : '(not sent)' }}</option>
+                            @for (f of data.fieldsAbove; track f.tagKey) { <option [value]="f.tagKey" [selected]="f.tagKey === tagOf(v.name)">{{ f.label }} &lt;{{ f.tagKey }}&gt;</option> }
+                          </select>
+                          @if (runIn() === 'worker' && tagOf(v.name)) {
+                            <select class="input" [value]="asFile(v.name) ? 'file' : 'text'" (change)="setAs(v.name, $any($event.target).value)"
+                                    title="Send the tag's text, or the contents of the object the tag names">
+                              <option value="text">send the tag's text</option>
+                              <option value="file">send the contents of the object it names</option>
+                            </select>
+                          }
+                        </div>
                       </td>
                     </tr>
                   }
@@ -96,10 +122,25 @@ export class AiStepPanel {
   readonly promptId = signal<number | null>(this.data.current?.promptId ?? null);
   readonly map = signal<Record<string, string>>({ ...(this.data.current?.variableMap ?? {}) });
   readonly onError = signal<'fail' | 'continue'>(this.data.current?.onError ?? 'fail');
+  readonly runIn = signal<'server' | 'worker'>(this.data.current?.runIn ?? 'server');
 
   readonly promptOptions = computed(() => this.prompts().map(p => ({ value: String(p.promptId), label: p.name, hint: `v${p.version} · ${p.variables.map(v => v.name).join(', ')}` })));
   readonly prompt = computed(() => this.prompts().find(p => p.promptId === this.promptId()) ?? null);
-  readonly missing = computed(() => (this.prompt()?.variables ?? []).filter(v => v.required && !this.map()[v.name]).map(v => v.name));
+  readonly missing = computed(() => (this.prompt()?.variables ?? []).filter(v => v.required && !this.tagOf(v.name)).map(v => v.name));
+
+  /** The tag a variable reads, without the file: marker. */
+  tagOf(variable: string): string { return (this.map()[variable] || '').replace(/^file:/, ''); }
+  asFile(variable: string): boolean { return (this.map()[variable] || '').startsWith('file:'); }
+  setAs(variable: string, mode: string): void {
+    const tag = this.tagOf(variable);
+    if (tag) this.map.update(m => ({ ...m, [variable]: mode === 'file' ? 'file:' + tag : tag }));
+  }
+  /** A step moved back to the server cannot read files; those become plain text reads. */
+  setRunIn(mode: string): void {
+    const next = mode === 'worker' ? 'worker' : 'server';
+    this.runIn.set(next);
+    if (next === 'server') this.map.update(m => Object.fromEntries(Object.entries(m).map(([k, v]) => [k, v.replace(/^file:/, '')])));
+  }
 
   constructor() {
     this.http.get<ApiResponse<Prompt[]>>(`${API_BASE}/aiPrompt.json/list`).subscribe({
@@ -118,10 +159,10 @@ export class AiStepPanel {
   }
 
   setSource(variable: string, tag: string): void {
-    this.map.update(m => { const n = { ...m }; if (tag) n[variable] = tag; else delete n[variable]; return n; });
+    this.map.update(m => { const n = { ...m }; if (tag) n[variable] = (this.asFile(variable) ? 'file:' : '') + tag; else delete n[variable]; return n; });
   }
 
   apply(): void {
-    this.ref.close({ promptId: this.promptId(), variableMap: this.map(), onError: this.onError() });
+    this.ref.close({ promptId: this.promptId(), variableMap: this.map(), onError: this.onError(), runIn: this.runIn() });
   }
 }

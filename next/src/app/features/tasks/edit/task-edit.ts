@@ -450,7 +450,7 @@ export class TaskEdit implements OnInit {
   aiStepReads(field: PipelineField): string {
     try {
       const tags = Object.values(JSON.parse(field.variableMap || '{}') as Record<string, string>).filter(Boolean);
-      return tags.length ? tags.map(t => `<${t}>`).join(' and ') : '';
+      return tags.length ? tags.map(t => t.startsWith('file:') ? `the file <${t.slice(5)}> names` : `<${t}>`).join(' and ') : '';
     } catch { return ''; }
   }
 
