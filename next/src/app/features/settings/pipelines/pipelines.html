@@ -178,9 +178,9 @@
           @for (form of filtered(); track form.pipelineKey) {
             <tr>
               <td class="max-w-80">
-                <div class="flex items-baseline gap-2 min-w-0">
+                <div class="flex items-center gap-2 min-w-0">
                   <span class="font-medium truncate">{{ form.pipelineName }}</span>
-                  <span class="mono text-accent text-xs shrink-0">{{ form.pipelineId }}</span>
+                  <span class="pipeline-id-chip shrink-0" [title]="'Pipeline id — what the worker routes on'">{{ form.pipelineId }}</span>
                 </div>
                 @if (form.description) {
                   <div class="text-xs text-[color:var(--text-muted)] line-clamp-1" [title]="form.description">
