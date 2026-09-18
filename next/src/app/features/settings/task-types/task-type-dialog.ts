@@ -33,17 +33,31 @@ export interface TaskType {
   imports: [ReactiveFormsModule, Field, FormDialog, Icon],
   template: `
     <app-form-dialog
-        [heading]="isEdit() ? 'Edit task type' : 'New task type'"
-        subtitle="Names a downstream consumer and the Kafka topic that reaches it."
+        [heading]="isEdit() ? 'Edit topic' : 'New topic'"
+        subtitle="A Kafka topic and the consumer behind it. Tasks pick a topic; the topic decides where their messages go."
         [confirmLabel]="isEdit() ? 'Save changes' : 'Create'"
         [saving]="saving()"
         (cancelled)="ref.close(false)" (confirmed)="save()">
       <form [formGroup]="form" class="form-stack">
-        <app-field label="Service name" for="serviceName" [required]="true"
-                   [control]="form.get('serviceName')" [submitted]="submitted()">
+        <app-field label="Name" for="serviceName" [required]="true"
+                   [control]="form.get('serviceName')" [submitted]="submitted()"
+                   hint="How the topic appears when a task picks it — usually the consumer's name.">
           <input id="serviceName" class="input" formControlName="serviceName"
                  placeholder="ETL Scrapping Pipeline" />
         </app-field>
+
+        @if (needsWorkspace()) {
+          <app-field label="Workspace" for="ttTenant" [required]="true"
+                     [control]="form.get('tenantId')" [submitted]="submitted()"
+                     hint="A topic belongs to one workspace; only that workspace's tasks can pick it.">
+            <select id="ttTenant" class="input" formControlName="tenantId">
+              <option [ngValue]="null">Choose a workspace…</option>
+              @for (t of data.tenants ?? []; track t.tenantId) {
+                <option [ngValue]="t.tenantId">{{ t.tenantName }}</option>
+              }
+            </select>
+          </app-field>
+        }
 
         <app-field label="Description" for="ttDescription"
                    [control]="form.get('description')" [submitted]="submitted()">
@@ -52,7 +66,7 @@ export interface TaskType {
         </app-field>
 
         <div class="form-grid">
-          <app-field label="Topic" for="topic" [required]="true"
+          <app-field label="Kafka topic" for="topic" [required]="true"
                      [control]="form.get('topic')" [submitted]="submitted()"
                      hint="Letters, digits, dots, underscores and hyphens — up to 249 characters."
                      [errorMessages]="{ pattern: 'Use letters, digits, dots, underscores or hyphens, such as test-user-1-topic.' }">
@@ -67,7 +81,7 @@ export interface TaskType {
           </app-field>
         </div>
 
-        <app-field label="Default Kafka connection" for="defaultKafkaProfile"
+        <app-field label="Kafka connection" for="defaultKafkaProfile"
                    [control]="form.get('defaultKafkaConnectionProfileId')" [submitted]="submitted()"
                    hint="Which cluster this topic's messages publish to. Shared with every tenant that uses this type, unless a tenant sets its own override below. Leave unset to use the platform's default cluster.">
           <select id="defaultKafkaProfile" class="input" formControlName="defaultKafkaConnectionProfileId">
@@ -115,7 +129,16 @@ export interface TaskType {
 })
 export class TaskTypeDialog implements OnInit {
   readonly ref = inject<DialogRef<boolean>>(DialogRef);
-  readonly data = inject<{ type?: TaskType; profiles: any[] }>(DIALOG_DATA);
+  readonly data = inject<{
+    type?: TaskType;
+    profiles: any[];
+    /** Pre-selects the connection when the dialog is opened from a profile's own pane. */
+    defaultProfileId?: number | null;
+    /** The workspace a new topic belongs to, when the caller already knows it. */
+    tenantId?: number | null;
+    /** Offered to a platform admin who has to say which workspace a new topic is for. */
+    tenants?: { tenantId: number; tenantName: string }[];
+  }>(DIALOG_DATA);
   private readonly fb = inject(FormBuilder);
   private readonly http = inject(HttpClient);
   private readonly toast = inject(ToastService);
@@ -130,6 +153,14 @@ export class TaskTypeDialog implements OnInit {
    * tenant and a platform admin has none. Offering the control would be offering a failure.
    */
   readonly canRoute = computed(() => !this.auth.isPlatformAdmin());
+
+  /**
+   * The server refuses a platform admin's new topic without a workspace (validateTaskTypeOwner):
+   * a platform admin has no tenant of their own to file it under. Asked only when the caller
+   * did not already say -- opened from a tenant's Kafka profile, the workspace is that tenant's.
+   */
+  readonly needsWorkspace = computed(() =>
+    !this.isEdit() && this.auth.isPlatformAdmin() && this.data.tenantId == null);
 
   /** Stored as one string, "topic=x&partitions=[*]", but edited as two fields. */
   private parse(value?: string) { return parseTopicPartition(value); }
@@ -149,7 +180,8 @@ export class TaskTypeDialog implements OnInit {
       Validators.pattern(/^(\*|10|[0-9])$/)],
     // The type's own default -- saved on the type itself and shared with every tenant that
     // uses it (KafkaConnectionResolver falls back to it once no tenant override applies).
-    defaultKafkaConnectionProfileId: [this.data.type?.kafkaConnectionProfileId ?? null],
+    defaultKafkaConnectionProfileId: [this.data.type?.kafkaConnectionProfileId ?? this.data.defaultProfileId ?? null],
+    tenantId: [this.data.tenantId ?? null, this.needsWorkspace() ? Validators.required : []],
     // A separate, per-tenant override on top of the default above -- see canRoute.
     routeKafkaConnectionProfileId: [null],
     status: [this.data.type?.status ?? 'Active'],
@@ -184,6 +216,7 @@ export class TaskTypeDialog implements OnInit {
       queueTopicPartition: formatTopicPartition(value.topic, value.partitions),
       kafkaConnectionProfileId: value.defaultKafkaConnectionProfileId,
       status: value.status,
+      tenantId: value.tenantId,
     };
 
     this.saving.set(true);
@@ -203,7 +236,7 @@ export class TaskTypeDialog implements OnInit {
       },
       error: err => {
         this.saving.set(false);
-        this.toast.error(err?.error?.message || 'The task type could not be saved.');
+        this.toast.error(err?.error?.message || 'The topic could not be saved.');
       },
     });
   }

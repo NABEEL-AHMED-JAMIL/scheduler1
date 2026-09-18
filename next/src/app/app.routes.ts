@@ -226,13 +226,9 @@ export const routes: Routes = [
         data: { pageKey: 'tools-transcript' },
         canActivate: [pageGuard],
       },
-      {
-        path: 'settings/task-types',
-        loadComponent: () =>
-          import('./features/settings/task-types/task-types').then(m => m.TaskTypes),
-        data: { minRole: 'TENANT_ADMIN' },
-        canActivate: [roleGuard],
-      },
+      // Topics (source task types) are managed on the Kafka screen since 2026-09-18; the old
+      // address still lands somewhere useful, with a ?profileId= link keeping its meaning.
+      { path: 'settings/task-types', redirectTo: 'settings/kafka' },
       {
         path: 'settings/pipeline-forms',
         loadComponent: () =>

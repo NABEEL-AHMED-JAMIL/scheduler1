@@ -140,10 +140,8 @@ export class Shell {
       label: 'Configuration',
       adminOnly: true,
       children: [
-        { label: 'Source Task Types', path: '/settings/task-types', icon: 'layers', adminOnly: true,
-          hint: 'Consumers and their Kafka topics' },
-        { label: 'Kafka Connections', path: '/settings/kafka', icon: 'server', adminOnly: true,
-          hint: 'Brokers and credentials' },
+        { label: 'Kafka & Topics', path: '/settings/kafka', icon: 'server', adminOnly: true,
+          hint: 'Brokers, credentials and the topics that publish through them' },
         { label: 'Pipeline Forms', path: '/settings/pipeline-forms', icon: 'template', adminOnly: true,
           hint: 'Define a pipeline and its form instead of a lookup row' },
         { label: 'Lookups', path: '/settings/lookup', icon: 'list', adminOnly: true,

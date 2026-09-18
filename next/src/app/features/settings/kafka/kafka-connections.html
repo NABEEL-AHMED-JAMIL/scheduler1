@@ -3,9 +3,9 @@
     <div>
       <h1 class="page-title">Kafka Connections</h1>
       <p class="page-subtitle">
-        Broker settings a task uses to reach Kafka. Pick a profile on the left to see how it connects,
-        how its last test went and which task types route through it. Secrets are encrypted and never
-        sent back to the browser.
+        Broker settings and the topics that publish through them. Pick a profile on the left to see
+        how it connects, how its last test went, and to manage its topics. Secrets are encrypted and
+        never sent back to the browser.
       </p>
     </div>
     <div class="flex items-center gap-2">
@@ -251,35 +251,92 @@
             </dl>
           </section>
 
-          <!-- Used by -->
-          <section class="kafka-detail-section">
-            <h3 class="section-title">Used by
-              <span class="text-[color:var(--text-muted)] font-normal">({{ usedBy().length }})</span>
-            </h3>
-            @if (usedBy().length) {
-              <ul class="kafka-usedby">
-                @for (t of usedBy(); track t.sourceTaskTypeId) {
-                  <li>
-                    <a class="link-inline font-medium" [routerLink]="['/settings/task-types']"
-                       [queryParams]="{ q: t.serviceName }" [title]="'Open ' + t.serviceName + ' on Source Task Types'">{{ t.serviceName }}</a>
-                    <span class="mono text-xs text-[color:var(--text-muted)]">{{ t.queueTopicPartition }}</span>
-                  </li>
-                }
-              </ul>
-              <p class="field-note text-[color:var(--text-muted)] mt-2">
-                Task types that name this profile. @if (p.isDefault) { As the default it also serves every task type with no profile of its own. }
-              </p>
-            } @else {
-              <p class="text-sm text-[color:var(--text-secondary)]">
-                @if (p.isDefault) {
-                  No task type names it directly, but as the default it serves every task type without a profile of its own.
-                } @else {
-                  Nothing routes through this profile yet. Pick it on a task type, or set it as the default.
-                }
-              </p>
-            }
-          </section>
         </div>
+
+        <!-- Topics: the Kafka topics (and the consumers behind them) that publish through this
+             profile. Managed here rather than on a screen of their own, since a topic is only
+             ever read next to the connection it goes out on. -->
+        <section class="kafka-topics">
+          <div class="lookup-entries-head">
+            <h3 class="section-title">Topics
+              <span class="text-[color:var(--text-muted)] font-normal">({{ topicsHere().length }})</span>
+            </h3>
+            <button type="button" class="btn btn-default btn-sm ml-auto" (click)="addTopic(p)">
+              <app-icon name="plus" class="icon-ok" />Add topic
+            </button>
+          </div>
+          @if (!topicsHere().length) {
+            <div class="lookup-entries-empty">
+              <app-icon name="layers" size="1.5rem" class="icon-muted" />
+              <p>No topic publishes through this profile yet.</p>
+              <p class="text-[color:var(--text-muted)]">
+                @if (p.isDefault) {
+                  As the default it would carry any topic with no connection of its own — there are none right now.
+                } @else {
+                  Add a topic here, or point an existing one at this connection when editing it.
+                }
+              </p>
+            </div>
+          } @else {
+            <div class="lookup-entries-scroll">
+              <table class="table-modern lookup-entry-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Kafka topic</th>
+                    <th>Via</th>
+                    <th class="text-right">Tasks</th>
+                    <th class="text-right">State</th>
+                    <th class="w-20"><span class="sr-only">Actions</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (row of topicsHere(); track row.type.sourceTaskTypeId) {
+                    <tr>
+                      <td class="max-w-56">
+                        <div class="font-medium truncate" [title]="row.type.serviceName">{{ row.type.serviceName }}</div>
+                        @if (row.type.description) {
+                          <div class="text-xs text-[color:var(--text-muted)] truncate" [title]="row.type.description">{{ row.type.description }}</div>
+                        }
+                      </td>
+                      <td class="max-w-64">
+                        <div class="lookup-value">
+                          <span class="mono text-accent truncate" [title]="topicOf(row.type.queueTopicPartition)">{{ topicOf(row.type.queueTopicPartition) || '—' }}</span>
+                          @if (partitionsOf(row.type.queueTopicPartition); as parts) {
+                            <span class="mono text-xs text-[color:var(--text-muted)]">{{ parts }}</span>
+                          }
+                          @if (topicOf(row.type.queueTopicPartition); as topic) {
+                            <app-copy-button [value]="topic" [copied]="copiedTopicId() === row.type.sourceTaskTypeId"
+                                             copiedLabel="Topic copied" (copy)="copyTopic(row.type.sourceTaskTypeId, topic)" />
+                          }
+                        </div>
+                      </td>
+                      <td>
+                        @if (row.via === 'explicit') {
+                          <span class="pill pill-neutral" title="This topic names this connection">named</span>
+                        } @else if (row.via === 'override') {
+                          <span class="pill pill-brand" title="Your workspace routes this topic here, over the topic's own setting">your override</span>
+                        } @else {
+                          <span class="pill pill-neutral" title="The topic names no connection, so the default carries it">via default</span>
+                        }
+                      </td>
+                      <td class="text-right tabular" [class.text-[color:var(--text-muted)]]="!row.type.totalTaskLink">{{ row.type.totalTaskLink || 0 }}</td>
+                      <td class="text-right"><app-status [label]="row.type.status || 'Active'" [quiet]="true" /></td>
+                      <td>
+                        <div class="flex items-center justify-end gap-1">
+                          <button type="button" class="btn-circle" title="Edit topic" aria-label="Edit topic"
+                                  (click)="editTopic(row.type)"><app-icon name="edit" size="0.9em" /></button>
+                          <button type="button" class="btn-circle btn-circle-danger" title="Delete topic" aria-label="Delete topic"
+                                  (click)="removeTopic(row.type)"><app-icon name="trash" size="0.9em" /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </section>
       } @else if (!loading() && !error()) {
         <div class="lookup-entries-empty lookup-detail-empty">
           <app-icon name="server" size="1.6rem" class="icon-muted" />

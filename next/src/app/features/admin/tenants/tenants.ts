@@ -95,7 +95,7 @@ export class Tenants implements OnInit {
         ? `${t.pipelineCount} pipeline${t.pipelineCount === 1 ? '' : 's'}`
         : '',
     },
-    { key: 'sourceTaskTypeCount', label: 'Task types', icon: 'layers' },
+    { key: 'sourceTaskTypeCount', label: 'Topics', icon: 'layers' },
     { key: 'bucketCount', label: 'Buckets', icon: 'cloud' },
     { key: 'kafkaProfileCount', label: 'Kafka', icon: 'server' },
   ];
@@ -154,7 +154,7 @@ export class Tenants implements OnInit {
       return `${count} ${count === 1 ? label.replace(/s$/, '') : label}`;
     });
     if (missing.length === this.minorResources.length) {
-      return 'No task types, buckets or Kafka profiles yet';
+      return 'No topics, buckets or Kafka profiles yet';
     }
     return parts.join(' · ') + (missing.length ? ` · no ${missing.map(m => m.label.toLowerCase()).join(', ')}` : '');
   }

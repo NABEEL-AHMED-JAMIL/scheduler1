@@ -1628,7 +1628,7 @@ html.dark .kafka-rail-env-warn { color: var(--color-warn-400); }
 .kafka-test-glyph.crit { background: var(--color-crit-100); color: var(--color-crit-500); }
 html.dark .kafka-test-glyph.ok { background: color-mix(in oklab, var(--color-ok-500) 22%, transparent); color: var(--color-ok-400); }
 html.dark .kafka-test-glyph.crit { background: color-mix(in oklab, var(--color-crit-500) 22%, transparent); color: var(--color-crit-400); }
-.kafka-detail-grid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
+.kafka-detail-grid { display: grid; grid-template-columns: 1fr; border-bottom: 1px solid var(--border-subtle); }
 .kafka-detail-section { padding: 1rem 1.25rem; min-width: 0; }
 .kafka-detail-section + .kafka-detail-section { border-left: 1px solid var(--border-subtle); }
 .kafka-detail-section .section-title { margin: 0 0 0.6rem; }
@@ -1642,3 +1642,5 @@ html.dark .kafka-test-glyph.crit { background: color-mix(in oklab, var(--color-c
   .kafka-detail-grid { grid-template-columns: 1fr; }
   .kafka-detail-section + .kafka-detail-section { border-left: 0; border-top: 1px solid var(--border-subtle); }
 }
+.kafka-topics { padding-top: 0.75rem; }
+.kafka-topics .lookup-entries-head { padding-right: 1rem; }

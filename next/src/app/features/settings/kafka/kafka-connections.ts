@@ -2,7 +2,7 @@ import { Component, OnInit, computed, effect, inject, signal, untracked } from '
 import { KAFKA_ENVIRONMENTS, kafkaEnvironment } from './kafka-environment';
 import { HttpClient } from '@angular/common/http';
 import { DatePipe } from '@angular/common';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
@@ -16,6 +16,9 @@ import { copyText } from '../../../shared/ui/clipboard.util';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { confirmWith } from '../../../shared/ui/confirm';
 import { KafkaDialog } from './kafka-dialog';
+import { TaskType, TaskTypeDialog } from '../task-types/task-type-dialog';
+import { parseTopicPartition } from '../../../shared/ui/topic';
+import { HttpParams } from '@angular/common/http';
 
 /** As much of a tenant.json/listTenants row as this screen reads. */
 export interface TenantName {
@@ -67,7 +70,7 @@ export interface KafkaProfile {
 
 @Component({
   selector: 'app-kafka-connections',
-  imports: [MineFilter, StatTile, DatePipe, StatusPill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger, CopyButton, RouterLink],
+  imports: [MineFilter, StatTile, DatePipe, StatusPill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger, CopyButton],
   templateUrl: './kafka-connections.html',
 })
 export class KafkaConnections implements OnInit {
@@ -90,12 +93,107 @@ export class KafkaConnections implements OnInit {
     this.router.navigate([], { relativeTo: this.route, queryParams: { profileId: profile.kafkaConnectionProfileId }, queryParamsHandling: 'merge', replaceUrl: true });
   }
 
-  /** Task types that name a profile, so the pane can say what depends on it. */
-  private readonly taskTypes = signal<{ sourceTaskTypeId: number; serviceName: string; queueTopicPartition: string; kafkaConnectionProfileId?: number; status: string }[]>([]);
-  readonly usedBy = computed(() => {
-    const id = this.selectedId();
-    return this.taskTypes().filter(t => t.kafkaConnectionProfileId === id && t.status !== 'Delete');
+  /**
+   * Every topic (source task type) the caller can see, and which profile each one actually
+   * publishes through: the topic's own connection, else -- for a tenant admin -- their
+   * workspace's override, else the default. What the pane lists under a profile is the set
+   * that resolves to it, tagged with why, so "via default" is visible rather than implied.
+   */
+  private readonly taskTypes = signal<TaskType[]>([]);
+  private readonly routes = signal<Record<number, number>>({});
+  readonly topicsHere = computed<{ type: TaskType; via: 'explicit' | 'override' | 'default' }[]>(() => {
+    const p = this.selected();
+    if (!p) return [];
+    const routes = this.routes();
+    const out: { type: TaskType; via: 'explicit' | 'override' | 'default' }[] = [];
+    for (const t of this.taskTypes()) {
+      if (t.status === 'Delete' || !t.sourceTaskTypeId) continue;
+      const override = routes[t.sourceTaskTypeId];
+      if (override) {
+        if (override === p.kafkaConnectionProfileId) out.push({ type: t, via: 'override' });
+        continue;
+      }
+      if (t.kafkaConnectionProfileId != null) {
+        if (t.kafkaConnectionProfileId === p.kafkaConnectionProfileId) out.push({ type: t, via: 'explicit' });
+        continue;
+      }
+      if (p.isDefault && (p.tenantId == null || (t as any).tenantId == null || (t as any).tenantId === p.tenantId)) {
+        out.push({ type: t, via: 'default' });
+      }
+    }
+    return out.sort((a, b) => a.type.serviceName.localeCompare(b.type.serviceName));
   });
+
+  readonly copiedTopicId = signal<number | null>(null);
+  topicOf(raw?: string): string { return parseTopicPartition(raw).topic; }
+  partitionsOf(raw?: string): string {
+    const partitions = parseTopicPartition(raw).partitions;
+    return partitions ? `[${partitions}]` : '';
+  }
+  copyTopic(id: number | undefined, topic: string): void {
+    copyText(topic).then(ok => {
+      if (!ok) { this.toast.error('Could not copy that. Select it and copy by hand.'); return; }
+      this.copiedTopicId.set(id ?? null);
+      setTimeout(() => { if (this.copiedTopicId() === (id ?? null)) this.copiedTopicId.set(null); }, 1500);
+    });
+  }
+
+  private loadTopics(): void {
+    this.http.get<ApiResponse<any>>(`${API_BASE}/setting.json/appSetting`).subscribe({
+      next: r => {
+        if (r.status !== API_SUCCESS) return;
+        this.taskTypes.set(r.data?.sourceTaskTypes ?? []);
+        // The override endpoint refuses a platform admin -- they have no workspace to override for.
+        if (this.auth.isPlatformAdmin()) return;
+        for (const t of this.taskTypes()) {
+          if (!t.sourceTaskTypeId || t.status === 'Delete') continue;
+          const id = t.sourceTaskTypeId;
+          this.http.get<ApiResponse<any>>(`${API_BASE}/setting.json/fetchKafkaRoute`, { params: { sourceTaskTypeId: id } }).subscribe({
+            next: res => {
+              if (res.status !== API_SUCCESS) return;
+              const profileId = res.data?.kafkaConnectionProfileId ?? res.data?.profileId;
+              if (profileId) this.routes.update(map => ({ ...map, [id]: profileId }));
+            },
+            error: () => {},
+          });
+        }
+      },
+      error: () => {},
+    });
+  }
+
+  addTopic(profile: KafkaProfile): void {
+    this.dialog.open<boolean>(TaskTypeDialog, { data: {
+      profiles: this.profiles(), defaultProfileId: profile.kafkaConnectionProfileId,
+      tenantId: profile.tenantId ?? null, tenants: this.tenants(),
+    } }).closed.subscribe(saved => { if (saved) this.loadTopics(); });
+  }
+
+  editTopic(type: TaskType): void {
+    this.dialog.open<boolean>(TaskTypeDialog, { data: { type, profiles: this.profiles(), tenants: this.tenants() } }).closed
+      .subscribe(saved => { if (saved) this.loadTopics(); });
+  }
+
+  async removeTopic(type: TaskType): Promise<void> {
+    const linked = type.totalTaskLink ?? 0;
+    const ok = await confirmWith(this.dialog, {
+      title: `Delete ${type.serviceName}?`,
+      body: linked
+        ? `${linked} task${linked === 1 ? '' : 's'} use this topic. Deleting it also marks their jobs deleted — they will stop running.`
+        : 'No task uses this topic.',
+      confirmLabel: 'Delete topic',
+      danger: true,
+    });
+    if (!ok) return;
+    this.http.delete<ApiResponse>(`${API_BASE}/setting.json/deleteSourceTaskType`,
+      { params: new HttpParams().set('sourceTaskTypeId', type.sourceTaskTypeId!) }).subscribe({
+      next: response => {
+        if (response.status === API_SUCCESS) { this.toast.success(response.message); this.loadTopics(); }
+        else this.toast.error(response.message);
+      },
+      error: err => this.toast.error(err?.error?.message || 'The topic could not be deleted.'),
+    });
+  }
 
   /** The last test, as one tone the rail dot, the pane banner and its glyph all share. */
   testTone(p: KafkaProfile): { cls: 'ok' | 'crit' | 'muted'; label: string; icon: string } {
@@ -237,10 +335,7 @@ export class KafkaConnections implements OnInit {
   ngOnInit(): void {
     this.loadTenants();
     this.load();
-    this.http.get<ApiResponse<any>>(`${API_BASE}/setting.json/appSetting`).subscribe({
-      next: r => { if (r.status === API_SUCCESS) this.taskTypes.set(r.data?.sourceTaskTypes ?? []); },
-      error: () => {},
-    });
+    this.loadTopics();
   }
 
   /**

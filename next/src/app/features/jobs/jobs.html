@@ -277,7 +277,7 @@
                <div class="detail-panel">
                 <dl class="grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-3 text-sm">
                   @for (item of [
-                    { label: 'Task type',   value: job.taskDetail?.sourceTaskType?.serviceName },
+                    { label: 'Topic',       value: job.taskDetail?.sourceTaskType?.serviceName },
                     { label: 'Pipeline',    value: job.taskDetail?.pipelineId },
                     { label: 'Bucket',      value: job.taskDetail?.bucket, mono: true },
                     { label: 'Output',      value: job.taskDetail?.outputFolder, mono: true },

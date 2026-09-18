@@ -22,11 +22,11 @@
                    placeholder="Hurricane Data Task" />
           </app-field>
 
-          <app-field label="Task type" for="taskType" [required]="true"
+          <app-field label="Topic" for="taskType" [required]="true"
                      [control]="form.get('sourceTaskTypeId')" [submitted]="submitted()"
                      hint="Decides which consumer and Kafka topic this reaches.">
             <select id="taskType" class="input" formControlName="sourceTaskTypeId">
-              <option [ngValue]="null">Select a type</option>
+              <option [ngValue]="null">Select a topic</option>
               @for (type of taskTypes(); track type.sourceTaskTypeId) {
                 <option [ngValue]="type.sourceTaskTypeId">{{ type.serviceName }}</option>
               }

@@ -353,22 +353,25 @@ export class Docs implements AfterViewInit {
           + 'another tenant reads, and the console will refuse to serve those objects across the boundary.',
     },
     {
-      id: 'task-type', title: 'Register the task type',
-      intro: 'A task type names the downstream consumer that does the work and the Kafka topic '
-           + 'that reaches it. Many tasks can share a type, and every task type belongs to one '
-           + 'workspace — a workspace needs its own before it can describe any task.',
-      where: 'Configuration → Source Task Types',
+      id: 'task-type', title: 'Register the topic',
+      intro: 'A topic is the Kafka topic a task publishes to and the consumer behind it. It is '
+           + 'managed next to the Kafka connection it goes out on. Many tasks can share a topic, '
+           + 'and every topic belongs to one workspace — a workspace needs its own before it can '
+           + 'describe any task.',
+      where: 'Configuration → Kafka & Topics, then a profile’s Topics section → Add topic',
       fields: [
-        { name: 'Service name', required: true, note: 'The consumer, as you refer to it. For example ETL Scrapping Pipeline.' },
-        { name: 'Topic', required: true, note: 'Letters and hyphens only. Digits, dots and underscores are rejected.' },
+        { name: 'Name', required: true, note: 'How the topic appears when a task picks it — usually the consumer’s name. For example ETL Scrapping Pipeline.' },
+        { name: 'Kafka topic', required: true, note: 'Letters and hyphens only. Digits, dots and underscores are rejected.' },
         { name: 'Partition', required: false, note: '* for every partition, or one index from 0 to 10. A comma-separated list is not supported.' },
         { name: 'Workspace', required: true, note: 'Which workspace owns it. A tenant administrator gets their own and is not asked; a platform administrator has to say.' },
-        { name: 'Kafka connection', required: false, note: 'Leave unset to publish to the tenant’s default cluster.' },
+        { name: 'Kafka connection', required: false, note: 'Pre-filled with the profile you opened it from. Leave unset to publish through the workspace’s default.' },
       ],
       notes: ['Kafka routing is a per-tenant override, so it is set by a tenant administrator.',
-              'Task types do not cross workspaces. A platform administrator creating one has to '
+              'Topics do not cross workspaces. A platform administrator creating one has to '
             + 'name the workspace it is for — there is no way to make one that everybody shares, '
-            + 'because a shared task type showed its Kafka topic name to every other workspace.'],
+            + 'because a shared topic showed its Kafka topic name to every other workspace.',
+              'A profile’s Topics section shows every topic that publishes through it, tagged with why: '
+            + 'named on the topic, your workspace’s override, or via the default.'],
     },
     {
       id: 'task', title: 'Describe the task',
@@ -377,7 +380,7 @@ export class Docs implements AfterViewInit {
       where: 'Pipelines → Source Tasks → New task',
       fields: [
         { name: 'Task name', required: true, note: 'Name it for the work, not the schedule. One task often feeds several jobs.' },
-        { name: 'Task type', required: true, note: 'The consumer registered in the previous step.' },
+        { name: 'Topic', required: true, note: 'The topic registered in the previous step.' },
         { name: 'Pipeline', required: false, note: 'The pipelineId the worker routes on. It decides which handler runs.' },
         { name: 'Bucket', required: false, note: 'Where output lands. This is the connection added in step 2.' },
         { name: 'Payload', required: true, note: 'The configuration the worker receives, as XML tags.' },
