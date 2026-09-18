@@ -1,4 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { HttpClient } from '@angular/common/http';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -48,10 +49,12 @@ export interface LookupData {
                  [placeholder]="data.parent ? 'Batch Email Delivery Pipeline' : 'PIPELINE_IDS'" />
         </app-field>
 
-        <app-field label="Value" for="lookupValue" [required]="true"
-                   [control]="form.get('lookupValue')" [submitted]="submitted()">
+        <app-field label="Value" for="lookupValue" [required]="!storedSecret()"
+                   [control]="form.get('lookupValue')" [submitted]="submitted()"
+                   [hint]="storedSecret() ? 'The stored secret is never shown. Leave this blank to keep it; type here to replace it.' : ''">
           <input id="lookupValue" class="input" formControlName="lookupValue"
-                 [placeholder]="data.parent ? 'F76800' : 'Pipeline ids'" />
+                 [type]="encryptedNow() ? 'password' : 'text'" autocomplete="off"
+                 [placeholder]="storedSecret() ? 'Leave blank to keep the stored secret' : (data.parent ? 'F76800' : 'Pipeline ids')" />
         </app-field>
 
         <app-field label="Description" for="lookupDescription"
@@ -65,7 +68,11 @@ export interface LookupData {
           <span>
             Store encrypted
             <span class="block text-xs text-[color:var(--text-muted)] mt-0.5 leading-snug">
-              For values that are secrets. The value stops being readable here once saved.
+              @if (storedSecret() && !encryptedNow()) {
+                Unticked: saving writes the current secret back readable, for anyone who can open this page.
+              } @else {
+                For values that are secrets. The value stops being readable here once saved.
+              }
             </span>
           </span>
         </label>
@@ -89,14 +96,27 @@ export class LookupDialog {
     return this.data.parent ? 'New entry' : 'New lookup';
   });
 
+  /**
+   * Editing a row whose value is stored encrypted. The list shows "••••••••" for it, and the
+   * form used to be pre-filled with exactly that and send it back as the value -- which the
+   * server then encrypted, so one edit of the description destroyed the secret. The box starts
+   * empty instead: blank means "keep what is stored", anything typed replaces it.
+   */
+  readonly storedSecret = computed(() => this.isEdit() && !!this.data.lookup?.encrypted);
+
   readonly form: FormGroup = this.fb.group({
     lookupId: [this.data.lookup?.lookupId ?? null],
     lookupType: [this.data.lookup?.lookupType ?? '', Validators.required],
-    lookupValue: [this.data.lookup?.lookupValue ?? '', Validators.required],
+    lookupValue: [this.isEdit() && this.data.lookup?.encrypted ? '' : (this.data.lookup?.lookupValue ?? ''),
+                  this.isEdit() && this.data.lookup?.encrypted ? [] : Validators.required],
     description: [this.data.lookup?.description ?? ''],
     encrypted: [this.data.lookup?.encrypted ?? false],
     parentLookupId: [this.data.lookup?.parentLookupId ?? this.data.parent?.lookupId ?? null],
   });
+
+  /** Whether "Store encrypted" is ticked right now, so the box masks what is typed. */
+  readonly encryptedNow = toSignal(this.form.get('encrypted')!.valueChanges,
+    { initialValue: this.form.get('encrypted')!.value as boolean });
 
   save(): void {
     this.submitted.set(true);
