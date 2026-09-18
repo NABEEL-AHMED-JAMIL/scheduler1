@@ -1,12 +1,11 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
 import { KAFKA_ENVIRONMENTS, kafkaEnvironment } from './kafka-environment';
 import { HttpClient } from '@angular/common/http';
 import { DatePipe } from '@angular/common';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
-import { TableShell } from '../../../shared/ui/data-table';
 import { MineFilter, isMine } from '../../../shared/ui/mine-filter';
 import { AuthService } from '../../../core/auth/auth.service';
 import { StatTile } from '../../../shared/ui/stat-tile';
@@ -14,10 +13,8 @@ import { StatusPill } from '../../../shared/ui/status-pill';
 import { Icon } from '../../../shared/ui/icon';
 import { CopyButton } from '../../../shared/ui/copy-button';
 import { copyText } from '../../../shared/ui/clipboard.util';
-import { ViewToggle } from '../../../shared/ui/view-toggle';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { confirmWith } from '../../../shared/ui/confirm';
-import { createSort } from '../../../shared/ui/sort';
 import { KafkaDialog } from './kafka-dialog';
 
 /** As much of a tenant.json/listTenants row as this screen reads. */
@@ -70,28 +67,55 @@ export interface KafkaProfile {
 
 @Component({
   selector: 'app-kafka-connections',
-  imports: [MineFilter, ViewToggle, StatTile, DatePipe, TableShell, StatusPill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger, CopyButton],
+  imports: [MineFilter, StatTile, DatePipe, StatusPill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger, CopyButton, RouterLink],
   templateUrl: './kafka-connections.html',
 })
 export class KafkaConnections implements OnInit {
-  readonly view = signal<'table' | 'cards'>('table');
   private readonly http = inject(HttpClient);
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 
-  /** Set by ?profileId=… when arriving from a link on another screen (e.g. Task Types). */
-  readonly focusedProfileId = signal<number | null>(null);
+  /**
+   * Which profile the detail pane shows. Mirrored to ?profileId=, which is also what Source
+   * Task Types links to, so arriving from there lands on that profile rather than on a banner.
+   */
+  readonly selectedId = signal<number | null>(null);
+  readonly selected = computed(() =>
+    this.profiles().find(p => p.kafkaConnectionProfileId === this.selectedId()) ?? null);
 
-  readonly focusedProfileName = computed(() => {
-    const id = this.focusedProfileId();
-    if (id === null) return '';
-    return this.profiles().find(p => p.kafkaConnectionProfileId === id)?.profileName ?? `#${id}`;
+  select(profile: KafkaProfile): void {
+    this.selectedId.set(profile.kafkaConnectionProfileId);
+    this.router.navigate([], { relativeTo: this.route, queryParams: { profileId: profile.kafkaConnectionProfileId }, queryParamsHandling: 'merge', replaceUrl: true });
+  }
+
+  /** Task types that name a profile, so the pane can say what depends on it. */
+  private readonly taskTypes = signal<{ sourceTaskTypeId: number; serviceName: string; queueTopicPartition: string; kafkaConnectionProfileId?: number; status: string }[]>([]);
+  readonly usedBy = computed(() => {
+    const id = this.selectedId();
+    return this.taskTypes().filter(t => t.kafkaConnectionProfileId === id && t.status !== 'Delete');
   });
 
-  clearProfileFocus(): void {
-    this.router.navigate([], { relativeTo: this.route, queryParams: {} });
+  /** The last test, as one tone the rail dot, the pane banner and its glyph all share. */
+  testTone(p: KafkaProfile): { cls: 'ok' | 'crit' | 'muted'; label: string; icon: string } {
+    if (p.connectionStatus === 'SUCCESS') return { cls: 'ok', label: 'Last test passed', icon: 'check' };
+    if (p.connectionStatus === 'FAILED') return { cls: 'crit', label: 'Last test failed', icon: 'xCircle' };
+    return { cls: 'muted', label: 'Not tested yet', icon: 'plug' };
+  }
+
+  constructor() {
+    // Keep something selected: the linked profile when the list arrives, else the first, and
+    // move off a profile the moment it stops existing or is filtered out.
+    effect(() => {
+      const rows = this.filtered();
+      const current = untracked(this.selectedId);
+      if (!rows.length) { if (current !== null) this.selectedId.set(null); return; }
+      if (rows.some(p => p.kafkaConnectionProfileId === current)) return;
+      const linked = Number(untracked(() => this.route.snapshot.queryParamMap.get('profileId')));
+      const pick = rows.find(p => p.kafkaConnectionProfileId === linked) ?? rows[0];
+      this.selectedId.set(pick.kafkaConnectionProfileId);
+    });
   }
 
   readonly profiles = signal<KafkaProfile[]>([]);
@@ -104,14 +128,13 @@ export class KafkaConnections implements OnInit {
   readonly environments = KAFKA_ENVIRONMENTS;
   readonly env = (p: KafkaProfile) => kafkaEnvironment(p.environmentLabel);
   readonly testing = signal<number | null>(null);
-  readonly sort = createSort<KafkaProfile>('profileName');
 
   readonly protocols = computed(() =>
     [...new Set(this.profiles().map(p => p.securityProtocol).filter(Boolean))].sort());
 
   readonly hasFilters = computed(() =>
     !!(this.search().trim() || this.protocolFilter() || this.environmentFilter() || this.statusFilter()
-       || this.focusedProfileId() !== null));
+       || this.onlyMine()));
 
   /** Narrows the list to rows this person created. Not persisted -- see MineFilter. */
 
@@ -169,9 +192,7 @@ export class KafkaConnections implements OnInit {
     const protocol = this.protocolFilter();
     const environment = this.environmentFilter();
     const status = this.statusFilter();
-    const focusedProfile = this.focusedProfileId();
     const rows = this.profiles().filter(p => {
-      if (focusedProfile !== null && p.kafkaConnectionProfileId !== focusedProfile) return false;
       if (protocol && p.securityProtocol !== protocol) return false;
       if (environment && kafkaEnvironment(p.environmentLabel)?.key !== environment) return false;
       if (status && p.status !== status) return false;
@@ -181,7 +202,7 @@ export class KafkaConnections implements OnInit {
       return `${p.profileName} ${p.environmentLabel ?? ''} ${p.bootstrapServers} ${workspace}`
         .toLowerCase().includes(term);
     });
-    return this.sort.apply(this.mine(rows), (row, key) => (row as any)[key]);
+    return this.mine(rows).slice().sort((a, b) => a.profileName.localeCompare(b.profileName));
   });
 
   readonly summary = computed(() => {
@@ -214,13 +235,12 @@ export class KafkaConnections implements OnInit {
   });
 
   ngOnInit(): void {
-    this.route.queryParamMap.subscribe(params => {
-      const raw = params.get('profileId');
-      const parsed = raw === null ? null : Number(raw);
-      this.focusedProfileId.set(parsed !== null && Number.isFinite(parsed) ? parsed : null);
-    });
     this.loadTenants();
     this.load();
+    this.http.get<ApiResponse<any>>(`${API_BASE}/setting.json/appSetting`).subscribe({
+      next: r => { if (r.status === API_SUCCESS) this.taskTypes.set(r.data?.sourceTaskTypes ?? []); },
+      error: () => {},
+    });
   }
 
   /**
@@ -257,7 +277,6 @@ export class KafkaConnections implements OnInit {
     this.protocolFilter.set('');
     this.environmentFilter.set('');
     this.statusFilter.set('');
-    if (this.focusedProfileId() !== null) this.clearProfileFocus();
   }
 
   create(): void {

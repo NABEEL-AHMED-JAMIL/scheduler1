@@ -16,7 +16,7 @@ import { confirmWith } from '../../../shared/ui/confirm';
 import { TaskType, TaskTypeDialog } from './task-type-dialog';
 import { AuthService } from '../../../core/auth/auth.service';
 import { parseTopicPartition } from '../../../shared/ui/topic';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 
 interface LinkedTask {
   taskDetailId: number;
@@ -63,6 +63,7 @@ export class TaskTypes implements OnInit {
   });
 
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   /**
    * Which source tasks use this type. The legacy screen had it and the endpoint has been
@@ -218,6 +219,9 @@ export class TaskTypes implements OnInit {
   }
 
   ngOnInit(): void {
+    // ?q= pre-fills the search, so a link from a Kafka profile's "Used by" lands on that type.
+    const q = this.route.snapshot.queryParamMap.get('q');
+    if (q) this.search.set(q);
     this.load();
     this.http.get<ApiResponse<any[]>>(`${API_BASE}/kafkaConnectionProfile.json/fetchAllProfiles`)
       .subscribe({

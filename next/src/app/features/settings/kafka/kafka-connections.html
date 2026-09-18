@@ -3,7 +3,9 @@
     <div>
       <h1 class="page-title">Kafka Connections</h1>
       <p class="page-subtitle">
-        Broker settings a task uses to reach Kafka. Secrets are encrypted and never sent back to the browser.
+        Broker settings a task uses to reach Kafka. Pick a profile on the left to see how it connects,
+        how its last test went and which task types route through it. Secrets are encrypted and never
+        sent back to the browser.
       </p>
     </div>
     <div class="flex items-center gap-2">
@@ -20,301 +22,270 @@
     @for (tile of [
       { label: 'Profiles',  value: summary().total,    foot: summary().active + ' active', icon: 'server', tone: 'info' },
       { label: 'Tested OK', value: summary().testedOk, foot: 'last test passed', icon: 'plug', tone: 'ok' },
-      { label: 'Failing',   value: summary().failing,  foot: 'need attention', icon: 'xCircle', tone: 'crit' },
+      { label: 'Failing',   value: summary().failing,  foot: summary().failing ? 'need attention' : 'nothing failing', icon: 'xCircle', tone: summary().failing ? 'crit' : 'muted' },
       { label: canSeeWorkspace() ? 'Platform default' : 'Default', value: defaultProfile() ? 1 : 0,
-        foot: defaultProfile()?.profileName || 'none set', icon: 'zap', tone: 'info' }
+        foot: defaultProfile()?.profileName || 'none set', icon: 'zap', tone: defaultProfile() ? 'info' : 'warn' }
     ]; track tile.label) {
       <app-stat-tile [label]="tile.label" [value]="tile.value" [icon]="tile.icon" [tone]="$any(tile.tone)" [foot]="tile.foot" />
     }
   </div>
 
-  @if (focusedProfileId() !== null) {
-    <div class="card flex flex-wrap items-center gap-2 px-4 py-2.5 text-sm">
-      <app-icon name="filter" class="text-[color:var(--text-muted)]" />
-      <span>
-        Showing <strong>{{ focusedProfileName() }}</strong> only — opened from a task type.
-      </span>
-      <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="clearProfileFocus()">
-        <app-icon name="close" />Show all profiles
-      </button>
-    </div>
-  }
-
-  @if (!defaultProfile() && profiles().length) {
+  @if (!loading() && !error() && profiles().length && !defaultProfile()) {
     <div class="card flex flex-wrap items-center gap-2 px-4 py-2.5 text-sm">
       <app-icon name="alert" class="icon-warn" />
-      @if (canSeeWorkspace()) {
-        <span>No platform-owned profile is marked default — a task in a workspace that has no default
-              of its own has no broker to reach.</span>
-      } @else {
-        <span>No profile is marked default — a task without an explicit profile has no broker to reach.</span>
-      }
+      <span>
+        @if (canSeeWorkspace()) {
+          No platform default. A workspace with no default of its own has no broker to fall back to.
+        } @else {
+          No default profile. Tasks with no explicit profile have no broker to reach.
+        }
+      </span>
     </div>
   }
 
-  <app-table-shell heading="Kafka profiles" [loading]="loading()" [error]="error()"
-                   [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="profiles().length"
-                   [emptyMessage]="hasFilters() ? 'No profiles match the current filters.' : 'No Kafka profiles yet.'"
-                   emptyIcon="server"
-                   (retry)="load()">
-    <ng-container toolbar>
-      <app-view-toggle [(value)]="view" key="kafka" cardsIcon="server" />
-      <select class="input max-w-44" [value]="protocolFilter()"
-              (change)="protocolFilter.set($any($event.target).value)">
-        <option value="">All protocols</option>
-        @for (p of protocols(); track p) { <option [value]="p">{{ p }}</option> }
-      </select>
-      <select class="input max-w-40" [value]="environmentFilter()" aria-label="Environment"
-              (change)="environmentFilter.set($any($event.target).value)">
-        <option value="">All environments</option>
-        @for (e of environments; track e.key) { <option [value]="e.key">{{ e.label }}</option> }
-      </select>
-      <select class="input max-w-32" [value]="statusFilter()"
-              (change)="statusFilter.set($any($event.target).value)">
-        <option value="">All states</option>
-        <option value="Active">Active</option>
-        <option value="Inactive">Inactive</option>
-      </select>
-      <div class="search-field max-w-56">
-        <app-icon name="search" size="0.95em" />
-        <input class="input"
-               [placeholder]="canSeeWorkspace() ? 'Search name, label, broker or workspace' : 'Search name, label or broker'"
-               [value]="search()" (input)="search.set($any($event.target).value)" />
-      </div>
-      <app-mine-filter [(only)]="onlyMine" />
-      @if (hasFilters()) {
-        <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()">
-          <app-icon name="close" />Clear
-        </button>
-      }
-    </ng-container>
+  <!-- ── Master / detail ─────────────────────────────────────────────────────────────── -->
+  <div class="card lookup-split kafka-split">
 
-    @if (view() === 'cards') {
-      <div class="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
-        @for (p of filtered(); track p.kafkaConnectionProfileId) {
-          <article class="card p-4 flex flex-col gap-3"
-                   [class.opacity-55]="testing() === p.kafkaConnectionProfileId">
-            <div class="flex items-start gap-2.5">
-              <span class="stat-glyph shrink-0"><app-icon name="server" /></span>
-              <div class="min-w-0 flex-1">
-                <h3 class="font-semibold truncate flex items-center gap-1.5" [title]="p.profileName">
-                  <span class="truncate">{{ p.profileName }}</span>
-                  @if (p.isDefault) {
-                    <span class="pill pill-brand shrink-0" [title]="defaultHint(p)">
-                      <app-icon name="check" size="0.85em" />default
-                    </span>
-                  }
-                </h3>
-                @if (canSeeWorkspace()) {
-                  <span class="pill pill-neutral mt-0.5" [title]="workspaceHint(p)">
-                    @if (p.tenantId == null) {
-                      <app-icon name="globe" size="0.8em" class="opacity-70" />
-                    } @else {
-                      <app-icon name="building" size="0.8em" class="opacity-70" />
-                    }
-                    {{ workspaceName(p) }}
-                  </span>
-                }
-                @if (env(p); as e) {
-                  <span class="mt-0.5" [class]="'pill env-pill pill-' + e.tone" [title]="e.hint">
-                    <span class="env-pill-k">env</span>{{ e.label }}
-                  </span>
-                }
-              </div>
-              <div class="shrink-0 flex items-center gap-1">
-                <app-status [label]="p.status" [quiet]="true" />
-                <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="cardMenu"
-                        [disabled]="testing() === p.kafkaConnectionProfileId" aria-label="Actions">
-                  <app-icon name="dots" size="1.05em" />
-                </button>
-                <ng-template #cardMenu>
-                  <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
-                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="edit(p)">
-                      <app-icon name="edit" />Edit
-                    </button>
-                    <button cdkMenuItem class="menu-item btn-intent-ok" (cdkMenuItemTriggered)="testConnection(p)">
-                      <app-icon name="plug" class="icon-ok" />Test connection
-                    </button>
-                    <div class="my-1 border-t border-subtle"></div>
-                    @if (p.isDefault) {
-                      <button cdkMenuItem class="menu-item btn-intent-warn" (cdkMenuItemTriggered)="clearDefault()">
-                        <app-icon name="minus" />Clear default
-                      </button>
-                    } @else {
-                      <button cdkMenuItem class="menu-item btn-intent-ok" (cdkMenuItemTriggered)="setDefault(p)">
-                        <app-icon name="check" />Set as default
-                      </button>
-                    }
-                    <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="remove(p)">
-                      <app-icon name="trash" class="icon-crit" />Delete
-                    </button>
-                  </div>
-                </ng-template>
-              </div>
-            </div>
-
-            <dl class="text-xs grid gap-1">
-              <div class="flex gap-2 min-w-0">
-                <dt class="text-[color:var(--text-muted)] shrink-0 w-16">Brokers</dt>
-                <dd class="lookup-value min-w-0">
-                  <span class="mono truncate" [title]="p.bootstrapServers">{{ p.bootstrapServers }}</span>
-                  <app-copy-button [value]="p.bootstrapServers" [copied]="copiedId() === p.kafkaConnectionProfileId"
-                                   copiedLabel="Brokers copied" (copy)="copyRow(p.kafkaConnectionProfileId, p.bootstrapServers)" />
-                </dd>
-              </div>
-              <div class="flex gap-2 min-w-0">
-                <dt class="text-[color:var(--text-muted)] shrink-0 w-16">Security</dt>
-                <dd class="min-w-0">
-                  <span [class]="protocolTone(p)"
-                        [title]="p.securityProtocol === 'PLAINTEXT' ? 'Unencrypted — credentials and data travel in the clear' : ''">
-                    @if (p.securityProtocol === 'PLAINTEXT') { <app-icon name="alert" size="0.85em" /> }
-                    @else { <app-icon name="lock" size="0.85em" /> }
-                    {{ p.securityProtocol }}
-                  </span>
-                  @if (p.saslMechanism && p.securityProtocol.startsWith('SASL_')) {
-                    <span class="text-[color:var(--text-muted)] ml-1">{{ p.saslMechanism }}</span>
-                  }
-                </dd>
-              </div>
-            </dl>
-
-            <div class="flex flex-wrap items-center gap-1.5 mt-auto pt-1">
-              <span [class]="testPill(p)" [title]="p.lastTestMessage || ''">
-                @if (testGlyph(p)) { <app-icon [name]="testGlyph(p)" size="0.85em" /> }{{ testLabel(p) }}
-              </span>
-              @if (p.lastTestedAt) {
-                <span class="text-[11px] text-[color:var(--text-muted)] ml-auto">
-                  {{ p.lastTestedAt | date:'d MMM, HH:mm' }}
-                </span>
-              }
-            </div>
-          </article>
-        }
-      </div>
-    } @else {
-    <table class="table-modern">
-      <thead>
-        <tr>
-          @for (column of [
-            { key: 'profileName', label: 'Profile' },
-            { key: 'bootstrapServers', label: 'Bootstrap servers' },
-            { key: 'securityProtocol', label: 'Security' },
-            { key: 'connectionStatus', label: 'Last test' }
-          ]; track column.key) {
-            <th>
-              <span class="th-sort" [class.th-sort-active]="sort.key() === column.key"
-                    (click)="sort.toggle(column.key)">
-                {{ column.label }}
-                <app-icon [name]="sort.iconFor(column.key)" size="0.875rem"
-                          [class]="sort.key() === column.key ? 'icon-info' : 'icon-muted'" />
-              </span>
-            </th>
+    <aside class="lookup-rail">
+      <div class="lookup-rail-tools">
+        <div class="search-field">
+          <app-icon name="search" size="0.95em" />
+          <input class="input" placeholder="Find by name, broker or workspace" aria-label="Find a profile"
+                 [value]="search()" (input)="search.set($any($event.target).value)" />
+        </div>
+        <div class="flex gap-2">
+          <select class="input min-w-0 flex-1" [value]="environmentFilter()" aria-label="Environment"
+                  (change)="environmentFilter.set($any($event.target).value)">
+            <option value="">All environments</option>
+            @for (e of environments; track e.key) { <option [value]="e.key">{{ e.label }}</option> }
+          </select>
+          <select class="input min-w-0 flex-1" [value]="statusFilter()" aria-label="State"
+                  (change)="statusFilter.set($any($event.target).value)">
+            <option value="">All states</option>
+            <option value="Active">Active</option>
+            <option value="Inactive">Inactive</option>
+          </select>
+        </div>
+        <div class="flex items-center gap-2">
+          <app-mine-filter [(only)]="onlyMine" />
+          @if (hasFilters()) {
+            <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="clearFilters()">
+              <app-icon name="close" />Clear
+            </button>
           }
-          @if (canSeeWorkspace()) { <th>Workspace</th> }
-          <th>Created by</th>
-          <th>Updated by</th>
-          <th class="text-right">State</th>
-          <th class="w-12"></th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (p of filtered(); track p.kafkaConnectionProfileId) {
-          <tr [class.opacity-55]="testing() === p.kafkaConnectionProfileId">
-            <td class="max-w-56">
-              <div class="font-medium flex items-center gap-1.5">
-                {{ p.profileName }}
-                @if (p.isDefault) {
-                  <span class="pill pill-brand" [title]="defaultHint(p)">
-                    <app-icon name="check" size="0.85em" />default
+        </div>
+      </div>
+
+      @if (loading()) {
+        <div class="lookup-rail-empty"><app-icon name="refresh" class="spin icon-muted" /> Loading…</div>
+      } @else if (error()) {
+        <div class="lookup-rail-empty text-crit-500">
+          {{ error() }}
+          <button type="button" class="btn btn-default btn-sm mt-2" (click)="load()">Try again</button>
+        </div>
+      } @else if (!filtered().length) {
+        <div class="lookup-rail-empty">
+          <app-icon name="server" size="1.4rem" class="icon-muted" />
+          {{ hasFilters() ? 'No profile matches the current filters.' : 'No Kafka profiles yet.' }}
+        </div>
+      } @else {
+        <ul class="lookup-rail-list" role="listbox" aria-label="Kafka profiles">
+          @for (p of filtered(); track p.kafkaConnectionProfileId) {
+            <li>
+              <button type="button" class="lookup-rail-item kafka-rail-item"
+                      role="option" [attr.aria-selected]="selectedId() === p.kafkaConnectionProfileId"
+                      [class.is-selected]="selectedId() === p.kafkaConnectionProfileId"
+                      (click)="select(p)">
+                <span class="kafka-rail-dot" [class]="'kafka-rail-dot ' + testTone(p).cls" [title]="testTone(p).label"></span>
+                <span class="min-w-0 flex-1">
+                  <span class="lookup-rail-key">
+                    {{ p.profileName }}
+                    @if (p.isDefault) { <app-icon name="check" size="0.8em" class="icon-info" title="Default" /> }
                   </span>
-                }
-              </div>
-              @if (env(p); as e) {
-                <span class="mt-1" [class]="'pill env-pill pill-' + e.tone" [title]="e.hint">
-                  <span class="env-pill-k">env</span>{{ e.label }}
+                  <span class="lookup-rail-sub">
+                    @if (env(p); as e) { <span [class]="'kafka-rail-env kafka-rail-env-' + e.tone">{{ e.label }}</span> · }
+                    @if (canSeeWorkspace()) { {{ workspaceName(p) }} · }
+                    <span class="mono">{{ p.bootstrapServers }}</span>
+                  </span>
                 </span>
+                <app-icon name="chevronRight" size="0.9em" class="lookup-rail-chev" />
+              </button>
+            </li>
+          }
+        </ul>
+      }
+    </aside>
+
+    <section class="lookup-detail" aria-live="polite">
+      @if (selected(); as p) {
+        <header class="lookup-detail-head">
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2 flex-wrap">
+              @if (env(p); as e) {
+                <span [class]="'pill env-pill pill-' + e.tone" [title]="e.hint"><span class="env-pill-k">env</span>{{ e.label }}</span>
               }
-            </td>
-            <td class="max-w-64">
-              <div class="lookup-value">
-                <span class="mono truncate" [title]="p.bootstrapServers">{{ p.bootstrapServers }}</span>
-                <app-copy-button [value]="p.bootstrapServers" [copied]="copiedId() === p.kafkaConnectionProfileId"
-                                 copiedLabel="Brokers copied" (copy)="copyRow(p.kafkaConnectionProfileId, p.bootstrapServers)" />
-              </div>
-            </td>
-            <td>
-              <span [class]="protocolTone(p)"
-                    [title]="p.securityProtocol === 'PLAINTEXT' ? 'Unencrypted — credentials and data travel in the clear' : ''">
-                @if (p.securityProtocol === 'PLAINTEXT') { <app-icon name="alert" size="0.85em" /> }
-                @else { <app-icon name="lock" size="0.85em" /> }
-                {{ p.securityProtocol }}
-              </span>
-              @if (p.saslMechanism && p.securityProtocol.startsWith('SASL_')) {
-                <div class="text-xs text-[color:var(--text-muted)] mt-0.5">{{ p.saslMechanism }}</div>
+              @if (p.isDefault) {
+                <span class="pill pill-brand" [title]="defaultHint(p)"><app-icon name="check" size="0.85em" />default</span>
               }
-            </td>
-            <td>
-              <span [class]="testPill(p)" [title]="p.lastTestMessage || ''">
-                @if (testGlyph(p)) { <app-icon [name]="testGlyph(p)" size="0.85em" /> }{{ testLabel(p) }}
-              </span>
-              @if (p.lastTestedAt) {
-                <div class="text-xs text-[color:var(--text-muted)] mt-0.5">
-                  {{ p.lastTestedAt | date:'d MMM, HH:mm' }}
-                </div>
-              }
-            </td>
-            @if (canSeeWorkspace()) {
-              <td>
+              @if (canSeeWorkspace()) {
                 <span class="pill pill-neutral" [title]="workspaceHint(p)">
-                  @if (p.tenantId == null) {
-                    <app-icon name="globe" size="0.8em" class="opacity-70" />
-                  } @else {
-                    <app-icon name="building" size="0.8em" class="opacity-70" />
-                  }
+                  <app-icon [name]="p.tenantId == null ? 'globe' : 'building'" size="0.8em" class="opacity-70" />
                   {{ workspaceName(p) }}
                 </span>
-              </td>
-            }
-            <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
-              {{ p.createdByName || '—' }}
-            </td>
-            <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
-              {{ p.updatedByName || '—' }}
-            </td>
-            <td class="text-right"><app-status [label]="p.status" [quiet]="true" /></td>
-            <td class="text-right">
-              <button type="button" class="btn btn-ghost btn-icon" [cdkMenuTriggerFor]="menu"
-                      [disabled]="testing() === p.kafkaConnectionProfileId" aria-label="Actions">
-                <app-icon name="dots" size="1.05em" />
-              </button>
-              <ng-template #menu>
-                <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
-                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="edit(p)">
-                    <app-icon name="edit" />Edit
+              }
+              <app-status [label]="p.status" [quiet]="true" />
+            </div>
+            <h2 class="lookup-detail-key mt-1.5" [title]="p.profileName">{{ p.profileName }}</h2>
+            <p class="text-xs text-[color:var(--text-muted)] mt-1.5">
+              @if (p.createdByName) { Added by {{ p.createdByName }} }
+              @if (p.createdByName && p.updatedByName) { · }
+              @if (p.updatedByName) { last changed by {{ p.updatedByName }} }
+              @if (p.dateCreated) { · since {{ p.dateCreated | date: 'mediumDate' }} }
+            </p>
+          </div>
+          <div class="flex items-center gap-1.5 shrink-0">
+            <button type="button" class="btn btn-primary btn-sm" (click)="testConnection(p)"
+                    [disabled]="testing() === p.kafkaConnectionProfileId">
+              <app-icon name="plug" [busy]="testing() === p.kafkaConnectionProfileId" />
+              {{ testing() === p.kafkaConnectionProfileId ? 'Testing…' : 'Test connection' }}
+            </button>
+            <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="detailMenu" aria-label="More actions">
+              <app-icon name="dots" size="1.05em" />
+            </button>
+            <ng-template #detailMenu>
+              <div cdkMenu class="card shadow-xl py-1 min-w-52 text-sm">
+                <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="edit(p)">
+                  <app-icon name="edit" />Edit profile
+                </button>
+                @if (p.isDefault) {
+                  <button cdkMenuItem class="menu-item btn-intent-warn" (cdkMenuItemTriggered)="clearDefault()">
+                    <app-icon name="zapOff" />Clear default
                   </button>
-                  <button cdkMenuItem class="menu-item btn-intent-ok" (cdkMenuItemTriggered)="testConnection(p)">
-                    <app-icon name="plug" class="icon-ok" />Test connection
+                } @else {
+                  <button cdkMenuItem class="menu-item btn-intent-ok" (cdkMenuItemTriggered)="setDefault(p)">
+                    <app-icon name="zap" class="icon-ok" />Set as default
                   </button>
-                  <div class="my-1 border-t border-subtle"></div>
-                  @if (p.isDefault) {
-                    <button cdkMenuItem class="menu-item btn-intent-warn" (cdkMenuItemTriggered)="clearDefault()">
-                      <app-icon name="minus" />Clear default
-                    </button>
-                  } @else {
-                    <button cdkMenuItem class="menu-item btn-intent-ok" (cdkMenuItemTriggered)="setDefault(p)">
-                      <app-icon name="check" />Set as default
-                    </button>
-                  }
-                  <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="remove(p)">
-                    <app-icon name="trash" class="icon-crit" />Delete
-                  </button>
+                }
+                <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="remove(p)">
+                  <app-icon name="trash" class="icon-crit" />Delete profile
+                </button>
+              </div>
+            </ng-template>
+          </div>
+        </header>
+
+        <!-- Last test: the one fact somebody opening this page is usually after. -->
+        <div class="lookup-value-block kafka-test" [class]="'lookup-value-block kafka-test kafka-test-' + testTone(p).cls">
+          <div class="flex items-start gap-3">
+            <span class="kafka-test-glyph" [class]="'kafka-test-glyph ' + testTone(p).cls">
+              <app-icon [name]="testTone(p).icon" size="1.1em" />
+            </span>
+            <div class="min-w-0 flex-1">
+              <div class="flex items-baseline gap-2 flex-wrap">
+                <span class="font-semibold">{{ testTone(p).label }}</span>
+                @if (p.lastTestedAt) {
+                  <span class="text-xs text-[color:var(--text-muted)]">{{ p.lastTestedAt | date: 'd MMM yyyy, HH:mm' }}</span>
+                }
+              </div>
+              <p class="text-sm text-[color:var(--text-secondary)] mt-0.5 break-words">
+                {{ p.lastTestMessage || (p.connectionStatus === 'UNTESTED' || !p.connectionStatus
+                    ? 'Never tested. Run a test to confirm the brokers answer with these settings.'
+                    : '') }}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="kafka-detail-grid">
+          <!-- Connection -->
+          <section class="kafka-detail-section">
+            <h3 class="section-title">Connection</h3>
+            <dl class="kafka-dl">
+              <dt>Brokers</dt>
+              <dd>
+                <div class="lookup-value">
+                  <span class="mono break-all">{{ p.bootstrapServers }}</span>
+                  <app-copy-button [value]="p.bootstrapServers" [copied]="copiedId() === p.kafkaConnectionProfileId"
+                                   copiedLabel="Brokers copied" (copy)="copyRow(p.kafkaConnectionProfileId, p.bootstrapServers)" />
                 </div>
-              </ng-template>
-            </td>
-          </tr>
-        }
-      </tbody>
-    </table>
-    }
-  </app-table-shell>
+              </dd>
+              <dt>Security</dt>
+              <dd>
+                <span class="pill" [class]="'pill ' + (p.securityProtocol === 'PLAINTEXT' ? 'pill-warn' : 'pill-ok')"
+                      [title]="p.securityProtocol === 'PLAINTEXT' ? 'Unencrypted and unauthenticated — fine on a local stack, not beyond it' : 'Encrypted'">
+                  @if (p.securityProtocol === 'PLAINTEXT') { <app-icon name="alert" size="0.85em" /> } @else { <app-icon name="lock" size="0.85em" /> }
+                  {{ p.securityProtocol }}
+                </span>
+              </dd>
+              @if (p.saslMechanism) {
+                <dt>SASL</dt>
+                <dd>
+                  <span class="mono">{{ p.saslMechanism }}</span>
+                  @if (p.saslUsername) { <span class="text-[color:var(--text-muted)]"> as </span><span class="mono">{{ p.saslUsername }}</span> }
+                  @if (p.saslPasswordConfigured) { <span class="pill pill-ok ml-1">password stored</span> }
+                </dd>
+              }
+              @if (p.securityProtocol === 'SSL' || p.securityProtocol === 'SASL_SSL') {
+                <dt>TLS</dt>
+                <dd class="space-y-1">
+                  <div>Hostname check
+                    <span class="pill" [class]="'pill ' + (p.sslEndpointIdentificationAlgorithm ? 'pill-ok' : 'pill-warn')">
+                      {{ p.sslEndpointIdentificationAlgorithm ? 'on' : 'off' }}
+                    </span>
+                  </div>
+                  @if (p.sslTruststoreLocation) {
+                    <div class="text-[color:var(--text-secondary)]">Truststore <span class="mono">{{ p.sslTruststoreBucket }}/{{ p.sslTruststoreLocation }}</span></div>
+                  }
+                  @if (p.sslKeystoreLocation) {
+                    <div class="text-[color:var(--text-secondary)]">Keystore <span class="mono">{{ p.sslKeystoreBucket }}/{{ p.sslKeystoreLocation }}</span></div>
+                  }
+                  @if (!p.sslTruststoreLocation && !p.sslKeystoreLocation) {
+                    <div class="text-[color:var(--text-muted)]">No certificate files — the JVM's default trust applies.</div>
+                  }
+                </dd>
+              }
+              @if (p.additionalProperties?.trim()) {
+                <dt>Extra properties</dt>
+                <dd><pre class="kafka-props">{{ p.additionalProperties }}</pre></dd>
+              }
+            </dl>
+          </section>
+
+          <!-- Used by -->
+          <section class="kafka-detail-section">
+            <h3 class="section-title">Used by
+              <span class="text-[color:var(--text-muted)] font-normal">({{ usedBy().length }})</span>
+            </h3>
+            @if (usedBy().length) {
+              <ul class="kafka-usedby">
+                @for (t of usedBy(); track t.sourceTaskTypeId) {
+                  <li>
+                    <a class="link-inline font-medium" [routerLink]="['/settings/task-types']"
+                       [queryParams]="{ q: t.serviceName }" [title]="'Open ' + t.serviceName + ' on Source Task Types'">{{ t.serviceName }}</a>
+                    <span class="mono text-xs text-[color:var(--text-muted)]">{{ t.queueTopicPartition }}</span>
+                  </li>
+                }
+              </ul>
+              <p class="field-note text-[color:var(--text-muted)] mt-2">
+                Task types that name this profile. @if (p.isDefault) { As the default it also serves every task type with no profile of its own. }
+              </p>
+            } @else {
+              <p class="text-sm text-[color:var(--text-secondary)]">
+                @if (p.isDefault) {
+                  No task type names it directly, but as the default it serves every task type without a profile of its own.
+                } @else {
+                  Nothing routes through this profile yet. Pick it on a task type, or set it as the default.
+                }
+              </p>
+            }
+          </section>
+        </div>
+      } @else if (!loading() && !error()) {
+        <div class="lookup-entries-empty lookup-detail-empty">
+          <app-icon name="server" size="1.6rem" class="icon-muted" />
+          <p>Pick a profile on the left.</p>
+        </div>
+      }
+    </section>
+  </div>
 </div>
