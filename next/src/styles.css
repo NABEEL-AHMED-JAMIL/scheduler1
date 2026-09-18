@@ -1628,7 +1628,7 @@ html.dark .kafka-rail-env-warn { color: var(--color-warn-400); }
 .kafka-test-glyph.crit { background: var(--color-crit-100); color: var(--color-crit-500); }
 html.dark .kafka-test-glyph.ok { background: color-mix(in oklab, var(--color-ok-500) 22%, transparent); color: var(--color-ok-400); }
 html.dark .kafka-test-glyph.crit { background: color-mix(in oklab, var(--color-crit-500) 22%, transparent); color: var(--color-crit-400); }
-.kafka-detail-grid { display: grid; grid-template-columns: 1fr; border-bottom: 1px solid var(--border-subtle); }
+.kafka-detail-grid { display: grid; grid-template-columns: 1fr; }
 .kafka-detail-section { padding: 1rem 1.25rem; min-width: 0; }
 .kafka-detail-section + .kafka-detail-section { border-left: 1px solid var(--border-subtle); }
 .kafka-detail-section .section-title { margin: 0 0 0.6rem; }
@@ -1652,3 +1652,14 @@ html.dark .kafka-test-glyph.crit { background: color-mix(in oklab, var(--color-c
 .pipeline-fields .mono { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pipeline-field-label { color: var(--text-secondary); }
 .pipeline-field-meta { color: var(--text-muted); font-size: 11px; white-space: nowrap; }
+
+/* The Kafka pane's summary strip: last test on one line, brokers and security on the next. */
+.kafka-strip { padding: 0.6rem 1.25rem; border-bottom: 1px solid var(--border-subtle); background: var(--surface-inset); display: flex; flex-direction: column; gap: 0.4rem; font-size: 13px; }
+.kafka-strip-row { display: flex; align-items: center; gap: 0.6rem; min-width: 0; flex-wrap: wrap; }
+.kafka-strip-k { flex: none; width: 4.5rem; font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
+.kafka-strip-dot { flex: none; width: 0.55rem; height: 0.55rem; border-radius: 999px; background: var(--border-strong); }
+.kafka-strip-dot.ok { background: var(--color-ok-500); }
+.kafka-strip-dot.crit { background: var(--color-crit-500); }
+.kafka-strip-msg { flex: 1 1 12rem; min-width: 0; }
+.kafka-strip-more { padding-top: 0.4rem; border-top: 1px solid var(--border-subtle); }
+.lookup-detail-head { padding: 0.75rem 1.25rem; }

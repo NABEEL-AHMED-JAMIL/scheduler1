@@ -92,6 +92,7 @@ export class KafkaConnections implements OnInit {
     this.selectedId.set(profile.kafkaConnectionProfileId);
     this.topicSearch.set('');
     this.topicTests.set({});
+    this.detailsOpen.set(false);
     this.router.navigate([], { relativeTo: this.route, queryParams: { profileId: profile.kafkaConnectionProfileId }, queryParamsHandling: 'merge', replaceUrl: true });
   }
 
@@ -145,6 +146,14 @@ export class KafkaConnections implements OnInit {
         this.topicTests.update(m => ({ ...m, [id]: { ok: false, message: err?.error?.message || 'The topic check could not be run.' } }));
       },
     });
+  }
+
+  /** The strip's fold-out for TLS files, the stored SASL password and extra properties. */
+  readonly detailsOpen = signal(false);
+  toggleDetails(): void { this.detailsOpen.update(v => !v); }
+  hasMoreConnectionDetail(p: KafkaProfile): boolean {
+    return p.securityProtocol === 'SSL' || p.securityProtocol === 'SASL_SSL'
+      || !!p.saslPasswordConfigured || !!p.additionalProperties?.trim();
   }
 
   readonly copiedTopicId = signal<number | null>(null);

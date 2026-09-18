@@ -132,13 +132,13 @@
               }
               <app-status [label]="p.status" [quiet]="true" />
             </div>
-            <h2 class="lookup-detail-key mt-1.5" [title]="p.profileName">{{ p.profileName }}</h2>
-            <p class="text-xs text-[color:var(--text-muted)] mt-1.5">
-              @if (p.createdByName) { Added by {{ p.createdByName }} }
-              @if (p.createdByName && p.updatedByName) { · }
-              @if (p.updatedByName) { last changed by {{ p.updatedByName }} }
-              @if (p.dateCreated) { · since {{ p.dateCreated | date: 'mediumDate' }} }
-            </p>
+            <div class="flex items-baseline gap-3 mt-1 min-w-0 flex-wrap">
+              <h2 class="lookup-detail-key" [title]="p.profileName">{{ p.profileName }}</h2>
+              <span class="text-xs text-[color:var(--text-muted)] truncate"
+                    [title]="(p.createdByName ? 'Added by ' + p.createdByName : '') + (p.updatedByName ? ' · last changed by ' + p.updatedByName : '')">
+                @if (p.createdByName) { {{ p.createdByName }} }@if (p.dateCreated) { · {{ p.dateCreated | date: 'mediumDate' }} }
+              </span>
+            </div>
           </div>
           <div class="flex items-center gap-1.5 shrink-0">
             <button type="button" class="btn btn-primary btn-sm" (click)="testConnection(p)"
@@ -171,57 +171,47 @@
           </div>
         </header>
 
-        <!-- Last test: the one fact somebody opening this page is usually after. -->
-        <div class="lookup-value-block kafka-test" [class]="'lookup-value-block kafka-test kafka-test-' + testTone(p).cls">
-          <div class="flex items-start gap-3">
-            <span class="kafka-test-glyph" [class]="'kafka-test-glyph ' + testTone(p).cls">
-              <app-icon [name]="testTone(p).icon" size="1.1em" />
+        <!-- One strip for how it connects and how the last test went: reference, not the work.
+             It took a third of the screen as a banner plus a table; the topics are why anyone
+             is here. SASL, TLS and extra properties open on demand. -->
+        <div class="kafka-strip">
+          <div class="kafka-strip-row">
+            <span class="kafka-strip-k">Last test</span>
+            <span class="kafka-strip-dot" [class]="'kafka-strip-dot ' + testTone(p).cls"></span>
+            <span class="font-medium">{{ testTone(p).label }}</span>
+            @if (p.lastTestedAt) { <span class="text-[color:var(--text-muted)]">{{ p.lastTestedAt | date: 'd MMM, HH:mm' }}</span> }
+            <span class="kafka-strip-msg truncate text-[color:var(--text-secondary)]"
+                  [title]="p.lastTestMessage || ''">
+              {{ p.lastTestMessage || (p.connectionStatus === 'UNTESTED' || !p.connectionStatus ? 'Never tested — run a test to confirm the brokers answer.' : '') }}
             </span>
-            <div class="min-w-0 flex-1">
-              <div class="flex items-baseline gap-2 flex-wrap">
-                <span class="font-semibold">{{ testTone(p).label }}</span>
-                @if (p.lastTestedAt) {
-                  <span class="text-xs text-[color:var(--text-muted)]">{{ p.lastTestedAt | date: 'd MMM yyyy, HH:mm' }}</span>
-                }
-              </div>
-              <p class="text-sm text-[color:var(--text-secondary)] mt-0.5 break-words">
-                {{ p.lastTestMessage || (p.connectionStatus === 'UNTESTED' || !p.connectionStatus
-                    ? 'Never tested. Run a test to confirm the brokers answer with these settings.'
-                    : '') }}
-              </p>
-            </div>
           </div>
-        </div>
-
-        <div class="kafka-detail-grid">
-          <!-- Connection -->
-          <section class="kafka-detail-section">
-            <h3 class="section-title">Connection</h3>
-            <dl class="kafka-dl">
-              <dt>Brokers</dt>
-              <dd>
-                <div class="lookup-value">
-                  <span class="mono break-all">{{ p.bootstrapServers }}</span>
-                  <app-copy-button [value]="p.bootstrapServers" [copied]="copiedId() === p.kafkaConnectionProfileId"
-                                   copiedLabel="Brokers copied" (copy)="copyRow(p.kafkaConnectionProfileId, p.bootstrapServers)" />
-                </div>
-              </dd>
-              <dt>Security</dt>
-              <dd>
-                <span class="pill" [class]="'pill ' + (p.securityProtocol === 'PLAINTEXT' ? 'pill-warn' : 'pill-ok')"
-                      [title]="p.securityProtocol === 'PLAINTEXT' ? 'Unencrypted and unauthenticated — fine on a local stack, not beyond it' : 'Encrypted'">
-                  @if (p.securityProtocol === 'PLAINTEXT') { <app-icon name="alert" size="0.85em" /> } @else { <app-icon name="lock" size="0.85em" /> }
-                  {{ p.securityProtocol }}
-                </span>
-              </dd>
-              @if (p.saslMechanism) {
-                <dt>SASL</dt>
-                <dd>
-                  <span class="mono">{{ p.saslMechanism }}</span>
-                  @if (p.saslUsername) { <span class="text-[color:var(--text-muted)]"> as </span><span class="mono">{{ p.saslUsername }}</span> }
-                  @if (p.saslPasswordConfigured) { <span class="pill pill-ok ml-1">password stored</span> }
-                </dd>
-              }
+          <div class="kafka-strip-row">
+            <span class="kafka-strip-k">Brokers</span>
+            <span class="lookup-value min-w-0">
+              <span class="mono truncate" [title]="p.bootstrapServers">{{ p.bootstrapServers }}</span>
+              <app-copy-button [value]="p.bootstrapServers" [copied]="copiedId() === p.kafkaConnectionProfileId"
+                               copiedLabel="Brokers copied" (copy)="copyRow(p.kafkaConnectionProfileId, p.bootstrapServers)" />
+            </span>
+            <span class="pill" [class]="'pill ' + (p.securityProtocol === 'PLAINTEXT' ? 'pill-warn' : 'pill-ok')"
+                  [title]="p.securityProtocol === 'PLAINTEXT' ? 'Unencrypted and unauthenticated — fine on a local stack, not beyond it' : 'Encrypted'">
+              @if (p.securityProtocol === 'PLAINTEXT') { <app-icon name="alert" size="0.85em" /> } @else { <app-icon name="lock" size="0.85em" /> }
+              {{ p.securityProtocol }}
+            </span>
+            @if (p.saslMechanism) {
+              <span class="pill pill-neutral" [title]="'SASL ' + p.saslMechanism + (p.saslUsername ? ' as ' + p.saslUsername : '')">
+                {{ p.saslMechanism }}@if (p.saslUsername) { · {{ p.saslUsername }} }
+              </span>
+            }
+            @if (hasMoreConnectionDetail(p)) {
+              <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="toggleDetails()"
+                      [attr.aria-expanded]="detailsOpen()">
+                <app-icon [name]="detailsOpen() ? 'chevronDown' : 'chevronRight'" size="0.9em" />
+                {{ detailsOpen() ? 'Less' : 'Details' }}
+              </button>
+            }
+          </div>
+          @if (detailsOpen() && hasMoreConnectionDetail(p)) {
+            <dl class="kafka-dl kafka-strip-more">
               @if (p.securityProtocol === 'SSL' || p.securityProtocol === 'SASL_SSL') {
                 <dt>TLS</dt>
                 <dd class="space-y-1">
@@ -241,12 +231,19 @@
                   }
                 </dd>
               }
+              @if (p.saslPasswordConfigured) {
+                <dt>SASL password</dt>
+                <dd><span class="pill pill-ok">stored</span></dd>
+              }
               @if (p.additionalProperties?.trim()) {
                 <dt>Extra properties</dt>
                 <dd><pre class="kafka-props">{{ p.additionalProperties }}</pre></dd>
               }
             </dl>
-          </section>
+          }
+        </div>
+
+        <div class="kafka-detail-grid">
 
         </div>
 
