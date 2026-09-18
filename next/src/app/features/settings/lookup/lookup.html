@@ -216,6 +216,7 @@
               <p>No entry matches “{{ entrySearch().trim() || search() }}”.</p>
             </div>
           } @else {
+            <app-blur-loader [active]="loadingChildren().has($any(lookup.lookupId))" label="Refreshing entries…">
             <div class="lookup-entries-scroll">
               <table class="table-modern lookup-entry-table">
                 <thead>
@@ -283,6 +284,7 @@
                 </tbody>
               </table>
             </div>
+            </app-blur-loader>
           }
         </div>
       } @else if (!loading() && !error()) {

@@ -10,6 +10,7 @@ import { Icon } from '../../../shared/ui/icon';
 import { StatTile } from '../../../shared/ui/stat-tile';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { CopyButton } from '../../../shared/ui/copy-button';
+import { BlurLoader } from '../../../shared/ui/blur-loader';
 import { copyText } from '../../../shared/ui/clipboard.util';
 import { confirmWith } from '../../../shared/ui/confirm';
 import { LookupData, LookupDialog } from './lookup-dialog';
@@ -18,7 +19,7 @@ import { catchError, map } from 'rxjs/operators';
 
 @Component({
   selector: 'app-lookup',
-  imports: [MineFilter, Icon, StatTile, CdkMenu, CdkMenuItem, CdkMenuTrigger, CopyButton],
+  imports: [MineFilter, Icon, StatTile, CdkMenu, CdkMenuItem, CdkMenuTrigger, CopyButton, BlurLoader],
   templateUrl: './lookup.html',
 })
 export class Lookup implements OnInit {

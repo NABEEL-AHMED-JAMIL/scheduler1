@@ -12,6 +12,7 @@ import { StatTile } from '../../../shared/ui/stat-tile';
 import { StatusPill } from '../../../shared/ui/status-pill';
 import { Icon } from '../../../shared/ui/icon';
 import { CopyButton } from '../../../shared/ui/copy-button';
+import { BlurLoader } from '../../../shared/ui/blur-loader';
 import { copyText } from '../../../shared/ui/clipboard.util';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { confirmWith } from '../../../shared/ui/confirm';
@@ -70,7 +71,7 @@ export interface KafkaProfile {
 
 @Component({
   selector: 'app-kafka-connections',
-  imports: [MineFilter, StatTile, DatePipe, StatusPill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger, CopyButton, RouterLink],
+  imports: [MineFilter, StatTile, DatePipe, StatusPill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger, CopyButton, RouterLink, BlurLoader],
   templateUrl: './kafka-connections.html',
 })
 export class KafkaConnections implements OnInit {
@@ -102,15 +103,16 @@ export class KafkaConnections implements OnInit {
    * own is shown under the default, since that is where the resolver sends it.
    */
   private readonly taskTypes = signal<TaskType[]>([]);
+  /** Which profile the loaded topics belong to; anything else on screen is stale. */
+  private readonly topicsFor = signal<number | null>(null);
+  readonly topicsLoading = signal(false);
   readonly topicsHere = computed<{ type: TaskType }[]>(() => {
     const p = this.selected();
     if (!p) return [];
-    return this.taskTypes()
-      .filter(t => t.status !== 'Delete' && t.sourceTaskTypeId
-        && (t.kafkaConnectionProfileId === p.kafkaConnectionProfileId
-          || (t.kafkaConnectionProfileId == null && p.isDefault)))
-      .sort((a, b) => a.serviceName.localeCompare(b.serviceName))
-      .map(type => ({ type }));
+    // While the next profile's topics are on their way the previous rows stay, blurred under
+    // the loader, so switching profiles reads as the list changing rather than going blank.
+    if (this.topicsFor() !== p.kafkaConnectionProfileId && !this.topicsLoading()) return [];
+    return this.taskTypes().map(type => ({ type }));
   });
 
   /** Narrows the pane's topics by name, Kafka topic or description; a hundred rows need it. */
@@ -184,23 +186,29 @@ export class KafkaConnections implements OnInit {
     this.openPipelines.update(set => { const n = new Set(set); n.has(id) ? n.delete(id) : n.add(id); return n; });
   }
 
+  /**
+   * The selected profile's topics, each with its pipelines, in one call -- asked when a
+   * profile is picked, not for every profile up front. A workspace with ten thousand topics
+   * used to download all of them (and every pipeline) to show the one pane it was looking at.
+   */
   private loadTopics(): void {
-    this.http.get<ApiResponse<any>>(`${API_BASE}/setting.json/appSetting`).subscribe({
-      next: r => { if (r.status === API_SUCCESS) this.taskTypes.set(r.data?.sourceTaskTypes ?? []); },
-      error: () => {},
-    });
-    this.http.get<ApiResponse<any[]>>(`${API_BASE}/pipeline.json/list`).subscribe({
+    const p = this.selected();
+    if (!p) { this.taskTypes.set([]); this.topicsFor.set(null); return; }
+    const id = p.kafkaConnectionProfileId;
+    this.topicsLoading.set(true);
+    this.http.get<ApiResponse<any[]>>(`${API_BASE}/setting.json/topicsForProfile`, { params: { kafkaConnectionProfileId: id } }).subscribe({
       next: r => {
-        if (r.status !== API_SUCCESS) return;
+        this.topicsLoading.set(false);
+        if (r.status !== API_SUCCESS) { this.toast.error(r.message); return; }
+        // A slower answer for a profile no longer selected must not overwrite the current one.
+        if (this.selectedId() !== id) return;
         const byTopic: Record<number, { pipelineKey: number; pipelineId: string; pipelineName: string; status?: string; fields?: number }[]> = {};
-        for (const p of r.data ?? []) {
-          if (p.sourceTaskTypeId == null || p.status === 'Delete') continue;
-          (byTopic[p.sourceTaskTypeId] ??= []).push({ pipelineKey: p.pipelineKey, pipelineId: p.pipelineId, pipelineName: p.pipelineName, status: p.status, fields: p.fields?.length ?? 0 });
-        }
-        for (const list of Object.values(byTopic)) list.sort((a, b) => a.pipelineName.localeCompare(b.pipelineName));
+        for (const t of r.data ?? []) byTopic[t.sourceTaskTypeId] = t.pipelines ?? [];
         this.pipelinesByTopic.set(byTopic);
+        this.taskTypes.set(r.data ?? []);
+        this.topicsFor.set(id);
       },
-      error: () => {},
+      error: err => { this.topicsLoading.set(false); this.toast.error(err?.error?.message || 'The topics could not be loaded.'); },
     });
   }
 
@@ -246,6 +254,11 @@ export class KafkaConnections implements OnInit {
   }
 
   constructor() {
+    // The pane's topics follow the selection: every change of selected profile is one fetch.
+    effect(() => {
+      const id = this.selectedId();
+      untracked(() => { if (id !== null) this.loadTopics(); else { this.taskTypes.set([]); this.topicsFor.set(null); } });
+    });
     // Keep something selected: the linked profile when the list arrives, else the first, and
     // move off a profile the moment it stops existing or is filtered out.
     effect(() => {
@@ -383,7 +396,6 @@ export class KafkaConnections implements OnInit {
   ngOnInit(): void {
     this.loadTenants();
     this.load();
-    this.loadTopics();
   }
 
   /**

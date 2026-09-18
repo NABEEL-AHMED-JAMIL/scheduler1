@@ -253,9 +253,13 @@
         <section class="kafka-topics">
           <div class="lookup-entries-head">
             <h3 class="section-title">Topics
-              <span class="text-[color:var(--text-muted)] font-normal">
-                ({{ topicsShown().length }}@if (topicsShown().length !== topicsHere().length) { of {{ topicsHere().length }} })
-              </span>
+              @if (!topicsLoading()) {
+                <span class="text-[color:var(--text-muted)] font-normal">
+                  ({{ topicsShown().length }}@if (topicsShown().length !== topicsHere().length) { of {{ topicsHere().length }} })
+                </span>
+              } @else {
+                <app-icon name="refresh" class="spin icon-muted ml-1" size="0.9em" />
+              }
             </h3>
             @if (topicsHere().length > 8) {
               <div class="search-field max-w-56 ml-auto">
@@ -268,7 +272,9 @@
               <app-icon name="plus" class="icon-ok" />Add topic
             </button>
           </div>
-          @if (!topicsHere().length) {
+          @if (topicsLoading() && !topicsHere().length) {
+            <div class="lookup-entries-empty"><app-icon name="refresh" class="spin icon-muted" /> Loading topics…</div>
+          } @else if (!topicsHere().length) {
             <div class="lookup-entries-empty">
               <app-icon name="layers" size="1.5rem" class="icon-muted" />
               <p>No topic publishes through this profile yet.</p>
@@ -279,6 +285,7 @@
           } @else if (!topicsShown().length) {
             <div class="lookup-entries-empty"><p>No topic matches “{{ topicSearch() }}”.</p></div>
           } @else {
+            <app-blur-loader [active]="topicsLoading()" label="Loading topics…">
             <div class="lookup-entries-scroll">
               <table class="table-modern lookup-entry-table">
                 <thead>
@@ -373,6 +380,7 @@
                 </tbody>
               </table>
             </div>
+            </app-blur-loader>
           }
         </section>
       } @else if (!loading() && !error()) {

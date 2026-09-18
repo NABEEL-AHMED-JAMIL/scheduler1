@@ -1,5 +1,6 @@
 import { Component, input, output } from '@angular/core';
 import { Icon } from './icon';
+import { BlurLoader } from './blur-loader';
 
 /**
  * Shared chrome for the list screens: a titled card with a filter slot, plus consistent
@@ -9,7 +10,7 @@ import { Icon } from './icon';
  */
 @Component({
   selector: 'app-table-shell',
-  imports: [Icon],
+  imports: [Icon, BlurLoader],
   template: `
     <div class="card overflow-hidden">
       <div class="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-subtle"
@@ -39,12 +40,14 @@ import { Icon } from './icon';
         </div>
       }
 
-      @if (loading()) {
+      @if (loading() && isEmpty()) {
+        <!-- Nothing to show yet: a plain spinner. Once rows exist, a reload keeps them under
+             a blur (see the last branch) rather than swapping them for this block. -->
         <div class="px-6 py-14 text-center text-sm text-[color:var(--text-muted)]">
           <div class="spinner mx-auto mb-3" role="status" aria-label="Loading"></div>
           Loading…
         </div>
-      } @else if (error()) {
+      } @else if (error() && !loading()) {
         <div class="px-6 py-14 text-center">
           <app-icon name="alert" size="1.75rem" class="icon-crit block mx-auto mb-3" />
           <p class="text-sm text-crit-500">{{ error() }}</p>
@@ -52,7 +55,7 @@ import { Icon } from './icon';
             <app-icon name="refresh" />Try again
           </button>
         </div>
-      } @else if (isEmpty()) {
+      } @else if (isEmpty() && !loading()) {
         <div class="px-6 py-14 text-center">
           <app-icon [name]="emptyIcon()" size="1.75rem"
                     class="icon-muted block mx-auto mb-3" />
@@ -63,7 +66,9 @@ import { Icon } from './icon';
         <!-- The rows scroll inside their own box so the toolbar above and the pager below
              stay put. Without it a 369-entry log ran the page to 15,000px and the view
              switcher, search and refresh were all off-screen by the second row. -->
-        <div class="overflow-x-auto" [class.scroll-table]="scrollRows()"><ng-content /></div>
+        <app-blur-loader [active]="loading()" label="Refreshing…">
+          <div class="overflow-x-auto" [class.scroll-table]="scrollRows()"><ng-content /></div>
+        </app-blur-loader>
       }
       <!-- Outside the scroll box: paging controls that scroll away with the rows are
            unreachable exactly when a long list makes them necessary. -->
