@@ -259,9 +259,18 @@
         <section class="kafka-topics">
           <div class="lookup-entries-head">
             <h3 class="section-title">Topics
-              <span class="text-[color:var(--text-muted)] font-normal">({{ topicsHere().length }})</span>
+              <span class="text-[color:var(--text-muted)] font-normal">
+                ({{ topicsShown().length }}@if (topicsShown().length !== topicsHere().length) { of {{ topicsHere().length }} })
+              </span>
             </h3>
-            <button type="button" class="btn btn-default btn-sm ml-auto" (click)="addTopic(p)">
+            @if (topicsHere().length > 8) {
+              <div class="search-field max-w-56 ml-auto">
+                <app-icon name="search" size="0.95em" />
+                <input class="input" placeholder="Find a topic" aria-label="Find a topic"
+                       [value]="topicSearch()" (input)="topicSearch.set($any($event.target).value)" />
+              </div>
+            }
+            <button type="button" class="btn btn-default btn-sm" [class.ml-auto]="topicsHere().length <= 8" (click)="addTopic(p)">
               <app-icon name="plus" class="icon-ok" />Add topic
             </button>
           </div>
@@ -277,6 +286,8 @@
                 }
               </p>
             </div>
+          } @else if (!topicsShown().length) {
+            <div class="lookup-entries-empty"><p>No topic matches “{{ topicSearch() }}”.</p></div>
           } @else {
             <div class="lookup-entries-scroll">
               <table class="table-modern lookup-entry-table">
@@ -291,7 +302,7 @@
                   </tr>
                 </thead>
                 <tbody>
-                  @for (row of topicsHere(); track row.type.sourceTaskTypeId) {
+                  @for (row of topicsShown(); track row.type.sourceTaskTypeId) {
                     <tr>
                       <td class="max-w-56">
                         <div class="font-medium truncate" [title]="row.type.serviceName">{{ row.type.serviceName }}</div>

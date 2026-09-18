@@ -90,6 +90,7 @@ export class KafkaConnections implements OnInit {
 
   select(profile: KafkaProfile): void {
     this.selectedId.set(profile.kafkaConnectionProfileId);
+    this.topicSearch.set('');
     this.router.navigate([], { relativeTo: this.route, queryParams: { profileId: profile.kafkaConnectionProfileId }, queryParamsHandling: 'merge', replaceUrl: true });
   }
 
@@ -122,6 +123,16 @@ export class KafkaConnections implements OnInit {
       }
     }
     return out.sort((a, b) => a.type.serviceName.localeCompare(b.type.serviceName));
+  });
+
+  /** Narrows the pane's topics by name, Kafka topic or description; a hundred rows need it. */
+  readonly topicSearch = signal('');
+  readonly topicsShown = computed(() => {
+    const term = this.topicSearch().trim().toLowerCase();
+    const rows = this.topicsHere();
+    if (!term) return rows;
+    return rows.filter(r => `${r.type.serviceName} ${r.type.description ?? ''} ${this.topicOf(r.type.queueTopicPartition)}`
+      .toLowerCase().includes(term));
   });
 
   readonly copiedTopicId = signal<number | null>(null);
