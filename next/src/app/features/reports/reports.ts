@@ -29,12 +29,25 @@ const NO_DAYS: DaySeries = { bars: [], capped: false };
  *
  * Drawn from the JobStatus enum, which has exactly eight constants: Queue, Start, Running,
  * Failed, Completed, Skip, Interrupt, Missed. Two things follow that the UI must respect.
- * There is no Cancelled and no Stopped, so neither is ever shown. And Skip and Missed cannot
- * reach this page at all -- the engine leaves start_time NULL for them and the runs query
- * filters WHERE start_time IS NOT NULL -- so they are absent by construction rather than by
- * chance, and a legend seeded from the enum would render permanently empty segments.
+ * There is no Cancelled and no Stopped, so neither is ever shown. Skip and Missed rows carry
+ * skip_time rather than start_time; the runs query (QueryService.runReportRows) admits either,
+ * so a task that was skipped six times this week shows six skipped runs rather than six fewer.
  */
 const FAILED = new Set(['Failed', 'Interrupt']);
+
+/**
+ * The outcome columns of the task table, in the order a reader wants them: what went right,
+ * what went wrong, what never happened. Interrupt is kept apart from Failed -- a run that was
+ * stopped is a different problem from one that broke -- though both count as failures for the
+ * task's tone and success rate.
+ */
+const OUTCOME_COLUMNS = [
+  { status: 'Completed', label: 'Completed', tone: 'ok',   title: 'Runs that finished successfully' },
+  { status: 'Failed',    label: 'Failed',    tone: 'crit', title: 'Runs that reported an error' },
+  { status: 'Interrupt', label: 'Interrupted', tone: 'crit', title: 'Runs stopped before they finished' },
+  { status: 'Skip',      label: 'Skipped',   tone: 'warn', title: 'Runs skipped by hand or because the job was already queued' },
+  { status: 'Missed',    label: 'Missed',    tone: 'warn', title: 'Scheduled runs the dispatcher never picked up' },
+] as const;
 const IN_FLIGHT = new Set(['Queue', 'Start', 'Running']);
 
 // NO_DURATION -- the -1 a run that has not ended carries instead of a duration -- is imported
@@ -51,6 +64,8 @@ interface TaskHealth {
    *  job on every row -- it was simply never counted. */
   jobs: number;
   failures: number;
+  /** Runs per outcome, by JobStatus name; missing means zero. */
+  outcomes: Record<string, number>;
   successRate: number;
   median: number;
   /** Slowest finished run. Read next to the median it says whether the task is steady or
@@ -212,6 +227,7 @@ export class Reports implements OnInit {
 
   readonly humanSeconds = humanSeconds;
   readonly statusColor = statusColor;
+  readonly outcomeColumns = OUTCOME_COLUMNS;
   /** Durations on the histogram axis read as durations, not as bare numbers. */
   readonly formatSeconds = (value: number): string => humanSeconds(Math.round(value));
 
@@ -265,6 +281,18 @@ export class Reports implements OnInit {
       else if (IN_FLIGHT.has(status)) inFlight++;
     }
     return { total: rows.length, completed, failed, inFlight };
+  });
+
+  /** Skipped and missed runs in the range -- due, but never started. */
+  readonly notRun = computed(() =>
+    this.rows().filter(r => { const s = this.statusAt(r); return s === 'Skip' || s === 'Missed'; }).length);
+
+  /** The Runs tile's foot: the period comparison, and how many of the runs never started. */
+  readonly runsFoot = computed(() => {
+    const parts: string[] = [];
+    if (this.runsDelta()) parts.push(this.runsDelta());
+    if (this.notRun()) parts.push(`${this.notRun()} skipped or missed`);
+    return parts.join(' · ');
   });
 
   /**
@@ -508,6 +536,8 @@ export class Reports implements OnInit {
     for (const [taskIdx, rows] of byTask) {
       const failures = rows.filter(r => FAILED.has(this.statusAt(r))).length;
       const completed = rows.filter(r => this.statusAt(r) === 'Completed').length;
+      const outcomes: Record<string, number> = {};
+      for (const r of rows) { const s = this.statusAt(r); outcomes[s] = (outcomes[s] ?? 0) + 1; }
       const timed = rows.filter(r => r[SECONDS] !== NO_DURATION);
       // The SAME settled denominator the Overview tile uses. Dividing by every run here while
       // the tile divided by settled ones made the page print two different success percentages
@@ -553,7 +583,7 @@ export class Reports implements OnInit {
         task: data.task[taskIdx] ?? '(no task)',
         runs: rows.length,
         jobs: new Set(rows.map(r => r[JOB_NAME])).size,
-        failures, successRate,
+        failures, outcomes, successRate,
         median: timed.length ? aggregate(timed, 'median') : NO_DURATION,
         slowest: timed.length ? aggregate(timed, 'max') : NO_DURATION,
         lastDay, tone, state, why,

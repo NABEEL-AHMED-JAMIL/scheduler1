@@ -154,7 +154,7 @@
     <section class="space-y-3">
       <div>
           <h2 class="section-title">Overview</h2>
-        <p class="section-sub">Every run that started between the two dates above.
+        <p class="section-sub">Every run due between the two dates above — started, skipped or missed.
           @if (showTenantFilter() && !tenantFilter()) {
             <strong>These totals combine {{ tenantOptions().length }} workspaces</strong> —
             pick one above to separate them.
@@ -162,8 +162,8 @@
         </p>
       </div>
       <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <app-stat-tile label="Runs started" [value]="counts().total" icon="play"
-                       [foot]="runsDelta()" />
+        <app-stat-tile label="Runs" [value]="counts().total" icon="play"
+                       [foot]="runsFoot()" />
         <app-stat-tile label="Failed" [value]="counts().failed" icon="alert"
                        [tone]="counts().failed ? 'crit' : 'muted'" />
         <!-- A dash, not a zero, when nothing has settled: 0% in red says everything failed,
@@ -194,8 +194,8 @@
         <div class="card p-4 min-w-0">
           <h3 class="text-sm font-semibold">Outcome mix</h3>
           <p class="field-note text-[color:var(--text-muted)] mb-3">
-            Only outcomes that occurred. Skipped and missed runs never start, so they cannot
-            appear here.
+            Only outcomes that occurred. Skipped and missed runs are counted: they were due,
+            even though they never ran.
           </p>
           <app-donut [data]="outcomeMix()" totalLabel="runs" [colorFor]="statusColor" />
         </div>
@@ -257,7 +257,12 @@
               <th>Task</th>
               <th class="text-right hidden lg:table-cell" title="Distinct jobs that drove this task">Jobs</th>
               <th class="text-right">Runs</th>
-              <th class="text-right">Failed</th>
+              <!-- One column per outcome, not a single "Failed": Interrupt is a different
+                   problem from Failed (the run was stopped, not broken), and Skip and Missed
+                   are the only trace a task leaves when it never ran at all. -->
+              @for (col of outcomeColumns; track col.status) {
+                <th class="text-right" [title]="col.title">{{ col.label }}</th>
+              }
               <th class="text-right">Success</th>
               <th class="text-right">Median</th>
               <th class="text-right hidden xl:table-cell" title="Slowest finished run">Slowest</th>
@@ -279,8 +284,14 @@
                 </td>
                 <td class="text-right tabular hidden lg:table-cell">{{ task.jobs }}</td>
                 <td class="text-right tabular">{{ task.runs }}</td>
-                <td class="text-right tabular"
-                    [class.text-crit-500]="task.failures > 0">{{ task.failures }}</td>
+                @for (col of outcomeColumns; track col.status) {
+                  <td class="text-right tabular"
+                      [class.text-[color:var(--text-muted)]]="!task.outcomes[col.status]"
+                      [class.text-crit-500]="col.tone === 'crit' && task.outcomes[col.status] > 0"
+                      [class.text-warn-500]="col.tone === 'warn' && task.outcomes[col.status] > 0">
+                    {{ task.outcomes[col.status] || 0 }}
+                  </td>
+                }
                 <td class="text-right tabular">
                   {{ task.successRate >= 0 ? task.successRate + '%' : '—' }}
                 </td>
