@@ -213,6 +213,7 @@ export class Landing {
     { label: 'Schedule types', value: '5' },
     { label: 'Storage backends', value: '4' },
     { label: 'Export formats', value: 'CSV · XLSX' },
+    { label: 'Run outcomes reported', value: '5' },
   ];
 
   readonly capabilities = [
@@ -223,8 +224,8 @@ export class Landing {
       body: 'Start any job by hand without disturbing its timetable, or skip the next run and '
           + 'leave the rest in place.' },
     { icon: 'history', title: 'Every run accounted for',
-      body: 'Queued, running, completed, failed and skipped are all recorded, and a run missed '
-          + 'during downtime is written down rather than quietly forgotten.' },
+      body: 'Queued, running, completed, failed, interrupted and skipped are all recorded, and a '
+          + 'run missed during downtime is written down rather than quietly forgotten.' },
     { icon: 'terminal', title: 'Logs while it runs',
       body: 'Each run keeps its own log, streamed as it happens and kept afterwards, so a '
           + 'failure can be read rather than guessed at.' },
@@ -232,8 +233,9 @@ export class Landing {
       body: 'S3, Azure, MinIO and FTP connections. Browse buckets, upload, preview a file and '
           + 'send a job’s output straight to one.' },
     { icon: 'chart', title: 'Reports you can take away',
-      body: 'Group runs by task, outcome or day, measure them how you like, and export the '
-          + 'result as CSV or XLSX — to your machine or to a bucket.' },
+      body: 'Every task with its completed, failed, interrupted, skipped and missed runs side by '
+          + 'side. Group by task, outcome or day, measure how you like, and export as CSV or '
+          + 'XLSX — to your machine or to a bucket.' },
     { icon: 'database', title: 'Queries on a timetable',
       body: 'Register a database, save a query, preview it, and have it run to a bucket on a '
           + 'schedule of its own.' },
@@ -241,8 +243,13 @@ export class Landing {
       body: 'Build a form, share its link, and turn what comes back into a task’s configuration '
           + 'without hand-writing XML.' },
     { icon: 'shield', title: 'Separated by tenant',
-      body: 'Every job, task, bucket and user belongs to a tenant, and roles decide what each '
-          + 'person can reach.' },
+      body: 'Every job, task, bucket and user belongs to a tenant. Roles decide how much a '
+          + 'person may do, and access profiles decide which pages they see — with a per-person '
+          + 'exception when one is needed.' },
+    { icon: 'key', title: 'Workers prove themselves per run',
+      body: 'Each dispatch carries a token good for that run alone, echoed back on every '
+          + 'callback. Nothing to hand out, nothing to rotate, and a finished run’s token is '
+          + 'dead.' },
   ];
 
   readonly steps = [

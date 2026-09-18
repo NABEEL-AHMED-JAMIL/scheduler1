@@ -306,7 +306,13 @@ export class Docs implements AfterViewInit {
         { name: 'Position', required: false, note: 'Their job title. Separate from Role — a lead and an engineer can share a role.' },
         { name: 'Role', required: true, note: 'What they may reach. See the reference below.' },
       ],
-      notes: ['Give each tenant at least two administrators, so nobody is locked out when one is away.'],
+      notes: [
+        'Give each tenant at least two administrators, so nobody is locked out when one is away.',
+        'The Tenants screen shows each workspace\'s code under its name — click it to copy, since the code is what '
+          + 'bucket names, IAM policies and scripts are written against — and its first tenant admin, so you know who to contact.',
+        'Every person has a copyable email and phone on Administration → Users, in the table as well as on the cards. '
+          + 'Pick the country code first when entering a phone; the number is stored in international form.',
+      ],
     },
     {
       id: 'access', title: 'Decide which pages each person opens',
@@ -416,7 +422,11 @@ export class Docs implements AfterViewInit {
         'Each run keeps its own log. Open a run from the job’s history to read it, live while it '
         + 'is going and afterwards.',
         'A run missed while the system was down is recorded as Missed rather than passed over, so '
-        + 'a gap in the history is visible rather than silent.',
+        + 'a gap in the history is visible rather than silent. A run stopped before it finished — '
+        + 'cancelled from the screen, or a worker that went away — is Interrupted, kept apart from Failed.',
+        'A worker proves it is allowed to report on a run with a token minted for that run at dispatch '
+        + 'and echoed back as X-Worker-Token. There is nothing to configure or rotate: a retry gets a '
+        + 'fresh token, and a finished run\'s token is refused, whoever ended the run.',
       ],
     },
     {
@@ -424,6 +434,10 @@ export class Docs implements AfterViewInit {
       intro: 'Runs roll up into a report you can group and measure, then take away.',
       where: 'Reports',
       notes: [
+        'The task table has a column per outcome — Completed, Failed, Interrupted, Skipped, Missed — '
+        + 'so a task that was skipped six times this week shows six skipped runs, not six fewer.',
+        'Skipped and missed runs count as runs: they were due even though they never started. '
+        + 'The success rate is over settled runs only, so a run still going does not read as a failure.',
         'Group by task, outcome or day, choose a measure, and the table and chart follow.',
         'Export as CSV or XLSX — either to your machine or straight into one of the buckets from '
         + 'step 2.',
@@ -465,6 +479,7 @@ export class Docs implements AfterViewInit {
     { name: 'Start / Running', note: 'A worker has it and is reporting progress.' },
     { name: 'Completed', note: 'Finished, and whatever it produced has been written.' },
     { name: 'Failed', note: 'Stopped with a reason. The run’s log says what happened.' },
+    { name: 'Interrupt', note: 'Stopped before it finished — cancelled, or the worker went away. Counts against the success rate like Failed.' },
     { name: 'Skip', note: 'Passed over deliberately — by a person, or because the job was already queued.' },
     { name: 'Missed', note: 'Its slot went by while nothing was running to take it.' },
   ];
