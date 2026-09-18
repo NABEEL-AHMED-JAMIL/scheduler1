@@ -147,3 +147,32 @@ describe('whose profile a row is', () => {
     expect(screen.filtered()).toEqual([]);
   });
 });
+
+// ---- environments -------------------------------------------------------------------------
+
+import { KAFKA_ENVIRONMENTS, kafkaEnvironment } from './kafka-environment';
+
+describe('kafkaEnvironment', () => {
+  it('resolves the five listed keys whatever their case or padding', () => {
+    for (const e of KAFKA_ENVIRONMENTS) {
+      expect(kafkaEnvironment(e.key)!.tone).toBe(e.tone);
+      expect(kafkaEnvironment(`  ${e.key.toUpperCase()} `)!.key).toBe(e.key);
+    }
+  });
+
+  it('draws production, and only production, as critical', () => {
+    expect(kafkaEnvironment('prod')!.tone).toBe('crit');
+    expect(KAFKA_ENVIRONMENTS.filter(e => e.tone === 'crit').map(e => e.key)).toEqual(['prod']);
+  });
+
+  it('keeps an older free-text label visible as a neutral chip rather than dropping it', () => {
+    const legacy = kafkaEnvironment('Staging EU');
+    expect(legacy).toEqual(expect.objectContaining({ key: 'staging eu', label: 'Staging EU', tone: 'neutral' }));
+  });
+
+  it('is nothing for an empty label', () => {
+    expect(kafkaEnvironment('')).toBeNull();
+    expect(kafkaEnvironment('   ')).toBeNull();
+    expect(kafkaEnvironment(undefined)).toBeNull();
+  });
+});

@@ -1,4 +1,5 @@
 import { Component, computed, effect, inject, signal } from '@angular/core';
+import { KAFKA_ENVIRONMENTS } from './kafka-environment';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { HttpClient } from '@angular/common/http';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -52,11 +53,16 @@ import {
                    placeholder="Production cluster" />
           </app-field>
 
-          <app-field label="Environment label" for="environmentLabel"
+          <app-field label="Environment" for="environmentLabel"
                      [control]="form.get('environmentLabel')" [submitted]="submitted()"
-                     hint="Free text shown beside the name, e.g. staging.">
-            <input id="environmentLabel" class="input" formControlName="environmentLabel"
-                   placeholder="staging" />
+                     [hint]="environmentHint()">
+            <select id="environmentLabel" class="input" formControlName="environmentLabel">
+              <option value="">Not set</option>
+              @for (e of environments; track e.key) { <option [value]="e.key">{{ e.label }}</option> }
+              @if (legacyEnvironment(); as legacy) {
+                <option [value]="legacy">{{ legacy }} (older label)</option>
+              }
+            </select>
           </app-field>
         </div>
 
@@ -182,7 +188,7 @@ export class KafkaDialog {
   readonly form: FormGroup = this.fb.group({
     kafkaConnectionProfileId: [this.data.profile?.kafkaConnectionProfileId ?? null],
     profileName: [this.data.profile?.profileName ?? '', Validators.required],
-    environmentLabel: [this.data.profile?.environmentLabel ?? ''],
+    environmentLabel: [(this.data.profile?.environmentLabel ?? '').trim().toLowerCase()],
     bootstrapServers: [this.data.profile?.bootstrapServers ?? '', Validators.required],
     securityProtocol: [this.data.profile?.securityProtocol ?? 'PLAINTEXT', Validators.required],
     saslMechanism: [this.data.profile?.saslMechanism ?? 'PLAIN'],
@@ -336,4 +342,25 @@ export class KafkaDialog {
       },
     });
   }
+
+  readonly environments = KAFKA_ENVIRONMENTS;
+
+  /**
+   * A label from before environments were a fixed list, kept selectable so opening an old
+   * profile does not silently change it. Once it is switched to a listed value it is gone.
+   */
+  readonly legacyEnvironment = computed(() => {
+    const stored = (this.data.profile?.environmentLabel ?? '').trim().toLowerCase();
+    return stored && !KAFKA_ENVIRONMENTS.some(e => e.key === stored) ? stored : '';
+  });
+
+  /** The chosen environment's own sentence, so the hint says what the choice means. */
+  readonly environmentHint = computed(() => {
+    const key = this.environmentValue();
+    return KAFKA_ENVIRONMENTS.find(e => e.key === key)?.hint
+      ?? 'Which deployment this broker serves. Production is drawn red wherever the profile appears.';
+  });
+  private readonly environmentValue = toSignal(
+    this.form.get('environmentLabel')!.valueChanges,
+    { initialValue: this.form.get('environmentLabel')!.value as string });
 }

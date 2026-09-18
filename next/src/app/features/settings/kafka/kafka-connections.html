@@ -64,6 +64,11 @@
         <option value="">All protocols</option>
         @for (p of protocols(); track p) { <option [value]="p">{{ p }}</option> }
       </select>
+      <select class="input max-w-40" [value]="environmentFilter()" aria-label="Environment"
+              (change)="environmentFilter.set($any($event.target).value)">
+        <option value="">All environments</option>
+        @for (e of environments; track e.key) { <option [value]="e.key">{{ e.label }}</option> }
+      </select>
       <select class="input max-w-32" [value]="statusFilter()"
               (change)="statusFilter.set($any($event.target).value)">
         <option value="">All states</option>
@@ -110,8 +115,10 @@
                     {{ workspaceName(p) }}
                   </span>
                 }
-                @if (p.environmentLabel) {
-                  <p class="text-xs text-[color:var(--text-muted)] truncate">{{ p.environmentLabel }}</p>
+                @if (env(p); as e) {
+                  <span class="mt-0.5" [class]="'pill env-pill pill-' + e.tone" [title]="e.hint">
+                    <span class="env-pill-k">env</span>{{ e.label }}
+                  </span>
                 }
               </div>
               <div class="shrink-0 flex items-center gap-1">
@@ -218,8 +225,10 @@
                   </span>
                 }
               </div>
-              @if (p.environmentLabel) {
-                <div class="text-xs text-[color:var(--text-muted)] truncate">{{ p.environmentLabel }}</div>
+              @if (env(p); as e) {
+                <span class="mt-1" [class]="'pill env-pill pill-' + e.tone" [title]="e.hint">
+                  <span class="env-pill-k">env</span>{{ e.label }}
+                </span>
               }
             </td>
             <td class="max-w-64">

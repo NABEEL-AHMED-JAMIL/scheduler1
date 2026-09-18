@@ -1551,3 +1551,8 @@ html.dark .access-cell-exception { background: color-mix(in oklab, var(--color-w
 .tenant-code:hover app-icon, .tenant-code:focus-visible app-icon, .tenant-code.is-copied app-icon { opacity: 1; }
 .tenant-code.is-copied { background: var(--color-ok-100); color: var(--color-ok-500); }
 html.dark .tenant-code.is-copied { background: color-mix(in oklab, var(--color-ok-500) 25%, transparent); color: var(--color-ok-400); }
+
+/* Kafka profile environment chip: a small "env" key before the value, so a coloured word under
+   a profile name reads as "environment: prod" rather than as a status. */
+.env-pill { text-transform: none; }
+.env-pill .env-pill-k { font-size: 9px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.7; margin-right: 0.1rem; }

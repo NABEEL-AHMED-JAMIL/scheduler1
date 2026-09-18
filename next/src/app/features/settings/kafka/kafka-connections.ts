@@ -1,4 +1,5 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { KAFKA_ENVIRONMENTS, kafkaEnvironment } from './kafka-environment';
 import { HttpClient } from '@angular/common/http';
 import { DatePipe } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -96,7 +97,10 @@ export class KafkaConnections implements OnInit {
   readonly error = signal('');
   readonly search = signal('');
   readonly protocolFilter = signal('');
+  readonly environmentFilter = signal('');
   readonly statusFilter = signal('');
+  readonly environments = KAFKA_ENVIRONMENTS;
+  readonly env = (p: KafkaProfile) => kafkaEnvironment(p.environmentLabel);
   readonly testing = signal<number | null>(null);
   readonly sort = createSort<KafkaProfile>('profileName');
 
@@ -104,7 +108,7 @@ export class KafkaConnections implements OnInit {
     [...new Set(this.profiles().map(p => p.securityProtocol).filter(Boolean))].sort());
 
   readonly hasFilters = computed(() =>
-    !!(this.search().trim() || this.protocolFilter() || this.statusFilter()
+    !!(this.search().trim() || this.protocolFilter() || this.environmentFilter() || this.statusFilter()
        || this.focusedProfileId() !== null));
 
   /** Narrows the list to rows this person created. Not persisted -- see MineFilter. */
@@ -161,11 +165,13 @@ export class KafkaConnections implements OnInit {
   readonly filtered = computed(() => {
     const term = this.search().trim().toLowerCase();
     const protocol = this.protocolFilter();
+    const environment = this.environmentFilter();
     const status = this.statusFilter();
     const focusedProfile = this.focusedProfileId();
     const rows = this.profiles().filter(p => {
       if (focusedProfile !== null && p.kafkaConnectionProfileId !== focusedProfile) return false;
       if (protocol && p.securityProtocol !== protocol) return false;
+      if (environment && kafkaEnvironment(p.environmentLabel)?.key !== environment) return false;
       if (status && p.status !== status) return false;
       if (!term) return true;
       // Only a platform admin has a workspace column to read, so only their search matches on one.
@@ -247,6 +253,7 @@ export class KafkaConnections implements OnInit {
   clearFilters(): void {
     this.search.set('');
     this.protocolFilter.set('');
+    this.environmentFilter.set('');
     this.statusFilter.set('');
     if (this.focusedProfileId() !== null) this.clearProfileFocus();
   }
