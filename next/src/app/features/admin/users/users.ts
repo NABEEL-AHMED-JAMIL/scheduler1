@@ -520,7 +520,7 @@ export class Users implements OnInit {
 
   /** Straight to this person's row in the People × pages grid. */
   openPageAccess(user: AppUser): void {
-    void this.router.navigate(['/admin/access-profiles'], {
+    void this.router.navigate(['/administration/access-profiles'], {
       queryParams: { view: 'people', q: user.username, tenantId: this.canPickTenant() ? user.tenantId : null },
     });
   }

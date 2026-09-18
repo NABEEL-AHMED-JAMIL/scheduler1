@@ -16,10 +16,10 @@
       <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
         <app-icon name="refresh" [class.spin]="loading()" />Refresh
       </button>
-      <a routerLink="/jobs/bulk" class="btn btn-default btn-sm">
+      <a routerLink="/operations/jobs/bulk" class="btn btn-default btn-sm">
         <app-icon name="upload" />Bulk import
       </a>
-      <a routerLink="/jobs/new" class="btn btn-primary btn-sm"><app-icon name="plus" />New job</a>
+      <a routerLink="/operations/jobs/new" class="btn btn-primary btn-sm"><app-icon name="plus" />New job</a>
     </div>
   </div>
 
@@ -234,8 +234,8 @@
                           [title]="!canSkipNext(job) ? 'Only scheduled jobs have a next run' : ''"
                           (cdkMenuItemTriggered)="skipNext(job)"><app-icon name="skip" />Skip next run</button>
                   <div class="my-1 border-t border-subtle"></div>
-                  <a cdkMenuItem class="menu-item" [routerLink]="['/jobs', job.jobId, 'edit']"><app-icon name="edit" />Edit</a>
-                  <a cdkMenuItem class="menu-item" [routerLink]="['/jobs', job.jobId, 'history']"><app-icon name="clock" />Run history</a>
+                  <a cdkMenuItem class="menu-item" [routerLink]="['/operations/jobs', job.jobId, 'edit']"><app-icon name="edit" />Edit</a>
+                  <a cdkMenuItem class="menu-item" [routerLink]="['/operations/jobs', job.jobId, 'history']"><app-icon name="clock" />Run history</a>
                   <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="openAssistant(job)">
                     <app-icon name="chat" />Ask about this job
                   </button>
@@ -301,7 +301,7 @@
                     <div>
                       <dt class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">Task</dt>
                       <dd class="mt-1">
-                        <a class="link-inline" [routerLink]="['/tasks', job.taskDetail!.taskDetailId, 'edit']">
+                        <a class="link-inline" [routerLink]="['/operations/tasks', job.taskDetail!.taskDetailId, 'edit']">
                           <app-icon name="link" size="0.85em" class="icon-info" />
                           #{{ job.taskDetail!.taskDetailId }} {{ job.taskDetail!.taskName }}
                         </a>
@@ -318,7 +318,7 @@
                     <div>
                       <dt class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">Storage</dt>
                       <dd class="mt-1">
-                        <a class="link-inline" routerLink="/objects"
+                        <a class="link-inline" routerLink="/objects/files"
                            [queryParams]="{ bucket: target.bucket, prefix: target.prefix }">
                           <app-icon name="folder" size="0.85em" class="icon-info" />View in bucket
                         </a>
@@ -387,7 +387,7 @@
                         Last {{ recentRunBars }} runs, oldest first · minutes per run — click a bar for its logs
                       </span>
                     }
-                    <a class="link-inline text-xs ml-auto" [routerLink]="['/jobs', job.jobId, 'history']">
+                    <a class="link-inline text-xs ml-auto" [routerLink]="['/operations/jobs', job.jobId, 'history']">
                       <app-icon name="clock" size="0.85em" class="icon-info" />Full history
                     </a>
                   </div>
@@ -429,7 +429,7 @@
         {{ job.jobName }}
         <span class="text-[color:var(--text-muted)] font-normal">#{{ job.jobId }}</span>
       </span>
-      <a class="btn btn-ghost btn-sm" [routerLink]="['/jobs', job.jobId, 'assistant']"
+      <a class="btn btn-ghost btn-sm" [routerLink]="['/operations/jobs', job.jobId, 'assistant']"
          title="Open the full page"><app-icon name="maximize" />Full page</a>
       <button type="button" class="btn btn-ghost btn-icon"
               (click)="assistantMinimised.set(!assistantMinimised())"

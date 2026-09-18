@@ -242,7 +242,7 @@ export class Tenants implements OnInit {
   }
 
   viewUsers(tenant: Tenant): void {
-    this.router.navigate(['/admin/users'], { queryParams: { tenantId: tenant.tenantId } });
+    this.router.navigate(['/administration/users'], { queryParams: { tenantId: tenant.tenantId } });
   }
 
   async toggleSuspend(tenant: Tenant): Promise<void> {
@@ -329,7 +329,7 @@ export class Tenants implements OnInit {
    */
   /** The people × pages grid, already scoped to this tenant. */
   viewAccessProfiles(tenant: Tenant): void {
-    this.router.navigate(['/admin/access-profiles'], { queryParams: { view: 'people', tenantId: tenant.tenantId } });
+    this.router.navigate(['/administration/access-profiles'], { queryParams: { view: 'people', tenantId: tenant.tenantId } });
   }
 
   copyCode(tenant: Tenant): void {

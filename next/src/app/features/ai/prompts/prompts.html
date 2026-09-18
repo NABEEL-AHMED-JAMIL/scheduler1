@@ -13,7 +13,7 @@
         <app-icon name="refresh" [class.spin]="loading()" />Refresh
       </button>
       @if (canManage()) {
-        <a class="btn btn-primary btn-sm" [routerLink]="['/ai/prompts/new']"><app-icon name="plus" />New prompt</a>
+        <a class="btn btn-primary btn-sm" [routerLink]="['/assistants/prompts/new']"><app-icon name="plus" />New prompt</a>
       }
     </div>
   </div>
@@ -63,7 +63,7 @@
               <span class="stat-glyph shrink-0"><app-icon name="sparkle" /></span>
               <div class="min-w-0 flex-1">
                 <h3 class="font-semibold truncate" [title]="p.name">
-                  @if (canManage()) { <a class="link-inline" [routerLink]="['/ai/prompts', p.promptId, 'edit']">{{ p.name }}</a> } @else { {{ p.name }} }
+                  @if (canManage()) { <a class="link-inline" [routerLink]="['/assistants/prompts', p.promptId, 'edit']">{{ p.name }}</a> } @else { {{ p.name }} }
                 </h3>
                 <p class="text-xs text-[color:var(--text-muted)]">v{{ p.version }} · {{ p.connectionName || 'no connection' }} · <span class="mono">{{ p.effectiveModel || '—' }}</span></p>
               </div>
@@ -73,7 +73,7 @@
                   <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="cardMenu" aria-label="Actions"><app-icon name="dots" size="1.05em" /></button>
                   <ng-template #cardMenu>
                     <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
-                      <a cdkMenuItem class="menu-item" [routerLink]="['/ai/prompts', p.promptId, 'edit']"><app-icon name="edit" />Edit &amp; try</a>
+                      <a cdkMenuItem class="menu-item" [routerLink]="['/assistants/prompts', p.promptId, 'edit']"><app-icon name="edit" />Edit &amp; try</a>
                       <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="toggle(p)"><app-icon [name]="p.status === 'Active' ? 'pause' : 'play'" />{{ p.status === 'Active' ? 'Deactivate' : 'Activate' }}</button>
                       <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="remove(p)"><app-icon name="trash" class="icon-crit" />Delete</button>
                     </div>
@@ -115,7 +115,7 @@
             <tr>
               <td class="max-w-72">
                 <div class="flex items-center gap-2 min-w-0">
-                  @if (canManage()) { <a class="link-inline font-medium truncate" [routerLink]="['/ai/prompts', p.promptId, 'edit']">{{ p.name }}</a> } @else { <span class="font-medium truncate">{{ p.name }}</span> }
+                  @if (canManage()) { <a class="link-inline font-medium truncate" [routerLink]="['/assistants/prompts', p.promptId, 'edit']">{{ p.name }}</a> } @else { <span class="font-medium truncate">{{ p.name }}</span> }
                   <span class="pill pill-neutral mono shrink-0">v{{ p.version }}</span>
                 </div>
                 @if (p.description) { <div class="text-xs text-[color:var(--text-muted)] line-clamp-1" [title]="p.description">{{ p.description }}</div> }
@@ -145,7 +145,7 @@
                   <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="rowMenu" aria-label="Actions"><app-icon name="dots" size="1.05em" /></button>
                   <ng-template #rowMenu>
                     <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
-                      <a cdkMenuItem class="menu-item" [routerLink]="['/ai/prompts', p.promptId, 'edit']"><app-icon name="edit" />Edit &amp; try</a>
+                      <a cdkMenuItem class="menu-item" [routerLink]="['/assistants/prompts', p.promptId, 'edit']"><app-icon name="edit" />Edit &amp; try</a>
                       <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="toggle(p)"><app-icon [name]="p.status === 'Active' ? 'pause' : 'play'" />{{ p.status === 'Active' ? 'Deactivate' : 'Activate' }}</button>
                       <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="remove(p)"><app-icon name="trash" class="icon-crit" />Delete</button>
                     </div>

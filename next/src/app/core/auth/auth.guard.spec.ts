@@ -88,8 +88,8 @@ describe('passwordChangeGuard', () => {
   // read it -- so a one-time password worked forever as long as Profile was never opened.
   it('sends a session that owes a password change to the profile screen', () => {
     expect(String(runPasswordGuard(true, '/dashboard'))).toBe('/profile');
-    expect(String(runPasswordGuard(true, '/jobs/4/edit'))).toBe('/profile');
-    expect(String(runPasswordGuard(true, '/admin/users'))).toBe('/profile');
+    expect(String(runPasswordGuard(true, '/operations/jobs/4/edit'))).toBe('/profile');
+    expect(String(runPasswordGuard(true, '/administration/users'))).toBe('/profile');
   });
 
   // Redirecting the destination onto itself is a navigation that never settles.
@@ -133,10 +133,10 @@ describe('route table', () => {
   it('keeps the admin-only routes matching the legacy app', () => {
     const byPath: Record<string, string> = {};
     walk(routes, r => { if (r.data?.minRole) byPath[r.path] = r.data.minRole; });
-    expect(byPath['admin/tenants']).toBe('PLATFORM_ADMIN');
-    expect(byPath['admin/tenant-requests']).toBe('PLATFORM_ADMIN');
-    for (const p of ['admin/users', 'settings/storage-connections', 'settings/lookup', 'settings/kafka',
-                     'ai/connections', 'ai/prompts/new', 'ai/prompts/:promptId/edit']) {
+    expect(byPath['administration/tenants']).toBe('PLATFORM_ADMIN');
+    expect(byPath['administration/tenant-requests']).toBe('PLATFORM_ADMIN');
+    for (const p of ['administration/users', 'configuration/storage-connections', 'configuration/lookup', 'configuration/kafka',
+                     'assistants/connections', 'assistants/prompts/new', 'assistants/prompts/:promptId/edit']) {
       expect(byPath[p]).toBe('TENANT_ADMIN');
     }
   });
@@ -146,7 +146,7 @@ describe('route table', () => {
   it('gates the task editor and the task bulk page on TENANT_ADMIN', () => {
     const byPath: Record<string, string> = {};
     walk(routes, r => { if (r.data?.minRole) byPath[r.path] = r.data.minRole; });
-    for (const p of ['tasks/new', 'tasks/:taskDetailId/edit', 'tasks/bulk']) {
+    for (const p of ['operations/tasks/new', 'operations/tasks/:taskDetailId/edit', 'operations/tasks/bulk']) {
       expect(byPath[p]).toBe('TENANT_ADMIN');
     }
   });
@@ -155,7 +155,7 @@ describe('route table', () => {
   it('leaves the task list and prompts open', () => {
     const guarded: string[] = [];
     walk(routes, r => { if (r.data?.minRole) guarded.push(r.path); });
-    for (const p of ['tasks', 'ai/prompts', 'jobs/bulk']) {
+    for (const p of ['operations/tasks', 'assistants/prompts', 'operations/jobs/bulk']) {
       expect(guarded).not.toContain(p);
     }
   });

@@ -1,6 +1,6 @@
 <div class="page">
   <div>
-    <a routerLink="/jobs" class="text-sm text-accent hover:underline">← Back to jobs</a>
+    <a routerLink="/operations/jobs" class="text-sm text-accent hover:underline">← Back to jobs</a>
     <h1 class="page-title mt-1">
       Run history
       @if (jobName()) {
@@ -166,7 +166,7 @@
                 <dt>Task</dt>
                 <dd class="truncate">
                   <a class="text-accent hover:underline"
-                     [routerLink]="['/tasks', task.taskDetailId, 'edit']">
+                     [routerLink]="['/operations/tasks', task.taskDetailId, 'edit']">
                     {{ task.taskName }}
                   </a>
                 </dd>
@@ -315,7 +315,7 @@
             </td>
             @if (isAllJobs()) {
               <td class="mono whitespace-nowrap">
-                <a class="link-inline" [routerLink]="['/jobs', run.jobId, 'history']"
+                <a class="link-inline" [routerLink]="['/operations/jobs', run.jobId, 'history']"
                    title="Open this job's own history">#{{ run.jobId }}</a>
               </td>
             }
@@ -370,7 +370,7 @@
                    Logs button that cannot say whose logs is worse than no button. -->
               @if (run.jobId) {
                 <a class="btn btn-ghost btn-sm"
-                   [routerLink]="['/jobs', run.jobId, 'runs', run.jobQueueId, 'logs']"><app-icon name="file" />Logs</a>
+                   [routerLink]="['/operations/jobs', run.jobId, 'runs', run.jobQueueId, 'logs']"><app-icon name="file" />Logs</a>
               }
             </td>
           </tr>
@@ -411,7 +411,7 @@
         Job assistant
         <span class="text-[color:var(--text-muted)] font-normal">#{{ jobId() }}</span>
       </span>
-      <a class="btn btn-ghost btn-sm" [routerLink]="['/jobs', jobId(), 'assistant']"
+      <a class="btn btn-ghost btn-sm" [routerLink]="['/operations/jobs', jobId(), 'assistant']"
          title="Open the full page">
         <app-icon name="maximize" />Full page
       </a>

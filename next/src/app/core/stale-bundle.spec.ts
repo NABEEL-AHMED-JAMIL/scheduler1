@@ -39,23 +39,23 @@ describe('shouldReloadFor', () => {
   beforeEach(() => clearStaleBundleMarker());
 
   it('allows the first reload for a URL', () => {
-    expect(shouldReloadFor('/reports')).toBe(true);
+    expect(shouldReloadFor('/operations/reports')).toBe(true);
   });
 
   it('refuses a second, so a genuinely missing chunk cannot loop for ever', () => {
-    expect(shouldReloadFor('/reports')).toBe(true);
-    expect(shouldReloadFor('/reports')).toBe(false);
-    expect(shouldReloadFor('/reports')).toBe(false);
+    expect(shouldReloadFor('/operations/reports')).toBe(true);
+    expect(shouldReloadFor('/operations/reports')).toBe(false);
+    expect(shouldReloadFor('/operations/reports')).toBe(false);
   });
 
   it('re-arms once a navigation succeeds, so a later deploy still recovers', () => {
-    expect(shouldReloadFor('/reports')).toBe(true);
+    expect(shouldReloadFor('/operations/reports')).toBe(true);
     clearStaleBundleMarker();
-    expect(shouldReloadFor('/reports')).toBe(true);
+    expect(shouldReloadFor('/operations/reports')).toBe(true);
   });
 
   it('tracks one URL at a time, so a different route is still allowed its own attempt', () => {
-    expect(shouldReloadFor('/reports')).toBe(true);
-    expect(shouldReloadFor('/jobs')).toBe(true);
+    expect(shouldReloadFor('/operations/reports')).toBe(true);
+    expect(shouldReloadFor('/operations/jobs')).toBe(true);
   });
 });

@@ -1,6 +1,6 @@
 <div class="page">
   <div>
-    <a [routerLink]="['/jobs', jobId(), 'history']" class="text-sm text-accent hover:underline">
+    <a [routerLink]="['/operations/jobs', jobId(), 'history']" class="text-sm text-accent hover:underline">
       ← Back to run history
     </a>
     <div class="flex items-start gap-3">
@@ -34,7 +34,7 @@
                 <dt>Name</dt>
                 <dd class="truncate">
                   <a class="text-accent hover:underline"
-                     [routerLink]="['/jobs', jobId(), 'history']">{{ j.jobName }}</a>
+                     [routerLink]="['/operations/jobs', jobId(), 'history']">{{ j.jobName }}</a>
                 </dd>
                 <dt>Execution</dt><dd>{{ j.execution || '—' }}</dd>
                 <dt>State</dt><dd><app-status [label]="j.jobStatus" [quiet]="true" /></dd>

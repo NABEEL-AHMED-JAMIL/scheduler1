@@ -330,10 +330,10 @@
                       <td class="max-w-64">
                         @if (pipelinesOf(row.type); as list) {
                           @if (!list.length) {
-                            <a class="text-xs text-[color:var(--text-muted)] hover:underline" [routerLink]="['/settings/pipelines']" [queryParams]="{ topic: row.type.sourceTaskTypeId }"
+                            <a class="text-xs text-[color:var(--text-muted)] hover:underline" [routerLink]="['/configuration/pipelines']" [queryParams]="{ topic: row.type.sourceTaskTypeId }"
                                title="No pipeline publishes on this topic yet — add one">none yet</a>
                           } @else if (list.length === 1) {
-                            <a class="link-inline block truncate" [routerLink]="['/settings/pipelines']" [queryParams]="{ topic: row.type.sourceTaskTypeId }"
+                            <a class="link-inline block truncate" [routerLink]="['/configuration/pipelines']" [queryParams]="{ topic: row.type.sourceTaskTypeId }"
                                [title]="list[0].pipelineId + ' · ' + list[0].fields + ' field(s)'">{{ list[0].pipelineName }}</a>
                             <span class="mono text-xs text-[color:var(--text-muted)]">{{ list[0].pipelineId }}</span>
                           } @else {

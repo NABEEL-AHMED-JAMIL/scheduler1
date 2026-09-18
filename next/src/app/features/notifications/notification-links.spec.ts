@@ -3,22 +3,22 @@ import { notificationTarget } from './notification-links';
 
 describe('notificationTarget', () => {
   it('rewrites a route stored by the old app', () => {
-    expect(notificationTarget('/jobList')).toBe('/jobs');
-    expect(notificationTarget('/taskList')).toBe('/tasks');
-    expect(notificationTarget('/objectBrowser')).toBe('/objects');
-    expect(notificationTarget('/users')).toBe('/admin/users');
-    expect(notificationTarget('/tenants')).toBe('/admin/tenants');
+    expect(notificationTarget('/jobList')).toBe('/operations/jobs');
+    expect(notificationTarget('/taskList')).toBe('/operations/tasks');
+    expect(notificationTarget('/objectBrowser')).toBe('/objects/files');
+    expect(notificationTarget('/users')).toBe('/administration/users');
+    expect(notificationTarget('/tenants')).toBe('/administration/tenants');
   });
 
   // The stored links carry a query string the old app understood and this one has no route
   // for, so the lookup ignores it and so does the navigation.
   it('matches on the path alone and drops the query string', () => {
-    expect(notificationTarget('/jobList?jobId=42')).toBe('/jobs');
-    expect(notificationTarget('/reports?from=today')).toBe('/reports');
+    expect(notificationTarget('/jobList?jobId=42')).toBe('/operations/jobs');
+    expect(notificationTarget('/operations/reports?from=today')).toBe('/operations/reports');
   });
 
   it('passes an unmapped absolute path straight through', () => {
-    expect(notificationTarget('/queue')).toBe('/queue');
+    expect(notificationTarget('/operations/queue')).toBe('/operations/queue');
   });
 
   // Nothing to open is a row that does not navigate, rather than one that navigates nowhere.

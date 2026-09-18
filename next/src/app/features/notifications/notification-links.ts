@@ -8,11 +8,11 @@
  * one that was missed would have sent people to a route that no longer resolves.
  */
 const ROUTE_MAP: Record<string, string> = {
-  '/jobList': '/jobs',
-  '/taskList': '/tasks',
-  '/objectBrowser': '/objects',
-  '/users': '/admin/users',
-  '/tenants': '/admin/tenants',
+  '/jobList': '/operations/jobs',
+  '/taskList': '/operations/tasks',
+  '/objectBrowser': '/objects/files',
+  '/users': '/administration/users',
+  '/tenants': '/administration/tenants',
 };
 
 /**

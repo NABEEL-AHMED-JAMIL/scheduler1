@@ -172,7 +172,7 @@
               <dt>Tokens out</dt><dd>{{ c.tokensOut30d ?? 0 | number }}</dd>
               <dt>Prompts</dt><dd>
                 @if (c.promptCount) {
-                  <a class="link-inline" [routerLink]="['/ai/prompts']" [queryParams]="{ connection: c.connectionId }">{{ c.promptCount }} run on it</a>
+                  <a class="link-inline" [routerLink]="['/assistants/prompts']" [queryParams]="{ connection: c.connectionId }">{{ c.promptCount }} run on it</a>
                 } @else { none yet@if (c.isDefault) { — prompts on the workspace default use it } }
               </dd>
             </dl>

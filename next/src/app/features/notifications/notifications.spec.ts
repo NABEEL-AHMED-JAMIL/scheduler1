@@ -121,7 +121,7 @@ describe('Notifications mark-read guards', () => {
     notifications.open(second);
 
     expect(post).toHaveBeenCalledTimes(2);
-    expect(router.navigateByUrl).toHaveBeenCalledWith('/jobs');
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/operations/jobs');
   });
 
   it('markAllRead ignores a second call while the first is still in flight', () => {

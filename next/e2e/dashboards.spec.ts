@@ -42,7 +42,7 @@ test.beforeEach(async () => {
 });
 
 async function openLibrary(page: Page) {
-  await page.goto('/analytics/dashboards');
+  await page.goto('/objects/analytics/dashboards');
   await expect(page.getByText(/re-run every time it is opened/)).toBeVisible();
 }
 

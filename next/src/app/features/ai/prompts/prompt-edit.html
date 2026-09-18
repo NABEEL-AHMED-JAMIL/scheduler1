@@ -1,7 +1,7 @@
 <div class="page">
   <div class="page-head">
     <div>
-      <a routerLink="/ai/prompts" class="text-sm text-accent hover:underline">← Back to prompts</a>
+      <a routerLink="/assistants/prompts" class="text-sm text-accent hover:underline">← Back to prompts</a>
       <h1 class="page-title mt-1 flex items-center gap-2">
         {{ isEdit() ? (loaded()?.name || 'Edit prompt') : 'New prompt' }}
         @if (loaded(); as p) { <span class="pill pill-neutral mono">v{{ p.version }}</span> <span class="pill" [class]="'pill ' + (p.status === 'Active' ? 'pill-ok' : 'pill-neutral')">{{ p.status }}</span> }
@@ -12,7 +12,7 @@
       </p>
     </div>
     <div class="flex items-center gap-2">
-      <a routerLink="/ai/prompts" class="btn btn-ghost btn-sm">Cancel</a>
+      <a routerLink="/assistants/prompts" class="btn btn-ghost btn-sm">Cancel</a>
       <button type="button" class="btn btn-default btn-sm" (click)="save(false)" [disabled]="saving()">
         {{ isEdit() ? 'Save as v' + ((loaded()?.version ?? 0) + 1) : 'Save draft' }}
       </button>

@@ -262,7 +262,7 @@
                 </td>
                 <td class="max-w-56">
                   @if (task.bucketName) {
-                    <a class="link-inline truncate" routerLink="/objects"
+                    <a class="link-inline truncate" routerLink="/objects/files"
                        [queryParams]="{ bucket: task.bucketName, prefix: outputFolderOf(task) }"
                        [title]="task.bucketName + '/' + outputFolderOf(task)">
                       <app-icon name="folder" size="0.85em" class="icon-info" />{{ task.bucketName }}

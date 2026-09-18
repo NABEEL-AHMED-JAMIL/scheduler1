@@ -38,7 +38,7 @@ test.beforeEach(async () => {
 });
 
 async function openFixture(page: Page) {
-  await page.goto('/analytics');
+  await page.goto('/objects/analytics');
   await page.locator('select').first().selectOption('etl-bucket');
   await page.getByRole('button', { name: /analytics-benchmark/ }).click();
   await page.getByRole('button', { name: /sales-10mb\.csv/ }).click();
@@ -83,14 +83,14 @@ test('the dataset workspace has no WCAG A/AA violations on any tab', async ({ pa
 
 test('the browse screen has no WCAG A/AA violations before a dataset is opened', async ({ page }) => {
   // The empty state is a screen in its own right and the one every reader sees first.
-  await page.goto('/analytics');
+  await page.goto('/objects/analytics');
   await page.locator('select').first().selectOption('etl-bucket');
   const violations = await scan(page);
   expect(violations, `axe found WCAG A/AA violations:${describeAll(violations)}`).toEqual([]);
 });
 
 test('the saved-analysis library has no WCAG A/AA violations', async ({ page }) => {
-  await page.goto('/analytics/dashboards');
+  await page.goto('/objects/analytics/dashboards');
   await expect(page.getByText(/re-run every time it is opened/)).toBeVisible();
   const violations = await scan(page);
   expect(violations, `axe found WCAG A/AA violations:${describeAll(violations)}`).toEqual([]);

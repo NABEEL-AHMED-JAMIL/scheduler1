@@ -37,7 +37,7 @@ test.beforeEach(async () => {
 
 /** Opens the fixture and waits for the workspace to describe it. */
 async function openFixture(page: Page) {
-  await page.goto('/analytics');
+  await page.goto('/objects/analytics');
   await page.getByLabel(/connection/i).or(page.locator('select').first())
     .selectOption('etl-bucket');
   await page.getByRole('button', { name: /analytics-benchmark/ }).click();
@@ -135,7 +135,7 @@ test('7 — Compact labels its estimates as estimates', async ({ page }) => {
 });
 
 test('8 — dashboards say they re-run rather than caching a result', async ({ page }) => {
-  await page.goto('/analytics/dashboards');
+  await page.goto('/objects/analytics/dashboards');
   await expect(page.getByText(/re-run every time it is opened/)).toBeVisible();
 });
 
@@ -143,7 +143,7 @@ test('9 — the saved-analysis library is reachable from the menu, not just by t
   async ({ page }) => {
     // It had a route and no entry. A page you can only reach by knowing the URL is a page nobody
     // reaches, and no unit test can see the difference -- the route existed and resolved fine.
-    await page.goto('/analytics');
+    await page.goto('/objects/analytics');
     await page.getByRole('button', { name: 'Object Browser' }).click();
     await page.getByRole('link', { name: /Saved Analyses/ }).click();
     await expect(page).toHaveURL(/\/analytics\/dashboards/);
@@ -184,7 +184,7 @@ test('10 — a Canvas drill narrows the Data tab, and says so', async ({ page })
 test('11 — a date column can be bucketed by month, and the heading says so', async ({ page }) => {
   // The gap that limited this module most: grouping a DATE column gave one bucket per day, so
   // "revenue by month" -- the grain a business reads -- was not expressible at all.
-  await page.goto('/analytics');
+  await page.goto('/objects/analytics');
   await page.locator('select').first().selectOption('etl-bucket');
   await page.getByRole('button', { name: /analytics-samples/ }).click();
   await page.getByRole('button', { name: /orders\.csv/ }).click();

@@ -65,7 +65,7 @@ test.describe('access profiles', () => {
   test('an admin makes a profile, assigns it, and the person\'s console follows', async ({ browser, request }) => {
     // --- the admin, in the browser: create a Reports-only profile
     const adminPage = await pageAs(browser, adminSession);
-    await adminPage.goto('/admin/access-profiles');
+    await adminPage.goto('/administration/access-profiles');
     await expect(adminPage.getByRole('heading', { name: 'Access profiles' })).toBeVisible();
     await adminPage.getByTestId('new-profile').click();
     await adminPage.getByLabel('Profile name').fill(PROFILE);
@@ -83,7 +83,7 @@ test.describe('access profiles', () => {
     createdProfileId = created.pageAccessProfileId;
 
     // --- the admin, in the browser: put the person on it from the user dialog
-    await adminPage.goto('/admin/users');
+    await adminPage.goto('/administration/users');
     const row = adminPage.locator('tr', { hasText: member.username! }).first();
     await expect(row).toBeVisible();
     await row.getByRole('button', { name: 'Actions' }).click();
@@ -110,14 +110,14 @@ test.describe('access profiles', () => {
     await expect(nav.getByText('Assistants')).toHaveCount(0);
 
     // A direct URL to a withheld page lands on the access page, naming it, with a way to ask.
-    await memberPage.goto('/analytics');
+    await memberPage.goto('/objects/analytics');
     await expect(memberPage).toHaveURL(/\/unauthorized\?page=analytics/);
     await expect(memberPage.getByRole('heading', { name: /Analytics Studio isn't part of your access/ })).toBeVisible();
     await memberPage.getByRole('button', { name: 'Request access' }).click();
     await expect(memberPage.getByRole('button', { name: 'Asked' })).toBeVisible();
 
     // The page they do hold opens.
-    await memberPage.goto('/reports');
+    await memberPage.goto('/operations/reports');
     await expect(memberPage).toHaveURL(/\/reports$/);
 
     // And the server refuses the API behind a withheld page, whatever the browser shows.
@@ -129,7 +129,7 @@ test.describe('access profiles', () => {
 
     // --- the admin ticks one box in the grid: an exception on top of the profile
     const gridPage = await pageAs(browser, adminSession);
-    await gridPage.goto('/admin/access-profiles');
+    await gridPage.goto('/administration/access-profiles');
     await gridPage.getByTestId('view-people').click();
     const box = gridPage.locator(`[data-cell="${member.username}|analytics"]`);
     await expect(box).toHaveAttribute('data-open', 'false');

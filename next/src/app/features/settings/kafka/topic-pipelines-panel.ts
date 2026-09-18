@@ -44,7 +44,7 @@ export interface TopicPipelineRow {
         @for (p of shown(); track p.pipelineKey) {
           <li>
             <div class="min-w-0">
-              <a class="link-inline font-medium truncate block" [routerLink]="['/settings/pipelines']"
+              <a class="link-inline font-medium truncate block" [routerLink]="['/configuration/pipelines']"
                  [queryParams]="{ topic: data.sourceTaskTypeId }" [title]="p.pipelineName" (click)="ref.close()">{{ p.pipelineName }}</a>
               <div class="text-xs text-[color:var(--text-muted)]">
                 <span class="mono">{{ p.pipelineId }}</span> · {{ p.fields ?? 0 }} field{{ p.fields === 1 ? '' : 's' }}
@@ -55,7 +55,7 @@ export interface TopicPipelineRow {
         }
       </ul>
       <div foot>
-        <a class="btn btn-default btn-sm" [routerLink]="['/settings/pipelines']" [queryParams]="{ topic: data.sourceTaskTypeId }" (click)="ref.close()">
+        <a class="btn btn-default btn-sm" [routerLink]="['/configuration/pipelines']" [queryParams]="{ topic: data.sourceTaskTypeId }" (click)="ref.close()">
           <app-icon name="template" />Open in Pipelines
         </a>
         <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="ref.close()">Close</button>

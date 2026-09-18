@@ -14,10 +14,10 @@
            Both routes behind these links are guarded, so for a tenant user they only ever led to
            /unauthorized -- an offer the console already knows it cannot keep. -->
       @if (auth.canManageTasks()) {
-        <a routerLink="/tasks/bulk" class="btn btn-default btn-sm">
+        <a routerLink="/operations/tasks/bulk" class="btn btn-default btn-sm">
           <app-icon name="upload" />Bulk import
         </a>
-        <a routerLink="/tasks/new" class="btn btn-primary btn-sm"><app-icon name="plus" />New task</a>
+        <a routerLink="/operations/tasks/new" class="btn btn-primary btn-sm"><app-icon name="plus" />New task</a>
       }
     </div>
   </div>
@@ -75,7 +75,7 @@
                   </button>
                   <ng-template #cardMenu>
                     <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
-                      <a cdkMenuItem class="menu-item" [routerLink]="['/tasks', task.taskDetailId, 'edit']">
+                      <a cdkMenuItem class="menu-item" [routerLink]="['/operations/tasks', task.taskDetailId, 'edit']">
                         <app-icon name="edit" />Edit
                       </a>
                       <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="clone(task)">
@@ -217,7 +217,7 @@
                 </div>
                 <ng-template #taskMenu>
                   <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
-                    <a cdkMenuItem class="menu-item" [routerLink]="['/tasks', task.taskDetailId, 'edit']">
+                    <a cdkMenuItem class="menu-item" [routerLink]="['/operations/tasks', task.taskDetailId, 'edit']">
                       <app-icon name="edit" />Edit
                     </a>
                     <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="clone(task)">
@@ -296,7 +296,7 @@
                               @for (job of jobs; track job.jobId) {
                                 <tr>
                                   <td class="max-w-64">
-                                    <a class="link-inline truncate" [routerLink]="['/jobs', job.jobId, 'edit']"
+                                    <a class="link-inline truncate" [routerLink]="['/operations/jobs', job.jobId, 'edit']"
                                        [title]="job.jobName">
                                       <app-icon name="link" size="0.8em" class="icon-info" />{{ job.jobName }}
                                     </a>

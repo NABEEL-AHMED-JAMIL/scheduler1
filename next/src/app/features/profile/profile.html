@@ -241,7 +241,7 @@
                counted every job whose status was set and not Missed, which is neither a period
                nor an event -- it read as "today" and meant "ever". -->
           <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <a routerLink="/jobs" class="stat-tile hover:border-brand-500 transition-colors">
+            <a routerLink="/operations/jobs" class="stat-tile hover:border-brand-500 transition-colors">
               <div class="stat-label">Jobs</div>
               <div class="stat-value">{{ jobsAssigned() }}</div>
               <div class="stat-foot">{{ activeJobs() }} active</div>
@@ -280,7 +280,7 @@
                 <li class="py-2.5 flex flex-col gap-1">
                   <div class="flex items-center gap-2 min-w-0">
                     <app-icon name="briefcase" size="0.95em" class="icon-muted shrink-0" />
-                    <a class="link-inline truncate" [routerLink]="['/jobs', run.jobId, 'history']"
+                    <a class="link-inline truncate" [routerLink]="['/operations/jobs', run.jobId, 'history']"
                        [title]="run.jobName">{{ run.jobName }}</a>
                     <span class="ml-auto shrink-0"><app-status [label]="run.jobStatus" /></span>
                   </div>

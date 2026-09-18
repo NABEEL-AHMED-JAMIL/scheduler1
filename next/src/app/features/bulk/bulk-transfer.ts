@@ -21,14 +21,14 @@ const ROUTES: Record<Kind, Endpoints> = {
     exportAll: '/sourceJob.json/downloadListSourceJob',
     upload: '/sourceJob.json/uploadSourceJob',
     noun: 'jobs',
-    backTo: '/jobs',
+    backTo: '/operations/jobs',
   },
   task: {
     template: '/sourceTask.json/downloadSourceTaskTemplate',
     exportAll: '/sourceTask.json/downloadListSourceTask',
     upload: '/sourceTask.json/uploadSourceTask',
     noun: 'tasks',
-    backTo: '/tasks',
+    backTo: '/operations/tasks',
   },
 };
 

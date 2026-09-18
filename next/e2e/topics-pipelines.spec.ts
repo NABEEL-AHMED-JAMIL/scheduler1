@@ -77,7 +77,7 @@ test.describe('topics and pipelines', () => {
     const page = await pageAs(browser, session);
 
     // ── 1. Kafka & Topics: add a topic under the workspace's profile ─────────────────────
-    await page.goto('/settings/kafka');
+    await page.goto('/configuration/kafka');
     await page.getByRole('button', { name: 'Add topic' }).click();
     // The dialog animates in; a fill that lands mid-mount is dropped.
     await page.getByRole('heading', { name: 'New topic' }).waitFor();
@@ -97,7 +97,7 @@ test.describe('topics and pipelines', () => {
     await expect(topicRow.getByText(/reachable|does not exist|Could not reach/)).toBeVisible();
 
     // ── 2. Pipelines: define one on that topic (the topic box is searchable) ─────────────
-    await page.goto('/settings/pipelines');
+    await page.goto('/configuration/pipelines');
     await page.getByRole('button', { name: 'New pipeline' }).click();
     await page.getByRole('heading', { name: 'New pipeline' }).waitFor();
     await page.locator('#pipelineId').fill(PIPELINE_ID);
@@ -115,11 +115,11 @@ test.describe('topics and pipelines', () => {
     expect(pipelineRow?.sourceTaskTypeId, 'the pipeline names the topic').toBe(topicId);
 
     // The topic row on the Kafka pane now names it (one pipeline shows inline, by name).
-    await page.goto('/settings/kafka');
+    await page.goto('/configuration/kafka');
     await expect(page.locator('.kafka-topics tbody tr', { hasText: TOPIC_NAME }).locator('a', { hasText: PIPELINE_NAME })).toBeVisible();
 
     // ── 3. A task: connection → topic → pipeline, each list fetched on the pick before ──
-    await page.goto('/tasks/new');
+    await page.goto('/operations/tasks/new');
     await page.getByRole('heading', { name: 'New task' }).waitFor();
     await page.locator('#taskName').fill(TASK_NAME);
     await expect(page.locator('#pipeline')).toHaveAttribute('placeholder', 'Pick a topic first');
@@ -140,7 +140,7 @@ test.describe('topics and pipelines', () => {
     expect(taskRow?.sourceTaskType?.sourceTaskTypeId).toBe(topicId);
 
     // ── 4. Source Tasks: filter topic → pipeline lands on that one row ───────────────────
-    await page.goto('/tasks');
+    await page.goto('/operations/tasks');
     await pick(page, 'tasks-topic', STAMP, TOPIC_NAME);
     await pick(page, 'tasks-pipeline', PIPELINE_ID, PIPELINE_ID);
     await expect(page.locator('table tbody tr')).toHaveCount(1);

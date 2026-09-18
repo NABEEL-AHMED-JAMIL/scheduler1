@@ -81,7 +81,7 @@ test.describe('AI prompts in pipelines', () => {
     const page = await pageAs(browser, session);
 
     // ── 1. Model connection: add, test (lists the models), see it on the pane ────────────
-    await page.goto('/ai/connections');
+    await page.goto('/assistants/connections');
     await page.getByRole('button', { name: 'New connection' }).click();
     await page.getByRole('heading', { name: 'New model connection' }).waitFor();
     await page.locator('#cxName').fill(CONNECTION);
@@ -97,7 +97,7 @@ test.describe('AI prompts in pipelines', () => {
     await expect(page.locator('.kafka-strip')).toContainText('model(s) listed');
 
     // ── 2. Prompt: two variables (added from the template), try it, save & activate ──────
-    await page.goto('/ai/prompts/new');
+    await page.goto('/assistants/prompts/new');
     await page.getByRole('heading', { name: 'New prompt' }).waitFor();
     await page.locator('#pName').fill(PROMPT);
     await pick(page, 'pConnection', STAMP, CONNECTION);
@@ -126,7 +126,7 @@ test.describe('AI prompts in pipelines', () => {
     const topics = await (await request.get(`${api}/setting.json/topics?kafkaConnectionProfileId=${defaultProfile.kafkaConnectionProfileId}`, { headers })).json();
     const topic = topics.data.find((t: any) => t.status === 'Active');
     expect(topic, 'the default profile has a topic').toBeTruthy();
-    await page.goto('/settings/pipelines');
+    await page.goto('/configuration/pipelines');
     await page.getByRole('button', { name: 'New pipeline' }).click();
     await page.getByRole('heading', { name: 'New pipeline' }).waitFor();
     await page.locator('#pipelineId').fill(PIPELINE_ID);
@@ -158,7 +158,7 @@ test.describe('AI prompts in pipelines', () => {
     expect(refused.message).toContain('pipeline(s) run this prompt');
 
     // ── 4. Task: the step is a read-only card, the other fields are inputs ───────────────
-    await page.goto('/tasks/new');
+    await page.goto('/operations/tasks/new');
     await page.getByRole('heading', { name: 'New task' }).waitFor();
     await page.locator('#taskName').fill(TASK_NAME);
     await expect(page.locator('#taskProfile')).not.toHaveValue('');
@@ -195,7 +195,7 @@ test.describe('AI prompts in pipelines', () => {
     expect(steps.data[0].run.status, steps.data[0].run.error).toBe('ok');
     expect(steps.data[0].run.stepTag).toBe('summary');
 
-    await page.goto(`/jobs/${jobId}/runs/${queueRow.jobQueueId}/logs`);
+    await page.goto(`/operations/jobs/${jobId}/runs/${queueRow.jobQueueId}/logs`);
     await expect(page.getByText('AI steps')).toBeVisible();
     await expect(page.locator('.detail-panel .side-panel-list li').first()).toContainText('answered');
     await expect(page.locator('.detail-panel .side-panel-list li').first()).toContainText(PROMPT);

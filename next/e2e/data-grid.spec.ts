@@ -27,7 +27,7 @@ test.beforeEach(async () => {
 });
 
 async function openGrid(page: Page) {
-  await page.goto('/analytics');
+  await page.goto('/objects/analytics');
   await page.locator('select').first().selectOption('etl-bucket');
   await page.getByRole('button', { name: /analytics-benchmark/ }).click();
   await page.getByRole('button', { name: /sales-10mb\.csv/ }).click();

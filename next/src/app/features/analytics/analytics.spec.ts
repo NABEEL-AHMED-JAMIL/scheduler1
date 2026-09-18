@@ -4234,7 +4234,7 @@ describe('the dashboard and the registry are reachable from the workspace', () =
     const text = grid.show();
 
     const link = (grid.fixture.nativeElement as HTMLElement)
-      .querySelector('a[href="/analytics/dashboards"]');
+      .querySelector('a[href="/objects/analytics/dashboards"]');
     expect(link).not.toBeNull();
     expect(text).toContain('re-runs saved analyses and saved queries every time');
   });

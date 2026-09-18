@@ -306,10 +306,10 @@ export class JobHistory {
 
   /** Drops the hour/status narrowing and shows the job's whole history. */
   clearDrillDown(): void {
-    // Without a job there is no wider history to widen to -- '/jobs//history' would 404 --
+    // Without a job there is no wider history to widen to -- '/operations/jobs//history' would 404 --
     // so an all-jobs drill-down goes back to the dashboard it came from.
     if (!this.jobId()) { this.router.navigate(['/dashboard']); return; }
-    this.router.navigate(['/jobs', this.jobId(), 'history']);
+    this.router.navigate(['/operations/jobs', this.jobId(), 'history']);
   }
 
   hourLabel(hour: string): string {

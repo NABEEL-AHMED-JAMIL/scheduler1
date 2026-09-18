@@ -1,7 +1,7 @@
 <div [class.page]="!compact()" [class.flex]="compact()" [class.flex-col]="compact()"
      [class.gap-3]="compact()" [class.min-h-0]="compact()" [class.p-3]="compact()">
   @if (!compact()) {
-    <a class="link-inline text-sm" [routerLink]="['/jobs', jobId(), 'history']">
+    <a class="link-inline text-sm" [routerLink]="['/operations/jobs', jobId(), 'history']">
       <app-icon name="arrowLeft" size="0.9em" />Back to run history
     </a>
   }
@@ -232,7 +232,7 @@
                         <td class="text-right">
                           @if (run.jobQueueId) {
                             <a class="link-inline text-xs"
-                               [routerLink]="['/jobs', jobId(), 'runs', run.jobQueueId, 'logs']">Logs</a>
+                               [routerLink]="['/operations/jobs', jobId(), 'runs', run.jobQueueId, 'logs']">Logs</a>
                           } @else {
                             <span class="text-xs text-[color:var(--text-muted)]">—</span>
                           }

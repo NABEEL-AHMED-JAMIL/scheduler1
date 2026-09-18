@@ -83,19 +83,19 @@ export class Shell {
       // jobs, tasks, queue and reports. Two menus called Pipelines meant two different things.
       label: 'Operations',
       children: [
-        { label: 'Source Jobs', path: '/jobs', pageKey: 'jobs', icon: 'briefcase',
+        { label: 'Source Jobs', path: '/operations/jobs', pageKey: 'jobs', icon: 'briefcase',
           hint: 'Scheduled work and its runs' },
         // Deliberately not adminOnly: listSourceTask is TENANT_USER, and a job points at a
         // task, so reading the list is part of reading the console. Only writing one is
         // TENANT_ADMIN, and those controls are gated inside the page on auth.canManageTasks --
         // the same computed this menu's adminOnly entries resolve through.
-        { label: 'Source Tasks', path: '/tasks', pageKey: 'tasks', icon: 'list',
+        { label: 'Source Tasks', path: '/operations/tasks', pageKey: 'tasks', icon: 'list',
           hint: 'What a job does, and where' },
-        { label: 'Queue', path: '/queue', pageKey: 'queue', icon: 'clock',
+        { label: 'Queue', path: '/operations/queue', pageKey: 'queue', icon: 'clock',
           hint: 'What is in flight right now' },
         // Beside the runs it summarises, rather than under Tools: this reads pipeline data
         // rather than being a general-purpose instrument.
-        { label: 'Reports', path: '/reports', pageKey: 'reports', icon: 'chart',
+        { label: 'Reports', path: '/operations/reports', pageKey: 'reports', icon: 'chart',
           hint: 'Group and measure your runs' },
       ],
     },
@@ -104,15 +104,15 @@ export class Shell {
       // reads what is inside them. They share a storage service, so they share a menu.
       label: 'Object Browser',
       children: [
-        { label: 'Browse files', path: '/objects', pageKey: 'objects', icon: 'folder',
+        { label: 'Browse files', path: '/objects/files', pageKey: 'objects', icon: 'folder',
           hint: 'Upload, preview and share objects' },
-        { label: 'Analytics Studio', path: '/analytics', pageKey: 'analytics', icon: 'chart',
+        { label: 'Analytics Studio', path: '/objects/analytics', pageKey: 'analytics', icon: 'chart',
           hint: 'Read a file as data, where it lives' },
         // The saved-analysis library had a route and no way to reach it: /analytics/dashboards
         // was reachable only by typing the address. It is a sibling rather than a child because
         // the menu has one level of nesting, and a saved analysis is a thing you go TO, not a
         // mode of the workspace.
-        { label: 'Saved Analyses', path: '/analytics/dashboards', pageKey: 'analytics-dashboards', icon: 'save',
+        { label: 'Saved Analyses', path: '/objects/analytics/dashboards', pageKey: 'analytics-dashboards', icon: 'save',
           hint: 'Analyses and queries you kept, re-run on open' },
       ],
     },
@@ -133,9 +133,9 @@ export class Shell {
         // object browser's file chat depends on it, so the list is readable by everyone and
         // only New prompt, Edit, Try it and Delete are gated (auth.canManageAgents). Model
         // connections is a genuine admin screen -- every call it makes is TENANT_ADMIN.
-        { label: 'Prompts', path: '/ai/prompts', pageKey: 'ai-prompts', icon: 'sparkle',
+        { label: 'Prompts', path: '/assistants/prompts', pageKey: 'ai-prompts', icon: 'sparkle',
           hint: 'What a step says to a model' },
-        { label: 'Model connections', path: '/ai/connections', icon: 'server', adminOnly: true,
+        { label: 'Model connections', path: '/assistants/connections', icon: 'server', adminOnly: true,
           hint: 'Providers, keys and caps' },
       ],
     },
@@ -143,13 +143,13 @@ export class Shell {
       label: 'Configuration',
       adminOnly: true,
       children: [
-        { label: 'Kafka & Topics', path: '/settings/kafka', icon: 'server', adminOnly: true,
+        { label: 'Kafka & Topics', path: '/configuration/kafka', icon: 'server', adminOnly: true,
           hint: 'Brokers, credentials and the topics that publish through them' },
-        { label: 'Pipelines', path: '/settings/pipelines', icon: 'template', adminOnly: true,
+        { label: 'Pipelines', path: '/configuration/pipelines', icon: 'template', adminOnly: true,
           hint: 'Each pipeline, the topic it publishes on, and its form' },
-        { label: 'Lookups', path: '/settings/lookup', icon: 'list', adminOnly: true,
+        { label: 'Lookups', path: '/configuration/lookup', icon: 'list', adminOnly: true,
           hint: 'Shared key and value data' },
-        { label: 'Storage Connections', path: '/settings/storage-connections', icon: 'cloud', adminOnly: true,
+        { label: 'Storage Connections', path: '/configuration/storage-connections', icon: 'cloud', adminOnly: true,
           hint: 'S3, Azure, MinIO, FTP' },
       ],
     },
@@ -157,16 +157,16 @@ export class Shell {
       label: 'Administration',
       adminOnly: true,
       children: [
-        { label: 'Users', path: '/admin/users', icon: 'users', adminOnly: true,
+        { label: 'Users', path: '/administration/users', icon: 'users', adminOnly: true,
           hint: 'Who can sign in, and as what' },
-        { label: 'Access profiles', path: '/admin/access-profiles', icon: 'shield', adminOnly: true,
+        { label: 'Access profiles', path: '/administration/access-profiles', icon: 'shield', adminOnly: true,
           hint: 'Which pages your tenant users can open.' },
-        { label: 'Tenants', path: '/admin/tenants', icon: 'globe', platformOnly: true,
+        { label: 'Tenants', path: '/administration/tenants', icon: 'globe', platformOnly: true,
           hint: 'Isolated workspaces' },
         // Platform, not admin: listRequests, approve and reject all carry
         // @PreAuthorize("hasRole('PLATFORM_ADMIN')"), so a tenant admin shown this link was
         // walked straight into the unauthorized page.
-        { label: 'Workspace Requests', path: '/admin/tenant-requests', icon: 'inbox',
+        { label: 'Workspace Requests', path: '/administration/tenant-requests', icon: 'inbox',
           platformOnly: true, hint: 'Asks from outside for a workspace' },
       ],
     },

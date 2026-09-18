@@ -652,7 +652,7 @@ export class TaskEdit implements OnInit {
         this.saving.set(false);
         if (response.status === API_SUCCESS) {
           this.toast.success(this.isEdit() ? 'Task updated.' : 'Task created.');
-          this.router.navigate(['/tasks']);
+          this.router.navigate(['/operations/tasks']);
         } else {
           this.toast.error(response.message);
         }

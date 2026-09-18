@@ -35,7 +35,7 @@ export interface AiStepConfig {
           <app-combobox id="aiStepPrompt" [selected]="promptId()" (selectedChange)="pickPrompt($event)"
                         placeholder="Search active prompts…" [allowClear]="false" [options]="promptOptions()" />
           @if (!prompts().length && loaded()) {
-            <p class="text-xs text-warn-600 mt-1">No active prompt in this workspace. <a class="link-inline" routerLink="/ai/prompts/new" (click)="ref.close()">Create one</a> first.</p>
+            <p class="text-xs text-warn-600 mt-1">No active prompt in this workspace. <a class="link-inline" routerLink="/assistants/prompts/new" (click)="ref.close()">Create one</a> first.</p>
           } @else if (prompt(); as p) {
             <p class="text-xs text-[color:var(--text-muted)] mt-1">v{{ p.version }} · {{ p.connectionName || 'workspace default' }} · <span class="mono">{{ p.effectiveModel || '' }}</span> · {{ p.outputMode === 'json' ? 'JSON' : 'text' }} output</p>
           }

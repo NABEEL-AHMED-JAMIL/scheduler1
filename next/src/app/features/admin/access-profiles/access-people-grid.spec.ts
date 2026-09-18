@@ -8,10 +8,10 @@ import { AccessPerson, AccessProfile } from './access-profiles.service';
 import { AccessPeopleGrid } from './access-people-grid';
 
 const PAGES: PageCatalogueEntry[] = [
-  { key: 'jobs', label: 'Source Jobs', section: 'Pipelines', route: '/jobs' },
-  { key: 'queue', label: 'Queue', section: 'Pipelines', route: '/queue' },
-  { key: 'reports', label: 'Reports', section: 'Pipelines', route: '/reports' },
-  { key: 'objects', label: 'Browse files', section: 'Object Browser', route: '/objects' },
+  { key: 'jobs', label: 'Source Jobs', section: 'Pipelines', route: '/operations/jobs' },
+  { key: 'queue', label: 'Queue', section: 'Pipelines', route: '/operations/queue' },
+  { key: 'reports', label: 'Reports', section: 'Pipelines', route: '/operations/reports' },
+  { key: 'objects', label: 'Browse files', section: 'Object Browser', route: '/objects/files' },
   { key: 'tools-converter', label: 'Document Converter', section: 'Tools', route: '/tools/converter' },
 ];
 const profile = (id: number, name: string, keys: string[], isDefault = false): AccessProfile =>

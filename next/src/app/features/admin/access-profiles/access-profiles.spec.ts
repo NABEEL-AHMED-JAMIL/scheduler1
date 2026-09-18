@@ -12,12 +12,12 @@ import { AccessProfileDialog } from './access-profile-dialog';
 import { AccessProfiles } from './access-profiles';
 
 const PAGES: PageCatalogueEntry[] = [
-  { key: 'jobs', label: 'Source Jobs', section: 'Pipelines', route: '/jobs' },
-  { key: 'tasks', label: 'Source Tasks', section: 'Pipelines', route: '/tasks' },
-  { key: 'queue', label: 'Queue', section: 'Pipelines', route: '/queue' },
-  { key: 'reports', label: 'Reports', section: 'Pipelines', route: '/reports' },
-  { key: 'objects', label: 'Browse files', section: 'Object Browser', route: '/objects' },
-  { key: 'analytics', label: 'Analytics Studio', section: 'Object Browser', route: '/analytics' },
+  { key: 'jobs', label: 'Source Jobs', section: 'Pipelines', route: '/operations/jobs' },
+  { key: 'tasks', label: 'Source Tasks', section: 'Pipelines', route: '/operations/tasks' },
+  { key: 'queue', label: 'Queue', section: 'Pipelines', route: '/operations/queue' },
+  { key: 'reports', label: 'Reports', section: 'Pipelines', route: '/operations/reports' },
+  { key: 'objects', label: 'Browse files', section: 'Object Browser', route: '/objects/files' },
+  { key: 'analytics', label: 'Analytics Studio', section: 'Object Browser', route: '/objects/analytics' },
   { key: 'tools-converter', label: 'Document Converter', section: 'Tools', route: '/tools/converter' },
 ];
 

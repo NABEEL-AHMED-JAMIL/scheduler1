@@ -49,8 +49,9 @@ describe('shell navigation', () => {
   it('tags every page an access profile can withhold, and nothing a profile cannot', () => {
     const tagged = children().filter(child => child.pageKey).map(child => child.path).sort();
     expect(tagged).toEqual([
-      '/ai/prompts', '/analytics', '/analytics/dashboards', '/jobs', '/objects', '/queue',
-      '/reports', '/tasks', '/tools/converter', '/tools/transcript',
+      '/assistants/prompts', '/objects/analytics', '/objects/analytics/dashboards', '/objects/files',
+      '/operations/jobs', '/operations/queue', '/operations/reports', '/operations/tasks',
+      '/tools/converter', '/tools/transcript',
     ]);
     expect(children().find(child => child.path === '/dashboard')?.pageKey).toBeUndefined();
   });
@@ -71,9 +72,9 @@ describe('shell navigation', () => {
     const restricted = TestBed.createComponent(Shell).componentInstance;
     const paths = restricted.nav().flatMap(item => item.children ?? []).map(child => child.path);
 
-    expect(paths).toContain('/jobs');
-    expect(paths).toContain('/queue');
-    expect(paths).not.toContain('/reports');
+    expect(paths).toContain('/operations/jobs');
+    expect(paths).toContain('/operations/queue');
+    expect(paths).not.toContain('/operations/reports');
     expect(paths).not.toContain('/tools/converter');
     expect(restricted.nav().map(item => item.label)).not.toContain('Tools');
     expect(restricted.nav().map(item => item.label)).not.toContain('Assistants');
@@ -83,26 +84,26 @@ describe('shell navigation', () => {
   });
 
   it('offers the saved-analysis library, which had a route and no way to reach it', () => {
-    const saved = children().find(child => child.path === '/analytics/dashboards');
+    const saved = children().find(child => child.path === '/objects/analytics/dashboards');
     expect(saved).toBeDefined();
     expect(saved?.label).toBe('Saved Analyses');
   });
 
   it('names an icon the icon set actually has', () => {
     // An unknown name renders nothing, which reads as a layout bug rather than a missing glyph.
-    const saved = children().find(child => child.path === '/analytics/dashboards');
+    const saved = children().find(child => child.path === '/objects/analytics/dashboards');
     expect(saved?.icon).toBe('save');
   });
 
   it('marks a parent route exact, so standing on the child does not light both', () => {
-    const parent = children().find(child => child.path === '/analytics');
+    const parent = children().find(child => child.path === '/objects/analytics');
     expect(parent?.exact).toBe(true);
   });
 
   it('leaves a leaf route on prefix matching, so its own sub-pages keep it lit', () => {
-    const saved = children().find(child => child.path === '/analytics/dashboards');
+    const saved = children().find(child => child.path === '/objects/analytics/dashboards');
     expect(saved?.exact).toBe(false);
     // Not a special case for analytics: every entry with nothing beneath it stays prefix-matched.
-    expect(children().find(child => child.path === '/objects')?.exact).toBe(false);
+    expect(children().find(child => child.path === '/objects/files')?.exact).toBe(false);
   });
 });

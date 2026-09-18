@@ -203,7 +203,7 @@
               </td>
               <td>
                 @if (form.topicName) {
-                  <a class="link-inline" [routerLink]="['/settings/kafka']" [queryParams]="{ topic: form.sourceTaskTypeId }"
+                  <a class="link-inline" [routerLink]="['/configuration/kafka']" [queryParams]="{ topic: form.sourceTaskTypeId }"
                      [title]="'Publishes on ' + (form.kafkaTopic || '') + ' — open on Kafka & Topics'">{{ form.topicName }}</a>
                   @if (form.kafkaTopic) { <div class="mono text-xs text-[color:var(--text-muted)]">{{ form.kafkaTopic }}</div> }
                 } @else {

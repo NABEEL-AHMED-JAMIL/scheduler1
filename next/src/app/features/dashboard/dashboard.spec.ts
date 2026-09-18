@@ -85,7 +85,7 @@ describe('drilling into an hour from the breakdown', () => {
   it('puts the job in the path when the row names one', () => {
     const { dashboard, navigated } = dashboardRecording();
     dashboard.openCount(row({ jobId: 42, jobName: 'Nightly load', completed: 3 }), 'Completed', 3);
-    expect(navigated[0]).toEqual(['/jobs', 42, 'history']);
+    expect(navigated[0]).toEqual(['/operations/jobs', 42, 'history']);
   });
 
   it('falls back to the cross-job view rather than writing undefined into the path', () => {
@@ -94,7 +94,7 @@ describe('drilling into an hour from the breakdown', () => {
       row({ jobId: undefined as unknown as number, jobName: 'Nightly load', completed: 3 }),
       'Completed', 3);
 
-    expect(navigated[0]).toEqual(['/jobs', 'history']);
+    expect(navigated[0]).toEqual(['/operations/jobs', 'history']);
     expect(JSON.stringify(navigated[0])).not.toContain('undefined');
   });
 

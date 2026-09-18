@@ -967,12 +967,12 @@ export class Reports implements OnInit {
    * per status before this control was added. The rule is unchanged; only the fact was stale.
    */
   openJobHistory(jobId: number): void {
-    if (jobId) this.router.navigate(['/jobs', jobId, 'history']);
+    if (jobId) this.router.navigate(['/operations/jobs', jobId, 'history']);
   }
 
   openRunLogs(failure: FailureRow): void {
     if (failure.jobId && failure.jobQueueId) {
-      this.router.navigate(['/jobs', failure.jobId, 'runs', failure.jobQueueId, 'logs']);
+      this.router.navigate(['/operations/jobs', failure.jobId, 'runs', failure.jobQueueId, 'logs']);
     }
   }
 
