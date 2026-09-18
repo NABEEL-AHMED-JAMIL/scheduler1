@@ -185,6 +185,13 @@
             @if (loadingChildren().has($any(lookup.lookupId))) {
               <app-icon name="refresh" class="spin icon-muted" />
             }
+            @if (entryCount(lookup) > 8) {
+              <div class="search-field max-w-56 ml-auto">
+                <app-icon name="search" size="0.95em" />
+                <input class="input" placeholder="Find an entry" aria-label="Find an entry"
+                       [value]="entrySearch()" (input)="entrySearch.set($any($event.target).value)" />
+              </div>
+            }
           </div>
 
           @if (!entryCount(lookup)) {
@@ -206,7 +213,7 @@
             </div>
           } @else if (!visibleEntries().length) {
             <div class="lookup-entries-empty">
-              <p>No entry matches “{{ search() }}”.</p>
+              <p>No entry matches “{{ entrySearch().trim() || search() }}”.</p>
             </div>
           } @else {
             <div class="lookup-entries-scroll">

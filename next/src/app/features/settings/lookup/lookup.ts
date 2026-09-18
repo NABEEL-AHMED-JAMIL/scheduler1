@@ -72,12 +72,20 @@ export class Lookup implements OnInit {
       || (c.description ?? '').toLowerCase().includes(term);
   }
 
-  /** The selected lookup's entries, narrowed by the same search box when it names one of them. */
+  /** The pane's own search over the selected lookup's entries -- nineteen providers need one. */
+  readonly entrySearch = signal('');
+
+  /**
+   * The selected lookup's entries, narrowed by the pane's own box first, else by the rail's
+   * search when that names one of them (so "openai" typed in the rail still lands on the row).
+   */
   readonly visibleEntries = computed(() => {
     const lookup = this.selected();
     if (!lookup) return [];
-    const term = this.search().trim().toLowerCase();
     const all = lookup.children ?? [];
+    const own = this.entrySearch().trim().toLowerCase();
+    if (own) return all.filter(c => this.entryMatches(c, own));
+    const term = this.search().trim().toLowerCase();
     if (!term || this.matchingEntries(lookup) === 0) return all;
     return all.filter(c => this.entryMatches(c, term));
   });
@@ -116,6 +124,7 @@ export class Lookup implements OnInit {
 
   select(lookup: LookupData): void {
     this.selectedId.set(lookup.lookupId ?? null);
+    this.entrySearch.set('');
     this.router.navigate([], { relativeTo: this.route, queryParams: { lookup: lookup.lookupId }, queryParamsHandling: 'merge', replaceUrl: true });
   }
 
