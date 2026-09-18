@@ -375,7 +375,7 @@ export class Docs implements AfterViewInit {
       id: 'task', title: 'Describe the task',
       intro: 'A task is the unit of work: what to fetch or process, where it reads from and '
            + 'where it writes. It carries no timetable — that comes next.',
-      where: 'Pipelines → Source Tasks → New task',
+      where: 'Operations → Source Tasks → New task',
       fields: [
         { name: 'Task name', required: true, note: 'Name it for the work, not the schedule. One task often feeds several jobs.' },
         { name: 'Topic', required: true, note: 'Pick it first: where the task publishes. Only this topic’s pipelines are offered next.' },
@@ -392,7 +392,7 @@ export class Docs implements AfterViewInit {
       id: 'job', title: 'Put the task on a timetable',
       intro: 'A job binds a task to a schedule. The same task can carry several jobs — one '
            + 'hourly, one at month end — without being described twice.',
-      where: 'Pipelines → Source Jobs → New job',
+      where: 'Operations → Source Jobs → New job',
       fields: [
         { name: 'Job name', required: true, note: 'Name it for when it runs, since that is what distinguishes it from its siblings.' },
         { name: 'Task', required: true, note: 'The task from step 4.' },
@@ -417,7 +417,7 @@ export class Docs implements AfterViewInit {
       id: 'watch', title: 'Watch it run',
       intro: 'Once a job is due the scheduler queues it, a worker picks it up, and the console '
            + 'follows it from there.',
-      where: 'Pipelines → Source Jobs, and Pipelines → Q-Message',
+      where: 'Operations → Source Jobs, and Operations → Queue',
       notes: [
         'Run now starts a job immediately without disturbing its timetable. Skip next run drops '
         + 'the next slot and leaves the rest in place.',

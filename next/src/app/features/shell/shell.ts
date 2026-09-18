@@ -78,7 +78,10 @@ export class Shell {
   private readonly allNav: NavItem[] = [
     { label: 'Dashboard', path: '/dashboard', icon: 'chart' },
     {
-      label: 'Pipelines',
+      // "Operations", not "Pipelines": a pipeline is a definition now (Configuration ›
+      // Pipelines -- id, topic, fields), and this section is the running side of it -- the
+      // jobs, tasks, queue and reports. Two menus called Pipelines meant two different things.
+      label: 'Operations',
       children: [
         { label: 'Source Jobs', path: '/jobs', pageKey: 'jobs', icon: 'briefcase',
           hint: 'Scheduled work and its runs' },

@@ -105,7 +105,7 @@ test.describe('access profiles', () => {
     const memberPage = await pageAs(browser, memberSession);
     await memberPage.goto('/dashboard');
     const nav = memberPage.locator('nav, header').first();
-    await expect(nav.getByText('Pipelines')).toBeVisible();
+    await expect(nav.getByText('Operations')).toBeVisible();
     await expect(nav.getByText('Tools')).toHaveCount(0);
     await expect(nav.getByText('Assistants')).toHaveCount(0);
 
