@@ -274,14 +274,14 @@
                 </td>
                 <td>
                   <div class="flex items-center justify-end gap-1.5">
-                    <button type="button" class="btn-circle"
+                    <button type="button" class="btn-circle btn-circle-info"
                             [disabled]="!task.inputStorageKey"
                             [title]="task.inputStorageKey ? 'View the original file' : 'The original was not kept'"
                             aria-label="View the original file"
                             (click)="view(task, 'input')">
                       <app-icon name="file" size="0.9em" />
                     </button>
-                    <button type="button" class="btn-circle"
+                    <button type="button" class="btn-circle btn-circle-info"
                             [disabled]="!task.outputStorageKey"
                             [title]="task.outputStorageKey ? 'View the converted file' : 'The result was not kept'"
                             aria-label="View the converted file"

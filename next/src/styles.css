@@ -1675,3 +1675,19 @@ html.dark .kafka-test-glyph.crit { background: color-mix(in oklab, var(--color-c
 
 /* The pipeline's public id beside its name: a chip in mono, dark enough to read at a glance. */
 .pipeline-id-chip { display: inline-block; font-family: var(--font-mono); font-size: 11px; font-weight: 600; line-height: 1.5; padding: 0.05rem 0.45rem; border-radius: 0.375rem; background: var(--surface-sunken); color: var(--text-primary); border: 1px solid var(--border-subtle); letter-spacing: 0.01em; }
+
+/* Row-action circles carry their intent as colour, always, not only on hover: green to check
+   or open something, blue to edit, red to delete -- so a row of three reads at a glance and
+   the destructive one is never mistaken for its neighbours. */
+.btn-circle-ok     { background: var(--color-ok-100);   border-color: color-mix(in oklab, var(--color-ok-500) 35%, transparent);   color: var(--color-ok-500); }
+.btn-circle-info   { background: color-mix(in oklab, #3b82f6 12%, var(--surface-raised)); border-color: color-mix(in oklab, #3b82f6 40%, transparent); color: #2563eb; }
+.btn-circle-danger { background: var(--color-crit-100); border-color: color-mix(in oklab, var(--color-crit-500) 35%, transparent); color: var(--color-crit-500); }
+.btn-circle-ok:hover:not(:disabled)     { background: color-mix(in oklab, var(--color-ok-500) 22%, var(--surface-raised)); border-color: var(--color-ok-500); color: var(--color-ok-500); }
+.btn-circle-info:hover:not(:disabled)   { background: color-mix(in oklab, #3b82f6 22%, var(--surface-raised)); border-color: #2563eb; color: #1d4ed8; }
+.btn-circle-danger:hover:not(:disabled) { background: color-mix(in oklab, var(--color-crit-500) 22%, var(--surface-raised)); border-color: var(--color-crit-500); color: var(--color-crit-500); }
+html.dark .btn-circle-ok     { background: color-mix(in oklab, var(--color-ok-500) 18%, transparent); color: var(--color-ok-400); }
+html.dark .btn-circle-info   { background: color-mix(in oklab, #60a5fa 18%, transparent); border-color: color-mix(in oklab, #60a5fa 45%, transparent); color: #93c5fd; }
+html.dark .btn-circle-danger { background: color-mix(in oklab, var(--color-crit-500) 18%, transparent); color: var(--color-crit-400); }
+html.dark .btn-circle-ok:hover:not(:disabled)     { color: var(--color-ok-400); }
+html.dark .btn-circle-info:hover:not(:disabled)   { color: #bfdbfe; border-color: #60a5fa; }
+html.dark .btn-circle-danger:hover:not(:disabled) { color: var(--color-crit-400); }
