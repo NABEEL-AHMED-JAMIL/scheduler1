@@ -10,6 +10,8 @@ import { ToastService } from '../../../shared/ui/toast.service';
 import { Field } from '../../../shared/ui/field';
 import { Icon } from '../../../shared/ui/icon';
 import { Combobox } from '../../../shared/ui/combobox';
+import { Dialog } from '@angular/cdk/dialog';
+import { ObjectPicker, PickedObject, objectPickerConfig } from '../../../shared/ui/object-picker';
 import { ModelConnection } from '../ai-providers';
 import { Prompt, PromptRun, PromptVariable, placeholdersOf } from './prompt-model';
 
@@ -30,6 +32,7 @@ export class PromptEdit implements OnInit {
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
+  private readonly dialog = inject(Dialog);
 
   readonly isEdit = computed(() => !!this.promptId());
   readonly loading = signal(false);
@@ -85,6 +88,50 @@ export class PromptEdit implements OnInit {
 
   // ---- Try it ---------------------------------------------------------------------------------
   readonly trying = signal(false);
+
+  /**
+   * Try it on a file. A variable can take its value from an object in any bucket -- read the
+   * way the file chat reads it, whatever the type (a PDF, a spreadsheet, an image described by
+   * the vision model, a recording transcribed) -- without that text becoming the saved sample:
+   * a sample is a line or two that documents the variable, and sixty thousand characters of a
+   * CSV are not that. So the file's text lives here, keyed by variable, and rides along as
+   * `values` on the try alone. A variable named file_name is filled with the file's name at
+   * the same time, which is what every file-type prompt asks for beside the text.
+   */
+  readonly trySources = signal<Record<string, TrySource>>({});
+  readonly reading = signal<string | null>(null);
+  readonly trySourceList = computed(() => Object.values(this.trySources()));
+
+  fromFile(variableName: string): void {
+    const name = (variableName || '').trim();
+    if (!name) { this.toast.error('Name the variable first.'); return; }
+    this.dialog.open<PickedObject | undefined>(ObjectPicker, objectPickerConfig({ heading: `Fill {{${name}}} from a file` }))
+      .closed.subscribe(picked => { if (picked) this.readObject(name, picked); });
+  }
+
+  private readObject(variable: string, picked: PickedObject): void {
+    this.reading.set(variable);
+    this.http.get<ApiResponse<ObjectText>>(`${API_BASE}/aiPrompt.json/objectText`, { params: { bucket: picked.bucket, key: picked.key } }).subscribe({
+      next: r => {
+        this.reading.set(null);
+        if (r.status !== API_SUCCESS || !r.data) { this.toast.error(r.message || 'That file could not be read.'); return; }
+        const d = r.data;
+        this.trySources.update(all => {
+          const next = { ...all, [variable]: { variable, bucket: d.bucket, key: d.key, name: d.name, kind: d.kind, chars: d.chars, totalChars: d.totalChars, truncated: d.truncated, text: d.text } };
+          const fileName = this.variables.controls.map(g => g.get('name')!.value).find(n => n === 'file_name' && n !== variable);
+          if (fileName) next[fileName] = { variable: fileName, bucket: d.bucket, key: d.key, name: d.name, kind: 'name', chars: d.name.length, totalChars: d.name.length, truncated: false, text: d.name };
+          return next;
+        });
+        this.toast.success(r.message);
+      },
+      error: err => { this.reading.set(null); this.toast.error(err?.error?.message || 'That file could not be read.'); },
+    });
+  }
+
+  clearSource(variable: string): void {
+    this.trySources.update(all => { const next = { ...all }; delete next[variable]; return next; });
+  }
+  sourceOf(variable: string): TrySource | undefined { return this.trySources()[variable]; }
   readonly lastRun = signal<PromptRun | null>(null);
   readonly runs = signal<PromptRun[]>([]);
   readonly showRendered = signal(false);
@@ -197,7 +244,9 @@ export class PromptEdit implements OnInit {
     if (!this.valid()) return;
     this.trying.set(true);
     this.lastRun.set(null);
-    this.http.post<ApiResponse<PromptRun>>(`${API_BASE}/aiPrompt.json/try`, this.body(false)).subscribe({
+    const values: Record<string, string> = {};
+    for (const source of this.trySourceList()) values[source.variable] = source.text;
+    this.http.post<ApiResponse<PromptRun>>(`${API_BASE}/aiPrompt.json/try`, { ...this.body(false), values }).subscribe({
       next: r => {
         this.trying.set(false);
         if (r.data) this.lastRun.set(r.data);
@@ -213,4 +262,17 @@ export class PromptEdit implements OnInit {
     if (this.outputMode() !== 'json') return run.output;
     try { return JSON.stringify(JSON.parse(run.output), null, 2); } catch { return run.output; }
   }
+}
+
+/** What GET aiPrompt.json/objectText answers. */
+interface ObjectText {
+  bucket: string; key: string; name: string; kind: 'text' | 'transcript' | 'description';
+  text: string; chars: number; totalChars: number; truncated: boolean;
+}
+
+/** A Try-it value that came from a file, and where. */
+export interface TrySource {
+  variable: string; bucket: string; key: string; name: string;
+  kind: 'text' | 'transcript' | 'description' | 'name';
+  chars: number; totalChars: number; truncated: boolean; text: string;
 }

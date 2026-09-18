@@ -15,8 +15,12 @@ import { API_SUCCESS } from '../../../core/api/api.config';
  * the row is there, so a typo never reaches a run as an empty string.
  */
 function editor() {
-  const get = vi.fn((url: string) => {
+  const get = vi.fn((url: string, options?: { params?: Record<string, string> }) => {
     if (url.endsWith('/aiConnection.json/list')) return of({ status: API_SUCCESS, data: [{ connectionId: 7, name: 'Ollama', provider: 'Ollama', defaultModel: 'gemma3:1b', isDefault: true }] });
+    if (url.endsWith('/aiPrompt.json/objectText')) return of({ status: API_SUCCESS, message: 'Read discharge.pdf: 420 characters.', data: {
+      bucket: options?.params?.['bucket'], key: options?.params?.['key'], name: 'discharge.pdf', kind: 'text',
+      text: 'Discharge summary for M. Okafor. Total billed $188.50.', chars: 54, totalChars: 54, truncated: false,
+    } });
     throw new Error(`unexpected GET ${url}`);
   });
   const post = vi.fn(() => of({ status: API_SUCCESS, message: 'ok', data: {} }));
@@ -31,7 +35,7 @@ function editor() {
   const component = TestBed.runInInjectionContext(() => new PromptEdit());
   component.ngOnInit();
   TestBed.tick();
-  return { component, post, toast };
+  return { component, post, toast, get };
 }
 
 describe('placeholdersOf', () => {
@@ -73,5 +77,35 @@ describe('PromptEdit', () => {
     }));
     component.save(true);
     expect(post).toHaveBeenLastCalledWith(expect.stringContaining('/aiPrompt.json/save'), expect.objectContaining({ activate: true }));
+  });
+
+  /**
+   * Try it on a file. The file's text rides on the try as `values`, keyed by variable, and
+   * never becomes the saved sample; a file_name variable is filled with the name alongside.
+   */
+  it('fills a variable from a file for the try alone, and file_name with it', () => {
+    const { component, post, get } = editor();
+    component.form.patchValue({ name: 'Any file', userTemplate: '{{file_name}}: {{document_text}}' });
+    TestBed.tick();
+    component.variables.at(1).patchValue({ sample: 'hello' });
+    // The picker is a dialog; drive the read directly with what it would have answered.
+    (component as any).readObject('document_text', { bucket: 'medaxis', key: 'docs/discharge.pdf', name: 'discharge.pdf' });
+    expect(get).toHaveBeenCalledWith(expect.stringContaining('/aiPrompt.json/objectText'), { params: { bucket: 'medaxis', key: 'docs/discharge.pdf' } });
+    expect(component.sourceOf('document_text')?.name).toBe('discharge.pdf');
+    expect(component.sourceOf('file_name')?.text).toBe('discharge.pdf');
+    expect(component.trySourceList().map(s => s.variable).sort()).toEqual(['document_text', 'file_name']);
+
+    component.tryIt();
+    expect(post).toHaveBeenCalledWith(expect.stringContaining('/aiPrompt.json/try'), expect.objectContaining({
+      values: { document_text: 'Discharge summary for M. Okafor. Total billed $188.50.', file_name: 'discharge.pdf' },
+      // The sample is untouched: it documents the variable, the file is the try's business.
+      variables: expect.arrayContaining([expect.objectContaining({ name: 'document_text', sample: 'hello' })]),
+    }));
+    component.save(false);
+    expect(post).toHaveBeenLastCalledWith(expect.stringContaining('/aiPrompt.json/save'), expect.not.objectContaining({ values: expect.anything() }));
+
+    component.clearSource('document_text');
+    expect(component.sourceOf('document_text')).toBeUndefined();
+    expect(component.sourceOf('file_name')).toBeDefined();
   });
 });
