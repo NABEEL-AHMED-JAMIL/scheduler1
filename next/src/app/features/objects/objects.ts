@@ -1,4 +1,5 @@
 import { Component, Injector, OnInit, afterNextRender, computed, inject, signal, viewChild } from '@angular/core';
+import { Combobox } from '../../shared/ui/combobox';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { EMPTY, catchError, from, mergeMap, of, tap } from 'rxjs';
 import { DatePipe } from '@angular/common';
@@ -27,7 +28,7 @@ const SLOW_PROVIDERS = ['FTP', 'FTPS'];
 
 @Component({
   selector: 'app-objects',
-  imports: [Icon, DatePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, FileChat, Donut, RankedBar],
+  imports: [Icon, DatePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, FileChat, Donut, RankedBar, Combobox],
   templateUrl: './objects.html',
 })
 export class Objects implements OnInit {
@@ -38,6 +39,7 @@ export class Objects implements OnInit {
   private readonly injector = inject(Injector);
 
   readonly buckets = signal<BucketSummary[]>([]);
+  readonly bucketOptions = computed(() => this.buckets().map(b => ({ value: b.bucket, label: b.label || b.bucket, hint: b.provider })));
 
   /** FTP is a different kind of thing from an object store, and the card should say so. */
   providerIcon(provider: string): string {

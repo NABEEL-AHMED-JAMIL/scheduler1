@@ -1,4 +1,5 @@
 import { Component, OnDestroy, OnInit, computed, effect, inject, signal } from '@angular/core';
+import { Combobox } from '../../../shared/ui/combobox';
 import { HttpClient } from '@angular/common/http';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { ToastService } from '../../../shared/ui/toast.service';
@@ -14,7 +15,7 @@ const AUDIO_EXTENSIONS = ['mp3', 'm4a'];
 
 @Component({
   selector: 'app-transcript',
-  imports: [Icon, Segmented, FileDropzone, ReadAlongText],
+  imports: [Icon, Segmented, FileDropzone, ReadAlongText, Combobox],
   templateUrl: './transcript.html',
 })
 export class Transcript implements OnInit, OnDestroy {
@@ -110,6 +111,8 @@ export class Transcript implements OnInit, OnDestroy {
   /** Folders at this level, so audio nested inside them can be reached. */
   readonly folders = computed(() => this.objects().filter(o => o.folder));
 
+  readonly bucketOptions = computed(() => this.buckets().map(b => ({ value: b.bucket, label: b.label || b.bucket, hint: b.provider })));
+  readonly fileOptions = computed(() => this.audioObjects().map(o => ({ value: o.key, label: o.name, hint: o.key })));
   readonly audioObjects = computed(() =>
     this.objects().filter(o => !o.folder && AUDIO_EXTENSIONS.some(e => o.name.toLowerCase().endsWith('.' + e))));
 

@@ -12,13 +12,10 @@
         <!-- [selected] on the options, not [value] on the select: the select's value is applied
              before the options exist, so a deep-linked tenantId showed "Choose a workspace…"
              above a grid that had already loaded that tenant's people. -->
-        <select class="input max-w-56" (change)="pickTenant($any($event.target).value)"
-                aria-label="Workspace" data-testid="tenant-picker">
-          <option value="" [selected]="!tenantId()">Choose a workspace…</option>
-          @for (tenant of tenants(); track tenant.tenantId) {
-            <option [value]="tenant.tenantId" [selected]="tenant.tenantId === tenantId()">{{ tenant.tenantName }}</option>
-          }
-        </select>
+        <div class="w-56" data-testid="tenant-picker">
+          <app-combobox id="ap-tenant" [selected]="tenantId() ?? ''" (selectedChange)="pickTenant($event)"
+                        placeholder="Choose a workspace…" clearLabel="Choose a workspace…" [options]="tenantOptions()" />
+        </div>
       }
       <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading() || needsWorkspace()">
         <app-icon name="refresh" [class.spin]="loading()" />Refresh

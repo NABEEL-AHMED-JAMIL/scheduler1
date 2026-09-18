@@ -44,20 +44,14 @@
         <div>
           <label class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]"
                  for="r-f-task">Task</label>
-          <select id="r-f-task" class="input max-w-44 mt-1" [value]="taskFilter()"
-                  (change)="taskFilter.set($any($event.target).value)">
-            <option value="">All tasks</option>
-            @for (option of taskOptions(); track option) { <option [value]="option">{{ option }}</option> }
-          </select>
+          <div class="w-44 mt-1"><app-combobox id="r-f-task" [selected]="taskFilter()" (selectedChange)="taskFilter.set($event)"
+                    placeholder="All tasks" clearLabel="All tasks" [options]="asOptions(taskOptions())" /></div>
         </div>
         <div>
           <label class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]"
                  for="r-f-job">Job</label>
-          <select id="r-f-job" class="input max-w-44 mt-1" [value]="jobFilter()"
-                  (change)="jobFilter.set($any($event.target).value)">
-            <option value="">All jobs</option>
-            @for (option of jobOptions(); track option) { <option [value]="option">{{ option }}</option> }
-          </select>
+          <div class="w-44 mt-1"><app-combobox id="r-f-job" [selected]="jobFilter()" (selectedChange)="jobFilter.set($event)"
+                    placeholder="All jobs" clearLabel="All jobs" [options]="asOptions(jobOptions())" /></div>
         </div>
         <div>
           <label class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]"
@@ -72,21 +66,15 @@
           <div>
             <label class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]"
                    for="r-f-tenant">Workspace</label>
-            <select id="r-f-tenant" class="input max-w-44 mt-1" [value]="tenantFilter()"
-                    (change)="tenantFilter.set($any($event.target).value)">
-              <option value="">All workspaces</option>
-              @for (option of tenantOptions(); track option) { <option [value]="option">{{ option }}</option> }
-            </select>
+            <div class="w-44 mt-1"><app-combobox id="r-f-tenant" [selected]="tenantFilter()" (selectedChange)="tenantFilter.set($event)"
+                    placeholder="All workspaces" clearLabel="All workspaces" [options]="asOptions(tenantOptions())" /></div>
           </div>
         }
         <div>
           <label class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]"
                  for="r-f-owner">Owner</label>
-          <select id="r-f-owner" class="input max-w-40 mt-1" [value]="ownerFilter()"
-                  (change)="ownerFilter.set($any($event.target).value)">
-            <option value="">All owners</option>
-            @for (option of ownerOptions(); track option) { <option [value]="option">{{ option }}</option> }
-          </select>
+          <div class="w-40 mt-1"><app-combobox id="r-f-owner" [selected]="ownerFilter()" (selectedChange)="ownerFilter.set($event)"
+                    placeholder="All owners" clearLabel="All owners" [options]="asOptions(ownerOptions())" /></div>
         </div>
       </div>
       @if (truncated()) {

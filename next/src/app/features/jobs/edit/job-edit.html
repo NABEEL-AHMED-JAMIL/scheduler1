@@ -26,12 +26,8 @@
           <app-field label="Task" for="task" [required]="true"
                      [control]="form.get('taskDetailId')" [submitted]="submitted()"
                      hint="The work this job runs.">
-            <select id="task" class="input" formControlName="taskDetailId">
-              <option [ngValue]="null">Select a task</option>
-              @for (task of tasks(); track task.taskDetailId) {
-                <option [ngValue]="task.taskDetailId">{{ task.taskName }}</option>
-              }
-            </select>
+            <app-combobox id="task" formControlName="taskDetailId" [numeric]="true"
+                          placeholder="Search tasks…" [allowClear]="false" [options]="taskOptions()" />
           </app-field>
 
           <app-field label="Execution" for="execution" [required]="true"

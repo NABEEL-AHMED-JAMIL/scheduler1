@@ -16,32 +16,18 @@
       <div class="form-grid">
         <div class="field">
           <label class="label" for="cbucket">Bucket</label>
-          <select id="cbucket" class="input"
-                  (change)="onBucketChange($any($event.target).value)">
-            <option value="" [selected]="!bucket()">Choose a bucket</option>
-            @for (b of buckets(); track b.bucket) {
-              <option [value]="b.bucket" [selected]="b.bucket === bucket()">
-                {{ b.label || b.bucket }} · {{ b.provider }}
-              </option>
-            }
-          </select>
+          <app-combobox id="cbucket" [selected]="bucket()" (selectedChange)="onBucketChange($event)"
+                        placeholder="Choose a bucket" [allowClear]="false" [options]="bucketOptions()" />
         </div>
 
         <div class="field">
           <label class="label" for="cfile">File</label>
-          <select id="cfile" class="input"
-                  [disabled]="!bucket() || loadingObjects() || !convertibleObjects().length"
-                  (change)="selectedKey.set($any($event.target).value)">
-            <option value="" [selected]="!selectedKey()">
-              {{ loadingObjects() ? 'Reading the bucket…'
-                 : !bucket() ? 'Choose a bucket first'
-                 : convertibleObjects().length ? 'Choose a file'
-                 : (folders().length ? 'Open a folder below' : 'Nothing convertible here') }}
-            </option>
-            @for (o of convertibleObjects(); track o.key) {
-              <option [value]="o.key" [selected]="o.key === selectedKey()">{{ o.name }}</option>
-            }
-          </select>
+          <app-combobox id="cfile" [selected]="selectedKey()" (selectedChange)="selectedKey.set($event)"
+                        [placeholder]="loadingObjects() ? 'Reading the bucket…'
+                           : !bucket() ? 'Choose a bucket first'
+                           : convertibleObjects().length ? 'Search files…'
+                           : (folders().length ? 'Open a folder below' : 'Nothing convertible here')"
+                        clearLabel="None" [options]="fileOptions()" />
         </div>
       </div>
 
@@ -144,15 +130,8 @@
         <div class="form-grid">
           <div class="field">
             <label class="label" for="savebucket">Save to bucket</label>
-            <select id="savebucket" class="input"
-                    (change)="saveBucket.set($any($event.target).value)">
-              <option value="" [selected]="!saveBucket()">Choose a bucket</option>
-              @for (b of buckets(); track b.bucket) {
-                <option [value]="b.bucket" [selected]="b.bucket === saveBucket()">
-                  {{ b.label || b.bucket }} · {{ b.provider }}
-                </option>
-              }
-            </select>
+            <app-combobox id="savebucket" [selected]="saveBucket()" (selectedChange)="saveBucket.set($event)"
+                          placeholder="Choose a bucket" clearLabel="None" [options]="bucketOptions()" />
           </div>
 
           <div class="field">

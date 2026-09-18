@@ -31,16 +31,16 @@
       <app-view-toggle [(value)]="view" key="tasks" cardsIcon="layers" />
       <!-- Topic first, then the pipelines on it -- the same two-step pick the task editor uses,
            so the list can be narrowed the way tasks are actually organised. -->
-      <select class="input max-w-48" [value]="topicFilter()" aria-label="Topic"
-              (change)="setTopicFilter($any($event.target).value)">
-        <option value="">All topics</option>
-        @for (t of topicOptions(); track t.id) { <option [value]="t.id">{{ t.name }}</option> }
-      </select>
-      <select class="input max-w-52" [value]="pipelineFilter()" aria-label="Pipeline"
-              (change)="pipelineFilter.set($any($event.target).value); pager.reset()">
-        <option value="">{{ topicFilter() ? 'All pipelines on this topic' : 'All pipelines' }}</option>
-        @for (p of pipelineOptions(); track p.id) { <option [value]="p.id">{{ p.name }}</option> }
-      </select>
+      <div class="max-w-48 w-48">
+        <app-combobox id="tasks-topic" [selected]="topicFilter()" (selectedChange)="setTopicFilter($event)"
+                      placeholder="All topics" clearLabel="All topics" [options]="topicComboOptions()" />
+      </div>
+      <div class="max-w-52 w-52">
+        <app-combobox id="tasks-pipeline" [selected]="pipelineFilter()" (selectedChange)="pipelineFilter.set($event); pager.reset()"
+                      [placeholder]="topicFilter() ? 'All pipelines on this topic' : 'All pipelines'"
+                      [clearLabel]="topicFilter() ? 'All pipelines on this topic' : 'All pipelines'"
+                      [options]="pipelineComboOptions()" />
+      </div>
       <div class="search-field max-w-56">
         <app-icon name="search" size="0.95em" />
         <input class="input" placeholder="Search id, name, topic or pipeline"

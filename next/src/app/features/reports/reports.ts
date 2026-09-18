@@ -5,6 +5,7 @@ import { Subject, catchError, of, switchMap } from 'rxjs';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { ToastService } from '../../shared/ui/toast.service';
 import { statusColor } from '../../shared/charts/status-color';
+import { Combobox } from '../../shared/ui/combobox';
 import { Donut } from '../../shared/charts/donut';
 import { BarChart, Bar } from '../../shared/charts/bar-chart';
 import { DaySeries, daySeries } from '../../shared/charts/day-series';
@@ -121,7 +122,7 @@ interface QueueLog {
  */
 @Component({
   selector: 'app-reports',
-  imports: [Icon, StatTile, StatusPill, TableShell, Donut, BarChart, Histogram, ReportPivot],
+  imports: [Icon, StatTile, StatusPill, TableShell, Donut, BarChart, Histogram, ReportPivot, Combobox],
   templateUrl: './reports.html',
 })
 export class Reports implements OnInit {
@@ -148,6 +149,8 @@ export class Reports implements OnInit {
   readonly tenantFilter = signal('');
 
   /** Options come from the RAW payload, so choosing one never empties the other pickers. */
+  /** Plain strings as combobox rows; the filters are names, so the value is the label. */
+  asOptions(values: string[]): { value: string; label: string }[] { return values.map(v => ({ value: v, label: v })); }
   readonly taskOptions = computed(() => [...this.rawData().task].filter(Boolean).sort());
   readonly jobOptions = computed(() => [...(this.rawData().job ?? [])].filter(Boolean).sort());
   readonly statusOptions = computed(() => [...this.rawData().status].filter(Boolean).sort());

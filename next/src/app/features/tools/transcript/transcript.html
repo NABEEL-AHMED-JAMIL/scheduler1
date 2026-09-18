@@ -17,30 +17,15 @@
       <div class="grid sm:grid-cols-2 gap-3">
         <div>
           <label class="label" for="tbucket">Connection</label>
-          <select id="tbucket" class="input" [value]="bucket()"
-                  (change)="onBucketChange($any($event.target).value)">
-            <option value="">Select a connection</option>
-            @for (b of buckets(); track b.bucket) {
-              <option [value]="b.bucket">{{ b.label }}</option>
-            }
-          </select>
+          <app-combobox id="tbucket" [selected]="bucket()" (selectedChange)="onBucketChange($event)"
+                        placeholder="Search connections…" [allowClear]="false" [options]="bucketOptions()" />
         </div>
         <div>
           <label class="label" for="tfile">Audio file</label>
-          <select id="tfile" class="input"
-                  (change)="selectedKey.set($any($event.target).value)"
-                  [disabled]="!bucket() || loadingObjects() || !audioObjects().length">
-            <option value="" [selected]="!selectedKey()">
-              {{ loadingObjects()
-                  ? 'Looking…'
-                  : (audioObjects().length
-                      ? 'Select a file'
-                      : (folders().length ? 'Open a folder below' : 'No audio here')) }}
-            </option>
-            @for (o of audioObjects(); track o.key) {
-              <option [value]="o.key" [selected]="o.key === selectedKey()">{{ o.name }}</option>
-            }
-          </select>
+          <app-combobox id="tfile" [selected]="selectedKey()" (selectedChange)="selectedKey.set($event)"
+                        [placeholder]="loadingObjects() ? 'Looking…'
+                           : (audioObjects().length ? 'Search files…' : (folders().length ? 'Open a folder below' : 'No audio here'))"
+                        clearLabel="None" [options]="fileOptions()" />
         </div>
       </div>
 

@@ -37,10 +37,10 @@
                  [control]="form.get('bucketName')" [submitted]="submitted()">
         <div class="flex gap-2">
           @if (discovered().length) {
-            <select id="bucket" class="input" formControlName="bucketName">
-              <option value="">Select one</option>
-              @for (name of discovered(); track name) { <option [value]="name">{{ name }}</option> }
-            </select>
+            <div class="flex-1 min-w-0">
+              <app-combobox id="bucket" formControlName="bucketName" placeholder="Search the discovered buckets…"
+                            clearLabel="None" [options]="bucketOptions()" />
+            </div>
             <button type="button" class="btn btn-default btn-sm whitespace-nowrap"
                     (click)="discovered.set([])"><app-icon name="edit" />Type instead</button>
           } @else {

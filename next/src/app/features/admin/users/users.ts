@@ -1,4 +1,5 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Combobox } from '../../../shared/ui/combobox';
 import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
 import { DatePipe } from '@angular/common';
@@ -72,7 +73,7 @@ export interface AppUser {
 
 @Component({
   selector: 'app-users',
-  imports: [MineFilter, ViewToggle, StatTile, DatePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Icon, CopyButton, Avatar, Pagination],
+  imports: [MineFilter, ViewToggle, StatTile, DatePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Icon, CopyButton, Avatar, Pagination, Combobox],
   templateUrl: './users.html',
 })
 export class Users implements OnInit {
@@ -140,6 +141,7 @@ export class Users implements OnInit {
        || this.focusedTenantId() !== null || this.onlyMine()));
 
   /** Tenants that actually have users, so the filter never offers an empty result. */
+  readonly tenantComboOptions = computed(() => this.tenantOptions().map(t => ({ value: String(t.id), label: t.name })));
   readonly tenantOptions = computed(() => {
     const seen = new Map<number, string>();
     for (const user of this.users()) {

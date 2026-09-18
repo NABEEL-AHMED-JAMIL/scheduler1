@@ -1,5 +1,6 @@
 import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
+import { parseTopicPartition } from '../../../shared/ui/topic';
 import { HttpClient } from '@angular/common/http';
 import { forkJoin, of } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
@@ -142,6 +143,7 @@ export class TaskEdit implements OnInit {
     // The topic decides which pipelines may be picked. Changing it to one the current pipeline
     // does not publish on clears the pipeline rather than leaving a pair that cannot dispatch.
     this.form.get('sourceTaskTypeId')!.valueChanges.subscribe(topicId => {
+      this.topicVersion.set('changes');
       const current = (this.form.get('pipelineId')!.value ?? '').trim();
       if (!current) return;
       const stillValid = this.pipelines().some(p => p.pipelineId === current && p.sourceTaskTypeId === topicId);
@@ -176,6 +178,8 @@ export class TaskEdit implements OnInit {
           groupId: task.groupId,
           taskPayload: task.taskPayload,
         }, { emitEvent: false });
+        this.topicFromLoad.set(task.sourceTaskType?.sourceTaskTypeId ?? null);
+        this.topicVersion.set('load');
         this.taskTenantId = task.tenantId ?? null;
         const existing = task.xmlTagsInfo ?? task.tagsInfo ?? [];
         this.tags.clear();
@@ -208,9 +212,31 @@ export class TaskEdit implements OnInit {
    * template compiler ("Expected i18n meta to be a Message, but got: Function"), confirmed by
    * bisection, not assumed. Shaping the data here instead sidesteps it entirely.
    */
-  /** The chosen topic, as a signal, so the pipeline list can follow it. */
-  readonly selectedTopicId = toSignal(this.form.get('sourceTaskTypeId')!.valueChanges,
+  /** Topics as combobox rows: name first, Kafka topic as the searchable hint. */
+  readonly topicOptions = computed<ComboboxOption[]>(() => this.taskTypes().map((t: any) => ({
+    value: String(t.sourceTaskTypeId),
+    label: t.serviceName,
+    hint: parseTopicPartition(t.queueTopicPartition).topic,
+  })));
+
+  /**
+   * The chosen topic, as a signal, so the pipeline list can follow it.
+   *
+   * Fed from valueChanges AND set by hand in loadTask: that patch runs with emitEvent:false
+   * (see there), so without the explicit set an edited task opened with an empty pipeline list
+   * and its pipeline shown as a bare id -- the first thing found when the box became a
+   * combobox.
+   */
+  private readonly topicFromChanges = toSignal(this.form.get('sourceTaskTypeId')!.valueChanges,
     { initialValue: this.form.get('sourceTaskTypeId')!.value as number | null });
+  private readonly topicFromLoad = signal<number | null | undefined>(undefined);
+  readonly selectedTopicId = computed<number | null>(() => {
+    const changed = this.topicFromChanges();
+    const loaded = this.topicFromLoad();
+    // The most recent source wins: a load seeds it, a later pick overrides it.
+    return this.topicVersion() === 'load' ? (loaded ?? null) : (changed ?? null);
+  });
+  private readonly topicVersion = signal<'load' | 'changes'>('changes');
 
   /** Only the pipelines that publish on the chosen topic; nothing until a topic is chosen. */
   readonly pipelinesForTopic = computed<Pipeline[]>(() => {

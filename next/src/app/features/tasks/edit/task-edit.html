@@ -25,12 +25,9 @@
           <app-field label="Topic" for="taskType" [required]="true"
                      [control]="form.get('sourceTaskTypeId')" [submitted]="submitted()"
                      hint="Where this task publishes. Pick it first; the pipelines on it come next.">
-            <select id="taskType" class="input" formControlName="sourceTaskTypeId">
-              <option [ngValue]="null">Select a topic</option>
-              @for (type of taskTypes(); track type.sourceTaskTypeId) {
-                <option [ngValue]="type.sourceTaskTypeId">{{ type.serviceName }}</option>
-              }
-            </select>
+            <app-combobox id="taskType" formControlName="sourceTaskTypeId" [numeric]="true"
+                          placeholder="Search topics…" clearLabel="None"
+                          [options]="topicOptions()" />
           </app-field>
 
           <app-field label="Pipeline" for="pipeline" [control]="form.get('pipelineId')"

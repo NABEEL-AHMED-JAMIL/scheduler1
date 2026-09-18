@@ -1,4 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { Combobox } from '../../../shared/ui/combobox';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { HttpClient } from '@angular/common/http';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -28,7 +29,7 @@ const ROLES = Object.entries(ROLE_META).map(([value, meta]) => ({
 
 @Component({
   selector: 'app-user-dialog',
-  imports: [ReactiveFormsModule, Field, FormDialog, PhoneInput],
+  imports: [ReactiveFormsModule, Field, FormDialog, PhoneInput, Combobox],
   templateUrl: './user-dialog.html',
 })
 export class UserDialog {
@@ -81,6 +82,7 @@ export class UserDialog {
   /** E.164, owned by the phone component -- it validates against the same metadata the
       server does, so a second Validators rule here could only be a weaker copy. */
   readonly phone = signal<string>(this.data.user?.phoneNumber ?? '');
+  readonly tenantOptions = computed(() => (this.data.tenants ?? []).map((t: any) => ({ value: String(t.tenantId), label: t.tenantName, hint: t.tenantCode ?? '' })));
 
   readonly saving = signal(false);
   readonly submitted = signal(false);

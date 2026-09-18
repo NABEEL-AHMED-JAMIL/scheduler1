@@ -9,6 +9,7 @@ import { TableShell } from '../../shared/ui/data-table';
 import { StatusPill } from '../../shared/ui/status-pill';
 import { DatePipe } from '@angular/common';
 import { Icon } from '../../shared/ui/icon';
+import { Combobox } from '../../shared/ui/combobox';
 import { ViewToggle } from '../../shared/ui/view-toggle';
 import { copyText } from '../../shared/ui/clipboard.util';
 import { Dialog } from '@angular/cdk/dialog';
@@ -50,7 +51,7 @@ interface SourceTask {
 
 @Component({
   selector: 'app-tasks',
-  imports: [MineFilter, ViewToggle, Icon, RouterLink, TableShell, StatusPill, CdkMenu, CdkMenuItem, CdkMenuTrigger, Pagination, DatePipe],
+  imports: [MineFilter, ViewToggle, Icon, RouterLink, TableShell, StatusPill, CdkMenu, CdkMenuItem, CdkMenuTrigger, Pagination, DatePipe, Combobox],
   templateUrl: './tasks.html',
 })
 export class Tasks implements OnInit {
@@ -92,6 +93,8 @@ export class Tasks implements OnInit {
     }
     return [...seen].sort().map(id => ({ id, name: id }));
   });
+  readonly topicComboOptions = computed(() => this.topicOptions().map(t => ({ value: t.id, label: t.name })));
+  readonly pipelineComboOptions = computed(() => this.pipelineOptions().map(p => ({ value: p.id, label: p.name })));
   setTopicFilter(value: string): void {
     this.topicFilter.set(value);
     // A pipeline that is not on the newly chosen topic cannot stay selected.

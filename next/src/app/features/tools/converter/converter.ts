@@ -1,4 +1,5 @@
 import { Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
+import { Combobox } from '../../../shared/ui/combobox';
 import { HttpClient } from '@angular/common/http';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { ToastService } from '../../../shared/ui/toast.service';
@@ -46,7 +47,7 @@ interface ConvertResult {
 
 @Component({
   selector: 'app-converter',
-  imports: [Icon, RouterLink, DatePipe, Segmented, FileDropzone],
+  imports: [Icon, RouterLink, DatePipe, Segmented, FileDropzone, Combobox],
   templateUrl: './converter.html',
 })
 export class Converter implements OnInit {
@@ -131,6 +132,8 @@ export class Converter implements OnInit {
     this.families().find(f => f.inputFormats.includes(this.extension())) ?? null);
 
   /** Only files the converter can actually read are worth offering. */
+  readonly bucketOptions = computed(() => this.buckets().map(b => ({ value: b.bucket, label: b.label || b.bucket, hint: b.provider })));
+  readonly fileOptions = computed(() => this.convertibleObjects().map(o => ({ value: o.key, label: o.name, hint: o.key })));
   readonly convertibleObjects = computed(() => {
     const known = new Set(this.families().flatMap(f => f.inputFormats));
     return this.objects().filter(o => {

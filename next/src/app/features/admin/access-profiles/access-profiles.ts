@@ -1,4 +1,5 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Combobox } from '../../../shared/ui/combobox';
 import { Dialog } from '@angular/cdk/dialog';
 import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -29,7 +30,7 @@ interface Tenant { tenantId: number; tenantName: string; }
  */
 @Component({
   selector: 'app-access-profiles',
-  imports: [Icon, StatTile, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, AccessPeopleGrid],
+  imports: [Icon, StatTile, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, AccessPeopleGrid, Combobox],
   templateUrl: './access-profiles.html',
 })
 export class AccessProfiles implements OnInit {
@@ -92,6 +93,7 @@ export class AccessProfiles implements OnInit {
   })));
 
   readonly needsWorkspace = computed(() => this.canPickTenant() && !this.tenantId());
+  readonly tenantOptions = computed(() => this.tenants().map(t => ({ value: String(t.tenantId), label: t.tenantName })));
 
   ngOnInit(): void {
     // A link from the Users screen lands on one person's row: the grid view, their name in the

@@ -74,12 +74,8 @@
                  [hint]="tenantLocked()
                    ? 'Fixed once the account exists. Moving somebody between workspaces re-parents everything they are attached to.'
                    : ''">
-        <select id="tenantId" class="input" formControlName="tenantId">
-          <option [ngValue]="null">Select a tenant</option>
-          @for (tenant of data.tenants; track tenant.tenantId) {
-            <option [ngValue]="tenant.tenantId">{{ tenant.tenantName }}</option>
-          }
-        </select>
+        <app-combobox id="tenantId" formControlName="tenantId" [numeric]="true"
+                      placeholder="Search tenants…" [allowClear]="false" [options]="tenantOptions()" />
       </app-field>
     } @else if (!needsTenant()) {
       <p class="text-sm rounded-md px-3 py-2 bg-sunken">

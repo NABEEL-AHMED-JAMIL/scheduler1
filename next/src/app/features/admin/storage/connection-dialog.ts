@@ -1,4 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { Combobox } from '../../../shared/ui/combobox';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { HttpClient } from '@angular/common/http';
 import { AbstractControl, FormBuilder, FormGroup, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
@@ -39,7 +40,7 @@ const PROVIDERS = [
 
 @Component({
   selector: 'app-connection-dialog',
-  imports: [Icon, ReactiveFormsModule, Field, FormDialog],
+  imports: [Icon, ReactiveFormsModule, Field, FormDialog, Combobox],
   templateUrl: './connection-dialog.html',
 })
 export class ConnectionDialog {
@@ -54,6 +55,7 @@ export class ConnectionDialog {
   readonly submitted = signal(false);
   readonly discovering = signal(false);
   readonly discovered = signal<string[]>([]);
+  readonly bucketOptions = computed(() => this.discovered().map(name => ({ value: name, label: name })));
   readonly discoverError = signal('');
 
   readonly isEdit = computed(() => !!this.data.connection);

@@ -317,3 +317,32 @@ describe('TaskEdit -- the pipeline follows the topic', () => {
     expect(component.form.get('pipelineId')!.value).toBe('');
   });
 });
+
+describe('TaskEdit -- an edited task opens with its topic\'s pipelines', () => {
+  it('offers the loaded task\'s pipelines even though loadTask patches silently', () => {
+    const pipelines = [
+      { pipelineKey: 1, pipelineId: 'F900001', pipelineName: 'Claims file loader', sourceTaskTypeId: 1148 },
+      { pipelineKey: 2, pipelineId: 'F768927', pipelineName: 'Other', sourceTaskTypeId: 20 },
+    ];
+    const { component } = taskEditWith(url => {
+      if (url.endsWith('/setting.json/appSetting')) return appSettingWithPipelineIdsLookup;
+      if (url.endsWith('/pipeline.json/listPipelines')) return of({ status: API_SUCCESS, data: pipelines });
+      if (url.endsWith('/setting.json/fetchSubLookupByParentId')) return of({ status: API_SUCCESS, data: { lookupDatas: [] } });
+      if (url.endsWith('/pipeline.json/definition')) return of({ status: API_SUCCESS, data: null });
+      if (url.endsWith('/sourceTask.json/fetchSourceTaskWithSourceTaskId')) {
+        return of({ status: API_SUCCESS, data: { taskDetailId: 1469, taskName: 'Nightly claims load', taskStatus: 'Active',
+          sourceTaskType: { sourceTaskTypeId: 1148 }, pipelineId: 'F900001', taskPayload: '<pipeline/>', xmlTagsInfo: [] } });
+      }
+      throw new Error(`unexpected GET ${url}`);
+    });
+    (component as any).taskDetailId = () => 1469;
+    component.ngOnInit();
+
+    expect(component.selectedTopicId()).toBe(1148);
+    expect(component.pipelineOptions().map(o => o.value)).toEqual(['F900001']);
+
+    // A later pick still wins over the loaded value.
+    component.form.patchValue({ sourceTaskTypeId: 20 });
+    expect(component.pipelineOptions().map(o => o.value)).toEqual(['F768927']);
+  });
+});

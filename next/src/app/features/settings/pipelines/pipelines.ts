@@ -9,6 +9,7 @@ import { TableShell } from '../../../shared/ui/data-table';
 import { StatTile } from '../../../shared/ui/stat-tile';
 import { StatusPill } from '../../../shared/ui/status-pill';
 import { Icon } from '../../../shared/ui/icon';
+import { Combobox } from '../../../shared/ui/combobox';
 import { ViewToggle } from '../../../shared/ui/view-toggle';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { confirmWith } from '../../../shared/ui/confirm';
@@ -18,7 +19,7 @@ import { parseTopicPartition } from '../../../shared/ui/topic';
 
 @Component({
   selector: 'app-pipelines',
-  imports: [MineFilter, ViewToggle, StatTile, TableShell, StatusPill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink],
+  imports: [MineFilter, ViewToggle, StatTile, TableShell, StatusPill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink, Combobox],
   templateUrl: './pipelines.html',
 })
 export class Pipelines implements OnInit {
@@ -35,6 +36,11 @@ export class Pipelines implements OnInit {
   /** The topics the caller can see, for the filter and for the dialog's picker. */
   readonly topics = signal<{ sourceTaskTypeId: number; serviceName: string; queueTopicPartition?: string; status?: string; kafkaConnectionProfileName?: string }[]>([]);
   readonly topicFilter = signal('');
+  /** Topics for the filter box, plus a "No topic" row while any pipeline still lacks one. */
+  readonly topicFilterOptions = computed(() => {
+    const rows = this.topics().map(t => ({ value: String(t.sourceTaskTypeId), label: t.serviceName, hint: this.kafkaTopicOf(t) }));
+    return this.summary().untopped ? [...rows, { value: 'none', label: 'No topic', hint: 'pipelines still to be assigned' }] : rows;
+  });
   readonly hasFilters = computed(() => !!this.search().trim() || !!this.topicFilter());
   private readonly route = inject(ActivatedRoute);
 

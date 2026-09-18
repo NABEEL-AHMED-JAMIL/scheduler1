@@ -9,6 +9,7 @@ import { LIST_LIMIT } from '../../../core/api/list-limit';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { Field } from '../../../shared/ui/field';
 import { Icon } from '../../../shared/ui/icon';
+import { Combobox, ComboboxOption } from '../../../shared/ui/combobox';
 
 const FREQUENCIES = [
   { value: 'Mint',    label: 'Every N minutes', unit: 'minutes' },
@@ -59,7 +60,7 @@ function endAfterStart(group: AbstractControl): ValidationErrors | null {
 
 @Component({
   selector: 'app-job-edit',
-  imports: [Icon, ReactiveFormsModule, RouterLink, Field],
+  imports: [Icon, ReactiveFormsModule, RouterLink, Field, Combobox],
   templateUrl: './job-edit.html',
 })
 export class JobEdit implements OnInit {
@@ -75,6 +76,12 @@ export class JobEdit implements OnInit {
   readonly monthDays = Array.from({ length: 31 }, (_, i) => i + 1);
 
   readonly tasks = signal<any[]>([]);
+  /** Tasks as searchable rows: name first, the topic and pipeline as the hint so either finds it. */
+  readonly taskOptions = computed<ComboboxOption[]>(() => this.tasks().map(t => ({
+    value: String(t.taskDetailId),
+    label: t.taskName,
+    hint: [t.sourceTaskType?.serviceName, t.pipelineId, `#${t.taskDetailId}`].filter(Boolean).join(' · '),
+  })));
   readonly saving = signal(false);
   readonly loading = signal(false);
   readonly submitted = signal(false);

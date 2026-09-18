@@ -1,4 +1,4 @@
-import { Component, ElementRef, computed, forwardRef, input, signal, viewChild } from '@angular/core';
+import { Component, ElementRef, computed, effect, forwardRef, input, output, signal, viewChild } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 import { Icon } from './icon';
 
@@ -74,6 +74,30 @@ export class Combobox implements ControlValueAccessor {
   readonly allowClear = input(true);
   readonly clearLabel = input('None');
 
+  /**
+   * Hand the control a number rather than a string. Ids -- a topic, a task, a tenant -- are
+   * numbers everywhere else in the form and its payload; a box that quietly turned them into
+   * strings made `p.sourceTaskTypeId === topicId` false and the payload's ids quoted.
+   */
+  readonly numeric = input(false);
+
+  /**
+   * For a box that is not inside a form -- a list's filter bound to a signal. `selected` sets
+   * the value; `selectedChange` reports a pick (as a string, '' for cleared). A form-bound box
+   * ignores both and talks to its control.
+   */
+  readonly selected = input<string | number | null | undefined>(undefined);
+  readonly selectedChange = output<string>();
+
+  constructor() {
+    effect(() => {
+      const v = this.selected();
+      if (v === undefined) return;
+      this.value.set(v == null ? '' : String(v));
+      if (!this.open()) this.query.set(this.labelForValue());
+    });
+  }
+
   private readonly inputRef = viewChild<ElementRef<HTMLInputElement>>('inputEl');
 
   readonly value = signal('');
@@ -104,8 +128,8 @@ export class Combobox implements ControlValueAccessor {
     return match ? match.label : v;
   }
 
-  writeValue(v: string | null): void {
-    this.value.set(v ?? '');
+  writeValue(v: string | number | null): void {
+    this.value.set(v == null ? '' : String(v));
     if (!this.open()) this.query.set(this.labelForValue());
   }
 
@@ -181,7 +205,9 @@ export class Combobox implements ControlValueAccessor {
     this.value.set(v);
     this.query.set(this.labelForValue());
     this.open.set(false);
-    this.onChange(v);
+    if (this.numeric()) this.onChange((v === '' ? null : Number(v)) as any);
+    else this.onChange(v);
+    this.selectedChange.emit(v);
     this.onTouched();
   }
 }

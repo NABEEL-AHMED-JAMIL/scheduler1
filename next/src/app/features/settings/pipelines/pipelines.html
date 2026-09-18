@@ -50,12 +50,10 @@
                    (retry)="load()">
     <ng-container toolbar>
       <app-view-toggle [(value)]="view" key="pipelines" cardsIcon="template" />
-      <select class="input max-w-52" [value]="topicFilter()" aria-label="Topic"
-              (change)="topicFilter.set($any($event.target).value)">
-        <option value="">All topics</option>
-        @for (t of topics(); track t.sourceTaskTypeId) { <option [value]="t.sourceTaskTypeId">{{ t.serviceName }}</option> }
-        @if (summary().untopped) { <option value="none">No topic</option> }
-      </select>
+      <div class="w-56">
+        <app-combobox id="pipelines-topic" [selected]="topicFilter()" (selectedChange)="topicFilter.set($event)"
+                      placeholder="All topics" clearLabel="All topics" [options]="topicFilterOptions()" />
+      </div>
       <div class="search-field max-w-56">
         <app-icon name="search" size="0.95em" />
         <input class="input" placeholder="Search name, pipeline or description"

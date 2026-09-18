@@ -10,13 +10,8 @@
       <label class="label" for="bucket">Connection</label>
       <!-- [selected] per option rather than [value] on the select: the options come from an
            async list, and a value set on the select before they exist does not stick. -->
-      <select id="bucket" class="input"
-              (change)="onBucketChange($any($event.target).value)">
-        <option value="" [selected]="!bucket()">Select a connection</option>
-        @for (b of buckets(); track b.bucket) {
-          <option [value]="b.bucket" [selected]="b.bucket === bucket()">{{ b.label }} · {{ b.provider }}</option>
-        }
-      </select>
+      <app-combobox id="bucket" [selected]="bucket()" (selectedChange)="onBucketChange($event)"
+                    placeholder="Search connections…" [allowClear]="false" [options]="bucketOptions()" />
     </div>
   </div>
 

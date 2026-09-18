@@ -65,13 +65,10 @@
         </select>
       }
       @if (canPickTenant() && tenantOptions().length > 1) {
-        <select class="input max-w-44" [value]="tenantFilter()"
-                (change)="tenantFilter.set($any($event.target).value); pager.reset()">
-          <option value="">All tenants</option>
-          @for (tenant of tenantOptions(); track tenant.id) {
-            <option [value]="tenant.id">{{ tenant.name }}</option>
-          }
-        </select>
+        <div class="w-44">
+          <app-combobox id="users-tenant" [selected]="tenantFilter()" (selectedChange)="tenantFilter.set($event); pager.reset()"
+                        placeholder="All tenants" clearLabel="All tenants" [options]="tenantComboOptions()" />
+        </div>
       }
       <select class="input max-w-32" [value]="statusFilter()"
               (change)="statusFilter.set($any($event.target).value); pager.reset()">

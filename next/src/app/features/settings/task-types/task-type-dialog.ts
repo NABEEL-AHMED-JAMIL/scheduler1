@@ -1,4 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { Combobox } from '../../../shared/ui/combobox';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { HttpClient } from '@angular/common/http';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -30,7 +31,7 @@ export interface TaskType {
 
 @Component({
   selector: 'app-task-type-dialog',
-  imports: [ReactiveFormsModule, Field, FormDialog, Icon],
+  imports: [ReactiveFormsModule, Field, FormDialog, Icon, Combobox],
   template: `
     <app-form-dialog
         [heading]="isEdit() ? 'Edit topic' : 'New topic'"
@@ -50,12 +51,8 @@ export interface TaskType {
           <app-field label="Workspace" for="ttTenant" [required]="true"
                      [control]="form.get('tenantId')" [submitted]="submitted()"
                      hint="A topic belongs to one workspace; only that workspace's tasks can pick it.">
-            <select id="ttTenant" class="input" formControlName="tenantId">
-              <option [ngValue]="null">Choose a workspace…</option>
-              @for (t of data.tenants ?? []; track t.tenantId) {
-                <option [ngValue]="t.tenantId">{{ t.tenantName }}</option>
-              }
-            </select>
+            <app-combobox id="ttTenant" formControlName="tenantId" [numeric]="true"
+                          placeholder="Search workspaces…" [allowClear]="false" [options]="tenantOptions()" />
           </app-field>
         }
 
@@ -125,6 +122,8 @@ export class TaskTypeDialog {
    * a platform admin has no tenant of their own to file it under. Asked only when the caller
    * did not already say -- opened from a tenant's Kafka profile, the workspace is that tenant's.
    */
+  readonly tenantOptions = computed(() => (this.data.tenants ?? []).map(t => ({ value: String(t.tenantId), label: t.tenantName })));
+
   readonly needsWorkspace = computed(() =>
     !this.isEdit() && this.auth.isPlatformAdmin() && this.data.tenantId == null);
 
