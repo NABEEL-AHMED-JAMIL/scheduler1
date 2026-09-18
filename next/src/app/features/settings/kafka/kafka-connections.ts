@@ -254,7 +254,12 @@ export class KafkaConnections implements OnInit {
       if (!rows.length) { if (current !== null) this.selectedId.set(null); return; }
       if (rows.some(p => p.kafkaConnectionProfileId === current)) return;
       const linked = Number(untracked(() => this.route.snapshot.queryParamMap.get('profileId')));
-      const pick = rows.find(p => p.kafkaConnectionProfileId === linked) ?? rows[0];
+      // The linked profile, else the default -- the one a hundred-profile workspace actually
+      // routes through -- else the first by name.
+      const pick = rows.find(p => p.kafkaConnectionProfileId === linked)
+        ?? rows.find(p => p.isDefault && (p.tenantId != null || !this.canSeeWorkspace()))
+        ?? rows.find(p => p.isDefault)
+        ?? rows[0];
       this.selectedId.set(pick.kafkaConnectionProfileId);
     });
   }
