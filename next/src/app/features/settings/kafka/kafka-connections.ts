@@ -170,24 +170,35 @@ export class KafkaConnections implements OnInit {
     });
   }
 
-  /** How many pipelines publish on each topic, so the row can say and link to them. */
-  private readonly pipelinesByTopic = signal<Record<number, number>>({});
-  pipelineCount(type: TaskType): number { return this.pipelinesByTopic()[type.sourceTaskTypeId!] ?? 0; }
+  /**
+   * The pipelines that publish on each topic, so the row can name them rather than count them
+   * -- "2" said nothing; "Claims file loader, Load claims" says what the topic carries.
+   */
+  private readonly pipelinesByTopic = signal<Record<number, { pipelineKey: number; pipelineId: string; pipelineName: string; status?: string; fields?: number }[]>>({});
+  pipelinesOf(type: TaskType) { return this.pipelinesByTopic()[type.sourceTaskTypeId!] ?? []; }
+  pipelineCount(type: TaskType): number { return this.pipelinesOf(type).length; }
+  /** Topic rows whose pipeline list is unfolded. */
+  readonly openPipelines = signal<Set<number>>(new Set());
+  togglePipelines(type: TaskType): void {
+    const id = type.sourceTaskTypeId!;
+    this.openPipelines.update(set => { const n = new Set(set); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  }
 
   private loadTopics(): void {
     this.http.get<ApiResponse<any>>(`${API_BASE}/setting.json/appSetting`).subscribe({
       next: r => { if (r.status === API_SUCCESS) this.taskTypes.set(r.data?.sourceTaskTypes ?? []); },
       error: () => {},
     });
-    this.http.get<ApiResponse<{ sourceTaskTypeId?: number | null; status?: string }[]>>(`${API_BASE}/pipeline.json/list`).subscribe({
+    this.http.get<ApiResponse<any[]>>(`${API_BASE}/pipeline.json/list`).subscribe({
       next: r => {
         if (r.status !== API_SUCCESS) return;
-        const counts: Record<number, number> = {};
+        const byTopic: Record<number, { pipelineKey: number; pipelineId: string; pipelineName: string; status?: string; fields?: number }[]> = {};
         for (const p of r.data ?? []) {
           if (p.sourceTaskTypeId == null || p.status === 'Delete') continue;
-          counts[p.sourceTaskTypeId] = (counts[p.sourceTaskTypeId] ?? 0) + 1;
+          (byTopic[p.sourceTaskTypeId] ??= []).push({ pipelineKey: p.pipelineKey, pipelineId: p.pipelineId, pipelineName: p.pipelineName, status: p.status, fields: p.fields?.length ?? 0 });
         }
-        this.pipelinesByTopic.set(counts);
+        for (const list of Object.values(byTopic)) list.sort((a, b) => a.pipelineName.localeCompare(b.pipelineName));
+        this.pipelinesByTopic.set(byTopic);
       },
       error: () => {},
     });

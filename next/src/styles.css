@@ -1663,3 +1663,7 @@ html.dark .kafka-test-glyph.crit { background: color-mix(in oklab, var(--color-c
 .kafka-strip-msg { flex: 1 1 12rem; min-width: 0; }
 .kafka-strip-more { padding-top: 0.4rem; border-top: 1px solid var(--border-subtle); }
 .lookup-detail-head { padding: 0.75rem 1.25rem; }
+
+/* A topic row's unfolded pipelines: name, id, size -- each line a link to the Pipelines page. */
+.kafka-topic-pipelines { list-style: none; margin: 0.35rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.2rem; font-size: 11px; }
+.kafka-topic-pipelines li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 0.5rem; align-items: baseline; }

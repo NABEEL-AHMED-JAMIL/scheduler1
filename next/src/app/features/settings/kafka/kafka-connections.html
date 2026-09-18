@@ -285,7 +285,7 @@
                   <tr>
                     <th>Name</th>
                     <th>Kafka topic</th>
-                    <th class="text-right">Pipelines</th>
+                    <th>Pipelines</th>
                     <th class="text-right">Tasks</th>
                     <th class="text-right">State</th>
                     <th class="w-20"><span class="sr-only">Actions</span></th>
@@ -317,13 +317,37 @@
                           </div>
                         }
                       </td>
-                      <td class="text-right tabular">
-                        @if (pipelineCount(row.type); as n) {
-                          <a class="link-inline" [routerLink]="['/settings/pipelines']" [queryParams]="{ topic: row.type.sourceTaskTypeId }"
-                             title="Open the pipelines on this topic">{{ n }}</a>
-                        } @else {
-                          <a class="text-[color:var(--text-muted)] hover:underline" [routerLink]="['/settings/pipelines']" [queryParams]="{ topic: row.type.sourceTaskTypeId }"
-                             title="No pipeline publishes on this topic yet — add one">0</a>
+                      <!-- The pipelines by name, not a count. One shows inline; more fold out
+                           under the row with id, field count and state, each linking to its
+                           page. Nothing yet links straight to adding one. -->
+                      <td class="max-w-64">
+                        @if (pipelinesOf(row.type); as list) {
+                          @if (!list.length) {
+                            <a class="text-xs text-[color:var(--text-muted)] hover:underline" [routerLink]="['/settings/pipelines']" [queryParams]="{ topic: row.type.sourceTaskTypeId }"
+                               title="No pipeline publishes on this topic yet — add one">none yet</a>
+                          } @else if (list.length === 1) {
+                            <a class="link-inline block truncate" [routerLink]="['/settings/pipelines']" [queryParams]="{ topic: row.type.sourceTaskTypeId }"
+                               [title]="list[0].pipelineId + ' · ' + list[0].fields + ' field(s)'">{{ list[0].pipelineName }}</a>
+                            <span class="mono text-xs text-[color:var(--text-muted)]">{{ list[0].pipelineId }}</span>
+                          } @else {
+                            <button type="button" class="pill pill-brand hover-brand" (click)="togglePipelines(row.type)"
+                                    [attr.aria-expanded]="openPipelines().has(row.type.sourceTaskTypeId!)"
+                                    [title]="openPipelines().has(row.type.sourceTaskTypeId!) ? 'Hide the pipelines' : 'Show all ' + list.length + ' pipelines'">
+                              {{ list.length }} pipelines
+                              <app-icon [name]="openPipelines().has(row.type.sourceTaskTypeId!) ? 'chevronDown' : 'chevronRight'" size="0.85em" />
+                            </button>
+                            @if (openPipelines().has(row.type.sourceTaskTypeId!)) {
+                              <ul class="kafka-topic-pipelines">
+                                @for (p of list; track p.pipelineKey) {
+                                  <li>
+                                    <a class="link-inline truncate" [routerLink]="['/settings/pipelines']" [queryParams]="{ topic: row.type.sourceTaskTypeId }" [title]="p.pipelineName">{{ p.pipelineName }}</a>
+                                    <span class="mono text-[color:var(--text-muted)]">{{ p.pipelineId }}</span>
+                                    <span class="text-[color:var(--text-muted)]">{{ p.fields }} field{{ p.fields === 1 ? '' : 's' }}@if (p.status === 'Inactive') { · inactive }</span>
+                                  </li>
+                                }
+                              </ul>
+                            }
+                          }
                         }
                       </td>
                       <td class="text-right tabular" [class.text-[color:var(--text-muted)]]="!row.type.totalTaskLink">{{ row.type.totalTaskLink || 0 }}</td>
