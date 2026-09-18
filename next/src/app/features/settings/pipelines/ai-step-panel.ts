@@ -49,7 +49,8 @@ export interface AiStepConfig {
               <option value="worker">In the worker, as the task runs</option>
             </select>
             <p class="text-xs text-[color:var(--text-muted)] mt-1">
-              @if (runIn() === 'worker') { The worker resolves the variables — including a file a field names — and asks the console to run the prompt; the key stays on the server. }
+              @if (runIn() === 'worker' && loopsObjects()) { Runs once per object under the task's input folder; each answer is written to the output folder as &lt;object&gt;.{{ data.tagKey }}.json or .txt, and this tag holds the manifest. }
+              @else if (runIn() === 'worker') { The worker resolves the variables — including a file a field names, or each object in the input folder — and asks the console to run the prompt; the key stays on the server. }
               @else { The answer is in the task's document before the worker receives it; the worker needs no change. }
             </p>
           </div>
@@ -74,8 +75,14 @@ export interface AiStepConfig {
                           <select class="input min-w-0 flex-1" (change)="setSource(v.name, $any($event.target).value)">
                             <option value="" [selected]="!tagOf(v.name)">{{ v.required ? '— pick a field —' : '(not sent)' }}</option>
                             @for (f of data.fieldsAbove; track f.tagKey) { <option [value]="f.tagKey" [selected]="f.tagKey === tagOf(v.name)">{{ f.label }} &lt;{{ f.tagKey }}&gt;</option> }
+                            @if (runIn() === 'worker' && hasInputFolder()) {
+                              <!-- The worker loops over the task's input folder: one run per object, each
+                                   answer written to the output folder. -->
+                              <option value="object:text" [selected]="map()[v.name] === 'object:text'">Each input object — its contents</option>
+                              <option value="object:name" [selected]="map()[v.name] === 'object:name'">Each input object — its key</option>
+                            }
                           </select>
-                          @if (runIn() === 'worker' && tagOf(v.name)) {
+                          @if (runIn() === 'worker' && tagOf(v.name) && !isObject(v.name)) {
                             <select class="input" [value]="asFile(v.name) ? 'file' : 'text'" (change)="setAs(v.name, $any($event.target).value)"
                                     title="Send the tag's text, or the contents of the object the tag names">
                               <option value="text">send the tag's text</option>
@@ -128,8 +135,12 @@ export class AiStepPanel {
   readonly prompt = computed(() => this.prompts().find(p => p.promptId === this.promptId()) ?? null);
   readonly missing = computed(() => (this.prompt()?.variables ?? []).filter(v => v.required && !this.tagOf(v.name)).map(v => v.name));
 
-  /** The tag a variable reads, without the file: marker. */
+  /** The tag a variable reads, without the file: marker; an object: source reads as itself. */
   tagOf(variable: string): string { return (this.map()[variable] || '').replace(/^file:/, ''); }
+  isObject(variable: string): boolean { return (this.map()[variable] || '').startsWith('object:'); }
+  readonly loopsObjects = computed(() => Object.values(this.map()).some(v => v.startsWith('object:')));
+  /** The per-object loop needs the pipeline to say where its objects are. */
+  readonly hasInputFolder = computed(() => this.data.fieldsAbove.some(f => f.tagKey === 'input_folder'));
   asFile(variable: string): boolean { return (this.map()[variable] || '').startsWith('file:'); }
   setAs(variable: string, mode: string): void {
     const tag = this.tagOf(variable);
@@ -139,7 +150,8 @@ export class AiStepPanel {
   setRunIn(mode: string): void {
     const next = mode === 'worker' ? 'worker' : 'server';
     this.runIn.set(next);
-    if (next === 'server') this.map.update(m => Object.fromEntries(Object.entries(m).map(([k, v]) => [k, v.replace(/^file:/, '')])));
+    // Back on the server a step cannot read files or loop over objects: those sources go.
+    if (next === 'server') this.map.update(m => Object.fromEntries(Object.entries(m).filter(([, v]) => !v.startsWith('object:')).map(([k, v]) => [k, v.replace(/^file:/, '')])));
   }
 
   constructor() {

@@ -660,6 +660,10 @@ export class PipelineDialog {
         let map: Record<string, string> = {};
         try { map = JSON.parse(field.variableMap || '{}'); } catch { map = {}; }
         for (const [variable, raw] of Object.entries(map)) {
+          if ((raw || '').startsWith('object:')) {
+            if (!above.has('input_folder')) return `The AI step <${field.tagKey.trim()}> reads each input object for {{${variable}}}, but no field above it writes <input_folder>.`;
+            continue;
+          }
           const source = (raw || '').replace(/^file:/, '');
           if (source && !above.has(source)) return `The AI step <${field.tagKey.trim()}> reads <${source}> for {{${variable}}}, which is not above it.`;
         }

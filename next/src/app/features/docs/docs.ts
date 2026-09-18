@@ -464,7 +464,7 @@ export class Docs implements AfterViewInit {
       fields: [
         { name: 'Model connection', required: true, note: 'Where prompts run: a provider (OpenAI, Anthropic, a local Ollama, Azure, or anything OpenAI-compatible), its key, a default model, and two caps — calls in flight and a daily token budget. Test it to list the provider’s models. One connection is the workspace default.' },
         { name: 'Prompt', required: true, note: 'What is said: system instructions, a message template with {{variables}}, the variables with sample values, and the answer’s shape (text, or a JSON object with the keys named). Try it runs the page as it is. Every save is a version; Save & activate makes it the one a step runs.' },
-        { name: 'AI step', required: false, note: 'On the pipeline, a field of type "AI prompt": pick the prompt, map each variable to a field above the step, choose whether a failed call fails the run or leaves the tag empty. The step is the pipeline’s — a task shows it as a read-only card.' },
+        { name: 'AI step', required: false, note: 'On the pipeline, a field of type "AI prompt": pick the prompt, map each variable to a field above the step, choose whether a failed call fails the run or leaves the tag empty. Run it before dispatch on the server, or in the worker — where a variable can also be a file a field names, or each object under the task’s input folder, with every answer written to the output folder. The step is the pipeline’s — a task shows it as a read-only card.' },
       ],
       notes: [
         'The key never leaves the server, the step runs once per run (a retry reuses the recorded answer), '
