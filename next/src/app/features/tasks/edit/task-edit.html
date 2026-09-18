@@ -22,11 +22,19 @@
                    placeholder="Hurricane Data Task" />
           </app-field>
 
+          <app-field label="Kafka connection" for="taskProfile"
+                     hint="The connection the topic publishes through. Pick it first; its topics come next.">
+            <app-combobox id="taskProfile" [selected]="selectedProfileId()" (selectedChange)="pickProfile($event)"
+                          placeholder="Search connections…" clearLabel="None"
+                          [options]="profileOptions()" />
+          </app-field>
+
           <app-field label="Topic" for="taskType" [required]="true"
                      [control]="form.get('sourceTaskTypeId')" [submitted]="submitted()"
-                     hint="Where this task publishes. Pick it first; the pipelines on it come next.">
+                     [hint]="topicsLoading() ? 'Loading this connection’s topics…' : 'Where this task publishes. The pipelines on it come next.'">
             <app-combobox id="taskType" formControlName="sourceTaskTypeId" [numeric]="true"
-                          placeholder="Search topics…" clearLabel="None"
+                          [placeholder]="selectedProfileId() == null ? 'Pick a Kafka connection first' : 'Search this connection’s topics…'"
+                          clearLabel="None" [selectedLabel]="loadedTopicLabel()"
                           [options]="topicOptions()" />
           </app-field>
 

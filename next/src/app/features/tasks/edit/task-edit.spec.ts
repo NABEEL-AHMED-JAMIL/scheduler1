@@ -16,7 +16,9 @@ import { API_BASE, API_SUCCESS } from '../../../core/api/api.config';
  */
 function taskEditWith(getImpl: (url: string, opts?: any) => any,
                        postImpl: (url: string, body?: any) => any = () => of({})) {
-  const get = vi.fn(getImpl);
+  // Every test's editor loads the Kafka connections first; none of them is about that list.
+  const get = vi.fn((url: string, opts?: any) =>
+    url.endsWith('/kafkaConnectionProfile.json/fetchAllProfiles') ? of({ status: API_SUCCESS, data: [] }) : getImpl(url, opts));
   const post = vi.fn(postImpl);
   const toast = { success: vi.fn(), error: vi.fn(), info: () => {} };
   TestBed.resetTestingModule();
@@ -369,5 +371,49 @@ describe('TaskEdit -- an edited task opens with its topic\'s pipelines', () => {
     component.form.patchValue({ sourceTaskTypeId: 20 });
     settle();
     expect(component.pipelineOptions().map(o => o.value)).toEqual(['F768927']);
+  });
+});
+
+describe('TaskEdit -- topics are picked profile-first', () => {
+  const topicsOf: Record<string, any[]> = {
+    '5': [{ sourceTaskTypeId: 10, serviceName: 'Claims intake', queueTopicPartition: 'topic=claims&partitions=[*]' }],
+    '6': [{ sourceTaskTypeId: 20, serviceName: 'Audit alerts', queueTopicPartition: 'topic=audit&partitions=[*]' }],
+  };
+  const editor = () => taskEditWith((url, opts) => {
+    if (url.endsWith('/setting.json/topics') && opts?.params?.kafkaConnectionProfileId != null) {
+      return of({ status: API_SUCCESS, data: topicsOf[String(opts.params.kafkaConnectionProfileId)] ?? [] });
+    }
+    if (url.endsWith('/setting.json/topics')) return noTopics;
+    if (url.endsWith('/setting.json/lookups')) return noLookups;
+    if (url.endsWith('/pipeline.json/listForTopic')) return forTopic([], opts);
+    if (url.endsWith('/pipeline.json/definition')) return of({ status: API_SUCCESS, data: null });
+    throw new Error(`unexpected GET ${url}`);
+  });
+
+  it('offers no topic until a connection is picked, then only that connection\'s', () => {
+    const { component, get } = editor();
+    component.ngOnInit();
+    settle();
+
+    expect(component.topicOptions()).toEqual([]);
+    expect(get).not.toHaveBeenCalledWith(`${API_BASE}/setting.json/topics`, expect.anything());
+
+    component.pickProfile('5');
+    expect(get).toHaveBeenCalledWith(`${API_BASE}/setting.json/topics`, { params: { kafkaConnectionProfileId: 5 } });
+    expect(component.topicOptions().map(o => o.label)).toEqual(['Claims intake']);
+  });
+
+  it('clears a topic that does not publish through the newly picked connection', () => {
+    const { component } = editor();
+    component.ngOnInit();
+    settle();
+    component.pickProfile('5');
+    component.form.patchValue({ sourceTaskTypeId: 10 });
+    settle();
+
+    component.pickProfile('6');
+    settle();
+    expect(component.form.get('sourceTaskTypeId')!.value).toBeNull();
+    expect(component.topicOptions().map(o => o.label)).toEqual(['Audit alerts']);
   });
 });

@@ -5,7 +5,8 @@ import { test, expect, APIRequestContext, Browser, Page } from '@playwright/test
  * Kafka profile, a pipeline is defined on that topic, a task is made by picking the topic and
  * then one of its pipelines, the Source Tasks list narrows topic → pipeline, and the topic
  * refuses to be deleted while the pipeline still publishes on it. Every long picker on the way
- * is the searchable box, so the test types into it rather than choosing an <option>.
+ * is the searchable box, so the test types into it rather than choosing an <option>; the topic
+ * boxes ask the server for what was typed, and the task's topic comes after its connection.
  *
  * Needs one real account, given through the environment so no password lives here:
  *
@@ -107,20 +108,23 @@ test.describe('topics and pipelines', () => {
     await page.locator('input[formcontrolname="label"], input[id^="label"]').first().fill('Input folder');
     await page.getByRole('button', { name: 'Create pipeline' }).click();
     await expect(page.getByText(`"${PIPELINE_NAME}" saved`)).toBeVisible();
-    const pipelines = await (await request.get(`${api}/pipeline.json/list`, { headers })).json();
+    // The list is paged now; the topic's own list is the direct way to the row.
+    const pipelines = await (await request.get(`${api}/pipeline.json/listForTopic?sourceTaskTypeId=${topicId}`, { headers })).json();
     const pipelineRow = pipelines.data.find((p: any) => p.pipelineId === PIPELINE_ID);
     pipelineKey = pipelineRow?.pipelineKey ?? null;
     expect(pipelineRow?.sourceTaskTypeId, 'the pipeline names the topic').toBe(topicId);
 
-    // The topic row on the Kafka pane now counts it.
+    // The topic row on the Kafka pane now names it (one pipeline shows inline, by name).
     await page.goto('/settings/kafka');
-    await expect(page.locator('.kafka-topics tbody tr', { hasText: TOPIC_NAME }).locator('a', { hasText: '1' })).toBeVisible();
+    await expect(page.locator('.kafka-topics tbody tr', { hasText: TOPIC_NAME }).locator('a', { hasText: PIPELINE_NAME })).toBeVisible();
 
-    // ── 3. A task: no pipeline until the topic is picked, then only that topic's ─────────
+    // ── 3. A task: connection → topic → pipeline, each list fetched on the pick before ──
     await page.goto('/tasks/new');
     await page.getByRole('heading', { name: 'New task' }).waitFor();
     await page.locator('#taskName').fill(TASK_NAME);
     await expect(page.locator('#pipeline')).toHaveAttribute('placeholder', 'Pick a topic first');
+    // A tenant admin's one default connection is picked for them; the topic was added under it.
+    await expect(page.locator('#taskProfile')).not.toHaveValue('');
     await pick(page, 'taskType', STAMP, TOPIC_NAME);
     await expect(page.locator('#pipeline')).toHaveAttribute('placeholder', /this topic’s pipelines/);
     await pick(page, 'pipeline', STAMP, PIPELINE_NAME);

@@ -54,4 +54,47 @@ describe('Combobox', () => {
     box.onInput('billing-intake');
     expect(box.filtered().map(o => o.label)).toEqual(['Billing intake']);
   });
+
+  describe('remote mode', () => {
+    function remote() {
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({ imports: [Combobox] });
+      const fixture = TestBed.createComponent(Combobox);
+      fixture.componentRef.setInput('remote', true);
+      fixture.componentRef.setInput('options', [{ value: '10', label: 'Claims intake' }]);
+      fixture.componentRef.setInput('selectedLabel', 'Audit alerts');
+      fixture.detectChanges();
+      return fixture.componentInstance;
+    }
+
+    it('does no filtering of its own -- the server already did', () => {
+      const box = remote();
+      box.onInput('zzz');
+      expect(box.filtered().map(o => o.label)).toEqual(['Claims intake']);
+    });
+
+    it('asks once on focus with nothing typed, and again a beat after typing stops', () => {
+      vi.useFakeTimers();
+      try {
+        const box = remote();
+        const asked: string[] = [];
+        box.search.subscribe(q => asked.push(q));
+        box.onFocus();
+        expect(asked).toEqual(['']);
+        box.onInput('cl');
+        box.onInput('cla');
+        expect(asked).toEqual(['']);
+        vi.advanceTimersByTime(260);
+        expect(asked).toEqual(['', 'cla']);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('shows the label it was handed for a value the options do not include', () => {
+      const box = remote();
+      box.writeValue('99');
+      expect(box.displayValue()).toBe('Audit alerts');
+    });
+  });
 });

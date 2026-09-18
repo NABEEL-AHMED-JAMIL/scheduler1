@@ -46,7 +46,11 @@ export interface ComboboxOption {
             </button>
           }
           @if (!filtered().length) {
-            <div class="px-3 py-2 text-sm text-[color:var(--text-muted)]">No matches</div>
+            <div class="px-3 py-2 text-sm text-[color:var(--text-muted)]">
+              @if (searching()) { Searching… }
+              @else if (remote() && !query().trim()) { Type to search }
+              @else { No matches }
+            </div>
           }
           @for (opt of filtered(); track opt.value; let i = $index) {
             <button type="button" role="option" class="menu-item"
@@ -55,6 +59,9 @@ export interface ComboboxOption {
                     (mousedown)="selectOption(opt, $event)">
               {{ opt.label }}
             </button>
+          }
+          @if (remote() && filtered().length && filtered().length >= remoteCap()) {
+            <div class="px-3 py-1.5 text-xs text-[color:var(--text-muted)]">First {{ remoteCap() }} — type more to narrow</div>
           }
         </div>
       }
@@ -93,6 +100,23 @@ export class Combobox implements ControlValueAccessor {
   readonly selected = input<string | number | null | undefined>(undefined);
   readonly selectedChange = output<string>();
 
+  /**
+   * A box over a list too long to hand over whole -- ten thousand topics -- asks for rows as
+   * the person types. In remote mode the box does no filtering of its own: it emits `search`
+   * with the typed text (debounced, and once with '' on focus so a list appears before any
+   * typing) and shows whatever `options` the caller sets in answer, "Searching…" while
+   * `searching` is on. `selectedLabel` names a value the current options do not include --
+   * the row the box was opened with, before any search -- so it never shows a bare id.
+   * The caller keeps that label current; it is not resolved here.
+   */
+  readonly remote = input(false);
+  readonly searching = input(false);
+  readonly selectedLabel = input('');
+  /** How many rows the caller asks for; at that many, the list says there may be more. */
+  readonly remoteCap = input(50);
+  readonly search = output<string>();
+  private searchTimer: ReturnType<typeof setTimeout> | null = null;
+
   constructor() {
     effect(() => {
       const v = this.selected();
@@ -117,7 +141,7 @@ export class Combobox implements ControlValueAccessor {
   readonly filtered = computed(() => {
     const q = this.query().trim().toLowerCase();
     const opts = this.options();
-    if (!q) return opts;
+    if (!q || this.remote()) return opts;
     return opts.filter(o =>
       o.label.toLowerCase().includes(q) || (o.hint ?? '').toLowerCase().includes(q));
   });
@@ -129,7 +153,16 @@ export class Combobox implements ControlValueAccessor {
     const v = this.value();
     if (!v) return '';
     const match = this.options().find(o => o.value === v);
-    return match ? match.label : v;
+    if (match) return match.label;
+    return this.selectedLabel() || v;
+  }
+
+  /** Remote mode: ask the caller for rows, a beat after the last keystroke. */
+  private askRemote(text: string, immediate = false): void {
+    if (!this.remote()) return;
+    if (this.searchTimer) clearTimeout(this.searchTimer);
+    if (immediate) { this.search.emit(text); return; }
+    this.searchTimer = setTimeout(() => { this.searchTimer = null; this.search.emit(text); }, 250);
   }
 
   writeValue(v: string | number | null): void {
@@ -148,12 +181,16 @@ export class Combobox implements ControlValueAccessor {
     // Select-all so typing immediately replaces the current label rather than appending to it --
     // the same feel as clicking into a browser address bar with a page already loaded.
     queueMicrotask(() => this.inputRef()?.nativeElement.select());
+    // The label is selected, so the first keystroke replaces it: the list that opens now is
+    // the unfiltered first page, not "rows matching the current label".
+    this.askRemote('', true);
   }
 
   onInput(text: string): void {
     this.query.set(text);
     this.open.set(true);
     this.highlighted.set(this.filtered().length ? 0 : -1);
+    this.askRemote(text);
   }
 
   onBlur(): void {

@@ -42,7 +42,7 @@
   </div>
 
   <app-table-shell heading="Pipelines" [loading]="loading()" [error]="error()"
-                   [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="forms().length"
+                   [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="total()"
                    [emptyMessage]="hasFilters()
                       ? 'No pipelines match the current search.'
                       : 'No pipelines defined yet. Create one to let Source Task offer it, and let a task on it be filled in rather than hand-written.'"
@@ -50,22 +50,31 @@
                    (retry)="load()">
     <ng-container toolbar>
       <app-view-toggle [(value)]="view" key="pipelines" cardsIcon="template" />
+      @if (isPlatformAdmin()) {
+        <div class="w-48">
+          <app-combobox id="pipelines-tenant" [selected]="tenantFilter()" (selectedChange)="setFilter(tenantFilter, $event)"
+                        placeholder="All workspaces" clearLabel="All workspaces" [options]="tenantOptions()" />
+        </div>
+      }
       <div class="w-56">
-        <app-combobox id="pipelines-topic" [selected]="topicFilter()" (selectedChange)="topicFilter.set($event)"
-                      placeholder="All topics" clearLabel="All topics" [options]="topicFilterOptions()" />
+        <!-- Remote: the box asks for the first fifty topics matching what is typed. -->
+        <app-combobox id="pipelines-topic" [selected]="topicFilter()" (selectedChange)="setFilter(topicFilter, $event)"
+                      placeholder="All topics" clearLabel="All topics"
+                      [remote]="true" (search)="topicSearch.search($event)" [searching]="topicSearch.searching()"
+                      [options]="topicFilterOptions()" [selectedLabel]="topicSelectedLabel()" />
       </div>
       <select class="input max-w-32" [value]="statusFilter()" aria-label="State"
-              (change)="statusFilter.set($any($event.target).value)">
+              (change)="setFilter(statusFilter, $any($event.target).value)">
         <option value="">All states</option>
         <option value="Active">Active</option>
         <option value="Inactive">Inactive</option>
       </select>
       <div class="search-field max-w-56">
         <app-icon name="search" size="0.95em" />
-        <input class="input" placeholder="Search name, pipeline or description"
-               [value]="search()" (input)="search.set($any($event.target).value)" />
+        <input class="input" placeholder="Search name, pipeline, topic or description"
+               [value]="search()" (input)="onSearch($any($event.target).value)" />
       </div>
-      <app-mine-filter [(only)]="onlyMine" />
+      <app-mine-filter [only]="onlyMine()" (onlyChange)="setFilter(onlyMine, $event)" />
       @if (hasFilters()) {
         <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()">
           <app-icon name="close" />Clear
@@ -237,5 +246,8 @@
         </tbody>
       </table>
     }
+
+    <app-pagination pager [total]="total()" [page]="pager.page()" [size]="pager.size()"
+                    (goTo)="goToPage($event)" (setSize)="setPageSize($event)" />
   </app-table-shell>
 </div>

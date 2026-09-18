@@ -1,10 +1,13 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, WritableSignal, computed, effect, inject, signal, untracked } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
-import { MineFilter, isMine } from '../../../shared/ui/mine-filter';
+import { MineFilter } from '../../../shared/ui/mine-filter';
+import { createPager } from '../../../shared/ui/pager';
+import { Pagination } from '../../../shared/ui/pagination';
+import { createTopicSearch } from '../../../shared/ui/topic-search';
 import { AuthService } from '../../../core/auth/auth.service';
 import { TableShell } from '../../../shared/ui/data-table';
 import { StatTile } from '../../../shared/ui/stat-tile';
@@ -16,11 +19,14 @@ import { ToastService } from '../../../shared/ui/toast.service';
 import { confirmWith } from '../../../shared/ui/confirm';
 import { Pipeline, PipelineDialog, PipelineField } from './pipeline-dialog';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { parseTopicPartition } from '../../../shared/ui/topic';
+
+/** The tiles above the list: the whole scope's numbers, whatever page or filter is on. */
+interface PipelineSummary { total: number; active: number; fields: number; topics: number; untopped: number; }
+const EMPTY_SUMMARY: PipelineSummary = { total: 0, active: 0, fields: 0, topics: 0, untopped: 0 };
 
 @Component({
   selector: 'app-pipelines',
-  imports: [MineFilter, ViewToggle, StatTile, TableShell, StatusPill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink, Combobox],
+  imports: [MineFilter, ViewToggle, StatTile, TableShell, StatusPill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink, Combobox, Pagination],
   templateUrl: './pipelines.html',
 })
 export class Pipelines implements OnInit {
@@ -29,20 +35,42 @@ export class Pipelines implements OnInit {
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
 
+  /** The current page of rows -- the server filters and pages; nothing is narrowed here. */
   readonly forms = signal<Pipeline[]>([]);
   readonly loading = signal(true);
   readonly error = signal('');
-  readonly search = signal('');
+  /** How many rows match the filters, across every page. */
+  readonly total = signal(0);
+  readonly pager = createPager<Pipeline>();
 
-  /** The topics the caller can see, for the filter and for the dialog's picker. */
-  readonly topics = signal<{ sourceTaskTypeId: number; serviceName: string; queueTopicPartition?: string; status?: string; kafkaConnectionProfileName?: string }[]>([]);
+  // ---- filters: each one is a query parameter, and any change goes back to page 1 ---------
+  readonly search = signal('');
+  private searchTimer: ReturnType<typeof setTimeout> | null = null;
+  /** The search box waits for a pause in typing before asking the server. */
+  onSearch(text: string): void {
+    if (this.searchTimer) clearTimeout(this.searchTimer);
+    this.searchTimer = setTimeout(() => { this.searchTimer = null; this.setFilter(this.search, text); }, 300);
+  }
   readonly topicFilter = signal('');
   readonly statusFilter = signal('');
-  /** Topics for the filter box, plus a "No topic" row while any pipeline still lacks one. */
+  /** A platform admin can narrow to one workspace; a tenant's list is its own already. */
+  readonly tenantFilter = signal('');
+  readonly tenants = signal<{ tenantId: number; tenantName: string; tenantCode?: string }[]>([]);
+  readonly tenantOptions = computed(() => this.tenants().map(t => ({ value: String(t.tenantId), label: t.tenantName, hint: t.tenantCode ?? '' })));
+  setFilter(which: WritableSignal<string> | WritableSignal<boolean>, value: string | boolean): void {
+    (which as WritableSignal<string | boolean>).set(value);
+    this.pager.reset();
+  }
+
+  /** The topic box asks the server as the person types; see createTopicSearch. */
+  readonly topicSearch = createTopicSearch(this.http);
+  /** The topic rows found, plus a "No topic" row while any pipeline still lacks one. */
   readonly topicFilterOptions = computed(() => {
-    const rows = this.topics().map(t => ({ value: String(t.sourceTaskTypeId), label: t.serviceName, hint: this.kafkaTopicOf(t) }));
+    const rows = this.topicSearch.options();
     return this.summary().untopped ? [...rows, { value: 'none', label: 'No topic', hint: 'pipelines still to be assigned' }] : rows;
   });
+  readonly topicSelectedLabel = computed(() => this.topicFilter() === 'none' ? 'No topic' : this.topicSearch.selectedLabel());
+
   /** Cards whose full field list is open; keyed by pipeline so one click opens one card. */
   private readonly openFields = signal<Set<number>>(new Set());
   /** Rows whose fields are on their way; the button shows a spinner meanwhile. */
@@ -83,7 +111,7 @@ export class Pipelines implements OnInit {
     }
   }
 
-  readonly hasFilters = computed(() => !!this.search().trim() || !!this.topicFilter() || !!this.statusFilter());
+  readonly hasFilters = computed(() => !!this.search().trim() || !!this.topicFilter() || !!this.statusFilter() || !!this.tenantFilter() || this.onlyMine());
   private readonly route = inject(ActivatedRoute);
 
   private readonly auth = inject(AuthService);
@@ -101,61 +129,62 @@ export class Pipelines implements OnInit {
   readonly onlyMine = signal(false);
 
 
-  readonly filtered = computed(() => {
-    const term = this.search().trim().toLowerCase();
-    const topic = this.topicFilter();
-    let rows = this.mine(this.forms());
-    if (this.statusFilter()) rows = rows.filter(f => f.status === this.statusFilter());
-    if (topic === 'none') rows = rows.filter(f => f.sourceTaskTypeId == null);
-    else if (topic) rows = rows.filter(f => String(f.sourceTaskTypeId) === topic);
-    if (!term) return rows;
-    return rows.filter(form =>
-      `${form.pipelineName ?? ''} ${form.pipelineId ?? ''} ${form.description ?? ''} ${form.topicName ?? ''} ${form.kafkaTopic ?? ''}`
-        .toLowerCase().includes(term));
-  });
+  /** The page as shown; the name survives from when this screen filtered client-side. */
+  readonly filtered = computed(() => this.forms());
 
-  readonly summary = computed(() => {
-    const list = this.forms();
-    return {
-      total: list.length,
-      active: list.filter(f => f.status === 'Active').length,
-      fields: list.reduce((sum, form) => sum + this.fieldCount(form), 0),
-      topics: new Set(list.map(f => f.sourceTaskTypeId).filter(id => id != null)).size,
-      untopped: list.filter(f => f.sourceTaskTypeId == null).length,
-    };
+  /** The tiles: the whole scope's numbers, from the server, whatever page or filter is on. */
+  readonly summary = signal<PipelineSummary>(EMPTY_SUMMARY);
+
+  /** Any filter or page change asks the server again. */
+  private readonly reload = effect(() => {
+    this.search(); this.topicFilter(); this.statusFilter(); this.tenantFilter(); this.onlyMine();
+    this.pager.page(); this.pager.size();
+    untracked(() => this.load());
   });
 
   ngOnInit(): void {
     const topic = this.route.snapshot.queryParamMap.get('topic');
-    if (topic) this.topicFilter.set(topic);
-    this.load();
-    // Picker rows only -- appSetting described every topic in full, megabytes for a filter box.
-    this.http.get<ApiResponse<any[]>>(`${API_BASE}/setting.json/topics`).subscribe({
-      next: r => {
-        if (r.status !== API_SUCCESS) return;
-        this.topics.set(r.data ?? []);
-      },
-      error: () => {},
-    });
+    if (topic) { this.topicFilter.set(topic); this.topicSearch.resolve(topic); }
+    if (this.isPlatformAdmin()) {
+      this.http.get<ApiResponse<any[]>>(`${API_BASE}/tenant.json/listTenants`).subscribe({
+        next: r => { if (r.status === API_SUCCESS) this.tenants.set(r.data ?? []); },
+        error: () => {},
+      });
+    }
   }
 
-  kafkaTopicOf(t: { queueTopicPartition?: string }): string { return parseTopicPartition(t.queueTopicPartition).topic; }
-
+  private loadTicket = 0;
   load(): void {
+    const ticket = ++this.loadTicket;
     this.loading.set(true);
     this.error.set('');
-    this.http.get<ApiResponse<Pipeline[]>>(`${API_BASE}/pipeline.json/list`).subscribe({
+    const params: Record<string, string> = { page: String(this.pager.page()), limit: String(this.pager.size()) };
+    if (this.search().trim()) params['q'] = this.search().trim();
+    if (this.topicFilter()) params['topic'] = this.topicFilter();
+    if (this.statusFilter()) params['status'] = this.statusFilter();
+    if (this.tenantFilter()) params['tenantId'] = this.tenantFilter();
+    if (this.onlyMine()) params['onlyMine'] = 'true';
+    this.http.get<ApiResponse<{ rows: Pipeline[]; summary: PipelineSummary }>>(
+      `${API_BASE}/pipeline.json/list`, { params }).subscribe({
       next: response => {
+        // A slower answer to an earlier filter must not overwrite the newest one.
+        if (ticket !== this.loadTicket) return;
         this.loading.set(false);
         if (response.status !== API_SUCCESS) { this.error.set(response.message); return; }
-        this.forms.set(response.data ?? []);
+        this.forms.set(response.data?.rows ?? []);
+        this.summary.set(response.data?.summary ?? EMPTY_SUMMARY);
+        this.total.set(Number((response as any).paging?.totalRecord ?? 0));
       },
       error: err => {
+        if (ticket !== this.loadTicket) return;
         this.loading.set(false);
         this.error.set(err?.error?.message || 'Could not load forms.');
       },
     });
   }
+
+  goToPage(page: number): void { this.pager.goTo(page, this.total()); }
+  setPageSize(size: number): void { this.pager.setSize(size); }
 
   /** From the row's count when it has one; from the fields once they have been fetched. */
   fieldCount(form: Pipeline): number { return form.fields?.length ?? form.fieldCount ?? 0; }
@@ -165,14 +194,14 @@ export class Pipelines implements OnInit {
   }
 
   create(): void {
-    this.dialog.open<boolean>(PipelineDialog, { data: { topics: this.topics() } })
+    this.dialog.open<boolean>(PipelineDialog, { data: {} })
       .closed.subscribe(saved => { if (saved) this.load(); });
   }
 
   async edit(row: Pipeline): Promise<void> {
     const form = await this.withFields(row);
     if (!form) return;
-    this.dialog.open<boolean>(PipelineDialog, { data: { form, topics: this.topics() } })
+    this.dialog.open<boolean>(PipelineDialog, { data: { form } })
       .closed.subscribe(saved => { if (saved) this.load(); });
   }
 
@@ -187,7 +216,7 @@ export class Pipelines implements OnInit {
       pipelineName: `${form.pipelineName} (copy)`,
       fields: (form.fields ?? []).map(field => ({ ...field, pipelineFieldId: undefined })),
     };
-    this.dialog.open<boolean>(PipelineDialog, { data: { form: copy, topics: this.topics() } })
+    this.dialog.open<boolean>(PipelineDialog, { data: { form: copy } })
       .closed.subscribe(saved => { if (saved) this.load(); });
   }
 
@@ -210,19 +239,9 @@ export class Pipelines implements OnInit {
     });
   }
 
-  clearFilters(): void { this.search.set(''); }
-
-  /**
-   * Applies the "Only mine" toggle.
-   *
-   * Pure -- it runs inside a computed, where writing a signal is not allowed. The surviving
-   * count is already on the table header, so nothing needs recording.
-   */
-  private mine<T extends { createdBy?: number | null }>(rows: T[]): T[] {
-    if (!this.onlyMine()) {
-      return rows;
-    }
-    const myId = this.auth.user()?.appUserId ?? null;
-    return rows.filter(row => isMine(row, myId));
+  clearFilters(): void {
+    this.search.set(''); this.topicFilter.set(''); this.statusFilter.set(''); this.tenantFilter.set('');
+    this.onlyMine.set(false);
+    this.pager.reset();
   }
 }

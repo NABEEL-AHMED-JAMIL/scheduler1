@@ -8,7 +8,7 @@ import { Field } from '../../../shared/ui/field';
 import { FormDialog } from '../../../shared/ui/form-dialog';
 import { Icon } from '../../../shared/ui/icon';
 import { Combobox } from '../../../shared/ui/combobox';
-import { parseTopicPartition } from '../../../shared/ui/topic';
+import { createTopicSearch } from '../../../shared/ui/topic-search';
 
 export interface PipelineField {
   pipelineFieldId?: number;
@@ -217,7 +217,9 @@ export function validateSelectChoices(rows: PipelineField[]): string | null {
                    [control]="form.get('sourceTaskTypeId')" [submitted]="submitted()"
                    hint="The Kafka topic this pipeline's messages go out on. Many pipelines can share one; a task picks the topic first, then the pipeline.">
           <app-combobox id="pipelineTopic" formControlName="sourceTaskTypeId" [numeric]="true"
-                        placeholder="Search topics…" [allowClear]="false" [options]="topicOptions()" />
+                        placeholder="Search topics…" [allowClear]="false"
+                        [remote]="true" (search)="topicSearch.search($event)" [searching]="topicSearch.searching()"
+                        [options]="topicSearch.options()" [selectedLabel]="topicLabel()" />
         </app-field>
 
         <div class="form-grid">
@@ -425,17 +427,16 @@ export function validateSelectChoices(rows: PipelineField[]): string | null {
 })
 export class PipelineDialog {
   readonly ref = inject<DialogRef<boolean>>(DialogRef);
-  readonly data = inject<{ form?: Pipeline; topics?: { sourceTaskTypeId: number; serviceName: string; queueTopicPartition?: string; kafkaConnectionProfileName?: string }[] }>(DIALOG_DATA);
-  kafkaTopicOf(t: { queueTopicPartition?: string }): string { return parseTopicPartition(t.queueTopicPartition).topic; }
-  /** Name first; the Kafka topic and profile ride along as the hint so a search finds either. */
-  readonly topicOptions = computed(() => (this.data.topics ?? []).map(t => ({
-    value: String(t.sourceTaskTypeId),
-    label: t.serviceName,
-    hint: [this.kafkaTopicOf(t), t.kafkaConnectionProfileName].filter(Boolean).join(' · '),
-  })));
+  readonly data = inject<{ form?: Pipeline }>(DIALOG_DATA);
   private readonly fb = inject(FormBuilder);
   private readonly http = inject(HttpClient);
   private readonly toast = inject(ToastService);
+  /**
+   * The topic box asks the server as the person types (name or Kafka topic); the topic the
+   * form opened with is named by the row's own topicName so nothing is fetched to show it.
+   */
+  readonly topicSearch = createTopicSearch(this.http);
+  readonly topicLabel = computed(() => this.topicSearch.selectedLabel() || this.data.form?.topicName || '');
 
   readonly fieldTypes = FIELD_TYPES;
   readonly saving = signal(false);

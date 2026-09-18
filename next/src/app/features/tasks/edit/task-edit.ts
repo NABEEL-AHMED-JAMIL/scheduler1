@@ -32,6 +32,7 @@ export class TaskEdit implements OnInit {
   private readonly router = inject(Router);
 
   readonly taskTypes = signal<any[]>([]);
+  private pendingTopicSeed: { topicId: number; tenantId: number | null } | null = null;
   readonly lookups = signal<Record<string, any[]>>({});
   /**
    * The pipelines a form exists for -- Pipelines is the catalogue now, not a lookup type.
@@ -94,14 +95,89 @@ export class TaskEdit implements OnInit {
 
   get formData(): FormGroup { return this.form.get('formData') as FormGroup; }
 
-  ngOnInit(): void {
-    // Topics as picker rows: id, name, Kafka topic and state. appSetting described every topic
-    // in full and, past a few thousand of them, was the slowest thing about opening this page.
-    this.http.get<ApiResponse<any[]>>(`${API_BASE}/setting.json/topics`).subscribe({
+  /**
+   * Topics are picked profile-first: the Kafka connection (a hundred or so rows, the same
+   * rail the Kafka & Topics screen has), then one of the topics that publish through it
+   * (about a hundred more), then the pipeline. Ten thousand topics in one box was the
+   * alternative. The profile is a step in the pick, not part of the task -- the task keeps
+   * only its topic.
+   */
+  readonly profiles = signal<{ kafkaConnectionProfileId: number; profileName: string; environmentLabel?: string; isDefault?: boolean; tenantId?: number | null; tenantName?: string }[]>([]);
+  readonly selectedProfileId = signal<number | null>(null);
+  readonly topicsLoading = signal(false);
+  /** The topic the task was opened with, named before its profile's list has arrived. */
+  readonly loadedTopicLabel = signal('');
+  readonly profileOptions = computed<ComboboxOption[]>(() => this.profiles().map(p => ({
+    value: String(p.kafkaConnectionProfileId),
+    label: p.profileName,
+    hint: [p.environmentLabel, p.tenantName, p.isDefault ? 'default' : ''].filter(Boolean).join(' · '),
+  })));
+
+  /** A pick in the profile box: its topics replace the list, and a topic not on it is cleared. */
+  pickProfile(id: string): void {
+    const next = id ? Number(id) : null;
+    if (next === this.selectedProfileId()) return;
+    this.selectedProfileId.set(next);
+    if (this.form.get('sourceTaskTypeId')!.value != null) this.form.patchValue({ sourceTaskTypeId: null, pipelineId: '' });
+    this.loadTopicsFor(next);
+  }
+
+  private topicsTicket = 0;
+  private loadTopicsFor(profileId: number | null): void {
+    const ticket = ++this.topicsTicket;
+    if (profileId == null) { this.taskTypes.set([]); this.topicsLoading.set(false); return; }
+    this.topicsLoading.set(true);
+    this.http.get<ApiResponse<any[]>>(`${API_BASE}/setting.json/topics`,
+      { params: { kafkaConnectionProfileId: profileId } }).subscribe({
       next: response => {
+        if (ticket !== this.topicsTicket) return;
+        this.topicsLoading.set(false);
         if (response.status === API_SUCCESS) this.taskTypes.set(response.data ?? []);
+        else this.toast.error(response.message);
       },
-      error: () => this.toast.error('Could not load the topics.'),
+      error: () => { if (ticket === this.topicsTicket) { this.topicsLoading.set(false); this.toast.error('Could not load the topics.'); } },
+    });
+  }
+
+  /**
+   * An edited task names a topic; the profile box has to land on that topic's profile so the
+   * list it opens with contains it. The topic row says which profile; an unrouted topic (none)
+   * rides on the workspace's default profile, the same rule the Kafka pane applies.
+   */
+  private seedProfileForTopic(topicId: number, tenantId: number | null): void {
+    this.http.get<ApiResponse<any[]>>(`${API_BASE}/setting.json/topics`, { params: { ids: topicId } }).subscribe({
+      next: response => {
+        const row = response.status === API_SUCCESS ? (response.data ?? [])[0] : undefined;
+        if (!row) return;
+        this.loadedTopicLabel.set(row.serviceName ?? '');
+        const profileId: number | null = row.kafkaConnectionProfileId
+          ?? this.profiles().find(p => p.isDefault && (tenantId == null || p.tenantId === tenantId))?.kafkaConnectionProfileId
+          ?? null;
+        if (profileId == null) return;
+        this.selectedProfileId.set(profileId);
+        this.loadTopicsFor(profileId);
+      },
+      error: () => {},
+    });
+  }
+
+  ngOnInit(): void {
+    this.http.get<ApiResponse<any[]>>(`${API_BASE}/kafkaConnectionProfile.json/fetchAllProfiles`).subscribe({
+      next: response => {
+        if (response.status !== API_SUCCESS) return;
+        const rows = (response.data ?? []).filter((p: any) => p.status !== 'Delete');
+        this.profiles.set(rows);
+        // A new task starts on the workspace's default connection when there is exactly one
+        // to start on; a platform admin, who sees every workspace's, picks.
+        if (!this.isEdit() && this.selectedProfileId() == null) {
+          const defaults = rows.filter((p: any) => p.isDefault);
+          if (defaults.length === 1) { this.selectedProfileId.set(defaults[0].kafkaConnectionProfileId); this.loadTopicsFor(defaults[0].kafkaConnectionProfileId); }
+        }
+        // An edited task's topic may have arrived before the profiles did.
+        const pending = this.pendingTopicSeed;
+        if (pending) { this.pendingTopicSeed = null; this.seedProfileForTopic(pending.topicId, pending.tenantId); }
+      },
+      error: () => this.toast.error('Could not load the Kafka connections.'),
     });
 
     this.http.get<ApiResponse<any[]>>(`${API_BASE}/setting.json/lookups`).subscribe({
@@ -182,6 +258,12 @@ export class TaskEdit implements OnInit {
         this.topicFromLoad.set(task.sourceTaskType?.sourceTaskTypeId ?? null);
         this.topicVersion.set('load');
         this.taskTenantId = task.tenantId ?? null;
+        const topicId = task.sourceTaskType?.sourceTaskTypeId ?? null;
+        if (topicId != null) {
+          // The profile list decides where an unrouted topic lands; wait for it if it is not here yet.
+          if (this.profiles().length) this.seedProfileForTopic(topicId, this.taskTenantId);
+          else this.pendingTopicSeed = { topicId, tenantId: this.taskTenantId };
+        }
         const existing = task.xmlTagsInfo ?? task.tagsInfo ?? [];
         this.tags.clear();
         for (const tag of existing) this.pushTagRow(tag);
