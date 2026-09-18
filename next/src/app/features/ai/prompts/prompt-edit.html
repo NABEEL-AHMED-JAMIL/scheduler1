@@ -1,0 +1,203 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <a routerLink="/ai/prompts" class="text-sm text-accent hover:underline">← Back to prompts</a>
+      <h1 class="page-title mt-1 flex items-center gap-2">
+        {{ isEdit() ? (loaded()?.name || 'Edit prompt') : 'New prompt' }}
+        @if (loaded(); as p) { <span class="pill pill-neutral mono">v{{ p.version }}</span> <span class="pill" [class]="'pill ' + (p.status === 'Active' ? 'pill-ok' : 'pill-neutral')">{{ p.status }}</span> }
+      </h1>
+      <p class="page-subtitle">
+        Instructions, a message with <span class="mono">{{ '{{' }}variables{{ '}}' }}</span>, and the shape of the answer.
+        Try it runs what is on this page with the samples; nothing is saved until you say so.
+      </p>
+    </div>
+    <div class="flex items-center gap-2">
+      <a routerLink="/ai/prompts" class="btn btn-ghost btn-sm">Cancel</a>
+      <button type="button" class="btn btn-default btn-sm" (click)="save(false)" [disabled]="saving()">
+        {{ isEdit() ? 'Save as v' + ((loaded()?.version ?? 0) + 1) : 'Save draft' }}
+      </button>
+      <button type="button" class="btn btn-primary btn-sm" (click)="save(true)" [disabled]="saving()">
+        @if (saving()) { <app-icon name="refresh" class="spin" /> }Save &amp; activate
+      </button>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <div class="card p-12 text-center text-sm text-[color:var(--text-muted)]"><div class="spinner mx-auto mb-3"></div>Loading…</div>
+  } @else {
+    <div class="prompt-editor">
+      <!-- ── Definition ─────────────────────────────────────────────────────────────── -->
+      <form [formGroup]="form" class="card p-5 form-stack min-w-0" (ngSubmit)="save(true)">
+        <div class="form-grid">
+          <app-field label="Name" for="pName" [required]="true" [control]="form.get('name')" [submitted]="submitted()">
+            <input id="pName" class="input" formControlName="name" placeholder="Summarise claim file" />
+          </app-field>
+          <app-field label="Description" for="pDesc" [control]="form.get('description')" [submitted]="submitted()">
+            <input id="pDesc" class="input" formControlName="description" placeholder="What this prompt is for" />
+          </app-field>
+        </div>
+        @if (isPlatformAdmin() && !isEdit()) {
+          <app-field label="Workspace" for="pTenant" [required]="true" [control]="form.get('tenantId')" [submitted]="submitted()"
+                     hint="A prompt belongs to one workspace and runs on that workspace's connections.">
+            <app-combobox id="pTenant" formControlName="tenantId" [numeric]="true" placeholder="Search workspaces…" [allowClear]="false" [options]="tenantOptions()" />
+          </app-field>
+        }
+        <div class="form-grid">
+          <app-field label="Connection" for="pConnection" [control]="form.get('connectionId')" [submitted]="submitted()"
+                     hint="Blank runs on the workspace default.">
+            <app-combobox id="pConnection" formControlName="connectionId" [numeric]="true" placeholder="Workspace default" clearLabel="Workspace default" [options]="connectionOptions()" />
+          </app-field>
+          <app-field label="Model" for="pModel" [control]="form.get('model')" [submitted]="submitted()" [hint]="modelHint()">
+            <input id="pModel" class="input mono" formControlName="model" [placeholder]="connection()?.defaultModel || 'connection default'" list="pModels" />
+            <datalist id="pModels">@for (m of connection()?.models ?? []; track m) { <option [value]="m"></option> }</datalist>
+          </app-field>
+        </div>
+
+        <app-field label="System instructions" for="pSystem" [control]="form.get('systemInstructions')" [submitted]="submitted()"
+                   hint="Who the model is and how it should behave — the same for every run.">
+          <textarea id="pSystem" class="input resize-y min-h-20" formControlName="systemInstructions"
+                    placeholder="You are a claims analyst for a US health network. Be terse. Never invent a claim number."></textarea>
+        </app-field>
+
+        <app-field label="Message template" for="pTemplate" [required]="true" [control]="form.get('userTemplate')" [submitted]="submitted()"
+                   hint="What is sent each run, with the variables filled in. Type {{ '{{' }}name{{ '}}' }} or click a variable to insert it.">
+          <textarea #templateBox id="pTemplate" class="input resize-y min-h-32 mono" formControlName="userTemplate"
+                    placeholder="Claim {{ '{{' }}claim_id{{ '}}' }}. Summarise the attached file in four keys: diagnosis, procedures, total_billed, flags.&#10;&#10;{{ '{{' }}document_text{{ '}}' }}"></textarea>
+          <div class="flex flex-wrap items-center gap-1 mt-1.5">
+            <span class="text-xs text-[color:var(--text-muted)]">Insert:</span>
+            @for (name of declaredNames(); track name) {
+              <button type="button" class="pill pill-brand hover-brand mono" (click)="insertVariable(name, templateBox)">{{ '{{' }}{{ name }}{{ '}}' }}</button>
+            }
+            @if (!declaredNames().length) { <span class="text-xs text-[color:var(--text-muted)]">add a variable below first</span> }
+          </div>
+        </app-field>
+
+        <div>
+          <div class="flex items-center gap-2 mb-1.5">
+            <span class="label">Variables</span>
+            <span class="text-xs text-[color:var(--text-muted)]">what the pipeline fills in; the sample is what Try it runs with</span>
+            <button type="button" class="btn btn-default btn-sm ml-auto" (click)="addVariable()"><app-icon name="plus" />Add variable</button>
+          </div>
+          @if (!variables.length) {
+            <p class="text-sm text-[color:var(--text-muted)] rounded-md px-3 py-2 bg-sunken">No variables yet. A prompt without any always says the same thing.</p>
+          } @else {
+            <div class="overflow-x-auto">
+              <table class="table-modern prompt-vars" formArrayName="variables">
+                <thead><tr><th>Name</th><th>Type</th><th>Required</th><th>Sample value</th><th class="w-10"></th></tr></thead>
+                <tbody>
+                  @for (g of variables.controls; track $index; let i = $index) {
+                    <tr [formGroupName]="i">
+                      <td><input class="input mono" formControlName="name" placeholder="claim_id" (input)="onVariableChanged()" /></td>
+                      <td>
+                        <select class="input" formControlName="type">
+                          <option value="text">text</option>
+                          <option value="number">number</option>
+                          <option value="url">url</option>
+                          <option value="file">file → text</option>
+                        </select>
+                      </td>
+                      <td class="text-center"><input type="checkbox" class="checkbox" formControlName="required" /></td>
+                      <td><input class="input" formControlName="sample" placeholder="what Try it uses" /></td>
+                      <td><button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Remove variable" (click)="removeVariable(i)"><app-icon name="trash" class="icon-crit" /></button></td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+          @if (undeclared().length) {
+            <p class="text-xs text-warn-600 mt-1.5">The template names {{ undeclared().join(', ') }} — rows were added above; give them a sample.</p>
+          }
+        </div>
+
+        <div class="form-grid">
+          <app-field label="Output" for="pOutput" [control]="form.get('outputMode')" [submitted]="submitted()"
+                     [hint]="outputMode() === 'json' ? 'The answer must be a JSON object; the keys below are asked for out loud and checked, with one repair round.' : 'Free text, used as-is.'">
+            <select id="pOutput" class="input" formControlName="outputMode">
+              <option value="text">Text</option>
+              <option value="json">JSON object</option>
+            </select>
+          </app-field>
+          <app-field label="Tags" for="pTags" [control]="form.get('tags')" [submitted]="submitted()" hint="Comma-separated. File types here (pdf, docx) offer the prompt in the file chat.">
+            <input id="pTags" class="input" formControlName="tags" placeholder="pdf, docx" />
+          </app-field>
+        </div>
+        @if (outputMode() === 'json') {
+          <app-field label="Output schema" for="pSchema" [control]="form.get('outputSchema')" [submitted]="submitted()"
+                     hint='A JSON object with "required": [keys] (or "properties"). Blank accepts any JSON object.'>
+            <textarea id="pSchema" class="input resize-y min-h-20 mono" formControlName="outputSchema"
+                      placeholder='{ "required": ["diagnosis", "procedures", "total_billed", "flags"] }'></textarea>
+          </app-field>
+        }
+        <div class="form-grid">
+          <app-field label="Temperature" for="pTemp" [control]="form.get('temperature')" [submitted]="submitted()" hint="0 is deterministic; blank is the provider's default.">
+            <input id="pTemp" type="number" min="0" max="2" step="0.1" class="input" formControlName="temperature" placeholder="0.2" />
+          </app-field>
+          <app-field label="Max tokens" for="pMax" [control]="form.get('maxTokens')" [submitted]="submitted()" hint="Caps the answer's length; blank is the provider's default.">
+            <input id="pMax" type="number" min="1" step="50" class="input" formControlName="maxTokens" placeholder="800" />
+          </app-field>
+        </div>
+      </form>
+
+      <!-- ── Try it ─────────────────────────────────────────────────────────────────── -->
+      <aside class="card p-5 prompt-try min-w-0">
+        <div class="flex items-center gap-2 flex-wrap">
+          <h2 class="section-title">Try it</h2>
+          <span class="text-xs text-[color:var(--text-muted)]">runs the page as it is, with the samples · recorded as a try</span>
+          <button type="button" class="btn btn-primary btn-sm ml-auto" (click)="tryIt()" [disabled]="trying()">
+            <app-icon name="play" [class.spin]="trying()" />{{ trying() ? 'Running…' : 'Run' }}
+          </button>
+        </div>
+        @if (connection(); as c) {
+          <p class="text-xs text-[color:var(--text-muted)] mt-1">On <b>{{ c.name }}</b> · {{ c.provider }} · <span class="mono">{{ form.get('model')?.value || c.defaultModel }}</span>@if (c.dailyTokenBudget) { · {{ c.tokensToday | number }} of {{ c.dailyTokenBudget | number }} tokens today }</p>
+        } @else {
+          <p class="text-xs text-warn-600 mt-1">No connection to run on — pick one above, or set a workspace default under Model connections.</p>
+        }
+
+        @if (lastRun(); as run) {
+          <div class="mt-4">
+            <div class="flex items-center gap-2 flex-wrap text-xs">
+              <span class="pill" [class]="'pill ' + (run.status === 'ok' ? 'pill-ok' : 'pill-crit')">{{ run.status === 'ok' ? 'answered' : 'failed' }}</span>
+              @if (run.latencyMs != null) { <span>{{ (run.latencyMs / 1000) | number: '1.1-1' }} s</span> }
+              @if (run.tokensIn != null) { <span class="text-[color:var(--text-muted)]">{{ run.tokensIn | number }} in · {{ run.tokensOut | number }} out</span> }
+              @if ((run.attempts ?? 1) > 1) { <span class="text-[color:var(--text-muted)]">{{ run.attempts }} attempts</span> }
+              <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="showRendered.set(!showRendered())">{{ showRendered() ? 'Hide input' : 'Show rendered input' }}</button>
+            </div>
+            @if (showRendered()) {
+              <pre class="prompt-out mt-2" [attr.aria-label]="'Rendered input'">{{ run.renderedInput }}</pre>
+            }
+            @if (run.status === 'ok') {
+              <pre class="prompt-out mt-2">{{ prettyOutput(run) }}</pre>
+            } @else {
+              <p class="text-sm text-crit-500 mt-2">{{ run.error }}</p>
+            }
+          </div>
+        } @else {
+          <div class="mt-4 rounded-md px-3 py-6 bg-sunken text-center text-sm text-[color:var(--text-muted)]">
+            The rendered input, the answer, tokens and time land here.
+          </div>
+        }
+
+        @if (runs().length) {
+          <h3 class="section-title mt-5">Recent runs</h3>
+          <ul class="side-panel-list mt-1 text-xs">
+            @for (r of runs(); track r.runId) {
+              <li>
+                <div class="min-w-0">
+                  <span class="pill" [class]="'pill ' + (r.status === 'ok' ? 'pill-ok' : 'pill-crit')">{{ r.status }}</span>
+                  <span class="ml-1">{{ r.kind === 'try' ? 'try' : 'step' }} · v{{ r.promptVersion }}</span>
+                  <span class="text-[color:var(--text-muted)]"> · {{ r.dateCreated | date: 'd MMM, HH:mm' }}</span>
+                  @if (r.error) { <div class="text-crit-500 truncate" [title]="r.error">{{ r.error }}</div> }
+                </div>
+                <span class="text-[color:var(--text-muted)] whitespace-nowrap">
+                  @if (r.latencyMs != null) { {{ (r.latencyMs / 1000) | number: '1.1-1' }} s }
+                  @if (r.tokensIn != null) { · {{ r.tokensIn }}→{{ r.tokensOut }} }
+                </span>
+              </li>
+            }
+          </ul>
+        }
+      </aside>
+    </div>
+  }
+</div>

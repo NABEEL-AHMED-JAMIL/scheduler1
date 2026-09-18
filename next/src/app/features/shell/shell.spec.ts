@@ -49,7 +49,7 @@ describe('shell navigation', () => {
   it('tags every page an access profile can withhold, and nothing a profile cannot', () => {
     const tagged = children().filter(child => child.pageKey).map(child => child.path).sort();
     expect(tagged).toEqual([
-      '/ai/agents', '/analytics', '/analytics/dashboards', '/jobs', '/objects', '/queue',
+      '/ai/prompts', '/analytics', '/analytics/dashboards', '/jobs', '/objects', '/queue',
       '/reports', '/tasks', '/tools/converter', '/tools/transcript',
     ]);
     expect(children().find(child => child.path === '/dashboard')?.pageKey).toBeUndefined();

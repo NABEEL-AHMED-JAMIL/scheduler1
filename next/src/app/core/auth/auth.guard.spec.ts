@@ -136,7 +136,7 @@ describe('route table', () => {
     expect(byPath['admin/tenants']).toBe('PLATFORM_ADMIN');
     expect(byPath['admin/tenant-requests']).toBe('PLATFORM_ADMIN');
     for (const p of ['admin/users', 'settings/storage-connections', 'settings/lookup', 'settings/kafka',
-                     'ai/models']) {
+                     'ai/connections', 'ai/prompts/new', 'ai/prompts/:promptId/edit']) {
       expect(byPath[p]).toBe('TENANT_ADMIN');
     }
   });
@@ -152,10 +152,10 @@ describe('route table', () => {
   });
 
   // Their read APIs are genuinely TENANT_USER; the writes are gated on the controls instead.
-  it('leaves the task list and agents open', () => {
+  it('leaves the task list and prompts open', () => {
     const guarded: string[] = [];
     walk(routes, r => { if (r.data?.minRole) guarded.push(r.path); });
-    for (const p of ['tasks', 'ai/agents', 'jobs/bulk']) {
+    for (const p of ['tasks', 'ai/prompts', 'jobs/bulk']) {
       expect(guarded).not.toContain(p);
     }
   });

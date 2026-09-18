@@ -1715,3 +1715,16 @@ html.dark .btn-circle-danger:hover:not(:disabled) { background: color-mix(in okl
 .side-panel-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .side-panel-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.25rem 0.75rem; align-items: center; padding: 0.55rem 0; border-bottom: 1px solid var(--border-subtle); }
 .side-panel-list li:last-child { border-bottom: 0; }
+
+/* Model connection budget: a thin bar of today's spend against the daily cap. */
+.ai-budget { display: inline-block; width: 6rem; height: 0.4rem; border-radius: 999px; background: var(--surface-sunken); overflow: hidden; vertical-align: middle; }
+.ai-budget-fill { display: block; height: 100%; background: var(--color-brand-500); }
+.ai-budget-fill.is-warn { background: var(--color-warn-500); }
+
+/* Prompt editor: the definition on the left, Try it on the right, stacked when narrow. */
+.prompt-editor { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 1rem; align-items: start; }
+@media (max-width: 1100px) { .prompt-editor { grid-template-columns: 1fr; } }
+.prompt-try { position: sticky; top: 1rem; }
+.prompt-out { background: var(--surface-inset); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 0.7rem 0.85rem; font-family: var(--font-mono, ui-monospace, monospace); font-size: 12px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; max-height: 24rem; overflow: auto; margin: 0; }
+.prompt-vars td { padding-top: 0.35rem; padding-bottom: 0.35rem; }
+.prompt-vars .input { padding-top: 0.3rem; padding-bottom: 0.3rem; }

@@ -129,14 +129,14 @@ export class Shell {
     {
       label: 'Assistants',
       children: [
-        // Open for the same reason as Source Tasks: fetchAllAgents is TENANT_USER and the
+        // Open for the same reason as Source Tasks: aiPrompt.json/list is TENANT_USER and the
         // object browser's file chat depends on it, so the list is readable by everyone and
-        // only New agent, Edit and Delete are gated (auth.canManageAgents). Models below is a
-        // genuine admin screen -- every call it makes is TENANT_ADMIN -- and keeps its flag.
-        { label: 'AI Agents', path: '/ai/agents', pageKey: 'ai-agents', icon: 'sparkle',
-          hint: 'Provider, model and instructions' },
-        { label: 'Models', path: '/ai/models', icon: 'server', adminOnly: true,
-          hint: 'Local Ollama models' },
+        // only New prompt, Edit, Try it and Delete are gated (auth.canManageAgents). Model
+        // connections is a genuine admin screen -- every call it makes is TENANT_ADMIN.
+        { label: 'Prompts', path: '/ai/prompts', pageKey: 'ai-prompts', icon: 'sparkle',
+          hint: 'What a step says to a model' },
+        { label: 'Model connections', path: '/ai/connections', icon: 'server', adminOnly: true,
+          hint: 'Providers, keys and caps' },
       ],
     },
     {

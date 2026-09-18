@@ -1,0 +1,156 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Prompts</h1>
+      <p class="page-subtitle">
+        What a step says to a model: instructions, a message with <span class="mono">{{ '{{' }}variables{{ '}}' }}</span>
+        the pipeline fills in, and the shape of the answer. Every save is a version; Try it runs
+        one before anything is wired to it.
+      </p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
+        <app-icon name="refresh" [class.spin]="loading()" />Refresh
+      </button>
+      @if (canManage()) {
+        <a class="btn btn-primary btn-sm" [routerLink]="['/ai/prompts/new']"><app-icon name="plus" />New prompt</a>
+      }
+    </div>
+  </div>
+
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+    @for (tile of [
+      { label: 'Prompts', value: summary().total, foot: summary().active + ' active', icon: 'sparkle', tone: 'info' },
+      { label: 'JSON output', value: summary().json, foot: 'validated against a schema', icon: 'code', tone: 'info' },
+      { label: 'Runs', value: summary().runs, foot: 'tries and pipeline steps', icon: 'play', tone: 'info' },
+      { label: 'Last run failed', value: summary().failing, foot: summary().failing ? 'open one to see why' : 'all answering', icon: 'alert', tone: summary().failing ? 'warn' : 'muted' }
+    ]; track tile.label) {
+      <app-stat-tile [label]="tile.label" [value]="tile.value" [icon]="tile.icon" [tone]="$any(tile.tone)" [foot]="tile.foot" />
+    }
+  </div>
+
+  <app-table-shell heading="Prompts" [loading]="loading()" [error]="error()"
+                   [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="prompts().length"
+                   [emptyMessage]="hasFilters() ? 'No prompt matches the current filters.' : 'No prompts yet. Create one, try it with sample values, and a pipeline step can run it.'"
+                   emptyIcon="sparkle" (retry)="load()">
+    <ng-container toolbar>
+      <app-view-toggle [(value)]="view" key="prompts" cardsIcon="sparkle" />
+      <select class="input max-w-32" [value]="statusFilter()" aria-label="State" (change)="statusFilter.set($any($event.target).value)">
+        <option value="">All states</option>
+        <option value="Active">Active</option>
+        <option value="Inactive">Inactive</option>
+      </select>
+      <select class="input max-w-32" [value]="outputFilter()" aria-label="Output" (change)="outputFilter.set($any($event.target).value)">
+        <option value="">Any output</option>
+        <option value="text">Text</option>
+        <option value="json">JSON</option>
+      </select>
+      <div class="search-field max-w-56">
+        <app-icon name="search" size="0.95em" />
+        <input class="input" placeholder="Search name, model or variable" [value]="search()" (input)="search.set($any($event.target).value)" />
+      </div>
+      <app-mine-filter [(only)]="onlyMine" />
+      @if (hasFilters()) {
+        <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()"><app-icon name="close" />Clear</button>
+      }
+    </ng-container>
+
+    @if (view() === 'cards') {
+      <div class="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
+        @for (p of filtered(); track p.promptId) {
+          <article class="card p-4 flex flex-col gap-3">
+            <div class="flex items-start gap-2.5">
+              <span class="stat-glyph shrink-0"><app-icon name="sparkle" /></span>
+              <div class="min-w-0 flex-1">
+                <h3 class="font-semibold truncate" [title]="p.name">
+                  @if (canManage()) { <a class="link-inline" [routerLink]="['/ai/prompts', p.promptId, 'edit']">{{ p.name }}</a> } @else { {{ p.name }} }
+                </h3>
+                <p class="text-xs text-[color:var(--text-muted)]">v{{ p.version }} · {{ p.connectionName || 'no connection' }} · <span class="mono">{{ p.effectiveModel || '—' }}</span></p>
+              </div>
+              <div class="shrink-0 flex items-center gap-1">
+                <app-status [label]="p.status || 'Inactive'" [quiet]="true" />
+                @if (canManage()) {
+                  <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="cardMenu" aria-label="Actions"><app-icon name="dots" size="1.05em" /></button>
+                  <ng-template #cardMenu>
+                    <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                      <a cdkMenuItem class="menu-item" [routerLink]="['/ai/prompts', p.promptId, 'edit']"><app-icon name="edit" />Edit &amp; try</a>
+                      <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="toggle(p)"><app-icon [name]="p.status === 'Active' ? 'pause' : 'play'" />{{ p.status === 'Active' ? 'Deactivate' : 'Activate' }}</button>
+                      <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="remove(p)"><app-icon name="trash" class="icon-crit" />Delete</button>
+                    </div>
+                  </ng-template>
+                }
+              </div>
+            </div>
+            @if (p.description) { <p class="text-xs text-[color:var(--text-secondary)] line-clamp-2">{{ p.description }}</p> }
+            <div class="flex flex-wrap items-center gap-1">
+              @for (v of p.variables; track v.name) { <span class="pill pill-neutral mono" [title]="v.type + (v.required ? ' · required' : '')">{{ '{{' }}{{ v.name }}{{ '}}' }}</span> }
+              <span class="pill" [class]="'pill ' + (p.outputMode === 'json' ? 'pill-brand' : 'pill-neutral')">{{ p.outputMode === 'json' ? 'JSON' : 'text' }}</span>
+            </div>
+            <dl class="text-xs grid gap-1">
+              <div class="flex gap-2"><dt class="text-[color:var(--text-muted)] shrink-0 w-20">Runs</dt><dd>{{ p.runCount ?? 0 }}@if (p.lastRunAt) { · last {{ p.lastRunAt | date: 'd MMM, HH:mm' }} @if (p.lastRunStatus === 'failed') { <span class="text-crit-500">failed</span> } }</dd></div>
+              @if (p.createdByName) { <div class="flex gap-2"><dt class="text-[color:var(--text-muted)] shrink-0 w-20">Created by</dt><dd class="truncate">{{ p.createdByName }}</dd></div> }
+            </dl>
+          </article>
+        }
+      </div>
+    } @else {
+      <table class="table-modern">
+        <thead>
+          <tr>
+            <th>Prompt</th>
+            <th>Connection · model</th>
+            <th>Variables</th>
+            <th>Output</th>
+            <th class="text-right">Runs</th>
+            <th>Last run</th>
+            @if (isPlatformAdmin()) { <th>Workspace</th> }
+            <th class="text-right">State</th>
+            @if (canManage()) { <th class="w-12"></th> }
+          </tr>
+        </thead>
+        <tbody>
+          @for (p of filtered(); track p.promptId) {
+            <tr>
+              <td class="max-w-72">
+                <div class="flex items-center gap-2 min-w-0">
+                  @if (canManage()) { <a class="link-inline font-medium truncate" [routerLink]="['/ai/prompts', p.promptId, 'edit']">{{ p.name }}</a> } @else { <span class="font-medium truncate">{{ p.name }}</span> }
+                  <span class="pill pill-neutral mono shrink-0">v{{ p.version }}</span>
+                </div>
+                @if (p.description) { <div class="text-xs text-[color:var(--text-muted)] line-clamp-1" [title]="p.description">{{ p.description }}</div> }
+              </td>
+              <td>
+                <div class="truncate max-w-56" [title]="p.connectionName || ''">{{ p.connectionName || '—' }}</div>
+                <div class="mono text-xs text-[color:var(--text-muted)]">{{ p.effectiveModel || '' }}</div>
+              </td>
+              <td>
+                <div class="flex flex-wrap gap-1 max-w-64">
+                  @for (v of p.variables; track v.name) { <span class="pill pill-neutral mono" [title]="v.type + (v.required ? ' · required' : '')">{{ v.name }}</span> }
+                  @if (!p.variables.length) { <span class="text-xs text-[color:var(--text-muted)]">none</span> }
+                </div>
+              </td>
+              <td><span class="pill" [class]="'pill ' + (p.outputMode === 'json' ? 'pill-brand' : 'pill-neutral')">{{ p.outputMode === 'json' ? 'JSON' : 'text' }}</span></td>
+              <td class="text-right tabular">{{ p.runCount ?? 0 }}</td>
+              <td class="text-xs whitespace-nowrap">
+                @if (p.lastRunAt) { {{ p.lastRunAt | date: 'd MMM, HH:mm' }} @if (p.lastRunStatus === 'failed') { <span class="text-crit-500">· failed</span> } } @else { <span class="text-[color:var(--text-muted)]">never</span> }
+              </td>
+              @if (isPlatformAdmin()) { <td class="text-xs">{{ p.tenantName || '—' }}</td> }
+              <td class="text-right"><app-status [label]="p.status || 'Inactive'" [quiet]="true" /></td>
+              @if (canManage()) {
+                <td>
+                  <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="rowMenu" aria-label="Actions"><app-icon name="dots" size="1.05em" /></button>
+                  <ng-template #rowMenu>
+                    <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                      <a cdkMenuItem class="menu-item" [routerLink]="['/ai/prompts', p.promptId, 'edit']"><app-icon name="edit" />Edit &amp; try</a>
+                      <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="toggle(p)"><app-icon [name]="p.status === 'Active' ? 'pause' : 'play'" />{{ p.status === 'Active' ? 'Deactivate' : 'Activate' }}</button>
+                      <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="remove(p)"><app-icon name="trash" class="icon-crit" />Delete</button>
+                    </div>
+                  </ng-template>
+                </td>
+              }
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+  </app-table-shell>
+</div>

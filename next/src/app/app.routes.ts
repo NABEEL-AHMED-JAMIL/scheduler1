@@ -171,15 +171,36 @@ export const routes: Routes = [
         canActivate: [pageGuard],
       },
       { path: 'admin/storage', redirectTo: 'settings/storage-connections' },
+      // Prompts replaced AI Agents on 2026-09-18: reading is TENANT_USER (a person must see
+      // what the step on their task says; the file chat lists prompts), writing and Try it are
+      // gated inside the pages on auth.canManageAgents.
+      { path: 'ai/agents', redirectTo: 'ai/prompts' },
       {
-        // Deliberately open, unlike its Models sibling: fetchAllAgents is TENANT_USER and the
-        // objects screen depends on it. Only add/update/delete need TENANT_ADMIN, so the gate
-        // belongs on those controls (auth.canManageAgents) rather than on the page.
-        path: 'ai/agents',
-        loadComponent: () => import('./features/ai/agents/agents').then(m => m.Agents),
-        data: { pageKey: 'ai-agents' },
+        path: 'ai/prompts',
+        loadComponent: () => import('./features/ai/prompts/prompts').then(m => m.Prompts),
+        data: { pageKey: 'ai-prompts' },
         canActivate: [pageGuard],
       },
+      {
+        path: 'ai/prompts/new',
+        loadComponent: () => import('./features/ai/prompts/prompt-edit').then(m => m.PromptEdit),
+        data: { pageKey: 'ai-prompts', minRole: 'TENANT_ADMIN' },
+        canActivate: [pageGuard, roleGuard],
+      },
+      {
+        path: 'ai/prompts/:promptId/edit',
+        loadComponent: () => import('./features/ai/prompts/prompt-edit').then(m => m.PromptEdit),
+        data: { pageKey: 'ai-prompts', minRole: 'TENANT_ADMIN' },
+        canActivate: [pageGuard, roleGuard],
+      },
+      {
+        path: 'ai/connections',
+        loadComponent: () => import('./features/ai/connections/connections').then(m => m.Connections),
+        data: { minRole: 'TENANT_ADMIN' },
+        canActivate: [roleGuard],
+      },
+      // The Ollama Models page folded into a connection's "Test connection", which lists them.
+      { path: 'ai/models', redirectTo: 'ai/connections' },
       {
         path: 'admin/users',
         loadComponent: () => import('./features/admin/users/users').then(m => m.Users),
@@ -207,12 +228,6 @@ export const routes: Routes = [
         path: 'notifications',
         loadComponent: () =>
           import('./features/notifications/notifications').then(m => m.Notifications),
-      },
-      {
-        path: 'ai/models',
-        loadComponent: () => import('./features/ai/models/models').then(m => m.Models),
-        data: { minRole: 'TENANT_ADMIN' },
-        canActivate: [roleGuard],
       },
       {
         path: 'tools/converter',

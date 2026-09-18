@@ -1,0 +1,189 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Model connections</h1>
+      <p class="page-subtitle">
+        Where prompts run: a provider, a key, a default model, and the two caps that keep a
+        scheduled job from running up a bill. One connection is the workspace default; a prompt
+        that names none runs on it. Keys are encrypted and never sent back to the browser.
+      </p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
+        <app-icon name="refresh" [class.spin]="loading()" />Refresh
+      </button>
+      <button type="button" class="btn btn-primary btn-sm" (click)="create()">
+        <app-icon name="plus" />New connection
+      </button>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+    @for (tile of [
+      { label: 'Connections', value: summary().total, foot: summary().active + ' active', icon: 'server', tone: 'info' },
+      { label: 'Tested OK', value: summary().testedOk, foot: 'last test passed', icon: 'plug', tone: 'ok' },
+      { label: 'Failing', value: summary().failing, foot: summary().failing ? 'need attention' : 'nothing failing', icon: 'xCircle', tone: summary().failing ? 'crit' : 'muted' },
+      { label: 'Runs · 30 days', value: summary().runs30d, foot: (summary().tokens30d | number) + ' tokens', icon: 'sparkle', tone: 'info' }
+    ]; track tile.label) {
+      <app-stat-tile [label]="tile.label" [value]="tile.value" [icon]="tile.icon" [tone]="$any(tile.tone)" [foot]="tile.foot" />
+    }
+  </div>
+
+  <div class="card lookup-split kafka-split">
+    <aside class="lookup-rail">
+      <div class="lookup-rail-tools">
+        <div class="search-field">
+          <app-icon name="search" size="0.95em" />
+          <input class="input" placeholder="Find by name, provider or model" aria-label="Find a connection"
+                 [value]="search()" (input)="search.set($any($event.target).value)" />
+        </div>
+        <select class="input w-full" [value]="providerFilter()" aria-label="Provider" (change)="providerFilter.set($any($event.target).value)">
+          <option value="">All providers</option>
+          @for (p of providers; track p.key) { <option [value]="p.key">{{ p.label }}</option> }
+        </select>
+        <div class="flex items-center gap-2">
+          <select class="input min-w-0 flex-1" [value]="statusFilter()" aria-label="State" (change)="statusFilter.set($any($event.target).value)">
+            <option value="">All states</option>
+            <option value="Active">Active</option>
+            <option value="Inactive">Inactive</option>
+          </select>
+          <app-mine-filter [(only)]="onlyMine" />
+        </div>
+        @if (hasFilters()) {
+          <button type="button" class="btn btn-ghost btn-sm self-start" (click)="clearFilters()"><app-icon name="close" />Clear filters</button>
+        }
+      </div>
+
+      @if (loading() && !connections().length) {
+        <div class="lookup-rail-empty"><app-icon name="refresh" class="spin icon-muted" /> Loading…</div>
+      } @else if (error()) {
+        <div class="lookup-rail-empty text-crit-500">{{ error() }}
+          <button type="button" class="btn btn-default btn-sm mt-2" (click)="load()">Try again</button></div>
+      } @else if (!filtered().length) {
+        <div class="lookup-rail-empty">
+          <app-icon name="server" size="1.4rem" class="icon-muted" />
+          {{ hasFilters() ? 'No connection matches the current filters.' : 'No model connections yet. Add one and prompts can run.' }}
+        </div>
+      } @else {
+        <app-blur-loader [active]="loading()">
+        <ul class="lookup-rail-list" role="listbox" aria-label="Model connections">
+          @for (c of filtered(); track c.connectionId) {
+            <li>
+              <button type="button" class="lookup-rail-item kafka-rail-item" role="option"
+                      [attr.aria-selected]="selectedId() === c.connectionId" [class.is-selected]="selectedId() === c.connectionId" (click)="select(c)">
+                <span [class]="'kafka-rail-dot ' + testTone(c).cls" [title]="testTone(c).label"></span>
+                <span class="min-w-0 flex-1">
+                  <span class="lookup-rail-key">{{ c.name }}</span>
+                  <span class="lookup-rail-sub">
+                    {{ providerLabel(c) }} · <span class="mono">{{ c.defaultModel }}</span>@if (c.isDefault) { · default }
+                    @if (canSeeWorkspace() && c.tenantName) { · {{ c.tenantName }} }
+                  </span>
+                </span>
+                <app-icon name="chevronRight" size="0.9em" class="lookup-rail-chev" />
+              </button>
+            </li>
+          }
+        </ul>
+        </app-blur-loader>
+      }
+    </aside>
+
+    <section class="lookup-detail" aria-live="polite">
+      @if (selected(); as c) {
+        <header class="lookup-detail-head">
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="pill pill-neutral">{{ providerLabel(c) }}</span>
+              @if (c.isDefault) { <span class="pill pill-brand" title="Prompts that name no connection run on this one"><app-icon name="check" size="0.85em" />default</span> }
+              @if (canSeeWorkspace() && c.tenantName) { <span class="pill pill-neutral"><app-icon name="building" size="0.8em" class="opacity-70" />{{ c.tenantName }}</span> }
+              <app-status [label]="c.status || 'Active'" [quiet]="true" />
+            </div>
+            <div class="flex items-baseline gap-3 mt-1 min-w-0 flex-wrap">
+              <h2 class="lookup-detail-key" [title]="c.name">{{ c.name }}</h2>
+              <span class="text-xs text-[color:var(--text-muted)] truncate">
+                @if (c.createdByName) { {{ c.createdByName }} }@if (c.dateCreated) { · {{ c.dateCreated | date: 'mediumDate' }} }
+              </span>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <button type="button" class="btn btn-primary btn-sm" (click)="test(c)" [disabled]="testing() === c.connectionId">
+              <app-icon name="plug" [class.spin]="testing() === c.connectionId" />{{ testing() === c.connectionId ? 'Testing…' : 'Test connection' }}
+            </button>
+            <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="menu" aria-label="Actions"><app-icon name="dots" size="1.05em" /></button>
+            <ng-template #menu>
+              <div cdkMenu class="card shadow-xl py-1 min-w-52 text-sm">
+                <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="edit(c)"><app-icon name="edit" />Edit connection</button>
+                @if (!c.isDefault) {
+                  <button cdkMenuItem class="menu-item btn-intent-ok" (cdkMenuItemTriggered)="setDefault(c)"><app-icon name="zap" class="icon-ok" />Set as default</button>
+                }
+                <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="remove(c)"><app-icon name="trash" class="icon-crit" />Delete connection</button>
+              </div>
+            </ng-template>
+          </div>
+        </header>
+
+        <div class="kafka-strip">
+          <div class="kafka-strip-row">
+            <span class="kafka-strip-k">Last test</span>
+            <span [class]="'kafka-strip-dot ' + testTone(c).cls"></span>
+            <span class="font-medium">{{ testTone(c).label }}</span>
+            @if (c.lastTestedAt) { <span class="text-[color:var(--text-muted)]">{{ c.lastTestedAt | date: 'd MMM, HH:mm' }}</span> }
+            <span class="kafka-strip-msg truncate text-[color:var(--text-secondary)]" [title]="c.lastTestMessage || ''">
+              {{ c.lastTestMessage || 'Never tested — run a test to list the provider’s models and confirm the key.' }}
+            </span>
+          </div>
+          <div class="kafka-strip-row">
+            <span class="kafka-strip-k">Endpoint</span>
+            <span class="mono truncate" [title]="endpointOf(c)">{{ endpointOf(c) }}</span>
+            <span class="pill" [class]="'pill ' + (c.apiKeyConfigured ? 'pill-ok' : 'pill-neutral')">
+              @if (c.apiKeyConfigured) { <app-icon name="lock" size="0.85em" />key stored } @else { no key }
+            </span>
+          </div>
+          <div class="kafka-strip-row">
+            <span class="kafka-strip-k">Caps</span>
+            <span>{{ c.maxConcurrency ?? 4 }} in flight</span>
+            <span class="text-[color:var(--text-muted)]">·</span>
+            @if (c.dailyTokenBudget) {
+              <span>{{ c.tokensToday | number }} of {{ c.dailyTokenBudget | number }} tokens today</span>
+              <span class="ai-budget" [title]="budgetUsed(c) + '% of today’s budget'"><span class="ai-budget-fill" [class.is-warn]="(budgetUsed(c) ?? 0) >= 80" [style.width.%]="budgetUsed(c)"></span></span>
+            } @else {
+              <span class="text-[color:var(--text-muted)]">no daily budget</span>
+            }
+          </div>
+        </div>
+
+        <div class="p-5 grid gap-5 md:grid-cols-2">
+          <div>
+            <h3 class="section-title">Models</h3>
+            <p class="text-xs text-[color:var(--text-muted)] mb-2">Default <span class="mono">{{ c.defaultModel }}</span>@if (c.models?.length) { · {{ c.models!.length }} listed by the provider }</p>
+            @if (c.models?.length) {
+              <div class="flex flex-wrap gap-1">
+                @for (m of c.models; track m) { <span class="pill mono" [class]="'pill mono ' + (m === c.defaultModel ? 'pill-brand' : 'pill-neutral')">{{ m }}</span> }
+              </div>
+            } @else {
+              <p class="text-sm text-[color:var(--text-secondary)]">Test the connection to see what the provider lists; a prompt may still name any model by hand.</p>
+            }
+          </div>
+          <div>
+            <h3 class="section-title">Usage · last 30 days</h3>
+            <dl class="kafka-dl mt-2">
+              <dt>Runs</dt><dd>{{ c.runs30d ?? 0 | number }}</dd>
+              <dt>Tokens in</dt><dd>{{ c.tokensIn30d ?? 0 | number }}</dd>
+              <dt>Tokens out</dt><dd>{{ c.tokensOut30d ?? 0 | number }}</dd>
+              <dt>Prompts</dt><dd>
+                @if (c.promptCount) {
+                  <a class="link-inline" [routerLink]="['/ai/prompts']" [queryParams]="{ connection: c.connectionId }">{{ c.promptCount }} run on it</a>
+                } @else { none yet@if (c.isDefault) { — prompts on the workspace default use it } }
+              </dd>
+            </dl>
+          </div>
+        </div>
+      } @else {
+        <div class="lookup-entries-empty lookup-detail-empty">
+          <app-icon name="server" size="1.6rem" class="icon-muted" />
+          <p>Pick a connection on the left.</p>
+        </div>
+      }
+    </section>
+  </div>
+</div>
