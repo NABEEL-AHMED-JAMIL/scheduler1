@@ -98,10 +98,7 @@
                       (click)="select(p)">
                 <span class="kafka-rail-dot" [class]="'kafka-rail-dot ' + testTone(p).cls" [title]="testTone(p).label"></span>
                 <span class="min-w-0 flex-1">
-                  <span class="lookup-rail-key">
-                    {{ p.profileName }}
-                    @if (p.isDefault) { <app-icon name="check" size="0.8em" class="icon-info" title="Default" /> }
-                  </span>
+                  <span class="lookup-rail-key">{{ p.profileName }}</span>
                   <span class="lookup-rail-sub">
                     @if (env(p); as e) { <span [class]="'kafka-rail-env kafka-rail-env-' + e.tone">{{ e.label }}</span> · }
                     @if (canSeeWorkspace()) { {{ workspaceName(p) }} · }
