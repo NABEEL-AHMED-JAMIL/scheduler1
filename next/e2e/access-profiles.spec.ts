@@ -75,7 +75,7 @@ test.describe('access profiles', () => {
     const card = adminPage.locator(`[data-profile="${PROFILE}"]`);
     await expect(card).toBeVisible();
     await expect(card.getByText('Reports', { exact: true })).toBeVisible();
-    await expect(card.getByText('Nobody holds it yet')).toBeVisible();
+    await expect(card.getByText('No one on it yet')).toBeVisible();
 
     const listed = await request.get(`${api}/pageAccess.json/listProfiles`, { headers: { Authorization: `Bearer ${adminSession.token}` } });
     const created = (await listed.json()).data.find((p: any) => p.profileName === PROFILE);

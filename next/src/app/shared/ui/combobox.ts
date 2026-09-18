@@ -60,6 +60,10 @@ export interface ComboboxOption {
       }
     </div>
   `,
+  // The caller writes id="taskType" on the host so its label's `for` finds the box, but the
+  // same string is bound onto the inner <input>; without this the page carried two elements
+  // with one id and the label pointed at the unfocusable host.
+  host: { '[attr.id]': 'null' },
   providers: [{
     provide: NG_VALUE_ACCESSOR,
     useExisting: forwardRef(() => Combobox),
