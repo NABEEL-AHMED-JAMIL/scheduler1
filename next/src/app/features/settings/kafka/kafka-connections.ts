@@ -91,6 +91,7 @@ export class KafkaConnections implements OnInit {
   select(profile: KafkaProfile): void {
     this.selectedId.set(profile.kafkaConnectionProfileId);
     this.topicSearch.set('');
+    this.topicTests.set({});
     this.router.navigate([], { relativeTo: this.route, queryParams: { profileId: profile.kafkaConnectionProfileId }, queryParamsHandling: 'merge', replaceUrl: true });
   }
 
@@ -134,6 +135,31 @@ export class KafkaConnections implements OnInit {
     return rows.filter(r => `${r.type.serviceName} ${r.type.description ?? ''} ${this.topicOf(r.type.queueTopicPartition)}`
       .toLowerCase().includes(term));
   });
+
+  /**
+   * Whether each topic exists on the profile it is listed under -- the server describes it with
+   * that profile's own client. Kept per row so a page of a hundred topics can be checked one
+   * at a time and the answers stay put; cleared when another profile is picked.
+   */
+  readonly topicTests = signal<Record<number, { ok: boolean; message: string }>>({});
+  readonly testingTopic = signal<number | null>(null);
+  testTopic(profile: KafkaProfile, type: TaskType): void {
+    const topic = this.topicOf(type.queueTopicPartition);
+    const id = type.sourceTaskTypeId!;
+    if (!topic) { this.toast.error('This topic has no Kafka topic name to check.'); return; }
+    this.testingTopic.set(id);
+    this.http.get<ApiResponse>(`${API_BASE}/kafkaConnectionProfile.json/testTopic`,
+      { params: { topicName: topic, kafkaConnectionProfileId: String(profile.kafkaConnectionProfileId) } }).subscribe({
+      next: r => {
+        this.testingTopic.set(null);
+        this.topicTests.update(m => ({ ...m, [id]: { ok: r.status === API_SUCCESS, message: r.message } }));
+      },
+      error: err => {
+        this.testingTopic.set(null);
+        this.topicTests.update(m => ({ ...m, [id]: { ok: false, message: err?.error?.message || 'The topic check could not be run.' } }));
+      },
+    });
+  }
 
   readonly copiedTopicId = signal<number | null>(null);
   topicOf(raw?: string): string { return parseTopicPartition(raw).topic; }

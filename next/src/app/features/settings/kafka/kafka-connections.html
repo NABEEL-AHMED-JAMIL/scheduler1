@@ -321,6 +321,11 @@
                                              copiedLabel="Topic copied" (copy)="copyTopic(row.type.sourceTaskTypeId, topic)" />
                           }
                         </div>
+                        @if (topicTests()[row.type.sourceTaskTypeId!]; as test) {
+                          <div class="text-[11px] mt-0.5 truncate" [class]="test.ok ? 'text-ok-500' : 'text-crit-500'" [title]="test.message">
+                            {{ test.message }}
+                          </div>
+                        }
                       </td>
                       <td>
                         @if (row.via === 'explicit') {
@@ -335,6 +340,14 @@
                       <td class="text-right"><app-status [label]="row.type.status || 'Active'" [quiet]="true" /></td>
                       <td>
                         <div class="flex items-center justify-end gap-1">
+                          <button type="button" class="btn-circle" aria-label="Test topic"
+                                  [title]="topicTests()[row.type.sourceTaskTypeId!]?.message || 'Check that this topic exists on ' + p.profileName"
+                                  [disabled]="testingTopic() === row.type.sourceTaskTypeId"
+                                  (click)="testTopic(p, row.type)">
+                            <app-icon [name]="topicTests()[row.type.sourceTaskTypeId!]?.ok === true ? 'check' : topicTests()[row.type.sourceTaskTypeId!]?.ok === false ? 'xCircle' : 'plug'"
+                                      size="0.9em" [busy]="testingTopic() === row.type.sourceTaskTypeId"
+                                      [class]="topicTests()[row.type.sourceTaskTypeId!]?.ok === true ? 'icon-ok' : topicTests()[row.type.sourceTaskTypeId!]?.ok === false ? 'icon-crit' : ''" />
+                          </button>
                           <button type="button" class="btn-circle" title="Edit topic" aria-label="Edit topic"
                                   (click)="editTopic(row.type)"><app-icon name="edit" size="0.9em" /></button>
                           <button type="button" class="btn-circle btn-circle-danger" title="Delete topic" aria-label="Delete topic"
