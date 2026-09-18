@@ -156,7 +156,11 @@
             <dl class="text-xs grid gap-1">
               <div class="flex gap-2 min-w-0">
                 <dt class="text-[color:var(--text-muted)] shrink-0 w-16">Brokers</dt>
-                <dd class="mono truncate min-w-0" [title]="p.bootstrapServers">{{ p.bootstrapServers }}</dd>
+                <dd class="lookup-value min-w-0">
+                  <span class="mono truncate" [title]="p.bootstrapServers">{{ p.bootstrapServers }}</span>
+                  <app-copy-button [value]="p.bootstrapServers" [copied]="copiedId() === p.kafkaConnectionProfileId"
+                                   copiedLabel="Brokers copied" (copy)="copyRow(p.kafkaConnectionProfileId, p.bootstrapServers)" />
+                </dd>
               </div>
               <div class="flex gap-2 min-w-0">
                 <dt class="text-[color:var(--text-muted)] shrink-0 w-16">Security</dt>
@@ -232,7 +236,11 @@
               }
             </td>
             <td class="max-w-64">
-              <span class="mono truncate block" [title]="p.bootstrapServers">{{ p.bootstrapServers }}</span>
+              <div class="lookup-value">
+                <span class="mono truncate" [title]="p.bootstrapServers">{{ p.bootstrapServers }}</span>
+                <app-copy-button [value]="p.bootstrapServers" [copied]="copiedId() === p.kafkaConnectionProfileId"
+                                 copiedLabel="Brokers copied" (copy)="copyRow(p.kafkaConnectionProfileId, p.bootstrapServers)" />
+              </div>
             </td>
             <td>
               <span [class]="protocolTone(p)"

@@ -76,6 +76,13 @@
         <option value="">All providers</option>
         @for (p of providers(); track p) { <option [value]="p">{{ p }}</option> }
       </select>
+      @if (canSeeWorkspace()) {
+        <select class="input max-w-48" [value]="workspaceFilter()" aria-label="Workspace"
+                (change)="workspaceFilter.set($any($event.target).value)">
+          <option value="">All workspaces</option>
+          @for (w of workspaces(); track w.id) { <option [value]="w.id">{{ w.name }}</option> }
+        </select>
+      }
       <div class="search-field max-w-56">
         <app-icon name="search" size="0.95em" />
         <input class="input" placeholder="Search name, alias or host"
@@ -83,7 +90,7 @@
       </div>
       <app-mine-filter [(only)]="onlyMine" />
 
-      @if (search() || providerFilter()) {
+      @if (search() || providerFilter() || workspaceFilter()) {
         <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()"><app-icon name="close" />Clear</button>
       }
     </ng-container>
@@ -98,7 +105,17 @@
               <div class="min-w-0 flex-1">
                 <h3 class="font-semibold truncate" [title]="c.connectionName">{{ c.connectionName }}</h3>
                 <!-- The alias is what a job or task actually references, so it leads. -->
-                <p class="mono text-accent truncate" [title]="c.alias">{{ c.alias }}</p>
+                <div class="flex items-center gap-1 min-w-0">
+                  <p class="mono text-accent truncate" [title]="c.alias">{{ c.alias }}</p>
+                  <app-copy-button [value]="c.alias" [copied]="copiedKey() === c.storageConnectionId + ':alias'"
+                                   copiedLabel="Alias copied" (copy)="copyValue(c.storageConnectionId, 'alias', c.alias)" />
+                </div>
+                @if (canSeeWorkspace()) {
+                  <span class="pill pill-neutral mt-1" [title]="workspaceHint(c)">
+                    <app-icon [name]="c.tenantId == null ? 'globe' : 'building'" size="0.8em" class="opacity-70" />
+                    {{ workspaceName(c) }}
+                  </span>
+                }
               </div>
               <div class="shrink-0 flex items-center gap-1">
                 <app-status [label]="c.status" [quiet]="true" />
@@ -169,6 +186,7 @@
           <th>Alias</th>
           <th>Provider</th>
           <th>Target</th>
+          @if (canSeeWorkspace()) { <th>Workspace</th> }
           <th>Credentials</th>
           <th>Last test</th>
           <th>Created by</th>
@@ -194,11 +212,31 @@
                 </div>
               }
             </td>
-            <td><span class="mono text-accent">{{ c.alias }}</span></td>
-            <td><span class="pill pill-neutral">{{ c.provider }}</span></td>
-            <td class="mono text-[color:var(--text-secondary)] max-w-56 truncate" [title]="target(c)">
-              {{ target(c) }}
+            <td class="max-w-52">
+              <div class="lookup-value">
+                <span class="mono text-accent truncate" [title]="c.alias">{{ c.alias }}</span>
+                <app-copy-button [value]="c.alias" [copied]="copiedKey() === c.storageConnectionId + ':alias'"
+                                 copiedLabel="Alias copied" (copy)="copyValue(c.storageConnectionId, 'alias', c.alias)" />
+              </div>
             </td>
+            <td><span class="pill pill-neutral">{{ c.provider }}</span></td>
+            <td class="max-w-56">
+              <div class="lookup-value">
+                <span class="mono text-[color:var(--text-secondary)] truncate" [title]="target(c)">{{ target(c) }}</span>
+                @if (target(c) && target(c) !== '—') {
+                  <app-copy-button [value]="target(c)" [copied]="copiedKey() === c.storageConnectionId + ':target'"
+                                   copiedLabel="Target copied" (copy)="copyValue(c.storageConnectionId, 'target', target(c))" />
+                }
+              </div>
+            </td>
+            @if (canSeeWorkspace()) {
+              <td>
+                <span class="pill pill-neutral" [title]="workspaceHint(c)">
+                  <app-icon [name]="c.tenantId == null ? 'globe' : 'building'" size="0.8em" class="opacity-70" />
+                  {{ workspaceName(c) }}
+                </span>
+              </td>
+            }
             <td>
               @if (c.secretKeyConfigured || c.passwordConfigured) {
                 <span class="pill pill-ok">Stored</span>

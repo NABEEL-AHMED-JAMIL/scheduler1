@@ -39,7 +39,11 @@
             <div class="flex items-start gap-2.5">
               <span class="stat-glyph shrink-0"><app-icon name="list" /></span>
               <div class="min-w-0 flex-1">
-                <h3 class="font-semibold mono truncate" [title]="lookup.lookupType">{{ lookup.lookupType }}</h3>
+                <div class="flex items-center gap-1 min-w-0">
+                  <h3 class="font-semibold mono truncate" [title]="lookup.lookupType">{{ lookup.lookupType }}</h3>
+                  <app-copy-button [value]="lookup.lookupType" [copied]="copiedKey() === lookup.lookupId + ':type'"
+                                   copiedLabel="Key copied" (copy)="copyValue(lookup.lookupId, 'type', lookup.lookupType)" />
+                </div>
                 <p class="text-xs text-[color:var(--text-secondary)] truncate"
                    [title]="lookup.description || ''">{{ lookup.description || 'No description' }}</p>
               </div>
@@ -68,8 +72,18 @@
                 <span class="pill pill-neutral" title="Stored encrypted — the value is not shown">
                   <app-icon name="lock" size="0.85em" class="icon-warn" />encrypted
                 </span>
+              } @else if (lookup.lookupValue) {
+                <div class="lookup-value">
+                  <span class="mono break-words">{{ lookup.lookupValue }}</span>
+                  @if (isUrl(lookup.lookupValue)) {
+                    <a class="lookup-open" [href]="lookup.lookupValue" target="_blank" rel="noopener" title="Open in a new tab">
+                      <app-icon name="external" size="0.85em" /></a>
+                  }
+                  <app-copy-button [value]="lookup.lookupValue" [copied]="copiedKey() === lookup.lookupId + ':value'"
+                                   copiedLabel="Value copied" (copy)="copyValue(lookup.lookupId, 'value', lookup.lookupValue)" />
+                </div>
               } @else {
-                <div class="mono break-words">{{ lookup.lookupValue || '—' }}</div>
+                <div class="text-[color:var(--text-muted)]">—</div>
               }
             </div>
 
@@ -93,12 +107,15 @@
                 <ul class="mt-2 rounded border divide-y divide-[color:var(--border-subtle)] text-xs border-subtle"
                    >
                   @for (child of lookup.children; track child.lookupId) {
-                    <li class="px-2.5 py-1.5 flex items-baseline gap-2 border-subtle"
-                       >
-                      <span class="mono truncate">{{ child.lookupType }}</span>
-                      <span class="text-[color:var(--text-muted)] truncate ml-auto">
+                    <li class="px-2.5 py-1.5 flex items-center gap-2 border-subtle">
+                      <span class="mono truncate" [title]="child.lookupType">{{ child.lookupType }}</span>
+                      <span class="text-[color:var(--text-muted)] truncate ml-auto" [title]="child.encrypted ? '' : (child.lookupValue || '')">
                         {{ child.encrypted ? '••••' : (child.lookupValue || '—') }}
                       </span>
+                      @if (!child.encrypted && child.lookupValue) {
+                        <app-copy-button [value]="child.lookupValue" [copied]="copiedKey() === child.lookupId + ':value'"
+                                         copiedLabel="Value copied" (copy)="copyValue(child.lookupId, 'value', child.lookupValue)" />
+                      }
                     </li>
                   }
                 </ul>
@@ -137,14 +154,30 @@
                 </button>
               }
             </td>
-            <td class="mono font-medium">{{ lookup.lookupType }}</td>
-            <td class="text-[color:var(--text-secondary)] max-w-64 truncate">
+            <td class="max-w-56">
+              <div class="lookup-value">
+                <span class="mono font-medium truncate" [title]="lookup.lookupType">{{ lookup.lookupType }}</span>
+                <app-copy-button [value]="lookup.lookupType" [copied]="copiedKey() === lookup.lookupId + ':type'"
+                                 copiedLabel="Key copied" (copy)="copyValue(lookup.lookupId, 'type', lookup.lookupType)" />
+              </div>
+            </td>
+            <td class="text-[color:var(--text-secondary)] max-w-64">
               @if (lookup.encrypted) {
                 <span class="pill pill-neutral" title="Stored encrypted — the value is not shown">
                   <app-icon name="lock" size="0.85em" class="icon-warn" />encrypted
                 </span>
+              } @else if (lookup.lookupValue) {
+                <div class="lookup-value">
+                  <span class="mono truncate" [title]="lookup.lookupValue">{{ lookup.lookupValue }}</span>
+                  @if (isUrl(lookup.lookupValue)) {
+                    <a class="lookup-open" [href]="lookup.lookupValue" target="_blank" rel="noopener" title="Open in a new tab">
+                      <app-icon name="external" size="0.85em" /></a>
+                  }
+                  <app-copy-button [value]="lookup.lookupValue" [copied]="copiedKey() === lookup.lookupId + ':value'"
+                                   copiedLabel="Value copied" (copy)="copyValue(lookup.lookupId, 'value', lookup.lookupValue)" />
+                </div>
               } @else {
-                {{ lookup.lookupValue }}
+                <span class="text-[color:var(--text-muted)]">—</span>
               }
             </td>
             <td class="text-[color:var(--text-secondary)] max-w-80 truncate"
@@ -194,16 +227,31 @@
             @for (child of lookup.children ?? []; track child.lookupId) {
               <tr class="lookup-child">
                 <td></td>
-                <td class="pl-6 text-[color:var(--text-secondary)]">
-                  <span class="lookup-child-rule"></span>{{ child.lookupType }}
+                <td class="pl-6 text-[color:var(--text-secondary)] max-w-56">
+                  <div class="lookup-value">
+                    <span class="lookup-child-rule"></span>
+                    <span class="truncate" [title]="child.lookupType">{{ child.lookupType }}</span>
+                    <app-copy-button [value]="child.lookupType" [copied]="copiedKey() === child.lookupId + ':type'"
+                                     copiedLabel="Name copied" (copy)="copyValue(child.lookupId, 'type', child.lookupType)" />
+                  </div>
                 </td>
-                <td class="text-[color:var(--text-secondary)]">
+                <td class="text-[color:var(--text-secondary)] max-w-64">
                   @if (child.encrypted) {
                     <span class="pill pill-neutral" title="Stored encrypted — the value is not shown">
                       <app-icon name="lock" size="0.85em" class="icon-warn" />encrypted
                     </span>
+                  } @else if (child.lookupValue) {
+                    <div class="lookup-value">
+                      <span class="mono truncate" [title]="child.lookupValue">{{ child.lookupValue }}</span>
+                      @if (isUrl(child.lookupValue)) {
+                        <a class="lookup-open" [href]="child.lookupValue" target="_blank" rel="noopener" title="Open in a new tab">
+                          <app-icon name="external" size="0.85em" /></a>
+                      }
+                      <app-copy-button [value]="child.lookupValue" [copied]="copiedKey() === child.lookupId + ':value'"
+                                       copiedLabel="Value copied" (copy)="copyValue(child.lookupId, 'value', child.lookupValue)" />
+                    </div>
                   } @else {
-                    {{ child.lookupValue }}
+                    <span class="text-[color:var(--text-muted)]">—</span>
                   }
                 </td>
                 <td class="text-[color:var(--text-muted)] max-w-80 truncate"

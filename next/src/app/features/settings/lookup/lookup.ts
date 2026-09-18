@@ -9,6 +9,8 @@ import { AuthService } from '../../../core/auth/auth.service';
 import { Icon } from '../../../shared/ui/icon';
 import { ViewToggle } from '../../../shared/ui/view-toggle';
 import { ToastService } from '../../../shared/ui/toast.service';
+import { CopyButton } from '../../../shared/ui/copy-button';
+import { copyText } from '../../../shared/ui/clipboard.util';
 import { confirmWith } from '../../../shared/ui/confirm';
 import { LookupData, LookupDialog } from './lookup-dialog';
 import { forkJoin, of } from 'rxjs';
@@ -16,7 +18,7 @@ import { catchError, map } from 'rxjs/operators';
 
 @Component({
   selector: 'app-lookup',
-  imports: [MineFilter, ViewToggle, Icon, TableShell, CdkMenu, CdkMenuItem, CdkMenuTrigger],
+  imports: [MineFilter, ViewToggle, Icon, TableShell, CdkMenu, CdkMenuItem, CdkMenuTrigger, CopyButton],
   templateUrl: './lookup.html',
 })
 export class Lookup implements OnInit {
@@ -24,6 +26,9 @@ export class Lookup implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
+
+  /** `<lookupId>:<type|value>` of the thing just copied, so exactly one icon ticks. */
+  readonly copiedKey = signal<string | null>(null);
 
   readonly lookups = signal<LookupData[]>([]);
   readonly loading = signal(true);
@@ -190,5 +195,24 @@ export class Lookup implements OnInit {
     }
     const mine = this.auth.user()?.tenantId ?? null;
     return entry.tenantId != null && entry.tenantId === mine;
+  }
+
+  /**
+   * A lookup's key and value are what people paste into pipelines, forms and config, and both
+   * truncate in a column -- selecting a truncated cell by hand copies the ellipsis. The tick
+   * only shows when the clipboard really changed (copyText reports that).
+   */
+  copyValue(lookupId: number | undefined, field: 'type' | 'value', value: string): void {
+    copyText(value ?? '').then(ok => {
+      if (!ok) { this.toast.error('Could not copy that. Select it and copy by hand.'); return; }
+      const key = `${lookupId}:${field}`;
+      this.copiedKey.set(key);
+      setTimeout(() => { if (this.copiedKey() === key) this.copiedKey.set(null); }, 1500);
+    });
+  }
+
+  /** A value that is a web address gets an "open" link beside its copy icon. */
+  isUrl(value: string | null | undefined): boolean {
+    return /^https?:\/\/\S+$/i.test((value ?? '').trim());
   }
 }

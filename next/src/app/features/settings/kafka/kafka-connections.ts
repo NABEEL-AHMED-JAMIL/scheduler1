@@ -12,6 +12,8 @@ import { AuthService } from '../../../core/auth/auth.service';
 import { StatTile } from '../../../shared/ui/stat-tile';
 import { StatusPill } from '../../../shared/ui/status-pill';
 import { Icon } from '../../../shared/ui/icon';
+import { CopyButton } from '../../../shared/ui/copy-button';
+import { copyText } from '../../../shared/ui/clipboard.util';
 import { ViewToggle } from '../../../shared/ui/view-toggle';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { confirmWith } from '../../../shared/ui/confirm';
@@ -68,7 +70,7 @@ export interface KafkaProfile {
 
 @Component({
   selector: 'app-kafka-connections',
-  imports: [MineFilter, ViewToggle, StatTile, DatePipe, TableShell, StatusPill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger],
+  imports: [MineFilter, ViewToggle, StatTile, DatePipe, TableShell, StatusPill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger, CopyButton],
   templateUrl: './kafka-connections.html',
 })
 export class KafkaConnections implements OnInit {
@@ -379,5 +381,17 @@ export class KafkaConnections implements OnInit {
     }
     const myId = this.auth.user()?.appUserId ?? null;
     return rows.filter(row => isMine(row, myId));
+  }
+
+  /** `<id>` of the row whose value was just copied, so exactly one icon ticks. */
+  readonly copiedId = signal<number | null>(null);
+
+  /** The broker list is what a worker's config and a kafka-console command are typed against. */
+  copyRow(id: number | undefined, value: string): void {
+    copyText(value ?? '').then(ok => {
+      if (!ok) { this.toast.error('Could not copy that. Select it and copy by hand.'); return; }
+      this.copiedId.set(id ?? null);
+      setTimeout(() => { if (this.copiedId() === (id ?? null)) this.copiedId.set(null); }, 1500);
+    });
   }
 }

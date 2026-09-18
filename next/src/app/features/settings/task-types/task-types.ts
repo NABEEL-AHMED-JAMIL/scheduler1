@@ -8,6 +8,8 @@ import { MineFilter, isMine } from '../../../shared/ui/mine-filter';
 import { StatTile } from '../../../shared/ui/stat-tile';
 import { StatusPill } from '../../../shared/ui/status-pill';
 import { Icon } from '../../../shared/ui/icon';
+import { CopyButton } from '../../../shared/ui/copy-button';
+import { copyText } from '../../../shared/ui/clipboard.util';
 import { ViewToggle } from '../../../shared/ui/view-toggle';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { confirmWith } from '../../../shared/ui/confirm';
@@ -25,7 +27,7 @@ interface LinkedTask {
 
 @Component({
   selector: 'app-task-types',
-  imports: [MineFilter, ViewToggle, StatTile, TableShell, StatusPill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger],
+  imports: [MineFilter, ViewToggle, StatTile, TableShell, StatusPill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger, CopyButton],
   templateUrl: './task-types.html',
 })
 export class TaskTypes implements OnInit {
@@ -302,5 +304,17 @@ export class TaskTypes implements OnInit {
     }
     const myId = this.auth.user()?.appUserId ?? null;
     return rows.filter(row => isMine(row, myId));
+  }
+
+  /** `<id>` of the row whose value was just copied, so exactly one icon ticks. */
+  readonly copiedId = signal<number | null>(null);
+
+  /** The topic name is what a consumer subscribes to; typed from a truncated cell it is wrong. */
+  copyRow(id: number | undefined, value: string): void {
+    copyText(value ?? '').then(ok => {
+      if (!ok) { this.toast.error('Could not copy that. Select it and copy by hand.'); return; }
+      this.copiedId.set(id ?? null);
+      setTimeout(() => { if (this.copiedId() === (id ?? null)) this.copiedId.set(null); }, 1500);
+    });
   }
 }

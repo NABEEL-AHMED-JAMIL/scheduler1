@@ -1556,3 +1556,11 @@ html.dark .tenant-code.is-copied { background: color-mix(in oklab, var(--color-o
    a profile name reads as "environment: prod" rather than as a status. */
 .env-pill { text-transform: none; }
 .env-pill .env-pill-k { font-size: 9px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.7; margin-right: 0.1rem; }
+
+/* Lookup key/value cells: text, an optional "open" link for a URL, and a copy icon, on one
+   line, with the text taking the room and the icons never wrapping under it. */
+.lookup-value { display: flex; align-items: center; gap: 0.35rem; min-width: 0; }
+.lookup-value > .mono, .lookup-value > .truncate { min-width: 0; }
+.lookup-value .lookup-child-rule { flex: none; }
+.lookup-open { flex: none; display: inline-flex; color: var(--text-muted); }
+.lookup-open:hover { color: var(--accent-text); }

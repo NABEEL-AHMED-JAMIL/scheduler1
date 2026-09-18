@@ -15,10 +15,15 @@ import { StatusPill } from '../../../shared/ui/status-pill';
 import { ConnectionDialog } from './connection-dialog';
 import { CloneDialog } from './clone-dialog';
 import { Icon } from '../../../shared/ui/icon';
+import { CopyButton } from '../../../shared/ui/copy-button';
+import { copyText } from '../../../shared/ui/clipboard.util';
+import type { TenantName } from '../../settings/kafka/kafka-connections';
 import { ViewToggle } from '../../../shared/ui/view-toggle';
 import { kafkaDependencyNote, kafkaProfilesUsing } from './kafka-dependents';
 
 interface StorageConnection {
+  /** Owning workspace; null for the two platform buckets. */
+  tenantId?: number | null;
   /** The author's id, so "Only mine" matches on identity rather than display text. */
   createdBy?: number | null;
 
@@ -47,7 +52,7 @@ interface StorageConnection {
 
 @Component({
   selector: 'app-storage-connections',
-  imports: [MineFilter, ViewToggle, StatTile, Icon, DatePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill],
+  imports: [MineFilter, ViewToggle, StatTile, Icon, DatePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, CopyButton],
   templateUrl: './storage-connections.html',
 })
 export class StorageConnections implements OnInit {
@@ -60,6 +65,23 @@ export class StorageConnections implements OnInit {
   readonly error = signal('');
   readonly search = signal('');
   readonly providerFilter = signal('');
+  readonly workspaceFilter = signal('');
+
+  /**
+   * Whose connection each row is. A platform admin's list merges every workspace's, and
+   * without a column a tenant bucket and a platform bucket looked the same; the Kafka screen
+   * already carries this, so the two screens now answer the same question the same way.
+   */
+  private readonly tenants = signal<TenantName[]>([]);
+  readonly canSeeWorkspace = computed(() => this.auth.isPlatformAdmin());
+  readonly workspaces = computed(() => {
+    const ids = new Set(this.connections().map(c => c.tenantId ?? 0));
+    return [{ id: 0, name: 'Platform' }, ...this.tenants().map(t => ({ id: t.tenantId, name: t.tenantName }))]
+      .filter(w => ids.has(w.id));
+  });
+
+  /** `<connectionId>:<alias|target>` of the thing just copied, so exactly one icon ticks. */
+  readonly copiedKey = signal<string | null>(null);
   readonly testing = signal<number | null>(null);
 
   /** Ids ticked for a bulk action. Cleared after one runs, so a second click cannot repeat it. */
@@ -82,8 +104,10 @@ export class StorageConnections implements OnInit {
   readonly filtered = computed(() => {
     const term = this.search().trim().toLowerCase();
     const provider = this.providerFilter();
+    const workspace = this.workspaceFilter();
     return this.mine(this.connections()).filter(c => {
       if (provider && c.provider !== provider) return false;
+      if (workspace && String(c.tenantId ?? 0) !== workspace) return false;
       if (!term) return true;
       return (c.connectionName ?? '').toLowerCase().includes(term)
         || (c.alias ?? '').toLowerCase().includes(term)
@@ -94,7 +118,7 @@ export class StorageConnections implements OnInit {
 
   /** True while anything narrows the table, which is when the tiles need saying out loud. */
   readonly isFiltered = computed(() =>
-    !!this.search().trim() || !!this.providerFilter() || this.onlyMine());
+    !!this.search().trim() || !!this.providerFilter() || !!this.workspaceFilter() || this.onlyMine());
 
   /**
    * Counts the estate, not the filtered view -- the same choice Users and Tenants make, and the
@@ -119,7 +143,7 @@ export class StorageConnections implements OnInit {
     };
   });
 
-  ngOnInit(): void { this.load(); }
+  ngOnInit(): void { this.load(); this.loadTenants(); }
 
   load(): void {
     this.loading.set(true);
@@ -244,6 +268,7 @@ export class StorageConnections implements OnInit {
   }
 
   clearFilters(): void {
+    this.workspaceFilter.set('');
     this.search.set('');
     this.providerFilter.set('');
   }
@@ -350,5 +375,38 @@ export class StorageConnections implements OnInit {
     failed === 0
       ? this.toast.success(`All ${passed} reached their bucket.`)
       : this.toast.error(`${passed} reached their bucket, ${failed} did not — see Last test.`);
+  }
+
+  private loadTenants(): void {
+    if (!this.canSeeWorkspace()) return;
+    this.http.get<ApiResponse<TenantName[]>>(`${API_BASE}/tenant.json/listTenants`).subscribe({
+      next: response => { if (response.status === API_SUCCESS) this.tenants.set(response.data ?? []); },
+      error: () => {},
+    });
+  }
+
+  workspaceName(c: StorageConnection): string {
+    if (c.tenantId == null) return 'Platform';
+    return this.tenants().find(t => t.tenantId === c.tenantId)?.tenantName ?? `Tenant ${c.tenantId}`;
+  }
+
+  workspaceHint(c: StorageConnection): string {
+    return c.tenantId == null
+      ? 'Platform-owned — one of the two buckets the console itself uses'
+      : `Workspace: ${this.workspaceName(c)}`;
+  }
+
+  /**
+   * The alias is what a task, a form and the Analytics Studio name a connection by, and the
+   * target is the bucket an IAM policy names; both truncate or wrap in a column, and a
+   * hand-selected cell copies the line breaks with it.
+   */
+  copyValue(id: number | undefined, field: 'alias' | 'target', value: string): void {
+    copyText(value ?? '').then(ok => {
+      if (!ok) { this.toast.error('Could not copy that. Select it and copy by hand.'); return; }
+      const key = `${id}:${field}`;
+      this.copiedKey.set(key);
+      setTimeout(() => { if (this.copiedKey() === key) this.copiedKey.set(null); }, 1500);
+    });
   }
 }

@@ -102,8 +102,12 @@
             <dl class="text-xs grid gap-1">
               <div class="flex gap-2 min-w-0">
                 <dt class="text-[color:var(--text-muted)] shrink-0 w-20">Topic</dt>
-                <dd class="mono text-accent truncate min-w-0">
-                  {{ topicOf(type.queueTopicPartition) || '—' }}
+                <dd class="lookup-value min-w-0">
+                  <span class="mono text-accent truncate">{{ topicOf(type.queueTopicPartition) || '—' }}</span>
+                  @if (topicOf(type.queueTopicPartition); as topic) {
+                    <app-copy-button [value]="topic" [copied]="copiedId() === type.sourceTaskTypeId"
+                                     copiedLabel="Topic copied" (copy)="copyRow(type.sourceTaskTypeId, topic)" />
+                  }
                 </dd>
               </div>
               <div class="flex gap-2">
@@ -164,7 +168,15 @@
             </td>
             <td class="text-[color:var(--text-secondary)] max-w-80 truncate"
                 [title]="type.description || ''">{{ type.description || '—' }}</td>
-            <td><span class="mono text-accent">{{ topicOf(type.queueTopicPartition) || '—' }}</span></td>
+            <td class="max-w-56">
+              <div class="lookup-value">
+                <span class="mono text-accent truncate">{{ topicOf(type.queueTopicPartition) || '—' }}</span>
+                @if (topicOf(type.queueTopicPartition); as topic) {
+                  <app-copy-button [value]="topic" [copied]="copiedId() === type.sourceTaskTypeId"
+                                   copiedLabel="Topic copied" (copy)="copyRow(type.sourceTaskTypeId, topic)" />
+                }
+              </div>
+            </td>
             <td class="mono text-[color:var(--text-muted)]">
               {{ partitionsOf(type.queueTopicPartition) || '—' }}
             </td>
