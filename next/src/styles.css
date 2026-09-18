@@ -1564,3 +1564,45 @@ html.dark .tenant-code.is-copied { background: color-mix(in oklab, var(--color-o
 .lookup-value .lookup-child-rule { flex: none; }
 .lookup-open { flex: none; display: inline-flex; color: var(--text-muted); }
 .lookup-open:hover { color: var(--accent-text); }
+
+/* Lookups: master-detail. The rail lists lookups; the pane shows one -- its value, then its
+   entries. Below md the two stack, the rail first, since a phone cannot hold both. */
+.lookup-split { display: grid; grid-template-columns: minmax(240px, 300px) minmax(0, 1fr); overflow: hidden; }
+.lookup-rail { border-right: 1px solid var(--border-subtle); display: flex; flex-direction: column; min-height: 20rem; }
+.lookup-rail-tools { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.75rem; border-bottom: 1px solid var(--border-subtle); }
+.lookup-rail-list { list-style: none; margin: 0; padding: 0.375rem; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; max-height: 34rem; }
+.lookup-rail-item { width: 100%; display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0.6rem; border-radius: 0.5rem; text-align: left; color: var(--text-primary); }
+.lookup-rail-item:hover { background: var(--surface-sunken); }
+.lookup-rail-item:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.lookup-rail-item.is-selected { background: var(--pill-brand-bg); }
+.lookup-rail-item.is-selected .lookup-rail-key { color: var(--pill-brand-fg); }
+.lookup-rail-item.is-selected .lookup-rail-chev { opacity: 1; }
+.lookup-rail-glyph { flex: none; width: 1.75rem; height: 1.75rem; border-radius: 0.45rem; display: inline-flex; align-items: center; justify-content: center; background: var(--surface-sunken); color: var(--text-muted); }
+.lookup-rail-glyph.is-list { background: var(--pill-brand-bg); color: var(--pill-brand-fg); }
+.lookup-rail-glyph.is-setting { background: var(--color-ok-100); color: var(--color-ok-500); }
+.lookup-rail-glyph.is-managed { background: var(--color-warn-100); color: var(--color-warn-600); }
+html.dark .lookup-rail-glyph.is-setting { background: color-mix(in oklab, var(--color-ok-500) 22%, transparent); color: var(--color-ok-400); }
+html.dark .lookup-rail-glyph.is-managed { background: color-mix(in oklab, var(--color-warn-500) 22%, transparent); color: var(--color-warn-400); }
+.lookup-rail-key { display: block; font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lookup-rail-sub { display: block; font-size: 11px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lookup-rail-sub em { font-style: normal; color: var(--pill-brand-fg); }
+.lookup-rail-chev { flex: none; opacity: 0; color: var(--text-muted); }
+.lookup-rail-empty { padding: 2rem 1rem; text-align: center; font-size: 13px; color: var(--text-secondary); display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
+.lookup-detail { min-width: 0; display: flex; flex-direction: column; }
+.lookup-detail-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-subtle); }
+.lookup-detail-key { font-size: 1.05rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.lookup-value-block { padding: 0.9rem 1.25rem; border-bottom: 1px solid var(--border-subtle); background: var(--surface-inset); }
+.lookup-value-block .eyebrow { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.35rem; }
+.lookup-value-lg { font-size: 14px; }
+.lookup-value-lg .mono { font-size: 14px; }
+.lookup-entries { padding: 0.75rem 0 0; }
+.lookup-entries-head { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 1.25rem 0.5rem; }
+.lookup-entries-head .section-title { margin: 0; }
+.lookup-entries-empty { padding: 2.5rem 1.25rem; text-align: center; font-size: 13px; color: var(--text-secondary); display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
+.lookup-detail-empty { flex: 1; justify-content: center; min-height: 20rem; }
+.lookup-entry-table tbody tr:last-child td { border-bottom: 0; }
+@media (max-width: 767px) {
+  .lookup-split { grid-template-columns: 1fr; }
+  .lookup-rail { border-right: 0; border-bottom: 1px solid var(--border-subtle); min-height: 0; }
+  .lookup-rail-list { max-height: 16rem; }
+}

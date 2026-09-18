@@ -3,8 +3,8 @@
     <div>
       <h1 class="page-title">Lookups</h1>
       <p class="page-subtitle">
-        Shared key and value data the forms and pipelines read from.
-        @if (totalEntries()) { {{ totalEntries() }} entries across {{ lookups().length }} lookups. }
+        Named lists and settings the forms and pipelines read from. Pick a lookup on the left; its
+        entries and value are on the right.
       </p>
     </div>
     <div class="flex items-center gap-2">
@@ -17,286 +17,277 @@
     </div>
   </div>
 
-  <app-table-shell heading="Lookups" [loading]="loading()" [error]="error()"
-                   [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="lookups().length"
-                   [emptyMessage]="search() ? 'No lookups match that search.' : 'No lookups defined yet.'"
-                   emptyIcon="list"
-                   (retry)="load()">
-    <ng-container toolbar>
-      <app-view-toggle [(value)]="view" key="lookup" cardsIcon="list" />
-      <div class="search-field max-w-56">
-        <app-icon name="search" size="0.95em" />
-        <input class="input" placeholder="Search type or value"
-               [value]="search()" (input)="search.set($any($event.target).value)" />
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+    <app-stat-tile label="Lookups" [value]="lookups().length" icon="list" tone="info"
+                   [foot]="stats().lists + ' with entries'" />
+    <app-stat-tile label="Entries" [value]="stats().entries" icon="layers" tone="info"
+                   foot="across every list" />
+    <app-stat-tile label="Settings" [value]="stats().settings" icon="settings"
+                   [tone]="stats().settings ? 'ok' : 'muted'" foot="one value each" />
+    <app-stat-tile label="Managed" [value]="stats().managed" icon="clock"
+                   [tone]="stats().managed ? 'warn' : 'muted'" foot="written by the scheduler" />
+  </div>
+
+  <!-- ── Master / detail ─────────────────────────────────────────────────────────────── -->
+  <div class="card lookup-split">
+
+    <!-- Rail: one row per lookup, the selected one carrying the detail on the right. -->
+    <aside class="lookup-rail">
+      <div class="lookup-rail-tools">
+        <div class="search-field">
+          <app-icon name="search" size="0.95em" />
+          <input class="input" placeholder="Find a lookup or entry" aria-label="Find a lookup or entry"
+                 [value]="search()" (input)="search.set($any($event.target).value)" />
+        </div>
+        <app-mine-filter [(only)]="onlyMine" />
       </div>
-      <app-mine-filter [(only)]="onlyMine" />
-    </ng-container>
 
-    @if (view() === 'cards') {
-      <div class="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
-        @for (lookup of filtered(); track lookup.lookupId) {
-          <article class="card p-4 flex flex-col gap-3">
-            <div class="flex items-start gap-2.5">
-              <span class="stat-glyph shrink-0"><app-icon name="list" /></span>
-              <div class="min-w-0 flex-1">
-                <div class="flex items-center gap-1 min-w-0">
-                  <h3 class="font-semibold mono truncate" [title]="lookup.lookupType">{{ lookup.lookupType }}</h3>
-                  <app-copy-button [value]="lookup.lookupType" [copied]="copiedKey() === lookup.lookupId + ':type'"
-                                   copiedLabel="Key copied" (copy)="copyValue(lookup.lookupId, 'type', lookup.lookupType)" />
-                </div>
-                <p class="text-xs text-[color:var(--text-secondary)] truncate"
-                   [title]="lookup.description || ''">{{ lookup.description || 'No description' }}</p>
-              </div>
-              <button type="button" class="btn btn-ghost btn-icon btn-sm shrink-0"
-                      [cdkMenuTriggerFor]="cardMenu" aria-label="Actions">
-                <app-icon name="dots" size="1.05em" />
-              </button>
-              <ng-template #cardMenu>
-                <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
-                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="edit(lookup)">
-                    <app-icon name="edit" />Edit
-                  </button>
-                  <button cdkMenuItem class="menu-item btn-intent-ok" (cdkMenuItemTriggered)="addChild(lookup)">
-                    <app-icon name="plus" class="icon-ok" />Add entry
-                  </button>
-                  <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="remove(lookup)">
-                    <app-icon name="trash" class="icon-crit" />Delete
-                  </button>
-                </div>
-              </ng-template>
-            </div>
-
-            <div class="text-xs">
-              <div class="text-[color:var(--text-muted)] mb-1">Value</div>
-              @if (lookup.encrypted) {
-                <span class="pill pill-neutral" title="Stored encrypted — the value is not shown">
-                  <app-icon name="lock" size="0.85em" class="icon-warn" />encrypted
+      @if (loading()) {
+        <div class="lookup-rail-empty"><app-icon name="refresh" class="spin icon-muted" /> Loading…</div>
+      } @else if (error()) {
+        <div class="lookup-rail-empty text-crit-500">
+          {{ error() }}
+          <button type="button" class="btn btn-default btn-sm mt-2" (click)="load()">Try again</button>
+        </div>
+      } @else if (!filtered().length) {
+        <div class="lookup-rail-empty">
+          <app-icon name="list" size="1.4rem" class="icon-muted" />
+          {{ search() ? 'Nothing matches that.' : 'No lookups yet.' }}
+        </div>
+      } @else {
+        <ul class="lookup-rail-list" role="listbox" aria-label="Lookups">
+          @for (lookup of filtered(); track lookup.lookupId) {
+            <li>
+              <button type="button" class="lookup-rail-item"
+                      role="option" [attr.aria-selected]="selectedId() === lookup.lookupId"
+                      [class.is-selected]="selectedId() === lookup.lookupId"
+                      (click)="select(lookup)">
+                <span [class]="'lookup-rail-glyph ' + kindOf(lookup).cls">
+                  <app-icon [name]="kindOf(lookup).icon" size="0.95em" />
                 </span>
-              } @else if (lookup.lookupValue) {
-                <div class="lookup-value">
-                  <span class="mono break-words">{{ lookup.lookupValue }}</span>
-                  @if (isUrl(lookup.lookupValue)) {
-                    <a class="lookup-open" [href]="lookup.lookupValue" target="_blank" rel="noopener" title="Open in a new tab">
-                      <app-icon name="external" size="0.85em" /></a>
-                  }
-                  <app-copy-button [value]="lookup.lookupValue" [copied]="copiedKey() === lookup.lookupId + ':value'"
-                                   copiedLabel="Value copied" (copy)="copyValue(lookup.lookupId, 'value', lookup.lookupValue)" />
-                </div>
-              } @else {
-                <div class="text-[color:var(--text-muted)]">—</div>
-              }
-            </div>
-
-            <!-- Entries are the reason to open a lookup, so the count opens them in place. -->
-            <div class="mt-auto pt-1">
-              @if (entryCount(lookup)) {
-                <button type="button" class="pill pill-neutral hover-brand"
-                        (click)="toggle(lookup)"
-                        [attr.aria-expanded]="expanded().has($any(lookup.lookupId))">
-                  <app-icon [name]="expanded().has($any(lookup.lookupId)) ? 'chevronDown' : 'chevronRight'"
-                            size="0.85em" />
-                  {{ entryCount(lookup) }} {{ entryCount(lookup) === 1 ? 'entry' : 'entries' }}
-                </button>
-              } @else {
-                <button type="button" class="btn btn-default btn-sm" (click)="addChild(lookup)">
-                  <app-icon name="plus" size="0.85em" class="icon-ok" />Add an entry
-                </button>
-              }
-
-              @if (expanded().has($any(lookup.lookupId)) && lookup.children?.length) {
-                <ul class="mt-2 rounded border divide-y divide-[color:var(--border-subtle)] text-xs border-subtle"
-                   >
-                  @for (child of lookup.children; track child.lookupId) {
-                    <li class="px-2.5 py-1.5 flex items-center gap-2 border-subtle">
-                      <span class="mono truncate" [title]="child.lookupType">{{ child.lookupType }}</span>
-                      <span class="text-[color:var(--text-muted)] truncate ml-auto" [title]="child.encrypted ? '' : (child.lookupValue || '')">
-                        {{ child.encrypted ? '••••' : (child.lookupValue || '—') }}
-                      </span>
-                      @if (!child.encrypted && child.lookupValue) {
-                        <app-copy-button [value]="child.lookupValue" [copied]="copiedKey() === child.lookupId + ':value'"
-                                         copiedLabel="Value copied" (copy)="copyValue(child.lookupId, 'value', child.lookupValue)" />
-                      }
-                    </li>
-                  }
-                </ul>
-              }
-            </div>
-          </article>
-        }
-      </div>
-    } @else {
-    <table class="table-modern">
-      <thead>
-        <tr>
-          <th class="w-8"></th>
-          <th>Type</th>
-          <th>Value</th>
-          <th>Description</th>
-          <th>Entries</th>
-          <th>Created by</th>
-          <th>Updated by</th>
-          <th class="w-12"></th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (lookup of filtered(); track lookup.lookupId) {
-          <tr>
-            <td>
-              @if (loadingChildren().has($any(lookup.lookupId))) {
-                <app-icon name="refresh" class="spin icon-muted" />
-              } @else if (entryCount(lookup)) {
-                <button type="button" class="hover:opacity-80"
-                        (click)="toggle(lookup)"
-                        [attr.aria-label]="expanded().has($any(lookup.lookupId)) ? 'Hide entries' : 'Show entries'"
-                        [attr.aria-expanded]="expanded().has($any(lookup.lookupId))">
-                  <app-icon [name]="expanded().has($any(lookup.lookupId)) ? 'chevronDown' : 'chevronRight'"
-                            [class]="expanded().has($any(lookup.lookupId)) ? 'icon-info' : 'icon-muted'" />
-                </button>
-              }
-            </td>
-            <td class="max-w-56">
-              <div class="lookup-value">
-                <span class="mono font-medium truncate" [title]="lookup.lookupType">{{ lookup.lookupType }}</span>
-                <app-copy-button [value]="lookup.lookupType" [copied]="copiedKey() === lookup.lookupId + ':type'"
-                                 copiedLabel="Key copied" (copy)="copyValue(lookup.lookupId, 'type', lookup.lookupType)" />
-              </div>
-            </td>
-            <td class="text-[color:var(--text-secondary)] max-w-64">
-              @if (lookup.encrypted) {
-                <span class="pill pill-neutral" title="Stored encrypted — the value is not shown">
-                  <app-icon name="lock" size="0.85em" class="icon-warn" />encrypted
-                </span>
-              } @else if (lookup.lookupValue) {
-                <div class="lookup-value">
-                  <span class="mono truncate" [title]="lookup.lookupValue">{{ lookup.lookupValue }}</span>
-                  @if (isUrl(lookup.lookupValue)) {
-                    <a class="lookup-open" [href]="lookup.lookupValue" target="_blank" rel="noopener" title="Open in a new tab">
-                      <app-icon name="external" size="0.85em" /></a>
-                  }
-                  <app-copy-button [value]="lookup.lookupValue" [copied]="copiedKey() === lookup.lookupId + ':value'"
-                                   copiedLabel="Value copied" (copy)="copyValue(lookup.lookupId, 'value', lookup.lookupValue)" />
-                </div>
-              } @else {
-                <span class="text-[color:var(--text-muted)]">—</span>
-              }
-            </td>
-            <td class="text-[color:var(--text-secondary)] max-w-80 truncate"
-                [title]="lookup.description || ''">{{ lookup.description || '—' }}</td>
-            <td>
-              @if (entryCount(lookup)) {
-                <button type="button" class="pill pill-neutral hover-brand"
-                        (click)="toggle(lookup)"
-                        [title]="expanded().has($any(lookup.lookupId)) ? 'Hide entries' : 'Show entries'"
-                        [attr.aria-expanded]="expanded().has($any(lookup.lookupId))">
-                  {{ entryCount(lookup) }}
-                </button>
-              } @else {
-                <button type="button" class="btn btn-ghost btn-sm" (click)="addChild(lookup)">
-                  <app-icon name="plus" size="0.85em" class="icon-ok" />Add
-                </button>
-              }
-            </td>
-            <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
-              {{ lookup.createdByName || '—' }}
-            </td>
-            <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
-              {{ lookup.updatedByName || '—' }}
-            </td>
-            <td class="text-right">
-              <button type="button" class="btn btn-ghost btn-icon" [cdkMenuTriggerFor]="menu"
-                      aria-label="Actions">
-                <app-icon name="dots" size="1.05em" />
-              </button>
-              <ng-template #menu>
-                <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
-                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="edit(lookup)">
-                    <app-icon name="edit" />Edit
-                  </button>
-                  <button cdkMenuItem class="menu-item btn-intent-ok" (cdkMenuItemTriggered)="addChild(lookup)">
-                    <app-icon name="plus" class="icon-ok" />Add entry
-                  </button>
-                  <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="remove(lookup)">
-                    <app-icon name="trash" class="icon-crit" />Delete
-                  </button>
-                </div>
-              </ng-template>
-            </td>
-          </tr>
-
-          @if (expanded().has($any(lookup.lookupId))) {
-            @for (child of lookup.children ?? []; track child.lookupId) {
-              <tr class="lookup-child">
-                <td></td>
-                <td class="pl-6 text-[color:var(--text-secondary)] max-w-56">
-                  <div class="lookup-value">
-                    <span class="lookup-child-rule"></span>
-                    <span class="truncate" [title]="child.lookupType">{{ child.lookupType }}</span>
-                    <app-copy-button [value]="child.lookupType" [copied]="copiedKey() === child.lookupId + ':type'"
-                                     copiedLabel="Name copied" (copy)="copyValue(child.lookupId, 'type', child.lookupType)" />
-                  </div>
-                </td>
-                <td class="text-[color:var(--text-secondary)] max-w-64">
-                  @if (child.encrypted) {
-                    <span class="pill pill-neutral" title="Stored encrypted — the value is not shown">
-                      <app-icon name="lock" size="0.85em" class="icon-warn" />encrypted
-                    </span>
-                  } @else if (child.lookupValue) {
-                    <div class="lookup-value">
-                      <span class="mono truncate" [title]="child.lookupValue">{{ child.lookupValue }}</span>
-                      @if (isUrl(child.lookupValue)) {
-                        <a class="lookup-open" [href]="child.lookupValue" target="_blank" rel="noopener" title="Open in a new tab">
-                          <app-icon name="external" size="0.85em" /></a>
-                      }
-                      <app-copy-button [value]="child.lookupValue" [copied]="copiedKey() === child.lookupId + ':value'"
-                                       copiedLabel="Value copied" (copy)="copyValue(child.lookupId, 'value', child.lookupValue)" />
-                    </div>
-                  } @else {
-                    <span class="text-[color:var(--text-muted)]">—</span>
-                  }
-                </td>
-                <td class="text-[color:var(--text-muted)] max-w-80 truncate"
-                    [title]="child.description || ''">{{ child.description || '—' }}</td>
-                <td></td>
-                <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
-                  {{ child.createdByName || '—' }}
-                </td>
-                <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
-                  {{ child.updatedByName || '—' }}
-                </td>
-                <td>
-                  <div class="flex items-center justify-end gap-1.5">
-                    @if (canModify(child)) {
-                      <button type="button" class="btn-circle" title="Edit entry"
-                              aria-label="Edit entry" (click)="edit(child, lookup)">
-                        <app-icon name="edit" size="0.9em" />
-                      </button>
-                      <button type="button" class="btn-circle btn-circle-danger"
-                              title="Delete entry" aria-label="Delete entry"
-                              (click)="remove(child, lookup)">
-                        <app-icon name="trash" size="0.9em" />
-                      </button>
+                <span class="min-w-0 flex-1">
+                  <span class="lookup-rail-key mono">{{ lookup.lookupType }}</span>
+                  <span class="lookup-rail-sub">
+                    @if (kindOf(lookup).key === 'list') {
+                      {{ entryCount(lookup) }} {{ entryCount(lookup) === 1 ? 'entry' : 'entries' }}
+                      @if (matchingEntries(lookup); as n) { <em>· {{ n }} match</em> }
+                    } @else if (lookup.encrypted) {
+                      encrypted value
                     } @else {
-                      <span class="pill pill-neutral"
-                            title="Shared with every workspace — only a platform admin can change it">
-                        <app-icon name="lock" size="0.8em" />shared
-                      </span>
+                      {{ lookup.lookupValue || '—' }}
                     }
-                  </div>
-                </td>
-              </tr>
-            }
-            <tr class="lookup-child">
-              <td></td>
-              <td colspan="7" class="py-1.5">
-                <button type="button" class="btn btn-ghost btn-sm ml-5" (click)="addChild(lookup)">
-                  <app-icon name="plus" size="0.85em" class="icon-ok" />Add an entry under {{ lookup.lookupType }}
-                </button>
-              </td>
-            </tr>
+                  </span>
+                </span>
+                <app-icon name="chevronRight" size="0.9em" class="lookup-rail-chev" />
+              </button>
+            </li>
           }
-        }
-      </tbody>
-    </table>
-    }
-  </app-table-shell>
+        </ul>
+      }
+    </aside>
+
+    <!-- Detail -->
+    <section class="lookup-detail" aria-live="polite">
+      @if (selected(); as lookup) {
+        <header class="lookup-detail-head">
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span [class]="'pill ' + kindOf(lookup).pill" [title]="kindOf(lookup).hint">
+                <app-icon [name]="kindOf(lookup).icon" size="0.85em" />{{ kindOf(lookup).label }}
+              </span>
+              @if (lookup.tenantId == null) {
+                <span class="pill pill-neutral" title="Platform-owned — every workspace reads it">
+                  <app-icon name="globe" size="0.8em" class="opacity-70" />Platform
+                </span>
+              }
+            </div>
+            <div class="flex items-center gap-1.5 mt-1.5 min-w-0">
+              <h2 class="lookup-detail-key mono" [title]="lookup.lookupType">{{ lookup.lookupType }}</h2>
+              <app-copy-button [value]="lookup.lookupType" [copied]="copiedKey() === lookup.lookupId + ':type'"
+                               copiedLabel="Key copied" (copy)="copyValue(lookup.lookupId, 'type', lookup.lookupType)" />
+            </div>
+            <p class="text-sm text-[color:var(--text-secondary)] mt-1">{{ lookup.description || 'No description.' }}</p>
+            <p class="text-xs text-[color:var(--text-muted)] mt-1.5">
+              @if (lookup.createdByName) { Added by {{ lookup.createdByName }} }
+              @if (lookup.createdByName && lookup.updatedByName) { · }
+              @if (lookup.updatedByName) { last changed by {{ lookup.updatedByName }} }
+              @if (!lookup.createdByName && !lookup.updatedByName) { Part of the platform's seed data. }
+            </p>
+          </div>
+          <div class="flex items-center gap-1.5 shrink-0">
+            @if (kindOf(lookup).key !== 'managed') {
+              <button type="button" class="btn btn-primary btn-sm" (click)="addChild(lookup)">
+                <app-icon name="plus" />Add entry
+              </button>
+            }
+            <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="detailMenu" aria-label="More actions">
+              <app-icon name="dots" size="1.05em" />
+            </button>
+            <ng-template #detailMenu>
+              <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="edit(lookup)">
+                  <app-icon name="edit" />Edit lookup
+                </button>
+                @if (kindOf(lookup).key === 'managed') {
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="addChild(lookup)">
+                    <app-icon name="plus" />Add entry anyway
+                  </button>
+                }
+                <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="remove(lookup)">
+                  <app-icon name="trash" class="icon-crit" />Delete lookup
+                </button>
+              </div>
+            </ng-template>
+          </div>
+        </header>
+
+        <!-- The value: a setting's whole point, a list's label. Managed values carry a warning. -->
+        <div class="lookup-value-block">
+          <div class="eyebrow">Value</div>
+          @if (lookup.encrypted) {
+            <span class="pill pill-neutral" title="Stored encrypted — the value is not shown">
+              <app-icon name="lock" size="0.85em" class="icon-warn" />encrypted
+            </span>
+          } @else if (lookup.lookupValue) {
+            <div class="lookup-value lookup-value-lg">
+              <span class="mono break-all">{{ lookup.lookupValue }}</span>
+              @if (isUrl(lookup.lookupValue)) {
+                <a class="lookup-open" [href]="lookup.lookupValue" target="_blank" rel="noopener" title="Open in a new tab">
+                  <app-icon name="external" size="0.95em" /></a>
+              }
+              <app-copy-button [value]="lookup.lookupValue" [copied]="copiedKey() === lookup.lookupId + ':value'"
+                               copiedLabel="Value copied" (copy)="copyValue(lookup.lookupId, 'value', lookup.lookupValue)" />
+            </div>
+          } @else {
+            <span class="text-[color:var(--text-muted)]">—</span>
+          }
+          @if (kindOf(lookup).key === 'managed') {
+            <p class="field-note text-[color:var(--text-muted)] mt-2 flex items-start gap-1.5">
+              <app-icon name="clock" size="0.9em" class="icon-warn shrink-0 mt-0.5" />
+              <span>The scheduler writes this on every pass. Changing it by hand moves the watermark, which
+                re-reads or skips work — do it only to recover from a stuck sync.</span>
+            </p>
+          } @else if (kindOf(lookup).key === 'list') {
+            <p class="field-note text-[color:var(--text-muted)] mt-2">
+              A list's value is only its display label; the entries below are what a form or pipeline offers.
+            </p>
+          }
+        </div>
+
+        <!-- Entries -->
+        <div class="lookup-entries">
+          <div class="lookup-entries-head">
+            <h3 class="section-title">Entries
+              <span class="text-[color:var(--text-muted)] font-normal">
+                ({{ visibleEntries().length }}@if (visibleEntries().length !== entryCount(lookup)) { of {{ entryCount(lookup) }} })
+              </span>
+            </h3>
+            @if (loadingChildren().has($any(lookup.lookupId))) {
+              <app-icon name="refresh" class="spin icon-muted" />
+            }
+          </div>
+
+          @if (!entryCount(lookup)) {
+            <div class="lookup-entries-empty">
+              <app-icon name="layers" size="1.5rem" class="icon-muted" />
+              <p>No entries under <span class="mono">{{ lookup.lookupType }}</span> yet.</p>
+              <p class="text-[color:var(--text-muted)]">
+                @if (kindOf(lookup).key === 'managed') {
+                  A managed watermark does not take entries.
+                } @else {
+                  An entry is one option a form or pipeline can offer — a provider, a home page, a group.
+                }
+              </p>
+              @if (kindOf(lookup).key !== 'managed') {
+                <button type="button" class="btn btn-default btn-sm" (click)="addChild(lookup)">
+                  <app-icon name="plus" class="icon-ok" />Add the first entry
+                </button>
+              }
+            </div>
+          } @else if (!visibleEntries().length) {
+            <div class="lookup-entries-empty">
+              <p>No entry matches “{{ search() }}”.</p>
+            </div>
+          } @else {
+            <div class="overflow-x-auto">
+              <table class="table-modern lookup-entry-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Value</th>
+                    <th>Description</th>
+                    @if (canSeeWorkspace()) { <th>Workspace</th> }
+                    <th>Added by</th>
+                    <th class="w-20"><span class="sr-only">Actions</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (child of visibleEntries(); track child.lookupId) {
+                    <tr>
+                      <td class="max-w-56">
+                        <div class="lookup-value">
+                          <span class="font-medium truncate" [title]="child.lookupType">{{ child.lookupType }}</span>
+                          <app-copy-button [value]="child.lookupType" [copied]="copiedKey() === child.lookupId + ':type'"
+                                           copiedLabel="Name copied" (copy)="copyValue(child.lookupId, 'type', child.lookupType)" />
+                        </div>
+                      </td>
+                      <td class="max-w-72">
+                        @if (child.encrypted) {
+                          <span class="pill pill-neutral" title="Stored encrypted — the value is not shown">
+                            <app-icon name="lock" size="0.85em" class="icon-warn" />encrypted
+                          </span>
+                        } @else if (child.lookupValue) {
+                          <div class="lookup-value">
+                            <span class="mono truncate text-[color:var(--text-secondary)]" [title]="child.lookupValue">{{ child.lookupValue }}</span>
+                            @if (isUrl(child.lookupValue)) {
+                              <a class="lookup-open" [href]="child.lookupValue" target="_blank" rel="noopener" title="Open in a new tab">
+                                <app-icon name="external" size="0.85em" /></a>
+                            }
+                            <app-copy-button [value]="child.lookupValue" [copied]="copiedKey() === child.lookupId + ':value'"
+                                             copiedLabel="Value copied" (copy)="copyValue(child.lookupId, 'value', child.lookupValue)" />
+                          </div>
+                        } @else {
+                          <span class="text-[color:var(--text-muted)]">—</span>
+                        }
+                      </td>
+                      <td class="max-w-80 text-[color:var(--text-secondary)]">
+                        <span class="block truncate" [title]="child.description || ''">{{ child.description || '—' }}</span>
+                      </td>
+                      @if (canSeeWorkspace()) {
+                        <td>
+                          <span class="pill pill-neutral" [title]="child.tenantId == null ? 'Platform-owned — every workspace reads it' : 'Workspace: ' + workspaceName(child)">
+                            <app-icon [name]="child.tenantId == null ? 'globe' : 'building'" size="0.8em" class="opacity-70" />
+                            {{ workspaceName(child) }}
+                          </span>
+                        </td>
+                      }
+                      <td class="text-xs text-[color:var(--text-secondary)] whitespace-nowrap">{{ child.createdByName || '—' }}</td>
+                      <td>
+                        <div class="flex items-center justify-end gap-1">
+                          @if (canModify(child)) {
+                            <button type="button" class="btn-circle" title="Edit entry" aria-label="Edit entry"
+                                    (click)="edit(child, lookup)"><app-icon name="edit" size="0.9em" /></button>
+                            <button type="button" class="btn-circle btn-circle-danger" title="Delete entry" aria-label="Delete entry"
+                                    (click)="remove(child, lookup)"><app-icon name="trash" size="0.9em" /></button>
+                          } @else {
+                            <span class="text-[10px] text-[color:var(--text-muted)] whitespace-nowrap"
+                                  title="Owned by the platform or another workspace">read-only</span>
+                          }
+                        </div>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </div>
+      } @else if (!loading() && !error()) {
+        <div class="lookup-entries-empty lookup-detail-empty">
+          <app-icon name="list" size="1.6rem" class="icon-muted" />
+          <p>Pick a lookup on the left.</p>
+        </div>
+      }
+    </section>
+  </div>
 </div>

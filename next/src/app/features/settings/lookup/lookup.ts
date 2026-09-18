@@ -1,13 +1,13 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
-import { TableShell } from '../../../shared/ui/data-table';
 import { MineFilter, isMine } from '../../../shared/ui/mine-filter';
 import { AuthService } from '../../../core/auth/auth.service';
 import { Icon } from '../../../shared/ui/icon';
-import { ViewToggle } from '../../../shared/ui/view-toggle';
+import { StatTile } from '../../../shared/ui/stat-tile';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { CopyButton } from '../../../shared/ui/copy-button';
 import { copyText } from '../../../shared/ui/clipboard.util';
@@ -18,11 +18,10 @@ import { catchError, map } from 'rxjs/operators';
 
 @Component({
   selector: 'app-lookup',
-  imports: [MineFilter, ViewToggle, Icon, TableShell, CdkMenu, CdkMenuItem, CdkMenuTrigger, CopyButton],
+  imports: [MineFilter, Icon, StatTile, CdkMenu, CdkMenuItem, CdkMenuTrigger, CopyButton],
   templateUrl: './lookup.html',
 })
 export class Lookup implements OnInit {
-  readonly view = signal<'table' | 'cards'>('table');
   private readonly http = inject(HttpClient);
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
@@ -34,7 +33,9 @@ export class Lookup implements OnInit {
   readonly loading = signal(true);
   readonly error = signal('');
   readonly search = signal('');
-  readonly expanded = signal<Set<number>>(new Set<number>());
+  /** Which lookup the detail pane shows; mirrored to ?lookup= so a row can be linked to. */
+  readonly selectedId = signal<number | null>(null);
+  readonly selected = computed(() => this.lookups().find(l => l.lookupId === this.selectedId()) ?? null);
   readonly loadingChildren = signal<Set<number>>(new Set<number>());
 
   /** Narrows the list to rows this person created. Not persisted -- see MineFilter. */
@@ -44,16 +45,114 @@ export class Lookup implements OnInit {
   readonly onlyMine = signal(false);
 
 
+  /**
+   * The rail: a lookup stays listed when it matches itself OR one of its entries matches, so
+   * searching "openai" lands on AI_PROVIDER with "1 match" beside it rather than on nothing.
+   */
   readonly filtered = computed(() => {
     const term = this.search().trim().toLowerCase();
     const rows = this.mine(this.lookups());
     if (!term) return rows;
     return rows.filter(l =>
       (l.lookupType ?? '').toLowerCase().includes(term)
-      || (l.lookupValue ?? '').toLowerCase().includes(term));
+      || (l.lookupValue ?? '').toLowerCase().includes(term)
+      || this.matchingEntries(l) > 0);
   });
 
-  ngOnInit(): void { this.load(); }
+  /** How many of a lookup's entries match the search; 0 when there is no search. */
+  matchingEntries(lookup: LookupData): number {
+    const term = this.search().trim().toLowerCase();
+    if (!term) return 0;
+    return (lookup.children ?? []).filter(c => this.entryMatches(c, term)).length;
+  }
+
+  private entryMatches(c: LookupData, term: string): boolean {
+    return (c.lookupType ?? '').toLowerCase().includes(term)
+      || (c.lookupValue ?? '').toLowerCase().includes(term)
+      || (c.description ?? '').toLowerCase().includes(term);
+  }
+
+  /** The selected lookup's entries, narrowed by the same search box when it names one of them. */
+  readonly visibleEntries = computed(() => {
+    const lookup = this.selected();
+    if (!lookup) return [];
+    const term = this.search().trim().toLowerCase();
+    const all = lookup.children ?? [];
+    if (!term || this.matchingEntries(lookup) === 0) return all;
+    return all.filter(c => this.entryMatches(c, term));
+  });
+
+  /**
+   * What a lookup IS, because the table treated three different things alike.
+   *
+   * A list has entries -- AI_PROVIDER, PIPELINE_HOME_PAGES -- and its own value is only a label.
+   * A setting is one value the engine reads -- QUEUE_FETCH_LIMIT. A managed lookup is a
+   * watermark the scheduler writes on every pass; editing one by hand is a recovery action,
+   * not configuration, so the screen says so and does not lead with "Add entry".
+   */
+  kindOf(lookup: LookupData): { key: 'list' | 'setting' | 'managed'; label: string; icon: string; pill: string; cls: string; hint: string } {
+    if ((lookup.children?.length ?? 0) > 0) {
+      return { key: 'list', label: 'List', icon: 'layers', pill: 'pill-brand', cls: 'is-list',
+        hint: 'A named set of entries a form or pipeline offers as choices' };
+    }
+    if (/_LAST_RUN_TIME$/.test(lookup.lookupType ?? '')) {
+      return { key: 'managed', label: 'Managed', icon: 'clock', pill: 'pill-warn', cls: 'is-managed',
+        hint: 'A watermark the scheduler writes; not something to configure' };
+    }
+    return { key: 'setting', label: 'Setting', icon: 'settings', pill: 'pill-ok', cls: 'is-setting',
+      hint: 'One value the engine or a pipeline reads' };
+  }
+
+  readonly stats = computed(() => {
+    const all = this.lookups();
+    const kinds = all.map(l => this.kindOf(l).key);
+    return {
+      lists: kinds.filter(k => k === 'list').length,
+      settings: kinds.filter(k => k === 'setting').length,
+      managed: kinds.filter(k => k === 'managed').length,
+      entries: all.reduce((sum, l) => sum + (l.children?.length ?? 0), 0),
+    };
+  });
+
+  select(lookup: LookupData): void {
+    this.selectedId.set(lookup.lookupId ?? null);
+    this.router.navigate([], { relativeTo: this.route, queryParams: { lookup: lookup.lookupId }, queryParamsHandling: 'merge', replaceUrl: true });
+  }
+
+  /** Whose entry each row is; only a platform admin sees more than one workspace here. */
+  private readonly tenants = signal<{ tenantId: number; tenantName: string }[]>([]);
+  readonly canSeeWorkspace = computed(() => this.auth.isPlatformAdmin());
+  workspaceName(entry: LookupData): string {
+    if (entry.tenantId == null) return 'Platform';
+    return this.tenants().find(t => t.tenantId === entry.tenantId)?.tenantName ?? `Tenant ${entry.tenantId}`;
+  }
+
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+
+  constructor() {
+    // Keep something selected: the linked one when the list arrives, else the first, and move
+    // off a lookup the moment it stops existing (deleted, or filtered out by "Only mine").
+    effect(() => {
+      const rows = this.filtered();
+      const current = untracked(this.selectedId);
+      if (!rows.length) { if (current !== null) this.selectedId.set(null); return; }
+      if (rows.some(l => l.lookupId === current)) return;
+      const linked = Number(untracked(() => this.route.snapshot.queryParamMap.get('lookup')));
+      const pick = rows.find(l => l.lookupId === linked) ?? rows[0];
+      this.selectedId.set(pick.lookupId ?? null);
+    });
+  }
+
+  ngOnInit(): void {
+    this.load();
+    if (this.canSeeWorkspace()) {
+      this.http.get<ApiResponse<{ tenantId: number; tenantName: string }[]>>(`${API_BASE}/tenant.json/listTenants`).subscribe({
+        next: r => { if (r.status === API_SUCCESS) this.tenants.set(r.data ?? []); },
+        error: () => {},
+      });
+    }
+  }
 
   load(): void {
     this.loading.set(true);
@@ -91,16 +190,6 @@ export class Lookup implements OnInit {
         this.loading.set(false);
         this.error.set(err?.error?.message || 'Could not load lookups.');
       },
-    });
-  }
-
-  /** Children are already loaded, so this is only a disclosure toggle. */
-  toggle(lookup: LookupData): void {
-    const id = lookup.lookupId!;
-    this.expanded.update(set => {
-      const next = new Set<number>(set);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
     });
   }
 
@@ -153,7 +242,6 @@ export class Lookup implements OnInit {
         if (response.status !== API_SUCCESS) return;
         const children = response.data?.lookupDatas ?? [];
         this.lookups.update(list => list.map(l => (l.lookupId === id ? { ...l, children } : l)));
-        this.expanded.update(set => new Set<number>(set).add(id));
       },
       error: () => {
         this.loadingChildren.update(set => { const n = new Set<number>(set); n.delete(id); return n; });
@@ -163,9 +251,6 @@ export class Lookup implements OnInit {
   }
 
   entryCount(lookup: LookupData): number { return lookup.children?.length ?? 0; }
-
-  readonly totalEntries = computed(() =>
-    this.lookups().reduce((sum, l) => sum + (l.children?.length ?? 0), 0));
 
   /**
    * Applies the "Only mine" toggle.
