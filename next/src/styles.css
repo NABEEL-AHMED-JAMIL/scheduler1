@@ -1438,6 +1438,11 @@ html.dark {
   .page-tool   { @apply space-y-5; }
 
   .page-head       { @apply flex flex-wrap items-end justify-between gap-3 mb-1; }
+  /* The action group stays on the right even when a long subtitle wraps it onto its own row:
+     with justify-between alone a lone second-row item sat flush left under the text. The
+     subtitle is capped so on a wide screen it does not push the actions down at all. */
+  .page-head > :last-child:not(:first-child) { margin-left: auto; }
+  .page-head > :first-child { max-width: 64rem; min-width: 0; }
   .page-title      { @apply text-2xl font-semibold tracking-tight; }
   .page-subtitle   { @apply text-sm text-[color:var(--text-secondary)] mt-1; }
 
