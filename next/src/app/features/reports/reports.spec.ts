@@ -4,7 +4,7 @@ import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { of } from 'rxjs';
 import { ToastService } from '../../shared/ui/toast.service';
-import { Reports } from './reports';
+import { Reports, reasonKey } from './reports';
 import { NO_DURATION, RunData, RunRow, humanSeconds } from './pivot';
 
 function reportsFor() {
@@ -221,5 +221,22 @@ describe('the truncation caption', () => {
 
     expect(reports.runsByDay()).toEqual([]);
     expect(reports.daysCapped()).toBe(false);
+  });
+});
+
+describe('reasonKey', () => {
+  it('folds the job id, the wording of the prefix and every number into one reason', () => {
+    const a = reasonKey('Job 2477 failed due to AI step <summary> failed: Daily token budget reached on "Ollama" (9,941 of 9,657 today). No call was made.');
+    const b = reasonKey('Job 2476: AI step <summary> failed: Daily token budget reached on "Ollama" (16,801 of 1 today). No call was made.');
+    expect(a).toBe(b);
+    expect(a).toBe('AI step <summary> failed: Daily token budget reached on "Ollama" (# of # today). No call was made.');
+  });
+  it('keeps a message with no job prefix, and names an empty one', () => {
+    expect(reasonKey("Task payload for F768926 could not be parsed; check the task's XML"))
+      .toBe("Task payload for F# could not be parsed; check the task's XML");
+    expect(reasonKey('Job 2489 failed in the queue because the main job is deleted or inactive.'))
+      .toBe('failed in the queue because the main job is deleted or inactive.');
+    expect(reasonKey('   ')).toBe('(no message)');
+    expect(reasonKey(undefined)).toBe('(no message)');
   });
 });

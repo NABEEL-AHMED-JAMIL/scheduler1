@@ -236,9 +236,23 @@
           }
         </p>
       </div>
-      <app-table-shell heading="Tasks" [shown]="taskHealth().length" [total]="taskHealth().length"
-                       [isEmpty]="!taskHealth().length"
-                       emptyMessage="No task ran in this range." emptyIcon="chart">
+      <app-table-shell heading="Tasks" [shown]="healthRows().length" [total]="taskHealth().length"
+                       [isEmpty]="!healthRows().length"
+                       [emptyMessage]="taskHealth().length ? 'No task matches.' : 'No task ran in this range.'" emptyIcon="chart">
+        <ng-container toolbar>
+          <!-- At a hundred tasks the worst-first order is not enough: the chips cut the list to
+               the tasks that need looking at, the search finds one by name. -->
+          <button type="button" class="pill pill-crit hover-brand" [class.is-on]="healthState() === 'failing'"
+                  (click)="setHealthState('failing')" title="Tasks with at least one failed run">{{ unhealthyTasks() }} failing</button>
+          <button type="button" class="pill pill-warn hover-brand" [class.is-on]="healthState() === 'inflight'"
+                  (click)="setHealthState('inflight')" title="Tasks with a run still going">{{ inFlightTasks() }} in flight</button>
+          <button type="button" class="pill pill-ok hover-brand" [class.is-on]="healthState() === 'healthy'"
+                  (click)="setHealthState('healthy')" title="Tasks whose every run completed">{{ taskHealth().length - unhealthyTasks() - inFlightTasks() }} healthy</button>
+          <div class="search-field max-w-56">
+            <app-icon name="search" size="0.95em" />
+            <input class="input" placeholder="Find a task" aria-label="Find a task" [value]="healthSearch()" (input)="setHealthSearch($any($event.target).value)" />
+          </div>
+        </ng-container>
         <table class="table-modern">
           <thead>
             <tr>
@@ -259,7 +273,7 @@
             </tr>
           </thead>
           <tbody>
-            @for (task of taskHealth(); track task.task) {
+            @for (task of healthPage(); track task.task) {
               <tr>
                 <td class="max-w-64">
                   <button type="button" class="link-inline font-medium text-left max-w-full block"
@@ -302,6 +316,8 @@
             }
           </tbody>
         </table>
+        <app-pagination pager [total]="healthRows().length" [page]="healthPager.page()" [size]="healthPager.size()"
+                        (goTo)="healthPager.goTo($event, healthRows().length)" (setSize)="healthPager.setSize($event)" />
       </app-table-shell>
     </section>
 
@@ -318,11 +334,42 @@
         <!-- [total] is the same population as [shown]. It used to be counts().failed, which
              comes from the runs feed while the rows come from fetchLogs: the two filter on
              different date columns, so the header could read "(5 of 4)". -->
+        <!-- The same message with its numbers taken out is one reason. Sixty failed rows were
+             four reasons; this says so first, and a reason narrows the list under it. -->
+        @if (failureReasons().length > 1) {
+          <div class="card p-4">
+            <div class="flex items-baseline gap-2 mb-2">
+              <h3 class="font-semibold text-sm">By reason</h3>
+              <span class="text-xs text-[color:var(--text-muted)]">{{ failureReasons().length }} distinct · click one to narrow the list</span>
+            </div>
+            <ul class="reason-list">
+              @for (r of failureReasons().slice(0, 8); track r.key) {
+                <li>
+                  <button type="button" class="reason-row" [class.is-on]="failureReason() === r.key" (click)="setFailureReason(r.key)" [title]="r.sample">
+                    <span class="reason-count tabular">{{ r.count }}</span>
+                    <span class="reason-bar"><span class="reason-fill" [style.width.%]="(r.count / failureReasons()[0].count) * 100"></span></span>
+                    <span class="reason-text mono truncate">{{ r.sample }}</span>
+                    <span class="reason-meta">{{ r.count === 1 ? 'run' : 'runs' }} across {{ r.tasks }} task{{ r.tasks === 1 ? '' : 's' }}</span>
+                  </button>
+                </li>
+              }
+            </ul>
+          </div>
+        }
         <app-table-shell heading="Failed runs" [loading]="failuresLoading()"
-                         [error]="failuresError()" [shown]="visibleFailures().length"
-                         [total]="visibleFailures().length" [isEmpty]="!visibleFailures().length"
-                         emptyMessage="No failure detail was returned for this range."
+                         [error]="failuresError()" [shown]="failureRows().length"
+                         [total]="visibleFailures().length" [isEmpty]="!failureRows().length"
+                         [emptyMessage]="visibleFailures().length ? 'No failed run matches.' : 'No failure detail was returned for this range.'"
                          emptyIcon="alert" (retry)="retryFailures()">
+          <ng-container toolbar>
+            @if (failureReason()) {
+              <button type="button" class="btn btn-ghost btn-sm" (click)="setFailureReason(failureReason())"><app-icon name="close" />One reason</button>
+            }
+            <div class="search-field max-w-56">
+              <app-icon name="search" size="0.95em" />
+              <input class="input" placeholder="Find by job, task or error" aria-label="Find a failed run" [value]="failureSearch()" (input)="setFailureSearch($any($event.target).value)" />
+            </div>
+          </ng-container>
           <table class="table-modern">
             <thead>
               <tr>
@@ -334,7 +381,7 @@
               </tr>
             </thead>
             <tbody>
-              @for (failure of visibleFailures(); track failure.jobQueueId) {
+              @for (failure of failurePage(); track failure.jobQueueId) {
                 <tr>
                   <!-- The drill-through is a real control in the cell, not a click handler on
                        the row. A bare (click) on a <tr> is reachable by mouse only: no tab
@@ -374,6 +421,59 @@
                       }
                     </div>
                   </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+          <app-pagination pager [total]="failureRows().length" [page]="failurePager.page()" [size]="failurePager.size()"
+                          (goTo)="failurePager.goTo($event, failureRows().length)" (setSize)="failurePager.setSize($event)" />
+        </app-table-shell>
+      </section>
+    }
+
+    <!-- ── Model calls ────────────────────────────────────────────────────────────────── -->
+    @if (aiUsage().length) {
+      <section class="space-y-3">
+        <div>
+          <h2 class="section-title">Model calls</h2>
+          <p class="section-sub">
+            What the AI steps and prompt tries in this range cost: every call, whichever prompt
+            made it, with the tokens it spent. A failed call is a refusal before the model was
+            asked (budget, an empty variable) or an answer that never validated.
+          </p>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <app-stat-tile label="Calls" [value]="aiTotals().calls" icon="sparkle" tone="info" [foot]="aiTotals().prompts + ' prompt' + (aiTotals().prompts === 1 ? '' : 's')" />
+          <app-stat-tile label="Failed" [value]="aiTotals().failed" icon="alert" [tone]="aiTotals().failed ? 'warn' : 'muted'" [foot]="aiTotals().calls ? aiTotals().failedPct + '% of calls' : ''" />
+          <app-stat-tile label="Tokens in" [value]="aiTotals().tokensIn" icon="list" tone="info" foot="what the prompts sent" />
+          <app-stat-tile label="Tokens out" [value]="aiTotals().tokensOut" icon="code" tone="info" foot="what the models answered" />
+        </div>
+        <app-table-shell heading="Prompts" [shown]="aiUsage().length" [total]="aiUsage().length" [loading]="aiUsageLoading()"
+                         [isEmpty]="!aiUsage().length" emptyMessage="No model call in this range." emptyIcon="sparkle">
+          <table class="table-modern">
+            <thead>
+              <tr>
+                <th>Prompt</th>
+                <th class="text-right">Calls</th>
+                <th class="text-right">Failed</th>
+                <th class="text-right hidden md:table-cell" title="Runs from the editor's Try it">Tries</th>
+                <th class="text-right">Tokens in</th>
+                <th class="text-right">Tokens out</th>
+                <th class="text-right hidden lg:table-cell">Median</th>
+                <th class="hidden lg:table-cell">Last call</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (r of aiUsage(); track r.promptName + r.promptId) {
+                <tr>
+                  <td class="max-w-64"><span class="font-medium truncate block">{{ r.promptName }}</span></td>
+                  <td class="text-right tabular">{{ r.calls | number }}</td>
+                  <td class="text-right tabular" [class.text-crit-500]="r.failed > 0" [class.text-[color:var(--text-muted)]]="!r.failed">{{ r.failed }}</td>
+                  <td class="text-right tabular hidden md:table-cell text-[color:var(--text-muted)]">{{ r.tries }}</td>
+                  <td class="text-right tabular">{{ r.tokensIn | number }}</td>
+                  <td class="text-right tabular">{{ r.tokensOut | number }}</td>
+                  <td class="text-right tabular mono text-xs hidden lg:table-cell">{{ (r.medianMs / 1000) | number: '1.1-1' }} s</td>
+                  <td class="hidden lg:table-cell mono text-xs text-[color:var(--text-muted)]">{{ r.lastAt ? r.lastAt.slice(0, 16).replace('T', ' ') : '—' }}</td>
                 </tr>
               }
             </tbody>

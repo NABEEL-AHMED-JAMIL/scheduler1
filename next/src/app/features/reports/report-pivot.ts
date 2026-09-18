@@ -7,12 +7,14 @@ import { statusColor } from '../../shared/charts/status-color';
 import { Icon } from '../../shared/ui/icon';
 import { StatusPill } from '../../shared/ui/status-pill';
 import { TableShell } from '../../shared/ui/data-table';
+import { createPager } from '../../shared/ui/pager';
+import { Pagination } from '../../shared/ui/pagination';
 import { CHART_LABELS, ChartKind, RADAR_ROWS, ReportChart } from './report-chart';
 import { ReportDestinationDialog } from './report-destination-dialog';
 import {
   DIMENSIONS, Dimension, dimensionFor, MEASURE_GROUPS, MEASURE_LABELS, Measure, RunData, RunRow,
-  COUNTING, EXECUTION, EXEC_SECONDS, JOB_NAME, NO_DURATION, RUN_ID, SECONDS, buildPivot,
-  formatMeasure, humanSeconds, ADDITIVE} from './pivot';
+  COUNTING, EXECUTION, EXEC_SECONDS, JOB_NAME, NO_DURATION, RUN_ID, SECONDS, Pivot, aggregate,
+  buildPivot, formatMeasure, humanSeconds, ADDITIVE} from './pivot';
 
 const EMPTY: RunData = { task: [], status: [], owner: [], day: [], job: [], tenant: [], rows: [] };
 
@@ -34,7 +36,7 @@ const EMPTY: RunData = { task: [], status: [], owner: [], day: [], job: [], tena
  */
 @Component({
   selector: 'app-report-pivot',
-  imports: [Icon, StatusPill, TableShell, ReportChart],
+  imports: [Icon, StatusPill, TableShell, ReportChart, Pagination],
   templateUrl: './report-pivot.html',
   // The spacing used to come from the .page wrapper this markup sat inside. Without it the
   // shape card, the chart and the grid render flush against each other, and an Angular host is
@@ -156,8 +158,86 @@ export class ReportPivot {
     return pivot.colLabels;
   });
 
-  readonly pivot = computed(() =>
+  /** Every row, in the order the dictionary supplies. The grid and the chart are views of it. */
+  readonly fullPivot = computed(() =>
     buildPivot(this.data(), this.rowDim(), this.colDim(), this.measure()));
+
+  /**
+   * The grid grew up on a handful of tasks. At a hundred and seventy rows it was a wall: nothing
+   * to find a row by, nothing to say which rows mattered, and a page-long scroll to the totals.
+   * So the rows are searched, ordered and paged here -- and the chart draws the top of that
+   * order rather than a hairline per row.
+   */
+  readonly rowSearch = signal('');
+  /** Highest total first, or the order the dimension came in (chronological for Day, A-Z else). */
+  readonly rowOrder = signal<'total' | 'natural'>('total');
+  readonly rowPager = createPager<number>(25);
+
+  /** The rows the reader asked for, in the order they asked for. Totals follow the rows shown. */
+  readonly pivot = computed<Pivot>(() => {
+    const full = this.fullPivot();
+    const q = this.rowSearch().trim().toLowerCase();
+    let order = full.rowLabels.map((_, i) => i);
+    if (q) order = order.filter(i => full.rowLabels[i].toLowerCase().includes(q));
+    if (this.rowOrder() === 'total') {
+      // Stable on ties, so equal rows keep the dictionary's order instead of shuffling.
+      order = [...order].sort((a, b) => (full.rowTotals[b] - full.rowTotals[a]) || (a - b));
+    }
+    if (!q && order.every((v, i) => v === i)) return full;
+    const cellRows = order.map(i => full.cellRows[i]);
+    const measure = this.measure();
+    // A search narrows the totals too: an "All" row that counted rows the reader had filtered
+    // out would disagree with every number above it.
+    const colTotals = q
+      ? full.colLabels.map((_, ci) => aggregate(cellRows.flatMap(cells => cells[ci]), measure))
+      : full.colTotals;
+    return {
+      rowLabels: order.map(i => full.rowLabels[i]),
+      colLabels: full.colLabels,
+      matrix: order.map(i => full.matrix[i]),
+      rowTotals: order.map(i => full.rowTotals[i]),
+      colTotals,
+      grand: q ? aggregate(cellRows.flat(2), measure) : full.grand,
+      cellRows,
+    };
+  });
+
+  /** Which rows of the ordered pivot are on the page now, as indexes into it. */
+  readonly pageRows = computed(() =>
+    this.rowPager.slice(this.pivot().rowLabels.map((_, i) => i)));
+
+  /** How many rows a category chart draws before the bars stop being bars. */
+  static readonly CHART_ROWS = 12;
+
+  /**
+   * What the chart is given. Ranked and radar cap themselves and say so; the rest drew one
+   * series per row, which at 173 tasks was a comb of 1px lines with nine labels between them.
+   * Those now draw the top rows by total, and the note under the chart says how many more the
+   * grid holds. A Day axis is left whole: it is a time line, and cutting it to the busiest
+   * twelve days would put March next to August.
+   */
+  readonly chartPivot = computed<Pivot>(() => {
+    const p = this.pivot();
+    const kind = this.chart();
+    if (kind === 'ranked' || kind === 'radar' || this.dayAxis() === 'row'
+        || p.rowLabels.length <= ReportPivot.CHART_ROWS) return p;
+    const top = p.rowLabels.map((_, i) => i)
+      .sort((a, b) => (p.rowTotals[b] - p.rowTotals[a]) || (a - b))
+      .slice(0, ReportPivot.CHART_ROWS)
+      .sort((a, b) => a - b);
+    return {
+      ...p,
+      rowLabels: top.map(i => p.rowLabels[i]),
+      matrix: top.map(i => p.matrix[i]),
+      rowTotals: top.map(i => p.rowTotals[i]),
+      cellRows: top.map(i => p.cellRows[i]),
+    };
+  });
+  readonly chartHidden = computed(() =>
+    this.pivot().rowLabels.length - this.chartPivot().rowLabels.length);
+
+  setRowSearch(text: string): void { this.rowSearch.set(text); this.rowPager.reset(); }
+  setRowOrder(order: 'total' | 'natural'): void { this.rowOrder.set(order); this.rowPager.reset(); }
 
   readonly title = computed(() =>
     `${MEASURE_LABELS[this.measure()]} by ${this.rowDim().label.toLowerCase()}` +
@@ -172,16 +252,24 @@ export class ReportPivot {
     // Two of the same dimension would produce a diagonal and nothing else.
     if (next.key === this.colDim().key) this.colDim.set(this.rowDim());
     this.rowDim.set(next);
+    this.rowsReshaped();
   }
   setColDim(key: string): void {
     const next = DIMENSIONS.find(d => d.key === key)!;
     if (next.key === this.rowDim().key) this.rowDim.set(this.colDim());
     this.colDim.set(next);
+    this.rowsReshaped();
   }
   swap(): void {
     const row = this.rowDim();
     this.rowDim.set(this.colDim());
     this.colDim.set(row);
+    this.rowsReshaped();
+  }
+  /** New rows, new order: days read in date order, everything else busiest first. */
+  private rowsReshaped(): void {
+    this.rowOrder.set(this.rowDim().key === 'day' ? 'natural' : 'total');
+    this.rowPager.reset();
   }
   setMeasure(value: string): void { this.measure.set(value as Measure); }
 

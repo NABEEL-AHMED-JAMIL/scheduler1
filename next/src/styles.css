@@ -1733,3 +1733,15 @@ html.dark .btn-circle-danger:hover:not(:disabled) { background: color-mix(in okl
 .ai-step-line { display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 0.75rem; border-radius: 8px; background: var(--surface-inset); border: 1px dashed var(--border-strong); }
 .icon-brand { color: var(--color-brand-500); }
 .ai-step-card { display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.7rem 0.85rem; border-radius: 8px; background: var(--surface-inset); border: 1px dashed var(--border-strong); }
+
+/* Reports: failures by reason -- one row per distinct message, a bar for its share. */
+.reason-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.25rem; }
+.reason-row { display: grid; grid-template-columns: 3rem 6rem minmax(0, 1fr) auto; gap: 0.75rem; align-items: center; width: 100%; text-align: left; padding: 0.35rem 0.5rem; border-radius: 6px; border: 1px solid transparent; background: none; color: inherit; font: inherit; cursor: pointer; }
+.reason-row:hover { background: var(--surface-sunken); }
+.reason-row.is-on { border-color: var(--color-brand-500); background: var(--surface-sunken); }
+.reason-count { font-weight: 600; text-align: right; }
+.reason-bar { height: 0.45rem; border-radius: 999px; background: var(--surface-sunken); overflow: hidden; }
+.reason-fill { display: block; height: 100%; background: var(--color-crit-500); opacity: 0.75; }
+.reason-text { font-size: 12px; color: var(--text-secondary); min-width: 0; }
+.reason-meta { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+.pill.is-on { outline: 2px solid var(--color-brand-500); outline-offset: 1px; }

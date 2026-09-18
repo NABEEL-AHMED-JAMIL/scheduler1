@@ -105,8 +105,15 @@
     }
   </div>
   <div class="p-4">
-    <app-report-chart #chartRef [pivot]="pivot()" [measure]="measure()" [kind]="chart()"
+    <app-report-chart #chartRef [pivot]="chartPivot()" [measure]="measure()" [kind]="chart()"
                       [dayAxis]="dayAxis()" [colorFor]="colourFor" />
+    @if (chartHidden()) {
+      <p class="field-note text-[color:var(--text-muted)] mt-2">
+        Showing the top {{ chartPivot().rowLabels.length }} of {{ pivot().rowLabels.length }}
+        {{ rowDim().label.toLowerCase() }} rows by total. The other {{ chartHidden() }} are in the
+        table below.
+      </p>
+    }
     @if (chartRef.rankedHidden()) {
       <p class="field-note text-[color:var(--text-muted)] mt-2">
         Showing the top 8 of {{ pivot().rowLabels.length }} rows by total.
@@ -136,12 +143,24 @@
 </div>
 
 <!-- the grid -->
-<app-table-shell [heading]="title()" [shown]="pivot().rowLabels.length"
-                 [total]="pivot().rowLabels.length" [isEmpty]="false">
+<app-table-shell [heading]="title()" [shown]="pageRows().length"
+                 [total]="fullPivot().rowLabels.length" [isEmpty]="false">
   <ng-container toolbar>
-    <span class="text-xs text-[color:var(--text-muted)]">
+    <span class="text-xs text-[color:var(--text-muted)] hidden md:inline">
       Click any number to see the runs behind it
     </span>
+    <button type="button" class="pill pill-neutral hover-brand" [class.is-on]="rowOrder() === 'total'"
+            (click)="setRowOrder('total')" title="Busiest rows first">Highest first</button>
+    <button type="button" class="pill pill-neutral hover-brand" [class.is-on]="rowOrder() === 'natural'"
+            (click)="setRowOrder('natural')"
+            [title]="rowDim().key === 'day' ? 'Oldest day first' : 'In the order the ' + rowDim().label.toLowerCase() + 's are listed'"
+            >{{ rowDim().key === 'day' ? 'By date' : 'A → Z' }}</button>
+    <div class="search-field max-w-56">
+      <app-icon name="search" size="0.95em" />
+      <input class="input" id="r-find" [placeholder]="'Find a ' + rowDim().label.toLowerCase()"
+             [attr.aria-label]="'Find a ' + rowDim().label.toLowerCase()"
+             [value]="rowSearch()" (input)="setRowSearch($any($event.target).value)" />
+    </div>
   </ng-container>
 
   <table class="table-modern">
@@ -192,10 +211,10 @@
       </tr>
     </thead>
     <tbody>
-      @for (rowLabel of pivot().rowLabels; track rowLabel; let ri = $index) {
+      @for (ri of pageRows(); track pivot().rowLabels[ri]) {
         <tr>
           <td class="font-medium max-w-64">
-            <span class="truncate block" [title]="rowLabel">{{ rowLabel }}</span>
+            <span class="truncate block" [title]="pivot().rowLabels[ri]">{{ pivot().rowLabels[ri] }}</span>
           </td>
           @for (colLabel of pivot().colLabels; track colLabel; let ci = $index) {
             <td class="text-right tabular !p-0">
@@ -210,7 +229,7 @@
                              disabled:hover:bg-transparent"
                       [class.text-[color:var(--text-muted)]]="cellIsEmpty(ri, ci)"
                       [disabled]="cellIsEmpty(ri, ci)"
-                      [title]="rowLabel + ' · ' + colLabel"
+                      [title]="pivot().rowLabels[ri] + ' · ' + colLabel"
                       (click)="drill(ri, ci)">
                 {{ cellText(ri, ci) }}
               </button>
@@ -224,8 +243,13 @@
           </td>
         </tr>
       }
+      @if (!pivot().rowLabels.length) {
+        <tr><td [attr.colspan]="pivot().colLabels.length + 2" class="text-center text-sm text-[color:var(--text-muted)] py-6">
+          No {{ rowDim().label.toLowerCase() }} matches “{{ rowSearch() }}”.
+        </td></tr>
+      }
       <tr class="border-t-2 border-strong">
-        <td class="font-semibold bg-raised">All</td>
+        <td class="font-semibold bg-raised">All{{ rowSearch() ? ' matching' : '' }}</td>
         @for (colLabel of pivot().colLabels; track colLabel; let ci = $index) {
           <td class="text-right tabular font-semibold !p-0 bg-raised"
              >
@@ -240,6 +264,8 @@
       </tr>
     </tbody>
   </table>
+  <app-pagination pager [total]="pivot().rowLabels.length" [page]="rowPager.page()" [size]="rowPager.size()"
+                  (goTo)="rowPager.goTo($event, pivot().rowLabels.length)" (setSize)="rowPager.setSize($event)" />
 </app-table-shell>
 @if (drillRows().length) {
   <div class="fixed inset-x-0 bottom-0 z-40 card shadow-2xl flex flex-col"

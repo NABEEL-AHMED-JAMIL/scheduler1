@@ -14,6 +14,9 @@ import { Icon } from '../../shared/ui/icon';
 import { StatTile } from '../../shared/ui/stat-tile';
 import { StatusPill } from '../../shared/ui/status-pill';
 import { TableShell } from '../../shared/ui/data-table';
+import { createPager } from '../../shared/ui/pager';
+import { Pagination } from '../../shared/ui/pagination';
+import { DecimalPipe } from '@angular/common';
 import { ReportPivot } from './report-pivot';
 import {
   EXEC_SECONDS, JOB_NAME, NO_DURATION, RUN_ID, TENANT_IDX, RunData, RunRow, SECONDS, aggregate,
@@ -89,6 +92,43 @@ interface FailureRow {
   seconds: number;
 }
 
+/** One prompt's model calls over the range, from aiPrompt.json/usage. */
+interface AiUsageRow {
+  promptId: number | null;
+  promptName: string;
+  calls: number;
+  failed: number;
+  tries: number;
+  tokensIn: number;
+  tokensOut: number;
+  medianMs: number;
+  lastAt: string | null;
+}
+
+/** Failures with the same message once its numbers are taken out: one reason, many runs. */
+interface FailureReason {
+  key: string;
+  sample: string;
+  count: number;
+  tasks: number;
+  lastWhen: string;
+}
+
+/**
+ * What a failure message says once its particulars are taken out: the job id, and every
+ * number. Two server paths word the same fault differently -- "Job 2477 failed due to X" and
+ * "Job 2476: X" -- and a token budget prints today's tally, so without this the one reason
+ * showed up as three or four rows in the list that exists to say how many reasons there are.
+ */
+export function reasonKey(message: string | undefined | null): string {
+  const text = (message || '').replace(/\s+/g, ' ').trim();
+  if (!text) return '(no message)';
+  return text
+    .replace(/^Job\s+\d+\s*(failed due to\s*|:\s*|(?=failed))/i, '')
+    .replace(/\d[\d,]*(\.\d+)?/g, '#')
+    .slice(0, 160);
+}
+
 /** One row of POST /message.json/fetchLogs. */
 interface QueueLog {
   jobQueueId?: number; jobId?: number; jobName?: string;
@@ -122,7 +162,7 @@ interface QueueLog {
  */
 @Component({
   selector: 'app-reports',
-  imports: [Icon, StatTile, StatusPill, TableShell, Donut, BarChart, Histogram, ReportPivot, Combobox],
+  imports: [Icon, StatTile, StatusPill, TableShell, Donut, BarChart, Histogram, ReportPivot, Combobox, Pagination, DecimalPipe],
   templateUrl: './reports.html',
 })
 export class Reports implements OnInit {
@@ -221,6 +261,18 @@ export class Reports implements OnInit {
   readonly showBuilder = signal(false);
 
   readonly failures = signal<FailureRow[]>([]);
+
+  // ---- Task health at volume: a search, a state filter and a page, over the worst-first list.
+  readonly healthSearch = signal('');
+  readonly healthState = signal<'' | 'failing' | 'inflight' | 'healthy'>('');
+  readonly healthPager = createPager<TaskHealth>(25);
+  // ---- Failures at volume: the same message with its numbers taken out is one reason.
+  readonly failureSearch = signal('');
+  readonly failureReason = signal('');
+  readonly failurePager = createPager<FailureRow>(25);
+  // ---- Model calls in the range, per prompt.
+  readonly aiUsage = signal<AiUsageRow[]>([]);
+  readonly aiUsageLoading = signal(false);
   readonly failuresLoading = signal(false);
   readonly failuresError = signal('');
 
@@ -602,6 +654,64 @@ export class Reports implements OnInit {
   });
 
   readonly unhealthyTasks = computed(() => this.taskHealth().filter(t => t.failures > 0).length);
+  readonly inFlightTasks = computed(() => this.taskHealth().filter(t => t.tone === 'warn' && t.failures === 0).length);
+
+  /** The health table narrowed by the search box and the state chips, still worst first. */
+  readonly healthRows = computed(() => {
+    const q = this.healthSearch().trim().toLowerCase();
+    const state = this.healthState();
+    return this.taskHealth().filter(t =>
+      (!q || t.task.toLowerCase().includes(q))
+      && (state === '' || (state === 'failing' ? t.failures > 0 : state === 'inflight' ? (t.tone === 'warn' && t.failures === 0) : t.failures === 0 && t.tone === 'ok')));
+  });
+  readonly healthPage = computed(() => this.healthPager.slice(this.healthRows()));
+  setHealthState(state: '' | 'failing' | 'inflight' | 'healthy'): void {
+    this.healthState.set(this.healthState() === state ? '' : state);
+    this.healthPager.reset();
+  }
+  setHealthSearch(text: string): void { this.healthSearch.set(text); this.healthPager.reset(); }
+
+  /**
+   * Failures grouped by what went wrong. A message with its numbers replaced by # is the
+   * reason: "Job 2489 failed in the queue because…" and "Job 2574 failed…" are one line
+   * with a count, which is what a page of sixty rows was hiding.
+   */
+  readonly failureReasons = computed<FailureReason[]>(() => {
+    const groups = new Map<string, FailureReason & { taskSet: Set<string> }>();
+    for (const f of this.visibleFailures()) {
+      const key = reasonKey(f.message);
+      let g = groups.get(key);
+      if (!g) { g = { key, sample: reasonKey(f.message), count: 0, tasks: 0, lastWhen: '', taskSet: new Set() }; groups.set(key, g); }
+      g.count++; g.taskSet.add(f.task || String(f.jobId)); if (f.when > g.lastWhen) g.lastWhen = f.when;
+    }
+    return [...groups.values()].map(g => ({ key: g.key, sample: g.sample, count: g.count, tasks: g.taskSet.size, lastWhen: g.lastWhen }))
+      .sort((a, b) => b.count - a.count);
+  });
+  readonly failureRows = computed(() => {
+    const q = this.failureSearch().trim().toLowerCase();
+    const reason = this.failureReason();
+    return this.visibleFailures().filter(f =>
+      (!reason || reasonKey(f.message) === reason)
+      && (!q || `${f.job} ${f.task} ${f.message}`.toLowerCase().includes(q)));
+  });
+  readonly failurePage = computed(() => this.failurePager.slice(this.failureRows()));
+  setFailureReason(key: string): void { this.failureReason.set(this.failureReason() === key ? '' : key); this.failurePager.reset(); }
+  setFailureSearch(text: string): void { this.failureSearch.set(text); this.failurePager.reset(); }
+
+  /** The AI section's tiles: every model call in the range, whatever prompt made it. */
+  readonly aiTotals = computed(() => {
+    const rows = this.aiUsage();
+    const calls = rows.reduce((n, r) => n + r.calls, 0);
+    return {
+      calls,
+      failed: rows.reduce((n, r) => n + r.failed, 0),
+      tokens: rows.reduce((n, r) => n + r.tokensIn + r.tokensOut, 0),
+      tokensIn: rows.reduce((n, r) => n + r.tokensIn, 0),
+      tokensOut: rows.reduce((n, r) => n + r.tokensOut, 0),
+      prompts: rows.length,
+      failedPct: calls ? Math.round(rows.reduce((n, r) => n + r.failed, 0) / calls * 100) : 0,
+    };
+  });
 
   /**
    * run id -> the workspace it belongs to, taken from the RAW payload.
@@ -695,6 +805,7 @@ export class Reports implements OnInit {
       if (payload.truncated) this.toast.info(response.message);
       this.loadFailures();
       this.loadPriorPeriod();
+      this.loadAiUsage();
     });
     this.load();
   }
@@ -789,6 +900,20 @@ export class Reports implements OnInit {
    * things are getting better or worse. Nothing else on the page uses it, and when it comes
    * back empty the tiles say that rather than inventing a change.
    */
+  /** Model calls per prompt for the same range; a page without any AI simply has no section. */
+  private loadAiUsage(): void {
+    const asked = { start: this.startDate(), end: this.endDate() };
+    this.aiUsageLoading.set(true);
+    this.http.get<ApiResponse<AiUsageRow[]>>(`${API_BASE}/aiPrompt.json/usage`, { params: { from: asked.start, to: asked.end } }).subscribe({
+      next: response => {
+        if (asked.start !== this.startDate() || asked.end !== this.endDate()) return;
+        this.aiUsageLoading.set(false);
+        this.aiUsage.set(response.status === API_SUCCESS ? (response.data ?? []) : []);
+      },
+      error: () => { this.aiUsageLoading.set(false); this.aiUsage.set([]); },
+    });
+  }
+
   private loadPriorPeriod(): void {
     this.priorRuns.set(null);
     this.priorSuccessRate.set(null);

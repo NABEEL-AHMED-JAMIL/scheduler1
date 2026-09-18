@@ -227,3 +227,85 @@ describe('the column header histogram bins the measure that is selected', () => 
     expect(pivot.columnCount(0)).toBe(1);
   });
 });
+
+/**
+ * The grid at scale. Forty tasks is past every cap this view has: the chart's twelve series,
+ * the page of twenty-five, and the point where a row can only be found by searching for it.
+ * Task k has k+1 completed runs, so "highest first" is a known order and every total is known.
+ */
+function manyTasks(count: number): RunData {
+  const task = Array.from({ length: count }, (_, k) => `task-${String(k).padStart(2, '0')}`);
+  const rows: RunRow[] = [];
+  let id = 1;
+  task.forEach((_, k) => {
+    for (let n = 0; n <= k; n++) rows.push([k, 0, 0, 0, 10, 'job', id++, 0, 1] as RunRow);
+  });
+  return { task, status: ['Completed', 'Failed'], owner: ['Ada'], day: ['2026-08-01'], rows };
+}
+
+describe('ReportPivot with many rows', () => {
+  it('orders rows highest total first, and pages them twenty-five at a time', () => {
+    const pivot = pivotFor(manyTasks(40));
+    expect(pivot.pivot().rowLabels[0]).toBe('task-39');
+    expect(pivot.pivot().rowTotals.slice(0, 3)).toEqual([40, 39, 38]);
+    expect(pivot.pageRows().length).toBe(25);
+    pivot.rowPager.goTo(2, 40);
+    expect(pivot.pageRows().length).toBe(15);
+    // The grand total is untouched by the order: every run is still counted.
+    expect(pivot.pivot().grand).toBe(820);
+  });
+
+  it('keeps the natural order on request, and the export follows what is on screen', () => {
+    const pivot = pivotFor(manyTasks(40));
+    pivot.setRowOrder('natural');
+    expect(pivot.pivot().rowLabels[0]).toBe('task-00');
+    pivot.setRowOrder('total');
+    pivot.export('csv');
+    expect(lastExport!.rows[0][0]).toBe('task-39');
+    // Every row exports, not just the page on screen.
+    expect(lastExport!.rows.length).toBe(41);
+  });
+
+  it('a search narrows the rows and the totals under them together', () => {
+    const pivot = pivotFor(manyTasks(40));
+    pivot.setRowSearch('task-3');
+    // task-30 .. task-39: ten rows, whose run counts are 31..40.
+    expect(pivot.pivot().rowLabels.length).toBe(10);
+    expect(pivot.pivot().grand).toBe(355);
+    expect(pivot.pivot().colTotals[0]).toBe(355);
+    expect(pivot.pivot().colTotals[1]).toBe(0);
+    pivot.setRowSearch('nothing-like-this');
+    expect(pivot.pivot().rowLabels.length).toBe(0);
+    expect(pivot.pageRows().length).toBe(0);
+  });
+
+  it('hands the chart the top twelve rows and says how many it left out', () => {
+    const pivot = pivotFor(manyTasks(40));
+    expect(pivot.chartPivot().rowLabels.length).toBe(12);
+    expect(pivot.chartHidden()).toBe(28);
+    expect(pivot.chartPivot().rowLabels).toContain('task-39');
+    expect(pivot.chartPivot().rowLabels).not.toContain('task-00');
+    // Ranked draws its own top eight and says so itself, so it gets everything.
+    pivot.chart.set('ranked');
+    expect(pivot.chartHidden()).toBe(0);
+  });
+
+  it('a Day axis is never cut: the busiest twelve days are not a time line', () => {
+    const many = manyTasks(3);
+    const day = Array.from({ length: 20 }, (_, d) => `2026-08-${String(d + 1).padStart(2, '0')}`);
+    const rows = day.map((_, d) => [0, 0, 0, d, 10, 'job', d + 1, 0, 1] as RunRow);
+    const pivot = pivotFor({ ...many, day, rows });
+    pivot.setRowDim('day');
+    expect(pivot.rowOrder()).toBe('natural');
+    expect(pivot.pivot().rowLabels[0]).toBe('2026-08-01');
+    expect(pivot.chartPivot().rowLabels.length).toBe(20);
+    expect(pivot.chartHidden()).toBe(0);
+  });
+
+  it('a small grid is handed through untouched', () => {
+    const pivot = pivotFor(data);
+    pivot.setRowOrder('natural');
+    expect(pivot.pivot()).toBe(pivot.fullPivot());
+    expect(pivot.chartPivot()).toBe(pivot.pivot());
+  });
+});
