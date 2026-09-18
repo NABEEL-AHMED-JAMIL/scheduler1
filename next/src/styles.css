@@ -1728,3 +1728,8 @@ html.dark .btn-circle-danger:hover:not(:disabled) { background: color-mix(in okl
 .prompt-out { background: var(--surface-inset); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 0.7rem 0.85rem; font-family: var(--font-mono, ui-monospace, monospace); font-size: 12px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; max-height: 24rem; overflow: auto; margin: 0; }
 .prompt-vars td { padding-top: 0.35rem; padding-bottom: 0.35rem; }
 .prompt-vars .input { padding-top: 0.3rem; padding-bottom: 0.3rem; }
+
+/* An AI step's line in the pipeline editor: what it runs, opened in the drawer. */
+.ai-step-line { display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 0.75rem; border-radius: 8px; background: var(--surface-inset); border: 1px dashed var(--border-strong); }
+.icon-brand { color: var(--color-brand-500); }
+.ai-step-card { display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.7rem 0.85rem; border-radius: 8px; background: var(--surface-inset); border: 1px dashed var(--border-strong); }

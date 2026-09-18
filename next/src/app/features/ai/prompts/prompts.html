@@ -87,6 +87,7 @@
               <span class="pill" [class]="'pill ' + (p.outputMode === 'json' ? 'pill-brand' : 'pill-neutral')">{{ p.outputMode === 'json' ? 'JSON' : 'text' }}</span>
             </div>
             <dl class="text-xs grid gap-1">
+              <div class="flex gap-2"><dt class="text-[color:var(--text-muted)] shrink-0 w-20">Used by</dt><dd>{{ p.pipelineCount ? p.pipelineCount + ' pipeline' + (p.pipelineCount === 1 ? '' : 's') : 'no pipeline yet' }}</dd></div>
               <div class="flex gap-2"><dt class="text-[color:var(--text-muted)] shrink-0 w-20">Runs</dt><dd>{{ p.runCount ?? 0 }}@if (p.lastRunAt) { · last {{ p.lastRunAt | date: 'd MMM, HH:mm' }} @if (p.lastRunStatus === 'failed') { <span class="text-crit-500">failed</span> } }</dd></div>
               @if (p.createdByName) { <div class="flex gap-2"><dt class="text-[color:var(--text-muted)] shrink-0 w-20">Created by</dt><dd class="truncate">{{ p.createdByName }}</dd></div> }
             </dl>
@@ -101,6 +102,7 @@
             <th>Connection · model</th>
             <th>Variables</th>
             <th>Output</th>
+            <th>Used by</th>
             <th class="text-right">Runs</th>
             <th>Last run</th>
             @if (isPlatformAdmin()) { <th>Workspace</th> }
@@ -129,6 +131,9 @@
                 </div>
               </td>
               <td><span class="pill" [class]="'pill ' + (p.outputMode === 'json' ? 'pill-brand' : 'pill-neutral')">{{ p.outputMode === 'json' ? 'JSON' : 'text' }}</span></td>
+              <td class="text-xs whitespace-nowrap">
+                @if (p.pipelineCount) { {{ p.pipelineCount }} pipeline{{ p.pipelineCount === 1 ? '' : 's' }} } @else { <span class="text-[color:var(--text-muted)]">—</span> }
+              </td>
               <td class="text-right tabular">{{ p.runCount ?? 0 }}</td>
               <td class="text-xs whitespace-nowrap">
                 @if (p.lastRunAt) { {{ p.lastRunAt | date: 'd MMM, HH:mm' }} @if (p.lastRunStatus === 'failed') { <span class="text-crit-500">· failed</span> } } @else { <span class="text-[color:var(--text-muted)]">never</span> }

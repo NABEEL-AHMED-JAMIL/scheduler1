@@ -31,6 +31,8 @@ export interface Prompt {
   version?: number;
   status?: string;
   runCount?: number;
+  /** How many live pipelines run it as a step. */
+  pipelineCount?: number;
   lastRunAt?: string | null;
   lastRunStatus?: string | null;
   dateCreated?: string;

@@ -91,6 +91,22 @@
 
           <div class="form-grid" formGroupName="formData">
             @for (field of formFields(); track controlName(field)) {
+              @if (field.fieldType === 'ai') {
+                <!-- Not an input: the pipeline runs this before dispatch and writes the answer to
+                     the tag. Shown so the operator knows what the task will carry; not editable
+                     per task -- that is the point of it living on the pipeline. -->
+                <div class="ai-step-card md:col-span-2">
+                  <app-icon name="sparkle" class="icon-brand shrink-0" />
+                  <div class="min-w-0 flex-1">
+                    <div class="text-sm font-medium">{{ field.label }} <span class="pill pill-brand ml-1">AI step</span></div>
+                    <div class="text-xs text-[color:var(--text-secondary)] mt-0.5">
+                      Runs <b>{{ field.promptName || 'a prompt' }}</b> before dispatch and writes the answer to
+                      <span class="mono">&lt;{{ field.tagKey }}&gt;</span>@if (aiStepReads(field); as reads) { , reading {{ reads }} }.
+                      @if (field.onError === 'continue') { If it fails the run continues with the tag empty. } @else { If it fails, the run fails. }
+                    </div>
+                  </div>
+                </div>
+              } @else {
               <app-field [label]="field.label" [for]="'ff-' + controlName(field)"
                          [control]="formData.get(controlName(field))"
                          [submitted]="submitted()" [required]="field.required"
@@ -133,6 +149,7 @@
                   }
                 }
               </app-field>
+              }
             }
           </div>
 

@@ -1,6 +1,6 @@
 import { Component, OnDestroy, OnInit, computed, effect, inject, input, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { DatePipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { TableShell } from '../../../shared/ui/data-table';
@@ -21,7 +21,7 @@ interface AuditLog {
 
 @Component({
   selector: 'app-job-logs',
-  imports: [StickToBottom, Icon, DatePipe, RouterLink, TableShell, RankedBar, StatusPill],
+  imports: [StickToBottom, Icon, DatePipe, DecimalPipe, RouterLink, TableShell, RankedBar, StatusPill],
   templateUrl: './job-logs.html',
 })
 export class JobLogs implements OnInit, OnDestroy {
@@ -52,6 +52,8 @@ export class JobLogs implements OnInit, OnDestroy {
   /** The job and the specific run, so a log line has the context the old screen showed. */
   readonly job = signal<any | null>(null);
   readonly run = signal<any | null>(null);
+  /** The pipeline's AI steps for this run, with what each answered; empty when it has none. */
+  readonly aiSteps = signal<{ run: any; promptName?: string }[]>([]);
   readonly showDetail = signal(true);
 
   /**
@@ -108,6 +110,18 @@ export class JobLogs implements OnInit, OnDestroy {
     this.clearTimer();
     if (!this.autoRefreshing()) return;
     this.timer = setTimeout(() => this.refresh(), 5000);
+  }
+
+  private aiStepsLoadedFor: string | null = null;
+  private loadAiSteps(): void {
+    // Once per run: the steps ran before dispatch and do not change while the logs poll.
+    if (this.aiStepsLoadedFor === this.jobQueueId()) return;
+    this.aiStepsLoadedFor = this.jobQueueId();
+    this.http.get<ApiResponse<{ run: any; promptName?: string }[]>>(`${API_BASE}/aiPrompt.json/runsForJob`,
+      { params: { jobQueueId: this.jobQueueId() } }).subscribe({
+      next: r => { if (r.status === API_SUCCESS) this.aiSteps.set(r.data ?? []); },
+      error: () => {},
+    });
   }
 
   ngOnDestroy(): void {
@@ -330,6 +344,7 @@ export class JobLogs implements OnInit, OnDestroy {
           // The same call already carries both -- there is no reason to fetch them again.
           this.job.set(data?.sourceJob ?? null);
           this.run.set(data?.sourceJobQueue ?? null);
+          this.loadAiSteps();
         } else {
           this.error.set(response.message);
         }

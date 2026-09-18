@@ -446,11 +446,20 @@ export class TaskEdit implements OnInit {
    * An existing task's tags win over the field's default: the default describes a new task, and
    * overwriting a saved value with it would quietly undo somebody's edit on first open.
    */
+  /** "<claim_id> and <document>" -- what an AI step reads, from its variable map. */
+  aiStepReads(field: PipelineField): string {
+    try {
+      const tags = Object.values(JSON.parse(field.variableMap || '{}') as Record<string, string>).filter(Boolean);
+      return tags.length ? tags.map(t => `<${t}>`).join(' and ') : '';
+    } catch { return ''; }
+  }
+
   private buildFormControls(): void {
     for (const name of Object.keys(this.formData.controls)) {
       this.formData.removeControl(name, { emitEvent: false });
     }
-    for (const field of this.formFields()) {
+    // An AI step is the pipeline's, not the operator's: no control, no tag from this side.
+    for (const field of this.formFields().filter(f => f.fieldType !== 'ai')) {
       const existing = this.findTag(field);
       const seed = existing ?? field.defaultValue ?? '';
       const control = this.fb.control(
@@ -482,6 +491,7 @@ export class TaskEdit implements OnInit {
    */
   syncFormToTags(): void {
     for (const field of this.formFields()) {
+      if (field.fieldType === 'ai') continue;
       const control = this.formData.get(this.controlName(field));
       if (!control) continue;
       const raw = control.value;

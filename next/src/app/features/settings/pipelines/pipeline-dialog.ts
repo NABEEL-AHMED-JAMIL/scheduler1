@@ -9,9 +9,17 @@ import { FormDialog } from '../../../shared/ui/form-dialog';
 import { Icon } from '../../../shared/ui/icon';
 import { Combobox } from '../../../shared/ui/combobox';
 import { createTopicSearch } from '../../../shared/ui/topic-search';
+import { Dialog } from '@angular/cdk/dialog';
+import { sidePanelConfig } from '../../../shared/ui/side-panel';
+import { AiStepConfig, AiStepPanel } from './ai-step-panel';
 
 export interface PipelineField {
   pipelineFieldId?: number;
+  /** An AI step (fieldType "ai"): the prompt, which earlier fields feed its variables, what a failure does. */
+  promptId?: number | null;
+  promptName?: string | null;
+  variableMap?: string | null;
+  onError?: 'fail' | 'continue' | null;
   tagKey: string;
   tagParent?: string | null;
   label: string;
@@ -50,7 +58,7 @@ export interface Pipeline {
 }
 
 /** The set the server accepts; anything else is silently stored as text. */
-export const FIELD_TYPES = ['text', 'textarea', 'number', 'url', 'select', 'checkbox', 'date'];
+export const FIELD_TYPES = ['text', 'textarea', 'number', 'url', 'select', 'checkbox', 'date', 'ai'];
 
 /**
  * One entry in a select: what the task stores, and what the operator reads.
@@ -304,7 +312,7 @@ export function validateSelectChoices(rows: PipelineField[]): string | null {
                            [submitted]="submitted()">
                   <select [id]="'fieldType' + i" class="input" formControlName="fieldType">
                     @for (type of fieldTypes; track type) {
-                      <option [value]="type">{{ type }}</option>
+                      <option [value]="type">{{ type === 'ai' ? 'AI prompt (runs before dispatch)' : type }}</option>
                     }
                   </select>
                 </app-field>
@@ -352,6 +360,26 @@ export function validateSelectChoices(rows: PipelineField[]): string | null {
                          placeholder="Shown under the field" />
                 </app-field>
               </div>
+
+              @if (row.get('fieldType')?.value === 'ai') {
+                <!-- The step's configuration opens in the drawer: this dialog is full already,
+                     and a prompt's variable map is a small form of its own. -->
+                <div class="ai-step-line">
+                  <app-icon name="sparkle" class="icon-brand shrink-0" />
+                  <div class="min-w-0 flex-1 text-sm">
+                    @if (row.get('promptId')?.value) {
+                      <span class="font-medium">{{ row.get('promptName')?.value || 'Prompt ' + row.get('promptId')?.value }}</span>
+                      <span class="text-[color:var(--text-muted)]"> · {{ mappedCount(i) }} variable(s) mapped · on failure: {{ row.get('onError')?.value === 'continue' ? 'continue empty' : 'fail the run' }}</span>
+                    } @else {
+                      <span class="text-warn-600">No prompt chosen yet.</span>
+                    }
+                    <div class="text-xs text-[color:var(--text-muted)]">The answer is written to &lt;{{ row.get('tagKey')?.value || '…' }}&gt; before the task is dispatched; a task shows this as a read-only step.</div>
+                  </div>
+                  <button type="button" class="btn btn-default btn-sm shrink-0" (click)="configureAiStep(i)">
+                    <app-icon name="edit" />{{ row.get('promptId')?.value ? 'Change' : 'Configure' }}
+                  </button>
+                </div>
+              }
 
               @if (row.get('fieldType')?.value === 'select') {
                 <div class="flex flex-col gap-1.5">
@@ -472,6 +500,10 @@ export class PipelineDialog {
       required: [field?.required ?? false],
       defaultValue: [field?.defaultValue ?? ''],
       helpText: [field?.helpText ?? ''],
+      promptId: [field?.promptId ?? null],
+      promptName: [field?.promptName ?? ''],
+      variableMap: [field?.variableMap ?? ''],
+      onError: [field?.onError ?? 'fail'],
       /*
        * The choices, parsed out of the stored text once on open and written back out in rows().
        * The raw `fieldOptions` control this replaced is gone deliberately rather than kept in
@@ -537,6 +569,37 @@ export class PipelineDialog {
     return choices;
   }
 
+  private readonly dialog = inject(Dialog);
+
+  /** How many of the step's variables have a source field. */
+  mappedCount(index: number): number {
+    try { return Object.keys(JSON.parse(this.fields.at(index).get('variableMap')!.value || '{}')).length; } catch { return 0; }
+  }
+
+  /** Opens the drawer for one AI step; the fields above it are what its variables may read. */
+  configureAiStep(index: number): void {
+    const row = this.fields.at(index);
+    const above = this.fields.controls.slice(0, index)
+      .map(g => ({ tagKey: String(g.get('tagKey')!.value ?? '').trim(), label: String(g.get('label')!.value ?? '').trim() }))
+      .filter(f => f.tagKey);
+    let current: Partial<AiStepConfig> = { promptId: row.get('promptId')!.value, onError: row.get('onError')!.value || 'fail' };
+    try { current.variableMap = JSON.parse(row.get('variableMap')!.value || '{}'); } catch { current.variableMap = {}; }
+    this.dialog.open<AiStepConfig | undefined>(AiStepPanel, sidePanelConfig({ tagKey: String(row.get('tagKey')!.value ?? '').trim() || '…', fieldsAbove: above, current }))
+      .closed.subscribe(result => {
+        if (!result) return;
+        row.patchValue({ promptId: result.promptId, variableMap: JSON.stringify(result.variableMap), onError: result.onError, required: false });
+        this.namePrompt(row, result.promptId);
+      });
+  }
+
+  private namePrompt(row: any, promptId: number | null): void {
+    if (!promptId) { row.patchValue({ promptName: '' }); return; }
+    this.http.get<ApiResponse<{ name: string }>>(`${API_BASE}/aiPrompt.json/get`, { params: { promptId } }).subscribe({
+      next: r => { if (r.status === API_SUCCESS && r.data) row.patchValue({ promptName: r.data.name }); },
+      error: () => {},
+    });
+  }
+
   addField(): void {
     this.fields.push(this.fieldGroup());
     this.revision.update(n => n + 1);
@@ -587,6 +650,19 @@ export class PipelineDialog {
     }
     const choiceProblem = validateSelectChoices(rows);
     if (choiceProblem) return choiceProblem;
+    // An AI step names a prompt and reads only fields above it; the server checks the same.
+    const above = new Set<string>();
+    for (const field of rows) {
+      if (field.fieldType === 'ai') {
+        if (!field.promptId) return `The AI step <${field.tagKey.trim()}> has no prompt. Configure it first.`;
+        let map: Record<string, string> = {};
+        try { map = JSON.parse(field.variableMap || '{}'); } catch { map = {}; }
+        for (const [variable, source] of Object.entries(map)) {
+          if (source && !above.has(source)) return `The AI step <${field.tagKey.trim()}> reads <${source}> for {{${variable}}}, which is not above it.`;
+        }
+      }
+      above.add(field.tagKey.trim());
+    }
     return this.findNestingCycle(rows);
   }
 
@@ -675,6 +751,9 @@ export class PipelineDialog {
          */
         fieldOptions: serializeFieldChoices(this.choicesFor(index)) || null,
         position: index,
+        promptId: value.fieldType === 'ai' ? (value.promptId ?? null) : null,
+        variableMap: value.fieldType === 'ai' ? (value.variableMap || null) : null,
+        onError: value.fieldType === 'ai' ? (value.onError || 'fail') : null,
       };
     });
   }

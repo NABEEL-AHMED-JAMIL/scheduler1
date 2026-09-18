@@ -242,6 +242,10 @@ export class Landing {
     { icon: 'inbox', title: 'Pipelines that configure work',
       body: 'Define a pipeline once — its id, the topic it publishes on, the fields it asks for — '
           + 'and every task on it is filled in field by field instead of hand-written XML.' },
+    { icon: 'sparkle', title: 'A model as a pipeline step',
+      body: 'Connect a provider once, write a prompt with variables and try it, then put it on a '
+          + 'pipeline: it runs before each dispatch and its answer arrives as a tag — with every '
+          + 'call’s tokens and time on record.' },
     { icon: 'shield', title: 'Separated by tenant',
       body: 'Every job, task, bucket and user belongs to a tenant. Roles decide how much a '
           + 'person may do, and access profiles decide which pages they see — with a per-person '

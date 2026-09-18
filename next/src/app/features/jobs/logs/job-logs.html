@@ -71,6 +71,34 @@
             </div>
           }
         </div>
+
+        <!-- The pipeline's AI steps for this run: what each prompt answered, what it cost. -->
+        @if (aiSteps().length) {
+          <div class="detail-panel mt-3">
+            <div class="detail-head">AI steps</div>
+            <ul class="side-panel-list text-xs">
+              @for (s of aiSteps(); track s.run.runId) {
+                <li>
+                  <div class="min-w-0">
+                    <span class="pill" [class]="'pill ' + (s.run.status === 'ok' ? 'pill-ok' : 'pill-crit')">{{ s.run.status === 'ok' ? 'answered' : 'failed' }}</span>
+                    <span class="ml-1 font-medium">{{ s.promptName || 'prompt' }}</span>
+                    <span class="text-[color:var(--text-muted)]"> v{{ s.run.promptVersion }} → <span class="mono">&lt;{{ s.run.stepTag }}&gt;</span></span>
+                    @if (s.run.status === 'ok') {
+                      <pre class="prompt-out mt-1" style="max-height: 10rem">{{ s.run.output }}</pre>
+                    } @else {
+                      <div class="text-crit-500 mt-0.5">{{ s.run.error }}</div>
+                    }
+                  </div>
+                  <span class="text-[color:var(--text-muted)] whitespace-nowrap">
+                    @if (s.run.latencyMs != null) { {{ (s.run.latencyMs / 1000) | number: '1.1-1' }} s }
+                    @if (s.run.tokensIn != null) { · {{ s.run.tokensIn }}→{{ s.run.tokensOut }} tokens }
+                    @if ((s.run.attempts ?? 1) > 1) { · {{ s.run.attempts }} attempts }
+                  </span>
+                </li>
+              }
+            </ul>
+          </div>
+        }
       }
     </div>
   }
