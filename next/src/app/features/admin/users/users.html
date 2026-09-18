@@ -324,13 +324,28 @@
                       <span class="pill pill-neutral shrink-0">You</span>
                     }
                   </div>
-                  <div class="mono text-xs text-[color:var(--text-muted)] truncate"
-                       [title]="user.username">{{ user.username }}</div>
+                  <!-- Same copy buttons as the card. The address truncates in this column and
+                       a tel: link does nothing on a desktop without a phone app, so copying
+                       is the only way either gets into an email or a dialler. -->
+                  <div class="flex items-center gap-1 min-w-0">
+                    <span class="mono text-xs text-[color:var(--text-muted)] truncate"
+                          [title]="user.username">{{ user.username }}</span>
+                    <app-copy-button [value]="user.username"
+                                     [copied]="copiedKey() === user.appUserId + ':email'"
+                                     copiedLabel="Address copied"
+                                     (copy)="copyContact(user.appUserId, 'email', user.username)" />
+                  </div>
                   <!-- Only when there is one. A column of dashes is noise; a line that appears
                        when a number exists is information. -->
                   @if (user.phoneNumber) {
-                    <a class="mono text-xs link-inline"
-                       [href]="'tel:' + user.phoneNumber">{{ user.phoneNumber }}</a>
+                    <div class="flex items-center gap-1 min-w-0">
+                      <a class="mono text-xs link-inline truncate"
+                         [href]="'tel:' + user.phoneNumber">{{ user.phoneNumber }}</a>
+                      <app-copy-button [value]="user.phoneNumber"
+                                       [copied]="copiedKey() === user.appUserId + ':phone'"
+                                       copiedLabel="Number copied"
+                                       (copy)="copyContact(user.appUserId, 'phone', user.phoneNumber)" />
+                    </div>
                   }
                 </div>
               </div>
