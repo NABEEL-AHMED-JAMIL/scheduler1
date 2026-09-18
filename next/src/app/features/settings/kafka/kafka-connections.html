@@ -337,23 +337,13 @@
                                [title]="list[0].pipelineId + ' · ' + list[0].fields + ' field(s)'">{{ list[0].pipelineName }}</a>
                             <span class="mono text-xs text-[color:var(--text-muted)]">{{ list[0].pipelineId }}</span>
                           } @else {
-                            <button type="button" class="pill pill-brand hover-brand" (click)="togglePipelines(row.type)"
-                                    [attr.aria-expanded]="openPipelines().has(row.type.sourceTaskTypeId!)"
-                                    [title]="openPipelines().has(row.type.sourceTaskTypeId!) ? 'Hide the pipelines' : 'Show all ' + list.length + ' pipelines'">
+                            <!-- More than one opens the drawer: a row that unfolded thirty
+                                 pipelines under itself pushed the table apart. -->
+                            <button type="button" class="pill pill-brand hover-brand" (click)="showPipelines(row.type)"
+                                    [title]="'Show all ' + list.length + ' pipelines'">
                               {{ list.length }} pipelines
-                              <app-icon [name]="openPipelines().has(row.type.sourceTaskTypeId!) ? 'chevronDown' : 'chevronRight'" size="0.85em" />
+                              <app-icon name="chevronRight" size="0.85em" />
                             </button>
-                            @if (openPipelines().has(row.type.sourceTaskTypeId!)) {
-                              <ul class="kafka-topic-pipelines">
-                                @for (p of list; track p.pipelineKey) {
-                                  <li>
-                                    <a class="link-inline truncate" [routerLink]="['/settings/pipelines']" [queryParams]="{ topic: row.type.sourceTaskTypeId }" [title]="p.pipelineName">{{ p.pipelineName }}</a>
-                                    <span class="mono text-[color:var(--text-muted)]">{{ p.pipelineId }}</span>
-                                    <span class="text-[color:var(--text-muted)]">{{ p.fields }} field{{ p.fields === 1 ? '' : 's' }}@if (p.status === 'Inactive') { · inactive }</span>
-                                  </li>
-                                }
-                              </ul>
-                            }
                           }
                         }
                       </td>

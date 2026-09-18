@@ -13,6 +13,8 @@ import { StatusPill } from '../../../shared/ui/status-pill';
 import { Icon } from '../../../shared/ui/icon';
 import { CopyButton } from '../../../shared/ui/copy-button';
 import { BlurLoader } from '../../../shared/ui/blur-loader';
+import { sidePanelConfig } from '../../../shared/ui/side-panel';
+import { TopicPipelinesPanel } from './topic-pipelines-panel';
 import { copyText } from '../../../shared/ui/clipboard.util';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { confirmWith } from '../../../shared/ui/confirm';
@@ -180,10 +182,14 @@ export class KafkaConnections implements OnInit {
   pipelinesOf(type: TaskType) { return this.pipelinesByTopic()[type.sourceTaskTypeId!] ?? []; }
   pipelineCount(type: TaskType): number { return this.pipelinesOf(type).length; }
   /** Topic rows whose pipeline list is unfolded. */
-  readonly openPipelines = signal<Set<number>>(new Set());
-  togglePipelines(type: TaskType): void {
-    const id = type.sourceTaskTypeId!;
-    this.openPipelines.update(set => { const n = new Set(set); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  /** Opens the drawer with this topic's pipelines; a row holds one name, not a list. */
+  showPipelines(type: TaskType): void {
+    this.dialog.open<void>(TopicPipelinesPanel, sidePanelConfig({
+      sourceTaskTypeId: type.sourceTaskTypeId!,
+      topicName: type.serviceName,
+      kafkaTopic: parseTopicPartition(type.queueTopicPartition).topic,
+      pipelines: this.pipelinesOf(type),
+    }));
   }
 
   /**
