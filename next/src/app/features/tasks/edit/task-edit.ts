@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
+import { Component, OnInit, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { parseTopicPartition } from '../../../shared/ui/topic';
 import { HttpClient } from '@angular/common/http';
@@ -95,15 +95,23 @@ export class TaskEdit implements OnInit {
   get formData(): FormGroup { return this.form.get('formData') as FormGroup; }
 
   ngOnInit(): void {
-    this.http.get<ApiResponse<any>>(`${API_BASE}/setting.json/appSetting`).subscribe({
+    // Topics as picker rows: id, name, Kafka topic and state. appSetting described every topic
+    // in full and, past a few thousand of them, was the slowest thing about opening this page.
+    this.http.get<ApiResponse<any[]>>(`${API_BASE}/setting.json/topics`).subscribe({
+      next: response => {
+        if (response.status === API_SUCCESS) this.taskTypes.set(response.data ?? []);
+      },
+      error: () => this.toast.error('Could not load the topics.'),
+    });
+
+    this.http.get<ApiResponse<any[]>>(`${API_BASE}/setting.json/lookups`).subscribe({
       next: response => {
         if (response.status !== API_SUCCESS) return;
-        this.taskTypes.set(response.data?.sourceTaskTypes ?? []);
 
-        // appSetting returns only the parent lookup rows -- there is no "children" on them,
+        // The server returns only the parent lookup rows -- there is no "children" on them,
         // so every dropdown rendered with nothing but "None". The options are the sub-lookups,
         // which have to be fetched per parent.
-        const parents: any[] = response.data?.lookupDatas ?? [];
+        const parents: any[] = response.data ?? [];
         const wanted = parents.filter(p => LOOKUP_TYPES.includes(p.lookupType));
         if (!wanted.length) return;
 
@@ -126,13 +134,6 @@ export class TaskEdit implements OnInit {
       error: () => this.toast.error('Could not load the task settings.'),
     });
 
-    this.http.get<ApiResponse<Pipeline[]>>(`${API_BASE}/pipeline.json/listPipelines`).subscribe({
-      next: response => {
-        if (response.status === API_SUCCESS) this.pipelines.set(response.data ?? []);
-      },
-      // Not fatal: the Pipeline field just offers nothing to pick until this loads or retries.
-      error: () => {},
-    });
 
     // A pipeline chosen by hand loads its form straight away. Editing an existing task goes
     // through loadTask instead, which has to wait for the tags before it can prefill.
@@ -238,6 +239,31 @@ export class TaskEdit implements OnInit {
   });
   private readonly topicVersion = signal<'load' | 'changes'>('changes');
 
+  /**
+   * The chosen topic's pipelines are fetched when it is chosen (pipeline.json/listForTopic)
+   * rather than every pipeline up front: listPipelines carried all of them, fields included,
+   * to fill a box that only ever shows one topic's. A late answer for a topic the person has
+   * since moved off is dropped.
+   */
+  readonly pipelinesLoading = signal(false);
+  private readonly pipelinesFetched = effect(() => {
+    const topic = this.selectedTopicId();
+    untracked(() => {
+      if (topic == null) { this.pipelines.set([]); return; }
+      this.pipelinesLoading.set(true);
+      this.http.get<ApiResponse<Pipeline[]>>(`${API_BASE}/pipeline.json/listForTopic`,
+        { params: { sourceTaskTypeId: topic } }).subscribe({
+        next: response => {
+          if (this.selectedTopicId() !== topic) return;
+          this.pipelinesLoading.set(false);
+          if (response.status === API_SUCCESS) this.pipelines.set(response.data ?? []);
+        },
+        // Not fatal: the Pipeline field just offers nothing to pick until a retry.
+        error: () => { if (this.selectedTopicId() === topic) this.pipelinesLoading.set(false); },
+      });
+    });
+  });
+
   /** Only the pipelines that publish on the chosen topic; nothing until a topic is chosen. */
   readonly pipelinesForTopic = computed<Pipeline[]>(() => {
     const topic = this.selectedTopicId();
@@ -258,6 +284,7 @@ export class TaskEdit implements OnInit {
   /** What the Pipeline field says under itself, given where the person is in the two-step pick. */
   readonly pipelineHint = computed(() => {
     if (this.selectedTopicId() == null) return 'Pick a topic first; its pipelines appear here.';
+    if (this.pipelinesLoading()) return 'Loading this topic’s pipelines…';
     if (!this.pipelinesForTopic().length) return 'No pipeline publishes on this topic yet — add one under Configuration › Pipelines.';
     return 'Picking one loads its form below, if it has one.';
   });

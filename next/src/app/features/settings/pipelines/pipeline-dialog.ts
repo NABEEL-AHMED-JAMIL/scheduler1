@@ -39,8 +39,14 @@ export interface Pipeline {
   dateCreated?: string;
   createdBy?: number;
   createdByName?: string | null;
-  /** Absent, not null, when the server has nothing: its DTOs omit null fields. */
+  /**
+   * Absent, not null, when the server has nothing: its DTOs omit null fields. A list row
+   * arrives without them and with the two counts instead; the fields are fetched when the
+   * row is opened (pipeline.json/fields) and kept on the row from then on.
+   */
   fields?: PipelineField[];
+  fieldCount?: number;
+  requiredCount?: number;
 }
 
 /** The set the server accepts; anything else is silently stored as text. */

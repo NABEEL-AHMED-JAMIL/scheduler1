@@ -98,12 +98,12 @@ export class Agents implements OnInit {
   readonly providers = signal<string[]>([]);
 
   private loadProviders(): void {
-    this.http.get<ApiResponse<any>>(`${API_BASE}/setting.json/appSetting`).subscribe({
+    this.http.get<ApiResponse<any[]>>(`${API_BASE}/setting.json/lookups`).subscribe({
       next: response => {
         if (response.status !== API_SUCCESS) return;
-        const parent = (response.data?.lookupDatas ?? [])
+        const parent = (response.data ?? [])
           .find((l: any) => l.lookupType === 'AI_PROVIDER');
-        // appSetting returns only the parent lookup row -- there is no "children" on it (see the
+        // The server returns only the parent lookup row -- there is no "children" on it (see the
         // same fix in task-edit.ts), so the real list has to be fetched separately per parent id.
         if (!parent) { this.providers.set(['OpenAI', 'Anthropic', 'Ollama']); return; }
         this.http.get<ApiResponse<any>>(`${API_BASE}/setting.json/fetchSubLookupByParentId`,

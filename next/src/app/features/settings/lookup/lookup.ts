@@ -167,21 +167,22 @@ export class Lookup implements OnInit {
   load(): void {
     this.loading.set(true);
     this.error.set('');
-    this.http.get<ApiResponse<any>>(`${API_BASE}/setting.json/appSetting`).subscribe({
+    // Lookups alone: appSetting also carried every topic, megabytes this screen threw away.
+    this.http.get<ApiResponse<LookupData[]>>(`${API_BASE}/setting.json/lookups`).subscribe({
       next: response => {
         if (response.status !== API_SUCCESS) {
           this.loading.set(false);
           this.error.set(response.message);
           return;
         }
-        const parents: LookupData[] = response.data?.lookupDatas ?? [];
+        const parents: LookupData[] = response.data ?? [];
         if (!parents.length) {
           this.loading.set(false);
           this.lookups.set([]);
           return;
         }
 
-        // appSetting returns parents with no children, so the entry count is unknown until
+        // The server returns parents with no children, so the entry count is unknown until
         // each one is asked for. Fetching them all up front is a handful of small requests
         // and means the Entries column says something before anything is expanded, and that
         // a row with nothing under it does not offer an expander.

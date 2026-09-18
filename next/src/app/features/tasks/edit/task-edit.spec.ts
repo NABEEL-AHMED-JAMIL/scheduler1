@@ -31,31 +31,38 @@ function taskEditWith(getImpl: (url: string, opts?: any) => any,
   return { component, get, post, toast };
 }
 
-const appSettingWithPipelineIdsLookup = of({
+const noTopics = of({ status: API_SUCCESS, data: [] });
+const lookupsWithPipelineIds = of({
   status: API_SUCCESS,
-  data: {
-    sourceTaskTypes: [],
-    // A PIPELINE_IDS parent row may still exist in old data/other tenants -- the point of the
-    // migration is that this screen no longer treats it as the pipeline source even if present.
-    lookupDatas: [
-      { lookupId: 1015, lookupType: 'PIPELINE_IDS' },
-      { lookupId: 2001, lookupType: 'TASK_GROUPS' },
-      { lookupId: 2002, lookupType: 'PIPELINE_HOME_PAGES' },
-    ],
-  },
+  // A PIPELINE_IDS parent row may still exist in old data/other tenants -- the point of the
+  // migration is that this screen no longer treats it as the pipeline source even if present.
+  data: [
+    { lookupId: 1015, lookupType: 'PIPELINE_IDS' },
+    { lookupId: 2001, lookupType: 'TASK_GROUPS' },
+    { lookupId: 2002, lookupType: 'PIPELINE_HOME_PAGES' },
+  ],
 });
+const noLookups = of({ status: API_SUCCESS, data: [] });
+
+/** What pipeline.json/listForTopic answers: the given pipelines on the topic the call names. */
+function forTopic(pipelines: any[], opts: any) {
+  const topic = Number(opts?.params?.sourceTaskTypeId);
+  return of({ status: API_SUCCESS, data: pipelines.filter(p => p.sourceTaskTypeId === topic) });
+}
+
+/** The pipelines are fetched by an effect, which runs on the next tick rather than inline. */
+const settle = () => TestBed.tick();
 
 describe('TaskEdit pipeline selection', () => {
-  it('populates the Pipeline field from pipeline.json/listPipelines, not a lookup', () => {
+  it('populates the Pipeline field from pipeline.json/listForTopic, not a lookup', () => {
     const pipelines = [
-      { pipelineKey: 1, pipelineId: 'F768926', pipelineName: 'Hurricanes ETL' },
-      { pipelineKey: 2, pipelineId: 'F768927', pipelineName: 'MP3 Noise Processing' },
+      { pipelineKey: 1, pipelineId: 'F768926', pipelineName: 'Hurricanes ETL', sourceTaskTypeId: 10 },
+      { pipelineKey: 2, pipelineId: 'F768927', pipelineName: 'MP3 Noise Processing', sourceTaskTypeId: 10 },
     ];
-    const { component, get } = taskEditWith(url => {
-      if (url.endsWith('/setting.json/appSetting')) return appSettingWithPipelineIdsLookup;
-      if (url.endsWith('/pipeline.json/listPipelines')) {
-        return of({ status: API_SUCCESS, data: pipelines });
-      }
+    const { component, get } = taskEditWith((url, opts) => {
+      if (url.endsWith('/setting.json/topics')) return noTopics;
+      if (url.endsWith('/setting.json/lookups')) return lookupsWithPipelineIds;
+      if (url.endsWith('/pipeline.json/listForTopic')) return forTopic(pipelines, opts);
       if (url.endsWith('/setting.json/fetchSubLookupByParentId')) {
         return of({ status: API_SUCCESS, data: { lookupDatas: [] } });
       }
@@ -66,15 +73,21 @@ describe('TaskEdit pipeline selection', () => {
     });
 
     component.ngOnInit();
+    settle();
 
+    // Nothing is fetched until a topic is chosen; then only that topic's pipelines are.
+    expect(get).not.toHaveBeenCalledWith(`${API_BASE}/pipeline.json/listForTopic`, expect.anything());
+    component.form.patchValue({ sourceTaskTypeId: 10 });
+    settle();
     expect(component.pipelines()).toEqual(pipelines);
-    expect(get).toHaveBeenCalledWith(`${API_BASE}/pipeline.json/listPipelines`);
+    expect(get).toHaveBeenCalledWith(`${API_BASE}/pipeline.json/listForTopic`, { params: { sourceTaskTypeId: 10 } });
   });
 
   it('never asks the lookup API for a PIPELINE_IDS sub-lookup', () => {
-    const { component, get } = taskEditWith(url => {
-      if (url.endsWith('/setting.json/appSetting')) return appSettingWithPipelineIdsLookup;
-      if (url.endsWith('/pipeline.json/listPipelines')) return of({ status: API_SUCCESS, data: [] });
+    const { component, get } = taskEditWith((url, opts) => {
+      if (url.endsWith('/setting.json/topics')) return noTopics;
+      if (url.endsWith('/setting.json/lookups')) return lookupsWithPipelineIds;
+      if (url.endsWith('/pipeline.json/listForTopic')) return forTopic([], opts);
       if (url.endsWith('/setting.json/fetchSubLookupByParentId')) {
         return of({ status: API_SUCCESS, data: { lookupDatas: [] } });
       }
@@ -83,9 +96,10 @@ describe('TaskEdit pipeline selection', () => {
     });
 
     component.ngOnInit();
+    settle();
 
     // Only the two remaining lookup-backed dropdowns (TASK_GROUPS, PIPELINE_HOME_PAGES) should
-    // trigger a sub-lookup fetch -- never one for the PIPELINE_IDS parent, even though appSetting
+    // trigger a sub-lookup fetch -- never one for the PIPELINE_IDS parent, even though the lookups list
     // still returned it (old data, or another tenant's rows the cache has not dropped yet).
     const subLookupCalls = get.mock.calls.filter(
       ([url]) => typeof url === 'string' && url.endsWith('/setting.json/fetchSubLookupByParentId'));
@@ -96,15 +110,15 @@ describe('TaskEdit pipeline selection', () => {
   });
 
   it('sends the pipeline id straight through to formForPipeline, unparsed', () => {
-    const { component, get } = taskEditWith(url => {
-      if (url.endsWith('/setting.json/appSetting')) {
-        return of({ status: API_SUCCESS, data: { sourceTaskTypes: [], lookupDatas: [] } });
-      }
-      if (url.endsWith('/pipeline.json/listPipelines')) return of({ status: API_SUCCESS, data: [] });
+    const { component, get } = taskEditWith((url, opts) => {
+      if (url.endsWith('/setting.json/topics')) return noTopics;
+      if (url.endsWith('/setting.json/lookups')) return noLookups;
+      if (url.endsWith('/pipeline.json/listForTopic')) return forTopic([], opts);
       if (url.endsWith('/pipeline.json/definition')) return of({ status: API_SUCCESS, data: null });
       throw new Error(`unexpected GET ${url}`);
     });
     component.ngOnInit();
+    settle();
     get.mockClear();
 
     // A pipeline's id is now its own string (e.g. "F768926") -- never a numeric lookup row id --
@@ -133,11 +147,10 @@ describe('TaskEdit -- payload generated from the pipeline form on save', () => {
   };
 
   it('calls xmlCreateChecker with the form\'s answers and submits the result as the payload', () => {
-    const { component, post } = taskEditWith(url => {
-      if (url.endsWith('/setting.json/appSetting')) {
-        return of({ status: API_SUCCESS, data: { sourceTaskTypes: [], lookupDatas: [] } });
-      }
-      if (url.endsWith('/pipeline.json/listPipelines')) return of({ status: API_SUCCESS, data: [oneFieldForm] });
+    const { component, post } = taskEditWith((url, opts) => {
+      if (url.endsWith('/setting.json/topics')) return noTopics;
+      if (url.endsWith('/setting.json/lookups')) return noLookups;
+      if (url.endsWith('/pipeline.json/listForTopic')) return forTopic([oneFieldForm], opts);
       if (url.endsWith('/pipeline.json/definition')) return of({ status: API_SUCCESS, data: oneFieldForm });
       throw new Error(`unexpected GET ${url}`);
     }, (url, body) => {
@@ -153,6 +166,7 @@ describe('TaskEdit -- payload generated from the pipeline form on save', () => {
       throw new Error(`unexpected POST ${url}`);
     });
     component.ngOnInit();
+    settle();
     component.form.patchValue({ taskName: 'AC', sourceTaskTypeId: 1, taskStatus: 'Active', pipelineId: 'F768926' });
     component.formData.get('|search_term')!.setValue('hurricanes');
 
@@ -163,14 +177,14 @@ describe('TaskEdit -- payload generated from the pipeline form on save', () => {
   });
 
   it('still requires a hand-written payload when no pipeline form applies', () => {
-    const { component, post, toast } = taskEditWith(url => {
-      if (url.endsWith('/setting.json/appSetting')) {
-        return of({ status: API_SUCCESS, data: { sourceTaskTypes: [], lookupDatas: [] } });
-      }
-      if (url.endsWith('/pipeline.json/listPipelines')) return of({ status: API_SUCCESS, data: [] });
+    const { component, post, toast } = taskEditWith((url, opts) => {
+      if (url.endsWith('/setting.json/topics')) return noTopics;
+      if (url.endsWith('/setting.json/lookups')) return noLookups;
+      if (url.endsWith('/pipeline.json/listForTopic')) return forTopic([], opts);
       throw new Error(`unexpected GET ${url}`);
     });
     component.ngOnInit();
+    settle();
     component.form.patchValue({ taskName: 'AC', sourceTaskTypeId: 1, taskStatus: 'Active' });
     // pipelineId left empty -> no form -> taskPayload stays required and, here, blank.
 
@@ -201,15 +215,15 @@ describe('TaskEdit -- a select field\'s choices', () => {
   }
 
   function loaded(def: any) {
-    const { component } = taskEditWith(url => {
-      if (url.endsWith('/setting.json/appSetting')) {
-        return of({ status: API_SUCCESS, data: { sourceTaskTypes: [], lookupDatas: [] } });
-      }
-      if (url.endsWith('/pipeline.json/listPipelines')) return of({ status: API_SUCCESS, data: [def] });
+    const { component } = taskEditWith((url, opts) => {
+      if (url.endsWith('/setting.json/topics')) return noTopics;
+      if (url.endsWith('/setting.json/lookups')) return noLookups;
+      if (url.endsWith('/pipeline.json/listForTopic')) return forTopic([def], opts);
       if (url.endsWith('/pipeline.json/definition')) return of({ status: API_SUCCESS, data: def });
       throw new Error(`unexpected GET ${url}`);
     });
     component.ngOnInit();
+    settle();
     component.form.get('pipelineId')!.setValue('F768930');
     return component;
   }
@@ -279,9 +293,10 @@ describe('TaskEdit -- the pipeline follows the topic', () => {
     { pipelineKey: 2, pipelineId: 'F768927', pipelineName: 'MP3 Noise Processing', sourceTaskTypeId: 20 },
     { pipelineKey: 3, pipelineId: 'F768928', pipelineName: 'Claims files', sourceTaskTypeId: 10 },
   ];
-  const withEverything = () => taskEditWith(url => {
-    if (url.endsWith('/setting.json/appSetting')) return appSettingWithPipelineIdsLookup;
-    if (url.endsWith('/pipeline.json/listPipelines')) return of({ status: API_SUCCESS, data: pipelines });
+  const withEverything = () => taskEditWith((url, opts) => {
+    if (url.endsWith('/setting.json/topics')) return noTopics;
+      if (url.endsWith('/setting.json/lookups')) return lookupsWithPipelineIds;
+    if (url.endsWith('/pipeline.json/listForTopic')) return forTopic(pipelines, opts);
     if (url.endsWith('/setting.json/fetchSubLookupByParentId')) return of({ status: API_SUCCESS, data: { lookupDatas: [] } });
     if (url.endsWith('/pipeline.json/definition')) return of({ status: API_SUCCESS, data: null });
     throw new Error(`unexpected GET ${url}`);
@@ -290,14 +305,17 @@ describe('TaskEdit -- the pipeline follows the topic', () => {
   it('offers no pipeline until a topic is chosen, then only that topic\'s', () => {
     const { component } = withEverything();
     component.ngOnInit();
+    settle();
 
     expect(component.pipelineOptions()).toEqual([]);
     expect(component.pipelineHint()).toContain('Pick a topic first');
 
     component.form.patchValue({ sourceTaskTypeId: 10 });
+    settle();
     expect(component.pipelineOptions().map(o => o.value)).toEqual(['F768926', 'F768928']);
 
     component.form.patchValue({ sourceTaskTypeId: 30 });
+    settle();
     expect(component.pipelineOptions()).toEqual([]);
     expect(component.pipelineHint()).toContain('No pipeline publishes on this topic');
   });
@@ -305,15 +323,19 @@ describe('TaskEdit -- the pipeline follows the topic', () => {
   it('clears a pipeline that does not publish on the newly chosen topic', () => {
     const { component } = withEverything();
     component.ngOnInit();
+    settle();
     component.form.patchValue({ sourceTaskTypeId: 10 });
+    settle();
     component.form.patchValue({ pipelineId: 'F768926' });
 
     // Same topic: the pipeline stays.
     component.form.patchValue({ sourceTaskTypeId: 10 });
+    settle();
     expect(component.form.get('pipelineId')!.value).toBe('F768926');
 
     // A topic F768926 does not publish on: the pair could not dispatch, so the pipeline goes.
     component.form.patchValue({ sourceTaskTypeId: 20 });
+    settle();
     expect(component.form.get('pipelineId')!.value).toBe('');
   });
 });
@@ -324,9 +346,10 @@ describe('TaskEdit -- an edited task opens with its topic\'s pipelines', () => {
       { pipelineKey: 1, pipelineId: 'F900001', pipelineName: 'Claims file loader', sourceTaskTypeId: 1148 },
       { pipelineKey: 2, pipelineId: 'F768927', pipelineName: 'Other', sourceTaskTypeId: 20 },
     ];
-    const { component } = taskEditWith(url => {
-      if (url.endsWith('/setting.json/appSetting')) return appSettingWithPipelineIdsLookup;
-      if (url.endsWith('/pipeline.json/listPipelines')) return of({ status: API_SUCCESS, data: pipelines });
+    const { component } = taskEditWith((url, opts) => {
+      if (url.endsWith('/setting.json/topics')) return noTopics;
+      if (url.endsWith('/setting.json/lookups')) return lookupsWithPipelineIds;
+      if (url.endsWith('/pipeline.json/listForTopic')) return forTopic(pipelines, opts);
       if (url.endsWith('/setting.json/fetchSubLookupByParentId')) return of({ status: API_SUCCESS, data: { lookupDatas: [] } });
       if (url.endsWith('/pipeline.json/definition')) return of({ status: API_SUCCESS, data: null });
       if (url.endsWith('/sourceTask.json/fetchSourceTaskWithSourceTaskId')) {
@@ -337,12 +360,14 @@ describe('TaskEdit -- an edited task opens with its topic\'s pipelines', () => {
     });
     (component as any).taskDetailId = () => 1469;
     component.ngOnInit();
+    settle();
 
     expect(component.selectedTopicId()).toBe(1148);
     expect(component.pipelineOptions().map(o => o.value)).toEqual(['F900001']);
 
     // A later pick still wins over the loaded value.
     component.form.patchValue({ sourceTaskTypeId: 20 });
+    settle();
     expect(component.pipelineOptions().map(o => o.value)).toEqual(['F768927']);
   });
 });

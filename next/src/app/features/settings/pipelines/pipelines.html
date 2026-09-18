@@ -131,22 +131,26 @@
             </dl>
 
             <!-- Two tags and a count, not a wall of chips: a big form's twenty tags drowned the
-                 card. The count opens the full list in place, with what each field is. -->
-            @if (form.fields?.length) {
+                 card. The count opens the full list in place, with what each field is. A row
+                 arrives with the count alone; the first open fetches the fields. -->
+            @if (fieldCount(form)) {
               <div class="flex flex-wrap items-center gap-1">
-                @for (field of form.fields.slice(0, 2); track field.pipelineFieldId) {
+                @for (field of (form.fields ?? []).slice(0, 2); track field.pipelineFieldId) {
                   <span class="pill pill-neutral mono" [title]="field.label">{{ field.tagKey }}</span>
                 }
-                @if (form.fields.length > 2) {
+                @if (fieldCount(form) > (form.fields ? 2 : 0)) {
                   <button type="button" class="pill pill-brand hover-brand"
-                          [attr.aria-expanded]="isOpen(form)"
-                          [title]="isOpen(form) ? 'Hide the fields' : 'Show all ' + form.fields.length + ' fields'"
+                          [attr.aria-expanded]="isOpen(form)" [disabled]="isFetchingFields(form)"
+                          [title]="isOpen(form) ? 'Hide the fields' : 'Show all ' + fieldCount(form) + ' fields'"
                           (click)="toggleFields(form)">
-                    {{ isOpen(form) ? 'Hide' : '+' + (form.fields.length - 2) + ' more' }}
+                    @if (isFetchingFields(form)) {
+                      <app-icon name="refresh" class="spin" size="0.85em" />
+                    }
+                    {{ isOpen(form) ? 'Hide' : form.fields ? '+' + (fieldCount(form) - 2) + ' more' : fieldCount(form) + (fieldCount(form) === 1 ? ' field' : ' fields') }}
                   </button>
                 }
               </div>
-              @if (isOpen(form)) {
+              @if (isOpen(form) && form.fields) {
                 <ul class="pipeline-fields">
                   @for (field of form.fields; track field.pipelineFieldId) {
                     <li>
