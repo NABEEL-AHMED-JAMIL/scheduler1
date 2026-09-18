@@ -36,6 +36,7 @@ export class Pipelines implements OnInit {
   /** The topics the caller can see, for the filter and for the dialog's picker. */
   readonly topics = signal<{ sourceTaskTypeId: number; serviceName: string; queueTopicPartition?: string; status?: string; kafkaConnectionProfileName?: string }[]>([]);
   readonly topicFilter = signal('');
+  readonly statusFilter = signal('');
   /** Topics for the filter box, plus a "No topic" row while any pipeline still lacks one. */
   readonly topicFilterOptions = computed(() => {
     const rows = this.topics().map(t => ({ value: String(t.sourceTaskTypeId), label: t.serviceName, hint: this.kafkaTopicOf(t) }));
@@ -49,7 +50,7 @@ export class Pipelines implements OnInit {
     this.openFields.update(set => { const n = new Set(set); n.has(key) ? n.delete(key) : n.add(key); return n; });
   }
 
-  readonly hasFilters = computed(() => !!this.search().trim() || !!this.topicFilter());
+  readonly hasFilters = computed(() => !!this.search().trim() || !!this.topicFilter() || !!this.statusFilter());
   private readonly route = inject(ActivatedRoute);
 
   private readonly auth = inject(AuthService);
@@ -71,6 +72,7 @@ export class Pipelines implements OnInit {
     const term = this.search().trim().toLowerCase();
     const topic = this.topicFilter();
     let rows = this.mine(this.forms());
+    if (this.statusFilter()) rows = rows.filter(f => f.status === this.statusFilter());
     if (topic === 'none') rows = rows.filter(f => f.sourceTaskTypeId == null);
     else if (topic) rows = rows.filter(f => String(f.sourceTaskTypeId) === topic);
     if (!term) return rows;

@@ -242,7 +242,11 @@ export class TaskEdit implements OnInit {
   readonly pipelinesForTopic = computed<Pipeline[]>(() => {
     const topic = this.selectedTopicId();
     if (topic == null) return [];
-    return this.pipelines().filter(p => p.sourceTaskTypeId === topic);
+    // An Inactive pipeline is not offered for new work, but a task already on it keeps
+    // resolving its label rather than showing a bare id.
+    const current = (this.form.get('pipelineId')!.value ?? '').trim();
+    return this.pipelines().filter(p => p.sourceTaskTypeId === topic
+      && (p.status !== 'Inactive' || p.pipelineId === current));
   });
 
   readonly pipelineOptions = computed<ComboboxOption[]>(() => this.pipelinesForTopic().map(p => ({

@@ -214,11 +214,21 @@ export function validateSelectChoices(rows: PipelineField[]): string | null {
                         placeholder="Search topics…" [allowClear]="false" [options]="topicOptions()" />
         </app-field>
 
-        <app-field label="Description" for="formDescription"
-                   [control]="form.get('description')" [submitted]="submitted()">
-          <textarea id="formDescription" class="input" rows="2" formControlName="description"
-                    placeholder="What a task on this pipeline collects"></textarea>
-        </app-field>
+        <div class="form-grid">
+          <app-field label="Description" for="formDescription"
+                     [control]="form.get('description')" [submitted]="submitted()">
+            <textarea id="formDescription" class="input" rows="2" formControlName="description"
+                      placeholder="What a task on this pipeline collects"></textarea>
+          </app-field>
+
+          <app-field label="Status" for="pipelineStatus" [control]="form.get('status')" [submitted]="submitted()"
+                     hint="Inactive keeps the pipeline and its tasks but takes it off the task screen's picker.">
+            <select id="pipelineStatus" class="input" formControlName="status">
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+            </select>
+          </app-field>
+        </div>
 
         <!-- Fields ------------------------------------------------------------------ -->
         <div class="flex items-center justify-between gap-2 pt-1">

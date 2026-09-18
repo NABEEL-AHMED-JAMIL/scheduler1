@@ -54,6 +54,12 @@
         <app-combobox id="pipelines-topic" [selected]="topicFilter()" (selectedChange)="topicFilter.set($event)"
                       placeholder="All topics" clearLabel="All topics" [options]="topicFilterOptions()" />
       </div>
+      <select class="input max-w-32" [value]="statusFilter()" aria-label="State"
+              (change)="statusFilter.set($any($event.target).value)">
+        <option value="">All states</option>
+        <option value="Active">Active</option>
+        <option value="Inactive">Inactive</option>
+      </select>
       <div class="search-field max-w-56">
         <app-icon name="search" size="0.95em" />
         <input class="input" placeholder="Search name, pipeline or description"
