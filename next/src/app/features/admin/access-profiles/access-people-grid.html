@@ -100,8 +100,21 @@
     </table>
   </div>
   <div class="flex flex-wrap items-center gap-x-5 gap-y-1 px-4 py-2.5 border-t border-[color:var(--border-subtle)] text-xs text-[color:var(--text-muted)]">
-    <span class="inline-flex items-center gap-1.5"><input type="checkbox" class="checkbox" checked disabled aria-hidden="true" /> open</span>
-    <span class="inline-flex items-center gap-1.5"><input type="checkbox" class="checkbox" disabled aria-hidden="true" /> withheld</span>
+    <!-- Samples look exactly like the cells they explain. They used to be disabled inputs, and
+         the disabled fade made the ticked "open" sample read as an empty grey box -- the same
+         as "withheld". Inert via tabindex/pointer-events instead, so they keep the real colours. -->
+    <span class="inline-flex items-center gap-1.5">
+      <input type="checkbox" class="checkbox access-legend-sample" checked tabindex="-1" aria-hidden="true" /> open
+    </span>
+    <span class="inline-flex items-center gap-1.5">
+      <input type="checkbox" class="checkbox access-legend-sample" tabindex="-1" aria-hidden="true" /> withheld
+    </span>
+    <span class="inline-flex items-center gap-1.5">
+      <span class="access-mark access-mark-on"><app-icon name="check" size="0.85rem" /></span> profile baseline
+    </span>
+    <span class="inline-flex items-center gap-1.5">
+      <span class="access-mark access-mark-off"><app-icon name="minus" size="0.85rem" /></span> not in profile
+    </span>
     <span class="inline-flex items-center gap-1.5"><span class="access-exception-dot"></span> exception to the profile</span>
     <span>Tick a box to open or withhold that page for that person; the profile row above shows the baseline.</span>
     <span class="ml-auto">Admins are not listed — they open everything.</span>

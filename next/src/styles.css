@@ -1535,6 +1535,7 @@ html.dark {
 .access-mark { display: inline-flex; align-items: center; justify-content: center; width: 1.35rem; height: 1.35rem; border-radius: 0.375rem; }
 .access-mark-on  { background: var(--color-ok-100); color: var(--color-ok-500); }
 .access-mark-off { background: transparent; color: var(--border-strong); }
+.access-legend-sample { pointer-events: none; }
 :root { --access-group-bg: color-mix(in oklab, var(--surface-inverse) 4%, var(--surface-raised)); }
 html.dark { --access-group-bg: color-mix(in oklab, var(--surface-inverse) 7%, var(--surface-raised)); }
 html.dark .access-mark-on { background: color-mix(in oklab, var(--color-ok-500) 25%, transparent); color: var(--color-ok-400); }
