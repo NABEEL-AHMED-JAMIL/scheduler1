@@ -279,11 +279,7 @@
               <app-icon name="layers" size="1.5rem" class="icon-muted" />
               <p>No topic publishes through this profile yet.</p>
               <p class="text-[color:var(--text-muted)]">
-                @if (p.isDefault) {
-                  As the default it would carry any topic with no connection of its own — there are none right now.
-                } @else {
-                  Add a topic here, or point an existing one at this connection when editing it.
-                }
+                Add one and it publishes through this connection.
               </p>
             </div>
           } @else if (!topicsShown().length) {
@@ -295,7 +291,6 @@
                   <tr>
                     <th>Name</th>
                     <th>Kafka topic</th>
-                    <th>Via</th>
                     <th class="text-right">Tasks</th>
                     <th class="text-right">State</th>
                     <th class="w-20"><span class="sr-only">Actions</span></th>
@@ -325,15 +320,6 @@
                           <div class="text-[11px] mt-0.5 truncate" [class]="test.ok ? 'text-ok-500' : 'text-crit-500'" [title]="test.message">
                             {{ test.message }}
                           </div>
-                        }
-                      </td>
-                      <td>
-                        @if (row.via === 'explicit') {
-                          <span class="pill pill-neutral" title="This topic names this connection">named</span>
-                        } @else if (row.via === 'override') {
-                          <span class="pill pill-brand" title="Your workspace routes this topic here, over the topic's own setting">your override</span>
-                        } @else {
-                          <span class="pill pill-neutral" title="The topic names no connection, so the default carries it">via default</span>
                         }
                       </td>
                       <td class="text-right tabular" [class.text-[color:var(--text-muted)]]="!row.type.totalTaskLink">{{ row.type.totalTaskLink || 0 }}</td>

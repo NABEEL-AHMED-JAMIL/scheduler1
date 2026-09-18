@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { HttpClient } from '@angular/common/http';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -81,41 +81,11 @@ export interface TaskType {
           </app-field>
         </div>
 
-        <app-field label="Kafka connection" for="defaultKafkaProfile"
-                   [control]="form.get('defaultKafkaConnectionProfileId')" [submitted]="submitted()"
-                   hint="Which cluster this topic's messages publish to. Shared with every tenant that uses this type, unless a tenant sets its own override below. Leave unset to use the platform's default cluster.">
-          <select id="defaultKafkaProfile" class="input" formControlName="defaultKafkaConnectionProfileId">
-            <option [ngValue]="null">Platform default</option>
-            @for (profile of data.profiles; track profile.kafkaConnectionProfileId) {
-              <option [ngValue]="profile.kafkaConnectionProfileId">
-                {{ profile.profileName }}@if (profile.environmentLabel) { ({{ profile.environmentLabel }}) }
-              </option>
-            }
-          </select>
-        </app-field>
-
-        @if (canRoute()) {
-          <app-field label="Your override" for="kafkaProfile"
-                     [control]="form.get('routeKafkaConnectionProfileId')" [submitted]="submitted()"
-                     hint="Replaces the default above for your tenant only. Leave unset to use the default as-is.">
-            <select id="kafkaProfile" class="input" formControlName="routeKafkaConnectionProfileId">
-              <option [ngValue]="null">Use the default above</option>
-              @for (profile of data.profiles; track profile.kafkaConnectionProfileId) {
-                <option [ngValue]="profile.kafkaConnectionProfileId">
-                  {{ profile.profileName }}@if (profile.environmentLabel) { ({{ profile.environmentLabel }}) }
-                </option>
-              }
-            </select>
-          </app-field>
-        } @else {
-          <p class="field-note text-[color:var(--text-muted)] flex items-start gap-1.5">
-            <app-icon name="info" size="0.9em" class="mt-px shrink-0" />
-            <span>
-              A tenant can still override the default above for themselves; that per-tenant
-              override is set by a tenant admin rather than here.
-            </span>
-          </p>
-        }
+        <p class="field-note text-[color:var(--text-muted)] flex items-start gap-1.5">
+          <app-icon name="server" size="0.9em" class="mt-px shrink-0" />
+          <span>Publishes through <strong>{{ data.profileName || 'the profile it was opened from' }}</strong>.
+            A topic belongs to the connection it was added under; to move it, add it under the other one.</span>
+        </p>
 
         <app-field label="Status" for="ttStatus" [control]="form.get('status')" [submitted]="submitted()">
           <select id="ttStatus" class="input" formControlName="status">
@@ -127,13 +97,14 @@ export interface TaskType {
     </app-form-dialog>
   `,
 })
-export class TaskTypeDialog implements OnInit {
+export class TaskTypeDialog {
   readonly ref = inject<DialogRef<boolean>>(DialogRef);
   readonly data = inject<{
     type?: TaskType;
     profiles: any[];
-    /** Pre-selects the connection when the dialog is opened from a profile's own pane. */
+    /** The profile the dialog was opened from: the topic publishes through it, no choice offered. */
     defaultProfileId?: number | null;
+    profileName?: string;
     /** The workspace a new topic belongs to, when the caller already knows it. */
     tenantId?: number | null;
     /** Offered to a platform admin who has to say which workspace a new topic is for. */
@@ -148,11 +119,6 @@ export class TaskTypeDialog implements OnInit {
   readonly submitted = signal(false);
   readonly isEdit = computed(() => !!this.data.type?.sourceTaskTypeId);
 
-  /**
-   * The route endpoints reject a platform admin outright -- the override is scoped to a
-   * tenant and a platform admin has none. Offering the control would be offering a failure.
-   */
-  readonly canRoute = computed(() => !this.auth.isPlatformAdmin());
 
   /**
    * The server refuses a platform admin's new topic without a workspace (validateTaskTypeOwner):
@@ -182,24 +148,8 @@ export class TaskTypeDialog implements OnInit {
     // uses it (KafkaConnectionResolver falls back to it once no tenant override applies).
     defaultKafkaConnectionProfileId: [this.data.type?.kafkaConnectionProfileId ?? this.data.defaultProfileId ?? null],
     tenantId: [this.data.tenantId ?? null, this.needsWorkspace() ? Validators.required : []],
-    // A separate, per-tenant override on top of the default above -- see canRoute.
-    routeKafkaConnectionProfileId: [null],
     status: [this.data.type?.status ?? 'Active'],
   });
-
-  ngOnInit(): void {
-    // The route is stored separately from the type, so it is read separately too.
-    const id = this.data.type?.sourceTaskTypeId;
-    if (!id || !this.canRoute()) return;
-    this.http.get<ApiResponse<any>>(`${API_BASE}/setting.json/fetchKafkaRoute`,
-      { params: { sourceTaskTypeId: id } }).subscribe({
-      next: response => {
-        if (response.status !== API_SUCCESS) return;
-        const routed = response.data?.kafkaConnectionProfileId ?? response.data?.profileId ?? null;
-        if (routed) this.form.patchValue({ routeKafkaConnectionProfileId: routed });
-      },
-    });
-  }
 
   save(): void {
     this.submitted.set(true);
@@ -231,8 +181,9 @@ export class TaskTypeDialog implements OnInit {
           this.toast.error(response.message);
           return;
         }
-        const id = value.sourceTaskTypeId ?? (response.data as any)?.sourceTaskTypeId;
-        this.applyRoute(id, value.routeKafkaConnectionProfileId, response.message);
+        this.saving.set(false);
+        this.toast.success(response.message);
+        this.ref.close(true);
       },
       error: err => {
         this.saving.set(false);
@@ -241,25 +192,4 @@ export class TaskTypeDialog implements OnInit {
     });
   }
 
-  /** Routing lives behind its own endpoints, so it is a second call after the type is saved. */
-  private applyRoute(id: number | undefined, profileId: number | null, message: string): void {
-    const done = () => { this.saving.set(false); this.toast.success(message); this.ref.close(true); };
-    if (!id || !this.canRoute()) { done(); return; }
-
-    const call = profileId
-      ? this.http.put<ApiResponse>(`${API_BASE}/setting.json/setKafkaRoute`, null,
-          { params: { sourceTaskTypeId: id, kafkaConnectionProfileId: profileId } })
-      : this.http.delete<ApiResponse>(`${API_BASE}/setting.json/deleteKafkaRoute`,
-          { params: { sourceTaskTypeId: id } });
-
-    call.subscribe({
-      next: () => done(),
-      // The type itself saved; a routing failure should say so rather than look like a total failure.
-      error: () => {
-        this.saving.set(false);
-        this.toast.error('Saved, but the Kafka route could not be applied.');
-        this.ref.close(true);
-      },
-    });
-  }
 }

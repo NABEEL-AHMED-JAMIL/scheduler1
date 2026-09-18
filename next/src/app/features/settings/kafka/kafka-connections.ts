@@ -96,34 +96,20 @@ export class KafkaConnections implements OnInit {
   }
 
   /**
-   * Every topic (source task type) the caller can see, and which profile each one actually
-   * publishes through: the topic's own connection, else -- for a tenant admin -- their
-   * workspace's override, else the default. What the pane lists under a profile is the set
-   * that resolves to it, tagged with why, so "via default" is visible rather than implied.
+   * The topics (source task types) that publish through the selected profile. A topic belongs
+   * to the connection it was added under; one from before that rule with no connection of its
+   * own is shown under the default, since that is where the resolver sends it.
    */
   private readonly taskTypes = signal<TaskType[]>([]);
-  private readonly routes = signal<Record<number, number>>({});
-  readonly topicsHere = computed<{ type: TaskType; via: 'explicit' | 'override' | 'default' }[]>(() => {
+  readonly topicsHere = computed<{ type: TaskType }[]>(() => {
     const p = this.selected();
     if (!p) return [];
-    const routes = this.routes();
-    const out: { type: TaskType; via: 'explicit' | 'override' | 'default' }[] = [];
-    for (const t of this.taskTypes()) {
-      if (t.status === 'Delete' || !t.sourceTaskTypeId) continue;
-      const override = routes[t.sourceTaskTypeId];
-      if (override) {
-        if (override === p.kafkaConnectionProfileId) out.push({ type: t, via: 'override' });
-        continue;
-      }
-      if (t.kafkaConnectionProfileId != null) {
-        if (t.kafkaConnectionProfileId === p.kafkaConnectionProfileId) out.push({ type: t, via: 'explicit' });
-        continue;
-      }
-      if (p.isDefault && (p.tenantId == null || (t as any).tenantId == null || (t as any).tenantId === p.tenantId)) {
-        out.push({ type: t, via: 'default' });
-      }
-    }
-    return out.sort((a, b) => a.type.serviceName.localeCompare(b.type.serviceName));
+    return this.taskTypes()
+      .filter(t => t.status !== 'Delete' && t.sourceTaskTypeId
+        && (t.kafkaConnectionProfileId === p.kafkaConnectionProfileId
+          || (t.kafkaConnectionProfileId == null && p.isDefault)))
+      .sort((a, b) => a.serviceName.localeCompare(b.serviceName))
+      .map(type => ({ type }));
   });
 
   /** Narrows the pane's topics by name, Kafka topic or description; a hundred rows need it. */
@@ -177,37 +163,21 @@ export class KafkaConnections implements OnInit {
 
   private loadTopics(): void {
     this.http.get<ApiResponse<any>>(`${API_BASE}/setting.json/appSetting`).subscribe({
-      next: r => {
-        if (r.status !== API_SUCCESS) return;
-        this.taskTypes.set(r.data?.sourceTaskTypes ?? []);
-        // The override endpoint refuses a platform admin -- they have no workspace to override for.
-        if (this.auth.isPlatformAdmin()) return;
-        for (const t of this.taskTypes()) {
-          if (!t.sourceTaskTypeId || t.status === 'Delete') continue;
-          const id = t.sourceTaskTypeId;
-          this.http.get<ApiResponse<any>>(`${API_BASE}/setting.json/fetchKafkaRoute`, { params: { sourceTaskTypeId: id } }).subscribe({
-            next: res => {
-              if (res.status !== API_SUCCESS) return;
-              const profileId = res.data?.kafkaConnectionProfileId ?? res.data?.profileId;
-              if (profileId) this.routes.update(map => ({ ...map, [id]: profileId }));
-            },
-            error: () => {},
-          });
-        }
-      },
+      next: r => { if (r.status === API_SUCCESS) this.taskTypes.set(r.data?.sourceTaskTypes ?? []); },
       error: () => {},
     });
   }
 
   addTopic(profile: KafkaProfile): void {
     this.dialog.open<boolean>(TaskTypeDialog, { data: {
-      profiles: this.profiles(), defaultProfileId: profile.kafkaConnectionProfileId,
+      profiles: this.profiles(), defaultProfileId: profile.kafkaConnectionProfileId, profileName: profile.profileName,
       tenantId: profile.tenantId ?? null, tenants: this.tenants(),
     } }).closed.subscribe(saved => { if (saved) this.loadTopics(); });
   }
 
   editTopic(type: TaskType): void {
-    this.dialog.open<boolean>(TaskTypeDialog, { data: { type, profiles: this.profiles(), tenants: this.tenants() } }).closed
+    const profile = this.selected();
+    this.dialog.open<boolean>(TaskTypeDialog, { data: { type, profiles: this.profiles(), tenants: this.tenants(), profileName: profile?.profileName } }).closed
       .subscribe(saved => { if (saved) this.loadTopics(); });
   }
 

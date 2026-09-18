@@ -364,14 +364,12 @@ export class Docs implements AfterViewInit {
         { name: 'Kafka topic', required: true, note: 'Letters and hyphens only. Digits, dots and underscores are rejected.' },
         { name: 'Partition', required: false, note: '* for every partition, or one index from 0 to 10. A comma-separated list is not supported.' },
         { name: 'Workspace', required: true, note: 'Which workspace owns it. A tenant administrator gets their own and is not asked; a platform administrator has to say.' },
-        { name: 'Kafka connection', required: false, note: 'Pre-filled with the profile you opened it from. Leave unset to publish through the workspace’s default.' },
       ],
-      notes: ['Kafka routing is a per-tenant override, so it is set by a tenant administrator.',
+      notes: ['A topic publishes through the connection it was added under — there is nothing to pick. To move one, add it under the other connection.',
               'Topics do not cross workspaces. A platform administrator creating one has to '
             + 'name the workspace it is for — there is no way to make one that everybody shares, '
             + 'because a shared topic showed its Kafka topic name to every other workspace.',
-              'A profile’s Topics section shows every topic that publishes through it, tagged with why: '
-            + 'named on the topic, your workspace’s override, or via the default.'],
+              'A profile’s Topics section lists every topic that publishes through it, with a Test that asks the broker whether the topic exists.'],
     },
     {
       id: 'task', title: 'Describe the task',
