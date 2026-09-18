@@ -41,6 +41,14 @@ export class Pipelines implements OnInit {
     const rows = this.topics().map(t => ({ value: String(t.sourceTaskTypeId), label: t.serviceName, hint: this.kafkaTopicOf(t) }));
     return this.summary().untopped ? [...rows, { value: 'none', label: 'No topic', hint: 'pipelines still to be assigned' }] : rows;
   });
+  /** Cards whose full field list is open; keyed by pipeline so one click opens one card. */
+  private readonly openFields = signal<Set<number>>(new Set());
+  isOpen(form: Pipeline): boolean { return this.openFields().has(form.pipelineKey ?? -1); }
+  toggleFields(form: Pipeline): void {
+    const key = form.pipelineKey ?? -1;
+    this.openFields.update(set => { const n = new Set(set); n.has(key) ? n.delete(key) : n.add(key); return n; });
+  }
+
   readonly hasFilters = computed(() => !!this.search().trim() || !!this.topicFilter());
   private readonly route = inject(ActivatedRoute);
 
