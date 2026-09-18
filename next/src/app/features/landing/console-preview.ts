@@ -38,6 +38,8 @@ type View = 'dashboard' | 'jobs' | 'reports';
     .bar-idle   { background: rgb(255 255 255 / 0.14); border-radius: 2px; }
     .bar-ok     { background: rgb(52 211 153 / 0.8);   border-radius: 2px; }
     .bar-fail   { background: rgb(244 63 94 / 0.55);   border-radius: 2px; }
+    .bar-stop   { background: rgb(251 113 133 / 0.35); border-radius: 2px; }
+    .bar-skip   { background: rgb(251 191 36 / 0.55);  border-radius: 2px; }
 
     /* Swapping views should feel like the screen changed, not like the page reloaded. */
     .view { animation: fade .28s ease both; }
@@ -129,16 +131,26 @@ type View = 'dashboard' | 'jobs' | 'reports';
               <div class="px-3 py-2 flex items-center gap-3 text-[10px] dim uppercase tracking-wider"
                    style="background: rgb(255 255 255 / .03);">
                 <span class="flex-1">Task</span>
-                <span class="w-16 text-right">Completed</span>
-                <span class="w-12 text-right">Failed</span>
-                <span class="w-12 text-right">Total</span>
+                <!-- The same five outcome columns the real report has -- one per JobStatus that
+                     ends a run -- so the preview does not promise a simpler table than the one
+                     behind the sign-in. Abbreviated to fit a 500px panel; the full words are
+                     in the title. -->
+                <span class="w-12 text-right" title="Completed">Done</span>
+                <span class="w-10 text-right" title="Failed">Failed</span>
+                <span class="w-10 text-right" title="Interrupted">Intr.</span>
+                <span class="w-10 text-right" title="Skipped">Skip</span>
+                <span class="w-10 text-right" title="Missed">Miss</span>
+                <span class="w-10 text-right">Total</span>
               </div>
               @for (row of reportRows; track row.task) {
                 <div class="px-3 py-2 flex items-center gap-3 text-[12px] panel-row">
                   <span class="flex-1 key truncate">{{ row.task }}</span>
-                  <span class="w-16 text-right mono" style="color:#86efac;">{{ row.done }}</span>
-                  <span class="w-12 text-right mono" style="color:#fda4af;">{{ row.failed }}</span>
-                  <span class="w-12 text-right mono key">{{ row.done + row.failed }}</span>
+                  <span class="w-12 text-right mono" style="color:#86efac;">{{ row.done }}</span>
+                  <span class="w-10 text-right mono" [style.color]="row.failed ? '#fda4af' : null" [class.dim]="!row.failed">{{ row.failed }}</span>
+                  <span class="w-10 text-right mono" [style.color]="row.stopped ? '#fda4af' : null" [class.dim]="!row.stopped">{{ row.stopped }}</span>
+                  <span class="w-10 text-right mono" [style.color]="row.skipped ? '#fcd34d' : null" [class.dim]="!row.skipped">{{ row.skipped }}</span>
+                  <span class="w-10 text-right mono" [style.color]="row.missed ? '#fcd34d' : null" [class.dim]="!row.missed">{{ row.missed }}</span>
+                  <span class="w-10 text-right mono key">{{ total(row) }}</span>
                 </div>
               }
             </div>
@@ -148,6 +160,8 @@ type View = 'dashboard' | 'jobs' | 'reports';
             <div class="mt-3 flex items-end gap-1.5" style="height: 44px;">
               @for (row of reportRows; track row.task) {
                 <div class="flex-1 flex flex-col justify-end gap-px">
+                  <div class="bar-skip" [style.height.px]="barPx(row.skipped + row.missed)"></div>
+                  <div class="bar-stop" [style.height.px]="barPx(row.stopped)"></div>
                   <div class="bar-fail" [style.height.px]="barPx(row.failed)"></div>
                   <div class="bar-ok" [style.height.px]="barPx(row.done)"></div>
                 </div>
@@ -197,14 +211,19 @@ export class ConsolePreview {
 
   /** Tallest column fills the box; everything else is drawn in proportion to it. */
   barPx(value: number): number {
-    const tallest = Math.max(...this.reportRows.map(r => r.done + r.failed));
+    const tallest = Math.max(...this.reportRows.map(r => this.total(r)));
     return Math.round((value / tallest) * 42);
   }
 
+  total(row: { done: number; failed: number; stopped: number; skipped: number; missed: number }): number {
+    return row.done + row.failed + row.stopped + row.skipped + row.missed;
+  }
+
+  /** Every way a run can end, so the mock shows the same columns as the real table. */
   readonly reportRows = [
-    { task: 'Port disruption history', done: 96, failed: 2 },
-    { task: 'Catastrophe claims', done: 74, failed: 5 },
-    { task: 'Cat bond loss history', done: 61, failed: 0 },
-    { task: 'Crop origin weather', done: 48, failed: 3 },
+    { task: 'Port disruption history', done: 96, failed: 2, stopped: 1, skipped: 3, missed: 0 },
+    { task: 'Catastrophe claims', done: 74, failed: 5, stopped: 0, skipped: 1, missed: 2 },
+    { task: 'Cat bond loss history', done: 61, failed: 0, stopped: 0, skipped: 0, missed: 0 },
+    { task: 'Crop origin weather', done: 48, failed: 3, stopped: 2, skipped: 4, missed: 1 },
   ];
 }
