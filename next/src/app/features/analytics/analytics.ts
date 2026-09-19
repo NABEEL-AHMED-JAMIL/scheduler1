@@ -17,6 +17,7 @@ import { BucketSummary, ObjectSummary, StorageService } from '../objects/storage
 import { SqlEditor } from './sql-editor';
 import { DataGrid, GridColumn, GridCopy, GridSort } from './data-grid';
 import { DatasetRegistry } from './dashboard';
+import { DatasetOverview } from './dataset-overview';
 import {
   FilterBuilder, countFilterClauses, describeClause, emptyFilterGroup, isDateType,
   isNumericType,
@@ -589,7 +590,7 @@ const DATE_ONLY_TYPE = /^DATE$/i;
   selector: 'app-analytics',
   imports: [
     Icon, TableShell, SqlEditor, BarChart, Donut, RankedBar, Histogram, FilterBuilder, DataGrid,
-    DatasetRegistry, RouterLink, ColumnCard,
+    DatasetRegistry, RouterLink, ColumnCard, DatasetOverview,
   ],
   templateUrl: './analytics.html',
 })
@@ -779,7 +780,7 @@ export class Analytics implements OnInit {
       label: 'The file',
       hint: 'Already paid for by opening it — the schema and a page of rows.',
       tabs: [
-        { id: 'overview', label: 'Details' },
+        { id: 'overview', label: 'Overview' },
         { id: 'data', label: 'Data' },
       ],
     },
@@ -3708,6 +3709,30 @@ export class Analytics implements OnInit {
    * of a drilled-into view should not silently climb back out of it. The trail is dropped only
    * where it stops meaning anything: when the dimensions it drilled through are re-picked.
    */
+  /**
+   * The Canvas picks up a chart the overview drew: the same dimensions, grain, measure, sort
+   * and Top-N, so the reader continues from the picture rather than rebuilding it. Nothing runs
+   * until Run is pressed -- one more governed query is theirs to spend.
+   */
+  /** The overview already scanned the file; the Profile and Quality tabs read that scan rather than paying for a second. */
+  adoptProfile(profile: DatasetProfile): void {
+    if (!this.profile() && !this.profileLoading()) this.profile.set(profile);
+  }
+
+  openInCanvas(request: AnalysisRequest): void {
+    this.dimensions.set([...(request.dimensions ?? [])]);
+    this.dimensionGrains.set((request.dimensions ?? []).map((_, i) => request.grains?.[i] ?? null));
+    this.aggregation.set(request.measure.aggregation);
+    this.measureField.set(request.measure.field ?? '');
+    this.topNLimit.set(request.topN?.limit ?? null);
+    this.topNOther.set(request.topN?.includeOther ?? true);
+    this.sortBy.set(request.sort?.by ?? 'MEASURE');
+    this.sortDirection.set(request.sort?.direction ?? 'DESC');
+    this.clearDrills();
+    this.showTab('canvas');
+    this.runAnalysis();
+  }
+
   runAnalysis(): void {
     if (!this.canAnalyse()) return;
     const runId = 'ui-' + Date.now().toString(36) + '-'

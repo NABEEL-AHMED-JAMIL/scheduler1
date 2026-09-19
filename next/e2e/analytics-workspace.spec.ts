@@ -2,6 +2,13 @@ import { test, expect, Page } from '@playwright/test';
 import { readFileSync } from 'fs';
 
 /**
+ * The alias the deployed console gives the MinIO bucket that holds the fixtures. It was
+ * "etl-bucket" when these specs were written and is "worker-store" on the current stack; an
+ * alias nobody has fails every spec at the first select, which looks nothing like what it is.
+ */
+const CONNECTION = process.env['E2E_CONNECTION'] ?? 'worker-store';
+
+/**
  * The flow recorded in .ai/spec/E2E-FLOW.md, automated.
  *
  * <b>A note on selectors.</b> Several assertions here are scoped to a specific element rather
@@ -39,15 +46,17 @@ test.beforeEach(async () => {
 async function openFixture(page: Page) {
   await page.goto('/objects/analytics');
   await page.getByLabel(/connection/i).or(page.locator('select').first())
-    .selectOption('etl-bucket');
+    .selectOption(CONNECTION);
   await page.getByRole('button', { name: /analytics-benchmark/ }).click();
   await page.getByRole('button', { name: new RegExp(DATASET.replace('.', '\\.')) }).click();
   await expect(page.getByText(/150K/)).toBeVisible();
 }
 
-test('1 — the workspace opens a real dataset and offers all ten tabs', async ({ page }) => {
+test('1 — the workspace opens a real dataset and offers all nine tabs', async ({ page }) => {
+  // Nine, not ten: Columns was merged into Compact (its card opens under the row it describes),
+  // and Details became the Overview.
   await openFixture(page);
-  for (const tab of ['Details', 'Data', 'Compact', 'Columns', 'Profile',
+  for (const tab of ['Overview', 'Data', 'Compact', 'Profile',
                      'Quality', 'Canvas', 'SQL', 'Charts', 'Activity']) {
     await expect(page.getByRole('button', { name: tab, exact: true })).toBeVisible();
   }
@@ -185,7 +194,7 @@ test('11 — a date column can be bucketed by month, and the heading says so', a
   // The gap that limited this module most: grouping a DATE column gave one bucket per day, so
   // "revenue by month" -- the grain a business reads -- was not expressible at all.
   await page.goto('/objects/analytics');
-  await page.locator('select').first().selectOption('etl-bucket');
+  await page.locator('select').first().selectOption(CONNECTION);
   await page.getByRole('button', { name: /analytics-samples/ }).click();
   await page.getByRole('button', { name: /orders\.csv/ }).click();
   await expect(page.getByText(/250K/)).toBeVisible();

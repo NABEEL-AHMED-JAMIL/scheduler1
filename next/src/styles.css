@@ -1791,6 +1791,13 @@ html.dark .btn-circle-danger:hover:not(:disabled) { background: color-mix(in okl
 .bill-dot-warn { background: var(--color-warn-600); }
 .bill-dot-info { background: var(--color-brand-500); }
 .bill-dot-muted { background: var(--color-ink-400); }
+ /* Analytics widgets: one grid for a board and for the Studio's overview, two across from tablet
+   width, three on a wide screen; a tile never narrower than a readable chart. */
+.widget-grid { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); }
+@media (min-width: 1536px) { .widget-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.widget-foot { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; min-width: 0; padding-top: 0.25rem; border-top: 1px solid var(--border-subtle); }
+.widget-foot:empty { display: none; }
+.widget-kind { width: auto; max-width: 14rem; }
 .bill-preview { min-height: 24rem; height: 60vh; display: flex; flex-direction: column; border-bottom: 1px solid var(--border-subtle); }
 .bill-preview img { max-width: 100%; max-height: 100%; object-fit: contain; margin: auto; }
 .doc-row { display: flex; align-items: center; gap: .6rem; padding: .45rem 0; border-bottom: 1px solid var(--border-subtle); }

@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
-import { API_BASE, ApiResponse } from '../../core/api/api.config';
+import { Observable, of, tap } from 'rxjs';
+import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 
 export interface DatasetColumn {
   name: string;
@@ -646,6 +646,25 @@ export interface AnalysisResult {
   durationMs?: number;
 }
 
+/** One chart the server chose for a dataset's overview, with the question it answers and the request behind it. */
+export interface OverviewChart {
+  kind: 'rowsOverTime' | 'topValues' | 'spread' | 'completeness';
+  title: string;
+  question: string;
+  column?: string | null;
+  request?: AnalysisRequest | null;
+  result?: AnalysisResult | null;
+  distribution?: ColumnDistribution | null;
+  error?: string | null;
+}
+
+/** analytics.json/overview: the profile and the charts worth drawing unasked, in one round trip. */
+export interface DatasetOverview {
+  profile: DatasetProfile;
+  charts: OverviewChart[];
+  durationMs: number;
+}
+
 /**
  * An analysis somebody named and kept.
  *
@@ -803,6 +822,9 @@ function analysisBody(request: AnalysisRequest): Record<string, unknown> {
   return body;
 }
 
+/** How many datasets' overviews are remembered for the session. */
+const OVERVIEWS_KEPT = 8;
+
 /**
  * Analytics Studio's API: reading a dataset, querying one, and the library around both.
  *
@@ -890,6 +912,26 @@ export class AnalyticsService {
    * opening a file already spends three of the governor's four permits; this one is asked for
    * when a reader opens the tab that needs it and not before.
    */
+  /**
+   * The most expensive read here after profile itself -- one full scan and a handful of
+   * aggregations, governed like any other -- so the answer is kept for the session: the Overview
+   * tab is left and returned to far more often than the file changes underneath it. "Read again"
+   * passes `fresh`; a few datasets are remembered, oldest forgotten first.
+   */
+  overview(connection: string, path: string, fresh = false): Observable<ApiResponse<DatasetOverview>> {
+    const key = connection + '\u0000' + path;
+    const kept = fresh ? undefined : this.overviews.get(key);
+    if (kept) return of(kept);
+    return this.http.get<ApiResponse<DatasetOverview>>(`${this.base}/overview`, { params: { connection, path } }).pipe(
+      tap(answer => {
+        if (answer.status !== API_SUCCESS || !answer.data) return;
+        this.overviews.delete(key); this.overviews.set(key, answer);
+        while (this.overviews.size > OVERVIEWS_KEPT) this.overviews.delete(this.overviews.keys().next().value!);
+      }),
+    );
+  }
+  private readonly overviews = new Map<string, ApiResponse<DatasetOverview>>();
+
   profile(connection: string, path: string): Observable<ApiResponse<DatasetProfile>> {
     return this.http.get<ApiResponse<DatasetProfile>>(`${this.base}/profile`, {
       params: { connection, path },

@@ -3,6 +3,13 @@ import AxeBuilder from '@axe-core/playwright';
 import { readFileSync } from 'fs';
 
 /**
+ * The alias the deployed console gives the MinIO bucket that holds the fixtures. It was
+ * "etl-bucket" when these specs were written and is "worker-store" on the current stack; an
+ * alias nobody has fails every spec at the first select, which looks nothing like what it is.
+ */
+const CONNECTION = process.env['E2E_CONNECTION'] ?? 'worker-store';
+
+/**
  * WCAG 2.1 A and AA over the Analytics Studio, checked by axe rather than by eye.
  *
  * Document 15's accessibility row said "no audit, no automated check", and an audit done once by
@@ -39,7 +46,7 @@ test.beforeEach(async () => {
 
 async function openFixture(page: Page) {
   await page.goto('/objects/analytics');
-  await page.locator('select').first().selectOption('etl-bucket');
+  await page.locator('select').first().selectOption(CONNECTION);
   await page.getByRole('button', { name: /analytics-benchmark/ }).click();
   await page.getByRole('button', { name: /sales-10mb\.csv/ }).click();
   await expect(page.getByText(/150K/)).toBeVisible();
@@ -66,7 +73,8 @@ test('the dataset workspace has no WCAG A/AA violations on any tab', async ({ pa
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await openFixture(page);
 
-  const tabs = ['Details', 'Data', 'Compact', 'Columns', 'Profile',
+  // Nine: Columns was merged into Compact, and Details became the Overview.
+  const tabs = ['Overview', 'Data', 'Compact', 'Profile',
                 'Quality', 'Canvas', 'SQL', 'Charts', 'Activity'];
   const failures: string[] = [];
 
@@ -77,14 +85,14 @@ test('the dataset workspace has no WCAG A/AA violations on any tab', async ({ pa
   }
 
   // Reported together rather than failing on the first tab: fixing these one round trip at a
-  // time, ten tabs deep, is how an accessibility pass gets abandoned half done.
+  // time, nine tabs deep, is how an accessibility pass gets abandoned half done.
   expect(failures, `axe found WCAG A/AA violations:\n${failures.join('\n')}`).toEqual([]);
 });
 
 test('the browse screen has no WCAG A/AA violations before a dataset is opened', async ({ page }) => {
   // The empty state is a screen in its own right and the one every reader sees first.
   await page.goto('/objects/analytics');
-  await page.locator('select').first().selectOption('etl-bucket');
+  await page.locator('select').first().selectOption(CONNECTION);
   const violations = await scan(page);
   expect(violations, `axe found WCAG A/AA violations:${describeAll(violations)}`).toEqual([]);
 });

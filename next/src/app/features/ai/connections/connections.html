@@ -68,7 +68,7 @@
         <app-blur-loader [active]="loading()">
         <ul class="lookup-rail-list" role="listbox" aria-label="Model connections">
           @for (c of filtered(); track c.connectionId) {
-            <li>
+            <li role="presentation">
               <button type="button" class="lookup-rail-item kafka-rail-item" role="option"
                       [attr.aria-selected]="selectedId() === c.connectionId" [class.is-selected]="selectedId() === c.connectionId" (click)="select(c)">
                 <span [class]="'kafka-rail-dot ' + testTone(c).cls" [title]="testTone(c).label"></span>

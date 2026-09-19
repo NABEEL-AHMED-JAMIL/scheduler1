@@ -2,6 +2,13 @@ import { test, expect, Page } from '@playwright/test';
 import { readFileSync } from 'fs';
 
 /**
+ * The alias the deployed console gives the MinIO bucket that holds the fixtures. It was
+ * "etl-bucket" when these specs were written and is "worker-store" on the current stack; an
+ * alias nobody has fails every spec at the first select, which looks nothing like what it is.
+ */
+const CONNECTION = process.env['E2E_CONNECTION'] ?? 'worker-store';
+
+/**
  * Document 06's Data view, capability by capability, against the real 150,000-row fixture.
  *
  * <b>Written because the audit was wrong, not because the feature was missing.</b> AUDIT.md
@@ -28,7 +35,7 @@ test.beforeEach(async () => {
 
 async function openGrid(page: Page) {
   await page.goto('/objects/analytics');
-  await page.locator('select').first().selectOption('etl-bucket');
+  await page.locator('select').first().selectOption(CONNECTION);
   await page.getByRole('button', { name: /analytics-benchmark/ }).click();
   await page.getByRole('button', { name: /sales-10mb\.csv/ }).click();
   await expect(page.getByText(/150K/)).toBeVisible();

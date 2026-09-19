@@ -50,7 +50,7 @@
       } @else {
         <ul class="lookup-rail-list" role="listbox" aria-label="Rate card versions">
           @for (c of visible(); track c.version) {
-            <li>
+            <li role="presentation">
               <button type="button" class="lookup-rail-item" role="option" [attr.aria-selected]="selectedVersion() === c.version" [class.is-selected]="selectedVersion() === c.version" (click)="select(c)">
                 <span class="lookup-rail-glyph" [class.is-list]="c.tenant_id == null" [class.is-managed]="c.tenant_id != null"><app-icon [name]="c.tenant_id == null ? 'globe' : 'building'" size="0.9em" /></span>
                 <span class="min-w-0 flex-1">

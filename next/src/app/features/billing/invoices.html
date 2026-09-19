@@ -77,7 +77,7 @@
       } @else {
         <ul class="lookup-rail-list" role="listbox" aria-label="Invoices">
           @for (r of visible(); track r.invoiceId) {
-            <li>
+            <li role="presentation">
               <button type="button" class="lookup-rail-item" role="option" [attr.aria-selected]="selectedNumber() === r.number" [class.is-selected]="selectedNumber() === r.number" (click)="select(r)">
                 <span class="kafka-rail-dot" [class]="'kafka-rail-dot bill-dot-' + tone(r)" [title]="statusLabel[r.status]"></span>
                 <span class="min-w-0 flex-1">

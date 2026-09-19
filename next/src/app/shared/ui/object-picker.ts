@@ -69,7 +69,7 @@ export interface PickedObject {
               {{ filter() ? 'Nothing here matches "' + filter() + '".' : 'Nothing in this folder.' }}
             </p>
           } @else {
-            <ul class="object-picker-list" role="listbox" aria-label="Files">
+            <ul class="object-picker-list" aria-label="Files">
               @for (row of rows(); track row.key) {
                 <li>
                   @if (row.folder) {

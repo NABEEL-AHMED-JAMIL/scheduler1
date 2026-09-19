@@ -2,6 +2,13 @@ import { test, expect, Page } from '@playwright/test';
 import { readFileSync } from 'fs';
 
 /**
+ * The alias the deployed console gives the MinIO bucket that holds the fixtures. It was
+ * "etl-bucket" when these specs were written and is "worker-store" on the current stack; an
+ * alias nobody has fails every spec at the first select, which looks nothing like what it is.
+ */
+const CONNECTION = process.env['E2E_CONNECTION'] ?? 'worker-store';
+
+/**
  * The screen driven without a pointer.
  *
  * Document 15's keyboard row said "only CodeMirror's Ctrl/Cmd+Enter", which was true: everything
@@ -31,7 +38,7 @@ test.beforeEach(async () => {
 
 async function openFixture(page: Page) {
   await page.goto('/objects/analytics');
-  await page.locator('select').first().selectOption('etl-bucket');
+  await page.locator('select').first().selectOption(CONNECTION);
   await page.getByRole('button', { name: /analytics-benchmark/ }).click();
   await page.getByRole('button', { name: /sales-10mb\.csv/ }).click();
   await expect(page.getByText(/150K/)).toBeVisible();
@@ -40,13 +47,14 @@ async function openFixture(page: Page) {
 /** The id of whatever currently has focus, which is how the roving tabindex is observed. */
 const focusedId = (page: Page) => page.evaluate(() => document.activeElement?.id ?? '');
 
-test('the ten view tabs are ONE tab stop, not ten', async ({ page }) => {
+test('the nine view tabs are ONE tab stop, not nine', async ({ page }) => {
   await openFixture(page);
 
   const stops = await page.locator('[id^="a-tab-"][tabindex="0"]').count();
   expect(stops).toBe(1);
-  // The other nine are reachable by arrow key, not by Tab.
-  expect(await page.locator('[id^="a-tab-"][tabindex="-1"]').count()).toBe(9);
+  // The other eight are reachable by arrow key, not by Tab. Eight: Columns was merged into
+  // Compact, so the strip has nine tabs now.
+  expect(await page.locator('[id^="a-tab-"][tabindex="-1"]').count()).toBe(8);
 });
 
 test('arrow keys walk the strip and wrap at both ends', async ({ page }) => {

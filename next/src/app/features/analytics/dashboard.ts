@@ -4,20 +4,14 @@ import { Subscription } from 'rxjs';
 import { API_SUCCESS } from '../../core/api/api.config';
 import { Icon } from '../../shared/ui/icon';
 import { confirmWith } from '../../shared/ui/confirm';
-import { BarChart, Bar, BarSegment } from '../../shared/charts/bar-chart';
-import { Donut } from '../../shared/charts/donut';
-import { readableCell } from '../../shared/charts/number-format';
-import { KpiCard } from '../../shared/charts/kpi-card';
-import { LineChart, Point } from '../../shared/charts/line-chart';
-import { ScatterPlot, ScatterPoint } from '../../shared/charts/scatter-plot';
-import { Comparison, ComparisonSide } from '../../shared/charts/comparison';
-import { Histogram } from '../../shared/charts/histogram';
-import { ResultSummary } from '../../shared/charts/result-summary';
-import { RankedBar } from '../../shared/charts/ranked-bar';
-import { CHART_SLOTS, chartColor } from '../../shared/charts/status-color';
-import { GroupedBar, GroupedSeries } from '../../shared/charts/grouped-bar';
-import { WidgetTable, WidgetTableDialog, WidgetTableData } from './widget-table';
+import { RouterLink } from '@angular/router';
+import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
+import { StatTile } from '../../shared/ui/stat-tile';
+import { CHART_SLOTS } from '../../shared/charts/status-color';
+import { WidgetTableDialog, WidgetTableData } from './widget-table';
 import { KINDS } from './widget-kinds';
+import { AnalyticsWidget, WidgetState as TileState } from './analytics-widget';
+import { WidgetChart, WIDGET_HEIGHT, WIDGET_HEIGHT_MAX, WIDGET_HEIGHT_MIN, WIDGET_ROWS } from './widget-chart';
 import {
   FilterBuilder, asFilterGroup, countFilterClauses, describeClause, emptyFilterGroup,
   isNumericType, pruneFilters,
@@ -72,8 +66,6 @@ export interface Mark {
   inert?: boolean;
 }
 
-/** Rows a tile shows. The count printed under them is the WHOLE result's, never this. */
-const WIDGET_ROWS = 8;
 
 /**
  * The half of a tile that is about presentation rather than about which question it asks.
@@ -91,8 +83,6 @@ interface WidgetConfig {
   caption?: string;
 }
 
-/** What a tile is drawn at when its author has not said otherwise. */
-const WIDGET_HEIGHT = 180;
 /**
  * The bounds a typed height is held to.
  *
@@ -103,8 +93,6 @@ const WIDGET_HEIGHT = 180;
  * be read. The ceiling is a screenful: past this a single tile pushes every other tile off the
  * board, which is a worse outcome than a slightly cramped chart.
  */
-const WIDGET_HEIGHT_MIN = 120;
-const WIDGET_HEIGHT_MAX = 600;
 
 /**
  * Reads a tile's presentation settings.
@@ -1087,609 +1075,8 @@ function mintQueryId(widgetId: number): string {
  */
 @Component({
   selector: 'app-dashboards',
-  imports: [Icon, BarChart, Donut, RankedBar, KpiCard, LineChart, ScatterPlot,
-    Comparison, Histogram, ResultSummary, FilterBuilder, WidgetTable, GroupedBar],
-  template: `
-    <div class="space-y-4 min-w-0">
-
-      <!-- ---- the boards this workspace has ---------------------------------------------- -->
-      <div class="card p-4 space-y-3">
-        <div class="flex items-baseline gap-2 flex-wrap">
-          <h2 class="text-sm font-semibold">Dashboards</h2>
-          <span class="text-xs text-[color:var(--text-muted)]">
-            A page of saved analyses and saved queries, re-run every time it is opened.
-          </span>
-          <button type="button" class="btn btn-default btn-sm ml-auto"
-                  [disabled]="loading()" (click)="loadDashboards()">
-            <app-icon name="refresh" />
-            Refresh
-          </button>
-        </div>
-
-        <div class="flex gap-2 flex-wrap items-start">
-          <input class="input input-sm w-56" placeholder="New dashboard name"
-                 aria-label="New dashboard name"
-                 [value]="newName()" (input)="newName.set($any($event.target).value)" />
-          <input class="input input-sm flex-1 min-w-48" placeholder="What is it for? (optional)"
-                 aria-label="Dashboard description"
-                 [value]="newDescription()" (input)="newDescription.set($any($event.target).value)" />
-          <button type="button" class="btn btn-primary btn-sm"
-                  [disabled]="!canCreate()" (click)="createDashboard()">
-            <app-icon name="plus" />
-            Create
-          </button>
-        </div>
-        @if (createError()) {
-          <p class="text-xs text-crit-500">{{ createError() }}</p>
-        }
-
-        @if (loading()) {
-          <p class="text-xs text-[color:var(--text-muted)] py-2">Reading the dashboards…</p>
-        } @else if (error()) {
-          <p class="text-xs text-crit-500 py-2">{{ error() }}</p>
-        } @else if (!dashboards().length) {
-          <p class="text-xs text-[color:var(--text-muted)] py-2">
-            No dashboards yet. A dashboard holds saved analyses and saved queries side by side;
-            build one of those first and it can go on a page here.
-          </p>
-        } @else if (!listOpen()) {
-          <!-- Collapsed once a board is open, because the reason somebody clicked a report is to
-               look at it. Twenty-eight entries at full height pushed every widget below the fold,
-               so opening a report showed a list of reports. -->
-          <p class="text-xs text-[color:var(--text-muted)]">
-            {{ dashboards().length }} reports.
-            <button type="button" class="link-inline" (click)="listOpen.set(true)">Show the list</button>
-          </p>
-        } @else {
-          @if (dashboards().length > 8) {
-            <!-- A filter rather than a longer list. At twenty-eight, finding one by eye is the
-                 slowest part of opening it. -->
-            <input type="search" class="input input-sm w-full" [value]="listFilter()"
-                   (input)="listFilter.set($any($event.target).value)"
-                   placeholder="Filter these {{ dashboards().length }} reports by name"
-                   aria-label="Filter reports by name" />
-          }
-          @if (!visibleDashboards().length) {
-            <p class="text-xs text-[color:var(--text-muted)] py-2">
-              No report's name contains "{{ listFilter() }}".
-            </p>
-          }
-          <!-- Capped and scrolled, so the list can never be taller than the thing it is for.
-               Its own scroller, never the page's: the board below has to stay reachable. -->
-          <ul class="space-y-1 max-h-80 overflow-y-auto">
-            @for (item of visibleDashboards(); track item.analyticsDashboardId) {
-              <li class="flex items-center gap-2 min-w-0 border-t border-subtle pt-1">
-                <button type="button" class="btn btn-ghost btn-sm min-w-0 flex-1 justify-start"
-                        [class.font-semibold]="item.analyticsDashboardId === board()?.analyticsDashboardId"
-                        (click)="openDashboard(item)">
-                  <span class="truncate">{{ item.dashboardName }}</span>
-                </button>
-                @if (item.dashboardDescription) {
-                  <span class="text-xs text-[color:var(--text-muted)] truncate max-w-64">
-                    {{ item.dashboardDescription }}
-                  </span>
-                }
-                <span class="text-[11px] text-[color:var(--text-muted)] whitespace-nowrap ml-auto">
-                  {{ when(item.dateUpdated || item.dateCreated) }}
-                </span>
-                <button type="button" class="btn btn-ghost btn-xs" title="Delete this dashboard"
-                        (click)="removeDashboard(item)">
-                  <app-icon name="trash" />
-                </button>
-              </li>
-            }
-          </ul>
-        }
-      </div>
-
-      <!-- ---- the board that is open ----------------------------------------------------- -->
-      @if (boardLoading()) {
-        <div class="card p-4">
-          <p class="text-xs text-[color:var(--text-muted)]">Reading the board…</p>
-        </div>
-      } @else if (boardError()) {
-        <div class="card p-4"><p class="text-xs text-crit-500">{{ boardError() }}</p></div>
-      } @else if (board(); as open) {
-        <div class="card p-4 space-y-3">
-          <div class="flex items-baseline gap-2 flex-wrap">
-            <h3 class="text-sm font-semibold truncate">{{ open.dashboardName }}</h3>
-            @if (open.dashboardDescription) {
-              <span class="text-xs text-[color:var(--text-secondary)]">{{ open.dashboardDescription }}</span>
-            }
-            <div class="ml-auto flex gap-2">
-              @if (running()) {
-                <button type="button" class="btn btn-default btn-sm" (click)="stopRun()">
-                  <app-icon name="stop" />
-                  Stop
-                </button>
-              } @else if (widgets().length) {
-                <button type="button" class="btn btn-default btn-sm" (click)="runAll()">
-                  <app-icon name="refresh" />
-                  Run every widget
-                </button>
-              }
-            </div>
-          </div>
-
-          <!-- What opening this board costs, said on the board and not in a comment. -->
-          <p class="field-note text-[color:var(--text-muted)]">{{ cost() }}</p>
-          @if (running()) {
-            <p class="field-note text-[color:var(--text-secondary)]">
-              {{ progress() }}
-            </p>
-          }
-
-          <!-- ---- the board filter --------------------------------------------------------- -->
-          @if (boardDatasets().length) {
-            <div class="border-t border-subtle pt-3 space-y-2">
-              @if (!filterOpen()) {
-                <button type="button" class="btn btn-default btn-sm" (click)="filterOpen.set(true)">
-                  <app-icon name="filter" />
-                  Filter this board
-                  @if (boardFilterCount()) {
-                    <span class="pill pill-brand ml-1">{{ boardFilterCount() }} on</span>
-                  }
-                </button>
-              } @else {
-                <div class="flex flex-wrap items-end gap-2 min-w-0">
-                  <div class="flex flex-col gap-1 min-w-0">
-                    <label class="text-[11px] uppercase tracking-wider
-                                  text-[color:var(--text-muted)]" for="b-filter-dataset">
-                      Filter the widgets that read
-                    </label>
-                    <!-- ONE dataset. A condition naming a column another file does not have is a
-                         hard refusal from the server, so an unscoped board filter would turn half
-                         a board into error tiles. -->
-                    <select id="b-filter-dataset" class="input input-sm w-auto min-w-0 max-w-full"
-                            [value]="boardFilterOn()"
-                            (change)="chooseFilterDataset($any($event.target).value)">
-                      <option value="">nothing yet — pick a dataset</option>
-                      @for (dataset of boardDatasets(); track dataset.key) {
-                        <option [value]="dataset.key"
-                                [selected]="dataset.key === boardFilterOn()">
-                          {{ dataset.label }}
-                        </option>
-                      }
-                    </select>
-                  </div>
-                  <button type="button" class="btn btn-ghost btn-sm ms-auto"
-                          (click)="filterOpen.set(false)">Hide</button>
-                </div>
-
-                @if (boardColumnsLoading()) {
-                  <p class="field-note text-[color:var(--text-muted)]">
-                    Reading that dataset's columns. It costs one of the four queries this server
-                    runs at a time, which is why it is only read when you open this.
-                  </p>
-                } @else if (boardColumnsError()) {
-                  <p class="text-xs text-crit-500">{{ boardColumnsError() }}</p>
-                } @else if (boardFilterOn()) {
-                  <app-filter-builder [model]="boardFilter()" [columns]="boardColumns()"
-                                      (changed)="boardFilter.set($event)" />
-                  <div class="flex flex-wrap items-center gap-2">
-                    @if (unfinishedBoardFilters()) {
-                      <span class="pill pill-warn">
-                        {{ unfinishedBoardFilters() }} not finished, so not applied
-                      </span>
-                    }
-                    <!-- An explicit press. Ten widgets is ten governed queries, and a bar that
-                         re-ran as somebody typed would be the denial of service the serial queue
-                         above exists to prevent. -->
-                    <button type="button" class="btn btn-primary btn-sm"
-                            [disabled]="running()" (click)="applyBoardFilter()">
-                      Apply to the board
-                    </button>
-                    <span class="field-note text-[color:var(--text-muted)]">
-                      Editing here re-runs nothing until you press this. Clicking a bar on a tile
-                      fills this in and applies at once — one click, one pass of the board.
-                    </span>
-                  </div>
-                }
-              }
-            </div>
-          }
-
-          <!-- ---- adding a widget ---------------------------------------------------------- -->
-          <div class="border-t border-subtle pt-3 space-y-2">
-            @if (!addOpen()) {
-              <button type="button" class="btn btn-default btn-sm" (click)="openAdd()">
-                <app-icon name="plus" />
-                Add a widget
-              </button>
-            } @else {
-              <div class="flex gap-2 flex-wrap items-start">
-                <input class="input input-sm w-48" placeholder="Widget title"
-                       aria-label="Widget title"
-                       [value]="addTitle()" (input)="addTitle.set($any($event.target).value)" />
-                <select class="input input-sm w-auto" aria-label="What this widget shows"
-                        [value]="addKindOfSource()"
-                        (change)="pickSourceKind($any($event.target).value)">
-                  <option value="analysis" [selected]="addKindOfSource() === 'analysis'">
-                    A saved analysis
-                  </option>
-                  <option value="query" [selected]="addKindOfSource() === 'query'">
-                    A saved query
-                  </option>
-                </select>
-                <select class="input input-sm w-56" aria-label="Which one"
-                        [value]="addSourceId()"
-                        (change)="addSourceId.set($any($event.target).value)">
-                  <option value="" [selected]="!addSourceId()">Pick one…</option>
-                  @if (addKindOfSource() === 'analysis') {
-                    @for (item of analyses(); track item.analyticsAnalysisId) {
-                      <option [value]="item.analyticsAnalysisId">{{ item.analysisName }}</option>
-                    }
-                  } @else {
-                    @for (item of queries(); track item.analyticsQueryId) {
-                      <option [value]="item.analyticsQueryId">{{ item.queryName }}</option>
-                    }
-                  }
-                </select>
-                <select class="input input-sm w-auto" aria-label="How to draw it"
-                        [value]="addVisualization()"
-                        (change)="addVisualization.set($any($event.target).value)">
-                  @for (kind of kinds; track kind.id) {
-                    <option [value]="kind.id" [selected]="kind.id === addVisualization()">
-                      {{ kind.label }}
-                    </option>
-                  }
-                </select>
-                <input class="input input-sm w-28" type="number" placeholder="Height"
-                       aria-label="Drawing height in pixels"
-                       [attr.min]="heightMin" [attr.max]="heightMax" [attr.step]="10"
-                       [value]="addHeight()" (input)="addHeight.set($any($event.target).value)" />
-                <input class="input input-sm w-64" placeholder="Caption (optional)"
-                       aria-label="Caption shown under this widget"
-                       [value]="addCaption()" (input)="addCaption.set($any($event.target).value)" />
-                <button type="button" class="btn btn-primary btn-sm"
-                        [disabled]="!canAdd()" (click)="addWidget()">Add</button>
-                <button type="button" class="btn btn-ghost btn-sm" (click)="addOpen.set(false)">
-                  Cancel
-                </button>
-              </div>
-              <p class="field-note text-[color:var(--text-muted)]">
-                A widget points at saved work; it never keeps a copy of the result. Adding one
-                runs that widget alone, not the whole board.
-              </p>
-              @if (sourcesError()) {
-                <p class="text-xs text-crit-500">{{ sourcesError() }}</p>
-              } @else if (!analyses().length && !queries().length && sourcesReady()) {
-                <p class="text-xs text-[color:var(--text-muted)]">
-                  This workspace has saved neither an analysis nor a query yet, so there is
-                  nothing a widget could point at.
-                </p>
-              }
-              @if (addError()) {
-                <p class="text-xs text-crit-500">{{ addError() }}</p>
-              }
-            }
-          </div>
-        </div>
-
-        @if (widgetError()) {
-          <p class="text-xs text-crit-500">{{ widgetError() }}</p>
-        }
-
-        @if (!widgets().length) {
-          <div class="card p-4">
-            <p class="text-xs text-[color:var(--text-muted)]">
-              Nothing on this board yet.
-            </p>
-          </div>
-        } @else {
-          <div class="grid gap-3 md:grid-cols-2">
-            @for (widget of widgets(); track widget.analyticsDashboardWidgetId) {
-              <div class="card p-3 space-y-2 min-w-0">
-                <div class="flex items-baseline gap-2 min-w-0">
-                  <span class="text-sm font-semibold truncate">{{ widget.widgetTitle }}</span>
-                  <button type="button" class="btn btn-ghost btn-xs ml-auto shrink-0"
-                          title="Re-run this widget" (click)="runOne(widget)">
-                    <app-icon name="refresh" />
-                  </button>
-                  <button type="button" class="btn btn-ghost btn-xs shrink-0"
-                          title="Take this widget off the board" (click)="removeWidget(widget)">
-                    <app-icon name="trash" />
-                  </button>
-                </div>
-
-                <p class="field-note text-[color:var(--text-muted)] truncate"
-                   [title]="sourceOf(widget)">{{ sourceOf(widget) }}</p>
-
-                <!-- Whether the board filter reached THIS tile, said on the tile. A board that
-                     looks uniformly narrowed and is not is the failure the dataset scoping exists
-                     to prevent, and silence on the tiles it missed is exactly how that failure
-                     would look. -->
-                @if (boardFilterCount()) {
-                  @if (boardFilterNote(widget); as note) {
-                    <p class="field-note text-[color:var(--text-muted)] truncate" [title]="note">
-                      {{ note }}
-                    </p>
-                  }
-                }
-
-                @if (runs()[widget.analyticsDashboardWidgetId!]; as run) {
-                  @switch (run.state) {
-                    @case ('queued') {
-                      <p class="text-xs text-[color:var(--text-muted)] py-4 text-center">
-                        Waiting its turn. Widgets run one at a time.
-                      </p>
-                    }
-                    @case ('running') {
-                      <!-- A skeleton rather than a word, and it is deliberately NOT a spinner.
-                           A tile that keeps its height while it works stops the board reflowing
-                           under a reader as each widget lands -- these run one at a time, so a
-                           six-widget board would otherwise jump six times while somebody is
-                           trying to read the first tile.
-
-                           aria-busy and the visually-hidden sentence carry the same fact to a
-                           screen reader, which gets nothing at all from a shimmer. -->
-                      <div class="py-3 flex flex-col gap-2" aria-busy="true"
-                           [attr.aria-label]="'Running ' + widget.widgetTitle">
-                        <span class="sr-only">Running {{ widget.widgetTitle }}…</span>
-                        @for (line of skeletonLines; track line) {
-                          <!-- .pulse, not Tailwind's animate-pulse: this project's own class
-                               already turns itself off under prefers-reduced-motion and settles
-                               at 0.75 opacity, and a second animation that ignores that setting
-                               would undo it on this one screen. -->
-                          <span class="block h-3 rounded bg-sunken pulse"
-                                [style.width.%]="line" aria-hidden="true"></span>
-                        }
-                      </div>
-                    }
-                    @case ('failed') {
-                      <p class="text-xs text-crit-500 py-2">{{ run.error }}</p>
-                    }
-                    @case ('stopped') {
-                      <p class="text-xs text-[color:var(--text-muted)] py-4 text-center">
-                        Stopped before it ran. Nothing is on this tile, which is not the same as
-                        nothing being in the data.
-                      </p>
-                    }
-                    @default {
-                      @if (run.view; as view) {
-                        <div class="flex items-baseline gap-2 flex-wrap min-w-0">
-                          <!-- max-w-full and min-w-0, because w-auto sizes a select to its WIDEST
-                               option and the options now carry the reason a kind is unavailable
-                               -- a sentence. The tile overflowed its own card. The dropdown is
-                               free to be wider than the control when it opens, which is where
-                               those sentences need to be readable. -->
-                          <select class="input input-sm w-auto max-w-full min-w-0 truncate"
-                                  aria-label="How to draw this widget"
-                                  [value]="drawn(widget, view)"
-                                  (change)="setVisualization(widget, $any($event.target).value)">
-                            <!-- Listed and inert with the reason on it, never quietly missing: a
-                                 reader who cannot find "share of the total" needs to be told
-                                 that a ring of forty slices is not a chart. -->
-                            @for (kind of kinds; track kind.id) {
-                              <option [value]="kind.id" [disabled]="!!view.issues[kind.id]"
-                                      [selected]="kind.id === drawn(widget, view)"
-                                      [title]="view.issues[kind.id] || kind.label">
-                                {{ kind.label }}{{ view.issues[kind.id] ? ' — ' + view.issues[kind.id] : '' }}
-                              </option>
-                            }
-                          </select>
-                          <span class="text-[11px] text-[color:var(--text-muted)] ml-auto">
-                            ran {{ clock(view.ranAt) }}
-                          </span>
-                        </div>
-
-                        @if (view.truncated) {
-                          <!-- Loud, and above the figures rather than under them: a reader handed
-                               part of an answer and not told has a WRONG answer, not a short one. -->
-                          <p class="text-xs text-crit-500">
-                            Partial result — this stopped at the server's row ceiling.
-                          </p>
-                        }
-
-                        @switch (drawn(widget, view)) {
-                          @case ('kpi') {
-                            <app-kpi-card [value]="kpiValue(view)" [label]="kpiLabel(view)"
-                                          [caption]="kpiCaption(view)" />
-                          }
-                          <!-- [format] on all three line kinds, for the reason the stack below
-                               spells out: LineChart falls back to compactNumber, whose sub-1000
-                               branch is Math.round and whose 1000+ branch is one decimal place.
-                               The point tooltip is the ONLY numeric readout a line has, so a
-                               series of 1235, 1240, 1260 read "1.2K" three times -- and the same
-                               dataset drawn as bars beside it, which does pass figure, read the
-                               faithful values. Two tiles over one result disagreed. -->
-                          @case ('line') {
-                            <app-line-chart [data]="points(view)" [height]="heightOf(widget)"
-                                            [format]="figure" />
-                          }
-                          @case ('area') {
-                            <app-line-chart [data]="points(view)" [filled]="true"
-                                            [height]="heightOf(widget)" [format]="figure" />
-                          }
-                          @case ('groupedBar') {
-                            @if (view.pivot; as grid) {
-                              <app-grouped-bar [groupNames]="pivotGroupNames(grid)"
-                                               [series]="pivotSeries(grid)" />
-                            }
-                          }
-                          @case ('pivot') {
-                            @if (view.pivot; as grid) {
-                              <!-- The grid the server composed. Scrolls inside its own container
-                                   so a wide cross-tab never makes the PAGE scroll sideways. -->
-                              <div class="overflow-x-auto">
-                                <table class="w-full text-xs">
-                                  <thead>
-                                    <tr class="text-left text-[color:var(--text-muted)]">
-                                      <th class="px-2 py-1 font-medium whitespace-nowrap">
-                                        {{ grid.rowDimension }}
-                                      </th>
-                                      @for (column of grid.columnValues; track column) {
-                                        <th class="px-2 py-1 font-medium whitespace-nowrap text-right">
-                                          {{ column }}
-                                        </th>
-                                      }
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    @for (row of pivotRows(grid); track $index) {
-                                      <tr class="border-t border-subtle">
-                                        <td class="px-2 py-1 whitespace-nowrap">
-                                          @if (row.key === null) {
-                                            <span class="text-[color:var(--text-muted)]"
-                                                  title="null">—</span>
-                                          } @else {
-                                            {{ row.key }}
-                                          }
-                                        </td>
-                                        @for (cell of row.cells; track $index) {
-                                          <td class="px-2 py-1 whitespace-nowrap tabular text-right">
-                                            @if (cell === null) {
-                                              <!-- NO ROWS in that combination, which is not a
-                                                   zero. A grid that printed 0 here would assert a
-                                                   measurement nobody made. -->
-                                              <span class="text-[color:var(--text-muted)]"
-                                                    title="no rows">—</span>
-                                            } @else {
-                                              <span [title]="cell">{{ readable(cell) }}</span>
-                                            }
-                                          </td>
-                                        }
-                                      </tr>
-                                    }
-                                  </tbody>
-                                </table>
-                              </div>
-                            }
-                          }
-                          @case ('shareStacked') {
-                            <!-- Every bar full height, so the eye compares the MIX between groups
-                                 rather than their sizes. compactNumber would print "100" over
-                                 each one, which says nothing; the percentage is in each segment's
-                                 tooltip where it belongs. -->
-                            <app-bar-chart [data]="shareStacks(view)" [height]="heightOf(widget)"
-                                           [hideValues]="true" [format]="percentOfGroup" />
-                          }
-                          @case ('stacked') {
-                            <!-- [format], because BarChart otherwise falls back to compactNumber
-                                 and its sub-1000 branch is Math.round: an average of 500.43 is
-                                 labelled "500", and a set of rates at 0.42/0.38/0.11 all label
-                                 "0" over three visibly different bars. The rounding reaches the
-                                 tooltip too, so the exact figure was unreachable from the tile. -->
-                            <app-bar-chart [data]="stacks(view)" [height]="heightOf(widget)"
-                                           [format]="figure" />
-                          }
-                          @case ('histogram') {
-                            <!-- The four inputs Histogram declares for exactly this caller. Its
-                                 own docstring names Analytics Studio as the reason they exist:
-                                 the values are groups rather than runs, and a negative figure is
-                                 a refund or a loss and belongs on the chart. Unbound, the tile
-                                 said "17 runs" under 20 groups and rounded a rate of 0.08 to 0. -->
-                            <app-histogram [values]="figures(view)" [height]="heightOf(widget)"
-                                           noun="group" nounPlural="groups"
-                                           [dropBelow]="null" [format]="figure" />
-                          }
-                          @case ('scatter') {
-                            <app-scatter-plot [data]="scatterPoints(view)" [height]="heightOf(widget)"
-                                              [xLabel]="dimensionName(view)"
-                                              [yLabel]="measureName(view)" />
-                          }
-                          @case ('dimensionSummary') {
-                            <!-- additive AND a whole to divide. A Top-N that threw its tail away
-                                 leaves rows that are not the whole of anything, so "top share
-                                 34.2% of 2,100,000" names a number that is not the total. The
-                                 group count and the spread beside it are still true, which is why
-                                 the kind is drawn and only the share is withheld. -->
-                            <app-result-summary [data]="view.marks" mode="dimension"
-                                                [additive]="additive(view) && !view.topNTrimmed"
-                                                [dimensionLabel]="dimensionName(view)" />
-                          }
-                          @case ('trendSummary') {
-                            <app-result-summary [data]="view.marks" mode="trend"
-                                                [dimensionLabel]="dimensionName(view)" />
-                          }
-                          @case ('distributionSummary') {
-                            <app-result-summary [data]="view.marks" mode="distribution"
-                                                [dimensionLabel]="dimensionName(view)" />
-                          }
-                          @case ('comparison') {
-                            <app-comparison [first]="sides(view).first"
-                                            [second]="sides(view).second" />
-                          }
-                          @case ('ranked') {
-                            <!-- No percentages: a share of a total is only a share when the parts
-                                 add up to it, and the measure here is whatever was saved. -->
-                            <!-- formatValue, because the raw figures reach these labels too: a
-                                 ranked bar was reading "1267.19353428047" beside its bar for the
-                                 same reason the table cells were. -->
-                            <app-ranked-bar [data]="view.marks" [max]="view.marks.length"
-                                            [showPercent]="false" [formatValue]="figure"
-                                            [clickable]="narrows(widget, view)"
-                                            (picked)="narrowTo(widget, $any($event))" />
-                          }
-                          @case ('rankedShare') {
-                            <!-- The same bars, now stating each row's share. showPercent is only
-                                 ever true where the parts genuinely make a whole: issuesFor
-                                 refuses this kind over a Top-N with its tail thrown away, over a
-                                 measure that does not add up, and over a negative figure. -->
-                            <app-ranked-bar [data]="view.marks" [max]="view.marks.length"
-                                            [showPercent]="true" [formatValue]="figure"
-                                            [clickable]="narrows(widget, view)"
-                                            (picked)="narrowTo(widget, $any($event))" />
-                          }
-                          @case ('cumulative') {
-                            <!-- A running total is the worst of the three to round: the whole
-                                 point of the curve is the figure it reaches, and compactNumber
-                                 renders a closing total of 1,247,830 as "1.2M". -->
-                            <app-line-chart [data]="cumulativePoints(view)"
-                                            [height]="heightOf(widget)" [format]="figure" />
-                          }
-                          @case ('bar') {
-                            <app-bar-chart [data]="view.marks" [height]="heightOf(widget)"
-                                           [format]="figure"
-                                           [clickable]="narrows(widget, view)"
-                                           (barClicked)="narrowTo(widget, $any($event))" />
-                          }
-                          @case ('donut') {
-                            <app-donut [data]="view.marks" [totalLabel]="''"
-                                       [format]="figure" />
-                          }
-                          @default {
-                            <app-widget-table [columns]="view.columns"
-                                              [rows]="tileRows(view)"
-                                              [measureColumn]="view.measureColumn" />
-                          }
-                        }
-
-                        @if (captionOf(widget); as caption) {
-                          <!-- The author's own line, above the machine facts so those stay last.
-                               Its job is what the top of the tile cannot say -- the caveat, the
-                               as-of, what the reader should conclude -- not a restatement of the
-                               title and source already shown above. -->
-                          <p class="text-xs text-[color:var(--text-secondary)]">{{ caption }}</p>
-                        }
-                        <p class="field-note text-[color:var(--text-muted)] flex items-center gap-2 flex-wrap">
-                          <span>{{ counted(view, drawn(widget, view)) }}</span>
-                          @if (hasMoreRows(view)) {
-                            <!-- The sentence beside this used to be a dead end: it told the
-                                 reader sixteen rows existed that they could not see, and there
-                                 was no route to them anywhere on the board. -->
-                            <button type="button" class="btn btn-ghost btn-sm"
-                                    (click)="expandTable(widget, view)">Show all rows</button>
-                          }
-                        </p>
-                        @for (note of view.notes; track note) {
-                          <p class="field-note text-[color:var(--text-muted)]">{{ note }}</p>
-                        }
-                      }
-                    }
-                  }
-                } @else {
-                  <p class="text-xs text-[color:var(--text-muted)] py-4 text-center">
-                    Not run yet.
-                  </p>
-                }
-              </div>
-            }
-          </div>
-        }
-      }
-    </div>
-  `,
+  imports: [Icon, StatTile, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, FilterBuilder, AnalyticsWidget, WidgetChart],
+  templateUrl: './dashboard.html',
 })
 export class Dashboards implements OnInit, OnDestroy {
 
@@ -1700,13 +1087,6 @@ export class Dashboards implements OnInit, OnDestroy {
   readonly heightMin = WIDGET_HEIGHT_MIN;
   readonly heightMax = WIDGET_HEIGHT_MAX;
 
-  /**
-   * The widths of a running tile's placeholder lines, as percentages.
-   *
-   * Uneven on purpose: four identical bars read as a table that has finished loading badly, and
-   * a ragged right edge is what makes a skeleton legible as a placeholder rather than as content.
-   */
-  protected readonly skeletonLines = [92, 74, 84, 58];
 
   /**
    * A chart's value label, formatted the way the table formats a cell.
@@ -1714,7 +1094,6 @@ export class Dashboards implements OnInit, OnDestroy {
    * A bound arrow rather than a method, because it is passed AS a function to the chart -- a
    * method reference would lose `this` the moment the chart called it.
    */
-  protected readonly figure = (value: number): string => readableCell(String(value));
 
   /**
    * A segment of a 100% stack, written as the percentage it is.
@@ -1724,8 +1103,6 @@ export class Dashboards implements OnInit, OnDestroy {
    * bar's own total formats as "100%", which is true and is why the figure above the bar is
    * suppressed rather than formatted differently.
    */
-  protected readonly percentOfGroup = (value: number): string =>
-    `${Math.round(value * 10) / 10}%`;
 
   /** The key a dataset is identified by in the bar. A NUL cannot occur in either half. */
   private static datasetKey(connection: string, path: string): string {
@@ -1906,16 +1283,6 @@ export class Dashboards implements OnInit, OnDestroy {
     this.runAll();
   }
 
-  /**
-   * A result cell, formatted for reading. The raw value stays in the cell's title.
-   *
-   * Only a MEASURE is formatted. A dimension is a label even when it is spelled with digits, and
-   * grouping one rewrites it: `order_year` read 2,024 in this table and 2024 on the chart beside
-   * it, from the same row of the same result.
-   */
-  protected readable(cell: string, isMeasure = true): string {
-    return isMeasure ? readableCell(cell) : cell;
-  }
 
   // ---- turning one result into whatever the chosen kind needs -------------------------------
   //
@@ -1924,148 +1291,19 @@ export class Dashboards implements OnInit, OnDestroy {
   // the same analysis disagree.
 
   /** The measure column's name, humanised: amount_sum reads as "amount sum". */
-  /** Whether this result's measure has a total. Read off the view; see WidgetView.additive. */
-  protected additive(view: WidgetView): boolean {
-    return view.additive;
-  }
 
-  protected measureName(view: WidgetView): string {
-    const last = view.columns[view.columns.length - 1] ?? '';
-    return last.replace(/_/g, ' ');
-  }
 
-  protected dimensionName(view: WidgetView): string {
-    return (view.columns[0] ?? '').replace(/_/g, ' ');
-  }
 
-  /**
-   * The figure for a single-figure tile.
-   *
-   * The LAST column, because an analysis with no dimensions returns just the measure and one with
-   * dimensions returns them first -- and issuesFor only offers this kind when there is one row.
-   */
-  protected kpiValue(view: WidgetView): string {
-    const row = view.rows[0] ?? [];
-    return row[row.length - 1] ?? '—';
-  }
 
-  protected kpiLabel(view: WidgetView): string {
-    return this.measureName(view);
-  }
 
-  /** Names the group when there is one, so a one-row filtered result says what it is of. */
-  protected kpiCaption(view: WidgetView): string {
-    if (view.columns.length < 2) return '';
-    const row = view.rows[0] ?? [];
-    return row.slice(0, -1).filter(Boolean).join(' · ');
-  }
 
-  protected points(view: WidgetView): Point[] {
-    return view.marks.map(mark => ({ label: mark.name, value: mark.value }));
-  }
 
-  /**
-   * The same series accumulated, so each point is the total up to and including that row.
-   *
-   * No second query: this is the marks already drawn, added up. The kind is refused over a
-   * rank-ordered or reversed result, so the order these are accumulated in is the dimension's
-   * own -- accumulating a rank order would draw the shape of the sort.
-   */
-  protected cumulativePoints(view: WidgetView): Point[] {
-    let running = 0;
-    return view.marks.map(mark => {
-      running += mark.value;
-      return { label: mark.name, value: running };
-    });
-  }
 
-  protected figures(view: WidgetView): number[] {
-    return view.marks.map(mark => mark.value);
-  }
 
-  /**
-   * One bar per first dimension, split into a segment per second.
-   *
-   * The mark names arrive already joined -- "Electronics · North" -- so the split is on that
-   * separator. A mark with no separator cannot be divided and becomes a bar with no segments,
-   * which draws as a solid bar rather than disappearing.
-   */
-  protected stacks(view: WidgetView): Bar[] {
-    return this.stackedBars(view, false);
-  }
 
-  /**
-   * The same stacks, each scaled to fill its bar.
-   *
-   * "Share within each group" rather than "composition": every bar is the same height and the
-   * segments read as percentages of their own group, which is the question a stack of raw totals
-   * cannot answer. North being twice the size of south makes north's bar twice as tall, and that
-   * height difference is exactly what stops a reader comparing the MIX between them.
-   *
-   * Each bar's value is set to 100 so every bar reaches the top, and each segment carries its own
-   * percentage -- BarChart divides a segment by its bar's total, so the parts land in the right
-   * proportions and the tooltip reads in percent.
-   */
-  protected shareStacks(view: WidgetView): Bar[] {
-    return this.stackedBars(view, true);
-  }
 
-  /**
-   * One bar per outer dimension value, segmented by the inner one.
-   *
-   * <b>Segment colour is keyed on the CATEGORY, not on its position in the bar.</b> It used to be
-   * `var(--chart-${segments.length % 6})` -- the index within each bar -- so "returned" was
-   * chart-0 in a group where it happened to come first and chart-2 in the next one. The legend a
-   * reader builds in their head from the first bar was then wrong for every other bar, which is
-   * worse than no colour at all: the chart looks like it encodes something and encodes position.
-   */
-  private stackedBars(view: WidgetView, asShare: boolean): Bar[] {
-    const byOuter = new Map<string, BarSegment[]>();
-    const colourOf = new Map<string, string>();
-    for (const mark of view.marks) {
-      const cut = mark.name.indexOf(' · ');
-      const outer = cut < 0 ? mark.name : mark.name.slice(0, cut);
-      const inner = cut < 0 ? '' : mark.name.slice(cut + 3);
-      const label = inner || outer;
-      if (!colourOf.has(label)) {
-        colourOf.set(label, chartColor(colourOf.size));
-      }
-      const segments = byOuter.get(outer) ?? [];
-      segments.push({ label, value: mark.value, color: colourOf.get(label)! });
-      byOuter.set(outer, segments);
-    }
-    return Array.from(byOuter, ([name, segments]) => {
-      const total = segments.reduce((sum, segment) => sum + segment.value, 0);
-      if (!asShare || total <= 0) {
-        return {
-          name,
-          value: total,
-          segments: segments.length > 1 ? segments : undefined,
-        };
-      }
-      const shares = segments.map(segment => ({
-        ...segment,
-        value: (segment.value / total) * 100,
-      }));
-      return { name, value: 100, segments: shares.length > 1 ? shares : undefined };
-    });
-  }
 
-  protected scatterPoints(view: WidgetView): ScatterPoint[] {
-    return view.marks.map(mark => ({
-      label: mark.name,
-      x: Number(mark.name),
-      y: mark.value,
-    }));
-  }
 
-  protected sides(view: WidgetView): { first: ComparisonSide; second: ComparisonSide } {
-    const [first, second] = view.marks;
-    return {
-      first: { label: first?.name ?? '', value: first?.value ?? 0 },
-      second: { label: second?.name ?? '', value: second?.value ?? 0 },
-    };
-  }
 
   readonly dashboards = signal<Dashboard[]>([]);
   readonly loading = signal(false);
@@ -2196,6 +1434,22 @@ export class Dashboards implements OnInit, OnDestroy {
   private pending: 'all' | number[] | null = null;
 
   readonly widgets = computed<DashboardWidget[]>(() => this.board()?.widgets ?? []);
+  /** Whether the create form is open; a header button, not a permanent pair of inputs. */
+  readonly createOpen = signal(false);
+  readonly ranCount = computed(() => Object.values(this.runs()).filter(run => run.state === 'done').length);
+  readonly failedCount = computed(() => Object.values(this.runs()).filter(run => run.state === 'failed').length);
+  /** When the last tile landed, for the head's tile. */
+  readonly lastRunText = computed(() => {
+    const at = Math.max(0, ...Object.values(this.runs()).map(run => run.view?.ranAt ?? 0));
+    return at ? 'last ran ' + new Date(at).toLocaleTimeString() : '';
+  });
+
+  /** A run's state as the shared tile chrome names it; a result with no rows is 'empty'. */
+  stateOf(run: WidgetRun | undefined): TileState {
+    if (!run) return 'idle';
+    if (run.state === 'done') return run.view && !run.view.rowCount ? 'empty' : 'ready';
+    return run.state;
+  }
   readonly running = computed(() => this.runningId() !== null || this.queue().length > 0);
 
   readonly canCreate = computed(() => !!this.newName().trim() && !this.creating());
@@ -2591,17 +1845,6 @@ export class Dashboards implements OnInit, OnDestroy {
     });
   }
 
-  /**
-   * The grid rows the tile draws.
-   *
-   * The cross-tab was the one kind with no limit at all: every other branch cut to WIDGET_ROWS or
-   * to a mark count, and this drew whatever the server composed -- so a board with one cross-tab
-   * over a few hundred groups had a single tile hundreds of rows tall, pushing every other tile
-   * off the screen. The whole grid is still one click away, like every other table here.
-   */
-  pivotRows(grid: PivotGrid): NonNullable<PivotGrid['rows']> {
-    return (grid.rows ?? []).slice(0, WIDGET_ROWS);
-  }
 
   /**
    * The rows the tile itself draws.
@@ -2948,35 +2191,7 @@ export class Dashboards implements OnInit, OnDestroy {
 
   // ---- small renderings -------------------------------------------------------------------
 
-  /**
-   * The cluster labels for a grouped bar chart: the row dimension's values.
-   *
-   * A null key is the group with no value in it, which the grid carries as null rather than as
-   * an empty string so it cannot be confused with a real category called nothing.
-   */
-  pivotGroupNames(grid: PivotGrid): string[] {
-    return (grid.rows ?? []).map(row => row.key ?? '(no value)');
-  }
 
-  /**
-   * One series per COLUMN value, each carrying that column's figure for every row.
-   *
-   * The grid is row-major and the chart is series-major, so this is a transpose. A null cell
-   * stays null all the way through -- it means that pair had no rows, which a zero would
-   * misreport as "measured, and it was nothing".
-   */
-  pivotSeries(grid: PivotGrid): GroupedSeries[] {
-    const rows = grid.rows ?? [];
-    return grid.columnValues.map((column, columnIndex) => ({
-      name: column,
-      values: rows.map(row => {
-        const cell = row.cells[columnIndex];
-        if (cell === null || cell === undefined || cell === '') return null;
-        const value = Number(cell);
-        return Number.isFinite(value) ? value : null;
-      }),
-    }));
-  }
 
   /** A timestamp in the reader's locale, or the raw text when it will not parse. */
   when(raw: string | undefined): string {

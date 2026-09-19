@@ -91,7 +91,7 @@
       } @else {
         <ul class="lookup-rail-list" role="listbox" aria-label="Kafka profiles">
           @for (p of filtered(); track p.kafkaConnectionProfileId) {
-            <li>
+            <li role="presentation">
               <button type="button" class="lookup-rail-item kafka-rail-item"
                       role="option" [attr.aria-selected]="selectedId() === p.kafkaConnectionProfileId"
                       [class.is-selected]="selectedId() === p.kafkaConnectionProfileId"

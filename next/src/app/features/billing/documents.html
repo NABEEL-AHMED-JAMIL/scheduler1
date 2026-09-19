@@ -56,7 +56,7 @@
       } @else {
         <ul class="lookup-rail-list" role="listbox" aria-label="Documents">
           @for (d of visible(); track d.documentId) {
-            <li>
+            <li role="presentation">
               <button type="button" class="lookup-rail-item" role="option" [attr.aria-selected]="selectedId() === d.documentId" [class.is-selected]="selectedId() === d.documentId" (click)="pick(d.documentId)">
                 <span class="doc-ic">{{ glyph(d) }}</span>
                 <span class="min-w-0 flex-1">

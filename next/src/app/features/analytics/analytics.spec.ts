@@ -10,6 +10,7 @@ import {
   PreviewShape, QueryResult, QueryRun, SavedAnalysis, SavedQuery,
 } from './analytics.service';
 import { BucketSummary, ObjectSummary, StorageService } from '../objects/storage.service';
+import { API_SUCCESS } from '../../core/api/api.config';
 
 /**
  * Analytics Studio's frontend, which had no test at all.
@@ -106,7 +107,9 @@ function studioWith(over: { connections?: BucketSummary[]; objects?: ObjectSumma
     providers: [
       provideRouter([]),
       { provide: StorageService, useValue: { buckets, listObjects } },
-      { provide: AnalyticsService, useValue: { schema, preview, profile } },
+      // The Overview tab reads analytics.json/overview through its own component; here it is an
+      // empty answer so the Studio's specs stay about the Studio.
+      { provide: AnalyticsService, useValue: { schema, preview, profile, overview: () => of({ status: API_SUCCESS, data: { profile: { totalRows: 0, columns: [] }, charts: [], durationMs: 0 } }) } },
     ],
   });
   const studio = TestBed.runInInjectionContext(() => new Analytics());
@@ -795,7 +798,9 @@ describe('the three figures that are not exact', () => {
       providers: [
         provideRouter([]),
       { provide: StorageService, useValue: { buckets, listObjects } },
-        { provide: AnalyticsService, useValue: { schema, preview, profile } },
+        // The Overview tab reads analytics.json/overview through its own component; here it is an
+      // empty answer so the Studio's specs stay about the Studio.
+      { provide: AnalyticsService, useValue: { schema, preview, profile, overview: () => of({ status: API_SUCCESS, data: { profile: { totalRows: 0, columns: [] }, charts: [], durationMs: 0 } }) } },
       ],
     });
     const fixture = TestBed.createComponent(Analytics);
@@ -3647,7 +3652,9 @@ function gridWith(over: Partial<DatasetPreview> = {}) {
     providers: [
       provideRouter([]),
       { provide: StorageService, useValue: { buckets, listObjects } },
-      { provide: AnalyticsService, useValue: { schema, preview, profile } },
+      // The Overview tab reads analytics.json/overview through its own component; here it is an
+      // empty answer so the Studio's specs stay about the Studio.
+      { provide: AnalyticsService, useValue: { schema, preview, profile, overview: () => of({ status: API_SUCCESS, data: { profile: { totalRows: 0, columns: [] }, charts: [], durationMs: 0 } }) } },
     ],
   });
   const fixture = TestBed.createComponent(Analytics);
@@ -4236,7 +4243,7 @@ describe('the dashboard and the registry are reachable from the workspace', () =
     const link = (grid.fixture.nativeElement as HTMLElement)
       .querySelector('a[href="/objects/analytics/dashboards"]');
     expect(link).not.toBeNull();
-    expect(text).toContain('re-runs saved analyses and saved queries every time');
+    expect(text).toContain('a dashboard re-runs saved analyses every time it opens');
   });
 
   it('does not create the registry until somebody asks for it', () => {

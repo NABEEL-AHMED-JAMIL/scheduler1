@@ -2,6 +2,9 @@ import { test, expect, Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { readFileSync } from 'fs';
 
+/** The console's alias for the MinIO bucket that holds the fixtures; see analytics-workspace.spec.ts. */
+const CONNECTION = process.env['E2E_CONNECTION'] ?? 'worker-store';
+
 /**
  * How the workspace holds up in the dark, and on a small screen.
  *
@@ -32,7 +35,7 @@ test.beforeEach(async () => {
 
 async function openFixture(page: Page) {
   await page.goto('/objects/analytics');
-  await page.locator('select').first().selectOption('etl-bucket');
+  await page.locator('select').first().selectOption(CONNECTION);
   await page.getByRole('button', { name: /analytics-samples/ }).click();
   await page.getByRole('button', { name: /orders\.csv/ }).click();
   await expect(page.getByText(/250K/)).toBeVisible();
@@ -71,7 +74,7 @@ test('the workspace fits a phone without the page scrolling sideways', async ({ 
 test('a dashboard fits a phone too', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/objects/analytics/dashboards');
-  await page.getByRole('button', { name: '01 Overall KPI summary' }).click();
+  await page.getByRole('listbox', { name: 'Dashboards' }).getByRole('option', { name: '01 Overall KPI summary' }).click();
   await expect(page.getByText('Total revenue', { exact: true })).toBeVisible();
   await page.waitForTimeout(6000);
 
@@ -93,7 +96,7 @@ test('the workspace has no WCAG A/AA violations in DARK mode either', async ({ p
   await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
   await openFixture(page);
 
-  for (const tab of ['Details', 'Data', 'Compact', 'Quality', 'Canvas']) {
+  for (const tab of ['Overview', 'Data', 'Compact', 'Quality', 'Canvas']) {
     await page.getByRole('button', { name: tab, exact: true }).click();
     const results = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
@@ -104,7 +107,7 @@ test('the workspace has no WCAG A/AA violations in DARK mode either', async ({ p
 test('a dashboard has no WCAG A/AA violations in dark mode', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
   await page.goto('/objects/analytics/dashboards');
-  await page.getByRole('button', { name: '04 Category distribution' }).click();
+  await page.getByRole('listbox', { name: 'Dashboards' }).getByRole('option', { name: '04 Category distribution' }).click();
   await expect(page.getByText('Revenue share by category', { exact: true })).toBeVisible();
   await page.waitForTimeout(8000);
 

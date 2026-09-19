@@ -281,75 +281,29 @@
         </div>
 
         @if (tab() === 'overview') {
-          <div class="card p-4 flex flex-col gap-3">
-            <div>
-              <h3 class="text-sm font-semibold">What this is</h3>
-              <p class="field-note text-[color:var(--text-muted)]">
-                Read straight from {{ connection() }} by the query engine. The file is not copied,
-                imported or cached anywhere.
-              </p>
-            </div>
-            <dl class="grid sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
-              <div class="flex gap-2">
-                <dt class="text-[color:var(--text-muted)] min-w-24 shrink-0">Location</dt>
-                <dd class="mono text-xs break-all">{{ connection() }}/{{ path() }}</dd>
-              </div>
-              <div class="flex gap-2">
-                <dt class="text-[color:var(--text-muted)] min-w-24 shrink-0">Rows</dt>
-                <dd class="tabular">
-                  {{ (datasetRows() ?? rowCount()).toLocaleString() }}
-                  @if (previewFiltered()) {
-                    <span class="text-xs text-[color:var(--text-muted)]">
-                      — {{ rowCount().toLocaleString() }} of them match the filter on the Data tab
-                    </span>
-                  }
-                </dd>
-              </div>
-              <div class="flex gap-2">
-                <dt class="text-[color:var(--text-muted)] min-w-24 shrink-0">Columns</dt>
-                <dd class="tabular">{{ columnCount() }}</dd>
-              </div>
-              @if (modifiedAt()) {
-                <div class="flex gap-2">
-                  <dt class="text-[color:var(--text-muted)] min-w-24 shrink-0">Modified</dt>
-                  <dd class="text-xs">{{ modifiedAt() }}</dd>
-                </div>
-              }
-            </dl>
-            @if (multiFile()) {
-              <p class="field-note text-[color:var(--text-muted)]">
-                Every figure here covers all the files the pattern matches. Columns that appear in
-                only some of them are still included, and a row carries the file it came from.
-              </p>
-            }
+          <app-dataset-overview [connection]="connection()" [path]="path()" [multiFile]="multiFile()"
+                                [sizeBytes]="selected()?.size ?? null" [modified]="modifiedAt()" (openInCanvas)="openInCanvas($event)" (profiled)="adoptProfile($event)" />
 
-            <!-- The two things that outlive this visit, side by side, because they are the same
-                 kind of thing: a name for this file, and the board a saved analysis of it lands
-                 on. Both were built with no way in from the workspace at all. -->
-            <div class="flex flex-wrap items-center gap-2 border-t border-subtle pt-3">
-              <button type="button" class="btn btn-default btn-sm"
-                      [attr.aria-expanded]="registryOpen()"
-                      (click)="registryOpen.set(!registryOpen())">
-                <app-icon name="database" size="0.9em" />
-                {{ registryOpen() ? 'Hide the registry' : 'Name this dataset' }}
+          <div class="card p-4 flex flex-col gap-3 mt-4">
+            <div class="flex flex-wrap items-center gap-2">
+              <div class="min-w-0 flex-1">
+                <h3 class="text-sm font-semibold">Where this is</h3>
+                <p class="field-note text-[color:var(--text-muted)] mono break-all">{{ connection() }}/{{ path() }}</p>
+              </div>
+              <button type="button" class="btn btn-default btn-sm" [attr.aria-expanded]="registryOpen()" (click)="registryOpen.set(!registryOpen())">
+                <app-icon name="database" size="0.9em" />{{ registryOpen() ? 'Hide the registry' : 'Name this dataset' }}
               </button>
-              <a class="btn btn-default btn-sm" routerLink="/objects/analytics/dashboards">
-                <app-icon name="chart" size="0.9em" />
-                Dashboards
-              </a>
-              <span class="field-note text-[color:var(--text-muted)] basis-full">
-                A registered dataset is a name for a connection and a path — registering reads no
-                rows and spends no query permit. A dashboard re-runs saved analyses and saved
-                queries every time it is opened, so a tile is never a stored picture of an old
-                answer.
-              </span>
+              <a class="btn btn-default btn-sm" routerLink="/objects/analytics/dashboards"><app-icon name="chart" size="0.9em" />Dashboards</a>
             </div>
-
+            @if (multiFile()) {
+              <p class="field-note text-[color:var(--text-muted)]">Every figure covers all the files the pattern matches. Columns that appear in only some of them are still included, and a row carries the file it came from.</p>
+            }
+            @if (previewFiltered()) {
+              <p class="field-note text-[color:var(--text-muted)]">{{ rowCount().toLocaleString() }} rows match the filter on the Data tab; the figures above are the whole file.</p>
+            }
+            <p class="field-note text-[color:var(--text-muted)]">Read straight from {{ connection() }} by the query engine; nothing is copied, imported or cached. A registered dataset is a name for this location and reads no rows; a dashboard re-runs saved analyses every time it opens.</p>
             @if (registryOpen()) {
-              <!-- Created on the click and not before: it reads the registry when it is made, and
-                   that read is not worth spending on every file open. -->
-              <app-dataset-registry [connection]="connection()" [path]="path()"
-                                    (opened)="openRegistered($event)" />
+              <app-dataset-registry [connection]="connection()" [path]="path()" (opened)="openRegistered($event)" />
             }
           </div>
         }
@@ -801,10 +755,16 @@
             The controls stick, because they are a form a reader returns to between runs rather
             than something read once. Single column below xl: 380px of controls beside a result
             leaves neither of them enough room, and the stack is the honest answer there.
+
+            The sticky column is capped at the viewport and scrolls on its own, like the shared
+            rail. Without the cap, on a 1280x720 laptop the builder, the filters and the drill
+            trail measured taller than the screen, and the trail -- the last card -- could never
+            be scrolled to while the result beside it was long: the page scrolled, the column
+            stayed, and "All rows" sat 50px below the fold for as long as the reader cared to try.
           -->
           <div class="grid gap-3 min-w-0 xl:grid-cols-[minmax(340px,380px)_minmax(0,1fr)] xl:items-start">
 
-            <div class="flex flex-col gap-3 min-w-0 xl:sticky xl:top-3">
+            <div class="flex flex-col gap-3 min-w-0 xl:sticky xl:top-3 xl:max-h-[calc(100vh-5rem)] xl:overflow-y-auto">
 
             <!-- ── what to analyse ──────────────────────────────────────────────────────── -->
             <div class="card p-4 flex flex-col gap-3 min-w-0">

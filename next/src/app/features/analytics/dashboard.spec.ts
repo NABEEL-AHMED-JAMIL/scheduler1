@@ -2,12 +2,17 @@ import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
 import { Dialog } from '@angular/cdk/dialog';
+import { provideRouter } from '@angular/router';
 import { Subject, of } from 'rxjs';
 import {
   Dashboards, DatasetRegistry, analysisView, dateOnly, plainDecimal, queryView, combineFilters } from './dashboard';
 import { dateOnly as studioDateOnly, plainDecimal as studioPlainDecimal } from './analytics';
 import { CHART_SLOTS } from '../../shared/charts/status-color';
 import { KIND_IDS } from './widget-kinds';
+import { WidgetChart } from './widget-chart';
+
+/** The result-to-chart adapters moved to WidgetChart; a bare instance answers them without a view. */
+function chart(): WidgetChart { return TestBed.runInInjectionContext(() => new WidgetChart()); }
 import {
   AnalysisResult, AnalyticsService, Dashboard, DashboardWidget, FilterGroup, QueryResult,
   RegisteredDataset, SavedAnalysis, SavedQuery,
@@ -202,6 +207,7 @@ function configure(over: BoardOptions) {
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
     providers: [
+      provideRouter([]),
       { provide: AnalyticsService, useValue: stub.api },
       // confirmWith resolves as soon as the dialog "closes", so this is the reader saying yes.
       { provide: Dialog, useValue: { open: () => ({ closed: of(over.confirms ?? true) }) } },
@@ -1244,7 +1250,7 @@ describe('the kinds a result is not allowed to be drawn as', () => {
     const board = TestBed.runInInjectionContext(() => new Dashboards());
 
     expect(view.issues.cumulative).toBe('');
-    expect((board as any).cumulativePoints(view).map((p: any) => p.value)).toEqual([100, 350, 400]);
+    expect((chart() as any).cumulativePoints(view).map((p: any) => p.value)).toEqual([100, 350, 400]);
   });
 
   it('refuses a running total over a rank order, which draws the shape of the sort', () => {
@@ -1610,7 +1616,7 @@ describe('stacked bars and the share within each group', () => {
     expect(board.counted(view, 'pivot')).toBe('2 groups');
 
     // And the tile caps the grid like every other table here, rather than growing without bound.
-    expect(board.pivotRows(view.pivot!).length).toBe(2);
+    expect(chart().pivotRows(view.pivot!).length).toBe(2);
   });
 
   it('gives one category the same colour in every bar', () => {
@@ -1619,7 +1625,7 @@ describe('stacked bars and the share within each group', () => {
     // from the first bar is then wrong for every other bar -- worse than no colour, because the
     // chart looks like it encodes something and encodes position.
     const board = boardWith({ widgets: [widgetOn()] }).board;
-    const bars = (board as any).stacks(crossTab());
+    const bars = (chart() as any).stacks(crossTab());
 
     const colourIn = (name: string, label: string) =>
       bars.find((bar: any) => bar.name === name).segments
@@ -1631,7 +1637,7 @@ describe('stacked bars and the share within each group', () => {
 
   it('normalises each bar to its own total for the share view', () => {
     const board = boardWith({ widgets: [widgetOn()] }).board;
-    const bars = (board as any).shareStacks(crossTab());
+    const bars = (chart() as any).shareStacks(crossTab());
 
     // Every bar full height, so the eye compares the MIX rather than the size.
     expect(bars.map((bar: any) => bar.value)).toEqual([100, 100]);
@@ -1656,7 +1662,7 @@ describe('stacked bars and the share within each group', () => {
       dimensions: ['region', 'status'],
     }), 'SUM', { dimensionCount: 2 });
 
-    const bars = (board as any).shareStacks(view);
+    const bars = (chart() as any).shareStacks(view);
     expect(bars[0].value).toBe(0);
   });
 });
@@ -2091,11 +2097,11 @@ describe('bars side by side', () => {
   });
 
   it('turns the grid rows into cluster labels', () => {
-    expect(board().pivotGroupNames(GRID as any)).toEqual(['North', 'South', '(no value)']);
+    expect(chart().pivotGroupNames(GRID as any)).toEqual(['North', 'South', '(no value)']);
   });
 
   it('transposes the grid into one series per column value', () => {
-    const series = board().pivotSeries(GRID as any);
+    const series = chart().pivotSeries(GRID as any);
     expect(series.map(s => s.name)).toEqual(['Apparel', 'Electronics']);
     expect(series[0].values).toEqual([120.5, 90, 10]);
   });
@@ -2103,20 +2109,20 @@ describe('bars side by side', () => {
   it('keeps a pair with no rows as null rather than folding it to zero', () => {
     // A zero says "measured, and it was nothing". This pair was never measured, and the chart
     // draws no bar for it at all.
-    const series = board().pivotSeries(GRID as any);
+    const series = chart().pivotSeries(GRID as any);
     expect(series[1].values).toEqual([340, null, 20]);
   });
 
   it('reads a non-numeric cell as absent rather than NaN', () => {
     const odd = { ...GRID, rows: [{ key: 'North', cells: ['n/a', '5'] }] };
-    const series = board().pivotSeries(odd as any);
+    const series = chart().pivotSeries(odd as any);
     expect(series[0].values).toEqual([null]);
     expect(series[1].values).toEqual([5]);
   });
 
   it('survives a grid the server refused to compose', () => {
     const truncated = { ...GRID, rows: null };
-    expect(board().pivotGroupNames(truncated as any)).toEqual([]);
-    expect(board().pivotSeries(truncated as any).every(s => s.values.length === 0)).toBe(true);
+    expect(chart().pivotGroupNames(truncated as any)).toEqual([]);
+    expect(chart().pivotSeries(truncated as any).every((s: { values: unknown[] }) => s.values.length === 0)).toBe(true);
   });
 });

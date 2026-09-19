@@ -46,17 +46,31 @@ async function openLibrary(page: Page) {
   await expect(page.getByText(/re-run every time it is opened/)).toBeVisible();
 }
 
+/**
+ * The rail lists every board as an option in a listbox, the way Lookups, Kafka and Billing list
+ * theirs, and the option's accessible name carries the description and the date after the name.
+ * A substring on the name is enough: nothing here is named as a prefix of anything else.
+ */
+function boardInRail(page: Page, name: string) {
+  return page.getByRole('listbox', { name: 'Dashboards' }).getByRole('option', { name });
+}
+
+async function openBoard(page: Page, name: string) {
+  await boardInRail(page, name).click();
+  await expect(boardInRail(page, name)).toHaveAttribute('aria-selected', 'true');
+}
+
 test('all five seeded reports are listed', async ({ page }) => {
   await openLibrary(page);
   for (const report of REPORTS) {
-    await expect(page.getByRole('button', { name: report.name })).toBeVisible();
+    await expect(boardInRail(page, report.name)).toBeVisible();
   }
 });
 
 for (const report of REPORTS) {
   test(`${report.name} opens with its ${report.widgets} widgets`, async ({ page }) => {
     await openLibrary(page);
-    await page.getByRole('button', { name: report.name }).click();
+    await openBoard(page, report.name);
 
     // The heading, so a report that opened the WRONG one cannot pass by widget count alone.
     await expect(page.getByRole('heading', { name: report.name })).toBeVisible();
@@ -71,7 +85,7 @@ test('a widget draws a result rather than an error', async ({ page }) => {
   // page renders what came back. A tile that stored a good configuration and renders "could not
   // be read" looks identical in the database.
   await openLibrary(page);
-  await page.getByRole('button', { name: 'Executive summary' }).click();
+  await openBoard(page, 'Executive summary');
 
   await expect(page.getByText('Total revenue', { exact: true })).toBeVisible();
   // Nothing on a healthy report says any of this.
@@ -89,7 +103,7 @@ test('opening a report re-runs it instead of showing a stored answer', async ({ 
     if (request.url().includes('/analytics.json/analyze')) analyses.push(request.url());
   });
 
-  await page.getByRole('button', { name: 'Sales by region' }).click();
+  await openBoard(page, 'Sales by region');
   // exact: the board also renders "Running 1 of 6 - Revenue by region." while it works, and a
   // "Saved analysis - ..." provenance line under every tile.
   await expect(page.getByText('Revenue by region', { exact: true })).toBeVisible();
@@ -109,7 +123,7 @@ test('opening a report re-runs it instead of showing a stored answer', async ({ 
 test('the picker offers every kind, and disables the ones this result cannot honestly be',
   async ({ page }) => {
     await openLibrary(page);
-    await page.getByRole('button', { name: '01 Overall KPI summary' }).click();
+    await openBoard(page, '01 Overall KPI summary');
     await expect(page.getByText('Total revenue', { exact: true })).toBeVisible();
     await page.waitForTimeout(4000);
 
@@ -131,7 +145,7 @@ test('the picker offers every kind, and disables the ones this result cannot hon
 
 test('a single-figure tile draws the figure, and says it showed one row', async ({ page }) => {
   await openLibrary(page);
-  await page.getByRole('button', { name: '01 Overall KPI summary' }).click();
+  await openBoard(page, '01 Overall KPI summary');
   await expect(page.getByText('Total revenue', { exact: true })).toBeVisible();
   await page.waitForTimeout(4000);
 
@@ -148,27 +162,30 @@ test('a dimension-ordered series offers a line; a rank-ordered one refuses with 
     // The rule that stops a line being drawn through rank-ordered points, where it would slope
     // the same way whatever the data did.
     await openLibrary(page);
-    await page.getByRole('button', { name: '03 Monthly trend' }).click();
+    await openBoard(page, '03 Monthly trend');
     await expect(page.getByText('Revenue by month', { exact: true })).toBeVisible();
     await page.waitForTimeout(6000);
 
+    // The DOM property, not toBeDisabled(): Playwright 1.63 reads an <option>'s disabled state
+    // through ARIA, where an option carries none, and reported "enabled" for an option the
+    // browser refused to select. The property is what the picker sets and the browser honours.
     const ordered = page.locator('select').filter({ hasText: 'Bars in order' }).first();
-    await expect(ordered.locator('option[value="line"]')).toBeEnabled();
-    await expect(ordered.locator('option[value="stacked"]')).toBeDisabled();
+    await expect(ordered.locator('option[value="line"]')).toHaveJSProperty('disabled', false);
+    await expect(ordered.locator('option[value="stacked"]')).toHaveJSProperty('disabled', true);
     await expect(ordered.locator('option[value="stacked"]'))
       .toHaveAttribute('title', /second dimension/);
   });
 
 test('a two-dimension cross-tab is the one that may be stacked', async ({ page }) => {
   await openLibrary(page);
-  await page.getByRole('button', { name: '07 Category against region' }).click();
+  await openBoard(page, '07 Category against region');
   await expect(page.getByText('Revenue by category and region', { exact: true })).toBeVisible();
   await page.waitForTimeout(6000);
 
   const picker = page.locator('select').filter({ hasText: 'Table' }).first();
-  await expect(picker.locator('option[value="stacked"]')).toBeEnabled();
+  await expect(picker.locator('option[value="stacked"]')).toHaveJSProperty('disabled', false);
   // Sorted biggest-first, so a line through them would draw the sort.
-  await expect(picker.locator('option[value="line"]')).toBeDisabled();
+  await expect(picker.locator('option[value="line"]')).toHaveJSProperty('disabled', true);
 });
 
 /**
@@ -181,7 +198,7 @@ test('a two-dimension cross-tab is the one that may be stacked', async ({ page }
 test('nothing on an open board overflows its card, and the page never scrolls sideways',
   async ({ page }) => {
     await openLibrary(page);
-    await page.getByRole('button', { name: '01 Overall KPI summary' }).click();
+    await openBoard(page, '01 Overall KPI summary');
     await expect(page.getByText('Total revenue', { exact: true })).toBeVisible();
     await page.waitForTimeout(5000);
 
@@ -206,16 +223,17 @@ test('nothing on an open board overflows its card, and the page never scrolls si
     expect(sideways, 'the page body scrolls horizontally').toBe(false);
   });
 
-test('opening a report collapses the list, so the report is what you see', async ({ page }) => {
-  // Twenty-eight entries at full height pushed every widget below the fold.
+test('opening a report keeps the list beside it, and the report is what you see', async ({ page }) => {
+  // Twenty-eight entries at full height once pushed every widget below the fold, and the answer
+  // then was to collapse the list. The answer now is the rail: it scrolls on its own inside the
+  // viewport, the open board stays marked in it, and the first tile is in the first screenful.
   await openLibrary(page);
-  await expect(page.getByRole('button', { name: '01 Overall KPI summary' })).toBeVisible();
+  await expect(boardInRail(page, '01 Overall KPI summary')).toBeVisible();
 
-  await page.getByRole('button', { name: '01 Overall KPI summary' }).click();
+  await openBoard(page, '01 Overall KPI summary');
 
-  await expect(page.getByText(/\d+ reports\./)).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Show the list' })).toBeVisible();
-  // The first tile is now within the first screenful.
+  await expect(page.getByRole('heading', { name: '01 Overall KPI summary' })).toBeVisible();
+  await expect(page.getByRole('listbox', { name: 'Dashboards' })).toBeVisible();
   const top = await page.locator('.card').filter({ hasText: 'Total revenue' }).first()
     .evaluate(node => node.getBoundingClientRect().top);
   expect(top).toBeLessThan(900);
@@ -234,7 +252,7 @@ test('a board filter narrows every tile on its dataset, and says nothing ran unt
     await openLibrary(page);
     // Report 07's tiles are tables, so a figure is a cell with the raw value in its title -- the
     // most direct thing to compare before and after.
-    await page.getByRole('button', { name: '07 Category against region' }).click();
+    await openBoard(page, '07 Category against region');
     await expect(page.getByText('Revenue by category and region', { exact: true })).toBeVisible();
     await page.waitForTimeout(16000);
 
@@ -243,7 +261,9 @@ test('a board filter narrows every tile on its dataset, and says nothing ran unt
     const figure = page.locator('tbody tr').first().locator('td span[title]').last();
     const before = await figure.getAttribute('title');
 
-    await page.getByRole('button', { name: /Filter this board/ }).click();
+    // The filter lives behind the board's menu now, with adding a widget and deleting the board.
+    await page.getByRole('button', { name: 'More actions' }).click();
+    await page.getByRole('menuitem', { name: /Filter this board/ }).click();
     await expect(page.locator('#b-filter-dataset')).toBeVisible();
     await page.locator('#b-filter-dataset').selectOption({ index: 1 });
     await expect(page.locator('app-filter-builder')).toBeVisible();
@@ -284,7 +304,7 @@ test('clicking a bar narrows the board, and the rolled-up bar is not a button',
     // narrow the whole board to nothing while looking like an ordinary filter, so that bar is
     // inert -- INDIVIDUALLY inert, on a chart whose other bars work.
     await openLibrary(page);
-    await page.getByRole('button', { name: '05 Top 10 sub-categories' }).click();
+    await openBoard(page, '05 Top 10 sub-categories');
     await expect(page.getByText('Top 10 by revenue', { exact: true })).toBeVisible();
     await page.waitForTimeout(20000);
 
