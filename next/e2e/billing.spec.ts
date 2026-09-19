@@ -41,7 +41,10 @@ test.describe('cost & usage', () => {
     test.skip(health.status !== 'SUCCESS' || health.data?.status !== 'ok', 'The metering service is not reachable from the console.');
 
     const buckets = await (await request.get(`${api}/storage.json/buckets`, { headers: auth })).json();
-    const bucket = process.env['E2E_BUCKET'] ?? buckets.data?.[0]?.bucket;
+    // The worker bucket when the workspace has it: the first alias in the list is whatever sorts
+    // first, and after a configuration test that is a connection made to fail on purpose.
+    const listed: string[] = (buckets.data ?? []).map((b: { bucket: string }) => b.bucket);
+    const bucket = process.env['E2E_BUCKET'] ?? (listed.includes('worker-store') ? 'worker-store' : listed[0]);
     expect(bucket, 'a bucket to work in').toBeTruthy();
 
     // A file of a known size, uploaded then deleted through the same API the browser uses.
