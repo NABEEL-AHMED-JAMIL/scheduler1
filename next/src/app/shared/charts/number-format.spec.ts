@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { compactNumber, readableCell } from './number-format';
+import { compactNumber, compactTenths, readableCell } from './number-format';
 
 describe('compactNumber', () => {
   it.each([
@@ -13,6 +13,11 @@ describe('compactNumber', () => {
 
   it('keeps the sign', () => {
     expect(compactNumber(-1200)).toBe('-1.2K');
+  });
+
+  it('keeps the tenth at every magnitude when asked, so near-equal bars still differ', () => {
+    expect([14_791_928.89, 14_954_955.71, 25_400, 12_000, 999, 1_200_000_000].map(compactTenths))
+      .toEqual(['14.8M', '15M', '25.4K', '12K', '999', '1.2B']);
   });
 
   it('drops a trailing .0 rather than printing 12.0K', () => {

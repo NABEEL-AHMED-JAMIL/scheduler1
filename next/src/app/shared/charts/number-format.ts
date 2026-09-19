@@ -10,6 +10,22 @@
  * tenth of a thousand is noise once the leading digits carry the magnitude.
  */
 export function compactNumber(value: number): string {
+  return compact(value, false);
+}
+
+/**
+ * The same, keeping the tenth at every magnitude: 14.8M where compactNumber says 15M.
+ *
+ * For a row of bars whose values are all within a few percent of each other -- revenue by
+ * weekday, say, 14.73M to 14.95M -- compactNumber writes the same "15M" over every one, and a
+ * chart that labels seven different bars identically has said nothing. The bar chart tries this
+ * before giving up on figures altogether, and only where it fits.
+ */
+export function compactTenths(value: number): string {
+  return compact(value, true);
+}
+
+function compact(value: number, keepTenth: boolean): string {
   if (!Number.isFinite(value)) return '—';
   const sign = value < 0 ? '-' : '';
   const size = Math.abs(value);
@@ -24,7 +40,7 @@ export function compactNumber(value: number): string {
     if (size < scale) continue;
     const scaled = size / scale;
     // A tenth is worth showing below 10 and noise above it: 1.2K, 25K, 999K.
-    const text = scaled < 10 ? scaled.toFixed(1).replace(/\.0$/, '') : String(Math.round(scaled));
+    const text = scaled < 10 || keepTenth ? scaled.toFixed(1).replace(/\.0$/, '') : String(Math.round(scaled));
     return sign + text + suffix;
   }
   return sign + String(Math.round(size));

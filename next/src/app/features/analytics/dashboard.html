@@ -198,7 +198,7 @@
               <button type="button" class="btn btn-primary btn-sm mt-2" (click)="openAdd()"><app-icon name="plus" />Add a widget</button>
             </div>
           } @else {
-            <div class="widget-grid">
+            <div class="widget-grid widget-grid-rows">
               @for (widget of widgets(); track widget.analyticsDashboardWidgetId) {
                 @let run = runs()[widget.analyticsDashboardWidgetId!];
                 <app-analytics-widget [title]="widget.widgetTitle" [subtitle]="sourceOf(widget)" [state]="stateOf(run)" [error]="run?.error || ''" (refresh)="runOne(widget)">

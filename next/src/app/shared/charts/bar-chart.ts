@@ -2,7 +2,7 @@ import {
   Component, DestroyRef, ElementRef, afterNextRender, computed, inject, input, output, signal,
 } from '@angular/core';
 
-import { compactNumber } from './number-format';
+import { compactNumber, compactTenths } from './number-format';
 
 export interface BarSegment { label: string; value: number; color: string; }
 
@@ -61,6 +61,14 @@ function widestText(texts: string[]): number {
   }
   return widest * CHAR_PX + LABEL_GUTTER;
 }
+
+/**
+ * The widest a bar cell gets, in px: max-w-16 on the button. The pitch a label really has is
+ * the smaller of the column the chart could give each bar and this cap, and it used to be
+ * measured from the column alone -- so a seven-bar chart in a 930px pane reported 133px of
+ * pitch, drew "14,791,928.89" over each 64px bar, and seven labels ran into one another.
+ */
+const BAR_MAX_PX = 64;
 
 /** Chrome reserved above and below the bar itself: value line plus axis line, or axis alone. */
 const RESERVE_WITH_VALUES = 32;
@@ -294,7 +302,7 @@ export class BarChart {
   private readonly pitch = computed(() => {
     const count = this.data().length;
     const width = this.measured();
-    return count && width ? width / count : 0;
+    return count && width ? Math.min(width / count, BAR_MAX_PX + this.gap()) : 0;
   });
 
   /**
@@ -312,19 +320,34 @@ export class BarChart {
    */
   readonly hideValues = input(false);
 
-  protected readonly showValues = computed(() => {
-    if (this.hideValues()) return false;
-    const count = this.data().length;
-    if (!count) return false;
+  /**
+   * How a value is written above its bar: the caller's format when every one fits the pitch,
+   * the compact form ("14.8M", then "15M") when only that fits, and nothing when not even that does.
+   *
+   * Against the WIDEST value actually formatted, not a constant. A dashboard tile passes the
+   * faithful formatter, so these are "4,398,765.46" and not "4.4M"; whether they fit is a fact
+   * about the string, and the previous 22px threshold was true of "4.4M" and nothing else. The
+   * compact fallback is new: a seven-bar chart whose full figures do not fit used to draw them
+   * anyway, and one whose figures fit nowhere hid them all. The full figure stays in the bar's
+   * hint either way, so nothing is lost -- only the collision.
+   */
+  private readonly valueFormat = computed<((value: number) => string) | null>(() => {
+    if (this.hideValues()) return null;
+    const data = this.data();
+    if (!data.length) return null;
     const pitch = this.pitch();
-    if (!pitch) return count <= 24;
-    // Against the WIDEST value actually formatted, not a constant. A dashboard tile passes the
-    // faithful formatter, so these are "4,398,765.46" and not "4.4M"; whether they fit is a fact
-    // about the string, and the previous 22px threshold was true of "4.4M" and nothing else.
     const format = this.format();
-    const widest = widestText(this.data().map(bar => format(bar.value)));
-    return pitch >= Math.max(VALUE_PX, widest);
+    if (!pitch) return data.length <= 24 ? format : null;
+    const fits = (f: (value: number) => string) => pitch >= Math.max(VALUE_PX, widestText(data.map(bar => f(bar.value))));
+    if (fits(format)) return format;
+    if (format === compactNumber) return null;
+    // Tenths first: "14.8M" over seven bars that "15M" would label identically.
+    if (fits(compactTenths)) return compactTenths;
+    if (fits(compactNumber)) return compactNumber;
+    return null;
   });
+
+  protected readonly showValues = computed(() => this.valueFormat() !== null);
 
   /** Label every Nth group, where N is however many bars the WIDEST label is wide. */
   private readonly every = computed(() => {
@@ -404,7 +427,7 @@ export class BarChart {
         // The two outermost labels are pulled inward so they sit over the plot rather than
         // hanging 10px into the card's padding, pointing at nothing.
         align: !labelled ? 'center' : index === starts[0] ? 'start' : index === last ? 'end' : 'center',
-        display: format(bar.value),
+        display: (this.valueFormat() ?? format)(bar.value),
         hint: this.hintFor(bar, format),
         px: px,
         stack: this.stackFor(bar, px),

@@ -211,12 +211,32 @@ describe('whether a label fits where it is about to be drawn', () => {
     value: 4_398_765.46 + at,
   }));
 
-  it('withholds the figures when the formatted value is wider than a bar', () => {
+  it('falls back to the compact figure when the formatted value is wider than a bar', () => {
     // 900px over 24 bars is 37.5px of pitch, and "4,398,765.46" needs about 80. The old rule
     // asked only whether the pitch cleared a flat 22px, which is true of "4.4M" and of nothing
-    // else -- so it drew all twenty-four on top of each other.
+    // else -- so it drew all twenty-four on top of each other. Now the figure that does not fit
+    // is written the compact way instead of withheld, and the full one stays in the hint.
     const chart = chartAt(900, revenue, money);
+    expect((chart as any).showValues()).toBe(true);
+    expect(chart.bars()[0].display).toBe('4.4M');
+    expect(chart.bars()[0].hint).toContain(money(revenue[0].value));
+  });
+
+  it('withholds the figures when not even the compact form fits', () => {
+    // 60 bars over 900px is 15px of pitch; "4.4M" needs 32.
+    const many: Bar[] = Array.from({ length: 60 }, (_, at) => ({ name: 'd' + at, value: 4_398_765 - at }));
+    const chart = chartAt(900, many, money);
     expect((chart as any).showValues()).toBe(false);
+  });
+
+  it('measures the pitch against the bar cap, not the column the bar could have had', () => {
+    // Seven bars in a 930px pane: the column is 133px, but a bar is capped at 64px and its
+    // label sits over the bar, so "14,791,928.89" (about 86px) cannot fit and the seven labels
+    // ran into one another on a full-width dashboard tile.
+    const week: Bar[] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((name, at) => ({ name, value: 14_791_928.89 + at }));
+    const chart = chartAt(930, week, money);
+    expect((chart as any).showValues()).toBe(true);
+    expect(chart.bars()[0].display).toBe('14.8M');   // the tenth, because "15M" seven times says nothing
   });
 
   it('draws them when the SAME bars carry a value that does fit', () => {
