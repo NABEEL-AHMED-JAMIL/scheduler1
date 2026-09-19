@@ -1617,9 +1617,15 @@ html.dark .lookup-rail-glyph.is-managed { background: color-mix(in oklab, var(--
 .lookup-entries-scroll { max-height: 26rem; overflow: auto; }
 .lookup-entries-scroll thead th { position: sticky; top: 0; z-index: 1; background: var(--surface-raised); }
 @media (max-width: 767px) {
-  .lookup-split { grid-template-columns: 1fr; }
+  /* minmax(0, 1fr), not 1fr: a bare 1fr is minmax(auto, 1fr), so a rail item's nowrap subtitle
+     set the column's minimum width and ran past the card's edge on a phone. */
+  .lookup-split { grid-template-columns: minmax(0, 1fr); }
   .lookup-rail { border-right: 0; border-bottom: 1px solid var(--border-subtle); min-height: 0; position: static; max-height: none; }
   .lookup-rail-list { max-height: 16rem; }
+  /* The pane head stacks: beside a "Run every widget" button the title had 130px, so it was
+     cut to "20 Executive …" and its description wrapped one or two words to a line. */
+  .lookup-detail-head { flex-direction: column; align-items: stretch; gap: 0.5rem; }
+  .lookup-detail-head > .shrink-0 { justify-content: flex-end; }
 }
 
 /* Kafka profiles reuse the lookup master-detail chrome; these are the parts only it has. */

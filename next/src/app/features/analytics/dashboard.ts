@@ -1661,16 +1661,24 @@ export class Dashboards implements OnInit, OnDestroy {
   }
 
   /** What a tile is pointing at, in one line: the kind, the name and where it reads. */
+  /**
+   * What the tile points at. The saved work's name is left out when it is the tile's own title,
+   * which it almost always is: "Total revenue · Saved analysis · Total revenue · …" said the same
+   * thing twice on every tile of every seeded board.
+   */
   sourceOf(widget: DashboardWidget): string {
+    const saved = widget.analyticsAnalysisId
+      ? this.analyses().find(item => item.analyticsAnalysisId === widget.analyticsAnalysisId)
+      : undefined;
     if (widget.analyticsAnalysisId) {
-      const saved = this.analyses().find(
-        item => item.analyticsAnalysisId === widget.analyticsAnalysisId);
-      return saved ? `Saved analysis · ${saved.analysisName} · ${saved.connectionAlias}/${saved.datasetPath}`
-        : 'Saved analysis';
+      if (!saved) return 'Saved analysis';
+      const name = saved.analysisName === widget.widgetTitle ? '' : ` · ${saved.analysisName}`;
+      return `Saved analysis${name} · ${saved.connectionAlias}/${saved.datasetPath}`;
     }
-    const saved = this.queries().find(item => item.analyticsQueryId === widget.analyticsQueryId);
-    return saved ? `Saved query · ${saved.queryName} · ${saved.connectionAlias}/${saved.datasetPath}`
-      : 'Saved query';
+    const query = this.queries().find(item => item.analyticsQueryId === widget.analyticsQueryId);
+    if (!query) return 'Saved query';
+    const name = query.queryName === widget.widgetTitle ? '' : ` · ${query.queryName}`;
+    return `Saved query${name} · ${query.connectionAlias}/${query.datasetPath}`;
   }
 
   // ---- adding and removing a widget -------------------------------------------------------

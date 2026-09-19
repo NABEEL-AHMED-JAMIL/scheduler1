@@ -801,9 +801,13 @@ describe('the board on screen', () => {
   });
 
   it('names what each tile points at, so a title cannot be the only thing said about it', () => {
-    const rendered = renderedBoard({ widgets: [widgetOn({ visualizationType: 'table' })] });
-    expect(rendered.text()).toContain('Saved analysis · Revenue by region');
-    expect(rendered.text()).toContain('minio-main/daily/sales-2026.csv');
+    // The saved work's name is not repeated when it is the tile's own title...
+    const same = renderedBoard({ widgets: [widgetOn({ visualizationType: 'table' })] });
+    expect(same.text()).toContain('Saved analysis · minio-main/daily/sales-2026.csv');
+    expect(same.text()).not.toContain('Saved analysis · Revenue by region');
+    // ...and is when the tile was given a title of its own.
+    const renamed = renderedBoard({ widgets: [widgetOn({ visualizationType: 'table', widgetTitle: 'Where the money is' })] });
+    expect(renamed.text()).toContain('Saved analysis · Revenue by region · minio-main/daily/sales-2026.csv');
   });
 });
 

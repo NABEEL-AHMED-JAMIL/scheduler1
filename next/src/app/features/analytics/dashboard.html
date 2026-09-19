@@ -92,17 +92,17 @@
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-2 flex-wrap">
               <span class="pill pill-neutral">{{ widgets().length }} widget{{ widgets().length === 1 ? '' : 's' }}</span>
+              @if (boardDatasets().length) { <span class="pill pill-neutral">{{ boardDatasets().length }} dataset{{ boardDatasets().length === 1 ? '' : 's' }}</span> }
               @if (boardFilterCount()) { <span class="pill pill-brand">{{ boardFilterCount() }} filter{{ boardFilterCount() === 1 ? '' : 's' }} on</span> }
               @if (running()) { <span class="pill pill-info"><app-icon name="refresh" size="0.8em" class="spin" />{{ progress() }}</span> }
               @else if (failedCount()) { <span class="pill pill-crit">{{ failedCount() }} failed</span> }
+              @else if (ranCount()) { <span class="pill pill-ok">{{ ranCount() }} ran</span> }
             </div>
-            <div class="flex items-baseline gap-2 mt-1 min-w-0 flex-wrap">
-              <h2 class="lookup-detail-key" [title]="open.dashboardName">{{ open.dashboardName }}</h2>
-              <span class="text-xs text-[color:var(--text-muted)] truncate">
-                @if (open.dashboardDescription) { {{ open.dashboardDescription }} · }
-                @if (open.createdByName) { {{ open.createdByName }} · }{{ when(open.dateUpdated || open.dateCreated) }}
-              </span>
-            </div>
+            <h2 class="lookup-detail-key mt-1" [title]="open.dashboardName">{{ open.dashboardName }}</h2>
+            @if (open.dashboardDescription) { <p class="text-sm text-[color:var(--text-secondary)] mt-0.5">{{ open.dashboardDescription }}</p> }
+            <p class="text-xs text-[color:var(--text-muted)] mt-0.5">
+              @if (open.createdByName) { {{ open.createdByName }} · }{{ when(open.dateUpdated || open.dateCreated) }}
+            </p>
           </div>
           <div class="flex items-center gap-1.5 shrink-0">
             @if (running()) {
@@ -122,6 +122,35 @@
             </ng-template>
           </div>
         </header>
+
+        <!-- One strip for what the board reads and how its last run went: reference, not the
+             work, the way the Kafka pane keeps the broker and last test above the topics. -->
+        @if (widgets().length) {
+          <div class="kafka-strip">
+            <div class="kafka-strip-row">
+              <span class="kafka-strip-k">Reads</span>
+              @if (boardDatasets().length) {
+                @for (dataset of boardDatasets(); track dataset.key) { <span class="mono text-xs truncate max-w-full" [title]="dataset.label">{{ dataset.label }}</span> }
+              } @else { <span class="text-xs text-[color:var(--text-muted)]">saved queries only</span> }
+            </div>
+            <div class="kafka-strip-row">
+              <span class="kafka-strip-k">Last run</span>
+              <span class="kafka-strip-dot" [class.ok]="ranCount() && !failedCount() && !running()" [class.crit]="failedCount() > 0"></span>
+              <span class="kafka-strip-msg text-[color:var(--text-secondary)]">
+                @if (running()) { {{ progress() }} }
+                @else if (ranCount()) { {{ ranCount() }} of {{ widgets().length }} drew{{ failedCount() ? ', ' + failedCount() + ' failed' : '' }} · {{ lastRunText() }} }
+                @else { Not run yet — every tile is a live query, never a stored picture. }
+              </span>
+            </div>
+            @if (boardFilterCount()) {
+              <div class="kafka-strip-row">
+                <span class="kafka-strip-k">Filter</span>
+                <span class="kafka-strip-msg text-[color:var(--text-secondary)]">{{ boardFilterCount() }} condition{{ boardFilterCount() === 1 ? '' : 's' }} on every tile that reads the filtered dataset.</span>
+                <button type="button" class="btn btn-ghost btn-xs" (click)="filterOpen.set(!filterOpen())">{{ filterOpen() ? 'Hide' : 'Edit' }}</button>
+              </div>
+            }
+          </div>
+        }
 
         <!-- ---- the board filter: one dataset, an explicit apply --------------------------- -->
         @if (boardDatasets().length && filterOpen()) {
@@ -217,7 +246,7 @@
                   @if (run?.view; as view) {
                     @if (boardFilterCount()) { @if (boardFilterNote(widget); as note) { <p class="field-note text-[color:var(--text-muted)] truncate" [title]="note">{{ note }}</p> } }
                     @if (view.truncated) { <p class="text-xs text-crit-500">Partial result — this stopped at the server's row ceiling.</p> }
-                    <app-widget-chart [view]="view" [kind]="drawn(widget, view)" [height]="heightOf(widget)" [clickable]="narrows(widget, view)" (picked)="narrowTo(widget, $event)" />
+                    <app-widget-chart [view]="view" [kind]="drawn(widget, view)" [height]="heightOf(widget)" [clickable]="narrows(widget, view)" layout="row" (picked)="narrowTo(widget, $event)" />
                     @if (captionOf(widget); as caption) { <p class="text-xs text-[color:var(--text-secondary)] mt-2">{{ caption }}</p> }
                   }
 

@@ -33,9 +33,15 @@ export const WIDGET_HEIGHT_MAX = 600;
   imports: [BarChart, Donut, KpiCard, LineChart, ScatterPlot, Comparison, Histogram, ResultSummary, RankedBar, GroupedBar, WidgetTable],
   template: `
     @if (view(); as v) {
+      <!-- In a row layout a compact kind (a figure, a ring, ranked bars, a summary) is capped and
+           the figure is centred; a table, a line or a bar chart takes the whole row. Without this
+           a donut's legend sat at the far right of a 950px tile and a single figure read like the
+           first cell of an empty table. -->
+      <div [class]="shell()">
       @switch (drawn()) {
         @case ('kpi') {
-          <app-kpi-card [value]="kpiValue(v)" [label]="measureName(v)" [caption]="kpiCaption(v)" />
+          <app-kpi-card [value]="kpiValue(v)" [label]="measureName(v)" [caption]="kpiCaption(v)"
+                        [align]="layout() === 'row' ? 'center' : 'start'" [size]="layout() === 'row' ? 'lg' : 'md'" />
         }
         @case ('line') { <app-line-chart [data]="points(v)" [height]="height()" [format]="figure" /> }
         @case ('area') { <app-line-chart [data]="points(v)" [filled]="true" [height]="height()" [format]="figure" /> }
@@ -97,6 +103,7 @@ export const WIDGET_HEIGHT_MAX = 600;
         @case ('donut') { <app-donut [data]="v.marks" [totalLabel]="''" [format]="figure" /> }
         @default { <app-widget-table [columns]="v.columns" [rows]="tileRows(v)" [measureColumn]="v.measureColumn" /> }
       }
+      </div>
     }
   `,
 })
@@ -108,6 +115,19 @@ export class WidgetChart {
   /** Whether a bar may be clicked to narrow: the host decides, the chart only offers. */
   readonly clickable = input(false);
   readonly picked = output<Mark>();
+  /** 'tile' in a grid cell; 'row' when the widget has a whole row and compact kinds should not sprawl. */
+  readonly layout = input<'tile' | 'row'>('tile');
+
+  /** The kinds that read best at a bounded width, however wide the row is. */
+  private static readonly COMPACT: ReadonlySet<string> = new Set(['kpi', 'donut', 'ranked', 'rankedShare', 'comparison', 'dimensionSummary', 'trendSummary', 'distributionSummary']);
+
+  /** The wrapper's classes for the layout: a cap on compact kinds in a row, nothing otherwise. */
+  readonly shell = computed(() => {
+    if (this.layout() !== 'row') return 'min-w-0';
+    const kind = this.drawn();
+    if (kind === 'kpi') return 'min-w-0 mx-auto max-w-2xl';
+    return WidgetChart.COMPACT.has(kind) ? 'min-w-0 max-w-3xl' : 'min-w-0';
+  });
 
   readonly figure = (value: number): string => readableCell(String(value));
   readonly percentOfGroup = (value: number): string => `${Math.round(value * 10) / 10}%`;

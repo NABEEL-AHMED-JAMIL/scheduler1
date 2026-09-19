@@ -20,12 +20,15 @@ import { readableCell } from './number-format';
   selector: 'app-kpi-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="flex flex-col justify-center gap-1 py-4 px-1 min-w-0">
-      <span class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)] truncate"
+    <div class="flex flex-col justify-center gap-1 px-1 min-w-0"
+         [class.py-4]="size() === 'md'" [class.py-8]="size() === 'lg'"
+         [class.items-center]="align() === 'center'" [class.text-center]="align() === 'center'">
+      <span class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)] truncate max-w-full"
             [title]="label()">{{ label() }}</span>
       <!-- title carries the raw value: the displayed figure is grouped and may be rounded to two
            places, and the unrounded one has to stay reachable for anybody checking a total. -->
-      <span class="text-3xl font-semibold tabular leading-tight truncate"
+      <span class="font-semibold tabular leading-tight truncate max-w-full"
+            [class.text-3xl]="size() === 'md'" [class.text-5xl]="size() === 'lg'"
             [title]="value()">{{ shown() }}</span>
       @if (caption()) {
         <span class="text-xs text-[color:var(--text-muted)] truncate">{{ caption() }}</span>
@@ -43,6 +46,12 @@ export class KpiCard {
 
   /** An optional line underneath: what it was counted over, or a caveat. */
   readonly caption = input('');
+
+  /** Where the figure sits: at the start of a small tile, or in the middle of a full-width row. */
+  readonly align = input<'start' | 'center'>('start');
+
+  /** How big: md in a grid cell, lg when the figure has a whole row to itself. */
+  readonly size = input<'md' | 'lg'>('md');
 
   protected readonly shown = computed(() => readableCell(this.value()));
 }
