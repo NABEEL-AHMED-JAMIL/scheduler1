@@ -2,7 +2,7 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Combobox } from '../../../shared/ui/combobox';
 import { Dialog } from '@angular/cdk/dialog';
 import { HttpClient } from '@angular/common/http';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { forkJoin } from 'rxjs';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
@@ -30,7 +30,7 @@ interface Tenant { tenantId: number; tenantName: string; }
  */
 @Component({
   selector: 'app-access-profiles',
-  imports: [Icon, StatTile, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, AccessPeopleGrid, Combobox],
+  imports: [Icon, StatTile, CdkMenu, CdkMenuItem, CdkMenuTrigger, AccessPeopleGrid, Combobox],
   templateUrl: './access-profiles.html',
 })
 export class AccessProfiles implements OnInit {

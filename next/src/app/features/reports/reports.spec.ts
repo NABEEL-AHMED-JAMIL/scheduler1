@@ -4,6 +4,8 @@ import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { of } from 'rxjs';
 import { ToastService } from '../../shared/ui/toast.service';
+import { AuthService } from '../../core/auth/auth.service';
+import { BillingApi } from '../billing/billing.service';
 import { Reports, reasonKey } from './reports';
 import { NO_DURATION, RunData, RunRow, humanSeconds } from './pivot';
 
@@ -16,6 +18,9 @@ function reportsFor() {
       { provide: HttpClient, useValue: { get: () => of({ status: 'ERROR', message: '' }), post: () => of({ status: 'ERROR', message: '' }) } },
       { provide: ToastService, useValue: { success: () => {}, error: () => {}, info: () => {} } },
       { provide: Router, useValue: { navigate: () => {} } },
+      // The model-calls cost line asks billing only for an admin; these tests are not about it.
+      { provide: AuthService, useValue: { isTenantAdmin: () => false, isPlatformAdmin: () => false } },
+      { provide: BillingApi, useValue: { usageByMeter: () => of({ status: 'ERROR', message: '' }) } },
     ],
   });
   return TestBed.runInInjectionContext(() => new Reports());

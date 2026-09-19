@@ -4,6 +4,7 @@ import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { AuthService } from '../../core/auth/auth.service';
+import { BillingBrief } from '../billing/billing-brief';
 import { ToastService } from '../../shared/ui/toast.service';
 import { copyText } from '../../shared/ui/clipboard.util';
 import { PhoneInput } from '../../shared/ui/phone-input';
@@ -62,7 +63,7 @@ const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 
 @Component({
   selector: 'app-profile',
-  imports: [PhoneInput, Icon, CopyButton, DatePipe, RouterLink, StatusPill, Donut],
+  imports: [PhoneInput, Icon, CopyButton, DatePipe, RouterLink, StatusPill, Donut, BillingBrief],
   templateUrl: './profile.html',
 })
 export class Profile implements OnInit {

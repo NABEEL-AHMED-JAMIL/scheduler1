@@ -64,23 +64,42 @@ export class Billing implements OnInit {
     return Math.max(1, today.getDate());
   });
   readonly daysInMonth = computed(() => daysInMonth(new Date(this.month() + 'T00:00:00')));
-  /** At the last seven days' pace -- a guess, labelled as one. */
+  /** The sum of a day's amount by date, so a day with no usage counts as zero, not as absent. */
+  private amountOn(day: string): number { return this.days().find(d => d.day === day)?.amount ?? 0; }
+  private isoDay(d: Date): string { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+
+  /**
+   * At the last seven calendar days' pace -- a guess, labelled as one. Calendar days, not the
+   * last seven days that had usage: one burst of $5 on a quiet month is a $5/7 pace, not $5/day.
+   */
   readonly forecast = computed(() => {
-    if (!this.isCurrentMonth()) return null;
-    const recent = this.days().slice(-FORECAST_WINDOW_DAYS);
-    if (!recent.length) return null;
-    const perDay = recent.reduce((n, d) => n + d.amount, 0) / recent.length;
+    if (!this.isCurrentMonth() || !this.days().length) return null;
+    const today = new Date();
+    let spent = 0, counted = 0;
+    for (let back = 1; back <= FORECAST_WINDOW_DAYS; back++) {
+      const d = new Date(today); d.setDate(today.getDate() - back);
+      if (this.isoDay(d) < this.month()) break;            // the window does not reach into last month
+      spent += this.amountOn(this.isoDay(d)); counted++;
+    }
+    if (!counted) return null;
+    const perDay = spent / counted;
     return this.total() + perDay * Math.max(0, this.daysInMonth() - this.daysElapsed());
   });
+  /** What yesterday cost -- the date, not the last row but one. */
   readonly yesterday = computed(() => {
-    const d = this.days();
-    return d.length >= 2 ? d[d.length - 2].amount : d.length ? d[0].amount : 0;
+    const d = new Date(); d.setDate(d.getDate() - 1);
+    return this.amountOn(this.isoDay(d));
   });
   /** Bytes deleted this month; the meter carries bytes, the screen says KB/MB/GB. */
   readonly deletedBytes = computed(() => this.lines().find(l => l.meter === 'storage.bytes.deleted')?.quantity ?? 0);
   readonly deleteOps = computed(() => this.lines().find(l => l.meter === 'storage.ops.delete')?.quantity ?? 0);
   readonly churnAmount = computed(() => (this.lines().find(l => l.meter === 'storage.bytes.deleted')?.amount ?? 0) + (this.lines().find(l => l.meter === 'storage.ops.delete')?.amount ?? 0));
-  readonly storedGbDays = computed(() => (this.lines().find(l => l.meter === 'storage.gb_hours')?.quantity ?? 0) / HOURS_PER_DAY);
+  /** Storage kept, averaged over the nights it was measured -- not over the month, which would understate a late start. */
+  readonly storedGbAverage = computed(() => {
+    const line = this.lines().find(l => l.meter === 'storage.gb_hours');
+    return line ? line.quantity / HOURS_PER_DAY / Math.max(1, line.days) : 0;
+  });
+  readonly storedNights = computed(() => this.lines().find(l => l.meter === 'storage.gb_hours')?.days ?? 0);
   readonly seats = computed(() => {
     const line = this.lines().find(l => l.meter === 'seats.user_days');
     return line ? Math.round(line.quantity / Math.max(1, line.days)) : 0;

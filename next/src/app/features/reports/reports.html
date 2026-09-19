@@ -448,6 +448,13 @@
           <app-stat-tile label="Tokens in" [value]="aiTotals().tokensIn" icon="list" tone="info" foot="what the prompts sent" />
           <app-stat-tile label="Tokens out" [value]="aiTotals().tokensOut" icon="code" tone="info" foot="what the models answered" />
         </div>
+        @if (aiCost(); as cost) {
+          <p class="text-xs text-[color:var(--text-muted)]">
+            Priced from the meter, these calls cost <b class="text-[color:var(--text-primary)] tabular">{{ aiCostText() }}</b> in this range
+            @for (l of cost.lines; track l.meter) { · {{ l.label }} {{ formatMoney(l.amount, cost.currency) }} }
+            · <a routerLink="/billing/usage" class="link-inline">Cost &amp; usage</a>
+          </p>
+        }
         <app-table-shell heading="Prompts" [shown]="aiUsage().length" [total]="aiUsage().length" [loading]="aiUsageLoading()"
                          [isEmpty]="!aiUsage().length" emptyMessage="No model call in this range." emptyIcon="sparkle">
           <table class="table-modern">

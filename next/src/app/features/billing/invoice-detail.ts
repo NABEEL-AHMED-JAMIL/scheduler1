@@ -68,7 +68,10 @@ export class InvoicePane implements OnDestroy {
   readonly creditAmount = signal('');
   readonly creditReason = signal('');
 
-  readonly paid = computed(() => (this.invoice()?.payments ?? []).filter(p => p.status === 'verified').reduce((n, p) => n + Number(p.amount), 0));
+  /** Money that arrived: verified payments that were not a credit note applied. */
+  readonly paid = computed(() => (this.invoice()?.payments ?? []).filter(p => p.status === 'verified' && p.method !== 'credit_note').reduce((n, p) => n + Number(p.amount), 0));
+  /** Credit notes applied to this bill -- they reduce the balance, but no money came. */
+  readonly credited = computed(() => (this.invoice()?.payments ?? []).filter(p => p.status === 'verified' && p.method === 'credit_note').reduce((n, p) => n + Number(p.amount), 0));
   readonly pending = computed(() => (this.invoice()?.payments ?? []).filter(p => p.status === 'submitted'));
   readonly isOpen = computed(() => ['issued', 'partially_paid', 'overdue'].includes(this.invoice()?.status ?? ''));
   readonly canVoid = computed(() => this.isPlatformAdmin() && !!this.invoice() && this.invoice()!.status !== 'void' && this.invoice()!.kind === 'invoice' && this.paid() === 0);

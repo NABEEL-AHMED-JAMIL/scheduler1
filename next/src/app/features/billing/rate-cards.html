@@ -14,9 +14,9 @@
 
   <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
     <app-stat-tile label="Default card today" [value]="today().defaultCard ? 'v' + today().defaultCard!.version : '—'" icon="layers" tone="info"
-                   [foot]="today().defaultCard ? today().defaultCard!.name + ' · since ' + (today().defaultCard!.effective_from | date: 'd MMM yyyy') : 'no card in effect'" />
+                   [foot]="today().defaultCard ? 'since ' + (today().defaultCard!.effective_from | date: 'd MMM yyyy') : 'no card in effect'" />
     <app-stat-tile label="Workspace cards" [value]="today().own.length" icon="building" [tone]="today().own.length ? 'warn' : 'muted'"
-                   [foot]="today().own.length ? 'priced differently from the default' : 'every workspace is on the default'" />
+                   [foot]="today().own.length ? 'on a card of their own' : 'all on the default'" />
     <app-stat-tile label="Versions" [value]="cards().length" icon="history" tone="muted" [foot]="cards().length ? 'never edited, only added to' : 'seeded on the meter’s first start'" />
     <app-stat-tile label="Scheduled" [value]="upcoming()" icon="calendar" [tone]="upcoming() ? 'info' : 'muted'" [foot]="upcoming() ? 'not yet in effect' : 'none dated ahead'" />
   </div>

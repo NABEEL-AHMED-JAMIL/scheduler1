@@ -70,7 +70,7 @@
           @if (i.issuedAt) { <div class="text-xs text-[color:var(--text-secondary)]">issued {{ i.issuedAt | date: 'd MMM yyyy' }}</div> }
           @if (i.dueAt && i.kind === 'invoice') { <div class="text-xs" [class.text-crit-500]="i.status === 'overdue'" [class.text-[color:var(--text-secondary)]]="i.status !== 'overdue'">due {{ i.dueAt | date: 'd MMM yyyy' }} (net {{ i.account.paymentTermsDays }})</div> }</div>
         <div><span class="eyebrow">Total</span><div class="text-sm tabular font-semibold" [class.text-crit-500]="i.total < 0">{{ money(i.total) }}</div>
-          @if (i.kind === 'invoice' && i.status !== 'draft') { <div class="text-xs text-[color:var(--text-secondary)]">paid {{ money(paid()) }} · balance {{ money(i.balance) }}</div> }
+          @if (i.kind === 'invoice' && i.status !== 'draft') { <div class="text-xs text-[color:var(--text-secondary)]">paid {{ money(paid()) }}@if (credited() > 0) { · credited {{ money(credited()) }} } · balance {{ money(i.balance) }}</div> }
           @if (i.rateCardVersion) { <div class="text-xs text-[color:var(--text-muted)]">{{ i.rateCardName || 'Rate card' }} v{{ i.rateCardVersion }}</div> }</div>
       </div>
       <figure class="bill-qr" [title]="'Scan for ' + i.number">
@@ -137,7 +137,7 @@
                     @if (l.includedQuantity) { <div class="text-[11px] text-[color:var(--text-muted)]">includes {{ quantity({ quantity: l.includedQuantity, unit: l.unit }) }} at no charge · {{ quantity({ quantity: l.billableQuantity ?? l.quantity, unit: l.unit }) }} billable</div> }
                     @for (t of tiers(l); track t.from) { <div class="text-[11px] text-[color:var(--text-muted)]">{{ quantity({ quantity: t.units, unit: l.unit }) }} from {{ quantity({ quantity: t.from, unit: l.unit }) }}{{ t.to === null ? ' up' : ' to ' + quantity({ quantity: t.to, unit: l.unit }) }} at {{ rate({ unitPrice: t.unit_price, per: l.per, unit: l.unit }) }}</div> }</td>
                   <td class="text-right tabular">{{ quantity(l) }}</td>
-                  <td class="text-right tabular text-xs text-[color:var(--text-muted)] hidden md:table-cell">{{ rate(l) }}</td>
+                  <td class="text-right tabular text-xs text-[color:var(--text-muted)] hidden md:table-cell whitespace-nowrap">{{ rate(l) }}</td>
                   <td class="text-right tabular" [class.text-crit-500]="l.amount < 0">{{ money(l.amount) }}</td>
                 </tr>
               }
@@ -151,6 +151,7 @@
         <div class="is-total"><span>Total</span><span class="tabular">{{ money(i.total) }}</span></div>
         @if (i.kind === 'invoice' && i.status !== 'draft') {
           <div><span>Paid</span><span class="tabular">{{ money(paid()) }}</span></div>
+          @if (credited() > 0) { <div><span>Credited</span><span class="tabular">{{ money(credited()) }}</span></div> }
           <div class="is-total"><span>Balance</span><span class="tabular" [class.text-crit-500]="i.status === 'overdue'">{{ money(i.balance) }}</span></div>
         }
       </div>

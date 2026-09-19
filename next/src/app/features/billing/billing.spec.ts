@@ -66,7 +66,6 @@ describe('Billing', () => {
     expect(component.deleteOps()).toBe(1204);
     expect(component.churnAmount()).toBeCloseTo(0.38802, 4);
     expect(component.seats()).toBe(14);
-    expect(component.storedGbDays()).toBe(2120);
     expect(component.fmtMoney(0.00602)).toBe('$0.0060');
     expect(component.fmtMoney(46.2)).toBe('$46.20');
     expect(component.fmtRate(component.lines()[2])).toBe('$0.005 / 1,000 per op');
@@ -86,17 +85,25 @@ describe('Billing', () => {
     expect(component.fmtQuantity({ ...component.lines()[2], unit: 'minute', quantity: 0.0017 })).toBe('0.1 s');
   });
 
-  it('stacks each day by service and forecasts at the last week\'s pace, only for the open month', () => {
-    const { component } = page();
-    expect(component.dayBars().map(b => b.name)).toEqual(['09-16', '09-17', '09-18']);
-    expect(component.dayBars()[2].segments?.map(s => s.label)).toEqual(['Seats', 'Storage', 'Model calls']);
-    expect(component.yesterday()).toBe(6.0);
-    if (component.isCurrentMonth()) {
-      const perDay = (5 + 6 + 9.8) / 3;
-      expect(component.forecast()).toBeCloseTo(component.total() + perDay * (component.daysInMonth() - component.daysElapsed()), 6);
-    } else {
+  it('stacks each day by service and forecasts at the last seven calendar days\' pace, only for the open month', () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date('2026-09-19T10:00:00'));
+    try {
+      const { component } = page();
+      expect(component.dayBars().map(b => b.name)).toEqual(['09-16', '09-17', '09-18']);
+      expect(component.dayBars()[2].segments?.map(s => s.label)).toEqual(['Seats', 'Storage', 'Model calls']);
+      expect(component.yesterday()).toBe(9.8);                                   // the 18th, by date
+      // Seven calendar days back from the 19th: the 12th..18th -- four quiet days count as zero.
+      const perDay = (5 + 6 + 9.8) / 7;
+      expect(component.forecast()).toBeCloseTo(component.total() + perDay * (component.daysInMonth() - 19), 6);
+      component.shiftMonth(-1);
       expect(component.forecast()).toBeNull();
-    }
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('storage kept is averaged over the nights measured, not the month', () => {
+    const { component } = page();
+    expect(component.storedNights()).toBe(10);
+    expect(component.storedGbAverage()).toBe(212);                                // 50,880 GB-h / 24 / 10 nights
   });
 
   it('a line opens to the subjects behind it -- the object deleted, and by whom', () => {

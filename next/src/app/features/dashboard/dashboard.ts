@@ -1,3 +1,4 @@
+import { BillingBrief } from '../billing/billing-brief';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router, RouterLink } from '@angular/router';
@@ -30,7 +31,7 @@ type BreakdownKey = typeof BREAKDOWN_COLUMNS[number];
 
 @Component({
   selector: 'app-dashboard',
-  imports: [Pagination, Icon, RouterLink, Donut, BarChart, Heatmap],
+  imports: [Pagination, Icon, RouterLink, Donut, BarChart, Heatmap, BillingBrief],
   templateUrl: './dashboard.html',
 })
 export class Dashboard implements OnInit {

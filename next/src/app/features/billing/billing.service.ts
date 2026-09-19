@@ -68,6 +68,14 @@ export interface SubjectRow { subject_type: string; subject_id: string; quantity
 /** What every usage read names: a range, a workspace for a platform admin, and how to group. */
 export interface UsageQuery { from: string; to: string; tenantId?: string | null; }
 
+/** billing.json/summary: the bill in one glance, for a profile card or a dashboard row. */
+export interface BillingSummary {
+  currency: string; monthToDate: number; periodStart: string; rateCardName?: string; rateCardVersion?: number; meterDown?: boolean;
+  openBalance: number; openCount: number; overdueBalance: number; overdueCount: number; pendingSlips: number;
+  nextDueAt?: string; nextDueNumber?: string; nextDueBalance?: number;
+  latestNumber?: string; latestTotal?: number; latestStatus?: string; latestPeriodStart?: string;
+}
+
 export interface BillingAnalytics {
   invoiced: number; collected: number; open: number; overdue: number; overdueCount: number; drafts: number; medianDaysToPay: number; pendingPayments: number;
   months: { month: string; invoiced?: number; collected?: number; open?: number; drafts?: number }[];
@@ -115,6 +123,7 @@ export class BillingApi {
   statement(from: string, to: string, tenantId?: string | null): Observable<ApiResponse<DocumentRow>> {
     return this.http.post<ApiResponse<DocumentRow>>(`${this.base}/statement`, null, { params: { from, to, ...this.tenantParam(tenantId) } });
   }
+  summary(tenantId?: string | null): Observable<ApiResponse<BillingSummary>> { return this.http.get<ApiResponse<BillingSummary>>(`${this.base}/summary`, { params: this.tenantParam(tenantId) }); }
   usageByMeter(q: UsageQuery): Observable<ApiResponse<{ rows: MeterLine[]; rateCard?: PricedWith }>> {
     return this.http.get<ApiResponse<{ rows: MeterLine[]; rateCard?: PricedWith }>>(`${this.base}/usage`, { params: this.usageParams(q, 'meter') });
   }

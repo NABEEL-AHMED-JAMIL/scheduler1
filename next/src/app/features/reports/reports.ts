@@ -1,8 +1,11 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { Subject, catchError, of, switchMap } from 'rxjs';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
+import { AuthService } from '../../core/auth/auth.service';
+import { BillingApi, MeterLine } from '../billing/billing.service';
+import { formatMoney } from '../billing/billing-format';
 import { ToastService } from '../../shared/ui/toast.service';
 import { statusColor } from '../../shared/charts/status-color';
 import { Combobox } from '../../shared/ui/combobox';
@@ -162,10 +165,12 @@ interface QueueLog {
  */
 @Component({
   selector: 'app-reports',
-  imports: [Icon, StatTile, StatusPill, TableShell, Donut, BarChart, Histogram, ReportPivot, Combobox, Pagination, DecimalPipe],
+  imports: [Icon, StatTile, StatusPill, TableShell, Donut, BarChart, Histogram, ReportPivot, Combobox, Pagination, DecimalPipe, RouterLink],
   templateUrl: './reports.html',
 })
 export class Reports implements OnInit {
+  private readonly auth = inject(AuthService);
+  private readonly billingApi = inject(BillingApi);
   private readonly http = inject(HttpClient);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
@@ -900,9 +905,32 @@ export class Reports implements OnInit {
    * things are getting better or worse. Nothing else on the page uses it, and when it comes
    * back empty the tiles say that rather than inventing a change.
    */
+  /**
+   * What the model calls in this range cost, from the meter -- the ai.* lines priced with the
+   * card in effect. Admins only: the billing read refuses everyone else, and a tenant user's
+   * report is about runs, not money.
+   */
+  readonly aiCost = signal<{ amount: number; currency: string; lines: MeterLine[] } | null>(null);
+  private loadAiCost(): void {
+    if (!this.auth.isTenantAdmin()) return;
+    const asked = { start: this.startDate(), end: this.endDate() };
+    this.billingApi.usageByMeter({ from: asked.start, to: asked.end }).subscribe({
+      next: r => {
+        if (asked.start !== this.startDate() || asked.end !== this.endDate()) return;
+        if (r.status !== API_SUCCESS || !r.data) { this.aiCost.set(null); return; }
+        const lines = (r.data.rows ?? []).filter(l => l.meter.startsWith('ai.')).map(l => ({ ...l, amount: Number(l.amount), quantity: Number(l.quantity) }));
+        this.aiCost.set({ amount: lines.reduce((n, l) => n + l.amount, 0), currency: r.data.rateCard?.currency ?? 'USD', lines });
+      },
+      error: () => this.aiCost.set(null),
+    });
+  }
+  aiCostText(): string { const c = this.aiCost(); return c ? formatMoney(c.amount, c.currency) : ''; }
+  readonly formatMoney = formatMoney;
+
   /** Model calls per prompt for the same range; a page without any AI simply has no section. */
   private loadAiUsage(): void {
     const asked = { start: this.startDate(), end: this.endDate() };
+    this.loadAiCost();
     this.aiUsageLoading.set(true);
     this.http.get<ApiResponse<AiUsageRow[]>>(`${API_BASE}/aiPrompt.json/usage`, { params: { from: asked.start, to: asked.end } }).subscribe({
       next: response => {
