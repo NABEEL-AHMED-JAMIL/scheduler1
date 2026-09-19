@@ -19,6 +19,27 @@ export interface ObjectSummary {
   etag?: string;
 }
 
+export interface TablePreview {
+  source: 'csv' | 'tsv' | 'xlsx' | 'parquet' | 'jsonl' | 'json';
+  columns: string[];
+  rows: string[][];
+  offset: number;
+  limit: number;
+  /** -1 when the count was capped. */
+  totalRows: number;
+  sheets: string[];
+  sheet?: string;
+  note?: string;
+}
+
+export interface ArchiveEntry {
+  name: string;
+  directory: boolean;
+  size: number;
+  compressedSize: number;
+  lastModified: number;
+}
+
 export interface BrowseResponse {
   objects: ObjectSummary[];
   nextContinuationToken?: string;
@@ -57,6 +78,29 @@ export class StorageService {
     return this.http.get(`${this.base}/previewObject`, {
       params: { bucket, key }, responseType: 'blob',
     });
+  }
+
+  /** The first bytes only -- enough to tell text from binary without pulling the whole object. */
+  previewHead(bucket: string, key: string, bytes = 4096): Observable<Blob> {
+    return this.http.get(`${this.base}/previewObject`, {
+      params: { bucket, key }, responseType: 'blob', headers: { Range: `bytes=0-${bytes - 1}` },
+    });
+  }
+
+  /** A page of a tabular object: CSV/TSV, a sheet, parquet, JSON lines, a JSON array. */
+  previewTable(bucket: string, key: string, offset = 0, limit = 100, sheet?: string): Observable<ApiResponse<TablePreview>> {
+    const params: Record<string, string> = { bucket, key, offset: String(offset), limit: String(limit) };
+    if (sheet) params['sheet'] = sheet;
+    return this.http.get<ApiResponse<TablePreview>>(`${this.base}/previewTable`, { params });
+  }
+
+  /** A document rendered to PDF by the server, for the PDF viewer. */
+  previewDocument(bucket: string, key: string): Observable<Blob> {
+    return this.http.get(`${this.base}/previewDocument`, { params: { bucket, key }, responseType: 'blob' });
+  }
+
+  previewArchive(bucket: string, key: string): Observable<ApiResponse<ArchiveEntry[]>> {
+    return this.http.get<ApiResponse<ArchiveEntry[]>>(`${this.base}/previewArchive`, { params: { bucket, key } });
   }
 
   /**

@@ -1,4 +1,4 @@
-<div class="card shadow-2xl w-[60rem] max-w-[calc(100vw-2rem)] max-h-[88vh] flex flex-col overflow-hidden">
+<div class="card shadow-2xl max-w-[calc(100vw-2rem)] max-h-[88vh] flex flex-col overflow-hidden" [class.w-\[60rem\]]="kind() !== 'table'" [class.w-\[76rem\]]="kind() === 'table'">
   <div class="flex items-center gap-3 px-4 py-2.5 border-b shrink-0 border-subtle"
       >
     <app-icon [name]="kindIcon()" class="icon-info shrink-0" size="1.05em" />
@@ -21,6 +21,20 @@
                 title="Reset to fit">{{ zoomLabel() }}</button>
         <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="zoomBy(0.25)"
                 [disabled]="zoom() >= 4" title="Zoom in"><app-icon name="plus" class="icon-ok" /></button>
+      </div>
+    }
+
+    @if (kind() === 'table' && table(); as t) {
+      @if (t.sheets.length > 1) {
+        <label class="text-xs text-[color:var(--text-muted)] flex items-center gap-1.5">Sheet
+          <select class="input py-1 text-xs w-40" [value]="t.sheet" (change)="pickSheet($any($event.target).value)" aria-label="Sheet">
+            @for (s of t.sheets; track s) { <option [value]="s" [selected]="s === t.sheet">{{ s }}</option> }
+          </select>
+        </label>
+      }
+      <div class="search-field max-w-48">
+        <app-icon name="search" size="0.95em" />
+        <input class="input py-1 text-xs" placeholder="Find on this page" aria-label="Find on this page" [value]="tableSearch()" (input)="tableSearch.set($any($event.target).value)" />
       </div>
     }
 
@@ -110,6 +124,86 @@
         @case ('audio') {
           <div class="max-w-2xl mx-auto py-10">
             <app-audio-player [src]="mediaUrl()" />
+          </div>
+        }
+        @case ('table') {
+          @if (table(); as t) {
+            <div class="flex items-center gap-2 flex-wrap text-xs text-[color:var(--text-muted)] mb-2">
+              <span class="tabular">{{ t.columns.length }} column{{ t.columns.length === 1 ? '' : 's' }} · {{ tableTotalLabel() }}</span>
+              @if (t.note) { <span>· {{ t.note }}</span> }
+              @if (tableSearch() && tableRows().length !== t.rows.length) { <span>· {{ tableRows().length }} of {{ t.rows.length }} on this page match</span> }
+              <span class="ml-auto flex items-center gap-1">
+                <button type="button" class="btn btn-ghost btn-sm" [disabled]="t.offset === 0 || tableLoading()" (click)="tablePage(-1)"><app-icon name="chevronLeft" />Prev</button>
+                <span class="tabular px-1">rows {{ t.rows.length ? t.offset + 1 : 0 }}–{{ tableLast() }}</span>
+                <button type="button" class="btn btn-ghost btn-sm" [disabled]="!tableHasMore() || tableLoading()" (click)="tablePage(1)">Next<app-icon name="chevronRight" /></button>
+              </span>
+            </div>
+            <div class="overflow-auto rounded border border-subtle bg-code max-h-[68vh]" [class.opacity-60]="tableLoading()">
+              <table class="table-modern preview-grid">
+                <thead>
+                  <tr>
+                    <th class="tabular text-[color:var(--text-muted)] text-right">#</th>
+                    @for (c of t.columns; track $index) { <th [title]="c">{{ c }}</th> }
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (r of tableRows(); track r.n) {
+                    <tr>
+                      <td class="tabular text-right text-[color:var(--text-muted)]">{{ r.n }}</td>
+                      @for (c of r.cells; track $index) { <td [title]="c">{{ c }}</td> }
+                    </tr>
+                  }
+                  @if (!tableRows().length) {
+                    <tr><td [attr.colspan]="t.columns.length + 1" class="text-center text-[color:var(--text-muted)] py-6">
+                      {{ t.rows.length ? 'Nothing on this page matches “' + tableSearch() + '”.' : 'No rows.' }}
+                    </td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        }
+        @case ('document') {
+          <div class="h-[72vh]"><app-pdf-viewer [src]="mediaUrl()" /></div>
+        }
+        @case ('archive') {
+          <div class="flex items-center gap-2 flex-wrap text-xs text-[color:var(--text-muted)] mb-2">
+            <span class="tabular">{{ entries().length }} entr{{ entries().length === 1 ? 'y' : 'ies' }} · {{ humanBytes(archiveTotal()) }} unpacked</span>
+            <div class="search-field max-w-56 ml-auto">
+              <app-icon name="search" size="0.95em" />
+              <input class="input py-1 text-xs" placeholder="Find an entry" aria-label="Find an entry" [value]="entrySearch()" (input)="entrySearch.set($any($event.target).value)" />
+            </div>
+          </div>
+          <div class="overflow-auto rounded border border-subtle bg-code max-h-[68vh]">
+            <table class="table-modern preview-grid">
+              <thead><tr><th>Entry</th><th class="text-right">Size</th><th class="text-right">Stored</th><th>Modified</th></tr></thead>
+              <tbody>
+                @for (e of visibleEntries(); track e.name) {
+                  <tr>
+                    <td class="mono"><app-icon [name]="e.directory ? 'folder' : 'file'" size="0.9em" class="icon-muted mr-1" />{{ e.name }}</td>
+                    <td class="text-right tabular">{{ e.directory ? '' : humanBytes(e.size) }}</td>
+                    <td class="text-right tabular">{{ e.directory || e.compressedSize < 0 ? '' : humanBytes(e.compressedSize) }}</td>
+                    <td class="tabular">{{ e.lastModified > 0 ? (e.lastModified | date: 'd MMM yyyy, HH:mm') : '' }}</td>
+                  </tr>
+                }
+                @if (!visibleEntries().length) {
+                  <tr><td colspan="4" class="text-center text-[color:var(--text-muted)] py-6">{{ entries().length ? 'No entry matches.' : 'The archive is empty.' }}</td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+        @case ('binary') {
+          <div class="flex flex-col gap-3">
+            <div class="flex items-start gap-3 rounded-md px-3 py-2.5 bg-code border border-subtle">
+              <app-icon name="alert" class="icon-warn shrink-0 mt-0.5" />
+              <div class="text-sm">
+                <p class="font-medium">Not text, and no viewer knows this shape</p>
+                <p class="text-xs text-[color:var(--text-muted)] mt-0.5">The first bytes are below so you can tell what it is; download it to open it in its own application.</p>
+              </div>
+              <button type="button" class="btn btn-primary btn-sm ml-auto shrink-0" (click)="download()"><app-icon name="download" />Download</button>
+            </div>
+            <pre class="mono text-xs leading-relaxed rounded p-3 bg-code border border-subtle overflow-auto">{{ hex() }}</pre>
           </div>
         }
         @case ('video') {

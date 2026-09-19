@@ -1756,3 +1756,9 @@ html.dark .btn-circle-danger:hover:not(:disabled) { background: color-mix(in okl
 /* Where a Try-it variable came from: the file, how it was read, how much of it. */
 .var-source { display: inline-flex; align-items: center; gap: 0.35rem; max-width: 100%; font-size: 11px; color: var(--text-secondary); background: var(--surface-sunken); border-radius: 999px; padding: 0.1rem 0.5rem; }
 .var-source .mono { max-width: 14rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The object viewer's grid: dense, monospaced cells that never wrap, so a wide table scrolls
+   sideways inside its frame instead of folding every value onto three lines. */
+.preview-grid th, .preview-grid td { white-space: nowrap; max-width: 28rem; overflow: hidden; text-overflow: ellipsis; font-size: 12px; padding: 0.35rem 0.6rem; }
+.preview-grid td { font-family: var(--font-mono, ui-monospace, monospace); }
+.preview-grid thead th { position: sticky; top: 0; background: var(--surface-raised); z-index: 1; }
