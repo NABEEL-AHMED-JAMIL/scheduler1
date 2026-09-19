@@ -35,7 +35,7 @@ function page(platformAdmin = false, rows: object[] = LINES, days: object[] = DA
 
 const LINES = [
   { meter: 'seats.user_days', label: 'Seats', service: 'Seats', unit: 'user-day', per: 1, unitPrice: '0.33', quantity: '140', amount: '46.2', days: 10 },
-  { meter: 'storage.bytes.deleted', label: 'Bytes deleted (data churn)', service: 'Storage', unit: 'GB', per: 1, unitPrice: '0.01', quantity: '38.2', amount: '0.382', days: 3 },
+  { meter: 'storage.bytes.deleted', label: 'Bytes deleted (data churn)', service: 'Storage', unit: 'byte', per: 1073741824, unitPrice: '0.01', quantity: '41016604262', amount: '0.382', days: 3 },
   { meter: 'storage.ops.delete', label: 'Storage deletes', service: 'Storage', unit: 'op', per: 1000, unitPrice: '0.005', quantity: '1204', amount: '0.00602', days: 3 },
   { meter: 'storage.gb_hours', label: 'Storage kept', service: 'Storage', unit: 'GB-hour', per: 1, unitPrice: '0.000032', quantity: '50880', amount: '1.62816', days: 10 },
   { meter: 'ai.tokens.in', label: 'Model tokens in', service: 'Model calls', unit: 'token', per: 1000, unitPrice: '0.05', quantity: '42100', amount: '2.105', days: 4 },
@@ -53,7 +53,9 @@ describe('Billing', () => {
     expect(component.total()).toBeCloseTo(50.32118, 4);
     expect(component.byService().map(s => s.service)).toEqual(['Storage', 'Model calls', 'Seats']);
     expect(component.byService().find(s => s.service === 'Storage')?.amount).toBeCloseTo(2.01618, 4);
-    expect(component.deletedGb()).toBe(38.2);
+    expect(component.deletedBytes()).toBe(41016604262);
+    expect(component.fmtBytes(41016604262)).toBe('38.2 GB');
+    expect(component.fmtRate(component.lines()[1])).toBe('$0.01 per GB');
     expect(component.deleteOps()).toBe(1204);
     expect(component.churnAmount()).toBeCloseTo(0.38802, 4);
     expect(component.seats()).toBe(14);
@@ -62,7 +64,8 @@ describe('Billing', () => {
     expect(component.fmtMoney(46.2)).toBe('$46.20');
     expect(component.fmtRate(component.lines()[2])).toBe('$0.0050 / 1,000 per op');
     expect(component.fmtRate(component.lines()[3])).toBe('$0.000032 per GB-hour');
-    expect(component.fmtGb(0.000002)).toBe('2.1 KB');
+    expect(component.fmtBytes(2048)).toBe('2 KB');
+    expect(component.fmtBytes(900)).toBe('900 B');
     expect(component.fmtGb(0.43 / 1024)).toBe('440.3 KB');
     expect(component.fmtGb(12 / 1024)).toBe('12 MB');
     expect(component.fmtGb(38.2)).toBe('38.2 GB');

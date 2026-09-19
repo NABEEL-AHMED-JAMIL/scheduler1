@@ -17,7 +17,7 @@ export interface MeterLine {
   unitPrice: number; quantity: number; amount: number; days: number;
 }
 interface DayRow { day: string; amount: number; byService: Record<string, number>; }
-interface SubjectRow { subject_type: string; subject_id: string; quantity: number; events: number; last: string | null; actor_user_id: number | null; }
+interface SubjectRow { subject_type: string; subject_id: string; quantity: number; events: number; last: string | null; actor_user_id: number | null; actor_name?: string | null; }
 interface TenantOption { tenantId: number; tenantName: string; }
 
 /** The services a meter rolls up under, in the order the screen lists them. */
@@ -81,7 +81,8 @@ export class Billing implements OnInit {
     const d = this.days();
     return d.length >= 2 ? d[d.length - 2].amount : d.length ? d[0].amount : 0;
   });
-  readonly deletedGb = computed(() => this.lines().find(l => l.meter === 'storage.bytes.deleted')?.quantity ?? 0);
+  /** Bytes deleted this month; the meter carries bytes, the screen says KB/MB/GB. */
+  readonly deletedBytes = computed(() => this.lines().find(l => l.meter === 'storage.bytes.deleted')?.quantity ?? 0);
   readonly deleteOps = computed(() => this.lines().find(l => l.meter === 'storage.ops.delete')?.quantity ?? 0);
   readonly churnAmount = computed(() => (this.lines().find(l => l.meter === 'storage.bytes.deleted')?.amount ?? 0) + (this.lines().find(l => l.meter === 'storage.ops.delete')?.amount ?? 0));
   readonly storedGbDays = computed(() => (this.lines().find(l => l.meter === 'storage.gb_hours')?.quantity ?? 0) / 24);
@@ -192,15 +193,18 @@ export class Billing implements OnInit {
     const digits = abs > 0 && abs < 0.01 ? 4 : 2;
     return new Intl.NumberFormat(undefined, { style: 'currency', currency: this.currency(), minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value);
   }
-  /** Gigabytes as a person reads them: 2 KB is not "0 GB". */
-  fmtGb(gb: number): string {
-    if (gb <= 0) return '0 GB';
-    if (gb < 1 / 1024) return `${(gb * 1024 * 1024).toLocaleString(undefined, { maximumFractionDigits: 1 })} KB`;
-    if (gb < 1) return `${(gb * 1024).toLocaleString(undefined, { maximumFractionDigits: 2 })} MB`;
-    return `${gb.toLocaleString(undefined, { maximumFractionDigits: 2 })} GB`;
+  /** Bytes as a person reads them: 2 KB is not "0 GB". */
+  fmtBytes(bytes: number): string {
+    if (bytes <= 0) return '0 B';
+    if (bytes < 1024) return `${Math.round(bytes)} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toLocaleString(undefined, { maximumFractionDigits: 1 })} KB`;
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toLocaleString(undefined, { maximumFractionDigits: 2 })} MB`;
+    return `${(bytes / 1024 / 1024 / 1024).toLocaleString(undefined, { maximumFractionDigits: 2 })} GB`;
   }
+  fmtGb(gb: number): string { return this.fmtBytes(gb * 1024 * 1024 * 1024); }
   fmtQuantity(line: MeterLine): string {
     const q = line.quantity;
+    if (line.unit === 'byte') return this.fmtBytes(q);
     if (line.unit === 'GB') return this.fmtGb(q);
     if (line.unit === 'GB-hour') return q < 1 ? `${this.fmtGb(q / 24)} · day` : q.toLocaleString(undefined, { maximumFractionDigits: 1 });
     if (line.unit === 'minute') return q < 1 ? `${(q * 60).toLocaleString(undefined, { maximumFractionDigits: 1 })} s` : q.toLocaleString(undefined, { maximumFractionDigits: 1 });
@@ -211,6 +215,8 @@ export class Billing implements OnInit {
     const p = line.unitPrice;
     const digits = p >= 0.01 ? 2 : p >= 0.0001 ? 4 : 6;
     const price = new Intl.NumberFormat(undefined, { style: 'currency', currency: this.currency(), minimumFractionDigits: digits, maximumFractionDigits: digits }).format(p);
+    // A byte meter is priced per GB; saying "$0.01 / 1,073,741,824 per byte" would be true and unreadable.
+    if (line.unit === 'byte' && line.per === 1024 * 1024 * 1024) return `${price} per GB`;
     return `${price}${line.per > 1 ? ' / ' + line.per.toLocaleString() : ''} per ${line.unit}`;
   }
   subjectLabel(s: SubjectRow): string { return s.subject_id || (s.subject_type ? `(${s.subject_type})` : '(no subject)'); }

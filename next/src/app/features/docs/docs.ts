@@ -474,6 +474,22 @@ export class Docs implements AfterViewInit {
         + 'model connections, are for workspace admins.',
       ],
     },
+    {
+      id: 'billing', title: 'See what it costs',
+      intro: 'Everything a workspace uses is metered as it happens and priced from one rate card, '
+           + 'and the Cost & usage page shows the month the way the invoice will read it. '
+           + 'Deleting data counts too.',
+      where: 'Administration → Cost & usage',
+      fields: [
+        { name: 'What is metered', required: true, note: 'Storage kept (measured nightly at 02:00), bytes written, bytes read, and bytes deleted; every storage operation; each pipeline run and the minutes the worker spent on it; model tokens in and out; images described by the vision model; documents converted; analytics queries; seats; the topics in use. A pipeline reports its own usage with its run’s token as it finishes, so a run can only ever report as its own workspace.' },
+        { name: 'Deleting', required: false, note: 'A delete is an operation, and the bytes removed are billed at the write rate as data churn. Storage is measured nightly, so a file that existed at 02:00 is a day of storage whether or not it was deleted at 09:00. The line opens to which object was deleted, and by whom.' },
+        { name: 'The page', required: false, note: 'Month to date and a forecast at the last week’s pace (a guess, labelled as one); data deleted, storage kept and seats; cost by day stacked by service; and line by line — the same lines the invoice will carry — each opening to what is behind it. A platform admin picks the workspace; a workspace admin sees their own.' },
+      ],
+      notes: [
+        'Reporting is never in a job’s way: a metering service that is down costs a warning, the batch is kept on the worker and sent with the next run.',
+        'Invoices, payment slips and receipts are the next step; the lines here are what they will be built from.',
+      ],
+    },
   ];
 
   readonly sections: Section[] = [
