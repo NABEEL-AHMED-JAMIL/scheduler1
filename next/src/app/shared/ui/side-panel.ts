@@ -34,6 +34,6 @@ export class SidePanel {
 }
 
 /** Dialog config that pins the panel to the right edge, full height. */
-export function sidePanelConfig<D>(data: D) {
-  return { data, panelClass: 'side-panel-host', hasBackdrop: true, autoFocus: 'first-tabbable' as const };
+export function sidePanelConfig<D>(data: D, width: 'narrow' | 'wide' = 'narrow') {
+  return { data, panelClass: width === 'wide' ? ['side-panel-host', 'side-panel-wide'] : 'side-panel-host', hasBackdrop: true, autoFocus: 'first-tabbable' as const };
 }

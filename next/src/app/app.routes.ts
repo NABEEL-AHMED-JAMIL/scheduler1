@@ -288,6 +288,12 @@ export const routes: Routes = [
         canActivate: [roleGuard],
       },
       {
+        path: 'administration/billing/rates',
+        loadComponent: () => import('./features/billing/rate-cards').then(m => m.RateCards),
+        data: { minRole: 'PLATFORM_ADMIN' },
+        canActivate: [roleGuard],
+      },
+      {
         path: 'administration/tenant-requests',
         loadComponent: () =>
           import('./features/tenant-request/tenant-requests').then(m => m.TenantRequests),

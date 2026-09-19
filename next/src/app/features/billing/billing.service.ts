@@ -11,11 +11,34 @@ export interface InvoiceRow {
   invoiceId: number; number: string; kind: 'invoice' | 'credit_note'; referencesInvoiceId?: number; tenantId: number; tenantName?: string;
   periodStart: string; periodEnd: string; status: 'draft' | 'issued' | 'partially_paid' | 'paid' | 'overdue' | 'void'; currency: string;
   subtotal: number; taxRatePercent: number; tax: number; total: number; balance: number; note?: string;
-  issuedAt?: string; dueAt?: string; paidAt?: string; voidedAt?: string; rateCardVersion?: number; dateCreated?: string;
+  issuedAt?: string; dueAt?: string; paidAt?: string; voidedAt?: string; rateCardVersion?: number; rateCardName?: string; dateCreated?: string;
 }
 export interface InvoiceLine {
   invoiceLineId: number; sort: number; meter?: string; description: string; quantity: number; unit?: string; per: number;
   unitPrice: number; amount: number; periodLabel?: string; manual: boolean;
+  /** What the calculation applied when the line was frozen: the allowance and, as JSON, the tier bands. */
+  includedQuantity?: number | null; billableQuantity?: number | null; pricingDetail?: string | null;
+}
+/** One band of a graduated price: units from `from` (to the next band's `from`) cost `unit_price` per `per`. */
+export interface RateTier { from: number; unit_price: number; }
+/** A tier band as it was applied to a period's quantity. */
+export interface AppliedTier { from: number; to: number | null; units: number; unit_price: number; }
+export interface RateItem {
+  meter: string; label?: string; service?: string; unit: string; per: number; unit_price: number;
+  included_quantity?: number; tiers?: RateTier[];
+}
+/**
+ * One version of the calculation. `tenant_id` null is the default card every workspace without
+ * its own falls back to; a workspace's card wins for that workspace from its effective date.
+ */
+export interface RateCard {
+  version: number; name: string; tenant_id: number | null; tenantName?: string | null; effective_from: string; currency: string;
+  based_on_version?: number | null; note?: string | null; created_at?: string; items: RateItem[];
+}
+/** What a card is saved as: everything but the version, which the meter assigns. */
+export interface RateCardDraft {
+  name: string; tenant_id: number | null; effective_from: string; currency: string; based_on_version: number | null; note: string;
+  items: { meter: string; unit: string; per: number; unit_price: number; included_quantity: number; tiers: RateTier[] }[];
 }
 export interface PaymentRow {
   paymentId: number; amount: number; method: string; reference?: string; note?: string; status: 'submitted' | 'verified' | 'rejected';
@@ -34,6 +57,13 @@ export interface BillingAnalytics {
   months: { month: string; invoiced?: number; collected?: number; open?: number; drafts?: number }[];
   tenants: { tenantId: number; tenantName: string; invoiced: number; collected: number; open: number; overdue: number; status: string }[];
   usageByTenant?: { tenantId: number; amount: number; quantityByMeter: Record<string, number> }[] | null;
+}
+
+/** How many decimals a unit price needs to read as itself: 0.045 is not "$0.05", 0.000032 not "$0.00". */
+export function priceDigits(p: number): number {
+  const text = Math.abs(p).toFixed(6).replace(/0+$/, '');
+  const decimals = text.includes('.') ? text.split('.')[1].length : 0;
+  return Math.min(6, Math.max(2, decimals));
 }
 
 /** The billing.json calls: invoices, payments, documents, the account, the platform's view. */
@@ -74,6 +104,12 @@ export class BillingApi {
   statement(from: string, to: string, tenantId?: string | null): Observable<ApiResponse<DocumentRow>> {
     return this.http.post<ApiResponse<DocumentRow>>(`${this.base}/statement`, null, { params: { from, to, ...this.tenantParam(tenantId) } });
   }
+  rateCards(): Observable<ApiResponse<{ cards: RateCard[] }>> { return this.http.get<ApiResponse<{ cards: RateCard[] }>>(`${this.base}/rateCards`); }
+  rateCard(version: number): Observable<ApiResponse<RateCard>> { return this.http.get<ApiResponse<RateCard>>(`${this.base}/rateCard`, { params: { version: String(version) } }); }
+  rateCardFor(tenantId: string | null, day?: string): Observable<ApiResponse<RateCard>> {
+    return this.http.get<ApiResponse<RateCard>>(`${this.base}/rateCard`, { params: { ...this.tenantParam(tenantId), ...(day ? { day } : {}) } });
+  }
+  saveRateCard(card: RateCardDraft): Observable<ApiResponse<RateCard>> { return this.http.put<ApiResponse<RateCard>>(`${this.base}/rateCard`, card); }
   analytics(from: string, to: string): Observable<ApiResponse<BillingAnalytics>> { return this.http.get<ApiResponse<BillingAnalytics>>(`${this.base}/analytics`, { params: { from, to } }); }
 
   /** Opens a fetched document in a new tab (a PDF renders there; an image too). */

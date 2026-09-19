@@ -80,7 +80,7 @@
             <div><b>Billed to</b><br />{{ i.account.legalName }}@if (i.account.address) {<br />{{ i.account.address }}}@if (i.account.taxId) {<br />Tax ID {{ i.account.taxId }}}</div>
             <div class="text-right"><b>Period</b> {{ i.periodStart | date: 'd MMM' }} – {{ i.periodEnd | date: 'd MMM yyyy' }}
               @if (i.issuedAt) {<br /><b>Issued</b> {{ i.issuedAt | date: 'd MMM yyyy' }}}@if (i.dueAt && i.kind === 'invoice') {<br /><b>Due</b> {{ i.dueAt | date: 'd MMM yyyy' }} (net {{ i.account.paymentTermsDays }})}
-              @if (i.rateCardVersion) {<br /><b>Rate card</b> v{{ i.rateCardVersion }}}</div>
+              @if (i.rateCardVersion) {<br /><b>Rate card</b> {{ i.rateCardName ? i.rateCardName + ' ' : '' }}v{{ i.rateCardVersion }}}</div>
           </div>
           <table class="table-modern">
             <thead><tr><th>Description</th><th class="text-right">Qty</th><th class="text-right hidden md:table-cell">Rate</th><th class="text-right">Amount</th></tr></thead>
@@ -88,7 +88,9 @@
               @for (l of i.lines; track l.invoiceLineId) {
                 <tr>
                   <td>{{ l.description }}@if (l.periodLabel) { <span class="pill pill-neutral ml-1">{{ l.periodLabel }}</span> }@if (l.manual) { <span class="pill pill-neutral ml-1">manual</span> }
-                    @if (l.meter) { <div class="text-[11px] mono text-[color:var(--text-muted)]">{{ l.meter }}</div> }</td>
+                    @if (l.meter) { <div class="text-[11px] mono text-[color:var(--text-muted)]">{{ l.meter }}</div> }
+                    @if (l.includedQuantity) { <div class="text-[11px] text-[color:var(--text-muted)]">includes {{ quantity({ quantity: l.includedQuantity, unit: l.unit }) }} at no charge · {{ quantity({ quantity: l.billableQuantity ?? l.quantity, unit: l.unit }) }} billable</div> }
+                    @for (t of tiers(l); track t.from) { <div class="text-[11px] text-[color:var(--text-muted)]">{{ quantity({ quantity: t.units, unit: l.unit }) }} from {{ quantity({ quantity: t.from, unit: l.unit }) }}{{ t.to === null ? ' up' : ' to ' + quantity({ quantity: t.to, unit: l.unit }) }} at {{ rate({ unitPrice: t.unit_price, per: l.per, unit: l.unit }) }}</div> }</td>
                   <td class="text-right tabular">{{ quantity(l) }}</td>
                   <td class="text-right tabular text-xs text-[color:var(--text-muted)] hidden md:table-cell">{{ rate(l) }}</td>
                   <td class="text-right tabular" [class.text-crit-500]="l.amount < 0">{{ money(l.amount) }}</td>

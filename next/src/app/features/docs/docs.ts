@@ -476,18 +476,20 @@ export class Docs implements AfterViewInit {
     },
     {
       id: 'billing', title: 'See what it costs',
-      intro: 'Everything a workspace uses is metered as it happens and priced from one rate card, '
+      intro: 'Everything a workspace uses is metered as it happens and priced from a rate card, '
            + 'and the Cost & usage page shows the month the way the invoice will read it. '
            + 'Deleting data counts too.',
-      where: 'Administration → Cost & usage',
+      where: 'Administration → Cost & usage · Invoices · Billing documents · Rate cards',
       fields: [
         { name: 'What is metered', required: true, note: 'Storage kept (measured nightly at 02:00), bytes written, bytes read, and bytes deleted; every storage operation; each pipeline run and the minutes the worker spent on it; model tokens in and out; images described by the vision model; documents converted; analytics queries; seats; the topics in use. A pipeline reports its own usage with its run’s token as it finishes, so a run can only ever report as its own workspace.' },
         { name: 'Deleting', required: false, note: 'A delete is an operation, and the bytes removed are billed at the write rate as data churn. Storage is measured nightly, so a file that existed at 02:00 is a day of storage whether or not it was deleted at 09:00. The line opens to which object was deleted, and by whom.' },
         { name: 'The page', required: false, note: 'Month to date and a forecast at the last week’s pace (a guess, labelled as one); data deleted, storage kept and seats; cost by day stacked by service; and line by line — the same lines the invoice will carry — each opening to what is behind it. A platform admin picks the workspace; a workspace admin sees their own.' },
+        { name: 'Rate cards', required: false, note: 'The calculation behind every bill, kept as versions (platform admin). Each meter has a price per so many units, a monthly allowance that is free, and optionally graduated tiers. A change is a new version, drafted from an existing one, with a name and an effective date: it prices bills for periods that start on or after that day, and a bill already drafted keeps the version it names. A workspace can be given a card of its own, which wins over the default for that workspace.' },
+        { name: 'Invoices', required: false, note: 'A month closed into a bill: the meter’s lines frozen with the rate card version, the allowance and bands that applied, tax when the billing profile carries both a number and a rate, a PDF, payment slips uploaded by the workspace and verified by the platform (a receipt each), credit notes, a yearly statement.' },
       ],
       notes: [
         'Reporting is never in a job’s way: a metering service that is down costs a warning, the batch is kept on the worker and sent with the next run.',
-        'Invoices, payment slips and receipts are the next step; the lines here are what they will be built from.',
+        'Changing the calculation never changes a bill already drafted; a version dated mid-month applies from the next period.',
       ],
     },
   ];

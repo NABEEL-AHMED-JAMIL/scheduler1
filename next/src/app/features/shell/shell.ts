@@ -165,6 +165,8 @@ export class Shell {
           hint: 'Invoices, receipts, credit notes, statements and slips in one list' },
         { label: 'Billing analytics', path: '/administration/billing/analytics', icon: 'chart', platformOnly: true,
           hint: 'Invoiced, collected, overdue and churn across every workspace' },
+        { label: 'Rate cards', path: '/administration/billing/rates', icon: 'layers', platformOnly: true,
+          hint: 'The calculation behind every bill, versioned; a workspace can have its own' },
         { label: 'Users', path: '/administration/users', icon: 'users', adminOnly: true,
           hint: 'Who can sign in, and as what' },
         { label: 'Access profiles', path: '/administration/access-profiles', icon: 'shield', adminOnly: true,

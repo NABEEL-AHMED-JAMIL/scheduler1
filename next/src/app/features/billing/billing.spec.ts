@@ -13,8 +13,8 @@ import { API_SUCCESS } from '../../core/api/api.config';
  */
 function page(platformAdmin = false, rows: object[] = LINES, days: object[] = DAYS) {
   const get = vi.fn((url: string, options?: { params?: Record<string, string> }) => {
-    if (url.endsWith('/billing.json/usage')) return of({ status: API_SUCCESS, data: { rows: options?.params?.['groupBy'] === 'day' ? days : rows } });
-    if (url.endsWith('/billing.json/rateCard')) return of({ status: API_SUCCESS, data: { version: 1, currency: 'USD' } });
+    if (url.endsWith('/billing.json/usage')) return of({ status: API_SUCCESS, data: options?.params?.['groupBy'] === 'day' ? { rows: days }
+      : { rows, rateCard: { version: 2, name: 'Standard, churn free', currency: 'USD', tenantSpecific: false, effectiveFrom: '2026-09-01' } } });
     if (url.endsWith('/billing.json/subjects')) return of({ status: API_SUCCESS, data: { rows: [
       { subject_type: 'object', subject_id: 'medaxis/sales/orders.csv', quantity: '2.0', events: 1, last: '2026-09-18T10:00:00Z', actor_user_id: 4385 },
     ] } });
@@ -38,7 +38,8 @@ const LINES = [
   { meter: 'storage.bytes.deleted', label: 'Bytes deleted (data churn)', service: 'Storage', unit: 'byte', per: 1073741824, unitPrice: '0.01', quantity: '41016604262', amount: '0.382', days: 3 },
   { meter: 'storage.ops.delete', label: 'Storage deletes', service: 'Storage', unit: 'op', per: 1000, unitPrice: '0.005', quantity: '1204', amount: '0.00602', days: 3 },
   { meter: 'storage.gb_hours', label: 'Storage kept', service: 'Storage', unit: 'GB-hour', per: 1, unitPrice: '0.000032', quantity: '50880', amount: '1.62816', days: 10 },
-  { meter: 'ai.tokens.in', label: 'Model tokens in', service: 'Model calls', unit: 'token', per: 1000, unitPrice: '0.05', quantity: '42100', amount: '2.105', days: 4 },
+  { meter: 'ai.tokens.in', label: 'Model tokens in', service: 'Model calls', unit: 'token', per: 1000, unitPrice: '0.05', quantity: '42100', amount: '2.105', days: 4,
+    includedQuantity: '1000', billableQuantity: '41100', hasTiers: true, tiers: [{ from: '0', to: '1500', units: '1500', unit_price: '0.05' }, { from: '1500', to: null, units: '39600', unit_price: '0.02' }] },
 ];
 const DAYS = [
   { day: '2026-09-16', amount: '5.0', byService: { Seats: '4.62', Storage: '0.38' } },
@@ -62,8 +63,15 @@ describe('Billing', () => {
     expect(component.storedGbDays()).toBe(2120);
     expect(component.fmtMoney(0.00602)).toBe('$0.0060');
     expect(component.fmtMoney(46.2)).toBe('$46.20');
-    expect(component.fmtRate(component.lines()[2])).toBe('$0.0050 / 1,000 per op');
+    expect(component.fmtRate(component.lines()[2])).toBe('$0.005 / 1,000 per op');
     expect(component.fmtRate(component.lines()[3])).toBe('$0.000032 per GB-hour');
+    // The card that priced the month is named, and a line with an allowance or tiers says what applied.
+    expect(component.rateCard()?.name).toBe('Standard, churn free');
+    const tokens = component.lines()[4];
+    expect(component.fmtRate(tokens)).toBe('tiered');
+    expect(tokens.includedQuantity).toBe(1000);
+    expect(component.fmtUnits(tokens, tokens.billableQuantity)).toBe('41,100');
+    expect(tokens.tiers.map(t => component.fmtUnitPrice(t.unit_price, tokens.per, tokens.unit))).toEqual(['$0.05 / 1,000 per token', '$0.02 / 1,000 per token']);
     expect(component.fmtBytes(2048)).toBe('2 KB');
     expect(component.fmtBytes(900)).toBe('900 B');
     expect(component.fmtGb(0.43 / 1024)).toBe('440.3 KB');

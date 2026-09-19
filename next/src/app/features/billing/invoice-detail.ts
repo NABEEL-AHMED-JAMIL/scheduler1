@@ -8,7 +8,7 @@ import { ToastService } from '../../shared/ui/toast.service';
 import { confirmWith } from '../../shared/ui/confirm';
 import { Icon } from '../../shared/ui/icon';
 import { formatSize } from '../../shared/ui/format-size';
-import { BillingApi, DOCUMENT_KIND_LABEL, InvoiceDetail as Detail, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE, PaymentRow } from './billing.service';
+import { BillingApi, DOCUMENT_KIND_LABEL, InvoiceDetail as Detail, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE, PaymentRow, InvoiceLine, AppliedTier, priceDigits } from './billing.service';
 
 /** One entry of the invoice's story, in order. */
 interface HistoryEntry { at: string; text: string; tone?: 'ok' | 'warn' | 'crit' | 'muted'; }
@@ -104,9 +104,15 @@ export class InvoiceDetailPage implements OnInit {
   rate(l: { unitPrice: number; per: number; unit?: string }): string {
     if (l.unit === 'byte' && l.per === 1024 * 1024 * 1024) return `${this.money(l.unitPrice)} per GB`;
     if (l.unit === 'each') return '';
-    const digits = l.unitPrice >= 0.01 ? 2 : l.unitPrice >= 0.0001 ? 4 : 6;
+    const digits = priceDigits(l.unitPrice);
     const price = new Intl.NumberFormat(undefined, { style: 'currency', currency: this.invoice()?.currency ?? 'USD', minimumFractionDigits: digits, maximumFractionDigits: digits }).format(l.unitPrice);
     return `${price}${l.per > 1 ? ' / ' + l.per.toLocaleString() : ''} per ${l.unit ?? ''}`;
+  }
+  /** The tier bands frozen with a line, parsed once per render from the JSON the meter sent. */
+  tiers(l: InvoiceLine): AppliedTier[] {
+    if (!l.pricingDetail) return [];
+    try { return (JSON.parse(l.pricingDetail) as AppliedTier[]).map(t => ({ from: Number(t.from), to: t.to == null ? null : Number(t.to), units: Number(t.units), unit_price: Number(t.unit_price) })); }
+    catch { return []; }
   }
   quantity(l: { quantity: number; unit?: string }): string {
     if (l.unit === 'byte') { const b = l.quantity; return b < 1024 ? `${Math.round(b)} B` : b < 1024 ** 2 ? `${(b / 1024).toFixed(1)} KB` : b < 1024 ** 3 ? `${(b / 1024 ** 2).toFixed(2)} MB` : `${(b / 1024 ** 3).toFixed(2)} GB`; }

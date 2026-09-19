@@ -9,13 +9,19 @@ import { StatTile } from '../../shared/ui/stat-tile';
 import { Combobox } from '../../shared/ui/combobox';
 import { TableShell } from '../../shared/ui/data-table';
 import { Bar, BarChart } from '../../shared/charts/bar-chart';
+import { RouterLink } from '@angular/router';
 import { chartColor } from '../../shared/charts/status-color';
+import { AppliedTier, priceDigits } from './billing.service';
 
 /** One row of billing.json/usage?groupBy=meter: a meter's month, priced. */
 export interface MeterLine {
   meter: string; label: string; service: string; unit: string; per: number;
   unitPrice: number; quantity: number; amount: number; days: number;
+  /** The calculation applied to the period: allowance first, then tier bands if the card has them. */
+  includedQuantity: number; billableQuantity: number; tiers: AppliedTier[]; hasTiers: boolean; unpriced?: boolean;
 }
+/** The card the period is priced with, as the meter names it. */
+interface PricedWith { version: number; name: string; currency: string; tenantSpecific: boolean; effectiveFrom: string; }
 interface DayRow { day: string; amount: number; byService: Record<string, number>; }
 interface SubjectRow { subject_type: string; subject_id: string; quantity: number; events: number; last: string | null; actor_user_id: number | null; actor_name?: string | null; }
 interface TenantOption { tenantId: number; tenantName: string; }
@@ -33,7 +39,7 @@ const SERVICES = ['Storage', 'Model calls', 'Seats', 'Pipelines', 'Analytics & t
  */
 @Component({
   selector: 'app-billing',
-  imports: [Icon, StatTile, Combobox, TableShell, BarChart, DecimalPipe, DatePipe],
+  imports: [Icon, StatTile, Combobox, TableShell, BarChart, DecimalPipe, DatePipe, RouterLink],
   templateUrl: './billing.html',
 })
 export class Billing implements OnInit {
@@ -58,7 +64,7 @@ export class Billing implements OnInit {
   readonly lines = signal<MeterLine[]>([]);
   readonly days = signal<DayRow[]>([]);
   readonly currency = signal('USD');
-  readonly rateCardVersion = signal<number | null>(null);
+  readonly rateCard = signal<PricedWith | null>(null);
 
   // ---- the tiles ----
   readonly total = computed(() => this.lines().reduce((n, l) => n + l.amount, 0));
@@ -127,10 +133,6 @@ export class Billing implements OnInit {
     } else {
       this.load();
     }
-    this.http.get<ApiResponse<{ version: number; currency: string }>>(`${API_BASE}/billing.json/rateCard`).subscribe({
-      next: r => { if (r.status === API_SUCCESS && r.data) { this.rateCardVersion.set(r.data.version); this.currency.set(r.data.currency || 'USD'); } },
-      error: () => {},
-    });
   }
 
   pickTenant(id: string): void { this.tenantId.set(id); this.load(); }
@@ -152,10 +154,15 @@ export class Billing implements OnInit {
 
   load(): void {
     this.loading.set(true); this.error.set(''); this.openLine.set(null);
-    this.http.get<ApiResponse<{ rows: MeterLine[] }>>(`${API_BASE}/billing.json/usage`, { params: this.params({ groupBy: 'meter' }) }).subscribe({
+    this.http.get<ApiResponse<{ rows: MeterLine[]; rateCard?: PricedWith }>>(`${API_BASE}/billing.json/usage`, { params: this.params({ groupBy: 'meter' }) }).subscribe({
       next: r => {
         if (r.status !== API_SUCCESS) { this.loading.set(false); this.failed(r.message); return; }
-        this.lines.set((r.data?.rows ?? []).map(l => ({ ...l, quantity: Number(l.quantity), amount: Number(l.amount), unitPrice: Number(l.unitPrice) })));
+        if (r.data?.rateCard) { this.rateCard.set(r.data.rateCard); this.currency.set(r.data.rateCard.currency || 'USD'); }
+        this.lines.set((r.data?.rows ?? []).map(l => ({
+          ...l, quantity: Number(l.quantity), amount: Number(l.amount), unitPrice: Number(l.unitPrice),
+          includedQuantity: Number(l.includedQuantity ?? 0), billableQuantity: Number(l.billableQuantity ?? l.quantity),
+          tiers: (l.tiers ?? []).map(t => ({ from: Number(t.from), to: t.to == null ? null : Number(t.to), units: Number(t.units), unit_price: Number(t.unit_price) })),
+        })));
         this.http.get<ApiResponse<{ rows: DayRow[] }>>(`${API_BASE}/billing.json/usage`, { params: this.params({ groupBy: 'day' }) }).subscribe({
           next: d => {
             this.loading.set(false);
@@ -212,12 +219,18 @@ export class Billing implements OnInit {
   }
   /** The unit price with enough digits to be a price, not "$0.0000". */
   fmtRate(line: MeterLine): string {
-    const p = line.unitPrice;
-    const digits = p >= 0.01 ? 2 : p >= 0.0001 ? 4 : 6;
+    if (line.unpriced) return 'not on the card';
+    if (line.hasTiers) return 'tiered';
+    return this.fmtUnitPrice(line.unitPrice, line.per, line.unit);
+  }
+  /** A quantity of the line's unit, for the allowance and the tier bands. */
+  fmtUnits(line: MeterLine, q: number): string { return this.fmtQuantity({ ...line, quantity: q }); }
+  fmtUnitPrice(p: number, per: number, unit: string): string {
+    const digits = priceDigits(p);
     const price = new Intl.NumberFormat(undefined, { style: 'currency', currency: this.currency(), minimumFractionDigits: digits, maximumFractionDigits: digits }).format(p);
     // A byte meter is priced per GB; saying "$0.01 / 1,073,741,824 per byte" would be true and unreadable.
-    if (line.unit === 'byte' && line.per === 1024 * 1024 * 1024) return `${price} per GB`;
-    return `${price}${line.per > 1 ? ' / ' + line.per.toLocaleString() : ''} per ${line.unit}`;
+    if (unit === 'byte' && per === 1024 * 1024 * 1024) return `${price} per GB`;
+    return `${price}${per > 1 ? ' / ' + per.toLocaleString() : ''} per ${unit}`;
   }
   subjectLabel(s: SubjectRow): string { return s.subject_id || (s.subject_type ? `(${s.subject_type})` : '(no subject)'); }
 

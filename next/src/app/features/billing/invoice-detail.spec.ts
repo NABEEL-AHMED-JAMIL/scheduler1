@@ -13,7 +13,9 @@ import { API_SUCCESS } from '../../core/api/api.config';
 const DETAIL = {
   invoiceId: 7, number: 'INV-2026-08-0006', kind: 'invoice', tenantId: 2905, tenantName: 'Northline', periodStart: '2026-08-01', periodEnd: '2026-08-31', status: 'partially_paid', currency: 'USD',
   subtotal: '402.75', taxRatePercent: '0', tax: '0', total: '402.75', balance: '202.75', issuedAt: '2026-09-01T08:00:00Z', dueAt: '2026-09-30T08:00:00Z', dateCreated: '2026-09-01T07:00:00Z', createdByName: 'system',
-  lines: [{ invoiceLineId: 1, sort: 0, meter: 'storage.bytes.deleted', description: 'Bytes deleted', quantity: '131000000000', unit: 'byte', per: 1073741824, unitPrice: '0.01', amount: '1.22', manual: false }],
+  lines: [{ invoiceLineId: 1, sort: 0, meter: 'storage.bytes.deleted', description: 'Bytes deleted', quantity: '131000000000', unit: 'byte', per: 1073741824, unitPrice: '0.01', amount: '1.22', manual: false },
+    { invoiceLineId: 2, sort: 1, meter: 'ai.tokens.in', description: 'Model tokens in', quantity: '3000', unit: 'token', per: 1000, unitPrice: '0.05', amount: '0.085', manual: false,
+      includedQuantity: '1000', billableQuantity: '2000', pricingDetail: '[{"from": "0", "to": "1500", "units": "1500", "unit_price": "0.05"}, {"from": "1500", "to": null, "units": "500", "unit_price": "0.02"}]' }],
   payments: [
     { paymentId: 1, amount: '200', method: 'bank', reference: 'TRF-88213', status: 'verified', receiptNumber: 'RCP-2026-09-0012', submittedBy: 'Olivia Bennett', verifiedBy: 'Platform Admin', verifiedAt: '2026-09-08T09:30:00Z', dateCreated: '2026-09-06T14:12:00Z', hasSlip: true },
     { paymentId: 2, amount: '166.75', method: 'bank', status: 'submitted', submittedBy: 'Olivia Bennett', dateCreated: '2026-09-17T16:40:00Z', hasSlip: true },
@@ -45,6 +47,9 @@ describe('InvoiceDetailPage', () => {
     expect(component.payAmount()).toBe('202.75');
     expect(component.quantity(component.invoice()!.lines[0])).toBe('122.00 GB');
     expect(component.rate(component.invoice()!.lines[0])).toBe('$0.01 per GB');
+    // A frozen line keeps the calculation it was priced with: the tier bands come back as numbers.
+    expect(component.tiers(component.invoice()!.lines[0])).toEqual([]);
+    expect(component.tiers(component.invoice()!.lines[1])).toEqual([{ from: 0, to: 1500, units: 1500, unit_price: 0.05 }, { from: 1500, to: null, units: 500, unit_price: 0.02 }]);
     const story = component.history().map(h => h.text);
     expect(story[0]).toContain('Draft INV-2026-08-0006');
     expect(story[1]).toContain('Invoice issued for $402.75');

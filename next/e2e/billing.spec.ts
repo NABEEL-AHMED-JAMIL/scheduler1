@@ -61,7 +61,7 @@ test.describe('cost & usage', () => {
     const page = await pageAs(browser, session);
     await page.goto('/administration/billing');
     await expect(page.getByRole('heading', { name: 'Cost & usage' })).toBeVisible();
-    await expect(page.getByText('Priced with rate card')).toBeVisible();
+    await expect(page.getByText(/Priced with/)).toBeVisible();
 
     // The delete is on the page as a line...
     const deletedLine = page.getByRole('row').filter({ hasText: 'Bytes deleted (data churn)' });
