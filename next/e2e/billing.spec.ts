@@ -59,7 +59,7 @@ test.describe('cost & usage', () => {
     await request.post(`${api}/billing.json/refresh`, { headers: auth });
 
     const page = await pageAs(browser, session);
-    await page.goto('/administration/billing');
+    await page.goto('/billing/usage');
     await expect(page.getByRole('heading', { name: 'Cost & usage' })).toBeVisible();
     await expect(page.getByText(/Priced with/)).toBeVisible();
 

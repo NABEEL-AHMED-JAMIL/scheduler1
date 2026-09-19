@@ -103,7 +103,7 @@ export class Invoices implements OnInit {
 
   select(r: InvoiceRow, replace = false): void {
     this.selectedNumber.set(r.number);
-    this.router.navigate(['/administration/billing/invoices', r.number], { replaceUrl: replace });
+    this.router.navigate(['/billing/invoices', r.number], { replaceUrl: replace });
   }
   pickWorkspace(id: string): void { this.workspaces.tenantId.set(id); this.selectedNumber.set(null); this.load(); }
   setStatus(s: string): void { this.status.set(this.status() === s ? '' : s); }

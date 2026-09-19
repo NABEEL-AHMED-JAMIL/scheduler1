@@ -479,7 +479,7 @@ export class Docs implements AfterViewInit {
       intro: 'Everything a workspace uses is metered as it happens and priced from a rate card, '
            + 'and the Cost & usage page shows the month the way the invoice will read it. '
            + 'Deleting data counts too.',
-      where: 'Administration → Cost & usage · Invoices · Billing documents · Rate cards',
+      where: 'Billing → Cost & usage · Invoices · Billing documents · Rate cards · Billing analytics',
       fields: [
         { name: 'What is metered', required: true, note: 'Storage kept (measured nightly at 02:00), bytes written, bytes read, and bytes deleted; every storage operation; each pipeline run and the minutes the worker spent on it; model tokens in and out; images described by the vision model; documents converted; analytics queries; seats; the topics in use. A pipeline reports its own usage with its run’s token as it finishes, so a run can only ever report as its own workspace.' },
         { name: 'Deleting', required: false, note: 'A delete is an operation, and the bytes removed are billed at the write rate as data churn. Storage is measured nightly, so a file that existed at 02:00 is a day of storage whether or not it was deleted at 09:00. The line opens to which object was deleted, and by whom.' },

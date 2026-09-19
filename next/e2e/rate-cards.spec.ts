@@ -46,7 +46,7 @@ test.describe('rate cards', () => {
     const name = `e2e ${stamp}: images at 0.02`;
 
     const page = await pageAs(browser, session);
-    await page.goto('/administration/billing/rates');
+    await page.goto('/billing/rates');
     await expect(page.getByRole('heading', { name: 'Rate cards' })).toBeVisible();
     await expect(page.getByText('Default card today')).toBeVisible();
 
@@ -102,9 +102,9 @@ test.describe('rate cards', () => {
     const list = await (await request.get(`${api}/billing.json/rateCards`, { headers: auth })).json();
     expect(list.status).toBe('ERROR');
     const page = await pageAs(browser, session);
-    await page.goto('/administration/billing/rates');
+    await page.goto('/billing/rates');
     await expect(page.getByRole('heading', { name: 'Rate cards' })).toHaveCount(0);
-    await page.goto('/administration/billing');
+    await page.goto('/billing/usage');
     await expect(page.getByText(/Priced with/)).toBeVisible();
     await expect(page.getByRole('link', { name: 'rate cards' })).toHaveCount(0);
     await page.context().close();

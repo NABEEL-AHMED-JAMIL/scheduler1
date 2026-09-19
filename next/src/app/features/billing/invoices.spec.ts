@@ -58,13 +58,13 @@ describe('Invoices', () => {
   it('selects the overdue bill first, or the one the address names, and writes the number to the address', () => {
     const { component, router } = page(false);
     expect(component.selectedNumber()).toBe('INV-2026-08-0003');
-    expect(router.navigate).toHaveBeenCalledWith(['/administration/billing/invoices', 'INV-2026-08-0003'], { replaceUrl: true });
+    expect(router.navigate).toHaveBeenCalledWith(['/billing/invoices', 'INV-2026-08-0003'], { replaceUrl: true });
     const deep = page(false, 'INV-2026-09-0007');
     expect(deep.component.selectedNumber()).toBe('INV-2026-09-0007');
     expect(deep.router.navigate).not.toHaveBeenCalled();
     deep.component.select(deep.component.rows()[1]);
     expect(deep.component.selectedNumber()).toBe('INV-2026-08-0007');
-    expect(deep.router.navigate).toHaveBeenLastCalledWith(['/administration/billing/invoices', 'INV-2026-08-0007'], { replaceUrl: false });
+    expect(deep.router.navigate).toHaveBeenLastCalledWith(['/billing/invoices', 'INV-2026-08-0007'], { replaceUrl: false });
   });
 
   it('a platform admin drafts a month for the picked workspace; a tenant admin cannot', () => {

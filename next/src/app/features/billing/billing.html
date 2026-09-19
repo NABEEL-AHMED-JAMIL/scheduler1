@@ -34,7 +34,7 @@
     <p class="text-xs text-[color:var(--text-muted)] mb-3">
       @if (rateCard(); as card) {
         Priced with <b>{{ card.name }}</b> v{{ card.version }}@if (card.tenantSpecific) { <span class="pill pill-info ml-1">this workspace's card</span> } · {{ currency() }}
-        @if (isPlatformAdmin()) { · <a routerLink="/administration/billing/rates" class="link-inline">rate cards</a> }
+        @if (isPlatformAdmin()) { · <a routerLink="/billing/rates" class="link-inline">rate cards</a> }
       } @else { Priced with the rate card in effect · {{ currency() }} }
       · day {{ daysElapsed() }} of {{ daysInMonth() }}
       @if (isCurrentMonth()) { · yesterday {{ fmtMoney(yesterday()) }} }

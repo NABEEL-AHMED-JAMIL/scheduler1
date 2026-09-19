@@ -255,40 +255,49 @@ export const routes: Routes = [
       // a general form builder -- kept as a redirect so an old bookmark or link still lands.
       { path: 'settings/forms', redirectTo: 'configuration/pipelines' },
       { path: 'settings/pipeline-forms', redirectTo: 'configuration/pipelines' },
+      // Billing is a section of its own: <section>/<page>, the old administration/billing
+      // addresses kept as redirects so a bookmark, a document link or a notification still lands.
+      { path: 'administration/billing', redirectTo: 'billing/usage' },
+      { path: 'administration/billing/invoices', redirectTo: 'billing/invoices' },
+      { path: 'administration/billing/invoices/:number', redirectTo: 'billing/invoices/:number' },
+      { path: 'administration/billing/documents', redirectTo: 'billing/documents' },
+      { path: 'administration/billing/analytics', redirectTo: 'billing/analytics' },
+      { path: 'administration/billing/rates', redirectTo: 'billing/rates' },
+      { path: 'billing', pathMatch: 'full', redirectTo: 'billing/usage' },
       {
         // Cost & usage: a tenant admin's own workspace, a platform admin's any. A page an
         // access profile can withhold (pageKey billing), and TENANT_ADMIN at the floor.
-        path: 'administration/billing',
+        path: 'billing/usage',
         loadComponent: () => import('./features/billing/billing').then(m => m.Billing),
         data: { pageKey: 'billing', minRole: 'TENANT_ADMIN' },
         canActivate: [pageGuard, roleGuard],
       },
       {
-        path: 'administration/billing/invoices',
+        path: 'billing/invoices',
         loadComponent: () => import('./features/billing/invoices').then(m => m.Invoices),
         data: { pageKey: 'billing', minRole: 'TENANT_ADMIN' },
         canActivate: [pageGuard, roleGuard],
       },
       {
-        path: 'administration/billing/invoices/:number',
+        path: 'billing/invoices/:number',
         loadComponent: () => import('./features/billing/invoices').then(m => m.Invoices),
         data: { pageKey: 'billing', minRole: 'TENANT_ADMIN' },
         canActivate: [pageGuard, roleGuard],
       },
       {
-        path: 'administration/billing/documents',
+        path: 'billing/documents',
         loadComponent: () => import('./features/billing/documents').then(m => m.BillingDocuments),
         data: { pageKey: 'billing', minRole: 'TENANT_ADMIN' },
         canActivate: [pageGuard, roleGuard],
       },
       {
-        path: 'administration/billing/analytics',
+        path: 'billing/analytics',
         loadComponent: () => import('./features/billing/billing-analytics').then(m => m.BillingAnalyticsPage),
         data: { minRole: 'PLATFORM_ADMIN' },
         canActivate: [roleGuard],
       },
       {
-        path: 'administration/billing/rates',
+        path: 'billing/rates',
         loadComponent: () => import('./features/billing/rate-cards').then(m => m.RateCards),
         data: { minRole: 'PLATFORM_ADMIN' },
         canActivate: [roleGuard],

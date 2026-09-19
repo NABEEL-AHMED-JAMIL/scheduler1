@@ -84,7 +84,7 @@
               <h2 class="lookup-detail-key" [title]="d.fileName">{{ d.number || d.fileName }}</h2>
               <span class="text-xs text-[color:var(--text-muted)] truncate">
                 {{ d.issuedAt | date: 'd MMM yyyy, HH:mm' }}@if (d.createdByName) { · {{ d.createdByName }} }@if (d.sizeBytes) { · {{ humanSize(d.sizeBytes) }} }
-                @if (d.invoiceNumber) { · for <a class="link-inline mono" [routerLink]="['/administration/billing/invoices', d.invoiceNumber]">{{ d.invoiceNumber }}</a> }
+                @if (d.invoiceNumber) { · for <a class="link-inline mono" [routerLink]="['/billing/invoices', d.invoiceNumber]">{{ d.invoiceNumber }}</a> }
               </span>
             </div>
           </div>
@@ -95,7 +95,7 @@
               <div cdkMenu class="card shadow-xl py-1 min-w-52 text-sm">
                 <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="open(d)"><app-icon name="external" />Open in a new tab</button>
                 @if (d.invoiceNumber) {
-                  <a cdkMenuItem class="menu-item" [routerLink]="['/administration/billing/invoices', d.invoiceNumber]"><app-icon name="file" />Open invoice {{ d.invoiceNumber }}</a>
+                  <a cdkMenuItem class="menu-item" [routerLink]="['/billing/invoices', d.invoiceNumber]"><app-icon name="file" />Open invoice {{ d.invoiceNumber }}</a>
                 }
               </div>
             </ng-template>

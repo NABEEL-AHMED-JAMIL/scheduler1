@@ -39,11 +39,11 @@ test.describe('invoices as rail and pane', () => {
     test.skip(!issued, 'No issued invoice for this workspace yet.');
 
     const page = await pageAs(browser, session);
-    await page.goto('/administration/billing/invoices');
+    await page.goto('/billing/invoices');
     await expect(page.getByRole('heading', { name: 'Invoices' })).toBeVisible();
     await expect(page.getByRole('listbox', { name: 'Invoices' })).toBeVisible();
     // Deep link: the pane shows that bill, its number is the heading, its QR is an image that loaded.
-    await page.goto(`/administration/billing/invoices/${issued!.number}`);
+    await page.goto(`/billing/invoices/${issued!.number}`);
     await expect(page.getByRole('heading', { name: issued!.number })).toBeVisible();
     const qr = page.getByAltText(`QR code: ${issued!.number}`);
     await expect(qr).toBeVisible();
@@ -60,7 +60,7 @@ test.describe('invoices as rail and pane', () => {
       await expect(page).not.toHaveURL(new RegExp(issued!.number + '$'));
     }
     // The document opens in Billing documents, read in the console's own viewer.
-    await page.goto(`/administration/billing/invoices/${issued!.number}`);
+    await page.goto(`/billing/invoices/${issued!.number}`);
     await page.getByTitle('Open in Billing documents').first().click();
     await expect(page.getByRole('heading', { name: 'Billing documents' })).toBeVisible();
     await expect(page.getByRole('listbox', { name: 'Documents' }).getByRole('option', { selected: true })).toContainText(issued!.number);
@@ -73,7 +73,7 @@ test.describe('invoices as rail and pane', () => {
     test.skip(!platform.username || !platform.password, 'Set E2E_PLATFORM_ADMIN(_PASSWORD) to run this.');
     const session = await signIn(request, platform.username!, platform.password!);
     const page = await pageAs(browser, session);
-    await page.goto('/administration/billing/invoices');
+    await page.goto('/billing/invoices');
     await expect(page.getByRole('button', { name: /Draft month/ })).toBeVisible();
     await expect(page.getByRole('combobox', { name: 'Workspace' })).toBeVisible();
     await expect(page.getByText('Drafts')).toBeVisible();
