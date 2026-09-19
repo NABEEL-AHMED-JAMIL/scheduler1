@@ -1,12 +1,11 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
-import { RouterLink } from '@angular/router';
 import { Dialog } from '@angular/cdk/dialog';
+import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { API_SUCCESS } from '../../core/api/api.config';
 import { ToastService } from '../../shared/ui/toast.service';
 import { Icon } from '../../shared/ui/icon';
 import { StatTile } from '../../shared/ui/stat-tile';
-import { TableShell } from '../../shared/ui/data-table';
 import { sidePanelConfig } from '../../shared/ui/side-panel';
 import { BillingApi, RateCard, RateItem, priceDigits } from './billing.service';
 import { RateCardEditor, RateCardEditorData } from './rate-card-editor';
@@ -20,7 +19,7 @@ import { WorkspacePicker } from './workspace-picker';
  */
 @Component({
   selector: 'app-rate-cards',
-  imports: [Icon, StatTile, TableShell, RouterLink, DatePipe],
+  imports: [Icon, StatTile, DatePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger],
   templateUrl: './rate-cards.html',
 })
 export class RateCards implements OnInit {
@@ -35,6 +34,7 @@ export class RateCards implements OnInit {
   readonly selectedVersion = signal<number | null>(null);
   readonly scope = signal<'all' | 'default' | 'workspace'>('all');
   readonly search = signal('');
+  readonly todayIso = new Date().toISOString().slice(0, 10);
 
   readonly selected = computed(() => this.cards().find(c => c.version === this.selectedVersion()) ?? null);
   readonly visible = computed(() => {
@@ -78,6 +78,7 @@ export class RateCards implements OnInit {
   }
 
   select(c: RateCard): void { this.selectedVersion.set(c.version); }
+  selectVersion(v: number): void { this.selectedVersion.set(v); }
   setScope(s: 'all' | 'default' | 'workspace'): void { this.scope.set(this.scope() === s ? 'all' : s); }
   forLabel(c: RateCard): string { return c.tenant_id == null ? 'Every workspace' : (c.tenantName ?? `Workspace ${c.tenant_id}`); }
   isInEffect(c: RateCard): boolean { return c.tenant_id == null ? this.today().defaultCard?.version === c.version : this.today().own.some(o => o.version === c.version); }

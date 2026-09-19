@@ -12,6 +12,8 @@ export interface InvoiceRow {
   periodStart: string; periodEnd: string; status: 'draft' | 'issued' | 'partially_paid' | 'paid' | 'overdue' | 'void'; currency: string;
   subtotal: number; taxRatePercent: number; tax: number; total: number; balance: number; note?: string;
   issuedAt?: string; dueAt?: string; paidAt?: string; voidedAt?: string; rateCardVersion?: number; rateCardName?: string; dateCreated?: string;
+  /** The kinds of document the invoice has (invoice, payment_slip, receipt, credit_note) and slips awaiting verification. */
+  documentKinds?: string[]; pendingPayments?: number;
 }
 export interface InvoiceLine {
   invoiceLineId: number; sort: number; meter?: string; description: string; quantity: number; unit?: string; per: number;
@@ -100,6 +102,8 @@ export class BillingApi {
     return this.http.post<ApiResponse<PaymentRow>>(`${this.base}/payment/verify`, null, { params: { paymentId: String(paymentId), accept: String(accept), note } });
   }
   documents(tenantId?: string | null): Observable<ApiResponse<DocumentRow[]>> { return this.http.get<ApiResponse<DocumentRow[]>>(`${this.base}/documents`, { params: this.tenantParam(tenantId) }); }
+  /** The invoice number as a QR code (PNG); the PDF carries the same one. */
+  qrBlob(number: string, size = 160): Observable<Blob> { return this.http.get(`${this.base}/invoice/qr`, { params: { number, size: String(size) }, responseType: 'blob' }); }
   documentBlob(documentId: number): Observable<Blob> { return this.http.get(`${this.base}/document`, { params: { documentId: String(documentId) }, responseType: 'blob' }); }
   statement(from: string, to: string, tenantId?: string | null): Observable<ApiResponse<DocumentRow>> {
     return this.http.post<ApiResponse<DocumentRow>>(`${this.base}/statement`, null, { params: { from, to, ...this.tenantParam(tenantId) } });

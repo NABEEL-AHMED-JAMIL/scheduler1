@@ -271,7 +271,7 @@ export const routes: Routes = [
       },
       {
         path: 'administration/billing/invoices/:number',
-        loadComponent: () => import('./features/billing/invoice-detail').then(m => m.InvoiceDetailPage),
+        loadComponent: () => import('./features/billing/invoices').then(m => m.Invoices),
         data: { pageKey: 'billing', minRole: 'TENANT_ADMIN' },
         canActivate: [pageGuard, roleGuard],
       },

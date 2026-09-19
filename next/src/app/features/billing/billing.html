@@ -14,6 +14,7 @@
         <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="shiftMonth(1)" [disabled]="isCurrentMonth()" aria-label="Next month"><app-icon name="chevronRight" /></button>
       </div>
       <button type="button" class="btn btn-default btn-sm" (click)="refresh()" [disabled]="loading()" title="Price the last minutes' events now"><app-icon name="refresh" [class.spin]="loading()" />Refresh</button>
+      <button type="button" class="btn btn-default btn-sm" (click)="exportCsv()" [disabled]="loading() || !lines().length" title="The lines below as a CSV"><app-icon name="download" />Export CSV</button>
     </div>
   </div>
 
@@ -39,9 +40,9 @@
       @if (isCurrentMonth()) { · yesterday {{ fmtMoney(yesterday()) }} }
     </p>
 
-    <div class="stat-grid">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
       <app-stat-tile label="Month to date" [value]="fmtMoney(total())" icon="chart" tone="info"
-                     [foot]="isCurrentMonth() ? (forecast() !== null ? 'forecast ' + fmtMoney(forecast()!) + ' at the last 7 days’ pace' : 'no forecast yet') : 'closed month'" />
+                     [foot]="(isCurrentMonth() ? (forecast() !== null ? 'forecast ' + fmtMoney(forecast()!) + ' at the 7-day pace' : 'no forecast yet') : 'closed month') + (previousTotal() !== null ? ' · ' + previousLabel() + ' ' + fmtMoney(previousTotal()!) : '')" />
       <app-stat-tile label="Data deleted" [value]="fmtBytes(deletedBytes())" icon="trash" [tone]="deletedBytes() > 0 ? 'warn' : 'muted'"
                      [foot]="(deleteOps() | number: '1.0-0') + ' delete op' + (deleteOps() === 1 ? '' : 's') + ' · ' + fmtMoney(churnAmount()) + ' churn'" />
       <app-stat-tile label="Storage kept" [value]="fmtGb(storedGbDays() / daysElapsed())" icon="cloud" tone="muted"
@@ -57,11 +58,6 @@
           <div class="py-10 text-center text-sm text-[color:var(--text-muted)]"><div class="spinner mx-auto mb-2"></div>Reading the meter…</div>
         } @else {
           <app-bar-chart [data]="dayBars()" [height]="140" [format]="money" emptyMessage="Nothing metered in this month yet." />
-          <div class="flex flex-wrap gap-3 mt-2 text-xs">
-            @for (s of byService(); track s.service) {
-              <span class="inline-flex items-center gap-1.5"><span class="inline-block size-2.5 rounded-sm" [style.background]="s.color"></span>{{ s.service }}</span>
-            }
-          </div>
         }
       </div>
       <div class="card p-4">

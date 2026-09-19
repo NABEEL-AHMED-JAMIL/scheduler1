@@ -14,7 +14,7 @@
   } @else if (error()) {
     <div class="card p-8 text-center"><app-icon name="alert" size="1.6rem" class="icon-crit" /><p class="text-sm text-crit-500 mt-2">{{ error() }}</p></div>
   } @else if (data(); as d) {
-    <div class="stat-grid">
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
       <app-stat-tile label="Invoiced" [value]="money2(d.invoiced)" icon="file" tone="info" [foot]="d.months.length + ' month' + (d.months.length === 1 ? '' : 's')" />
       <app-stat-tile label="Collected" [value]="money2(d.collected)" icon="check" tone="ok" [foot]="collectedShare() + '% · median ' + d.medianDaysToPay + ' days to pay'" />
       <app-stat-tile label="Overdue" [value]="money2(d.overdue)" icon="alert" [tone]="d.overdue > 0 ? 'crit' : 'muted'" [foot]="d.overdueCount + ' invoice' + (d.overdueCount === 1 ? '' : 's')" />

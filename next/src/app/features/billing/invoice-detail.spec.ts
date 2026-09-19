@@ -1,15 +1,16 @@
 import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { ActivatedRoute } from '@angular/router';
+import { Component, ViewChild } from '@angular/core';
+import { provideRouter } from '@angular/router';
 import { Dialog } from '@angular/cdk/dialog';
 import { of } from 'rxjs';
-import { InvoiceDetailPage } from './invoice-detail';
+import { InvoicePane } from './invoice-detail';
 import { BillingApi } from './billing.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { ToastService } from '../../shared/ui/toast.service';
 import { API_SUCCESS } from '../../core/api/api.config';
 
-/** One invoice: what is paid, what is open, the story in order, and who may do what. */
+/** One invoice in the pane: what is paid, what is open, the story in order, and who may do what. */
 const DETAIL = {
   invoiceId: 7, number: 'INV-2026-08-0006', kind: 'invoice', tenantId: 2905, tenantName: 'Northline', periodStart: '2026-08-01', periodEnd: '2026-08-31', status: 'partially_paid', currency: 'USD',
   subtotal: '402.75', taxRatePercent: '0', tax: '0', total: '402.75', balance: '202.75', issuedAt: '2026-09-01T08:00:00Z', dueAt: '2026-09-30T08:00:00Z', dateCreated: '2026-09-01T07:00:00Z', createdByName: 'system',
@@ -24,23 +25,30 @@ const DETAIL = {
   account: { tenantId: 2905, legalName: 'Northline Clinics Ltd', paymentTermsDays: 30 },
 };
 
+/** The pane takes its number as an input, so it is mounted inside a host the way the list mounts it. */
+@Component({ imports: [InvoicePane], template: `<app-invoice-pane [number]="number" (changed)="changes = changes + 1" />` })
+class Host { number = 'INV-2026-08-0006'; changes = 0; @ViewChild(InvoicePane) pane!: InvoicePane; }
+
 function page(platformAdmin: boolean) {
-  const api = { invoice: vi.fn(() => of({ status: API_SUCCESS, data: DETAIL })), submitPayment: vi.fn(() => of({ status: API_SUCCESS, message: 'recorded' })), verifyPayment: vi.fn(() => of({ status: API_SUCCESS, message: 'verified' })), documentBlob: vi.fn(() => of(new Blob(['%PDF']))) };
+  // jsdom has no object URLs; the QR code and the documents are blobs shown through one.
+  vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: () => 'blob:qr', revokeObjectURL: () => {} }));
+  const api = { invoice: vi.fn(() => of({ status: API_SUCCESS, data: DETAIL })), submitPayment: vi.fn(() => of({ status: API_SUCCESS, message: 'recorded' })), verifyPayment: vi.fn(() => of({ status: API_SUCCESS, message: 'verified' })), documentBlob: vi.fn(() => of(new Blob(['%PDF']))), qrBlob: vi.fn(() => of(new Blob(['png']))) };
   TestBed.resetTestingModule();
-  TestBed.configureTestingModule({ providers: [
+  TestBed.configureTestingModule({ imports: [Host], providers: [provideRouter([]),
     { provide: BillingApi, useValue: api }, { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn(), info: vi.fn() } },
     { provide: Dialog, useValue: {} }, { provide: AuthService, useValue: { isPlatformAdmin: () => platformAdmin } },
-    { provide: ActivatedRoute, useValue: { paramMap: of(new Map([['number', 'INV-2026-08-0006']])) } },
   ] });
-  const component = TestBed.runInInjectionContext(() => new InvoiceDetailPage());
-  component.ngOnInit();
-  return { component, api };
+  const fixture = TestBed.createComponent(Host);
+  fixture.detectChanges();
+  const component = fixture.componentInstance.pane;
+  return { component, api, host: fixture.componentInstance, fixture };
 }
 
-describe('InvoiceDetailPage', () => {
+describe('InvoicePane', () => {
   it('reads the invoice, sums verified payments only, and tells the story in order', () => {
     const { component, api } = page(false);
     expect(api.invoice).toHaveBeenCalledWith('INV-2026-08-0006');
+    expect(api.qrBlob).toHaveBeenCalledWith('INV-2026-08-0006', 240);   // the QR code of the number, beside the facts
     expect(component.paid()).toBe(200);
     expect(component.pending()).toHaveLength(1);
     expect(component.isOpen()).toBe(true);
@@ -66,6 +74,7 @@ describe('InvoiceDetailPage', () => {
     const admin = page(true);
     admin.component.verify(DETAIL.payments[1] as any, true);
     expect(admin.api.verifyPayment).toHaveBeenCalledWith(2, true, '');
+    expect(admin.host.changes).toBe(1);                // the list beside the pane is told
     expect(admin.component.canVoid()).toBe(false);   // partly paid: a credit note, not a void
   });
 });

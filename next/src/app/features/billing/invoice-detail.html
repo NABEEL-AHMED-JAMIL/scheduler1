@@ -1,88 +1,133 @@
-<div class="page">
-  @if (loading()) {
-    <div class="card p-12 text-center text-sm text-[color:var(--text-muted)]"><div class="spinner mx-auto mb-3"></div>Loading…</div>
-  } @else if (error() || !invoice()) {
-    <div class="card p-8 text-center"><app-icon name="alert" size="1.6rem" class="icon-crit" /><p class="text-sm text-crit-500 mt-2">{{ error() }}</p>
-      <a routerLink="/administration/billing/invoices" class="btn btn-default btn-sm mt-3">Back to invoices</a></div>
-  } @else {
-    @if (invoice(); as i) {
-      <div class="page-head">
-        <div>
-          <p class="text-xs text-[color:var(--text-muted)] mb-1"><a routerLink="/administration/billing/invoices" class="link-inline">Invoices</a> / {{ i.number }}</p>
-          <h1 class="page-title mono">{{ i.number }}</h1>
-          <p class="page-subtitle">
-            {{ i.kind === 'credit_note' ? 'Credit note' : 'Invoice' }}@if (i.referencesNumber) { against <a class="link-inline mono" [routerLink]="['/administration/billing/invoices', i.referencesNumber]">{{ i.referencesNumber }}</a> }
-            · {{ i.tenantName }} · {{ i.periodStart | date: 'MMMM yyyy' }}
-            @if (i.issuedAt) { · issued {{ i.issuedAt | date: 'd MMM yyyy' }} }@if (i.dueAt && i.kind === 'invoice') { · due {{ i.dueAt | date: 'd MMM yyyy' }} }
-          </p>
-        </div>
+@if (loading() && !invoice()) {
+  <div class="lookup-entries-empty lookup-detail-empty"><app-icon name="refresh" class="spin icon-muted" /> Loading {{ number() }}…</div>
+} @else if (error() || !invoice()) {
+  <div class="lookup-entries-empty lookup-detail-empty">
+    <app-icon name="alert" size="1.5rem" class="icon-crit" />
+    <p class="text-crit-500">{{ error() }}</p>
+    <button type="button" class="btn btn-default btn-sm mt-2" (click)="load()">Try again</button>
+  </div>
+} @else {
+  @if (invoice(); as i) {
+    <header class="lookup-detail-head">
+      <div class="min-w-0 flex-1">
         <div class="flex items-center gap-2 flex-wrap">
-          <span class="pill" [class]="'pill ' + statusTone[i.status]">{{ statusLabel[i.status] }}@if (isOpen()) { · {{ money(i.balance) }} open }</span>
-          @if (i.status !== 'draft') { <button type="button" class="btn btn-default btn-sm" (click)="pdf()"><app-icon name="file" />PDF</button> }
-          @if (isPlatformAdmin() && i.status === 'draft') {
-            <button type="button" class="btn btn-ghost btn-sm" (click)="redraft()" [disabled]="busy() === 'draft'"><app-icon name="refresh" [class.spin]="busy() === 'draft'" />Rebuild from the meter</button>
-            <button type="button" class="btn btn-ghost btn-sm" (click)="addingLine.set(!addingLine())"><app-icon name="plus" />Add a line</button>
-            <button type="button" class="btn btn-primary btn-sm" (click)="issue()" [disabled]="busy() === 'issue'"><app-icon name="check" [busy]="busy() === 'issue'" />Issue</button>
-          }
-          @if (isPlatformAdmin() && isOpen()) {
-            <button type="button" class="btn btn-ghost btn-sm" (click)="crediting.set(!crediting())">Credit note</button>
-          }
-          @if (canVoid()) { <button type="button" class="btn btn-ghost btn-sm" (click)="voidInvoice()" [disabled]="busy() === 'void'">Void</button> }
-          @if (isOpen()) {
-            <button type="button" class="btn btn-primary btn-sm" (click)="paying.set(!paying())"><app-icon name="upload" />{{ isPlatformAdmin() ? 'Record payment' : 'Upload payment slip' }}</button>
-          }
+          <span class="pill" [class]="'pill ' + statusTone[i.status]">{{ statusLabel[i.status] }}@if (i.status === 'overdue') { · {{ overdueDays() }} d }@if (isOpen()) { · {{ money(i.balance) }} open }</span>
+          @if (i.kind === 'credit_note') { <span class="pill pill-neutral">credit note</span> }
+          @if (isPlatformAdmin()) { <span class="pill pill-neutral"><app-icon name="building" size="0.8em" class="opacity-70" />{{ i.tenantName }}</span> }
+          @if (pending().length) { <span class="pill pill-warn">{{ pending().length }} slip{{ pending().length === 1 ? '' : 's' }} to verify</span> }
+          @if (i.rateCardVersion) { <span class="pill pill-neutral" [title]="'Priced with rate card ' + (i.rateCardName || '') + ' v' + i.rateCardVersion">rate card v{{ i.rateCardVersion }}</span> }
+        </div>
+        <div class="flex items-baseline gap-2 mt-1 min-w-0 flex-wrap">
+          <h2 class="lookup-detail-key mono" [title]="i.number">{{ i.number }}</h2>
+          <app-copy-button [value]="i.number" [copied]="copied()" copiedLabel="Number copied" (copy)="copyNumber()" />
+          <span class="text-xs text-[color:var(--text-muted)]">
+            {{ i.periodStart | date: 'MMMM yyyy' }}
+            @if (i.referencesNumber) { · against <a class="link-inline mono" [routerLink]="['/administration/billing/invoices', i.referencesNumber]">{{ i.referencesNumber }}</a> }
+            @if (i.issuedAt) { · issued {{ i.issuedAt | date: 'd MMM yyyy' }} }@if (i.dueAt && i.kind === 'invoice') { · due {{ i.dueAt | date: 'd MMM yyyy' }} }
+          </span>
         </div>
       </div>
+      <div class="flex items-center gap-1.5 shrink-0">
+        @if (isPlatformAdmin() && i.status === 'draft') {
+          <button type="button" class="btn btn-primary btn-sm" (click)="issue()" [disabled]="busy() === 'issue'"><app-icon name="check" [busy]="busy() === 'issue'" />Issue</button>
+        } @else if (isOpen()) {
+          <button type="button" class="btn btn-primary btn-sm" (click)="paying.set(!paying())"><app-icon name="upload" />{{ isPlatformAdmin() ? 'Record payment' : 'Upload payment slip' }}</button>
+        } @else if (pdfDocument()) {
+          <button type="button" class="btn btn-primary btn-sm" (click)="pdf()"><app-icon name="file" />PDF</button>
+        }
+        <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="invoiceMenu" aria-label="More actions"><app-icon name="dots" size="1.05em" /></button>
+        <ng-template #invoiceMenu>
+          <div cdkMenu class="card shadow-xl py-1 min-w-52 text-sm">
+            @if (pdfDocument()) {
+              <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="pdf()"><app-icon name="eye" />View PDF</button>
+              <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="downloadPdf()"><app-icon name="download" />Download PDF</button>
+            }
+            @if (isOpen()) {
+              <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="paying.set(!paying())"><app-icon name="upload" />{{ isPlatformAdmin() ? 'Record a payment' : 'Upload a payment slip' }}</button>
+            }
+            @if (isPlatformAdmin() && i.status === 'draft') {
+              <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="redraft()"><app-icon name="refresh" />Rebuild from the meter</button>
+              <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="addingLine.set(!addingLine())"><app-icon name="plus" />Add a line</button>
+            }
+            @if (isPlatformAdmin() && isOpen()) {
+              <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="crediting.set(!crediting())"><app-icon name="minus" />Credit note</button>
+            }
+            @if (canVoid()) {
+              <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="voidInvoice()"><app-icon name="trash" class="icon-crit" />Void</button>
+            }
+          </div>
+        </ng-template>
+      </div>
+    </header>
 
-      @if (addingLine()) {
-        <div class="card p-4 mb-4 flex items-end gap-2 flex-wrap">
-          <label class="flex-1 min-w-56"><span class="label">Description</span><input class="input" [value]="lineDescription()" (input)="lineDescription.set($any($event.target).value)" placeholder="Onboarding support (2 h)" /></label>
-          <label><span class="label">Quantity</span><input class="input w-24" type="number" min="0" step="0.01" [value]="lineQuantity()" (input)="lineQuantity.set($any($event.target).value)" /></label>
-          <label><span class="label">Unit price</span><input class="input w-28" type="number" step="0.01" [value]="linePrice()" (input)="linePrice.set($any($event.target).value)" placeholder="3.02" /></label>
-          <button type="button" class="btn btn-primary btn-sm" (click)="addLine()" [disabled]="busy() === 'line'">Add</button>
-          <button type="button" class="btn btn-ghost btn-sm" (click)="addingLine.set(false)">Cancel</button>
-        </div>
-      }
-      @if (crediting()) {
-        <div class="card p-4 mb-4 flex items-end gap-2 flex-wrap">
-          <label><span class="label">Amount</span><input class="input w-28" type="number" min="0" step="0.01" [value]="creditAmount()" (input)="creditAmount.set($any($event.target).value)" /></label>
-          <label class="flex-1 min-w-56"><span class="label">Reason</span><input class="input" [value]="creditReason()" (input)="creditReason.set($any($event.target).value)" placeholder="duplicate conversion runs" /></label>
-          <button type="button" class="btn btn-primary btn-sm" (click)="creditNote()" [disabled]="busy() === 'credit'">Issue credit note</button>
-          <button type="button" class="btn btn-ghost btn-sm" (click)="crediting.set(false)">Cancel</button>
-        </div>
-      }
-      @if (paying()) {
-        <div class="card p-4 mb-4">
-          <h2 class="font-semibold text-sm">{{ isPlatformAdmin() ? 'Record a payment' : 'Tell us you paid' }}</h2>
-          <p class="text-xs text-[color:var(--text-muted)] mb-3">{{ isPlatformAdmin() ? 'It counts once verified.' : 'Attach the transfer slip; the platform verifies it and issues a receipt.' }}</p>
-          <div class="flex items-end gap-2 flex-wrap">
-            <label><span class="label">Amount</span><input class="input w-28" type="number" min="0" step="0.01" [value]="payAmount()" (input)="payAmount.set($any($event.target).value)" /></label>
-            <label><span class="label">Method</span>
-              <select class="input" [value]="payMethod()" (change)="payMethod.set($any($event.target).value)">
-                <option value="bank">bank transfer</option><option value="card">card</option><option value="cash">cash</option><option value="manual">other</option>
-              </select></label>
-            <label><span class="label">Reference</span><input class="input w-40 mono" [value]="payReference()" (input)="payReference.set($any($event.target).value)" placeholder="TRF-88213" /></label>
-            <label class="flex-1 min-w-48"><span class="label">Note</span><input class="input" [value]="payNote()" (input)="payNote.set($any($event.target).value)" /></label>
-            <label><span class="label">Slip</span><input class="input" type="file" accept=".pdf,.png,.jpg,.jpeg" (change)="slipPicked($event)" /></label>
-            <button type="button" class="btn btn-primary btn-sm" (click)="submitPayment()" [disabled]="busy() === 'pay'"><app-icon name="check" [busy]="busy() === 'pay'" />Submit</button>
-            <button type="button" class="btn btn-ghost btn-sm" (click)="paying.set(false)">Cancel</button>
-          </div>
-        </div>
-      }
+    <!-- Who is billed, for what, and the QR code of the number: the same facts the PDF prints. -->
+    <div class="bill-facts">
+      <div class="bill-facts-grid">
+        <div><span class="eyebrow">Billed to</span><div class="text-sm">{{ i.account.legalName || i.tenantName }}</div>
+          @if (i.account.address) { <div class="text-xs text-[color:var(--text-secondary)] whitespace-pre-line">{{ i.account.address }}</div> }
+          @if (i.account.taxId) { <div class="text-xs text-[color:var(--text-muted)]">Tax ID {{ i.account.taxId }}</div> }</div>
+        <div><span class="eyebrow">Period</span><div class="text-sm tabular">{{ i.periodStart | date: 'd MMM' }} – {{ i.periodEnd | date: 'd MMM yyyy' }}</div>
+          @if (i.issuedAt) { <div class="text-xs text-[color:var(--text-secondary)]">issued {{ i.issuedAt | date: 'd MMM yyyy' }}</div> }
+          @if (i.dueAt && i.kind === 'invoice') { <div class="text-xs" [class.text-crit-500]="i.status === 'overdue'" [class.text-[color:var(--text-secondary)]]="i.status !== 'overdue'">due {{ i.dueAt | date: 'd MMM yyyy' }} (net {{ i.account.paymentTermsDays }})</div> }</div>
+        <div><span class="eyebrow">Total</span><div class="text-sm tabular font-semibold" [class.text-crit-500]="i.total < 0">{{ money(i.total) }}</div>
+          @if (i.kind === 'invoice' && i.status !== 'draft') { <div class="text-xs text-[color:var(--text-secondary)]">paid {{ money(paid()) }} · balance {{ money(i.balance) }}</div> }
+          @if (i.rateCardVersion) { <div class="text-xs text-[color:var(--text-muted)]">{{ i.rateCardName || 'Rate card' }} v{{ i.rateCardVersion }}</div> }</div>
+      </div>
+      <figure class="bill-qr" [title]="'Scan for ' + i.number">
+        @if (qrUrl()) { <img [src]="qrUrl()" [alt]="'QR code: ' + i.number" width="88" height="88" /> } @else { <div class="bill-qr-blank"></div> }
+        <figcaption class="mono">{{ i.number }}</figcaption>
+      </figure>
+    </div>
 
-      <div class="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
-        <div class="card p-5 invoice-paper">
-          <div class="flex justify-between gap-4 border-b-2 border-strong pb-3 mb-3">
-            <div><div class="text-lg font-semibold">{{ i.kind === 'credit_note' ? 'Credit note' : 'Invoice' }}</div><div class="mono text-sm">{{ i.number }}</div></div>
-            <div class="text-right text-xs"><b>ETL Console</b><br />Platform billing</div>
-          </div>
-          <div class="flex justify-between gap-4 text-xs mb-4">
-            <div><b>Billed to</b><br />{{ i.account.legalName }}@if (i.account.address) {<br />{{ i.account.address }}}@if (i.account.taxId) {<br />Tax ID {{ i.account.taxId }}}</div>
-            <div class="text-right"><b>Period</b> {{ i.periodStart | date: 'd MMM' }} – {{ i.periodEnd | date: 'd MMM yyyy' }}
-              @if (i.issuedAt) {<br /><b>Issued</b> {{ i.issuedAt | date: 'd MMM yyyy' }}}@if (i.dueAt && i.kind === 'invoice') {<br /><b>Due</b> {{ i.dueAt | date: 'd MMM yyyy' }} (net {{ i.account.paymentTermsDays }})}
-              @if (i.rateCardVersion) {<br /><b>Rate card</b> {{ i.rateCardName ? i.rateCardName + ' ' : '' }}v{{ i.rateCardVersion }}}</div>
-          </div>
-          <table class="table-modern">
+    @if (addingLine()) {
+      <div class="bill-form">
+        <label class="flex-1 min-w-56"><span class="label">Description</span><input class="input" [value]="lineDescription()" (input)="lineDescription.set($any($event.target).value)" placeholder="Onboarding support (2 h)" /></label>
+        <label><span class="label">Quantity</span><input class="input w-24" type="number" min="0" step="0.01" [value]="lineQuantity()" (input)="lineQuantity.set($any($event.target).value)" /></label>
+        <label><span class="label">Unit price</span><input class="input w-28" type="number" step="0.01" [value]="linePrice()" (input)="linePrice.set($any($event.target).value)" placeholder="3.02" /></label>
+        <button type="button" class="btn btn-primary btn-sm" (click)="addLine()" [disabled]="busy() === 'line'">Add</button>
+        <button type="button" class="btn btn-ghost btn-sm" (click)="addingLine.set(false)">Cancel</button>
+      </div>
+    }
+    @if (crediting()) {
+      <div class="bill-form">
+        <label><span class="label">Amount</span><input class="input w-28" type="number" min="0" step="0.01" [value]="creditAmount()" (input)="creditAmount.set($any($event.target).value)" /></label>
+        <label class="flex-1 min-w-56"><span class="label">Reason</span><input class="input" [value]="creditReason()" (input)="creditReason.set($any($event.target).value)" placeholder="duplicate conversion runs" /></label>
+        <button type="button" class="btn btn-primary btn-sm" (click)="creditNote()" [disabled]="busy() === 'credit'">Issue credit note</button>
+        <button type="button" class="btn btn-ghost btn-sm" (click)="crediting.set(false)">Cancel</button>
+      </div>
+    }
+    @if (paying()) {
+      <div class="bill-form flex-col items-stretch">
+        <div>
+          <h3 class="font-semibold text-sm">{{ isPlatformAdmin() ? 'Record a payment' : 'Tell us you paid' }}</h3>
+          <p class="text-xs text-[color:var(--text-muted)]">{{ isPlatformAdmin() ? 'It counts once verified.' : 'Attach the transfer slip; the platform verifies it and issues a receipt.' }}</p>
+        </div>
+        <div class="flex items-end gap-2 flex-wrap">
+          <label><span class="label">Amount</span><input class="input w-28" type="number" min="0" step="0.01" [value]="payAmount()" (input)="payAmount.set($any($event.target).value)" /></label>
+          <label><span class="label">Method</span>
+            <select class="input" [value]="payMethod()" (change)="payMethod.set($any($event.target).value)">
+              <option value="bank">bank transfer</option><option value="card">card</option><option value="cash">cash</option><option value="manual">other</option>
+            </select></label>
+          <label><span class="label">Reference</span><input class="input w-40 mono" [value]="payReference()" (input)="payReference.set($any($event.target).value)" placeholder="TRF-88213" /></label>
+          <label class="flex-1 min-w-48"><span class="label">Note</span><input class="input" [value]="payNote()" (input)="payNote.set($any($event.target).value)" /></label>
+          <label><span class="label">Slip</span><input class="input" type="file" accept=".pdf,.png,.jpg,.jpeg" (change)="slipPicked($event)" /></label>
+          <button type="button" class="btn btn-primary btn-sm" (click)="submitPayment()" [disabled]="busy() === 'pay'"><app-icon name="check" [busy]="busy() === 'pay'" />Submit</button>
+          <button type="button" class="btn btn-ghost btn-sm" (click)="paying.set(false)">Cancel</button>
+        </div>
+      </div>
+    }
+
+    <!-- Lines, as frozen on the bill. -->
+    <section class="lookup-entries">
+      <div class="lookup-entries-head">
+        <h3 class="section-title">Lines <span class="text-[color:var(--text-muted)] font-normal">({{ i.lines.length }})</span></h3>
+        @if (i.status === 'draft') { <span class="text-xs text-[color:var(--text-muted)]">a running draft — rebuilt from the meter until it is issued</span> }
+      </div>
+      @if (!i.lines.length) {
+        <div class="lookup-entries-empty"><app-icon name="file" size="1.5rem" class="icon-muted" /><p>Nothing metered in this period.</p></div>
+      } @else {
+        <div class="lookup-entries-scroll">
+          <table class="table-modern lookup-entry-table">
             <thead><tr><th>Description</th><th class="text-right">Qty</th><th class="text-right hidden md:table-cell">Rate</th><th class="text-right">Amount</th></tr></thead>
             <tbody>
               @for (l of i.lines; track l.invoiceLineId) {
@@ -96,76 +141,88 @@
                   <td class="text-right tabular" [class.text-crit-500]="l.amount < 0">{{ money(l.amount) }}</td>
                 </tr>
               }
-              @if (!i.lines.length) { <tr><td colspan="4" class="text-center text-[color:var(--text-muted)] py-6">Nothing metered in this period.</td></tr> }
-              <tr class="border-t-2 border-strong"><td colspan="3" class="text-right">Subtotal</td><td class="text-right tabular">{{ money(i.subtotal) }}</td></tr>
-              <tr><td colspan="3" class="text-right">{{ taxApplies() ? (i.account.taxLabel || 'Tax') + ' ' + i.taxRatePercent + ' %' : 'Tax' }}</td><td class="text-right tabular">{{ taxApplies() ? money(i.tax) : 'not applied' }}</td></tr>
-              <tr><td colspan="3" class="text-right font-semibold">Total</td><td class="text-right tabular font-semibold">{{ money(i.total) }}</td></tr>
-              @if (i.kind === 'invoice' && i.status !== 'draft') {
-                <tr><td colspan="3" class="text-right">Paid</td><td class="text-right tabular">{{ money(paid()) }}</td></tr>
-                <tr><td colspan="3" class="text-right font-semibold">Balance</td><td class="text-right tabular font-semibold" [class.text-crit-500]="i.status === 'overdue'">{{ money(i.balance) }}</td></tr>
+            </tbody>
+          </table>
+        </div>
+      }
+      <div class="bill-totals">
+        <div><span>Subtotal</span><span class="tabular">{{ money(i.subtotal) }}</span></div>
+        <div><span>{{ taxApplies() ? (i.account.taxLabel || 'Tax') + ' ' + i.taxRatePercent + ' %' : 'Tax' }}</span><span class="tabular">{{ taxApplies() ? money(i.tax) : 'not applied' }}</span></div>
+        <div class="is-total"><span>Total</span><span class="tabular">{{ money(i.total) }}</span></div>
+        @if (i.kind === 'invoice' && i.status !== 'draft') {
+          <div><span>Paid</span><span class="tabular">{{ money(paid()) }}</span></div>
+          <div class="is-total"><span>Balance</span><span class="tabular" [class.text-crit-500]="i.status === 'overdue'">{{ money(i.balance) }}</span></div>
+        }
+      </div>
+      @if (i.note) { <p class="text-xs text-[color:var(--text-muted)] px-5 pb-3">{{ i.note }}</p> }
+    </section>
+
+    <!-- Documents: the PDF, the slips, the receipts, the credit notes. -->
+    <section class="lookup-entries">
+      <div class="lookup-entries-head">
+        <h3 class="section-title">Documents <span class="text-[color:var(--text-muted)] font-normal">({{ i.documents.length }})</span></h3>
+      </div>
+      @if (!i.documents.length) {
+        <div class="lookup-entries-empty"><p>None yet — the PDF is made when the invoice is issued.</p></div>
+      } @else {
+        <div class="px-5 pb-3">
+          @for (d of i.documents; track d.documentId) {
+            <div class="doc-row">
+              <span class="doc-ic">{{ (d.contentType || '').includes('pdf') ? 'PDF' : (d.contentType || '').startsWith('image/') ? 'IMG' : 'FILE' }}</span>
+              <div class="min-w-0 flex-1">
+                <button type="button" class="link-inline text-sm block truncate text-left" (click)="openDocument(d.documentId)">{{ d.fileName }}</button>
+                <div class="text-[11px] text-[color:var(--text-muted)]">{{ kindLabel[d.kind] }}@if (d.number) { · {{ d.number }} } · {{ d.issuedAt | date: 'd MMM, HH:mm' }}@if (d.createdByName) { · {{ d.createdByName }} }@if (d.amount != null) { · {{ money(d.amount) }} }@if (d.sizeBytes) { · {{ humanSize(d.sizeBytes) }} }</div>
+              </div>
+              <a class="btn btn-ghost btn-sm" [routerLink]="['/administration/billing/documents']" [queryParams]="{ document: d.documentId }" title="Open in Billing documents"><app-icon name="eye" /></a>
+              <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="downloadDocument(d.documentId, d.fileName)" aria-label="Download"><app-icon name="download" /></button>
+            </div>
+          }
+        </div>
+      }
+    </section>
+
+    @if (i.kind === 'invoice') {
+      <section class="lookup-entries">
+        <div class="lookup-entries-head">
+          <h3 class="section-title">Payments <span class="text-[color:var(--text-muted)] font-normal">({{ i.payments.length }})</span></h3>
+          @if (!isPlatformAdmin()) { <span class="text-xs text-[color:var(--text-muted)]">a payment counts once the platform verifies the slip; a receipt is issued then</span> }
+        </div>
+        @if (!i.payments.length) {
+          <div class="lookup-entries-empty"><p>None yet.</p></div>
+        } @else {
+          <table class="table-modern lookup-entry-table">
+            <thead><tr><th>Date</th><th>Method</th><th class="hidden md:table-cell">Reference</th><th class="hidden md:table-cell">By</th><th class="text-right">Amount</th><th class="text-right">State</th></tr></thead>
+            <tbody>
+              @for (p of i.payments; track p.paymentId) {
+                <tr>
+                  <td class="tabular text-xs">{{ p.dateCreated | date: 'd MMM' }}</td>
+                  <td>{{ p.method === 'credit_note' ? 'credit note' : p.method }}</td>
+                  <td class="mono text-xs hidden md:table-cell">{{ p.reference || '—' }}</td>
+                  <td class="text-xs text-[color:var(--text-muted)] hidden md:table-cell">{{ p.submittedBy || 'system' }}</td>
+                  <td class="text-right tabular">{{ money(p.amount) }}</td>
+                  <td class="text-right whitespace-nowrap">
+                    @if (p.status === 'verified') { <span class="pill pill-ok">{{ p.method === 'credit_note' ? 'applied' : 'verified' }}</span> }
+                    @else if (p.status === 'rejected') { <span class="pill pill-crit" [title]="p.note || ''">rejected</span> }
+                    @else if (isPlatformAdmin()) {
+                      <button type="button" class="btn btn-primary btn-xs" (click)="verify(p, true)" [disabled]="busy() === 'verify' + p.paymentId">Verify</button>
+                      <button type="button" class="btn btn-ghost btn-xs" (click)="verify(p, false)" [disabled]="busy() === 'verify' + p.paymentId">Reject</button>
+                    } @else { <span class="pill pill-warn">pending verification</span> }
+                  </td>
+                </tr>
               }
             </tbody>
           </table>
-          @if (i.note) { <p class="text-xs text-[color:var(--text-muted)] mt-3">{{ i.note }}</p> }
-        </div>
-
-        <div class="flex flex-col gap-4">
-          <div class="card p-4">
-            <h2 class="font-semibold text-sm mb-2">Documents</h2>
-            @if (!i.documents.length) { <p class="text-xs text-[color:var(--text-muted)]">None yet — the PDF is made when the invoice is issued.</p> }
-            @for (d of i.documents; track d.documentId) {
-              <div class="doc-row">
-                <span class="doc-ic">{{ (d.contentType || '').includes('pdf') ? 'PDF' : (d.contentType || '').startsWith('image/') ? 'IMG' : 'FILE' }}</span>
-                <div class="min-w-0 flex-1">
-                  <button type="button" class="link-inline text-sm block truncate text-left" (click)="openDocument(d.documentId)">{{ d.fileName }}</button>
-                  <div class="text-[11px] text-[color:var(--text-muted)]">{{ kindLabel[d.kind] }}@if (d.number) { · {{ d.number }} } · {{ d.issuedAt | date: 'd MMM, HH:mm' }}@if (d.createdByName) { · {{ d.createdByName }} }@if (d.amount != null) { · {{ money(d.amount) }} }@if (d.sizeBytes) { · {{ humanSize(d.sizeBytes) }} }</div>
-                </div>
-                <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="downloadDocument(d.documentId, d.fileName)" aria-label="Download"><app-icon name="download" /></button>
-              </div>
-            }
-          </div>
-
-          @if (i.kind === 'invoice') {
-            <div class="card p-4">
-              <h2 class="font-semibold text-sm mb-2">Payments</h2>
-              @if (!i.payments.length) { <p class="text-xs text-[color:var(--text-muted)]">None yet.</p> } @else {
-                <table class="table-modern">
-                  <thead><tr><th>Date</th><th>Method</th><th class="hidden md:table-cell">Reference</th><th class="text-right">Amount</th><th></th></tr></thead>
-                  <tbody>
-                    @for (p of i.payments; track p.paymentId) {
-                      <tr>
-                        <td class="tabular text-xs">{{ p.dateCreated | date: 'd MMM' }}</td>
-                        <td>{{ p.method === 'credit_note' ? 'credit note' : p.method }}</td>
-                        <td class="mono text-xs hidden md:table-cell">{{ p.reference || '—' }}</td>
-                        <td class="text-right tabular">{{ money(p.amount) }}</td>
-                        <td>
-                          @if (p.status === 'verified') { <span class="pill pill-ok">{{ p.method === 'credit_note' ? 'applied' : 'verified' }}</span> }
-                          @else if (p.status === 'rejected') { <span class="pill pill-crit" [title]="p.note || ''">rejected</span> }
-                          @else if (isPlatformAdmin()) {
-                            <button type="button" class="btn btn-primary btn-xs" (click)="verify(p, true)" [disabled]="busy() === 'verify' + p.paymentId">Verify</button>
-                            <button type="button" class="btn btn-ghost btn-xs" (click)="verify(p, false)" [disabled]="busy() === 'verify' + p.paymentId">Reject</button>
-                          } @else { <span class="pill pill-warn">pending verification</span> }
-                        </td>
-                      </tr>
-                    }
-                    <tr class="border-t-2 border-strong"><td colspan="3" class="font-semibold">Balance</td><td class="text-right tabular font-semibold">{{ money(i.balance) }}</td><td></td></tr>
-                  </tbody>
-                </table>
-              }
-              @if (!isPlatformAdmin()) { <p class="text-[11px] text-[color:var(--text-muted)] mt-2">A payment counts once the platform verifies the slip; a receipt is issued then.</p> }
-            </div>
-          }
-
-          <div class="card p-4">
-            <h2 class="font-semibold text-sm mb-2">History</h2>
-            <ul class="text-xs space-y-1.5">
-              @for (h of history(); track $index) {
-                <li class="flex gap-2"><span class="tabular text-[color:var(--text-muted)] whitespace-nowrap">{{ h.at | date: 'd MMM HH:mm' }}</span><span [class.text-crit-500]="h.tone === 'crit'">{{ h.text }}</span></li>
-              }
-            </ul>
-          </div>
-        </div>
-      </div>
+        }
+      </section>
     }
+
+    <section class="lookup-entries pb-3">
+      <div class="lookup-entries-head"><h3 class="section-title">History</h3></div>
+      <ul class="text-xs space-y-1.5 px-5">
+        @for (h of history(); track $index) {
+          <li class="flex gap-2"><span class="tabular text-[color:var(--text-muted)] whitespace-nowrap">{{ h.at | date: 'd MMM HH:mm' }}</span><span [class.text-crit-500]="h.tone === 'crit'">{{ h.text }}</span></li>
+        }
+      </ul>
+    </section>
   }
-</div>
+}

@@ -5,100 +5,140 @@
       <p class="page-subtitle">The calculation behind every bill, kept as versions. A new version prices bills from its effective date on; a bill already drafted keeps the version it names.</p>
     </div>
     <div class="flex items-center gap-2 flex-wrap">
+      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()"><app-icon name="refresh" [class.spin]="loading()" />Refresh</button>
       <button type="button" class="btn btn-primary btn-sm" (click)="newVersion()" [disabled]="loading() || !cards().length" title="Draft a new version from the selected card">
         <app-icon name="plus" />New version
       </button>
-      <a routerLink="/administration/billing" class="btn btn-ghost btn-sm">Cost &amp; usage</a>
-      <a routerLink="/administration/billing/invoices" class="btn btn-ghost btn-sm">Invoices</a>
     </div>
   </div>
 
-  @if (error()) {
-    <div class="card p-8 text-center"><app-icon name="alert" size="1.6rem" class="icon-crit" /><p class="text-sm text-crit-500 mt-2">{{ error() }}</p>
-      <button type="button" class="btn btn-default btn-sm mt-3" (click)="load()"><app-icon name="refresh" />Try again</button></div>
-  } @else {
-    <div class="stat-grid mb-4">
-      <app-stat-tile label="Default card today" [value]="today().defaultCard ? today().defaultCard!.name + ' v' + today().defaultCard!.version : '—'" icon="layers" tone="info"
-                     [foot]="today().defaultCard ? 'since ' + (today().defaultCard!.effective_from | date: 'd MMM yyyy') : 'no card in effect'" />
-      <app-stat-tile label="Workspaces on their own card" [value]="today().own.length" icon="building" [tone]="today().own.length ? 'warn' : 'muted'"
-                     [foot]="today().own.length ? today().own.length + ' priced differently from the default' : 'every workspace is on the default'" />
-      <app-stat-tile label="Versions" [value]="cards().length" icon="history" tone="muted" [foot]="upcoming() ? upcoming() + ' not yet in effect' : 'none scheduled'" />
-    </div>
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+    <app-stat-tile label="Default card today" [value]="today().defaultCard ? 'v' + today().defaultCard!.version : '—'" icon="layers" tone="info"
+                   [foot]="today().defaultCard ? today().defaultCard!.name + ' · since ' + (today().defaultCard!.effective_from | date: 'd MMM yyyy') : 'no card in effect'" />
+    <app-stat-tile label="Workspace cards" [value]="today().own.length" icon="building" [tone]="today().own.length ? 'warn' : 'muted'"
+                   [foot]="today().own.length ? 'priced differently from the default' : 'every workspace is on the default'" />
+    <app-stat-tile label="Versions" [value]="cards().length" icon="history" tone="muted" [foot]="cards().length ? 'never edited, only added to' : 'seeded on the meter’s first start'" />
+    <app-stat-tile label="Scheduled" [value]="upcoming()" icon="calendar" [tone]="upcoming() ? 'info' : 'muted'" [foot]="upcoming() ? 'not yet in effect' : 'none dated ahead'" />
+  </div>
 
-    <div class="grid gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-      <app-table-shell heading="Versions" [shown]="visible().length" [total]="cards().length" [loading]="loading()" [isEmpty]="!visible().length"
-                       [emptyMessage]="cards().length ? 'No version matches.' : 'No rate card yet -- the meter seeds one on its first start.'" emptyIcon="layers">
-        <ng-container toolbar>
-          <button type="button" class="pill pill-neutral hover-brand" [class.is-on]="scope() === 'default'" (click)="setScope('default')">Default</button>
-          <button type="button" class="pill pill-neutral hover-brand" [class.is-on]="scope() === 'workspace'" (click)="setScope('workspace')">Workspace cards</button>
-          <div class="search-field max-w-56">
-            <app-icon name="search" size="0.95em" />
-            <input class="input" placeholder="Find a version…" aria-label="Find a version" [value]="search()" (input)="search.set($any($event.target).value)" />
-          </div>
-        </ng-container>
-        <table class="table-modern">
-          <thead><tr><th>Version</th><th>For</th><th>Effective</th><th class="hidden md:table-cell">Based on</th></tr></thead>
-          <tbody>
-            @for (c of visible(); track c.version) {
-              <tr class="cursor-pointer hover-brand" [class.is-open]="selectedVersion() === c.version" (click)="select(c)">
-                <td><div class="font-medium">{{ c.name }} <span class="mono text-xs text-[color:var(--text-muted)]">v{{ c.version }}</span></div>
-                  @if (c.note) { <div class="text-[11px] text-[color:var(--text-muted)] truncate max-w-64">{{ c.note }}</div> }</td>
-                <td>
-                  @if (c.tenant_id == null) { <span class="pill pill-neutral">default</span> } @else { <span class="pill pill-info">{{ forLabel(c) }}</span> }
-                  @if (isInEffect(c)) { <span class="pill pill-ok ml-1">in effect</span> }
-                </td>
-                <td class="tabular text-xs">{{ c.effective_from | date: 'd MMM yyyy' }}</td>
-                <td class="hidden md:table-cell text-xs text-[color:var(--text-muted)]">{{ c.based_on_version ? 'v' + c.based_on_version : '—' }}</td>
-              </tr>
-            }
-          </tbody>
-        </table>
-      </app-table-shell>
+  <div class="card lookup-split">
+    <aside class="lookup-rail">
+      <div class="lookup-rail-tools">
+        <div class="search-field">
+          <app-icon name="search" size="0.95em" />
+          <input class="input" placeholder="Find a version, workspace, note" aria-label="Find a version" [value]="search()" (input)="search.set($any($event.target).value)" />
+        </div>
+        <select class="input w-full" [value]="scope()" aria-label="Scope" (change)="scope.set($any($event.target).value)">
+          <option value="all">Default and workspace cards</option>
+          <option value="default">Default cards</option>
+          <option value="workspace">Workspace cards</option>
+        </select>
+        @if (search() || scope() !== 'all') {
+          <button type="button" class="btn btn-ghost btn-sm self-start" (click)="search.set(''); scope.set('all')"><app-icon name="close" />Clear filters</button>
+        }
+      </div>
 
+      @if (loading() && !cards().length) {
+        <div class="lookup-rail-empty"><app-icon name="refresh" class="spin icon-muted" /> Loading…</div>
+      } @else if (error()) {
+        <div class="lookup-rail-empty text-crit-500">{{ error() }}<button type="button" class="btn btn-default btn-sm mt-2" (click)="load()">Try again</button></div>
+      } @else if (!visible().length) {
+        <div class="lookup-rail-empty">
+          <app-icon name="layers" size="1.4rem" class="icon-muted" />
+          {{ cards().length ? 'No version matches.' : 'No rate card yet — the meter seeds one on its first start.' }}
+        </div>
+      } @else {
+        <ul class="lookup-rail-list" role="listbox" aria-label="Rate card versions">
+          @for (c of visible(); track c.version) {
+            <li>
+              <button type="button" class="lookup-rail-item" role="option" [attr.aria-selected]="selectedVersion() === c.version" [class.is-selected]="selectedVersion() === c.version" (click)="select(c)">
+                <span class="lookup-rail-glyph" [class.is-list]="c.tenant_id == null" [class.is-managed]="c.tenant_id != null"><app-icon [name]="c.tenant_id == null ? 'globe' : 'building'" size="0.9em" /></span>
+                <span class="min-w-0 flex-1">
+                  <span class="lookup-rail-key">{{ c.name }} <span class="mono font-normal text-[color:var(--text-muted)]">v{{ c.version }}</span></span>
+                  <span class="lookup-rail-sub">
+                    @if (isInEffect(c)) { <em>in effect</em> · } @else if (c.effective_from > todayIso) { scheduled · }
+                    from {{ c.effective_from | date: 'd MMM yyyy' }} · {{ forLabel(c) }}
+                  </span>
+                </span>
+                <app-icon name="chevronRight" size="0.9em" class="lookup-rail-chev" />
+              </button>
+            </li>
+          }
+        </ul>
+      }
+    </aside>
+
+    <section class="lookup-detail" aria-live="polite">
       @if (selected(); as c) {
-        <div class="card p-4">
-          <div class="flex items-start justify-between gap-3 flex-wrap mb-3">
-            <div>
-              <h2 class="text-base font-semibold">{{ c.name }} <span class="mono text-sm text-[color:var(--text-muted)]">v{{ c.version }}</span></h2>
-              <p class="text-xs text-[color:var(--text-muted)]">
-                For <b>{{ forLabel(c) }}</b> · effective {{ c.effective_from | date: 'd MMM yyyy' }} · {{ c.currency }}
+        <header class="lookup-detail-head">
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2 flex-wrap">
+              @if (c.tenant_id == null) { <span class="pill pill-neutral"><app-icon name="globe" size="0.8em" class="opacity-70" />every workspace</span> }
+              @else { <span class="pill pill-info"><app-icon name="building" size="0.8em" class="opacity-70" />{{ forLabel(c) }}</span> }
+              @if (isInEffect(c)) { <span class="pill pill-ok">in effect</span> } @else if (c.effective_from > todayIso) { <span class="pill pill-brand">scheduled</span> } @else { <span class="pill pill-neutral">superseded</span> }
+              <span class="pill pill-neutral">{{ c.currency }}</span>
+            </div>
+            <div class="flex items-baseline gap-2 mt-1 min-w-0 flex-wrap">
+              <h2 class="lookup-detail-key" [title]="c.name">{{ c.name }} <span class="mono text-sm font-normal text-[color:var(--text-muted)]">v{{ c.version }}</span></h2>
+              <span class="text-xs text-[color:var(--text-muted)]">
+                effective {{ c.effective_from | date: 'd MMM yyyy' }}
                 @if (c.based_on_version) { · drafted from v{{ c.based_on_version }} }
                 @if (c.created_at) { · saved {{ c.created_at | date: 'd MMM yyyy, HH:mm' }} }
-              </p>
-              @if (c.note) { <p class="text-sm mt-1">{{ c.note }}</p> }
-              @if (changedAgainstBase(c).length) {
-                <p class="text-xs mt-1 text-[color:var(--text-secondary)]">Changed from v{{ c.based_on_version }}: {{ changedAgainstBase(c).join(', ') }}</p>
-              }
+              </span>
             </div>
-            <div class="flex items-center gap-2">
-              @if (c.tenant_id == null) {
-                <button type="button" class="btn btn-default btn-sm" (click)="newVersion(c, workspaces.tenantId() ? +workspaces.tenantId()! : null)" title="A card for one workspace, starting from this one"><app-icon name="building" />For a workspace</button>
-              }
-              <button type="button" class="btn btn-default btn-sm" (click)="newVersion(c)"><app-icon name="plus" />New version from this</button>
-            </div>
+            @if (c.note) { <p class="text-sm mt-1 text-[color:var(--text-secondary)]">{{ c.note }}</p> }
+            @if (changedAgainstBase(c).length) {
+              <p class="text-xs mt-1 text-[color:var(--text-secondary)]">Changed from v{{ c.based_on_version }}: {{ changedAgainstBase(c).join(', ') }}</p>
+            }
           </div>
-          <table class="table-modern">
-            <thead><tr><th>Meter</th><th class="text-right">Price</th><th class="text-right hidden md:table-cell">Included / month</th><th class="hidden lg:table-cell">Tiers</th></tr></thead>
-            <tbody>
-              @for (g of groups(c); track g.service) {
-                <tr class="bg-sunken"><td colspan="4" class="text-xs font-semibold uppercase tracking-wide text-[color:var(--text-muted)] !py-1.5">{{ g.service }}</td></tr>
-                @for (i of g.items; track i.meter) {
-                  <tr>
-                    <td><div>{{ i.label ?? i.meter }}</div><div class="text-[11px] mono text-[color:var(--text-muted)]">{{ i.meter }}</div></td>
-                    <td class="text-right tabular text-sm whitespace-nowrap">{{ i.tiers?.length ? 'tiered' : price(i, c.currency) }}</td>
-                    <td class="text-right tabular text-sm hidden md:table-cell">{{ i.included_quantity ? units(i, i.included_quantity) : '—' }}</td>
-                    <td class="hidden lg:table-cell text-xs">
-                      @for (t of tierText(i, c.currency); track t) { <div>{{ t }}</div> } @empty { <span class="text-[color:var(--text-muted)]">flat</span> }
-                    </td>
-                  </tr>
+          <div class="flex items-center gap-1.5 shrink-0">
+            <button type="button" class="btn btn-primary btn-sm" (click)="newVersion(c)"><app-icon name="plus" />New version from this</button>
+            <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="cardMenu" aria-label="More actions"><app-icon name="dots" size="1.05em" /></button>
+            <ng-template #cardMenu>
+              <div cdkMenu class="card shadow-xl py-1 min-w-56 text-sm">
+                @if (c.tenant_id == null) {
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="newVersion(c, workspaces.tenantId() ? +workspaces.tenantId()! : null)"><app-icon name="building" />A card for one workspace</button>
                 }
-              }
-            </tbody>
-          </table>
-        </div>
+                @if (c.based_on_version) {
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="selectVersion(c.based_on_version!)"><app-icon name="history" />Show v{{ c.based_on_version }} it was drafted from</button>
+                }
+              </div>
+            </ng-template>
+          </div>
+        </header>
+
+        <section class="lookup-entries">
+          <div class="lookup-entries-head">
+            <h3 class="section-title">Meters <span class="text-[color:var(--text-muted)] font-normal">({{ c.items.length }})</span></h3>
+            <span class="text-xs text-[color:var(--text-muted)]">a period is priced after the allowance; tiers price each band at its own rate</span>
+          </div>
+          <div class="lookup-entries-scroll">
+            <table class="table-modern lookup-entry-table">
+              <thead><tr><th>Meter</th><th class="text-right">Price</th><th class="text-right hidden md:table-cell">Included / month</th><th class="hidden lg:table-cell">Tiers</th></tr></thead>
+              <tbody>
+                @for (g of groups(c); track g.service) {
+                  <tr class="bg-sunken"><td colspan="4" class="text-xs font-semibold uppercase tracking-wide text-[color:var(--text-muted)] !py-1.5">{{ g.service }}</td></tr>
+                  @for (i of g.items; track i.meter) {
+                    <tr [class.is-changed]="changedAgainstBase(c).includes(i.label ?? i.meter)">
+                      <td><div>{{ i.label ?? i.meter }}</div><div class="text-[11px] mono text-[color:var(--text-muted)]">{{ i.meter }}</div></td>
+                      <td class="text-right tabular text-sm whitespace-nowrap">{{ i.tiers?.length ? 'tiered' : price(i, c.currency) }}</td>
+                      <td class="text-right tabular text-sm hidden md:table-cell">{{ i.included_quantity ? units(i, i.included_quantity) : '—' }}</td>
+                      <td class="hidden lg:table-cell text-xs">
+                        @for (t of tierText(i, c.currency); track t) { <div>{{ t }}</div> } @empty { <span class="text-[color:var(--text-muted)]">flat</span> }
+                      </td>
+                    </tr>
+                  }
+                }
+              </tbody>
+            </table>
+          </div>
+        </section>
       } @else if (!loading()) {
-        <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]">Pick a version to see its calculation.</div>
+        <div class="lookup-entries-empty lookup-detail-empty">
+          <app-icon name="layers" size="1.5rem" class="icon-muted" />
+          <p>Pick a version to see its calculation.</p>
+        </div>
       }
-    </div>
-  }
+    </section>
+  </div>
 </div>

@@ -65,6 +65,8 @@ export class Billing implements OnInit {
   readonly days = signal<DayRow[]>([]);
   readonly currency = signal('USD');
   readonly rateCard = signal<PricedWith | null>(null);
+  /** The month before, priced as a whole -- the comparison the forecast is read against. */
+  readonly previousTotal = signal<number | null>(null);
 
   // ---- the tiles ----
   readonly total = computed(() => this.lines().reduce((n, l) => n + l.amount, 0));
@@ -143,8 +145,10 @@ export class Billing implements OnInit {
     this.load();
   }
 
-  private params(extra: Record<string, string> = {}): Record<string, string> {
-    const from = this.month();
+  readonly previousLabel = computed(() => { const d = new Date(this.month() + 'T00:00:00'); d.setMonth(d.getMonth() - 1); return d.toLocaleDateString(undefined, { month: 'short' }); });
+
+  private params(extra: Record<string, string> = {}, month = this.month()): Record<string, string> {
+    const from = month;
     const first = new Date(from + 'T00:00:00');
     const to = `${from.slice(0, 7)}-${String(Billing.daysInMonth(first)).padStart(2, '0')}`;
     const p: Record<string, string> = { from, to, ...extra };
@@ -153,7 +157,12 @@ export class Billing implements OnInit {
   }
 
   load(): void {
-    this.loading.set(true); this.error.set(''); this.openLine.set(null);
+    this.loading.set(true); this.error.set(''); this.openLine.set(null); this.previousTotal.set(null);
+    const before = new Date(this.month() + 'T00:00:00'); before.setMonth(before.getMonth() - 1);
+    this.http.get<ApiResponse<{ rows: { amount: number }[] }>>(`${API_BASE}/billing.json/usage`, { params: this.params({ groupBy: 'meter' }, Billing.firstOfMonth(before)) }).subscribe({
+      next: r => { if (r.status === API_SUCCESS) this.previousTotal.set((r.data?.rows ?? []).reduce((n, l) => n + Number(l.amount), 0)); },
+      error: () => {},
+    });
     this.http.get<ApiResponse<{ rows: MeterLine[]; rateCard?: PricedWith }>>(`${API_BASE}/billing.json/usage`, { params: this.params({ groupBy: 'meter' }) }).subscribe({
       next: r => {
         if (r.status !== API_SUCCESS) { this.loading.set(false); this.failed(r.message); return; }
@@ -179,6 +188,16 @@ export class Billing implements OnInit {
   private failed(message?: string): void {
     if ((message || '').includes('not configured')) { this.notConfigured.set(true); return; }
     this.error.set(message || 'The metering service did not answer.');
+  }
+
+  /** The lines as a CSV -- the same figures, for a spreadsheet or the finance system. */
+  exportCsv(): void {
+    const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const rows = [['meter', 'label', 'service', 'quantity', 'unit', 'included_quantity', 'billable_quantity', 'unit_price', 'per', 'amount', 'currency', 'rate_card']];
+    for (const l of this.lines()) rows.push([l.meter, l.label, l.service, String(l.quantity), l.unit, String(l.includedQuantity), String(l.billableQuantity), String(l.unitPrice), String(l.per), l.amount.toFixed(5), this.currency(), this.rateCard() ? `${this.rateCard()!.name} v${this.rateCard()!.version}` : '']);
+    rows.push(['', 'Month to date', '', '', '', '', '', '', '', this.total().toFixed(5), this.currency(), '']);
+    const blob = new Blob([rows.map(r => r.map(esc).join(',')).join('\n')], { type: 'text/csv' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `cost-usage-${this.month().slice(0, 7)}.csv`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href);
   }
 
   /** Rolls the last two days again and reloads: the events of the last minutes, priced now. */

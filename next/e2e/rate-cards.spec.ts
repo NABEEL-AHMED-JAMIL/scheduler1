@@ -74,7 +74,7 @@ test.describe('rate cards', () => {
     expect(saved.items.length).toBeGreaterThan(10);                     // everything else carried over
     await expect(page.getByRole('heading', { name: `${name} v${saved.version}` })).toBeVisible();
     await expect(page.getByText(/Changed from v\d+: Images described/)).toBeVisible();
-    await expect(page.getByText(/\d+ not yet in effect/)).toBeVisible();   // dated the 1st of next month
+    await expect(page.getByText('not yet in effect')).toBeVisible();   // dated the 1st of next month: the Scheduled tile counts it
 
     // A bill already issued keeps its version; the card in effect this month is unchanged (the new one starts next month).
     const invoices = await (await request.get(`${api}/billing.json/invoices`, { headers: auth })).json();
