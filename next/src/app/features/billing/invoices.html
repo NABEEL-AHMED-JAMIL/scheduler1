@@ -1,0 +1,76 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Invoices</h1>
+      <p class="page-subtitle">Every month closed into a bill — its status, its balance, its documents.</p>
+    </div>
+    <div class="flex items-center gap-2 flex-wrap">
+      @if (isPlatformAdmin()) {
+        <app-combobox class="w-56" [selected]="workspaces.tenantId()" (selectedChange)="pickWorkspace($event)" placeholder="Workspace" [allowClear]="false" [options]="workspaces.options()" />
+        <label class="flex items-center gap-1.5 text-xs text-[color:var(--text-muted)]">Close
+          <input class="input w-32 py-1 text-xs mono" type="month" [value]="closePeriod()" (input)="closePeriod.set($any($event.target).value)" aria-label="Month to close" />
+        </label>
+        <button type="button" class="btn btn-default btn-sm" (click)="draft()" [disabled]="closing()" title="A draft from the meter for the month, for this workspace">
+          <app-icon name="refresh" [class.spin]="closing()" />{{ closing() ? 'Drafting…' : 'Draft month' }}
+        </button>
+      }
+      <button type="button" class="btn btn-default btn-sm" (click)="editAccount()"><app-icon name="edit" />Billing profile</button>
+      <button type="button" class="btn btn-default btn-sm" (click)="statement()" title="This year's invoices and payments as one PDF"><app-icon name="file" />Statement</button>
+      <a routerLink="/administration/billing" class="btn btn-ghost btn-sm">Cost &amp; usage</a>
+      <a routerLink="/administration/billing/documents" class="btn btn-ghost btn-sm">Documents</a>
+    </div>
+  </div>
+
+  @if (error()) {
+    <div class="card p-8 text-center"><app-icon name="alert" size="1.6rem" class="icon-crit" /><p class="text-sm text-crit-500 mt-2">{{ error() }}</p>
+      <button type="button" class="btn btn-default btn-sm mt-3" (click)="load()"><app-icon name="refresh" />Try again</button></div>
+  } @else {
+    <app-table-shell heading="Invoices" [shown]="visible().length" [total]="rows().length" [loading]="loading()"
+                     [isEmpty]="!visible().length" [emptyMessage]="rows().length ? 'No invoice matches.' : (isPlatformAdmin() ? 'No invoice yet. Draft a month to build one from the meter.' : 'No invoice yet — the first one arrives when a month is closed.')" emptyIcon="file">
+      <ng-container toolbar>
+        @for (s of ['overdue', 'issued', 'partially_paid', 'draft', 'paid']; track s) {
+          @if (counts()[s]) {
+            <button type="button" class="pill hover-brand" [class]="'pill hover-brand ' + statusTone[s]" [class.is-on]="status() === s" (click)="setStatus(s)">
+              {{ counts()[s].n }} {{ statusLabel[s] }}@if (s !== 'paid' && s !== 'draft') { · {{ money(counts()[s].amount) }} }
+            </button>
+          }
+        }
+        <div class="search-field max-w-64">
+          <app-icon name="search" size="0.95em" />
+          <input class="input" placeholder="Find an invoice, workspace…" aria-label="Find an invoice" [value]="search()" (input)="search.set($any($event.target).value)" />
+        </div>
+      </ng-container>
+      <table class="table-modern">
+        <thead>
+          <tr>
+            <th>Number</th>
+            @if (isPlatformAdmin()) { <th>Workspace</th> }
+            <th>Period</th>
+            <th class="hidden md:table-cell">Issued</th>
+            <th class="hidden md:table-cell">Due</th>
+            <th class="text-right">Total</th>
+            <th class="text-right">Balance</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (r of visible(); track r.invoiceId) {
+            <tr class="cursor-pointer hover-brand" (click)="open(r)">
+              <td class="mono"><a [routerLink]="['/administration/billing/invoices', r.number]" class="link-inline" (click)="$event.stopPropagation()">{{ r.number }}</a>
+                @if (r.kind === 'credit_note') { <span class="pill pill-neutral ml-1">credit note</span> }</td>
+              @if (isPlatformAdmin()) { <td>{{ r.tenantName }}</td> }
+              <td>{{ period(r) }}</td>
+              <td class="hidden md:table-cell tabular text-xs">{{ r.issuedAt ? (r.issuedAt | date: 'd MMM yyyy') : '—' }}</td>
+              <td class="hidden md:table-cell tabular text-xs">{{ r.dueAt ? (r.dueAt | date: 'd MMM yyyy') : '—' }}</td>
+              <td class="text-right tabular" [class.text-crit-500]="r.total < 0">{{ money(r.total, r.currency) }}</td>
+              <td class="text-right tabular">{{ r.kind === 'credit_note' || r.status === 'draft' ? '—' : money(r.balance, r.currency) }}</td>
+              <td>
+                <span class="pill" [class]="'pill ' + statusTone[r.status]">{{ statusLabel[r.status] }}@if (r.status === 'overdue') { {{ overdueDays(r) }} d }@if (r.status === 'draft') { · running }</span>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </app-table-shell>
+  }
+</div>

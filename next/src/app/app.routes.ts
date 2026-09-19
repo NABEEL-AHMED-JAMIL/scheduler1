@@ -264,6 +264,30 @@ export const routes: Routes = [
         canActivate: [pageGuard, roleGuard],
       },
       {
+        path: 'administration/billing/invoices',
+        loadComponent: () => import('./features/billing/invoices').then(m => m.Invoices),
+        data: { pageKey: 'billing', minRole: 'TENANT_ADMIN' },
+        canActivate: [pageGuard, roleGuard],
+      },
+      {
+        path: 'administration/billing/invoices/:number',
+        loadComponent: () => import('./features/billing/invoice-detail').then(m => m.InvoiceDetailPage),
+        data: { pageKey: 'billing', minRole: 'TENANT_ADMIN' },
+        canActivate: [pageGuard, roleGuard],
+      },
+      {
+        path: 'administration/billing/documents',
+        loadComponent: () => import('./features/billing/documents').then(m => m.BillingDocuments),
+        data: { pageKey: 'billing', minRole: 'TENANT_ADMIN' },
+        canActivate: [pageGuard, roleGuard],
+      },
+      {
+        path: 'administration/billing/analytics',
+        loadComponent: () => import('./features/billing/billing-analytics').then(m => m.BillingAnalyticsPage),
+        data: { minRole: 'PLATFORM_ADMIN' },
+        canActivate: [roleGuard],
+      },
+      {
         path: 'administration/tenant-requests',
         loadComponent: () =>
           import('./features/tenant-request/tenant-requests').then(m => m.TenantRequests),

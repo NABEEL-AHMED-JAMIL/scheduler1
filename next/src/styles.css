@@ -1762,3 +1762,9 @@ html.dark .btn-circle-danger:hover:not(:disabled) { background: color-mix(in okl
 .preview-grid th, .preview-grid td { white-space: nowrap; max-width: 28rem; overflow: hidden; text-overflow: ellipsis; font-size: 12px; padding: 0.35rem 0.6rem; }
 .preview-grid td { font-family: var(--font-mono, ui-monospace, monospace); }
 .preview-grid thead th { position: sticky; top: 0; background: var(--surface-raised); z-index: 1; }
+
+/* Billing: an invoice drawn as the document it will be, and a document row in a card. */
+.invoice-paper { font-size: 13px; }
+.doc-row { display: flex; align-items: center; gap: .6rem; padding: .45rem 0; border-bottom: 1px solid var(--border-subtle); }
+.doc-row:last-child { border-bottom: 0; }
+.doc-ic { width: 26px; height: 32px; border: 1px solid var(--border-strong); border-radius: 3px; display: grid; place-items: center; font-family: var(--font-mono, ui-monospace, monospace); font-size: 9px; color: var(--text-muted); flex-shrink: 0; }

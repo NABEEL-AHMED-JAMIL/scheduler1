@@ -159,6 +159,12 @@ export class Shell {
       children: [
         { label: 'Cost & usage', path: '/administration/billing', pageKey: 'billing', icon: 'chart', adminOnly: true,
           hint: 'What the workspace used this month and what it costs, line by line' },
+        { label: 'Invoices', path: '/administration/billing/invoices', pageKey: 'billing', icon: 'file', adminOnly: true,
+          hint: 'Every month closed into a bill: status, balance, payment slips, receipts' },
+        { label: 'Billing documents', path: '/administration/billing/documents', pageKey: 'billing', icon: 'folder', adminOnly: true,
+          hint: 'Invoices, receipts, credit notes, statements and slips in one list' },
+        { label: 'Billing analytics', path: '/administration/billing/analytics', icon: 'chart', platformOnly: true,
+          hint: 'Invoiced, collected, overdue and churn across every workspace' },
         { label: 'Users', path: '/administration/users', icon: 'users', adminOnly: true,
           hint: 'Who can sign in, and as what' },
         { label: 'Access profiles', path: '/administration/access-profiles', icon: 'shield', adminOnly: true,

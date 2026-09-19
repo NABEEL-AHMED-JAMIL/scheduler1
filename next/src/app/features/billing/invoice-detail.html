@@ -1,0 +1,169 @@
+<div class="page">
+  @if (loading()) {
+    <div class="card p-12 text-center text-sm text-[color:var(--text-muted)]"><div class="spinner mx-auto mb-3"></div>Loading…</div>
+  } @else if (error() || !invoice()) {
+    <div class="card p-8 text-center"><app-icon name="alert" size="1.6rem" class="icon-crit" /><p class="text-sm text-crit-500 mt-2">{{ error() }}</p>
+      <a routerLink="/administration/billing/invoices" class="btn btn-default btn-sm mt-3">Back to invoices</a></div>
+  } @else {
+    @if (invoice(); as i) {
+      <div class="page-head">
+        <div>
+          <p class="text-xs text-[color:var(--text-muted)] mb-1"><a routerLink="/administration/billing/invoices" class="link-inline">Invoices</a> / {{ i.number }}</p>
+          <h1 class="page-title mono">{{ i.number }}</h1>
+          <p class="page-subtitle">
+            {{ i.kind === 'credit_note' ? 'Credit note' : 'Invoice' }}@if (i.referencesNumber) { against <a class="link-inline mono" [routerLink]="['/administration/billing/invoices', i.referencesNumber]">{{ i.referencesNumber }}</a> }
+            · {{ i.tenantName }} · {{ i.periodStart | date: 'MMMM yyyy' }}
+            @if (i.issuedAt) { · issued {{ i.issuedAt | date: 'd MMM yyyy' }} }@if (i.dueAt && i.kind === 'invoice') { · due {{ i.dueAt | date: 'd MMM yyyy' }} }
+          </p>
+        </div>
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="pill" [class]="'pill ' + statusTone[i.status]">{{ statusLabel[i.status] }}@if (isOpen()) { · {{ money(i.balance) }} open }</span>
+          @if (i.status !== 'draft') { <button type="button" class="btn btn-default btn-sm" (click)="pdf()"><app-icon name="file" />PDF</button> }
+          @if (isPlatformAdmin() && i.status === 'draft') {
+            <button type="button" class="btn btn-ghost btn-sm" (click)="redraft()" [disabled]="busy() === 'draft'"><app-icon name="refresh" [class.spin]="busy() === 'draft'" />Rebuild from the meter</button>
+            <button type="button" class="btn btn-ghost btn-sm" (click)="addingLine.set(!addingLine())"><app-icon name="plus" />Add a line</button>
+            <button type="button" class="btn btn-primary btn-sm" (click)="issue()" [disabled]="busy() === 'issue'"><app-icon name="check" [busy]="busy() === 'issue'" />Issue</button>
+          }
+          @if (isPlatformAdmin() && isOpen()) {
+            <button type="button" class="btn btn-ghost btn-sm" (click)="crediting.set(!crediting())">Credit note</button>
+          }
+          @if (canVoid()) { <button type="button" class="btn btn-ghost btn-sm" (click)="voidInvoice()" [disabled]="busy() === 'void'">Void</button> }
+          @if (isOpen()) {
+            <button type="button" class="btn btn-primary btn-sm" (click)="paying.set(!paying())"><app-icon name="upload" />{{ isPlatformAdmin() ? 'Record payment' : 'Upload payment slip' }}</button>
+          }
+        </div>
+      </div>
+
+      @if (addingLine()) {
+        <div class="card p-4 mb-4 flex items-end gap-2 flex-wrap">
+          <label class="flex-1 min-w-56"><span class="label">Description</span><input class="input" [value]="lineDescription()" (input)="lineDescription.set($any($event.target).value)" placeholder="Onboarding support (2 h)" /></label>
+          <label><span class="label">Quantity</span><input class="input w-24" type="number" min="0" step="0.01" [value]="lineQuantity()" (input)="lineQuantity.set($any($event.target).value)" /></label>
+          <label><span class="label">Unit price</span><input class="input w-28" type="number" step="0.01" [value]="linePrice()" (input)="linePrice.set($any($event.target).value)" placeholder="3.02" /></label>
+          <button type="button" class="btn btn-primary btn-sm" (click)="addLine()" [disabled]="busy() === 'line'">Add</button>
+          <button type="button" class="btn btn-ghost btn-sm" (click)="addingLine.set(false)">Cancel</button>
+        </div>
+      }
+      @if (crediting()) {
+        <div class="card p-4 mb-4 flex items-end gap-2 flex-wrap">
+          <label><span class="label">Amount</span><input class="input w-28" type="number" min="0" step="0.01" [value]="creditAmount()" (input)="creditAmount.set($any($event.target).value)" /></label>
+          <label class="flex-1 min-w-56"><span class="label">Reason</span><input class="input" [value]="creditReason()" (input)="creditReason.set($any($event.target).value)" placeholder="duplicate conversion runs" /></label>
+          <button type="button" class="btn btn-primary btn-sm" (click)="creditNote()" [disabled]="busy() === 'credit'">Issue credit note</button>
+          <button type="button" class="btn btn-ghost btn-sm" (click)="crediting.set(false)">Cancel</button>
+        </div>
+      }
+      @if (paying()) {
+        <div class="card p-4 mb-4">
+          <h2 class="font-semibold text-sm">{{ isPlatformAdmin() ? 'Record a payment' : 'Tell us you paid' }}</h2>
+          <p class="text-xs text-[color:var(--text-muted)] mb-3">{{ isPlatformAdmin() ? 'It counts once verified.' : 'Attach the transfer slip; the platform verifies it and issues a receipt.' }}</p>
+          <div class="flex items-end gap-2 flex-wrap">
+            <label><span class="label">Amount</span><input class="input w-28" type="number" min="0" step="0.01" [value]="payAmount()" (input)="payAmount.set($any($event.target).value)" /></label>
+            <label><span class="label">Method</span>
+              <select class="input" [value]="payMethod()" (change)="payMethod.set($any($event.target).value)">
+                <option value="bank">bank transfer</option><option value="card">card</option><option value="cash">cash</option><option value="manual">other</option>
+              </select></label>
+            <label><span class="label">Reference</span><input class="input w-40 mono" [value]="payReference()" (input)="payReference.set($any($event.target).value)" placeholder="TRF-88213" /></label>
+            <label class="flex-1 min-w-48"><span class="label">Note</span><input class="input" [value]="payNote()" (input)="payNote.set($any($event.target).value)" /></label>
+            <label><span class="label">Slip</span><input class="input" type="file" accept=".pdf,.png,.jpg,.jpeg" (change)="slipPicked($event)" /></label>
+            <button type="button" class="btn btn-primary btn-sm" (click)="submitPayment()" [disabled]="busy() === 'pay'"><app-icon name="check" [busy]="busy() === 'pay'" />Submit</button>
+            <button type="button" class="btn btn-ghost btn-sm" (click)="paying.set(false)">Cancel</button>
+          </div>
+        </div>
+      }
+
+      <div class="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+        <div class="card p-5 invoice-paper">
+          <div class="flex justify-between gap-4 border-b-2 border-strong pb-3 mb-3">
+            <div><div class="text-lg font-semibold">{{ i.kind === 'credit_note' ? 'Credit note' : 'Invoice' }}</div><div class="mono text-sm">{{ i.number }}</div></div>
+            <div class="text-right text-xs"><b>ETL Console</b><br />Platform billing</div>
+          </div>
+          <div class="flex justify-between gap-4 text-xs mb-4">
+            <div><b>Billed to</b><br />{{ i.account.legalName }}@if (i.account.address) {<br />{{ i.account.address }}}@if (i.account.taxId) {<br />Tax ID {{ i.account.taxId }}}</div>
+            <div class="text-right"><b>Period</b> {{ i.periodStart | date: 'd MMM' }} – {{ i.periodEnd | date: 'd MMM yyyy' }}
+              @if (i.issuedAt) {<br /><b>Issued</b> {{ i.issuedAt | date: 'd MMM yyyy' }}}@if (i.dueAt && i.kind === 'invoice') {<br /><b>Due</b> {{ i.dueAt | date: 'd MMM yyyy' }} (net {{ i.account.paymentTermsDays }})}
+              @if (i.rateCardVersion) {<br /><b>Rate card</b> v{{ i.rateCardVersion }}}</div>
+          </div>
+          <table class="table-modern">
+            <thead><tr><th>Description</th><th class="text-right">Qty</th><th class="text-right hidden md:table-cell">Rate</th><th class="text-right">Amount</th></tr></thead>
+            <tbody>
+              @for (l of i.lines; track l.invoiceLineId) {
+                <tr>
+                  <td>{{ l.description }}@if (l.periodLabel) { <span class="pill pill-neutral ml-1">{{ l.periodLabel }}</span> }@if (l.manual) { <span class="pill pill-neutral ml-1">manual</span> }
+                    @if (l.meter) { <div class="text-[11px] mono text-[color:var(--text-muted)]">{{ l.meter }}</div> }</td>
+                  <td class="text-right tabular">{{ quantity(l) }}</td>
+                  <td class="text-right tabular text-xs text-[color:var(--text-muted)] hidden md:table-cell">{{ rate(l) }}</td>
+                  <td class="text-right tabular" [class.text-crit-500]="l.amount < 0">{{ money(l.amount) }}</td>
+                </tr>
+              }
+              @if (!i.lines.length) { <tr><td colspan="4" class="text-center text-[color:var(--text-muted)] py-6">Nothing metered in this period.</td></tr> }
+              <tr class="border-t-2 border-strong"><td colspan="3" class="text-right">Subtotal</td><td class="text-right tabular">{{ money(i.subtotal) }}</td></tr>
+              <tr><td colspan="3" class="text-right">{{ taxApplies() ? (i.account.taxLabel || 'Tax') + ' ' + i.taxRatePercent + ' %' : 'Tax' }}</td><td class="text-right tabular">{{ taxApplies() ? money(i.tax) : 'not applied' }}</td></tr>
+              <tr><td colspan="3" class="text-right font-semibold">Total</td><td class="text-right tabular font-semibold">{{ money(i.total) }}</td></tr>
+              @if (i.kind === 'invoice' && i.status !== 'draft') {
+                <tr><td colspan="3" class="text-right">Paid</td><td class="text-right tabular">{{ money(paid()) }}</td></tr>
+                <tr><td colspan="3" class="text-right font-semibold">Balance</td><td class="text-right tabular font-semibold" [class.text-crit-500]="i.status === 'overdue'">{{ money(i.balance) }}</td></tr>
+              }
+            </tbody>
+          </table>
+          @if (i.note) { <p class="text-xs text-[color:var(--text-muted)] mt-3">{{ i.note }}</p> }
+        </div>
+
+        <div class="flex flex-col gap-4">
+          <div class="card p-4">
+            <h2 class="font-semibold text-sm mb-2">Documents</h2>
+            @if (!i.documents.length) { <p class="text-xs text-[color:var(--text-muted)]">None yet — the PDF is made when the invoice is issued.</p> }
+            @for (d of i.documents; track d.documentId) {
+              <div class="doc-row">
+                <span class="doc-ic">{{ (d.contentType || '').includes('pdf') ? 'PDF' : (d.contentType || '').startsWith('image/') ? 'IMG' : 'FILE' }}</span>
+                <div class="min-w-0 flex-1">
+                  <button type="button" class="link-inline text-sm block truncate text-left" (click)="openDocument(d.documentId)">{{ d.fileName }}</button>
+                  <div class="text-[11px] text-[color:var(--text-muted)]">{{ kindLabel[d.kind] }}@if (d.number) { · {{ d.number }} } · {{ d.issuedAt | date: 'd MMM, HH:mm' }}@if (d.createdByName) { · {{ d.createdByName }} }@if (d.amount != null) { · {{ money(d.amount) }} }@if (d.sizeBytes) { · {{ humanSize(d.sizeBytes) }} }</div>
+                </div>
+                <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="downloadDocument(d.documentId, d.fileName)" aria-label="Download"><app-icon name="download" /></button>
+              </div>
+            }
+          </div>
+
+          @if (i.kind === 'invoice') {
+            <div class="card p-4">
+              <h2 class="font-semibold text-sm mb-2">Payments</h2>
+              @if (!i.payments.length) { <p class="text-xs text-[color:var(--text-muted)]">None yet.</p> } @else {
+                <table class="table-modern">
+                  <thead><tr><th>Date</th><th>Method</th><th class="hidden md:table-cell">Reference</th><th class="text-right">Amount</th><th></th></tr></thead>
+                  <tbody>
+                    @for (p of i.payments; track p.paymentId) {
+                      <tr>
+                        <td class="tabular text-xs">{{ p.dateCreated | date: 'd MMM' }}</td>
+                        <td>{{ p.method === 'credit_note' ? 'credit note' : p.method }}</td>
+                        <td class="mono text-xs hidden md:table-cell">{{ p.reference || '—' }}</td>
+                        <td class="text-right tabular">{{ money(p.amount) }}</td>
+                        <td>
+                          @if (p.status === 'verified') { <span class="pill pill-ok">{{ p.method === 'credit_note' ? 'applied' : 'verified' }}</span> }
+                          @else if (p.status === 'rejected') { <span class="pill pill-crit" [title]="p.note || ''">rejected</span> }
+                          @else if (isPlatformAdmin()) {
+                            <button type="button" class="btn btn-primary btn-xs" (click)="verify(p, true)" [disabled]="busy() === 'verify' + p.paymentId">Verify</button>
+                            <button type="button" class="btn btn-ghost btn-xs" (click)="verify(p, false)" [disabled]="busy() === 'verify' + p.paymentId">Reject</button>
+                          } @else { <span class="pill pill-warn">pending verification</span> }
+                        </td>
+                      </tr>
+                    }
+                    <tr class="border-t-2 border-strong"><td colspan="3" class="font-semibold">Balance</td><td class="text-right tabular font-semibold">{{ money(i.balance) }}</td><td></td></tr>
+                  </tbody>
+                </table>
+              }
+              @if (!isPlatformAdmin()) { <p class="text-[11px] text-[color:var(--text-muted)] mt-2">A payment counts once the platform verifies the slip; a receipt is issued then.</p> }
+            </div>
+          }
+
+          <div class="card p-4">
+            <h2 class="font-semibold text-sm mb-2">History</h2>
+            <ul class="text-xs space-y-1.5">
+              @for (h of history(); track $index) {
+                <li class="flex gap-2"><span class="tabular text-[color:var(--text-muted)] whitespace-nowrap">{{ h.at | date: 'd MMM HH:mm' }}</span><span [class.text-crit-500]="h.tone === 'crit'">{{ h.text }}</span></li>
+              }
+            </ul>
+          </div>
+        </div>
+      </div>
+    }
+  }
+</div>

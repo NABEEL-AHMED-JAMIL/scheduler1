@@ -1,0 +1,58 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Billing documents</h1>
+      <p class="page-subtitle">Every invoice, receipt, payment slip, credit note and statement — in one place.</p>
+    </div>
+    <div class="flex items-center gap-2 flex-wrap">
+      @if (isPlatformAdmin()) {
+        <app-combobox class="w-56" [selected]="workspaces.tenantId()" (selectedChange)="pickWorkspace($event)" placeholder="Workspace" [allowClear]="false" [options]="workspaces.options()" />
+      }
+      <select class="input w-28" [value]="year()" (change)="year.set($any($event.target).value)" aria-label="Year">
+        @for (y of years(); track y) { <option [value]="y" [selected]="y === year()">{{ y }}</option> }
+      </select>
+      <button type="button" class="btn btn-default btn-sm" (click)="statement()" title="The year's invoices and payments as one PDF"><app-icon name="file" />Generate statement</button>
+      <a routerLink="/administration/billing/invoices" class="btn btn-ghost btn-sm">Invoices</a>
+    </div>
+  </div>
+
+  @if (error()) {
+    <div class="card p-8 text-center"><app-icon name="alert" size="1.6rem" class="icon-crit" /><p class="text-sm text-crit-500 mt-2">{{ error() }}</p>
+      <button type="button" class="btn btn-default btn-sm mt-3" (click)="load()"><app-icon name="refresh" />Try again</button></div>
+  } @else {
+    <app-table-shell heading="Documents" [shown]="visible().length" [total]="rows().length" [loading]="loading()"
+                     [isEmpty]="!visible().length" [emptyMessage]="rows().length ? 'No document matches.' : 'No document yet — the first invoice PDF is made when a month is issued.'" emptyIcon="file">
+      <ng-container toolbar>
+        @for (k of kinds; track k) {
+          @if (counts()[k]) {
+            <button type="button" class="pill pill-neutral hover-brand" [class.is-on]="kind() === k" (click)="setKind(k)">{{ counts()[k] }} {{ kindLabel[k] }}{{ counts()[k] === 1 ? '' : 's' }}</button>
+          }
+        }
+        <div class="search-field max-w-64">
+          <app-icon name="search" size="0.95em" />
+          <input class="input" placeholder="Find a number, file, person…" aria-label="Find a document" [value]="search()" (input)="search.set($any($event.target).value)" />
+        </div>
+      </ng-container>
+      <table class="table-modern">
+        <thead><tr><th>Number</th><th>Kind</th><th>For</th>@if (isPlatformAdmin()) { <th>Workspace</th> }<th>Date</th><th class="text-right">Amount</th><th class="hidden md:table-cell">By</th><th></th></tr></thead>
+        <tbody>
+          @for (d of visible(); track d.documentId) {
+            <tr>
+              <td class="mono">{{ d.number || '—' }}</td>
+              <td><span class="pill pill-neutral">{{ kindLabel[d.kind] }}</span></td>
+              <td>@if (d.invoiceNumber) { <a class="link-inline mono" [routerLink]="['/administration/billing/invoices', d.invoiceNumber]">{{ d.invoiceNumber }}</a> } @else { <span class="text-[color:var(--text-muted)]">—</span> }</td>
+              @if (isPlatformAdmin()) { <td>{{ d.tenantName }}</td> }
+              <td class="tabular text-xs">{{ d.issuedAt | date: 'd MMM yyyy' }}</td>
+              <td class="text-right tabular">{{ d.amount != null ? money(d.amount) : '—' }}</td>
+              <td class="hidden md:table-cell text-xs text-[color:var(--text-muted)]">{{ d.createdByName || 'system' }}</td>
+              <td class="whitespace-nowrap text-right">
+                <button type="button" class="btn btn-ghost btn-sm" (click)="open(d)"><app-icon name="eye" />View</button>
+                <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="download(d)" aria-label="Download"><app-icon name="download" /></button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </app-table-shell>
+  }
+</div>
