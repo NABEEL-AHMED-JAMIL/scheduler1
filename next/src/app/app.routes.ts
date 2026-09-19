@@ -256,6 +256,14 @@ export const routes: Routes = [
       { path: 'settings/forms', redirectTo: 'configuration/pipelines' },
       { path: 'settings/pipeline-forms', redirectTo: 'configuration/pipelines' },
       {
+        // Cost & usage: a tenant admin's own workspace, a platform admin's any. A page an
+        // access profile can withhold (pageKey billing), and TENANT_ADMIN at the floor.
+        path: 'administration/billing',
+        loadComponent: () => import('./features/billing/billing').then(m => m.Billing),
+        data: { pageKey: 'billing', minRole: 'TENANT_ADMIN' },
+        canActivate: [pageGuard, roleGuard],
+      },
+      {
         path: 'administration/tenant-requests',
         loadComponent: () =>
           import('./features/tenant-request/tenant-requests').then(m => m.TenantRequests),

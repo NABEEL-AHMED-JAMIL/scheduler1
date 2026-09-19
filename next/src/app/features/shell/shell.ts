@@ -157,6 +157,8 @@ export class Shell {
       label: 'Administration',
       adminOnly: true,
       children: [
+        { label: 'Cost & usage', path: '/administration/billing', pageKey: 'billing', icon: 'chart', adminOnly: true,
+          hint: 'What the workspace used this month and what it costs, line by line' },
         { label: 'Users', path: '/administration/users', icon: 'users', adminOnly: true,
           hint: 'Who can sign in, and as what' },
         { label: 'Access profiles', path: '/administration/access-profiles', icon: 'shield', adminOnly: true,

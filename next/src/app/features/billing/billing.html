@@ -1,0 +1,159 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Cost &amp; usage</h1>
+      <p class="page-subtitle">What this workspace used, and what it costs — the same lines the invoice will carry.</p>
+    </div>
+    <div class="flex items-center gap-2 flex-wrap">
+      @if (isPlatformAdmin()) {
+        <app-combobox class="w-56" [selected]="tenantId()" (selectedChange)="pickTenant($event)" placeholder="Workspace" [allowClear]="false" [options]="tenantOptions()" />
+      }
+      <div class="flex items-center gap-1">
+        <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="shiftMonth(-1)" aria-label="Previous month"><app-icon name="chevronLeft" /></button>
+        <span class="text-sm font-medium min-w-36 text-center">{{ monthLabel() }}</span>
+        <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="shiftMonth(1)" [disabled]="isCurrentMonth()" aria-label="Next month"><app-icon name="chevronRight" /></button>
+      </div>
+      <button type="button" class="btn btn-default btn-sm" (click)="refresh()" [disabled]="loading()" title="Price the last minutes' events now"><app-icon name="refresh" [class.spin]="loading()" />Refresh</button>
+    </div>
+  </div>
+
+  @if (notConfigured()) {
+    <div class="card p-8 text-center">
+      <app-icon name="alert" size="1.6rem" class="icon-warn" />
+      <p class="text-sm font-medium mt-2">Metering is not configured on this console</p>
+      <p class="text-xs text-[color:var(--text-muted)] mt-1">Set <code class="mono">METER_URL</code> and <code class="mono">METER_SERVICE_KEY</code> on the console to point it at the metering service.</p>
+    </div>
+  } @else if (error()) {
+    <div class="card p-8 text-center">
+      <app-icon name="alert" size="1.6rem" class="icon-crit" />
+      <p class="text-sm text-crit-500 mt-2">{{ error() }}</p>
+      <button type="button" class="btn btn-default btn-sm mt-3" (click)="load()"><app-icon name="refresh" />Try again</button>
+    </div>
+  } @else {
+    <p class="text-xs text-[color:var(--text-muted)] mb-3">
+      Priced with rate card v{{ rateCardVersion() ?? '…' }} · {{ currency() }} · day {{ daysElapsed() }} of {{ daysInMonth() }}
+      @if (isCurrentMonth()) { · yesterday {{ fmtMoney(yesterday()) }} }
+    </p>
+
+    <div class="stat-grid">
+      <app-stat-tile label="Month to date" [value]="fmtMoney(total())" icon="chart" tone="info"
+                     [foot]="isCurrentMonth() ? (forecast() !== null ? 'forecast ' + fmtMoney(forecast()!) + ' at the last 7 days’ pace' : 'no forecast yet') : 'closed month'" />
+      <app-stat-tile label="Data deleted" [value]="fmtGb(deletedGb())" icon="trash" [tone]="deletedGb() > 0 ? 'warn' : 'muted'"
+                     [foot]="(deleteOps() | number: '1.0-0') + ' delete op' + (deleteOps() === 1 ? '' : 's') + ' · ' + fmtMoney(churnAmount()) + ' churn'" />
+      <app-stat-tile label="Storage kept" [value]="fmtGb(storedGbDays() / daysElapsed())" icon="cloud" tone="muted"
+                     [foot]="'average across the month · measured nightly at 02:00'" />
+      <app-stat-tile label="Seats" [value]="seats()" icon="users" tone="muted" [foot]="fmtMoney(seatsAmount()) + ' this month'" />
+    </div>
+
+    <div class="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] mt-4">
+      <div class="card p-4">
+        <h2 class="font-semibold text-sm">Cost by day</h2>
+        <p class="text-xs text-[color:var(--text-muted)] mb-2">Stacked by service. Measured items (storage kept, seats, topics) land on the night they were measured.</p>
+        @if (loading() && !days().length) {
+          <div class="py-10 text-center text-sm text-[color:var(--text-muted)]"><div class="spinner mx-auto mb-2"></div>Reading the meter…</div>
+        } @else {
+          <app-bar-chart [data]="dayBars()" [height]="140" [format]="money" emptyMessage="Nothing metered in this month yet." />
+          <div class="flex flex-wrap gap-3 mt-2 text-xs">
+            @for (s of byService(); track s.service) {
+              <span class="inline-flex items-center gap-1.5"><span class="inline-block size-2.5 rounded-sm" [style.background]="s.color"></span>{{ s.service }}</span>
+            }
+          </div>
+        }
+      </div>
+      <div class="card p-4">
+        <h2 class="font-semibold text-sm mb-2">By service</h2>
+        @if (!byService().length) {
+          <p class="text-sm text-[color:var(--text-muted)]">Nothing metered yet.</p>
+        } @else {
+          <table class="table-modern">
+            <tbody>
+              @for (s of byService(); track s.service) {
+                <tr>
+                  <td><span class="inline-block size-2.5 rounded-sm mr-2 align-middle" [style.background]="s.color"></span>{{ s.service }}</td>
+                  <td class="text-right tabular">{{ fmtMoney(s.amount) }}</td>
+                  <td class="text-right tabular text-[color:var(--text-muted)] w-14">{{ s.share }}%</td>
+                </tr>
+              }
+              <tr class="border-t-2 border-strong"><td class="font-semibold">Month to date</td><td class="text-right tabular font-semibold">{{ fmtMoney(total()) }}</td><td></td></tr>
+            </tbody>
+          </table>
+        }
+      </div>
+    </div>
+
+    <div class="mt-4">
+      <app-table-shell heading="Line by line" [shown]="lines().length" [total]="lines().length" [loading]="loading()"
+                       [isEmpty]="!lines().length" emptyMessage="Nothing metered in this month yet — run a pipeline, open a file, delete something." emptyIcon="chart">
+        <ng-container toolbar>
+          <span class="text-xs text-[color:var(--text-muted)]">Click a line for what is behind it — which bucket, which prompt, who deleted what.</span>
+        </ng-container>
+        <table class="table-modern">
+          <thead>
+            <tr>
+              <th>Meter</th>
+              <th class="hidden md:table-cell">Service</th>
+              <th class="text-right">Quantity</th>
+              <th class="hidden lg:table-cell">Unit</th>
+              <th class="text-right hidden md:table-cell">Rate</th>
+              <th class="text-right">Amount</th>
+              <th class="w-8"></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (line of lines(); track line.meter) {
+              <tr class="cursor-pointer hover-brand" [class.is-open]="openLine()?.meter === line.meter" (click)="toggleLine(line)">
+                <td>
+                  <div class="font-medium">{{ line.label }}</div>
+                  <div class="text-[11px] mono text-[color:var(--text-muted)]">{{ line.meter }}</div>
+                </td>
+                <td class="hidden md:table-cell text-[color:var(--text-secondary)]">{{ line.service }}</td>
+                <td class="text-right tabular">{{ fmtQuantity(line) }}</td>
+                <td class="hidden lg:table-cell text-[color:var(--text-muted)]">{{ line.unit }}</td>
+                <td class="text-right tabular text-xs text-[color:var(--text-muted)] hidden md:table-cell">{{ fmtRate(line) }}</td>
+                <td class="text-right tabular font-medium">{{ fmtMoney(line.amount) }}</td>
+                <td><app-icon [name]="openLine()?.meter === line.meter ? 'chevronDown' : 'chevronRight'" size="0.9em" class="icon-muted" /></td>
+              </tr>
+              @if (openLine()?.meter === line.meter) {
+                <tr class="bg-sunken">
+                  <td colspan="7" class="!py-3">
+                    @if (subjectsLoading()) {
+                      <span class="text-xs text-[color:var(--text-muted)]"><span class="spinner inline-block align-middle mr-2"></span>Reading the events…</span>
+                    } @else if (!subjects().length) {
+                      <span class="text-xs text-[color:var(--text-muted)]">No subject recorded on these events.</span>
+                    } @else {
+                      <table class="table-modern">
+                        <thead><tr><th>{{ line.meter.startsWith('storage.bytes.deleted') ? 'Object deleted' : 'Subject' }}</th><th class="text-right">Quantity</th><th class="text-right">Events</th><th>Last</th><th>By</th></tr></thead>
+                        <tbody>
+                          @for (s of subjects(); track s.subject_type + s.subject_id) {
+                            <tr>
+                              <td class="mono text-xs max-w-96"><span class="block truncate" [title]="s.subject_id">{{ subjectLabel(s) }}</span></td>
+                              <td class="text-right tabular">{{ line.unit === 'GB' ? fmtGb(s.quantity) : line.unit === 'GB-hour' ? fmtGb(s.quantity / 24) + ' · day' : (s.quantity | number: '1.0-2') + ' ' + line.unit }}</td>
+                              <td class="text-right tabular">{{ s.events }}</td>
+                              <td class="text-xs text-[color:var(--text-muted)] tabular">{{ s.last ? (s.last | date: 'd MMM, HH:mm') : '' }}</td>
+                              <td class="text-xs text-[color:var(--text-muted)]">{{ s.actor_user_id ? 'user #' + s.actor_user_id : 'pipeline' }}</td>
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
+                    }
+                  </td>
+                </tr>
+              }
+            }
+            @if (lines().length) {
+              <tr class="border-t-2 border-strong">
+                <td class="font-semibold" colspan="5">Month to date</td>
+                <td class="text-right tabular font-semibold">{{ fmtMoney(total()) }}</td>
+                <td></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </app-table-shell>
+    </div>
+
+    <p class="text-xs text-[color:var(--text-muted)] mt-3 max-w-3xl">
+      Deleting data is counted: each delete is an operation, and the bytes removed are billed at the write rate as data churn. Storage is measured nightly, so a file that existed at 02:00 is a day of storage whether or not it was deleted at 09:00.
+    </p>
+  }
+</div>
