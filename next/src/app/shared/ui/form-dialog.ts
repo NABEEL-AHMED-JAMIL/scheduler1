@@ -32,8 +32,8 @@ import { Icon } from './icon';
         <div class="ml-auto flex gap-2">
           <button type="button" class="btn btn-default btn-sm" [disabled]="saving()"
                   (click)="cancelled.emit()">Cancel</button>
-          <button type="button" class="btn btn-primary btn-sm" [disabled]="saving()"
-                  (click)="confirmed.emit()">
+          <button type="button" class="btn btn-sm" [class.btn-primary]="!danger()" [class.btn-danger]="danger()"
+                  [disabled]="saving() || confirmDisabled()" (click)="confirmed.emit()">
             @if (saving()) { <app-icon name="refresh" class="spin" /> }
             {{ saving() ? 'Saving…' : confirmLabel() }}
           </button>
@@ -58,6 +58,10 @@ export class FormDialog {
    * is fitting two cards across rather than more columns inside one.
    */
   readonly size = input<'default' | 'wide' | 'xwide'>('default');
+  /** A destructive confirm (void, reject, delete) reads as one. */
+  readonly danger = input(false);
+  /** Kept off until the form has what it needs -- a required reason, say. */
+  readonly confirmDisabled = input(false);
   readonly cancelled = output<void>();
   readonly confirmed = output<void>();
 }

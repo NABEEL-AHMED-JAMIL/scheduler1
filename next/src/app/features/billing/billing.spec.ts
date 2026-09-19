@@ -22,10 +22,14 @@ function page(platformAdmin = false, rows: object[] = LINES, days: object[] = DA
     ] } })),
     refreshUsage: vi.fn(() => of({ status: API_SUCCESS })),
   };
-  const tenantId = { value: platformAdmin ? '2905' : null };
+  // The picker holds no choice until one is made; Cost & usage reads `effective`, the first
+  // workspace, because it must look at one -- Invoices reads the choice itself (every workspace).
+  const tenantId = { value: null as string | null };
+  const options = platformAdmin ? [{ value: '2905', label: 'MedAxis' }, { value: '2901', label: 'CareBridge' }] : [];
   const workspaces = {
     tenantId: Object.assign(() => tenantId.value, { set: (v: string | null) => { tenantId.value = v; } }),
-    options: () => (platformAdmin ? [{ value: '2905', label: 'MedAxis' }, { value: '2901', label: 'CareBridge' }] : []),
+    effective: () => tenantId.value ?? options[0]?.value ?? null,
+    options: () => options,
     ready: (then: () => void) => then(), isPlatformAdmin: () => platformAdmin,
   };
   TestBed.resetTestingModule();
@@ -132,7 +136,7 @@ describe('Billing', () => {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({ providers: [
       { provide: BillingApi, useValue: { usageByMeter: off, usageByDay: off, subjects: off, refreshUsage: off } },
-      { provide: WorkspacePicker, useValue: { tenantId: () => null, options: () => [], ready: (then: () => void) => then(), isPlatformAdmin: () => false } },
+      { provide: WorkspacePicker, useValue: { tenantId: () => null, effective: () => null, options: () => [], ready: (then: () => void) => then(), isPlatformAdmin: () => false } },
       { provide: AuthService, useValue: { isPlatformAdmin: () => false } },
       { provide: ToastService, useValue: { success: () => {}, error: () => {} } },
     ] });

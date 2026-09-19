@@ -145,7 +145,7 @@ export class Billing implements OnInit {
   /** The month on screen as a range, for the platform admin's picked workspace. */
   private query(month = this.month()): UsageQuery {
     const first = new Date(month + 'T00:00:00');
-    return { from: month, to: `${month.slice(0, 7)}-${String(daysInMonth(first)).padStart(2, '0')}`, tenantId: this.isPlatformAdmin() ? this.workspaces.tenantId() : null };
+    return { from: month, to: `${month.slice(0, 7)}-${String(daysInMonth(first)).padStart(2, '0')}`, tenantId: this.isPlatformAdmin() ? this.workspaces.effective() : null };
   }
 
   load(): void {

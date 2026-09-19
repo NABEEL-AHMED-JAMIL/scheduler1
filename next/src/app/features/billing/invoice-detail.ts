@@ -7,6 +7,7 @@ import { API_SUCCESS } from '../../core/api/api.config';
 import { AuthService } from '../../core/auth/auth.service';
 import { ToastService } from '../../shared/ui/toast.service';
 import { confirmWith } from '../../shared/ui/confirm';
+import { askReason } from '../../shared/ui/reason';
 import { Icon } from '../../shared/ui/icon';
 import { CopyButton } from '../../shared/ui/copy-button';
 import { copyText } from '../../shared/ui/clipboard.util';
@@ -180,13 +181,19 @@ export class InvoicePane implements OnDestroy {
       error: err => { this.busy.set(''); this.toast.error(err?.error?.message || 'The payment could not be recorded.'); },
     });
   }
+  /** Both directions ask first, in the app's own dialog: accepting marks money received, rejecting wants the reason the payer will read. */
   verify(p: PaymentRow, accept: boolean): void {
-    const note = accept ? '' : (window.prompt('Why is this payment rejected?') ?? '');
-    if (!accept && note === null) return;
-    this.busy.set('verify' + p.paymentId);
-    this.api.verifyPayment(p.paymentId, accept, note).subscribe({
-      next: r => { this.busy.set(''); if (r.status !== API_SUCCESS) { this.toast.error(r.message); return; } this.toast.success(r.message); this.refresh(); },
-      error: err => { this.busy.set(''); this.toast.error(err?.error?.message || 'The payment could not be verified.'); },
+    const amount = this.money(Number(p.amount));
+    const asked: Promise<string | null> = accept
+      ? confirmWith(this.dialog, { title: `Verify this payment of ${amount}?`, body: 'The slip is accepted as received and a receipt is issued against the invoice. This cannot be undone from here.', confirmLabel: 'Verify payment' }).then(ok => ok ? '' : null)
+      : askReason(this.dialog, { title: `Reject this payment of ${amount}?`, subtitle: 'The claim is refused and the balance stays open. The note is shown to whoever filed it.', label: 'Why it is rejected', placeholder: 'The slip does not match the amount claimed.', confirmLabel: 'Reject payment', danger: true });
+    asked.then(note => {
+      if (note === null) return;
+      this.busy.set('verify' + p.paymentId);
+      this.api.verifyPayment(p.paymentId, accept, note).subscribe({
+        next: r => { this.busy.set(''); if (r.status !== API_SUCCESS) { this.toast.error(r.message); return; } this.toast.success(r.message); this.refresh(); },
+        error: err => { this.busy.set(''); this.toast.error(err?.error?.message || 'The payment could not be verified.'); },
+      });
     });
   }
 
@@ -200,11 +207,10 @@ export class InvoicePane implements OnDestroy {
   }
   redraft(): void {
     const i = this.invoice(); if (!i) return;
-    this.busy.set('draft');
-    this.api.draft(String(i.tenantId), i.periodStart.slice(0, 7)).subscribe({
-      next: r => { this.busy.set(''); if (r.status !== API_SUCCESS) { this.toast.error(r.message); return; } this.toast.success(r.message); this.refresh(); },
-      error: err => { this.busy.set(''); this.toast.error(err?.error?.message || 'The draft could not be rebuilt.'); },
-    });
+    confirmWith(this.dialog, { title: `Rebuild the draft ${i.number}?`, body: 'The lines are recomputed from the meter and the current rate card. A line added by hand is lost.', confirmLabel: 'Rebuild draft' })
+      .then(ok => { if (!ok) return; this.busy.set('draft'); this.api.draft(String(i.tenantId), i.periodStart.slice(0, 7)).subscribe({
+        next: r => { this.busy.set(''); if (r.status !== API_SUCCESS) { this.toast.error(r.message); return; } this.toast.success(r.message); this.refresh(); },
+        error: err => { this.busy.set(''); this.toast.error(err?.error?.message || 'The draft could not be rebuilt.'); } }); });
   }
   addLine(): void {
     const i = this.invoice(); if (!i) return;
@@ -218,13 +224,10 @@ export class InvoicePane implements OnDestroy {
   }
   voidInvoice(): void {
     const i = this.invoice(); if (!i) return;
-    const reason = window.prompt(`Void ${i.number}? Say why:`);
-    if (!reason) return;
-    this.busy.set('void');
-    this.api.void(i.invoiceId, reason).subscribe({
-      next: r => { this.busy.set(''); if (r.status !== API_SUCCESS) { this.toast.error(r.message); return; } this.toast.success(r.message); this.refresh(); },
-      error: err => { this.busy.set(''); this.toast.error(err?.error?.message || 'The invoice could not be voided.'); },
-    });
+    askReason(this.dialog, { title: `Void ${i.number}?`, subtitle: `${this.money(i.total)} for ${i.tenantName ?? 'the workspace'} is written off; the number is kept and marked void. A reason is required.`, label: 'Why it is voided', placeholder: 'Issued against the wrong period.', confirmLabel: 'Void invoice', required: true, danger: true })
+      .then(reason => { if (!reason) return; this.busy.set('void'); this.api.void(i.invoiceId, reason).subscribe({
+        next: r => { this.busy.set(''); if (r.status !== API_SUCCESS) { this.toast.error(r.message); return; } this.toast.success(r.message); this.refresh(); },
+        error: err => { this.busy.set(''); this.toast.error(err?.error?.message || 'The invoice could not be voided.'); } }); });
   }
   creditNote(): void {
     const i = this.invoice(); if (!i) return;

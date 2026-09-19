@@ -6,9 +6,14 @@ import { AuthService } from '../../core/auth/auth.service';
 interface TenantOption { tenantId: number; tenantName: string; }
 
 /**
- * Which workspace the billing screens are looking at. A platform admin picks one (the first,
- * until they do); a workspace admin has no choice and the value stays empty, which the server
- * reads as "your own". Shared across the four screens so the choice follows the person.
+ * Which workspace the billing screens are looking at. A workspace admin has no choice and the
+ * value stays empty, which the server reads as "your own". A platform admin's choice is shared
+ * across the screens so it follows the person -- and until they choose, it is EMPTY, which
+ * Invoices and Documents read as every workspace (their select says so) and Cost & usage, which
+ * needs one, reads as the first (`effective`). The picker used to fill in the first workspace
+ * for everyone, so a platform admin opened Invoices scoped to the newest workspace under a
+ * select that said "Every workspace", and a deep link to another workspace's invoice was
+ * replaced by that workspace's first.
  */
 @Injectable({ providedIn: 'root' })
 export class WorkspacePicker {
@@ -20,17 +25,18 @@ export class WorkspacePicker {
   readonly options = computed(() => this.tenants().map(t => ({ value: String(t.tenantId), label: t.tenantName })));
   readonly isPlatformAdmin = this.auth.isPlatformAdmin;
   readonly name = computed(() => this.tenants().find(t => String(t.tenantId) === this.tenantId())?.tenantName ?? '');
+  /** The choice, or the first workspace when none was made: for the screens that must look at one. */
+  readonly effective = computed(() => this.tenantId() ?? (this.tenants().length ? String(this.tenants()[0].tenantId) : null));
   private loaded = false;
 
   /** Runs `then` once a workspace is known: at once for a tenant admin, after the list for a platform admin. */
   ready(then: () => void): void {
     if (!this.isPlatformAdmin()) { then(); return; }
-    if (this.loaded && this.tenantId()) { then(); return; }
+    if (this.loaded) { then(); return; }
     this.http.get<ApiResponse<TenantOption[]>>(`${API_BASE}/tenant.json/listTenants`).subscribe({
       next: r => {
         this.loaded = true;
         if (r.status === API_SUCCESS) this.tenants.set(r.data ?? []);
-        if (!this.tenantId() && this.tenants().length) this.tenantId.set(String(this.tenants()[0].tenantId));
         then();
       },
       error: () => then(),

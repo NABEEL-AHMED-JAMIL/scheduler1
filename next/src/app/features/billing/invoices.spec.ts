@@ -62,6 +62,11 @@ describe('Invoices', () => {
     const deep = page(false, 'INV-2026-09-0007');
     expect(deep.component.selectedNumber()).toBe('INV-2026-09-0007');
     expect(deep.router.navigate).not.toHaveBeenCalled();
+    // A number that is not in this list is kept, not swapped for the first row: the pane reads
+    // it by number and says why it cannot, which is the truthful answer to a wrong address.
+    const foreign = page(false, 'INV-2026-09-9999');
+    expect(foreign.component.selectedNumber()).toBe('INV-2026-09-9999');
+    expect(foreign.router.navigate).not.toHaveBeenCalled();
     deep.component.select(deep.component.rows()[1]);
     expect(deep.component.selectedNumber()).toBe('INV-2026-08-0007');
     expect(deep.router.navigate).toHaveBeenLastCalledWith(['/billing/invoices', 'INV-2026-08-0007'], { replaceUrl: false });

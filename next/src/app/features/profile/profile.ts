@@ -1,5 +1,7 @@
 import { Component, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { Dialog } from '@angular/cdk/dialog';
+import { confirmWith } from '../../shared/ui/confirm';
 import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
@@ -68,6 +70,7 @@ const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 })
 export class Profile implements OnInit {
   private readonly http = inject(HttpClient);
+  private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
   private readonly storage = inject(StorageService);
   readonly auth = inject(AuthService);
@@ -387,7 +390,9 @@ export class Profile implements OnInit {
   }
 
   removePicture(): void {
-    this.saveAvatar('', '');
+    // Asked first, in the app's own dialog: the picture is gone from every screen at once.
+    confirmWith(this.dialog, { title: 'Remove your profile picture?', body: 'Your initials are shown instead, everywhere your name appears. You can upload a new one any time.', confirmLabel: 'Remove picture', danger: true })
+      .then(ok => { if (ok) this.saveAvatar('', ''); });
   }
 
   private saveAvatar(bucket: string, key: string): void {

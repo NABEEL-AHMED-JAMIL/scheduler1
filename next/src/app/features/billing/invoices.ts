@@ -87,8 +87,12 @@ export class Invoices implements OnInit {
         if (r.status !== API_SUCCESS) { this.error.set(r.message); return; }
         const rows = (r.data ?? []).map(Invoices.numeric);
         this.rows.set(rows);
-        // The address names one; otherwise the first that needs a look, else the newest.
-        if (!this.selectedNumber() || !rows.some(x => x.number === this.selectedNumber())) {
+        // The address names one, and is left alone even when it is not in this list -- the
+        // pane reads it by number and says why it cannot (a wrong number, another workspace's).
+        // It used to be swapped for the first row here, so a deep link to a foreign or mistyped
+        // invoice quietly opened a different bill. Otherwise the first that needs a look, else
+        // the newest.
+        if (!this.selectedNumber()) {
           const first = rows.find(x => x.status === 'overdue') ?? rows.find(x => (x.pendingPayments ?? 0) > 0) ?? rows[0] ?? null;
           if (first) this.select(first, true);
         }

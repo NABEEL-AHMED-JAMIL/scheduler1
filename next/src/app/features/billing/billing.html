@@ -6,7 +6,7 @@
     </div>
     <div class="flex items-center gap-2 flex-wrap">
       @if (isPlatformAdmin()) {
-        <app-combobox class="w-56" [selected]="workspaces.tenantId()" (selectedChange)="pickTenant($event)" placeholder="Workspace" [allowClear]="false" [options]="workspaces.options()" />
+        <app-combobox class="w-56" [selected]="workspaces.effective()" (selectedChange)="pickTenant($event)" placeholder="Workspace" [allowClear]="false" [options]="workspaces.options()" />
       }
       <div class="flex items-center gap-1">
         <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="shiftMonth(-1)" aria-label="Previous month"><app-icon name="chevronLeft" /></button>

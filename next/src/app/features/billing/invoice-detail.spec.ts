@@ -36,7 +36,8 @@ function page(platformAdmin: boolean) {
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({ imports: [Host], providers: [provideRouter([]),
     { provide: BillingApi, useValue: api }, { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn(), info: vi.fn() } },
-    { provide: Dialog, useValue: {} }, { provide: AuthService, useValue: { isPlatformAdmin: () => platformAdmin } },
+    // Every dialog answers yes: verify and void are asked first now, in the app's own dialog.
+    { provide: Dialog, useValue: { open: () => ({ closed: of(true) }) } }, { provide: AuthService, useValue: { isPlatformAdmin: () => platformAdmin } },
   ] });
   const fixture = TestBed.createComponent(Host);
   fixture.detectChanges();
@@ -65,7 +66,7 @@ describe('InvoicePane', () => {
     expect(story[story.length - 1]).toContain('166.75');
   });
 
-  it('a tenant admin can submit a slip; verifying and voiding are the platform\'s', () => {
+  it('a tenant admin can submit a slip; verifying and voiding are the platform\'s', async () => {
     const tenant = page(false);
     expect(tenant.component.canVoid()).toBe(false);
     tenant.component.payAmount.set('50');
@@ -73,6 +74,7 @@ describe('InvoicePane', () => {
     expect(tenant.api.submitPayment).toHaveBeenCalledWith(7, 50, 'bank', '', '', null);
     const admin = page(true);
     admin.component.verify(DETAIL.payments[1] as any, true);
+    await new Promise(r => setTimeout(r));                // the confirm dialog answers on the microtask queue
     expect(admin.api.verifyPayment).toHaveBeenCalledWith(2, true, '');
     expect(admin.host.changes).toBe(1);                // the list beside the pane is told
     expect(admin.component.canVoid()).toBe(false);   // partly paid: a credit note, not a void
