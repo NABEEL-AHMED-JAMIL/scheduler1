@@ -2,6 +2,7 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { AuthService } from '../../core/auth/auth.service';
@@ -131,7 +132,7 @@ export class Invoices implements OnInit {
     const call: Observable<ApiResponse<unknown>> = this.workspaces.tenantId() ? this.api.draft(this.workspaces.tenantId()!, period) : this.api.closeMonth(period);
     call.subscribe({
       next: (r: ApiResponse<unknown>) => { this.closing.set(false); if (r.status !== API_SUCCESS) { this.toast.error(r.message); return; } this.toast.success(r.message); this.load(); },
-      error: (err: any) => { this.closing.set(false); this.toast.error(err?.error?.message || 'The draft could not be built.'); },
+      error: (err: HttpErrorResponse) => { this.closing.set(false); this.toast.error(err.error?.message || 'The draft could not be built.'); },
     });
   }
 
