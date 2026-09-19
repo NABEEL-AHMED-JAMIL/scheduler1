@@ -53,7 +53,7 @@ describe('InvoicePane', () => {
     expect(component.pending()).toHaveLength(1);
     expect(component.isOpen()).toBe(true);
     expect(component.payAmount()).toBe('202.75');
-    expect(component.quantity(component.invoice()!.lines[0])).toBe('122.00 GB');
+    expect(component.quantity(component.invoice()!.lines[0])).toBe('122 GB');
     expect(component.rate(component.invoice()!.lines[0])).toBe('$0.01 per GB');
     // A frozen line keeps the calculation it was priced with: the tier bands come back as numbers.
     expect(component.tiers(component.invoice()!.lines[0])).toEqual([]);

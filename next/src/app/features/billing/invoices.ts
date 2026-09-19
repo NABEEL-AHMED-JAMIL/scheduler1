@@ -9,7 +9,8 @@ import { AuthService } from '../../core/auth/auth.service';
 import { ToastService } from '../../shared/ui/toast.service';
 import { Icon } from '../../shared/ui/icon';
 import { StatTile } from '../../shared/ui/stat-tile';
-import { BillingApi, InvoiceRow, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE } from './billing.service';
+import { BillingApi, InvoiceRow, INVOICE_STATUSES, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE } from './billing.service';
+import { daysOverdue, formatMoney, yearMonth } from './billing-format';
 import { BillingAccountDialog } from './billing-account-dialog';
 import { InvoicePane } from './invoice-detail';
 import { WorkspacePicker } from './workspace-picker';
@@ -46,7 +47,7 @@ export class Invoices implements OnInit {
 
   readonly statusLabel = INVOICE_STATUS_LABEL;
   readonly statusTone = INVOICE_STATUS_TONE;
-  readonly statuses = ['overdue', 'issued', 'partially_paid', 'draft', 'paid', 'void'];
+  readonly statuses = INVOICE_STATUSES;
 
   /** What needs attention, and what has been settled: the tiles. */
   readonly summary = computed(() => {
@@ -99,8 +100,7 @@ export class Invoices implements OnInit {
   static numeric(r: InvoiceRow): InvoiceRow {
     return { ...r, subtotal: Number(r.subtotal), tax: Number(r.tax), total: Number(r.total), balance: Number(r.balance), taxRatePercent: Number(r.taxRatePercent), documentKinds: r.documentKinds ?? [], pendingPayments: Number(r.pendingPayments ?? 0) };
   }
-  static lastMonth(): string { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
-  static thisMonth(): string { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
+  static lastMonth(): string { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); return yearMonth(d); }
 
   select(r: InvoiceRow, replace = false): void {
     this.selectedNumber.set(r.number);
@@ -109,11 +109,9 @@ export class Invoices implements OnInit {
   pickWorkspace(id: string): void { this.workspaces.tenantId.set(id); this.selectedNumber.set(null); this.load(); }
   setStatus(s: string): void { this.status.set(this.status() === s ? '' : s); }
   clearFilters(): void { this.search.set(''); this.status.set(''); }
-  money(v: number, currency = 'USD'): string {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
-  }
+  money(v: number, currency = 'USD'): string { return formatMoney(v, currency); }
   period(r: InvoiceRow): string { return new Date(r.periodStart + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', year: 'numeric' }); }
-  overdueDays(r: InvoiceRow): number { return r.dueAt ? Math.max(0, Math.floor((Date.now() - new Date(r.dueAt).getTime()) / 86_400_000)) : 0; }
+  overdueDays(r: InvoiceRow): number { return daysOverdue(r.dueAt); }
   /** The rail's dot: what the row's state means for the reader. */
   tone(r: InvoiceRow): string {
     return r.status === 'overdue' ? 'crit' : (r.pendingPayments ?? 0) > 0 ? 'warn' : r.status === 'paid' ? 'ok' : r.status === 'draft' || r.status === 'void' ? 'muted' : 'info';

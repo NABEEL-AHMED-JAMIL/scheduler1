@@ -6,6 +6,7 @@ import { SidePanel } from '../../shared/ui/side-panel';
 import { Icon } from '../../shared/ui/icon';
 import { Combobox, ComboboxOption } from '../../shared/ui/combobox';
 import { BillingApi, RateCard, RateCardDraft, RateItem, RateTier } from './billing.service';
+import { firstOfMonth } from './billing-format';
 
 /** One item as it is being edited: strings in the inputs, numbers on save. */
 interface EditItem {
@@ -168,5 +169,5 @@ export class RateCardEditor {
       tiers: it.tiers.map(t => ({ from: Number(t.from), unit_price: Number(t.unit_price) })).sort((a, b) => a.from - b.from),
     };
   }
-  static firstOfNextMonth(): string { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`; }
+  static firstOfNextMonth(): string { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + 1); return firstOfMonth(d); }
 }

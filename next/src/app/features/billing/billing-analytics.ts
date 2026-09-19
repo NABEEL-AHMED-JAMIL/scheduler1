@@ -8,6 +8,7 @@ import { Bar, BarChart } from '../../shared/charts/bar-chart';
 import { chartColor } from '../../shared/charts/status-color';
 import { WorkspacePicker } from './workspace-picker';
 import { BillingApi, BillingAnalytics as Analytics, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE } from './billing.service';
+import { formatBytes, formatMoney, formatMoneyRound } from './billing-format';
 
 /** The platform's view: invoiced, collected, open and overdue across every workspace, and who churns data. */
 @Component({
@@ -42,9 +43,9 @@ export class BillingAnalyticsPage implements OnInit {
       .sort((a, b) => b.deletedBytes - a.deletedBytes);
   });
   readonly collectedShare = computed(() => { const d = this.data(); return d && Number(d.invoiced) > 0 ? Math.round(Number(d.collected) / Number(d.invoiced) * 100) : 0; });
-  readonly money = (v: number) => new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(v);
-  readonly money2 = (v: number) => new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
-  fmtBytes(b: number): string { return b < 1024 ** 2 ? `${(b / 1024).toFixed(0)} KB` : b < 1024 ** 3 ? `${(b / 1024 ** 2).toFixed(1)} MB` : `${(b / 1024 ** 3).toFixed(2)} GB`; }
+  readonly money = (v: number) => formatMoneyRound(v);
+  readonly money2 = (v: number) => formatMoney(v);
+  fmtBytes(b: number): string { return formatBytes(b); }
 
   ngOnInit(): void { this.workspaces.ready(() => this.load()); }
   setMonths(n: number): void { this.months.set(n); this.load(); }

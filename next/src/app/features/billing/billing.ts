@@ -1,7 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { DatePipe, DecimalPipe } from '@angular/common';
-import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
+import { RouterLink } from '@angular/router';
+import { API_SUCCESS } from '../../core/api/api.config';
 import { AuthService } from '../../core/auth/auth.service';
 import { ToastService } from '../../shared/ui/toast.service';
 import { Icon } from '../../shared/ui/icon';
@@ -9,25 +9,15 @@ import { StatTile } from '../../shared/ui/stat-tile';
 import { Combobox } from '../../shared/ui/combobox';
 import { TableShell } from '../../shared/ui/data-table';
 import { Bar, BarChart } from '../../shared/charts/bar-chart';
-import { RouterLink } from '@angular/router';
 import { chartColor } from '../../shared/charts/status-color';
-import { AppliedTier, priceDigits } from './billing.service';
+import { BillingApi, DayRow, MeterLine, PricedWith, SERVICES, SubjectRow, UsageQuery } from './billing.service';
+import { HOURS_PER_DAY, daysInMonth, firstOfMonth, formatBytes, formatGb, formatMoney, formatQuantity, formatUnitPrice } from './billing-format';
+import { WorkspacePicker } from './workspace-picker';
 
-/** One row of billing.json/usage?groupBy=meter: a meter's month, priced. */
-export interface MeterLine {
-  meter: string; label: string; service: string; unit: string; per: number;
-  unitPrice: number; quantity: number; amount: number; days: number;
-  /** The calculation applied to the period: allowance first, then tier bands if the card has them. */
-  includedQuantity: number; billableQuantity: number; tiers: AppliedTier[]; hasTiers: boolean; unpriced?: boolean;
-}
-/** The card the period is priced with, as the meter names it. */
-interface PricedWith { version: number; name: string; currency: string; tenantSpecific: boolean; effectiveFrom: string; }
-interface DayRow { day: string; amount: number; byService: Record<string, number>; }
-interface SubjectRow { subject_type: string; subject_id: string; quantity: number; events: number; last: string | null; actor_user_id: number | null; actor_name?: string | null; }
-interface TenantOption { tenantId: number; tenantName: string; }
-
-/** The services a meter rolls up under, in the order the screen lists them. */
-const SERVICES = ['Storage', 'Model calls', 'Seats', 'Pipelines', 'Analytics & tools', 'Other'];
+/** How many subjects a line unfolds to: the top buckets, prompts or objects behind it. */
+const SUBJECTS_SHOWN = 25;
+/** The forecast paces the rest of the month at the last week's daily average. */
+const FORECAST_WINDOW_DAYS = 7;
 
 /**
  * Cost & usage: what this workspace used this month and what it costs, as the meter says.
@@ -43,20 +33,17 @@ const SERVICES = ['Storage', 'Model calls', 'Seats', 'Pipelines', 'Analytics & t
   templateUrl: './billing.html',
 })
 export class Billing implements OnInit {
-  private readonly http = inject(HttpClient);
+  private readonly api = inject(BillingApi);
   private readonly auth = inject(AuthService);
   private readonly toast = inject(ToastService);
+  readonly workspaces = inject(WorkspacePicker);
 
   readonly isPlatformAdmin = this.auth.isPlatformAdmin;
 
   /** The month on screen, as its first day. */
-  readonly month = signal(Billing.firstOfMonth(new Date()));
+  readonly month = signal(firstOfMonth(new Date()));
   readonly monthLabel = computed(() => new Date(this.month() + 'T00:00:00').toLocaleDateString(undefined, { month: 'long', year: 'numeric' }));
-  readonly isCurrentMonth = computed(() => this.month() === Billing.firstOfMonth(new Date()));
-
-  readonly tenants = signal<TenantOption[]>([]);
-  readonly tenantId = signal<string>('');
-  readonly tenantOptions = computed(() => this.tenants().map(t => ({ value: String(t.tenantId), label: t.tenantName })));
+  readonly isCurrentMonth = computed(() => this.month() === firstOfMonth(new Date()));
 
   readonly loading = signal(false);
   readonly error = signal('');
@@ -73,14 +60,14 @@ export class Billing implements OnInit {
   readonly daysElapsed = computed(() => {
     const first = new Date(this.month() + 'T00:00:00');
     const today = new Date();
-    if (!this.isCurrentMonth()) return Billing.daysInMonth(first);
+    if (!this.isCurrentMonth()) return daysInMonth(first);
     return Math.max(1, today.getDate());
   });
-  readonly daysInMonth = computed(() => Billing.daysInMonth(new Date(this.month() + 'T00:00:00')));
+  readonly daysInMonth = computed(() => daysInMonth(new Date(this.month() + 'T00:00:00')));
   /** At the last seven days' pace -- a guess, labelled as one. */
   readonly forecast = computed(() => {
     if (!this.isCurrentMonth()) return null;
-    const recent = this.days().slice(-7);
+    const recent = this.days().slice(-FORECAST_WINDOW_DAYS);
     if (!recent.length) return null;
     const perDay = recent.reduce((n, d) => n + d.amount, 0) / recent.length;
     return this.total() + perDay * Math.max(0, this.daysInMonth() - this.daysElapsed());
@@ -93,7 +80,7 @@ export class Billing implements OnInit {
   readonly deletedBytes = computed(() => this.lines().find(l => l.meter === 'storage.bytes.deleted')?.quantity ?? 0);
   readonly deleteOps = computed(() => this.lines().find(l => l.meter === 'storage.ops.delete')?.quantity ?? 0);
   readonly churnAmount = computed(() => (this.lines().find(l => l.meter === 'storage.bytes.deleted')?.amount ?? 0) + (this.lines().find(l => l.meter === 'storage.ops.delete')?.amount ?? 0));
-  readonly storedGbDays = computed(() => (this.lines().find(l => l.meter === 'storage.gb_hours')?.quantity ?? 0) / 24);
+  readonly storedGbDays = computed(() => (this.lines().find(l => l.meter === 'storage.gb_hours')?.quantity ?? 0) / HOURS_PER_DAY);
   readonly seats = computed(() => {
     const line = this.lines().find(l => l.meter === 'seats.user_days');
     return line ? Math.round(line.quantity / Math.max(1, line.days)) : 0;
@@ -123,47 +110,33 @@ export class Billing implements OnInit {
   readonly subjectsLoading = signal(false);
 
   ngOnInit(): void {
-    if (this.isPlatformAdmin()) {
-      this.http.get<ApiResponse<TenantOption[]>>(`${API_BASE}/tenant.json/listTenants`).subscribe({
-        next: r => {
-          if (r.status !== API_SUCCESS) return;
-          this.tenants.set(r.data ?? []);
-          if (!this.tenantId() && this.tenants().length) { this.tenantId.set(String(this.tenants()[0].tenantId)); this.load(); }
-        },
-        error: () => {},
-      });
-    } else {
-      this.load();
-    }
+    this.workspaces.ready(() => this.load());
   }
 
-  pickTenant(id: string): void { this.tenantId.set(id); this.load(); }
+  pickTenant(id: string): void { this.workspaces.tenantId.set(id); this.load(); }
   shiftMonth(delta: number): void {
     const d = new Date(this.month() + 'T00:00:00');
     d.setMonth(d.getMonth() + delta);
-    this.month.set(Billing.firstOfMonth(d));
+    this.month.set(firstOfMonth(d));
     this.load();
   }
 
   readonly previousLabel = computed(() => { const d = new Date(this.month() + 'T00:00:00'); d.setMonth(d.getMonth() - 1); return d.toLocaleDateString(undefined, { month: 'short' }); });
 
-  private params(extra: Record<string, string> = {}, month = this.month()): Record<string, string> {
-    const from = month;
-    const first = new Date(from + 'T00:00:00');
-    const to = `${from.slice(0, 7)}-${String(Billing.daysInMonth(first)).padStart(2, '0')}`;
-    const p: Record<string, string> = { from, to, ...extra };
-    if (this.isPlatformAdmin() && this.tenantId()) p['tenantId'] = this.tenantId();
-    return p;
+  /** The month on screen as a range, for the platform admin's picked workspace. */
+  private query(month = this.month()): UsageQuery {
+    const first = new Date(month + 'T00:00:00');
+    return { from: month, to: `${month.slice(0, 7)}-${String(daysInMonth(first)).padStart(2, '0')}`, tenantId: this.isPlatformAdmin() ? this.workspaces.tenantId() : null };
   }
 
   load(): void {
     this.loading.set(true); this.error.set(''); this.openLine.set(null); this.previousTotal.set(null);
     const before = new Date(this.month() + 'T00:00:00'); before.setMonth(before.getMonth() - 1);
-    this.http.get<ApiResponse<{ rows: { amount: number }[] }>>(`${API_BASE}/billing.json/usage`, { params: this.params({ groupBy: 'meter' }, Billing.firstOfMonth(before)) }).subscribe({
+    this.api.usageByMeter(this.query(firstOfMonth(before))).subscribe({
       next: r => { if (r.status === API_SUCCESS) this.previousTotal.set((r.data?.rows ?? []).reduce((n, l) => n + Number(l.amount), 0)); },
       error: () => {},
     });
-    this.http.get<ApiResponse<{ rows: MeterLine[]; rateCard?: PricedWith }>>(`${API_BASE}/billing.json/usage`, { params: this.params({ groupBy: 'meter' }) }).subscribe({
+    this.api.usageByMeter(this.query()).subscribe({
       next: r => {
         if (r.status !== API_SUCCESS) { this.loading.set(false); this.failed(r.message); return; }
         if (r.data?.rateCard) { this.rateCard.set(r.data.rateCard); this.currency.set(r.data.rateCard.currency || 'USD'); }
@@ -172,7 +145,7 @@ export class Billing implements OnInit {
           includedQuantity: Number(l.includedQuantity ?? 0), billableQuantity: Number(l.billableQuantity ?? l.quantity),
           tiers: (l.tiers ?? []).map(t => ({ from: Number(t.from), to: t.to == null ? null : Number(t.to), units: Number(t.units), unit_price: Number(t.unit_price) })),
         })));
-        this.http.get<ApiResponse<{ rows: DayRow[] }>>(`${API_BASE}/billing.json/usage`, { params: this.params({ groupBy: 'day' }) }).subscribe({
+        this.api.usageByDay(this.query()).subscribe({
           next: d => {
             this.loading.set(false);
             if (d.status !== API_SUCCESS) { this.failed(d.message); return; }
@@ -202,40 +175,22 @@ export class Billing implements OnInit {
 
   /** Rolls the last two days again and reloads: the events of the last minutes, priced now. */
   refresh(): void {
-    this.http.post<ApiResponse>(`${API_BASE}/billing.json/refresh`, null).subscribe({ next: () => this.load(), error: () => this.load() });
+    this.api.refreshUsage().subscribe({ next: () => this.load(), error: () => this.load() });
   }
 
   toggleLine(line: MeterLine): void {
     if (this.openLine()?.meter === line.meter) { this.openLine.set(null); return; }
     this.openLine.set(line); this.subjects.set([]); this.subjectsLoading.set(true);
-    this.http.get<ApiResponse<{ rows: SubjectRow[] }>>(`${API_BASE}/billing.json/subjects`, { params: this.params({ meter: line.meter, limit: '25' }) }).subscribe({
+    this.api.subjects(this.query(), line.meter, SUBJECTS_SHOWN).subscribe({
       next: r => { this.subjectsLoading.set(false); this.subjects.set((r.data?.rows ?? []).map(s => ({ ...s, quantity: Number(s.quantity), events: Number(s.events) }))); },
       error: () => this.subjectsLoading.set(false),
     });
   }
 
-  fmtMoney(value: number): string {
-    const abs = Math.abs(value);
-    const digits = abs > 0 && abs < 0.01 ? 4 : 2;
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency: this.currency(), minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value);
-  }
-  /** Bytes as a person reads them: 2 KB is not "0 GB". */
-  fmtBytes(bytes: number): string {
-    if (bytes <= 0) return '0 B';
-    if (bytes < 1024) return `${Math.round(bytes)} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toLocaleString(undefined, { maximumFractionDigits: 1 })} KB`;
-    if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toLocaleString(undefined, { maximumFractionDigits: 2 })} MB`;
-    return `${(bytes / 1024 / 1024 / 1024).toLocaleString(undefined, { maximumFractionDigits: 2 })} GB`;
-  }
-  fmtGb(gb: number): string { return this.fmtBytes(gb * 1024 * 1024 * 1024); }
-  fmtQuantity(line: MeterLine): string {
-    const q = line.quantity;
-    if (line.unit === 'byte') return this.fmtBytes(q);
-    if (line.unit === 'GB') return this.fmtGb(q);
-    if (line.unit === 'GB-hour') return q < 1 ? `${this.fmtGb(q / 24)} · day` : q.toLocaleString(undefined, { maximumFractionDigits: 1 });
-    if (line.unit === 'minute') return q < 1 ? `${(q * 60).toLocaleString(undefined, { maximumFractionDigits: 1 })} s` : q.toLocaleString(undefined, { maximumFractionDigits: 1 });
-    return Math.round(q).toLocaleString();
-  }
+  fmtMoney(value: number): string { return formatMoney(value, this.currency()); }
+  fmtBytes(bytes: number): string { return formatBytes(bytes); }
+  fmtGb(gb: number): string { return formatGb(gb); }
+  fmtQuantity(line: MeterLine): string { return line.unit === 'byte' || line.unit === 'GB' || line.unit === 'GB-hour' || line.unit === 'minute' ? formatQuantity(line.quantity, line.unit) : Math.round(line.quantity).toLocaleString(); }
   /** The unit price with enough digits to be a price, not "$0.0000". */
   fmtRate(line: MeterLine): string {
     if (line.unpriced) return 'not on the card';
@@ -244,15 +199,7 @@ export class Billing implements OnInit {
   }
   /** A quantity of the line's unit, for the allowance and the tier bands. */
   fmtUnits(line: MeterLine, q: number): string { return this.fmtQuantity({ ...line, quantity: q }); }
-  fmtUnitPrice(p: number, per: number, unit: string): string {
-    const digits = priceDigits(p);
-    const price = new Intl.NumberFormat(undefined, { style: 'currency', currency: this.currency(), minimumFractionDigits: digits, maximumFractionDigits: digits }).format(p);
-    // A byte meter is priced per GB; saying "$0.01 / 1,073,741,824 per byte" would be true and unreadable.
-    if (unit === 'byte' && per === 1024 * 1024 * 1024) return `${price} per GB`;
-    return `${price}${per > 1 ? ' / ' + per.toLocaleString() : ''} per ${unit}`;
-  }
+  fmtUnitPrice(p: number, per: number, unit: string): string { return formatUnitPrice(p, per, unit, this.currency()); }
   subjectLabel(s: SubjectRow): string { return s.subject_id || (s.subject_type ? `(${s.subject_type})` : '(no subject)'); }
 
-  static firstOfMonth(d: Date): string { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`; }
-  static daysInMonth(d: Date): number { return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(); }
 }

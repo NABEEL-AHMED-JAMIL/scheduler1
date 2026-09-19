@@ -1,8 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { HttpClient } from '@angular/common/http';
 import { of } from 'rxjs';
 import { Billing } from './billing';
+import { BillingApi, UsageQuery } from './billing.service';
+import { WorkspacePicker } from './workspace-picker';
+import { daysInMonth, firstOfMonth } from './billing-format';
 import { AuthService } from '../../core/auth/auth.service';
 import { ToastService } from '../../shared/ui/toast.service';
 import { API_SUCCESS } from '../../core/api/api.config';
@@ -12,25 +14,29 @@ import { API_SUCCESS } from '../../core/api/api.config';
  * lines, the same total, with the deletes called out and a forecast that says it is a guess.
  */
 function page(platformAdmin = false, rows: object[] = LINES, days: object[] = DAYS) {
-  const get = vi.fn((url: string, options?: { params?: Record<string, string> }) => {
-    if (url.endsWith('/billing.json/usage')) return of({ status: API_SUCCESS, data: options?.params?.['groupBy'] === 'day' ? { rows: days }
-      : { rows, rateCard: { version: 2, name: 'Standard, churn free', currency: 'USD', tenantSpecific: false, effectiveFrom: '2026-09-01' } } });
-    if (url.endsWith('/billing.json/subjects')) return of({ status: API_SUCCESS, data: { rows: [
+  const api = {
+    usageByMeter: vi.fn((q: UsageQuery) => of({ status: API_SUCCESS, data: { rows, rateCard: { version: 2, name: 'Standard, churn free', currency: 'USD', tenantSpecific: false, effectiveFrom: '2026-09-01' } } })),
+    usageByDay: vi.fn(() => of({ status: API_SUCCESS, data: { rows: days } })),
+    subjects: vi.fn(() => of({ status: API_SUCCESS, data: { rows: [
       { subject_type: 'object', subject_id: 'medaxis/sales/orders.csv', quantity: '2.0', events: 1, last: '2026-09-18T10:00:00Z', actor_user_id: 4385 },
-    ] } });
-    if (url.endsWith('/tenant.json/listTenants')) return of({ status: API_SUCCESS, data: [{ tenantId: 2905, tenantName: 'MedAxis' }, { tenantId: 2901, tenantName: 'CareBridge' }] });
-    throw new Error('unexpected GET ' + url);
-  });
-  const post = vi.fn(() => of({ status: API_SUCCESS }));
+    ] } })),
+    refreshUsage: vi.fn(() => of({ status: API_SUCCESS })),
+  };
+  const tenantId = { value: platformAdmin ? '2905' : null };
+  const workspaces = {
+    tenantId: Object.assign(() => tenantId.value, { set: (v: string | null) => { tenantId.value = v; } }),
+    options: () => (platformAdmin ? [{ value: '2905', label: 'MedAxis' }, { value: '2901', label: 'CareBridge' }] : []),
+    ready: (then: () => void) => then(), isPlatformAdmin: () => platformAdmin,
+  };
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({ providers: [
-    { provide: HttpClient, useValue: { get, post } },
+    { provide: BillingApi, useValue: api }, { provide: WorkspacePicker, useValue: workspaces },
     { provide: AuthService, useValue: { isPlatformAdmin: () => platformAdmin } },
     { provide: ToastService, useValue: { success: () => {}, error: () => {} } },
   ] });
   const component = TestBed.runInInjectionContext(() => new Billing());
   component.ngOnInit();
-  return { component, get, post };
+  return { component, api };
 }
 
 const LINES = [
@@ -94,9 +100,9 @@ describe('Billing', () => {
   });
 
   it('a line opens to the subjects behind it -- the object deleted, and by whom', () => {
-    const { component, get } = page();
+    const { component, api } = page();
     component.toggleLine(component.lines()[1]);
-    expect(get).toHaveBeenLastCalledWith(expect.stringContaining('/billing.json/subjects'), { params: expect.objectContaining({ meter: 'storage.bytes.deleted', limit: '25' }) });
+    expect(api.subjects).toHaveBeenLastCalledWith(expect.objectContaining({ from: expect.stringMatching(/-01$/) }), 'storage.bytes.deleted', 25);
     expect(component.subjects()[0].subject_id).toBe('medaxis/sales/orders.csv');
     expect(component.subjectLabel(component.subjects()[0])).toBe('medaxis/sales/orders.csv');
     component.toggleLine(component.lines()[1]);
@@ -105,23 +111,21 @@ describe('Billing', () => {
 
   it('a platform admin picks a workspace and the reads carry it; a tenant admin never does', () => {
     const admin = page(true);
-    expect(admin.component.tenantOptions().map(o => o.label)).toEqual(['MedAxis', 'CareBridge']);
-    expect(admin.component.tenantId()).toBe('2905');
-    expect(admin.get).toHaveBeenCalledWith(expect.stringContaining('/billing.json/usage'), { params: expect.objectContaining({ tenantId: '2905', groupBy: 'meter' }) });
+    expect(admin.component.workspaces.options().map(o => o.label)).toEqual(['MedAxis', 'CareBridge']);
+    expect(admin.api.usageByMeter).toHaveBeenCalledWith(expect.objectContaining({ tenantId: '2905' }));
     admin.component.pickTenant('2901');
-    expect(admin.get).toHaveBeenLastCalledWith(expect.stringContaining('/billing.json/usage'), { params: expect.objectContaining({ tenantId: '2901' }) });
+    expect(admin.api.usageByMeter).toHaveBeenLastCalledWith(expect.objectContaining({ tenantId: '2901' }));
 
     const tenant = page(false);
-    const usageCall = tenant.get.mock.calls.find(c => String(c[0]).endsWith('/billing.json/usage'))!;
-    expect((usageCall[1] as any).params.tenantId).toBeUndefined();
+    expect(tenant.api.usageByMeter).toHaveBeenLastCalledWith(expect.objectContaining({ tenantId: null }));
   });
 
   it('says plainly when the console has no meter', () => {
-    const get = vi.fn((url: string) => url.endsWith('/rateCard') ? of({ status: 'ERROR', message: 'Metering is not configured on this console.' })
-      : of({ status: 'ERROR', message: 'Metering is not configured on this console.' }));
+    const off = () => of({ status: 'ERROR', message: 'Metering is not configured on this console.' });
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({ providers: [
-      { provide: HttpClient, useValue: { get, post: () => of({}) } },
+      { provide: BillingApi, useValue: { usageByMeter: off, usageByDay: off, subjects: off, refreshUsage: off } },
+      { provide: WorkspacePicker, useValue: { tenantId: () => null, options: () => [], ready: (then: () => void) => then(), isPlatformAdmin: () => false } },
       { provide: AuthService, useValue: { isPlatformAdmin: () => false } },
       { provide: ToastService, useValue: { success: () => {}, error: () => {} } },
     ] });
@@ -140,7 +144,7 @@ describe('Billing', () => {
     expect(component.forecast()).toBeNull();
     component.shiftMonth(1);
     expect(component.month()).toBe(start);
-    expect(Billing.daysInMonth(new Date('2026-02-10T00:00:00'))).toBe(28);
-    expect(Billing.firstOfMonth(new Date('2026-09-18T00:00:00'))).toBe('2026-09-01');
+    expect(daysInMonth(new Date('2026-02-10T00:00:00'))).toBe(28);
+    expect(firstOfMonth(new Date('2026-09-18T00:00:00'))).toBe('2026-09-01');
   });
 });

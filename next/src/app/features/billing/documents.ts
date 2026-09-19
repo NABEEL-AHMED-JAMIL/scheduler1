@@ -8,7 +8,8 @@ import { Icon } from '../../shared/ui/icon';
 import { StatTile } from '../../shared/ui/stat-tile';
 import { PdfViewer } from '../objects/preview/pdf-viewer';
 import { formatSize } from '../../shared/ui/format-size';
-import { BillingApi, DOCUMENT_KIND_LABEL, DocumentRow } from './billing.service';
+import { BillingApi, DOCUMENT_KINDS, DOCUMENT_KIND_LABEL, DocumentRow } from './billing.service';
+import { formatMoney } from './billing-format';
 import { WorkspacePicker } from './workspace-picker';
 
 /**
@@ -39,7 +40,7 @@ export class BillingDocuments implements OnInit, OnDestroy {
   readonly previewLoading = signal(false);
   readonly previewError = signal('');
   readonly kindLabel = DOCUMENT_KIND_LABEL;
-  readonly kinds = ['invoice', 'receipt', 'payment_slip', 'credit_note', 'statement'];
+  readonly kinds = DOCUMENT_KINDS;
   readonly humanSize = formatSize;
   private wanted: number | null = null;
 
@@ -101,7 +102,7 @@ export class BillingDocuments implements OnInit, OnDestroy {
   pickWorkspace(id: string): void { this.workspaces.tenantId.set(id); this.selectedId.set(null); this.revoke(); this.load(); }
   setKind(k: string): void { this.kind.set(this.kind() === k ? '' : k); }
   clearFilters(): void { this.search.set(''); this.kind.set(''); }
-  money(v: number): string { return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(v); }
+  money(v: number): string { return formatMoney(v); }
   glyph(d: DocumentRow): string { const t = d.contentType || ''; return t.includes('pdf') ? 'PDF' : t.startsWith('image/') ? 'IMG' : 'FILE'; }
   open(d: DocumentRow): void { this.api.documentBlob(d.documentId).subscribe({ next: b => BillingApi.open(b), error: () => this.toast.error('Could not open the document.') }); }
   download(d: DocumentRow): void { this.api.documentBlob(d.documentId).subscribe({ next: b => BillingApi.save(b, d.fileName), error: () => this.toast.error('Could not download the document.') }); }

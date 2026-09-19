@@ -54,18 +54,25 @@ export interface DocumentRow {
 export interface InvoiceDetail extends InvoiceRow {
   lines: InvoiceLine[]; payments: PaymentRow[]; documents: DocumentRow[]; account: BillingAccount; referencesNumber?: string; createdByName?: string;
 }
+/** One row of billing.json/usage?groupBy=meter: a meter's period, priced with the card in effect. */
+export interface MeterLine {
+  meter: string; label: string; service: string; unit: string; per: number;
+  unitPrice: number; quantity: number; amount: number; days: number;
+  /** The calculation applied to the period: allowance first, then tier bands if the card has them. */
+  includedQuantity: number; billableQuantity: number; tiers: AppliedTier[]; hasTiers: boolean; unpriced?: boolean;
+}
+/** The card a period is priced with, as the meter names it. */
+export interface PricedWith { version: number; name: string; currency: string; tenantSpecific: boolean; effectiveFrom: string; }
+export interface DayRow { day: string; amount: number; byService: Record<string, number>; }
+export interface SubjectRow { subject_type: string; subject_id: string; quantity: number; events: number; last: string | null; actor_user_id: number | null; actor_name?: string | null; }
+/** What every usage read names: a range, a workspace for a platform admin, and how to group. */
+export interface UsageQuery { from: string; to: string; tenantId?: string | null; }
+
 export interface BillingAnalytics {
   invoiced: number; collected: number; open: number; overdue: number; overdueCount: number; drafts: number; medianDaysToPay: number; pendingPayments: number;
   months: { month: string; invoiced?: number; collected?: number; open?: number; drafts?: number }[];
   tenants: { tenantId: number; tenantName: string; invoiced: number; collected: number; open: number; overdue: number; status: string }[];
   usageByTenant?: { tenantId: number; amount: number; quantityByMeter: Record<string, number> }[] | null;
-}
-
-/** How many decimals a unit price needs to read as itself: 0.045 is not "$0.05", 0.000032 not "$0.00". */
-export function priceDigits(p: number): number {
-  const text = Math.abs(p).toFixed(6).replace(/0+$/, '');
-  const decimals = text.includes('.') ? text.split('.')[1].length : 0;
-  return Math.min(6, Math.max(2, decimals));
 }
 
 /** The billing.json calls: invoices, payments, documents, the account, the platform's view. */
@@ -108,6 +115,20 @@ export class BillingApi {
   statement(from: string, to: string, tenantId?: string | null): Observable<ApiResponse<DocumentRow>> {
     return this.http.post<ApiResponse<DocumentRow>>(`${this.base}/statement`, null, { params: { from, to, ...this.tenantParam(tenantId) } });
   }
+  usageByMeter(q: UsageQuery): Observable<ApiResponse<{ rows: MeterLine[]; rateCard?: PricedWith }>> {
+    return this.http.get<ApiResponse<{ rows: MeterLine[]; rateCard?: PricedWith }>>(`${this.base}/usage`, { params: this.usageParams(q, 'meter') });
+  }
+  usageByDay(q: UsageQuery): Observable<ApiResponse<{ rows: DayRow[] }>> {
+    return this.http.get<ApiResponse<{ rows: DayRow[] }>>(`${this.base}/usage`, { params: this.usageParams(q, 'day') });
+  }
+  subjects(q: UsageQuery, meter: string, limit: number): Observable<ApiResponse<{ rows: SubjectRow[] }>> {
+    return this.http.get<ApiResponse<{ rows: SubjectRow[] }>>(`${this.base}/subjects`, { params: { ...this.usageParams(q, 'meter'), meter, limit: String(limit) } });
+  }
+  /** Rolls the last two days again: the events of the last minutes, priced now. */
+  refreshUsage(): Observable<ApiResponse<unknown>> { return this.http.post<ApiResponse<unknown>>(`${this.base}/refresh`, null); }
+  private usageParams(q: UsageQuery, groupBy: string): Record<string, string> {
+    return { from: q.from, to: q.to, groupBy, ...this.tenantParam(q.tenantId) };
+  }
   rateCards(): Observable<ApiResponse<{ cards: RateCard[] }>> { return this.http.get<ApiResponse<{ cards: RateCard[] }>>(`${this.base}/rateCards`); }
   rateCard(version: number): Observable<ApiResponse<RateCard>> { return this.http.get<ApiResponse<RateCard>>(`${this.base}/rateCard`, { params: { version: String(version) } }); }
   rateCardFor(tenantId: string | null, day?: string): Observable<ApiResponse<RateCard>> {
@@ -128,6 +149,15 @@ export class BillingApi {
     URL.revokeObjectURL(url);
   }
 }
+
+/** The fixed sets the screens offer, in the order they are offered. They mirror the console's enums. */
+export const INVOICE_STATUSES = ['overdue', 'issued', 'partially_paid', 'draft', 'paid', 'void'] as const;
+export const DOCUMENT_KINDS = ['invoice', 'receipt', 'payment_slip', 'credit_note', 'statement'] as const;
+export const PAYMENT_METHODS: { value: string; label: string }[] = [
+  { value: 'bank', label: 'bank transfer' }, { value: 'card', label: 'card' }, { value: 'cash', label: 'cash' }, { value: 'manual', label: 'other' },
+];
+/** The services a meter rolls up under, in the order the screens list them. */
+export const SERVICES = ['Storage', 'Model calls', 'Seats', 'Pipelines', 'Analytics & tools', 'Other'];
 
 export const INVOICE_STATUS_LABEL: Record<string, string> = {
   draft: 'draft', issued: 'issued', partially_paid: 'partially paid', paid: 'paid', overdue: 'overdue', void: 'void',

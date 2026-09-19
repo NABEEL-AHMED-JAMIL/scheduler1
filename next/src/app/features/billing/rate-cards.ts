@@ -7,7 +7,8 @@ import { ToastService } from '../../shared/ui/toast.service';
 import { Icon } from '../../shared/ui/icon';
 import { StatTile } from '../../shared/ui/stat-tile';
 import { sidePanelConfig } from '../../shared/ui/side-panel';
-import { BillingApi, RateCard, RateItem, priceDigits } from './billing.service';
+import { BillingApi, RateCard, RateItem } from './billing.service';
+import { formatQuantity, formatUnitPrice } from './billing-format';
 import { RateCardEditor, RateCardEditorData } from './rate-card-editor';
 import { WorkspacePicker } from './workspace-picker';
 
@@ -98,17 +99,8 @@ export class RateCards implements OnInit {
     return c.items.filter(i => before.get(i.meter) !== key(i)).map(i => i.label ?? i.meter);
   }
 
-  price(i: RateItem, currency: string): string {
-    const p = i.unit_price;
-    const digits = priceDigits(p);
-    const money = new Intl.NumberFormat(undefined, { style: 'currency', currency, minimumFractionDigits: digits, maximumFractionDigits: digits }).format(p);
-    if (i.unit === 'byte' && i.per === 1024 * 1024 * 1024) return `${money} per GB`;
-    return `${money}${i.per > 1 ? ' / ' + i.per.toLocaleString() : ''} per ${i.unit}`;
-  }
-  units(i: RateItem, q: number): string {
-    if (i.unit === 'byte') return q >= 1024 ** 3 ? `${(q / 1024 ** 3).toLocaleString(undefined, { maximumFractionDigits: 2 })} GB` : q >= 1024 ** 2 ? `${(q / 1024 ** 2).toLocaleString(undefined, { maximumFractionDigits: 1 })} MB` : `${q.toLocaleString()} B`;
-    return q.toLocaleString(undefined, { maximumFractionDigits: 3 });
-  }
+  price(i: RateItem, currency: string): string { return formatUnitPrice(i.unit_price, i.per, i.unit, currency); }
+  units(i: RateItem, q: number): string { return formatQuantity(q, i.unit); }
   tierText(i: RateItem, currency: string): string[] {
     const tiers = [...(i.tiers ?? [])].sort((a, b) => a.from - b.from);
     return tiers.map((t, k) => `${this.units(i, t.from)}${tiers[k + 1] ? ' – ' + this.units(i, tiers[k + 1].from) : ' and up'}: ${this.price({ ...i, unit_price: t.unit_price }, currency)}`);

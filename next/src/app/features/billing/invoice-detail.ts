@@ -11,7 +11,8 @@ import { Icon } from '../../shared/ui/icon';
 import { CopyButton } from '../../shared/ui/copy-button';
 import { copyText } from '../../shared/ui/clipboard.util';
 import { formatSize } from '../../shared/ui/format-size';
-import { BillingApi, DOCUMENT_KIND_LABEL, InvoiceDetail as Detail, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE, PaymentRow, InvoiceLine, AppliedTier, priceDigits } from './billing.service';
+import { BillingApi, DOCUMENT_KIND_LABEL, InvoiceDetail as Detail, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE, PaymentRow, InvoiceLine, AppliedTier, PAYMENT_METHODS } from './billing.service';
+import { daysOverdue, formatMoney, formatQuantity, formatUnitPrice } from './billing-format';
 
 /** One entry of the invoice's story, in order. */
 interface HistoryEntry { at: string; text: string; tone?: 'ok' | 'warn' | 'crit' | 'muted'; }
@@ -48,6 +49,7 @@ export class InvoicePane implements OnDestroy {
   readonly statusTone = INVOICE_STATUS_TONE;
   readonly kindLabel = DOCUMENT_KIND_LABEL;
   readonly humanSize = formatSize;
+  readonly paymentMethods = PAYMENT_METHODS;
 
   // ---- the payment form (a workspace admin's slip) ----
   readonly paying = signal(false);
@@ -129,15 +131,10 @@ export class InvoicePane implements OnDestroy {
     copyText(n).then(() => { this.copied.set(true); setTimeout(() => this.copied.set(false), 1500); });
   }
 
-  money(v: number, currency = this.invoice()?.currency ?? 'USD'): string {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
-  }
+  money(v: number, currency = this.invoice()?.currency ?? 'USD'): string { return formatMoney(v, currency); }
   rate(l: { unitPrice: number; per: number; unit?: string }): string {
-    if (l.unit === 'byte' && l.per === 1024 * 1024 * 1024) return `${this.money(l.unitPrice)} per GB`;
     if (l.unit === 'each') return '';
-    const digits = priceDigits(l.unitPrice);
-    const price = new Intl.NumberFormat(undefined, { style: 'currency', currency: this.invoice()?.currency ?? 'USD', minimumFractionDigits: digits, maximumFractionDigits: digits }).format(l.unitPrice);
-    return `${price}${l.per > 1 ? ' / ' + l.per.toLocaleString() : ''} per ${l.unit ?? ''}`;
+    return formatUnitPrice(l.unitPrice, l.per, l.unit, this.invoice()?.currency ?? 'USD');
   }
   /** The tier bands frozen with a line, parsed once per render from the JSON the meter sent. */
   tiers(l: InvoiceLine): AppliedTier[] {
@@ -145,12 +142,8 @@ export class InvoicePane implements OnDestroy {
     try { return (JSON.parse(l.pricingDetail) as AppliedTier[]).map(t => ({ from: Number(t.from), to: t.to == null ? null : Number(t.to), units: Number(t.units), unit_price: Number(t.unit_price) })); }
     catch { return []; }
   }
-  quantity(l: { quantity: number; unit?: string }): string {
-    if (l.unit === 'byte') { const b = l.quantity; return b < 1024 ? `${Math.round(b)} B` : b < 1024 ** 2 ? `${(b / 1024).toFixed(1)} KB` : b < 1024 ** 3 ? `${(b / 1024 ** 2).toFixed(2)} MB` : `${(b / 1024 ** 3).toFixed(2)} GB`; }
-    if (l.unit === 'GB-hour') return `${l.quantity.toLocaleString(undefined, { maximumFractionDigits: 3 })} GB·h`;
-    return l.quantity.toLocaleString(undefined, { maximumFractionDigits: l.quantity < 10 ? 3 : 0 });
-  }
-  overdueDays(): number { const d = this.invoice()?.dueAt; return d ? Math.max(0, Math.floor((Date.now() - new Date(d).getTime()) / 86_400_000)) : 0; }
+  quantity(l: { quantity: number; unit?: string }): string { return formatQuantity(l.quantity, l.unit); }
+  overdueDays(): number { return daysOverdue(this.invoice()?.dueAt); }
 
   // ---- documents ----
   openDocument(documentId: number): void {
