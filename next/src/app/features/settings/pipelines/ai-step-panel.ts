@@ -4,7 +4,6 @@ import { HttpClient } from '@angular/common/http';
 import { RouterLink } from '@angular/router';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { SidePanel } from '../../../shared/ui/side-panel';
-import { Icon } from '../../../shared/ui/icon';
 import { Combobox } from '../../../shared/ui/combobox';
 import { Prompt } from '../../ai/prompts/prompt-model';
 
@@ -26,7 +25,7 @@ export interface AiStepConfig {
  */
 @Component({
   selector: 'app-ai-step-panel',
-  imports: [SidePanel, Icon, Combobox, RouterLink],
+  imports: [SidePanel, Combobox, RouterLink],
   template: `
     <app-side-panel [heading]="'AI step · <' + data.tagKey + '>'" [subtitle]="runIn() === 'worker' ? 'The worker runs it as the task runs; the answer is written to this tag.' : 'Runs before dispatch; the answer is written to this tag.'">
       <div class="form-stack">

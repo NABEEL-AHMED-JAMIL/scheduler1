@@ -54,13 +54,20 @@ test.describe('invoices as rail and pane', () => {
     await expect(page.getByRole('button', { name: /Upload payment slip|Record payment|PDF/ }).first()).toBeVisible();
     await expect(page.getByRole('button', { name: 'Issue' })).toHaveCount(0);
     // Picking another row in the rail changes the address.
-    const options = page.getByRole('listbox', { name: 'Invoices' }).getByRole('option');
-    if (await options.count() > 1) {
-      await options.nth(1).click();
+    const other = page.getByRole('listbox', { name: 'Invoices' }).getByRole('option').filter({ hasNotText: issued!.number }).first();
+    if (await other.count()) {
+      await other.click();
       await expect(page).not.toHaveURL(new RegExp(issued!.number + '$'));
     }
-    // The document opens in Billing documents, read in the console's own viewer.
+    // View reads the PDF in a modal, in the console's own viewer, without leaving the bill.
     await page.goto(`/billing/invoices/${issued!.number}`);
+    await page.getByRole('button', { name: 'View', exact: true }).first().click();
+    const modal = page.getByRole('dialog');
+    await expect(modal.locator('canvas').first()).toBeVisible({ timeout: 20_000 });
+    await expect(modal.getByRole('button', { name: 'Download' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(modal).toHaveCount(0);
+    // The folder icon goes to Billing documents, read in place there too.
     await page.getByTitle('Open in Billing documents').first().click();
     await expect(page.getByRole('heading', { name: 'Billing documents' })).toBeVisible();
     await expect(page.getByRole('listbox', { name: 'Documents' }).getByRole('option', { selected: true })).toContainText(issued!.number);

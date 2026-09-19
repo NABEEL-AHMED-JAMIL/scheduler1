@@ -1573,9 +1573,14 @@ html.dark .tenant-code.is-copied { background: color-mix(in oklab, var(--color-o
 /* Lookups: master-detail. The rail lists lookups; the pane shows one -- its value, then its
    entries. Below md the two stack, the rail first, since a phone cannot hold both. */
 .lookup-split { display: grid; grid-template-columns: minmax(240px, 300px) minmax(0, 1fr); overflow: hidden; }
-.lookup-rail { border-right: 1px solid var(--border-subtle); display: flex; flex-direction: column; min-height: 20rem; }
+/* The rail keeps to the viewport and sticks under the header while the pane scrolls with the
+   page: a long invoice never leaves its list behind, and the list uses the height there is
+   instead of a fixed 30rem that cut a fifth of a tall screen. Sticky needs the rail not to
+   stretch to the grid row, hence align-self: start. */
+.lookup-rail { border-right: 1px solid var(--border-subtle); display: flex; flex-direction: column; min-height: 20rem;
+  position: sticky; top: calc(3.5rem + 1px); align-self: start; max-height: calc(100vh - 3.5rem - 1px); }
 .lookup-rail-tools { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.75rem; border-bottom: 1px solid var(--border-subtle); }
-.lookup-rail-list { list-style: none; margin: 0; padding: 0.375rem; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; max-height: 30rem; }
+.lookup-rail-list { list-style: none; margin: 0; padding: 0.375rem; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; flex: 1 1 auto; min-height: 0; }
 .lookup-rail-item { width: 100%; display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0.6rem; border-radius: 0.5rem; text-align: left; color: var(--text-primary); }
 .lookup-rail-item:hover { background: var(--surface-sunken); }
 .lookup-rail-item:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
@@ -1613,7 +1618,7 @@ html.dark .lookup-rail-glyph.is-managed { background: color-mix(in oklab, var(--
 .lookup-entries-scroll thead th { position: sticky; top: 0; z-index: 1; background: var(--surface-raised); }
 @media (max-width: 767px) {
   .lookup-split { grid-template-columns: 1fr; }
-  .lookup-rail { border-right: 0; border-bottom: 1px solid var(--border-subtle); min-height: 0; }
+  .lookup-rail { border-right: 0; border-bottom: 1px solid var(--border-subtle); min-height: 0; position: static; max-height: none; }
   .lookup-rail-list { max-height: 16rem; }
 }
 

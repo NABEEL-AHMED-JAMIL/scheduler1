@@ -11,6 +11,7 @@ import { Icon } from '../../shared/ui/icon';
 import { CopyButton } from '../../shared/ui/copy-button';
 import { copyText } from '../../shared/ui/clipboard.util';
 import { formatSize } from '../../shared/ui/format-size';
+import { DocumentViewDialog } from './document-view-dialog';
 import { BillingApi, DOCUMENT_KIND_LABEL, InvoiceDetail as Detail, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE, PaymentRow, InvoiceLine, AppliedTier, PAYMENT_METHODS } from './billing.service';
 import { daysOverdue, formatMoney, formatQuantity, formatUnitPrice } from './billing-format';
 
@@ -149,8 +150,11 @@ export class InvoicePane implements OnDestroy {
   overdueDays(): number { return daysOverdue(this.invoice()?.dueAt); }
 
   // ---- documents ----
+  /** Read in place, in the same modal the Object Browser opens a file in. */
   openDocument(documentId: number): void {
-    this.api.documentBlob(documentId).subscribe({ next: b => BillingApi.open(b), error: () => this.toast.error('Could not open the document.') });
+    const doc = this.invoice()?.documents.find(d => d.documentId === documentId);
+    if (!doc) return;
+    this.dialog.open<void>(DocumentViewDialog, { data: doc, hasBackdrop: true });
   }
   downloadDocument(documentId: number, fileName: string): void {
     this.api.documentBlob(documentId).subscribe({ next: b => BillingApi.save(b, fileName), error: () => this.toast.error('Could not download the document.') });

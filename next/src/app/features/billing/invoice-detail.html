@@ -174,7 +174,8 @@
                 <button type="button" class="link-inline text-sm block truncate text-left" (click)="openDocument(d.documentId)">{{ d.fileName }}</button>
                 <div class="text-[11px] text-[color:var(--text-muted)]">{{ kindLabel[d.kind] }}@if (d.number) { · {{ d.number }} } · {{ d.issuedAt | date: 'd MMM, HH:mm' }}@if (d.createdByName) { · {{ d.createdByName }} }@if (d.amount != null) { · {{ money(d.amount) }} }@if (d.sizeBytes) { · {{ humanSize(d.sizeBytes) }} }</div>
               </div>
-              <a class="btn btn-ghost btn-sm" [routerLink]="['/billing/documents']" [queryParams]="{ document: d.documentId }" title="Open in Billing documents"><app-icon name="eye" /></a>
+              <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="openDocument(d.documentId)" aria-label="View" title="View here"><app-icon name="eye" /></button>
+              <a class="btn btn-ghost btn-icon btn-sm" [routerLink]="['/billing/documents']" [queryParams]="{ document: d.documentId }" title="Open in Billing documents" aria-label="Open in Billing documents"><app-icon name="folder" /></a>
               <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="downloadDocument(d.documentId, d.fileName)" aria-label="Download"><app-icon name="download" /></button>
             </div>
           }

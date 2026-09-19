@@ -19,7 +19,7 @@
           <app-icon name="plus" [busy]="closing()" />{{ closing() ? 'Drafting…' : 'Draft month' }}
         </button>
       }
-      <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="pageMenu" aria-label="More"><app-icon name="dots" size="1.05em" /></button>
+      <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="pageMenu" aria-label="Billing actions"><app-icon name="dots" size="1.05em" /></button>
       <ng-template #pageMenu>
         <div cdkMenu class="card shadow-xl py-1 min-w-52 text-sm">
           <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="editAccount()"><app-icon name="edit" />Billing profile</button>
