@@ -50,6 +50,8 @@ export interface DocumentRow {
   documentId: number; kind: 'invoice' | 'credit_note' | 'receipt' | 'statement' | 'payment_slip'; number?: string; fileName: string;
   contentType?: string; sizeBytes?: number; amount?: number; issuedAt: string; invoiceId?: number; invoiceNumber?: string; paymentId?: number;
   tenantId: number; tenantName?: string; createdByName?: string;
+  /** The currency `amount` is in: its invoice's, or the workspace's for a statement. */
+  currency?: string;
 }
 export interface InvoiceDetail extends InvoiceRow {
   lines: InvoiceLine[]; payments: PaymentRow[]; documents: DocumentRow[]; account: BillingAccount; referencesNumber?: string; createdByName?: string;

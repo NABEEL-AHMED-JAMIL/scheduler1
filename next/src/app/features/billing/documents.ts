@@ -9,7 +9,7 @@ import { StatTile } from '../../shared/ui/stat-tile';
 import { PdfViewer } from '../objects/preview/pdf-viewer';
 import { formatSize } from '../../shared/ui/format-size';
 import { BillingApi, DOCUMENT_KINDS, DOCUMENT_KIND_LABEL, DocumentRow } from './billing.service';
-import { formatMoney } from './billing-format';
+import { MoneyTotals, addMoney, formatMoney, formatTotals } from './billing-format';
 import { WorkspacePicker } from './workspace-picker';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 
@@ -49,10 +49,10 @@ export class BillingDocuments implements OnInit, OnDestroy {
   readonly inYear = computed(() => this.rows().filter(r => r.issuedAt.startsWith(this.year())));
   readonly counts = computed(() => { const by: Record<string, number> = {}; for (const r of this.inYear()) by[r.kind] = (by[r.kind] ?? 0) + 1; return by; });
   readonly summary = computed(() => {
-    const s = { documents: this.inYear().length, invoices: 0, invoiced: 0, receipts: 0, received: 0, slips: 0 };
+    const s = { documents: this.inYear().length, invoices: 0, invoiced: {} as MoneyTotals, receipts: 0, received: {} as MoneyTotals, slips: 0 };
     for (const r of this.inYear()) {
-      if (r.kind === 'invoice') { s.invoices++; s.invoiced += Number(r.amount ?? 0); }
-      if (r.kind === 'receipt') { s.receipts++; s.received += Number(r.amount ?? 0); }
+      if (r.kind === 'invoice') { s.invoices++; s.invoiced = addMoney(s.invoiced, Number(r.amount ?? 0), r.currency); }
+      if (r.kind === 'receipt') { s.receipts++; s.received = addMoney(s.received, Number(r.amount ?? 0), r.currency); }
       if (r.kind === 'payment_slip') s.slips++;
     }
     return s;
@@ -103,7 +103,8 @@ export class BillingDocuments implements OnInit, OnDestroy {
   pickWorkspace(id: string): void { this.workspaces.tenantId.set(id); this.selectedId.set(null); this.revoke(); this.load(); }
   setKind(k: string): void { this.kind.set(this.kind() === k ? '' : k); }
   clearFilters(): void { this.search.set(''); this.kind.set(''); }
-  money(v: number): string { return formatMoney(v); }
+  money(v: number, currency?: string): string { return formatMoney(v, currency || 'USD'); }
+  totals(t: MoneyTotals): string { return formatTotals(t); }
   glyph(d: DocumentRow): string { const t = d.contentType || ''; return t.includes('pdf') ? 'PDF' : t.startsWith('image/') ? 'IMG' : 'FILE'; }
   open(d: DocumentRow): void { this.api.documentBlob(d.documentId).subscribe({ next: b => BillingApi.open(b), error: () => this.toast.error('Could not open the document.') }); }
   download(d: DocumentRow): void { this.api.documentBlob(d.documentId).subscribe({ next: b => BillingApi.save(b, d.fileName), error: () => this.toast.error('Could not download the document.') }); }

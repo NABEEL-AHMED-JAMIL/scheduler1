@@ -82,3 +82,18 @@ describe('Invoices', () => {
     expect(tenant.api.draft).not.toHaveBeenCalled();
   });
 });
+
+describe('Invoices tiles in the currency billed', () => {
+  it('shows a pound invoice as pounds, and never adds it to dollars', () => {
+    const { component } = page(false);
+    component.rows.set([
+      { ...component.rows()[0], kind: 'invoice', status: 'overdue', balance: 100, total: 100, currency: 'GBP' },
+      { ...component.rows()[0], kind: 'invoice', status: 'overdue', balance: 40, total: 40, currency: 'USD' },
+    ] as any);
+
+    const tile = component.totals(component.summary().overdueTotals);
+    expect(tile).toContain('£100.00');
+    expect(tile).toContain('$40.00');
+    expect(tile).not.toContain('140');
+  });
+});

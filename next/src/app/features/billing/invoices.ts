@@ -10,7 +10,7 @@ import { ToastService } from '../../shared/ui/toast.service';
 import { Icon } from '../../shared/ui/icon';
 import { StatTile } from '../../shared/ui/stat-tile';
 import { BillingApi, InvoiceRow, INVOICE_STATUSES, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE } from './billing.service';
-import { daysOverdue, formatMoney, yearMonth } from './billing-format';
+import { MoneyTotals, addMoney, daysOverdue, formatMoney, formatTotals, yearMonth } from './billing-format';
 import { BillingAccountDialog } from './billing-account-dialog';
 import { InvoicePane } from './invoice-detail';
 import { WorkspacePicker } from './workspace-picker';
@@ -51,14 +51,16 @@ export class Invoices implements OnInit {
 
   /** What needs attention, and what has been settled: the tiles. */
   readonly summary = computed(() => {
-    const s = { overdue: 0, overdueAmount: 0, open: 0, openAmount: 0, slips: 0, drafts: 0, draftAmount: 0, paid: 0, paidAmount: 0 };
+    const s = { overdue: 0, overdueAmount: 0, open: 0, openAmount: 0, slips: 0, drafts: 0, draftAmount: 0, paid: 0, paidAmount: 0,
+      // What the tiles show: the same sums kept apart by currency, so pounds never read as dollars.
+      overdueTotals: {} as MoneyTotals, openTotals: {} as MoneyTotals, draftTotals: {} as MoneyTotals, paidTotals: {} as MoneyTotals };
     for (const r of this.rows()) {
       if (r.kind !== 'invoice') continue;
       s.slips += r.pendingPayments ?? 0;
-      if (r.status === 'overdue') { s.overdue++; s.overdueAmount += r.balance; }
-      if (r.status === 'issued' || r.status === 'partially_paid') { s.open++; s.openAmount += r.balance; }
-      if (r.status === 'draft') { s.drafts++; s.draftAmount += r.total; }
-      if (r.status === 'paid') { s.paid++; s.paidAmount += r.total; }
+      if (r.status === 'overdue') { s.overdue++; s.overdueAmount += r.balance; s.overdueTotals = addMoney(s.overdueTotals, r.balance, r.currency); }
+      if (r.status === 'issued' || r.status === 'partially_paid') { s.open++; s.openAmount += r.balance; s.openTotals = addMoney(s.openTotals, r.balance, r.currency); }
+      if (r.status === 'draft') { s.drafts++; s.draftAmount += r.total; s.draftTotals = addMoney(s.draftTotals, r.total, r.currency); }
+      if (r.status === 'paid') { s.paid++; s.paidAmount += r.total; s.paidTotals = addMoney(s.paidTotals, r.total, r.currency); }
     }
     return s;
   });
@@ -114,6 +116,7 @@ export class Invoices implements OnInit {
   setStatus(s: string): void { this.status.set(this.status() === s ? '' : s); }
   clearFilters(): void { this.search.set(''); this.status.set(''); }
   money(v: number, currency = 'USD'): string { return formatMoney(v, currency); }
+  totals(t: MoneyTotals): string { return formatTotals(t); }
   period(r: InvoiceRow): string { return new Date(r.periodStart + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', year: 'numeric' }); }
   overdueDays(r: InvoiceRow): number { return daysOverdue(r.dueAt); }
   /** The rail's dot: what the row's state means for the reader. */

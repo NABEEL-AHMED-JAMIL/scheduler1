@@ -15,6 +15,26 @@ export function formatMoney(value: number, currency = 'USD'): string {
   return new Intl.NumberFormat(undefined, { style: 'currency', currency, minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value);
 }
 
+/** Amounts added up per currency: a total never mixes two. */
+export type MoneyTotals = Record<string, number>;
+
+/** `totals` with `value` added under its currency (USD when the row names none, as elsewhere here). */
+export function addMoney(totals: MoneyTotals, value: number, currency: string | null | undefined): MoneyTotals {
+  const code = currency || 'USD';
+  return { ...totals, [code]: (totals[code] ?? 0) + Number(value || 0) };
+}
+
+/**
+ * A total as it reads on a tile: one figure in its own currency, or one figure per currency --
+ * "€50.00 · £1,000.00" -- when the rows behind it were billed in several. Adding pounds to euros
+ * and calling the result dollars is the one answer that is certainly wrong.
+ */
+export function formatTotals(totals: MoneyTotals): string {
+  const codes = Object.keys(totals).sort();
+  if (!codes.length) return formatMoney(0, 'USD');
+  return codes.map(code => formatMoney(totals[code], code)).join(' · ');
+}
+
 /** Money as a headline figure: whole units. */
 export function formatMoneyRound(value: number, currency = 'USD'): string {
   return new Intl.NumberFormat(undefined, { style: 'currency', currency, maximumFractionDigits: 0 }).format(value);

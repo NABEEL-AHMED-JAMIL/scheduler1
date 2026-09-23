@@ -31,15 +31,15 @@
 
   <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
     <app-stat-tile label="Overdue" [value]="summary().overdue" icon="alert" [tone]="summary().overdue ? 'crit' : 'muted'"
-                   [foot]="summary().overdue ? money(summary().overdueAmount) + ' past due' : 'nothing past due'" />
+                   [foot]="summary().overdue ? totals(summary().overdueTotals) + ' past due' : 'nothing past due'" />
     <app-stat-tile label="Open" [value]="summary().open" icon="clock" [tone]="summary().open ? 'info' : 'muted'"
-                   [foot]="summary().open ? money(summary().openAmount) + ' to collect' : 'nothing outstanding'" />
+                   [foot]="summary().open ? totals(summary().openTotals) + ' to collect' : 'nothing outstanding'" />
     <app-stat-tile label="Slips to verify" [value]="summary().slips" icon="upload" [tone]="summary().slips ? 'warn' : 'muted'"
                    [foot]="summary().slips ? (isPlatformAdmin() ? 'waiting on the platform' : 'waiting on verification') : 'none pending'" />
     @if (isPlatformAdmin()) {
-      <app-stat-tile label="Drafts" [value]="summary().drafts" icon="edit" tone="muted" [foot]="summary().drafts ? money(summary().draftAmount) + ' running' : 'no month open'" />
+      <app-stat-tile label="Drafts" [value]="summary().drafts" icon="edit" tone="muted" [foot]="summary().drafts ? totals(summary().draftTotals) + ' running' : 'no month open'" />
     } @else {
-      <app-stat-tile label="Paid" [value]="summary().paid" icon="check" [tone]="summary().paid ? 'ok' : 'muted'" [foot]="summary().paid ? money(summary().paidAmount) + ' settled' : 'nothing settled yet'" />
+      <app-stat-tile label="Paid" [value]="summary().paid" icon="check" [tone]="summary().paid ? 'ok' : 'muted'" [foot]="summary().paid ? totals(summary().paidTotals) + ' settled' : 'nothing settled yet'" />
     }
   </div>
 

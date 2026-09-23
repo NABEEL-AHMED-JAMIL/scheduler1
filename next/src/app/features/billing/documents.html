@@ -12,8 +12,8 @@
 
   <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
     <app-stat-tile label="Documents" [value]="summary().documents" icon="folder" tone="info" [foot]="'in ' + year()" />
-    <app-stat-tile label="Invoices" [value]="summary().invoices" icon="file" [tone]="summary().invoices ? 'info' : 'muted'" [foot]="summary().invoices ? money(summary().invoiced) + ' invoiced' : 'none issued'" />
-    <app-stat-tile label="Receipts" [value]="summary().receipts" icon="check" [tone]="summary().receipts ? 'ok' : 'muted'" [foot]="summary().receipts ? money(summary().received) + ' received' : 'none yet'" />
+    <app-stat-tile label="Invoices" [value]="summary().invoices" icon="file" [tone]="summary().invoices ? 'info' : 'muted'" [foot]="summary().invoices ? totals(summary().invoiced) + ' invoiced' : 'none issued'" />
+    <app-stat-tile label="Receipts" [value]="summary().receipts" icon="check" [tone]="summary().receipts ? 'ok' : 'muted'" [foot]="summary().receipts ? totals(summary().received) + ' received' : 'none yet'" />
     <app-stat-tile label="Payment slips" [value]="summary().slips" icon="upload" [tone]="summary().slips ? 'warn' : 'muted'" [foot]="summary().slips ? 'uploaded by the workspace' : 'none uploaded'" />
   </div>
 
@@ -61,7 +61,7 @@
                 <span class="doc-ic">{{ glyph(d) }}</span>
                 <span class="min-w-0 flex-1">
                   <span class="lookup-rail-key">{{ d.number || d.fileName }}</span>
-                  <span class="lookup-rail-sub">{{ kindLabel[d.kind] }}@if (d.invoiceNumber && d.kind !== 'invoice') { · for {{ d.invoiceNumber }} } · {{ d.issuedAt | serverTime: 'd MMM' }}@if (d.amount != null) { · <span class="tabular">{{ money(d.amount) }}</span> }</span>
+                  <span class="lookup-rail-sub">{{ kindLabel[d.kind] }}@if (d.invoiceNumber && d.kind !== 'invoice') { · for {{ d.invoiceNumber }} } · {{ d.issuedAt | serverTime: 'd MMM' }}@if (d.amount != null) { · <span class="tabular">{{ money(d.amount, d.currency) }}</span> }</span>
                 </span>
                 <app-icon name="chevronRight" size="0.9em" class="lookup-rail-chev" />
               </button>
@@ -78,7 +78,7 @@
             <div class="flex items-center gap-2 flex-wrap">
               <span class="pill pill-neutral">{{ kindLabel[d.kind] }}</span>
               @if (isPlatformAdmin() && d.tenantName) { <span class="pill pill-neutral"><app-icon name="building" size="0.8em" class="opacity-70" />{{ d.tenantName }}</span> }
-              @if (d.amount != null) { <span class="pill pill-brand tabular">{{ money(d.amount) }}</span> }
+              @if (d.amount != null) { <span class="pill pill-brand tabular">{{ money(d.amount, d.currency) }}</span> }
             </div>
             <div class="flex items-baseline gap-2 mt-1 min-w-0 flex-wrap">
               <h2 class="lookup-detail-key" [title]="d.fileName">{{ d.number || d.fileName }}</h2>

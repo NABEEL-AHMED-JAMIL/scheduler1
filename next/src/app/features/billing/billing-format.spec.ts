@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { BYTES_PER_GB, daysOverdue, formatBytes, formatMoney, formatMoneyRound, formatQuantity, formatUnitPrice, priceDigits, yearMonth } from './billing-format';
+import { BYTES_PER_GB, addMoney, formatTotals, daysOverdue, formatBytes, formatMoney, formatMoneyRound, formatQuantity, formatUnitPrice, priceDigits, yearMonth } from './billing-format';
 
 /** The one way billing figures read, on every billing screen. */
 describe('billing-format', () => {
@@ -37,5 +37,30 @@ describe('billing-format', () => {
     expect(daysOverdue('2026-10-15T00:00:00Z', now)).toBe(0);
     expect(daysOverdue(null, now)).toBe(0);
     expect(yearMonth(new Date('2026-09-19T00:00:00'))).toBe('2026-09');
+  });
+});
+
+/**
+ * A tile that adds up amounts from several invoices. Summed as one number and labelled dollars,
+ * a workspace billed in pounds read "$1,200.00 to collect"; and across workspaces billed in
+ * different currencies there is no single number to show at all.
+ */
+describe('addMoney / formatTotals', () => {
+  it('shows a total in the currency it was billed in', () => {
+    const totals = addMoney(addMoney({}, 1000, 'GBP'), 200, 'GBP');
+    expect(formatTotals(totals)).toBe(formatMoney(1200, 'GBP'));
+  });
+
+  it('keeps different currencies apart rather than adding them', () => {
+    const totals = addMoney(addMoney({}, 1000, 'GBP'), 50, 'EUR');
+    expect(formatTotals(totals)).toBe(`${formatMoney(50, 'EUR')} · ${formatMoney(1000, 'GBP')}`);
+  });
+
+  it('reads a row with no currency as dollars, as the rest of billing does', () => {
+    expect(formatTotals(addMoney({}, 5, undefined))).toBe(formatMoney(5, 'USD'));
+  });
+
+  it('says nothing is owed in no particular currency', () => {
+    expect(formatTotals({})).toBe(formatMoney(0, 'USD'));
   });
 });
