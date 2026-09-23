@@ -1,6 +1,7 @@
 import { DataGrid } from './data-grid';
 import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
+import { ToastService } from '../../shared/ui/toast.service';
 import { provideRouter } from '@angular/router';
 import { Dialog } from '@angular/cdk/dialog';
 import { Subject, of } from 'rxjs';
@@ -5362,5 +5363,52 @@ describe('finding your way around in the storage rail', () => {
     const harness = studioWith({ connections: [FTP, AZURE] });
     expect(harness.studio.unreadableConnectionCount()).toBe(0);
     expect(harness.studio.noReadableConnection()).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * A refused rename or delete is about ONE row. It used to be written into the signal that means
+ * "the list could not be read", so one refusal replaced the whole list with an error -- and the
+ * "Try again" beside it reloaded the list instead of retrying, which wiped the message.
+ */
+describe('a refused change to one saved item leaves the list alone', () => {
+  const toasts = () => TestBed.inject(ToastService).toasts().map(t => t.message);
+
+  it('keeps the saved queries on screen when a delete is refused, and says why', async () => {
+    const console = consoleWith({ confirms: true });
+    console.answers.saved!.next(SERVER_RESPONSE([SAVED]));
+    await console.studio.removeSaved(SAVED);
+    console.answers.remove!.next(SERVER_REFUSAL('Only its owner can delete this query.'));
+
+    expect(console.studio.savedError()).toBe('');
+    expect(console.show()).toContain(SAVED.queryName!);
+    expect(toasts()).toContain('Only its owner can delete this query.');
+  });
+
+  it('keeps the saved queries on screen when a rename is refused, and says why', () => {
+    const console = consoleWith();
+    console.answers.saved!.next(SERVER_RESPONSE([SAVED]));
+    console.studio.startRename(SAVED);
+    console.studio.renameName.set('Something else');
+    console.studio.applyRename();
+    console.answers.rename!.next(SERVER_REFUSAL('That name is taken.'));
+
+    expect(console.studio.savedError()).toBe('');
+    expect(console.show()).toContain(SAVED.queryName!);
+    expect(toasts()).toContain('That name is taken.');
+  });
+
+  it('keeps the saved analyses on screen when a delete is refused, and says why', async () => {
+    const canvas = canvasWith();
+    await canvas.studio.removeAnalysis({
+      analyticsAnalysisId: 7, analysisName: 'Q3 draft', connectionAlias: 'minio-main',
+      datasetPath: 'daily/sales-2026.csv', analysisConfig: '{}',
+    });
+    canvas.answers.deleteAnalysis!.next(SERVER_REFUSAL('Only its owner can delete this analysis.'));
+
+    expect(canvas.studio.analysesError()).toBe('');
+    expect(toasts()).toContain('Only its owner can delete this analysis.');
   });
 });

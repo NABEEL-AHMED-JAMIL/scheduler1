@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
+import { ToastService } from '../../shared/ui/toast.service';
 import { HttpClient } from '@angular/common/http';
 import { Dialog } from '@angular/cdk/dialog';
 import { provideRouter } from '@angular/router';
@@ -2128,5 +2129,45 @@ describe('bars side by side', () => {
     const truncated = { ...GRID, rows: null };
     expect(chart().pivotGroupNames(truncated as any)).toEqual([]);
     expect(chart().pivotSeries(truncated as any).every((s: { values: unknown[] }) => s.values.length === 0)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+
+/** One refused delete used to replace the whole rail, or the whole registry, with its message. */
+describe('a refused delete leaves the list alone', () => {
+  const toasts = () => TestBed.inject(ToastService).toasts().map(t => t.message);
+
+  it('keeps every dashboard in the rail and says why the delete was refused', async () => {
+    const view = boardWith();
+    view.deleteDashboard.mockReturnValueOnce(of(SERVER_REFUSAL('Only its owner can delete this dashboard.')) as any);
+    await view.board.removeDashboard(BOARD);
+
+    expect(view.board.error()).toBe('');
+    expect(toasts()).toContain('Only its owner can delete this dashboard.');
+  });
+
+  it('keeps the registry listed and says why a Forget was refused', async () => {
+    TestBed.resetTestingModule();
+    const DATASET = { analyticsDatasetId: 3, datasetName: 'Sales', connectionAlias: 'minio-main',
+      datasetPath: 'daily/sales-2026.csv', datasetFormat: 'CSV' } as any;
+    const deleteDataset = vi.fn(() => of(SERVER_REFUSAL('Only its owner can remove this dataset.')));
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: AnalyticsService, useValue: {
+          fetchAllDatasets: () => of(SERVER_RESPONSE([DATASET])), registerDataset: vi.fn(), deleteDataset } },
+        { provide: Dialog, useValue: { open: () => ({ closed: of(true) }) } },
+      ],
+    });
+    const fixture = TestBed.createComponent(DatasetRegistry);
+    fixture.componentRef.setInput('connection', 'minio-main');
+    fixture.componentRef.setInput('path', 'daily/sales-2026.csv');
+    fixture.detectChanges();
+    await fixture.componentInstance.forget(DATASET);
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.error()).toBe('');
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Sales');
+    expect(toasts()).toContain('Only its owner can remove this dataset.');
   });
 });

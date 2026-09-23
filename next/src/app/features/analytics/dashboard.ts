@@ -24,6 +24,7 @@ import {
   SavedAnalysis,
   SavedQuery, TopN, WidgetVisualization,
 } from './analytics.service';
+import { ToastService } from '../../shared/ui/toast.service';
 
 /**
  * One mark on a chart.
@@ -1082,6 +1083,7 @@ export class Dashboards implements OnInit, OnDestroy {
 
   private readonly analytics = inject(AnalyticsService);
   private readonly dialog = inject(Dialog);
+  private readonly toast = inject(ToastService);
 
   readonly kinds = KINDS;
   readonly heightMin = WIDGET_HEIGHT_MIN;
@@ -1559,7 +1561,7 @@ export class Dashboards implements OnInit, OnDestroy {
     this.analytics.deleteDashboard(id).subscribe({
       next: response => {
         if (response.status !== API_SUCCESS) {
-          this.error.set(response.message || 'The dashboard could not be deleted.');
+          this.toast.error(response.message || 'The dashboard could not be deleted.');
           return;
         }
         if (this.board()?.analyticsDashboardId === id) {
@@ -1569,7 +1571,7 @@ export class Dashboards implements OnInit, OnDestroy {
         this.loadDashboards();
       },
       error: err => {
-        this.error.set(err?.error?.message || 'The dashboard could not be deleted.');
+        this.toast.error(err?.error?.message || 'The dashboard could not be deleted.');
       },
     });
   }
@@ -2323,6 +2325,7 @@ export class DatasetRegistry implements OnInit {
 
   private readonly analytics = inject(AnalyticsService);
   private readonly dialog = inject(Dialog);
+  private readonly toast = inject(ToastService);
 
   /** The connection and path a host screen is already looking at. Both are editable here. */
   readonly connection = input('');
@@ -2427,13 +2430,13 @@ export class DatasetRegistry implements OnInit {
     this.analytics.deleteDataset(id).subscribe({
       next: response => {
         if (response.status !== API_SUCCESS) {
-          this.error.set(response.message || 'That dataset could not be removed.');
+          this.toast.error(response.message || 'That dataset could not be removed.');
           return;
         }
         this.load();
       },
       error: err => {
-        this.error.set(err?.error?.message || 'That dataset could not be removed.');
+        this.toast.error(err?.error?.message || 'That dataset could not be removed.');
       },
     });
   }

@@ -33,6 +33,7 @@ import {
   isFilterGroup,
   SavedQuery, WriteBackResult,
 } from './analytics.service';
+import { ToastService } from '../../shared/ui/toast.service';
 
 /**
  * The tabs a dataset is read through -- document 02's ten.
@@ -599,6 +600,7 @@ export class Analytics implements OnInit {
   private readonly storage = inject(StorageService);
   private readonly analytics = inject(AnalyticsService);
   private readonly dialog = inject(Dialog);
+  private readonly toast = inject(ToastService);
 
   readonly humanSize = formatSize;
   readonly compact = compactNumber;
@@ -3012,7 +3014,7 @@ export class Analytics implements OnInit {
       next: response => {
         this.cancelRename();
         if (response.status !== API_SUCCESS) {
-          this.savedError.set(response.message || 'The query could not be renamed.');
+          this.toast.error(response.message || 'The query could not be renamed.');
           return;
         }
         // The one in the editor carries its own copy of the name; a rename that left the header
@@ -3026,7 +3028,7 @@ export class Analytics implements OnInit {
       },
       error: err => {
         this.cancelRename();
-        this.savedError.set(err?.error?.message || 'The query could not be renamed.');
+        this.toast.error(err?.error?.message || 'The query could not be renamed.');
       },
     });
   }
@@ -3044,7 +3046,7 @@ export class Analytics implements OnInit {
     const confirmed = await confirmWith(this.dialog, {
       title: 'Delete this saved query?',
       body: `"${query.queryName}" will be removed. The record of the times it was run stays in `
-        + 'the history below.',
+        + 'Run history.',
       confirmLabel: 'Delete',
       danger: true,
     });
@@ -3052,14 +3054,14 @@ export class Analytics implements OnInit {
     this.analytics.deleteQuery(id).subscribe({
       next: response => {
         if (response.status !== API_SUCCESS) {
-          this.savedError.set(response.message || 'The query could not be deleted.');
+          this.toast.error(response.message || 'The query could not be deleted.');
           return;
         }
         if (this.loadedQuery()?.analyticsQueryId === id) this.loadedQuery.set(null);
         this.loadSavedQueries();
       },
       error: err => {
-        this.savedError.set(err?.error?.message || 'The query could not be deleted.');
+        this.toast.error(err?.error?.message || 'The query could not be deleted.');
       },
     });
   }
@@ -4979,7 +4981,7 @@ export class Analytics implements OnInit {
     this.analytics.deleteAnalysis(id).subscribe({
       next: response => {
         if (response.status !== API_SUCCESS) {
-          this.analysesError.set(response.message || 'The analysis could not be deleted.');
+          this.toast.error(response.message || 'The analysis could not be deleted.');
           return;
         }
         // The server's own sentence, which is the only account of how many tiles went with it.
@@ -4988,7 +4990,7 @@ export class Analytics implements OnInit {
         this.loadAnalyses();
       },
       error: err => {
-        this.analysesError.set(err?.error?.message || 'The analysis could not be deleted.');
+        this.toast.error(err?.error?.message || 'The analysis could not be deleted.');
       },
     });
   }
