@@ -37,9 +37,15 @@ function browserWithHiddenSelection() {
         download: (_bucket: string, key: string) => { downloaded.push(key); return of(new Blob()); },
       } },
       // Every dialog answers yes: the share form with an address, the delete confirm with true.
-      { provide: Dialog, useValue: { open: (component: { name?: string }) => ({
-        closed: of(/Share/.test(component?.name ?? '') ? { recipientEmail: 'a@b.example', message: '' } : true),
-      }) } },
+      // The share dialog sends by itself (ShareOptions.send); this is the person pressing Send.
+      { provide: Dialog, useValue: { open: (_component: unknown, config?: { data?: any }) => {
+        if (config?.data?.send) {
+          const typed = { recipientEmail: 'a@b.example', message: '' };
+          config.data.send(typed).subscribe();
+          return { closed: of(typed) };
+        }
+        return { closed: of(true) };
+      } } },
       { provide: AuthService, useValue: { user: () => null, displayName: () => 'Tester' } },
     ],
   });

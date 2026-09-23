@@ -274,7 +274,15 @@ function openPanel(options: PanelOptions = {}) {
       { provide: AuthService, useValue: { user: () => null, displayName: () => 'Tester' } },
       // confirmWith resolves as soon as the dialog "closes", so this is the reader answering
       // "Close this chat?" without an overlay ever being rendered.
-      { provide: Dialog, useValue: { open: () => ({ closed: of(options.confirms ?? true) }) } },
+      // A share dialog sends by itself (ShareOptions.send); this is the person pressing Send.
+      { provide: Dialog, useValue: { open: (_component: unknown, config?: { data?: any }) => {
+        if (config?.data?.send) {
+          const typed = { recipientEmail: 'reader@example.com', message: '' };
+          config.data.send(typed).subscribe();
+          return { closed: of(typed) };
+        }
+        return { closed: of(options.confirms ?? true) };
+      } } },
     ],
   });
 

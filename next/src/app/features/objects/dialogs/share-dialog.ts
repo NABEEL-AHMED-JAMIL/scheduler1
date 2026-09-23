@@ -1,4 +1,5 @@
 import { Component, inject, signal } from '@angular/core';
+import { Observable } from 'rxjs';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 
 /**
@@ -9,7 +10,15 @@ import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
  * file / Sent as a ZIP attachment" is wrong on both halves. Overriding two strings keeps one
  * dialog rather than growing a second, near-identical one that would drift from it.
  */
-export interface ShareOptions { count: number; title?: string; subtitle?: string; }
+export interface ShareOptions {
+  count: number; title?: string; subtitle?: string;
+  /**
+   * Sends the email. When given, the dialog stays open until the server has answered: a refusal
+   * (an address it rejects, an attachment over the size limit) is shown here, with what was
+   * typed still in place, instead of as a toast after the dialog has already gone.
+   */
+  send?: (result: ShareResult) => Observable<{ status: string; message?: string }>;
+}
 export interface ShareResult { recipientEmail: string; message: string; }
 
 @Component({
@@ -32,10 +41,16 @@ export interface ShareResult { recipientEmail: string; message: string; }
         <label class="label mt-3" for="note">Message</label>
         <textarea id="note" class="input resize-y min-h-20" placeholder="Optional note"
                   [value]="message()" (input)="message.set($any($event.target).value)"></textarea>
+
+        @if (error()) {
+          <p class="field-note text-crit-500 mt-2" role="alert">{{ error() }}</p>
+        }
       </div>
       <div class="flex justify-end gap-2 px-5 py-3 border-t border-subtle">
-        <button type="button" class="btn btn-default btn-sm" (click)="ref.close()">Cancel</button>
-        <button type="submit" class="btn btn-primary btn-sm" [disabled]="!valid()">Send</button>
+        <button type="button" class="btn btn-default btn-sm" (click)="ref.close()" [disabled]="sending()">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm" [disabled]="!valid() || sending()">
+          {{ sending() ? 'Sending…' : 'Send' }}
+        </button>
       </div>
     </form>
   `,
@@ -45,6 +60,8 @@ export class ShareDialog {
   readonly data = inject<ShareOptions>(DIALOG_DATA);
   readonly email = signal('');
   readonly message = signal('');
+  readonly sending = signal(false);
+  readonly error = signal('');
 
   valid(): boolean {
     // Deliberately loose: the server is the authority on deliverability, this only
@@ -54,8 +71,21 @@ export class ShareDialog {
 
   submit(event: Event): void {
     event.preventDefault();
-    if (this.valid()) {
-      this.ref.close({ recipientEmail: this.email().trim(), message: this.message().trim() });
-    }
+    if (!this.valid() || this.sending()) return;
+    const result = { recipientEmail: this.email().trim(), message: this.message().trim() };
+    if (!this.data.send) { this.ref.close(result); return; }
+    this.sending.set(true);
+    this.error.set('');
+    this.data.send(result).subscribe({
+      next: response => {
+        this.sending.set(false);
+        if (response.status === 'SUCCESS') this.ref.close(result);
+        else this.error.set(response.message || 'The email could not be sent.');
+      },
+      error: err => {
+        this.sending.set(false);
+        this.error.set(err?.error?.message || 'The email could not be sent.');
+      },
+    });
   }
 }

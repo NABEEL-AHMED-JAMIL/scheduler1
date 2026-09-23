@@ -12,7 +12,7 @@ import { confirmWith } from '../../../shared/ui/confirm';
 import { copyText } from '../../../shared/ui/clipboard.util';
 import { ChatFile, parseDownloadableFiles, stripExportFences } from './chat-export';
 import { ShareDialog, ShareResult } from '../dialogs/share-dialog';
-import { Subscription } from 'rxjs';
+import { Subscription, finalize } from 'rxjs';
 
 interface ChatMessage {
   role: 'user' | 'assistant' | 'error';
@@ -645,31 +645,24 @@ export class FileChat implements OnInit, OnDestroy {
     const answer = (text ?? '').trim();
     if (!answer || this.emailing()) return;
     const token = `answer-${index ?? this.messages().findIndex(m => m.text === text)}`;
+    // The dialog sends and stays open until the server answers; see ShareOptions.send.
+    const send = (result: ShareResult) => {
+      this.emailing.set(token);
+      return this.http.post<ApiResponse>(`${API_BASE}/fileChat.json/emailExport`, {
+        content: answer, sourceFormat: 'md', targetFormat: 'pdf',
+        recipientEmail: result.recipientEmail, message: result.message,
+      }).pipe(finalize(() => this.emailing.set(null)));
+    };
     this.dialog.open<ShareResult>(ShareDialog, {
       hasBackdrop: true,
       data: {
         count: 1,
         title: 'Email this answer',
         subtitle: 'Converted to a PDF and sent as an attachment.',
+        send,
       },
     }).closed.subscribe(result => {
-      if (!result) return;
-      this.emailing.set(token);
-      this.http.post<ApiResponse>(`${API_BASE}/fileChat.json/emailExport`, {
-        content: answer, sourceFormat: 'md', targetFormat: 'pdf',
-        recipientEmail: result.recipientEmail, message: result.message,
-      }).subscribe({
-        next: response => {
-          this.emailing.set(null);
-          response.status === API_SUCCESS
-            ? this.toast.success(`Sent to ${result.recipientEmail}.`)
-            : this.toast.error(response.message || 'The email could not be sent.');
-        },
-        error: err => {
-          this.emailing.set(null);
-          this.toast.error(err?.error?.message || 'The email could not be sent.');
-        },
-      });
+      if (result) this.toast.success(`Sent to ${result.recipientEmail}.`);
     });
   }
 
@@ -685,28 +678,19 @@ export class FileChat implements OnInit, OnDestroy {
         subtitle: pending
           ? `The reply is converted to .${format} and sent as an attachment.`
           : `${file.filename} is sent as an attachment.`,
+        send: (result: ShareResult) => {
+          this.emailing.set(file.filename);
+          return this.http.post<ApiResponse>(`${API_BASE}/fileChat.json/emailExport`, {
+            content: file.content,
+            sourceFormat: pending ? pending.sourceFormat : 'txt',
+            targetFormat: pending ? pending.targetFormat : 'pdf',
+            recipientEmail: result.recipientEmail,
+            message: result.message,
+          }).pipe(finalize(() => this.emailing.set(null)));
+        },
       },
     }).closed.subscribe(result => {
-      if (!result) return;
-      this.emailing.set(file.filename);
-      this.http.post<ApiResponse>(`${API_BASE}/fileChat.json/emailExport`, {
-        content: file.content,
-        sourceFormat: pending ? pending.sourceFormat : 'txt',
-        targetFormat: pending ? pending.targetFormat : 'pdf',
-        recipientEmail: result.recipientEmail,
-        message: result.message,
-      }).subscribe({
-        next: response => {
-          this.emailing.set(null);
-          response.status === API_SUCCESS
-            ? this.toast.success(`Sent to ${result.recipientEmail}.`)
-            : this.toast.error(response.message || 'The email could not be sent.');
-        },
-        error: err => {
-          this.emailing.set(null);
-          this.toast.error(err?.error?.message || 'The email could not be sent.');
-        },
-      });
+      if (result) this.toast.success(`Sent to ${result.recipientEmail}.`);
     });
   }
 

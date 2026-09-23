@@ -658,28 +658,18 @@ export class Objects implements OnInit {
     const keys = entry ? [entry.key] : this.visibleSelection();
     if (!keys.length) return;
     this.actionBusy.set(true);
+    const bucket = this.bucket();
+    // The dialog sends, and stays open until the server answers, so a refusal is shown beside
+    // what was typed rather than after it has gone.
+    const send = (result: ShareResult) => this.http.post<ApiResponse>(`${API_BASE}/fileShare.json/send`, {
+      bucket, keys, recipientEmail: result.recipientEmail, message: result.message,
+    });
     this.dialog.open<ShareResult>(ShareDialog, {
       hasBackdrop: true,
-      data: { count: keys.length },
+      data: { count: keys.length, send },
     }).closed.subscribe(result => {
-      if (!result) { this.actionBusy.set(false); return; }
-      this.http.post<ApiResponse>(`${API_BASE}/fileShare.json/send`, {
-        bucket: this.bucket(),
-        keys,
-        recipientEmail: result.recipientEmail,
-        message: result.message,
-      }).subscribe({
-        next: response => {
-          this.actionBusy.set(false);
-          response.status === API_SUCCESS
-            ? this.toast.success(`Sent to ${result.recipientEmail}.`)
-            : this.toast.error(response.message);
-        },
-        error: err => {
-          this.actionBusy.set(false);
-          this.toast.error(err?.error?.message || 'The email could not be sent.');
-        },
-      });
+      this.actionBusy.set(false);
+      if (result) this.toast.success(`Sent to ${result.recipientEmail}.`);
     });
   }
 
