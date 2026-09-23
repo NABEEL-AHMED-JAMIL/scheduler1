@@ -78,16 +78,16 @@
           }
         </nav>
 
-        @if (selected().size) {
+        @if (visibleSelection().length) {
           <button type="button" class="btn btn-default btn-sm" (click)="downloadSelected()">
-            Download {{ selected().size }}
+            Download {{ visibleSelection().length }}
           </button>
           <button type="button" class="btn btn-default btn-sm" (click)="share()" [disabled]="actionBusy()">
-            Email {{ selected().size }}
+            Email {{ visibleSelection().length }}
           </button>
           <button type="button" class="btn btn-danger btn-sm" (click)="removeSelected()"
                   [disabled]="actionBusy()">
-            Delete {{ selected().size }}
+            Delete {{ visibleSelection().length }}
           </button>
         }
 

@@ -164,6 +164,15 @@ export class Objects implements OnInit {
 
   humanSize = formatSize;
 
+  /**
+   * The ticked files the reader can still see. A tick survives a search or date filter that hides
+   * its row -- clearing the filter brings it back ticked -- but nothing acts on a file that is
+   * off the screen: "Delete 5" used to delete files the search had hidden, while Download took
+   * only the visible ones. Every action and every count reads this, so they agree.
+   */
+  readonly visibleSelection = computed(() =>
+    this.filtered().filter(o => !o.folder && this.selected().has(o.key)).map(o => o.key));
+
   readonly allSelected = computed(() => {
     const rows = this.filtered().filter(o => !o.folder);
     return rows.length > 0 && rows.every(o => this.selected().has(o.key));
@@ -332,7 +341,7 @@ export class Objects implements OnInit {
 
   async removeSelected(): Promise<void> {
     if (this.actionBusy()) return;
-    const keys = [...this.selected()];
+    const keys = this.visibleSelection();
     if (!keys.length) return;
     this.actionBusy.set(true);
     const ok = await confirmWith(this.dialog, {
@@ -646,7 +655,7 @@ export class Objects implements OnInit {
   /** Emails one file, or the current selection, as a ZIP. */
   share(entry?: ObjectSummary): void {
     if (this.actionBusy()) return;
-    const keys = entry ? [entry.key] : [...this.selected()];
+    const keys = entry ? [entry.key] : this.visibleSelection();
     if (!keys.length) return;
     this.actionBusy.set(true);
     this.dialog.open<ShareResult>(ShareDialog, {
@@ -676,7 +685,8 @@ export class Objects implements OnInit {
 
   /** Downloads each selected file individually; folders are skipped rather than zipped. */
   downloadSelected(): void {
-    const files = this.filtered().filter(o => !o.folder && this.selected().has(o.key));
+    const keys = new Set(this.visibleSelection());
+    const files = this.filtered().filter(o => keys.has(o.key));
     if (!files.length) return;
     this.toast.info(`Downloading ${files.length} file${files.length === 1 ? '' : 's'}.`);
     let failed = 0;
