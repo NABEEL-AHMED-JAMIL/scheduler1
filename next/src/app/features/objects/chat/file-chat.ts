@@ -377,7 +377,13 @@ export class FileChat implements OnInit, OnDestroy {
   private loadAgents(): void {
     this.http.get<ApiResponse<Agent[]>>(`${API_BASE}/aiAgent.json/fetchAllAgents`).subscribe({
       next: response => {
-        if (response.status !== API_SUCCESS) return;
+        if (response.status !== API_SUCCESS) {
+          // Returning here left "Reading the file..." up for good with the composer disabled.
+          // Said once, then the file is still read -- the same as when the request fails outright.
+          this.toast.error(response.message || 'The list of agents could not be read.');
+          this.prepare();
+          return;
+        }
         // Only agents that can actually answer: active, and either keyed or local Ollama.
         const usable = (response.data ?? []).filter(a =>
           a.status === 'Active' && (a.apiKeyConfigured || a.provider?.toLowerCase() === 'ollama'));

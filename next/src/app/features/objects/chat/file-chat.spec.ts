@@ -235,6 +235,8 @@ const READER: Agent = {
 interface PanelOptions {
   /** What fetchAllAgents answers. An empty list is what leaves `agentId` null. */
   agents?: Agent[];
+  /** fetchAllAgents answers with a refusal envelope instead of a list. */
+  agentsRefused?: string;
   /** What prepareContext answers, keyed on the agent asked -- so "change agent and it works"
       can actually be driven rather than asserted about. */
   prepare?: (aiAgentId: number | null) => { status: 'SUCCESS' | 'ERROR'; message: string; data?: unknown };
@@ -253,7 +255,9 @@ function openPanel(options: PanelOptions = {}) {
 
   const http = {
     get: vi.fn((url: string) =>
-      of(url.includes('fetchAllAgents') ? OK(options.agents ?? [READER]) : OK(null))),
+      of(url.includes('fetchAllAgents')
+        ? (options.agentsRefused !== undefined ? { status: 'ERROR', message: options.agentsRefused } : OK(options.agents ?? [READER]))
+        : OK(null))),
     post: vi.fn((url: string, body: any) => {
       posts.push({ url, body });
       if (url.includes('prepareContext')) return of(prepare(body?.aiAgentId ?? null));
@@ -681,5 +685,19 @@ describe('emailing an answer', () => {
     panel.chat.emailing.set('answer-0');
     panel.chat.emailAnswer('anything', 1);
     expect(panel.posts.find(p => p.url.includes('emailExport'))).toBeUndefined();
+  });
+});
+
+describe('opening the panel when the agent list is refused', () => {
+  afterEach(() => sessionStorage.clear());
+
+  /** "Reading the file..." stayed up for good and the composer stayed disabled, with no word why. */
+  it('does not leave the panel reading forever, and says why there is no agent', () => {
+    const panel = openPanel({ agentsRefused: 'You do not have access to AI agents.' });
+    panel.fixture.detectChanges();
+
+    expect(panel.chat.preparing()).toBe(false);
+    expect(panel.toast.error).toHaveBeenCalledWith('You do not have access to AI agents.');
+    expect(panel.posts.some(p => p.url.includes('prepareContext'))).toBe(true);
   });
 });
