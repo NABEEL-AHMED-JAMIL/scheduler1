@@ -1,5 +1,8 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
+import { StorageService, BucketSummary } from '../objects/storage.service';
+import { Combobox } from '../../shared/ui/combobox';
+import { API_SUCCESS } from '../../core/api/api.config';
 
 export interface ReportDestinationOptions {
   kind: 'bucket' | 'submit';
@@ -21,6 +24,7 @@ export interface ReportDestinationResult {
  */
 @Component({
   selector: 'app-report-destination-dialog',
+  imports: [Combobox],
   template: `
     <form class="card shadow-2xl w-[26rem] max-w-[calc(100vw-2rem)] overflow-hidden"
           (submit)="submit($event)">
@@ -31,9 +35,16 @@ export interface ReportDestinationResult {
             Written as a file inside the folder you name.
           </p>
 
-          <label class="label mt-3" for="bucket">Bucket</label>
-          <input id="bucket" class="input" cdkFocusInitial placeholder="reports-bucket"
-                 [value]="bucket()" (input)="bucket.set($any($event.target).value)" />
+          <label class="label mt-3" for="bucket">Connection</label>
+          @if (bucketsError()) {
+            <p class="field-note text-crit-500" role="alert">{{ bucketsError() }}</p>
+          } @else {
+            <!-- The workspace's own connections, as the Object Browser offers them. It was free
+                 text, and a typo showed up only as a toast after the dialog had closed. -->
+            <app-combobox id="bucket" [selected]="bucket()" (selectedChange)="bucket.set($event)"
+                          [options]="bucketOptions()" [allowClear]="false"
+                          [placeholder]="loadingBuckets() ? 'Reading connections…' : 'Search connections…'" />
+          }
 
           <label class="label mt-3" for="folder">Folder</label>
           <input id="folder" class="input" placeholder="reports"
@@ -67,9 +78,31 @@ export class ReportDestinationDialog {
   readonly folder = signal('reports');
   readonly submitUrl = signal('');
 
+  private readonly connections = signal<BucketSummary[]>([]);
+  readonly loadingBuckets = signal(false);
+  readonly bucketsError = signal('');
+  readonly bucketOptions = computed(() =>
+    this.connections().map(b => ({ value: b.bucket, label: b.label || b.bucket, hint: b.provider })));
+
+  constructor() {
+    if (this.data.kind !== 'bucket') return;
+    this.loadingBuckets.set(true);
+    inject(StorageService).buckets().subscribe({
+      next: response => {
+        this.loadingBuckets.set(false);
+        if (response.status !== API_SUCCESS) { this.bucketsError.set(response.message || 'The connections could not be read.'); return; }
+        this.connections.set(response.data ?? []);
+      },
+      error: err => {
+        this.loadingBuckets.set(false);
+        this.bucketsError.set(err?.error?.message || 'The connections could not be read.');
+      },
+    });
+  }
+
   valid(): boolean {
     return this.data.kind === 'bucket'
-      ? !!this.bucket().trim()
+      ? !!this.bucket().trim() && this.connections().some(c => c.bucket === this.bucket().trim())
       : /^https?:\/\/\S+/.test(this.submitUrl().trim());
   }
 

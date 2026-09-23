@@ -1,14 +1,23 @@
 import { describe, it, expect } from 'vitest';
+import { Observable, of, throwError } from 'rxjs';
+import { StorageService } from '../objects/storage.service';
 import { TestBed } from '@angular/core/testing';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { ReportDestinationDialog, ReportDestinationOptions } from './report-destination-dialog';
 
-function dialogFor(kind: ReportDestinationOptions['kind']) {
+const CONNECTIONS = [
+  { label: 'Reports archive', bucket: 'reports-archive', provider: 'MINIO' },
+  { label: 'Claims', bucket: 'claims', provider: 'S3' },
+];
+
+function dialogFor(kind: ReportDestinationOptions['kind'],
+                   buckets: () => Observable<any> = () => of({ status: 'SUCCESS', data: CONNECTIONS })) {
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
     providers: [
       { provide: DIALOG_DATA, useValue: { kind } },
       { provide: DialogRef, useValue: { close: () => {} } },
+      { provide: StorageService, useValue: { buckets } },
     ],
   });
   return TestBed.runInInjectionContext(() => new ReportDestinationDialog());
@@ -73,5 +82,30 @@ describe('ReportDestinationDialog', () => {
     (dialog.ref as any).close = () => { closed = true; };
     dialog.submit({ preventDefault: () => {} } as Event);
     expect(closed).toBe(false);
+  });
+});
+
+/**
+ * The bucket was a free-text box with a made-up placeholder. A typo surfaced only as a toast after
+ * the dialog had closed; the workspace's connections were one call away, as the Object Browser
+ * offers them.
+ */
+describe('ReportDestinationDialog bucket choice', () => {
+  it('offers the workspace\'s own connections', () => {
+    const dialog = dialogFor('bucket');
+    expect(dialog.bucketOptions().map(o => o.value)).toEqual(['reports-archive', 'claims']);
+  });
+
+  it('will not save into a bucket that is not one of them', () => {
+    const dialog = dialogFor('bucket');
+    dialog.bucket.set('reprots-archive');
+    expect(dialog.valid()).toBe(false);
+  });
+
+  it('says so when the connections cannot be read, and saves nowhere', () => {
+    const dialog = dialogFor('bucket', () => throwError(() => ({ error: { message: 'Storage is unavailable.' } })));
+    expect(dialog.bucketsError()).toBe('Storage is unavailable.');
+    dialog.bucket.set('reports-archive');
+    expect(dialog.valid()).toBe(false);
   });
 });
