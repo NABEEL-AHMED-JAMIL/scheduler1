@@ -43,6 +43,8 @@ export interface Pipeline {
   sourceTaskTypeId?: number | null;
   topicName?: string | null;
   kafkaTopic?: string | null;
+  /** The Kafka profile the topic lives on: what the topic link opens. */
+  kafkaConnectionProfileId?: number | null;
   description?: string | null;
   status?: string;
   dateCreated?: string;
