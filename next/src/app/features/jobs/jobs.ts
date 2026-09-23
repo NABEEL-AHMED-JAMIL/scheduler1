@@ -627,6 +627,9 @@ export class Jobs implements OnInit {
   }
 
   async toggleStatus(job: SourceJob): Promise<void> {
+    // The row is locked while its request is out, as Run now, Skip and Duplicate already were;
+    // without it a second click sent the change twice.
+    if (this.busyJob() === job.jobId) return;
     const activating = job.jobStatus !== 'Active';
     const ok = await confirmWith(this.dialog, {
       title: activating ? 'Activate job' : 'Deactivate job',
@@ -634,12 +637,17 @@ export class Jobs implements OnInit {
         ? `"${job.jobName}" will resume running on its schedule.`
         : `"${job.jobName}" will stop running. Slots that pass while it is off are recorded as Missed rather than replayed when you turn it back on.`,
       confirmLabel: activating ? 'Activate' : 'Deactivate',
+      // Turning a schedule off is confirmed as dangerous, like Delete here and the user and
+      // workspace turn-offs elsewhere; turning it back on is not.
+      danger: !activating,
     });
     if (!ok) return;
 
     const toggle = jobActionRequest('toggle', job.jobId);
+    this.busyJob.set(job.jobId);
     this.http.request<ApiResponse>(toggle.method, toggle.url, { body: toggle.body }).subscribe({
       next: response => {
+        this.busyJob.set(null);
         if (response.status === API_SUCCESS) {
           this.toast.success(`${job.jobName} ${activating ? 'activated' : 'deactivated'}.`);
           this.patchJob(job.jobId, { jobStatus: activating ? 'Active' : 'Inactive' });
@@ -647,11 +655,12 @@ export class Jobs implements OnInit {
           this.toast.error(response.message);
         }
       },
-      error: err => this.toast.error(err?.error?.message || 'Could not change the status.'),
+      error: err => { this.busyJob.set(null); this.toast.error(err?.error?.message || 'Could not change the status.'); },
     });
   }
 
   async remove(job: SourceJob): Promise<void> {
+    if (this.busyJob() === job.jobId) return;
     const ok = await confirmWith(this.dialog, {
       title: 'Delete job',
       body: `"${job.jobName}" will be deleted and will stop running. Its run history is kept.`,
@@ -661,8 +670,10 @@ export class Jobs implements OnInit {
     if (!ok) return;
 
     const remove = jobActionRequest('delete', job.jobId);
+    this.busyJob.set(job.jobId);
     this.http.request<ApiResponse>(remove.method, remove.url, { body: remove.body }).subscribe({
       next: response => {
+        this.busyJob.set(null);
         if (response.status === API_SUCCESS) {
           this.toast.success(`${job.jobName} deleted.`);
           this.jobs.update(list => list.filter(row => row.jobId !== job.jobId));
@@ -670,7 +681,7 @@ export class Jobs implements OnInit {
           this.toast.error(response.message);
         }
       },
-      error: err => this.toast.error(err?.error?.message || 'Delete failed.'),
+      error: err => { this.busyJob.set(null); this.toast.error(err?.error?.message || 'Delete failed.'); },
     });
   }
 
