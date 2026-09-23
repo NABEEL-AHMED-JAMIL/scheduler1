@@ -11,13 +11,13 @@ import { Component, input } from '@angular/core';
   host: { class: 'flex items-center gap-2 shrink-0' },
   template: `
     @if (subtitle()) {
-      <div class="size-9 rounded-lg bg-brand-500 grid place-items-center text-white font-bold">E</div>
+      <div class="size-9 rounded-lg grid place-items-center font-bold bg-[var(--btn-primary-bg)] text-[color:var(--btn-primary-fg)]">E</div>
       <div>
         <div class="font-semibold leading-tight">ETL Console</div>
         <div class="text-xs text-[color:var(--text-muted)]">{{ subtitle() }}</div>
       </div>
     } @else {
-      <div class="size-7 rounded-md bg-brand-500 grid place-items-center text-white text-sm font-bold">E</div>
+      <div class="size-7 rounded-md grid place-items-center text-sm font-bold bg-[var(--btn-primary-bg)] text-[color:var(--btn-primary-fg)]">E</div>
       <span class="font-semibold text-sm tracking-tight"
             [class.hidden]="hideOnMobile()" [class.sm:block]="hideOnMobile()">ETL Console</span>
     }

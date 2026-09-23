@@ -198,10 +198,11 @@
              would misrepresent them is offered DISABLED with the sentence
              saying why, rather than hidden -- the same rule the dashboard's
              widget picker follows. -->
-        <div class="mt-1 flex flex-wrap gap-1">
+        <div class="seg mt-1 flex-wrap" role="group" aria-label="Draw this column as">
           @for (option of kinds(); track option.id) {
-            <button type="button" class="btn btn-ghost btn-xs"
-                    [class.btn-active]="kind() === option.id"
+            <button type="button" class="seg-btn"
+                    [class.seg-on]="kind() === option.id"
+                    [attr.aria-pressed]="kind() === option.id"
                     [disabled]="!!option.reason"
                     [title]="option.reason || ('Draw as ' + option.label)"
                     (click)="chooseKind(option.id)">

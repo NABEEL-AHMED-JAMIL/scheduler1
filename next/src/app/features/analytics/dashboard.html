@@ -94,7 +94,7 @@
               <span class="pill pill-neutral">{{ widgets().length }} widget{{ widgets().length === 1 ? '' : 's' }}</span>
               @if (boardDatasets().length) { <span class="pill pill-neutral">{{ boardDatasets().length }} dataset{{ boardDatasets().length === 1 ? '' : 's' }}</span> }
               @if (boardFilterCount()) { <span class="pill pill-brand">{{ boardFilterCount() }} filter{{ boardFilterCount() === 1 ? '' : 's' }} on</span> }
-              @if (running()) { <span class="pill pill-info"><app-icon name="refresh" size="0.8em" class="spin" />{{ progress() }}</span> }
+              @if (running()) { <span class="pill pill-brand"><app-icon name="refresh" size="0.8em" class="spin" />{{ progress() }}</span> }
               @else if (failedCount()) { <span class="pill pill-crit">{{ failedCount() }} failed</span> }
               @else if (ranCount()) { <span class="pill pill-ok">{{ ranCount() }} ran</span> }
             </div>

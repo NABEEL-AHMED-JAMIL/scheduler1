@@ -1,6 +1,6 @@
 <div class="min-h-screen flex flex-col">
   <header class="sticky top-0 z-40 border-b bg-raised border-subtle">
-    <div class="mx-auto max-w-[1600px] px-4 h-14 flex items-center gap-1">
+    <div class="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8 h-14 flex items-center gap-1">
 
       <a routerLink="/" class="mr-4">
         <app-brand-mark [hideOnMobile]="true" />
@@ -21,6 +21,7 @@
           } @else {
             <div class="relative" data-nav-menu>
               <button type="button" (click)="toggleMenu(item.label)"
+                      aria-haspopup="true" [attr.aria-expanded]="openMenu() === item.label"
                       class="px-2.5 py-1.5 rounded-md text-sm font-medium inline-flex items-center gap-1
                              whitespace-nowrap text-[color:var(--text-secondary)]
                              hover:text-[color:var(--text-primary)]
@@ -74,6 +75,7 @@
 
         <div class="relative" data-nav-menu>
           <button type="button" (click)="toggleMenu('__user')"
+                  aria-label="Account menu" aria-haspopup="true" [attr.aria-expanded]="openMenu() === '__user'"
                   class="flex items-center gap-2 px-1.5 py-1 rounded-md hover:bg-[color:var(--surface-sunken)]">
             @if (auth.avatarUrl()) {
               <img [src]="auth.avatarUrl()" alt="" class="avatar-img size-7" />
@@ -111,7 +113,7 @@
         </div>
 
         <button type="button" class="btn btn-ghost btn-icon xl:hidden" (click)="mobileOpen.set(!mobileOpen())"
-                aria-label="Menu">
+                aria-label="Menu" [attr.aria-expanded]="mobileOpen()">
           <app-icon [name]="mobileOpen() ? 'close' : 'menu'" size="1.15em" />
         </button>
       </div>

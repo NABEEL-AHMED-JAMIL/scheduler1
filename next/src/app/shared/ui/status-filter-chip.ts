@@ -17,6 +17,7 @@ import { StatusPill } from './status-pill';
     <button type="button" class="card px-3.5 py-2 flex items-center gap-2 hover:shadow-md
                                  transition-shadow ring-[color:var(--focus-ring)]"
             [class.ring-2]="selected()"
+            [attr.aria-pressed]="selected()"
             (click)="toggle.emit()">
       <app-status [label]="status()" />
       <span class="tabular font-semibold">{{ count() }}</span>

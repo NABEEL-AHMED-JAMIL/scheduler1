@@ -175,6 +175,15 @@
        has to contrast with the ground it is drawn on, so it flips with the theme. */
     --focus-ring: var(--color-ink-900);
 
+    /* The brand as a MARK -- a bar, a dot, a thumb, an outline, a drag-over edge -- as distinct
+       from the brand as text (--accent-text) or as a button (--btn-primary-*). Twenty-odd rules
+       painted --color-brand-500 directly, and that step is a near-black: right on this ground,
+       1.1-1.4:1 on the dark one, where a progress bar, a spinner's arc, the selected chip's
+       outline and the audio thumb all simply vanished (UI audit B.0). A mark has to contrast
+       with the ground it sits on, so, like the focus ring, it flips with the theme. */
+    --accent-mark:        var(--color-brand-500);
+    --accent-mark-strong: var(--color-brand-600);
+
     /* The pill family. neutral and brand are a binary in several places -- kafka-tls-section
        swaps one class for the other to mean off/on -- so they must never share a background.
        After the rebrand they did: brand-50 and ink-100 both resolve to #f3f4f6, so "Private CA"
@@ -246,6 +255,11 @@
     --btn-primary-active: var(--color-ink-300);
 
     --focus-ring: var(--color-ink-50);
+
+    /* ink-300 rather than the page-white of --focus-ring: a mark is often a filled area (a
+       progress bar, a budget bar) and full white there glares; ink-300 is 12:1 on a card. */
+    --accent-mark:        var(--color-ink-300);
+    --accent-mark-strong: var(--color-ink-50);
 
     /* Same pair, inverted. neutral used --surface-sunken here, which on this theme is the page
        colour itself, so a neutral pill had no chip shape at all -- it was text on the page.
@@ -373,8 +387,8 @@
            transition-colors;
   }
   .btn-circle:hover:not(:disabled) {
-    border-color: var(--color-brand-500);
-    color: var(--color-brand-600);
+    border-color: var(--accent-mark);
+    color: var(--accent-text);
     background: var(--surface-sunken);
   }
   .btn-circle:disabled { @apply opacity-40 cursor-not-allowed; }
@@ -382,7 +396,6 @@
     border-color: var(--color-crit-500);
     color: var(--color-crit-500);
   }
-  html.dark .btn-circle:hover:not(:disabled) { color: var(--color-brand-300); }
   html.dark .btn-circle-danger:hover:not(:disabled) { color: var(--color-crit-400); }
   .btn-icon { @apply px-2 py-1.5; }
 
@@ -401,7 +414,7 @@
   /* The native control inherits nothing useful, so give it the brand colour and a focus
      ring that matches the buttons rather than the browser default. */
   .checkbox {
-    accent-color: var(--color-brand-600);
+    accent-color: var(--accent-mark-strong);
     @apply w-4 h-4 rounded align-middle cursor-pointer;
   }
   .checkbox:disabled { @apply cursor-not-allowed opacity-40; }
@@ -484,7 +497,7 @@
     @apply shrink-0 rounded px-1.5 py-0.5 font-mono text-[11px] tabular-nums
            transition-colors hover:brightness-110;
   }
-  html.dark .ts-mark { color: var(--color-brand-300); }
+  html.dark .ts-mark { color: var(--accent-text); }
   .ts-text { color: var(--text-primary); @apply text-sm min-w-0; }
 
   /* Read-along: the word being spoken, and the passage it sits in.
@@ -553,13 +566,15 @@
     @apply inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium
            transition-colors whitespace-nowrap;
   }
-  .seg-btn:hover { color: var(--text-primary); }
+  .seg-btn:hover:not(:disabled) { color: var(--text-primary); }
+  /* An option that exists but cannot be chosen here -- offered, with its title saying why. */
+  .seg-btn:disabled { @apply opacity-40 cursor-not-allowed; }
   .seg-on {
     background: var(--surface-raised);
     color: var(--color-brand-600);
     @apply shadow-sm;
   }
-  html.dark .seg-on { color: var(--color-brand-300); }
+  html.dark .seg-on { color: var(--accent-text); }
 
   /* A dot that only pulses while it is actually following the run. */
   .live-dot {
@@ -624,7 +639,7 @@
     border-color: var(--border-subtle);
     @apply mt-4 pt-4 border-t;
   }
-  html.dark .detail-panel { border-left-color: var(--color-brand-400); }
+  html.dark .detail-panel { border-left-color: var(--accent-mark); }
 
   /* An inline link inside a definition list: coloured and underlined on hover, so it reads
      as a link without a button's weight. */
@@ -632,7 +647,7 @@
     color: var(--accent-text);
     @apply inline-flex items-center gap-1 hover:underline;
   }
-  html.dark .link-inline { color: var(--color-brand-300); }
+  html.dark .link-inline { color: var(--accent-text); }
 
   .stat-glyph {
     background: var(--surface-sunken);
@@ -687,15 +702,25 @@
     min-height: 2.25rem;
     @apply w-full border rounded-md px-3 py-1.5 text-sm
            placeholder:text-[color:var(--text-muted)]
-           focus:border-brand-500 focus:outline-none;
+           focus:border-[color:var(--focus-ring)] focus:outline-none;
+  }
+
+  /* The compact control for dense rows -- filter builders, inline editors -- the height of a
+     .btn-sm beside it. Analytics used it 26 times with no definition, so each one
+     rendered at full height and the filter rows stepped up and down against their buttons. */
+  .input-sm {
+    min-height: 1.75rem;
+    @apply px-2 py-0.5 text-xs;
   }
 
   /* A focus ring the page draws, matching the buttons and checkboxes. Without it the only
      focus cue was a border colour change, which is not visible enough to navigate by. */
   .input:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-brand-500) 28%, transparent);
-    border-color: var(--color-brand-500);
+    /* --focus-ring, not the brand: brand-500 equals the resting dark border exactly, so in dark
+       a focused field showed no change at all (WCAG 2.4.7). */
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--focus-ring) 28%, transparent);
+    border-color: var(--focus-ring);
   }
 
   .input:disabled {
@@ -822,7 +847,8 @@
   /* Filled chips separate the second status in a family from the first: Running from Start,
      Failed from Interrupt, Missed from Skip. White text on each of these measures 6.29, 5.86
      and 7.63 against white, so all three clear 4.5 for small text. */
-  .pill-solid-brand { background: var(--color-brand-500); color: #ffffff; }
+  /* The primary button's own inversion: a near-black chip on the dark card had no edge. */
+  .pill-solid-brand { background: var(--btn-primary-bg); color: var(--btn-primary-fg); }
   .pill-solid-crit  { background: var(--color-crit-500);  color: #ffffff; }
   .pill-solid-warn  { background: var(--color-warn-600);  color: #ffffff; }
   .pill-solid-ok    { background: var(--color-ok-500);    color: #ffffff; }
@@ -851,9 +877,10 @@
            hover:text-[color:var(--text-primary)];
   }
   .tab-active {
-    @apply border-brand-500 text-[color:var(--text-primary)];
+    border-color: var(--accent-mark-strong);
+    @apply text-[color:var(--text-primary)];
   }
-  .tab-active app-icon { color: var(--color-brand-500); }
+  .tab-active app-icon { color: var(--accent-text); }
 
   .dropzone {
     border-color: var(--border-strong);
@@ -862,15 +889,15 @@
            px-6 py-10 transition-colors;
   }
   .dropzone-active {
-    border-color: var(--color-brand-500);
-    background: color-mix(in oklab, var(--color-brand-500) 8%, var(--surface-sunken));
+    border-color: var(--accent-mark);
+    background: color-mix(in oklab, var(--accent-mark) 8%, var(--surface-sunken));
   }
 
   .progress {
     background: var(--surface-raised);
     @apply h-1.5 w-full overflow-hidden rounded-full;
   }
-  .progress-bar { @apply h-full bg-brand-500 transition-[width] duration-200; }
+  .progress-bar { @apply h-full transition-[width] duration-200; background: var(--accent-mark); }
 
   /* A chart card is a summary, not a section: title and note stay small and tight so the
      card is dominated by the data rather than by its own chrome. */
@@ -881,19 +908,22 @@
   /* Media controls, themed. The native widgets cannot follow the palette. */
   .audio-play {
     @apply inline-flex items-center justify-center size-9 rounded-full shrink-0
-           bg-brand-500 text-white transition-colors hover:bg-brand-600;
+           transition-colors;
+    background: var(--btn-primary-bg);
+    color: var(--btn-primary-fg);
   }
+  .audio-play:hover { background: var(--btn-primary-hover); }
   .audio-range {
     @apply h-1 appearance-none rounded-full cursor-pointer;
     background: var(--surface-sunken);
   }
   .audio-range::-webkit-slider-thumb {
     @apply appearance-none size-3 rounded-full;
-    background: var(--color-brand-500);
+    background: var(--accent-mark-strong);
   }
   .audio-range::-moz-range-thumb {
     @apply size-3 rounded-full border-0;
-    background: var(--color-brand-500);
+    background: var(--accent-mark-strong);
   }
 
   /* Markdown inside a chat bubble. Kept tight -- an assistant reply is not an article. */
@@ -1018,7 +1048,7 @@
     aspect-ratio: 1;
     border-radius: 50%;
     border: 2.5px solid var(--border-subtle);
-    border-top-color: var(--color-brand-500);
+    border-top-color: var(--accent-mark-strong);
     animation: spin 700ms linear infinite;
   }
   @media (prefers-reduced-motion: reduce) {
@@ -1070,8 +1100,8 @@
     z-index: 200;
     pointer-events: none;
     opacity: 0;
-    background: linear-gradient(90deg, var(--color-brand-400), var(--color-brand-600));
-    box-shadow: 0 0 10px color-mix(in oklab, var(--color-brand-500) 65%, transparent);
+    background: linear-gradient(90deg, var(--accent-mark), var(--accent-mark-strong));
+    box-shadow: 0 0 10px color-mix(in oklab, var(--accent-mark) 65%, transparent);
     border-radius: 0 2px 2px 0;
     transition: width 220ms ease-out, opacity 300ms ease;
     will-change: width, opacity;
@@ -1114,7 +1144,7 @@ html:not(.dark) .text-warn-500 { color: var(--color-warn-600); }
 
 html.dark .text-brand-500,
 html.dark .text-brand-600,
-html.dark .text-brand-700 { color: var(--color-brand-300); }
+html.dark .text-brand-700 { color: var(--accent-text); }
 html.dark .text-ok-500    { color: var(--color-ok-400); }
 html.dark .text-warn-500  { color: var(--color-warn-400); }
 html.dark .text-crit-500  { color: var(--color-crit-400); }
@@ -1122,15 +1152,14 @@ html.dark .text-crit-500  { color: var(--color-crit-400); }
 html.dark .icon-ok   { color: var(--color-ok-400); }
 html.dark .icon-warn { color: var(--color-warn-400); }
 html.dark .icon-crit { color: var(--color-crit-400); }
-html.dark .icon-info { color: var(--color-brand-300); }
+html.dark .icon-info { color: var(--accent-text); }
 
 /* The calendar/clock glyph inside a date or time field is drawn by the browser in near-black
    and ignores currentColor, so on the dark theme it sat invisible against the field. */
 html.dark .input::-webkit-calendar-picker-indicator { filter: invert(1); }
-html.dark .tab-active app-icon { color: var(--color-brand-300); }
-html.dark .nav-child-active { @apply text-brand-300; }
+html.dark .nav-child-active { color: var(--accent-text); }
 html.dark .nav-child:hover .nav-child-icon,
-html.dark .nav-child-active .nav-child-icon { color: var(--color-brand-300); }
+html.dark .nav-child-active .nav-child-icon { color: var(--accent-text); }
 
 html.dark .btn-intent-warn:hover app-icon,
 html.dark .btn-intent-warn:focus app-icon { color: var(--color-warn-400); }
@@ -1180,12 +1209,12 @@ html.dark .btn-intent-crit:focus app-icon { color: var(--color-crit-400); }
            focus-visible:bg-[color:var(--surface-sunken)];
   }
   .nav-child-icon { @apply mt-0.5 shrink-0 text-[color:var(--text-muted)]; }
-  .nav-child:hover .nav-child-icon { color: var(--color-brand-500); }
+  .nav-child:hover .nav-child-icon { color: var(--accent-text); }
   .nav-child-active {
     background: var(--surface-sunken);
     @apply text-brand-600;
   }
-  .nav-child-active .nav-child-icon { color: var(--color-brand-500); }
+  .nav-child-active .nav-child-icon { color: var(--accent-text); }
 
   /* Compact key/value pairs for the context panels. */
   .detail-head {
@@ -1731,7 +1760,7 @@ html.dark .btn-circle-danger:hover:not(:disabled) { background: color-mix(in okl
 
 /* Model connection budget: a thin bar of today's spend against the daily cap. */
 .ai-budget { display: inline-block; width: 6rem; height: 0.4rem; border-radius: 999px; background: var(--surface-sunken); overflow: hidden; vertical-align: middle; }
-.ai-budget-fill { display: block; height: 100%; background: var(--color-brand-500); }
+.ai-budget-fill { display: block; height: 100%; background: var(--accent-mark); }
 .ai-budget-fill.is-warn { background: var(--color-warn-500); }
 
 /* Prompt editor: the definition on the left, Try it on the right, stacked when narrow. */
@@ -1744,20 +1773,20 @@ html.dark .btn-circle-danger:hover:not(:disabled) { background: color-mix(in okl
 
 /* An AI step's line in the pipeline editor: what it runs, opened in the drawer. */
 .ai-step-line { display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 0.75rem; border-radius: 8px; background: var(--surface-inset); border: 1px dashed var(--border-strong); }
-.icon-brand { color: var(--color-brand-500); }
+.icon-brand { color: var(--accent-text); }
 .ai-step-card { display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.7rem 0.85rem; border-radius: 8px; background: var(--surface-inset); border: 1px dashed var(--border-strong); }
 
 /* Reports: failures by reason -- one row per distinct message, a bar for its share. */
 .reason-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.25rem; }
 .reason-row { display: grid; grid-template-columns: 3rem 6rem minmax(0, 1fr) auto; gap: 0.75rem; align-items: center; width: 100%; text-align: left; padding: 0.35rem 0.5rem; border-radius: 6px; border: 1px solid transparent; background: none; color: inherit; font: inherit; cursor: pointer; }
 .reason-row:hover { background: var(--surface-sunken); }
-.reason-row.is-on { border-color: var(--color-brand-500); background: var(--surface-sunken); }
+.reason-row.is-on { border-color: var(--accent-mark-strong); background: var(--surface-sunken); }
 .reason-count { font-weight: 600; text-align: right; }
 .reason-bar { height: 0.45rem; border-radius: 999px; background: var(--surface-sunken); overflow: hidden; }
 .reason-fill { display: block; height: 100%; background: var(--color-crit-500); opacity: 0.75; }
 .reason-text { font-size: 12px; color: var(--text-secondary); min-width: 0; }
 .reason-meta { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
-.pill.is-on { outline: 2px solid var(--color-brand-500); outline-offset: 1px; }
+.pill.is-on { outline: 2px solid var(--accent-mark-strong); outline-offset: 1px; }
 
 /* Object picker: one row per folder or file, the whole row is the control. */
 .object-picker-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border: 1px solid var(--border-subtle); border-radius: 0.5rem; overflow: hidden; }
@@ -1791,11 +1820,11 @@ html.dark .btn-circle-danger:hover:not(:disabled) { background: color-mix(in okl
 .bill-totals > div > span:first-child { color: var(--text-secondary); text-align: right; }
 .bill-totals > div > span:last-child { text-align: right; }
 .bill-totals > div.is-total > span { font-weight: 600; color: var(--text-primary); }
-.lookup-entry-table tr.is-changed td:first-child { box-shadow: inset 3px 0 0 var(--color-brand-500); }
+.lookup-entry-table tr.is-changed td:first-child { box-shadow: inset 3px 0 0 var(--accent-mark); }
 .bill-dot-ok { background: var(--color-ok-500); }
 .bill-dot-crit { background: var(--color-crit-500); }
 .bill-dot-warn { background: var(--color-warn-600); }
-.bill-dot-info { background: var(--color-brand-500); }
+.bill-dot-info { background: var(--accent-mark); }
 .bill-dot-muted { background: var(--color-ink-400); }
  /* Analytics widgets: one grid for a board and for the Studio's overview, two across from tablet
    width, three on a wide screen; a tile never narrower than a readable chart. */

@@ -74,7 +74,7 @@
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-2 flex-wrap">
               @if (c.tenant_id == null) { <span class="pill pill-neutral"><app-icon name="globe" size="0.8em" class="opacity-70" />every workspace</span> }
-              @else { <span class="pill pill-info"><app-icon name="building" size="0.8em" class="opacity-70" />{{ forLabel(c) }}</span> }
+              @else { <span class="pill pill-brand"><app-icon name="building" size="0.8em" class="opacity-70" />{{ forLabel(c) }}</span> }
               @if (isInEffect(c)) { <span class="pill pill-ok">in effect</span> } @else if (c.effective_from > todayIso) { <span class="pill pill-brand">scheduled</span> } @else { <span class="pill pill-neutral">superseded</span> }
               <span class="pill pill-neutral">{{ c.currency }}</span>
             </div>

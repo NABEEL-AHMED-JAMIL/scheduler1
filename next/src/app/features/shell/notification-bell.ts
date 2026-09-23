@@ -36,6 +36,7 @@ const FETCH_ROWS = 20;
   template: `
     <div class="relative" data-nav-menu>
       <button type="button" class="btn btn-ghost btn-icon relative" (click)="toggle()"
+              aria-haspopup="true" [attr.aria-expanded]="open()"
               [attr.aria-label]="unread() ? unread() + ' unread notifications' : 'Notifications'">
         <app-icon name="bell" size="1.05em" />
         @if (unread()) {
@@ -62,7 +63,7 @@ const FETCH_ROWS = 20;
               <p class="text-sm text-[color:var(--text-muted)]">You are all caught up.</p>
             </div>
           } @else {
-            <ul class="max-h-80 overflow-y-auto divide-y border-subtle">
+            <ul class="max-h-80 overflow-y-auto divide-y divide-[color:var(--border-subtle)]">
               @for (note of recent(); track note.notificationId) {
                 <li>
                   <button type="button" class="w-full text-left flex items-start gap-2.5 px-3 py-2.5
