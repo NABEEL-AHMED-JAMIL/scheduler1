@@ -152,7 +152,7 @@ export class Converter implements OnInit {
 
   /** True when this level holds neither a convertible document nor anywhere further to look. */
   readonly nothingHere = computed(() =>
-    !this.loadingObjects() && !this.convertibleObjects().length && !this.folders().length);
+    !this.loadingObjects() && !this.browseError() && !this.convertibleObjects().length && !this.folders().length);
 
   /** Nothing to convert without a source, a target format, and a destination if saving. */
   readonly canConvert = computed(() => {
@@ -183,9 +183,20 @@ export class Converter implements OnInit {
   /** Bumped per listing; a response whose ticket is stale has been superseded. */
   private browseTicket = 0;
 
+  /**
+   * Why the folder in the breadcrumb could not be read. A refusal or a failed request was
+   * dropped, which left the previous level's folders and files under the new breadcrumb -- or
+   * "Nothing here" for a folder that had not been read at all.
+   */
+  readonly browseError = signal('');
+
+  /** Reads the level in the breadcrumb again, after a failure. */
+  retryBrowse(): void { this.browse(this.prefix()); }
+
   private browse(prefix: string, append = false): void {
     this.prefix.set(prefix);
     this.selectedKey.set('');
+    this.browseError.set('');
     // A filter typed for one level would otherwise hide everything in the next one; "load more"
     // keeps it, since that is the same level still being read.
     if (!append) this.folderFilter.set('');
@@ -198,16 +209,29 @@ export class Converter implements OnInit {
         next: response => {
           if (ticket !== this.browseTicket) return;
           this.loadingObjects.set(false);
-          if (response.status !== API_SUCCESS) return;
+          if (response.status !== API_SUCCESS) {
+            this.failBrowse(response.message || 'This folder could not be read.', append);
+            return;
+          }
           const page = response.data?.objects ?? [];
           this.objects.update(current => (append ? [...current, ...page] : page));
           this.nextToken.set(response.data?.nextContinuationToken);
         },
-        error: () => {
+        error: err => {
           if (ticket !== this.browseTicket) return;
           this.loadingObjects.set(false);
+          this.failBrowse(err?.error?.message || 'This folder could not be read.', append);
         },
       });
+  }
+
+  /** A failed "load more" keeps what is listed; a failed level shows nothing it has not read. */
+  private failBrowse(message: string, append: boolean): void {
+    this.browseError.set(message);
+    if (!append) {
+      this.objects.set([]);
+      this.nextToken.set(undefined);
+    }
   }
 
   /** Pulls the chosen object down so it can be posted as the multipart file. */

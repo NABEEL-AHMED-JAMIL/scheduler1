@@ -87,6 +87,13 @@
           </button>
         }
 
+        @if (browseError()) {
+          <p class="text-xs text-crit-500 flex items-center gap-2" role="alert">
+            {{ browseError() }}
+            <button type="button" class="link-inline" (click)="retryBrowse()">Try again</button>
+          </p>
+        }
+
         @if (nothingHere()) {
           <p class="text-xs text-[color:var(--text-muted)]">
             Nothing here. Go back up and try another folder.

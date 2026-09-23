@@ -124,7 +124,7 @@ export class Transcript implements OnInit, OnDestroy {
 
   /** True when this level holds neither audio nor anywhere further to look. */
   readonly nothingHere = computed(() =>
-    !this.loadingObjects() && !this.audioObjects().length && !this.folders().length);
+    !this.loadingObjects() && !this.browseError() && !this.audioObjects().length && !this.folders().length);
 
   readonly canExtract = computed(() =>
     this.mode() === 'upload' ? !!this.file() : !!this.selectedKey());
@@ -165,9 +165,20 @@ export class Transcript implements OnInit, OnDestroy {
    * forty files. Folders are listed alongside the audio so there is somewhere to go, rather
    * than being filtered out and leaving the tool looking broken.
    */
+  /**
+   * Why the folder in the breadcrumb could not be read. A refusal or a failed request was
+   * dropped, which left the previous level's folders and files under the new breadcrumb -- or
+   * "Nothing here" for a folder that had not been read at all.
+   */
+  readonly browseError = signal('');
+
+  /** Reads the level in the breadcrumb again, after a failure. */
+  retryBrowse(): void { this.browse(this.prefix()); }
+
   private browse(prefix: string, append = false): void {
     this.prefix.set(prefix);
     this.selectedKey.set('');
+    this.browseError.set('');
     this.loadingObjects.set(true);
     // Only the newest listing may write: clicking through folders quickly would otherwise let
     // a slow response for an abandoned one replace the level actually being viewed.
@@ -177,16 +188,29 @@ export class Transcript implements OnInit, OnDestroy {
         next: response => {
           if (ticket !== this.browseTicket) return;
           this.loadingObjects.set(false);
-          if (response.status !== API_SUCCESS) return;
+          if (response.status !== API_SUCCESS) {
+            this.failBrowse(response.message || 'This folder could not be read.', append);
+            return;
+          }
           const page = response.data?.objects ?? [];
           this.objects.update(current => (append ? [...current, ...page] : page));
           this.nextToken.set(response.data?.nextContinuationToken);
         },
-        error: () => {
+        error: err => {
           if (ticket !== this.browseTicket) return;
           this.loadingObjects.set(false);
+          this.failBrowse(err?.error?.message || 'This folder could not be read.', append);
         },
       });
+  }
+
+  /** A failed "load more" keeps what is listed; a failed level shows nothing it has not read. */
+  private failBrowse(message: string, append: boolean): void {
+    this.browseError.set(message);
+    if (!append) {
+      this.objects.set([]);
+      this.nextToken.set(undefined);
+    }
   }
 
   private browseTicket = 0;

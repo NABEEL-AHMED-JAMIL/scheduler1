@@ -119,3 +119,36 @@ describe('Converter bucket browsing', () => {
     expect(converter.objects().map(o => o.key)).toEqual(['b/fresh.docx']);
   });
 });
+
+/**
+ * A folder that could not be read. The breadcrumb moved to the new folder before the request,
+ * and a refusal or a failure was dropped -- so the previous level's folders and files sat under
+ * the new breadcrumb, or "Nothing here" claimed a folder was empty when it had not been read.
+ */
+describe('Converter folder that cannot be read', () => {
+  function openedThenRefused(refusal: (answers: Subject<any>) => void) {
+    const answers = new Subject<any>();
+    const listObjects = vi.fn(() => answers.asObservable());
+    const screen = converterFor(listObjects);
+    screen.onBucketChange('etl-avatar');
+    answers.next(page([{ name: '1000', key: '1000/', folder: true }, { name: 'a.mp3', key: 'a.mp3', folder: false }, { name: 'b.pdf', key: 'b.pdf', folder: false }]));
+    screen.openFolder('1000/');
+    refusal(answers);
+    return { screen, listObjects };
+  }
+
+  it('does not show the previous folder under the new breadcrumb, and says why', () => {
+    const { screen } = openedThenRefused(a => a.next({ status: 'ERROR', message: 'Access denied to 1000/.' }));
+    expect(screen.prefix()).toBe('1000/');
+    expect(screen.folders()).toEqual([]);
+    expect(screen.browseError()).toBe('Access denied to 1000/.');
+    expect(screen.nothingHere()).toBe(false);
+  });
+
+  it('says so when the request itself fails, and can try again', () => {
+    const { screen, listObjects } = openedThenRefused(a => a.error({ error: { message: 'Gateway timeout.' } }));
+    expect(screen.browseError()).toBe('Gateway timeout.');
+    screen.retryBrowse();
+    expect(listObjects).toHaveBeenLastCalledWith('etl-avatar', '1000/', undefined, 200);
+  });
+});
