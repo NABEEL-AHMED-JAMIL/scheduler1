@@ -1,10 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
-import { of, throwError } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 import { PreviewDialog } from './preview-dialog';
 import { StorageService } from '../storage.service';
 import { API_SUCCESS } from '../../../core/api/api.config';
+import { ToastService } from '../../../shared/ui/toast.service';
 
 /**
  * The viewer decides what to draw by the shape of the data: a table for rows and columns, a
@@ -123,5 +124,66 @@ describe('PreviewDialog', () => {
   it('a table the server cannot read says why, with Download beside it', () => {
     const dialog = open('huge.xlsx', { previewTable: () => throwError(() => ({ error: { message: 'huge.xlsx is 40.0 MB -- download it instead.' } })) });
     expect(dialog.error()).toContain('40.0 MB');
+  });
+});
+
+/**
+ * Failures of an ACTION inside a working preview. They were written into the load-error signal,
+ * which swaps the whole body for "could not load" -- a failed Save threw away the editor and the
+ * text being edited, and its "Try again" reloaded the file rather than retrying the save.
+ */
+describe('PreviewDialog when an action fails', () => {
+  const toasts = () => TestBed.inject(ToastService).toasts().map(t => t.message);
+
+  it('keeps the editor and the edited text when a save is refused', () => {
+    const dialog = open('notes.txt', { upload: () => of({ status: 'ERROR', message: 'The bucket is read-only.' }) });
+    dialog.editing.set(true);
+    dialog.draft.set('edited');
+
+    dialog.save();
+
+    expect(dialog.error()).toBe('');
+    expect(dialog.editing()).toBe(true);
+    expect(dialog.draft()).toBe('edited');
+    expect(toasts()).toContain('The bucket is read-only.');
+  });
+
+  it('keeps the preview when a download fails', () => {
+    const dialog = open('notes.txt', { download: () => throwError(() => ({ error: { message: 'Access denied.' } })) });
+    dialog.download();
+
+    expect(dialog.error()).toBe('');
+    expect(toasts()).toContain('Access denied.');
+  });
+});
+
+/** Esc and a backdrop click closed the dialog without releasing the file or reporting a save. */
+describe('PreviewDialog closing', () => {
+  it('closes through the same path on Escape, reporting the save to the listing', () => {
+    const keys = new Subject<KeyboardEvent>();
+    const close = vi.fn();
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [
+      { provide: StorageService, useValue: { previewText: () => of('plain text'), upload: () => of({ status: API_SUCCESS, message: '' }) } },
+      { provide: DialogRef, useValue: { close, keydownEvents: keys, backdropClick: new Subject(), disableClose: false } },
+      { provide: DIALOG_DATA, useValue: { bucket: 'b', key: 'folder/notes.txt', name: 'notes.txt' } },
+    ] });
+    const dialog = TestBed.runInInjectionContext(() => new PreviewDialog());
+    dialog.ngOnInit();
+    dialog.editing.set(true);
+    dialog.draft.set('edited');
+    dialog.save();
+
+    keys.next(new KeyboardEvent('keydown', { key: 'Escape' }));
+
+    expect(close).toHaveBeenCalledWith(true);
+  });
+});
+
+describe('PreviewDialog width', () => {
+  /** w-[76rem] was bound as a class Tailwind never generated, so a table opened at content width. */
+  it('is wider for a table than for anything else', () => {
+    expect(open('orders.csv', { previewTable: () => table() }).widthRem()).toBe(76);
+    expect(open('notes.txt', {}).widthRem()).toBe(60);
   });
 });

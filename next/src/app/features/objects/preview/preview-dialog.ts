@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { ArchiveEntry, StorageService, TablePreview } from '../storage.service';
 import { API_SUCCESS } from '../../../core/api/api.config';
@@ -10,6 +10,7 @@ import { copyText } from '../../../shared/ui/clipboard.util';
 import { formatSize } from '../../../shared/ui/format-size';
 import { catchError } from 'rxjs';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
+import { ToastService } from '../../../shared/ui/toast.service';
 
 export interface PreviewData {
   bucket: string;
@@ -49,8 +50,26 @@ export class PreviewDialog implements OnInit {
   readonly ref = inject<DialogRef<boolean>>(DialogRef);
   readonly data = inject<PreviewData>(DIALOG_DATA);
   private readonly storage = inject(StorageService);
+  private readonly toast = inject(ToastService);
+
+  constructor() {
+    // Esc and a backdrop click used to close the dialog themselves, skipping close(): the file's
+    // blob URL was never released and the listing never heard that a save had changed the file.
+    // Both are routed through close() now.
+    this.ref.disableClose = true;
+    this.ref.backdropClick?.subscribe(() => this.close());
+    this.ref.keydownEvents?.subscribe(event => { if (event.key === 'Escape') this.close(); });
+    // And released whatever way the dialog goes.
+    inject(DestroyRef).onDestroy(() => this.releaseUrl());
+  }
 
   readonly kind = signal<PreviewKind>('none');
+  /**
+   * The dialog's width, bound as a style. It was two class bindings, and Tailwind generates only
+   * the classes it finds written out -- w-[76rem] never made it into the build, so a table opened
+   * at its content's width instead of the wide one it was meant to get.
+   */
+  readonly widthRem = computed(() => (this.kind() === 'table' ? 76 : 60));
   readonly text = signal('');
   /**
    * <img>, <audio> and <video> take the plain blob: URL, which is already safe in those
@@ -399,7 +418,9 @@ export class PreviewDialog implements OnInit {
     this.storage.upload(this.data.bucket, this.folderOfKey(), file).subscribe({
       next: response => {
         this.saving.set(false);
-        if (response.status !== API_SUCCESS) { this.error.set(response.message); return; }
+        // A failed save is reported, not rendered as a failed load: that swapped the editor -- and
+        // the text being edited -- for "could not load", with a Try again that reloaded the file.
+        if (response.status !== API_SUCCESS) { this.toast.error(response.message || 'Could not save this file.'); return; }
         // Re-pretty-print JSON so the saved view matches what a fresh load would show.
         this.text.set(this.kind() === 'json' ? this.prettyJson(text) : text);
         this.editing.set(false);
@@ -407,7 +428,7 @@ export class PreviewDialog implements OnInit {
       },
       error: err => {
         this.saving.set(false);
-        this.error.set(err?.error?.message || 'Could not save this file.');
+        this.toast.error(err?.error?.message || 'Could not save this file.');
       },
     });
   }
@@ -423,7 +444,9 @@ export class PreviewDialog implements OnInit {
   }
 
   copy(): void {
-    copyText(this.text()).then(() => {
+    copyText(this.text()).then(ok => {
+      // "Copied" only when it was: a refused clipboard write used to say it anyway.
+      if (!ok) { this.toast.error('The clipboard refused the copy.'); return; }
       this.copied.set(true);
       setTimeout(() => this.copied.set(false), 1500);
     });
@@ -440,8 +463,14 @@ export class PreviewDialog implements OnInit {
   openInTab(): void {
     if (this.objectUrl) { window.open(this.objectUrl, '_blank', 'noopener'); return; }
     this.storage.download(this.data.bucket, this.data.key).subscribe({
-      next: blob => window.open(URL.createObjectURL(blob), '_blank', 'noopener'),
-      error: err => this.error.set(err?.error?.message || 'Could not open this file.'),
+      next: blob => {
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank', 'noopener');
+        // The new tab has its own copy once it has loaded; this one would otherwise live as long
+        // as the console does.
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      },
+      error: err => this.toast.error(err?.error?.message || 'Could not open this file.'),
     });
   }
 
@@ -450,14 +479,19 @@ export class PreviewDialog implements OnInit {
   download(): void {
     this.storage.download(this.data.bucket, this.data.key).subscribe({
       next: blob => StorageService.saveBlob(blob, this.data.name),
-      error: err => this.error.set(err?.error?.message || 'Could not download this file.'),
+      error: err => this.toast.error(err?.error?.message || 'Could not download this file.'),
     });
   }
 
   close(): void {
-    // Blob URLs leak for the life of the document unless released explicitly.
-    if (this.objectUrl) URL.revokeObjectURL(this.objectUrl);
+    this.releaseUrl();
     // Tells the browser whether the listing's size and modified date are now stale.
     this.ref.close(this.didSave);
+  }
+
+  /** Blob URLs leak for the life of the document unless released explicitly. */
+  private releaseUrl(): void {
+    if (this.objectUrl) URL.revokeObjectURL(this.objectUrl);
+    this.objectUrl = null;
   }
 }

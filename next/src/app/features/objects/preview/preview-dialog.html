@@ -1,4 +1,4 @@
-<div class="card shadow-2xl max-w-[calc(100vw-2rem)] max-h-[88vh] flex flex-col overflow-hidden" [class.w-\[60rem\]]="kind() !== 'table'" [class.w-\[76rem\]]="kind() === 'table'">
+<div class="card shadow-2xl max-w-[calc(100vw-2rem)] max-h-[88vh] flex flex-col overflow-hidden" [style.width.rem]="widthRem()">
   <div class="flex items-center gap-3 px-4 py-2.5 border-b shrink-0 border-subtle"
       >
     <app-icon [name]="kindIcon()" class="icon-info shrink-0" size="1.05em" />
