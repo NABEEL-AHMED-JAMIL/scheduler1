@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
 import { Dialog } from '@angular/cdk/dialog';
@@ -181,5 +181,36 @@ describe('Queue active-filter strip', () => {
 
     queue.clearFilter({ key: 'status:Failed', label: 'Status', value: 'Failed' });
     expect(queue.selectedStatuses()).toEqual([]);
+  });
+});
+
+/**
+ * The chips are multi-select, but the statuses were applied by the SERVER: picking Failed refetched
+ * only Failed rows, the chips are counted over the fetched rows, and every other chip vanished --
+ * a second status could never be added, and switching meant deselecting first. The range is
+ * fetched whole (fetchJobQLog has no LIMIT), so the statuses are applied here instead.
+ */
+describe('Queue status chips, more than one', () => {
+  it('keeps every status on offer after one is picked, and shows the rows of all that are picked', () => {
+    const queue = queueFor();
+    queue.rows.set(mixedRows);
+
+    queue.toggleStatus('Failed');
+    expect(queue.counts().map(c => c.status)).toEqual(['Completed', 'Failed']);
+    expect(queue.data().every(r => r.jobStatus === 'Failed')).toBe(true);
+
+    queue.toggleStatus('Completed');
+    expect(queue.data()).toHaveLength(mixedRows.length);
+  });
+
+  it('does not ask the server again to change which statuses are shown', () => {
+    const queue = queueFor();
+    const http = TestBed.inject(HttpClient) as unknown as { post: (...a: unknown[]) => unknown };
+    const post = vi.spyOn(http, 'post');
+    queue.rows.set(mixedRows);
+
+    queue.toggleStatus('Failed');
+
+    expect(post).not.toHaveBeenCalled();
   });
 });

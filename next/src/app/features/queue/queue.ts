@@ -88,8 +88,13 @@ export class Queue implements OnInit {
    */
   readonly data = computed(() => {
     const term = this.search().trim().toLowerCase();
-    if (!term) return this.rows();
-    return this.rows().filter(row =>
+    // Statuses are applied here, not by the server: the range comes back whole (fetchJobQLog
+    // has no LIMIT), and a server-side filter narrowed the rows the chips are counted over, so
+    // picking one status made every other chip vanish.
+    const statuses = this.selectedStatuses();
+    const shown = statuses.length ? this.rows().filter(row => statuses.includes(row.jobStatus as string)) : this.rows();
+    if (!term) return shown;
+    return shown.filter(row =>
       String(row.jobId).includes(term)
       || String(row.jobQueueId).includes(term)
       || (row.jobStatusMessage ?? '').toLowerCase().includes(term));
@@ -147,8 +152,6 @@ export class Queue implements OnInit {
       this.pager.reset();
       return;
     }
-    // Statuses are applied by the server, so dropping one has to refetch rather than widen
-    // a predicate the browser holds.
     this.toggleStatus(filter.value);
   }
 
@@ -270,7 +273,6 @@ export class Queue implements OnInit {
       fromDate: this.fromDate() || Queue.isoDaysAgo(6),
       toDate: this.toDate() || Queue.isoDaysAgo(0),
     };
-    if (this.selectedStatuses().length) body.jobStatuses = this.selectedStatuses();
 
     this.http.post<ApiResponse<QueueRow[] | { jobQueues?: QueueRow[] }>>(
       `${API_BASE}/message.json/fetchLogs`, body).subscribe({
@@ -295,7 +297,7 @@ export class Queue implements OnInit {
   toggleStatus(status: string): void {
     this.selectedStatuses.update(list =>
       list.includes(status) ? list.filter(s => s !== status) : [...list, status]);
-    this.load();
+    this.pager.reset();
   }
 
   clearFilters(): void {
