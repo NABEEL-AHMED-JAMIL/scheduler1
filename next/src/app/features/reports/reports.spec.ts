@@ -1,12 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
-import { Router } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
+import { By } from '@angular/platform-browser';
 import { of } from 'rxjs';
 import { ToastService } from '../../shared/ui/toast.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { BillingApi } from '../billing/billing.service';
 import { Reports, reasonKey } from './reports';
+import { ReportPivot } from './report-pivot';
 import { NO_DURATION, RunData, RunRow, humanSeconds } from './pivot';
 
 function reportsFor() {
@@ -243,5 +245,38 @@ describe('reasonKey', () => {
       .toBe('failed in the queue because the main job is deleted or inactive.');
     expect(reasonKey('   ')).toBe('(no message)');
     expect(reasonKey(undefined)).toBe('(no message)');
+  });
+});
+
+/**
+ * The builder is kept alive with [hidden] so that collapsing it does not throw away the reader's
+ * dimensions, measure, chart and drill-down -- but it sat inside the loading/error @if, so every
+ * Refresh, date change or Try again destroyed it and reset all of that anyway.
+ */
+describe('Reports builder across a reload', () => {
+  it('is the same builder, settings and all, after the page reloads', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [
+      provideRouter([]),
+      { provide: HttpClient, useValue: { get: () => of({ status: 'ERROR', message: '' }), post: () => of({ status: 'ERROR', message: '' }) } },
+      { provide: ToastService, useValue: { success: () => {}, error: () => {}, info: () => {} } },
+      { provide: AuthService, useValue: { isTenantAdmin: () => false, isPlatformAdmin: () => false } },
+      { provide: BillingApi, useValue: { usageByMeter: () => of({ status: 'ERROR', message: '' }) } },
+    ] });
+    const fixture = TestBed.createComponent(Reports);
+    fixture.detectChanges();
+    const reports = fixture.componentInstance;
+    const settle = () => { reports.loading.set(false); reports.error.set(''); reports.rawData.set(inFlight); fixture.detectChanges(); };
+    settle();
+    reports.showBuilder.set(true);
+    fixture.detectChanges();
+    const before = fixture.debugElement.query(By.directive(ReportPivot))?.componentInstance;
+    expect(before).toBeTruthy();
+
+    reports.loading.set(true);
+    fixture.detectChanges();
+    settle();
+
+    expect(fixture.debugElement.query(By.directive(ReportPivot))?.componentInstance).toBe(before);
   });
 });

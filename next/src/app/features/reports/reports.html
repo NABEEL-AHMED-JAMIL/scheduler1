@@ -489,20 +489,24 @@
       </section>
     }
 
-    <!-- ── The builder ────────────────────────────────────────────────────────────────
-         [hidden], not @if. An @if DESTROYS the component, so collapsing the builder threw away
-         the reader's dimensions, measure, chart kind and open drill-down; reopening it dropped
-         them back to Task x Job / Runs / Grouped bars. It also refetched nothing, since the
-         data is an input -- so the only thing the destroy achieved was losing the work. -->
-    <section class="space-y-3" [hidden]="!showBuilder()">
-        <div>
-          <h2 class="section-title">Build your own view</h2>
-          <p class="section-sub">
-            Group these same runs by any two dimensions, measure them how you like, and export
-            the result.
-          </p>
-        </div>
-        <app-report-pivot [data]="data()" [startDate]="startDate()" [endDate]="endDate()" />
-    </section>
   }
+
+  <!-- ── The builder ──────────────────────────────────────────────────────────────────
+       [hidden], not @if. An @if DESTROYS the component, so collapsing the builder threw away
+       the reader's dimensions, measure, chart kind and open drill-down; reopening it dropped
+       them back to Task x Job / Runs / Grouped bars. It also refetched nothing, since the
+       data is an input -- so the only thing the destroy achieved was losing the work.
+
+       And outside the loading / error / empty chain for the same reason: inside it, every
+       Refresh, date change or Try again destroyed the builder on the way through "loading". -->
+  <section class="space-y-3" [hidden]="!showBuilder() || loading() || !!error() || !hasRows()">
+      <div>
+        <h2 class="section-title">Build your own view</h2>
+        <p class="section-sub">
+          Group these same runs by any two dimensions, measure them how you like, and export
+          the result.
+        </p>
+      </div>
+      <app-report-pivot [data]="data()" [startDate]="startDate()" [endDate]="endDate()" />
+  </section>
 </div>
