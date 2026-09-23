@@ -29,6 +29,7 @@ import { isInFlight, isStalled, stalledFor } from './stalled';
 import { notifyChips, notifyCount, notifySentence } from './notify-summary';
 import { JobAssistant } from './assistant/job-assistant';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
+import { clonePayload } from './job-clone';
 
 export interface Scheduler {
   schedulerId: number;
@@ -456,29 +457,7 @@ export class Jobs implements OnInit {
           this.toast.error(response.message || 'That job could not be read.');
           return;
         }
-        const source = response.data;
-        const payload: any = {
-          jobName: `${source.jobName} (copy)`,
-          taskDetail: { taskDetailId: source.taskDetail?.taskDetailId },
-          execution: source.execution,
-          priority: source.priority,
-          // A copy starts inactive: cloning a live schedule should not silently double the runs.
-          jobStatus: 'Inactive',
-          completeJob: source.completeJob,
-          failJob: source.failJob,
-          skipJob: source.skipJob,
-        };
-        if (source.scheduler) {
-          payload.schedulers = [{
-            startDate: source.scheduler.startDate,
-            endDate: source.scheduler.endDate,
-            startTime: source.scheduler.startTime,
-            frequency: source.scheduler.frequency,
-            intervalValue: source.scheduler.intervalValue,
-            daysOfWeek: source.scheduler.daysOfWeek,
-            dayOfMonth: source.scheduler.dayOfMonth,
-          }];
-        }
+        const payload = clonePayload(response.data);
         this.http.post<ApiResponse>(`${API_BASE}/sourceJob.json/addSourceJob`, payload).subscribe({
           next: created => {
             this.busyJob.set(null);
