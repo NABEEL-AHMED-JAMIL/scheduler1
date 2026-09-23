@@ -37,6 +37,12 @@ export class PromptEdit implements OnInit {
 
   readonly isEdit = computed(() => !!this.promptId());
   readonly loading = signal(false);
+  /**
+   * Why the prompt being edited could not be read. While set, no form is shown: a blank "Edit
+   * prompt" form had nothing loaded, so its save carried no promptId and created a new prompt
+   * rather than a version of this one.
+   */
+  readonly loadError = signal('');
   readonly saving = signal(false);
   readonly submitted = signal(false);
   readonly loaded = signal<Prompt | null>(null);
@@ -156,8 +162,9 @@ export class PromptEdit implements OnInit {
     if (this.isEdit()) this.load();
   }
 
-  private load(): void {
+  load(): void {
     this.loading.set(true);
+    this.loadError.set('');
     this.http.get<ApiResponse<Prompt>>(`${API_BASE}/aiPrompt.json/get`, { params: { promptId: this.promptId()! } }).subscribe({
       next: r => {
         this.loading.set(false);
@@ -173,7 +180,7 @@ export class PromptEdit implements OnInit {
         for (const v of p.variables ?? []) this.addVariable(v);
         this.loadRuns();
       },
-      error: err => { this.loading.set(false); this.toast.error(err?.error?.message || 'Could not load the prompt.'); },
+      error: err => { this.loading.set(false); this.loadError.set(err?.error?.message || 'Could not load the prompt.'); },
     });
   }
 
@@ -228,6 +235,8 @@ export class PromptEdit implements OnInit {
   }
 
   save(activate: boolean): void {
+    // Editing, with nothing read back: saving would create a prompt, not a version of this one.
+    if (this.isEdit() && !this.loaded()) return;
     if (!this.valid()) return;
     this.saving.set(true);
     this.http.post<ApiResponse<Prompt>>(`${API_BASE}/aiPrompt.json/save`, this.body(activate)).subscribe({

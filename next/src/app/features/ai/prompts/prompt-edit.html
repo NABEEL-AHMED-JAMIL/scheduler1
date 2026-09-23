@@ -13,10 +13,10 @@
     </div>
     <div class="flex items-center gap-2">
       <a routerLink="/assistants/prompts" class="btn btn-ghost btn-sm">Cancel</a>
-      <button type="button" class="btn btn-default btn-sm" (click)="save(false)" [disabled]="saving()">
+      <button type="button" class="btn btn-default btn-sm" (click)="save(false)" [disabled]="saving() || !!loadError()">
         {{ isEdit() ? 'Save as v' + ((loaded()?.version ?? 0) + 1) : 'Save draft' }}
       </button>
-      <button type="button" class="btn btn-primary btn-sm" (click)="save(true)" [disabled]="saving()">
+      <button type="button" class="btn btn-primary btn-sm" (click)="save(true)" [disabled]="saving() || !!loadError()">
         @if (saving()) { <app-icon name="refresh" class="spin" /> }Save &amp; activate
       </button>
     </div>
@@ -24,6 +24,14 @@
 
   @if (loading()) {
     <div class="card p-12 text-center text-sm text-[color:var(--text-muted)]"><div class="spinner mx-auto mb-3"></div>Loading…</div>
+  } @else if (loadError()) {
+    <div class="card p-12 text-center" role="alert">
+      <app-icon name="alert" size="1.5rem" class="icon-crit block mx-auto mb-2" />
+      <p class="text-sm">{{ loadError() }}</p>
+      <button type="button" class="btn btn-default btn-sm mt-3" (click)="load()">
+        <app-icon name="refresh" />Try again
+      </button>
+    </div>
   } @else {
     <div class="prompt-editor">
       <!-- ── Definition ─────────────────────────────────────────────────────────────── -->

@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
-import { Router } from '@angular/router';
-import { of } from 'rxjs';
+import { Router, provideRouter } from '@angular/router';
+import { of, throwError } from 'rxjs';
 import { PromptEdit } from './prompt-edit';
 import { placeholdersOf } from './prompt-model';
 import { ToastService } from '../../../shared/ui/toast.service';
@@ -107,5 +107,53 @@ describe('PromptEdit', () => {
     component.clearSource('document_text');
     expect(component.sourceOf('document_text')).toBeUndefined();
     expect(component.sourceOf('file_name')).toBeDefined();
+  });
+});
+
+/**
+ * Opening an existing prompt whose read fails.
+ *
+ * The failure cleared the spinner and toasted, then rendered a blank "Edit prompt" form. Nothing
+ * was loaded, so the save carried no promptId and CREATED a new prompt instead of a version of
+ * the one being edited.
+ */
+describe('PromptEdit when the prompt cannot be read', () => {
+  function openFailing() {
+    let reads = 0;
+    const get = vi.fn((url: string) => {
+      if (url.endsWith('/aiPrompt.json/get')) { reads++; return throwError(() => ({ status: 500, error: { message: 'Database unavailable.' } })); }
+      return of({ status: API_SUCCESS, data: [] });
+    });
+    const post = vi.fn((_url: string, _body?: unknown) => of({ status: API_SUCCESS, message: 'ok', data: {} }));
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [
+      { provide: HttpClient, useValue: { get, post } },
+      { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn(), info: () => {} } },
+      provideRouter([]),
+      { provide: AuthService, useValue: { isPlatformAdmin: () => false, canManageAgents: () => true, user: () => ({ appUserId: 1 }) } },
+    ] });
+    const fixture = TestBed.createComponent(PromptEdit);
+    fixture.componentRef.setInput('promptId', '42');
+    fixture.detectChanges();
+    return { fixture, component: fixture.componentInstance, post, reads: () => reads,
+      text: () => ((fixture.nativeElement as HTMLElement).textContent ?? '').replace(/\s+/g, ' ') };
+  }
+
+  it('shows why, with a way to try again, instead of an empty form', () => {
+    const view = openFailing();
+    expect(view.text()).toContain('Database unavailable.');
+    expect((view.fixture.nativeElement as HTMLElement).querySelector('form')).toBeNull();
+
+    const retry = Array.from((view.fixture.nativeElement as HTMLElement).querySelectorAll('button'))
+      .find(b => (b.textContent ?? '').includes('Try again'))!;
+    retry.click();
+    expect(view.reads()).toBe(2);
+  });
+
+  it('never saves a version of a prompt it could not read', () => {
+    const view = openFailing();
+    view.component.form.patchValue({ name: 'x', userTemplate: 'Hello' });
+    view.component.save(true);
+    expect(view.post.mock.calls.filter(c => String(c[0]).endsWith('/aiPrompt.json/save'))).toHaveLength(0);
   });
 });
