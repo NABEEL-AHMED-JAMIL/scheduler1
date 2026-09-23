@@ -120,22 +120,31 @@
                 <app-icon name="plus" />Add entry
               </button>
             }
-            <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="detailMenu" aria-label="More actions">
-              <app-icon name="dots" size="1.05em" />
-            </button>
+            <!-- Edit and Delete are gated by canModify(), as on the entry rows: a platform-owned
+                 lookup is shared with every workspace, and offering a workspace the button only
+                 ended in the server's refusal. With nothing left to offer, no menu at all. -->
+            @if (canModify(lookup) || kindOf(lookup).key === 'managed') {
+              <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="detailMenu" aria-label="More actions">
+                <app-icon name="dots" size="1.05em" />
+              </button>
+            }
             <ng-template #detailMenu>
               <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
-                <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="edit(lookup)">
-                  <app-icon name="edit" />Edit lookup
-                </button>
+                @if (canModify(lookup)) {
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="edit(lookup)">
+                    <app-icon name="edit" />Edit lookup
+                  </button>
+                }
                 @if (kindOf(lookup).key === 'managed') {
                   <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="addChild(lookup)">
                     <app-icon name="plus" />Add entry anyway
                   </button>
                 }
-                <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="remove(lookup)">
-                  <app-icon name="trash" class="icon-crit" />Delete lookup
-                </button>
+                @if (canModify(lookup)) {
+                  <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="remove(lookup)">
+                    <app-icon name="trash" class="icon-crit" />Delete lookup
+                  </button>
+                }
               </div>
             </ng-template>
           </div>

@@ -226,7 +226,8 @@ export class Lookup implements OnInit {
       body: children
         ? `${children} ${children === 1 ? 'entry' : 'entries'} sit under this. Anything reading this lookup stops finding it.`
         : 'Anything reading this lookup stops finding it.',
-      confirmLabel: 'Delete lookup',
+      // Named for what the row button said: an entry is not a lookup.
+      confirmLabel: parent ? 'Delete entry' : 'Delete lookup',
       danger: true,
     });
     if (!ok) return;
