@@ -8,11 +8,12 @@ import { RouterLink } from '@angular/router';
 import { BucketSummary, ObjectSummary, StorageService } from '../../objects/storage.service';
 import { PreviewDialog } from '../../objects/preview/preview-dialog';
 import { Dialog } from '@angular/cdk/dialog';
-import { DatePipe } from '@angular/common';
+
 import { confirmWith } from '../../../shared/ui/confirm';
 import { formatSize } from '../../../shared/ui/format-size';
 import { Segmented, SegmentOption } from '../../../shared/ui/segmented';
 import { FileDropzone } from '../../../shared/ui/file-dropzone';
+import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 
 interface FormatFamily {
   key: string;
@@ -47,7 +48,7 @@ interface ConvertResult {
 
 @Component({
   selector: 'app-converter',
-  imports: [Icon, RouterLink, DatePipe, Segmented, FileDropzone, Combobox],
+  imports: [Icon, RouterLink, ServerTimePipe, Segmented, FileDropzone, Combobox],
   templateUrl: './converter.html',
 })
 export class Converter implements OnInit {

@@ -1,5 +1,5 @@
 import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
-import { DatePipe } from '@angular/common';
+
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { API_SUCCESS } from '../../core/api/api.config';
@@ -11,6 +11,7 @@ import { formatSize } from '../../shared/ui/format-size';
 import { BillingApi, DOCUMENT_KINDS, DOCUMENT_KIND_LABEL, DocumentRow } from './billing.service';
 import { formatMoney } from './billing-format';
 import { WorkspacePicker } from './workspace-picker';
+import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 
 /**
  * Every billing document -- invoices, receipts, credit notes, statements, payment slips -- as a
@@ -19,7 +20,7 @@ import { WorkspacePicker } from './workspace-picker';
  */
 @Component({
   selector: 'app-billing-documents',
-  imports: [Icon, StatTile, RouterLink, DatePipe, PdfViewer, CdkMenu, CdkMenuItem, CdkMenuTrigger],
+  imports: [Icon, StatTile, RouterLink, ServerTimePipe, PdfViewer, CdkMenu, CdkMenuItem, CdkMenuTrigger],
   templateUrl: './documents.html',
 })
 export class BillingDocuments implements OnInit, OnDestroy {

@@ -1,5 +1,5 @@
 import { Component, OnDestroy, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
-import { DatePipe } from '@angular/common';
+
 import { RouterLink } from '@angular/router';
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
@@ -15,6 +15,7 @@ import { formatSize } from '../../shared/ui/format-size';
 import { DocumentViewDialog } from './document-view-dialog';
 import { BillingApi, DOCUMENT_KIND_LABEL, InvoiceDetail as Detail, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE, PaymentRow, InvoiceLine, AppliedTier, PAYMENT_METHODS } from './billing.service';
 import { daysOverdue, formatMoney, formatQuantity, formatUnitPrice } from './billing-format';
+import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 
 /** One entry of the invoice's story, in order. */
 interface HistoryEntry { at: string; text: string; tone?: 'ok' | 'warn' | 'crit' | 'muted'; }
@@ -28,7 +29,7 @@ interface HistoryEntry { at: string; text: string; tone?: 'ok' | 'warn' | 'crit'
  */
 @Component({
   selector: 'app-invoice-pane',
-  imports: [Icon, RouterLink, DatePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, CopyButton],
+  imports: [Icon, RouterLink, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, CopyButton],
   templateUrl: './invoice-detail.html',
 })
 export class InvoicePane implements OnDestroy {

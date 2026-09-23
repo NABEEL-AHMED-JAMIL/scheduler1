@@ -1,6 +1,6 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { DatePipe } from '@angular/common';
+
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -15,6 +15,7 @@ import { ViewToggle } from '../../../shared/ui/view-toggle';
 import { MineFilter, isMine } from '../../../shared/ui/mine-filter';
 import { confirmWith } from '../../../shared/ui/confirm';
 import { Prompt } from './prompt-model';
+import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 
 /**
  * Prompts: what a step says to a model. Readable by everyone who can open the page (a
@@ -23,7 +24,7 @@ import { Prompt } from './prompt-model';
  */
 @Component({
   selector: 'app-prompts',
-  imports: [Icon, TableShell, StatusPill, StatTile, ViewToggle, MineFilter, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink, DatePipe],
+  imports: [Icon, TableShell, StatusPill, StatTile, ViewToggle, MineFilter, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink, ServerTimePipe],
   templateUrl: './prompts.html',
 })
 export class Prompts implements OnInit {

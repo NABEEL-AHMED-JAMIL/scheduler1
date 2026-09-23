@@ -2,7 +2,7 @@ import { Component, OnInit, computed, inject, signal, viewChild } from '@angular
 import { HttpClient } from '@angular/common/http';
 import { Dialog } from '@angular/cdk/dialog';
 import { confirmWith } from '../../shared/ui/confirm';
-import { DatePipe } from '@angular/common';
+
 import { RouterLink } from '@angular/router';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { AuthService } from '../../core/auth/auth.service';
@@ -16,6 +16,7 @@ import { StatusPill } from '../../shared/ui/status-pill';
 import { StorageService } from '../objects/storage.service';
 import { Donut } from '../../shared/charts/donut';
 import { statusColor } from '../../shared/charts/status-color';
+import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 
 /** One run of one of the caller's jobs, as /sourceJob.json/myActivity reports it. */
 export interface ActivityRun {
@@ -65,7 +66,7 @@ const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 
 @Component({
   selector: 'app-profile',
-  imports: [PhoneInput, Icon, CopyButton, DatePipe, RouterLink, StatusPill, Donut, BillingBrief],
+  imports: [PhoneInput, Icon, CopyButton, ServerTimePipe, RouterLink, StatusPill, Donut, BillingBrief],
   templateUrl: './profile.html',
 })
 export class Profile implements OnInit {

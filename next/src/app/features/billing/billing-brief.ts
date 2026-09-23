@@ -1,11 +1,12 @@
 import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
-import { DatePipe } from '@angular/common';
+
 import { RouterLink } from '@angular/router';
 import { API_SUCCESS } from '../../core/api/api.config';
 import { AuthService } from '../../core/auth/auth.service';
 import { Icon } from '../../shared/ui/icon';
 import { BillingApi, BillingSummary, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE } from './billing.service';
 import { daysOverdue, formatMoney } from './billing-format';
+import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 
 /**
  * The bill in one glance, wherever a person lands before Billing: this month so far, what is
@@ -14,7 +15,7 @@ import { daysOverdue, formatMoney } from './billing-format';
  */
 @Component({
   selector: 'app-billing-brief',
-  imports: [Icon, RouterLink, DatePipe],
+  imports: [Icon, RouterLink, ServerTimePipe],
   template: `
     @if (auth.isTenantAdmin() && summary(); as s) {
       <div class="card p-4" [class.chart-card]="!compact()">
@@ -28,7 +29,7 @@ import { daysOverdue, formatMoney } from './billing-format';
           <div><dt>Owed</dt><dd class="tabular" [class.text-crit-500]="s.overdueCount > 0">{{ money(s.openBalance, s.currency) }}</dd>
             <dd class="billing-brief-sub">{{ s.openCount ? s.openCount + ' open invoice' + (s.openCount === 1 ? '' : 's') : 'nothing outstanding' }}@if (s.overdueCount) { · <span class="text-crit-500">{{ s.overdueCount }} overdue</span> }</dd></div>
           @if (s.nextDueNumber) {
-            <div><dt>Next due</dt><dd class="tabular">{{ s.nextDueAt | date: 'd MMM' }}</dd>
+            <div><dt>Next due</dt><dd class="tabular">{{ s.nextDueAt | serverTime: 'd MMM' }}</dd>
               <dd class="billing-brief-sub"><a class="link-inline mono" [routerLink]="['/billing/invoices', s.nextDueNumber]">{{ s.nextDueNumber }}</a> · {{ money(s.nextDueBalance ?? 0, s.currency) }}{{ overdueDays(s.nextDueAt) ? ' · ' + overdueDays(s.nextDueAt) + ' d late' : '' }}</dd></div>
           } @else if (s.latestNumber) {
             <div><dt>Last invoice</dt><dd><span class="pill" [class]="'pill ' + statusTone[s.latestStatus ?? '']">{{ statusLabel[s.latestStatus ?? ''] }}</span></dd>

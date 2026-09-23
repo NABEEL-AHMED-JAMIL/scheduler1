@@ -1,6 +1,6 @@
 import { Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { DatePipe, DecimalPipe } from '@angular/common';
+import { DecimalPipe } from '@angular/common';
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { RouterLink } from '@angular/router';
@@ -15,6 +15,7 @@ import { confirmWith } from '../../../shared/ui/confirm';
 import { BlurLoader } from '../../../shared/ui/blur-loader';
 import { ConnectionDialog } from './connection-dialog';
 import { AI_PROVIDERS, ModelConnection, providerOf } from '../ai-providers';
+import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 
 /**
  * Model connections: where prompts run. The same rail-and-pane the Kafka page has, because
@@ -23,7 +24,7 @@ import { AI_PROVIDERS, ModelConnection, providerOf } from '../ai-providers';
  */
 @Component({
   selector: 'app-connections',
-  imports: [Icon, StatTile, StatusPill, MineFilter, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink, BlurLoader, DatePipe, DecimalPipe],
+  imports: [Icon, StatTile, StatusPill, MineFilter, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink, BlurLoader, ServerTimePipe, DecimalPipe],
   templateUrl: './connections.html',
 })
 export class Connections implements OnInit {

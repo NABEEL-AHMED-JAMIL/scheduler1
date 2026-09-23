@@ -14,7 +14,7 @@
 
   <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
     <app-stat-tile label="Default card today" [value]="today().defaultCard ? 'v' + today().defaultCard!.version : '—'" icon="layers" tone="info"
-                   [foot]="today().defaultCard ? 'since ' + (today().defaultCard!.effective_from | date: 'd MMM yyyy') : 'no card in effect'" />
+                   [foot]="today().defaultCard ? 'since ' + (today().defaultCard!.effective_from | serverTime: 'd MMM yyyy') : 'no card in effect'" />
     <app-stat-tile label="Workspace cards" [value]="today().own.length" icon="building" [tone]="today().own.length ? 'warn' : 'muted'"
                    [foot]="today().own.length ? 'on a card of their own' : 'all on the default'" />
     <app-stat-tile label="Versions" [value]="cards().length" icon="history" tone="muted" [foot]="cards().length ? 'never edited, only added to' : 'seeded on the meter’s first start'" />
@@ -57,7 +57,7 @@
                   <span class="lookup-rail-key">{{ c.name }} <span class="mono font-normal text-[color:var(--text-muted)]">v{{ c.version }}</span></span>
                   <span class="lookup-rail-sub">
                     @if (isInEffect(c)) { <em>in effect</em> · } @else if (c.effective_from > todayIso) { scheduled · }
-                    from {{ c.effective_from | date: 'd MMM yyyy' }} · {{ forLabel(c) }}
+                    from {{ c.effective_from | serverTime: 'd MMM yyyy' }} · {{ forLabel(c) }}
                   </span>
                 </span>
                 <app-icon name="chevronRight" size="0.9em" class="lookup-rail-chev" />
@@ -81,9 +81,9 @@
             <div class="flex items-baseline gap-2 mt-1 min-w-0 flex-wrap">
               <h2 class="lookup-detail-key" [title]="c.name">{{ c.name }} <span class="mono text-sm font-normal text-[color:var(--text-muted)]">v{{ c.version }}</span></h2>
               <span class="text-xs text-[color:var(--text-muted)]">
-                effective {{ c.effective_from | date: 'd MMM yyyy' }}
+                effective {{ c.effective_from | serverTime: 'd MMM yyyy' }}
                 @if (c.based_on_version) { · drafted from v{{ c.based_on_version }} }
-                @if (c.created_at) { · saved {{ c.created_at | date: 'd MMM yyyy, HH:mm' }} }
+                @if (c.created_at) { · saved {{ c.created_at | serverTime: 'd MMM yyyy, HH:mm' }} }
               </span>
             </div>
             @if (c.note) { <p class="text-sm mt-1 text-[color:var(--text-secondary)]">{{ c.note }}</p> }

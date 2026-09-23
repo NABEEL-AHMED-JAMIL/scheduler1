@@ -214,7 +214,7 @@
                 <div class="min-w-0">
                   <span class="pill" [class]="'pill ' + (r.status === 'ok' ? 'pill-ok' : 'pill-crit')">{{ r.status }}</span>
                   <span class="ml-1">{{ r.kind === 'try' ? 'try' : 'step' }} · v{{ r.promptVersion }}</span>
-                  <span class="text-[color:var(--text-muted)]"> · {{ r.dateCreated | date: 'd MMM, HH:mm' }}</span>
+                  <span class="text-[color:var(--text-muted)]"> · {{ r.dateCreated | serverTime: 'd MMM, HH:mm' }}</span>
                   @if (r.error) { <div class="text-crit-500 truncate" [title]="r.error">{{ r.error }}</div> }
                 </div>
                 <span class="text-[color:var(--text-muted)] whitespace-nowrap">

@@ -1,7 +1,7 @@
 import { Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
 import { KAFKA_ENVIRONMENTS, kafkaEnvironment } from './kafka-environment';
 import { HttpClient } from '@angular/common/http';
-import { DatePipe } from '@angular/common';
+
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
@@ -22,6 +22,7 @@ import { KafkaDialog } from './kafka-dialog';
 import { TaskType, TaskTypeDialog } from '../task-types/task-type-dialog';
 import { parseTopicPartition } from '../../../shared/ui/topic';
 import { HttpParams } from '@angular/common/http';
+import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 
 /** As much of a tenant.json/listTenants row as this screen reads. */
 export interface TenantName {
@@ -73,7 +74,7 @@ export interface KafkaProfile {
 
 @Component({
   selector: 'app-kafka-connections',
-  imports: [MineFilter, StatTile, DatePipe, StatusPill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger, CopyButton, RouterLink, BlurLoader],
+  imports: [MineFilter, StatTile, ServerTimePipe, StatusPill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger, CopyButton, RouterLink, BlurLoader],
   templateUrl: './kafka-connections.html',
 })
 export class KafkaConnections implements OnInit {

@@ -1,6 +1,6 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { DatePipe } from '@angular/common';
+
 import { Router } from '@angular/router';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { LIST_LIMIT } from '../../core/api/list-limit';
@@ -11,6 +11,7 @@ import { Icon } from '../../shared/ui/icon';
 import { Pagination } from '../../shared/ui/pagination';
 import { createPager } from '../../shared/ui/pager';
 import { notificationTarget } from './notification-links';
+import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 
 interface Notification {
   notificationId: number;
@@ -38,7 +39,7 @@ interface NotificationListResponse
 
 @Component({
   selector: 'app-notifications',
-  imports: [DatePipe, TableShell, Icon, Pagination],
+  imports: [ServerTimePipe, TableShell, Icon, Pagination],
   templateUrl: './notifications.html',
 })
 export class Notifications implements OnInit {

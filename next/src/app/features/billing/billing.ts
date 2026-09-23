@@ -1,5 +1,5 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { DatePipe, DecimalPipe } from '@angular/common';
+import { DecimalPipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { API_SUCCESS } from '../../core/api/api.config';
 import { AuthService } from '../../core/auth/auth.service';
@@ -13,6 +13,7 @@ import { chartColor } from '../../shared/charts/status-color';
 import { BillingApi, DayRow, MeterLine, PricedWith, SERVICES, SubjectRow, UsageQuery } from './billing.service';
 import { HOURS_PER_DAY, daysInMonth, firstOfMonth, formatBytes, formatGb, formatMoney, formatQuantity, formatUnitPrice } from './billing-format';
 import { WorkspacePicker } from './workspace-picker';
+import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 
 /** How many subjects a line unfolds to: the top buckets, prompts or objects behind it. */
 const SUBJECTS_SHOWN = 25;
@@ -29,7 +30,7 @@ const FORECAST_WINDOW_DAYS = 7;
  */
 @Component({
   selector: 'app-billing',
-  imports: [Icon, StatTile, Combobox, TableShell, BarChart, DecimalPipe, DatePipe, RouterLink],
+  imports: [Icon, StatTile, Combobox, TableShell, BarChart, DecimalPipe, ServerTimePipe, RouterLink],
   templateUrl: './billing.html',
 })
 export class Billing implements OnInit {

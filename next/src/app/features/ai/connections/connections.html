@@ -101,7 +101,7 @@
             <div class="flex items-baseline gap-3 mt-1 min-w-0 flex-wrap">
               <h2 class="lookup-detail-key" [title]="c.name">{{ c.name }}</h2>
               <span class="text-xs text-[color:var(--text-muted)] truncate">
-                @if (c.createdByName) { {{ c.createdByName }} }@if (c.dateCreated) { · {{ c.dateCreated | date: 'mediumDate' }} }
+                @if (c.createdByName) { {{ c.createdByName }} }@if (c.dateCreated) { · {{ c.dateCreated | serverTime: 'mediumDate' }} }
               </span>
             </div>
           </div>
@@ -127,7 +127,7 @@
             <span class="kafka-strip-k">Last test</span>
             <span [class]="'kafka-strip-dot ' + testTone(c).cls"></span>
             <span class="font-medium">{{ testTone(c).label }}</span>
-            @if (c.lastTestedAt) { <span class="text-[color:var(--text-muted)]">{{ c.lastTestedAt | date: 'd MMM, HH:mm' }}</span> }
+            @if (c.lastTestedAt) { <span class="text-[color:var(--text-muted)]">{{ c.lastTestedAt | serverTime: 'd MMM, HH:mm' }}</span> }
             <span class="kafka-strip-msg truncate text-[color:var(--text-secondary)]" [title]="c.lastTestMessage || ''">
               {{ c.lastTestMessage || 'Never tested — run a test to list the provider’s models and confirm the key.' }}
             </span>

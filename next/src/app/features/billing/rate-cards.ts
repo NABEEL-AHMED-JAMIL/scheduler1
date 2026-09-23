@@ -1,5 +1,5 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { DatePipe } from '@angular/common';
+
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { API_SUCCESS } from '../../core/api/api.config';
@@ -11,6 +11,7 @@ import { BillingApi, RateCard, RateItem } from './billing.service';
 import { formatQuantity, formatUnitPrice } from './billing-format';
 import { RateCardEditor, RateCardEditorData } from './rate-card-editor';
 import { WorkspacePicker } from './workspace-picker';
+import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 
 /**
  * Rate cards: the calculation behind every bill, kept as versions. The default card prices
@@ -20,7 +21,7 @@ import { WorkspacePicker } from './workspace-picker';
  */
 @Component({
   selector: 'app-rate-cards',
-  imports: [Icon, StatTile, DatePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger],
+  imports: [Icon, StatTile, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger],
   templateUrl: './rate-cards.html',
 })
 export class RateCards implements OnInit {

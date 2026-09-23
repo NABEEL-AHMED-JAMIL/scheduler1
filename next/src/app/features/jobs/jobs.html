@@ -192,15 +192,15 @@
             <td class="whitespace-nowrap">
               @if (nextRun(job); as nextRunAt) {
                 <div class="text-[color:var(--text-secondary)]">
-                  Next {{ nextRunAt | date:'d MMM, HH:mm' }}
+                  Next {{ nextRunAt | serverTime:'d MMM, HH:mm' }}
                 </div>
               }
               <div class="text-xs text-[color:var(--text-muted)]">
-                {{ job.lastJobRun ? ('Last ' + (when(job.lastJobRun) | date:'d MMM, HH:mm')) : 'Never run' }}
+                {{ job.lastJobRun ? ('Last ' + (when(job.lastJobRun) | serverTime:'d MMM, HH:mm')) : 'Never run' }}
               </div>
             </td>
             <td class="text-[color:var(--text-secondary)] whitespace-nowrap">
-              {{ job.dateCreated ? (job.dateCreated | date:'d MMM yyyy') : '—' }}
+              {{ job.dateCreated ? (job.dateCreated | serverTime:'d MMM yyyy') : '—' }}
             </td>
             <td>
               <div class="flex items-center gap-1.5">

@@ -51,9 +51,9 @@
               <dl class="detail-list">
                 <dt>Run</dt><dd class="mono">#{{ r.jobQueueId }}</dd>
                 <dt>Started</dt>
-                <dd>{{ r.startTime ? (r.startTime | date:'d MMM yyyy, HH:mm:ss') : '—' }}</dd>
+                <dd>{{ r.startTime ? (r.startTime | serverTime:'d MMM yyyy, HH:mm:ss') : '—' }}</dd>
                 <dt>Ended</dt>
-                <dd>{{ r.endTime ? (r.endTime | date:'d MMM yyyy, HH:mm:ss') : '—' }}</dd>
+                <dd>{{ r.endTime ? (r.endTime | serverTime:'d MMM yyyy, HH:mm:ss') : '—' }}</dd>
                 <dt>Duration</dt><dd class="tabular">{{ duration() }}</dd>
               </dl>
             </div>
@@ -199,7 +199,7 @@
                 <span class="log-tl-dot" [style.background]="toneOf(log.logsDetail)"></span>
               </span>
               <span class="text-xs text-[color:var(--text-muted)] whitespace-nowrap tabular shrink-0 pt-0.5">
-                {{ log.dateCreated ? (log.dateCreated | date:'HH:mm:ss') : '—' }}
+                {{ log.dateCreated ? (log.dateCreated | serverTime:'HH:mm:ss') : '—' }}
               </span>
               <span class="text-sm mono break-words min-w-0">{{ log.logsDetail }}</span>
             </li>
@@ -222,7 +222,7 @@
                 <tr>
                   <td class="text-right tabular text-[color:var(--text-muted)]">{{ $index + 1 }}</td>
                   <td class="tabular whitespace-nowrap">
-                    {{ log.dateCreated ? (log.dateCreated | date:'HH:mm:ss') : '—' }}
+                    {{ log.dateCreated ? (log.dateCreated | serverTime:'HH:mm:ss') : '—' }}
                   </td>
                   <td class="mono break-words">{{ log.logsDetail }}</td>
                 </tr>
@@ -236,7 +236,7 @@
         <div class="log-console" [appStickToBottom]="filtered().length">
           @for (log of filtered(); track $index) {
             <div class="log-console-line">
-              <span class="log-console-time">[{{ log.dateCreated ? (log.dateCreated | date:'yyyy-MM-dd HH:mm:ss') : '—' }}]</span>
+              <span class="log-console-time">[{{ log.dateCreated ? (log.dateCreated | serverTime:'yyyy-MM-dd HH:mm:ss') : '—' }}]</span>
               <span>{{ log.logsDetail }}</span>
             </div>
           }

@@ -134,11 +134,11 @@
               <div class="mt-auto pt-2.5 border-t border-subtle text-[11px]
                           text-[color:var(--text-muted)] flex flex-wrap items-center gap-x-2 gap-y-1">
                 <span>
-                  {{ r.dateCreated ? ('Received ' + (r.dateCreated | date: 'd MMM y')) : 'Received —' }}
+                  {{ r.dateCreated ? ('Received ' + (r.dateCreated | serverTime: 'd MMM y')) : 'Received —' }}
                 </span>
                 @if (r.decidedAt) {
                   <span class="text-[color:var(--border-strong)]">·</span>
-                  <span>{{ statusLabel(r.status) }} {{ r.decidedAt | date: 'd MMM y' }}</span>
+                  <span>{{ statusLabel(r.status) }} {{ r.decidedAt | serverTime: 'd MMM y' }}</span>
                 }
               </div>
 
@@ -252,7 +252,7 @@
               }
             </td>
             <td class="text-xs text-[color:var(--text-secondary)] whitespace-nowrap">
-              {{ r.dateCreated ? (r.dateCreated | date:'d MMM y') : '—' }}
+              {{ r.dateCreated ? (r.dateCreated | serverTime:'d MMM y') : '—' }}
             </td>
             <td>
               <!-- A full chip, not the quiet dot: this column is the whole point of the
@@ -263,7 +263,7 @@
                    column having broken rather than as "there's nothing left to do here". -->
               @if (r.status !== 'Pending' && r.decidedAt) {
                 <div class="text-xs text-[color:var(--text-muted)] mt-0.5 whitespace-nowrap">
-                  {{ statusLabel(r.status) }} {{ r.decidedAt | date:'d MMM y' }}
+                  {{ statusLabel(r.status) }} {{ r.decidedAt | serverTime:'d MMM y' }}
                 </div>
               }
               @if (r.status === 'Rejected' && r.decisionNote && !isOpen(r.tenantRequestId)) {
@@ -315,7 +315,7 @@
                       <div class="flex flex-col gap-0.5">
                         <span class="text-[11px] uppercase tracking-wider
                                      text-[color:var(--text-muted)]">Decided</span>
-                        <span class="text-xs">{{ r.decidedAt | date:'d MMM y, HH:mm' }}</span>
+                        <span class="text-xs">{{ r.decidedAt | serverTime:'d MMM y, HH:mm' }}</span>
                       </div>
                     }
                   </div>

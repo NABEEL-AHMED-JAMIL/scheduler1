@@ -131,7 +131,7 @@
                               <td class="mono text-xs max-w-96"><span class="block truncate" [title]="s.subject_id">{{ subjectLabel(s) }}</span></td>
                               <td class="text-right tabular">{{ line.unit === 'byte' ? fmtBytes(s.quantity) : line.unit === 'GB' ? fmtGb(s.quantity) : line.unit === 'GB-hour' ? fmtGb(s.quantity / 24) + ' · day' : (s.quantity | number: '1.0-2') + ' ' + line.unit }}</td>
                               <td class="text-right tabular">{{ s.events }}</td>
-                              <td class="text-xs text-[color:var(--text-muted)] tabular">{{ s.last ? (s.last | date: 'd MMM, HH:mm') : '' }}</td>
+                              <td class="text-xs text-[color:var(--text-muted)] tabular">{{ s.last ? (s.last | serverTime: 'd MMM, HH:mm') : '' }}</td>
                               <td class="text-xs text-[color:var(--text-muted)]">{{ s.actor_name || (s.actor_user_id ? 'user #' + s.actor_user_id : 'pipeline') }}</td>
                             </tr>
                           }

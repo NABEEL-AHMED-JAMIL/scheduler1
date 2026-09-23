@@ -1,10 +1,11 @@
 import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
-import { DatePipe } from '@angular/common';
+
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { Icon } from '../../shared/ui/icon';
 import { formatSize } from '../../shared/ui/format-size';
 import { PdfViewer } from '../objects/preview/pdf-viewer';
 import { BillingApi, DOCUMENT_KIND_LABEL, DocumentRow } from './billing.service';
+import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 
 /**
  * A billing document read in place -- the same modal the Object Browser opens a file in, with
@@ -13,7 +14,7 @@ import { BillingApi, DOCUMENT_KIND_LABEL, DocumentRow } from './billing.service'
  */
 @Component({
   selector: 'app-document-view-dialog',
-  imports: [Icon, DatePipe, PdfViewer],
+  imports: [Icon, ServerTimePipe, PdfViewer],
   template: `
     <div class="card shadow-2xl w-[60rem] max-w-[calc(100vw-2rem)] max-h-[88vh] flex flex-col overflow-hidden">
       <div class="flex items-center gap-3 px-4 py-2.5 border-b shrink-0 border-subtle">
@@ -23,7 +24,7 @@ import { BillingApi, DOCUMENT_KIND_LABEL, DocumentRow } from './billing.service'
           <div class="text-[11px] text-[color:var(--text-muted)] flex items-center gap-2 leading-tight mt-0.5">
             <span class="uppercase">{{ kindLabel[data.kind] }}</span>
             @if (data.sizeBytes) { <span>·</span><span>{{ humanSize(data.sizeBytes) }}</span> }
-            <span>·</span><span>{{ data.issuedAt | date: 'd MMM yyyy, HH:mm' }}</span>
+            <span>·</span><span>{{ data.issuedAt | serverTime: 'd MMM yyyy, HH:mm' }}</span>
             @if (data.createdByName) { <span>·</span><span>{{ data.createdByName }}</span> }
           </div>
         </div>

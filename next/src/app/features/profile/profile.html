@@ -183,11 +183,11 @@
             </div>
             <div>
               <dt class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">Joined</dt>
-              <dd>{{ me.dateCreated ? (me.dateCreated | date: 'd MMM y') : '—' }}</dd>
+              <dd>{{ me.dateCreated ? (me.dateCreated | serverTime: 'd MMM y') : '—' }}</dd>
             </div>
             <div>
               <dt class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">Last sign-in</dt>
-              <dd>{{ me.lastLoginAt ? (me.lastLoginAt | date: 'd MMM y, HH:mm') : 'Never' }}</dd>
+              <dd>{{ me.lastLoginAt ? (me.lastLoginAt | serverTime: 'd MMM y, HH:mm') : 'Never' }}</dd>
             </div>
           </dl>
         </div>
@@ -292,7 +292,7 @@
                   <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 pl-6
                               text-[11px] text-[color:var(--text-muted)]">
                     @if (run.startTime) {
-                      <span>{{ run.startTime | date: 'd MMM, HH:mm' }}</span>
+                      <span>{{ run.startTime | serverTime: 'd MMM, HH:mm' }}</span>
                       <span class="text-[color:var(--border-strong)]">&middot;</span>
                       <span>
                         {{ runDuration(run) }}{{ stillRunning(run) ? ' so far' : '' }}

@@ -1,6 +1,6 @@
 import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { DatePipe } from '@angular/common';
+
 import { RouterLink } from '@angular/router';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { ToastService } from '../../../shared/ui/toast.service';
@@ -15,6 +15,7 @@ import { classify, PRESETS, Intent } from './job-assistant.intents';
 import {
   Answer, JobFacts, JobRun, answerFor, computeStats, humanDuration, runsToCsv,
 } from './job-assistant.answers';
+import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 
 interface Turn {
   /** Monotonic, so two turns in the same millisecond cannot collide as @for track keys. */
@@ -34,7 +35,7 @@ interface Turn {
  */
 @Component({
   selector: 'app-job-assistant',
-  imports: [Icon, DatePipe, RouterLink, StatusPill, Donut, RankedBar],
+  imports: [Icon, ServerTimePipe, RouterLink, StatusPill, Donut, RankedBar],
   templateUrl: './job-assistant.html',
   /*
    * In a panel the host has to be a flex item that can shrink, or the layout chain breaks

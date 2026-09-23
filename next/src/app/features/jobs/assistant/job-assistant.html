@@ -131,7 +131,7 @@
           <app-icon name="user" size="0.9em" class="icon-muted" />
           <p class="text-sm font-medium flex-1">{{ turn.question }}</p>
           <span class="text-[11px] tabular text-[color:var(--text-muted)]">
-            {{ turn.at | date: 'HH:mm' }}
+            {{ turn.at | serverTime: 'HH:mm' }}
           </span>
         </div>
 
@@ -223,7 +223,7 @@
                       <tr>
                         <td class="mono">#{{ run.jobQueueId }}</td>
                         <td class="whitespace-nowrap text-[color:var(--text-secondary)]">
-                          {{ run.startTime ? (run.startTime | date: 'd MMM, HH:mm') : '—' }}
+                          {{ run.startTime ? (run.startTime | serverTime: 'd MMM, HH:mm') : '—' }}
                         </td>
                         <td><app-status [label]="run.jobStatus" /></td>
                         <td class="max-w-72 truncate" [title]="run.jobStatusMessage">

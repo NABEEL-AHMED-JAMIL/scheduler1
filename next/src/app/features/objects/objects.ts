@@ -2,7 +2,7 @@ import { Component, Injector, OnInit, afterNextRender, computed, inject, signal,
 import { Combobox } from '../../shared/ui/combobox';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { EMPTY, catchError, from, mergeMap, of, tap } from 'rxjs';
-import { DatePipe } from '@angular/common';
+
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { BucketSummary, ObjectSummary, StorageService } from './storage.service';
@@ -20,6 +20,7 @@ import { HttpClient } from '@angular/common/http';
 import { API_BASE } from '../../core/api/api.config';
 import { Icon } from '../../shared/ui/icon';
 import { formatSize } from '../../shared/ui/format-size';
+import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 
 interface Crumb { name: string; prefix: string; }
 
@@ -28,7 +29,7 @@ const SLOW_PROVIDERS = ['FTP', 'FTPS'];
 
 @Component({
   selector: 'app-objects',
-  imports: [Icon, DatePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, FileChat, Donut, RankedBar, Combobox],
+  imports: [Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, FileChat, Donut, RankedBar, Combobox],
   templateUrl: './objects.html',
 })
 export class Objects implements OnInit {

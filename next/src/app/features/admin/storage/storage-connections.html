@@ -164,7 +164,7 @@
               }
               @if (c.lastTestedAt) {
                 <span class="text-[11px] text-[color:var(--text-muted)] ml-auto">
-                  {{ c.lastTestedAt | date:'d MMM, HH:mm' }}
+                  {{ c.lastTestedAt | serverTime:'d MMM, HH:mm' }}
                 </span>
               }
             </div>
@@ -252,7 +252,7 @@
               </span>
               @if (c.lastTestedAt) {
                 <div class="text-xs text-[color:var(--text-muted)] mt-0.5">
-                  {{ c.lastTestedAt | date:'d MMM, HH:mm' }}
+                  {{ c.lastTestedAt | serverTime:'d MMM, HH:mm' }}
                 </div>
               }
             </td>

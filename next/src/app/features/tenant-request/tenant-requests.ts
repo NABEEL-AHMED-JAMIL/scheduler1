@@ -1,5 +1,5 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { DatePipe } from '@angular/common';
+
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { Dialog } from '@angular/cdk/dialog';
@@ -17,6 +17,7 @@ import { createSort } from '../../shared/ui/sort';
 import { Pagination } from '../../shared/ui/pagination';
 import { createPager } from '../../shared/ui/pager';
 import { RejectDialog } from './reject-dialog';
+import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 
 interface TenantRequest {
   tenantRequestId: number;
@@ -41,7 +42,7 @@ interface TenantRequest {
  */
 @Component({
   selector: 'app-tenant-requests',
-  imports: [TableShell, StatTile, StatusPill, Icon, CopyButton, ViewToggle, DatePipe, Pagination],
+  imports: [TableShell, StatTile, StatusPill, Icon, CopyButton, ViewToggle, ServerTimePipe, Pagination],
   templateUrl: './tenant-requests.html',
   styles: [`
     /* An open row and its panel are one thing, so the border between them is dropped and the

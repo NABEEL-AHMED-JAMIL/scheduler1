@@ -213,7 +213,7 @@
                           text-[color:var(--text-muted)] flex flex-wrap items-center gap-x-2 gap-y-1">
                 <span>
                   {{ user.lastLoginAt
-                      ? 'Last in ' + (user.lastLoginAt | date: 'd MMM y')
+                      ? 'Last in ' + (user.lastLoginAt | serverTime: 'd MMM y')
                       : 'Never signed in' }}
                 </span>
                 @if (statFor(user); as stat) {
@@ -398,9 +398,9 @@
 
             <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-sm">
               @if (user.lastLoginAt) {
-                {{ user.lastLoginAt | date:'d MMM yyyy' }}
+                {{ user.lastLoginAt | serverTime:'d MMM yyyy' }}
                 <div class="text-xs text-[color:var(--text-muted)]">
-                  {{ user.lastLoginAt | date:'HH:mm' }}
+                  {{ user.lastLoginAt | serverTime:'HH:mm' }}
                 </div>
               } @else {
                 <span class="text-[color:var(--text-muted)]">Never</span>
@@ -436,7 +436,7 @@
             <!-- When, and by whom, in one cell. The editor line appears only when it was somebody
                  other than the author -- otherwise it restates the line above it. -->
             <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-sm">
-              {{ user.dateCreated ? (user.dateCreated | date:'d MMM yyyy') : '—' }}
+              {{ user.dateCreated ? (user.dateCreated | serverTime:'d MMM yyyy') : '—' }}
               @if (user.createdByName) {
                 <div class="text-xs text-[color:var(--text-muted)]">by {{ user.createdByName }}</div>
               }

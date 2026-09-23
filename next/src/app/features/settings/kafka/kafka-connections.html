@@ -136,7 +136,7 @@
               <h2 class="lookup-detail-key" [title]="p.profileName">{{ p.profileName }}</h2>
               <span class="text-xs text-[color:var(--text-muted)] truncate"
                     [title]="(p.createdByName ? 'Added by ' + p.createdByName : '') + (p.updatedByName ? ' · last changed by ' + p.updatedByName : '')">
-                @if (p.createdByName) { {{ p.createdByName }} }@if (p.dateCreated) { · {{ p.dateCreated | date: 'mediumDate' }} }
+                @if (p.createdByName) { {{ p.createdByName }} }@if (p.dateCreated) { · {{ p.dateCreated | serverTime: 'mediumDate' }} }
               </span>
             </div>
           </div>
@@ -179,7 +179,7 @@
             <span class="kafka-strip-k">Last test</span>
             <span class="kafka-strip-dot" [class]="'kafka-strip-dot ' + testTone(p).cls"></span>
             <span class="font-medium">{{ testTone(p).label }}</span>
-            @if (p.lastTestedAt) { <span class="text-[color:var(--text-muted)]">{{ p.lastTestedAt | date: 'd MMM, HH:mm' }}</span> }
+            @if (p.lastTestedAt) { <span class="text-[color:var(--text-muted)]">{{ p.lastTestedAt | serverTime: 'd MMM, HH:mm' }}</span> }
             <span class="kafka-strip-msg truncate text-[color:var(--text-secondary)]"
                   [title]="p.lastTestMessage || ''">
               {{ p.lastTestMessage || (p.connectionStatus === 'UNTESTED' || !p.connectionStatus ? 'Never tested — run a test to confirm the brokers answer.' : '') }}

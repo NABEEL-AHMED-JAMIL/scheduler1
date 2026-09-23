@@ -1,6 +1,6 @@
 import { Component, OnInit, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { DatePipe, DecimalPipe } from '@angular/common';
+import { DecimalPipe } from '@angular/common';
 import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { Router, RouterLink } from '@angular/router';
@@ -14,6 +14,7 @@ import { Dialog } from '@angular/cdk/dialog';
 import { ObjectPicker, PickedObject, objectPickerConfig } from '../../../shared/ui/object-picker';
 import { ModelConnection } from '../ai-providers';
 import { Prompt, PromptRun, PromptVariable, placeholdersOf } from './prompt-model';
+import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 
 /**
  * The prompt editor, with Try it beside it: the template and its variables on the left, the
@@ -22,7 +23,7 @@ import { Prompt, PromptRun, PromptVariable, placeholdersOf } from './prompt-mode
  */
 @Component({
   selector: 'app-prompt-edit',
-  imports: [ReactiveFormsModule, RouterLink, Field, Icon, Combobox, DatePipe, DecimalPipe],
+  imports: [ReactiveFormsModule, RouterLink, Field, Icon, Combobox, ServerTimePipe, DecimalPipe],
   templateUrl: './prompt-edit.html',
 })
 export class PromptEdit implements OnInit {

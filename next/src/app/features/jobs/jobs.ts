@@ -1,6 +1,6 @@
 import { Component, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { DatePipe } from '@angular/common';
+
 import { RouterLink } from '@angular/router';
 import { EMPTY, catchError, from, mergeMap, tap } from 'rxjs';
 import { Dialog } from '@angular/cdk/dialog';
@@ -28,6 +28,7 @@ import { copyText } from '../../shared/ui/clipboard.util';
 import { isInFlight, isStalled, stalledFor } from './stalled';
 import { notifyChips, notifyCount, notifySentence } from './notify-summary';
 import { JobAssistant } from './assistant/job-assistant';
+import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 
 export interface Scheduler {
   schedulerId: number;
@@ -101,7 +102,7 @@ const BULK_CONCURRENCY = 4;
 
 @Component({
   selector: 'app-jobs',
-  imports: [MineFilter, JobAssistant, Icon, DatePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Pagination, BarChart],
+  imports: [MineFilter, JobAssistant, Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Pagination, BarChart],
   templateUrl: './jobs.html',
 })
 export class Jobs implements OnInit {

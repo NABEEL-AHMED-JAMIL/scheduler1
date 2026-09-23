@@ -7,7 +7,7 @@ import { AuthService } from '../../core/auth/auth.service';
 import { RouterLink } from '@angular/router';
 import { TableShell } from '../../shared/ui/data-table';
 import { StatusPill } from '../../shared/ui/status-pill';
-import { DatePipe } from '@angular/common';
+
 import { Icon } from '../../shared/ui/icon';
 import { Combobox } from '../../shared/ui/combobox';
 import { ViewToggle } from '../../shared/ui/view-toggle';
@@ -18,6 +18,7 @@ import { confirmWith } from '../../shared/ui/confirm';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { createPager } from '../../shared/ui/pager';
 import { Pagination } from '../../shared/ui/pagination';
+import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 
 export interface LinkedJob {
   jobId: number;
@@ -51,7 +52,7 @@ interface SourceTask {
 
 @Component({
   selector: 'app-tasks',
-  imports: [MineFilter, ViewToggle, Icon, RouterLink, TableShell, StatusPill, CdkMenu, CdkMenuItem, CdkMenuTrigger, Pagination, DatePipe, Combobox],
+  imports: [MineFilter, ViewToggle, Icon, RouterLink, TableShell, StatusPill, CdkMenu, CdkMenuItem, CdkMenuTrigger, Pagination, ServerTimePipe, Combobox],
   templateUrl: './tasks.html',
 })
 export class Tasks implements OnInit {

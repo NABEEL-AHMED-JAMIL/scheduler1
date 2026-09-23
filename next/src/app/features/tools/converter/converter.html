@@ -270,7 +270,7 @@
                   } @else { <span class="text-[color:var(--text-muted)]">—</span> }
                 </td>
                 <td class="whitespace-nowrap text-[color:var(--text-secondary)]">
-                  {{ task.dateCreated ? (task.dateCreated | date: 'd MMM y, HH:mm') : '—' }}
+                  {{ task.dateCreated ? (task.dateCreated | serverTime: 'd MMM y, HH:mm') : '—' }}
                 </td>
                 <td>
                   <div class="flex items-center justify-end gap-1.5">

@@ -237,7 +237,7 @@
                     </button>
                   </td>
                   <td class="text-[color:var(--text-secondary)] whitespace-nowrap">
-                    {{ entry.lastModified ? (entry.lastModified | date:'d MMM yyyy, HH:mm') : '—' }}
+                    {{ entry.lastModified ? (entry.lastModified | serverTime:'d MMM yyyy, HH:mm') : '—' }}
                   </td>
                   <td class="text-right text-[color:var(--text-secondary)] tabular">
                     {{ entry.folder ? '—' : formatBytes(entry.size) }}

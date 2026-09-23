@@ -1,6 +1,6 @@
 import { Component, OnDestroy, OnInit, computed, effect, inject, input, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { DatePipe, DecimalPipe } from '@angular/common';
+import { DecimalPipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { TableShell } from '../../../shared/ui/data-table';
@@ -10,6 +10,7 @@ import { RankedBar } from '../../../shared/charts/ranked-bar';
 import { StatusPill } from '../../../shared/ui/status-pill';
 import { JobEventsService } from '../../../core/socket/job-events.service';
 import { Subscription } from 'rxjs';
+import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 
 interface AuditLog {
   jobAuditLogId?: number;
@@ -21,7 +22,7 @@ interface AuditLog {
 
 @Component({
   selector: 'app-job-logs',
-  imports: [StickToBottom, Icon, DatePipe, DecimalPipe, RouterLink, TableShell, RankedBar, StatusPill],
+  imports: [StickToBottom, Icon, ServerTimePipe, DecimalPipe, RouterLink, TableShell, RankedBar, StatusPill],
   templateUrl: './job-logs.html',
 })
 export class JobLogs implements OnInit, OnDestroy {

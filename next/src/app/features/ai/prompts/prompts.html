@@ -88,7 +88,7 @@
             </div>
             <dl class="text-xs grid gap-1">
               <div class="flex gap-2"><dt class="text-[color:var(--text-muted)] shrink-0 w-20">Used by</dt><dd>{{ p.pipelineCount ? p.pipelineCount + ' pipeline' + (p.pipelineCount === 1 ? '' : 's') : 'no pipeline yet' }}</dd></div>
-              <div class="flex gap-2"><dt class="text-[color:var(--text-muted)] shrink-0 w-20">Runs</dt><dd>{{ p.runCount ?? 0 }}@if (p.lastRunAt) { · last {{ p.lastRunAt | date: 'd MMM, HH:mm' }} @if (p.lastRunStatus === 'failed') { <span class="text-crit-500">failed</span> } }</dd></div>
+              <div class="flex gap-2"><dt class="text-[color:var(--text-muted)] shrink-0 w-20">Runs</dt><dd>{{ p.runCount ?? 0 }}@if (p.lastRunAt) { · last {{ p.lastRunAt | serverTime: 'd MMM, HH:mm' }} @if (p.lastRunStatus === 'failed') { <span class="text-crit-500">failed</span> } }</dd></div>
               @if (p.createdByName) { <div class="flex gap-2"><dt class="text-[color:var(--text-muted)] shrink-0 w-20">Created by</dt><dd class="truncate">{{ p.createdByName }}</dd></div> }
             </dl>
           </article>
@@ -136,7 +136,7 @@
               </td>
               <td class="text-right tabular">{{ p.runCount ?? 0 }}</td>
               <td class="text-xs whitespace-nowrap">
-                @if (p.lastRunAt) { {{ p.lastRunAt | date: 'd MMM, HH:mm' }} @if (p.lastRunStatus === 'failed') { <span class="text-crit-500">· failed</span> } } @else { <span class="text-[color:var(--text-muted)]">never</span> }
+                @if (p.lastRunAt) { {{ p.lastRunAt | serverTime: 'd MMM, HH:mm' }} @if (p.lastRunStatus === 'failed') { <span class="text-crit-500">· failed</span> } } @else { <span class="text-[color:var(--text-muted)]">never</span> }
               </td>
               @if (isPlatformAdmin()) { <td class="text-xs">{{ p.tenantName || '—' }}</td> }
               <td class="text-right"><app-status [label]="p.status || 'Inactive'" [quiet]="true" /></td>

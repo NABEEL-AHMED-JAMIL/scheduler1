@@ -2,7 +2,7 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Combobox } from '../../../shared/ui/combobox';
 import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
-import { DatePipe } from '@angular/common';
+
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
@@ -25,6 +25,7 @@ import { AccessProfile, AccessProfilesService } from '../access-profiles/access-
 import { PromptDialog } from '../../objects/dialogs/prompt-dialog';
 import { createPager } from '../../../shared/ui/pager';
 import { Pagination } from '../../../shared/ui/pagination';
+import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 
 /** What one user owns and how their runs have gone, from dashboard.json/userStatistics. */
 export interface UserStatistic {
@@ -73,7 +74,7 @@ export interface AppUser {
 
 @Component({
   selector: 'app-users',
-  imports: [MineFilter, ViewToggle, StatTile, DatePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Icon, CopyButton, Avatar, Pagination, Combobox],
+  imports: [MineFilter, ViewToggle, StatTile, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Icon, CopyButton, Avatar, Pagination, Combobox],
   templateUrl: './users.html',
 })
 export class Users implements OnInit {

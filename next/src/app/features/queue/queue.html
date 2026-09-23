@@ -138,7 +138,7 @@
             <td class="mono text-[color:var(--text-muted)]">#{{ row.jobQueueId }}</td>
             <td class="mono">{{ row.jobId }}</td>
             <td class="whitespace-nowrap text-[color:var(--text-secondary)]">
-              {{ row.dateCreated ? (row.dateCreated | date:'d MMM, HH:mm:ss') : '—' }}
+              {{ row.dateCreated ? (row.dateCreated | serverTime:'d MMM, HH:mm:ss') : '—' }}
             </td>
             <td class="tabular text-[color:var(--text-secondary)] whitespace-nowrap">
               @if (duration(row); as d) { {{ d }} }

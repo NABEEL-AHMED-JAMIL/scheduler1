@@ -73,7 +73,7 @@
 
           <div class="flex items-center gap-1 shrink-0">
             <span class="text-xs text-[color:var(--text-muted)] whitespace-nowrap">
-              {{ when(item.dateCreated) | date: 'd MMM, HH:mm' }}
+              {{ when(item.dateCreated) | serverTime: 'd MMM, HH:mm' }}
             </span>
 
             @if (!item.read) {

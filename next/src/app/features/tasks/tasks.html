@@ -304,7 +304,7 @@
                                   </td>
                                   <td><span class="pill pill-neutral">{{ job.execution || '—' }}</span></td>
                                   <td class="whitespace-nowrap text-[color:var(--text-secondary)]">
-                                    {{ job.lastJobRun ? (job.lastJobRun | date: 'd MMM, HH:mm') : 'Never' }}
+                                    {{ job.lastJobRun ? (job.lastJobRun | serverTime: 'd MMM, HH:mm') : 'Never' }}
                                   </td>
                                   <td><app-status [label]="job.jobRunningStatus || '—'" /></td>
                                   <td class="text-right"><app-status [label]="job.jobStatus" [quiet]="true" /></td>

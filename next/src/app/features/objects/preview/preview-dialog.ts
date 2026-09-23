@@ -2,13 +2,14 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { ArchiveEntry, StorageService, TablePreview } from '../storage.service';
 import { API_SUCCESS } from '../../../core/api/api.config';
-import { DatePipe } from '@angular/common';
+
 import { Icon } from '../../../shared/ui/icon';
 import { AudioPlayer } from './audio-player';
 import { PdfViewer } from './pdf-viewer';
 import { copyText } from '../../../shared/ui/clipboard.util';
 import { formatSize } from '../../../shared/ui/format-size';
 import { catchError } from 'rxjs';
+import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 
 export interface PreviewData {
   bucket: string;
@@ -41,7 +42,7 @@ const VIDEO = ['mp4', 'webm', 'ogv', 'mov', 'm4v'];
 
 @Component({
   selector: 'app-preview-dialog',
-  imports: [Icon, DatePipe, AudioPlayer, PdfViewer],
+  imports: [Icon, ServerTimePipe, AudioPlayer, PdfViewer],
   templateUrl: './preview-dialog.html',
 })
 export class PreviewDialog implements OnInit {

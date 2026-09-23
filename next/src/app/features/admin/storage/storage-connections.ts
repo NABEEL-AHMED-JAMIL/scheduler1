@@ -1,7 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import { DatePipe } from '@angular/common';
+
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
@@ -20,6 +20,7 @@ import { copyText } from '../../../shared/ui/clipboard.util';
 import type { TenantName } from '../../settings/kafka/kafka-connections';
 import { ViewToggle } from '../../../shared/ui/view-toggle';
 import { kafkaDependencyNote, kafkaProfilesUsing } from './kafka-dependents';
+import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 
 interface StorageConnection {
   /** Owning workspace; null for the two platform buckets. */
@@ -52,7 +53,7 @@ interface StorageConnection {
 
 @Component({
   selector: 'app-storage-connections',
-  imports: [MineFilter, ViewToggle, StatTile, Icon, DatePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, CopyButton],
+  imports: [MineFilter, ViewToggle, StatTile, Icon, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, CopyButton],
   templateUrl: './storage-connections.html',
 })
 export class StorageConnections implements OnInit {

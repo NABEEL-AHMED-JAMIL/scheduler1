@@ -21,9 +21,9 @@
           <h2 class="lookup-detail-key mono" [title]="i.number">{{ i.number }}</h2>
           <app-copy-button [value]="i.number" [copied]="copied()" copiedLabel="Number copied" (copy)="copyNumber()" />
           <span class="text-xs text-[color:var(--text-muted)]">
-            {{ i.periodStart | date: 'MMMM yyyy' }}
+            {{ i.periodStart | serverTime: 'MMMM yyyy' }}
             @if (i.referencesNumber) { · against <a class="link-inline mono" [routerLink]="['/billing/invoices', i.referencesNumber]">{{ i.referencesNumber }}</a> }
-            @if (i.issuedAt) { · issued {{ i.issuedAt | date: 'd MMM yyyy' }} }@if (i.dueAt && i.kind === 'invoice') { · due {{ i.dueAt | date: 'd MMM yyyy' }} }
+            @if (i.issuedAt) { · issued {{ i.issuedAt | serverTime: 'd MMM yyyy' }} }@if (i.dueAt && i.kind === 'invoice') { · due {{ i.dueAt | serverTime: 'd MMM yyyy' }} }
           </span>
         </div>
       </div>
@@ -66,9 +66,9 @@
         <div><span class="eyebrow">Billed to</span><div class="text-sm">{{ i.account.legalName || i.tenantName }}</div>
           @if (i.account.address) { <div class="text-xs text-[color:var(--text-secondary)] whitespace-pre-line">{{ i.account.address }}</div> }
           @if (i.account.taxId) { <div class="text-xs text-[color:var(--text-muted)]">Tax ID {{ i.account.taxId }}</div> }</div>
-        <div><span class="eyebrow">Period</span><div class="text-sm tabular">{{ i.periodStart | date: 'd MMM' }} – {{ i.periodEnd | date: 'd MMM yyyy' }}</div>
-          @if (i.issuedAt) { <div class="text-xs text-[color:var(--text-secondary)]">issued {{ i.issuedAt | date: 'd MMM yyyy' }}</div> }
-          @if (i.dueAt && i.kind === 'invoice') { <div class="text-xs" [class.text-crit-500]="i.status === 'overdue'" [class.text-[color:var(--text-secondary)]]="i.status !== 'overdue'">due {{ i.dueAt | date: 'd MMM yyyy' }} (net {{ i.account.paymentTermsDays }})</div> }</div>
+        <div><span class="eyebrow">Period</span><div class="text-sm tabular">{{ i.periodStart | serverTime: 'd MMM' }} – {{ i.periodEnd | serverTime: 'd MMM yyyy' }}</div>
+          @if (i.issuedAt) { <div class="text-xs text-[color:var(--text-secondary)]">issued {{ i.issuedAt | serverTime: 'd MMM yyyy' }}</div> }
+          @if (i.dueAt && i.kind === 'invoice') { <div class="text-xs" [class.text-crit-500]="i.status === 'overdue'" [class.text-[color:var(--text-secondary)]]="i.status !== 'overdue'">due {{ i.dueAt | serverTime: 'd MMM yyyy' }} (net {{ i.account.paymentTermsDays }})</div> }</div>
         <div><span class="eyebrow">Total</span><div class="text-sm tabular font-semibold" [class.text-crit-500]="i.total < 0">{{ money(i.total) }}</div>
           @if (i.kind === 'invoice' && i.status !== 'draft') { <div class="text-xs text-[color:var(--text-secondary)]">paid {{ money(paid()) }}@if (credited() > 0) { · credited {{ money(credited()) }} } · balance {{ money(i.balance) }}</div> }
           @if (i.rateCardVersion) { <div class="text-xs text-[color:var(--text-muted)]">{{ i.rateCardName || 'Rate card' }} v{{ i.rateCardVersion }}</div> }</div>
@@ -172,7 +172,7 @@
               <span class="doc-ic">{{ (d.contentType || '').includes('pdf') ? 'PDF' : (d.contentType || '').startsWith('image/') ? 'IMG' : 'FILE' }}</span>
               <div class="min-w-0 flex-1">
                 <button type="button" class="link-inline text-sm block truncate text-left" (click)="openDocument(d.documentId)">{{ d.fileName }}</button>
-                <div class="text-[11px] text-[color:var(--text-muted)]">{{ kindLabel[d.kind] }}@if (d.number) { · {{ d.number }} } · {{ d.issuedAt | date: 'd MMM, HH:mm' }}@if (d.createdByName) { · {{ d.createdByName }} }@if (d.amount != null) { · {{ money(d.amount) }} }@if (d.sizeBytes) { · {{ humanSize(d.sizeBytes) }} }</div>
+                <div class="text-[11px] text-[color:var(--text-muted)]">{{ kindLabel[d.kind] }}@if (d.number) { · {{ d.number }} } · {{ d.issuedAt | serverTime: 'd MMM, HH:mm' }}@if (d.createdByName) { · {{ d.createdByName }} }@if (d.amount != null) { · {{ money(d.amount) }} }@if (d.sizeBytes) { · {{ humanSize(d.sizeBytes) }} }</div>
               </div>
               <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="openDocument(d.documentId)" aria-label="View" title="View here"><app-icon name="eye" /></button>
               <a class="btn btn-ghost btn-icon btn-sm" [routerLink]="['/billing/documents']" [queryParams]="{ document: d.documentId }" title="Open in Billing documents" aria-label="Open in Billing documents"><app-icon name="folder" /></a>
@@ -197,7 +197,7 @@
             <tbody>
               @for (p of i.payments; track p.paymentId) {
                 <tr>
-                  <td class="tabular text-xs">{{ p.dateCreated | date: 'd MMM' }}</td>
+                  <td class="tabular text-xs">{{ p.dateCreated | serverTime: 'd MMM' }}</td>
                   <td>{{ p.method === 'credit_note' ? 'credit note' : p.method }}</td>
                   <td class="mono text-xs hidden md:table-cell">{{ p.reference || '—' }}</td>
                   <td class="text-xs text-[color:var(--text-muted)] hidden md:table-cell">{{ p.submittedBy || 'system' }}</td>
@@ -222,7 +222,7 @@
       <div class="lookup-entries-head"><h3 class="section-title">History</h3></div>
       <ul class="text-xs space-y-1.5 px-5">
         @for (h of history(); track $index) {
-          <li class="flex gap-2"><span class="tabular text-[color:var(--text-muted)] whitespace-nowrap">{{ h.at | date: 'd MMM HH:mm' }}</span><span [class.text-crit-500]="h.tone === 'crit'">{{ h.text }}</span></li>
+          <li class="flex gap-2"><span class="tabular text-[color:var(--text-muted)] whitespace-nowrap">{{ h.at | serverTime: 'd MMM HH:mm' }}</span><span [class.text-crit-500]="h.tone === 'crit'">{{ h.text }}</span></li>
         }
       </ul>
     </section>

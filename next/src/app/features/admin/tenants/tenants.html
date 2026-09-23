@@ -120,7 +120,7 @@
                 </td>
               }
               <td class="whitespace-nowrap text-[color:var(--text-secondary)]">
-                {{ tenant.dateCreated ? (tenant.dateCreated | date: 'mediumDate') : '—' }}
+                {{ tenant.dateCreated ? (tenant.dateCreated | serverTime: 'mediumDate') : '—' }}
               </td>
               <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
                 {{ tenant.createdByName || '—' }}
@@ -186,7 +186,7 @@
                     <app-icon [name]="copiedId() === tenant.tenantId ? 'check' : 'copy'" size="0.85em" />
                   </button>
                 @if (tenant.dateCreated) {
-                  <span>since {{ tenant.dateCreated | date: 'mediumDate' }}</span>
+                  <span>since {{ tenant.dateCreated | serverTime: 'mediumDate' }}</span>
                 }
               </div>
               @if (tenant.adminName || tenant.adminEmail) {

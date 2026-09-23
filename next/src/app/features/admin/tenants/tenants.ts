@@ -1,6 +1,6 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { DatePipe } from '@angular/common';
+
 import { Router } from '@angular/router';
 import { Dialog } from '@angular/cdk/dialog';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
@@ -17,6 +17,7 @@ import { copyText } from '../../../shared/ui/clipboard.util';
 import { confirmWith } from '../../../shared/ui/confirm';
 import { createSort } from '../../../shared/ui/sort';
 import { TenantDialog } from './tenant-dialog';
+import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 
 export interface Tenant {
   /** Filled in by the server on the way out; null on rows with no recorded author. */
@@ -61,7 +62,7 @@ interface ResourceCount {
 
 @Component({
   selector: 'app-tenants',
-  imports: [MineFilter, CdkMenu, CdkMenuItem, CdkMenuTrigger, ViewToggle, StatTile, Icon, DatePipe, StatusPill, TableShell],
+  imports: [MineFilter, CdkMenu, CdkMenuItem, CdkMenuTrigger, ViewToggle, StatTile, Icon, ServerTimePipe, StatusPill, TableShell],
   templateUrl: './tenants.html',
 })
 export class Tenants implements OnInit {
