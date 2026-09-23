@@ -126,6 +126,12 @@ export class JobEdit implements OnInit {
   private readonly maxAttemptsValue = signal(1);
 
   readonly frequencyValue = signal('Daily');
+  /**
+   * The schedule group's values as a signal, for the summary. Form values are not signals, so a
+   * computed() reading them directly only re-ran when something it DID track changed -- the
+   * frequency -- and went on describing the old interval, time, day or end date.
+   */
+  private readonly schedule = signal<Record<string, any>>({});
   readonly unit = computed(() =>
     FREQUENCIES.find(f => f.value === this.frequencyValue())?.unit ?? '');
 
@@ -143,6 +149,8 @@ export class JobEdit implements OnInit {
 
     this.form.get('executionType')!.valueChanges.subscribe(v => this.executionValue.set(v));
     this.scheduler.get('frequency')!.valueChanges.subscribe(v => this.frequencyValue.set(v));
+    this.schedule.set(this.scheduler.getRawValue());
+    this.scheduler.valueChanges.subscribe(() => this.schedule.set(this.scheduler.getRawValue()));
     this.form.get('maxAttempts')!.valueChanges.subscribe(v => this.maxAttemptsValue.set(Number(v)));
 
     if (this.isEdit()) this.loadJob();
@@ -207,8 +215,10 @@ export class JobEdit implements OnInit {
   readonly summary = computed(() => {
     if (!this.isScheduled()) return 'Runs only when you trigger it.';
     const frequency = this.frequencyValue();
-    const every = this.scheduler.get('intervalValue')?.value || '1';
-    const time = this.scheduler.get('startTime')?.value || '00:00';
+    const schedule = this.schedule();
+    // A job read back from the server carries the interval as a number: 1, not '1'.
+    const every = String(schedule['intervalValue'] || '1');
+    const time = schedule['startTime'] || '00:00';
     const plural = every === '1' ? '' : 's';
     let text: string;
     switch (frequency) {
@@ -224,7 +234,7 @@ export class JobEdit implements OnInit {
         break;
       }
       case 'Monthly': {
-        const day = this.scheduler.get('dayOfMonth')?.value;
+        const day = schedule['dayOfMonth'];
         text = day
           ? `Every ${every} month${plural} on day ${day} at ${time}`
           : `Every ${every} month${plural} at ${time} — pick a day`;
@@ -232,7 +242,7 @@ export class JobEdit implements OnInit {
       }
       default: text = '';
     }
-    const end = this.scheduler.get('endDate')?.value;
+    const end = schedule['endDate'];
     return end ? `${text}, until ${end} inclusive.` : `${text}.`;
   });
 
