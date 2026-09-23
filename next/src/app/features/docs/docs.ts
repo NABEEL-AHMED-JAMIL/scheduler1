@@ -39,7 +39,7 @@ interface Step {
     :host { display: block; }
     .doc h2 { scroll-margin-top: 5rem; }
     .doc-body p { line-height: 1.7; }
-    .toc-link.is-current { color: var(--color-brand-500); font-weight: 600; }
+    .toc-link.is-current { color: var(--accent-text); font-weight: 600; }
     /* A screenshot is a picture of a screen, so it is framed like one rather than floated on
        the page. max-width keeps a wide capture inside the column on a narrow viewport. */
     .doc-shot {
@@ -52,7 +52,7 @@ interface Step {
       display: grid; place-items: center; flex: none;
       width: 1.6rem; height: 1.6rem; border-radius: 999px;
       font-size: .75rem; font-weight: 600;
-      background: var(--surface-inset); color: var(--color-brand-500);
+      background: var(--surface-inset); color: var(--accent-text);
       border: 1px solid var(--border-subtle);
     }
   `],
@@ -88,7 +88,9 @@ interface Step {
               @for (s of sections; track s.id) {
                 <li>
                   <a class="toc-link text-[color:var(--text-secondary)] hover:underline block"
-                     [class.is-current]="current() === s.id" [href]="'#' + s.id">{{ s.title }}</a>
+                     [class.is-current]="current() === s.id"
+                     [attr.aria-current]="current() === s.id ? 'location' : null"
+                     [href]="'#' + s.id" (click)="jump($event, s.id)">{{ s.title }}</a>
                 </li>
               }
             </ul>
@@ -167,7 +169,7 @@ interface Step {
               }
 
               @if (step.warn) {
-                <p class="mt-3 field-note text-crit-500 flex items-start gap-1.5" role="note">
+                <p class="mt-3 field-note text-warn-500 flex items-start gap-1.5" role="note">
                   <app-icon name="alert" size="0.9em" class="mt-px shrink-0" />
                   <span>{{ step.warn }}</span>
                 </p>
@@ -527,6 +529,22 @@ export class Docs implements AfterViewInit {
   /** Screenshots come in a light and a dark file; the viewer's theme picks which. */
   shotFor(name: string): string {
     return `/docs/${name}-${this.theme.theme()}.png`;
+  }
+
+  /**
+   * Scrolls to a section without leaving the page.
+   *
+   * The href stays for what it tells a reader (and a middle-click), but a plain "#id" resolves
+   * against <base href="/"> to "/#id" -- the landing page -- so the click itself is handled here.
+   * The address still gains the fragment, so a section can be linked to.
+   */
+  jump(event: Event, id: string): void {
+    const target = (this.host.nativeElement as HTMLElement).querySelector<HTMLElement>(`#${id}`);
+    if (!target) return;
+    event.preventDefault();
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    history.replaceState(history.state, '', `${location.pathname}${location.search}#${id}`);
+    this.current.set(id);
   }
 
   /**

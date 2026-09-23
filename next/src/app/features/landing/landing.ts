@@ -162,7 +162,7 @@ import { ThemeService } from '../../core/theme.service';
               <li class="relative">
                 <div class="size-[2.1rem] rounded-full grid place-items-center text-xs font-semibold relative z-10"
                      style="background: var(--surface-raised); border: 1px solid var(--border-subtle);
-                            color: var(--color-brand-500);">
+                            color: var(--accent-text);">
                   {{ i + 1 }}
                 </div>
                 <h3 class="mt-3.5 text-sm font-semibold">{{ step.title }}</h3>
