@@ -208,3 +208,32 @@ describe('Transcript folder that cannot be read', () => {
     expect(listObjects).toHaveBeenLastCalledWith('etl-avatar', '1000/', undefined, 200);
   });
 });
+
+/**
+ * "Read aloud from here" was a double-click on the timestamp: no keyboard or touch route, and the
+ * double-click fired the timestamp's copy twice before reading began.
+ */
+describe('Transcript timeline controls', () => {
+  it('reads aloud from a line with its own button, without copying anything', () => {
+    TestBed.resetTestingModule();
+    const success = vi.fn();
+    TestBed.configureTestingModule({ providers: [
+      { provide: HttpClient, useValue: { get: () => new Subject(), post: () => new Subject() } },
+      { provide: StorageService, useValue: { buckets: () => new Subject(), listObjects: () => new Subject() } },
+      { provide: ToastService, useValue: { success, error: () => {}, info: () => {} } },
+    ] });
+    const fixture = TestBed.createComponent(Transcript);
+    const t = fixture.componentInstance;
+    t.transcript.set('[00:00:03.550] Hello there. [00:00:07.120] Second bit.');
+    const readFrom = vi.spyOn(t, 'readFrom').mockImplementation(() => {});
+    fixture.detectChanges();
+
+    const read = (fixture.nativeElement as HTMLElement)
+      .querySelector<HTMLButtonElement>('button[aria-label="Read aloud from 00:00:07.120"]');
+    expect(read).toBeTruthy();
+    read!.click();
+
+    expect(readFrom).toHaveBeenCalledWith(1);
+    expect(success).not.toHaveBeenCalled();
+  });
+});

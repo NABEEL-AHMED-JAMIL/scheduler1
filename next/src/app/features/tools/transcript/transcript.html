@@ -142,10 +142,13 @@
               @if (segment.time) {
                 <p class="ts-line" [attr.data-read-index]="$index"
                    [class.ts-reading]="$index === readingIndex()">
-                  <button type="button" class="ts-mark"
-                          title="Click to copy this timestamp, double-click to read aloud from here"
-                          (click)="copyStamp(segment.time)"
-                          (dblclick)="readFrom($index)">{{ segment.time }}</button>
+                  <!-- Two controls, not one with a double-click: a double-click fired the copy twice
+                       before reading, and had no keyboard or touch route at all. -->
+                  <button type="button" class="ts-mark" title="Copy this timestamp"
+                          (click)="copyStamp(segment.time)">{{ segment.time }}</button>
+                  <button type="button" class="btn btn-ghost btn-icon btn-xs align-middle"
+                          [attr.aria-label]="'Read aloud from ' + segment.time" title="Read aloud from here"
+                          (click)="readFrom($index)"><app-icon name="play" size="0.8em" /></button>
                   <span class="ts-text">
                     <app-read-along-text [text]="segment.text"
                       [at]="$index === readingIndex() ? readingAt() : null" />
