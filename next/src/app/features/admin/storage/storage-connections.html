@@ -90,7 +90,7 @@
       </div>
       <app-mine-filter [(only)]="onlyMine" />
 
-      @if (search() || providerFilter() || workspaceFilter()) {
+      @if (hasFilters()) {
         <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()"><app-icon name="close" />Clear</button>
       }
     </ng-container>

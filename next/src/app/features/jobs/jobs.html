@@ -65,7 +65,7 @@
 
   <app-table-shell heading="Jobs" [scrollRows]="false" [loading]="loading()" [error]="error()"
                    [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="jobs().length"
-                   [emptyMessage]="search() || statusFilter() || executionFilter()
+                   [emptyMessage]="hasFilters()
                       ? 'No jobs match the current filters.' : 'No jobs yet.'"
                    emptyIcon="briefcase"
                    (retry)="load()">
@@ -88,7 +88,7 @@
                [value]="search()" (input)="search.set($any($event.target).value); onFilterChange()" />
       </div>
       <app-mine-filter [(only)]="onlyMine" />
-      @if (search() || statusFilter() || executionFilter()) {
+      @if (hasFilters()) {
         <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()"><app-icon name="close" />Clear</button>
       }
     </ng-container>

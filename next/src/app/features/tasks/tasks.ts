@@ -102,7 +102,11 @@ export class Tasks implements OnInit {
     if (this.pipelineFilter() && !this.pipelineOptions().some(p => p.id === this.pipelineFilter())) this.pipelineFilter.set('');
     this.pager.reset();
   }
-  clearFilters(): void { this.search.set(''); this.topicFilter.set(''); this.pipelineFilter.set(''); this.pager.reset(); }
+  /** Whether Clear is offered: anything that narrows the list, Only mine included. */
+  readonly hasFilters = computed(() =>
+    !!(this.search() || this.topicFilter() || this.pipelineFilter() || this.onlyMine()));
+
+  clearFilters(): void { this.search.set(''); this.topicFilter.set(''); this.pipelineFilter.set(''); this.onlyMine.set(false); this.pager.reset(); }
 
   readonly filtered = computed(() => {
     const term = this.search().trim().toLowerCase();

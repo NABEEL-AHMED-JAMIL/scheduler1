@@ -24,7 +24,7 @@
 
   <app-table-shell heading="Tasks" [loading]="loading()" [error]="error()"
                    [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="tasks().length"
-                   [emptyMessage]="search() ? 'No tasks match your search.' : 'No tasks yet.'"
+                   [emptyMessage]="hasFilters() ? 'No tasks match the filters.' : 'No tasks yet.'"
                    emptyIcon="list"
                    (retry)="load()">
     <ng-container toolbar>
@@ -47,7 +47,7 @@
                [value]="search()" (input)="search.set($any($event.target).value); pager.reset()" />
       </div>
       <app-mine-filter [(only)]="onlyMine" />
-      @if (search() || topicFilter() || pipelineFilter()) {
+      @if (hasFilters()) {
         <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()"><app-icon name="close" />Clear</button>
       }
     </ng-container>

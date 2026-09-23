@@ -268,10 +268,14 @@ export class StorageConnections implements OnInit {
     }
   }
 
+  /** Whether Clear is offered: anything that narrows the table, Only mine included. */
+  readonly hasFilters = computed(() => this.isFiltered());
+
   clearFilters(): void {
     this.workspaceFilter.set('');
     this.search.set('');
     this.providerFilter.set('');
+    this.onlyMine.set(false);
   }
 
   /**

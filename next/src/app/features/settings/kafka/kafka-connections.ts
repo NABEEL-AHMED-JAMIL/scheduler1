@@ -442,6 +442,9 @@ export class KafkaConnections implements OnInit {
     this.protocolFilter.set('');
     this.environmentFilter.set('');
     this.statusFilter.set('');
+    // hasFilters() counts Only mine, so Clear has to turn it off -- with only that on, the button
+    // was shown and did nothing.
+    this.onlyMine.set(false);
   }
 
   create(): void {

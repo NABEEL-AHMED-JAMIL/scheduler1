@@ -829,10 +829,17 @@ export class Jobs implements OnInit {
 
   clearSelection(): void { this.selected.set(new Set()); }
 
+  /** Whether Clear is offered: anything that narrows the list, Only mine included. */
+  readonly hasFilters = computed(() =>
+    !!(this.search() || this.statusFilter() || this.executionFilter() || this.onlyMine()));
+
   clearFilters(): void {
     this.search.set('');
     this.statusFilter.set('');
     this.executionFilter.set('');
+    this.onlyMine.set(false);
+    // As every other filter change does: back to page one, nothing selected that is now hidden.
+    this.onFilterChange();
   }
 
   /**
