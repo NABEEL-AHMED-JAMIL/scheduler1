@@ -104,3 +104,49 @@ describe('AccessPeopleGrid', () => {
     expect(emitted.length).toBe(2);
   });
 });
+
+/**
+ * A profile choice the server refused. The select showed what the person picked -- nothing in
+ * the model had changed, so nothing redrew it -- and the grid claimed an assignment that never
+ * happened. The select follows the model: back at once, and moved only by the server's answer.
+ */
+describe('AccessPeopleGrid profile select', () => {
+  function rendered(people: AccessPerson[]) {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection(), provideHttpClient(), provideHttpClientTesting()] });
+    const fixture = TestBed.createComponent(AccessPeopleGrid);
+    fixture.componentRef.setInput('people', people);
+    fixture.componentRef.setInput('profiles', [OPERATOR, ANALYST, COMPLIANCE]);
+    fixture.componentRef.setInput('pages', PAGES);
+    fixture.componentRef.setInput('search', '');
+    fixture.detectChanges();
+    const select = (fixture.nativeElement as HTMLElement).querySelector<HTMLSelectElement>('.access-grid-profile select')!;
+    return { fixture, select };
+  }
+
+  it('does not keep showing a choice until the server has accepted it', () => {
+    const ada = person(5, 'Ada King', 2, 'Analyst', ['jobs', 'queue', 'reports']);
+    const { fixture, select } = rendered([ada]);
+    const emitted: unknown[] = [];
+    fixture.componentInstance.assign.subscribe(e => emitted.push(e));
+
+    select.value = '3';
+    select.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    expect(emitted).toHaveLength(1);
+    expect(select.value).toBe('2');
+  });
+
+  it('moves once the row comes back with the new profile', () => {
+    const ada = person(5, 'Ada King', 2, 'Analyst', ['jobs', 'queue', 'reports']);
+    const { fixture, select } = rendered([ada]);
+    select.value = '3';
+    select.dispatchEvent(new Event('change'));
+
+    fixture.componentRef.setInput('people', [{ ...ada, pageAccessProfileId: 3, pageAccessProfileName: 'Compliance' }]);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.access-grid-profile select').value).toBe('3');
+  });
+});

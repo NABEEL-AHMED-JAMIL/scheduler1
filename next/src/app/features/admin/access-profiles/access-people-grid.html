@@ -57,7 +57,7 @@
                 </div>
               </td>
               <td class="access-grid-profile">
-                <select class="input py-1 text-xs" (change)="pick(row.person, $any($event.target).value)"
+                <select class="input py-1 text-xs" (change)="pick(row.person, $any($event.target).value, $any($event.target))"
                         [disabled]="busy() === row.person.appUserId" [attr.aria-label]="'Profile for ' + row.person.fullName">
                   <option value="" [selected]="row.person.pageAccessProfileId == null">Default{{ defaultProfile() ? ' · ' + defaultProfile()!.profileName : '' }}</option>
                   @for (profile of profiles(); track profile.pageAccessProfileId) {

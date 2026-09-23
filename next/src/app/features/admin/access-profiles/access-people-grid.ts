@@ -125,7 +125,13 @@ export class AccessPeopleGrid {
 
   readonly shown = computed(() => this.groups().reduce((n, g) => n + g.rows.length, 0));
 
-  pick(person: AccessPerson, value: string): void {
+  /**
+   * Asks for the change; does not show it. The select is put straight back to the person's
+   * current profile and moves only when the row comes back from the server -- a refused change
+   * used to stay on screen, because nothing in the model had moved to redraw it.
+   */
+  pick(person: AccessPerson, value: string, select?: HTMLSelectElement): void {
+    if (select) select.value = person.pageAccessProfileId == null ? '' : String(person.pageAccessProfileId);
     const id = Number(value);
     const profile = id > 0 ? (this.profiles().find(p => p.pageAccessProfileId === id) ?? null) : null;
     if ((profile?.pageAccessProfileId ?? null) === person.pageAccessProfileId) return;
