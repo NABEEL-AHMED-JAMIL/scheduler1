@@ -44,8 +44,8 @@ export class AuthService {
   readonly role = computed<UserRole | null>(() => roleFromToken(this.currentUser()?.accessToken));
 
   /**
-   * The one place the hierarchy is expressed: a platform admin has everything a tenant admin
-   * has, and a tenant admin everything a tenant user has, exactly as the server's RoleHierarchy
+   * The one place the hierarchy is expressed: a platform administrator has everything a tenant administrator
+   * has, and a tenant administrator everything a tenant user has, exactly as the server's RoleHierarchy
    * says. A screen or a route asks for the minimum it needs and never has to remember to name
    * the roles above it as well.
    *
@@ -90,7 +90,7 @@ export class AuthService {
   readonly canManageAgents = computed(() => this.hasAtLeast('TENANT_ADMIN'));
   /** appUser.json addUser/changeUserStatus/resetPassword. */
   readonly canManageUsers = computed(() => this.hasAtLeast('TENANT_ADMIN'));
-  /** tenant.json -- a tenant spans the platform, so only a platform admin touches one. */
+  /** tenant.json -- a tenant spans the platform, so only a platform administrator touches one. */
   readonly canManageTenants = computed(() => this.hasAtLeast('PLATFORM_ADMIN'));
 
   /**

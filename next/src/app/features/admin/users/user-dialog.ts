@@ -50,19 +50,19 @@ export class UserDialog {
   /**
    * Only the roles this administrator can actually grant.
    *
-   * addUser refuses "Only a Platform Admin can create another Platform Admin", so offering the
-   * option to a tenant admin meant filling in the whole form to be told no at the end. The
+   * addUser refuses "Only a platform administrator can create another platform administrator", so offering the
+   * option to a tenant administrator meant filling in the whole form to be told no at the end. The
    * server check is the one that matters and stays where it is; this stops the console
    * proposing something it knows will be refused.
    *
-   * A tenant admin staffs its workspace with tenant users and nothing above them -- granting a
+   * A tenant administrator staffs its workspace with tenant users and nothing above them -- granting a
    * second set of keys to everything the workspace holds is the platform's decision -- so that
    * is the one option it is offered. The role the edited row already carries is kept in the list
    * whatever it is: the console posts the whole form back, resubmitting an unchanged role grants
    * nothing and the server allows it, and dropping the option would leave an admin editing their
    * own name through a picker showing no role at all.
    *
-   * Your own row is the exception, and it comes first because it binds a platform admin too:
+   * Your own row is the exception, and it comes first because it binds a platform administrator too:
    * updateUser refuses any role but the one already held -- "You cannot change your own role" --
    * so a picker offering a second option there can only ever lose somebody the whole form. The
    * one option it does offer is the one the server accepts, which is what keeps the field
@@ -92,7 +92,7 @@ export class UserDialog {
   /**
    * Whether the workspace is settled and no longer up for changing.
    *
-   * True only when editing somebody who already has one. A platform admin has none, so demoting
+   * True only when editing somebody who already has one. A platform administrator has none, so demoting
    * one has to leave the field usable -- otherwise it submits null and the server refuses with
    * "a tenant is required for this role", which reads as a bug rather than a rule.
    */
@@ -109,7 +109,7 @@ export class UserDialog {
     this.role() === 'TENANT_USER' && this.accessProfiles().length > 0);
 
   /**
-   * The profiles on offer. A tenant admin's arrive with the dialog; a platform admin's follow the
+   * The profiles on offer. A tenant administrator's arrive with the dialog; a platform administrator's follow the
    * tenant it picks, because profiles belong to a workspace and the picker cannot know which
    * until the form says so.
    */
@@ -119,7 +119,7 @@ export class UserDialog {
   readonly defaultProfileName = computed(() =>
     this.accessProfiles().find(p => p.defaultProfile)?.profileName ?? '');
 
-  /** A platform admin spans every tenant, so a tenant choice would be meaningless. */
+  /** A platform administrator spans every tenant, so a tenant choice would be meaningless. */
   readonly needsTenant = computed(() => this.role() !== 'PLATFORM_ADMIN');
   readonly roleHint = computed(() => ROLES.find(r => r.value === this.role())?.hint ?? '');
 

@@ -314,7 +314,7 @@ export class KafkaConnections implements OnInit {
   /**
    * Workspace names for the tenant ids sitting on the rows.
    *
-   * fetchAllProfiles gives a platform admin every workspace's profiles and carries only a
+   * fetchAllProfiles gives a platform administrator every workspace's profiles and carries only a
    * tenantId, so the screen listed six rows called "Globex Data PLAINTEXT" with nothing on them
    * saying whose they were. The names come from listTenants, the same source Tenants and Users
    * read; nothing here invents one for a tenant that list does not mention.
@@ -343,7 +343,7 @@ export class KafkaConnections implements OnInit {
    * What the "default" pill on a row actually means, which depends on whose default it is.
    *
    * isDefault is per-workspace -- setAsDefault clears it inside one tenant and leaves every other
-   * tenant's alone -- so on a platform admin's list several rows carry it at once, and the fixed
+   * tenant's alone -- so on a platform administrator's list several rows carry it at once, and the fixed
    * "Used by tasks with no explicit profile" read as though each of them were the only default
    * there is.
    */
@@ -366,7 +366,7 @@ export class KafkaConnections implements OnInit {
       if (environment && kafkaEnvironment(p.environmentLabel)?.key !== environment) return false;
       if (status && p.status !== status) return false;
       if (!term) return true;
-      // Only a platform admin has a workspace column to read, so only their search matches on one.
+      // Only a platform administrator has a workspace column to read, so only their search matches on one.
       const workspace = this.canSeeWorkspace() ? this.workspaceName(p) : '';
       return `${p.profileName} ${p.environmentLabel ?? ''} ${p.bootstrapServers} ${workspace}`
         .toLowerCase().includes(term);

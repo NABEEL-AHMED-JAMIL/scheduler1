@@ -53,7 +53,7 @@ export class Pipelines implements OnInit {
   }
   readonly topicFilter = signal('');
   readonly statusFilter = signal('');
-  /** A platform admin can narrow to one workspace; a tenant's list is its own already. */
+  /** A platform administrator can narrow to one workspace; a tenant's list is its own already. */
   readonly tenantFilter = signal('');
   readonly tenants = signal<{ tenantId: number; tenantName: string; tenantCode?: string }[]>([]);
   readonly tenantOptions = computed(() => this.tenants().map(t => ({ value: String(t.tenantId), label: t.tenantName, hint: t.tenantCode ?? '' })));
@@ -117,9 +117,9 @@ export class Pipelines implements OnInit {
   private readonly auth = inject(AuthService);
 
   /**
-   * A new form always belongs to one tenant. A platform admin has none, so
+   * A new form always belongs to one tenant. A platform administrator has none, so
    * PipelineServiceImpl.saveForm files their new form under the seeded "default" tenant instead
-   * of refusing it -- only that tenant's users can use it. Surfaced here so a platform admin
+   * of refusing it -- only that tenant's users can use it. Surfaced here so a platform administrator
    * knows where to find (or sign in as, to fully manage) what they are about to create.
    */
   readonly isPlatformAdmin = computed(() => this.auth.isPlatformAdmin());

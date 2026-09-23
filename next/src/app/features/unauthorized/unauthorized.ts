@@ -6,6 +6,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { AuthService } from '../../core/auth/auth.service';
+import { roleLabel as labelOf } from '../../core/auth/auth.models';
 import { PAGE_LABELS, PageKey, isPageKey } from '../../core/auth/page-keys';
 import { Icon } from '../../shared/ui/icon';
 import { ToastService } from '../../shared/ui/toast.service';
@@ -83,9 +84,9 @@ export class Unauthorized {
   readonly asking = signal(false);
   readonly asked = signal(false);
 
+  /** Mid-sentence, so lowercase: "Your role is tenant user". */
   roleLabel(): string {
-    const role = this.auth.role() ?? '';
-    return role ? role.toLowerCase().replace(/_/g, ' ') : 'unknown';
+    return labelOf(this.auth.role()).toLowerCase();
   }
 
   back(): void {

@@ -69,7 +69,7 @@ export class StorageConnections implements OnInit {
   readonly workspaceFilter = signal('');
 
   /**
-   * Whose connection each row is. A platform admin's list merges every workspace's, and
+   * Whose connection each row is. A platform administrator's list merges every workspace's, and
    * without a column a tenant bucket and a platform bucket looked the same; the Kafka screen
    * already carries this, so the two screens now answer the same question the same way.
    */

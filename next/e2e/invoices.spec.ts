@@ -50,7 +50,7 @@ test.describe('invoices as rail and pane', () => {
     expect(await qr.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
     await expect(page.getByRole('listbox', { name: 'Invoices' }).getByRole('option', { selected: true })).toContainText(issued!.number);
     await expect(page.getByRole('heading', { name: /^Lines/ })).toBeVisible();
-    // A tenant admin sees the slip action, never Issue or Void.
+    // A tenant administrator sees the slip action, never Issue or Void.
     await expect(page.getByRole('button', { name: /Upload payment slip|Record payment|PDF/ }).first()).toBeVisible();
     await expect(page.getByRole('button', { name: 'Issue' })).toHaveCount(0);
     // Picking another row in the rail changes the address.
@@ -76,7 +76,7 @@ test.describe('invoices as rail and pane', () => {
     await page.context().close();
   });
 
-  test('the platform admin drafts from the head and sees every workspace in the rail', async ({ browser, request }) => {
+  test('the platform administrator drafts from the head and sees every workspace in the rail', async ({ browser, request }) => {
     test.skip(!platform.username || !platform.password, 'Set E2E_PLATFORM_ADMIN(_PASSWORD) to run this.');
     const session = await signIn(request, platform.username!, platform.password!);
     const page = await pageAs(browser, session);

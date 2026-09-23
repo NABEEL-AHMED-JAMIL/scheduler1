@@ -18,7 +18,7 @@ const DETAIL = {
     { invoiceLineId: 2, sort: 1, meter: 'ai.tokens.in', description: 'Model tokens in', quantity: '3000', unit: 'token', per: 1000, unitPrice: '0.05', amount: '0.085', manual: false,
       includedQuantity: '1000', billableQuantity: '2000', pricingDetail: '[{"from": "0", "to": "1500", "units": "1500", "unit_price": "0.05"}, {"from": "1500", "to": null, "units": "500", "unit_price": "0.02"}]' }],
   payments: [
-    { paymentId: 1, amount: '200', method: 'bank', reference: 'TRF-88213', status: 'verified', receiptNumber: 'RCP-2026-09-0012', submittedBy: 'Olivia Bennett', verifiedBy: 'Platform Admin', verifiedAt: '2026-09-08T09:30:00Z', dateCreated: '2026-09-06T14:12:00Z', hasSlip: true },
+    { paymentId: 1, amount: '200', method: 'bank', reference: 'TRF-88213', status: 'verified', receiptNumber: 'RCP-2026-09-0012', submittedBy: 'Olivia Bennett', verifiedBy: 'Platform administrator', verifiedAt: '2026-09-08T09:30:00Z', dateCreated: '2026-09-06T14:12:00Z', hasSlip: true },
     { paymentId: 2, amount: '166.75', method: 'bank', status: 'submitted', submittedBy: 'Olivia Bennett', dateCreated: '2026-09-17T16:40:00Z', hasSlip: true },
   ],
   documents: [{ documentId: 1, kind: 'invoice', number: 'INV-2026-08-0006', fileName: 'INV-2026-08-0006.pdf', contentType: 'application/pdf', sizeBytes: 84000, issuedAt: '2026-09-01T08:00:00Z', tenantId: 2905 }],
@@ -66,7 +66,7 @@ describe('InvoicePane', () => {
     expect(story[story.length - 1]).toContain('166.75');
   });
 
-  it('a tenant admin can submit a slip; verifying and voiding are the platform\'s', async () => {
+  it('a tenant administrator can submit a slip; verifying and voiding are the platform\'s', async () => {
     const tenant = page(false);
     expect(tenant.component.canVoid()).toBe(false);
     tenant.component.payAmount.set('50');

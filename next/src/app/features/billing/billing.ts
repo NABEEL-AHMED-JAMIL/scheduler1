@@ -143,7 +143,7 @@ export class Billing implements OnInit {
 
   readonly previousLabel = computed(() => { const d = new Date(this.month() + 'T00:00:00'); d.setMonth(d.getMonth() - 1); return d.toLocaleDateString(undefined, { month: 'short' }); });
 
-  /** The month on screen as a range, for the platform admin's picked workspace. */
+  /** The month on screen as a range, for the platform administrator's picked workspace. */
   private query(month = this.month()): UsageQuery {
     const first = new Date(month + 'T00:00:00');
     return { from: month, to: `${month.slice(0, 7)}-${String(daysInMonth(first)).padStart(2, '0')}`, tenantId: this.isPlatformAdmin() ? this.workspaces.effective() : null };

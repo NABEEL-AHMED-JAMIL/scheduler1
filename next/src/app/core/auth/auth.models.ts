@@ -3,9 +3,9 @@ export type UserRole = 'PLATFORM_ADMIN' | 'TENANT_ADMIN' | 'TENANT_USER';
 /**
  * The server's hierarchy as a number, so "at least this role" is a comparison rather than a
  * list. MethodSecurityConfig installs ROLE_PLATFORM_ADMIN > ROLE_TENANT_ADMIN > ROLE_TENANT_USER,
- * which means hasRole('TENANT_ADMIN') already admits a platform admin. Comparing role strings
+ * which means hasRole('TENANT_ADMIN') already admits a platform administrator. Comparing role strings
  * for equality does not, so every page guarded that way had to spell the pair out by hand and
- * the one that forgot would lock the platform admin out of a page the API serves them.
+ * the one that forgot would lock the platform administrator out of a page the API serves them.
  */
 export const ROLE_RANK: Record<UserRole, number> = {
   TENANT_USER: 0,
@@ -33,18 +33,34 @@ export const ROLE_META: Record<UserRole, { label: string; hint: string; pill: st
     accent: 'var(--border-subtle)',
   },
   TENANT_ADMIN: {
-    label: 'Tenant admin',
+    label: 'Tenant administrator',
     hint: 'Also configures tasks, connections and users.',
     pill: 'pill pill-brand',
     accent: 'var(--color-brand-500)',
   },
   PLATFORM_ADMIN: {
-    label: 'Platform admin',
+    label: 'Platform administrator',
     hint: 'Operates across every tenant.',
     pill: 'pill pill-crit',
     accent: 'var(--color-crit-500)',
   },
 };
+
+/**
+ * A role as a person reads it: the label from ROLE_META, sentence case. A role the table does not
+ * know yet still comes out as words, never as its enum name.
+ */
+export function roleLabel(role: string | null | undefined): string {
+  if (!role) {
+    return 'Unknown role';
+  }
+  const known = ROLE_META[role as UserRole];
+  if (known) {
+    return known.label;
+  }
+  const words = role.replace(/_/g, ' ').toLowerCase();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
 
 export interface AuthUser {
   username: string;

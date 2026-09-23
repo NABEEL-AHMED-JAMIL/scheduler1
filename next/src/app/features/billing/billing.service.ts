@@ -67,7 +67,7 @@ export interface MeterLine {
 export interface PricedWith { version: number; name: string; currency: string; tenantSpecific: boolean; effectiveFrom: string; }
 export interface DayRow { day: string; amount: number; byService: Record<string, number>; }
 export interface SubjectRow { subject_type: string; subject_id: string; quantity: number; events: number; last: string | null; actor_user_id: number | null; actor_name?: string | null; }
-/** What every usage read names: a range, a workspace for a platform admin, and how to group. */
+/** What every usage read names: a range, a workspace for a platform administrator, and how to group. */
 export interface UsageQuery { from: string; to: string; tenantId?: string | null; }
 
 /** billing.json/summary: the bill in one glance, for a profile card or a dashboard row. */

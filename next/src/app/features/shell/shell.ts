@@ -182,7 +182,7 @@ export class Shell {
         { label: 'Tenants', path: '/administration/tenants', icon: 'globe', platformOnly: true,
           hint: 'Isolated workspaces' },
         // Platform, not admin: listRequests, approve and reject all carry
-        // @PreAuthorize("hasRole('PLATFORM_ADMIN')"), so a tenant admin shown this link was
+        // @PreAuthorize("hasRole('PLATFORM_ADMIN')"), so a tenant administrator shown this link was
         // walked straight into the unauthorized page.
         { label: 'Workspace Requests', path: '/administration/tenant-requests', icon: 'inbox',
           platformOnly: true, hint: 'Asks from outside for a workspace' },

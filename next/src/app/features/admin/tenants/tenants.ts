@@ -47,7 +47,7 @@ export interface Tenant {
    * ten of the twelve tenants have no tasks at all, so a seventh column would be mostly zeros.
    */
   pipelineCount: number;
-  /** The workspace's first active tenant admin -- who to contact about it. */
+  /** The workspace's first active tenant administrator -- who to contact about it. */
   adminName?: string | null;
   adminEmail?: string | null;
 }

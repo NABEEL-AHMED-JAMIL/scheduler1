@@ -265,7 +265,7 @@ export const routes: Routes = [
       { path: 'administration/billing/rates', redirectTo: 'billing/rates' },
       { path: 'billing', pathMatch: 'full', redirectTo: 'billing/usage' },
       {
-        // Cost & usage: a tenant admin's own workspace, a platform admin's any. A page an
+        // Cost & usage: a tenant administrator's own workspace, a platform administrator's any. A page an
         // access profile can withhold (pageKey billing), and TENANT_ADMIN at the floor.
         path: 'billing/usage',
         loadComponent: () => import('./features/billing/billing').then(m => m.Billing),

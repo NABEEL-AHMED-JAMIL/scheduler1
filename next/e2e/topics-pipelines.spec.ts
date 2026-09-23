@@ -1,7 +1,7 @@
 import { test, expect, APIRequestContext, Browser, Page } from '@playwright/test';
 
 /**
- * Topics and pipelines, end to end, as a tenant admin: a topic is added under the workspace's
+ * Topics and pipelines, end to end, as a tenant administrator: a topic is added under the workspace's
  * Kafka profile, a pipeline is defined on that topic, a task is made by picking the topic and
  * then one of its pipelines, the Source Tasks list narrows topic → pipeline, and the topic
  * refuses to be deleted while the pipeline still publishes on it. Every long picker on the way
@@ -123,7 +123,7 @@ test.describe('topics and pipelines', () => {
     await page.getByRole('heading', { name: 'New task' }).waitFor();
     await page.locator('#taskName').fill(TASK_NAME);
     await expect(page.locator('#pipeline')).toHaveAttribute('placeholder', 'Pick a topic first');
-    // A tenant admin's one default connection is picked for them; the topic was added under it.
+    // A tenant administrator's one default connection is picked for them; the topic was added under it.
     await expect(page.locator('#taskProfile')).not.toHaveValue('');
     await pick(page, 'taskType', STAMP, TOPIC_NAME);
     await expect(page.locator('#pipeline')).toHaveAttribute('placeholder', /this topic’s pipelines/);

@@ -7,7 +7,7 @@ import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { AuthService } from '../../../core/auth/auth.service';
-import { ROLE_META, ROLE_RANK, isUserRole } from '../../../core/auth/auth.models';
+import { ROLE_META, ROLE_RANK, isUserRole, roleLabel as labelOf } from '../../../core/auth/auth.models';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { copyText } from '../../../shared/ui/clipboard.util';
 import { MineFilter, isMine } from '../../../shared/ui/mine-filter';
@@ -90,8 +90,8 @@ export class Users implements OnInit {
   readonly stats = signal<Record<number, UserStatistic>>({});
   readonly tenants = signal<any[]>([]);
   /**
-   * The workspace's access profiles, for the dialog's picker. Loaded only for a tenant admin:
-   * profiles belong to a workspace, and a platform admin has none to list -- so a platform
+   * The workspace's access profiles, for the dialog's picker. Loaded only for a tenant administrator:
+   * profiles belong to a workspace, and a platform administrator has none to list -- so a platform
    * admin creates people onto the workspace default and the workspace's own admin picks.
    */
   readonly accessProfiles = signal<AccessProfile[]>([]);
@@ -287,7 +287,7 @@ export class Users implements OnInit {
 
   /**
    * Fetched the first time a dialog needs them, not on every visit to the list: most visits
-   * never open one. A platform admin's dialog fetches per tenant on its own.
+   * never open one. A platform administrator's dialog fetches per tenant on its own.
    */
   private accessProfilesLoaded = false;
   private withAccessProfiles(open: (profiles: AccessProfile[]) => void): void {
@@ -315,7 +315,7 @@ export class Users implements OnInit {
   }
 
   /**
-   * Whether a row is a platform admin, asked of the row rather than of the signed-in user.
+   * Whether a row is a platform administrator, asked of the row rather than of the signed-in user.
    *
    * A method rather than the role literal repeated in the template: this is a fact about somebody
    * else's account, so it cannot go through AuthService like every other role decision now does,
@@ -333,8 +333,8 @@ export class Users implements OnInit {
   /**
    * Whether this administrator can act on the row at all.
    *
-   * The same question the server's scopedFind answers: a platform admin reaches every account, a
-   * tenant admin reaches the tenant users in its workspace, and anybody reaches their own row.
+   * The same question the server's scopedFind answers: a platform administrator reaches every account, a
+   * tenant administrator reaches the tenant users in its workspace, and anybody reaches their own row.
    * Asked here because listUsers still returns the peer administrators -- so without it the row
    * offers Edit, Reset password, Deactivate and Delete, and every one of them comes back "user
    * not found" about a row that is plainly on screen.
@@ -344,7 +344,7 @@ export class Users implements OnInit {
   }
 
   /** Said on the row in place of the controls, so the absence is a rule rather than a gap. */
-  readonly managedByPlatformOnly = 'Only a Platform Admin can manage another Tenant Admin.';
+  readonly managedByPlatformOnly = 'Only a platform administrator can manage another tenant administrator.';
 
   async toggleStatus(user: AppUser): Promise<void> {
     const activating = user.status !== 'Active';
@@ -427,8 +427,8 @@ export class Users implements OnInit {
     });
   }
 
-  roleLabel(role: string): string {
-    return (role || '').replace(/_/g, ' ').toLowerCase();
+  roleLabel(role?: string | null): string {
+    return labelOf(role);
   }
 
   rolePill(role: string): string {

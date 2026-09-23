@@ -65,7 +65,7 @@ export class TaskEdit implements OnInit {
   /**
    * The tenant that owns the task being edited, sent with the form lookup.
    *
-   * Only a platform admin can see across tenants, and two tenants may each hold a form for the
+   * Only a platform administrator can see across tenants, and two tenants may each hold a form for the
    * same pipeline id -- the id is the worker's routing key, not a unique name. Without saying
    * which tenant's task this is, the server had to guess, and picking the wrong one wrote that
    * form's fields into this task's tags on save.
@@ -168,7 +168,7 @@ export class TaskEdit implements OnInit {
         const rows = (response.data ?? []).filter((p: any) => p.status !== 'Delete');
         this.profiles.set(rows);
         // A new task starts on the workspace's default connection when there is exactly one
-        // to start on; a platform admin, who sees every workspace's, picks.
+        // to start on; a platform administrator, who sees every workspace's, picks.
         if (!this.isEdit() && this.selectedProfileId() == null) {
           const defaults = rows.filter((p: any) => p.isDefault);
           if (defaults.length === 1) { this.selectedProfileId.set(defaults[0].kafkaConnectionProfileId); this.loadTopicsFor(defaults[0].kafkaConnectionProfileId); }

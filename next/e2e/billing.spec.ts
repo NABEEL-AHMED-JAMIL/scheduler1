@@ -1,7 +1,7 @@
 import { test, expect, APIRequestContext, Browser, Page } from '@playwright/test';
 
 /**
- * Cost & usage, end to end: a tenant admin uploads a file of a known size and deletes it, and
+ * Cost & usage, end to end: a tenant administrator uploads a file of a known size and deletes it, and
  * the same month's page carries the delete -- as an operation, as bytes, and in the drill-down
  * under the object's own name with the person who did it.
  *

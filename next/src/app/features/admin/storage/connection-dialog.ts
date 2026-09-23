@@ -167,7 +167,7 @@ export class ConnectionDialog {
     // S3 no longer falls back to the host IAM role, so blank keys are a server error rather
     // than a choice. The one deployment that opts back into ambient credentials can only do so
     // for platform-level connections, and the browser cannot tell whether it did -- asking for
-    // the keys there costs a platform admin two fields they could have left empty, which is the
+    // the keys there costs a platform administrator two fields they could have left empty, which is the
     // better half of the trade against every other tenant getting a 400 with nothing marked.
     this.setRequired('accessKey', provider === 'S3');
     this.setRequired('secretKey', provider === 'S3' && !this.isEdit());

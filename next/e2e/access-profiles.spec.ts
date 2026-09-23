@@ -1,7 +1,7 @@
 import { test, expect, APIRequestContext, Browser, Page } from '@playwright/test';
 
 /**
- * Access profiles, end to end: a tenant admin makes a profile and puts a person on it, and that
+ * Access profiles, end to end: a tenant administrator makes a profile and puts a person on it, and that
  * person's console shrinks to match -- menu, direct URL, and the API behind it.
  *
  * Needs two real accounts in one workspace, given through the environment so no password lives

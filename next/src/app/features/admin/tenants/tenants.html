@@ -107,7 +107,7 @@
                     <div class="truncate text-[11px] text-[color:var(--text-muted)]">{{ tenant.adminEmail }}</div>
                   }
                 } @else {
-                  <span class="text-[color:var(--text-muted)]" title="No active tenant admin -- nobody can manage this workspace's users">—</span>
+                  <span class="text-[color:var(--text-muted)]" title="No active tenant administrator -- nobody can manage this workspace's users">—</span>
                 }
               </td>
               @for (res of resources; track res.key) {
@@ -191,7 +191,7 @@
               </div>
               @if (tenant.adminName || tenant.adminEmail) {
                 <div class="mt-1.5 flex items-center gap-1.5 text-[11px] text-[color:var(--text-secondary)]"
-                     [title]="'Tenant admin' + (tenant.adminEmail ? ' — ' + tenant.adminEmail : '')">
+                     [title]="'tenant administrator' + (tenant.adminEmail ? ' — ' + tenant.adminEmail : '')">
                   <app-icon name="shield" size="0.9em" class="icon-muted" />
                   <span class="truncate">{{ tenant.adminName || tenant.adminEmail }}</span>
                 </div>

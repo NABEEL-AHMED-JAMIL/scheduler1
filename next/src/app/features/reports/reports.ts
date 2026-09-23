@@ -205,8 +205,8 @@ export class Reports implements OnInit {
   /**
    * Only worth showing when more than one workspace is actually present.
    *
-   * A tenant admin sees exactly their own, so the control would be a select with one option
-   * that can never change anything. A platform admin has the tenant filter switched off in the
+   * A tenant administrator sees exactly their own, so the control would be a select with one option
+   * that can never change anything. A platform administrator has the tenant filter switched off in the
    * backend, so for them the report really does merge workspaces -- which is precisely when
    * this needs to be visible.
    */
@@ -743,7 +743,7 @@ export class Reports implements OnInit {
    * narrowing for free -- and a page that filtered its charts to one task while still listing
    * every other task's failures underneath would be worse than not filtering at all.
    *
-   * Workspace was the one filter this never honoured, and for a platform admin -- whose
+   * Workspace was the one filter this never honoured, and for a platform administrator -- whose
    * tenantClause() is empty, so the runs feed merges every workspace -- it was the filter that
    * mattered most. Picking Workspace = Acme narrowed the Failed tile to Acme's 3 failures while
    * the table underneath went on listing all 27 and its own header went on counting them, with

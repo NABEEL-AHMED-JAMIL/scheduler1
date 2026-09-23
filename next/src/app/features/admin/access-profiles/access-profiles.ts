@@ -42,8 +42,8 @@ export class AccessProfiles implements OnInit {
   private readonly route = inject(ActivatedRoute);
 
   /**
-   * A platform admin has no workspace of its own, so it picks one; the screen is empty until it
-   * does. A tenant admin never sees the picker -- its workspace is the only one it can reach.
+   * A platform administrator has no workspace of its own, so it picks one; the screen is empty until it
+   * does. A tenant administrator never sees the picker -- its workspace is the only one it can reach.
    */
   readonly canPickTenant = computed(() => this.auth.isPlatformAdmin());
   readonly tenants = signal<Tenant[]>([]);
@@ -97,7 +97,7 @@ export class AccessProfiles implements OnInit {
 
   ngOnInit(): void {
     // A link from the Users screen lands on one person's row: the grid view, their name in the
-    // filter, and -- for a platform admin -- their workspace already picked.
+    // filter, and -- for a platform administrator -- their workspace already picked.
     const params = this.route.snapshot.queryParamMap;
     if (params.get('view') === 'people') this.view.set('people');
     this.search.set(params.get('q') ?? '');

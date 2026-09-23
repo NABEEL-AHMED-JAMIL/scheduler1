@@ -14,7 +14,7 @@ export interface AccessProfileDialogData {
   pages: PageCatalogueEntry[];
   /** Whether any profile exists yet: the first one becomes the default whatever the box says. */
   first: boolean;
-  /** The workspace, when the caller is a platform admin choosing one; a tenant admin's is its own. */
+  /** The workspace, when the caller is a platform administrator choosing one; a tenant administrator's is its own. */
   tenantId?: number | null;
 }
 

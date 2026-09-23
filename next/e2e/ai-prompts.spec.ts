@@ -1,7 +1,7 @@
 import { test, expect, APIRequestContext, Browser, Page } from '@playwright/test';
 
 /**
- * A model as a pipeline step, end to end, as a tenant admin: a model connection is added
+ * A model as a pipeline step, end to end, as a tenant administrator: a model connection is added
  * and tested, a prompt is written with two variables and tried against the model, a
  * pipeline gets an AI step configured in the drawer (prompt, variable map), a task on it
  * shows the step as a read-only card, and a run of a job on that task carries the model's

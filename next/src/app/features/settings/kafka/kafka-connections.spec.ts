@@ -12,7 +12,7 @@ import { KafkaConnections, KafkaProfile } from './kafka-connections';
 /**
  * Whose profile a row is, and whose default it is.
  *
- * fetchAllProfiles hands a platform admin every workspace's profiles in one list, ordered newest
+ * fetchAllProfiles hands a platform administrator every workspace's profiles in one list, ordered newest
  * id first, and each row carries a tenantId and no name. Two things went wrong with that: the
  * screen showed six identically named rows with nothing saying which workspace each belonged to,
  * and isDefault -- which setAsDefault sets per workspace -- was read as though the first flagged
@@ -132,7 +132,7 @@ describe('whose profile a row is', () => {
     expect(screen.defaultHint(GLOBEX_DEFAULT)).toBe('Used by tasks with no explicit profile');
   });
 
-  it('lets a platform admin search by workspace, which is the only thing telling the rows apart', () => {
+  it('lets a platform administrator search by workspace, which is the only thing telling the rows apart', () => {
     // Neither name carries its workspace, which is the case the column exists for.
     const globex = profile({ kafkaConnectionProfileId: 1089, tenantId: 1828, profileName: 'prod-cluster' });
     const demo = profile({ kafkaConnectionProfileId: 1249, tenantId: 2364, profileName: 'staging-cluster' });

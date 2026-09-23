@@ -10,7 +10,7 @@ import { AuthService } from '../../core/auth/auth.service';
 import { ToastService } from '../../shared/ui/toast.service';
 import { API_SUCCESS } from '../../core/api/api.config';
 
-/** The invoices list: chips that count and sum, a search, and drafting for the platform admin only. */
+/** The invoices list: chips that count and sum, a search, and drafting for the platform administrator only. */
 const ROWS = [
   { invoiceId: 1, number: 'INV-2026-08-0003', kind: 'invoice', tenantId: 2901, tenantName: 'CareBridge', periodStart: '2026-08-01', periodEnd: '2026-08-31', status: 'overdue', currency: 'USD', subtotal: '198.4', taxRatePercent: '0', tax: '0', total: '198.4', balance: '198.4', issuedAt: '2026-09-01T08:00:00Z', dueAt: '2026-09-15T08:00:00Z' },
   { invoiceId: 2, number: 'INV-2026-08-0007', kind: 'invoice', tenantId: 2905, tenantName: 'MedAxis', periodStart: '2026-08-01', periodEnd: '2026-08-31', status: 'paid', currency: 'USD', subtotal: '241.1', taxRatePercent: '0', tax: '0', total: '241.1', balance: '0' },
@@ -72,7 +72,7 @@ describe('Invoices', () => {
     expect(deep.router.navigate).toHaveBeenLastCalledWith(['/billing/invoices', 'INV-2026-08-0007'], { replaceUrl: false });
   });
 
-  it('a platform admin drafts a month for the picked workspace; a tenant admin cannot', () => {
+  it('a platform administrator drafts a month for the picked workspace; a tenant administrator cannot', () => {
     const admin = page(true);
     admin.component.draft('2026-08');
     expect(admin.api.draft).toHaveBeenCalledWith('2905', '2026-08');

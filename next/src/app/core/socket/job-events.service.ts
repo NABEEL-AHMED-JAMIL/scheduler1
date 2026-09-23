@@ -51,7 +51,7 @@ const WS_URL = `${API_BASE}/ws`;
  *
  * The packages for this were already in package.json and nothing imported them, so every
  * screen polled or reloaded wholesale instead. A tenant user joins its own tenant's feed; a
- * platform admin, who sees every tenant's jobs, joins the cross-tenant one. The server
+ * platform administrator, who sees every tenant's jobs, joins the cross-tenant one. The server
  * refuses any subscription whose tenant does not match the token, so the destination chosen
  * here is a convenience rather than the security boundary.
  */

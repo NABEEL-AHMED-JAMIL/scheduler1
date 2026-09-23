@@ -120,7 +120,7 @@ describe('Billing', () => {
     expect(component.openLine()).toBeNull();
   });
 
-  it('a platform admin picks a workspace and the reads carry it; a tenant admin never does', () => {
+  it('a platform administrator picks a workspace and the reads carry it; a tenant administrator never does', () => {
     const admin = page(true);
     expect(admin.component.workspaces.options().map(o => o.label)).toEqual(['MedAxis', 'CareBridge']);
     expect(admin.api.usageByMeter).toHaveBeenCalledWith(expect.objectContaining({ tenantId: '2905' }));

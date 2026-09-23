@@ -41,14 +41,14 @@ describe('roleGuard', () => {
   });
 
   // The whole point of a minimum: the server's RoleHierarchy makes hasRole('TENANT_ADMIN')
-  // pass for a platform admin, so a page guarded that way must open for one too.
+  // pass for a platform administrator, so a page guarded that way must open for one too.
   it('lets a higher role through a route that asks for a lower one', () => {
     expect(runGuard(roleGuard, 'PLATFORM_ADMIN', { minRole: 'TENANT_ADMIN' })).toBe(true);
     expect(runGuard(roleGuard, 'TENANT_ADMIN', { minRole: 'TENANT_USER' })).toBe(true);
     expect(runGuard(roleGuard, 'PLATFORM_ADMIN', { minRole: 'TENANT_USER' })).toBe(true);
   });
 
-  it('sends a tenant admin away from a platform-admin route', () => {
+  it('sends a tenant administrator away from a platform-admin route', () => {
     expect(String(runGuard(roleGuard, 'TENANT_ADMIN', { minRole: 'PLATFORM_ADMIN' }))).toBe('/unauthorized');
   });
 

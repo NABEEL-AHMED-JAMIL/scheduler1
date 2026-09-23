@@ -17,7 +17,7 @@ import { WorkspacePicker } from './workspace-picker';
 
 /**
  * Invoices as rail and pane: every month closed into a bill on the left, the one picked on the
- * right with its lines, QR code, documents, payments and story. A platform admin sees every
+ * right with its lines, QR code, documents, payments and story. A platform administrator sees every
  * workspace and closes months; a workspace admin sees their own and pays. The address carries
  * the number (`/invoices/INV-…`), so a link from a document or a notification lands on the bill.
  */

@@ -23,7 +23,7 @@ interface HistoryEntry { at: string; text: string; tone?: 'ok' | 'warn' | 'crit'
 /**
  * One invoice in the pane beside the list: its lines as frozen, the QR code of its number, the
  * documents around it, the payments against it and the story so far. A workspace admin reads
- * it and uploads a payment slip; a platform admin issues a draft, verifies or rejects a slip,
+ * it and uploads a payment slip; a platform administrator issues a draft, verifies or rejects a slip,
  * adds a line, voids, or issues a credit note. `changed` fires after any of those so the list
  * beside it can catch up.
  */
@@ -62,7 +62,7 @@ export class InvoicePane implements OnDestroy {
   readonly payNote = signal('');
   readonly paySlip = signal<File | null>(null);
 
-  // ---- a manual line, a credit note (platform admin) ----
+  // ---- a manual line, a credit note (platform administrator) ----
   readonly addingLine = signal(false);
   readonly lineDescription = signal('');
   readonly lineQuantity = signal('1');

@@ -129,7 +129,7 @@ export class Lookup implements OnInit {
     this.router.navigate([], { relativeTo: this.route, queryParams: { lookup: lookup.lookupId }, queryParamsHandling: 'merge', replaceUrl: true });
   }
 
-  /** Whose entry each row is; only a platform admin sees more than one workspace here. */
+  /** Whose entry each row is; only a platform administrator sees more than one workspace here. */
   private readonly tenants = signal<{ tenantId: number; tenantName: string }[]>([]);
   readonly canSeeWorkspace = computed(() => this.auth.isPlatformAdmin());
   workspaceName(entry: LookupData): string {
@@ -281,7 +281,7 @@ export class Lookup implements OnInit {
   /**
    * Whether this entry is the caller's to change.
    *
-   * A platform admin may change anything. Everyone else may change only rows their own
+   * A platform administrator may change anything. Everyone else may change only rows their own
    * workspace owns -- a row with no tenant belongs to the platform and is shared with every
    * workspace, so removing one would take it away from all of them. The server refuses either
    * way; this stops the console offering a button that can only end in a refusal.

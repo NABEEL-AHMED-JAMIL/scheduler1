@@ -190,8 +190,8 @@ describe('AccessProfiles screen', () => {
     expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('still held by 2 people'));
   });
 
-  /** A platform admin has no workspace of its own: nothing lists until one is picked, and the pick travels to the dialog. */
-  it('makes a platform admin choose a workspace first, and hands it to the dialog', () => {
+  /** A platform administrator has no workspace of its own: nothing lists until one is picked, and the pick travels to the dialog. */
+  it('makes a platform administrator choose a workspace first, and hands it to the dialog', () => {
     const list = vi.fn(() => of({ status: 'SUCCESS', message: '', data: [profile(1, 'Operator', ['jobs'], true)] }));
     const { screen } = screenWith([], { list }, true);
     expect(screen.canPickTenant()).toBe(true);
@@ -207,7 +207,7 @@ describe('AccessProfiles screen', () => {
     expect(dialog.open.mock.calls[0][1].data.tenantId).toBe(5);
   });
 
-  it('never shows a tenant admin the picker, and lists its own workspace at once', () => {
+  it('never shows a tenant administrator the picker, and lists its own workspace at once', () => {
     const list = vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] }));
     const { screen } = screenWith([], { list }, false);
     expect(screen.canPickTenant()).toBe(false);

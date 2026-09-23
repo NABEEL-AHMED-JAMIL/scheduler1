@@ -7,11 +7,11 @@ interface TenantOption { tenantId: number; tenantName: string; }
 
 /**
  * Which workspace the billing screens are looking at. A workspace admin has no choice and the
- * value stays empty, which the server reads as "your own". A platform admin's choice is shared
+ * value stays empty, which the server reads as "your own". A platform administrator's choice is shared
  * across the screens so it follows the person -- and until they choose, it is EMPTY, which
  * Invoices and Documents read as every workspace (their select says so) and Cost & usage, which
  * needs one, reads as the first (`effective`). The picker used to fill in the first workspace
- * for everyone, so a platform admin opened Invoices scoped to the newest workspace under a
+ * for everyone, so a platform administrator opened Invoices scoped to the newest workspace under a
  * select that said "Every workspace", and a deep link to another workspace's invoice was
  * replaced by that workspace's first.
  */
@@ -29,7 +29,7 @@ export class WorkspacePicker {
   readonly effective = computed(() => this.tenantId() ?? (this.tenants().length ? String(this.tenants()[0].tenantId) : null));
   private loaded = false;
 
-  /** Runs `then` once a workspace is known: at once for a tenant admin, after the list for a platform admin. */
+  /** Runs `then` once a workspace is known: at once for a tenant administrator, after the list for a platform administrator. */
   ready(then: () => void): void {
     if (!this.isPlatformAdmin()) { then(); return; }
     if (this.loaded) { then(); return; }

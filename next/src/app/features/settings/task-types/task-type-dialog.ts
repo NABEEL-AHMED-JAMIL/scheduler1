@@ -104,7 +104,7 @@ export class TaskTypeDialog {
     profileName?: string;
     /** The workspace a new topic belongs to, when the caller already knows it. */
     tenantId?: number | null;
-    /** Offered to a platform admin who has to say which workspace a new topic is for. */
+    /** Offered to a platform administrator who has to say which workspace a new topic is for. */
     tenants?: { tenantId: number; tenantName: string }[];
   }>(DIALOG_DATA);
   private readonly fb = inject(FormBuilder);
@@ -118,8 +118,8 @@ export class TaskTypeDialog {
 
 
   /**
-   * The server refuses a platform admin's new topic without a workspace (validateTaskTypeOwner):
-   * a platform admin has no tenant of their own to file it under. Asked only when the caller
+   * The server refuses a platform administrator's new topic without a workspace (validateTaskTypeOwner):
+   * a platform administrator has no tenant of their own to file it under. Asked only when the caller
    * did not already say -- opened from a tenant's Kafka profile, the workspace is that tenant's.
    */
   readonly tenantOptions = computed(() => (this.data.tenants ?? []).map(t => ({ value: String(t.tenantId), label: t.tenantName })));

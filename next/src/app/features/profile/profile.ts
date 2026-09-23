@@ -6,6 +6,7 @@ import { confirmWith } from '../../shared/ui/confirm';
 import { RouterLink } from '@angular/router';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { AuthService } from '../../core/auth/auth.service';
+import { roleLabel as labelOf } from '../../core/auth/auth.models';
 import { BillingBrief } from '../billing/billing-brief';
 import { ToastService } from '../../shared/ui/toast.service';
 import { copyText } from '../../shared/ui/clipboard.util';
@@ -425,8 +426,8 @@ export class Profile implements OnInit {
     });
   }
 
-  roleLabel(role?: string): string {
-    return (role ?? '').replace(/_/g, ' ').toLowerCase();
+  roleLabel(role?: string | null): string {
+    return labelOf(role);
   }
 
   /**

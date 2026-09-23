@@ -88,7 +88,7 @@ describe('the median duration tile', () => {
 });
 
 /**
- * Two workspaces, as a platform admin sees them: tenantClause() is empty for that role, so the
+ * Two workspaces, as a platform administrator sees them: tenantClause() is empty for that role, so the
  * runs feed merges every workspace and the Workspace filter is the only thing separating them.
  */
 const twoWorkspaces: RunData = {

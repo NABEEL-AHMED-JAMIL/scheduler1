@@ -1,9 +1,9 @@
 import { test, expect, APIRequestContext, Browser, Page } from '@playwright/test';
 
 /**
- * Rate cards, end to end: the platform admin saves a new version of the calculation through the
+ * Rate cards, end to end: the platform administrator saves a new version of the calculation through the
  * editor, the page lists it with what changed, a bill drafted before keeps its version, and a
- * fresh draft is priced with the new one. A tenant admin never sees the page.
+ * fresh draft is priced with the new one. A tenant administrator never sees the page.
  *
  * Needs a running metering service (etl_meter) behind the console, and:
  *   E2E_PLATFORM_ADMIN / E2E_PLATFORM_ADMIN_PASSWORD   a PLATFORM_ADMIN
@@ -93,7 +93,7 @@ test.describe('rate cards', () => {
     await page.context().close();
   });
 
-  test('a tenant admin is kept off the page and cannot change the calculation', async ({ browser, request }) => {
+  test('a tenant administrator is kept off the page and cannot change the calculation', async ({ browser, request }) => {
     test.skip(!tenant.username || !tenant.password, 'Set E2E_TENANT_ADMIN(_PASSWORD) to run this.');
     const session = await signIn(request, tenant.username!, tenant.password!);
     const auth = { Authorization: `Bearer ${session.token}` };

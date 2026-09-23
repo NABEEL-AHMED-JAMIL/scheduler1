@@ -5,7 +5,7 @@ import { Icon } from './icon';
 /**
  * "Only mine" -- narrows a list to what the signed-in person created.
  *
- * Aimed at the platform admin, who sees every tenant's work at once and otherwise has no quick
+ * Aimed at the platform administrator, who sees every tenant's work at once and otherwise has no quick
  * way to pick their own out of it. Everyone else benefits too, so it is not gated by role.
  *
  * Matched on the author's id rather than their display name: two people can share a name, and a
