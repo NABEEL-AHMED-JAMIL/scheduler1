@@ -181,8 +181,13 @@ export class Notifications implements OnInit {
     this.beginMarking(item.notificationId);
     this.http.post<ApiResponse>(`${API_BASE}/notification.json/markRead/${item.notificationId}`, null)
       .subscribe({
-        next: () => {
+        next: response => {
           this.endMarking(item.notificationId);
+          // A 200 can still be a refusal; flipping the row then showed what was never recorded.
+          if (response.status !== API_SUCCESS) {
+            this.toast.error(response.message || 'Could not mark that as read.');
+            return;
+          }
           this.items.update(list =>
             list.map(n => (n.notificationId === item.notificationId ? { ...n, read: true } : n)));
         },
@@ -209,8 +214,12 @@ export class Notifications implements OnInit {
     if (this.markingAll()) return;
     this.markingAll.set(true);
     this.http.post<ApiResponse>(`${API_BASE}/notification.json/markAllRead`, null).subscribe({
-      next: () => {
+      next: response => {
         this.markingAll.set(false);
+        if (response.status !== API_SUCCESS) {
+          this.toast.error(response.message || 'Could not mark them as read.');
+          return;
+        }
         this.items.update(list => list.map(n => ({ ...n, read: true })));
         this.toast.success('All notifications marked as read.');
       },

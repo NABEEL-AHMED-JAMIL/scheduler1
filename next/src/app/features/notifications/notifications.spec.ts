@@ -246,3 +246,32 @@ describe('Notifications timestamps', () => {
     expect(notifications.when(null)).toBeNull();
   });
 });
+
+/**
+ * A 200 carrying status ERROR is a refusal, and the rows used to flip to read anyway -- the screen
+ * then said something the server had declined to record, until the next reload undid it.
+ */
+describe('Notifications mark-read refused by the server', () => {
+  const REFUSED = { status: 'ERROR', message: 'That notification is not yours.' };
+
+  it('leaves the row unread and says why', () => {
+    const { notifications, toast } = build({ post: vi.fn(() => of(REFUSED)) });
+    notifications.items.set(rows(1, () => true) as any);
+
+    notifications.markRead(notifications.items()[0] as any);
+
+    expect(notifications.items()[0].read).toBe(false);
+    expect(toast.error).toHaveBeenCalledWith('That notification is not yours.');
+  });
+
+  it('leaves every row unread and does not announce success', () => {
+    const { notifications, toast } = build({ post: vi.fn(() => of(REFUSED)) });
+    notifications.items.set(rows(3, () => true) as any);
+
+    notifications.markAllRead();
+
+    expect(notifications.items().every(n => !n.read)).toBe(true);
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith('That notification is not yours.');
+  });
+});

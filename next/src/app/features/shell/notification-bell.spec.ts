@@ -169,3 +169,26 @@ describe('Notification bell timestamps', () => {
     expect(bell.ago('')).toBe('');
   });
 });
+
+describe('Notification bell when marking is refused', () => {
+  const REFUSED = { status: 'ERROR', message: 'Refused.' };
+
+  it('keeps the row unread and the badge where it was', () => {
+    const built = opened({ unreadCount: 158, fetched: rows(20, () => true) });
+    built.post.mockReturnValue(of(REFUSED) as any);
+
+    built.bell.open_(note(1, false) as any);
+
+    expect(built.bell.unread()).toBe(158);
+    expect(built.bell.items().find(n => n.notificationId === 1)?.read).toBe(false);
+  });
+
+  it('keeps the badge when mark-all is refused', () => {
+    const built = opened({ unreadCount: 158, fetched: rows(20, () => true) });
+    built.post.mockReturnValue(of(REFUSED) as any);
+
+    built.bell.markAllRead();
+
+    expect(built.bell.unread()).toBe(158);
+  });
+});

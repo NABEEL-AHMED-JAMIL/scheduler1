@@ -211,7 +211,9 @@ export class NotificationBell implements OnInit, OnDestroy {
     if (!note.read) {
       this.http.post<ApiResponse>(`${API_BASE}/notification.json/markRead/${note.notificationId}`, null)
         .subscribe({
-          next: () => {
+          next: response => {
+            // Quietly, as every bell failure is -- but a refusal must not flip the row.
+            if (response.status !== API_SUCCESS) return;
             this.items.update(list =>
               list.map(n => (n.notificationId === note.notificationId ? { ...n, read: true } : n)));
             // The badge is the server's number now, so it no longer falls on its own when a row
@@ -227,7 +229,8 @@ export class NotificationBell implements OnInit, OnDestroy {
 
   markAllRead(): void {
     this.http.post<ApiResponse>(`${API_BASE}/notification.json/markAllRead`, null).subscribe({
-      next: () => {
+      next: response => {
+        if (response.status !== API_SUCCESS) return;
         this.items.update(list => list.map(n => ({ ...n, read: true })));
         this.unread.set(0);
       },
