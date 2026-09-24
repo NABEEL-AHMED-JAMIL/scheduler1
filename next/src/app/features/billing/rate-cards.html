@@ -56,8 +56,8 @@
                 <span class="min-w-0 flex-1">
                   <span class="lookup-rail-key">{{ c.name }} <span class="mono font-normal text-[color:var(--text-muted)]">v{{ c.version }}</span></span>
                   <span class="lookup-rail-sub">
-                    @if (isInEffect(c)) { <em>in effect</em> · } @else if (c.effective_from > todayIso) { scheduled · }
-                    from {{ c.effective_from | serverTime: 'd MMM yyyy' }} · {{ forLabel(c) }}
+                    @if (isInEffect(c)) { <em>In effect</em> · from } @else if (c.effective_from > todayIso) { Scheduled · from } @else { From }
+                    {{ c.effective_from | serverTime: 'd MMM yyyy' }} · {{ forLabel(c) }}
                   </span>
                 </span>
                 <app-icon name="chevronRight" size="0.9em" class="lookup-rail-chev" />
@@ -73,15 +73,15 @@
         <header class="lookup-detail-head">
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-2 flex-wrap">
-              @if (c.tenant_id == null) { <span class="pill pill-neutral"><app-icon name="globe" size="0.8em" class="opacity-70" />every workspace</span> }
+              @if (c.tenant_id == null) { <span class="pill pill-neutral"><app-icon name="globe" size="0.8em" class="opacity-70" />Every workspace</span> }
               @else { <span class="pill pill-brand"><app-icon name="building" size="0.8em" class="opacity-70" />{{ forLabel(c) }}</span> }
-              @if (isInEffect(c)) { <span class="pill pill-ok">in effect</span> } @else if (c.effective_from > todayIso) { <span class="pill pill-brand">scheduled</span> } @else { <span class="pill pill-neutral">superseded</span> }
+              @if (isInEffect(c)) { <span class="pill pill-ok">In effect</span> } @else if (c.effective_from > todayIso) { <span class="pill pill-brand">Scheduled</span> } @else { <span class="pill pill-neutral">Superseded</span> }
               <span class="pill pill-neutral">{{ c.currency }}</span>
             </div>
             <div class="flex items-baseline gap-2 mt-1 min-w-0 flex-wrap">
               <h2 class="lookup-detail-key" [title]="c.name">{{ c.name }} <span class="mono text-sm font-normal text-[color:var(--text-muted)]">v{{ c.version }}</span></h2>
               <span class="text-xs text-[color:var(--text-muted)]">
-                effective {{ c.effective_from | serverTime: 'd MMM yyyy' }}
+                Effective {{ c.effective_from | serverTime: 'd MMM yyyy' }}
                 @if (c.based_on_version) { · drafted from v{{ c.based_on_version }} }
                 @if (c.created_at) { · saved {{ c.created_at | serverTime: 'd MMM yyyy, HH:mm' }} }
               </span>
@@ -110,7 +110,7 @@
         <section class="lookup-entries">
           <div class="lookup-entries-head">
             <h3 class="section-title">Meters <span class="text-[color:var(--text-muted)] font-normal">({{ c.items.length }})</span></h3>
-            <span class="text-xs text-[color:var(--text-muted)]">a period is priced after the allowance; tiers price each band at its own rate</span>
+            <span class="text-xs text-[color:var(--text-muted)]">A period is priced after the allowance; tiers price each band at its own rate</span>
           </div>
           <div class="lookup-entries-scroll">
             <table class="table-modern lookup-entry-table">
@@ -121,10 +121,10 @@
                   @for (i of g.items; track i.meter) {
                     <tr [class.is-changed]="changedAgainstBase(c).includes(i.label ?? i.meter)">
                       <td><div>{{ i.label ?? i.meter }}</div><div class="text-[11px] mono text-[color:var(--text-muted)]">{{ i.meter }}</div></td>
-                      <td class="text-right tabular text-sm whitespace-nowrap">{{ i.tiers?.length ? 'tiered' : price(i, c.currency) }}</td>
+                      <td class="text-right tabular text-sm whitespace-nowrap">{{ i.tiers?.length ? 'Tiered' : price(i, c.currency) }}</td>
                       <td class="text-right tabular text-sm hidden md:table-cell">{{ i.included_quantity ? units(i, i.included_quantity) : '—' }}</td>
                       <td class="hidden lg:table-cell text-xs">
-                        @for (t of tierText(i, c.currency); track t) { <div>{{ t }}</div> } @empty { <span class="text-[color:var(--text-muted)]">flat</span> }
+                        @for (t of tierText(i, c.currency); track t) { <div>{{ t }}</div> } @empty { <span class="text-[color:var(--text-muted)]">Flat</span> }
                       </td>
                     </tr>
                   }

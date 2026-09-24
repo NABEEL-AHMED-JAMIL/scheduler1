@@ -24,7 +24,8 @@ import { Icon } from './icon';
         </span>
       }
     </div>
-    @if (foot()) { <div class="stat-foot truncate">{{ foot() }}</div> }
+    <!-- Two lines before an ellipsis: a phone-width tile cut "forecast $0.03 · Aug $0.02" at "Aug $…". -->
+    @if (foot()) { <div class="stat-foot line-clamp-2" [title]="foot()">{{ foot() }}</div> }
   `,
 })
 export class StatTile {

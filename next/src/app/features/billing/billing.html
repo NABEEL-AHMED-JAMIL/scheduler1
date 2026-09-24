@@ -21,8 +21,8 @@
   @if (notConfigured()) {
     <div class="card p-8 text-center">
       <app-icon name="alert" size="1.6rem" class="icon-warn" />
-      <p class="text-sm font-medium mt-2">Metering is not configured on this console</p>
-      <p class="text-xs text-[color:var(--text-muted)] mt-1">Set <code class="mono">METER_URL</code> and <code class="mono">METER_SERVICE_KEY</code> on the console to point it at the metering service.</p>
+      <p class="text-sm font-medium mt-2">Metering is not configured</p>
+      <p class="text-xs text-[color:var(--text-muted)] mt-1">Set <code class="mono">METER_URL</code> and <code class="mono">METER_SERVICE_KEY</code> on the billing service to point it at the meter.</p>
     </div>
   } @else if (error()) {
     <div class="card p-8 text-center">
@@ -33,7 +33,7 @@
   } @else {
     <p class="text-xs text-[color:var(--text-muted)] mb-3">
       @if (rateCard(); as card) {
-        Priced with <b>{{ card.name }}</b> v{{ card.version }}@if (card.tenantSpecific) { <span class="pill pill-brand ml-1">this workspace's card</span> } · {{ currency() }}
+        Priced with <b>{{ card.name }}</b> v{{ card.version }}@if (card.tenantSpecific) { <span class="pill pill-brand ml-1">This workspace's card</span> } · {{ currency() }}
         @if (isPlatformAdmin()) { · <a routerLink="/billing/rates" class="link-inline">rate cards</a> }
       } @else { Priced with the rate card in effect · {{ currency() }} }
       · day {{ daysElapsed() }} of {{ daysInMonth() }}
@@ -53,7 +53,7 @@
     <div class="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] mt-4">
       <div class="card p-4">
         <h2 class="font-semibold text-sm">Cost by day</h2>
-        <p class="text-xs text-[color:var(--text-muted)] mb-2">Stacked by service, before monthly allowances and tiers -- the month's total above is after them. Measured items (storage kept, seats, topics) land on the night they were measured.</p>
+        <p class="text-xs text-[color:var(--text-muted)] mb-2">Stacked by service, before monthly allowances and tiers — the month's total above is after them. Measured items (storage kept, seats, topics) land on the night they were measured.</p>
         @if (loading() && !days().length) {
           <div class="py-10 text-center text-sm text-[color:var(--text-muted)]"><div class="spinner mx-auto mb-2"></div>Reading the meter…</div>
         } @else {
@@ -112,7 +112,7 @@
                 <td class="hidden lg:table-cell text-[color:var(--text-muted)]">{{ line.unit }}</td>
                 <td class="text-right tabular text-xs text-[color:var(--text-muted)] hidden md:table-cell whitespace-nowrap">{{ fmtRate(line) }}
                   @for (t of line.tiers; track t.from) { <div class="text-[11px]">{{ fmtUnits(line, t.units) }} at {{ fmtUnitPrice(t.unit_price, line.per, line.unit) }}</div> }</td>
-                <td class="text-right tabular font-medium">{{ fmtMoney(line.amount) }}</td>
+                <td class="text-right tabular font-medium">{{ fmtAmount(line.amount) }}</td>
                 <td><app-icon [name]="openLine()?.meter === line.meter ? 'chevronDown' : 'chevronRight'" size="0.9em" class="icon-muted" /></td>
               </tr>
               @if (openLine()?.meter === line.meter) {
@@ -132,7 +132,7 @@
                               <td class="text-right tabular">{{ line.unit === 'byte' ? fmtBytes(s.quantity) : line.unit === 'GB' ? fmtGb(s.quantity) : line.unit === 'GB-hour' ? fmtGb(s.quantity / 24) + ' · day' : (s.quantity | number: '1.0-2') + ' ' + line.unit }}</td>
                               <td class="text-right tabular">{{ s.events }}</td>
                               <td class="text-xs text-[color:var(--text-muted)] tabular">{{ s.last ? (s.last | serverTime: 'd MMM, HH:mm') : '' }}</td>
-                              <td class="text-xs text-[color:var(--text-muted)]">{{ s.actor_name || (s.actor_user_id ? 'user #' + s.actor_user_id : 'pipeline') }}</td>
+                              <td class="text-xs text-[color:var(--text-muted)]">{{ actorLabel(s) }}</td>
                             </tr>
                           }
                         </tbody>
@@ -145,7 +145,7 @@
             @if (lines().length) {
               <tr class="border-t-2 border-strong">
                 <td class="font-semibold" colspan="5">Month to date</td>
-                <td class="text-right tabular font-semibold">{{ fmtMoney(total()) }}</td>
+                <td class="text-right tabular font-semibold">{{ fmtAmount(total()) }}</td>
                 <td></td>
               </tr>
             }

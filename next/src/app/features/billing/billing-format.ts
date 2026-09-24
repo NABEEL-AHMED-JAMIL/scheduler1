@@ -8,11 +8,20 @@ export const BYTES_PER_GB = 1024 * 1024 * 1024;
 export const HOURS_PER_DAY = 24;
 export const MS_PER_DAY = 86_400_000;
 
-/** Money with two decimals -- or four when the figure is real but under a cent, so it is not "$0.00". */
-export function formatMoney(value: number, currency = 'USD'): string {
+/**
+ * Money with two decimals -- or four when the figure is real but under a cent, so it is not "$0.00".
+ * A column passes the `digits` its figures share (see `moneyDigits`), so one row is not "$0.0055"
+ * under another's "$0.01".
+ */
+export function formatMoney(value: number, currency = 'USD', digits?: number): string {
   const abs = Math.abs(value);
-  const digits = abs > 0 && abs < 0.01 ? 4 : 2;
+  digits ??= abs > 0 && abs < 0.01 ? 4 : 2;
   return new Intl.NumberFormat(undefined, { style: 'currency', currency, minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value);
+}
+
+/** The precision a column of amounts shares: four decimals when any real amount in it is under a cent. */
+export function moneyDigits(values: number[]): number {
+  return values.some(v => { const abs = Math.abs(Number(v) || 0); return abs > 0 && abs < 0.01; }) ? 4 : 2;
 }
 
 /** Amounts added up per currency: a total never mixes two. */
@@ -47,13 +56,21 @@ export function priceDigits(p: number): number {
   return Math.min(6, Math.max(2, decimals));
 }
 
-/** "$0.05 / 1,000 per token", "$0.01 per GB", "$0.33 per user-day". */
+/** A unit in the plural, for "per 1,000 tokens": GB stays GB, a query becomes queries. */
+export function pluralUnit(unit: string): string {
+  if (!unit || unit === 'GB' || unit.endsWith('s')) return unit;
+  return /[^aeiou]y$/.test(unit) ? unit.slice(0, -1) + 'ies' : unit + 's';
+}
+
+/** "$0.05 per 1,000 tokens", "$0.01 per GB", "$0.33 per user-day", "Free". */
 export function formatUnitPrice(unitPrice: number, per: number, unit: string | undefined, currency = 'USD'): string {
+  if (Number(unitPrice) === 0) return 'Free';
   const digits = priceDigits(unitPrice);
   const price = new Intl.NumberFormat(undefined, { style: 'currency', currency, minimumFractionDigits: digits, maximumFractionDigits: digits }).format(unitPrice);
-  // A byte meter is priced per GB; "$0.01 / 1,073,741,824 per byte" would be true and unreadable.
+  // A byte meter is priced per GB; "$0.01 per 1,073,741,824 bytes" would be true and unreadable.
   if (unit === 'byte' && per === BYTES_PER_GB) return `${price} per GB`;
-  return `${price}${per > 1 ? ' / ' + per.toLocaleString() : ''} per ${unit ?? ''}`;
+  if (unit === 'each') return `${price} each`;
+  return per > 1 ? `${price} per ${per.toLocaleString()} ${pluralUnit(unit ?? '')}`.trimEnd() : `${price} per ${unit ?? ''}`.trimEnd();
 }
 
 /** Bytes as a person reads them, trailing zeros dropped: "38.2 GB", "2 KB", "900 B". */
@@ -85,3 +102,25 @@ export function firstOfMonth(d: Date): string { return `${d.getFullYear()}-${Str
 export function daysInMonth(d: Date): number { return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(); }
 /** "2026-09": the month a period is closed under. */
 export function yearMonth(d: Date): string { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
+
+/** "2026-09" (or a first-of-month date) as the console writes a month: "Sep 2026". */
+export function monthShort(month: string): string {
+  const [y, m] = month.split('-').map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+}
+
+/** The viewer's own calendar day as yyyy-MM-dd. toISOString() is UTC, and in the evening already says tomorrow. */
+export function localIsoDate(d = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** Each workspace's name for a picker or a table; names that repeat carry the id, so two rows never read the same. */
+export function workspaceLabels(tenants: { tenantId: number; tenantName: string }[]): Map<number, string> {
+  const key = (n: string) => (n ?? '').trim().toLowerCase();
+  const seen = new Map<string, number>();
+  for (const t of tenants) seen.set(key(t.tenantName), (seen.get(key(t.tenantName)) ?? 0) + 1);
+  return new Map(tenants.map(t => {
+    const name = (t.tenantName ?? '').trim() || `Workspace ${t.tenantId}`;
+    return [t.tenantId, (seen.get(key(t.tenantName)) ?? 0) > 1 ? `${name} (#${t.tenantId})` : name];
+  }));
+}

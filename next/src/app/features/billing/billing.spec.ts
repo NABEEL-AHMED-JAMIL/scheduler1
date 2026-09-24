@@ -88,15 +88,15 @@ describe('Billing', () => {
     expect(component.seats()).toBe(14);
     expect(component.fmtMoney(0.00602)).toBe('$0.0060');
     expect(component.fmtMoney(46.2)).toBe('$46.20');
-    expect(component.fmtRate(component.lines()[2])).toBe('$0.005 / 1,000 per op');
+    expect(component.fmtRate(component.lines()[2])).toBe('$0.005 per 1,000 ops');
     expect(component.fmtRate(component.lines()[3])).toBe('$0.000032 per GB-hour');
     // The card that priced the month is named, and a line with an allowance or tiers says what applied.
     expect(component.rateCard()?.name).toBe('Standard, churn free');
     const tokens = component.lines()[4];
-    expect(component.fmtRate(tokens)).toBe('tiered');
+    expect(component.fmtRate(tokens)).toBe('Tiered');
     expect(tokens.includedQuantity).toBe(1000);
     expect(component.fmtUnits(tokens, tokens.billableQuantity)).toBe('41,100');
-    expect(tokens.tiers.map(t => component.fmtUnitPrice(t.unit_price, tokens.per, tokens.unit))).toEqual(['$0.05 / 1,000 per token', '$0.02 / 1,000 per token']);
+    expect(tokens.tiers.map(t => component.fmtUnitPrice(t.unit_price, tokens.per, tokens.unit))).toEqual(['$0.05 per 1,000 tokens', '$0.02 per 1,000 tokens']);
     expect(component.fmtBytes(2048)).toBe('2 KB');
     expect(component.fmtBytes(900)).toBe('900 B');
     expect(component.fmtGb(0.43 / 1024)).toBe('440.3 KB');
@@ -173,5 +173,21 @@ describe('Billing', () => {
     expect(component.month()).toBe(start);
     expect(daysInMonth(new Date('2026-02-10T00:00:00'))).toBe(28);
     expect(firstOfMonth(new Date('2026-09-18T00:00:00'))).toBe('2026-09-01');
+  });
+
+  /** MIG-211: one precision per Amount column, sentence case in the cells, a person's words for who did it. */
+  it('the Amount column shares one precision, and the rate and actor cells read in sentence case', () => {
+    const { component } = page();
+    expect(component.lineDigits()).toBe(4);                            // 0.00602 is real and under a cent
+    expect(component.fmtAmount(46.2)).toBe('$46.2000');
+    expect(component.fmtAmount(0.00602)).toBe('$0.0060');
+    const tidy = page(false, LINES.filter(l => l.meter !== 'storage.ops.delete'));
+    expect(tidy.component.fmtAmount(46.2)).toBe('$46.20');
+    expect(component.fmtRate(component.lines().find(l => l.hasTiers)!)).toBe('Tiered');
+    expect(component.fmtRate({ ...component.lines()[0], unpriced: true })).toBe('Not on the card');
+    expect(component.fmtRate(component.lines().find(l => l.meter === 'storage.ops.delete')!)).toBe('$0.005 per 1,000 ops');
+    expect(component.actorLabel({ actor_user_id: 4385 } as any)).toBe('User #4385');
+    expect(component.actorLabel({ actor_name: 'Olivia Bennett', actor_user_id: 4385 } as any)).toBe('Olivia Bennett');
+    expect(component.actorLabel({} as any)).toBe('Pipeline');
   });
 });

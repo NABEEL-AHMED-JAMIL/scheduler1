@@ -75,7 +75,7 @@ describe('RateCards', () => {
     expect([priceDigits(0.05), priceDigits(0.045), priceDigits(0.000032), priceDigits(3), priceDigits(0.0000001)]).toEqual([2, 3, 6, 2, 2]);
     expect(component.units(c.items[1], 1000)).toBe('1,000');
     expect(component.units(c.items[2], 2 * 1024 ** 3)).toBe('2 GB');
-    expect(component.tierText(c.items[1], 'USD')).toEqual(['0 – 1,500: $0.05 / 1,000 per token', '1,500 and up: $0.02 / 1,000 per token']);
+    expect(component.tierText(c.items[1], 'USD')).toEqual(['0 – 1,500: $0.05 per 1,000 tokens', '1,500 and up: $0.02 per 1,000 tokens']);
   });
 
   it('drafts a new version from the selected card in the side panel and reloads on save', () => {
@@ -87,6 +87,51 @@ describe('RateCards', () => {
     expect(config.data.base.version).toBe(1);
     expect(config.data.tenantId).toBeNull();
     expect(api.rateCards).toHaveBeenCalledTimes(1);
+  });
+});
+
+/** MIG-211: the card reads in sentence case, a free meter says Free, and "today" is the viewer's day, not UTC's. */
+describe('RateCards, as rendered', () => {
+  function rendered() {
+    const api = { rateCards: vi.fn(() => of({ status: API_SUCCESS, data: { cards: CARDS } })), saveRateCard: vi.fn() };
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [RateCards], providers: [
+      { provide: BillingApi, useValue: api }, { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } }, { provide: Dialog, useValue: { open: vi.fn() } },
+      { provide: WorkspacePicker, useValue: { tenantId: () => '2905', options: () => [{ value: '2905', label: 'MedAxis' }], ready: (then: () => void) => then() } },
+    ] });
+    const fixture = TestBed.createComponent(RateCards);
+    fixture.detectChanges();
+    return { fixture, component: fixture.componentInstance, el: fixture.nativeElement as HTMLElement };
+  }
+
+  it('writes chips and rail states in sentence case', () => {
+    const { el } = rendered();
+    const pills = [...el.querySelectorAll('.lookup-detail-head .pill')].map(p => p.textContent!.trim());
+    expect(pills).toEqual(['Every workspace', 'In effect', 'USD']);
+    const subs = [...el.querySelectorAll('.lookup-rail-sub')].map(s => s.textContent!.replace(/\s+/g, ' ').trim());
+    expect(subs[0]).toMatch(/^Scheduled · from 1 Oct 2099/);
+    expect(subs[1]).toMatch(/^In effect · from 1 Sep 2026/);
+    expect(subs[3]).toMatch(/^From 1 Jan 2026/);
+    expect(el.textContent).toContain('A period is priced after the allowance');
+  });
+
+  it('a meter priced at nothing reads Free, and a tiered one Tiered', () => {
+    const { el } = rendered();                                   // v2, the default in effect, has free churn
+    const cells = [...el.querySelectorAll('.lookup-entry-table tbody td:nth-child(2)')].map(td => td.textContent!.trim());
+    expect(cells).toContain('Free');
+    expect(cells).toContain('Tiered');
+    expect(cells).not.toContain('tiered');
+  });
+
+  it("dates today by the viewer's calendar, so a card starting tomorrow is not in effect tonight", () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(new Date(2026, 7, 31, 23, 30));           // 31 Aug, 23:30 local: UTC is already 1 Sep in the Americas
+      const { component } = rendered();
+      expect(component.todayIso).toBe('2026-08-31');
+      expect(component.today().defaultCard?.version).toBe(1);    // v2 starts 1 Sep: tomorrow, not today
+      expect(component.upcoming()).toBe(3);                      // v2 and v3 (1 Sep) and v4 (2099)
+    } finally { vi.useRealTimers(); }
   });
 });
 
@@ -124,6 +169,20 @@ describe('RateCardEditor', () => {
     expect(draft.tenant_id).toBeNull();
     expect(draft.items[0]).toEqual({ meter: 'seats.user_days', unit: 'user-day', per: 1, unit_price: 0.2, included_quantity: 10, tiers: [{ from: 100, unit_price: 0.1 }] });
     expect(draft.items[1].tiers).toEqual([{ from: 0, unit_price: 0.05 }, { from: 1500, unit_price: 0.02 }]);
+  });
+
+  it('shows a byte meter priced per GB as "GB", not a disabled 1073741824', () => {
+    const base = RateCards.numeric(CARDS[3] as unknown as RateCard);
+    editor(base);
+    const fixture = TestBed.createComponent(RateCardEditor);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const perCells = [...el.querySelectorAll('.rate-edit tbody tr')].map(tr => tr.querySelectorAll('td')[2]);
+    expect(perCells[2].textContent!.trim()).toBe('GB');
+    expect(perCells[2].querySelector('input')).toBeNull();
+    expect((perCells[1].querySelector('input') as HTMLInputElement).value).toBe('1000');
+    expect([...el.querySelectorAll('.rate-edit th')].map(th => th.textContent!.trim())).toContain('Per');
+    expect((el.querySelector('#rcNote') as HTMLInputElement).placeholder).toBe('Why — the agreement, the ticket, the reason');
   });
 
   it('saves for a workspace and closes with the version the meter assigned', () => {

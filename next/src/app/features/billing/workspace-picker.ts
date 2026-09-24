@@ -2,6 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { AuthService } from '../../core/auth/auth.service';
+import { workspaceLabels } from './billing-format';
 
 interface TenantOption { tenantId: number; tenantName: string; }
 
@@ -22,9 +23,11 @@ export class WorkspacePicker {
 
   readonly tenants = signal<TenantOption[]>([]);
   readonly tenantId = signal<string | null>(null);
-  readonly options = computed(() => this.tenants().map(t => ({ value: String(t.tenantId), label: t.tenantName })));
+  /** How each workspace is named in the pickers: two that share a name carry their ids, or they read as one. */
+  readonly labels = computed(() => workspaceLabels(this.tenants()));
+  readonly options = computed(() => this.tenants().map(t => ({ value: String(t.tenantId), label: this.labels().get(t.tenantId) ?? t.tenantName })));
   readonly isPlatformAdmin = this.auth.isPlatformAdmin;
-  readonly name = computed(() => this.tenants().find(t => String(t.tenantId) === this.tenantId())?.tenantName ?? '');
+  readonly name = computed(() => this.options().find(o => o.value === this.tenantId())?.label ?? '');
   /** The choice, or the first workspace when none was made: for the screens that must look at one. */
   readonly effective = computed(() => this.tenantId() ?? (this.tenants().length ? String(this.tenants()[0].tenantId) : null));
   private loaded = false;

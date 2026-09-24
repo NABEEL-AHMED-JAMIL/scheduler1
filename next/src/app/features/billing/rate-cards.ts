@@ -8,7 +8,7 @@ import { Icon } from '../../shared/ui/icon';
 import { StatTile } from '../../shared/ui/stat-tile';
 import { sidePanelConfig } from '../../shared/ui/side-panel';
 import { BillingApi, RateCard, RateItem } from './billing.service';
-import { formatQuantity, formatUnitPrice } from './billing-format';
+import { formatQuantity, formatUnitPrice, localIsoDate } from './billing-format';
 import { RateCardEditor, RateCardEditorData } from './rate-card-editor';
 import { WorkspacePicker } from './workspace-picker';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
@@ -36,7 +36,8 @@ export class RateCards implements OnInit {
   readonly selectedVersion = signal<number | null>(null);
   readonly scope = signal<'all' | 'default' | 'workspace'>('all');
   readonly search = signal('');
-  readonly todayIso = new Date().toISOString().slice(0, 10);
+  /** The viewer's own day: an ISO string is UTC, and by evening in the Americas it already says tomorrow. */
+  readonly todayIso = localIsoDate();
 
   readonly selected = computed(() => this.cards().find(c => c.version === this.selectedVersion()) ?? null);
   readonly visible = computed(() => {
@@ -46,7 +47,7 @@ export class RateCards implements OnInit {
   });
   /** The default card that prices today, and the workspaces on a card of their own today. */
   readonly today = computed(() => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = this.todayIso;
     const inEffect = (cs: RateCard[]) => cs.filter(c => c.effective_from <= today).sort((a, b) => b.effective_from.localeCompare(a.effective_from) || b.version - a.version)[0] ?? null;
     const byTenant = new Map<number, RateCard[]>();
     for (const c of this.cards()) if (c.tenant_id != null) byTenant.set(c.tenant_id, [...(byTenant.get(c.tenant_id) ?? []), c]);
@@ -54,7 +55,7 @@ export class RateCards implements OnInit {
     for (const cs of byTenant.values()) { const c = inEffect(cs); if (c) own.push(c); }
     return { defaultCard: inEffect(this.cards().filter(c => c.tenant_id == null)), own };
   });
-  readonly upcoming = computed(() => { const today = new Date().toISOString().slice(0, 10); return this.cards().filter(c => c.effective_from > today).length; });
+  readonly upcoming = computed(() => this.cards().filter(c => c.effective_from > this.todayIso).length);
 
   ngOnInit(): void {
     this.workspaces.ready(() => this.load());

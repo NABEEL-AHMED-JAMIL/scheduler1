@@ -16,19 +16,20 @@
   } @else if (data(); as d) {
     <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
       <app-stat-tile label="Invoiced" [value]="money2(d.invoiced)" icon="file" tone="info" [foot]="d.months.length + ' month' + (d.months.length === 1 ? '' : 's')" />
-      <app-stat-tile label="Collected" [value]="money2(d.collected)" icon="check" tone="ok" [foot]="collectedShare() + '% · median ' + d.medianDaysToPay + ' days to pay'" />
+      <app-stat-tile label="Collected" [value]="money2(d.collected)" icon="check" tone="ok" [foot]="collectedFoot()" />
       <app-stat-tile label="Overdue" [value]="money2(d.overdue)" icon="alert" [tone]="d.overdue > 0 ? 'crit' : 'muted'" [foot]="d.overdueCount + ' invoice' + (d.overdueCount === 1 ? '' : 's')" />
       <app-stat-tile label="Open" [value]="money2(d.open)" icon="clock" [tone]="d.open > 0 ? 'warn' : 'muted'" [foot]="'issued, not yet paid'" />
       <app-stat-tile label="Unbilled drafts" [value]="money2(d.drafts)" icon="edit" tone="muted" [foot]="d.pendingPayments + ' payment slip' + (d.pendingPayments === 1 ? '' : 's') + ' awaiting verification'" />
     </div>
     <div class="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] mt-4">
-      <div class="card p-4">
+      <div class="card p-4 min-w-0">
         <h2 class="font-semibold text-sm">Invoiced by month</h2>
         <p class="text-xs text-[color:var(--text-muted)] mb-2">Collected against still open.</p>
         <app-bar-chart [data]="bars()" [height]="140" [format]="money2" emptyMessage="No invoice in this range." />
       </div>
-      <div class="card p-4">
+      <div class="card p-4 min-w-0">
         <h2 class="font-semibold text-sm mb-2">By workspace</h2>
+        <div class="overflow-x-auto">
         <table class="table-modern">
           <thead><tr><th>Workspace</th><th class="text-right">Invoiced</th><th class="text-right">Open</th><th></th></tr></thead>
           <tbody>
@@ -39,11 +40,13 @@
             @if (!tenants().length) { <tr><td colspan="4" class="text-center text-[color:var(--text-muted)] py-4">No invoice in this range.</td></tr> }
           </tbody>
         </table>
+        </div>
       </div>
     </div>
     <div class="card p-4 mt-4">
       <h2 class="font-semibold text-sm">Usage and churn by workspace</h2>
       <p class="text-xs text-[color:var(--text-muted)] mb-2">From the meter, for the same range: what each workspace deleted, wrote and spent on models.</p>
+      <div class="overflow-x-auto">
       <table class="table-modern">
         <thead><tr><th>Workspace</th><th class="text-right">Metered cost</th><th class="text-right">Data deleted</th><th class="text-right">Data written</th><th class="text-right">Model tokens</th></tr></thead>
         <tbody>
@@ -53,6 +56,7 @@
           @if (!churn().length) { <tr><td colspan="5" class="text-center text-[color:var(--text-muted)] py-4">Nothing metered in this range.</td></tr> }
         </tbody>
       </table>
+      </div>
     </div>
   }
 </div>

@@ -8,7 +8,7 @@ import { Bar, BarChart } from '../../shared/charts/bar-chart';
 import { chartColor } from '../../shared/charts/status-color';
 import { WorkspacePicker } from './workspace-picker';
 import { BillingApi, BillingAnalytics as Analytics, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE } from './billing.service';
-import { formatBytes, formatMoney, formatMoneyRound } from './billing-format';
+import { formatBytes, formatMoney, formatMoneyRound, monthShort, workspaceLabels } from './billing-format';
 
 /** The platform's view: invoiced, collected, open and overdue across every workspace, and who churns data. */
 @Component({
@@ -27,20 +27,34 @@ export class BillingAnalyticsPage implements OnInit {
   readonly statusTone = INVOICE_STATUS_TONE;
 
   readonly bars = computed<Bar[]>(() => (this.data()?.months ?? []).map(m => ({
-    name: m.month.slice(2), value: Math.round(Number(m.invoiced ?? 0) * 100) / 100,
+    name: monthShort(m.month), value: Math.round(Number(m.invoiced ?? 0) * 100) / 100,
     segments: [
       { label: 'Collected', value: Math.round(Number(m.collected ?? 0) * 100) / 100, color: chartColor(2) },
       { label: 'Open', value: Math.round((Number(m.invoiced ?? 0) - Number(m.collected ?? 0)) * 100) / 100, color: chartColor(1) },
     ],
   })));
-  readonly tenants = computed(() => [...(this.data()?.tenants ?? [])].map(t => ({ ...t, invoiced: Number(t.invoiced), collected: Number(t.collected), open: Number(t.open), overdue: Number(t.overdue) })).sort((a, b) => b.invoiced - a.invoiced));
+  /**
+   * Every workspace's name for these tables. One with usage but no invoice yet is still named -- from the
+   * workspace list, not the bills -- and two that share a name carry their ids, or a table shows one row twice.
+   */
+  readonly labels = computed(() => {
+    const known = new Map<number, string>(this.workspaces.tenants().map(t => [t.tenantId, t.tenantName]));
+    for (const t of this.data()?.tenants ?? []) if (!known.has(t.tenantId)) known.set(t.tenantId, t.tenantName);
+    return workspaceLabels([...known].map(([tenantId, tenantName]) => ({ tenantId, tenantName })));
+  });
+  readonly tenants = computed(() => [...(this.data()?.tenants ?? [])].map(t => ({ ...t, tenantName: this.labels().get(t.tenantId) ?? t.tenantName, invoiced: Number(t.invoiced), collected: Number(t.collected), open: Number(t.open), overdue: Number(t.overdue) })).sort((a, b) => b.invoiced - a.invoiced));
   readonly churn = computed(() => {
-    // A workspace with usage but no invoice yet is still named -- from the workspace list, not the bills.
-    const names = new Map<number, string>(this.workspaces.tenants().map(t => [t.tenantId, t.tenantName]));
-    for (const t of this.tenants()) names.set(t.tenantId, t.tenantName);
+    const names = this.labels();
     return (this.data()?.usageByTenant ?? []).map(u => ({ tenantId: u.tenantId, tenantName: names.get(u.tenantId) ?? `Workspace ${u.tenantId}`, amount: Number(u.amount),
       deletedBytes: Number(u.quantityByMeter?.['storage.bytes.deleted'] ?? 0), writtenBytes: Number(u.quantityByMeter?.['storage.bytes.written'] ?? 0), tokens: Number(u.quantityByMeter?.['ai.tokens.in'] ?? 0) + Number(u.quantityByMeter?.['ai.tokens.out'] ?? 0) }))
       .sort((a, b) => b.deletedBytes - a.deletedBytes);
+  });
+  /** Under Collected: the share and how fast it came, or plainly that nothing has yet. */
+  readonly collectedFoot = computed(() => {
+    const d = this.data();
+    if (!d || !(Number(d.collected) > 0)) return 'nothing collected yet';
+    const days = Number(d.medianDaysToPay);
+    return `${this.collectedShare()}% · median ${days} day${days === 1 ? '' : 's'} to pay`;
   });
   readonly collectedShare = computed(() => { const d = this.data(); return d && Number(d.invoiced) > 0 ? Math.round(Number(d.collected) / Number(d.invoiced) * 100) : 0; });
   readonly money = (v: number) => formatMoneyRound(v);

@@ -11,7 +11,7 @@ import { TableShell } from '../../shared/ui/data-table';
 import { Bar, BarChart } from '../../shared/charts/bar-chart';
 import { chartColor } from '../../shared/charts/status-color';
 import { BillingApi, DayRow, MeterLine, PricedWith, SERVICES, SubjectRow, UsageQuery } from './billing.service';
-import { HOURS_PER_DAY, daysInMonth, firstOfMonth, formatBytes, formatGb, formatMoney, formatQuantity, formatUnitPrice } from './billing-format';
+import { HOURS_PER_DAY, daysInMonth, firstOfMonth, formatBytes, formatGb, formatMoney, formatQuantity, formatUnitPrice, moneyDigits } from './billing-format';
 import { WorkspacePicker } from './workspace-picker';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 
@@ -50,6 +50,8 @@ export class Billing implements OnInit {
   readonly error = signal('');
   readonly notConfigured = signal(false);
   readonly lines = signal<MeterLine[]>([]);
+  /** The precision the Amount column shares: four decimals for every row when one real amount is under a cent. */
+  readonly lineDigits = computed(() => moneyDigits([...this.lines().map(l => l.amount), this.total()]));
   readonly days = signal<DayRow[]>([]);
   readonly currency = signal('USD');
   readonly rateCard = signal<PricedWith | null>(null);
@@ -212,18 +214,22 @@ export class Billing implements OnInit {
   }
 
   fmtMoney(value: number): string { return formatMoney(value, this.currency()); }
+  /** An amount in the line-by-line table, at the precision its column shares. */
+  fmtAmount(value: number): string { return formatMoney(value, this.currency(), this.lineDigits()); }
   fmtBytes(bytes: number): string { return formatBytes(bytes); }
   fmtGb(gb: number): string { return formatGb(gb); }
   fmtQuantity(line: MeterLine): string { return line.unit === 'byte' || line.unit === 'GB' || line.unit === 'GB-hour' || line.unit === 'minute' ? formatQuantity(line.quantity, line.unit) : Math.round(line.quantity).toLocaleString(); }
   /** The unit price with enough digits to be a price, not "$0.0000". */
   fmtRate(line: MeterLine): string {
-    if (line.unpriced) return 'not on the card';
-    if (line.hasTiers) return 'tiered';
+    if (line.unpriced) return 'Not on the card';
+    if (line.hasTiers) return 'Tiered';
     return this.fmtUnitPrice(line.unitPrice, line.per, line.unit);
   }
   /** A quantity of the line's unit, for the allowance and the tier bands. */
   fmtUnits(line: MeterLine, q: number): string { return this.fmtQuantity({ ...line, quantity: q }); }
   fmtUnitPrice(p: number, per: number, unit: string): string { return formatUnitPrice(p, per, unit, this.currency()); }
+  /** Who caused the events: a person by name, else by id, else the pipeline that ran unattended. */
+  actorLabel(s: SubjectRow): string { return s.actor_name || (s.actor_user_id ? `User #${s.actor_user_id}` : 'Pipeline'); }
   subjectLabel(s: SubjectRow): string { return s.subject_id || (s.subject_type ? `(${s.subject_type})` : '(no subject)'); }
 
 }

@@ -29,10 +29,10 @@ const DETAIL = {
 @Component({ imports: [InvoicePane], template: `<app-invoice-pane [number]="number" (changed)="changes = changes + 1" />` })
 class Host { number = 'INV-2026-08-0006'; changes = 0; @ViewChild(InvoicePane) pane!: InvoicePane; }
 
-function page(platformAdmin: boolean) {
+function page(platformAdmin: boolean, detail: object = DETAIL) {
   // jsdom has no object URLs; the QR code and the documents are blobs shown through one.
   vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: () => 'blob:qr', revokeObjectURL: () => {} }));
-  const api = { invoice: vi.fn(() => of({ status: API_SUCCESS, data: DETAIL })), submitPayment: vi.fn(() => of({ status: API_SUCCESS, message: 'recorded' })), verifyPayment: vi.fn(() => of({ status: API_SUCCESS, message: 'verified' })), documentBlob: vi.fn(() => of(new Blob(['%PDF']))), qrBlob: vi.fn(() => of(new Blob(['png']))) };
+  const api = { invoice: vi.fn(() => of({ status: API_SUCCESS, data: detail })), submitPayment: vi.fn(() => of({ status: API_SUCCESS, message: 'recorded' })), verifyPayment: vi.fn(() => of({ status: API_SUCCESS, message: 'verified' })), documentBlob: vi.fn(() => of(new Blob(['%PDF']))), qrBlob: vi.fn(() => of(new Blob(['png']))) };
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({ imports: [Host], providers: [provideRouter([]),
     { provide: BillingApi, useValue: api }, { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn(), info: vi.fn() } },
@@ -78,5 +78,36 @@ describe('InvoicePane', () => {
     expect(admin.api.verifyPayment).toHaveBeenCalledWith(2, true, '');
     expect(admin.host.changes).toBe(1);                // the list beside the pane is told
     expect(admin.component.canVoid()).toBe(false);   // partly paid: a credit note, not a void
+  });
+
+  /** MIG-211: the pane reads like the rest of the console -- sentence case, one date style, one precision per column. */
+  it('writes statuses and methods in sentence case, and dates the way the rest of the pane does', () => {
+    const { fixture, component } = page(false);
+    const text = (fixture.nativeElement as HTMLElement).textContent!.replace(/\s+/g, ' ');
+    expect(text).toContain('Partially paid · $202.75 open');
+    expect(text).toContain('Bank transfer');
+    expect(text).not.toMatch(/\bbank\b/);
+    expect(text).toContain('Verified');
+    expect(text).toContain('Pending verification');
+    expect(text).toMatch(/Issued \d{1,2} Sep 2026/);
+    expect(text).toMatch(/Due 30 Sep 2026 \(net 30\)/);
+    expect(text).toMatch(/Paid \$200\.00 · balance \$202\.75/);
+    // "due 9/30/2026" was the browser's own date format, in the browser's own zone.
+    expect(component.history().find(h => h.text.startsWith('Invoice issued'))!.text).toBe('Invoice issued for $402.75, due 30 Sep 2026');
+  });
+
+  it('a column of line amounts shares one precision, so $0.0010 never sits above $0.01', () => {
+    const tiny = { ...DETAIL, lines: [...DETAIL.lines, { invoiceLineId: 3, sort: 2, meter: 'storage.ops.read', description: 'Storage reads', quantity: '243', unit: 'op', per: 1000, unitPrice: '0.004', amount: '0.000972', manual: false }] };
+    const { fixture } = page(false, tiny);
+    const amounts = [...(fixture.nativeElement as HTMLElement).querySelectorAll('.lookup-entry-table tbody tr td:last-child')].slice(0, 3).map(td => td.textContent!.trim());
+    expect(amounts).toEqual(['$1.2200', '$0.0850', '$0.0010']);
+  });
+
+  it('a platform administrator reads a manual line and a system draft in sentence case', () => {
+    const manual = { ...DETAIL, lines: [{ invoiceLineId: 9, sort: 0, description: 'Onboarding support', quantity: '1', unit: 'each', per: 1, unitPrice: '3.02', amount: '3.02', manual: true }] };
+    const { fixture } = page(true, manual);
+    const text = (fixture.nativeElement as HTMLElement).textContent!;
+    expect(text).toContain('Manual');
+    expect(text).not.toMatch(/\bmanual\b/);
   });
 });

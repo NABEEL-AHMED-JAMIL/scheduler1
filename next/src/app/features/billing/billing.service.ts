@@ -167,17 +167,22 @@ export class BillingApi {
 export const INVOICE_STATUSES = ['overdue', 'issued', 'partially_paid', 'draft', 'paid', 'void'] as const;
 export const DOCUMENT_KINDS = ['invoice', 'receipt', 'payment_slip', 'credit_note', 'statement'] as const;
 export const PAYMENT_METHODS: { value: string; label: string }[] = [
-  { value: 'bank', label: 'bank transfer' }, { value: 'card', label: 'card' }, { value: 'cash', label: 'cash' }, { value: 'manual', label: 'other' },
+  { value: 'bank', label: 'Bank transfer' }, { value: 'card', label: 'Card' }, { value: 'cash', label: 'Cash' }, { value: 'manual', label: 'Other' },
 ];
+/** A payment's method as a person reads it; a credit note applied is recorded as a payment too. */
+export function paymentMethodLabel(method: string): string {
+  if (method === 'credit_note') return 'Credit note';
+  return PAYMENT_METHODS.find(m => m.value === method)?.label ?? (method ? method[0].toUpperCase() + method.slice(1) : '');
+}
 /** The services a meter rolls up under, in the order the screens list them. */
 export const SERVICES = ['Storage', 'Model calls', 'Seats', 'Pipelines', 'Analytics & tools', 'Other'];
 
 export const INVOICE_STATUS_LABEL: Record<string, string> = {
-  draft: 'draft', issued: 'issued', partially_paid: 'partially paid', paid: 'paid', overdue: 'overdue', void: 'void',
+  draft: 'Draft', issued: 'Issued', partially_paid: 'Partially paid', paid: 'Paid', overdue: 'Overdue', void: 'Void',
 };
 export const INVOICE_STATUS_TONE: Record<string, string> = {
   draft: 'pill-neutral', issued: 'pill-warn', partially_paid: 'pill-warn', paid: 'pill-ok', overdue: 'pill-crit', void: 'pill-neutral',
 };
 export const DOCUMENT_KIND_LABEL: Record<string, string> = {
-  invoice: 'invoice', credit_note: 'credit note', receipt: 'receipt', statement: 'statement', payment_slip: 'payment slip',
+  invoice: 'Invoice', credit_note: 'Credit note', receipt: 'Receipt', statement: 'Statement', payment_slip: 'Payment slip',
 };

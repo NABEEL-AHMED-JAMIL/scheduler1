@@ -35,7 +35,7 @@ export interface RateCardEditorData { base: RateCard; workspaces: ComboboxOption
           <input id="rcFrom" class="input mono" type="date" [value]="effectiveFrom()" (input)="effectiveFrom.set($any($event.target).value)" />
           <span class="hint">Prices bills for periods that start on or after this day.</span></label>
         <label class="col-span-2"><span class="label">Note</span>
-          <input id="rcNote" class="input" [value]="note()" (input)="note.set($any($event.target).value)" placeholder="Why -- the agreement, the ticket, the reason" /></label>
+          <input id="rcNote" class="input" [value]="note()" (input)="note.set($any($event.target).value)" placeholder="Why — the agreement, the ticket, the reason" /></label>
       </div>
 
       <div class="flex items-center justify-between mb-2">
@@ -43,13 +43,16 @@ export interface RateCardEditorData { base: RateCard; workspaces: ComboboxOption
         <span class="text-xs text-[color:var(--text-muted)]">{{ data.base.currency }}</span>
       </div>
       <table class="table-modern rate-edit">
-        <thead><tr><th>Meter</th><th class="text-right">Price</th><th class="text-right">per</th><th class="text-right">Included / month</th><th>Tiers</th></tr></thead>
+        <thead><tr><th>Meter</th><th class="text-right">Price</th><th class="text-right">Per</th><th class="text-right">Included / month</th><th>Tiers</th></tr></thead>
         <tbody>
           @for (it of items(); track it.meter; let i = $index) {
             <tr [class.is-changed]="changed().has(it.meter)">
               <td><div class="font-medium">{{ it.label }}</div><div class="text-[11px] mono text-[color:var(--text-muted)]">{{ it.meter }} · {{ it.unit }}</div></td>
               <td class="text-right"><input class="input py-1 text-xs w-24 text-right mono" type="number" min="0" step="any" [value]="it.unit_price" (input)="set(i, 'unit_price', $any($event.target).value)" [attr.aria-label]="it.label + ' price'" /></td>
-              <td class="text-right"><input class="input py-1 text-xs w-24 text-right mono" type="number" min="1" step="1" [value]="it.per" (input)="setPer(i, $any($event.target).value)" [attr.aria-label]="it.label + ' per'" [disabled]="it.unit === 'byte'" [title]="it.unit === 'byte' ? 'Bytes are priced per GB' : ''" /></td>
+              <td class="text-right">
+                @if (it.unit === 'byte') { <span class="text-xs text-[color:var(--text-muted)] pr-2" title="Bytes are priced per GB">GB</span> }
+                @else { <input class="input py-1 text-xs w-24 text-right mono" type="number" min="1" step="1" [value]="it.per" (input)="setPer(i, $any($event.target).value)" [attr.aria-label]="it.label + ' per'" /> }
+              </td>
               <td class="text-right"><input class="input py-1 text-xs w-28 text-right mono" type="number" min="0" step="any" [value]="it.included_quantity" (input)="set(i, 'included_quantity', $any($event.target).value)" [attr.aria-label]="it.label + ' included'" placeholder="0" /></td>
               <td>
                 @for (t of it.tiers; track $index; let j = $index) {

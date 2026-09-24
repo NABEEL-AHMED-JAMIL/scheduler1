@@ -53,6 +53,9 @@ describe('Invoices', () => {
     expect(component.docsLabel(component.rows()[0])).toBe('PDF · slip pending');
     expect(component.docsLabel(component.rows()[1])).toBe('PDF · slip · receipt');
     expect(component.docsLabel(component.rows()[3])).toBe('');
+    // MIG-211: a line that starts with the slip starts with a capital, and a month reads as everywhere else.
+    expect(component.docsLabel({ ...component.rows()[3], documentKinds: [], pendingPayments: 1 })).toBe('Slip pending');
+    expect(component.period({ ...component.rows()[3], periodStart: '2026-09-01' })).toBe('Sep 2026');
   });
 
   it('selects the overdue bill first, or the one the address names, and writes the number to the address', () => {

@@ -60,7 +60,7 @@
               <button type="button" class="lookup-rail-item" role="option" [attr.aria-selected]="selectedId() === d.documentId" [class.is-selected]="selectedId() === d.documentId" (click)="pick(d.documentId)">
                 <span class="doc-ic">{{ glyph(d) }}</span>
                 <span class="min-w-0 flex-1">
-                  <span class="lookup-rail-key">{{ d.number || d.fileName }}</span>
+                  <span class="lookup-rail-key is-wrap">{{ d.number || d.fileName }}</span>
                   <span class="lookup-rail-sub">{{ kindLabel[d.kind] }}@if (d.invoiceNumber && d.kind !== 'invoice') { · for {{ d.invoiceNumber }} } · {{ d.issuedAt | serverTime: 'd MMM' }}@if (d.amount != null) { · <span class="tabular">{{ money(d.amount, d.currency) }}</span> }</span>
                 </span>
                 <app-icon name="chevronRight" size="0.9em" class="lookup-rail-chev" />
@@ -82,7 +82,7 @@
             </div>
             <div class="flex items-baseline gap-2 mt-1 min-w-0 flex-wrap">
               <h2 class="lookup-detail-key" [title]="d.fileName">{{ d.number || d.fileName }}</h2>
-              <span class="text-xs text-[color:var(--text-muted)] truncate">
+              <span class="text-xs text-[color:var(--text-muted)] min-w-0">
                 {{ d.issuedAt | serverTime: 'd MMM yyyy, HH:mm' }}@if (d.createdByName) { · {{ d.createdByName }} }@if (d.sizeBytes) { · {{ humanSize(d.sizeBytes) }} }
                 @if (d.invoiceNumber) { · for <a class="link-inline mono" [routerLink]="['/billing/invoices', d.invoiceNumber]">{{ d.invoiceNumber }}</a> }
               </span>
@@ -114,7 +114,7 @@
           } @else {
             <div class="lookup-entries-empty lookup-detail-empty">
               <app-icon name="file" size="1.5rem" class="icon-muted" />
-              <p>{{ d.fileName }} — {{ d.contentType || 'unknown type' }}. Download it to read it.</p>
+              <p>{{ d.fileName }} — {{ d.contentType || 'an unknown type' }}. Download it to read it.</p>
             </div>
           }
         </div>

@@ -1,4 +1,4 @@
-import { Component, OnDestroy, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
+import { Component, LOCALE_ID, OnDestroy, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 
 import { RouterLink } from '@angular/router';
 import { Dialog } from '@angular/cdk/dialog';
@@ -13,8 +13,8 @@ import { CopyButton } from '../../shared/ui/copy-button';
 import { copyText } from '../../shared/ui/clipboard.util';
 import { formatSize } from '../../shared/ui/format-size';
 import { DocumentViewDialog } from './document-view-dialog';
-import { BillingApi, DOCUMENT_KIND_LABEL, InvoiceDetail as Detail, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE, PaymentRow, InvoiceLine, AppliedTier, PAYMENT_METHODS } from './billing.service';
-import { daysOverdue, formatMoney, formatQuantity, formatUnitPrice } from './billing-format';
+import { BillingApi, DOCUMENT_KIND_LABEL, InvoiceDetail as Detail, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE, PaymentRow, InvoiceLine, AppliedTier, PAYMENT_METHODS, paymentMethodLabel } from './billing.service';
+import { daysOverdue, formatMoney, formatQuantity, formatUnitPrice, moneyDigits } from './billing-format';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 
 /** One entry of the invoice's story, in order. */
@@ -53,6 +53,8 @@ export class InvoicePane implements OnDestroy {
   readonly kindLabel = DOCUMENT_KIND_LABEL;
   readonly humanSize = formatSize;
   readonly paymentMethods = PAYMENT_METHODS;
+  readonly methodLabel = paymentMethodLabel;
+  private readonly serverTime = new ServerTimePipe(inject(LOCALE_ID));
 
   // ---- the payment form (a workspace admin's slip) ----
   readonly paying = signal(false);
@@ -79,6 +81,8 @@ export class InvoicePane implements OnDestroy {
   readonly isOpen = computed(() => ['issued', 'partially_paid', 'overdue'].includes(this.invoice()?.status ?? ''));
   readonly canVoid = computed(() => this.isPlatformAdmin() && !!this.invoice() && this.invoice()!.status !== 'void' && this.invoice()!.kind === 'invoice' && this.paid() === 0);
   readonly taxApplies = computed(() => Number(this.invoice()?.taxRatePercent ?? 0) > 0);
+  /** The precision the Amount column shares, so a line under a cent does not sit in another format beside the rest. */
+  readonly lineDigits = computed(() => moneyDigits((this.invoice()?.lines ?? []).map(l => l.amount)));
   readonly pdfDocument = computed(() => this.invoice()?.documents.find(d => d.kind === 'invoice' || d.kind === 'credit_note') ?? null);
 
   readonly history = computed<HistoryEntry[]>(() => {
@@ -86,7 +90,7 @@ export class InvoicePane implements OnDestroy {
     if (!i) return [];
     const out: HistoryEntry[] = [];
     if (i.dateCreated) out.push({ at: i.dateCreated, text: `Draft ${i.number} built from the meter${i.createdByName ? ' by ' + i.createdByName : ''}`, tone: 'muted' });
-    if (i.issuedAt) out.push({ at: i.issuedAt, text: `${i.kind === 'credit_note' ? 'Credit note' : 'Invoice'} issued for ${this.money(i.total)}${i.dueAt ? ', due ' + new Date(i.dueAt).toLocaleDateString() : ''}`, tone: 'ok' });
+    if (i.issuedAt) out.push({ at: i.issuedAt, text: `${i.kind === 'credit_note' ? 'Credit note' : 'Invoice'} issued for ${this.money(i.total)}${i.dueAt ? ', due ' + this.serverTime.transform(i.dueAt, 'd MMM yyyy') : ''}`, tone: 'ok' });
     for (const p of i.payments) {
       out.push({ at: p.dateCreated, text: `Payment of ${this.money(Number(p.amount))} ${p.method === 'credit_note' ? 'credited (' + p.reference + ')' : 'submitted' + (p.submittedBy ? ' by ' + p.submittedBy : '') + (p.reference ? ' · ' + p.reference : '')}`, tone: 'muted' });
       if (p.verifiedAt && p.method !== 'credit_note') out.push({ at: p.verifiedAt, text: p.status === 'verified' ? `Verified${p.verifiedBy ? ' by ' + p.verifiedBy : ''} · receipt ${p.receiptNumber}` : `Rejected${p.verifiedBy ? ' by ' + p.verifiedBy : ''}${p.note ? ' · ' + p.note : ''}`, tone: p.status === 'verified' ? 'ok' : 'crit' });
@@ -137,7 +141,7 @@ export class InvoicePane implements OnDestroy {
     copyText(n).then(() => { this.copied.set(true); setTimeout(() => this.copied.set(false), 1500); });
   }
 
-  money(v: number, currency = this.invoice()?.currency ?? 'USD'): string { return formatMoney(v, currency); }
+  money(v: number, currency = this.invoice()?.currency ?? 'USD', digits?: number): string { return formatMoney(v, currency, digits); }
   rate(l: { unitPrice: number; per: number; unit?: string }): string {
     if (l.unit === 'each') return '';
     return formatUnitPrice(l.unitPrice, l.per, l.unit, this.invoice()?.currency ?? 'USD');
@@ -148,7 +152,7 @@ export class InvoicePane implements OnDestroy {
     try { return (JSON.parse(l.pricingDetail) as AppliedTier[]).map(t => ({ from: Number(t.from), to: t.to == null ? null : Number(t.to), units: Number(t.units), unit_price: Number(t.unit_price) })); }
     catch { return []; }
   }
-  quantity(l: { quantity: number; unit?: string }): string { return formatQuantity(l.quantity, l.unit); }
+  quantity(l: { quantity: number; unit?: string }): string { return formatQuantity(Number(l.quantity), l.unit); }
   overdueDays(): number { return daysOverdue(this.invoice()?.dueAt); }
 
   // ---- documents ----

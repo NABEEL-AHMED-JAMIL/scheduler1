@@ -1623,6 +1623,8 @@ html.dark .tenant-code.is-copied { background: color-mix(in oklab, var(--color-o
 html.dark .lookup-rail-glyph.is-setting { background: color-mix(in oklab, var(--color-ok-500) 22%, transparent); color: var(--color-ok-400); }
 html.dark .lookup-rail-glyph.is-managed { background: color-mix(in oklab, var(--color-warn-500) 22%, transparent); color: var(--color-warn-400); }
 .lookup-rail-key { display: block; font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A key that must be read whole -- a statement's number ends in the part that tells two apart. */
+.lookup-rail-key.is-wrap { white-space: normal; overflow-wrap: anywhere; }
 .lookup-rail-sub { display: block; font-size: 11px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lookup-rail-sub em { font-style: normal; color: var(--pill-brand-fg); }
 .lookup-rail-chev { flex: none; opacity: 0; color: var(--text-muted); }

@@ -10,7 +10,7 @@ import { ToastService } from '../../shared/ui/toast.service';
 import { Icon } from '../../shared/ui/icon';
 import { StatTile } from '../../shared/ui/stat-tile';
 import { BillingApi, InvoiceRow, INVOICE_STATUSES, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE } from './billing.service';
-import { MoneyTotals, addMoney, daysOverdue, formatMoney, formatTotals, yearMonth } from './billing-format';
+import { MoneyTotals, addMoney, daysOverdue, formatMoney, formatTotals, yearMonth, monthShort } from './billing-format';
 import { BillingAccountDialog } from './billing-account-dialog';
 import { InvoicePane } from './invoice-detail';
 import { WorkspacePicker } from './workspace-picker';
@@ -117,7 +117,7 @@ export class Invoices implements OnInit {
   clearFilters(): void { this.search.set(''); this.status.set(''); }
   money(v: number, currency = 'USD'): string { return formatMoney(v, currency); }
   totals(t: MoneyTotals): string { return formatTotals(t); }
-  period(r: InvoiceRow): string { return new Date(r.periodStart + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', year: 'numeric' }); }
+  period(r: InvoiceRow): string { return monthShort(r.periodStart); }
   overdueDays(r: InvoiceRow): number { return daysOverdue(r.dueAt); }
   /** The rail's dot: what the row's state means for the reader. */
   tone(r: InvoiceRow): string {
@@ -127,7 +127,7 @@ export class Invoices implements OnInit {
     const short: Record<string, string> = { invoice: 'PDF', credit_note: 'PDF', payment_slip: 'slip', receipt: 'receipt', statement: 'statement' };
     const order = ['invoice', 'credit_note', 'payment_slip', 'receipt', 'statement'];
     const kinds = [...(r.documentKinds ?? [])].sort((a, b) => order.indexOf(a) - order.indexOf(b)).map(k => short[k] ?? k);
-    return kinds.length ? kinds.join(' · ') + ((r.pendingPayments ?? 0) > 0 ? ' · slip pending' : '') : ((r.pendingPayments ?? 0) > 0 ? 'slip pending' : '');
+    return kinds.length ? kinds.join(' · ') + ((r.pendingPayments ?? 0) > 0 ? ' · slip pending' : '') : ((r.pendingPayments ?? 0) > 0 ? 'Slip pending' : '');
   }
 
   /** A draft for the picked workspace and month, from the meter -- or, for every workspace, the month close. */
