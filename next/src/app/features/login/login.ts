@@ -1,7 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { AuthService } from '../../core/auth/auth.service';
+import { AuthService, PASSWORD_CHANGED_NOTICE, PASSWORD_CHANGED_REASON } from '../../core/auth/auth.service';
 import { API_SUCCESS } from '../../core/api/api.config';
 import { ConsolePreview } from '../landing/console-preview';
 import { Icon } from '../../shared/ui/icon';
@@ -20,6 +20,14 @@ export class Login {
 
   readonly submitting = signal(false);
   readonly error = signal('');
+
+  /**
+   * Why the person is here, when a session ended under them: a password change signed it out and the
+   * server handed back no new pair. Only reasons this console sends are shown; anything else in the
+   * address is ignored rather than printed.
+   */
+  readonly notice = this.route.snapshot.queryParamMap.get('reason') === PASSWORD_CHANGED_REASON
+    ? PASSWORD_CHANGED_NOTICE : '';
 
   readonly form = this.fb.nonNullable.group({
     username: ['', Validators.required],

@@ -138,7 +138,12 @@ describe('authInterceptor', () => {
     TestBed.configureTestingModule({
       providers: [{
         provide: AuthService,
-        useValue: { accessToken: 'fine', passwordChanged: () => seen.push('cleared') },
+        useValue: {
+          accessToken: 'fine',
+          passwordChanged: () => seen.push('cleared'),
+          adoptSession: () => seen.push('adopted'),
+          signOutAfterPasswordChange: () => seen.push('signed out'),
+        },
       }],
     });
 
@@ -147,13 +152,15 @@ describe('authInterceptor', () => {
       (() => of(new HttpResponse({ status: 200, body }))) as any,
     )).subscribe();
 
-    send('/api/v1/appUser.json/changeOwnPassword', { status: 'SUCCESS', message: 'ok' });
-    expect(seen).toEqual(['cleared']);
+    // The change hands this session a new pair (password-change.spec.ts has the rest of that).
+    send('/api/v1/appUser.json/changeOwnPassword',
+      { status: 'SUCCESS', message: 'ok', data: { accessToken: 'new', refreshToken: 'new-refresh' } });
+    expect(seen).toEqual(['adopted', 'cleared']);
 
     // A refused change leaves the debt standing, and no other call speaks to it at all.
     send('/api/v1/appUser.json/changeOwnPassword', { status: 'ERROR', message: 'wrong password' });
     send('/api/v1/appUser.json/updateOwnProfile', { status: 'SUCCESS', message: 'ok' });
-    expect(seen).toEqual(['cleared']);
+    expect(seen).toEqual(['adopted', 'cleared']);
   });
 
   /*
@@ -177,6 +184,8 @@ describe('authInterceptor', () => {
           refresh: () => of({ status: 'SUCCESS', message: 'ok' } as ApiResponse<unknown>),
           logout: () => undefined,
           passwordChanged: () => seen.push('cleared'),
+          adoptSession: () => seen.push('adopted'),
+          signOutAfterPasswordChange: () => seen.push('signed out'),
         },
       }],
     });
@@ -187,12 +196,14 @@ describe('authInterceptor', () => {
         calls++;
         return calls === 1
           ? throwError(() => new HttpErrorResponse({ status: 401 }))
-          : of(new HttpResponse({ status: 200, body: { status: 'SUCCESS', message: 'ok' } }));
+          : of(new HttpResponse({ status: 200, body: {
+            status: 'SUCCESS', message: 'ok', data: { accessToken: 'new', refreshToken: 'new-refresh' },
+          } }));
       }) as any,
     )).subscribe();
 
     expect(calls).toBe(2);
-    expect(seen).toEqual(['cleared']);
+    expect(seen).toEqual(['adopted', 'cleared']);
   });
 
   /*

@@ -289,6 +289,9 @@ export class Profile implements OnInit {
         this.newPassword.set('');
         if (response.status === API_SUCCESS) {
           this.toast.success(response.message);
+          // Against a server that hands back no new pair the change has signed this session out
+          // (the interceptor did it, before this ran): there is no profile left to re-read.
+          if (!this.auth.isLoggedIn()) return;
           // The notice at the top is driven by the profile, so it is re-read rather than guessed.
           this.load();
         } else {

@@ -8,6 +8,11 @@ import { PageKey } from './page-keys';
 
 const STORAGE_KEY = 'etl_auth_user';
 
+/** The login page's `reason` for a session signed out because its password changed. */
+export const PASSWORD_CHANGED_REASON = 'password-changed';
+/** What the login page says for it. */
+export const PASSWORD_CHANGED_NOTICE = 'Your password was changed. Please sign in with the new password.';
+
 /**
  * The role the server signed into the access token, or null when there is nothing readable.
  *
@@ -76,6 +81,29 @@ export class AuthService {
    */
   passwordChanged(): void {
     if (this.currentUser()?.mustChangePassword) this.patchUser({ mustChangePassword: false });
+  }
+
+  /**
+   * A change of this person's own password ended every token they held -- on the server, a password
+   * change signs the account out everywhere -- and handed this session a fresh sign-in pair. Stored
+   * over the old one, with whatever else the server sent (the settled password debt among it), so the
+   * next request already carries it. Called from the interceptor, before the response reaches the
+   * screen that made the change.
+   */
+  adoptSession(session: Partial<AuthUser>): void {
+    const user = this.currentUser();
+    if (!user) return;
+    this.persist({ ...user, ...session });
+  }
+
+  /**
+   * The password changed and the server handed back no new pair (one from before it did): every
+   * token this session holds is, or is about to be, refused. Signed out cleanly and told why, rather
+   * than left on a screen whose every call now fails.
+   */
+  signOutAfterPasswordChange(): void {
+    this.clear();
+    void this.router.navigate(['/login'], { queryParams: { reason: PASSWORD_CHANGED_REASON } });
   }
 
   /*

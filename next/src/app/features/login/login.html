@@ -11,6 +11,13 @@
         Use your platform account to continue.
       </p>
 
+      @if (notice) {
+        <div class="card p-4 mb-5 flex items-start gap-2.5 border-brand-500" role="status">
+          <app-icon name="key" class="icon-info mt-0.5 shrink-0" />
+          <p class="text-sm">{{ notice }}</p>
+        </div>
+      }
+
       <form [formGroup]="form" (ngSubmit)="submit()" novalidate class="form-stack">
         <div>
           <label class="label" for="username">Username</label>

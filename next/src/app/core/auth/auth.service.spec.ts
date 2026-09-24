@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { AuthService } from './auth.service';
+import { AuthService, PASSWORD_CHANGED_REASON } from './auth.service';
 import { AuthUser, UserRole } from './auth.models';
 import { useMemoryStorage } from '../../shared/testing/memory-storage';
 
@@ -144,5 +144,54 @@ describe('AuthService.mustChangePassword', () => {
     auth.passwordChanged();
     expect(auth.mustChangePassword()).toBe(false);
     expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!).mustChangePassword).toBe(false);
+  });
+});
+
+describe('AuthService after a password change', () => {
+  useMemoryStorage();
+
+  function owingSession(): void {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      username: 'someone@example.com', userRole: 'TENANT_USER', appUserId: 7, fullName: 'Some One',
+      accessToken: tokenWithRole('TENANT_USER'), refreshToken: 'old-refresh', mustChangePassword: true,
+    }));
+  }
+
+  // The change ended every token the person held; the pair it handed back is what this session
+  // runs on now, reload included.
+  it('keeps the session on the pair the change handed back', () => {
+    owingSession();
+    const auth = service();
+    const fresh = tokenWithRole('TENANT_USER') + 'x';
+
+    auth.adoptSession({ accessToken: fresh, refreshToken: 'new-refresh', mustChangePassword: false });
+
+    expect(auth.accessToken).toBe(fresh);
+    expect(auth.isLoggedIn()).toBe(true);
+    expect(auth.mustChangePassword()).toBe(false);
+    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY)!);
+    expect(stored.accessToken).toBe(fresh);
+    expect(stored.refreshToken).toBe('new-refresh');
+    // What the pair did not mention is kept.
+    expect(stored.fullName).toBe('Some One');
+  });
+
+  it('signs out to the login page with the reason when there is no pair to keep', () => {
+    owingSession();
+    const navigations: unknown[][] = [];
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: HttpClient, useValue: { get: () => ({ subscribe: () => undefined }) } },
+        { provide: Router, useValue: { navigate: (...args: unknown[]) => { navigations.push(args); return Promise.resolve(true); } } },
+      ],
+    });
+    const auth = TestBed.inject(AuthService);
+
+    auth.signOutAfterPasswordChange();
+
+    expect(auth.isLoggedIn()).toBe(false);
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+    expect(navigations).toEqual([[['/login'], { queryParams: { reason: PASSWORD_CHANGED_REASON } }]]);
   });
 });
