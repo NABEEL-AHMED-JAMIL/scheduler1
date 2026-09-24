@@ -3,7 +3,11 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { API_BASE, ApiResponse } from '../../core/api/api.config';
 
-export interface NameValue { name: string; value: number; }
+/**
+ * One total. tenantId names the workspace it is for; allWorkspaces is true when a platform
+ * administrator's number adds up every workspace (MIG-46).
+ */
+export interface NameValue { name: string; value: number; tenantId?: number; allWorkspaces?: boolean; }
 export interface HourCell { dayCode: string; hr: number; date: string; count: number; }
 
 export interface JobBreakdown {

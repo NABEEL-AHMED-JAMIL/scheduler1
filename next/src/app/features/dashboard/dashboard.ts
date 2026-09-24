@@ -77,6 +77,13 @@ export class Dashboard implements OnInit {
   });
   readonly activeJobs  = computed(() => this.valueOf(this.jobStatus(), 'active'));
 
+  /**
+   * Whose numbers these are, when they are not simply the reader's own workspace: a platform
+   * administrator's totals add up every workspace, and the server says so on each one (MIG-46).
+   */
+  readonly scopeLabel = computed(() =>
+    this.jobStatus().some(d => d.allWorkspaces) ? 'all workspaces' : null);
+
   /** The real statuses, with the "All" total removed so it can't appear as a slice. */
   readonly statusCategories = computed(() =>
     this.jobStatus().filter(d => (d.name ?? '').toLowerCase() !== 'all'));

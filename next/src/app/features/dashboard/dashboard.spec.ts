@@ -104,3 +104,23 @@ describe('drilling into an hour from the breakdown', () => {
     expect(navigated).toEqual([]);
   });
 });
+
+/**
+ * MIG-46 (DEF-128): a platform administrator's tiles add up every workspace, and the page used to
+ * say nothing about it. The server now says so on each total; the subtitle repeats it.
+ */
+describe('whose numbers the dashboard shows', () => {
+  it('says the totals cover every workspace when the server says so', () => {
+    const dashboard = dashboardFor();
+    dashboard.jobStatus.set([{ name: 'All', value: 351, allWorkspaces: true }]);
+    expect(dashboard.scopeLabel()).toBe('all workspaces');
+  });
+
+  it('says nothing extra for one workspace, whose own numbers need no label', () => {
+    const dashboard = dashboardFor();
+    dashboard.jobStatus.set([{ name: 'All', value: 12, tenantId: 1004, allWorkspaces: false }]);
+    expect(dashboard.scopeLabel()).toBeNull();
+    dashboard.jobStatus.set([]);
+    expect(dashboard.scopeLabel()).toBeNull();
+  });
+});

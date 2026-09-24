@@ -3,7 +3,7 @@
     <div>
       <h1 class="page-title">Dashboard</h1>
       <p class="page-subtitle">
-        Showing {{ startDate() }} to {{ endDate() }}
+        Showing {{ startDate() }} to {{ endDate() }}@if (scopeLabel(); as scope) {, {{ scope }}}
       </p>
     </div>
     <!-- Wraps: a date field has an intrinsic minimum width and two of them plus the
