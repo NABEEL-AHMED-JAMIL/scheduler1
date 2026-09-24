@@ -154,7 +154,13 @@ export class Dashboard implements OnInit {
     const to = this.endDate();
 
     this.dashboard.jobStatus(from, to).subscribe({
-      next: r => { if (r.status === API_SUCCESS) this.jobStatus.set(r.data ?? []); this.loading.set(false); },
+      // A refusal (a date that is not a date) is a 200 carrying ERROR and a sentence (MIG-103). Said
+      // once, here: the other tiles are refused for the same reason.
+      next: r => {
+        if (r.status === API_SUCCESS) this.jobStatus.set(r.data ?? []);
+        else this.toast.error(r.message);
+        this.loading.set(false);
+      },
       error: () => this.loading.set(false),
     });
     this.dashboard.jobRunning(from, to).subscribe({

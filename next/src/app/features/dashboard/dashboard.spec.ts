@@ -124,3 +124,34 @@ describe('whose numbers the dashboard shows', () => {
     expect(dashboard.scopeLabel()).toBeNull();
   });
 });
+
+/**
+ * MIG-103 (ADR-023): a request the server refuses -- a date that is not a date -- is an HTTP 200
+ * carrying status ERROR and a sentence. The first load used to drop it and show empty tiles; it now
+ * says why, once, and still stops the spinner.
+ */
+describe('a refused dashboard load', () => {
+  it('shows the server sentence once and stops loading', () => {
+    const errors: string[] = [];
+    const refused = { status: 'ERROR', message: 'Invalid date -- expected yyyy-MM-dd.' };
+    const answer = (value: unknown) => ({ subscribe: (o: { next: (v: unknown) => void }) => o.next(value) });
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: DashboardService, useValue: {
+          jobStatus: () => answer(refused), jobRunning: () => answer(refused),
+          weekly: () => answer(refused), hourly: () => answer(refused),
+        } },
+        { provide: HttpClient, useValue: { get: () => answer({ status: 'SUCCESS', data: 0 }) } },
+        { provide: ToastService, useValue: { success: () => {}, error: (m: string) => errors.push(m), info: () => {} } },
+        { provide: Router, useValue: { navigate: () => {} } },
+      ],
+    });
+    const dashboard = TestBed.runInInjectionContext(() => new Dashboard());
+
+    dashboard.load();
+
+    expect(errors).toEqual(['Invalid date -- expected yyyy-MM-dd.']);
+    expect(dashboard.loading()).toBe(false);
+  });
+});
