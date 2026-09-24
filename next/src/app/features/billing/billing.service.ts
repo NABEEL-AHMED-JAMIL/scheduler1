@@ -135,8 +135,10 @@ export class BillingApi {
   subjects(q: UsageQuery, meter: string, limit: number): Observable<ApiResponse<{ rows: SubjectRow[] }>> {
     return this.http.get<ApiResponse<{ rows: SubjectRow[] }>>(`${this.base}/subjects`, { params: { ...this.usageParams(q, 'meter'), meter, limit: String(limit) } });
   }
-  /** Rolls the last two days again: the events of the last minutes, priced now. */
+  /** Rolls every workspace's last two days again: the platform administrator's refresh. */
   refreshUsage(): Observable<ApiResponse<unknown>> { return this.http.post<ApiResponse<unknown>>(`${this.base}/refresh`, null); }
+  /** Rolls the signed-in workspace's today and yesterday again: a workspace administrator's refresh. */
+  refreshWorkspace(): Observable<ApiResponse<unknown>> { return this.http.post<ApiResponse<unknown>>(`${this.base}/refreshWorkspace`, null); }
   private usageParams(q: UsageQuery, groupBy: string): Record<string, string> {
     return { from: q.from, to: q.to, groupBy, ...this.tenantParam(q.tenantId) };
   }

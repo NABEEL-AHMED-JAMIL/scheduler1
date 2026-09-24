@@ -193,9 +193,13 @@ export class Billing implements OnInit {
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `cost-usage-${this.month().slice(0, 7)}.csv`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href);
   }
 
-  /** Rolls the last two days again and reloads: the events of the last minutes, priced now. */
+  /**
+   * Rolls the last two days again and reloads: the events of the last minutes, priced now. The
+   * platform administrator re-prices every workspace; a workspace administrator only their own.
+   */
   refresh(): void {
-    this.api.refreshUsage().subscribe({ next: () => this.load(), error: () => this.load() });
+    const roll = this.isPlatformAdmin() ? this.api.refreshUsage() : this.api.refreshWorkspace();
+    roll.subscribe({ next: () => this.load(), error: () => this.load() });
   }
 
   toggleLine(line: MeterLine): void {

@@ -21,6 +21,7 @@ function page(platformAdmin = false, rows: object[] = LINES, days: object[] = DA
       { subject_type: 'object', subject_id: 'medaxis/sales/orders.csv', quantity: '2.0', events: 1, last: '2026-09-18T10:00:00Z', actor_user_id: 4385 },
     ] } })),
     refreshUsage: vi.fn(() => of({ status: API_SUCCESS })),
+    refreshWorkspace: vi.fn(() => of({ status: API_SUCCESS })),
   };
   // The picker holds no choice until one is made; Cost & usage reads `effective`, the first
   // workspace, because it must look at one -- Invoices reads the choice itself (every workspace).
@@ -58,6 +59,21 @@ const DAYS = [
 ];
 
 describe('Billing', () => {
+  // MIG-16: the platform-wide rollup is the platform's; a workspace admin's Refresh prices their own workspace.
+  it('refreshes only the signed-in workspace for a workspace admin', () => {
+    const { component, api } = page(false);
+    component.refresh();
+    expect(api.refreshWorkspace).toHaveBeenCalledTimes(1);
+    expect(api.refreshUsage).not.toHaveBeenCalled();
+  });
+
+  it('refreshes the whole platform for a platform administrator', () => {
+    const { component, api } = page(true);
+    component.refresh();
+    expect(api.refreshUsage).toHaveBeenCalledTimes(1);
+    expect(api.refreshWorkspace).not.toHaveBeenCalled();
+  });
+
   it('shows the lines the invoice will carry, largest service first, and the deletes called out', () => {
     const { component } = page();
     expect(component.lines().map(l => l.meter)).toContain('storage.bytes.deleted');
