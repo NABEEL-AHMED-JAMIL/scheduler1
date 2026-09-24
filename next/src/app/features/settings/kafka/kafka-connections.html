@@ -122,7 +122,7 @@
                 <span [class]="'pill env-pill pill-' + e.tone" [title]="e.hint"><span class="env-pill-k">env</span>{{ e.label }}</span>
               }
               @if (p.isDefault) {
-                <span class="pill pill-brand" [title]="defaultHint(p)"><app-icon name="check" size="0.85em" />default</span>
+                <span class="pill pill-brand" [title]="defaultHint(p)"><app-icon name="check" size="0.85em" />Default</span>
               }
               @if (canSeeWorkspace()) {
                 <span class="pill pill-neutral" [title]="workspaceHint(p)">
@@ -217,7 +217,7 @@
                 <dd class="space-y-1">
                   <div>Hostname check
                     <span class="pill" [class]="'pill ' + (p.sslEndpointIdentificationAlgorithm ? 'pill-ok' : 'pill-warn')">
-                      {{ p.sslEndpointIdentificationAlgorithm ? 'on' : 'off' }}
+                      {{ p.sslEndpointIdentificationAlgorithm ? 'On' : 'Off' }}
                     </span>
                   </div>
                   @if (p.sslTruststoreLocation) {
@@ -233,7 +233,7 @@
               }
               @if (p.saslPasswordConfigured) {
                 <dt>SASL password</dt>
-                <dd><span class="pill pill-ok">stored</span></dd>
+                <dd><span class="pill pill-ok">Stored</span></dd>
               }
               @if (p.additionalProperties?.trim()) {
                 <dt>Extra properties</dt>

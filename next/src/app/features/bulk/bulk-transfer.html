@@ -12,7 +12,7 @@
   </div>
 
   <div class="grid gap-4 lg:grid-cols-2 items-start">
-    <div class="card p-5">
+    <div class="card p-4">
       <h2 class="text-sm font-semibold flex items-center gap-2">
         <app-icon name="upload" class="icon-info" />Import
       </h2>
@@ -52,7 +52,7 @@
       </div>
 
       @if (result(); as r) {
-        <div class="card flex items-start gap-2 px-3 py-2.5 text-sm mt-4"
+        <div class="card flex items-start gap-2 px-4 py-2.5 text-sm mt-4"
              [style.border-color]="r.ok ? 'var(--color-ok-500)' : 'var(--color-crit-500)'">
           <app-icon [name]="r.ok ? 'checkCircle' : 'xCircle'"
                     [class]="r.ok ? 'icon-ok' : 'icon-crit'" class="mt-0.5 shrink-0" />
@@ -61,7 +61,7 @@
       }
     </div>
 
-    <div class="card p-5">
+    <div class="card p-4">
       <h2 class="text-sm font-semibold flex items-center gap-2">
         <app-icon name="download" class="icon-info" />Export
       </h2>

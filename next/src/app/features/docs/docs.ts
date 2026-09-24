@@ -492,7 +492,7 @@ export class Docs implements AfterViewInit {
       notes: [
         'Reporting is never in a job’s way: a metering service that is down costs a warning, the batch is kept on the worker and sent with the next run.',
         'Changing the calculation never changes a bill already drafted; a version dated mid-month applies from the next period.',
-        'Your profile and the Dashboard carry the bill in one glance -- this month so far, what is owed and by when -- and Reports › Model calls says what the range’s calls cost.',
+        'Your profile and the Dashboard carry the bill in one glance — this month so far, what is owed and by when — and Reports › Model calls says what the range’s calls cost.',
       ],
     },
   ];

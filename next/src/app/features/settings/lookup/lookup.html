@@ -155,7 +155,7 @@
           <div class="eyebrow">Value</div>
           @if (lookup.encrypted) {
             <span class="pill pill-neutral" title="Stored encrypted — the value is not shown">
-              <app-icon name="lock" size="0.85em" class="icon-warn" />encrypted
+              <app-icon name="lock" size="0.85em" class="icon-warn" />Encrypted
             </span>
           } @else if (lookup.lookupValue) {
             <div class="lookup-value lookup-value-lg">
@@ -247,7 +247,7 @@
                       <td class="max-w-72">
                         @if (child.encrypted) {
                           <span class="pill pill-neutral" title="Stored encrypted — the value is not shown">
-                            <app-icon name="lock" size="0.85em" class="icon-warn" />encrypted
+                            <app-icon name="lock" size="0.85em" class="icon-warn" />Encrypted
                           </span>
                         } @else if (child.lookupValue) {
                           <div class="lookup-value">

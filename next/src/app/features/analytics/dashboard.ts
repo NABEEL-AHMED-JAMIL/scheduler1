@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, computed, inject, input, output, signal } from '@angular/core';
+import { Component, LOCALE_ID, OnDestroy, OnInit, computed, inject, input, output, signal } from '@angular/core';
 import { Dialog } from '@angular/cdk/dialog';
 import { Subscription } from 'rxjs';
 import { API_SUCCESS } from '../../core/api/api.config';
@@ -25,6 +25,7 @@ import {
   SavedQuery, TopN, WidgetVisualization,
 } from './analytics.service';
 import { ToastService } from '../../shared/ui/toast.service';
+import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 
 /**
  * One mark on a chart.
@@ -431,7 +432,7 @@ function nonPositiveNote(marks: Mark[]): string | null {
   // line that broke even, was told to go and look at a different chart. Switching to ranked
   // found the same rows missing and a sentence that still did not apply.
   return `${count} ${count === 1 ? 'figure is' : 'figures are'} zero or below. A bar has no `
-    + 'length to draw for those -- ranked leaves them out, and "bars in order" draws them flat '
+    + 'length to draw for those — ranked leaves them out, and "bars in order" draws them flat '
     + 'against the baseline. They are in the table.';
 }
 
@@ -574,7 +575,7 @@ function issuesFor(marks: Mark[], reason: string, additive: boolean | 'unknown',
      * whose columns were truncated arrives with rows null and says so in its own words.
      */
     pivot: !shape.hasPivot
-      ? 'A cross-tab needs exactly two dimensions -- one for the rows and one for the columns.'
+      ? 'A cross-tab needs exactly two dimensions — one for the rows and one for the columns.'
       : shape.pivotTruncated
         ? 'That second dimension has more values than a grid can carry across the page.'
         : '',
@@ -592,7 +593,7 @@ function issuesFor(marks: Mark[], reason: string, additive: boolean | 'unknown',
      * zero here and there is no axis for a bar running the other way.
      */
     groupedBar: !shape.hasPivot
-      ? 'Bars side by side need exactly two dimensions -- one for the groups, one for the bars.'
+      ? 'Bars side by side need exactly two dimensions — one for the groups, one for the bars.'
       : shape.pivotTruncated
         ? 'That second dimension has more values than a row of bars can carry.'
         : negative
@@ -1082,6 +1083,12 @@ function mintQueryId(widgetId: number): string {
 export class Dashboards implements OnInit, OnDestroy {
 
   private readonly analytics = inject(AnalyticsService);
+  /** Server times, read and written as the rest of the console does. */
+  private readonly serverTime = new ServerTimePipe(inject(LOCALE_ID));
+  /** A time in the given format, or the text as it came when it is not a time at all. */
+  private timeOf(raw: string | Date, format: string): string {
+    try { return this.serverTime.transform(raw, format) ?? String(raw); } catch { return String(raw); }
+  }
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
 
@@ -1443,7 +1450,7 @@ export class Dashboards implements OnInit, OnDestroy {
   /** When the last tile landed, for the head's tile. */
   readonly lastRunText = computed(() => {
     const at = Math.max(0, ...Object.values(this.runs()).map(run => run.view?.ranAt ?? 0));
-    return at ? 'last ran ' + new Date(at).toLocaleTimeString() : '';
+    return at ? 'last ran ' + this.clock(at) : '';
   });
 
   /** A run's state as the shared tile chrome names it; a result with no rows is 'empty'. */
@@ -1879,6 +1886,11 @@ export class Dashboards implements OnInit, OnDestroy {
    * carries around and nothing server-side validates: a height of 4, of 40000, or of "tall"
    * reaches this method exactly as a legitimate one does.
    */
+  /** One figure -- a single row of at most a label and a value -- which can share a row with others. */
+  isFigure(view: WidgetView | null | undefined): boolean {
+    return !!view && view.rowCount === 1 && view.columns.length <= 2 && !view.truncated;
+  }
+
   heightOf(widget: DashboardWidget): number {
     const asked = widgetConfigOf(widget).height;
     if (typeof asked !== 'number' || !Number.isFinite(asked)) return WIDGET_HEIGHT;
@@ -2203,16 +2215,19 @@ export class Dashboards implements OnInit, OnDestroy {
 
 
 
-  /** A timestamp in the reader's locale, or the raw text when it will not parse. */
+  /**
+   * A saved time as the console writes one: "19 Sep 2026, 09:53". The server sends Chicago
+   * wall-clock with no offset, which the serverTime pipe reads as such; a bare Date would have
+   * read it as the viewer's own local time, in the browser's own format.
+   */
   when(raw: string | undefined): string {
     if (!raw) return '';
-    const at = new Date(raw);
-    return isNaN(at.getTime()) ? raw : at.toLocaleString();
+    return this.timeOf(raw, 'd MMM yyyy, HH:mm');
   }
 
   /** The time a tile ran, to the second: a figure with no time against it is a figure on trust. */
   clock(at: number): string {
-    return new Date(at).toLocaleTimeString();
+    return this.timeOf(new Date(at), 'HH:mm:ss');
   }
 }
 

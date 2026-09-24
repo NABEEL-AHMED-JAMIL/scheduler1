@@ -96,7 +96,7 @@
                     <app-icon name="layers" size="0.8em" class="opacity-70" />{{ form.topicName }}
                   </span>
                 } @else {
-                  <span class="pill pill-warn mt-1" title="Assign a topic; a task cannot pick this pipeline until then">no topic</span>
+                  <span class="pill pill-warn mt-1" title="Assign a topic; a task cannot pick this pipeline until then">No topic</span>
                 }
               </div>
               <div class="shrink-0 flex items-center gap-1">
@@ -207,7 +207,7 @@
                      [title]="'Publishes on ' + (form.kafkaTopic || '') + ' — open on Kafka & Topics'">{{ form.topicName }}</a>
                   @if (form.kafkaTopic) { <div class="mono text-xs text-[color:var(--text-muted)]">{{ form.kafkaTopic }}</div> }
                 } @else {
-                  <span class="pill pill-warn" title="Assign a topic; a task cannot pick this pipeline until then">no topic</span>
+                  <span class="pill pill-warn" title="Assign a topic; a task cannot pick this pipeline until then">No topic</span>
                 }
               </td>
               <td>

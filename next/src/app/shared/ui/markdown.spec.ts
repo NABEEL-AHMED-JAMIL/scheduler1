@@ -119,3 +119,13 @@ describe('markdown link safety', () => {
     expect(hrefsIn('<a href="javascript:alert(1)">x</a>')).toEqual([]);
   });
 });
+
+/** MIG-212: a model escapes markdown's own characters ("order\\_id"); the reader sees the character, not the escape. */
+describe('markdown escapes', () => {
+  it('shows an escaped character as itself', () => {
+    const text = (inlines: Inline[]) => inlines.map(i => i.text).join('');
+    expect(text(parseInlines('**order\\_id**: one per order'))).toBe('order_id: one per order');
+    expect(text(parseInlines('not \\*starred\\* at all'))).toBe('not *starred* at all');
+    expect(text(parseInlines('a path C:\\data stays'))).toBe('a path C:\\data stays');
+  });
+});

@@ -20,7 +20,7 @@
 
   <!-- Range. Kept as the app's two native date inputs rather than a new picker component:
        every other screen does it this way, and matching costs nothing. -->
-  <div class="card px-4 py-3">
+  <div class="card p-4">
     <div class="flex flex-wrap items-end gap-3">
       <div>
         <label class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]"
@@ -79,7 +79,7 @@
       </div>
       @if (truncated()) {
         <span class="pill pill-warn mb-1.5">
-          <app-icon name="alert" size="0.85em" />capped
+          <app-icon name="alert" size="0.85em" />Capped
         </span>
         <p class="w-full text-xs text-crit-500 mt-1">
           Only the most recent runs were read. Every figure below describes that sample, not

@@ -404,10 +404,23 @@
   .stat-tile {
     background: var(--surface-raised);
     border-color: var(--border-subtle);
+    container-type: inline-size;
     @apply border rounded-[var(--radius-card)] p-4;
   }
   .stat-label { @apply text-[11px] font-semibold uppercase tracking-wider text-[color:var(--text-muted)]; }
-  .stat-value { @apply mt-1 text-xl font-semibold; font-variant-numeric: tabular-nums; }
+  /* Sized to the tile, not the page: a long figure such as 103,909,527.58 has nowhere to break,
+     and at a phone's width it ran out of its tile. It shrinks with the tile, and wraps last. */
+  .stat-value { @apply mt-1 font-semibold; font-size: clamp(1rem, 15cqi, 1.25rem); line-height: 1.25;
+    overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+  /* A board's single-figure widget: the figure is the answer, so it shrinks to fit and wraps last. */
+  .kpi-card { display: block; container-type: inline-size; }
+  .kpi-figure { font-size: clamp(1rem, 11cqi, 1.875rem); font-weight: 600; line-height: 1.15;
+    overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+  .kpi-figure.is-lg { font-size: clamp(1.5rem, 9cqi, 3rem); }
+  /* The dashboard's larger KPI figures, on the same rule. */
+  .kpi-tile { container-type: inline-size; }
+  .kpi-value { @apply font-semibold; font-size: clamp(1.125rem, 16cqi, 1.5rem); line-height: 1.2;
+    overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
   .stat-foot  { @apply mt-0.5 text-[11px] text-[color:var(--text-muted)]; }
   /* The glyph sits on the sunken surface so it reads as a quiet marker beside the number
      rather than a second thing competing with it for attention. */
@@ -588,6 +601,14 @@
 
   /* Timeline: a rail down the left with a dot per entry, coloured by the line's severity. */
   .log-timeline { @apply relative; }
+  /* A path in a log line: it opens its folder, and wraps only between its names (<wbr> after
+     each slash) -- a long file name is broken only when it cannot fit on a line at all. */
+  .log-message { overflow-wrap: break-word; }
+  .log-path { color: var(--accent-text); overflow-wrap: anywhere; }
+  a.log-path { text-decoration: underline dotted; text-underline-offset: 2px; }
+  a.log-path:hover { text-decoration-style: solid; }
+  /* An AI step's answer, formatted from its markdown and kept to a readable box. */
+  .ai-step-output { max-height: 10rem; }
   .log-tl-item {
     border-color: var(--border-subtle);
     @apply relative flex items-start gap-3 pl-9 pr-4 py-2.5;
@@ -901,7 +922,7 @@
 
   /* A chart card is a summary, not a section: title and note stay small and tight so the
      card is dominated by the data rather than by its own chrome. */
-  .chart-card  { @apply p-3.5; }
+  .chart-card  { @apply p-4; }
   .chart-title { @apply text-xs font-semibold mb-2 leading-none; }
   .chart-sub   { @apply text-[11px] text-[color:var(--text-muted)] -mt-1 mb-2 leading-snug; }
 
@@ -1601,7 +1622,9 @@ html.dark .tenant-code.is-copied { background: color-mix(in oklab, var(--color-o
 
 /* Lookups: master-detail. The rail lists lookups; the pane shows one -- its value, then its
    entries. Below md the two stack, the rail first, since a phone cannot hold both. */
-.lookup-split { display: grid; grid-template-columns: minmax(240px, 300px) minmax(0, 1fr); overflow: hidden; }
+/* clip, not hidden: overflow: hidden makes the card the sticky rail's scroll container, so the
+   rail stuck 57px (the header's height) down inside its own card -- a gap above its search box. */
+.lookup-split { display: grid; grid-template-columns: minmax(240px, 300px) minmax(0, 1fr); overflow: clip; }
 /* The rail keeps to the viewport and sticks under the header while the pane scrolls with the
    page: a long invoice never leaves its list behind, and the list uses the height there is
    instead of a fixed 30rem that cut a fifth of a tall screen. Sticky needs the rail not to
@@ -1757,8 +1780,10 @@ html.dark .btn-circle-danger:hover:not(:disabled) { background: color-mix(in okl
 @keyframes side-panel-in { from { transform: translateX(1.5rem); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .side-panel { animation: none; } }
 .side-panel-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
-.side-panel-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.25rem 0.75rem; align-items: center; padding: 0.55rem 0; border-bottom: 1px solid var(--border-subtle); }
-.side-panel-list li:last-child { border-bottom: 0; }
+.side-panel-list > li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.25rem 0.75rem; align-items: center; padding: 0.55rem 0; border-bottom: 1px solid var(--border-subtle); }
+.side-panel-list > li:last-child { border-bottom: 0; }
+/* On a phone a row's side column goes under it: beside it, an AI step's answer had a 120px column. */
+@media (max-width: 640px) { .side-panel-list > li { grid-template-columns: minmax(0, 1fr); } }
 
 /* Model connection budget: a thin bar of today's spend against the daily cap. */
 .ai-budget { display: inline-block; width: 6rem; height: 0.4rem; border-radius: 999px; background: var(--surface-sunken); overflow: hidden; vertical-align: middle; }
@@ -1770,6 +1795,8 @@ html.dark .btn-circle-danger:hover:not(:disabled) { background: color-mix(in okl
 @media (max-width: 1100px) { .prompt-editor { grid-template-columns: 1fr; } }
 .prompt-try { position: sticky; top: 1rem; }
 .prompt-out { background: var(--surface-inset); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 0.7rem 0.85rem; font-family: var(--font-mono, ui-monospace, monospace); font-size: 12px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; max-height: 24rem; overflow: auto; margin: 0; }
+/* An AI step's answer as the model wrote it: prose, so it reads in the text face, not code's. */
+.prompt-out.ai-step-md { white-space: normal; font-family: inherit; font-size: 12.5px; line-height: 1.55; }
 .prompt-vars td { padding-top: 0.35rem; padding-bottom: 0.35rem; }
 .prompt-vars .input { padding-top: 0.3rem; padding-bottom: 0.3rem; }
 
@@ -1834,6 +1861,10 @@ html.dark .btn-circle-danger:hover:not(:disabled) { background: color-mix(in okl
 @media (min-width: 1536px) { .widget-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 /* A board: one widget per row at every width, so a table or a wide chart has the whole pane. */
 .widget-grid-rows, .widget-grid-rows.widget-grid { grid-template-columns: minmax(0, 1fr); }
+/* A board: single figures flow in cells that fit the width; a table or a chart keeps the whole row. */
+.widget-grid.widget-board { grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr)); }
+@media (min-width: 1536px) { .widget-grid.widget-board { grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); } }
+.widget-board > .widget-wide { grid-column: 1 / -1; }
 .widget-foot { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; min-width: 0; padding-top: 0.25rem; border-top: 1px solid var(--border-subtle); }
 .widget-foot:empty { display: none; }
 .widget-kind { width: auto; max-width: 14rem; }

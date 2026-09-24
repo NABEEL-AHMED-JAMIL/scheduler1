@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, LOCALE_ID, OnInit, computed, inject, signal } from '@angular/core';
 import { Dialog } from '@angular/cdk/dialog';
 import { forkJoin, of } from 'rxjs';
 import { API_SUCCESS } from '../../core/api/api.config';
@@ -34,6 +34,7 @@ import {
   SavedQuery, WriteBackResult,
 } from './analytics.service';
 import { ToastService } from '../../shared/ui/toast.service';
+import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 
 /**
  * The tabs a dataset is read through -- document 02's ten.
@@ -598,6 +599,12 @@ const DATE_ONLY_TYPE = /^DATE$/i;
 export class Analytics implements OnInit {
 
   private readonly storage = inject(StorageService);
+  /** Server times, read and written as the rest of the console does. */
+  private readonly serverTime = new ServerTimePipe(inject(LOCALE_ID));
+  /** A time in the given format, or the text as it came when it is not a time at all. */
+  private timeOf(raw: string | Date, format: string): string {
+    try { return this.serverTime.transform(raw, format) ?? String(raw); } catch { return String(raw); }
+  }
   private readonly analytics = inject(AnalyticsService);
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
@@ -2019,8 +2026,7 @@ export class Analytics implements OnInit {
   modifiedAt(): string {
     const raw = this.selected()?.lastModified;
     if (!raw) return '';
-    const at = new Date(raw);
-    return isNaN(at.getTime()) ? raw : at.toLocaleString();
+    return this.timeOf(raw, 'd MMM yyyy, HH:mm');
   }
 
   /**
@@ -3092,12 +3098,11 @@ export class Analytics implements OnInit {
     return rows === null || rows === undefined ? '' : rows.toLocaleString();
   }
 
-  /** A run's timestamp in the reader's locale, falling back to the raw text if it will not parse. */
+  /** A run's time as the console writes one (server time), or the raw text if it will not parse. */
   runWhen(run: QueryRun): string {
     const raw = run.dateCreated;
     if (!raw) return '';
-    const at = new Date(raw);
-    return isNaN(at.getTime()) ? raw : at.toLocaleString();
+    return this.timeOf(raw, 'd MMM yyyy, HH:mm');
   }
 
   /**
@@ -4995,11 +5000,10 @@ export class Analytics implements OnInit {
     });
   }
 
-  /** A saved analysis's timestamp in the reader's locale, or the raw text if it will not parse. */
+  /** A saved analysis's time as the console writes one (server time), or the raw text if it will not parse. */
   analysisWhen(saved: SavedAnalysis): string {
     const raw = saved.dateUpdated || saved.dateCreated;
     if (!raw) return '';
-    const at = new Date(raw);
-    return isNaN(at.getTime()) ? raw : at.toLocaleString();
+    return this.timeOf(raw, 'd MMM yyyy, HH:mm');
   }
 }

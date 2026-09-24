@@ -204,7 +204,7 @@ export function validateSelectChoices(rows: PipelineField[]): string | null {
   template: `
     <app-form-dialog
         [heading]="isEdit() ? 'Edit pipeline' : 'New pipeline'"
-        subtitle="A pipeline is its id, the topic it publishes on, and the fields a task on it fills in -- creating one here is what makes it choosable on Source Task, in place of a hand-written XML tag."
+        subtitle="A pipeline is its id, the topic it publishes on, and the fields a task on it fills in — creating one here is what makes it choosable on Source Task, in place of a hand-written XML tag."
         [confirmLabel]="isEdit() ? 'Save changes' : 'Create pipeline'"
         [saving]="saving()" size="xwide"
         (cancelled)="ref.close(false)" (confirmed)="save()">

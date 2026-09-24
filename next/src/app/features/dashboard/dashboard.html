@@ -34,12 +34,12 @@
       { label: 'Failed',       value: failed(),     tone: 'crit' },
       { label: 'Unread',       value: unread(),     tone: 'warn', link: '/notifications' }
     ]; track tile.label) {
-      <a class="card p-4 block hover:shadow-md transition-shadow"
+      <a class="card p-4 block kpi-tile hover:shadow-md transition-shadow"
          [routerLink]="tile.link || null" [class.cursor-default]="!tile.link">
         <div class="text-[11px] font-semibold uppercase tracking-wider text-[color:var(--text-muted)]">
           {{ tile.label }}
         </div>
-        <div class="mt-1.5 text-2xl font-semibold tabular"
+        <div class="mt-1.5 kpi-value"
              [class.text-ok-500]="tile.tone === 'ok'"
              [class.text-crit-500]="tile.tone === 'crit'"
              [class.text-warn-500]="tile.tone === 'warn'">{{ tile.value }}</div>

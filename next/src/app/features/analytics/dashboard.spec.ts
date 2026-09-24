@@ -2171,3 +2171,57 @@ describe('a refused delete leaves the list alone', () => {
     expect(toasts()).toContain('Only its owner can remove this dataset.');
   });
 });
+
+/**
+ * MIG-212: a board's dates read the way the rest of the console writes them. They were
+ * "9/19/2026, 9:53:50 AM" -- the browser's own format, with the server's Chicago wall-clock
+ * read as the viewer's local time.
+ */
+describe('the dates a board shows', () => {
+  it('writes a saved time as server time in the console\'s format, and a run\'s clock to the second', () => {
+    const { board } = boardWith();
+    expect(board.when('2026-09-19 09:53:50')).toMatch(/^19 Sep 2026, \d{2}:53$/);
+    expect(board.when(undefined)).toBe('');
+    expect(board.clock(new Date(2026, 8, 23, 22, 59, 1).getTime())).toBe('22:59:01');
+  });
+});
+
+/**
+ * MIG-212: a board used the whole width for every widget, so six single figures took six full
+ * rows. A figure now takes one cell of a grid that fits the width; a table or a chart keeps the row.
+ */
+describe('how a board lays out its widgets', () => {
+  const view = (rowCount: number, columns: string[], truncated = false) => ({ rowCount, columns, truncated }) as never;
+
+  it('lets a single figure share the row, and gives anything larger the whole row', () => {
+    const { board } = boardWith();
+    expect(board.isFigure(view(1, ['amount_sum']))).toBe(true);
+    expect(board.isFigure(view(1, ['region', 'amount_sum']))).toBe(true);
+    expect(board.isFigure(view(4, ['region', 'amount_sum']))).toBe(false);
+    expect(board.isFigure(view(1, ['a', 'b', 'c']))).toBe(false);
+    expect(board.isFigure(view(1, ['amount_sum'], true))).toBe(false);
+    expect(board.isFigure(undefined)).toBe(false);
+  });
+});
+
+/**
+ * MIG-212: ranked bars were capped at 768px in a board row, so "Top 10 customers" left a third
+ * of its card empty on the right. Bars read at any width, with their values at the far edge; a
+ * ring, a comparison or a summary keeps its cap, where the width only strands its legend.
+ */
+describe('how wide a chart draws in a board row', () => {
+  it('gives ranked bars the whole row and keeps the compact kinds capped', () => {
+    TestBed.resetTestingModule();
+    const fixture = TestBed.createComponent(WidgetChart);
+    fixture.componentRef.setInput('layout', 'row');
+    fixture.componentRef.setInput('view', { issues: {} } as never);
+    for (const kind of ['ranked', 'rankedShare', 'bar', 'table']) {
+      fixture.componentRef.setInput('kind', kind);
+      expect(fixture.componentInstance.shell(), kind).toBe('min-w-0');
+    }
+    for (const kind of ['donut', 'comparison', 'dimensionSummary']) {
+      fixture.componentRef.setInput('kind', kind);
+      expect(fixture.componentInstance.shell(), kind).toContain('max-w-3xl');
+    }
+  });
+});

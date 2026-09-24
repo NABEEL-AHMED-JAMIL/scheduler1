@@ -19,6 +19,7 @@ import { readableCell } from './number-format';
 @Component({
   selector: 'app-kpi-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'kpi-card' },
   template: `
     <div class="flex flex-col justify-center gap-1 px-1 min-w-0"
          [class.py-4]="size() === 'md'" [class.py-8]="size() === 'lg'"
@@ -27,8 +28,9 @@ import { readableCell } from './number-format';
             [title]="label()">{{ label() }}</span>
       <!-- title carries the raw value: the displayed figure is grouped and may be rounded to two
            places, and the unrounded one has to stay reachable for anybody checking a total. -->
-      <span class="font-semibold tabular leading-tight truncate max-w-full"
-            [class.text-3xl]="size() === 'md'" [class.text-5xl]="size() === 'lg'"
+      <!-- Sized to the card and never truncated: in a board cell "103,909,527.58" was cut to
+           "103,90…", which is exactly the shortening this card exists not to do. -->
+      <span class="kpi-figure max-w-full" [class.is-lg]="size() === 'lg'"
             [title]="value()">{{ shown() }}</span>
       @if (caption()) {
         <span class="text-xs text-[color:var(--text-muted)] truncate">{{ caption() }}</span>

@@ -84,7 +84,7 @@
             @if (p.description) { <p class="text-xs text-[color:var(--text-secondary)] line-clamp-2">{{ p.description }}</p> }
             <div class="flex flex-wrap items-center gap-1">
               @for (v of p.variables; track v.name) { <span class="pill pill-neutral mono" [title]="v.type + (v.required ? ' · required' : '')">{{ '{{' }}{{ v.name }}{{ '}}' }}</span> }
-              <span class="pill" [class]="'pill ' + (p.outputMode === 'json' ? 'pill-brand' : 'pill-neutral')">{{ p.outputMode === 'json' ? 'JSON' : 'text' }}</span>
+              <span class="pill" [class]="'pill ' + (p.outputMode === 'json' ? 'pill-brand' : 'pill-neutral')">{{ p.outputMode === 'json' ? 'JSON' : 'Text' }}</span>
             </div>
             <dl class="text-xs grid gap-1">
               <div class="flex gap-2"><dt class="text-[color:var(--text-muted)] shrink-0 w-20">Used by</dt><dd>{{ p.pipelineCount ? p.pipelineCount + ' pipeline' + (p.pipelineCount === 1 ? '' : 's') : 'no pipeline yet' }}</dd></div>
@@ -130,7 +130,7 @@
                   @if (!p.variables.length) { <span class="text-xs text-[color:var(--text-muted)]">none</span> }
                 </div>
               </td>
-              <td><span class="pill" [class]="'pill ' + (p.outputMode === 'json' ? 'pill-brand' : 'pill-neutral')">{{ p.outputMode === 'json' ? 'JSON' : 'text' }}</span></td>
+              <td><span class="pill" [class]="'pill ' + (p.outputMode === 'json' ? 'pill-brand' : 'pill-neutral')">{{ p.outputMode === 'json' ? 'JSON' : 'Text' }}</span></td>
               <td class="text-xs whitespace-nowrap">
                 @if (p.pipelineCount) { {{ p.pipelineCount }} pipeline{{ p.pipelineCount === 1 ? '' : 's' }} } @else { <span class="text-[color:var(--text-muted)]">—</span> }
               </td>

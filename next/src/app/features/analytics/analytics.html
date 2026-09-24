@@ -14,7 +14,7 @@
   <div class="grid gap-3 lg:grid-cols-[260px_minmax(0,1fr)]">
 
     <!-- ── the storage rail ─────────────────────────────────────────────────────────── -->
-    <div class="card p-3 flex flex-col gap-2 min-w-0 self-start">
+    <div class="card p-4 flex flex-col gap-2 min-w-0 self-start">
       <div>
         <label class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]"
                for="a-conn">Connection</label>
@@ -174,7 +174,7 @@
             <h2 class="text-base font-semibold truncate max-w-full"
                 [title]="path()">{{ datasetName() }}</h2>
             @if (format()) { <span class="pill pill-neutral">{{ format() }}</span> }
-            @if (multiFile()) { <span class="pill pill-brand">folder dataset</span> }
+            @if (multiFile()) { <span class="pill pill-brand">Folder dataset</span> }
             <span class="mono text-xs text-[color:var(--text-muted)] truncate">
               {{ connection() }}/{{ path() }}
             </span>
@@ -344,7 +344,7 @@
                  inherited narrowing is stated, in the Canvas's own chip wording, with the switch
                  that removes it right beside the sentence. -->
             @if (inheritedDataFilterCount()) {
-              <div class="card p-3 flex flex-wrap items-center gap-2 min-w-0" role="status">
+              <div class="card p-4 flex flex-wrap items-center gap-2 min-w-0" role="status">
                 <span class="text-xs text-[color:var(--text-muted)]">Narrowed by the Canvas</span>
                 @for (chip of filterChips(); track chip.key) {
                   <span class="pill"
@@ -948,7 +948,7 @@
                   </label>
                 }
                 @if (topNActive() && !topNOther()) {
-                  <span class="pill pill-warn">the tail will be missing, not summarised</span>
+                  <span class="pill pill-warn">The tail will be missing, not summarised</span>
                 }
               </div>
 
@@ -1009,7 +1009,7 @@
 
             <!-- ── where the reader is: crumbs, then chips ──────────────────────────────── -->
             @if (crumbTrail().length > 1 || crumbsMissing()) {
-              <div class="card p-3 flex flex-col gap-2 min-w-0">
+              <div class="card p-4 flex flex-col gap-2 min-w-0">
                 @if (crumbTrail().length) {
                   <!-- The SERVER's trail, rendered and not reconstructed. Every response carries
                        it precisely so this screen never has to work out where it is from a stack
@@ -1102,7 +1102,7 @@
                          twenty-five rows on screen labelled "every group that matched", which is
                          a partial answer presented as the complete one. -->
                     @if (analysisTruncated()) {
-                      <span class="pill pill-warn">stopped at the limit — there may be more</span>
+                      <span class="pill pill-warn">Stopped at the limit — there may be more</span>
                     } @else if (analysedTopN()) {
                       <span class="text-[color:var(--text-muted)]">
                         the top {{ analysedTopN()!.limit }}{{ otherBucket() ? ', plus the rolled-up rest' : '' }}
@@ -1208,7 +1208,7 @@
                     @if (analysisTruncated()) {
                       <!-- On the figure's own title. This is the line that travels with the
                            picture when somebody screenshots it. -->
-                      <span class="pill pill-warn">partial — part of the answer</span>
+                      <span class="pill pill-warn">Partial — part of the answer</span>
                     }
                     @if (otherBucket()) {
                       <span class="pill pill-neutral">
@@ -1217,10 +1217,10 @@
                       </span>
                     }
                     @if (distinctExactness() === 'unstated') {
-                      <span class="pill pill-warn">exactness not stated</span>
+                      <span class="pill pill-warn">Exactness not stated</span>
                     }
                     @if (distinctExactness() === 'estimated') {
-                      <span class="pill pill-warn">estimated, not counted</span>
+                      <span class="pill pill-warn">Estimated, not counted</span>
                     }
                   </div>
 
@@ -1445,7 +1445,7 @@
             <!-- ── saved analyses ───────────────────────────────────────────────────────── -->
             <div class="grid gap-3 sm:grid-cols-2">
 
-              <div class="card p-3 flex flex-col gap-2 min-w-0">
+              <div class="card p-4 flex flex-col gap-2 min-w-0">
                 <h3 class="text-xs uppercase tracking-wider text-[color:var(--text-muted)]">
                   Save this analysis
                 </h3>
@@ -1490,7 +1490,7 @@
                 }
               </div>
 
-              <div class="card p-3 flex flex-col gap-2 min-w-0">
+              <div class="card p-4 flex flex-col gap-2 min-w-0">
                 <div class="flex items-baseline justify-between gap-2">
                   <h3 class="text-xs uppercase tracking-wider text-[color:var(--text-muted)]">
                     Saved analyses
@@ -1770,7 +1770,7 @@
                          takes away, and a caveat further down the page is read after it has
                          already been believed. -->
                     @if (truncated()) {
-                      <span class="pill pill-warn">stopped at the limit — there may be more</span>
+                      <span class="pill pill-warn">Stopped at the limit — there may be more</span>
                     } @else {
                       <span class="text-[color:var(--text-muted)]">
                         everything the query matched
@@ -1895,7 +1895,7 @@
                  subject than the statements one person chose to keep. -->
             <div class="grid gap-3">
 
-              <div class="card p-3 flex flex-col gap-2 min-w-0">
+              <div class="card p-4 flex flex-col gap-2 min-w-0">
                 <div class="flex items-baseline justify-between gap-2">
                   <h3 class="text-xs uppercase tracking-wider text-[color:var(--text-muted)]
                              font-semibold">Saved queries</h3>
@@ -2096,10 +2096,10 @@
                 @if (truncated()) {
                   <!-- On the chart's own title, not only in the strip above it. This is the
                        line that travels with the picture when somebody screenshots it. -->
-                  <span class="pill pill-warn">partial — part of the answer</span>
+                  <span class="pill pill-warn">Partial — part of the answer</span>
                 }
                 @if (chartStale()) {
-                  <span class="pill pill-warn">of the previous statement</span>
+                  <span class="pill pill-warn">From the previous statement</span>
                 }
               </div>
 
@@ -2140,7 +2140,7 @@
         }
 
         @if (tab() === 'activity') {
-          <div class="card p-3 flex flex-col gap-2 min-w-0">
+          <div class="card p-4 flex flex-col gap-2 min-w-0">
             <div class="flex items-baseline justify-between gap-2 flex-wrap">
               <h3 class="text-sm font-semibold">Run history</h3>
               <span class="text-xs text-[color:var(--text-muted)]">

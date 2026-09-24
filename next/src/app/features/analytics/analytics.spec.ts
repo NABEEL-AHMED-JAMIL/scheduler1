@@ -1464,7 +1464,7 @@ describe('a truncated result is a partial answer and has to read as one', () => 
     const text = console.show();
 
     expect(console.studio.truncated()).toBe(true);
-    expect(text).toContain('stopped at the limit — there may be more');
+    expect(text).toContain('Stopped at the limit — there may be more');
     expect(text).toContain('This is part of the answer, not all of it.');
     expect(text).not.toContain('everything the query matched');
   });
@@ -2122,7 +2122,7 @@ describe('a truncated result makes a wrong chart, and has to say so ON it', () =
     const text = console.show();
 
     expect(console.studio.chartDrawn()).toBe(true);
-    expect(text).toContain('partial — part of the answer');
+    expect(text).toContain('Partial — part of the answer');
     expect(text).toContain('This chart is drawn from part of the answer.');
     // And it does not guess at what is missing, because nothing here knows. The wording is the
     // chart's own -- the result table above says the same thing about its rows, and asserting a
@@ -2136,14 +2136,14 @@ describe('a truncated result makes a wrong chart, and has to say so ON it', () =
 
     for (const kind of ['bar', 'ranked', 'donut'] as const) {
       console.studio.chartKindName.set(kind);
-      expect(console.show(), kind).toContain('partial — part of the answer');
+      expect(console.show(), kind).toContain('Partial — part of the answer');
     }
   });
 
   it('says nothing of the sort about a complete result, so the mark means something', () => {
     const console = charted(pairsOf([['north', '10'], ['south', '20'], ['east', '30']]));
 
-    expect(console.show()).not.toContain('partial — part of the answer');
+    expect(console.show()).not.toContain('Partial — part of the answer');
     expect(console.show()).not.toContain('This chart is drawn from part of the answer.');
   });
 });
@@ -3100,8 +3100,8 @@ describe('a partial answer says so on the figure, not in a footnote', () => {
     canvas.ran(analysisOf({ truncated: true }));
     const text = canvas.show();
 
-    expect(text).toContain('stopped at the limit — there may be more');
-    expect(text).toContain('partial — part of the answer');
+    expect(text).toContain('Stopped at the limit — there may be more');
+    expect(text).toContain('Partial — part of the answer');
     expect(text).toContain('This is part of the answer.');
   });
 
@@ -3112,7 +3112,7 @@ describe('a partial answer says so on the figure, not in a footnote', () => {
     const text = canvas.show();
 
     expect(text).toContain('every group that matched');
-    expect(text).not.toContain('partial — part of the answer');
+    expect(text).not.toContain('Partial — part of the answer');
   });
 
   it('shows the Other bucket rather than implying it', () => {
@@ -3170,7 +3170,7 @@ describe('a partial answer says so on the figure, not in a footnote', () => {
     canvas.studio.setTopN(10);
     canvas.studio.topNOther.set(false);
 
-    expect(canvas.show()).toContain('the tail will be missing, not summarised');
+    expect(canvas.show()).toContain('The tail will be missing, not summarised');
   });
 
   it('says that rows a filter excluded are excluded, not zero', () => {
@@ -3259,7 +3259,7 @@ describe('a distinct count is labelled as whatever it actually is', () => {
     const canvas = counted('region_approx_distinct');
 
     expect(canvas.studio.distinctExactness()).toBe('estimated');
-    expect(canvas.show()).toContain('estimated, not counted');
+    expect(canvas.show()).toContain('Estimated, not counted');
     expect(canvas.show()).toContain('3.7% low');
   });
 
@@ -3267,7 +3267,7 @@ describe('a distinct count is labelled as whatever it actually is', () => {
     const canvas = counted('regions');
 
     expect(canvas.studio.distinctExactness()).toBe('unstated');
-    expect(canvas.show()).toContain('exactness not stated');
+    expect(canvas.show()).toContain('Exactness not stated');
     expect(canvas.show()).toContain('does not say whether this distinct count is exact');
   });
 
@@ -3276,7 +3276,7 @@ describe('a distinct count is labelled as whatever it actually is', () => {
     canvas.ran();
 
     expect(canvas.studio.distinctExactness()).toBe('');
-    expect(canvas.show()).not.toContain('exactness not stated');
+    expect(canvas.show()).not.toContain('Exactness not stated');
   });
 
   it('hedges the median on the picker, before anything has been run', () => {
@@ -4135,7 +4135,7 @@ describe('Charts is a tab, and the drift the old layout prevented is now said ou
 
     expect(console.studio.chartStale()).toBe(true);
     expect(text).toContain('This is a chart of the previous answer');
-    expect(text).toContain('of the previous statement');
+    expect(text).toContain('From the previous statement');
   });
 
   it('shows the statement that actually ran, rather than asserting one has changed', () => {
@@ -4166,7 +4166,7 @@ describe('Charts is a tab, and the drift the old layout prevented is now said ou
     const text = console.show();
 
     expect(text).toContain('This chart is drawn from part of the answer');
-    expect(text).toContain('partial — part of the answer');
+    expect(text).toContain('Partial — part of the answer');
   });
 });
 
@@ -5410,5 +5410,15 @@ describe('a refused change to one saved item leaves the list alone', () => {
 
     expect(canvas.studio.analysesError()).toBe('');
     expect(toasts()).toContain('Only its owner can delete this analysis.');
+  });
+});
+
+/** MIG-212: the Studio's dates read as the console writes them, not in the browser's own format. */
+describe('the dates the Studio shows', () => {
+  it('writes a run\'s and a saved analysis\'s time as server time in the console\'s format', () => {
+    const { studio } = studioWith();
+    expect(studio.runWhen({ dateCreated: '2026-09-19 09:53:50' } as any)).toMatch(/^19 Sep 2026, \d{2}:53$/);
+    expect(studio.analysisWhen({ dateUpdated: '2026-09-19 09:53:50' } as any)).toMatch(/^19 Sep 2026, \d{2}:53$/);
+    expect(studio.runWhen({ dateCreated: 'not a date' } as any)).toBe('not a date');
   });
 });

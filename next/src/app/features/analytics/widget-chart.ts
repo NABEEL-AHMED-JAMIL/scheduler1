@@ -119,7 +119,7 @@ export class WidgetChart {
   readonly layout = input<'tile' | 'row'>('tile');
 
   /** The kinds that read best at a bounded width, however wide the row is. */
-  private static readonly COMPACT: ReadonlySet<string> = new Set(['kpi', 'donut', 'ranked', 'rankedShare', 'comparison', 'dimensionSummary', 'trendSummary', 'distributionSummary']);
+  private static readonly COMPACT: ReadonlySet<string> = new Set(['kpi', 'donut', 'comparison', 'dimensionSummary', 'trendSummary', 'distributionSummary']);
 
   /** The wrapper's classes for the layout: a cap on compact kinds in a row, nothing otherwise. */
   readonly shell = computed(() => {

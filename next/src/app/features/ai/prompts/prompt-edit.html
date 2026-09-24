@@ -35,7 +35,7 @@
   } @else {
     <div class="prompt-editor">
       <!-- ── Definition ─────────────────────────────────────────────────────────────── -->
-      <form [formGroup]="form" class="card p-5 form-stack min-w-0" (ngSubmit)="save(true)">
+      <form [formGroup]="form" class="card p-4 form-stack min-w-0" (ngSubmit)="save(true)">
         <div class="form-grid">
           <app-field label="Name" for="pName" [required]="true" [control]="form.get('name')" [submitted]="submitted()">
             <input id="pName" class="input" formControlName="name" placeholder="Summarise claim file" />
@@ -165,7 +165,7 @@
       </form>
 
       <!-- ── Try it ─────────────────────────────────────────────────────────────────── -->
-      <aside class="card p-5 prompt-try min-w-0">
+      <aside class="card p-4 prompt-try min-w-0">
         <div class="flex items-center gap-2 flex-wrap">
           <h2 class="section-title">Try it</h2>
           <span class="text-xs text-[color:var(--text-muted)]">runs the page as it is, with the samples · recorded as a try</span>
@@ -193,7 +193,7 @@
         @if (lastRun(); as run) {
           <div class="mt-4">
             <div class="flex items-center gap-2 flex-wrap text-xs">
-              <span class="pill" [class]="'pill ' + (run.status === 'ok' ? 'pill-ok' : 'pill-crit')">{{ run.status === 'ok' ? 'answered' : 'failed' }}</span>
+              <span class="pill" [class]="'pill ' + (run.status === 'ok' ? 'pill-ok' : 'pill-crit')">{{ run.status === 'ok' ? 'Answered' : 'Failed' }}</span>
               @if (run.latencyMs != null) { <span>{{ (run.latencyMs / 1000) | number: '1.1-1' }} s</span> }
               @if (run.tokensIn != null) { <span class="text-[color:var(--text-muted)]">{{ run.tokensIn | number }} in · {{ run.tokensOut | number }} out</span> }
               @if ((run.attempts ?? 1) > 1) { <span class="text-[color:var(--text-muted)]">{{ run.attempts }} attempts</span> }

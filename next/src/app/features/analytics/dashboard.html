@@ -69,7 +69,7 @@
                 <span class="lookup-rail-glyph is-list"><app-icon name="chart" size="0.9em" /></span>
                 <span class="min-w-0 flex-1">
                   <span class="lookup-rail-key">{{ item.dashboardName }}</span>
-                  <span class="lookup-rail-sub">{{ item.dashboardDescription || 'no description' }}@if (item.dateUpdated || item.dateCreated) { · {{ when(item.dateUpdated || item.dateCreated) }} }</span>
+                  <span class="lookup-rail-sub">{{ item.dashboardDescription || 'No description' }}@if (item.dateUpdated || item.dateCreated) { · {{ when(item.dateUpdated || item.dateCreated) }} }</span>
                 </span>
                 <app-icon name="chevronRight" size="0.9em" class="lookup-rail-chev" />
               </button>
@@ -227,10 +227,11 @@
               <button type="button" class="btn btn-primary btn-sm mt-2" (click)="openAdd()"><app-icon name="plus" />Add a widget</button>
             </div>
           } @else {
-            <div class="widget-grid widget-grid-rows">
+            <!-- A single figure takes one cell; a table or a chart keeps the whole row. -->
+            <div class="widget-grid widget-board">
               @for (widget of widgets(); track widget.analyticsDashboardWidgetId) {
                 @let run = runs()[widget.analyticsDashboardWidgetId!];
-                <app-analytics-widget [title]="widget.widgetTitle" [subtitle]="sourceOf(widget)" [state]="stateOf(run)" [error]="run?.error || ''" (refresh)="runOne(widget)">
+                <app-analytics-widget [class.widget-wide]="!isFigure(run?.view)" [title]="widget.widgetTitle" [subtitle]="sourceOf(widget)" [state]="stateOf(run)" [error]="run?.error || ''" (refresh)="runOne(widget)">
                   <ng-container actions>
                     <button type="button" class="btn btn-ghost btn-icon btn-xs" [cdkMenuTriggerFor]="tileMenu" [attr.aria-label]="'Actions for ' + widget.widgetTitle"><app-icon name="dots" size="1em" /></button>
                     <ng-template #tileMenu>

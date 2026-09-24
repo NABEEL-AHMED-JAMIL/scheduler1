@@ -185,27 +185,32 @@ export function parseMarkdown(source: string): Block[] {
   }
 
   /** Inline code first: its contents must not then be read as bold or italic markers. */
-export function parseInlines(text: string): Inline[] {
+export function parseInlines(source: string): Inline[] {
+    // A backslash-escaped markdown character ("order\_id") is that character, not a marker.
+    // It is held as a private-use character while the markers are read, then given back: bare
+    // in text, with its backslash inside code, where markdown reads no escapes.
+    const text = source.replace(/\\([\\`*_{}[\]()#+\-.!|>~])/g, (_, c: string) => String.fromCharCode(0xE000 + c.charCodeAt(0)));
+    const back = (s: string, code = false) => s.replace(/[\uE000-\uE0FF]/g, ch => (code ? '\\' : '') + String.fromCharCode(ch.charCodeAt(0) - 0xE000));
     const spans: Inline[] = [];
     const pattern = /(`[^`]+`)|(\*\*[^*]+\*\*)|(__[^_]+__)|(\*[^*\n]+\*)|(\[[^\]]+\]\((https?:\/\/[^)\s]+)\))/g;
     let last = 0;
     let match: RegExpExecArray | null;
 
     while ((match = pattern.exec(text)) !== null) {
-      if (match.index > last) spans.push({ text: text.slice(last, match.index) });
+      if (match.index > last) spans.push({ text: back(text.slice(last, match.index)) });
       const token = match[0];
       if (token.startsWith('`')) {
-        spans.push({ text: token.slice(1, -1), code: true });
+        spans.push({ text: back(token.slice(1, -1), true), code: true });
       } else if (token.startsWith('**') || token.startsWith('__')) {
-        spans.push({ text: token.slice(2, -2), bold: true });
+        spans.push({ text: back(token.slice(2, -2)), bold: true });
       } else if (token.startsWith('[')) {
         const link = /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/.exec(token);
-        if (link) spans.push({ text: link[1], href: link[2] });
+        if (link) spans.push({ text: back(link[1]), href: back(link[2]) });
       } else {
-        spans.push({ text: token.slice(1, -1), italic: true });
+        spans.push({ text: back(token.slice(1, -1)), italic: true });
       }
       last = pattern.lastIndex;
     }
-    if (last < text.length) spans.push({ text: text.slice(last) });
-    return spans.length ? spans : [{ text }];
+    if (last < text.length) spans.push({ text: back(text.slice(last)) });
+    return spans.length ? spans : [{ text: back(text) }];
   }

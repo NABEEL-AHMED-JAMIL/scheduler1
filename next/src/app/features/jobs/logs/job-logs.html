@@ -80,11 +80,15 @@
               @for (s of aiSteps(); track s.run.runId) {
                 <li>
                   <div class="min-w-0">
-                    <span class="pill" [class]="'pill ' + (s.run.status === 'ok' ? 'pill-ok' : 'pill-crit')">{{ s.run.status === 'ok' ? 'answered' : 'failed' }}</span>
+                    <span class="pill" [class]="'pill ' + (s.run.status === 'ok' ? 'pill-ok' : 'pill-crit')">{{ s.run.status === 'ok' ? 'Answered' : 'Failed' }}</span>
                     <span class="ml-1 font-medium">{{ s.promptName || 'prompt' }}</span>
                     <span class="text-[color:var(--text-muted)]"> v{{ s.run.promptVersion }} → <span class="mono">&lt;{{ s.run.stepTag }}&gt;</span></span>
                     @if (s.run.status === 'ok') {
-                      <pre class="prompt-out mt-1" style="max-height: 10rem">{{ s.run.output }}</pre>
+                      @if (isJson(s.run.output)) {
+                        <pre class="prompt-out ai-step-output mt-1">{{ s.run.output }}</pre>
+                      } @else {
+                        <div class="prompt-out ai-step-output ai-step-md mt-1"><app-markdown [source]="s.run.output" /></div>
+                      }
                     } @else {
                       <div class="text-crit-500 mt-0.5">{{ s.run.error }}</div>
                     }
@@ -104,14 +108,6 @@
   }
 
   @if (hasInsights()) {
-    <div class="flex">
-      <button type="button" class="btn btn-ghost btn-sm -ml-2"
-              [class.text-accent]="showInsights()"
-              (click)="showInsights.set(!showInsights())">
-        <app-icon name="chart" />{{ showInsights() ? 'Hide timing' : 'Timing' }}
-      </button>
-    </div>
-
     @if (showInsights()) {
       <div class="card chart-card">
         <div class="flex flex-wrap items-baseline gap-2">
@@ -176,6 +172,12 @@
         <button type="button" class="btn btn-ghost btn-sm" (click)="search.set('')"><app-icon name="close" />Clear</button>
       }
 
+      @if (hasInsights()) {
+        <button type="button" class="btn btn-default btn-sm" [class.text-accent]="showInsights()"
+                (click)="showInsights.set(!showInsights())" title="Where this run waited between entries">
+          <app-icon name="chart" />{{ showInsights() ? 'Hide timing' : 'Timing' }}
+        </button>
+      }
       @if (stillRunning()) {
         <button type="button" class="btn btn-default btn-sm" [class.btn-intent-ok]="autoRefreshing()"
                 (click)="toggleLive()"
@@ -201,7 +203,7 @@
               <span class="text-xs text-[color:var(--text-muted)] whitespace-nowrap tabular shrink-0 pt-0.5">
                 {{ log.dateCreated ? (log.dateCreated | serverTime:'HH:mm:ss') : '—' }}
               </span>
-              <span class="text-sm mono break-words min-w-0">{{ log.logsDetail }}</span>
+              <span class="text-sm mono log-message min-w-0"><ng-container [ngTemplateOutlet]="message" [ngTemplateOutletContext]="{ $implicit: log }" /></span>
             </li>
           }
         </ul>
@@ -224,7 +226,7 @@
                   <td class="tabular whitespace-nowrap">
                     {{ log.dateCreated ? (log.dateCreated | serverTime:'HH:mm:ss') : '—' }}
                   </td>
-                  <td class="mono break-words">{{ log.logsDetail }}</td>
+                  <td class="mono log-message"><ng-container [ngTemplateOutlet]="message" [ngTemplateOutletContext]="{ $implicit: log }" /></td>
                 </tr>
               }
             </tbody>
@@ -237,11 +239,15 @@
           @for (log of filtered(); track $index) {
             <div class="log-console-line">
               <span class="log-console-time">[{{ log.dateCreated ? (log.dateCreated | serverTime:'yyyy-MM-dd HH:mm:ss') : '—' }}]</span>
-              <span>{{ log.logsDetail }}</span>
+              <span class="log-message"><ng-container [ngTemplateOutlet]="message" [ngTemplateOutletContext]="{ $implicit: log }" /></span>
             </div>
           }
         </div>
       }
     }
   </app-table-shell>
+
+  <!-- A line as text and paths; a path opens its folder in the Object Browser and wraps only
+       between names, so "orders_2026-09-a.csv" is never split at its hyphen. -->
+  <ng-template #message let-log>@for (seg of segmentsOf(log); track $index) {@if (seg.path; as p) {@if (p.bucket) {<a class="log-path" routerLink="/objects/files" [queryParams]="{ bucket: p.bucket, prefix: p.prefix }" [title]="'Open ' + (p.prefix || '/') + ' in ' + p.bucket">@for (part of pathParts(seg.text); track $index) {{{ part }}@if (part.endsWith('/')) {<wbr>}}</a>} @else {<span class="log-path">@for (part of pathParts(seg.text); track $index) {{{ part }}@if (part.endsWith('/')) {<wbr>}}</span>}} @else {{{ seg.text }}}}</ng-template>
 </div>

@@ -109,7 +109,7 @@ test.describe('AI prompts in pipelines', () => {
     await rows.nth(0).locator('input[formcontrolname="sample"]').fill('CLM-E2E-1');
     await rows.nth(1).locator('input[formcontrolname="sample"]').fill('Patient seen for a routine check; total billed 120.');
     await page.locator('.prompt-try').getByRole('button', { name: 'Run' }).click();
-    await expect(page.locator('.prompt-try').getByText('answered')).toBeVisible({ timeout: 90_000 });
+    await expect(page.locator('.prompt-try').getByText('Answered')).toBeVisible({ timeout: 90_000 });
     await expect(page.locator('.prompt-try .prompt-out')).not.toBeEmpty();
     await page.getByRole('button', { name: 'Save & activate' }).click();
     await expect(page.getByText(/saved as v1 and active/)).toBeVisible();
@@ -197,7 +197,7 @@ test.describe('AI prompts in pipelines', () => {
 
     await page.goto(`/operations/jobs/${jobId}/runs/${queueRow.jobQueueId}/logs`);
     await expect(page.getByText('AI steps')).toBeVisible();
-    await expect(page.locator('.detail-panel .side-panel-list li').first()).toContainText('answered');
+    await expect(page.locator('.detail-panel .side-panel-list li').first()).toContainText('Answered');
     await expect(page.locator('.detail-panel .side-panel-list li').first()).toContainText(PROMPT);
   });
 });

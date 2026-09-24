@@ -139,7 +139,7 @@ export function combinationSummary(
   }
   if (protocol === 'SSL') {
     return mutualTls
-      ? 'There is no username here -- the client certificate in your keystore is what identifies you to the broker, so it is required.'
+      ? 'There is no username here — the client certificate in your keystore is what identifies you to the broker, so it is required.'
       : 'TLS encrypts the connection and verifies the broker, but sends nothing that identifies this client. Tick the box below if the broker asks for a client certificate.';
   }
   return '';

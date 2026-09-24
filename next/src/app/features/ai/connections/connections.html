@@ -94,7 +94,7 @@
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-2 flex-wrap">
               <span class="pill pill-neutral">{{ providerLabel(c) }}</span>
-              @if (c.isDefault) { <span class="pill pill-brand" title="Prompts that name no connection run on this one"><app-icon name="check" size="0.85em" />default</span> }
+              @if (c.isDefault) { <span class="pill pill-brand" title="Prompts that name no connection run on this one"><app-icon name="check" size="0.85em" />Default</span> }
               @if (canSeeWorkspace() && c.tenantName) { <span class="pill pill-neutral"><app-icon name="building" size="0.8em" class="opacity-70" />{{ c.tenantName }}</span> }
               <app-status [label]="c.status || 'Active'" [quiet]="true" />
             </div>

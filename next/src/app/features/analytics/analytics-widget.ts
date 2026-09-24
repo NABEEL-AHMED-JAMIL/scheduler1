@@ -67,7 +67,7 @@ export type WidgetState = 'idle' | 'queued' | 'running' | 'failed' | 'stopped' |
     </div>
   `,
   styles: `
-    .widget { display: flex; flex-direction: column; padding: 0.75rem 0.9rem; gap: 0.5rem; }
+    .widget { display: flex; flex-direction: column; padding: 1rem; gap: 0.5rem; }
     .widget-head { display: flex; align-items: flex-start; gap: 0.5rem; }
     .widget-title { font-size: 0.875rem; font-weight: 600; line-height: 1.25rem; }
     .widget-sub { font-size: 11px; color: var(--text-muted); line-height: 1rem; }

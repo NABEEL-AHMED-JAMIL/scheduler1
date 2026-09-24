@@ -1,6 +1,6 @@
 import { Component, OnDestroy, OnInit, computed, effect, inject, input, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { DecimalPipe } from '@angular/common';
+import { DecimalPipe, NgTemplateOutlet } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { TableShell } from '../../../shared/ui/data-table';
@@ -11,6 +11,8 @@ import { StatusPill } from '../../../shared/ui/status-pill';
 import { JobEventsService } from '../../../core/socket/job-events.service';
 import { Subscription } from 'rxjs';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
+import { Markdown } from '../../../shared/ui/markdown';
+import { LogSegment, logSegments, pathParts } from './log-segments';
 
 interface AuditLog {
   jobAuditLogId?: number;
@@ -22,7 +24,7 @@ interface AuditLog {
 
 @Component({
   selector: 'app-job-logs',
-  imports: [StickToBottom, Icon, ServerTimePipe, DecimalPipe, RouterLink, TableShell, RankedBar, StatusPill],
+  imports: [StickToBottom, Icon, ServerTimePipe, DecimalPipe, NgTemplateOutlet, RouterLink, TableShell, RankedBar, StatusPill, Markdown],
   templateUrl: './job-logs.html',
 })
 export class JobLogs implements OnInit, OnDestroy {
@@ -56,6 +58,18 @@ export class JobLogs implements OnInit, OnDestroy {
   /** The pipeline's AI steps for this run, with what each answered; empty when it has none. */
   readonly aiSteps = signal<{ run: any; promptName?: string }[]>([]);
   readonly showDetail = signal(true);
+
+  /** The bucket the run's task reads and writes, which a path in a log line is relative to. */
+  readonly bucket = computed<string | null>(() => this.job()?.taskDetail?.bucket ?? null);
+  /** Each entry split into text and the paths it names, once per load rather than per render. */
+  readonly segments = computed(() => {
+    const bucket = this.bucket();
+    return new Map(this.logs().map(log => [log, logSegments(log.logsDetail ?? '', bucket)] as [AuditLog, LogSegment[]]));
+  });
+  segmentsOf(log: AuditLog): LogSegment[] { return this.segments().get(log) ?? [{ text: log.logsDetail ?? '' }]; }
+  readonly pathParts = pathParts;
+  /** A model's answer in JSON mode is data, shown as it came; anything else is the markdown it wrote. */
+  isJson(output: string | null | undefined): boolean { return /^\s*[[{]/.test(output ?? ''); }
 
   /**
    * Three ways to read the same entries, as the legacy screen had. Timeline for following a
