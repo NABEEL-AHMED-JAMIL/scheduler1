@@ -34,17 +34,19 @@ function taskEditWith(getImpl: (url: string, opts?: any) => any,
 }
 
 const noTopics = of({ status: API_SUCCESS, data: [] });
-const lookupsWithPipelineIds = of({
-  status: API_SUCCESS,
-  // A PIPELINE_IDS parent row may still exist in old data/other tenants -- the point of the
-  // migration is that this screen no longer treats it as the pipeline source even if present.
-  data: [
-    { lookupId: 1015, lookupType: 'PIPELINE_IDS' },
-    { lookupId: 2001, lookupType: 'TASK_GROUPS' },
-    { lookupId: 2002, lookupType: 'PIPELINE_HOME_PAGES' },
+/** What setting.json/taskReferences answers: the task groups or the home pages, by the kind asked for. */
+const REFERENCES: Record<string, any[]> = {
+  TASK_GROUP: [
+    { id: 2001, tenantId: 2901, kind: 'TASK_GROUP', name: 'Nightly', usedByTasks: 1 },
+    { id: 2003, tenantId: 2901, kind: 'TASK_GROUP', name: 'Claims', value: 'CLM', usedByTasks: 0 },
   ],
-});
-const noLookups = of({ status: API_SUCCESS, data: [] });
+  HOME_PAGE: [
+    { id: 2002, tenantId: 2901, kind: 'HOME_PAGE', name: 'Claims portal', value: 'https://claims.example.com', usedByTasks: 1 },
+  ],
+};
+function references(opts: any) {
+  return of({ status: API_SUCCESS, data: REFERENCES[opts?.params?.kind] ?? [] });
+}
 
 /** What pipeline.json/listForTopic answers: the given pipelines on the topic the call names. */
 function forTopic(pipelines: any[], opts: any) {
@@ -63,11 +65,8 @@ describe('TaskEdit pipeline selection', () => {
     ];
     const { component, get } = taskEditWith((url, opts) => {
       if (url.endsWith('/setting.json/topics')) return noTopics;
-      if (url.endsWith('/setting.json/lookups')) return lookupsWithPipelineIds;
+      if (url.endsWith('/setting.json/taskReferences')) return references(opts);
       if (url.endsWith('/pipeline.json/listForTopic')) return forTopic(pipelines, opts);
-      if (url.endsWith('/setting.json/fetchSubLookupByParentId')) {
-        return of({ status: API_SUCCESS, data: { lookupDatas: [] } });
-      }
       if (url.endsWith('/pipeline.json/definition')) {
         return of({ status: API_SUCCESS, data: null });
       }
@@ -85,36 +84,10 @@ describe('TaskEdit pipeline selection', () => {
     expect(get).toHaveBeenCalledWith(`${API_BASE}/pipeline.json/listForTopic`, { params: { sourceTaskTypeId: 10 } });
   });
 
-  it('never asks the lookup API for a PIPELINE_IDS sub-lookup', () => {
-    const { component, get } = taskEditWith((url, opts) => {
-      if (url.endsWith('/setting.json/topics')) return noTopics;
-      if (url.endsWith('/setting.json/lookups')) return lookupsWithPipelineIds;
-      if (url.endsWith('/pipeline.json/listForTopic')) return forTopic([], opts);
-      if (url.endsWith('/setting.json/fetchSubLookupByParentId')) {
-        return of({ status: API_SUCCESS, data: { lookupDatas: [] } });
-      }
-      if (url.endsWith('/pipeline.json/definition')) return of({ status: API_SUCCESS, data: null });
-      throw new Error(`unexpected GET ${url}`);
-    });
-
-    component.ngOnInit();
-    settle();
-
-    // Only the two remaining lookup-backed dropdowns (TASK_GROUPS, PIPELINE_HOME_PAGES) should
-    // trigger a sub-lookup fetch -- never one for the PIPELINE_IDS parent, even though the lookups list
-    // still returned it (old data, or another tenant's rows the cache has not dropped yet).
-    const subLookupCalls = get.mock.calls.filter(
-      ([url]) => typeof url === 'string' && url.endsWith('/setting.json/fetchSubLookupByParentId'));
-    expect(subLookupCalls).toHaveLength(2);
-    const requestedParentIds = subLookupCalls.map(([, opts]) => opts.params.parentLookUpId);
-    expect(requestedParentIds).not.toContain(1015);
-    expect(requestedParentIds.sort()).toEqual([2001, 2002]);
-  });
-
   it('sends the pipeline id straight through to formForPipeline, unparsed', () => {
     const { component, get } = taskEditWith((url, opts) => {
       if (url.endsWith('/setting.json/topics')) return noTopics;
-      if (url.endsWith('/setting.json/lookups')) return noLookups;
+      if (url.endsWith('/setting.json/taskReferences')) return references(opts);
       if (url.endsWith('/pipeline.json/listForTopic')) return forTopic([], opts);
       if (url.endsWith('/pipeline.json/definition')) return of({ status: API_SUCCESS, data: null });
       throw new Error(`unexpected GET ${url}`);
@@ -151,7 +124,7 @@ describe('TaskEdit -- payload generated from the pipeline form on save', () => {
   it('calls xmlCreateChecker with the form\'s answers and submits the result as the payload', () => {
     const { component, post } = taskEditWith((url, opts) => {
       if (url.endsWith('/setting.json/topics')) return noTopics;
-      if (url.endsWith('/setting.json/lookups')) return noLookups;
+      if (url.endsWith('/setting.json/taskReferences')) return references(opts);
       if (url.endsWith('/pipeline.json/listForTopic')) return forTopic([oneFieldForm], opts);
       if (url.endsWith('/pipeline.json/definition')) return of({ status: API_SUCCESS, data: oneFieldForm });
       throw new Error(`unexpected GET ${url}`);
@@ -181,7 +154,7 @@ describe('TaskEdit -- payload generated from the pipeline form on save', () => {
   it('still requires a hand-written payload when no pipeline form applies', () => {
     const { component, post, toast } = taskEditWith((url, opts) => {
       if (url.endsWith('/setting.json/topics')) return noTopics;
-      if (url.endsWith('/setting.json/lookups')) return noLookups;
+      if (url.endsWith('/setting.json/taskReferences')) return references(opts);
       if (url.endsWith('/pipeline.json/listForTopic')) return forTopic([], opts);
       throw new Error(`unexpected GET ${url}`);
     });
@@ -219,7 +192,7 @@ describe('TaskEdit -- a select field\'s choices', () => {
   function loaded(def: any) {
     const { component } = taskEditWith((url, opts) => {
       if (url.endsWith('/setting.json/topics')) return noTopics;
-      if (url.endsWith('/setting.json/lookups')) return noLookups;
+      if (url.endsWith('/setting.json/taskReferences')) return references(opts);
       if (url.endsWith('/pipeline.json/listForTopic')) return forTopic([def], opts);
       if (url.endsWith('/pipeline.json/definition')) return of({ status: API_SUCCESS, data: def });
       throw new Error(`unexpected GET ${url}`);
@@ -297,9 +270,8 @@ describe('TaskEdit -- the pipeline follows the topic', () => {
   ];
   const withEverything = () => taskEditWith((url, opts) => {
     if (url.endsWith('/setting.json/topics')) return noTopics;
-      if (url.endsWith('/setting.json/lookups')) return lookupsWithPipelineIds;
+      if (url.endsWith('/setting.json/taskReferences')) return references(opts);
     if (url.endsWith('/pipeline.json/listForTopic')) return forTopic(pipelines, opts);
-    if (url.endsWith('/setting.json/fetchSubLookupByParentId')) return of({ status: API_SUCCESS, data: { lookupDatas: [] } });
     if (url.endsWith('/pipeline.json/definition')) return of({ status: API_SUCCESS, data: null });
     throw new Error(`unexpected GET ${url}`);
   });
@@ -350,9 +322,8 @@ describe('TaskEdit -- an edited task opens with its topic\'s pipelines', () => {
     ];
     const { component } = taskEditWith((url, opts) => {
       if (url.endsWith('/setting.json/topics')) return noTopics;
-      if (url.endsWith('/setting.json/lookups')) return lookupsWithPipelineIds;
+      if (url.endsWith('/setting.json/taskReferences')) return references(opts);
       if (url.endsWith('/pipeline.json/listForTopic')) return forTopic(pipelines, opts);
-      if (url.endsWith('/setting.json/fetchSubLookupByParentId')) return of({ status: API_SUCCESS, data: { lookupDatas: [] } });
       if (url.endsWith('/pipeline.json/definition')) return of({ status: API_SUCCESS, data: null });
       if (url.endsWith('/sourceTask.json/fetchSourceTaskWithSourceTaskId')) {
         return of({ status: API_SUCCESS, data: { taskDetailId: 1469, taskName: 'Nightly claims load', taskStatus: 'Active',
@@ -384,7 +355,7 @@ describe('TaskEdit -- topics are picked profile-first', () => {
       return of({ status: API_SUCCESS, data: topicsOf[String(opts.params.kafkaConnectionProfileId)] ?? [] });
     }
     if (url.endsWith('/setting.json/topics')) return noTopics;
-    if (url.endsWith('/setting.json/lookups')) return noLookups;
+    if (url.endsWith('/setting.json/taskReferences')) return references(opts);
     if (url.endsWith('/pipeline.json/listForTopic')) return forTopic([], opts);
     if (url.endsWith('/pipeline.json/definition')) return of({ status: API_SUCCESS, data: null });
     throw new Error(`unexpected GET ${url}`);
@@ -415,5 +386,66 @@ describe('TaskEdit -- topics are picked profile-first', () => {
     settle();
     expect(component.form.get('sourceTaskTypeId')!.value).toBeNull();
     expect(component.topicOptions().map(o => o.label)).toEqual(['Audit alerts']);
+  });
+});
+
+/**
+ * MIG-167: the Group and Home page boxes read setting.json/taskReferences. They were sub-lookups
+ * of the generic Lookups table, fetched parent by parent through two endpoints that no longer
+ * exist; the rows kept their ids, so a task's saved groupId/homePageId -- string ids on the
+ * wire -- must still match an option's value.
+ */
+describe('TaskEdit -- Group and Home page choices', () => {
+  const editor = (task?: any) => taskEditWith((url, opts) => {
+    if (url.endsWith('/setting.json/taskReferences')) return references(opts);
+    if (url.endsWith('/setting.json/topics')) return noTopics;
+    if (url.endsWith('/pipeline.json/listForTopic')) return forTopic([], opts);
+    if (url.endsWith('/pipeline.json/definition')) return of({ status: API_SUCCESS, data: null });
+    if (task && url.endsWith('/sourceTask.json/fetchSourceTaskWithSourceTaskId')) return of({ status: API_SUCCESS, data: task });
+    throw new Error(`unexpected GET ${url}`);
+  });
+  const referenceCalls = (get: any) => get.mock.calls
+    .filter(([url]: [string]) => url.endsWith('/setting.json/taskReferences'))
+    .map(([, opts]: [string, any]) => opts.params);
+
+  it('asks for the task groups and the home pages, and nothing of the retired lookup API', () => {
+    const { component, get } = editor();
+    component.ngOnInit();
+    settle();
+
+    expect(referenceCalls(get)).toEqual([{ kind: 'TASK_GROUP' }, { kind: 'HOME_PAGE' }]);
+    const urls = get.mock.calls.map(([url]) => url as string);
+    expect(urls.some(u => /\/setting\.json\/(lookups|fetchSubLookupByParentId)$/.test(u))).toBe(false);
+  });
+
+  it('offers each by its id as a string, named, with its value beside it when it has one', () => {
+    const { component } = editor();
+    component.ngOnInit();
+    settle();
+
+    expect(component.groupOptions()).toEqual([
+      { value: '2001', label: 'Nightly', hint: '' },
+      { value: '2003', label: 'Claims (CLM)', hint: '' },
+    ]);
+    expect(component.homePageOptions()).toEqual([
+      { value: '2002', label: 'Claims portal (https://claims.example.com)', hint: '' },
+    ]);
+  });
+
+  it('asks an edited task\'s own workspace, and keeps its saved ids matching an option', () => {
+    const { component, get } = editor({
+      taskDetailId: 1469, tenantId: 2901, taskName: 'Nightly claims load', taskStatus: 'Active',
+      homePageId: '2002', groupId: '2001', taskPayload: '<pipeline/>', xmlTagsInfo: [],
+    });
+    (component as any).taskDetailId = () => 1469;
+    component.ngOnInit();
+    settle();
+
+    expect(referenceCalls(get)).toEqual([
+      { kind: 'TASK_GROUP', tenantId: '2901' },
+      { kind: 'HOME_PAGE', tenantId: '2901' },
+    ]);
+    expect(component.groupOptions().map(o => o.value)).toContain(component.form.get('groupId')!.value);
+    expect(component.homePageOptions().map(o => o.value)).toContain(component.form.get('homePageId')!.value);
   });
 });

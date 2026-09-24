@@ -1280,13 +1280,6 @@ html.dark .btn-intent-crit:focus app-icon { color: var(--color-crit-400); }
            bg-crit-500 text-white text-[10px] font-semibold leading-4 text-center;
   }
 
-  /* A sub-lookup row, tied to its parent by an indent rule rather than only a background. */
-  .lookup-child { background: var(--surface-inset); }
-  .lookup-child-rule {
-    background: var(--border-strong);
-    @apply inline-block w-2 h-px align-middle mr-2;
-  }
-
   .notify-row {
     @apply flex items-start gap-2.5 rounded-md px-2.5 py-2 cursor-pointer transition-colors
            hover:bg-[color:var(--surface-sunken)];
@@ -1612,16 +1605,13 @@ html.dark .tenant-code.is-copied { background: color-mix(in oklab, var(--color-o
 .env-pill { text-transform: none; }
 .env-pill .env-pill-k { font-size: 9px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.7; margin-right: 0.1rem; }
 
-/* Lookup key/value cells: text, an optional "open" link for a URL, and a copy icon, on one
-   line, with the text taking the room and the icons never wrapping under it. */
+/* A key/value cell (Kafka's profile and topic rows): the text takes the room, icons never wrap under it. */
 .lookup-value { display: flex; align-items: center; gap: 0.35rem; min-width: 0; }
 .lookup-value > .mono, .lookup-value > .truncate { min-width: 0; }
-.lookup-value .lookup-child-rule { flex: none; }
-.lookup-open { flex: none; display: inline-flex; color: var(--text-muted); }
-.lookup-open:hover { color: var(--accent-text); }
 
-/* Lookups: master-detail. The rail lists lookups; the pane shows one -- its value, then its
-   entries. Below md the two stack, the rail first, since a phone cannot hold both. */
+/* Master-detail (Kafka, dashboards, billing): the rail lists things; the pane shows one. The
+   names are the retired Lookups screen's, which first had this layout. Below md the two stack,
+   the rail first, since a phone cannot hold both. */
 /* clip, not hidden: overflow: hidden makes the card the sticky rail's scroll container, so the
    rail stuck 57px (the header's height) down inside its own card -- a gap above its search box. */
 .lookup-split { display: grid; grid-template-columns: minmax(240px, 300px) minmax(0, 1fr); overflow: clip; }
@@ -1641,9 +1631,7 @@ html.dark .tenant-code.is-copied { background: color-mix(in oklab, var(--color-o
 .lookup-rail-item.is-selected .lookup-rail-chev { opacity: 1; }
 .lookup-rail-glyph { flex: none; width: 1.75rem; height: 1.75rem; border-radius: 0.45rem; display: inline-flex; align-items: center; justify-content: center; background: var(--surface-sunken); color: var(--text-muted); }
 .lookup-rail-glyph.is-list { background: var(--pill-brand-bg); color: var(--pill-brand-fg); }
-.lookup-rail-glyph.is-setting { background: var(--color-ok-100); color: var(--color-ok-500); }
 .lookup-rail-glyph.is-managed { background: var(--color-warn-100); color: var(--color-warn-600); }
-html.dark .lookup-rail-glyph.is-setting { background: color-mix(in oklab, var(--color-ok-500) 22%, transparent); color: var(--color-ok-400); }
 html.dark .lookup-rail-glyph.is-managed { background: color-mix(in oklab, var(--color-warn-500) 22%, transparent); color: var(--color-warn-400); }
 .lookup-rail-key { display: block; font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* A key that must be read whole -- a statement's number ends in the part that tells two apart. */
@@ -1655,10 +1643,6 @@ html.dark .lookup-rail-glyph.is-managed { background: color-mix(in oklab, var(--
 .lookup-detail { min-width: 0; display: flex; flex-direction: column; }
 .lookup-detail-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-subtle); }
 .lookup-detail-key { font-size: 1.05rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.lookup-value-block { padding: 0.9rem 1.25rem; border-bottom: 1px solid var(--border-subtle); background: var(--surface-inset); }
-.lookup-value-block .eyebrow { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.35rem; }
-.lookup-value-lg { font-size: 14px; }
-.lookup-value-lg .mono { font-size: 14px; }
 .lookup-entries { padding: 0.75rem 0 0; }
 .lookup-entries-head { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 1.25rem 0.5rem; flex-wrap: wrap; }
 .lookup-entries-head .section-title { margin: 0; }
@@ -1873,3 +1857,6 @@ html.dark .btn-circle-danger:hover:not(:disabled) { background: color-mix(in okl
 .doc-row { display: flex; align-items: center; gap: .6rem; padding: .45rem 0; border-bottom: 1px solid var(--border-subtle); }
 .doc-row:last-child { border-bottom: 0; }
 .doc-ic { width: 26px; height: 32px; border: 1px solid var(--border-strong); border-radius: 3px; display: grid; place-items: center; font-family: var(--font-mono, ui-monospace, monospace); font-size: 9px; color: var(--text-muted); flex-shrink: 0; }
+
+/* Configuration values: a secret is shown as a mask and never as its value. */
+.secret-mask { letter-spacing: 0.12em; color: var(--text-muted); user-select: none; }

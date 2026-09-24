@@ -135,7 +135,7 @@ export const routes: Routes = [
       },
       {
         // Lives under settings/ rather than admin/ because it groups with the rest of the
-        // Configuration menu (Kafka & Topics, Lookups, Pipelines) -- infrastructure
+        // Configuration menu (Kafka & Topics, Pipelines, Configuration values) -- infrastructure
         // setup, not the Administration menu's people/tenant management. The old admin/storage
         // path is kept as a redirect below so an old bookmark or link still lands.
         path: 'configuration/storage-connections',
@@ -343,12 +343,40 @@ export const routes: Routes = [
         data: { minRole: 'TENANT_ADMIN' },
         canActivate: [roleGuard],
       },
+      // MIG-167: the generic Lookups screen is gone. What it held now has a typed screen each --
+      // a workspace's configuration values and secrets, the engine's own settings, and the home
+      // pages and groups a task points at. The old address lands on the nearest of them.
       {
-        path: 'configuration/lookup',
-        loadComponent: () => import('./features/settings/lookup/lookup').then(m => m.Lookup),
+        path: 'configuration/values',
+        loadComponent: () =>
+          import('./features/settings/configuration/config-values').then(m => m.ConfigValues),
         data: { minRole: 'TENANT_ADMIN' },
         canActivate: [roleGuard],
       },
+      {
+        // Platform-wide: the fetch limit and the crons' watermarks are the engine's, not a
+        // workspace's, and every call behind this screen is PLATFORM_ADMIN on the server.
+        path: 'configuration/engine',
+        loadComponent: () =>
+          import('./features/settings/configuration/engine-settings').then(m => m.EngineSettings),
+        data: { minRole: 'PLATFORM_ADMIN' },
+        canActivate: [roleGuard],
+      },
+      {
+        path: 'configuration/home-pages',
+        loadComponent: () =>
+          import('./features/settings/configuration/task-references').then(m => m.TaskReferences),
+        data: { minRole: 'TENANT_ADMIN', kind: 'HOME_PAGE' },
+        canActivate: [roleGuard],
+      },
+      {
+        path: 'configuration/task-groups',
+        loadComponent: () =>
+          import('./features/settings/configuration/task-references').then(m => m.TaskReferences),
+        data: { minRole: 'TENANT_ADMIN', kind: 'TASK_GROUP' },
+        canActivate: [roleGuard],
+      },
+      { path: 'configuration/lookup', redirectTo: 'configuration/values' },
       {
         // TENANT_USER rather than nothing at all: StorageBrowserRestApi's floor is a signed-in
         // user, and which bucket and key that user may actually reach is decided per request,
@@ -391,7 +419,7 @@ export const routes: Routes = [
       { path: 'tasks/bulk', redirectTo: 'operations/tasks/bulk' },
       { path: 'reports', redirectTo: 'operations/reports' },
       { path: 'settings/kafka', redirectTo: 'configuration/kafka' },
-      { path: 'settings/lookup', redirectTo: 'configuration/lookup' },
+      { path: 'settings/lookup', redirectTo: 'configuration/values' },
       { path: 'objects', redirectTo: 'objects/files' },
     ],
   },

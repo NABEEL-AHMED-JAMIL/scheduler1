@@ -50,14 +50,14 @@
                      [submitted]="submitted()">
             <app-combobox id="group" formControlName="groupId"
                           placeholder="Search groups…" clearLabel="None"
-                          [options]="lookupComboOptions('TASK_GROUPS')" />
+                          [options]="groupOptions()" />
           </app-field>
 
           <app-field label="Home page" for="homePage" [control]="form.get('homePageId')"
                      [submitted]="submitted()" hint="Where users land after this job completes.">
             <app-combobox id="homePage" formControlName="homePageId"
                           placeholder="Search home pages…" clearLabel="None"
-                          [options]="lookupComboOptions('PIPELINE_HOME_PAGES')" />
+                          [options]="homePageOptions()" />
           </app-field>
 
           <app-field label="Status" for="taskStatus" [required]="true"

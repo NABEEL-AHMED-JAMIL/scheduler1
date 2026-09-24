@@ -1,0 +1,145 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Configuration values</h1>
+      <p class="page-subtitle">
+        Values and secrets a task's payload reads at run time, per workspace — a bucket name, a
+        database password — kept here once instead of written into every task.
+      </p>
+    </div>
+    <div class="flex items-center gap-2 ml-auto">
+      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
+        <app-icon name="refresh" [class.spin]="loading()" />Refresh
+      </button>
+      <button type="button" class="btn btn-primary btn-sm" (click)="create()">
+        <app-icon name="plus" />New value
+      </button>
+    </div>
+  </div>
+
+  <div class="card p-4 flex items-start gap-3 text-sm">
+    <app-icon name="info" class="text-[color:var(--text-muted)] mt-0.5 shrink-0" />
+    <div class="grid gap-1.5 min-w-0">
+      <p>
+        A task references an entry by name inside its payload:
+        <span class="mono">{{ configRef }}</span> for a value, <span class="mono">{{ secretRef }}</span>
+        for a secret. The worker asks for the real value when the run starts; the payload, the queue
+        message and the logs only ever carry the reference.
+      </p>
+      <p class="text-[color:var(--text-secondary)]">
+        A tag whose name looks like a credential — password, secret, token, API key, access key,
+        private key, client secret — must hold exactly <span class="mono">{{ secretRef }}</span>.
+        A task that writes a literal there, or names a key that does not exist in its workspace, is
+        refused when it is saved.
+      </p>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-3 gap-3">
+    <app-stat-tile label="Values" [value]="stats().values" icon="settings" tone="info" foot="readable here" />
+    <app-stat-tile label="Secrets" [value]="stats().secrets" icon="lock" tone="info" foot="write-only" />
+    <app-stat-tile label="In use" [value]="stats().inUse" icon="list" tone="muted" foot="referenced by a live task" />
+  </div>
+
+  <app-table-shell heading="Configuration values" [loading]="loading()" [error]="error()"
+                   [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="rows().length"
+                   [emptyMessage]="search().trim()
+                      ? 'No entry matches the search.'
+                      : 'No configuration values yet. Add one, then reference it from a task.'"
+                   emptyIcon="settings"
+                   (retry)="load()">
+    <ng-container toolbar>
+      @if (isPlatformAdmin()) {
+        <div class="w-48">
+          <app-combobox id="config-tenant" [selected]="tenantFilter()" (selectedChange)="setTenant($event)"
+                        placeholder="All workspaces" clearLabel="All workspaces" [options]="tenantOptions()" />
+        </div>
+      }
+      <div class="search-field max-w-56">
+        <app-icon name="search" size="0.95em" />
+        <input class="input" placeholder="Search key, value or description" aria-label="Search"
+               [value]="search()" (input)="search.set($any($event.target).value)" />
+      </div>
+    </ng-container>
+
+    <table class="table-modern">
+      <thead>
+        <tr>
+          <th>Key</th>
+          @if (showWorkspace()) { <th>Workspace</th> }
+          <th>Kind</th>
+          <th>Value</th>
+          <th>Used by</th>
+          <th class="w-32"></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of filtered(); track row.id) {
+          <tr [attr.data-key]="row.key">
+            <td class="max-w-72">
+              <div class="mono font-medium truncate" [title]="row.key">{{ row.key }}</div>
+              <div class="mono text-xs text-[color:var(--text-muted)] truncate" title="How a task references it">{{ reference(row) }}</div>
+              @if (row.description) {
+                <div class="text-xs text-[color:var(--text-secondary)] line-clamp-1" [title]="row.description">{{ row.description }}</div>
+              }
+            </td>
+            @if (showWorkspace()) {
+              <td class="text-xs text-[color:var(--text-secondary)]">{{ workspaceName(row.tenantId) }}</td>
+            }
+            <td>
+              @if (row.kind === 'SECRET') {
+                <span class="pill pill-warn"><app-icon name="lock" size="0.8em" />Secret</span>
+              } @else {
+                <span class="pill pill-neutral">Value</span>
+              }
+            </td>
+            <td class="max-w-80">
+              @if (row.kind === 'SECRET') {
+                <span class="secret-mask mono" aria-label="Secret, not shown">••••••••</span>
+              } @else {
+                <span class="mono truncate block" [title]="row.value ?? ''">{{ row.value }}</span>
+              }
+              @if (row.setAt) {
+                <div class="text-xs text-[color:var(--text-muted)]">
+                  set on {{ row.setAt | serverTime:'d MMM y, HH:mm' }}@if (row.setByName) { by {{ row.setByName }}}
+                </div>
+              }
+            </td>
+            <td class="text-xs whitespace-nowrap">
+              @if (row.usedByTasks > 0) {
+                {{ row.usedByTasks }} {{ row.usedByTasks === 1 ? 'task' : 'tasks' }}
+              } @else {
+                <span class="text-[color:var(--text-muted)]">No task</span>
+              }
+            </td>
+            <td>
+              <div class="flex items-center justify-end gap-1">
+                @if (row.kind === 'SECRET') {
+                  <button type="button" class="btn btn-default btn-sm" (click)="replaceSecret(row)"
+                          [attr.aria-label]="'Replace secret ' + row.key">
+                    <app-icon name="key" />Replace secret
+                  </button>
+                  <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="edit(row)"
+                          [attr.aria-label]="'Edit description of ' + row.key" title="Edit description">
+                    <app-icon name="edit" />
+                  </button>
+                } @else {
+                  <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="edit(row)"
+                          [attr.aria-label]="'Edit ' + row.key" title="Edit">
+                    <app-icon name="edit" />
+                  </button>
+                }
+                <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="remove(row)"
+                        [disabled]="row.usedByTasks > 0"
+                        [attr.aria-label]="'Delete ' + row.key"
+                        [title]="row.usedByTasks > 0 ? inUseSentence(row) : 'Delete'">
+                  <app-icon name="trash" class="icon-crit" />
+                </button>
+              </div>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </app-table-shell>
+</div>

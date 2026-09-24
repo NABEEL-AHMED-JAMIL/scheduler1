@@ -454,7 +454,13 @@ export class Docs implements AfterViewInit {
       notes: [
         'Pipelines — describe what a pipeline expects once, and the topic it publishes on, so its '
         + 'tasks are filled in field by field rather than as raw tags.',
-        'Lookups — shared key and value data the forms and pipelines read from.',
+        'Configuration values — per-workspace values and secrets a task’s payload reads at run '
+        + 'time as ${config:KEY} and ${secret:KEY}. A secret is write-only: it can be replaced, '
+        + 'never shown, and any tag that looks like a credential must use ${secret:KEY}.',
+        'Home pages and Task groups — the addresses and labels a task’s Home page and Group '
+        + 'fields offer, per workspace.',
+        'Engine settings (platform administrators) — how many queued runs one scheduler pass '
+        + 'claims, and the watermarks each cron writes for itself.',
       ],
     },
     {

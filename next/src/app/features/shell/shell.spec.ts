@@ -106,4 +106,33 @@ describe('shell navigation', () => {
     // Not a special case for analytics: every entry with nothing beneath it stays prefix-matched.
     expect(children().find(child => child.path === '/objects/files')?.exact).toBe(false);
   });
+
+  /**
+   * MIG-167: Lookups became typed screens. A tenant administrator gets the workspace's own;
+   * Engine settings is the platform's and only a platform administrator is shown it.
+   */
+  it('lists the typed configuration screens, and Engine settings for a platform administrator only', () => {
+    const configurationFor = (role: string) => {
+      const claims = btoa(JSON.stringify({ sub: 'a@example.com', appUserId: 5, userRole: role }))
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      localStorage.setItem('etl_auth_user', JSON.stringify({
+        username: 'a@example.com', userRole: role, appUserId: 5,
+        accessToken: `header.${claims}.unsigned`, refreshToken: 'r',
+      }));
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [provideZonelessChangeDetection(), provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
+      });
+      const built = TestBed.createComponent(Shell).componentInstance;
+      localStorage.removeItem('etl_auth_user');
+      return (built.nav().find(item => item.label === 'Configuration')?.children ?? []).map(child => child.path);
+    };
+
+    const tenant = configurationFor('TENANT_ADMIN');
+    expect(tenant).toEqual(expect.arrayContaining(['/configuration/values', '/configuration/home-pages', '/configuration/task-groups']));
+    expect(tenant).not.toContain('/configuration/engine');
+    expect(tenant).not.toContain('/configuration/lookup');
+
+    expect(configurationFor('PLATFORM_ADMIN')).toContain('/configuration/engine');
+  });
 });

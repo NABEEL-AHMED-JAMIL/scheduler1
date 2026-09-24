@@ -1,0 +1,101 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">{{ copy().title }}</h1>
+      <p class="page-subtitle">{{ copy().subtitle }}</p>
+    </div>
+    <div class="flex items-center gap-2 ml-auto">
+      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
+        <app-icon name="refresh" [class.spin]="loading()" />Refresh
+      </button>
+      <button type="button" class="btn btn-primary btn-sm" (click)="create()">
+        <app-icon name="plus" />New {{ copy().singular }}
+      </button>
+    </div>
+  </div>
+
+  <app-table-shell [heading]="copy().title" [loading]="loading()" [error]="error()"
+                   [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="rows().length"
+                   [emptyMessage]="search().trim() ? 'Nothing matches the search.' : copy().empty"
+                   [emptyIcon]="copy().icon"
+                   (retry)="load()">
+    <ng-container toolbar>
+      @if (isPlatformAdmin()) {
+        <div class="w-48">
+          <app-combobox id="reference-tenant" [selected]="tenantFilter()" (selectedChange)="setTenant($event)"
+                        placeholder="All workspaces" clearLabel="All workspaces" [options]="tenantOptions()" />
+        </div>
+      }
+      <div class="search-field max-w-56">
+        <app-icon name="search" size="0.95em" />
+        <input class="input" placeholder="Search name, value or description" aria-label="Search"
+               [value]="search()" (input)="search.set($any($event.target).value)" />
+      </div>
+    </ng-container>
+
+    <table class="table-modern">
+      <thead>
+        <tr>
+          <th>Name</th>
+          @if (showWorkspace()) { <th>Workspace</th> }
+          <th>{{ isHomePage() ? 'Address' : 'Value' }}</th>
+          <th>Used by</th>
+          <th>Last changed</th>
+          <th class="w-24"></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of filtered(); track row.id) {
+          <tr [attr.data-id]="row.id">
+            <td class="max-w-72">
+              <div class="font-medium truncate" [title]="row.name">{{ row.name }}</div>
+              @if (row.description) {
+                <div class="text-xs text-[color:var(--text-secondary)] line-clamp-1" [title]="row.description">{{ row.description }}</div>
+              }
+            </td>
+            @if (showWorkspace()) {
+              <td class="text-xs text-[color:var(--text-secondary)]">{{ workspaceName(row.tenantId) }}</td>
+            }
+            <td class="max-w-80">
+              @if (isLink(row.value)) {
+                <a class="link-inline mono truncate block" [href]="row.value" target="_blank" rel="noopener noreferrer"
+                   [title]="row.value ?? ''">{{ row.value }}</a>
+              } @else if (row.value) {
+                <span class="truncate block" [title]="row.value">{{ row.value }}</span>
+              } @else {
+                <span class="text-[color:var(--text-muted)]">—</span>
+              }
+            </td>
+            <td class="text-xs whitespace-nowrap">
+              @if (row.usedByTasks > 0) {
+                {{ row.usedByTasks }} {{ row.usedByTasks === 1 ? 'task' : 'tasks' }}
+              } @else {
+                <span class="text-[color:var(--text-muted)]">No task</span>
+              }
+            </td>
+            <td class="text-xs text-[color:var(--text-secondary)] whitespace-nowrap">
+              @if (row.updatedAt || row.createdAt) {
+                {{ (row.updatedAt || row.createdAt) | serverTime:'d MMM y' }}
+                @if (row.updatedByName || row.createdByName) { by {{ row.updatedByName || row.createdByName }}}
+              } @else { — }
+            </td>
+            <td>
+              <div class="flex items-center justify-end gap-1">
+                <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="edit(row)"
+                        [attr.aria-label]="'Edit ' + row.name" title="Edit">
+                  <app-icon name="edit" />
+                </button>
+                <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="remove(row)"
+                        [disabled]="row.usedByTasks > 0"
+                        [attr.aria-label]="'Delete ' + row.name"
+                        [title]="row.usedByTasks > 0 ? inUseSentence(row) : 'Delete'">
+                  <app-icon name="trash" class="icon-crit" />
+                </button>
+              </div>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </app-table-shell>
+</div>

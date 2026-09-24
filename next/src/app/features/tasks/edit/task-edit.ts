@@ -2,8 +2,6 @@ import { Component, OnInit, computed, effect, inject, input, signal, untracked }
 import { toSignal } from '@angular/core/rxjs-interop';
 import { parseTopicPartition } from '../../../shared/ui/topic';
 import { HttpClient } from '@angular/common/http';
-import { forkJoin, of } from 'rxjs';
-import { catchError, map } from 'rxjs/operators';
 import { Router, RouterLink } from '@angular/router';
 import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
@@ -12,11 +10,7 @@ import { Field } from '../../../shared/ui/field';
 import { Combobox, ComboboxOption } from '../../../shared/ui/combobox';
 import { Icon } from '../../../shared/ui/icon';
 import { FieldChoice, Pipeline, PipelineField, parseFieldChoices } from '../../settings/pipelines/pipeline-dialog';
-
-/** The lookup parents whose sub-lookups fill the two remaining lookup-backed dropdowns here.
- *  Pipeline used to be a third one (PIPELINE_IDS) -- it now reads from Pipelines instead,
- *  since a pipeline is defined by creating its form, not by adding a lookup row. */
-const LOOKUP_TYPES = ['TASK_GROUPS', 'PIPELINE_HOME_PAGES'];
+import { TaskReference, TaskReferenceKind } from '../../settings/configuration/configuration.models';
 
 @Component({
   selector: 'app-task-edit',
@@ -33,7 +27,13 @@ export class TaskEdit implements OnInit {
 
   readonly taskTypes = signal<any[]>([]);
   private pendingTopicSeed: { topicId: number; tenantId: number | null } | null = null;
-  readonly lookups = signal<Record<string, any[]>>({});
+  /**
+   * What the Group and Home page boxes offer: the workspace's task groups and home pages
+   * (setting.json/taskReferences, MIG-167). They were sub-lookups of the generic Lookups table
+   * until that was retired; the ids carried over, so a saved groupId/homePageId still matches.
+   */
+  readonly groups = signal<TaskReference[]>([]);
+  readonly homePages = signal<TaskReference[]>([]);
   /**
    * The pipelines a form exists for -- Pipelines is the catalogue now, not a lookup type.
    * Creating a pipeline's form is what makes it choosable here; there is no other way to add one.
@@ -180,35 +180,8 @@ export class TaskEdit implements OnInit {
       error: () => this.toast.error('Could not load the Kafka connections.'),
     });
 
-    this.http.get<ApiResponse<any[]>>(`${API_BASE}/setting.json/lookups`).subscribe({
-      next: response => {
-        if (response.status !== API_SUCCESS) return;
-
-        // The server returns only the parent lookup rows -- there is no "children" on them,
-        // so every dropdown rendered with nothing but "None". The options are the sub-lookups,
-        // which have to be fetched per parent.
-        const parents: any[] = response.data ?? [];
-        const wanted = parents.filter(p => LOOKUP_TYPES.includes(p.lookupType));
-        if (!wanted.length) return;
-
-        forkJoin(
-          wanted.map(parent =>
-            this.http.get<ApiResponse<any>>(`${API_BASE}/setting.json/fetchSubLookupByParentId`,
-              { params: { parentLookUpId: parent.lookupId } }).pipe(
-              map(sub => ({
-                type: parent.lookupType as string,
-                options: (sub?.data?.lookupDatas ?? []) as any[],
-              })),
-              catchError(() => of({ type: parent.lookupType as string, options: [] as any[] })),
-            )),
-        ).subscribe(results => {
-          const byType: Record<string, any[]> = {};
-          for (const result of results) byType[result.type] = result.options;
-          this.lookups.set(byType);
-        });
-      },
-      error: () => this.toast.error('Could not load the task settings.'),
-    });
+    // A new task has no workspace yet to ask for; an edited one asks once loadTask knows its tenant.
+    if (!this.isEdit()) this.loadReferences(null);
 
 
     // A pipeline chosen by hand loads its form straight away. Editing an existing task goes
@@ -258,6 +231,7 @@ export class TaskEdit implements OnInit {
         this.topicFromLoad.set(task.sourceTaskType?.sourceTaskTypeId ?? null);
         this.topicVersion.set('load');
         this.taskTenantId = task.tenantId ?? null;
+        this.loadReferences(this.taskTenantId);
         const topicId = task.sourceTaskType?.sourceTaskTypeId ?? null;
         if (topicId != null) {
           // The profile list decides where an unrouted topic lands; wait for it if it is not here yet.
@@ -276,6 +250,25 @@ export class TaskEdit implements OnInit {
     });
   }
 
+  /**
+   * Loads the Group and Home page choices. The task's own workspace is named when it is known:
+   * a platform administrator sees every workspace's otherwise, and a task may only point at its
+   * own. A tenant administrator's request carries it too, and the server ignores it -- theirs
+   * is the only workspace it will answer for.
+   */
+  private loadReferences(tenantId: number | null): void {
+    const fetch = (kind: TaskReferenceKind, into: (rows: TaskReference[]) => void) => {
+      const params: Record<string, string> = { kind };
+      if (tenantId != null) params['tenantId'] = String(tenantId);
+      this.http.get<ApiResponse<TaskReference[]>>(`${API_BASE}/setting.json/taskReferences`, { params }).subscribe({
+        next: response => { if (response.status === API_SUCCESS) into(response.data ?? []); },
+        error: () => this.toast.error(kind === 'HOME_PAGE' ? 'Could not load the home pages.' : 'Could not load the task groups.'),
+      });
+    };
+    fetch('TASK_GROUP', rows => this.groups.set(rows));
+    fetch('HOME_PAGE', rows => this.homePages.set(rows));
+  }
+
   /** Internal only -- there is no more UI that adds, removes or edits a tag row by hand. */
   private pushTagRow(tag?: any): void {
     this.tags.push(this.fb.group({
@@ -284,8 +277,6 @@ export class TaskEdit implements OnInit {
       tagValue: [tag?.tagValue ?? ''],
     }));
   }
-
-  lookupOptions(type: string): any[] { return this.lookups()[type] ?? []; }
 
   /**
    * Pre-shaped rows for the Pipeline/Group/Home page combo-boxes.
@@ -371,18 +362,9 @@ export class TaskEdit implements OnInit {
     return 'Picking one loads its form below, if it has one.';
   });
 
-  private toLookupOption(opt: any): ComboboxOption {
-    const name = opt.lookupType || opt.lookupValue || '';
-    return {
-      value: String(opt.lookupId ?? ''),
-      label: opt.lookupValue && opt.lookupType ? `${name} (${opt.lookupValue})` : name,
-      hint: opt.description ?? '',
-    };
-  }
-
-  lookupComboOptions(type: string): ComboboxOption[] {
-    return this.lookupOptions(type).map(o => this.toLookupOption(o));
-  }
+  /** Group and Home page rows: the id as the value (the wire keeps it a string), the name, then its value. */
+  readonly groupOptions = computed<ComboboxOption[]>(() => this.groups().map(toReferenceOption));
+  readonly homePageOptions = computed<ComboboxOption[]>(() => this.homePages().map(toReferenceOption));
 
   /**
    * Fetches the form the chosen pipeline expects, if it has one.
@@ -663,4 +645,12 @@ export class TaskEdit implements OnInit {
       },
     });
   }
+}
+
+function toReferenceOption(ref: TaskReference): ComboboxOption {
+  return {
+    value: String(ref.id),
+    label: ref.value ? `${ref.name} (${ref.value})` : ref.name,
+    hint: ref.description ?? '',
+  };
 }

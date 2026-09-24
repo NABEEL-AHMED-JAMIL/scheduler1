@@ -47,7 +47,7 @@ async function openLibrary(page: Page) {
 }
 
 /**
- * The rail lists every board as an option in a listbox, the way Lookups, Kafka and Billing list
+ * The rail lists every board as an option in a listbox, the way Kafka and Billing list
  * theirs, and the option's accessible name carries the description and the date after the name.
  * A substring on the name is enough: nothing here is named as a prefix of anything else.
  */

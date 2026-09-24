@@ -1,0 +1,88 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Engine settings</h1>
+      <p class="page-subtitle">
+        The scheduler's own settings, shared by every workspace. The fetch limit is how many queued
+        runs one scheduler pass claims; the two watermarks record where each cron last got to.
+      </p>
+    </div>
+    <div class="flex items-center gap-2 ml-auto">
+      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
+        <app-icon name="refresh" [class.spin]="loading()" />Refresh
+      </button>
+    </div>
+  </div>
+
+  <app-table-shell heading="Engine settings" [loading]="loading()" [error]="error()"
+                   [isEmpty]="!settings().length" emptyMessage="No engine settings came back."
+                   emptyIcon="settings" [scrollRows]="false"
+                   (retry)="load()">
+    <table class="table-modern">
+      <thead>
+        <tr>
+          <th>Setting</th>
+          <th>Value</th>
+          <th>Last changed</th>
+          <th class="w-40"></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (s of settings(); track s.key) {
+          <tr [attr.data-key]="s.key">
+            <td class="max-w-80">
+              <div class="mono font-medium">{{ s.key }}</div>
+              @if (s.description) {
+                <div class="text-xs text-[color:var(--text-secondary)]">{{ s.description }}</div>
+              }
+            </td>
+            <td>
+              @if (editing() === s.key) {
+                <div class="field" [class.field-invalid]="!!draftError()">
+                  <input id="engineValue" class="input mono max-w-40" inputmode="numeric" autocomplete="off"
+                         [attr.aria-label]="s.key" [value]="draft()"
+                         (input)="onDraft($any($event.target).value)" />
+                  @if (draftError()) {
+                    <p class="field-note text-crit-500 flex items-start gap-1.5" role="alert">
+                      <app-icon name="alert" size="0.9em" class="mt-px shrink-0" />
+                      <span>{{ draftError() }}</span>
+                    </p>
+                  } @else {
+                    <p class="field-note text-[color:var(--text-muted)]">A whole number from 1 to 1,000,000.</p>
+                  }
+                </div>
+              } @else {
+                <span class="mono">{{ s.value }}</span>
+                @if (!canEdit(s)) {
+                  <div class="text-xs text-[color:var(--text-muted)]">Written only by its cron</div>
+                }
+              }
+            </td>
+            <td class="text-xs text-[color:var(--text-secondary)] whitespace-nowrap">
+              @if (s.updatedAt) {
+                {{ s.updatedAt | serverTime:'d MMM y, HH:mm' }}@if (s.updatedByName) { by {{ s.updatedByName }}}
+              } @else { — }
+            </td>
+            <td>
+              @if (canEdit(s)) {
+                <div class="flex items-center justify-end gap-1">
+                  @if (editing() === s.key) {
+                    <button type="button" class="btn btn-default btn-sm" (click)="cancel()" [disabled]="saving()">Cancel</button>
+                    <button type="button" class="btn btn-primary btn-sm" (click)="save()" [disabled]="saving()">
+                      @if (saving()) { <app-icon name="refresh" class="spin" /> }Save
+                    </button>
+                  } @else {
+                    <button type="button" class="btn btn-default btn-sm" (click)="startEdit(s)"
+                            [attr.aria-label]="'Edit ' + s.key">
+                      <app-icon name="edit" />Edit
+                    </button>
+                  }
+                </div>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </app-table-shell>
+</div>
