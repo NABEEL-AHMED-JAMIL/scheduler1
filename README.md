@@ -1,5 +1,7 @@
 # Scheduler — ETL Console frontend
 
+**Running the platform:** every service, its settings and its secrets are started from [etl-platform](https://github.com/NABEEL-AHMED-JAMIL/etl-platform) (`../etl-platform`): `scripts/up.sh`, `scripts/deploy.sh <service>`, `scripts/verify.sh`. This repository's own `docker-compose.yml` still works for standalone development, but once the service runs from etl-platform its `.env` here no longer configures the running container -- change `etl-platform/config/` or `etl-platform/secrets/` instead.
+
 **This repository holds two applications, not one.** A rewrite is in progress, and both trees are live at the same time.
 
 | | `src/` | `next/` |
