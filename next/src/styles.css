@@ -1494,11 +1494,14 @@ html.dark {
   .page-head > :first-child { max-width: 64rem; min-width: 0; }
   /* A heading's actions are .btn-sm; a field among them (workspace picker, date range, search)
      took the full 2.25rem .input and stood a third taller than the buttons beside it. Same padding,
-     line and border as .btn-sm, so the row lines up by construction. */
-  .page-head:has(.btn-sm) .input { min-height: 0; @apply px-2.5 py-1 text-xs; }
+     line and border as .btn-sm, so the row lines up by construction (vertical only: horizontal
+     padding stays the field's, so a search box's icon inset survives). */
+  .page-head:has(.btn-sm) .input { min-height: 0; @apply py-1 text-xs; }
   /* A list's toolbar (app-table-shell) held a 30px view toggle, 36px filters and 26px buttons in one
      row. Every control there is the view toggle's height, and the filters take the compact type. */
-  .table-toolbar .input { min-height: 1.875rem; @apply px-2.5 py-1 text-xs; }
+  /* Height and type only: horizontal padding is the field's own (a search box keeps pl-8 for its
+     icon; setting px here slid the placeholder under the magnifier). */
+  .table-toolbar .input { min-height: 1.875rem; @apply py-1 text-xs; }
   .table-toolbar .btn-sm { min-height: 1.875rem; }
   /* Joined controls: a stepper such as "< September 2026 >" built from .btn-sm pieces, one box. */
   .btn-join { @apply inline-flex items-stretch; }
