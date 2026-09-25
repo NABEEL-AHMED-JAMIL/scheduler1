@@ -14,8 +14,12 @@ import { Icon } from '../../../shared/ui/icon';
 @Component({
   selector: 'app-pdf-viewer',
   imports: [Icon],
+  // The tag itself is the box: a shrinkable flex column that fills whatever holds it (a flex dialog body or a
+  // fixed-height div). Inline, its inner h-full had no height to take and the page scroller grew to the whole
+  // PDF, so a billing document opened in its dialog could not be scrolled.
+  host: { class: 'flex flex-col flex-1 min-h-0 h-full' },
   template: `
-    <div class="flex flex-col h-full">
+    <div class="flex flex-col flex-1 min-h-0">
       @if (pageCount()) {
         <div class="flex items-center gap-1 px-3 py-1.5 border-b shrink-0 border-subtle bg-raised"
             >
