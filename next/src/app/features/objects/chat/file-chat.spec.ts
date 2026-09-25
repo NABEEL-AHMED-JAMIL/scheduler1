@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
+import { DictationService } from '../../../shared/ui/dictation.service';
 import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
 import { Dialog } from '@angular/cdk/dialog';
@@ -483,6 +484,22 @@ describe('what the panel releases on the way out', () => {
     const recognition = speech.created[0];
     expect(recognition.aborted || recognition.stopped).toBe(true);
     expect(panel.chat.listening()).toBe(false);
+  });
+
+  it('dictates through the shared DictationService, so one microphone is held console-wide', () => {
+    const speech = fakeSpeechApi();
+    restoreSpeech = speech.restore;
+    const panel = openPanel();
+    const dictation = TestBed.inject(DictationService);
+    const abort = vi.spyOn(dictation, 'abort');
+
+    panel.chat.toggleMic();
+    expect(dictation.listeningFor('file-chat')).toBe(true);
+    speech.created[0].onresult?.({ results: [[{ transcript: 'summarise clause nine' }]] });
+    expect(panel.chat.draft()).toBe('summarise clause nine');
+
+    panel.fixture.destroy();
+    expect(abort).toHaveBeenCalledWith('file-chat');
   });
 
   it('abandons the reply in flight when the panel is destroyed', () => {

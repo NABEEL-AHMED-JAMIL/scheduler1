@@ -14,6 +14,7 @@ import { ChatFile, parseDownloadableFiles, stripExportFences } from './chat-expo
 import { ShareDialog, ShareResult } from '../dialogs/share-dialog';
 import { Subscription, finalize } from 'rxjs';
 import { StorageService } from '../storage.service';
+import { DictationService } from '../../../shared/ui/dictation.service';
 
 interface ChatMessage {
   role: 'user' | 'assistant' | 'error';
@@ -106,7 +107,10 @@ export class FileChat implements OnInit, OnDestroy {
   readonly sending = signal(false);
   readonly minimized = signal(false);
   readonly copiedIndex = signal<number | null>(null);
-  readonly listening = signal(false);
+  /** The shared service owns the microphone, so the chat and the job assistant cannot both hold it. */
+  private readonly dictation = inject(DictationService);
+  private static readonly MIC_ID = 'file-chat';
+  readonly listening = computed(() => this.dictation.listeningFor(FileChat.MIC_ID));
   readonly converting = signal<string | null>(null);
 
   /**
@@ -264,31 +268,21 @@ export class FileChat implements OnInit, OnDestroy {
     this.settle();
   }
 
-  /** abort() rather than stop(): stop() delivers whatever was heard so far, firing onresult
-      against a panel that is going away; abort() drops it. Both throw on a recognition that
-      never actually started (permission refused before onstart), and there is nothing left to
-      release at that point, so the failure is the outcome we wanted anyway. */
+  /** abort() rather than stop(): stop() delivers whatever was heard so far, into a panel that
+      is going away. Only this panel's session is dropped, never another composer's. */
   private stopDictation(): void {
-    const recognition = this.recognition;
-    this.recognition = null;
-    this.listening.set(false);
-    if (!recognition) return;
     try {
-      if (typeof recognition.abort === 'function') recognition.abort();
-      else recognition.stop?.();
+      this.dictation.abort(FileChat.MIC_ID);
     } catch {
-      // Nothing was listening; the indicator is already off.
+      // A recognition that never started throws on abort; there is nothing left to release.
     }
   }
 
   /** Held so the request can be abandoned; see stop(). */
   private inFlight: Subscription | null = null;
-  private recognition: any = null;
 
   /** Dictation needs the browser's speech API, which not every browser exposes. */
-  readonly voiceSupported =
-    typeof window !== 'undefined' &&
-    !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+  readonly voiceSupported = this.dictation.supported;
 
   /**
    * The tick has to mean the clipboard actually changed.
@@ -553,34 +547,10 @@ export class FileChat implements OnInit, OnDestroy {
    * make the callbacks safe without NgZone -- setting one schedules its own change detection.
    */
   toggleMic(): void {
-    if (this.listening()) {
-      this.recognition?.stop();
-      return;
-    }
-    const Ctor = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!Ctor) {
-      this.toast.error('This browser cannot record speech.');
-      return;
-    }
-    const recognition = new Ctor();
-    recognition.lang = 'en-US';
-    recognition.continuous = false;
-    recognition.interimResults = false;
-    recognition.onstart = () => this.listening.set(true);
-    recognition.onerror = (event: any) => {
-      this.listening.set(false);
-      if (event?.error === 'not-allowed') this.toast.error('Microphone access was refused.');
-      else if (event?.error !== 'aborted') this.toast.error('Could not hear anything.');
-    };
-    recognition.onend = () => { this.listening.set(false); this.recognition = null; };
-    recognition.onresult = (event: any) => {
-      const said = event.results?.[0]?.[0]?.transcript?.trim();
-      if (!said) return;
+    this.dictation.toggle(FileChat.MIC_ID, said => {
       const current = this.draft().trim();
       this.draft.set(current ? `${current} ${said}` : said);
-    };
-    this.recognition = recognition;
-    recognition.start();
+    });
   }
 
   /**

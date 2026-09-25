@@ -5,7 +5,8 @@ import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config
 import { ToastService } from '../../../shared/ui/toast.service';
 import { Icon } from '../../../shared/ui/icon';
 import { RouterLink } from '@angular/router';
-import { BucketSummary, ObjectSummary, StorageService } from '../../objects/storage.service';
+import { BucketSummary, StorageService } from '../../objects/storage.service';
+import { ObjectPicker, PickedObject, objectPickerConfig } from '../../../shared/ui/object-picker';
 import { PreviewDialog } from '../../objects/preview/preview-dialog';
 import { Dialog } from '@angular/cdk/dialog';
 
@@ -79,43 +80,8 @@ export class Converter implements OnInit {
   ];
   readonly buckets = signal<BucketSummary[]>([]);
   readonly bucket = signal('');
-  readonly objects = signal<ObjectSummary[]>([]);
-  readonly loadingObjects = signal(false);
   readonly selectedKey = signal('');
   readonly fetchingSource = signal(false);
-
-  /** Where in the bucket the picker is looking. Empty is the root. This mode used to only ever
-      list the root (prefix hard-coded to '') with no way to go any deeper, so any bucket that
-      organises its documents into folders -- the common case -- showed "Nothing convertible in
-      this bucket" regardless of what it actually held. */
-  readonly prefix = signal('');
-  /** Set when a level has more entries than one page returned; the token to fetch the rest. */
-  readonly nextToken = signal<string | undefined>(undefined);
-
-  /** Folders at this level, so a document nested inside one can be reached. */
-  readonly folders = computed(() => this.objects().filter(o => o.folder));
-
-  /**
-   * Narrows the folder list by name.
-   *
-   * A bucket whose folders are one-per-something -- etl-avatar has one per user id, and lists
-   * over a hundred at the root -- rendered as a wall of buttons nobody could find anything in.
-   * The filter only appears once there are enough folders for scanning to be the slower option.
-   */
-  readonly folderFilter = signal('');
-  readonly filteredFolders = computed(() => {
-    const q = this.folderFilter().trim().toLowerCase();
-    const all = this.folders();
-    return q ? all.filter(f => (f.name ?? '').toLowerCase().includes(q)) : all;
-  });
-  /** Below this, a filter box is more clutter than help and scanning is faster. */
-  readonly folderFilterWorthIt = computed(() => this.folders().length > 12);
-
-  /** Breadcrumb segments for the current prefix, each with the prefix to jump back to. */
-  readonly crumbs = computed(() => {
-    const parts = this.prefix().split('/').filter(Boolean);
-    return parts.map((name, i) => ({ name, prefix: parts.slice(0, i + 1).join('/') + '/' }));
-  });
 
   /** Where the output goes, when it should go anywhere but the browser's downloads. */
   readonly saveToBucket = signal(false);
@@ -142,25 +108,12 @@ export class Converter implements OnInit {
 
   /** Only files the converter can actually read are worth offering. */
   readonly bucketOptions = computed(() => this.buckets().map(b => ({ value: b.bucket, label: b.label || b.bucket, hint: b.provider })));
-  readonly fileOptions = computed(() => this.convertibleObjects().map(o => ({ value: o.key, label: o.name, hint: o.key })));
-  readonly convertibleObjects = computed(() => {
-    const known = new Set(this.families().flatMap(f => f.inputFormats));
-    return this.objects().filter(o => {
-      if (o.folder) return false;
-      const dot = o.name.lastIndexOf('.');
-      return dot >= 0 && known.has(o.name.slice(dot + 1).toLowerCase());
-    });
-  });
 
   readonly sourceName = computed(() => {
     if (this.mode() === 'upload') return this.file()?.name ?? '';
     const key = this.selectedKey();
     return key ? key.slice(key.lastIndexOf('/') + 1) : '';
   });
-
-  /** True when this level holds neither a convertible document nor anywhere further to look. */
-  readonly nothingHere = computed(() =>
-    !this.loadingObjects() && !this.browseError() && !this.convertibleObjects().length && !this.folders().length);
 
   /** Nothing to convert without a source, a target format, and a destination if saving. */
   readonly canConvert = computed(() => {
@@ -169,77 +122,22 @@ export class Converter implements OnInit {
     return this.mode() === 'upload' ? !!this.file() : !!this.selectedKey();
   });
 
-  onBucketChange(value: string): void {
-    this.bucket.set(value);
-    this.selectedKey.set('');
-    this.objects.set([]);
-    this.nextToken.set(undefined);
-    this.prefix.set('');
-    if (!value) return;
-    this.browse('');
-  }
-
-  /** Descend into a folder. */
-  openFolder(key: string): void { this.browse(key); }
-
-  /** Jump to a breadcrumb, or to the bucket root when given nothing. */
-  goTo(prefix: string): void { this.browse(prefix); }
-
-  /** Fetches the next page of the level currently open, appending rather than replacing. */
-  loadMore(): void { this.browse(this.prefix(), true); }
-
-  /** Bumped per listing; a response whose ticket is stale has been superseded. */
-  private browseTicket = 0;
-
   /**
-   * Why the folder in the breadcrumb could not be read. A refusal or a failed request was
-   * dropped, which left the previous level's folders and files under the new breadcrumb -- or
-   * "Nothing here" for a folder that had not been read at all.
+   * Chooses the source document in the console's one ObjectPicker, offering only the formats
+   * the converter reads. It reopens in the folder of the last pick; dismissing it keeps that pick.
    */
-  readonly browseError = signal('');
-
-  /** Reads the level in the breadcrumb again, after a failure. */
-  retryBrowse(): void { this.browse(this.prefix()); }
-
-  private browse(prefix: string, append = false): void {
-    this.prefix.set(prefix);
-    this.selectedKey.set('');
-    this.browseError.set('');
-    // A filter typed for one level would otherwise hide everything in the next one; "load more"
-    // keeps it, since that is the same level still being read.
-    if (!append) this.folderFilter.set('');
-    this.loadingObjects.set(true);
-    // Only the newest listing may write: clicking through folders quickly would otherwise let
-    // a slow response for an abandoned one replace the level actually being viewed.
-    const ticket = ++this.browseTicket;
-    this.storage.listObjects(this.bucket(), prefix, append ? this.nextToken() : undefined, 200)
-      .subscribe({
-        next: response => {
-          if (ticket !== this.browseTicket) return;
-          this.loadingObjects.set(false);
-          if (response.status !== API_SUCCESS) {
-            this.failBrowse(response.message || 'This folder could not be read.', append);
-            return;
-          }
-          const page = response.data?.objects ?? [];
-          this.objects.update(current => (append ? [...current, ...page] : page));
-          this.nextToken.set(response.data?.nextContinuationToken);
-        },
-        error: err => {
-          if (ticket !== this.browseTicket) return;
-          this.loadingObjects.set(false);
-          this.failBrowse(err?.error?.message || 'This folder could not be read.', append);
-        },
-      });
-  }
-
-  /** A failed "load more" keeps what is listed; a failed level shows nothing it has not read. */
-  private failBrowse(message: string, append: boolean): void {
-    this.browseError.set(message);
-    if (!append) {
-      this.objects.set([]);
-      this.nextToken.set(undefined);
-    }
+  chooseFile(): void {
+    const key = this.selectedKey();
+    this.dialog.open<PickedObject | undefined>(ObjectPicker, objectPickerConfig({
+      heading: 'Pick a document to convert',
+      bucket: this.bucket() || undefined,
+      prefix: key ? key.slice(0, key.lastIndexOf('/') + 1) : undefined,
+      extensions: this.families().flatMap(f => f.inputFormats),
+    })).closed.subscribe(picked => {
+      if (!picked) return;
+      this.bucket.set(picked.bucket);
+      this.selectedKey.set(picked.key);
+    });
   }
 
   /** Pulls the chosen object down so it can be posted as the multipart file. */

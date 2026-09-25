@@ -38,6 +38,7 @@ export interface ReportDestinationResult {
       <app-form-dialog [heading]="data.kind === 'bucket' ? 'Save into a bucket' : 'Submit the report'"
                        [subtitle]="data.kind === 'bucket' ? 'Written as a file inside the folder you name.' : 'Posted as JSON to the endpoint you give.'"
                        [confirmLabel]="data.kind === 'bucket' ? 'Save' : 'Submit'"
+                       [busyLabel]="data.kind === 'bucket' ? 'Saving…' : 'Submitting…'"
                        [saving]="sending()" [confirmDisabled]="!valid()"
                        (confirmed)="submit()" (cancelled)="ref.close()">
         <div class="form-stack">

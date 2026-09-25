@@ -49,20 +49,6 @@ describe('Transcript, rendered', () => {
     expect(t.transcript()).toBe('');
   });
 
-  it('boxes many folders in the folder picker, with a named filter', () => {
-    const folders = Array.from({ length: 20 }, (_, i) => ({ name: `f${i}`, key: `f${i}/`, folder: true }));
-    const { t, fixture, el } = page(folders);
-    t.mode.set('bucket');
-    t.onBucketChange('audio');
-    fixture.detectChanges();
-    expect(el.querySelector('.folder-picker')).not.toBeNull();
-    const filter = el.querySelector<HTMLInputElement>('input[aria-label="Filter folders"]')!;
-    expect(filter).not.toBeNull();
-    t.folderFilter.set('f1');
-    fixture.detectChanges();
-    expect(el.querySelectorAll('.folder-picker button').length).toBe(11);   // f1, f10..f19
-  });
-
   it('lets the read-aloud button\'s visible words be its name', () => {
     const { t, fixture, el } = page();
     t.transcript.set('[00:00] hello');

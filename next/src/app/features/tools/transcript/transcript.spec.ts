@@ -1,7 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
-import { Subject } from 'rxjs';
+import { Subject, of } from 'rxjs';
+import { Dialog } from '@angular/cdk/dialog';
+import { ObjectPicker, PickedObject } from '../../../shared/ui/object-picker';
 import { Transcript } from './transcript';
 import { StorageService } from '../../objects/storage.service';
 import { ToastService } from '../../../shared/ui/toast.service';
@@ -112,100 +114,40 @@ describe('Transcript segments', () => {
   });
 });
 
-function transcriptWithStorage(listObjects: ReturnType<typeof vi.fn>) {
-  TestBed.resetTestingModule();
-  TestBed.configureTestingModule({
-    providers: [
+/**
+ * Audio from a bucket is chosen in the console's one ObjectPicker. Browsing, paging, stale answers
+ * and read failures are the picker's, pinned in object-picker.spec.ts; the hand-rolled copy this
+ * tool had (and its own tests of paging and failed folders) went with it.
+ */
+describe('Transcript source from a bucket', () => {
+  function picking(picked: PickedObject | undefined) {
+    const open = vi.fn((_component: unknown, _config: any) => ({ closed: of(picked) }));
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [
       { provide: HttpClient, useValue: {} },
-      { provide: StorageService, useValue: { listObjects, buckets: () => new Subject() } },
+      { provide: StorageService, useValue: {} },
+      { provide: Dialog, useValue: { open } },
       { provide: ToastService, useValue: { success: () => {}, error: () => {}, info: () => {} } },
-    ],
-  });
-  return TestBed.runInInjectionContext(() => new Transcript());
-}
-
-const page = (objects: any[], nextContinuationToken?: string) => ({
-  status: 'SUCCESS', message: '', data: { objects, nextContinuationToken },
-});
-
-/**
- * Regression tests: a bucket level with more entries than one page returns (a real example:
- * an avatars-style bucket with hundreds of per-user folders) previously had no way to fetch the
- * rest -- listObjects's own continuation token was fetched but never read.
- */
-describe('Transcript bucket pagination', () => {
-  it('requests 200 at a time and exposes a continuation token when more remain', () => {
-    const responses = new Subject<any>();
-    const listObjects = vi.fn(() => responses.asObservable());
-    const t = transcriptWithStorage(listObjects);
-
-    t.onBucketChange('etl-avatar');
-    expect(listObjects).toHaveBeenCalledWith('etl-avatar', '', undefined, 200);
-
-    responses.next(page([{ name: '1000', key: '1000/', folder: true }], '2544/'));
-    expect(t.nextToken()).toBe('2544/');
-  });
-
-  it('loadMore appends the next page rather than replacing the current one', () => {
-    const responses = new Subject<any>();
-    const listObjects = vi.fn(() => responses.asObservable());
-    const t = transcriptWithStorage(listObjects);
-
-    t.onBucketChange('etl-avatar');
-    responses.next(page([{ name: '1000', key: '1000/', folder: true }], '2544/'));
-
-    t.loadMore();
-    expect(listObjects).toHaveBeenLastCalledWith('etl-avatar', '', '2544/', 200);
-    responses.next(page([{ name: '2545', key: '2545/', folder: true }]));
-
-    expect(t.folders().map(f => f.key)).toEqual(['1000/', '2545/']);
-    expect(t.nextToken()).toBeUndefined();
-  });
-
-  it('switching buckets clears a stale continuation token from the previous one', () => {
-    const responses = new Subject<any>();
-    const listObjects = vi.fn(() => responses.asObservable());
-    const t = transcriptWithStorage(listObjects);
-
-    t.onBucketChange('etl-avatar');
-    responses.next(page([], '2544/'));
-    expect(t.nextToken()).toBe('2544/');
-
-    t.onBucketChange('etl-bucket');
-    expect(t.nextToken()).toBeUndefined();
-  });
-});
-
-/**
- * A folder that could not be read. The breadcrumb moved to the new folder before the request,
- * and a refusal or a failure was dropped -- so the previous level's folders and files sat under
- * the new breadcrumb, or "Nothing here" claimed a folder was empty when it had not been read.
- */
-describe('Transcript folder that cannot be read', () => {
-  function openedThenRefused(refusal: (answers: Subject<any>) => void) {
-    const answers = new Subject<any>();
-    const listObjects = vi.fn(() => answers.asObservable());
-    const screen = transcriptWithStorage(listObjects);
-    screen.onBucketChange('etl-avatar');
-    answers.next(page([{ name: '1000', key: '1000/', folder: true }, { name: 'a.mp3', key: 'a.mp3', folder: false }, { name: 'b.pdf', key: 'b.pdf', folder: false }]));
-    screen.openFolder('1000/');
-    refusal(answers);
-    return { screen, listObjects };
+    ] });
+    return { t: TestBed.runInInjectionContext(() => new Transcript()), open };
   }
 
-  it('does not show the previous folder under the new breadcrumb, and says why', () => {
-    const { screen } = openedThenRefused(a => a.next({ status: 'ERROR', message: 'Access denied to 1000/.' }));
-    expect(screen.prefix()).toBe('1000/');
-    expect(screen.folders()).toEqual([]);
-    expect(screen.browseError()).toBe('Access denied to 1000/.');
-    expect(screen.nothingHere()).toBe(false);
+  it('opens the shared ObjectPicker for mp3 and m4a files', () => {
+    const { t, open } = picking(undefined);
+    t.chooseFile();
+    expect(open.mock.calls[0][0]).toBe(ObjectPicker);
+    expect(open.mock.calls[0][1].data.extensions).toEqual(['mp3', 'm4a']);
   });
 
-  it('says so when the request itself fails, and can try again', () => {
-    const { screen, listObjects } = openedThenRefused(a => a.error({ error: { message: 'Gateway timeout.' } }));
-    expect(screen.browseError()).toBe('Gateway timeout.');
-    screen.retryBrowse();
-    expect(listObjects).toHaveBeenLastCalledWith('etl-avatar', '1000/', undefined, 200);
+  it('takes the picked bucket and key, and reopens in that folder next time', () => {
+    const { t, open } = picking({ bucket: 'audio', key: 'calls/2026/one.mp3', name: 'one.mp3' });
+    t.mode.set('bucket');
+    t.chooseFile();
+    expect(t.bucket()).toBe('audio');
+    expect(t.selectedKey()).toBe('calls/2026/one.mp3');
+    expect(t.canExtract()).toBe(true);
+    t.chooseFile();
+    expect(open.mock.calls[1][1].data).toMatchObject({ bucket: 'audio', prefix: 'calls/2026/' });
   });
 });
 

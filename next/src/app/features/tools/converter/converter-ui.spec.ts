@@ -78,7 +78,7 @@ describe('Converter, rendered', () => {
     expect(c.result()).toBeNull();
   });
 
-  it('has a page head, a named folder filter, an expandable formats list and an Actions column', () => {
+  it('has a page head, an expandable formats list and an Actions column', () => {
     const { el, c, fixture } = converter(answer(() => ({ status: 'SUCCESS', data: [TASK(1)] })));
     expect(el.querySelector('.page-head .page-title')?.textContent).toContain('Document Converter');
     const formats = [...el.querySelectorAll('button')].find(b => b.textContent!.includes('Supported formats'))!;

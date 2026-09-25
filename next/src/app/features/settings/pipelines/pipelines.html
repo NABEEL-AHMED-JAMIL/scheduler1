@@ -52,7 +52,7 @@
       <app-view-toggle [(value)]="view" key="pipelines" cardsIcon="template" />
       @if (isPlatformAdmin()) {
         <div class="w-48">
-          <app-combobox id="pipelines-tenant" [selected]="tenantFilter()" (selectedChange)="setFilter(tenantFilter, $event)"
+          <app-combobox id="pipelines-tenant" ariaLabel="Filter by workspace" [selected]="tenantFilter()" (selectedChange)="setFilter(tenantFilter, $event)"
                         placeholder="All workspaces" clearLabel="All workspaces" [options]="tenantOptions()" />
         </div>
       }

@@ -920,3 +920,19 @@ describe('the grid, audit 09-22', () => {
     expect(toggle.classList).toContain('btn-primary');
   });
 });
+
+describe('the filter row header, audit 09-22 (deferred)', () => {
+  // Not the shared .th-static: that class sets a heading's type (11px uppercase), it does not
+  // unpin. The !static utility wins over .scroll-table's sticky rule without an inline style.
+  it('unpins the filter row with a utility class, not an inline style', () => {
+    const grid = gridWith();
+    grid.openFilters();
+    const cells = Array.from(grid.element.querySelectorAll<HTMLElement>('thead tr:nth-child(2) th'));
+    expect(cells.length).toBeGreaterThan(0);
+    for (const th of cells) {
+      expect(th.classList).toContain('!static');
+      expect(th.classList).not.toContain('th-static');
+      expect(th.getAttribute('style') ?? '').not.toContain('position');
+    }
+  });
+});

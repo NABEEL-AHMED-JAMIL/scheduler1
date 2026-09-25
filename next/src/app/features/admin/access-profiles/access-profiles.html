@@ -13,7 +13,7 @@
              before the options exist, so a deep-linked tenantId showed "Choose a workspace…"
              above a grid that had already loaded that tenant's people. -->
         <div class="w-56" data-testid="tenant-picker">
-          <app-combobox id="ap-tenant" [selected]="tenantId() ?? ''" (selectedChange)="pickTenant($event)"
+          <app-combobox id="ap-tenant" ariaLabel="Workspace" [selected]="tenantId() ?? ''" (selectedChange)="pickTenant($event)"
                         placeholder="Choose a workspace…" clearLabel="Choose a workspace…" [options]="tenantOptions()" />
         </div>
       }
