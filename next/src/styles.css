@@ -1488,6 +1488,9 @@ html.dark {
      with justify-between alone a lone second-row item sat flush left under the text. The
      subtitle is capped so on a wide screen it does not push the actions down at all. */
   .page-head > :last-child:not(:first-child) { margin-left: auto; }
+  /* ...and its own row of actions wraps rather than running off a phone: Access profiles' picker
+     plus two buttons pushed "New profile" 27px past the edge of a 390px screen. */
+  .page-head > :last-child:not(:first-child) { flex-wrap: wrap; justify-content: flex-end; }
   .page-head > :first-child { max-width: 64rem; min-width: 0; }
   /* A heading's actions are .btn-sm; a field among them (workspace picker, date range, search)
      took the full 2.25rem .input and stood a third taller than the buttons beside it. Same padding,
@@ -1888,6 +1891,11 @@ html.dark .btn-circle-danger:hover:not(:disabled) { background: color-mix(in okl
      key, "xxxxxxxx...") ran straight out of its card -- a tenant request's purpose did, by 37,000px.
      It may now break anywhere, but only when it has to. */
   :where(.whitespace-pre-wrap, .whitespace-pre-line) { overflow-wrap: anywhere; }
+
+  /* A grid cell may not grow past its track. A grid item's min-width is auto -- its content's --
+     so a card holding a long name (a storage connection "MIG-216 Azurite"...) widened its column
+     and pushed a phone's page sideways, and the name's own truncate never got to act. */
+  :where(.grid) > :where(*) { min-width: 0; }
 
   :where(.page, .page-form, .page-tool, [class*="space-y-"]) > :where(:not(
     div, section, form, header, footer, nav, article, aside, main, p, h1, h2, h3, h4, h5, h6, ul, ol, dl,
