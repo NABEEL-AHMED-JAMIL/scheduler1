@@ -86,3 +86,20 @@ describe('Job assistant layout', () => {
     expect(dl).toContain('[class.sm:grid-cols-2]="!compact()"');
   });
 });
+
+describe('Job editor weekday toggles', () => {
+  /**
+   * Several days can be on at once, so "on" has to stand out from the track by itself. The single-
+   * select .seg-on (a white chip on a grey track) measured 1.06:1 in light and 1.13:1 in dark.
+   */
+  it('fills a selected day with the primary button colours and marks it with a check', async () => {
+    const html = await read('edit/job-edit.html');
+    const group = html.slice(html.indexOf('aria-labelledby="days-of-week"') - 80);
+    const block = group.slice(0, group.indexOf('</div>'));
+    expect(block).toContain('seg-multi');
+    expect(block).not.toContain('seg-on');
+    expect(block).toContain('name="check"');
+    const ts = await read('edit/job-edit.ts');
+    expect(ts).toMatch(/\.seg-multi \.seg-btn\[aria-pressed="true"\]\s*\{[^}]*var\(--btn-primary-bg\)/);
+  });
+});

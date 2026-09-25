@@ -64,6 +64,23 @@ function endAfterStart(group: AbstractControl): ValidationErrors | null {
   selector: 'app-job-edit',
   imports: [Icon, ReactiveFormsModule, RouterLink, Field, Combobox, LoadError],
   templateUrl: './job-edit.html',
+  /*
+   * The weekday picker is the one multi-select .seg: several days can be on at once, so "on" has
+   * to stand out from the track by itself (WCAG 1.4.11), not by being the one chip that differs.
+   * The shared .seg-on -- a white chip on a grey track -- measured 1.06:1 in light and 1.13:1 in
+   * dark. The filled primary-button colours are defined for both themes.
+   */
+  styles: `
+    .seg-multi .seg-btn[aria-pressed="true"] {
+      background: var(--btn-primary-bg);
+      color: var(--btn-primary-fg);
+      box-shadow: none;
+    }
+    .seg-multi .seg-btn[aria-pressed="true"]:hover:not(:disabled) {
+      background: var(--btn-primary-hover);
+      color: var(--btn-primary-fg);
+    }
+  `,
 })
 export class JobEdit implements OnInit {
   readonly jobId = input<string>('');
