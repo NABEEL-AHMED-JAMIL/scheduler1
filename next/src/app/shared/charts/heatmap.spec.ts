@@ -35,9 +35,9 @@ function heatmapWith(cells: { day: string; hour: number; value: number }[]): Hea
 describe('how busy an hour looks', () => {
 
   const week = [
-    { day: 'Mon', hour: 9, value: 1 },
-    { day: 'Mon', hour: 10, value: 40 },
-    { day: 'Tue', hour: 11, value: 83 },
+    { day: 'Monday', hour: 9, value: 1 },
+    { day: 'Monday', hour: 10, value: 40 },
+    { day: 'Tuesday', hour: 11, value: 83 },
   ];
 
   it('paints from a token that each theme defines for itself', () => {
@@ -69,4 +69,44 @@ describe('how busy an hour looks', () => {
   function percentIn(shade: string): number {
     return Number(/(\d+)%/.exec(shade)![1]);
   }
+});
+
+/**
+ * Over more than a week the same weekday and hour comes round again, and each later date replaced
+ * the one before: four Thursdays at 10pm with 4, 11, 8 and 5 runs drew 5, and "Busiest hour" was
+ * read from the raw cells, so it could name a figure no drawn cell showed.
+ */
+describe('a range longer than a week', () => {
+  const thursdays = [
+    { day: 'Thursday', hour: 22, value: 4, key: '2026-09-03' },
+    { day: 'Thursday', hour: 22, value: 11, key: '2026-09-10' },
+    { day: 'Thursday', hour: 22, value: 8, key: '2026-09-17' },
+    { day: 'Thursday', hour: 22, value: 5, key: '2026-09-24' },
+    { day: 'Thursday', hour: 9, value: 0, key: '2026-09-24' },
+  ];
+
+  it('adds up the runs of every date that falls on the same weekday and hour', () => {
+    const heatmap = heatmapWith(thursdays);
+    const cell = heatmap.rows()[0].cells[22];
+    expect(cell.value).toBe(28);
+    expect(cell.keys).toEqual(['2026-09-03', '2026-09-10', '2026-09-17', '2026-09-24']);
+  });
+
+  it('reads the busiest hour from the cells it draws', () => {
+    const heatmap = heatmapWith(thursdays);
+    expect(heatmap.max()).toBe(28);
+  });
+
+  it('says how many dates a cell covers', () => {
+    const heatmap = heatmapWith(thursdays);
+    expect(heatmap.tooltip('Thursday', heatmap.rows()[0].cells[22])).toBe('Thursday 10p — 28 runs across 4 dates');
+  });
+
+  it('keeps one date as the cell key when only one date is in it', () => {
+    const heatmap = heatmapWith([{ day: 'Monday', hour: 9, value: 3, key: '2026-09-21' }] as never);
+    const cell = heatmap.rows()[0].cells[9];
+    expect(cell.key).toBe('2026-09-21');
+    expect(cell.keys).toEqual(['2026-09-21']);
+    expect(heatmap.tooltip('Monday', cell)).toBe('Monday 9a — 3 runs');
+  });
 });

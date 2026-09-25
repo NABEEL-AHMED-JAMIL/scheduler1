@@ -76,7 +76,8 @@ export class Dashboard implements OnInit {
   /** The same for the hour drill-down, which said "No jobs ran in this hour." after a failure. */
   readonly breakdownError = signal('');
   readonly breakdownLoading = signal(false);
-  readonly selectedCell = signal<{ date: string; hr: number } | null>(null);
+  /** The hour drilled into: one date, and every date its heatmap cell covers (several over a long range). */
+  readonly selectedCell = signal<{ date: string; hr: number; day: string; dates: string[] } | null>(null);
   readonly breakdownSearch = signal('');
 
   readonly columns = BREAKDOWN_COLUMNS;
@@ -122,9 +123,7 @@ export class Dashboard implements OnInit {
 
   readonly selectedHeat = computed(() => {
     const cell = this.selectedCell();
-    if (!cell) return null;
-    const match = this.hourly().find(h => h.date === cell.date && h.hr === cell.hr);
-    return match ? { day: match.dayCode, hour: match.hr } : null;
+    return cell ? { day: cell.day, hour: cell.hr } : null;
   });
 
   /**
@@ -200,13 +199,30 @@ export class Dashboard implements OnInit {
 
   /** Clicking an hour cell drills into which jobs ran in that exact hour. */
   onHeatCell(selection: HeatSelection): void {
-    this.selectCell(selection.key ?? '', selection.hour, selection.value);
+    this.selectCell(selection.key ?? '', selection.hour, selection.value, selection.day, selection.keys);
   }
 
-  selectCell(date: string, hr: number, count: number): void {
+  selectCell(date: string, hr: number, count: number, day?: string, dates?: string[]): void {
     if (!count || !date) return;
-    this.selectedCell.set({ date, hr });
+    const dayName = day ?? this.hourly().find(h => h.date === date)?.dayCode ?? '';
+    this.selectedCell.set({ date, hr, day: dayName, dates: dates?.length ? dates : [date] });
     this.readBreakdown(date, hr);
+  }
+
+  /** "24 Sep" from "2026-09-24", read as a calendar date (no time zone to shift it a day). */
+  dateLabel(date: string): string {
+    const [y, m, d] = date.split('-').map(Number);
+    if (!y || !m || !d) return date;
+    return `${d} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m - 1]}`;
+  }
+
+  /** Another of the dates the selected cell covers: same weekday and hour, that date's jobs. */
+  pickDate(date: string): void {
+    const cell = this.selectedCell();
+    if (!cell || cell.date === date || !cell.dates.includes(date)) return;
+    this.selectedCell.set({ ...cell, date });
+    this.breakdownSearch.set('');
+    this.readBreakdown(date, cell.hr);
   }
 
   /** Try again on the drill-down: the same hour, read afresh. */

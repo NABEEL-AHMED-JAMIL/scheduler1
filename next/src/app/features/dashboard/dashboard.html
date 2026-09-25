@@ -89,7 +89,7 @@
   @if (selectedCell(); as cell) {
     <!-- The table shell's loading, error (with Try again) and empty states; the card used to
          hand-roll them and had no error state, so a failed read said "No jobs ran in this hour." -->
-    <app-table-shell [heading]="'Jobs in ' + cell.date + ' at ' + hourLabel(cell.hr)"
+    <app-table-shell [heading]="'Jobs on ' + (cell.day ? cell.day + ' ' : '') + dateLabel(cell.date) + ' at ' + hourLabel(cell.hr)"
                      [loading]="breakdownLoading()" [error]="breakdownError()"
                      [isEmpty]="!filteredBreakdown().length"
                      [shown]="breakdownRows().length ? filteredBreakdown().length : null"
@@ -98,6 +98,15 @@
                      emptyIcon="clock"
                      (retry)="retryBreakdown()">
       <ng-container toolbar>
+        <!-- Over more than a week one cell is several dates; the breakdown is for one of them. -->
+        @if (cell.dates.length > 1) {
+          <div class="seg max-w-full overflow-x-auto" role="group" [attr.aria-label]="'Dates in this cell'">
+            @for (date of cell.dates; track date) {
+              <button type="button" class="seg-btn tabular" [class.seg-on]="date === cell.date"
+                      [attr.aria-pressed]="date === cell.date" (click)="pickDate(date)">{{ dateLabel(date) }}</button>
+            }
+          </div>
+        }
         <div class="search-field max-w-56">
           <app-icon name="search" size="0.95em" />
           <input class="input" placeholder="Search job id or name" aria-label="Search jobs in this hour"

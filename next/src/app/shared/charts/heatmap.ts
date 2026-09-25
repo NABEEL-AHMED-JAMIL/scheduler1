@@ -1,7 +1,12 @@
 import { Component, computed, input, output, signal } from '@angular/core';
 
-export interface HeatCell { day: string; hour: number; value: number; key?: string; }
-export interface HeatSelection { day: string; hour: number; key?: string; value: number; }
+/**
+ * `key` is what a click drills into (the dashboard's date). A range longer than a week brings the
+ * same weekday and hour round again; those cells are added up, and `keys` lists every date with runs
+ * in them, oldest first. `key` is then the latest of them.
+ */
+export interface HeatCell { day: string; hour: number; value: number; key?: string; keys?: string[]; }
+export interface HeatSelection { day: string; hour: number; key?: string; keys?: string[]; value: number; }
 
 const DAY_ORDER = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
@@ -48,7 +53,7 @@ const HOURS = Array.from({ length: 24 }, (_, i) => i);
                       (mouseleave)="hovered.set(null)"
                       (focus)="hovered.set({ day: row.day, cell })"
                       (blur)="hovered.set(null)"
-                      (click)="cellClicked.emit({ day: row.day, hour: cell.hour, key: cell.key, value: cell.value })">
+                      (click)="cellClicked.emit({ day: row.day, hour: cell.hour, key: cell.key, keys: cell.keys, value: cell.value })">
                 <span class="sr-only">{{ tooltip(row.day, cell) }}</span>
               </button>
             }
@@ -63,7 +68,8 @@ const HOURS = Array.from({ length: 24 }, (_, i) => i);
               <span class="font-medium">{{ hover.day }} {{ hourLabel(hover.cell.hour) }}</span>
               <span class="text-[color:var(--text-secondary)]">
                 &middot; {{ hover.cell.value }} run{{ hover.cell.value === 1 ? '' : 's' }}
-                @if (hover.cell.key) { &middot; {{ hover.cell.key }} }
+                @if ((hover.cell.keys?.length ?? 0) > 1) { &middot; across {{ hover.cell.keys!.length }} dates }
+                @else if (hover.cell.key) { &middot; {{ hover.cell.key }} }
               </span>
             </span>
           }
@@ -92,20 +98,27 @@ export class Heatmap {
   readonly hovered = signal<{ day: string; cell: HeatCell } | null>(null);
   readonly legend = [0, 0.25, 0.5, 0.75, 1];
 
-  readonly max = computed(() => Math.max(1, ...this.data().map(c => c.value ?? 0)));
-
   readonly rows = computed(() => {
     const byDay = new Map<string, Map<number, HeatCell>>();
     for (const cell of this.data()) {
       if (!byDay.has(cell.day)) byDay.set(cell.day, new Map());
-      byDay.get(cell.day)!.set(cell.hour, cell);
+      const hours = byDay.get(cell.day)!;
+      const prev = hours.get(cell.hour);
+      const value = (prev?.value ?? 0) + (cell.value ?? 0);
+      const keys = [...(prev?.keys ?? [])];
+      if (cell.key && cell.value && !keys.includes(cell.key)) keys.push(cell.key);
+      keys.sort();
+      hours.set(cell.hour, { day: cell.day, hour: cell.hour, value, keys, key: keys[keys.length - 1] ?? cell.key });
     }
     return DAY_ORDER.filter(day => byDay.has(day)).map(day => ({
       day,
       cells: HOURS.map(hour => byDay.get(day)!.get(hour)
-        ?? { day, hour, value: 0, key: undefined }),
+        ?? { day, hour, value: 0, key: undefined, keys: [] }),
     }));
   });
+
+  /** The busiest cell as drawn, so the legend never names a figure no cell shows. */
+  readonly max = computed(() => Math.max(1, ...this.rows().flatMap(row => row.cells.map(c => c.value))));
 
   background(value: number): string {
     if (!value) return 'var(--surface-sunken)';
@@ -125,9 +138,10 @@ export class Heatmap {
   }
 
   tooltip(day: string, cell: HeatCell): string {
-    return cell.value
-      ? `${day} ${this.hourLabel(cell.hour)} — ${cell.value} run${cell.value === 1 ? '' : 's'}`
-      : `${day} ${this.hourLabel(cell.hour)} — no runs`;
+    if (!cell.value) return `${day} ${this.hourLabel(cell.hour)} — no runs`;
+    const dates = cell.keys?.length ?? 0;
+    return `${day} ${this.hourLabel(cell.hour)} — ${cell.value} run${cell.value === 1 ? '' : 's'}`
+      + (dates > 1 ? ` across ${dates} dates` : '');
   }
 
   hourLabel(hour: number): string {

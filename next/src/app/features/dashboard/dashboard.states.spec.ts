@@ -13,8 +13,13 @@ const ok = () => of({ status: 'SUCCESS', data: [] });
 function dashboard(answers: Answers = {}) {
   const calls: string[] = [];
   const service: Record<string, unknown> = {};
+  const breakdownDates: string[] = [];
   for (const name of ['jobStatus', 'jobRunning', 'weekly', 'hourly', 'breakdown'] as const) {
-    service[name] = () => { calls.push(name); return (answers[name] ?? ok)(); };
+    service[name] = (...args: unknown[]) => {
+      calls.push(name);
+      if (name === 'breakdown') breakdownDates.push(String(args[0]));
+      return (answers[name] ?? ok)();
+    };
   }
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
@@ -25,7 +30,7 @@ function dashboard(answers: Answers = {}) {
       { provide: Router, useValue: { navigate: () => {} } },
     ],
   });
-  return { dashboard: TestBed.runInInjectionContext(() => new Dashboard()), calls };
+  return { dashboard: TestBed.runInInjectionContext(() => new Dashboard()), calls, breakdownDates };
 }
 
 const localDay = (d: Date) =>
@@ -109,5 +114,38 @@ describe('Dashboard default range', () => {
     const weekAgo = new Date(now); weekAgo.setDate(now.getDate() - 6);
     expect(d.endDate()).toBe(localDay(now));
     expect(d.startDate()).toBe(localDay(weekAgo));
+  });
+});
+
+/**
+ * Over more than a week one heatmap cell holds several dates (every Thursday at 10pm). The
+ * breakdown and the history links it opens are for one date, so the drill-down opens on the latest
+ * of them and offers the others, rather than showing only whichever date happened to be drawn.
+ */
+describe('Dashboard drill-down into a cell covering several dates', () => {
+  const thursdays = ['2026-09-03', '2026-09-10', '2026-09-17', '2026-09-24'];
+
+  it('opens on the latest date and lists every date in the cell', () => {
+    const { dashboard: d, breakdownDates } = dashboard();
+    d.onHeatCell({ day: 'Thursday', hour: 22, key: '2026-09-24', keys: thursdays, value: 28 });
+    expect(d.selectedCell()).toEqual({ date: '2026-09-24', hr: 22, day: 'Thursday', dates: thursdays });
+    expect(breakdownDates).toEqual(['2026-09-24']);
+  });
+
+  it('reads another of the cell\'s dates when it is picked, and keeps the heatmap cell selected', () => {
+    const { dashboard: d, breakdownDates } = dashboard();
+    d.onHeatCell({ day: 'Thursday', hour: 22, key: '2026-09-24', keys: thursdays, value: 28 });
+    d.pickDate('2026-09-10');
+    expect(d.selectedCell()?.date).toBe('2026-09-10');
+    expect(breakdownDates).toEqual(['2026-09-24', '2026-09-10']);
+    expect(d.selectedHeat()).toEqual({ day: 'Thursday', hour: 22 });
+  });
+
+  it('ignores a date the cell does not hold', () => {
+    const { dashboard: d, breakdownDates } = dashboard();
+    d.onHeatCell({ day: 'Thursday', hour: 22, key: '2026-09-24', keys: thursdays, value: 28 });
+    d.pickDate('2026-09-11');
+    expect(d.selectedCell()?.date).toBe('2026-09-24');
+    expect(breakdownDates).toHaveLength(1);
   });
 });
