@@ -51,7 +51,9 @@
          UL's own border, which has no width -- so nothing was ever drawn. -->
     <ul class="divide-y">
       @for (item of paged(); track item.notificationId) {
-        <li class="notification-row" [class.is-unread]="!item.read"
+        <!-- Below sm the date and buttons wrap to their own line; beside the text they left the
+             message a ~90px column on a phone. gap-y-2 spaces that second line. -->
+        <li class="notification-row flex-wrap sm:flex-nowrap gap-y-2" [class.is-unread]="!item.read"
             [style.--tone]="toneOf(item)">
           <app-icon [name]="glyphOf(item)" [class]="intentOf(item)" size="1.1em"
                     class="mt-0.5 shrink-0" />
@@ -71,17 +73,18 @@
             }
           </div>
 
-          <div class="flex items-center gap-1 shrink-0">
-            <span class="text-xs text-[color:var(--text-muted)] whitespace-nowrap">
+          <!-- The indent is the glyph plus the row gap, so the line starts under the title. -->
+          <div class="notification-actions flex items-center gap-1 shrink-0 w-full sm:w-auto pl-[calc(1.1em+0.75rem)] sm:pl-0">
+            <span class="text-xs text-[color:var(--text-muted)] whitespace-nowrap mr-auto sm:mr-0">
               {{ when(item.dateCreated) | serverTime: 'd MMM, HH:mm' }}
             </span>
 
             @if (!item.read) {
-              <button type="button" class="btn btn-ghost btn-icon btn-sm btn-intent-ok"
+              <button type="button" class="btn btn-ghost btn-icon btn-sm btn-intent-ok max-sm:gap-1"
                       title="Mark as read" aria-label="Mark as read"
                       [disabled]="isMarking(item)"
                       (click)="markRead(item)">
-                <app-icon name="check" size="0.9em" [busy]="isMarking(item)" />
+                <app-icon name="check" [busy]="isMarking(item)" /><span class="sm:hidden">Mark read</span>
               </button>
             }
 
