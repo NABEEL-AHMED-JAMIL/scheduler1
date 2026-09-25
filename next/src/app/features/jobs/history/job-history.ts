@@ -16,6 +16,8 @@ import { copyText } from '../../../shared/ui/clipboard.util';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { SplitBar } from '../../../shared/charts/split-bar';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
+import { createPager } from '../../../shared/ui/pager';
+import { Pagination } from '../../../shared/ui/pagination';
 
 interface JobQueue {
   jobQueueId: number;
@@ -33,7 +35,7 @@ interface JobQueue {
 
 @Component({
   selector: 'app-job-history',
-  imports: [JobAssistant, Icon, ServerTimePipe, RouterLink, TableShell, StatusPill, StatusFilterChip, Donut, BarChart, SplitBar],
+  imports: [JobAssistant, Icon, ServerTimePipe, RouterLink, TableShell, StatusPill, StatusFilterChip, Donut, BarChart, SplitBar, Pagination],
   templateUrl: './job-history.html',
 })
 export class JobHistory {
@@ -127,6 +129,26 @@ export class JobHistory {
       return `${run.jobQueueId} ${run.jobStatusMessage ?? ''}`.toLowerCase().includes(term);
     });
   });
+
+  /**
+   * A long-lived job's history is every run it ever made, so the table pages like Jobs, Tasks
+   * and Queue instead of rendering thousands of rows in one piece.
+   */
+  readonly pager = createPager<JobQueue>();
+  readonly paged = computed(() => this.pager.slice(this.filtered()));
+  goToPage(next: number): void { this.pager.goTo(next, this.filtered().length); }
+  setPageSize(size: number): void { this.pager.setSize(size); }
+
+  /** Filters change what "page 2" holds, so each goes back to the first page. */
+  setStatusFilter(status: string): void { this.statusFilter.set(status); this.pager.reset(); }
+  setSearch(term: string): void { this.search.set(term); this.pager.reset(); }
+  clearFilters(): void { this.setStatusFilter(''); this.setSearch(''); }
+
+  /** Why the table is empty -- a filter, an empty hour, or a job that has never run. */
+  readonly emptyMessage = computed(() =>
+    this.statusFilter() || this.search().trim() ? 'No runs match the current filters.'
+      : this.isDrillDown() ? 'No runs in this hour.'
+      : 'This job has never run.');
 
   /** Counts per status, so the shape of a job's history reads at a glance. */
   readonly summary = computed(() => {
