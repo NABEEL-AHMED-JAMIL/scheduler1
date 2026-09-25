@@ -101,7 +101,12 @@ export class Dashboard implements OnInit {
   /** The real statuses, with the "All" total removed so it can't appear as a slice. */
   readonly statusCategories = computed(() =>
     this.jobStatus().filter(d => (d.name ?? '').toLowerCase() !== 'all'));
-  readonly runningNow  = computed(() => this.valueOf(this.jobRunning(), 'running'));
+  /**
+   * The job tiles are the workspace now, whatever the range (the charts are the runs in it). A run the
+   * engine has started but the worker has not picked up is Start, and it is running as far as anyone
+   * watching is concerned; it was left out.
+   */
+  readonly runningNow  = computed(() => this.valueOf(this.jobRunning(), 'running') + this.valueOf(this.jobRunning(), 'start'));
   readonly completed   = computed(() => this.valueOf(this.jobRunning(), 'completed'));
   readonly failed      = computed(() => this.valueOf(this.jobRunning(), 'failed'));
 

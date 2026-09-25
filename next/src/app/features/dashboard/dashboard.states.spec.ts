@@ -149,3 +149,16 @@ describe('Dashboard drill-down into a cell covering several dates', () => {
     expect(breakdownDates).toHaveLength(1);
   });
 });
+
+describe('Dashboard running-now tile', () => {
+  it('counts a run the engine has started as running', () => {
+    const { dashboard: d } = dashboard({
+      jobRunning: () => of({ status: 'SUCCESS', data: [
+        { name: 'RUNNING', value: 2 }, { name: 'START', value: 1 },
+        { name: 'FAILED', value: 4 }] }),
+    });
+    d.load();
+    expect(d.runningNow()).toBe(3);
+    expect(d.failed()).toBe(4);
+  });
+});

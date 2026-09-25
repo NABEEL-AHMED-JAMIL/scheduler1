@@ -35,8 +35,8 @@
         <app-stat-tile label="Total jobs"  [value]="totalJobs()"  icon="briefcase" tone="info" />
         <app-stat-tile label="Active jobs" [value]="activeJobs()" icon="zap" tone="ok" />
         <app-stat-tile label="Running now" [value]="runningNow()" icon="play" tone="info" />
-        <app-stat-tile label="Completed"   [value]="completed()"  icon="checkCircle" tone="ok" />
-        <app-stat-tile label="Failed"      [value]="failed()"     icon="xCircle" tone="crit" />
+        <app-stat-tile label="Last run completed" [value]="completed()" foot="jobs" icon="checkCircle" tone="ok" />
+        <app-stat-tile label="Last run failed" [value]="failed()" foot="jobs" icon="xCircle" tone="crit" />
         <a routerLink="/notifications" class="block rounded-[var(--radius-card)] hover:shadow-md transition-shadow"
            [attr.aria-label]="unread() + ' unread notifications'">
           <app-stat-tile label="Unread" [value]="unread()" icon="bell" tone="warn" />
