@@ -1,10 +1,10 @@
-import { Component, OnDestroy, OnInit, computed, effect, inject, signal , untracked } from '@angular/core';
-import { Combobox } from '../../../shared/ui/combobox';
+import { Component, OnDestroy, computed, effect, inject, signal, untracked } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { copyText } from '../../../shared/ui/clipboard.util';
-import { BucketSummary, ObjectSummary, StorageService } from '../../objects/storage.service';
+import { Dialog } from '@angular/cdk/dialog';
+import { ObjectPicker, PickedObject, objectPickerConfig } from '../../../shared/ui/object-picker';
 import { Icon } from '../../../shared/ui/icon';
 import { Segmented, SegmentOption } from '../../../shared/ui/segmented';
 import { FileDropzone } from '../../../shared/ui/file-dropzone';
@@ -15,12 +15,12 @@ const AUDIO_EXTENSIONS = ['mp3', 'm4a'];
 
 @Component({
   selector: 'app-transcript',
-  imports: [Icon, Segmented, FileDropzone, ReadAlongText, Combobox],
+  imports: [Icon, Segmented, FileDropzone, ReadAlongText],
   templateUrl: './transcript.html',
 })
-export class Transcript implements OnInit, OnDestroy {
+export class Transcript implements OnDestroy {
   private readonly http = inject(HttpClient);
-  private readonly storage = inject(StorageService);
+  private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
   readonly reader = inject(ReadAloudService);
 
@@ -32,10 +32,7 @@ export class Transcript implements OnInit, OnDestroy {
   readonly timestamps = signal(false);
   readonly file = signal<File | null>(null);
 
-  readonly buckets = signal<BucketSummary[]>([]);
   readonly bucket = signal('');
-  readonly objects = signal<ObjectSummary[]>([]);
-  readonly loadingObjects = signal(false);
   readonly selectedKey = signal('');
 
   readonly extracting = signal(false);
@@ -98,131 +95,26 @@ export class Transcript implements OnInit, OnDestroy {
       .join('\n');
   }
 
-  /** Where in the bucket the picker is looking. Empty is the root. */
-  readonly prefix = signal('');
-
-  /** Set when a level has more entries than one page returned; the token to fetch the rest.
-      Undefined means either the level is fully loaded or hasn't loaded yet. Without this, a
-      folder holding more than 200 entries (an "ETL Avatars"-style bucket with hundreds of
-      per-user folders is a real example) silently truncated at 200 with no way to reach
-      anything past it -- the audio being looked for could be sitting just past the cut. */
-  readonly nextToken = signal<string | undefined>(undefined);
-
-  /** Folders at this level, so audio nested inside them can be reached. */
-  readonly folders = computed(() => this.objects().filter(o => o.folder));
-  /** A bucket can hold hundreds of folders at one level; past a dozen they get a filter. */
-  readonly folderFilter = signal('');
-  readonly filteredFolders = computed(() => {
-    const q = this.folderFilter().trim().toLowerCase();
-    const all = this.folders();
-    return q ? all.filter(f => (f.name ?? '').toLowerCase().includes(q)) : all;
-  });
-  readonly folderFilterWorthIt = computed(() => this.folders().length > 12);
-
-  readonly bucketOptions = computed(() => this.buckets().map(b => ({ value: b.bucket, label: b.label || b.bucket, hint: b.provider })));
-  readonly fileOptions = computed(() => this.audioObjects().map(o => ({ value: o.key, label: o.name, hint: o.key })));
-  readonly audioObjects = computed(() =>
-    this.objects().filter(o => !o.folder && AUDIO_EXTENSIONS.some(e => o.name.toLowerCase().endsWith('.' + e))));
-
-  /** Breadcrumb segments for the current prefix, each with the prefix to jump back to. */
-  readonly crumbs = computed(() => {
-    const parts = this.prefix().split('/').filter(Boolean);
-    return parts.map((name, i) => ({ name, prefix: parts.slice(0, i + 1).join('/') + '/' }));
-  });
-
-  /** True when this level holds neither audio nor anywhere further to look. */
-  readonly nothingHere = computed(() =>
-    !this.loadingObjects() && !this.browseError() && !this.audioObjects().length && !this.folders().length);
-
   readonly canExtract = computed(() =>
     this.mode() === 'upload' ? !!this.file() : !!this.selectedKey());
 
-  ngOnInit(): void {
-    this.storage.buckets().subscribe({
-      next: response => {
-        if (response.status === API_SUCCESS) this.buckets.set(response.data ?? []);
-      },
-      error: () => { /* upload mode still works without a bucket list */ },
+  /**
+   * Chooses the audio in the console's one ObjectPicker, which offers only mp3 and m4a and
+   * reopens in the folder of the last pick; dismissing it keeps that pick.
+   */
+  chooseFile(): void {
+    const key = this.selectedKey();
+    this.dialog.open<PickedObject | undefined>(ObjectPicker, objectPickerConfig({
+      heading: 'Pick an audio file',
+      bucket: this.bucket() || undefined,
+      prefix: key ? key.slice(0, key.lastIndexOf('/') + 1) : undefined,
+      extensions: AUDIO_EXTENSIONS,
+    })).closed.subscribe(picked => {
+      if (!picked) return;
+      this.bucket.set(picked.bucket);
+      this.selectedKey.set(picked.key);
     });
   }
-
-  onBucketChange(value: string): void {
-    this.bucket.set(value);
-    this.selectedKey.set('');
-    this.objects.set([]);
-    this.nextToken.set(undefined);
-    this.prefix.set('');
-    if (!value) return;
-    this.browse('');
-  }
-
-  /** Descend into a folder. */
-  openFolder(key: string): void { this.browse(key); }
-
-  /** Jump to a breadcrumb, or to the bucket root when given nothing. */
-  goTo(prefix: string): void { this.browse(prefix); }
-
-  /** Fetches the next page of the level currently open, appending rather than replacing. */
-  loadMore(): void { this.browse(this.prefix(), true); }
-
-  /**
-   * Lists one level of the bucket.
-   *
-   * The audio this tool is for is rarely at the root -- ours sits two levels down, under
-   * audio_text/input -- and listing only the root showed an empty picker on a bucket holding
-   * forty files. Folders are listed alongside the audio so there is somewhere to go, rather
-   * than being filtered out and leaving the tool looking broken.
-   */
-  /**
-   * Why the folder in the breadcrumb could not be read. A refusal or a failed request was
-   * dropped, which left the previous level's folders and files under the new breadcrumb -- or
-   * "Nothing here" for a folder that had not been read at all.
-   */
-  readonly browseError = signal('');
-
-  /** Reads the level in the breadcrumb again, after a failure. */
-  retryBrowse(): void { this.browse(this.prefix()); }
-
-  private browse(prefix: string, append = false): void {
-    this.prefix.set(prefix);
-    this.selectedKey.set('');
-    if (!append) this.folderFilter.set('');
-    this.browseError.set('');
-    this.loadingObjects.set(true);
-    // Only the newest listing may write: clicking through folders quickly would otherwise let
-    // a slow response for an abandoned one replace the level actually being viewed.
-    const ticket = ++this.browseTicket;
-    this.storage.listObjects(this.bucket(), prefix, append ? this.nextToken() : undefined, 200)
-      .subscribe({
-        next: response => {
-          if (ticket !== this.browseTicket) return;
-          this.loadingObjects.set(false);
-          if (response.status !== API_SUCCESS) {
-            this.failBrowse(response.message || 'This folder could not be read.', append);
-            return;
-          }
-          const page = response.data?.objects ?? [];
-          this.objects.update(current => (append ? [...current, ...page] : page));
-          this.nextToken.set(response.data?.nextContinuationToken);
-        },
-        error: err => {
-          if (ticket !== this.browseTicket) return;
-          this.loadingObjects.set(false);
-          this.failBrowse(err?.error?.message || 'This folder could not be read.', append);
-        },
-      });
-  }
-
-  /** A failed "load more" keeps what is listed; a failed level shows nothing it has not read. */
-  private failBrowse(message: string, append: boolean): void {
-    this.browseError.set(message);
-    if (!append) {
-      this.objects.set([]);
-      this.nextToken.set(undefined);
-    }
-  }
-
-  private browseTicket = 0;
 
   onFile(file: File | null): void {
     this.file.set(file);
