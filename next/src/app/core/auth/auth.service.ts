@@ -1,5 +1,5 @@
-import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { DestroyRef, Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Observable, tap } from 'rxjs';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../api/api.config';
@@ -249,10 +249,36 @@ export class AuthService {
       }));
   }
 
+  /**
+   * Signs out everywhere this session reaches: identity-service revokes the access and the refresh token (POST
+   * /auth.json/logout) -- forgetting them only in this tab left both working. Fire and forget: a server that cannot be
+   * reached must not keep anyone signed in here. Other open tabs follow through the storage event (see below).
+   */
   logout(): void {
+    const user = this.currentUser();
+    if (user?.accessToken) {
+      this.http.post(`${API_BASE}/auth.json/logout`, { refreshToken: user.refreshToken ?? null },
+        { headers: new HttpHeaders({ Authorization: `Bearer ${user.accessToken}` }) })
+        .subscribe({ error: () => { /* signed out here regardless */ } });
+    }
     this.clear();
     void this.router.navigate(['/login']);
   }
+
+  /** Another tab signed out (it removed the stored session): this tab signs out too instead of carrying on. */
+  private readonly followOtherTabs = (() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === STORAGE_KEY && event.newValue === null && this.currentUser()) {
+        this.currentUser.set(null);
+        void this.router.navigate(['/login']);
+      }
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', onStorage);
+      inject(DestroyRef).onDestroy(() => window.removeEventListener('storage', onStorage));
+    }
+    return true;
+  })();
 
   get accessToken(): string | null {
     return this.currentUser()?.accessToken ?? null;
