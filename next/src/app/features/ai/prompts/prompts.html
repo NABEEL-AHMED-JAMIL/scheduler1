@@ -47,9 +47,18 @@
       </select>
       <div class="search-field max-w-56">
         <app-icon name="search" size="0.95em" />
-        <input class="input" placeholder="Search name, model or variable" [value]="search()" (input)="search.set($any($event.target).value)" />
+        <input class="input" placeholder="Search name, model or variable" aria-label="Search prompts" [value]="search()" (input)="search.set($any($event.target).value)" />
       </div>
       <app-mine-filter [(only)]="onlyMine" />
+      @if (connectionFilter()) {
+        <span class="pill pill-neutral">
+          <app-icon name="server" size="0.85em" />Connection: {{ connectionFilterLabel() }}
+          <button type="button" class="-mr-1 rounded-full p-0.5 hover:text-[color:var(--text-primary)]"
+                  [attr.aria-label]="'Remove the ' + connectionFilterLabel() + ' filter'" (click)="connectionFilter.set('')">
+            <app-icon name="close" size="0.85em" />
+          </button>
+        </span>
+      }
       @if (hasFilters()) {
         <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()"><app-icon name="close" />Clear</button>
       }
@@ -107,7 +116,7 @@
             <th>Last run</th>
             @if (isPlatformAdmin()) { <th>Workspace</th> }
             <th class="text-right">State</th>
-            @if (canManage()) { <th class="w-12"></th> }
+            @if (canManage()) { <th class="w-12"><span class="sr-only">Actions</span></th> }
           </tr>
         </thead>
         <tbody>

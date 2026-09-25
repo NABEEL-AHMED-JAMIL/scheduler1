@@ -58,6 +58,16 @@ export class Prompts implements OnInit {
   });
   readonly hasFilters = computed(() => !!this.search().trim() || !!this.statusFilter() || !!this.outputFilter() || !!this.connectionFilter() || this.onlyMine());
 
+  /**
+   * The connection a link from Model connections narrowed the list to, by name, so the toolbar
+   * can say why the list is short; there is no control that sets it otherwise.
+   */
+  readonly connectionFilterLabel = computed(() => {
+    const id = this.connectionFilter();
+    if (!id) return '';
+    return this.prompts().find(p => String(p.connectionId ?? '') === id)?.connectionName || `Connection ${id}`;
+  });
+
   readonly summary = computed(() => {
     const list = this.prompts();
     return {
