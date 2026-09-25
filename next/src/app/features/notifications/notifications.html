@@ -25,7 +25,7 @@
                    (retry)="load()">
     <ng-container toolbar>
       @if (types().length > 1) {
-        <select class="input max-w-44" [value]="typeFilter()"
+        <select class="input max-w-44" [value]="typeFilter()" aria-label="Filter by kind"
                 (change)="typeFilter.set($any($event.target).value); onFilterChange()">
           <option value="">All kinds</option>
           @for (type of types(); track type) {

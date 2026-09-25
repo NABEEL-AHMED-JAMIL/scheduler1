@@ -258,7 +258,9 @@ export class Notifications implements OnInit {
       case 'SUCCESS': return 'var(--color-ok-500)';
       case 'ERROR':   return 'var(--color-crit-500)';
       case 'WARNING': return 'var(--color-warn-500)';
-      default:        return 'var(--color-brand-500)';
+      // --accent-mark is brand-500 in light and flips in dark, where brand-500 on the dark card
+      // took the unread marker off every info notification -- the default kind.
+      default:        return 'var(--accent-mark)';
     }
   }
 
