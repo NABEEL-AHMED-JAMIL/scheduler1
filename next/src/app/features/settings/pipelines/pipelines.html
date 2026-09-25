@@ -71,7 +71,7 @@
       </select>
       <div class="search-field max-w-56">
         <app-icon name="search" size="0.95em" />
-        <input class="input" placeholder="Search name, pipeline, topic or description"
+        <input class="input" placeholder="Search name, pipeline, topic or description" aria-label="Search pipelines"
                [value]="search()" (input)="onSearch($any($event.target).value)" />
       </div>
       <app-mine-filter [only]="onlyMine()" (onlyChange)="setFilter(onlyMine, $event)" />
@@ -184,7 +184,7 @@
             <th>Created by</th>
             <th>Updated by</th>
             <th>Status</th>
-            <th class="w-12"></th>
+            <th class="w-12"><span class="sr-only">Actions</span></th>
           </tr>
         </thead>
         <tbody>

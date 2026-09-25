@@ -374,7 +374,7 @@ export function validateSelectChoices(rows: PipelineField[]): string | null {
                       <span class="font-medium">{{ row.get('promptName')?.value || 'Prompt ' + row.get('promptId')?.value }}</span>
                       <span class="text-[color:var(--text-muted)]"> · {{ mappedCount(i) }} variable(s) mapped · {{ row.get('runIn')?.value === 'worker' ? 'in the worker' : 'before dispatch' }} · on failure: {{ row.get('onError')?.value === 'continue' ? 'continue empty' : 'fail the run' }}</span>
                     } @else {
-                      <span class="text-warn-600">No prompt chosen yet.</span>
+                      <span class="text-warn-500">No prompt chosen yet.</span>
                     }
                     <div class="text-xs text-[color:var(--text-muted)]">The answer is written to &lt;{{ row.get('tagKey')?.value || '…' }}&gt; {{ row.get('runIn')?.value === 'worker' ? 'by the worker as the task runs' : 'before the task is dispatched' }}; a task shows this as a read-only step.</div>
                   </div>
@@ -835,7 +835,7 @@ export class PipelineDialog {
       },
       error: err => {
         this.saving.set(false);
-        this.toast.error(err?.error?.message || 'The form could not be saved.');
+        this.toast.error(err?.error?.message || 'The pipeline could not be saved.');
       },
     });
   }

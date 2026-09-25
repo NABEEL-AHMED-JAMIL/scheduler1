@@ -178,7 +178,7 @@ export class Pipelines implements OnInit {
       error: err => {
         if (ticket !== this.loadTicket) return;
         this.loading.set(false);
-        this.error.set(err?.error?.message || 'Could not load forms.');
+        this.error.set(err?.error?.message || 'Could not load pipelines.');
       },
     });
   }
@@ -225,7 +225,7 @@ export class Pipelines implements OnInit {
       title: `Delete ${form.pipelineName}?`,
       body: 'Tasks on this pipeline keep working — a form only describes their payload, it does '
         + 'not store it. They go back to being edited as raw tags.',
-      confirmLabel: 'Delete form',
+      confirmLabel: 'Delete pipeline',
       danger: true,
     });
     if (!ok) return;
@@ -235,7 +235,7 @@ export class Pipelines implements OnInit {
         if (response.status === API_SUCCESS) { this.toast.success(response.message); this.load(); }
         else this.toast.error(response.message);
       },
-      error: err => this.toast.error(err?.error?.message || 'The form could not be deleted.'),
+      error: err => this.toast.error(err?.error?.message || 'The pipeline could not be deleted.'),
     });
   }
 

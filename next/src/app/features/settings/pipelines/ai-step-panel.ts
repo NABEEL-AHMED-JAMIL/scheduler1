@@ -33,8 +33,15 @@ export interface AiStepConfig {
           <label class="label" for="aiStepPrompt">Prompt</label>
           <app-combobox id="aiStepPrompt" [selected]="promptId()" (selectedChange)="pickPrompt($event)"
                         placeholder="Search active prompts…" [allowClear]="false" [options]="promptOptions()" />
-          @if (!prompts().length && loaded()) {
-            <p class="text-xs text-warn-600 mt-1">No active prompt in this workspace. <a class="link-inline" routerLink="/assistants/prompts/new" (click)="ref.close()">Create one</a> first.</p>
+          @if (!loaded()) {
+            <p class="text-xs text-[color:var(--text-muted)] mt-1 flex items-center gap-1.5">
+              <span class="spinner [--spinner-size:0.85rem]" role="status" aria-label="Loading prompts"></span>Loading prompts…
+            </p>
+          } @else if (loadError()) {
+            <p class="text-xs text-crit-500 mt-1" role="alert">{{ loadError() }}
+              <button type="button" class="link-inline ml-1" (click)="loadPrompts()">Try again</button></p>
+          } @else if (!prompts().length) {
+            <p class="text-xs text-warn-500 mt-1">No active prompt in this workspace. <a class="link-inline" routerLink="/assistants/prompts/new" (click)="ref.close()">Create one</a> first.</p>
           } @else if (prompt(); as p) {
             <p class="text-xs text-[color:var(--text-muted)] mt-1">v{{ p.version }} · {{ p.connectionName || 'workspace default' }} · <span class="mono">{{ p.effectiveModel || '' }}</span> · {{ p.outputMode === 'json' ? 'JSON' : 'text' }} output</p>
           }
@@ -71,7 +78,8 @@ export interface AiStepConfig {
                         <div class="flex flex-col gap-1">
                           <!-- selected on the option, not value on the select: the options render
                                after the select's value would be set, and the browser then resets it. -->
-                          <select class="input min-w-0 flex-1" (change)="setSource(v.name, $any($event.target).value)">
+                          <select class="input min-w-0 flex-1" [attr.aria-label]="'Field for ' + v.name"
+                                  (change)="setSource(v.name, $any($event.target).value)">
                             <option value="" [selected]="!tagOf(v.name)">{{ v.required ? '— pick a field —' : '(not sent)' }}</option>
                             @for (f of data.fieldsAbove; track f.tagKey) { <option [value]="f.tagKey" [selected]="f.tagKey === tagOf(v.name)">{{ f.label }} &lt;{{ f.tagKey }}&gt;</option> }
                             @if (runIn() === 'worker' && hasInputFolder()) {
@@ -82,7 +90,7 @@ export interface AiStepConfig {
                             }
                           </select>
                           @if (runIn() === 'worker' && tagOf(v.name) && !isObject(v.name)) {
-                            <select class="input" [value]="asFile(v.name) ? 'file' : 'text'" (change)="setAs(v.name, $any($event.target).value)"
+                            <select class="input" [value]="asFile(v.name) ? 'file' : 'text'" [attr.aria-label]="'How to send ' + v.name" (change)="setAs(v.name, $any($event.target).value)"
                                     title="Send the tag's text, or the contents of the object the tag names">
                               <option value="text">send the tag's text</option>
                               <option value="file">send the contents of the object it names</option>
@@ -95,7 +103,7 @@ export interface AiStepConfig {
                 </tbody>
               </table>
               @if (!data.fieldsAbove.length) {
-                <p class="text-xs text-warn-600 mt-1.5">Nothing sits above this step yet — move it below the fields it should read.</p>
+                <p class="text-xs text-warn-500 mt-1.5">Nothing sits above this step yet — move it below the fields it should read.</p>
               }
             }
           </div>
@@ -125,6 +133,8 @@ export class AiStepPanel {
 
   readonly prompts = signal<Prompt[]>([]);
   readonly loaded = signal(false);
+  /** Why the prompt list could not be read; an empty workspace and a failed request are not the same. */
+  readonly loadError = signal('');
   readonly promptId = signal<number | null>(this.data.current?.promptId ?? null);
   readonly map = signal<Record<string, string>>({ ...(this.data.current?.variableMap ?? {}) });
   readonly onError = signal<'fail' | 'continue'>(this.data.current?.onError ?? 'fail');
@@ -154,12 +164,22 @@ export class AiStepPanel {
   }
 
   constructor() {
+    this.loadPrompts();
+  }
+
+  loadPrompts(): void {
+    this.loaded.set(false);
+    this.loadError.set('');
     this.http.get<ApiResponse<Prompt[]>>(`${API_BASE}/aiPrompt.json/list`).subscribe({
       next: r => {
         this.loaded.set(true);
         if (r.status === API_SUCCESS) this.prompts.set((r.data ?? []).filter(p => p.status === 'Active').map(p => ({ ...p, variables: p.variables ?? [] })));
+        else this.loadError.set(r.message || 'The prompts could not be loaded.');
       },
-      error: () => this.loaded.set(true),
+      error: err => {
+        this.loaded.set(true);
+        this.loadError.set(err?.error?.message || 'The prompts could not be loaded.');
+      },
     });
   }
 
