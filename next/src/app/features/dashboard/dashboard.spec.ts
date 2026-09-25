@@ -141,7 +141,7 @@ describe('a refused dashboard load', () => {
       providers: [
         { provide: DashboardService, useValue: {
           jobStatus: () => answer(refused), jobRunning: () => answer(refused),
-          weekly: () => answer(refused), hourly: () => answer(refused),
+          hourly: () => answer(refused),
         } },
         { provide: HttpClient, useValue: { get: () => answer({ status: 'SUCCESS', data: 0 }) } },
         { provide: ToastService, useValue: { success: () => {}, error: (m: string) => errors.push(m), info: () => {} } },

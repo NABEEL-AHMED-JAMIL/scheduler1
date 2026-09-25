@@ -7,7 +7,7 @@ import { Dashboard } from './dashboard';
 import { DashboardService } from './dashboard.service';
 import { ToastService } from '../../shared/ui/toast.service';
 
-type Answers = Partial<Record<'jobStatus' | 'jobRunning' | 'weekly' | 'hourly' | 'breakdown', () => unknown>>;
+type Answers = Partial<Record<'jobStatus' | 'jobRunning' | 'hourly' | 'breakdown', () => unknown>>;
 const ok = () => of({ status: 'SUCCESS', data: [] });
 
 function dashboard(answers: Answers = {}) {
@@ -15,7 +15,7 @@ function dashboard(answers: Answers = {}) {
   const service: Record<string, unknown> = {};
   const breakdownDates: string[] = [];
   const ranges: string[] = [];
-  for (const name of ['jobStatus', 'jobRunning', 'weekly', 'hourly', 'breakdown'] as const) {
+  for (const name of ['jobStatus', 'jobRunning', 'hourly', 'breakdown'] as const) {
     service[name] = (...args: unknown[]) => {
       calls.push(name);
       if (name === 'breakdown') breakdownDates.push(String(args[0]));
@@ -51,9 +51,9 @@ describe('Dashboard load states', () => {
   });
 
   it('keeps the server\'s sentence for a refused chart', () => {
-    const { dashboard: d } = dashboard({ weekly: () => of({ status: 'ERROR', message: 'Weekly figures are unavailable.' }) });
+    const { dashboard: d } = dashboard({ hourly: () => of({ status: 'ERROR', message: 'Hourly figures are unavailable.' }) });
     d.load();
-    expect(d.error()).toBe('Weekly figures are unavailable.');
+    expect(d.error()).toBe('Hourly figures are unavailable.');
   });
 
   it('clears the error when Try again succeeds', () => {
@@ -208,5 +208,47 @@ describe('Dashboard date range', () => {
     d.load();
     expect(ranges.every(r => r === '2026-09-01..2026-09-07')).toBe(true);
     expect(ranges.length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * Queue volume by day drew one bar per day that had runs, labelled only with the weekday: over a
+ * month "Thu" appeared four times, and a quiet day simply vanished, so two bursts a week apart sat
+ * side by side like steady traffic.
+ */
+describe('Dashboard queue volume by day', () => {
+  const cell = (date: string, dayCode: string, hr: number, count: number) => ({ date, dayCode, hr, count });
+
+  it('draws every day of the applied range, quiet days at zero', () => {
+    const { dashboard: d } = dashboard({
+      hourly: () => of({ status: 'SUCCESS', data: [
+        cell('2026-09-18', 'Friday', 9, 4), cell('2026-09-24', 'Thursday', 22, 30), cell('2026-09-24', 'Thursday', 23, 5)] }),
+    });
+    d.startDate.set('2026-09-18');
+    d.endDate.set('2026-09-24');
+    d.applyRange();
+    const bars = d.dayBars();
+    expect(bars.map(b => b.value)).toEqual([4, 0, 0, 0, 0, 0, 35]);
+    expect(bars[0].name).toBe('Fri 18');
+    expect(bars[6].name).toBe('Thu 24');
+  });
+
+  it('names each day by its date over a longer range, so no label repeats', () => {
+    const { dashboard: d } = dashboard({
+      hourly: () => of({ status: 'SUCCESS', data: [cell('2026-09-03', 'Thursday', 9, 1), cell('2026-09-10', 'Thursday', 9, 2)] }),
+    });
+    d.startDate.set('2026-09-01');
+    d.endDate.set('2026-09-30');
+    d.applyRange();
+    const names = d.dayBars().map(b => b.name);
+    expect(names).toHaveLength(30);
+    expect(new Set(names).size).toBe(30);
+    expect(names[2]).toBe('09-03');
+  });
+
+  it('keeps the empty state when the range has no runs at all', () => {
+    const { dashboard: d } = dashboard();
+    d.load();
+    expect(d.dayBars()).toEqual([]);
   });
 });

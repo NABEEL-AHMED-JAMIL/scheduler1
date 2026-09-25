@@ -33,11 +33,6 @@ export class DashboardService {
       { params: { startDate, endDate } });
   }
 
-  weekly(startDate: string, endDate: string): Observable<ApiResponse<NameValue[]>> {
-    return this.http.get<ApiResponse<NameValue[]>>(`${this.base}/weeklyRunningJobStatistics`,
-      { params: { startDate, endDate } });
-  }
-
   hourly(startDate: string, endDate: string): Observable<ApiResponse<HourCell[]>> {
     return this.http.get<ApiResponse<HourCell[]>>(`${this.base}/weeklyHrsRunningJobStatistics`,
       { params: { startDate, endDate } });

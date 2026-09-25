@@ -3,7 +3,8 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router, RouterLink } from '@angular/router';
 import { Donut } from '../../shared/charts/donut';
-import { BarChart } from '../../shared/charts/bar-chart';
+import { Bar, BarChart } from '../../shared/charts/bar-chart';
+import { daySeries } from '../../shared/charts/day-series';
 import { HeatCell, HeatSelection, Heatmap } from '../../shared/charts/heatmap';
 import { DashboardService, HourCell, JobBreakdown, NameValue } from './dashboard.service';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
@@ -19,7 +20,7 @@ import { BlurLoader } from '../../shared/ui/blur-loader';
 import { LoadError } from '../../shared/ui/load-error';
 import { Observable } from 'rxjs';
 
-const DAY_ORDER = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const WEEKDAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 /**
  * Status keys shown in the breakdown table, in lifecycle order.
@@ -79,7 +80,6 @@ export class Dashboard implements OnInit {
 
   readonly jobStatus = signal<NameValue[]>([]);
   readonly jobRunning = signal<NameValue[]>([]);
-  readonly weekly = signal<NameValue[]>([]);
   readonly hourly = signal<HourCell[]>([]);
   readonly breakdown = signal<JobBreakdown[]>([]);
   readonly unread = signal(0);
@@ -128,8 +128,24 @@ export class Dashboard implements OnInit {
   readonly failed      = computed(() => this.valueOf(this.jobRunning(), 'failed'));
 
   // ---- charts -------------------------------------------------------------
-  readonly weeklyBars = computed(() =>
-    this.weekly().map(d => ({ name: d.name, value: d.value })));
+  /**
+   * Runs per day, every day of the applied range present. The weekly endpoint answered one row
+   * per day that had runs, named only by weekday: over a month "Thu" came four times, and a quiet
+   * day vanished, so two bursts a week apart drew as steady traffic. The hourly cells carry their
+   * date and are read with the same filters, so the days are added up from them instead.
+   */
+  readonly dayBars = computed<Bar[]>(() => {
+    const counts = new Map<string, number>();
+    for (const cell of this.hourly()) counts.set(cell.date, (counts.get(cell.date) ?? 0) + (cell.count ?? 0));
+    if (!counts.size) return [];
+    const { bars } = daySeries(counts, this.appliedStart(), this.appliedEnd());
+    // A week or less reads better as "Thu 24"; longer ranges keep the dated labels, which never repeat.
+    if (bars.length > 7) return bars;
+    return bars.map(bar => {
+      const at = new Date(bar.meta + 'T00:00:00Z');
+      return { ...bar, name: `${WEEKDAY_SHORT[at.getUTCDay()]} ${at.getUTCDate()}` };
+    });
+  });
 
   /** Run outcomes keep their status colours so a chart matches the pills in the tables. */
   readonly outcomeColor = statusColor;
@@ -191,10 +207,10 @@ export class Dashboard implements OnInit {
     const from = this.appliedStart();
     const to = this.appliedEnd();
 
-    // Loading until all four have answered, and the first failure's reason kept. A refusal (a
+    // Loading until all three have answered, and the first failure's reason kept. A refusal (a
     // date that is not a date) is a 200 carrying ERROR and a sentence (MIG-103); every tile is
     // refused for the same reason, so one sentence is shown, once.
-    let pending = 4;
+    let pending = 3;
     const settle = () => { if (--pending === 0) this.loading.set(false); };
     const fail = (message: string | undefined) => {
       if (!this.error()) this.error.set(message || 'The dashboard could not be read.');
@@ -211,7 +227,6 @@ export class Dashboard implements OnInit {
 
     read(this.dashboard.jobStatus(from, to), data => this.jobStatus.set(data ?? []));
     read(this.dashboard.jobRunning(from, to), data => this.jobRunning.set(data ?? []));
-    read(this.dashboard.weekly(from, to), data => this.weekly.set(data ?? []));
     read(this.dashboard.hourly(from, to), data => this.hourly.set(data ?? []));
     this.http.get<ApiResponse<number>>(`${API_BASE}/notification.json/unreadCount`).subscribe({
       next: r => { if (r.status === API_SUCCESS) this.unread.set(Number(r.data ?? 0)); },
