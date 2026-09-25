@@ -1,4 +1,4 @@
-import { Component, input, output } from '@angular/core';
+import { AfterViewInit, Component, DestroyRef, ElementRef, computed, inject, input, output, signal } from '@angular/core';
 import { Icon } from './icon';
 import { BlurLoader } from './blur-loader';
 import { LoadError } from './load-error';
@@ -25,6 +25,34 @@ import { LoadError } from './load-error';
           }
         </h2>
         <ng-content select="[toolbar]" />
+        @if (columns().length >= 5) {
+          <!-- Owner, 2026-09-24: choose which columns to see. Read from the table's own headings, so every
+               list gets it; remembered per table. Blank and Actions columns always stay. -->
+          <div class="relative">
+            <button type="button" class="btn btn-default btn-sm" [attr.aria-expanded]="columnsOpen()"
+                    (click)="columnsOpen.set(!columnsOpen())" (keydown.escape)="columnsOpen.set(false)">
+              <app-icon name="eye" />Columns
+              @if (hiddenCount()) { <span class="pill pill-neutral ml-1">{{ hiddenCount() }} hidden</span> }
+            </button>
+            @if (columnsOpen()) {
+              <div class="fixed inset-0 z-10" aria-hidden="true" (click)="columnsOpen.set(false)"></div>
+              <div class="card absolute right-0 top-full mt-1 z-20 p-1 shadow-lg min-w-52 max-h-80 overflow-y-auto"
+                   role="group" aria-label="Columns to show">
+                @for (column of columns(); track column) {
+                  <label class="menu-item flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" class="checkbox" [checked]="!isHidden(column)"
+                           [disabled]="!isHidden(column) && visibleCount() === 1"
+                           (change)="toggleColumn(column)" />
+                    <span class="truncate">{{ column }}</span>
+                  </label>
+                }
+                @if (hiddenCount()) {
+                  <button type="button" class="btn btn-ghost btn-xs w-full mt-1" (click)="showAllColumns()">Show all</button>
+                }
+              </div>
+            }
+          </div>
+        }
       </div>
 
       <!-- A second row for controls that come and go -- bulk selection above all. Putting them
@@ -71,7 +99,7 @@ import { LoadError } from './load-error';
     </div>
   `,
 })
-export class TableShell {
+export class TableShell implements AfterViewInit {
   readonly heading = input.required<string>();
   /** Whether the second toolbar row is shown. See the note in the template. */
   readonly showSubbar = input(false);
@@ -93,4 +121,79 @@ export class TableShell {
   readonly shown = input<number | null>(null);
   readonly total = input<number | null>(null);
   readonly retry = output<void>();
+  /** Where the column choice is remembered; the heading when not given. */
+  readonly columnsKey = input('');
+
+  private readonly host = inject(ElementRef).nativeElement as HTMLElement;
+  protected readonly columnsOpen = signal(false);
+  /** The table's hideable columns, by heading. */
+  protected readonly columns = signal<string[]>([]);
+  private readonly hidden = signal<string[]>([]);
+  protected readonly hiddenCount = computed(() => this.hidden().filter(h => this.columns().includes(h)).length);
+  protected readonly visibleCount = computed(() => this.columns().length - this.hiddenCount());
+  private restoredKey = '';
+  private observer?: MutationObserver;
+
+  constructor() {
+    inject(DestroyRef).onDestroy(() => this.observer?.disconnect());
+  }
+
+  ngAfterViewInit(): void {
+    this.refreshColumns();
+    // Rows re-render (paging, filters, a reload), so the choice is re-applied whenever the table's children
+    // change. Only childList: the display changes made here must not wake it again.
+    this.observer = new MutationObserver(() => this.refreshColumns());
+    this.observer.observe(this.host, { childList: true, subtree: true });
+  }
+
+  protected isHidden(column: string): boolean {
+    return this.hidden().includes(column);
+  }
+
+  protected toggleColumn(column: string): void {
+    if (this.isHidden(column)) this.hidden.set(this.hidden().filter(h => h !== column));
+    else if (this.visibleCount() > 1) this.hidden.set([...this.hidden(), column]);
+    this.saveColumns();
+  }
+
+  protected showAllColumns(): void {
+    this.hidden.set([]);
+    this.saveColumns();
+  }
+
+  private storeKey(): string {
+    return 'etl_table_cols:' + (this.columnsKey() || this.heading());
+  }
+
+  private saveColumns(): void {
+    try { localStorage.setItem(this.storeKey(), JSON.stringify(this.hidden())); } catch { /* not remembered */ }
+    this.refreshColumns();
+  }
+
+  private refreshColumns(): void {
+    const table = this.host.querySelector('table');
+    const heads = table ? Array.from(table.querySelectorAll(':scope > thead > tr:first-child > th')) : [];
+    const labels = heads.map(th => (th.textContent ?? '').replace(/\s+/g, ' ').trim());
+    const hideable = labels.filter(label => label && label.toLowerCase() !== 'actions');
+    if (hideable.join('\u0000') !== this.columns().join('\u0000')) this.columns.set(hideable);
+    const key = this.storeKey();
+    if (key !== this.restoredKey) {
+      this.restoredKey = key;
+      try {
+        const saved = JSON.parse(localStorage.getItem(key) ?? '[]');
+        this.hidden.set(Array.isArray(saved) ? saved.filter((v: unknown) => typeof v === 'string') : []);
+      } catch { this.hidden.set([]); }
+    }
+    if (!table) return;
+    const hide = labels.map(label => !!label && label.toLowerCase() !== 'actions' && this.hidden().includes(label));
+    table.querySelectorAll<HTMLTableRowElement>(':scope > thead > tr, :scope > tbody > tr').forEach(row => {
+      const cells = Array.from(row.children) as HTMLElement[];
+      // A detail row spans the whole table in one cell: it has no columns to hide.
+      if (cells.length !== labels.length) return;
+      cells.forEach((cell, i) => {
+        const display = hide[i] ? 'none' : '';
+        if (cell.style.display !== display) cell.style.display = display;
+      });
+    });
+  }
 }
