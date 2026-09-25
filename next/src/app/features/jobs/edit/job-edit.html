@@ -148,11 +148,7 @@
       <div class="form-section">
         <h2 class="form-section-title">Email me when</h2>
         <div class="flex flex-wrap gap-4">
-          @for (option of [
-            { control: 'completeJob', label: 'The job completes' },
-            { control: 'failJob',     label: 'The job fails' },
-            { control: 'skipJob',     label: 'A run is skipped' }
-          ]; track option.control) {
+          @for (option of notifyOptions; track option.control) {
             <label class="flex items-center gap-2 text-sm">
               <input type="checkbox" class="checkbox" [formControlName]="option.control" />
               {{ option.label }}

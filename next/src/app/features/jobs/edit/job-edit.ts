@@ -10,6 +10,7 @@ import { ToastService } from '../../../shared/ui/toast.service';
 import { Field } from '../../../shared/ui/field';
 import { Icon } from '../../../shared/ui/icon';
 import { LoadError } from '../../../shared/ui/load-error';
+import { NOTIFY_OPTIONS } from '../notify-summary';
 import { Combobox, ComboboxOption } from '../../../shared/ui/combobox';
 
 const FREQUENCIES = [
@@ -74,6 +75,7 @@ export class JobEdit implements OnInit {
 
   readonly frequencies = FREQUENCIES;
   readonly days = DAYS;
+  readonly notifyOptions = NOTIFY_OPTIONS;
   readonly monthDays = Array.from({ length: 31 }, (_, i) => i + 1);
 
   readonly tasks = signal<any[]>([]);

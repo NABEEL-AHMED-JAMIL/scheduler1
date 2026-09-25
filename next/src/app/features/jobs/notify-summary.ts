@@ -10,6 +10,16 @@
  * So colour here encodes exactly one thing: whether the alert is on. The wording is the edit
  * form's, because that is where someone sets it and the two should match.
  */
+/**
+ * The three switches as the edit form names them. The row's email dialog said "When it
+ * completes" beside the form's "The job completes"; both read this list now.
+ */
+export const NOTIFY_OPTIONS: { control: 'completeJob' | 'failJob' | 'skipJob'; label: string }[] = [
+  { control: 'completeJob', label: 'The job completes' },
+  { control: 'failJob',     label: 'The job fails' },
+  { control: 'skipJob',     label: 'A run is skipped' },
+];
+
 export interface NotifyFlags {
   completeJob?: boolean | null;
   failJob?: boolean | null;

@@ -5,6 +5,10 @@ import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { ToastService } from '../../shared/ui/toast.service';
 import { FormDialog } from '../../shared/ui/form-dialog';
 import { Icon } from '../../shared/ui/icon';
+import { NOTIFY_OPTIONS } from './notify-summary';
+
+/** The edit form's wording for a switch, so the row dialog and the form say the same thing. */
+const labelOf = (control: string) => NOTIFY_OPTIONS.find(o => o.control === control)!.label;
 
 export interface NotifyData {
   jobId: number;
@@ -65,11 +69,11 @@ export class NotifyDialog {
   readonly saving = signal(false);
 
   readonly options = [
-    { key: 'completeJob' as const, label: 'When it completes', icon: 'checkCircle',
+    { key: 'completeJob' as const, label: labelOf('completeJob'), icon: 'checkCircle',
       intent: 'icon-ok', hint: 'A run finished without error.' },
-    { key: 'failJob' as const, label: 'When it fails', icon: 'xCircle',
+    { key: 'failJob' as const, label: labelOf('failJob'), icon: 'xCircle',
       intent: 'icon-crit', hint: 'A run ended in an error. Usually the one worth having on.' },
-    { key: 'skipJob' as const, label: 'When a run is skipped', icon: 'alert',
+    { key: 'skipJob' as const, label: labelOf('skipJob'), icon: 'alert',
       intent: 'icon-warn', hint: 'A scheduled run was skipped rather than started.' },
   ];
 
