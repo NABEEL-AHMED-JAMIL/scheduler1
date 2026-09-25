@@ -22,7 +22,7 @@
     <ng-container toolbar>
       @if (isPlatformAdmin()) {
         <div class="w-48">
-          <app-combobox id="reference-tenant" [selected]="tenantFilter()" (selectedChange)="setTenant($event)"
+          <app-combobox id="reference-tenant" ariaLabel="Filter by workspace" [selected]="tenantFilter()" (selectedChange)="setTenant($event)"
                         placeholder="All workspaces" clearLabel="All workspaces" [options]="tenantOptions()" />
         </div>
       }

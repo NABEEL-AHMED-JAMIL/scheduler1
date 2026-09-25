@@ -6,6 +6,7 @@ import { DIALOG_DATA, Dialog, DialogRef } from '@angular/cdk/dialog';
 import { HttpClient } from '@angular/common/http';
 import { of } from 'rxjs';
 import { AuthService } from '../../../core/auth/auth.service';
+import { ROLE_META } from '../../../core/auth/auth.models';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { AppUser, Users } from './users';
 import { ResetPasswordDialog } from './reset-password-dialog';
@@ -76,5 +77,16 @@ describe('Users -- reset password is checked inside its dialog', () => {
     d.form.setValue({ password: 'long enough' });
     d.submit();
     expect(close).toHaveBeenCalledWith('long enough');
+  });
+});
+
+describe('Users -- a card\'s role rule comes from ROLE_META', () => {
+  it('takes every accent from ROLE_META, the tenant admin\'s included (it flips in dark)', () => {
+    const screen = usersScreen();
+    for (const role of ['TENANT_USER', 'TENANT_ADMIN', 'PLATFORM_ADMIN'] as const) {
+      expect(screen.roleAccent(role)).toBe(ROLE_META[role].accent);
+    }
+    expect(screen.roleAccent('TENANT_ADMIN')).toBe('var(--accent-mark)');
+    expect(screen.roleAccent('SOMETHING_NEW')).toBe(ROLE_META.TENANT_USER.accent);
   });
 });

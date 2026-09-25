@@ -486,10 +486,8 @@ export class Users implements OnInit {
    * keeps the same anatomy and the eye is not caught by a structural difference instead.
    */
   roleAccent(role: string): string {
-    // ROLE_META gives the tenant administrator --color-brand-500, which is not remapped in dark
-    // and vanishes on the dark card -- the one rule meant to make the admins findable.
-    // --accent-mark is the same near-black in light and flips in dark.
-    if (role === 'TENANT_ADMIN') return 'var(--accent-mark)';
+    // ROLE_META carries the dark-safe --accent-mark for the tenant administrator now, so there
+    // is no local override to drift from it.
     return this.metaFor(role).accent;
   }
 
