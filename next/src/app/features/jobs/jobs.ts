@@ -195,6 +195,12 @@ export class Jobs implements OnInit {
   private readonly auth = inject(AuthService);
   /** The task editor is admin-only: others see a task's name, not a link to a refusal. */
   protected readonly canManageTasks = computed(() => this.auth.canManageTasks());
+  /**
+   * Only an admin's list holds other people's jobs: a tenant user is sent their own only (JobOwnership,
+   * owner decision 2026-09-24), so "Only mine" would do nothing -- or hide a job an admin made and
+   * assigned to them.
+   */
+  protected readonly seesOthersJobs = computed(() => this.auth.isTenantAdmin());
 
   /** Narrows the list to rows this person created. Not persisted -- see MineFilter. */
 
