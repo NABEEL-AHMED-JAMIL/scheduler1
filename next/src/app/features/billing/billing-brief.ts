@@ -17,7 +17,7 @@ import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
   selector: 'app-billing-brief',
   imports: [Icon, RouterLink, ServerTimePipe],
   template: `
-    @if (auth.isTenantAdmin() && summary(); as s) {
+    @if (auth.isTenantAdmin() && hasSomething() && summary(); as s) {
       <div class="card p-4" [class.chart-card]="!compact()">
         <div class="flex items-center justify-between gap-2 mb-3">
           <h3 class="text-sm font-semibold">{{ auth.isPlatformAdmin() ? 'Billing, every workspace' : 'Your bill' }}</h3>
@@ -58,7 +58,7 @@ export class BillingBrief implements OnInit {
   readonly summary = signal<BillingSummary | null>(null);
   readonly statusLabel = INVOICE_STATUS_LABEL;
   readonly statusTone = INVOICE_STATUS_TONE;
-  readonly hasSomething = computed(() => { const s = this.summary(); return !!s && (s.monthToDate > 0 || s.openCount > 0 || !!s.latestNumber); });
+  readonly hasSomething = computed(() => { const s = this.summary(); return !!s && (s.monthToDate > 0 || s.openCount > 0 || s.pendingSlips > 0 || !!s.latestNumber); });
 
   ngOnInit(): void {
     if (!this.auth.isTenantAdmin()) return;
