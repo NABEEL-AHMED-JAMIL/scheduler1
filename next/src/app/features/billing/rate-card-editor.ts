@@ -4,6 +4,7 @@ import { API_SUCCESS } from '../../core/api/api.config';
 import { ToastService } from '../../shared/ui/toast.service';
 import { SidePanel } from '../../shared/ui/side-panel';
 import { Icon } from '../../shared/ui/icon';
+import { Field } from '../../shared/ui/field';
 import { Combobox, ComboboxOption } from '../../shared/ui/combobox';
 import { BillingApi, RateCard, RateCardDraft, RateItem, RateTier } from './billing.service';
 import { firstOfMonth } from './billing-format';
@@ -22,27 +23,25 @@ export interface RateCardEditorData { base: RateCard; workspaces: ComboboxOption
  */
 @Component({
   selector: 'app-rate-card-editor',
-  imports: [SidePanel, Icon, Combobox],
+  imports: [SidePanel, Icon, Combobox, Field],
   template: `
     <app-side-panel [heading]="'New version from ' + data.base.name + ' v' + data.base.version" subtitle="Saved as its own version; bills already drafted keep the one they were priced with.">
       <div class="form-grid mb-4">
-        <label class="col-span-2"><span class="label">Name <span class="text-crit-500">*</span></span>
-          <input id="rcName" class="input" [value]="name()" (input)="name.set($any($event.target).value)" placeholder="What changed, or who it is for" /></label>
-        <label><span class="label">For</span>
-          <app-combobox id="rcFor" [selected]="tenantId() ?? ''" (selectedChange)="tenantId.set($event || null)" [options]="forOptions" [allowClear]="false" placeholder="Every workspace" />
-          <span class="hint">A workspace's own card wins over the default from its effective date.</span></label>
-        <label><span class="label">Effective from <span class="text-crit-500">*</span></span>
-          <input id="rcFrom" class="input mono" type="date" [value]="effectiveFrom()" (input)="effectiveFrom.set($any($event.target).value)" />
-          <span class="hint">Prices bills for periods that start on or after this day.</span></label>
-        <label class="col-span-2"><span class="label">Note</span>
-          <input id="rcNote" class="input" [value]="note()" (input)="note.set($any($event.target).value)" placeholder="Why — the agreement, the ticket, the reason" /></label>
+        <app-field class="col-span-2" label="Name" for="rcName" [required]="true">
+          <input id="rcName" class="input" [value]="name()" (input)="name.set($any($event.target).value)" placeholder="What changed, or who it is for" /></app-field>
+        <app-field label="For" for="rcFor" hint="A workspace's own card wins over the default from its effective date.">
+          <app-combobox id="rcFor" [selected]="tenantId() ?? ''" (selectedChange)="tenantId.set($event || null)" [options]="forOptions" [allowClear]="false" placeholder="Every workspace" /></app-field>
+        <app-field label="Effective from" for="rcFrom" [required]="true" hint="Prices bills for periods that start on or after this day.">
+          <input id="rcFrom" class="input mono" type="date" [value]="effectiveFrom()" (input)="effectiveFrom.set($any($event.target).value)" /></app-field>
+        <app-field class="col-span-2" label="Note" for="rcNote">
+          <input id="rcNote" class="input" [value]="note()" (input)="note.set($any($event.target).value)" placeholder="Why — the agreement, the ticket, the reason" /></app-field>
       </div>
 
       <div class="flex items-center justify-between mb-2">
         <span class="text-sm text-[color:var(--text-secondary)]">{{ items().length }} meters · {{ changed().size }} changed</span>
         <span class="text-xs text-[color:var(--text-muted)]">{{ data.base.currency }}</span>
       </div>
-      <table class="table-modern rate-edit">
+      <table class="table-modern rate-edit lookup-entry-table">
         <thead><tr><th>Meter</th><th class="text-right">Price</th><th class="text-right">Per</th><th class="text-right">Included / month</th><th>Tiers</th></tr></thead>
         <tbody>
           @for (it of items(); track it.meter; let i = $index) {
@@ -80,10 +79,6 @@ export interface RateCardEditorData { base: RateCard; workspaces: ComboboxOption
         <button type="button" class="btn btn-primary btn-sm" (click)="save()" [disabled]="saving()"><app-icon name="save" />{{ saving() ? 'Saving…' : 'Save version' }}</button>
       </ng-container>
     </app-side-panel>
-  `,
-  styles: `
-    .rate-edit tr.is-changed td:first-child { box-shadow: inset 3px 0 0 var(--color-brand-500); }
-    .hint { display: block; font-size: 11px; color: var(--text-muted); margin-top: 2px; }
   `,
 })
 export class RateCardEditor {

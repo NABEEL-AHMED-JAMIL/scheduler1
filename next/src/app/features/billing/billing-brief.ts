@@ -23,31 +23,25 @@ import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
           <h3 class="text-sm font-semibold">{{ auth.isPlatformAdmin() ? 'Billing, every workspace' : 'Your bill' }}</h3>
           <a routerLink="/billing/usage" class="btn btn-ghost btn-sm"><app-icon name="chart" size="0.9em" />Cost &amp; usage</a>
         </div>
-        <dl class="billing-brief">
-          <div><dt>This month so far</dt><dd class="tabular">{{ money(s.monthToDate, s.currency) }}</dd>
-            <dd class="billing-brief-sub">{{ s.meterDown ? 'the meter did not answer' : s.rateCardName ? s.rateCardName + ' v' + s.rateCardVersion : 'from the meter' }}</dd></div>
-          <div><dt>Owed</dt><dd class="tabular" [class.text-crit-500]="s.overdueCount > 0">{{ money(s.openBalance, s.currency) }}</dd>
-            <dd class="billing-brief-sub">{{ s.openCount ? s.openCount + ' open invoice' + (s.openCount === 1 ? '' : 's') : 'nothing outstanding' }}@if (s.overdueCount) { · <span class="text-crit-500">{{ s.overdueCount }} overdue</span> }</dd></div>
+        <dl class="grid grid-cols-[repeat(auto-fit,minmax(9rem,1fr))] gap-x-4 gap-y-3 m-0">
+          <div><dt class="stat-label">This month so far</dt><dd class="m-0 text-[1.05rem] font-semibold tabular">{{ money(s.monthToDate, s.currency) }}</dd>
+            <dd class="m-0 text-[11px] text-[color:var(--text-muted)]">{{ s.meterDown ? 'the meter did not answer' : s.rateCardName ? s.rateCardName + ' v' + s.rateCardVersion : 'from the meter' }}</dd></div>
+          <div><dt class="stat-label">Owed</dt><dd class="m-0 text-[1.05rem] font-semibold tabular" [class.text-crit-500]="s.overdueCount > 0">{{ money(s.openBalance, s.currency) }}</dd>
+            <dd class="m-0 text-[11px] text-[color:var(--text-muted)]">{{ s.openCount ? s.openCount + ' open invoice' + (s.openCount === 1 ? '' : 's') : 'nothing outstanding' }}@if (s.overdueCount) { · <span class="text-crit-500">{{ s.overdueCount }} overdue</span> }</dd></div>
           @if (s.nextDueNumber) {
-            <div><dt>Next due</dt><dd class="tabular">{{ s.nextDueAt | serverTime: 'd MMM' }}</dd>
-              <dd class="billing-brief-sub"><a class="link-inline mono" [routerLink]="['/billing/invoices', s.nextDueNumber]">{{ s.nextDueNumber }}</a> · {{ money(s.nextDueBalance ?? 0, s.currency) }}{{ overdueDays(s.nextDueAt) ? ' · ' + overdueDays(s.nextDueAt) + ' d late' : '' }}</dd></div>
+            <div><dt class="stat-label">Next due</dt><dd class="m-0 text-[1.05rem] font-semibold tabular">{{ s.nextDueAt | serverTime: 'd MMM' }}</dd>
+              <dd class="m-0 text-[11px] text-[color:var(--text-muted)]"><a class="link-inline mono" [routerLink]="['/billing/invoices', s.nextDueNumber]">{{ s.nextDueNumber }}</a> · {{ money(s.nextDueBalance ?? 0, s.currency) }}{{ overdueDays(s.nextDueAt) ? ' · ' + overdueDays(s.nextDueAt) + ' d late' : '' }}</dd></div>
           } @else if (s.latestNumber) {
-            <div><dt>Last invoice</dt><dd><span class="pill" [class]="'pill ' + statusTone[s.latestStatus ?? '']">{{ statusLabel[s.latestStatus ?? ''] }}</span></dd>
-              <dd class="billing-brief-sub"><a class="link-inline mono" [routerLink]="['/billing/invoices', s.latestNumber]">{{ s.latestNumber }}</a> · {{ money(s.latestTotal ?? 0, s.currency) }}</dd></div>
+            <div><dt class="stat-label">Last invoice</dt><dd class="m-0 text-[1.05rem] font-semibold"><span class="pill" [class]="'pill ' + statusTone[s.latestStatus ?? '']">{{ statusLabel[s.latestStatus ?? ''] }}</span></dd>
+              <dd class="m-0 text-[11px] text-[color:var(--text-muted)]"><a class="link-inline mono" [routerLink]="['/billing/invoices', s.latestNumber]">{{ s.latestNumber }}</a> · {{ money(s.latestTotal ?? 0, s.currency) }}</dd></div>
           }
           @if (s.pendingSlips) {
-            <div><dt>{{ auth.isPlatformAdmin() ? 'Slips to verify' : 'Awaiting verification' }}</dt><dd class="tabular">{{ s.pendingSlips }}</dd>
-              <dd class="billing-brief-sub"><a class="link-inline" routerLink="/billing/invoices">{{ auth.isPlatformAdmin() ? 'verify in Invoices' : 'a receipt follows' }}</a></dd></div>
+            <div><dt class="stat-label">{{ auth.isPlatformAdmin() ? 'Slips to verify' : 'Awaiting verification' }}</dt><dd class="m-0 text-[1.05rem] font-semibold tabular">{{ s.pendingSlips }}</dd>
+              <dd class="m-0 text-[11px] text-[color:var(--text-muted)]"><a class="link-inline" routerLink="/billing/invoices">{{ auth.isPlatformAdmin() ? 'verify in Invoices' : 'a receipt follows' }}</a></dd></div>
           }
         </dl>
       </div>
     }
-  `,
-  styles: `
-    .billing-brief { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: 0.75rem 1rem; margin: 0; }
-    .billing-brief dt { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
-    .billing-brief dd { margin: 0; font-size: 1.05rem; font-weight: 600; }
-    .billing-brief dd.billing-brief-sub { font-size: 11px; font-weight: 400; color: var(--text-muted); }
   `,
 })
 export class BillingBrief implements OnInit {
