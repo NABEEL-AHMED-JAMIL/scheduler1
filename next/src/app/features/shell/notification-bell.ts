@@ -2,8 +2,10 @@ import {
   Component, ElementRef, HostListener, OnDestroy, OnInit, computed, inject, signal,
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router, RouterLink } from '@angular/router';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
+import { NotificationsStore } from '../../core/notifications/notifications.store';
 import { instantMs } from '../../core/instant';
 import { Icon } from '../../shared/ui/icon';
 import { notificationTarget } from '../notifications/notification-links';
@@ -115,6 +117,7 @@ export class NotificationBell implements OnInit, OnDestroy {
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
   private readonly elementRef = inject(ElementRef<HTMLElement>);
+  private readonly store = inject(NotificationsStore);
 
   readonly open = signal(false);
   readonly items = signal<Note[]>([]);
@@ -124,9 +127,16 @@ export class NotificationBell implements OnInit, OnDestroy {
    *
    * This used to be a tally of the unread rows among the twenty this component fetches, so a
    * user with more than twenty unread saw a badge that stopped at twenty and disagreed with the
-   * dashboard tile -- which reads the endpoint below. Same number, same source, one truth.
+   * dashboard tile -- which reads the server's count. Same number, same source, one truth. It
+   * lives in NotificationsStore so that marking rows on the Notifications page moves it too.
    */
-  readonly unread = signal(0);
+  readonly unread = this.store.unread;
+
+  constructor() {
+    // Rows marked here or on the Notifications page flip in this panel as soon as the server agrees.
+    this.store.marked.pipe(takeUntilDestroyed()).subscribe(id =>
+      this.items.update(list => list.map(n => (id === 'all' || n.notificationId === id ? { ...n, read: true } : n))));
+  }
 
   /**
    * What the panel lists: unread first, then the newest read rows to fill the space.
@@ -204,12 +214,7 @@ export class NotificationBell implements OnInit, OnDestroy {
   private load(): void {
     // The count comes from the server rather than from the rows below, because the rows below are
     // one small window onto the mailbox and the badge is a statement about all of it.
-    this.http.get<ApiResponse<number>>(`${API_BASE}/notification.json/unreadCount`).subscribe({
-      next: response => {
-        if (response.status === API_SUCCESS) this.unread.set(Number(response.data ?? 0));
-      },
-      error: () => {},
-    });
+    this.store.refreshUnread();
     this.http.get<ApiResponse<any>>(`${API_BASE}/notification.json/list`,
       { params: { page: '1', limit: String(FETCH_ROWS) } }).subscribe({
       next: response => {
@@ -225,33 +230,16 @@ export class NotificationBell implements OnInit, OnDestroy {
   open_(note: Note): void {
     this.open.set(false);
     if (!note.read) {
-      this.http.post<ApiResponse>(`${API_BASE}/notification.json/markRead/${note.notificationId}`, null)
-        .subscribe({
-          next: response => {
-            // Quietly, as every bell failure is -- but a refusal must not flip the row.
-            if (response.status !== API_SUCCESS) return;
-            this.items.update(list =>
-              list.map(n => (n.notificationId === note.notificationId ? { ...n, read: true } : n)));
-            // The badge is the server's number now, so it no longer falls on its own when a row
-            // flips to read; it has to be moved here or it stays put until the next poll.
-            this.unread.update(count => Math.max(0, count - 1));
-          },
-          error: () => {},
-        });
+      // Quietly, as every bell failure is. The store flips the row and moves the badge only
+      // once the server agrees, so a refusal leaves both as they were.
+      this.store.markRead(note.notificationId).subscribe({ error: () => {} });
     }
     const target = notificationTarget(note.linkUrl);
     if (target) this.router.navigateByUrl(target);
   }
 
   markAllRead(): void {
-    this.http.post<ApiResponse>(`${API_BASE}/notification.json/markAllRead`, null).subscribe({
-      next: response => {
-        if (response.status !== API_SUCCESS) return;
-        this.items.update(list => list.map(n => ({ ...n, read: true })));
-        this.unread.set(0);
-      },
-      error: () => {},
-    });
+    this.store.markAllRead().subscribe({ error: () => {} });
   }
 
   private severity(note: Note): string { return (note.severity || '').toUpperCase(); }

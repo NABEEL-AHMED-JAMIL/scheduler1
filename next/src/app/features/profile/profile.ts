@@ -6,6 +6,7 @@ import { confirmWith } from '../../shared/ui/confirm';
 import { RouterLink } from '@angular/router';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { AuthService } from '../../core/auth/auth.service';
+import { NotificationsStore } from '../../core/notifications/notifications.store';
 import { roleLabel as labelOf } from '../../core/auth/auth.models';
 import { BillingBrief } from '../billing/billing-brief';
 import { ToastService } from '../../shared/ui/toast.service';
@@ -96,7 +97,9 @@ export class Profile implements OnInit {
    * which for someone who runs a dozen is a plainly wrong statement rather than an empty card.
    */
   readonly activityFailed = signal(false);
-  readonly unread = signal(0);
+  /** The header badge's count, so marking notifications read elsewhere moves this tile too. */
+  private readonly notifications = inject(NotificationsStore);
+  readonly unread = this.notifications.unread;
 
   /** Where a new picture goes. Avatars are small and personal, so they sit under one prefix
       in whichever bucket is available rather than being scattered per tenant. */
@@ -233,10 +236,7 @@ export class Profile implements OnInit {
       // worse page than one whose activity card says it could not be read.
       error: () => { this.activityLoading.set(false); this.activityFailed.set(true); },
     });
-    this.http.get<ApiResponse<number>>(`${API_BASE}/notification.json/unreadCount`).subscribe({
-      next: r => { if (r.status === API_SUCCESS) this.unread.set(Number(r.data ?? 0)); },
-      error: () => { /* leave at zero */ },
-    });
+    this.notifications.refreshUnread();
   }
 
   load(): void {

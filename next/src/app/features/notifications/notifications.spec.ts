@@ -7,6 +7,7 @@ import { Notifications } from './notifications';
 import { ToastService } from '../../shared/ui/toast.service';
 import { LIST_LIMIT } from '../../core/api/list-limit';
 import { PAGE_SIZES } from '../../shared/ui/pager';
+import { NotificationsStore } from '../../core/notifications/notifications.store';
 
 function build(http: Record<string, unknown>) {
   const toast = { success: vi.fn(), error: vi.fn(), warn: vi.fn(), info: vi.fn() };
@@ -273,5 +274,65 @@ describe('Notifications mark-read refused by the server', () => {
     expect(notifications.items().every(n => !n.read)).toBe(true);
     expect(toast.success).not.toHaveBeenCalled();
     expect(toast.error).toHaveBeenCalledWith('That notification is not yours.');
+  });
+});
+
+/**
+ * Marking rows here used to leave the header badge stale until its next poll: the page posted on
+ * its own and the bell kept its own count. Both go through NotificationsStore now.
+ */
+describe('Notifications page and the header badge', () => {
+  const unread = (id: number, read = false) => ({ notificationId: id, title: 'N' + id, read, dateCreated: '' }) as any;
+
+  it('drops the badge by one when a row is marked read here', () => {
+    const post = vi.fn(() => of({ status: 'SUCCESS' }));
+    const { notifications } = build({ get: vi.fn(() => of({ status: 'SUCCESS', data: 3 })), post });
+    const store = TestBed.inject(NotificationsStore);
+    store.refreshUnread();
+
+    notifications.markRead(unread(1));
+
+    expect(store.unread()).toBe(2);
+  });
+
+  it('zeroes the badge on Mark all read', () => {
+    const post = vi.fn(() => of({ status: 'SUCCESS' }));
+    const { notifications } = build({ get: vi.fn(() => of({ status: 'SUCCESS', data: 3 })), post });
+    const store = TestBed.inject(NotificationsStore);
+    store.refreshUnread();
+
+    notifications.markAllRead();
+
+    expect(store.unread()).toBe(0);
+  });
+
+  it('flips its own rows when the bell marks everything read', () => {
+    const post = vi.fn(() => of({ status: 'SUCCESS' }));
+    const { notifications } = build({ get: vi.fn(() => listOf([unread(1), unread(2)], 2)), post });
+    notifications.load();
+
+    TestBed.inject(NotificationsStore).markAllRead().subscribe();
+
+    expect(notifications.items().every(n => n.read)).toBe(true);
+  });
+
+  it('flips the one row the bell marked', () => {
+    const post = vi.fn(() => of({ status: 'SUCCESS' }));
+    const { notifications } = build({ get: vi.fn(() => listOf([unread(1), unread(2)], 2)), post });
+    notifications.load();
+
+    TestBed.inject(NotificationsStore).markRead(2).subscribe();
+
+    expect(notifications.items().map(n => n.read)).toEqual([false, true]);
+  });
+
+  it('resyncs the badge when the page loads', () => {
+    const get = vi.fn((url: string) => url.endsWith('/unreadCount')
+      ? of({ status: 'SUCCESS', data: 9 }) : listOf([], 0));
+    const { notifications } = build({ get, post: vi.fn() });
+
+    notifications.load();
+
+    expect(TestBed.inject(NotificationsStore).unread()).toBe(9);
   });
 });

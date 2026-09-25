@@ -5,6 +5,7 @@ import { HttpClient } from '@angular/common/http';
 import { Router, provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { NotificationBell } from './notification-bell';
+import { NotificationsStore } from '../../core/notifications/notifications.store';
 
 /**
  * The three ways the bell disagreed with itself.
@@ -250,5 +251,25 @@ describe('Notification bell and the keyboard', () => {
     expect(trigger.hasAttribute('aria-haspopup')).toBe(false);
     expect(trigger.getAttribute('aria-controls')).toBe('notif-panel');
     expect(el.querySelector('#notif-panel')).not.toBeNull();
+  });
+});
+
+describe('Notification bell and the Notifications page', () => {
+  it('shows the count the page moved, because both read one store', () => {
+    const { bell } = opened({ unreadCount: 5, fetched: rows(5, () => true) });
+
+    TestBed.inject(NotificationsStore).markRead(3).subscribe();
+
+    expect(bell.unread()).toBe(4);
+    expect(bell.items().find(n => n.notificationId === 3)?.read).toBe(true);
+  });
+
+  it('flips its rows when the page marks everything read', () => {
+    const { bell } = opened({ unreadCount: 5, fetched: rows(5, () => true) });
+
+    TestBed.inject(NotificationsStore).markAllRead().subscribe();
+
+    expect(bell.unread()).toBe(0);
+    expect(bell.items().every(n => n.read)).toBe(true);
   });
 });

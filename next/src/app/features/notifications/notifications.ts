@@ -1,10 +1,12 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { Router } from '@angular/router';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { LIST_LIMIT } from '../../core/api/list-limit';
 import { instantOf } from '../../core/instant';
+import { NotificationsStore } from '../../core/notifications/notifications.store';
 import { ToastService } from '../../shared/ui/toast.service';
 import { TableShell } from '../../shared/ui/data-table';
 import { Icon } from '../../shared/ui/icon';
@@ -46,6 +48,7 @@ export class Notifications implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
+  private readonly store = inject(NotificationsStore);
 
   readonly items = signal<Notification[]>([]);
   readonly loading = signal(true);
@@ -99,6 +102,13 @@ export class Notifications implements OnInit {
   readonly unreadCount = computed(() => this.items().filter(n => !n.read).length);
   readonly hasFilters = computed(() => this.unreadOnly() || !!this.typeFilter());
 
+  constructor() {
+    // Marking goes through the store, which also moves the header badge. Rows the bell marks
+    // flip here too, so the page and the badge never disagree about what is unread.
+    this.store.marked.pipe(takeUntilDestroyed()).subscribe(id =>
+      this.items.update(list => list.map(n => (id === 'all' || n.notificationId === id ? { ...n, read: true } : n))));
+  }
+
   ngOnInit(): void { this.load(); }
 
   load(): void {
@@ -132,6 +142,8 @@ export class Notifications implements OnInit {
         this.error.set(err?.error?.message || 'Could not load notifications.');
       },
     });
+    // Opening the page resyncs the badge with what the list is about to show.
+    this.store.refreshUnread();
   }
 
   /**
@@ -179,17 +191,15 @@ export class Notifications implements OnInit {
   markRead(item: Notification): void {
     if (item.read || this.isMarking(item)) return;
     this.beginMarking(item.notificationId);
-    this.http.post<ApiResponse>(`${API_BASE}/notification.json/markRead/${item.notificationId}`, null)
+    this.store.markRead(item.notificationId)
       .subscribe({
         next: response => {
           this.endMarking(item.notificationId);
           // A 200 can still be a refusal; flipping the row then showed what was never recorded.
+          // The store flips the row on success.
           if (response.status !== API_SUCCESS) {
             this.toast.error(response.message || 'Could not mark that as read.');
-            return;
           }
-          this.items.update(list =>
-            list.map(n => (n.notificationId === item.notificationId ? { ...n, read: true } : n)));
         },
         error: () => {
           this.endMarking(item.notificationId);
@@ -213,14 +223,13 @@ export class Notifications implements OnInit {
   markAllRead(): void {
     if (this.markingAll()) return;
     this.markingAll.set(true);
-    this.http.post<ApiResponse>(`${API_BASE}/notification.json/markAllRead`, null).subscribe({
+    this.store.markAllRead().subscribe({
       next: response => {
         this.markingAll.set(false);
         if (response.status !== API_SUCCESS) {
           this.toast.error(response.message || 'Could not mark them as read.');
           return;
         }
-        this.items.update(list => list.map(n => ({ ...n, read: true })));
         this.toast.success('All notifications marked as read.');
       },
       error: () => {
