@@ -4,6 +4,7 @@ import { API_SUCCESS } from '../../core/api/api.config';
 import { BucketSummary, ObjectSummary, StorageService } from '../../features/objects/storage.service';
 import { Combobox } from './combobox';
 import { Icon } from './icon';
+import { LoadError } from './load-error';
 import { SidePanel, sidePanelConfig } from './side-panel';
 import { formatSize } from './format-size';
 
@@ -37,10 +38,13 @@ export interface PickedObject {
  */
 @Component({
   selector: 'app-object-picker',
-  imports: [SidePanel, Combobox, Icon],
+  imports: [SidePanel, Combobox, Icon, LoadError],
   template: `
     <app-side-panel [heading]="data.heading || 'Pick a file'" [subtitle]="subtitle()">
       <div class="form-stack">
+        @if (error() && !bucket()) {
+          <app-load-error [message]="error()" (retry)="retry()" />
+        }
         <div>
           <label class="label" for="opBucket">Bucket</label>
           <app-combobox id="opBucket" [selected]="bucket()" (selectedChange)="openBucket($event)"
@@ -64,6 +68,8 @@ export interface PickedObject {
 
           @if (loading()) {
             <p class="text-sm text-[color:var(--text-muted)] px-1 py-4 text-center"><span class="spinner inline-block align-middle mr-2"></span>Reading the folder…</p>
+          } @else if (error()) {
+            <app-load-error [message]="error()" (retry)="retry()" />
           } @else if (!rows().length) {
             <p class="text-sm text-[color:var(--text-muted)] rounded-md px-3 py-4 bg-sunken text-center">
               {{ filter() ? 'Nothing here matches "' + filter() + '".' : 'Nothing in this folder.' }}
@@ -117,6 +123,8 @@ export class ObjectPicker {
   readonly nextToken = signal<string | undefined>(undefined);
   readonly loading = signal(false);
   readonly filter = signal('');
+  /** Why the bucket list or this folder could not be read; shown with Try again in place of the rows. */
+  readonly error = signal('');
 
   readonly bucketOptions = computed(() => this.buckets().map(b => ({ value: b.bucket, label: b.label || b.bucket, hint: b.provider })));
   readonly subtitle = computed(() => this.bucket() ? `${this.bucket()}/${this.prefix()}` : 'Any bucket you can see');
@@ -134,10 +142,25 @@ export class ObjectPicker {
   private ticket = 0;
 
   constructor() {
-    this.storage.buckets().subscribe(r => {
-      if (r.status === API_SUCCESS) this.buckets.set(r.data ?? []);
-    });
+    this.loadBuckets();
     if (this.bucket()) this.browse(this.prefix());
+  }
+
+  private loadBuckets(): void {
+    this.storage.buckets().subscribe({
+      next: r => {
+        if (r.status === API_SUCCESS) { this.buckets.set(r.data ?? []); return; }
+        this.error.set(r.message || 'Could not read the buckets.');
+      },
+      error: err => this.error.set(err?.error?.message || 'Could not read the buckets.'),
+    });
+  }
+
+  /** Try again: the folder when one is open, otherwise the bucket list. */
+  retry(): void {
+    this.error.set('');
+    if (this.bucket()) this.browse(this.prefix());
+    else this.loadBuckets();
   }
 
   openBucket(bucket: string): void {
@@ -150,17 +173,22 @@ export class ObjectPicker {
     this.prefix.set(prefix);
     if (!append) this.filter.set('');
     this.loading.set(!append);
+    this.error.set('');
     const ticket = ++this.ticket;
     this.storage.listObjects(this.bucket(), prefix, append ? this.nextToken() : undefined, 200).subscribe({
       next: r => {
         if (ticket !== this.ticket) return;
         this.loading.set(false);
-        if (r.status !== API_SUCCESS) return;
+        if (r.status !== API_SUCCESS) { this.error.set(r.message || 'Could not read this folder.'); return; }
         const page = r.data?.objects ?? [];
         this.objects.update(current => append ? [...current, ...page] : page);
         this.nextToken.set(r.data?.nextContinuationToken);
       },
-      error: () => { if (ticket === this.ticket) this.loading.set(false); },
+      error: err => {
+        if (ticket !== this.ticket) return;
+        this.loading.set(false);
+        this.error.set(err?.error?.message || 'Could not read this folder.');
+      },
     });
   }
 
