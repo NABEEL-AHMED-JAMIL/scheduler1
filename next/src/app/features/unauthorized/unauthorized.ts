@@ -1,7 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { Location } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
@@ -41,11 +41,10 @@ import { ToastService } from '../../shared/ui/toast.service';
             </a>
           </div>
         } @else {
-          <h1 class="text-xl font-semibold">You do not have access to that page</h1>
+          <h1 class="text-xl font-semibold">This page isn't available to you</h1>
           <p class="text-sm text-[color:var(--text-secondary)] mt-2 leading-relaxed">
-            Your role is <strong>{{ roleLabel() }}</strong>, which cannot reach it. Roles are
-            enforced on the server, so this is not something the page can work around — an
-            administrator has to grant it.
+            You're signed in as a <strong>{{ roleLabel() }}</strong>, and this page is for administrators.
+            If you need it, ask an administrator of your workspace.
           </p>
           <div class="flex items-center justify-center gap-2 mt-6">
             <button type="button" class="btn btn-default btn-sm" (click)="back()">
@@ -66,6 +65,9 @@ export class Unauthorized {
   private readonly http = inject(HttpClient);
   private readonly toast = inject(ToastService);
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+  /** How many entries this tab's history has; a seam for tests. */
+  protected historyLength = () => window.history.length;
 
   /** The page the guard named, or null when this was a role refusal. */
   readonly page = toSignal(this.route.queryParamMap.pipe(
@@ -89,8 +91,11 @@ export class Unauthorized {
     return labelOf(this.auth.role()).toLowerCase();
   }
 
+  /** Back where the reader came from -- or, in a freshly opened tab with nowhere to go back to, the Dashboard
+   *  rather than out of the console to about:blank. */
   back(): void {
-    this.location.back();
+    if (this.historyLength() > 1) this.location.back();
+    else this.router.navigateByUrl('/');
   }
 
   requestAccess(page: PageKey): void {
