@@ -57,8 +57,25 @@ export class Dashboard implements OnInit {
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
 
+  /** What the date boxes hold, which may be half-edited. */
   readonly startDate = signal(localIsoDaysAgo(6));
   readonly endDate = signal(localIsoDaysAgo(0));
+  /**
+   * The range the page last read. The subtitle, the day axis and Try again follow this one, so
+   * editing a box without pressing Apply does not relabel figures that are still the old range's.
+   */
+  readonly appliedStart = signal(localIsoDaysAgo(6));
+  readonly appliedEnd = signal(localIsoDaysAgo(0));
+
+  /**
+   * Why the boxes cannot be applied. From after To used to answer with zeros that read like a quiet
+   * week, and a cleared box sent an empty date the server refused.
+   */
+  readonly rangeError = computed(() => {
+    const iso = /^\d{4}-\d{2}-\d{2}$/;
+    if (!iso.test(this.startDate()) || !iso.test(this.endDate())) return 'Pick a date in both fields.';
+    return this.startDate() <= this.endDate() ? '' : 'From must be on or before To.';
+  });
 
   readonly jobStatus = signal<NameValue[]>([]);
   readonly jobRunning = signal<NameValue[]>([]);
@@ -171,8 +188,8 @@ export class Dashboard implements OnInit {
   load(): void {
     this.loading.set(true);
     this.error.set('');
-    const from = this.startDate();
-    const to = this.endDate();
+    const from = this.appliedStart();
+    const to = this.appliedEnd();
 
     // Loading until all four have answered, and the first failure's reason kept. A refusal (a
     // date that is not a date) is a 200 carrying ERROR and a sentence (MIG-103); every tile is
@@ -332,7 +349,13 @@ export class Dashboard implements OnInit {
       .map(s => ({ ...s, pct: (s.count / total) * 100 }));
   }
 
-  applyRange(): void { this.load(); this.clearCell(); }
+  applyRange(): void {
+    if (this.rangeError()) return;
+    this.appliedStart.set(this.startDate());
+    this.appliedEnd.set(this.endDate());
+    this.load();
+    this.clearCell();
+  }
 
   resetRange(): void {
     this.startDate.set(localIsoDaysAgo(6));

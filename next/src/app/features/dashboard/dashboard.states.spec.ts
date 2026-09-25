@@ -14,10 +14,12 @@ function dashboard(answers: Answers = {}) {
   const calls: string[] = [];
   const service: Record<string, unknown> = {};
   const breakdownDates: string[] = [];
+  const ranges: string[] = [];
   for (const name of ['jobStatus', 'jobRunning', 'weekly', 'hourly', 'breakdown'] as const) {
     service[name] = (...args: unknown[]) => {
       calls.push(name);
       if (name === 'breakdown') breakdownDates.push(String(args[0]));
+      else ranges.push(`${args[0]}..${args[1]}`);
       return (answers[name] ?? ok)();
     };
   }
@@ -30,7 +32,7 @@ function dashboard(answers: Answers = {}) {
       { provide: Router, useValue: { navigate: () => {} } },
     ],
   });
-  return { dashboard: TestBed.runInInjectionContext(() => new Dashboard()), calls, breakdownDates };
+  return { dashboard: TestBed.runInInjectionContext(() => new Dashboard()), calls, breakdownDates, ranges };
 }
 
 const localDay = (d: Date) =>
@@ -160,5 +162,51 @@ describe('Dashboard running-now tile', () => {
     d.load();
     expect(d.runningNow()).toBe(3);
     expect(d.failed()).toBe(4);
+  });
+});
+
+/**
+ * The date boxes had no check: From after To answered SUCCESS with zeros that read like a quiet
+ * week, a cleared box sent an empty date the server refused, and the subtitle claimed the half-typed
+ * range before Apply was pressed. The page now says what is wrong and keeps showing the range it
+ * last read.
+ */
+describe('Dashboard date range', () => {
+  it('refuses an inverted range, says why, and sends nothing', () => {
+    const { dashboard: d, calls } = dashboard();
+    d.startDate.set('2026-09-24');
+    d.endDate.set('2026-09-20');
+    expect(d.rangeError()).toBe('From must be on or before To.');
+    d.applyRange();
+    expect(calls).toEqual([]);
+  });
+
+  it('refuses a cleared date', () => {
+    const { dashboard: d, calls } = dashboard();
+    d.startDate.set('');
+    expect(d.rangeError()).toBe('Pick a date in both fields.');
+    d.applyRange();
+    expect(calls).toEqual([]);
+  });
+
+  it('keeps describing the applied range until Apply is pressed', () => {
+    const { dashboard: d } = dashboard();
+    const shown = d.appliedStart();
+    d.startDate.set('2026-01-01');
+    expect(d.appliedStart()).toBe(shown);
+    d.applyRange();
+    expect(d.appliedStart()).toBe('2026-01-01');
+  });
+
+  it('reads the applied range on Try again, not a half-edited one', () => {
+    const { dashboard: d, ranges } = dashboard();
+    d.startDate.set('2026-09-01');
+    d.endDate.set('2026-09-07');
+    d.applyRange();
+    d.startDate.set('');
+    ranges.length = 0;
+    d.load();
+    expect(ranges.every(r => r === '2026-09-01..2026-09-07')).toBe(true);
+    expect(ranges.length).toBeGreaterThan(0);
   });
 });
