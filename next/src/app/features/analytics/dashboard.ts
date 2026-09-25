@@ -3,6 +3,7 @@ import { Dialog } from '@angular/cdk/dialog';
 import { Subscription } from 'rxjs';
 import { API_SUCCESS } from '../../core/api/api.config';
 import { Icon } from '../../shared/ui/icon';
+import { Field } from '../../shared/ui/field';
 import { confirmWith } from '../../shared/ui/confirm';
 import { RouterLink } from '@angular/router';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
@@ -1077,7 +1078,7 @@ function mintQueryId(widgetId: number): string {
  */
 @Component({
   selector: 'app-dashboards',
-  imports: [Icon, StatTile, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, FilterBuilder, AnalyticsWidget, WidgetChart],
+  imports: [Icon, StatTile, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, FilterBuilder, AnalyticsWidget, WidgetChart, Field],
   templateUrl: './dashboard.html',
 })
 export class Dashboards implements OnInit, OnDestroy {
@@ -1455,8 +1456,17 @@ export class Dashboards implements OnInit, OnDestroy {
 
   readonly canCreate = computed(() => !!this.newName().trim() && !this.creating());
 
+  /** An out-of-range height, said beside the box rather than silently clamped by the server. */
+  readonly heightError = computed(() => {
+    const raw = this.addHeight().trim();
+    if (!raw) return '';
+    const n = Number(raw);
+    return Number.isFinite(n) && n >= this.heightMin && n <= this.heightMax
+      ? '' : `Between ${this.heightMin} and ${this.heightMax} pixels, or leave it empty.`;
+  });
+
   readonly canAdd = computed(() =>
-    !!this.addTitle().trim() && !!this.addSourceId() && !this.adding() && !!this.board());
+    !!this.addTitle().trim() && !!this.addSourceId() && !this.heightError() && !this.adding() && !!this.board());
 
   /**
    * What opening this board costs, in the reader's own terms.

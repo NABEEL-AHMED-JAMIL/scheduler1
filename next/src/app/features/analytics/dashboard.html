@@ -189,14 +189,16 @@
         <!-- ---- adding a widget ---------------------------------------------------------- -->
         @if (addOpen()) {
           <div class="bill-form flex-col items-stretch">
-            <div class="flex gap-2 flex-wrap items-end">
-              <label class="min-w-44"><span class="label">Title</span><input id="w-title" class="input" placeholder="Widget title" [value]="addTitle()" (input)="addTitle.set($any($event.target).value)" /></label>
-              <label><span class="label">Shows</span>
-                <select id="w-kind" class="input w-auto" [value]="addKindOfSource()" (change)="pickSourceKind($any($event.target).value)">
+            <!-- app-field and .form-grid, as every other create form: required stars, and an
+                 out-of-range height said beside its box. -->
+            <div class="form-grid">
+              <app-field label="Title" for="w-title" [required]="true"><input id="w-title" class="input" placeholder="Widget title" [value]="addTitle()" (input)="addTitle.set($any($event.target).value)" /></app-field>
+              <app-field label="Shows" for="w-kind">
+                <select id="w-kind" class="input" [value]="addKindOfSource()" (change)="pickSourceKind($any($event.target).value)">
                   <option value="analysis" [selected]="addKindOfSource() === 'analysis'">A saved analysis</option>
                   <option value="query" [selected]="addKindOfSource() === 'query'">A saved query</option>
-                </select></label>
-              <label class="min-w-56"><span class="label">Which one</span>
+                </select></app-field>
+              <app-field label="Which one" for="w-source" [required]="true">
                 <select id="w-source" class="input w-full" [value]="addSourceId()" (change)="addSourceId.set($any($event.target).value)">
                   <option value="" [selected]="!addSourceId()">Pick one…</option>
                   @if (addKindOfSource() === 'analysis') {
@@ -204,15 +206,22 @@
                   } @else {
                     @for (item of queries(); track item.analyticsQueryId) { <option [value]="item.analyticsQueryId">{{ item.queryName }}</option> }
                   }
-                </select></label>
-              <label><span class="label">Drawn as</span>
-                <select id="w-viz" class="input w-auto" [value]="addVisualization()" (change)="addVisualization.set($any($event.target).value)">
+                </select></app-field>
+              <app-field label="Drawn as" for="w-viz">
+                <select id="w-viz" class="input" [value]="addVisualization()" (change)="addVisualization.set($any($event.target).value)">
                   @for (kind of kinds; track kind.id) { <option [value]="kind.id" [selected]="kind.id === addVisualization()">{{ kind.label }}</option> }
-                </select></label>
-              <label><span class="label">Height</span><input id="w-height" class="input w-24" type="number" placeholder="180" [attr.min]="heightMin" [attr.max]="heightMax" [attr.step]="10" [value]="addHeight()" (input)="addHeight.set($any($event.target).value)" /></label>
-              <label class="flex-1 min-w-48"><span class="label">Caption (optional)</span><input id="w-caption" class="input" placeholder="What the reader should take from it" [value]="addCaption()" (input)="addCaption.set($any($event.target).value)" /></label>
-              <button type="button" class="btn btn-primary btn-sm" [disabled]="!canAdd()" (click)="addWidget()">Add</button>
+                </select></app-field>
+              <app-field label="Height" for="w-height">
+                <input id="w-height" class="input" type="number" placeholder="180" [class.input-invalid]="!!heightError()"
+                       [attr.aria-invalid]="heightError() ? 'true' : null" [attr.aria-describedby]="heightError() ? 'w-height-error' : null"
+                       [attr.min]="heightMin" [attr.max]="heightMax" [attr.step]="10" [value]="addHeight()" (input)="addHeight.set($any($event.target).value)" />
+                @if (heightError()) { <p id="w-height-error" class="field-note text-crit-500">{{ heightError() }}</p> }
+              </app-field>
+              <app-field label="Caption" for="w-caption" hint="Optional."><input id="w-caption" class="input" placeholder="What the reader should take from it" [value]="addCaption()" (input)="addCaption.set($any($event.target).value)" /></app-field>
+            </div>
+            <div class="form-actions">
               <button type="button" class="btn btn-ghost btn-sm" (click)="addOpen.set(false)">Cancel</button>
+              <button type="button" class="btn btn-primary btn-sm" [disabled]="!canAdd()" (click)="addWidget()">Add</button>
             </div>
             <p class="field-note text-[color:var(--text-muted)]">A widget points at saved work; it never keeps a copy of the result. Adding one runs that widget alone, not the whole board.</p>
             @if (sourcesError()) { <p class="text-xs text-crit-500">{{ sourcesError() }}</p> }

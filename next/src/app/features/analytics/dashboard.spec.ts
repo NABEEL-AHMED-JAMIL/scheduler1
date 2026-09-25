@@ -2328,3 +2328,22 @@ describe('the dataset registry, audit 09-22', () => {
     expect(el.textContent).toContain('removing one never touches a file');
   });
 });
+
+describe('adding a widget, audit 09-22', () => {
+  it('lays the form out with app-field, and says when the height is out of range', () => {
+    const rendered = renderedBoard({ widgets: [widgetOn()] });
+    rendered.board.openAdd();
+    rendered.text();
+    const el = rendered.fixture.nativeElement as HTMLElement;
+    expect(el.querySelectorAll('app-field').length).toBeGreaterThanOrEqual(5);
+    expect(el.querySelector('app-field label[for="w-title"]')?.textContent).toContain('(required)');
+    rendered.board.addTitle.set('Revenue');
+    rendered.board.addSourceId.set('11');
+    rendered.board.addHeight.set('20');
+    const text = rendered.text();
+    expect(text).toContain(`Between ${rendered.board.heightMin} and ${rendered.board.heightMax}`);
+    expect(rendered.board.canAdd()).toBe(false);
+    rendered.board.addHeight.set('200');
+    expect(rendered.board.canAdd()).toBe(true);
+  });
+});
