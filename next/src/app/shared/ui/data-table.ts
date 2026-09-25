@@ -36,7 +36,7 @@ import { LoadError } from './load-error';
             </button>
             @if (columnsOpen()) {
               <div class="fixed inset-0 z-10" aria-hidden="true" (click)="columnsOpen.set(false)"></div>
-              <div class="card absolute right-0 top-full mt-1 z-20 p-1 shadow-lg min-w-52 max-h-80 overflow-y-auto"
+              <div class="card absolute right-0 top-full mt-1 z-20 py-1 shadow-lg min-w-52 max-h-80 overflow-y-auto"
                    role="group" aria-label="Columns to show">
                 @for (column of columns(); track column) {
                   <label class="menu-item flex items-center gap-2 cursor-pointer">
