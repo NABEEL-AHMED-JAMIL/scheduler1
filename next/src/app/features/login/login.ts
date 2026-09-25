@@ -6,10 +6,11 @@ import { API_SUCCESS } from '../../core/api/api.config';
 import { ConsolePreview } from '../landing/console-preview';
 import { Icon } from '../../shared/ui/icon';
 import { BrandMark } from '../../shared/ui/brand-mark';
+import { Field } from '../../shared/ui/field';
 
 @Component({
   selector: 'app-login',
-  imports: [ConsolePreview, Icon, BrandMark, ReactiveFormsModule],
+  imports: [ConsolePreview, Icon, BrandMark, ReactiveFormsModule, Field],
   templateUrl: './login.html',
 })
 export class Login {
