@@ -3,7 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { ElementRef, provideZonelessChangeDetection } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router, provideRouter } from '@angular/router';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { NotificationBell } from './notification-bell';
 import { NotificationsStore } from '../../core/notifications/notifications.store';
 
@@ -271,5 +271,60 @@ describe('Notification bell and the Notifications page', () => {
 
     expect(bell.unread()).toBe(0);
     expect(bell.items().every(n => n.read)).toBe(true);
+  });
+});
+
+describe('Notification bell when the list cannot be loaded', () => {
+  async function renderedWith(list: () => unknown) {
+    const get = vi.fn((url: string) =>
+      url.endsWith('/unreadCount') ? of({ status: 'SUCCESS', data: 0 }) : list());
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideZonelessChangeDetection(),
+        provideRouter([]),
+        { provide: HttpClient, useValue: { get, post: vi.fn() } },
+      ],
+    });
+    const fixture = TestBed.createComponent(NotificationBell);
+    fixture.autoDetectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    el.querySelector<HTMLElement>('button')!.click();
+    await fixture.whenStable();
+    return { fixture, el, get };
+  }
+
+  afterEach(() => TestBed.resetTestingModule());
+
+  it('says it could not load, rather than that you are all caught up', async () => {
+    const { el } = await renderedWith(() => throwError(() => ({ status: 503 })));
+    expect(el.textContent).toContain('could not be loaded');
+    expect(el.textContent).not.toContain('all caught up');
+  });
+
+  it('treats a refused list the same way', async () => {
+    const { el } = await renderedWith(() => of({ status: 'ERROR', message: 'No.' }));
+    expect(el.textContent).toContain('could not be loaded');
+  });
+
+  it('clears the failure once a later load succeeds', async () => {
+    let fail = true;
+    const { fixture, el } = await renderedWith(() =>
+      fail ? throwError(() => ({ status: 503 })) : of({ status: 'SUCCESS', data: [] }));
+    fail = false;
+    const bell = el.querySelector<HTMLElement>('button')!;
+    bell.click(); // close
+    bell.click(); // open again, which reloads
+    await fixture.whenStable();
+    expect(el.textContent).toContain('all caught up');
+  });
+
+  it('sets the note about unread rows it has no room for apart from the last row', async () => {
+    const { fixture, el } = await renderedWith(() => of({ status: 'SUCCESS', data: [note(1, false)] }));
+    fixture.componentInstance.unread.set(30);
+    await fixture.whenStable();
+    const band = Array.from(el.querySelectorAll('p')).find(p => p.textContent?.includes('more unread'))!;
+    expect(band.className).toContain('border-t');
+    expect(band.className).toContain('py-2');
   });
 });

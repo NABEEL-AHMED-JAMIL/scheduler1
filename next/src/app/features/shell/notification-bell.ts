@@ -35,6 +35,12 @@ const FETCH_ROWS = 20;
 @Component({
   selector: 'app-notification-bell',
   imports: [Icon, RouterLink],
+  // Unread rows get the same tint the Notifications page gives them, not just the dot. Not
+  // .notification-row itself: that brings its own padding and a left rule the panel has no room for.
+  styles: [`
+    button.is-unread { background: color-mix(in oklab, var(--accent-text) 6%, transparent); }
+    button.is-unread:hover { background: color-mix(in oklab, var(--accent-text) 10%, transparent); }
+  `],
   template: `
     <div class="relative" data-nav-menu="__bell" (focusout)="onFocusOut($event)">
       <button type="button" class="btn btn-ghost btn-icon relative" (click)="toggle()"
@@ -59,13 +65,21 @@ const FETCH_ROWS = 20;
             }
           </div>
 
-          @if (!recent().length) {
+          <!-- A failed load with nothing in hand is not an empty mailbox; saying "all caught up"
+               there told people they had nothing to read when the bell simply could not look.
+               Rows from an earlier poll stay on screen: stale beats blank. -->
+          @if (!recent().length && failed()) {
+            <div class="px-3 py-8 text-center">
+              <app-icon name="alert" size="1.5rem" class="icon-warn block mx-auto mb-2" />
+              <p class="text-sm text-[color:var(--text-muted)]">Notifications could not be loaded.</p>
+            </div>
+          } @else if (!recent().length) {
             <div class="px-3 py-8 text-center">
               <app-icon name="bell" size="1.5rem" class="icon-muted block mx-auto mb-2" />
               <p class="text-sm text-[color:var(--text-muted)]">You are all caught up.</p>
             </div>
           } @else {
-            <ul class="max-h-80 overflow-y-auto divide-y divide-[color:var(--border-subtle)]">
+            <ul class="max-h-[26rem] overflow-y-auto divide-y divide-[color:var(--border-subtle)]">
               @for (note of recent(); track note.notificationId) {
                 <li>
                   <button type="button" class="w-full text-left flex items-start gap-2.5 px-3 py-2.5
@@ -97,8 +111,9 @@ const FETCH_ROWS = 20;
 
           <!-- The badge counts the whole mailbox; this panel holds eight rows. Without this line
                a badge reading 30 over a panel showing nothing unread looks like a bug. -->
-          @if (hiddenUnread()) {
-            <p class="px-3 pt-2 text-[11px] text-center text-[color:var(--text-muted)]">
+          @if (hiddenUnread() && !failed()) {
+            <!-- Its own band, so it cannot be read as the tail of the last row above it. -->
+            <p class="px-3 py-2 border-t border-subtle bg-sunken text-[11px] text-center text-[color:var(--text-muted)]">
               {{ hiddenUnread() }} more unread not shown here.
             </p>
           }
@@ -121,6 +136,9 @@ export class NotificationBell implements OnInit, OnDestroy {
 
   readonly open = signal(false);
   readonly items = signal<Note[]>([]);
+
+  /** The last list load failed, so an empty panel means "could not look", not "nothing new". */
+  readonly failed = signal(false);
 
   /**
    * The badge, as the server counts it.
@@ -218,12 +236,14 @@ export class NotificationBell implements OnInit, OnDestroy {
     this.http.get<ApiResponse<any>>(`${API_BASE}/notification.json/list`,
       { params: { page: '1', limit: String(FETCH_ROWS) } }).subscribe({
       next: response => {
-        if (response.status !== API_SUCCESS) return;
+        if (response.status !== API_SUCCESS) { this.failed.set(true); return; }
+        this.failed.set(false);
         const data = response.data as any;
         this.items.set(Array.isArray(data) ? data : (data?.content ?? []));
       },
-      // A failing bell must not put an error in front of whatever the user is doing.
-      error: () => {},
+      // A failing bell must not put an error in front of whatever the user is doing; the panel
+      // says so quietly instead.
+      error: () => this.failed.set(true),
     });
   }
 
