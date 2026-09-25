@@ -4,7 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
 import { Dialog } from '@angular/cdk/dialog';
 import { ActivatedRoute, Router } from '@angular/router';
-import { of } from 'rxjs';
+import { Observable, of } from 'rxjs';
 import { AuthService } from '../../../core/auth/auth.service';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { KafkaConnections, KafkaProfile } from './kafka-connections';
@@ -188,5 +188,39 @@ describe('the topic test', () => {
     expect(result.ok).toBe(true);
     expect(result.unread).toBe(true);
     expect(result.message).toContain('no consumer is reading');
+  });
+});
+
+describe('when the topics cannot be read', () => {
+  function screenWithTopics(answer: 'refused' | 'failed') {
+    const screen = screenFor(false, [GLOBEX_DEFAULT]);
+    const http = TestBed.inject(HttpClient) as any;
+    const original = http.get;
+    http.get = (url: string, options?: any) => url.includes('topicsForProfile')
+      ? (answer === 'refused'
+          ? of({ status: 'ERROR', message: 'Topics are not available right now.' })
+          : new Observable(sub => sub.error({ error: {} })))
+      : original(url, options);
+    screen.selectedId.set(GLOBEX_DEFAULT.kafkaConnectionProfileId);
+    screen.loadTopics();
+    return screen;
+  }
+
+  it('says so, rather than presenting a failed load as a profile with no topics', () => {
+    const screen = screenWithTopics('refused');
+    expect(screen.topicsError()).toBe('Topics are not available right now.');
+    expect(screen.topicsHere()).toEqual([]);
+  });
+
+  it('says so when the request itself fails', () => {
+    const screen = screenWithTopics('failed');
+    expect(screen.topicsError()).toBe('The topics could not be loaded.');
+  });
+
+  it('clears the error once a retry succeeds', () => {
+    const screen = screenWithTopics('refused');
+    (TestBed.inject(HttpClient) as any).get = () => of({ status: 'SUCCESS', message: '', data: [] });
+    screen.loadTopics();
+    expect(screen.topicsError()).toBe('');
   });
 });

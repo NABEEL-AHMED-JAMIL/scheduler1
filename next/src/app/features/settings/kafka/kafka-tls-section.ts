@@ -101,7 +101,7 @@ const STORE_FIELDS: Record<'truststore' | 'keystore', StoreFields> = {
       <div class="form-section-title flex items-center">
         TLS material
         <button type="button" class="btn btn-ghost btn-sm ml-auto"
-                (click)="showGuide.set(!showGuide())">
+                [attr.aria-expanded]="showGuide()" (click)="showGuide.set(!showGuide())">
           <app-icon name="info" class="icon-info" />
           {{ showGuide() ? 'Hide' : 'Where do these files come from?' }}
         </button>
@@ -133,7 +133,7 @@ const STORE_FIELDS: Record<'truststore' | 'keystore', StoreFields> = {
                     <div class="guide-cmd">
                       <code class="guide-code">{{ commands.fetchCert }}</code>
                       <button type="button" class="btn btn-ghost btn-icon btn-sm shrink-0"
-                              title="Copy command" (click)="copyCommand(commands.fetchCert)">
+                              title="Copy command" aria-label="Copy command" (click)="copyCommand(commands.fetchCert)">
                         <app-icon name="copy" size="0.9em" />
                       </button>
                     </div>
@@ -153,7 +153,7 @@ const STORE_FIELDS: Record<'truststore' | 'keystore', StoreFields> = {
                     <div class="guide-cmd">
                       <code class="guide-code">{{ commands.toPkcs8 }}</code>
                       <button type="button" class="btn btn-ghost btn-icon btn-sm shrink-0"
-                              title="Copy command" (click)="copyCommand(commands.toPkcs8)">
+                              title="Copy command" aria-label="Copy command" (click)="copyCommand(commands.toPkcs8)">
                         <app-icon name="copy" size="0.9em" />
                       </button>
                     </div>
@@ -167,7 +167,7 @@ const STORE_FIELDS: Record<'truststore' | 'keystore', StoreFields> = {
                     <div class="guide-cmd">
                       <code class="guide-code">{{ commands.truststore }}</code>
                       <button type="button" class="btn btn-ghost btn-icon btn-sm shrink-0"
-                              title="Copy command" (click)="copyCommand(commands.truststore)">
+                              title="Copy command" aria-label="Copy command" (click)="copyCommand(commands.truststore)">
                         <app-icon name="copy" size="0.9em" />
                       </button>
                     </div>
@@ -180,7 +180,7 @@ const STORE_FIELDS: Record<'truststore' | 'keystore', StoreFields> = {
                     <div class="guide-cmd">
                       <code class="guide-code">{{ commands.keystore }}</code>
                       <button type="button" class="btn btn-ghost btn-icon btn-sm shrink-0"
-                              title="Copy command" (click)="copyCommand(commands.keystore)">
+                              title="Copy command" aria-label="Copy command" (click)="copyCommand(commands.keystore)">
                         <app-icon name="copy" size="0.9em" />
                       </button>
                     </div>
@@ -224,6 +224,7 @@ const STORE_FIELDS: Record<'truststore' | 'keystore', StoreFields> = {
               <div class="seg mt-3" role="group" aria-label="How you are supplying the broker's CA">
                 @for (option of trustRoutes; track option.id) {
                   <button type="button" class="seg-btn" [class.seg-on]="trustRoute() === option.id"
+                          [attr.aria-pressed]="trustRoute() === option.id"
                           (click)="setTrustRoute(option.id)">
                     <app-icon [name]="option.icon" size="0.9em" />
                     {{ option.label }}
@@ -274,6 +275,7 @@ const STORE_FIELDS: Record<'truststore' | 'keystore', StoreFields> = {
                    aria-label="How you are supplying this client's certificate">
                 @for (option of identityRoutes; track option.id) {
                   <button type="button" class="seg-btn" [class.seg-on]="identityRoute() === option.id"
+                          [attr.aria-pressed]="identityRoute() === option.id"
                           (click)="setIdentityRoute(option.id)">
                     <app-icon [name]="option.icon" size="0.9em" />
                     {{ option.label }}
@@ -393,7 +395,7 @@ const STORE_FIELDS: Record<'truststore' | 'keystore', StoreFields> = {
           </button>
           <!-- Hidden because the native control cannot be styled and reports a path nobody needs;
                everything it would have said is in the row below once the file is accepted. -->
-          <input type="file" class="sr-only" #picker [accept]="need.accept"
+          <input type="file" class="sr-only" #picker [accept]="need.accept" tabindex="-1"
                  [attr.aria-label]="need.label" (change)="pick(need.id, picker)" />
         </div>
 
@@ -450,8 +452,8 @@ const STORE_FIELDS: Record<'truststore' | 'keystore', StoreFields> = {
             <app-icon name="plus" size="0.9em" />
             Add another file to the chain
           </button>
-          <input type="file" class="sr-only" #adder [accept]="need.accept"
-                 (change)="add(need.id, adder)" />
+          <input type="file" class="sr-only" #adder [accept]="need.accept" tabindex="-1"
+                 [attr.aria-label]="'Add another ' + need.label" (change)="add(need.id, adder)" />
         }
       </div>
     </ng-template>

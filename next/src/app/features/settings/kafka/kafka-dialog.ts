@@ -38,8 +38,8 @@ import {
 
       <form [formGroup]="form" class="form-stack">
         @if (testResult(); as result) {
-          <div class="card flex items-start gap-2 px-3 py-2.5 text-sm"
-               [style.border-color]="result.ok ? 'var(--color-ok-500)' : 'var(--color-crit-500)'">
+          <div class="card flex items-start gap-2 px-3 py-2.5 text-sm" role="status"
+               [class.kafka-test-ok]="result.ok" [class.kafka-test-crit]="!result.ok">
             <app-icon [name]="result.ok ? 'checkCircle' : 'xCircle'"
                       [class]="result.ok ? 'icon-ok' : 'icon-crit'" class="mt-0.5 shrink-0" />
             <span>{{ result.message }}</span>

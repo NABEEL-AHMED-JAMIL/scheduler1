@@ -109,6 +109,11 @@ export class KafkaConnections implements OnInit {
   /** Which profile the loaded topics belong to; anything else on screen is stale. */
   private readonly topicsFor = signal<number | null>(null);
   readonly topicsLoading = signal(false);
+  /**
+   * Why the selected profile's topics could not be read. A toast alone left the pane saying
+   * "No topic publishes through this profile yet", which a failed request is not.
+   */
+  readonly topicsError = signal('');
   readonly topicsHere = computed<{ type: TaskType }[]>(() => {
     const p = this.selected();
     if (!p) return [];
@@ -201,24 +206,29 @@ export class KafkaConnections implements OnInit {
    * profile is picked, not for every profile up front. A workspace with ten thousand topics
    * used to download all of them (and every pipeline) to show the one pane it was looking at.
    */
-  private loadTopics(): void {
+  loadTopics(): void {
     const p = this.selected();
+    this.topicsError.set('');
     if (!p) { this.taskTypes.set([]); this.topicsFor.set(null); return; }
     const id = p.kafkaConnectionProfileId;
     this.topicsLoading.set(true);
     this.http.get<ApiResponse<any[]>>(`${API_BASE}/setting.json/topicsForProfile`, { params: { kafkaConnectionProfileId: id } }).subscribe({
       next: r => {
         this.topicsLoading.set(false);
-        if (r.status !== API_SUCCESS) { this.toast.error(r.message); return; }
         // A slower answer for a profile no longer selected must not overwrite the current one.
         if (this.selectedId() !== id) return;
+        if (r.status !== API_SUCCESS) { this.topicsError.set(r.message || 'The topics could not be loaded.'); return; }
         const byTopic: Record<number, { pipelineKey: number; pipelineId: string; pipelineName: string; status?: string; fields?: number }[]> = {};
         for (const t of r.data ?? []) byTopic[t.sourceTaskTypeId] = t.pipelines ?? [];
         this.pipelinesByTopic.set(byTopic);
         this.taskTypes.set(r.data ?? []);
         this.topicsFor.set(id);
       },
-      error: err => { this.topicsLoading.set(false); this.toast.error(err?.error?.message || 'The topics could not be loaded.'); },
+      error: err => {
+        this.topicsLoading.set(false);
+        if (this.selectedId() !== id) return;
+        this.topicsError.set(err?.error?.message || 'The topics could not be loaded.');
+      },
     });
   }
 
@@ -291,18 +301,14 @@ export class KafkaConnections implements OnInit {
   readonly loading = signal(true);
   readonly error = signal('');
   readonly search = signal('');
-  readonly protocolFilter = signal('');
   readonly environmentFilter = signal('');
   readonly statusFilter = signal('');
   readonly environments = KAFKA_ENVIRONMENTS;
   readonly env = (p: KafkaProfile) => kafkaEnvironment(p.environmentLabel);
   readonly testing = signal<number | null>(null);
 
-  readonly protocols = computed(() =>
-    [...new Set(this.profiles().map(p => p.securityProtocol).filter(Boolean))].sort());
-
   readonly hasFilters = computed(() =>
-    !!(this.search().trim() || this.protocolFilter() || this.environmentFilter() || this.statusFilter()
+    !!(this.search().trim() || this.environmentFilter() || this.statusFilter()
        || this.onlyMine()));
 
   /** Narrows the list to rows this person created. Not persisted -- see MineFilter. */
@@ -358,11 +364,9 @@ export class KafkaConnections implements OnInit {
 
   readonly filtered = computed(() => {
     const term = this.search().trim().toLowerCase();
-    const protocol = this.protocolFilter();
     const environment = this.environmentFilter();
     const status = this.statusFilter();
     const rows = this.profiles().filter(p => {
-      if (protocol && p.securityProtocol !== protocol) return false;
       if (environment && kafkaEnvironment(p.environmentLabel)?.key !== environment) return false;
       if (status && p.status !== status) return false;
       if (!term) return true;
@@ -439,7 +443,6 @@ export class KafkaConnections implements OnInit {
 
   clearFilters(): void {
     this.search.set('');
-    this.protocolFilter.set('');
     this.environmentFilter.set('');
     this.statusFilter.set('');
     // hasFilters() counts Only mine, so Clear has to turn it off -- with only that on, the button
@@ -525,35 +528,6 @@ export class KafkaConnections implements OnInit {
       },
       error: err => this.toast.error(err?.error?.message || 'The profile could not be deleted.'),
     });
-  }
-
-  testPill(profile: KafkaProfile): string {
-    switch (profile.connectionStatus) {
-      case 'SUCCESS': return 'pill pill-ok';
-      case 'FAILED':  return 'pill pill-crit';
-      default:        return 'pill pill-neutral';
-    }
-  }
-
-  testGlyph(profile: KafkaProfile): string {
-    switch (profile.connectionStatus) {
-      case 'SUCCESS': return 'checkCircle';
-      case 'FAILED':  return 'xCircle';
-      default:        return '';
-    }
-  }
-
-  testLabel(profile: KafkaProfile): string {
-    switch (profile.connectionStatus) {
-      case 'SUCCESS': return 'OK';
-      case 'FAILED':  return 'Failed';
-      default:        return 'Untested';
-    }
-  }
-
-  /** SASL and SSL each imply a different set of things that must be configured. */
-  protocolTone(profile: KafkaProfile): string {
-    return profile.securityProtocol === 'PLAINTEXT' ? 'pill pill-warn' : 'pill pill-neutral';
   }
 
   /**

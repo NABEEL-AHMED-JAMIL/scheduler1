@@ -76,8 +76,8 @@
         }
       </div>
 
-      @if (loading()) {
-        <div class="lookup-rail-empty"><app-icon name="refresh" class="spin icon-muted" /> Loading…</div>
+      @if (loading() && !profiles().length) {
+        <div class="lookup-rail-empty"><div class="spinner" role="status" aria-label="Loading"></div> Loading…</div>
       } @else if (error()) {
         <div class="lookup-rail-empty text-crit-500">
           {{ error() }}
@@ -89,6 +89,7 @@
           {{ hasFilters() ? 'No profile matches the current filters.' : 'No Kafka profiles yet.' }}
         </div>
       } @else {
+        <app-blur-loader [active]="loading()">
         <ul class="lookup-rail-list" role="listbox" aria-label="Kafka profiles">
           @for (p of filtered(); track p.kafkaConnectionProfileId) {
             <li role="presentation">
@@ -96,7 +97,8 @@
                       role="option" [attr.aria-selected]="selectedId() === p.kafkaConnectionProfileId"
                       [class.is-selected]="selectedId() === p.kafkaConnectionProfileId"
                       (click)="select(p)">
-                <span class="kafka-rail-dot" [class]="'kafka-rail-dot ' + testTone(p).cls" [title]="testTone(p).label"></span>
+                <span class="kafka-rail-dot" [class]="'kafka-rail-dot ' + testTone(p).cls" [title]="testTone(p).label" aria-hidden="true"></span>
+                <span class="sr-only">{{ testTone(p).label }}</span>
                 <span class="min-w-0 flex-1">
                   <span class="lookup-rail-key">{{ p.profileName }}</span>
                   <span class="lookup-rail-sub">
@@ -110,6 +112,7 @@
             </li>
           }
         </ul>
+        </app-blur-loader>
       }
     </aside>
 
@@ -156,7 +159,7 @@
                 </button>
                 @if (p.isDefault) {
                   <button cdkMenuItem class="menu-item btn-intent-warn" (cdkMenuItemTriggered)="clearDefault()">
-                    <app-icon name="zapOff" />Clear default
+                    <app-icon name="close" />Clear default
                   </button>
                 } @else {
                   <button cdkMenuItem class="menu-item btn-intent-ok" (cdkMenuItemTriggered)="setDefault(p)">
@@ -243,10 +246,6 @@
           }
         </div>
 
-        <div class="kafka-detail-grid">
-
-        </div>
-
         <!-- Topics: the Kafka topics (and the consumers behind them) that publish through this
              profile. Managed here rather than on a screen of their own, since a topic is only
              ever read next to the connection it goes out on. -->
@@ -268,12 +267,18 @@
                        [value]="topicSearch()" (input)="topicSearch.set($any($event.target).value)" />
               </div>
             }
-            <button type="button" class="btn btn-default" [class.ml-auto]="topicsHere().length <= 8" (click)="addTopic(p)">
+            <button type="button" class="btn btn-default btn-sm" [class.ml-auto]="topicsHere().length <= 8" (click)="addTopic(p)">
               <app-icon name="plus" class="icon-ok" />Add topic
             </button>
           </div>
           @if (topicsLoading() && !topicsHere().length) {
-            <div class="lookup-entries-empty"><app-icon name="refresh" class="spin icon-muted" /> Loading topics…</div>
+            <div class="lookup-entries-empty"><div class="spinner" role="status" aria-label="Loading topics"></div> Loading topics…</div>
+          } @else if (topicsError()) {
+            <div class="lookup-entries-empty text-crit-500" role="alert">
+              <app-icon name="alert" size="1.5rem" />
+              <p>{{ topicsError() }}</p>
+              <button type="button" class="btn btn-default btn-sm" (click)="loadTopics()">Try again</button>
+            </div>
           } @else if (!topicsHere().length) {
             <div class="lookup-entries-empty">
               <app-icon name="layers" size="1.5rem" class="icon-muted" />
@@ -319,7 +324,7 @@
                           }
                         </div>
                         @if (topicTests()[row.type.sourceTaskTypeId!]; as test) {
-                          <div class="text-[11px] mt-0.5 truncate" [class]="test.unread ? 'text-warn-600' : test.ok ? 'text-ok-500' : 'text-crit-500'" [title]="test.message">
+                          <div class="text-[11px] mt-0.5 truncate" [class]="test.unread ? 'text-warn-500' : test.ok ? 'text-ok-500' : 'text-crit-500'" [title]="test.message">
                             {{ test.message }}
                           </div>
                         }
