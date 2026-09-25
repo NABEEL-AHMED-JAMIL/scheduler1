@@ -13,7 +13,7 @@
         </button>
       }
       <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
-        <app-icon name="refresh" [class.spin]="loading()" />{{ loading() ? 'Loading…' : 'Refresh' }}
+        <app-icon name="refresh" [class.spin]="loading()" />Refresh
       </button>
     </div>
   </div>
@@ -115,7 +115,7 @@
         <input class="input" placeholder="Search job, run or message" aria-label="Search queue messages"
                [value]="search()" (input)="search.set($any($event.target).value); pager.reset()" />
       </div>
-      @if (search() || selectedStatuses().length || fromDate() || toDate()) {
+      @if (hasFilters()) {
         <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()"><app-icon name="close" />Clear</button>
       }
     </ng-container>
