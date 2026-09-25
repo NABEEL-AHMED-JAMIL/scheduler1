@@ -252,3 +252,51 @@ describe('Dashboard queue volume by day', () => {
     expect(d.dayBars()).toEqual([]);
   });
 });
+
+/**
+ * A slow read from an earlier Apply used to land after the newer one and overwrite its tiles, and
+ * turn the loader off while the newer reads were still out. The same for two hour cells clicked in
+ * quick succession: the first hour's jobs could fill the second hour's table.
+ */
+describe('Dashboard answers that arrive out of order', () => {
+  it('keeps the newer range when the older one answers last', () => {
+    const pending: Subject<unknown>[] = [];
+    const { dashboard: d } = dashboard({ jobStatus: () => { const s = new Subject<unknown>(); pending.push(s); return s; } });
+    d.load();
+    d.startDate.set('2026-09-01');
+    d.applyRange();
+    const [older, newer] = pending;
+    newer.next({ status: 'SUCCESS', data: [{ name: 'All', value: 7 }] });
+    older.next({ status: 'SUCCESS', data: [{ name: 'All', value: 99 }] });
+    expect(d.totalJobs()).toBe(7);
+    expect(d.loading()).toBe(false);
+  });
+
+  it('stays loading while the newer reads are out, whatever the older ones do', () => {
+    const pending: Subject<unknown>[] = [];
+    const { dashboard: d } = dashboard({ jobStatus: () => { const s = new Subject<unknown>(); pending.push(s); return s; } });
+    d.load();
+    d.load();
+    pending[0].next({ status: 'SUCCESS', data: [] });
+    expect(d.loading()).toBe(true);
+  });
+
+  it('fills the table with the hour picked last', () => {
+    const pending: Subject<unknown>[] = [];
+    const { dashboard: d } = dashboard({ breakdown: () => { const s = new Subject<unknown>(); pending.push(s); return s; } });
+    d.selectCell('2026-09-20', 9, 4);
+    d.selectCell('2026-09-21', 10, 2);
+    pending[1].next({ status: 'SUCCESS', data: [{ jobId: 2, jobName: 'B', total: 2 }] });
+    pending[0].next({ status: 'SUCCESS', data: [{ jobId: 1, jobName: 'A', total: 4 }] });
+    expect(d.breakdownRows().map(r => r.jobId)).toEqual([2]);
+  });
+
+  it('ignores an hour that answers after the table was closed', () => {
+    const pending: Subject<unknown>[] = [];
+    const { dashboard: d } = dashboard({ breakdown: () => { const s = new Subject<unknown>(); pending.push(s); return s; } });
+    d.selectCell('2026-09-20', 9, 4);
+    d.clearCell();
+    pending[0].next({ status: 'SUCCESS', data: [{ jobId: 1, jobName: 'A', total: 4 }] });
+    expect(d.breakdown()).toEqual([]);
+  });
+});

@@ -1,5 +1,5 @@
 import { BillingBrief } from '../billing/billing-brief';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router, RouterLink } from '@angular/router';
 import { Donut } from '../../shared/charts/donut';
@@ -18,7 +18,7 @@ import { StatTile } from '../../shared/ui/stat-tile';
 import { TableShell } from '../../shared/ui/data-table';
 import { BlurLoader } from '../../shared/ui/blur-loader';
 import { LoadError } from '../../shared/ui/load-error';
-import { Observable } from 'rxjs';
+import { Observable, Subscription } from 'rxjs';
 
 const WEEKDAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -201,7 +201,22 @@ export class Dashboard implements OnInit {
 
   ngOnInit(): void { this.load(); }
 
+  /**
+   * The reads in flight. A new Apply cancels the old set: a slow answer from the earlier range used
+   * to land after the newer one and overwrite its tiles, and turn the loader off while the newer
+   * reads were still out. Same for the drill-down, where two quick clicks could fill the second
+   * hour's table with the first hour's jobs.
+   */
+  private loadSub = new Subscription();
+  private breakdownSub?: Subscription;
+
+  constructor() {
+    inject(DestroyRef).onDestroy(() => { this.loadSub.unsubscribe(); this.breakdownSub?.unsubscribe(); });
+  }
+
   load(): void {
+    this.loadSub.unsubscribe();
+    this.loadSub = new Subscription();
     this.loading.set(true);
     this.error.set('');
     const from = this.appliedStart();
@@ -216,22 +231,22 @@ export class Dashboard implements OnInit {
       if (!this.error()) this.error.set(message || 'The dashboard could not be read.');
     };
     const read = <T>(request: Observable<ApiResponse<T>>, into: (data: T | undefined) => void) =>
-      request.subscribe({
+      this.loadSub.add(request.subscribe({
         next: r => {
           if (r.status === API_SUCCESS) into(r.data);
           else fail(r.message);
           settle();
         },
         error: err => { fail(err?.error?.message); settle(); },
-      });
+      }));
 
     read(this.dashboard.jobStatus(from, to), data => this.jobStatus.set(data ?? []));
     read(this.dashboard.jobRunning(from, to), data => this.jobRunning.set(data ?? []));
     read(this.dashboard.hourly(from, to), data => this.hourly.set(data ?? []));
-    this.http.get<ApiResponse<number>>(`${API_BASE}/notification.json/unreadCount`).subscribe({
+    this.loadSub.add(this.http.get<ApiResponse<number>>(`${API_BASE}/notification.json/unreadCount`).subscribe({
       next: r => { if (r.status === API_SUCCESS) this.unread.set(Number(r.data ?? 0)); },
       error: () => { /* the tile simply shows zero */ },
-    });
+    }));
   }
 
   /** Clicking an hour cell drills into which jobs ran in that exact hour. */
@@ -272,7 +287,8 @@ export class Dashboard implements OnInit {
     this.breakdownLoading.set(true);
     this.breakdownError.set('');
     this.breakdown.set([]);
-    this.dashboard.breakdown(date, hr).subscribe({
+    this.breakdownSub?.unsubscribe();
+    this.breakdownSub = this.dashboard.breakdown(date, hr).subscribe({
       next: r => {
         this.breakdownLoading.set(false);
         if (r.status === API_SUCCESS) this.breakdown.set(r.data ?? []);
@@ -286,6 +302,8 @@ export class Dashboard implements OnInit {
   }
 
   clearCell(): void {
+    this.breakdownSub?.unsubscribe();
+    this.breakdownLoading.set(false);
     this.selectedCell.set(null);
     this.breakdownError.set('');
     this.breakdown.set([]);
