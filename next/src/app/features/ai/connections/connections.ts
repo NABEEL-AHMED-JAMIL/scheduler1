@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { DecimalPipe } from '@angular/common';
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { AuthService } from '../../../core/auth/auth.service';
 import { ToastService } from '../../../shared/ui/toast.service';
@@ -32,6 +32,8 @@ export class Connections implements OnInit {
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
   private readonly auth = inject(AuthService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
 
   readonly connections = signal<ModelConnection[]>([]);
   readonly loading = signal(true);
@@ -72,12 +74,14 @@ export class Connections implements OnInit {
   });
 
   constructor() {
-    // Land on the default, else the first, once the list is in -- a blank pane says nothing.
+    // Land on the linked connection, else the default, else the first, once the list is in --
+    // a blank pane says nothing.
     effect(() => {
       const rows = this.filtered();
       untracked(() => {
         if (this.selectedId() !== null && rows.some(c => c.connectionId === this.selectedId())) return;
-        const pick = rows.find(c => c.isDefault) ?? rows[0];
+        const linked = Number(this.route.snapshot.queryParamMap.get('connection'));
+        const pick = rows.find(c => c.connectionId === linked) ?? rows.find(c => c.isDefault) ?? rows[0];
         this.selectedId.set(pick?.connectionId ?? null);
       });
     });
@@ -106,7 +110,11 @@ export class Connections implements OnInit {
     });
   }
 
-  select(c: ModelConnection): void { this.selectedId.set(c.connectionId); }
+  /** Mirrored to ?connection=, as Kafka does with ?profileId=, so a connection can be linked to. */
+  select(c: ModelConnection): void {
+    this.selectedId.set(c.connectionId);
+    this.router.navigate([], { relativeTo: this.route, queryParams: { connection: c.connectionId }, queryParamsHandling: 'merge', replaceUrl: true });
+  }
   providerLabel(c: ModelConnection): string { return providerOf(c.provider).label; }
   endpointOf(c: ModelConnection): string {
     if (c.apiEndpoint) return c.apiEndpoint;

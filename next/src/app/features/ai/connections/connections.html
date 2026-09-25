@@ -55,7 +55,7 @@
       </div>
 
       @if (loading() && !connections().length) {
-        <div class="lookup-rail-empty"><app-icon name="refresh" class="spin icon-muted" /> Loading…</div>
+        <div class="lookup-rail-empty"><div class="spinner" role="status" aria-label="Loading"></div> Loading…</div>
       } @else if (error()) {
         <div class="lookup-rail-empty text-crit-500">{{ error() }}
           <button type="button" class="btn btn-default btn-sm mt-2" (click)="load()">Try again</button></div>
@@ -71,7 +71,8 @@
             <li role="presentation">
               <button type="button" class="lookup-rail-item kafka-rail-item" role="option"
                       [attr.aria-selected]="selectedId() === c.connectionId" [class.is-selected]="selectedId() === c.connectionId" (click)="select(c)">
-                <span [class]="'kafka-rail-dot ' + testTone(c).cls" [title]="testTone(c).label"></span>
+                <span [class]="'kafka-rail-dot ' + testTone(c).cls" [title]="testTone(c).label" aria-hidden="true"></span>
+                <span class="sr-only">{{ testTone(c).label }}</span>
                 <span class="min-w-0 flex-1">
                   <span class="lookup-rail-key">{{ c.name }}</span>
                   <span class="lookup-rail-sub">
@@ -107,7 +108,7 @@
           </div>
           <div class="flex items-center gap-2 shrink-0">
             <button type="button" class="btn btn-primary btn-sm" (click)="test(c)" [disabled]="testing() === c.connectionId">
-              <app-icon name="plug" [class.spin]="testing() === c.connectionId" />{{ testing() === c.connectionId ? 'Testing…' : 'Test connection' }}
+              <app-icon name="plug" [busy]="testing() === c.connectionId" />{{ testing() === c.connectionId ? 'Testing…' : 'Test connection' }}
             </button>
             <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="menu" aria-label="Actions"><app-icon name="dots" size="1.05em" /></button>
             <ng-template #menu>
@@ -145,7 +146,8 @@
             <span class="text-[color:var(--text-muted)]">·</span>
             @if (c.dailyTokenBudget) {
               <span>{{ c.tokensToday | number }} of {{ c.dailyTokenBudget | number }} tokens today</span>
-              <span class="ai-budget" [title]="budgetUsed(c) + '% of today’s budget'"><span class="ai-budget-fill" [class.is-warn]="(budgetUsed(c) ?? 0) >= 80" [style.width.%]="budgetUsed(c)"></span></span>
+              <span class="ai-budget" [title]="budgetUsed(c) + '% of today’s budget'" role="progressbar"
+                    aria-label="Today’s token budget used" aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="budgetUsed(c)"><span class="ai-budget-fill" [class.is-warn]="(budgetUsed(c) ?? 0) >= 80" [style.width.%]="budgetUsed(c)"></span></span>
             } @else {
               <span class="text-[color:var(--text-muted)]">no daily budget</span>
             }
@@ -166,7 +168,7 @@
           </div>
           <div>
             <h3 class="section-title">Usage · last 30 days</h3>
-            <dl class="kafka-dl mt-2">
+            <dl class="detail-list mt-2">
               <dt>Runs</dt><dd>{{ c.runs30d ?? 0 | number }}</dd>
               <dt>Tokens in</dt><dd>{{ c.tokensIn30d ?? 0 | number }}</dd>
               <dt>Tokens out</dt><dd>{{ c.tokensOut30d ?? 0 | number }}</dd>
@@ -178,7 +180,7 @@
             </dl>
           </div>
         </div>
-      } @else {
+      } @else if (!loading() && !error()) {
         <div class="lookup-entries-empty lookup-detail-empty">
           <app-icon name="server" size="1.6rem" class="icon-muted" />
           <p>Pick a connection on the left.</p>

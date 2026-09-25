@@ -1,7 +1,7 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { HttpClient } from '@angular/common/http';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { ToastService } from '../../../shared/ui/toast.service';
@@ -21,7 +21,7 @@ import { AI_PROVIDERS, ModelConnection, providerOf } from '../ai-providers';
   template: `
     <app-form-dialog [heading]="isEdit() ? 'Edit connection' : 'New model connection'"
                      [subtitle]="isEdit() ? data.connection!.name : 'A provider, a key and a default model. Prompts pick a connection or take the workspace default.'"
-                     [confirmLabel]="isEdit() ? 'Save' : 'Create'" [saving]="saving()"
+                     [confirmLabel]="confirmLabel()" [saving]="saving()"
                      (confirmed)="save()" (cancelled)="ref.close(false)">
       <form [formGroup]="form" class="form-stack" (ngSubmit)="save()">
         <div class="form-grid">
@@ -41,12 +41,12 @@ import { AI_PROVIDERS, ModelConnection, providerOf } from '../ai-providers';
           </app-field>
         }
         <app-field label="API endpoint" for="cxEndpoint" [control]="form.get('apiEndpoint')" [submitted]="submitted()"
-                   [required]="!provider().builtInEndpoint" [hint]="provider().endpointHint">
+                   [required]="endpointRequired()" [hint]="provider().endpointHint">
           <input id="cxEndpoint" class="input mono" formControlName="apiEndpoint" [placeholder]="provider().builtInEndpoint ? 'built in' : 'https://…'" />
         </app-field>
         @if (provider().needsKey) {
           <app-field label="API key" for="cxKey" [control]="form.get('apiKey')" [submitted]="submitted()"
-                     [required]="!isEdit() || !data.connection?.apiKeyConfigured"
+                     [required]="keyRequired()"
                      [hint]="isEdit() && data.connection?.apiKeyConfigured ? 'A key is stored. Leave blank to keep it; paste a new one to rotate it.' : 'Encrypted at rest and never sent back to the browser.'">
             <input id="cxKey" type="password" class="input" formControlName="apiKey" autocomplete="new-password" placeholder="paste the provider key" />
           </app-field>
@@ -108,14 +108,39 @@ export class ConnectionDialog {
   private readonly providerKey = toSignal(this.form.get('provider')!.valueChanges, { initialValue: this.form.get('provider')!.value });
   readonly provider = computed(() => providerOf(this.providerKey()));
 
+  /** Every other edit dialog says "Save changes". */
+  readonly confirmLabel = computed(() => this.isEdit() ? 'Save changes' : 'Create');
+
+  readonly endpointRequired = computed(() => !this.provider().builtInEndpoint);
+  readonly keyRequired = computed(() =>
+    this.provider().needsKey && !(this.isEdit() && this.data.connection?.apiKeyConfigured));
+  private readonly workspaceRequired = !!this.data.tenants?.length && !this.isEdit();
+
+  /**
+   * app-field's [required] only draws the star. The endpoint, key and workspace were checked by
+   * a toast each after the form had already passed as valid, with no field marked; the stars
+   * and the validators now read the same signals, as the Kafka dialog does.
+   */
+  private readonly conditionalValidators = effect(() => {
+    this.require('apiEndpoint', this.endpointRequired());
+    this.require('apiKey', this.keyRequired());
+    this.require('tenantId', this.workspaceRequired);
+  });
+
+  private require(name: string, required: boolean): void {
+    const control = this.form.get(name)!;
+    control.setValidators(required ? [Validators.required, notBlank] : null);
+    control.updateValueAndValidity({ emitEvent: false });
+  }
+
   save(): void {
     this.submitted.set(true);
-    const p = this.provider();
     const v = this.form.getRawValue();
-    if (this.form.invalid) return;
-    if (!p.builtInEndpoint && !(v.apiEndpoint ?? '').trim()) { this.toast.error('This provider needs an API endpoint.'); return; }
-    if (p.needsKey && !(v.apiKey ?? '').trim() && !(this.isEdit() && this.data.connection?.apiKeyConfigured)) { this.toast.error('This provider needs an API key.'); return; }
-    if (this.data.tenants?.length && !this.isEdit() && v.tenantId == null) { this.toast.error('Pick the workspace this connection belongs to.'); return; }
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      this.toast.error('Check the highlighted fields.');
+      return;
+    }
     this.saving.set(true);
     const body = {
       connectionId: this.data.connection?.connectionId,
@@ -132,4 +157,10 @@ export class ConnectionDialog {
       error: err => { this.saving.set(false); this.toast.error(err?.error?.message || 'The connection could not be saved.'); },
     });
   }
+}
+
+/** Validators.required lets a string of spaces through; an endpoint or key of spaces is none. */
+function notBlank(control: AbstractControl): ValidationErrors | null {
+  const value = control.value;
+  return typeof value === 'string' && !value.trim() ? { required: true } : null;
 }
