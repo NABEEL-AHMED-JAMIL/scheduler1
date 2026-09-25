@@ -113,7 +113,7 @@
           <th class="hidden 2xl:table-cell">Created by</th>
           <th class="hidden 2xl:table-cell">Updated by</th>
           <th class="text-right">State</th>
-          <th class="w-12"></th>
+          <th class="w-12 col-pin-right"><span class="sr-only">Actions</span></th>
         </tr>
       </thead>
       <tbody>
@@ -201,7 +201,7 @@
               {{ job.updatedByName || '—' }}
             </td>
             <td class="text-right"><app-status [label]="job.jobStatus" [quiet]="true" /></td>
-            <td class="text-right">
+            <td class="text-right col-pin-right">
               <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="menu"
                       [disabled]="busyJob() === job.jobId" aria-label="Actions">
                 <app-icon name="dots" size="1.05em" />
