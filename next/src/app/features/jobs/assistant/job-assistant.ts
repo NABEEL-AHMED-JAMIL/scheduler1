@@ -16,6 +16,7 @@ import {
   Answer, JobFacts, JobRun, answerFor, computeStats, humanDuration, runsToCsv,
 } from './job-assistant.answers';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
+import { StatStrip, StatStripItem } from '../../../shared/ui/stat-strip';
 
 interface Turn {
   /** Monotonic, so two turns in the same millisecond cannot collide as @for track keys. */
@@ -35,7 +36,7 @@ interface Turn {
  */
 @Component({
   selector: 'app-job-assistant',
-  imports: [Icon, ServerTimePipe, RouterLink, StatusPill, Donut, RankedBar],
+  imports: [Icon, ServerTimePipe, RouterLink, StatusPill, Donut, RankedBar, StatStrip],
   templateUrl: './job-assistant.html',
   /*
    * In a panel the host has to be a flex item that can shrink, or the layout chain breaks
@@ -140,6 +141,17 @@ export class JobAssistant {
   });
 
   readonly stats = computed(() => computeStats(this.runs()));
+
+  /** The stats answer's four headline figures, as strip tiles. */
+  readonly statTiles = computed<StatStripItem[]>(() => {
+    const stats = this.stats();
+    return [
+      { label: 'Runs',         value: stats.total },
+      { label: 'Success rate', value: stats.successRate === null ? '—' : stats.successRate + '%' },
+      { label: 'Average',      value: humanDuration(stats.averageSeconds) },
+      { label: 'Longest',      value: humanDuration(stats.longestSeconds) },
+    ];
+  });
 
   /** Outcome mix for the donut, in the same colours the rest of the app uses for a status. */
   readonly outcomeMix = computed(() =>

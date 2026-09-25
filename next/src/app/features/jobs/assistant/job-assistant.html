@@ -180,22 +180,7 @@
             }
 
             @case ('stats') {
-              <div class="grid grid-cols-2 sm:grid-cols-4 gap-px mt-3 rounded-lg overflow-hidden bg-subtle"
-                  >
-                @for (tile of [
-                  { label: 'Runs',         value: stats().total },
-                  { label: 'Success rate', value: stats().successRate === null ? '—' : stats().successRate + '%' },
-                  { label: 'Average',      value: humanDuration(stats().averageSeconds) },
-                  { label: 'Longest',      value: humanDuration(stats().longestSeconds) }
-                ]; track tile.label) {
-                  <div class="px-3 py-2.5 text-center bg-raised">
-                    <div class="text-sm font-semibold tabular leading-none">{{ tile.value }}</div>
-                    <div class="text-[10px] uppercase tracking-wide mt-1 text-[color:var(--text-muted)]">
-                      {{ tile.label }}
-                    </div>
-                  </div>
-                }
-              </div>
+              <app-stat-strip class="mt-3" [items]="statTiles()" [cols]="2" [smCols]="4" label="Run summary" />
             }
 
             @case ('chart') {
