@@ -1,5 +1,5 @@
 import { BillingBrief } from '../billing/billing-brief';
-import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, Injector, OnInit, afterNextRender, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router, RouterLink } from '@angular/router';
 import { Donut } from '../../shared/charts/donut';
@@ -57,6 +57,7 @@ export class Dashboard implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
+  private readonly injector = inject(Injector);
 
   /** What the date boxes hold, which may be half-edited. */
   readonly startDate = signal(localIsoDaysAgo(6));
@@ -159,6 +160,13 @@ export class Dashboard implements OnInit {
       key: cell.date,
     })));
 
+  /** The drill-down's heading, which also names the region it scrolls to. */
+  readonly drillHeading = computed(() => {
+    const cell = this.selectedCell();
+    if (!cell) return '';
+    return 'Jobs on ' + (cell.day ? cell.day + ' ' : '') + this.dateLabel(cell.date) + ' at ' + this.hourLabel(cell.hr);
+  });
+
   readonly selectedHeat = computed(() => {
     const cell = this.selectedCell();
     return cell ? { day: cell.day, hour: cell.hr } : null;
@@ -259,6 +267,22 @@ export class Dashboard implements OnInit {
     const dayName = day ?? this.hourly().find(h => h.date === date)?.dayCode ?? '';
     this.selectedCell.set({ date, hr, day: dayName, dates: dates?.length ? dates : [date] });
     this.readBreakdown(date, hr);
+    this.revealDrill();
+  }
+
+  /**
+   * The table opens below the heatmap, under the fold on a laptop and far below it on a phone, so
+   * a click looked like it did nothing. It is brought into view and takes focus, so a keyboard or
+   * screen-reader user lands on what just opened.
+   */
+  private revealDrill(): void {
+    afterNextRender(() => {
+      const drill = document.getElementById('dash-drill');
+      if (!drill) return;
+      const calm = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+      drill.scrollIntoView({ block: 'start', behavior: calm ? 'auto' : 'smooth' });
+      drill.focus({ preventScroll: true });
+    }, { injector: this.injector });
   }
 
   /** "24 Sep" from "2026-09-24", read as a calendar date (no time zone to shift it a day). */

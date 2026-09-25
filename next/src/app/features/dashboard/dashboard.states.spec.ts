@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
+import { ApplicationRef } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Subject, of, throwError } from 'rxjs';
@@ -298,5 +299,30 @@ describe('Dashboard answers that arrive out of order', () => {
     d.clearCell();
     pending[0].next({ status: 'SUCCESS', data: [{ jobId: 1, jobName: 'A', total: 4 }] });
     expect(d.breakdown()).toEqual([]);
+  });
+});
+
+/**
+ * The drill-down opens below the heatmap, which on a laptop is below the fold: a click seemed to do
+ * nothing. The table is now brought into view and takes focus, so a keyboard or screen-reader user
+ * lands on what just opened.
+ */
+describe('Dashboard drill-down opening', () => {
+  afterEach(() => document.getElementById('dash-drill')?.remove());
+
+  it('scrolls the table into view and moves focus to it', () => {
+    const { dashboard: d } = dashboard();
+    const drill = document.createElement('section');
+    drill.id = 'dash-drill';
+    drill.tabIndex = -1;
+    const scrolled = vi.fn();
+    drill.scrollIntoView = scrolled;
+    document.body.appendChild(drill);
+
+    d.selectCell('2026-09-20', 9, 4);
+    TestBed.inject(ApplicationRef).tick();
+
+    expect(scrolled).toHaveBeenCalledTimes(1);
+    expect(document.activeElement).toBe(drill);
   });
 });
