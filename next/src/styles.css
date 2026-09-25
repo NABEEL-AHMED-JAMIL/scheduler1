@@ -184,6 +184,17 @@
     --accent-mark:        var(--color-brand-500);
     --accent-mark-strong: var(--color-brand-600);
 
+    /* Caution as text on a surface: warn-600 here, warn-400 on the dark ground, where 600 is a
+       dark brown. The same pair .text-warn-500 is remapped to. */
+    --warn-text: var(--color-warn-600);
+
+    /* The one blue outside the charts: the "edit" row-action circle. Its hover ring, tint and
+       text as tokens, so the dark theme is a second set of values rather than a second rule. */
+    --intent-info:        #2563eb;
+    --intent-info-strong: #1d4ed8;
+    --intent-info-ring:   #2563eb;
+    --intent-info-soft:   color-mix(in oklab, #3b82f6 12%, var(--surface-raised));
+
     /* The pill family. neutral and brand are a binary in several places -- kafka-tls-section
        swaps one class for the other to mean off/on -- so they must never share a background.
        After the rebrand they did: brand-50 and ink-100 both resolve to #f3f4f6, so "Private CA"
@@ -260,6 +271,13 @@
        progress bar, a budget bar) and full white there glares; ink-300 is 12:1 on a card. */
     --accent-mark:        var(--color-ink-300);
     --accent-mark-strong: var(--color-ink-50);
+
+    --warn-text: var(--color-warn-400);
+
+    --intent-info:        #93c5fd;
+    --intent-info-strong: #bfdbfe;
+    --intent-info-ring:   #60a5fa;
+    --intent-info-soft:   color-mix(in oklab, #60a5fa 18%, transparent);
 
     /* Same pair, inverted. neutral used --surface-sunken here, which on this theme is the page
        colour itself, so a neutral pill had no chip shape at all -- it was text on the page.
@@ -505,12 +523,13 @@
   }
   .ts-line + .ts-line { border-color: var(--border-subtle); @apply border-t; }
   .ts-mark {
-    color: var(--color-brand-600);
-    background: color-mix(in srgb, var(--color-brand-500) 10%, transparent);
+    /* On theme tokens: the light values are unchanged, and the tint no longer disappears into
+       the dark card (10% of a near-black on a near-black). */
+    color: var(--accent-text);
+    background: color-mix(in srgb, var(--accent-mark) 10%, transparent);
     @apply shrink-0 rounded px-1.5 py-0.5 font-mono text-[11px] tabular-nums
            transition-colors hover:brightness-110;
   }
-  html.dark .ts-mark { color: var(--accent-text); }
   .ts-text { color: var(--text-primary); @apply text-sm min-w-0; }
 
   /* Read-along: the word being spoken, and the passage it sits in.
@@ -1540,6 +1559,12 @@ html.dark {
            hover:text-[color:var(--text-primary)];
   }
   .th-sort-active { @apply text-[color:var(--text-primary)]; }
+  /* A heading that does not sort, set exactly like a table-modern <th> -- for a header built
+     outside a <thead> (a grid list's header row) or a label beside .th-sort buttons. */
+  .th-static {
+    @apply text-left text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap
+           text-[color:var(--text-muted)];
+  }
 }
 
 /*
@@ -1705,16 +1730,10 @@ html.dark .lookup-rail-glyph.is-managed { background: color-mix(in oklab, var(--
 .kafka-rail-dot.crit { background: var(--color-crit-500); }
 .kafka-rail-env { font-weight: 600; }
 .kafka-rail-env-crit { color: var(--color-crit-500); }
-.kafka-rail-env-warn { color: var(--color-warn-600); }
+.kafka-rail-env-warn { color: var(--warn-text); }
 html.dark .kafka-rail-env-crit { color: var(--color-crit-400); }
-html.dark .kafka-rail-env-warn { color: var(--color-warn-400); }
 .kafka-test-ok { background: color-mix(in oklab, var(--color-ok-500) 7%, var(--surface-inset)); }
 .kafka-test-crit { background: color-mix(in oklab, var(--color-crit-500) 8%, var(--surface-inset)); }
-.kafka-test-glyph { flex: none; width: 2rem; height: 2rem; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; background: var(--surface-sunken); color: var(--text-muted); }
-.kafka-test-glyph.ok { background: var(--color-ok-100); color: var(--color-ok-500); }
-.kafka-test-glyph.crit { background: var(--color-crit-100); color: var(--color-crit-500); }
-html.dark .kafka-test-glyph.ok { background: color-mix(in oklab, var(--color-ok-500) 22%, transparent); color: var(--color-ok-400); }
-html.dark .kafka-test-glyph.crit { background: color-mix(in oklab, var(--color-crit-500) 22%, transparent); color: var(--color-crit-400); }
 .kafka-detail-grid { display: grid; grid-template-columns: 1fr; }
 .kafka-detail-section { padding: 1rem 1.25rem; min-width: 0; }
 .kafka-detail-section + .kafka-detail-section { border-left: 1px solid var(--border-subtle); }
@@ -1723,8 +1742,6 @@ html.dark .kafka-test-glyph.crit { background: color-mix(in oklab, var(--color-c
 .kafka-dl dt { color: var(--text-muted); font-size: 12px; padding-top: 0.1rem; }
 .kafka-dl dd { margin: 0; min-width: 0; }
 .kafka-props { margin: 0; font-family: var(--font-mono); font-size: 11px; background: var(--surface-sunken); border-radius: 0.375rem; padding: 0.5rem 0.6rem; white-space: pre-wrap; word-break: break-all; }
-.kafka-usedby { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; font-size: 13px; }
-.kafka-usedby li { display: flex; flex-direction: column; gap: 1px; }
 @media (max-width: 900px) {
   .kafka-detail-grid { grid-template-columns: 1fr; }
   .kafka-detail-section + .kafka-detail-section { border-left: 0; border-top: 1px solid var(--border-subtle); }
@@ -1761,16 +1778,14 @@ html.dark .kafka-test-glyph.crit { background: color-mix(in oklab, var(--color-c
    hundred rows; a coloured glyph on a quiet ring reads the same and stays out of the way.
    Hover brings the ring to the same colour. */
 .btn-circle-ok     { color: var(--color-ok-500); }
-.btn-circle-info   { color: #2563eb; }
+.btn-circle-info   { color: var(--intent-info); }
 .btn-circle-danger { color: var(--color-crit-500); }
 .btn-circle-ok:hover:not(:disabled)     { border-color: var(--color-ok-500);   color: var(--color-ok-500);   background: var(--color-ok-100); }
-.btn-circle-info:hover:not(:disabled)   { border-color: #2563eb;               color: #1d4ed8;               background: color-mix(in oklab, #3b82f6 12%, var(--surface-raised)); }
+.btn-circle-info:hover:not(:disabled)   { border-color: var(--intent-info-ring); color: var(--intent-info-strong); background: var(--intent-info-soft); }
 .btn-circle-danger:hover:not(:disabled) { border-color: var(--color-crit-500); color: var(--color-crit-500); background: var(--color-crit-100); }
 html.dark .btn-circle-ok     { color: var(--color-ok-400); }
-html.dark .btn-circle-info   { color: #93c5fd; }
 html.dark .btn-circle-danger { color: var(--color-crit-400); }
 html.dark .btn-circle-ok:hover:not(:disabled)     { background: color-mix(in oklab, var(--color-ok-500) 18%, transparent); }
-html.dark .btn-circle-info:hover:not(:disabled)   { background: color-mix(in oklab, #60a5fa 18%, transparent); border-color: #60a5fa; color: #bfdbfe; }
 html.dark .btn-circle-danger:hover:not(:disabled) { background: color-mix(in oklab, var(--color-crit-500) 18%, transparent); }
 
 /* Blur loader: the content stays, softened, under a veil with a spinner while a refresh is
@@ -1827,6 +1842,12 @@ html.dark .btn-circle-danger:hover:not(:disabled) { background: color-mix(in okl
 .reason-row { display: grid; grid-template-columns: 3rem 6rem minmax(0, 1fr) auto; gap: 0.75rem; align-items: center; width: 100%; text-align: left; padding: 0.35rem 0.5rem; border-radius: 6px; border: 1px solid transparent; background: none; color: inherit; font: inherit; cursor: pointer; }
 .reason-row:hover { background: var(--surface-sunken); }
 .reason-row.is-on { border-color: var(--accent-mark-strong); background: var(--surface-sunken); }
+/* At phone width four columns left the message a few characters wide: the count and its bar
+   share the first line, then the message and its meta each take a full line. */
+@media (max-width: 640px) {
+  .reason-row { grid-template-columns: 3rem minmax(0, 1fr); row-gap: 0.25rem; }
+  .reason-row > .reason-text, .reason-row > .reason-meta { grid-column: 1 / -1; }
+}
 .reason-count { font-weight: 600; text-align: right; }
 .reason-bar { height: 0.45rem; border-radius: 999px; background: var(--surface-sunken); overflow: hidden; }
 .reason-fill { display: block; height: 100%; background: var(--color-crit-500); opacity: 0.75; }
@@ -1859,6 +1880,9 @@ html.dark .btn-circle-danger:hover:not(:disabled) { background: color-mix(in okl
 .bill-facts .eyebrow { display: block; font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 2px; }
 .bill-qr { flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; margin: 0; }
 .bill-qr img, .bill-qr-blank { width: 88px; height: 88px; border-radius: 4px; background: #fff; border: 1px solid var(--border-subtle); image-rendering: pixelated; }
+/* The code itself stays on white so a phone can scan it; the empty placeholder has nothing to
+   scan and sat as a glaring white square on the dark pane. */
+.bill-qr-blank { background: var(--surface-raised); }
 .bill-qr figcaption { font-size: 10px; color: var(--text-muted); }
 .bill-form { display: flex; align-items: flex-end; gap: 0.5rem; flex-wrap: wrap; padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border-subtle); background: var(--surface-sunken); }
 .bill-totals { display: grid; grid-template-columns: max-content max-content; justify-content: end; gap: 0.2rem 2rem; padding: 0.6rem 1.25rem 0.4rem; font-size: 13px; }

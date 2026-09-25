@@ -40,3 +40,14 @@ describe('an icon on a control that is busy', () => {
     expect(render(false).querySelector('svg')).not.toBeNull();
   });
 });
+
+/** "Not connected" beside the zap used for a live connection: the zap with a slash through it. */
+describe('the zapOff glyph', () => {
+  it('draws something', () => {
+    TestBed.resetTestingModule();
+    const fixture = TestBed.configureTestingModule({ imports: [Icon] }).createComponent(Icon);
+    fixture.componentRef.setInput('name', 'zapOff');
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).querySelectorAll('path').length).toBeGreaterThan(0);
+  });
+});

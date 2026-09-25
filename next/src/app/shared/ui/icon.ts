@@ -58,6 +58,8 @@ const PATHS: Record<string, string> = {
   moon:      'M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z',
   sparkle:   'M12 3l1.9 5.8L20 10.7l-5.1 2 -1.9 5.8-1.9-5.8L6 10.7l5.1-1.9L12 3Z',
   zap:       'M13 2 3 14h9l-1 8 10-12h-9l1-8Z',
+  // The zap cut where the slash crosses it, so the two strokes do not blur into one.
+  zapOff:    'M10.513 4.856 13.12 2.17a.5.5 0 0 1 .86.46l-1.377 4.317M15.656 10H20a1 1 0 0 1 .78 1.63l-1.72 1.773M16.273 16.273 10.88 21.83a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14H4a1 1 0 0 1-.78-1.63l4.507-4.643M2 2l20 20',
   layers:    'M12 2 2 7l10 5 10-5-10-5Z M2 17l10 5 10-5 M2 12l10 5 10-5',
   list:      'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',
   briefcase: 'M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2ZM16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16',
