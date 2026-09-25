@@ -64,7 +64,8 @@ interface PageSection {
               <div class="flex flex-col gap-1.5">
                 <div class="flex items-center justify-between">
                   <span class="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">{{ group.section }}</span>
-                  <button type="button" class="btn btn-ghost btn-xs" (click)="toggleSection(group)">
+                  <button type="button" class="btn btn-ghost btn-xs" (click)="toggleSection(group)"
+                          [attr.aria-label]="(allOn(group) ? 'Clear all in ' : 'Select all in ') + group.section">
                     {{ allOn(group) ? 'None' : 'All' }}
                   </button>
                 </div>
@@ -85,8 +86,7 @@ interface PageSection {
         </div>
 
         <label class="flex items-start gap-2 text-sm cursor-pointer select-none">
-          <input type="checkbox" class="checkbox mt-0.5" formControlName="defaultProfile"
-                 [attr.disabled]="data.first || data.profile?.defaultProfile ? '' : null" />
+          <input type="checkbox" class="checkbox mt-0.5" formControlName="defaultProfile" />
           <span>
             <span class="font-medium">Default for this workspace</span>
             <span class="block text-xs text-[color:var(--text-muted)]">
@@ -134,7 +134,10 @@ export class AccessProfileDialog {
   readonly form: FormGroup = this.fb.group({
     profileName: [this.data.profile?.profileName ?? '', [Validators.required, Validators.maxLength(100)]],
     description: [this.data.profile?.description ?? '', Validators.maxLength(500)],
-    defaultProfile: [this.data.profile?.defaultProfile ?? this.data.first],
+    // Disabled on the control rather than with [attr.disabled], which Angular warns against and
+    // which left the control itself enabled. getRawValue() in save() still sends its value.
+    defaultProfile: [{ value: this.data.profile?.defaultProfile ?? this.data.first,
+                       disabled: !!(this.data.first || this.data.profile?.defaultProfile) }],
   });
 
   toggle(key: PageKey): void {

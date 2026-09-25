@@ -45,7 +45,15 @@
       </p>
     </div>
   } @else if (error()) {
-    <div class="card p-4 text-sm text-[color:var(--color-crit-500)]">{{ error() }}</div>
+    <div class="card p-10 text-center" role="alert">
+      <app-icon name="alert" size="1.5rem" class="icon-crit block mx-auto mb-2" />
+      <p class="text-sm text-crit-500">{{ error() }}</p>
+      <button type="button" class="btn btn-default btn-sm mt-3" (click)="load()">Try again</button>
+    </div>
+  } @else if (loading() && profiles().length === 0) {
+    <div class="card p-12 text-center text-sm text-[color:var(--text-muted)]">
+      <div class="spinner mx-auto mb-3" role="status" aria-label="Loading"></div>Loading…
+    </div>
   } @else if (!loading() && profiles().length === 0) {
     <div class="card p-10 text-center">
       <app-icon name="shield" size="2rem" class="block mx-auto mb-3 text-[color:var(--text-muted)]" />
@@ -62,25 +70,33 @@
     <!-- The view switch and, for the grid, a people filter -->
     <div class="flex flex-wrap items-center gap-2">
       <div class="seg" role="group" aria-label="View">
-        <button type="button" class="seg-btn" [class.seg-on]="view() === 'profiles'" (click)="showProfiles()" data-testid="view-profiles">
+        <button type="button" class="seg-btn" [class.seg-on]="view() === 'profiles'" [attr.aria-pressed]="view() === 'profiles'" (click)="showProfiles()" data-testid="view-profiles">
           <app-icon name="layers" />Profiles
         </button>
-        <button type="button" class="seg-btn" [class.seg-on]="view() === 'people'" (click)="showPeople()" data-testid="view-people">
+        <button type="button" class="seg-btn" [class.seg-on]="view() === 'people'" [attr.aria-pressed]="view() === 'people'" (click)="showPeople()" data-testid="view-people">
           <app-icon name="users" />People × pages
         </button>
       </div>
       @if (view() === 'people') {
-        <label class="relative ml-auto">
-          <app-icon name="search" size="0.9rem" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-[color:var(--text-muted)]" />
-          <input type="search" class="input pl-8 w-64" placeholder="Find a person…" [value]="search()"
+        <div class="search-field max-w-56 ml-auto">
+          <app-icon name="search" size="0.95em" />
+          <input type="search" class="input" placeholder="Find a person…" [value]="search()"
                  (input)="search.set($any($event.target).value)" aria-label="Find a person" />
-        </label>
+        </div>
       }
     </div>
 
     @if (view() === 'people') {
       @if (peopleLoading() && people().length === 0) {
-        <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]">Loading people…</div>
+        <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]">
+          <div class="spinner mx-auto mb-3" role="status" aria-label="Loading people"></div>Loading people…
+        </div>
+      } @else if (peopleError()) {
+        <div class="card p-8 text-center" role="alert">
+          <app-icon name="alert" size="1.5rem" class="icon-crit block mx-auto mb-2" />
+          <p class="text-sm text-crit-500">{{ peopleError() }}</p>
+          <button type="button" class="btn btn-default btn-sm mt-3" (click)="loadPeople()">Try again</button>
+        </div>
       } @else {
         <app-access-people-grid [people]="people()" [profiles]="profiles()" [pages]="pages()"
                                 [search]="search()" [busy]="assigning()" (assign)="assign($event)"
@@ -117,7 +133,7 @@
                     </button>
                   }
                   <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="remove(card.profile)">
-                    <app-icon name="trash" />Delete
+                    <app-icon name="trash" class="icon-crit" />Delete
                   </button>
                 </div>
               </ng-template>

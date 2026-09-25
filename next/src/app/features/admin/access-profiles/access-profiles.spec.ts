@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { DIALOG_DATA, Dialog, DialogRef } from '@angular/cdk/dialog';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { HttpClient } from '@angular/common/http';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { AuthService } from '../../../core/auth/auth.service';
@@ -231,5 +231,94 @@ describe('AccessProfiles screen', () => {
     screen.toggle({ person: screen.people()[0], page: PAGES[0], allowed: false });
     expect(toast.error).toHaveBeenCalledWith('Unknown page.');
     expect(screen.people()[0].pageKeys).toEqual(['jobs', 'reports']);
+  });
+});
+
+describe('AccessProfiles -- audit fixes', () => {
+  const person = (id: number, profileId: number | null) => ({ appUserId: id, fullName: `P${id}`, username: `p${id}@a`, status: 'Active',
+    pageAccessProfileId: profileId, pageAccessProfileName: profileId ? 'Analyst' : null, pageKeys: ['jobs'] });
+
+  it('moves the default\'s own count when a person leaves or joins the default', () => {
+    const operator = { ...profile(1, 'Operator', ['jobs'], true, 0), defaultUserCount: 3 };
+    const analyst = profile(2, 'Analyst', ['jobs', 'reports'], false, 1);
+    let answer: any = { appUserId: 44, pageAccessProfileId: 2, pageAccessProfileName: 'Analyst', pageKeys: ['jobs'] };
+    const assign = vi.fn(() => of({ status: 'SUCCESS', message: 'moved', data: answer }));
+    const { screen } = screenWith([operator, analyst], { assign, people: () => of({ status: 'SUCCESS', message: '', data: [person(44, null)] }) });
+    screen.showPeople();
+
+    screen.assign({ person: screen.people()[0] as any, profile: analyst });
+    expect(screen.profiles().find(p => p.pageAccessProfileId === 1)!.defaultUserCount).toBe(2);
+    expect(screen.profiles().find(p => p.pageAccessProfileId === 2)!.userCount).toBe(2);
+    expect(screen.stats().onDefault).toBe(2);
+
+    answer = { appUserId: 44, pageAccessProfileId: null, pageAccessProfileName: null, pageKeys: ['jobs'] };
+    screen.assign({ person: screen.people()[0] as any, profile: null });
+    expect(screen.profiles().find(p => p.pageAccessProfileId === 1)!.defaultUserCount).toBe(3);
+    expect(screen.profiles().find(p => p.pageAccessProfileId === 2)!.userCount).toBe(1);
+  });
+
+  it('keeps a failed people load as an error with a retry, not an empty workspace', () => {
+    let fail = true;
+    const people = vi.fn(() => fail ? throwError(() => ({ error: {} })) : of({ status: 'SUCCESS', message: '', data: [person(1, null)] }));
+    const { screen } = screenWith([profile(1, 'Operator', ['jobs'], true)], { people });
+    screen.showPeople();
+    expect(screen.peopleError()).toBe('People could not be loaded.');
+    fail = false;
+    screen.loadPeople();
+    expect(screen.peopleError()).toBe('');
+    expect(screen.people()).toHaveLength(1);
+  });
+
+  it('keeps a refused people load as an error too', () => {
+    const people = () => of({ status: 'ERROR', message: 'Not allowed.' });
+    const { screen } = screenWith([profile(1, 'Operator', ['jobs'], true)], { people });
+    screen.showPeople();
+    expect(screen.peopleError()).toBe('Not allowed.');
+  });
+
+  it('names what the delete button deletes', async () => {
+    const { screen } = screenWith([profile(1, 'Operator', ['jobs'], true)]);
+    const open = vi.fn(() => ({ closed: of(false) }));
+    (TestBed.inject(Dialog) as any).open = open;
+    await screen.remove(screen.profiles()[0]);
+    expect((open.mock.calls[0] as any)[1].data.confirmLabel).toBe('Delete profile');
+  });
+
+  it('says so when a platform administrator\'s workspace list or page catalogue cannot be read', () => {
+    TestBed.resetTestingModule();
+    const toast = { success: vi.fn(), error: vi.fn() };
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: AccessProfilesService, useValue: { pages: () => throwError(() => ({ error: {} })), list: () => of({ status: 'SUCCESS', data: [] }) } },
+        { provide: Dialog, useValue: {} },
+        { provide: ToastService, useValue: toast },
+        { provide: AuthService, useValue: { isPlatformAdmin: () => true } },
+        { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: { get: () => null } } } },
+        { provide: HttpClient, useValue: { get: () => throwError(() => ({ error: {} })) } },
+      ],
+    });
+    TestBed.runInInjectionContext(() => new AccessProfiles()).ngOnInit();
+    expect(toast.error).toHaveBeenCalledWith('The workspaces could not be loaded.');
+    expect(toast.error).toHaveBeenCalledWith('The page catalogue could not be loaded.');
+  });
+});
+
+describe('AccessProfileDialog -- the default box', () => {
+  it('is disabled on the control itself for the first profile, and still saved as default', () => {
+    const { dialog, save } = dialogFor({ first: true });
+    expect(dialog.form.get('defaultProfile')!.disabled).toBe(true);
+    dialog.form.get('profileName')!.setValue('Ops');
+    dialog.save();
+    expect(((save.mock.calls[0] as any)[0] as AccessProfileDraft).defaultProfile).toBe(true);
+  });
+
+  it('is disabled for the profile that is already the default', () => {
+    const { dialog } = dialogFor({ profile: profile(1, 'Operator', ['jobs'], true), first: false });
+    expect(dialog.form.get('defaultProfile')!.disabled).toBe(true);
+  });
+
+  it('stays free on any other profile', () => {
+    const { dialog } = dialogFor({ profile: profile(2, 'Analyst', ['jobs']), first: false });
+    expect(dialog.form.get('defaultProfile')!.enabled).toBe(true);
   });
 });

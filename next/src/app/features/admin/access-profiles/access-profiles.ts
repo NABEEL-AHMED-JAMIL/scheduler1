@@ -60,6 +60,8 @@ export class AccessProfiles implements OnInit {
   /** The profile, or the person, whose action is in flight. */
   readonly busy = signal<number | null>(null);
   readonly assigning = signal<number | null>(null);
+  /** Why the people grid could not be read; shown with a retry rather than as an empty workspace. */
+  readonly peopleError = signal('');
 
   readonly stats = computed(() => {
     const list = this.profiles();
@@ -104,9 +106,19 @@ export class AccessProfiles implements OnInit {
     const linkedTenant = Number(params.get('tenantId'));
     if (this.canPickTenant()) {
       this.http.get<ApiResponse<Tenant[]>>(`${API_BASE}/tenant.json/listTenants`).subscribe({
-        next: response => { if (response.status === API_SUCCESS) this.tenants.set(response.data ?? []); },
+        next: response => {
+          if (response.status === API_SUCCESS) this.tenants.set(response.data ?? []);
+          else this.toast.error(response.message || 'The workspaces could not be loaded.');
+        },
+        error: err => this.toast.error(err?.error?.message || 'The workspaces could not be loaded.'),
       });
-      this.api.pages().subscribe({ next: r => { if (r.status === API_SUCCESS) this.pages.set(r.data ?? []); } });
+      this.api.pages().subscribe({
+        next: r => {
+          if (r.status === API_SUCCESS) this.pages.set(r.data ?? []);
+          else this.toast.error(r.message || 'The page catalogue could not be loaded.');
+        },
+        error: err => this.toast.error(err?.error?.message || 'The page catalogue could not be loaded.'),
+      });
       if (Number.isFinite(linkedTenant) && linkedTenant > 0) this.pickTenant(String(linkedTenant));
       return;
     }
@@ -152,15 +164,16 @@ export class AccessProfiles implements OnInit {
   loadPeople(): void {
     if (this.needsWorkspace()) return;
     this.peopleLoading.set(true);
+    this.peopleError.set('');
     this.api.people(this.tenantId()).subscribe({
       next: response => {
         this.peopleLoading.set(false);
         if (response.status === API_SUCCESS) this.people.set(response.data ?? []);
-        else this.toast.error(response.message);
+        else this.peopleError.set(response.message || 'People could not be loaded.');
       },
       error: err => {
         this.peopleLoading.set(false);
-        this.toast.error(err?.error?.message || 'People could not be loaded.');
+        this.peopleError.set(err?.error?.message || 'People could not be loaded.');
       },
     });
   }
@@ -220,7 +233,7 @@ export class AccessProfiles implements OnInit {
       body: held
         ? `${profile.userCount} ${profile.userCount === 1 ? 'person holds' : 'people hold'} this profile. Move them to another one first; the server will refuse otherwise.`
         : 'Nobody holds this profile. It can be recreated later, but its name will be free in the meantime.',
-      confirmLabel: 'Delete',
+      confirmLabel: 'Delete profile',
       danger: true,
     });
     if (!ok) return;
@@ -263,10 +276,18 @@ export class AccessProfiles implements OnInit {
         this.people.update(rows => rows.map(row => row.appUserId === person.appUserId
           ? { ...row, pageAccessProfileId: updated.pageAccessProfileId, pageAccessProfileName: updated.pageAccessProfileName, pageKeys: updated.pageKeys }
           : row));
+        // A person with no profile of their own is counted on the default's defaultUserCount, not
+        // on any userCount, so moving off or onto the default moves that number instead.
+        const from = person.pageAccessProfileId ?? null;
         this.profiles.update(list => list.map(p => {
-          if (p.pageAccessProfileId === person.pageAccessProfileId) return { ...p, userCount: Math.max(0, p.userCount - 1) };
-          if (p.pageAccessProfileId === target) return { ...p, userCount: p.userCount + 1 };
-          return p;
+          let next = p;
+          if (from !== null && p.pageAccessProfileId === from) next = { ...next, userCount: Math.max(0, next.userCount - 1) };
+          if (target !== null && p.pageAccessProfileId === target) next = { ...next, userCount: next.userCount + 1 };
+          if (p.defaultProfile) {
+            if (from === null) next = { ...next, defaultUserCount: Math.max(0, (next.defaultUserCount ?? 0) - 1) };
+            if (target === null) next = { ...next, defaultUserCount: (next.defaultUserCount ?? 0) + 1 };
+          }
+          return next;
         }));
       },
       error: err => {
