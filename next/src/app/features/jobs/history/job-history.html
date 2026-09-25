@@ -31,7 +31,7 @@
         on {{ targetDate() }} at {{ hourLabel(targetHr()) }}
       </span>
       <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="clearDrillDown()">
-        <app-icon name="refresh" />{{ isAllJobs() ? 'Back to dashboard' : 'Show all runs' }}
+        <app-icon [name]="isAllJobs() ? 'arrowLeft' : 'close'" />{{ isAllJobs() ? 'Back to dashboard' : 'Show all runs' }}
       </button>
     </div>
   }
@@ -53,13 +53,14 @@
           <!-- Opens beside the history rather than replacing it: the questions are usually
                about what is on screen, and leaving the page to ask them lost that context. -->
           <button type="button" class="btn btn-default btn-sm shrink-0"
-                  [class.btn-intent-ok]="assistantOpen()"
+                  [class.btn-intent-ok]="assistantOpen()" [attr.aria-expanded]="assistantOpen()"
                   (click)="assistantOpen.set(!assistantOpen())">
             <app-icon name="chat" />Ask about this job
           </button>
         }
 
         <button type="button" class="btn btn-ghost btn-icon btn-sm shrink-0"
+                [attr.aria-expanded]="showDetail()"
                 [attr.aria-label]="showDetail() ? 'Collapse job detail' : 'Expand job detail'"
                 (click)="showDetail.set(!showDetail())">
           <app-icon [name]="showDetail() ? 'chevronDown' : 'chevronRight'" class="icon-muted" />
@@ -278,7 +279,7 @@
     <ng-container toolbar>
       <div class="search-field max-w-56">
         <app-icon name="search" size="0.95em" />
-        <input class="input" placeholder="Search run id or message"
+        <input class="input" placeholder="Search run id or message" aria-label="Search runs"
                [value]="search()" (input)="search.set($any($event.target).value)" />
       </div>
       @if (statusFilter() || search()) {
@@ -310,7 +311,7 @@
               #{{ run.jobQueueId }}
               @if (run.jobSend) {
                 <app-icon name="send" size="0.8em" class="icon-muted ml-1"
-                          title="Reached the queue" />
+                          label="Reached the queue" title="Reached the queue" />
               }
             </td>
             @if (isAllJobs()) {

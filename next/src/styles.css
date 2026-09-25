@@ -1294,6 +1294,9 @@ html.dark .btn-intent-crit:focus app-icon { color: var(--color-crit-400); }
      the focus stays in the box and aria-activedescendant names the row). Was an inline style. */
   .menu-item.is-active { background: var(--surface-sunken); color: var(--text-primary); }
   .menu-item-danger { @apply text-crit-500 hover:text-crit-500; }
+  /* A row that cannot be chosen now (Run now on a job already running, Delete on a task still
+     in use) looked exactly like one that could -- worse on a red Delete. */
+  .menu-item:disabled { @apply opacity-45 cursor-not-allowed; background: none; }
 
   /* An overlay menu shrink-to-fits its content, but .menu-item carries w-full -- a
      percentage width resolved against a shrink-to-fit parent is circular, and the browser

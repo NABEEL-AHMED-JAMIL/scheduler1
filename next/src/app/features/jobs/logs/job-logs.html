@@ -18,6 +18,7 @@
   @if (job() || run(); as _) {
     <div class="card">
       <button type="button" class="w-full flex items-center gap-2 px-4 py-2.5 text-left"
+              [attr.aria-expanded]="showDetail()"
               (click)="showDetail.set(!showDetail())">
         <app-icon name="briefcase" class="icon-info" />
         <span class="text-sm font-semibold">Job &amp; queue detail</span>
@@ -154,18 +155,11 @@
                    [emptyMessage]="search() ? 'No entries match your search.' : 'This run reported no log entries.'"
                    (retry)="load()">
     <ng-container toolbar>
-      <div class="seg">
-        @for (mode of views; track mode.key) {
-          <button type="button" class="seg-btn" [class.seg-on]="view() === mode.key"
-                  (click)="view.set(mode.key)">
-            <app-icon [name]="mode.icon" size="0.9em" />{{ mode.label }}
-          </button>
-        }
-      </div>
+      <app-segmented [(value)]="view" [options]="views" ariaLabel="Log layout" />
 
       <div class="search-field max-w-56">
         <app-icon name="search" size="0.95em" />
-        <input class="input" placeholder="Search entries"
+        <input class="input" placeholder="Search entries" aria-label="Search log entries"
                [value]="search()" (input)="search.set($any($event.target).value)" />
       </div>
       @if (search()) {
@@ -174,12 +168,14 @@
 
       @if (hasInsights()) {
         <button type="button" class="btn btn-default btn-sm" [class.text-accent]="showInsights()"
+                [attr.aria-expanded]="showInsights()"
                 (click)="showInsights.set(!showInsights())" title="Where this run waited between entries">
           <app-icon name="chart" />{{ showInsights() ? 'Hide timing' : 'Timing' }}
         </button>
       }
       @if (stillRunning()) {
         <button type="button" class="btn btn-default btn-sm" [class.btn-intent-ok]="autoRefreshing()"
+                [attr.aria-pressed]="autoRefreshing()"
                 (click)="toggleLive()"
                 [title]="autoRefreshing() ? 'Following this run — checking every 5s'
                                           : 'Not following; refresh by hand'">

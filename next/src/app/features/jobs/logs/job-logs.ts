@@ -12,6 +12,7 @@ import { JobEventsService } from '../../../core/socket/job-events.service';
 import { Subscription } from 'rxjs';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { Markdown } from '../../../shared/ui/markdown';
+import { SegmentOption, Segmented } from '../../../shared/ui/segmented';
 import { LogSegment, logSegments, pathParts } from './log-segments';
 
 interface AuditLog {
@@ -24,7 +25,7 @@ interface AuditLog {
 
 @Component({
   selector: 'app-job-logs',
-  imports: [StickToBottom, Icon, ServerTimePipe, DecimalPipe, NgTemplateOutlet, RouterLink, TableShell, RankedBar, StatusPill, Markdown],
+  imports: [StickToBottom, Icon, ServerTimePipe, DecimalPipe, NgTemplateOutlet, RouterLink, TableShell, RankedBar, StatusPill, Markdown, Segmented],
   templateUrl: './job-logs.html',
 })
 export class JobLogs implements OnInit, OnDestroy {
@@ -77,10 +78,10 @@ export class JobLogs implements OnInit, OnDestroy {
    * you want it to look like the log file it came from.
    */
   readonly view = signal<'timeline' | 'table' | 'console'>('timeline');
-  readonly views = [
-    { key: 'timeline' as const, label: 'Timeline', icon: 'clock' },
-    { key: 'table' as const,    label: 'Table',    icon: 'list' },
-    { key: 'console' as const,  label: 'Console',  icon: 'terminal' },
+  readonly views: SegmentOption<'timeline' | 'table' | 'console'>[] = [
+    { id: 'timeline', label: 'Timeline', icon: 'clock' },
+    { id: 'table',    label: 'Table',    icon: 'list' },
+    { id: 'console',  label: 'Console',  icon: 'terminal' },
   ];
 
   readonly refreshing = signal(false);

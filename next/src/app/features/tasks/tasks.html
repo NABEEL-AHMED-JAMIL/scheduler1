@@ -32,18 +32,18 @@
       <!-- Topic first, then the pipelines on it -- the same two-step pick the task editor uses,
            so the list can be narrowed the way tasks are actually organised. -->
       <div class="max-w-48 w-48">
-        <app-combobox id="tasks-topic" [selected]="topicFilter()" (selectedChange)="setTopicFilter($event)"
+        <app-combobox id="tasks-topic" ariaLabel="Filter by topic" [selected]="topicFilter()" (selectedChange)="setTopicFilter($event)"
                       placeholder="All topics" clearLabel="All topics" [options]="topicComboOptions()" />
       </div>
       <div class="max-w-52 w-52">
-        <app-combobox id="tasks-pipeline" [selected]="pipelineFilter()" (selectedChange)="pipelineFilter.set($event); pager.reset()"
+        <app-combobox id="tasks-pipeline" ariaLabel="Filter by pipeline" [selected]="pipelineFilter()" (selectedChange)="pipelineFilter.set($event); pager.reset()"
                       [placeholder]="topicFilter() ? 'All pipelines on this topic' : 'All pipelines'"
                       [clearLabel]="topicFilter() ? 'All pipelines on this topic' : 'All pipelines'"
                       [options]="pipelineComboOptions()" />
       </div>
       <div class="search-field max-w-56">
         <app-icon name="search" size="0.95em" />
-        <input class="input" placeholder="Search id, name, topic or pipeline"
+        <input class="input" placeholder="Search id, name, topic or pipeline" aria-label="Search tasks"
                [value]="search()" (input)="search.set($any($event.target).value); pager.reset()" />
       </div>
       <app-mine-filter [(only)]="onlyMine" />
@@ -81,13 +81,13 @@
                       <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="clone(task)">
                         <app-icon name="copy" />Duplicate
                       </button>
-                      <button cdkMenuItem class="menu-item btn-intent-crit"
+                      <button cdkMenuItem class="menu-item menu-item-danger"
                               [disabled]="task.taskStatus === 'Delete' || inUse(task)"
                               [title]="inUse(task)
                                 ? 'Used by ' + task.totalLinksJobs + ' job(s). Move or delete those first.'
                                 : 'Delete this task'"
                               (cdkMenuItemTriggered)="remove(task)">
-                        <app-icon name="trash" />Delete
+                        <app-icon name="trash" class="icon-crit" />Delete
                         @if (task.totalLinksJobs) {
                           <span class="pill pill-warn ml-auto">In use · {{ task.totalLinksJobs }}</span>
                         }
@@ -167,8 +167,9 @@
         @for (task of paged(); track task.taskDetailId) {
           <tr>
             <td>
-              <button type="button" class="text-[color:var(--text-muted)] hover:text-accent"
+              <button type="button" class="btn btn-ghost btn-icon btn-xs"
                       (click)="toggleRow(task)"
+                      [attr.aria-expanded]="expanded().has(task.taskDetailId)"
                       [attr.aria-label]="expanded().has(task.taskDetailId) ? 'Hide payload' : 'Show payload'">
                 <app-icon [name]="expanded().has(task.taskDetailId) ? 'chevronDown' : 'chevronRight'" />
               </button>
@@ -223,13 +224,13 @@
                     <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="clone(task)">
                       <app-icon name="copy" />Duplicate
                     </button>
-                    <button cdkMenuItem class="menu-item btn-intent-crit"
+                    <button cdkMenuItem class="menu-item menu-item-danger"
                             [disabled]="task.taskStatus === 'Delete' || inUse(task)"
                             [title]="inUse(task)
                               ? 'Used by ' + task.totalLinksJobs + ' job(s). Move or delete those first.'
                               : 'Delete this task'"
                             (cdkMenuItemTriggered)="remove(task)">
-                      <app-icon name="trash" />Delete
+                      <app-icon name="trash" class="icon-crit" />Delete
                       @if (task.totalLinksJobs) {
                         <span class="pill pill-warn ml-auto">In use · {{ task.totalLinksJobs }}</span>
                       }

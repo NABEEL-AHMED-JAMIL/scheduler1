@@ -34,7 +34,9 @@
   </div>
 
   @if (loading()) {
-    <div class="card p-12 text-center text-sm text-[color:var(--text-muted)]">Reading the job…</div>
+    <div class="card p-12 text-center text-sm text-[color:var(--text-muted)]">
+      <div class="spinner mx-auto mb-3" role="status" aria-label="Loading"></div>Reading the job…
+    </div>
   } @else if (error()) {
     <div class="card p-10 text-center">
       <app-icon name="alert" size="1.6em" class="icon-warn" />
@@ -51,7 +53,7 @@
            [class.mb-3]="!compact()" [class.mb-2]="compact()">
         <div class="search-field flex-1">
           <app-icon name="chat" size="0.95em" />
-          <input class="input" [value]="question()"
+          <input class="input" [value]="question()" aria-label="Ask about this job"
                  placeholder="Ask about this job — its schedule, files, failures or history"
                  (input)="question.set($any($event.target).value)"
                  (keydown.enter)="ask(question())" />

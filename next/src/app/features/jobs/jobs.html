@@ -70,21 +70,21 @@
                    emptyIcon="briefcase"
                    (retry)="load()">
     <ng-container toolbar>
-      <select class="input max-w-32" [value]="executionFilter()"
+      <select class="input max-w-32" aria-label="Filter by execution type" [value]="executionFilter()"
               (change)="executionFilter.set($any($event.target).value); onFilterChange()">
         <option value="">All types</option>
         @for (execution of executions(); track execution) {
           <option [value]="execution">{{ execution }}</option>
         }
       </select>
-      <select class="input max-w-36" [value]="statusFilter()"
+      <select class="input max-w-36" aria-label="Filter by run status" [value]="statusFilter()"
               (change)="statusFilter.set($any($event.target).value); onFilterChange()">
         <option value="">All statuses</option>
         @for (status of statuses(); track status) { <option [value]="status">{{ status }}</option> }
       </select>
       <div class="search-field max-w-56">
         <app-icon name="search" size="0.95em" />
-        <input class="input" placeholder="Search id, job or task"
+        <input class="input" placeholder="Search id, job or task" aria-label="Search jobs"
                [value]="search()" (input)="search.set($any($event.target).value); onFilterChange()" />
       </div>
       <app-mine-filter [(only)]="onlyMine" />
@@ -149,8 +149,9 @@
                      (change)="toggleSelect(job)" />
             </td>
             <td>
-              <button type="button" class="text-[color:var(--text-muted)] hover:text-accent"
+              <button type="button" class="btn btn-ghost btn-icon btn-xs"
                       (click)="toggleRow(job)"
+                      [attr.aria-expanded]="expanded().has(job.jobId)"
                       [attr.aria-label]="expanded().has(job.jobId) ? 'Hide details' : 'Show details'">
                 <app-icon [name]="expanded().has(job.jobId) ? 'chevronDown' : 'chevronRight'" />
               </button>
@@ -221,7 +222,7 @@
             </td>
             <td class="text-right"><app-status [label]="job.jobStatus" [quiet]="true" /></td>
             <td class="text-right">
-              <button type="button" class="btn btn-ghost btn-icon" [cdkMenuTriggerFor]="menu"
+              <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="menu"
                       [disabled]="busyJob() === job.jobId" aria-label="Actions">
                 <app-icon name="dots" size="1.05em" />
               </button>
