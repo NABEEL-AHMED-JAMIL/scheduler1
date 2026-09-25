@@ -115,6 +115,12 @@ describe('Bulk import / export', () => {
       expect(el.querySelector('.bulk-rows')).toBeNull();
     });
 
+    it('says something the uploader can act on when the server fails outright', () => {
+      const { el } = send({ post: () => throwError(() => ({ status: 500, error: { message: 'Some internal error occurred contact with support.' } })) });
+      expect(el.textContent).toContain('The server could not read that file.');
+      expect(el.textContent).not.toContain('Some internal error');
+    });
+
     it('lists the reasons from a refusal too', () => {
       const { items } = send({ post: () => throwError(() => ({ status: 400, error: { message: 'Total 1 source task invalid.', data: ['Row 4: bad cron.'] } })) });
       expect(items()).toEqual(['Row 4: bad cron.']);
