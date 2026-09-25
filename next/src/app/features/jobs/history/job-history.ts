@@ -18,6 +18,7 @@ import { SplitBar } from '../../../shared/charts/split-bar';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { createPager } from '../../../shared/ui/pager';
 import { Pagination } from '../../../shared/ui/pagination';
+import { StatStrip, StatStripItem, StatStripSummary } from '../../../shared/ui/stat-strip';
 
 interface JobQueue {
   jobQueueId: number;
@@ -35,7 +36,7 @@ interface JobQueue {
 
 @Component({
   selector: 'app-job-history',
-  imports: [AssistantDock, Icon, ServerTimePipe, RouterLink, TableShell, StatusPill, StatusFilterChip, Donut, BarChart, SplitBar, Pagination],
+  imports: [AssistantDock, Icon, ServerTimePipe, RouterLink, TableShell, StatusPill, StatusFilterChip, Donut, BarChart, SplitBar, Pagination, StatStrip],
   templateUrl: './job-history.html',
 })
 export class JobHistory {
@@ -175,6 +176,13 @@ export class JobHistory {
       .concat([{ name: 'Total', value: this.runs().length }]);
   });
 
+  /** The eight statuses as strip tiles; a status with no runs keeps its tile, its 0 muted. */
+  readonly runTiles = computed<StatStripItem[]>(() => this.runStats()
+    .filter(stat => stat.name !== 'Total')
+    .map(stat => ({ label: stat.name, value: stat.value, quiet: !stat.value })));
+
+  readonly runTotal = computed<StatStripSummary>(() => ({ label: 'Total', value: this.runs().length }));
+
   copyPayload(): void {
     copyText(this.detail()?.taskDetail?.taskPayload ?? '').then(() => {
       this.payloadCopied.set(true);
@@ -240,6 +248,17 @@ export class JobHistory {
       slowest: values[values.length - 1],
       count: values.length,
     };
+  });
+
+  /** Fastest, median and slowest as strip tiles; empty when no run has both a start and an end. */
+  readonly durationTiles = computed<StatStripItem[]>(() => {
+    const stats = this.durationStats();
+    if (!stats) return [];
+    return [
+      { label: 'Fastest', value: this.formatSeconds(stats.fastest) },
+      { label: 'Median',  value: this.formatSeconds(stats.median) },
+      { label: 'Slowest', value: this.formatSeconds(stats.slowest) },
+    ];
   });
 
   readonly hasInsights = computed(() => this.runs().length > 1);

@@ -69,3 +69,39 @@ describe('Run history empty message', () => {
     expect(history().emptyMessage()).toBe('This job has never run.');
   });
 });
+
+describe('Run history stat strips', () => {
+  it('draws all eight statuses as tiles, zeros kept and muted, with the total below', () => {
+    const h = history();
+    h.runs.set(runs(3));
+    expect(h.runTiles().map(t => t.label)).toEqual(['Queue', 'Start', 'Running', 'Completed', 'Failed', 'Skip', 'Interrupt', 'Missed']);
+    const completed = h.runTiles().find(t => t.label === 'Completed')!;
+    const failed = h.runTiles().find(t => t.label === 'Failed')!;
+    const skip = h.runTiles().find(t => t.label === 'Skip')!;
+    expect([completed.value, completed.quiet]).toEqual([2, false]);
+    expect([failed.value, failed.quiet]).toEqual([1, false]);
+    expect([skip.value, skip.quiet]).toEqual([0, true]);
+    expect(h.runTotal()).toEqual({ label: 'Total', value: 3 });
+  });
+
+  it('draws fastest, median and slowest as formatted durations', () => {
+    const h = history();
+    const at = (seconds: number) => new Date(Date.UTC(2026, 8, 24, 9, 0, seconds)).toISOString();
+    h.runs.set([
+      { jobQueueId: 1, jobId: 41, jobStatus: 'Completed', startTime: at(0), endTime: at(5) },
+      { jobQueueId: 2, jobId: 41, jobStatus: 'Completed', startTime: at(0), endTime: at(90) },
+      { jobQueueId: 3, jobId: 41, jobStatus: 'Failed', startTime: at(0), endTime: at(3700 - 0) },
+    ] as any[]);
+    expect(h.durationTiles()).toEqual([
+      { label: 'Fastest', value: '5s' },
+      { label: 'Median',  value: '1m 30s' },
+      { label: 'Slowest', value: '1h 2m' },
+    ]);
+  });
+
+  it('draws no duration strip when no run has both a start and an end', () => {
+    const h = history();
+    h.runs.set(runs(4));
+    expect(h.durationTiles()).toEqual([]);
+  });
+});

@@ -136,35 +136,13 @@
             </div>
           </div>
 
-          <div>
+          <div class="min-w-0">
             <div class="detail-head">Runs in this view</div>
-            <!-- Four columns for exactly eight statuses: two full rows, so no cell is ever
-                 left blank and none has to stretch to fill one. Previously only non-zero
-                 outcomes were drawn into a three-column grid, which left empty squares beside
-                 a run that had just one outcome. A status with no runs shows 0, muted --
+            <!-- All eight statuses, always: two full rows at four columns (four rows of two on a
+                 phone), so no cell is ever left blank. A status with no runs shows 0, muted --
                  "none yet" is information; a blank square is not. -->
-            <div class="grid grid-cols-4 gap-px overflow-hidden rounded-lg bg-subtle"
-                >
-              @for (stat of runStats(); track stat.name) {
-                @if (stat.name !== 'Total') {
-                  <div class="px-2 py-2 text-center bg-raised"
-                      >
-                    <div class="text-sm font-semibold tabular leading-none"
-                         [class.text-[color:var(--text-muted)]]="!stat.value">{{ stat.value }}</div>
-                    <div class="text-[10px] uppercase tracking-wide mt-1 text-[color:var(--text-muted)]">
-                      {{ stat.name }}
-                    </div>
-                  </div>
-                }
-              }
-              <div class="col-span-full px-2 py-1.5 text-center bg-sunken"
-                  >
-                <span class="text-xs tabular font-semibold">{{ runs().length }}</span>
-                <span class="text-[10px] uppercase tracking-wide ml-1.5 text-[color:var(--text-muted)]">
-                  total
-                </span>
-              </div>
-            </div>
+            <app-stat-strip [items]="runTiles()" [cols]="2" [smCols]="4" [summary]="runTotal()"
+                            label="Runs in this view by status" />
           </div>
 
           <div class="min-w-0">
@@ -248,22 +226,8 @@
           </p>
         }
 
-        @if (durationStats(); as stats) {
-          <div class="grid grid-cols-3 gap-px mt-4 overflow-hidden rounded-lg bg-subtle"
-              >
-            @for (stat of [
-              { label: 'Fastest', value: stats.fastest },
-              { label: 'Median',  value: stats.median },
-              { label: 'Slowest', value: stats.slowest }
-            ]; track stat.label) {
-              <div class="px-3 py-2.5 text-center bg-raised">
-                <div class="text-[10px] uppercase tracking-wide text-[color:var(--text-muted)]">
-                  {{ stat.label }}
-                </div>
-                <div class="text-sm font-semibold tabular mt-0.5">{{ formatSeconds(stat.value) }}</div>
-              </div>
-            }
-          </div>
+        @if (durationTiles().length) {
+          <app-stat-strip class="mt-4" [items]="durationTiles()" [cols]="3" label="Run durations" />
         }
       </div>
 
