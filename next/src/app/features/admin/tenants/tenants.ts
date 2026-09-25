@@ -16,6 +16,9 @@ import { ToastService } from '../../../shared/ui/toast.service';
 import { copyText } from '../../../shared/ui/clipboard.util';
 import { confirmWith } from '../../../shared/ui/confirm';
 import { createSort } from '../../../shared/ui/sort';
+import { createPager } from '../../../shared/ui/pager';
+import { Pagination } from '../../../shared/ui/pagination';
+import { CopyButton } from '../../../shared/ui/copy-button';
 import { TenantDialog } from './tenant-dialog';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 
@@ -62,7 +65,7 @@ interface ResourceCount {
 
 @Component({
   selector: 'app-tenants',
-  imports: [MineFilter, CdkMenu, CdkMenuItem, CdkMenuTrigger, ViewToggle, StatTile, Icon, ServerTimePipe, StatusPill, TableShell],
+  imports: [MineFilter, CdkMenu, CdkMenuItem, CdkMenuTrigger, ViewToggle, StatTile, Icon, ServerTimePipe, StatusPill, TableShell, Pagination, CopyButton],
   templateUrl: './tenants.html',
 })
 export class Tenants implements OnInit {
@@ -178,6 +181,14 @@ export class Tenants implements OnInit {
     return this.sort.apply(this.mine(rows), (row, key) => (row as any)[key]);
   });
 
+  /** Paged like Users, in both views; a few hundred workspaces were all drawn at once. */
+  readonly pager = createPager<Tenant>();
+  readonly paged = computed(() => this.pager.slice(this.filtered()));
+  goToPage(next: number): void { this.pager.goTo(next, this.filtered().length); }
+  setPageSize(size: number): void { this.pager.setSize(size); }
+  setSearch(term: string): void { this.search.set(term); this.pager.reset(); }
+  setStatusFilter(status: string): void { this.statusFilter.set(status); this.pager.reset(); }
+
   // Only mine narrows the list too, so Clear has to see it and reset it.
   readonly hasFilters = computed(() =>
     !!this.search().trim() || !!this.statusFilter() || this.onlyMine());
@@ -228,6 +239,7 @@ export class Tenants implements OnInit {
     this.search.set('');
     this.statusFilter.set('');
     this.onlyMine.set(false);
+    this.pager.reset();
   }
 
   addTenant(): void {

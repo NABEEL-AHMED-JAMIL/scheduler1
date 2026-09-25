@@ -104,3 +104,32 @@ describe('Tenants pipeline count', () => {
     expect(withSub.map(r => r.key)).toEqual(['sourceTaskCount']);
   });
 });
+
+/**
+ * Users pages its list; Tenants rendered every row in both views. A platform with a few hundred
+ * workspaces drew all of them as cards at once.
+ */
+describe('Tenants paging', () => {
+  const many = Array.from({ length: 120 }, (_, i) => ({ tenantId: i + 1, tenantName: `T${String(i + 1).padStart(3, '0')}`, tenantCode: `c${i}`, status: 'Active' }));
+
+  function screen() {
+    const tenants = tenantsFor(vi.fn());
+    tenants.tenants.set(many as any);
+    return tenants;
+  }
+
+  it('shows one page of rows at a time', () => {
+    const tenants = screen();
+    expect(tenants.paged().length).toBe(50);
+    expect(tenants.paged()[0].tenantName).toBe('T001');
+    tenants.goToPage(3);
+    expect(tenants.paged().map(t => t.tenantName)).toEqual(many.slice(100).map(t => t.tenantName));
+  });
+
+  it('goes back to the first page when a filter changes what the pages hold', () => {
+    const tenants = screen();
+    tenants.goToPage(2);
+    tenants.setSearch('T1');
+    expect(tenants.pager.page()).toBe(1);
+  });
+});
