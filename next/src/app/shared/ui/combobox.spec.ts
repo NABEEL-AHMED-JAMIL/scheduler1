@@ -179,3 +179,72 @@ describe('Combobox', () => {
     });
   });
 });
+
+/**
+ * The list is driven by the arrow keys and aria-activedescendant, but its rows were buttons in
+ * the tab order: Tab from the box landed on a row, the box blurred and closed, and the row it
+ * had landed on vanished -- focus went to <body>. Escape blurred the box outright.
+ */
+describe('Combobox and the keyboard', () => {
+  function rendered() {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [Combobox] });
+    const fixture = TestBed.createComponent(Combobox);
+    fixture.componentRef.setInput('options', [
+      { value: '10', label: 'Claims intake' },
+      { value: '20', label: 'Billing intake' },
+    ]);
+    fixture.componentRef.setInput('allowClear', true);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const input = el.querySelector('input') as HTMLInputElement;
+    return { fixture, el, input };
+  }
+
+  const key = (target: HTMLElement, name: string) => {
+    const event = new KeyboardEvent('keydown', { key: name, bubbles: true, cancelable: true });
+    target.dispatchEvent(event);
+    return event;
+  };
+
+  it('keeps every option out of the tab order', () => {
+    const { fixture, el, input } = rendered();
+    input.focus();
+    key(input, 'ArrowDown');
+    fixture.detectChanges();
+    const options = Array.from(el.querySelectorAll('[role="option"]'));
+    expect(options.length).toBe(3);
+    expect(options.every(o => o.getAttribute('tabindex') === '-1')).toBe(true);
+  });
+
+  it('closes on Escape and leaves focus in the box', () => {
+    const { fixture, input } = rendered();
+    input.focus();
+    key(input, 'ArrowDown');
+    fixture.detectChanges();
+    expect(input.getAttribute('aria-expanded')).toBe('true');
+
+    key(input, 'Escape');
+    fixture.detectChanges();
+
+    expect(document.activeElement).toBe(input);
+    expect(input.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('keeps the Escape that closed its list from also closing the dialog around it', () => {
+    const { fixture, input } = rendered();
+    input.focus();
+    key(input, 'ArrowDown');
+    fixture.detectChanges();
+    const heard = vi.fn();
+    document.addEventListener('keydown', heard);
+
+    key(input, 'Escape');
+    expect(heard).not.toHaveBeenCalled();
+
+    // With the list already closed, Escape is the dialog's again.
+    key(input, 'Escape');
+    expect(heard).toHaveBeenCalledTimes(1);
+    document.removeEventListener('keydown', heard);
+  });
+});

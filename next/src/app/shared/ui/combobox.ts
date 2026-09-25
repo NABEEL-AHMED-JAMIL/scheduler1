@@ -45,7 +45,10 @@ export interface ComboboxOption {
         <div class="card absolute left-0 right-0 top-full mt-1 z-20 max-h-64 overflow-y-auto p-1 shadow-lg" role="listbox"
              [id]="listId">
           @if (allowClear()) {
-            <button type="button" role="option" class="menu-item"
+            <!-- tabindex -1 on every row: the arrow keys and aria-activedescendant drive the list,
+                 and a row in the tab order took Tab's focus just as blur closed the list, which
+                 dropped focus to <body>. Mouse picks are unaffected (mousedown). -->
+            <button type="button" role="option" class="menu-item" tabindex="-1"
                     [id]="listId + '-clear'" [attr.aria-selected]="!value()"
                     [class.is-active]="highlighted() === -1"
                     (mousedown)="selectClear($event)">
@@ -60,7 +63,7 @@ export interface ComboboxOption {
             </div>
           }
           @for (opt of filtered(); track opt.value; let i = $index) {
-            <button type="button" role="option" class="menu-item"
+            <button type="button" role="option" class="menu-item" tabindex="-1"
                     [id]="listId + '-' + i" [attr.aria-selected]="opt.value === value()"
                     [class.is-active]="i === highlighted()"
                     [title]="opt.hint || ''"
@@ -242,10 +245,13 @@ export class Combobox implements ControlValueAccessor {
       if (i >= 0 && i < count) this.commit(this.filtered()[i].value);
       else if (count === 1) this.commit(this.filtered()[0].value);
     } else if (event.key === 'Escape') {
+      // Focus stays in the box, as a combobox's Escape should; blurring it sent focus to <body>.
+      // ArrowDown reopens the list. When the list was open this Escape was for the list alone,
+      // so it goes no further -- inside a dialog, the first Escape used to close both.
       event.preventDefault();
+      if (this.open()) event.stopPropagation();
       this.open.set(false);
       this.query.set(this.labelForValue());
-      this.inputRef()?.nativeElement.blur();
     }
   }
 
