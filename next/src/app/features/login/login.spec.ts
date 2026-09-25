@@ -1,9 +1,10 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { of } from 'rxjs';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { Login } from './login';
 import { AuthService } from '../../core/auth/auth.service';
+import { useMemoryStorage } from '../../shared/testing/memory-storage';
 
 /**
  * A session a password change signed out lands here, and the page says why -- otherwise the person
@@ -28,6 +29,17 @@ function renderFixture(query: Record<string, string>, login: () => unknown = () 
   fixture.detectChanges();
   return fixture;
 }
+
+// ThemeService reads and writes the stored choice.
+useMemoryStorage();
+
+// The page carries a theme toggle, and ThemeService asks the OS for its preference; the test
+// environment has no matchMedia.
+beforeEach(() => vi.stubGlobal('matchMedia', (query: string) => ({
+  matches: false, media: query, onchange: null,
+  addEventListener: () => {}, removeEventListener: () => {},
+  addListener: () => {}, removeListener: () => {}, dispatchEvent: () => false,
+})));
 
 describe('Login', () => {
   it('says the password was changed when that is why the session ended', () => {
@@ -67,5 +79,31 @@ describe('Login -- telling a screen reader what went wrong', () => {
     expect(page.querySelector('#username')!.getAttribute('aria-invalid')).toBe('true');
     const alerts = [...page.querySelectorAll('[role="alert"]')].map(el => el.textContent ?? '');
     expect(alerts.some(text => text.includes('Username is required'))).toBe(true);
+  });
+});
+
+/**
+ * The sign-in page was a dead end: no way back to the front page, to Request a workspace or to
+ * the setup guide, and no theme toggle, though every other public page has them.
+ */
+describe('Login -- ways out', () => {
+  it('links to the front page, Request a workspace and the setup guide', () => {
+    const page = render({});
+    expect(page.querySelector('a[href="/"]')).not.toBeNull();
+    expect(page.querySelector('a[href="/request-workspace"]')?.textContent).toContain('Request a workspace');
+    expect(page.querySelector('a[href="/docs"]')?.textContent).toContain('Setup guide');
+  });
+
+  it('says who resets a forgotten password', () => {
+    expect(render({}).textContent).toContain('Ask your workspace administrator');
+  });
+
+  it('offers the theme toggle', () => {
+    const toggle = render({}).querySelector('button[aria-label^="Switch to"]');
+    expect(toggle).not.toBeNull();
+  });
+
+  it('does not show bullets in the empty password field, as if one were already filled in', () => {
+    expect(render({}).querySelector('#password')!.getAttribute('placeholder') ?? '').not.toContain('•');
   });
 });

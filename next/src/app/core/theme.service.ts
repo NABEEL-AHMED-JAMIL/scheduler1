@@ -1,4 +1,4 @@
-import { Injectable, effect, signal } from '@angular/core';
+import { EnvironmentProviders, Injectable, effect, inject, provideAppInitializer, signal } from '@angular/core';
 
 type Theme = 'light' | 'dark';
 const STORAGE_KEY = 'etl_theme';
@@ -22,4 +22,13 @@ export class ThemeService {
   toggle(): void {
     this.theme.update(t => (t === 'dark' ? 'light' : 'dark'));
   }
+}
+
+/**
+ * Builds ThemeService as the app starts. The constructor is what applies the theme, and until
+ * this only screens that injected the service built it: the shell did, the sign-in page did not,
+ * so /login opened light for someone who had chosen dark.
+ */
+export function provideTheme(): EnvironmentProviders {
+  return provideAppInitializer(() => { inject(ThemeService); });
 }

@@ -2,8 +2,17 @@
   <!-- Left: the sign-in panel itself, kept narrow and calm. -->
   <div class="flex items-center justify-center px-6 py-12">
     <div class="w-full max-w-sm">
-      <div class="mb-8">
-        <app-brand-mark subtitle="Data pipeline platform" />
+      <!-- The mark leads back to the front page and the toggle matches the other public pages;
+           without them this page was a dead end. -->
+      <div class="mb-8 flex items-center justify-between gap-3">
+        <a routerLink="/" aria-label="ETL Console front page">
+          <app-brand-mark subtitle="Data pipeline platform" />
+        </a>
+        <button type="button" class="btn btn-ghost btn-icon btn-sm"
+                [attr.aria-label]="theme.theme() === 'dark' ? 'Switch to light' : 'Switch to dark'"
+                (click)="theme.toggle()">
+          <app-icon [name]="theme.theme() === 'dark' ? 'sun' : 'moon'" />
+        </button>
       </div>
 
       <h1 class="text-2xl font-semibold tracking-tight mb-1">Sign in</h1>
@@ -27,7 +36,7 @@
 
         <app-field label="Password" for="password" [control]="form.controls.password">
           <input id="password" class="input" type="password" formControlName="password"
-                 autocomplete="current-password" placeholder="••••••••"
+                 autocomplete="current-password"
                  [attr.aria-invalid]="form.controls.password.touched && form.controls.password.invalid" />
         </app-field>
 
@@ -45,6 +54,12 @@
           {{ submitting() ? 'Signing in…' : 'Sign in' }}
         </button>
       </form>
+
+      <div class="mt-6 space-y-2 text-sm text-[color:var(--text-secondary)]">
+        <p>No account yet? <a routerLink="/request-workspace" class="link-inline">Request a workspace</a>.</p>
+        <p>Forgot your password? Ask your workspace administrator to reset it.</p>
+        <p><a routerLink="/docs" class="link-inline">Setup guide</a></p>
+      </div>
     </div>
   </div>
 

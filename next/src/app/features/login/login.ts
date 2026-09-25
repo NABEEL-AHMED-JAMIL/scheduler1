@@ -1,8 +1,9 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService, PASSWORD_CHANGED_NOTICE, PASSWORD_CHANGED_REASON } from '../../core/auth/auth.service';
 import { API_SUCCESS } from '../../core/api/api.config';
+import { ThemeService } from '../../core/theme.service';
 import { ConsolePreview } from '../landing/console-preview';
 import { Icon } from '../../shared/ui/icon';
 import { BrandMark } from '../../shared/ui/brand-mark';
@@ -10,7 +11,7 @@ import { Field } from '../../shared/ui/field';
 
 @Component({
   selector: 'app-login',
-  imports: [ConsolePreview, Icon, BrandMark, ReactiveFormsModule, Field],
+  imports: [ConsolePreview, Icon, BrandMark, ReactiveFormsModule, Field, RouterLink],
   templateUrl: './login.html',
 })
 export class Login {
@@ -18,6 +19,7 @@ export class Login {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  readonly theme = inject(ThemeService);
 
   readonly submitting = signal(false);
   readonly error = signal('');
