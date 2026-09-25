@@ -21,6 +21,7 @@ import { instantOf } from '../../core/instant';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { BarChart, Bar } from '../../shared/charts/bar-chart';
 import { statusColor } from '../../shared/charts/status-color';
+import { StatStrip, StatStripItem } from '../../shared/ui/stat-strip';
 import { Router } from '@angular/router';
 import { createPager } from '../../shared/ui/pager';
 import { Pagination } from '../../shared/ui/pagination';
@@ -95,7 +96,7 @@ const BULK_CONCURRENCY = 4;
 
 @Component({
   selector: 'app-jobs',
-  imports: [MineFilter, AssistantDock, Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Pagination, BarChart],
+  imports: [MineFilter, AssistantDock, Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Pagination, BarChart, StatStrip],
   templateUrl: './jobs.html',
 })
 export class Jobs implements OnInit {
@@ -106,8 +107,6 @@ export class Jobs implements OnInit {
    * runs move -- which is the point: with work in flight the question is "what is happening
    * right now", and that was only answerable by reading down the Run status column.
    */
-  readonly statusColour = statusColor;
-
   readonly liveCounts = computed(() => {
     const all = this.jobs();
     const of = (test: (job: SourceJob) => boolean) => all.filter(test).length;
@@ -120,6 +119,22 @@ export class Jobs implements OnInit {
       idle:      of(job => !status(job)),
       total:     all.length,
     };
+  });
+
+  /**
+   * The live counts as strip tiles. The tone tints the icon in the status's family -- in
+   * flight, waiting, done, failed -- and the Running tile pulses while anything is running.
+   */
+  readonly liveTiles = computed<StatStripItem[]>(() => {
+    const counts = this.liveCounts();
+    return [
+      { label: 'Running',   value: counts.running,   tone: 'info',  icon: 'play',
+        live: counts.running ? 'Updating as runs report in' : undefined },
+      { label: 'Queued',    value: counts.starting,  tone: 'muted', icon: 'clock' },
+      { label: 'Completed', value: counts.completed, tone: 'ok',    icon: 'checkCircle' },
+      { label: 'Failed',    value: counts.failed,    tone: 'crit',  icon: 'xCircle' },
+      { label: 'Never run', value: counts.idle,      tone: 'muted', icon: 'minus' },
+    ];
   });
 
   /** The assistant as a panel over the list, rather than a page that replaces it. */

@@ -38,30 +38,8 @@
   }
 
   <!-- Live run counts. Driven by the same rows the socket patches, so they move on their own. -->
-  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-px rounded-lg overflow-hidden bg-subtle"
-      >
-    @for (tile of [
-      { label: 'Running',   value: liveCounts().running,   tone: 'running',   glyph: 'play' },
-      { label: 'Queued',    value: liveCounts().starting,  tone: 'queue',     glyph: 'clock' },
-      { label: 'Completed', value: liveCounts().completed, tone: 'completed', glyph: 'checkCircle' },
-      { label: 'Failed',    value: liveCounts().failed,    tone: 'failed',    glyph: 'xCircle' },
-      { label: 'Never run', value: liveCounts().idle,      tone: '',          glyph: 'minus' }
-    ]; track tile.label) {
-      <div class="px-4 py-3 flex items-center gap-2.5 bg-raised">
-        <app-icon [name]="tile.glyph" size="1.05em"
-                  [style.color]="tile.tone ? statusColour(tile.tone) : 'var(--text-muted)'" />
-        <div class="min-w-0">
-          <div class="text-lg font-semibold tabular leading-none">{{ tile.value }}</div>
-          <div class="text-[10px] uppercase tracking-wide mt-1 text-[color:var(--text-muted)]">
-            {{ tile.label }}
-          </div>
-        </div>
-        @if (tile.label === 'Running' && tile.value) {
-          <span class="live-dot live-on ml-auto shrink-0" title="Updating as runs report in"></span>
-        }
-      </div>
-    }
-  </div>
+  <app-stat-strip [items]="liveTiles()" [cols]="2" [smCols]="3" [lgCols]="5" align="start" size="md"
+                  label="Live run counts" />
 
   <app-table-shell heading="Jobs" [scrollRows]="false" [loading]="loading()" [error]="error()"
                    [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="jobs().length"
