@@ -12,8 +12,7 @@ export type PageKey =
   | 'jobs' | 'tasks' | 'queue' | 'reports'
   | 'objects' | 'analytics' | 'analytics-dashboards'
   | 'tools-converter' | 'tools-transcript'
-  | 'ai-prompts'
-  | 'billing';
+  | 'ai-prompts';
 
 /** A catalogue row as /pageAccess.json/pages serves it. */
 export interface PageCatalogueEntry {
@@ -35,7 +34,6 @@ export const PAGE_LABELS: Record<PageKey, string> = {
   'tools-converter': 'Document Converter',
   'tools-transcript': 'Audio Transcript',
   'ai-prompts': 'Prompts',
-  'billing': 'Cost & usage',
 };
 
 export function isPageKey(value: string | null | undefined): value is PageKey {

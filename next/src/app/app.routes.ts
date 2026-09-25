@@ -265,29 +265,29 @@ export const routes: Routes = [
       { path: 'administration/billing/rates', redirectTo: 'billing/rates' },
       { path: 'billing', pathMatch: 'full', redirectTo: 'billing/usage' },
       {
-        // Cost & usage: a tenant administrator's own workspace, a platform administrator's any. A page an
-        // access profile can withhold (pageKey billing), and TENANT_ADMIN at the floor.
+        // Cost & usage: a tenant administrator's own workspace, a platform administrator's any. Role-gated
+        // only, TENANT_ADMIN at the floor: Identity retired the 'billing' page key (MIG-34).
         path: 'billing/usage',
         loadComponent: () => import('./features/billing/billing').then(m => m.Billing),
-        data: { pageKey: 'billing', minRole: 'TENANT_ADMIN' },
+        data: { minRole: 'TENANT_ADMIN' },
         canActivate: [pageGuard, roleGuard],
       },
       {
         path: 'billing/invoices',
         loadComponent: () => import('./features/billing/invoices').then(m => m.Invoices),
-        data: { pageKey: 'billing', minRole: 'TENANT_ADMIN' },
+        data: { minRole: 'TENANT_ADMIN' },
         canActivate: [pageGuard, roleGuard],
       },
       {
         path: 'billing/invoices/:number',
         loadComponent: () => import('./features/billing/invoices').then(m => m.Invoices),
-        data: { pageKey: 'billing', minRole: 'TENANT_ADMIN' },
+        data: { minRole: 'TENANT_ADMIN' },
         canActivate: [pageGuard, roleGuard],
       },
       {
         path: 'billing/documents',
         loadComponent: () => import('./features/billing/documents').then(m => m.BillingDocuments),
-        data: { pageKey: 'billing', minRole: 'TENANT_ADMIN' },
+        data: { minRole: 'TENANT_ADMIN' },
         canActivate: [pageGuard, roleGuard],
       },
       {
