@@ -133,11 +133,13 @@
               <thead>
                 <tr>
                   <th>Job</th>
-                  @for (column of columns; track column) {
+                  @for (column of visibleColumns(); track column) {
                     <th class="text-right capitalize">{{ column }}</th>
                   }
-                  <th class="text-right">Total</th>
-                  <th class="w-28">Breakdown</th>
+                  <!-- Total is pinned so the key figure stays on screen however far the row
+                       runs; below md the Breakdown bar is dropped so Total is the last column. -->
+                  <th class="text-right col-pin-right">Total</th>
+                  <th class="w-28 hidden md:table-cell">Breakdown</th>
                 </tr>
               </thead>
               <tbody>
@@ -147,7 +149,7 @@
                       <div class="font-medium truncate" [title]="row.jobName">{{ row.jobName }}</div>
                       <div class="mono text-[color:var(--text-muted)]">#{{ row.jobId }}</div>
                     </td>
-                    @for (column of columns; track column) {
+                    @for (column of visibleColumns(); track column) {
                       <td class="text-right tabular !p-0">
                         <button type="button"
                                 class="w-full h-full px-4 py-2.5 text-right tabular rounded-sm
@@ -164,7 +166,7 @@
                         </button>
                       </td>
                     }
-                    <td class="text-right tabular font-semibold !p-0">
+                    <td class="text-right tabular font-semibold !p-0 col-pin-right">
                       <button type="button"
                               class="w-full h-full px-4 py-2.5 text-right tabular font-semibold rounded-sm
                                      hover-brand
@@ -175,7 +177,7 @@
                         {{ row.total }}
                       </button>
                     </td>
-                    <td>
+                    <td class="hidden md:table-cell">
                       <div class="flex h-2 rounded-full overflow-hidden bg-sunken"
                           >
                         @for (segment of segmentsFor(row); track segment.key) {
@@ -197,7 +199,7 @@
                         · {{ filteredBreakdown().length }} job{{ filteredBreakdown().length === 1 ? '' : 's' }}
                       </span>
                     </td>
-                    @for (column of columns; track column) {
+                    @for (column of visibleColumns(); track column) {
                       <td class="text-right tabular font-semibold !p-0">
                         <button type="button"
                                 class="w-full h-full px-4 py-2.5 text-right tabular font-semibold rounded-sm
@@ -215,7 +217,8 @@
                         </button>
                       </td>
                     }
-                    <td class="text-right tabular font-semibold !p-0">
+                    <!-- The pinned cell paints its own ground; the footer row's is inset, not raised. -->
+                    <td class="text-right tabular font-semibold !p-0 col-pin-right bg-[color:var(--surface-inset)]">
                       <button type="button"
                               class="w-full h-full px-4 py-2.5 text-right tabular font-semibold rounded-sm
                                      hover-brand
@@ -227,7 +230,7 @@
                         {{ totals.total }}
                       </button>
                     </td>
-                    <td>
+                    <td class="hidden md:table-cell">
                       <!-- The track behind the segments. It asked for var(--surface), a token
                            defined nowhere, so it resolved to nothing and the groove was invisible
                            whenever the segments did not fill the row. -->

@@ -157,3 +157,54 @@ describe('a refused dashboard load', () => {
     expect(dashboard.loading()).toBe(false);
   });
 });
+
+/**
+ * Nine status columns, most of them zero in any given hour, pushed Total and Breakdown off the
+ * right edge at tablet and phone widths. Only the statuses the hour actually has are shown, and
+ * Total is pinned to the right.
+ */
+describe('which status columns the drill-down shows', () => {
+  it('leaves out a status with no runs anywhere in the hour', () => {
+    const dashboard = dashboardFor();
+    dashboard.breakdown.set([
+      row({ jobId: 1, jobName: 'Alpha', completed: 3, total: 3 }),
+      row({ jobId: 2, jobName: 'Beta', failed: 1, completed: 1, total: 2 }),
+    ]);
+    expect(dashboard.visibleColumns()).toEqual(['failed', 'completed']);
+  });
+
+  it('does not change the columns while the search narrows the rows', () => {
+    const dashboard = dashboardFor();
+    dashboard.breakdown.set([
+      row({ jobId: 1, jobName: 'Alpha', completed: 3, total: 3 }),
+      row({ jobId: 2, jobName: 'Beta', failed: 1, total: 1 }),
+    ]);
+    dashboard.breakdownSearch.set('alpha');
+    expect(dashboard.visibleColumns()).toEqual(['failed', 'completed']);
+  });
+
+  it('keeps every column while there is nothing to judge by', () => {
+    const dashboard = dashboardFor();
+    expect(dashboard.visibleColumns()).toEqual(dashboard.columns);
+  });
+
+  it('still sums every status into the footer, shown or not', () => {
+    const dashboard = dashboardFor();
+    dashboard.breakdown.set([row({ jobId: 1, jobName: 'Alpha', completed: 3, total: 3 })]);
+    expect(dashboard.breakdownTotal()!.total).toBe(3);
+  });
+
+  async function template(): Promise<string> {
+    const fs = (await import(/* @vite-ignore */ ['node', 'fs'].join(':'))) as { readFileSync(p: string, e: 'utf8'): string };
+    const root = (globalThis as unknown as { process: { cwd(): string } }).process.cwd();
+    return fs.readFileSync(`${root}/src/app/features/dashboard/dashboard.html`, 'utf8');
+  }
+
+  it('pins Total to the right and drops the Breakdown bar below md (layout the test DOM cannot measure)', async () => {
+    const html = await template();
+    // Head, body and foot cells of each column.
+    expect(html.match(/<t[hd] class="[^"]*col-pin-right[^"]*"/g)).toHaveLength(3);
+    expect(html.match(/<t[hd] class="[^"]*hidden md:table-cell[^"]*"/g)).toHaveLength(3);
+    expect(html).not.toContain('column of columns;');
+  });
+});

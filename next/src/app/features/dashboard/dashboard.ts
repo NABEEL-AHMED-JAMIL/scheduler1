@@ -100,6 +100,17 @@ export class Dashboard implements OnInit {
 
   readonly columns = BREAKDOWN_COLUMNS;
 
+  /**
+   * The statuses this hour has runs in. Nine columns, most of them zero, pushed Total off the
+   * right edge at tablet and phone widths. Judged on the whole hour rather than the search
+   * results, so columns do not come and go while typing; the sums still cover every status.
+   */
+  readonly visibleColumns = computed<readonly BreakdownKey[]>(() => {
+    const rows = this.breakdownRows();
+    const shown = BREAKDOWN_COLUMNS.filter(key => rows.some(row => this.countFor(row, key) > 0));
+    return shown.length ? shown : BREAKDOWN_COLUMNS;
+  });
+
   // ---- KPI tiles ----------------------------------------------------------
   // jobStatusStatistics carries an "All" bucket alongside the real statuses, so it is the
   // total rather than another category -- summing the array would count every job twice.
