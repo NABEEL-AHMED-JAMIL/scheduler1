@@ -9,7 +9,9 @@
   </div>
 
   @if (loading()) {
-    <div class="card p-10 text-center text-sm text-[color:var(--text-muted)]">Loading your profile…</div>
+    <div class="card p-10 text-center text-sm text-[color:var(--text-muted)]">
+      <div class="spinner mx-auto mb-3" role="status" aria-label="Loading"></div>Loading your profile…
+    </div>
   } @else if (error()) {
     <div class="card p-8 text-center">
       <app-icon name="alert" size="1.6em" class="icon-crit" />
@@ -31,8 +33,7 @@
             <span class="avatar-initials size-28 text-3xl mx-auto">{{ auth.initials() }}</span>
           }
           @if (uploading()) {
-            <span class="absolute inset-0 rounded-full grid place-items-center"
-                  style="background: rgba(0,0,0,.55);">
+            <span class="absolute inset-0 rounded-full grid place-items-center bg-black/55">
               <app-icon name="refresh" class="spin text-white" size="1.4em" />
             </span>
           }
@@ -48,7 +49,8 @@
         </p>
 
         <div class="flex items-center justify-center gap-2 mt-4">
-          <label class="btn btn-default btn-sm cursor-pointer"
+          <!-- Focus lands on the hidden input, so the label draws the ring for it. -->
+          <label class="btn btn-default btn-sm cursor-pointer focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[color:var(--focus-ring)]"
                  [class.opacity-50]="uploading() || !targetBucket()">
             <app-icon name="upload" />{{ avatarUrl() ? 'Replace' : 'Add picture' }}
             <input type="file" class="sr-only" accept="image/png,image/jpeg,image/webp,image/gif"
@@ -63,7 +65,7 @@
         </div>
 
         @if (!targetBucket()) {
-          <p class="field-note text-[color:var(--color-warn-600)] mt-2">
+          <p class="field-note text-warn-500 mt-2">
             No storage connection is available, so there is nowhere to keep a picture.
           </p>
         }
@@ -96,8 +98,7 @@
 
       <div class="space-y-4">
         @if (me.mustChangePassword) {
-          <div class="card p-4 flex items-start gap-2.5 border-brand-500"
-              >
+          <div class="card p-4 flex items-start gap-2.5 border-[color:var(--accent-mark)]">
             <app-icon name="key" class="icon-info mt-0.5 shrink-0" />
             <p class="text-sm">
               <strong>Choose your own password.</strong>
@@ -109,45 +110,35 @@
           </div>
         }
 
-        <!-- form-section supplies the containment .form-grid queries against; without an
-             ancestor carrying container-type the grid silently stays one column. -->
-        <div class="card p-4 form-section">
+        <!-- .card:has(.form-grid) supplies the containment the grid queries against. form-section
+             here also re-coloured the card border and, as the column's first child, removed it. -->
+        <div class="card p-4">
           <h3 class="text-sm font-semibold mb-4">Details</h3>
 
           <!-- One row at full width, folding to two columns then one as the card narrows.
                items-start keeps the inputs on a shared baseline when one note wraps to two
                lines and its neighbours do not. -->
           <div class="form-grid items-start">
-            <div class="field">
-              <label class="label" for="fullName">Display name</label>
+            <app-field label="Display name" for="fullName"
+                       hint="Shown in the header and wherever a job records who assigned it.">
               <input id="fullName" class="input" placeholder="Your name"
                      [value]="name()" (input)="name.set($any($event.target).value)"
                      (keydown.enter)="saveName()" />
-              <p class="field-note text-[color:var(--text-muted)]">
-                Shown in the header and wherever a job records who assigned it.
-              </p>
-            </div>
+            </app-field>
 
-            <div class="field">
-              <label class="label" for="position">Position</label>
+            <app-field label="Position" for="position"
+                       hint="Your job title, separate from your permission role.">
               <input id="position" class="input" placeholder="Data Engineer"
                      [value]="position()" (input)="position.set($any($event.target).value)"
                      (keydown.enter)="saveName()" />
-              <p class="field-note text-[color:var(--text-muted)]">
-                Your job title, separate from your permission role.
-              </p>
-            </div>
+            </app-field>
 
             <!-- The same component the admin screen uses, so a number set here and one set for
                  you by an administrator are validated and stored identically. -->
-            <div class="field">
-              <label class="label" for="phoneNumber">Phone</label>
+            <app-field label="Phone" for="phoneNumber" hint="Empty removes the number on file.">
               <app-phone-input [(value)]="phone" inputId="phoneNumber"
                                [submitted]="phoneSubmitted()" />
-              <p class="field-note text-[color:var(--text-muted)]">
-                Empty removes the number on file.
-              </p>
-            </div>
+            </app-field>
           </div>
 
 
@@ -200,19 +191,16 @@
           </p>
 
           <div class="grid sm:grid-cols-2 gap-4 mt-4 max-w-xl">
-            <div class="field">
-              <label class="label" for="currentPassword">Current password</label>
+            <app-field label="Current password" for="currentPassword">
               <input id="currentPassword" type="password" class="input" autocomplete="current-password"
                      [value]="currentPassword()"
                      (input)="currentPassword.set($any($event.target).value)" />
-            </div>
-            <div class="field">
-              <label class="label" for="newPassword">New password</label>
+            </app-field>
+            <app-field label="New password" for="newPassword" hint="At least 8 characters.">
               <input id="newPassword" type="password" class="input" autocomplete="new-password"
                      [value]="newPassword()"
                      (input)="newPassword.set($any($event.target).value)" />
-              <p class="field-note text-[color:var(--text-muted)]">At least 8 characters.</p>
-            </div>
+            </app-field>
           </div>
 
           @if (passwordError()) {
@@ -243,30 +231,22 @@
                counted every job whose status was set and not Missed, which is neither a period
                nor an event -- it read as "today" and meant "ever". -->
           <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <a routerLink="/operations/jobs" class="stat-tile hover:border-brand-500 transition-colors">
-              <div class="stat-label">Jobs</div>
-              <div class="stat-value">{{ jobsAssigned() }}</div>
-              <div class="stat-foot">{{ activeJobs() }} active</div>
+            <a routerLink="/operations/jobs" class="group block rounded-[var(--radius-card)]">
+              <app-stat-tile label="Jobs" [value]="jobsAssigned()" icon="briefcase" tone="info"
+                             [foot]="activeJobs() + ' active'"
+                             class="h-full transition-colors group-hover:border-[color:var(--accent-mark)]" />
             </a>
-            <div class="stat-tile">
-              <div class="stat-label">Runs</div>
-              <div class="stat-value">{{ recentRuns() }}</div>
-              <div class="stat-foot">in {{ windowDays() }} days</div>
-            </div>
+            <app-stat-tile label="Runs" [value]="recentRuns()" icon="play" tone="info"
+                           [foot]="'in ' + windowDays() + ' days'" />
             <!-- The only tile that ever needs acting on, so it is the only one that changes
                  colour -- a red zero would cry wolf every time somebody opened their profile. -->
-            <div class="stat-tile" [class.border-crit-500]="recentFailures() > 0">
-              <div class="stat-label">Failed</div>
-              <div class="stat-value"
-                   [style.color]="recentFailures() > 0 ? 'var(--series-crit)' : null">
-                {{ recentFailures() }}
-              </div>
-              <div class="stat-foot">in {{ windowDays() }} days</div>
-            </div>
-            <a routerLink="/notifications" class="stat-tile hover:border-brand-500 transition-colors">
-              <div class="stat-label">Unread</div>
-              <div class="stat-value">{{ unread() }}</div>
-              <div class="stat-foot">notifications</div>
+            <app-stat-tile label="Failed" [value]="recentFailures()" icon="xCircle"
+                           [tone]="recentFailures() > 0 ? 'crit' : 'muted'"
+                           [foot]="'in ' + windowDays() + ' days'"
+                           [class.border-crit-500]="recentFailures() > 0" />
+            <a routerLink="/notifications" class="group block rounded-[var(--radius-card)]">
+              <app-stat-tile label="Unread" [value]="unread()" icon="bell" tone="info" foot="notifications"
+                             class="h-full transition-colors group-hover:border-[color:var(--accent-mark)]" />
             </a>
           </div>
 
@@ -302,8 +282,8 @@
                     }
                   </div>
                   @if (run.jobStatusMessage) {
-                    <p class="pl-6 text-[11px] leading-relaxed line-clamp-2"
-                       [style.color]="'var(--series-crit)'" [title]="run.jobStatusMessage">
+                    <p class="pl-6 text-[11px] leading-relaxed line-clamp-2 text-crit-500"
+                       [title]="run.jobStatusMessage">
                       {{ run.jobStatusMessage }}
                     </p>
                   }
