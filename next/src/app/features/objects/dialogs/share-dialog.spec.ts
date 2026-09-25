@@ -51,3 +51,29 @@ describe('ShareDialog', () => {
     expect(view.close).toHaveBeenCalledWith({ recipientEmail: 'ops@medaxis.example', message: 'Q3 files' });
   });
 });
+
+/** Audit 09-22: an incomplete address says why Send is off, once the person has left the box. */
+describe('ShareDialog address check', () => {
+  it('marks the recipient invalid and says what is wrong after it is touched', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [
+      { provide: DialogRef, useValue: { close: vi.fn() } },
+      { provide: DIALOG_DATA, useValue: { count: 1 } },
+    ] });
+    const fixture = TestBed.createComponent(ShareDialog);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const to = el.querySelector<HTMLInputElement>('#to')!;
+    to.value = 'ops@medaxis';
+    to.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(to.getAttribute('aria-invalid')).not.toBe('true');     // not while still typing
+    to.dispatchEvent(new Event('blur'));
+    fixture.detectChanges();
+    expect(to.getAttribute('aria-invalid')).toBe('true');
+    const note = el.querySelector('#to-error')!;
+    expect(note.textContent).toContain('Enter a full email address');
+    expect(to.getAttribute('aria-describedby')).toBe('to-error');
+  });
+});
+
