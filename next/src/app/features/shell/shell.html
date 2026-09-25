@@ -94,18 +94,15 @@
                 </div>
               </div>
               <a routerLink="/profile" (click)="openMenu.set(null)"
-                 class="flex items-center gap-2 px-3 py-1.5 text-sm text-[color:var(--text-secondary)]
-                        hover:bg-[color:var(--surface-sunken)] hover:text-[color:var(--text-primary)]">
+                 class="menu-item text-sm">
                 <app-icon name="user" size="0.95em" />Your profile
               </a>
               <a routerLink="/notifications" (click)="openMenu.set(null)"
-                 class="flex items-center gap-2 px-3 py-1.5 text-sm text-[color:var(--text-secondary)]
-                        hover:bg-[color:var(--surface-sunken)] hover:text-[color:var(--text-primary)]">
+                 class="menu-item text-sm">
                 <app-icon name="bell" size="0.95em" />Notifications
               </a>
               <button type="button" (click)="auth.logout()"
-                      class="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-[color:var(--text-secondary)]
-                             hover:bg-[color:var(--surface-sunken)] hover:text-[color:var(--text-primary)]">
+                      class="menu-item text-sm">
                 <app-icon name="logout" size="0.95em" />Sign out
               </button>
             </div>

@@ -1291,6 +1291,9 @@ html.dark .btn-intent-crit:focus app-icon { color: var(--color-crit-400); }
            hover:bg-[color:var(--surface-sunken)] hover:text-[color:var(--text-primary)]
            focus:bg-[color:var(--surface-sunken)] focus:outline-none;
   }
+  /* The row a keyboard has reached in a list the focus does not enter (a combobox's options:
+     the focus stays in the box and aria-activedescendant names the row). Was an inline style. */
+  .menu-item.is-active { background: var(--surface-sunken); color: var(--text-primary); }
   .menu-item-danger { @apply text-crit-500 hover:text-crit-500; }
 
   /* An overlay menu shrink-to-fits its content, but .menu-item carries w-full -- a
