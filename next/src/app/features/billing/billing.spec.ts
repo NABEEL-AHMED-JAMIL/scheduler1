@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { of } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
+import { provideRouter } from '@angular/router';
 import { Billing } from './billing';
 import { BillingApi, UsageQuery } from './billing.service';
 import { WorkspacePicker } from './workspace-picker';
@@ -191,3 +192,76 @@ describe('Billing', () => {
     expect(component.actorLabel({} as any)).toBe('Pipeline');
   });
 });
+
+/** Audit 09-22: the line-by-line table as a keyboard and a phone meet it. */
+describe('Billing, rendered', () => {
+  function view(over: Record<string, unknown> = {}) {
+    const api = {
+      usageByMeter: vi.fn(() => of({ status: API_SUCCESS, data: { rows: LINES, rateCard: { version: 2, name: 'Standard', currency: 'USD', tenantSpecific: false, effectiveFrom: '2026-09-01' } } })),
+      usageByDay: vi.fn(() => of({ status: API_SUCCESS, data: { rows: DAYS } })),
+      subjects: vi.fn(() => of({ status: API_SUCCESS, data: { rows: [] } })),
+      refreshUsage: vi.fn(() => of({ status: API_SUCCESS })),
+      refreshWorkspace: vi.fn(() => of({ status: API_SUCCESS })),
+      ...over,
+    };
+    const options = [{ value: '2905', label: 'MedAxis' }];
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [provideRouter([]),
+      { provide: BillingApi, useValue: api },
+      { provide: WorkspacePicker, useValue: { tenantId: Object.assign(() => null, { set: () => {} }), effective: () => '2905', options: () => options, ready: (then: () => void) => then(), isPlatformAdmin: () => true } },
+      { provide: AuthService, useValue: { isPlatformAdmin: () => true } },
+      { provide: ToastService, useValue: { success: () => {}, error: () => {} } },
+    ] });
+    const fixture = TestBed.createComponent(Billing);
+    fixture.detectChanges();
+    return { fixture, api, component: fixture.componentInstance, el: fixture.nativeElement as HTMLElement };
+  }
+
+  it('opens a line from a real button that says whether it is open', () => {
+    const { fixture, el, component } = view();
+    const toggles = [...el.querySelectorAll<HTMLButtonElement>('button[aria-expanded]')].filter(b => b.getAttribute('aria-label')?.startsWith('Show what is behind'));
+    expect(toggles.length).toBe(component.lines().length);
+    expect(toggles[0].getAttribute('aria-expanded')).toBe('false');
+    toggles[0].click();
+    fixture.detectChanges();
+    expect(component.openLine()?.meter).toBe(component.lines()[0].meter);
+    expect(toggles[0].getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('keeps the month total under Amount whichever columns the width hides', () => {
+    const { el } = view();
+    const table = [...el.querySelectorAll('table')].find(t => t.querySelector('th')?.textContent?.trim() === 'Meter')!;
+    const foot = [...table.querySelectorAll(':scope > tbody > tr')].find(tr => tr.textContent!.includes('Month to date'))!;
+    const cells = [...foot.children] as HTMLElement[];
+    // Below md only Meter, Quantity, Amount and the chevron show: the total must be the third visible cell.
+    const narrow = cells.filter(c => !c.classList.contains('hidden')).reduce((n, c) => n + Number(c.getAttribute('colspan') ?? 1), 0);
+    expect(narrow).toBe(4);
+    const beforeAmount = cells.slice(0, cells.findIndex(c => c.textContent!.includes('$'))).filter(c => !c.classList.contains('hidden'));
+    expect(beforeAmount.reduce((n, c) => n + Number(c.getAttribute('colspan') ?? 1), 0)).toBe(2);
+    // At full width all seven columns are there.
+    expect(cells.reduce((n, c) => n + Number(c.getAttribute('colspan') ?? 1), 0)).toBe(7);
+  });
+
+  it('names the workspace picker', () => {
+    const { el } = view();
+    const box = el.querySelector<HTMLInputElement>('input[role="combobox"]')!;
+    expect(box.id).toBeTruthy();
+    expect(el.querySelector(`label[for="${box.id}"]`)?.textContent?.trim()).toBe('Workspace');
+  });
+
+  it('says the drill-down could not be read rather than that nothing was recorded', () => {
+    const { fixture, el, component } = view({ subjects: vi.fn(() => throwError(() => ({ error: { message: 'The meter is down.' } }))) });
+    component.toggleLine(component.lines()[0]);
+    fixture.detectChanges();
+    expect(component.subjectsError()).toBe('The meter is down.');
+    expect(el.textContent).toContain('The meter is down.');
+    expect(el.textContent).not.toContain('No subject recorded');
+  });
+
+  it('shows Refresh as busy while the events are being priced', () => {
+    const { component } = view({ refreshUsage: vi.fn(() => NEVER) });
+    component.refresh();
+    expect(component.loading()).toBe(true);
+  });
+});
+
