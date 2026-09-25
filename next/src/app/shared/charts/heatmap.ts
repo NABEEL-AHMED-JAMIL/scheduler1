@@ -68,8 +68,9 @@ const HOURS = Array.from({ length: 24 }, (_, i) => i);
           </div>
         </div>
 
-        <!-- Reserving the row keeps the legend from jumping as the pointer moves. -->
-        <div class="h-6 mt-2 flex items-center">
+        <!-- Reserving the row keeps the legend from jumping as the pointer moves; my-2 keeps
+             the pill off the legend below as well as the grid above. -->
+        <div class="h-6 my-2 flex items-center">
           @if (hovered(); as hover) {
             <span class="text-xs px-2 py-1 rounded-md tabular"
                   style="background: var(--surface-sunken); color: var(--text-primary);">
