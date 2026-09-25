@@ -97,6 +97,24 @@ describe('WidgetTable', () => {
     const partial = [...el.querySelectorAll('.pill')].find(p => /partial/i.test(p.textContent!));
     expect(partial?.classList).toContain('pill-warn');
     const close = [...el.querySelectorAll('button')].find(b => b.textContent!.trim() === 'Close')!;
-    expect(close.classList).toContain('btn-ghost');
+    expect(close).toBeTruthy();
+  });
+
+  it('is the shared dialog shell, with Close as its only action', () => {
+    TestBed.resetTestingModule();
+    const close = vi.fn();
+    TestBed.configureTestingModule({ providers: [
+      { provide: DialogRef, useValue: { close } },
+      { provide: DIALOG_DATA, useValue: { title: 'Revenue', truncated: false, notes: [], columns: ['a'], rows: [['1'], ['2']], measureColumn: [false], rowCount: 5 } },
+    ] });
+    const fixture = TestBed.createComponent(WidgetTableDialog);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('app-form-dialog h2')?.textContent?.trim()).toBe('Revenue');
+    expect(el.textContent).toContain('2 of 5 rows');
+    const buttons = [...el.querySelectorAll('button')].map(b => b.textContent!.trim());
+    expect(buttons).toEqual(['Close']);
+    (el.querySelector('button') as HTMLButtonElement).click();
+    expect(close).toHaveBeenCalled();
   });
 });

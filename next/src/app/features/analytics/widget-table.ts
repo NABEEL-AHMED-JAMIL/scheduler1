@@ -1,6 +1,7 @@
 import { Component, ChangeDetectionStrategy, inject, input } from '@angular/core';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { readableCell } from '../../shared/charts/number-format';
+import { FormDialog } from '../../shared/ui/form-dialog';
 
 /**
  * The rows of a result, drawn the same way on a tile and in the expanded view.
@@ -95,37 +96,21 @@ export interface WidgetTableData {
  */
 @Component({
   selector: 'app-widget-table-dialog',
-  imports: [WidgetTable],
+  imports: [WidgetTable, FormDialog],
   template: `
-    <div class="card shadow-2xl w-[60rem] max-w-[calc(100vw-2rem)] overflow-hidden flex flex-col">
-      <div class="px-5 pt-4 pb-3 flex items-baseline gap-3">
-        <h2 class="text-base font-semibold truncate">{{ data.title }}</h2>
-        <span class="text-xs text-[color:var(--text-muted)] ml-auto whitespace-nowrap">
-          {{ shown() }}
-        </span>
-      </div>
-
+    <!-- The shared shell: header, scrolling body, and a footer that is the dismissal alone. -->
+    <app-form-dialog [heading]="data.title" [subtitle]="shown()" size="xwide"
+                     [showConfirm]="false" cancelLabel="Close" (cancelled)="ref.close()">
       @if (data.truncated) {
         <!-- A warning, as the Studio says it: part of the answer, not a failure. -->
-        <p class="px-5 pb-2"><span class="pill pill-warn">Partial result — stopped at the server's row ceiling</span></p>
+        <p class="pb-2"><span class="pill pill-warn">Partial result — stopped at the server's row ceiling</span></p>
       }
       @for (note of data.notes; track note) {
-        <p class="field-note text-[color:var(--text-muted)] px-5 pb-1">{{ note }}</p>
+        <p class="field-note text-[color:var(--text-muted)] pb-1">{{ note }}</p>
       }
-
-      <!-- Scrolls inside the dialog, so the header and the caveats above stay put while a
-           thousand rows go past under them. -->
-      <div class="px-5 pb-2 overflow-auto max-h-[calc(100dvh-16rem)]">
-        <app-widget-table [columns]="data.columns" [rows]="data.rows"
-                          [measureColumn]="data.measureColumn" />
-      </div>
-
-      <div class="flex justify-end gap-2 px-5 py-3 border-t border-subtle">
-        <button type="button" class="btn btn-ghost btn-sm" (click)="ref.close()" cdkFocusInitial>
-          Close
-        </button>
-      </div>
-    </div>
+      <app-widget-table [columns]="data.columns" [rows]="data.rows"
+                        [measureColumn]="data.measureColumn" />
+    </app-form-dialog>
   `,
 })
 export class WidgetTableDialog {
