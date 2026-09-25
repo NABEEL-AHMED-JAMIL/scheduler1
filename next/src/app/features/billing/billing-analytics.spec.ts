@@ -70,4 +70,32 @@ describe('BillingAnalyticsPage', () => {
     // A grid item will not shrink below its content unless told to; the scroller inside it then never scrolls.
     for (const card of el.querySelectorAll('.card')) if (card.parentElement!.classList.contains('grid')) expect(card.classList).toContain('min-w-0');
   });
+
+  it('marks the chosen range as pressed, so it is not carried by an outline alone', () => {
+    const { el, fixture, component } = page();
+    const buttons = () => [...el.querySelectorAll<HTMLButtonElement>('[aria-label="Range"] button')];
+    expect(buttons().map(b => b.textContent!.trim())).toEqual(['Last 3 months', 'Last 6 months', 'Last 12 months']);
+    expect(buttons().map(b => b.getAttribute('aria-pressed'))).toEqual(['false', 'true', 'false']);
+    buttons()[2].click();
+    fixture.detectChanges();
+    expect(component.months()).toBe(12);
+    expect(buttons().map(b => b.getAttribute('aria-pressed'))).toEqual(['false', 'false', 'true']);
+  });
+
+  it('offers Try again when the read fails, and it reads again', () => {
+    const api = { analytics: vi.fn(() => of({ status: 'FAILED', message: 'The meter did not answer.' })) };
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [BillingAnalyticsPage], providers: [provideRouter([]),
+      { provide: BillingApi, useValue: api },
+      { provide: WorkspacePicker, useValue: { tenants: signal(TENANTS), ready: (then: () => void) => then() } },
+    ] });
+    const fixture = TestBed.createComponent(BillingAnalyticsPage);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).toContain('The meter did not answer.');
+    const retry = [...el.querySelectorAll('button')].find(b => b.textContent!.includes('Try again'));
+    expect(retry).toBeTruthy();
+    retry!.click();
+    expect(api.analytics).toHaveBeenCalledTimes(2);
+  });
 });

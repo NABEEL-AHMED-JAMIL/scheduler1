@@ -5,14 +5,15 @@
       <p class="page-subtitle">Every workspace: what was invoiced, what came in, what is open, who churns data.</p>
     </div>
     <div class="flex items-center gap-2 flex-wrap">
-      @for (n of [3, 6, 12]; track n) { <button type="button" class="pill pill-neutral hover-brand" [class.is-on]="months() === n" (click)="setMonths(n)">Last {{ n }} months</button> }
+      <app-segmented ariaLabel="Range" [options]="rangeOptions" [value]="'' + months()" (valueChange)="setMonths(+$event)" />
       <a routerLink="/billing/invoices" class="btn btn-ghost btn-sm">Invoices</a>
     </div>
   </div>
   @if (loading()) {
     <div class="card p-12 text-center text-sm text-[color:var(--text-muted)]"><div class="spinner mx-auto mb-3"></div>Reading…</div>
   } @else if (error()) {
-    <div class="card p-8 text-center"><app-icon name="alert" size="1.6rem" class="icon-crit" /><p class="text-sm text-crit-500 mt-2">{{ error() }}</p></div>
+    <div class="card p-8 text-center"><app-icon name="alert" size="1.6rem" class="icon-crit" /><p class="text-sm text-crit-500 mt-2">{{ error() }}</p>
+      <button type="button" class="btn btn-default btn-sm mt-3" (click)="load()"><app-icon name="refresh" />Try again</button></div>
   } @else if (data(); as d) {
     <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
       <app-stat-tile label="Invoiced" [value]="money2(d.invoiced)" icon="file" tone="info" [foot]="d.months.length + ' month' + (d.months.length === 1 ? '' : 's')" />

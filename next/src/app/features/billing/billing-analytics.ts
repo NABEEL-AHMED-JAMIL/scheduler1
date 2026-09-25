@@ -4,6 +4,7 @@ import { RouterLink } from '@angular/router';
 import { API_SUCCESS } from '../../core/api/api.config';
 import { Icon } from '../../shared/ui/icon';
 import { StatTile } from '../../shared/ui/stat-tile';
+import { Segmented, SegmentOption } from '../../shared/ui/segmented';
 import { Bar, BarChart } from '../../shared/charts/bar-chart';
 import { chartColor } from '../../shared/charts/status-color';
 import { WorkspacePicker } from './workspace-picker';
@@ -13,7 +14,7 @@ import { formatBytes, formatMoney, formatMoneyRound, monthShort, workspaceLabels
 /** The platform's view: invoiced, collected, open and overdue across every workspace, and who churns data. */
 @Component({
   selector: 'app-billing-analytics',
-  imports: [Icon, StatTile, BarChart, RouterLink, DecimalPipe],
+  imports: [Icon, StatTile, BarChart, RouterLink, DecimalPipe, Segmented],
   templateUrl: './billing-analytics.html',
 })
 export class BillingAnalyticsPage implements OnInit {
@@ -22,6 +23,7 @@ export class BillingAnalyticsPage implements OnInit {
   readonly loading = signal(true);
   readonly error = signal('');
   readonly months = signal(6);
+  readonly rangeOptions: SegmentOption<string>[] = [3, 6, 12].map(n => ({ id: String(n), label: `Last ${n} months` }));
   readonly data = signal<Analytics | null>(null);
   readonly statusLabel = INVOICE_STATUS_LABEL;
   readonly statusTone = INVOICE_STATUS_TONE;
