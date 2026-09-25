@@ -22,7 +22,7 @@ import { Avatar } from '../../../shared/ui/avatar';
 import { createSort } from '../../../shared/ui/sort';
 import { UserDialog } from './user-dialog';
 import { AccessProfile, AccessProfilesService } from '../access-profiles/access-profiles.service';
-import { PromptDialog } from '../../objects/dialogs/prompt-dialog';
+import { ResetPasswordDialog } from './reset-password-dialog';
 import { createPager } from '../../../shared/ui/pager';
 import { Pagination } from '../../../shared/ui/pagination';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
@@ -203,9 +203,11 @@ export class Users implements OnInit {
   readonly summary = computed(() => {
     const focusedTenant = this.focusedTenantId();
     const tenant = this.tenantFilter();
-    const list = focusedTenant === null
-      ? this.users()
-      : this.users().filter(u => u.tenantId === focusedTenant);
+    // Both tenant narrowings, as filtered() applies them: the tiles ignored the combobox and
+    // counted every tenant while the list below showed one.
+    const list = this.users().filter(u =>
+      (focusedTenant === null || u.tenantId === focusedTenant)
+      && (!tenant || String(u.tenantId) === tenant));
     return {
       total: list.length,
       active: list.filter(u => u.status === 'Active').length,
@@ -391,21 +393,12 @@ export class Users implements OnInit {
   }
 
   resetPassword(user: AppUser): void {
-    this.dialog.open<string>(PromptDialog, {
+    // The length rule lives in the dialog now, on the field, so a short password never closes it.
+    this.dialog.open<string>(ResetPasswordDialog, {
       hasBackdrop: true,
-      data: {
-        title: `Reset password for ${user.fullName || user.username}`,
-        label: 'New password',
-        placeholder: 'At least 8 characters',
-        confirmLabel: 'Reset password',
-        hint: 'They will need this to sign in. It is stored hashed and cannot be read back.',
-      },
+      data: { name: user.fullName || user.username },
     }).closed.subscribe(password => {
       if (!password) return;
-      if (password.length < 8) {
-        this.toast.error('Use at least 8 characters.');
-        return;
-      }
       // The dialog is already gone by this point (it closes on submit, before this fires), so
       // `busy` is what the row's own Edit/Reset/status/delete buttons key off of -- without it,
       // this action alone gave no in-flight feedback anywhere and its own [disabled] guards
@@ -493,6 +486,10 @@ export class Users implements OnInit {
    * keeps the same anatomy and the eye is not caught by a structural difference instead.
    */
   roleAccent(role: string): string {
+    // ROLE_META gives the tenant administrator --color-brand-500, which is not remapped in dark
+    // and vanishes on the dark card -- the one rule meant to make the admins findable.
+    // --accent-mark is the same near-black in light and flips in dark.
+    if (role === 'TENANT_ADMIN') return 'var(--accent-mark)';
     return this.metaFor(role).accent;
   }
 

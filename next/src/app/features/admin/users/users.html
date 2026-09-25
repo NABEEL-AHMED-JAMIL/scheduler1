@@ -47,7 +47,7 @@
     <ng-container toolbar>
       <app-view-toggle [(value)]="view" key="users" cardsIcon="users" />
 
-      <select class="input max-w-40" [value]="roleFilter()"
+      <select class="input max-w-40" [value]="roleFilter()" aria-label="Filter by role"
               (change)="roleFilter.set($any($event.target).value); pager.reset()">
         <option value="">All roles</option>
         @for (role of roles(); track role) {
@@ -70,7 +70,7 @@
                         placeholder="All tenants" clearLabel="All tenants" [options]="tenantComboOptions()" />
         </div>
       }
-      <select class="input max-w-32" [value]="statusFilter()"
+      <select class="input max-w-32" [value]="statusFilter()" aria-label="Filter by state"
               (change)="statusFilter.set($any($event.target).value); pager.reset()">
         <option value="">All states</option>
         <option value="Active">Active</option>
@@ -78,7 +78,7 @@
       </select>
       <div class="search-field max-w-56">
         <app-icon name="search" size="0.95em" />
-        <input class="input" placeholder="Search name, email or tenant"
+        <input class="input" placeholder="Search name, email or tenant" aria-label="Search users"
                [value]="search()" (input)="search.set($any($event.target).value); pager.reset()" />
       </div>
       <app-mine-filter [(only)]="onlyMine" (onlyChange)="pager.reset()" />
@@ -116,7 +116,7 @@
                         [title]="user.fullName || user.username">
                       {{ user.fullName || user.username }}
                     </h3>
-                    @if (isSelf(user)) { <span class="pill pill-brand shrink-0">You</span> }
+                    @if (isSelf(user)) { <span class="pill pill-neutral shrink-0">You</span> }
                     <div class="ml-auto shrink-0">
                       <app-status [label]="user.status" [quiet]="true" />
                     </div>
@@ -200,7 +200,7 @@
                     }
                   </div>
                   @if (stat.failedCount) {
-                    <p class="text-[11px] -mt-1.5" [style.color]="'var(--series-crit)'">
+                    <p class="text-[11px] -mt-1.5 text-crit-500">
                       {{ stat.failedCount }} failed {{ stat.failedCount === 1 ? 'run' : 'runs' }}
                     </p>
                   }
@@ -257,6 +257,7 @@
                 <button type="button" class="btn btn-ghost btn-icon btn-sm ml-auto"
                         [disabled]="isSelf(user) || busy() === user.appUserId"
                         [title]="isSelf(user) ? 'You cannot delete your own account' : 'Remove this account for good'"
+                        [attr.aria-label]="isSelf(user) ? 'You cannot delete your own account' : 'Delete ' + (user.fullName || user.username)"
                         (click)="deleteUser(user)">
                   <app-icon name="trash" [class.icon-crit]="!isSelf(user)" />
                 </button>
@@ -372,7 +373,7 @@
                   <span class="block text-xs text-[color:var(--text-muted)]">
                     {{ accessDetail(user) }}
                     @if (user.pageExceptionCount) {
-                      <span class="inline-flex items-center gap-1 text-[color:var(--color-warn-600)]">
+                      <span class="inline-flex items-center gap-1 text-warn-500">
                         · <span class="inline-block w-1.5 h-1.5 rounded-full bg-[color:var(--color-warn-500)]"></span>{{ user.pageExceptionCount }} {{ user.pageExceptionCount === 1 ? 'exception' : 'exceptions' }}
                       </span>
                     }
@@ -420,7 +421,7 @@
                     <div class="text-xs text-[color:var(--text-muted)] tabular">
                       {{ stat.runCount }} runs
                       @if (successRate(stat) !== null) {
-                        <span [style.color]="successRate(stat)! >= 80 ? 'var(--series-ok)' : 'var(--series-crit)'"
+                        <span [class]="successRate(stat)! >= 80 ? 'text-ok-500' : 'text-crit-500'"
                               [title]="stat.completedCount + ' completed, ' + stat.failedCount + ' failed'">
                           {{ successRate(stat) }}%
                         </span>
