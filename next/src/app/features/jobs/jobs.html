@@ -68,6 +68,7 @@
                    [emptyMessage]="hasFilters()
                       ? 'No jobs match the current filters.' : 'No jobs yet.'"
                    emptyIcon="briefcase"
+                   [showSubbar]="selected().size > 0"
                    (retry)="load()">
     <ng-container toolbar>
       <select class="input max-w-32" aria-label="Filter by execution type" [value]="executionFilter()"
@@ -93,24 +94,24 @@
       }
     </ng-container>
 
-    @if (selected().size) {
-      <div class="flex flex-wrap items-center gap-2 px-4 py-2.5 border-b bg-sunken border-subtle"
-          >
-        <span class="text-xs font-medium">{{ selected().size }} selected</span>
-        <button type="button" class="btn btn-default btn-sm btn-intent-ok"
-                [disabled]="bulkBusy()" (click)="runSelected()">
-          <app-icon name="play" [busy]="bulkBusy()" />Run selected
-        </button>
-        <button type="button" class="btn btn-ghost btn-sm btn-intent-crit"
-                [disabled]="bulkBusy()" (click)="deleteSelected()">
-          <app-icon name="trash" [busy]="bulkBusy()" />Delete selected
-        </button>
-        <button type="button" class="btn btn-ghost btn-sm ml-auto"
-                [disabled]="bulkBusy()" (click)="clearSelection()">
-          <app-icon name="close" />Clear selection
-        </button>
-      </div>
-    }
+    <!-- The shell's second toolbar row, written for exactly this: inside the body slot the bar
+         sat in the blur and scroll box, and vanished whenever the shell showed its empty or
+         error state with a selection still made. -->
+    <div subbar class="contents">
+      <span class="text-xs font-medium">{{ selected().size }} selected</span>
+      <button type="button" class="btn btn-default btn-sm btn-intent-ok"
+              [disabled]="bulkBusy()" (click)="runSelected()">
+        <app-icon name="play" [busy]="bulkBusy()" />Run selected
+      </button>
+      <button type="button" class="btn btn-default btn-sm btn-intent-crit"
+              [disabled]="bulkBusy()" (click)="deleteSelected()">
+        <app-icon name="trash" [busy]="bulkBusy()" />Delete selected
+      </button>
+      <button type="button" class="btn btn-ghost btn-sm ml-auto"
+              [disabled]="bulkBusy()" (click)="clearSelection()">
+        <app-icon name="close" />Clear selection
+      </button>
+    </div>
 
     <table class="table-modern">
       <thead>
@@ -130,8 +131,9 @@
           <th>Next / last run</th>
           <th>Created</th>
           <th>Run status</th>
-        <th>Created by</th>
-        <th>Updated by</th>
+          <!-- Metadata columns wait for a wide screen, as on Tasks; the detail colspan stays 13. -->
+          <th class="hidden 2xl:table-cell">Created by</th>
+          <th class="hidden 2xl:table-cell">Updated by</th>
           <th class="text-right">State</th>
           <th class="w-12"></th>
         </tr>
@@ -214,10 +216,10 @@
                 }
               </div>
             </td>
-            <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
+            <td class="hidden 2xl:table-cell text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
               {{ job.createdByName || '—' }}
             </td>
-            <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
+            <td class="hidden 2xl:table-cell text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
               {{ job.updatedByName || '—' }}
             </td>
             <td class="text-right"><app-status [label]="job.jobStatus" [quiet]="true" /></td>
@@ -420,37 +422,6 @@
 </div>
 
 @if (assistantJob(); as job) {
-  <div class="fixed bottom-4 right-4 z-50 w-[34rem] max-w-[calc(100vw-2rem)] card shadow-2xl
-              flex flex-col overflow-hidden"
-       [style.height]="assistantMinimised() ? 'auto' : 'min(40rem, calc(100vh - 3rem))'">
-    <div class="flex items-center gap-2 px-3.5 py-2.5 border-b shrink-0 border-subtle"
-        >
-      <app-icon name="chat" size="0.95em" class="icon-info shrink-0" />
-      <span class="text-sm font-medium mr-auto truncate" [title]="job.jobName">
-        {{ job.jobName }}
-        <span class="text-[color:var(--text-muted)] font-normal">#{{ job.jobId }}</span>
-      </span>
-      <a class="btn btn-ghost btn-sm" [routerLink]="['/operations/jobs', job.jobId, 'assistant']"
-         title="Open the full page"><app-icon name="maximize" />Full page</a>
-      <button type="button" class="btn btn-ghost btn-icon"
-              (click)="assistantMinimised.set(!assistantMinimised())"
-              [attr.aria-label]="assistantMinimised() ? 'Expand' : 'Minimise'">
-        <app-icon [name]="assistantMinimised() ? 'chevronRight' : 'chevronDown'" />
-      </button>
-      <button type="button" class="btn btn-ghost btn-icon" (click)="assistantJob.set(null)"
-              aria-label="Close"><app-icon name="close" /></button>
-    </div>
-
-    @if (!assistantMinimised()) {
-      <div class="flex-1 min-h-0 overflow-hidden flex flex-col">
-        <!-- Keyed on the job so switching rows rebuilds it against the new one rather than
-             leaving the previous job's answers on screen under a new title. -->
-        <!-- String(undefined) is the text "undefined", which would travel into every link this
-             panel builds and reach the server as a job id. Guarded on the id itself. -->
-        @if (assistantJob()?.jobId; as currentJobId) {
-          <app-job-assistant [jobId]="String(currentJobId)" [compact]="true" />
-        }
-      </div>
-    }
-  </div>
+  <app-assistant-dock [jobId]="String(job.jobId)" [jobName]="job.jobName"
+                      [(minimised)]="assistantMinimised" (closed)="assistantJob.set(null)" />
 }

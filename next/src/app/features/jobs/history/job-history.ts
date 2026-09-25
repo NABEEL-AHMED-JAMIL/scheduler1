@@ -11,7 +11,7 @@ import { Donut } from '../../../shared/charts/donut';
 import { BarChart } from '../../../shared/charts/bar-chart';
 import { statusColor } from '../../../shared/charts/status-color';
 import { notifyChips, notifySentence } from '../notify-summary';
-import { JobAssistant } from '../assistant/job-assistant';
+import { AssistantDock } from '../assistant/assistant-dock';
 import { copyText } from '../../../shared/ui/clipboard.util';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { SplitBar } from '../../../shared/charts/split-bar';
@@ -35,7 +35,7 @@ interface JobQueue {
 
 @Component({
   selector: 'app-job-history',
-  imports: [JobAssistant, Icon, ServerTimePipe, RouterLink, TableShell, StatusPill, StatusFilterChip, Donut, BarChart, SplitBar, Pagination],
+  imports: [AssistantDock, Icon, ServerTimePipe, RouterLink, TableShell, StatusPill, StatusFilterChip, Donut, BarChart, SplitBar, Pagination],
   templateUrl: './job-history.html',
 })
 export class JobHistory {

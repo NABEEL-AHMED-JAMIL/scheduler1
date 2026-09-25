@@ -27,7 +27,7 @@ import { Pagination } from '../../shared/ui/pagination';
 import { copyText } from '../../shared/ui/clipboard.util';
 import { isInFlight, isStalled, stallHint } from './stalled';
 import { notifyChips, notifyCount, notifySentence } from './notify-summary';
-import { JobAssistant } from './assistant/job-assistant';
+import { AssistantDock } from './assistant/assistant-dock';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { clonePayload } from './job-clone';
 
@@ -95,7 +95,7 @@ const BULK_CONCURRENCY = 4;
 
 @Component({
   selector: 'app-jobs',
-  imports: [MineFilter, JobAssistant, Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Pagination, BarChart],
+  imports: [MineFilter, AssistantDock, Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Pagination, BarChart],
   templateUrl: './jobs.html',
 })
 export class Jobs implements OnInit {
@@ -120,12 +120,6 @@ export class Jobs implements OnInit {
       idle:      of(job => !status(job)),
       total:     all.length,
     };
-  });
-
-  /** Only worth showing while something is actually moving. */
-  readonly anyInFlight = computed(() => {
-    const counts = this.liveCounts();
-    return counts.running + counts.starting > 0;
   });
 
   /** The assistant as a panel over the list, rather than a page that replaces it. */
@@ -205,7 +199,6 @@ export class Jobs implements OnInit {
   });
 
   readonly paged = computed(() => this.pager.slice(this.filtered()));
-  readonly totalPages = computed(() => this.pager.totalPagesFor(this.filtered().length));
 
   /**
    * A run cannot be stacked on top of one already in flight, and a deleted job has nothing to
