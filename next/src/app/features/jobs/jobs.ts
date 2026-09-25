@@ -518,9 +518,37 @@ export class Jobs implements OnInit {
    * deliberately, so switching back to Auto resumes the timetable instead of losing it. The row
    * therefore keeps a live-looking frequency and a next_run_at the dispatcher will never reach,
    * and both were rendered as plain fact.
+   *
+   * An inactive job is the same case by another route: its row survives the toggle, but the
+   * dispatcher passes it over and records each slot that goes by as Missed, so the Next run it
+   * printed was a moment that never came.
    */
   private scheduleIsLive(job: SourceJob): boolean {
-    return !!job.scheduler && job.execution !== 'Manual';
+    return !!job.scheduler && job.execution !== 'Manual' && job.jobStatus === 'Active';
+  }
+
+  /**
+   * Whether Run now can do anything for this job.
+   *
+   * The server runs and skips Active jobs only -- runSourceJob looks the job up by id AND Active
+   * and answers "SourceJob not found with jobId." for anything else, which read as though the job
+   * had gone. The menu says why instead of offering a click that ends in that.
+   */
+  canRunNow(job: SourceJob): boolean {
+    return job.jobStatus === 'Active' && !this.isInFlight(job);
+  }
+
+  /** The tooltip on a Run now that is off; empty when it is on. */
+  runBlockedReason(job: SourceJob): string {
+    if (job.jobStatus !== 'Active') return 'Activate this job to run it';
+    return this.isInFlight(job) ? 'This job is already queued or running' : '';
+  }
+
+  /** The tooltip on a Skip next run that is off; empty when it is on. */
+  skipBlockedReason(job: SourceJob): string {
+    if (job.jobStatus !== 'Active') return 'Activate this job to run it';
+    if (this.isInFlight(job)) return 'This job is already queued or running';
+    return this.canSkipNext(job) ? '' : 'Only scheduled jobs have a next run';
   }
 
   /**
@@ -605,6 +633,8 @@ export class Jobs implements OnInit {
     // held rather than hiding it -- an operator who set one up needs to know it survived. Expired
     // and Ends-on notes are about a timetable that is running, which this one is not.
     if (job.execution === 'Manual') return { text: 'Schedule kept, paused while Manual', tone: 'muted' };
+    // Deactivating does not replay what it missed (see toggleStatus), so the note says so here too.
+    if (job.jobStatus !== 'Active') return { text: 'Paused while inactive — passed slots are recorded as Missed', tone: 'muted' };
     if (schedule.expired) return { text: 'Expired — no further runs', tone: 'warn' };
     if (schedule.lastFlight) return { text: 'Final run scheduled', tone: 'warn' };
     if (schedule.endDate) return { text: `Ends ${schedule.endDate}`, tone: 'muted' };
@@ -733,14 +763,19 @@ export class Jobs implements OnInit {
    * buried any real failure among them.
    */
   runSelected(): void {
-    const jobs = this.selectedJobs().filter(job => this.selectable(job));
+    // Inactive jobs stay selectable because Delete selected takes them, but the server will not
+    // run them, so they are left out here and the confirm says how many.
+    const candidates = this.selectedJobs().filter(job => this.selectable(job));
+    const jobs = candidates.filter(job => this.canRunNow(job));
     if (!jobs.length) {
-      this.toast.error('Select at least one job that is not deleted or already running.');
+      this.toast.error('Select at least one active job that is not already running.');
       return;
     }
+    const left = candidates.length - jobs.length;
+    const leftOut = left ? ` ${left} inactive job${left > 1 ? 's are' : ' is'} left out.` : '';
     this.confirmBulk({
       title: `Run ${jobs.length} job${jobs.length > 1 ? 's' : ''}?`,
-      body: 'Each one is queued immediately, ignoring its schedule.',
+      body: `Each one is queued immediately, ignoring its schedule.${leftOut}`,
       confirmLabel: 'Run them',
     }, jobs, 'run', 'queued');
   }

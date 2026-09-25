@@ -210,11 +210,11 @@
               </button>
               <ng-template #menu>
                 <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
-                  <button cdkMenuItem class="menu-item" [disabled]="isInFlight(job)"
-                          [title]="isInFlight(job) ? 'This job is already queued or running' : ''"
+                  <button cdkMenuItem class="menu-item" [disabled]="!canRunNow(job)"
+                          [title]="runBlockedReason(job)"
                           (cdkMenuItemTriggered)="runNow(job)"><app-icon name="play" />Run now</button>
                   <button cdkMenuItem class="menu-item" [disabled]="isInFlight(job) || !canSkipNext(job)"
-                          [title]="!canSkipNext(job) ? 'Only scheduled jobs have a next run' : ''"
+                          [title]="skipBlockedReason(job)"
                           (cdkMenuItemTriggered)="skipNext(job)"><app-icon name="skip" />Skip next run</button>
                   <div class="my-1 border-t border-subtle"></div>
                   <a cdkMenuItem class="menu-item" [routerLink]="['/operations/jobs', job.jobId, 'edit']"><app-icon name="edit" />Edit</a>

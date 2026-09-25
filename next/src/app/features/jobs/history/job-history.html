@@ -113,7 +113,13 @@
                   <dt>Ends</dt><dd>{{ s.endDate || 'no end date' }}</dd>
                   <dt>Next run</dt>
                   <dd>
-                    @if (s.expired) { <span class="text-warn-500">Expired</span> }
+                    <!-- The timetable is kept while a job is inactive, but nothing runs on it: the
+                         dispatcher records each passed slot as Missed. A time here never arrives. -->
+                    @if (job.jobStatus !== 'Active') {
+                      <span class="text-[color:var(--text-muted)]"
+                            title="Passed slots are recorded as Missed; the timetable resumes when the job is activated">Paused while inactive</span>
+                    }
+                    @else if (s.expired) { <span class="text-warn-500">Expired</span> }
                     @else { {{ s.nextRunAt ? (s.nextRunAt | serverTime:'d MMM, HH:mm') : '—' }} }
                   </dd>
                 </dl>
