@@ -10,9 +10,16 @@ import { copyText } from '../../shared/ui/clipboard.util';
 /** How many of a rejected sheet's row reasons the card lists before "and N more". */
 const ROWS_SHOWN = 20;
 
-/** The server's per-row reasons (ResponseDto.data on a rejected sheet): strings, each ending in a newline. */
+/**
+ * The server's reasons for a rejected sheet (ResponseDto.data): one string per bad row, holding that
+ * row's reasons one per line. Each reason is listed on its own; a "<br>" from an older server counts
+ * as a line break rather than being shown as text.
+ */
 export function rowsOf(data: unknown): string[] {
-  return Array.isArray(data) ? data.filter((x): x is string => typeof x === 'string').map(x => x.trim()).filter(Boolean) : [];
+  if (!Array.isArray(data)) return [];
+  return data.filter((x): x is string => typeof x === 'string')
+    .flatMap(x => x.split(/<br\s*\/?>|\n/i))
+    .map(x => x.trim()).filter(Boolean);
 }
 
 type Kind = 'job' | 'task';

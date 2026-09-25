@@ -104,6 +104,12 @@ describe('Bulk import / export', () => {
       expect(el.textContent).toContain('and 5 more');
     });
 
+    it('lists each of a row\'s reasons on its own line, and never shows a <br>', () => {
+      const { items } = send(answer({ status: 'ERROR', message: 'Total 1 source jobs invalid.',
+        data: ['Frequency must be one of [Daily] at row 4.\nStart Date is not valid at row 4.', 'Row 5 old.<br>Row 5 older.<br>'] }));
+      expect(items()).toEqual(['Frequency must be one of [Daily] at row 4.', 'Start Date is not valid at row 4.', 'Row 5 old.', 'Row 5 older.']);
+    });
+
     it('lists nothing for a sheet that went in', () => {
       const { el } = send(answer({ status: 'SUCCESS', message: 'Upload complete.', data: ['ignored'] }));
       expect(el.querySelector('.bulk-rows')).toBeNull();
