@@ -1,7 +1,7 @@
 <div class="page">
   <div class="page-head">
     <div>
-      <h1 class="page-title">Workspace Requests</h1>
+      <h1 class="page-title">Workspace requests</h1>
       <p class="page-subtitle">
         Asks from outside for a workspace. Approving one creates the tenant, its first
         administrator, and emails them how to sign in.
@@ -38,11 +38,11 @@
 
       <div class="search-field max-w-56 min-w-0">
         <app-icon name="search" size="0.95em" />
-        <input class="input min-w-0" placeholder="Search requests"
+        <input class="input min-w-0" placeholder="Search requests" aria-label="Search requests"
                [value]="search()"
                (input)="search.set($any($event.target).value); pager.reset()" />
       </div>
-      <select class="input max-w-36 shrink-0" [value]="statusFilter()"
+      <select class="input max-w-36 shrink-0" [value]="statusFilter()" aria-label="Filter by status"
               (change)="statusFilter.set($any($event.target).value); pager.reset()">
         <option value="">All statuses</option>
         <option value="Pending">Waiting</option>
@@ -106,8 +106,7 @@
                      [class.line-clamp-4]="!isOpen(r.tenantRequestId)">{{ r.purpose }}</p>
                   @if (isLong(r.purpose)) {
                     <button type="button"
-                            class="self-start text-xs font-medium text-brand-600
-                                   hover:underline"
+                            class="link-inline self-start text-xs font-medium"
                             [attr.aria-expanded]="isOpen(r.tenantRequestId)"
                             (click)="toggle(r.tenantRequestId)">
                       {{ isOpen(r.tenantRequestId) ? 'Show less' : 'Read all' }}
@@ -147,7 +146,7 @@
                    version of the same screen. -->
               @if (r.status === 'Pending') {
                 <div class="flex flex-wrap items-center gap-1 pt-2.5 border-t border-subtle">
-                  <button type="button" class="btn btn-primary btn-sm"
+                  <button type="button" class="btn btn-default btn-sm"
                           [disabled]="busy() === r.tenantRequestId" (click)="approve(r)">
                     <app-icon name="checkCircle" />Approve
                   </button>
@@ -275,13 +274,13 @@
             <td class="col-pin-right">
               @if (r.status === 'Pending') {
                 <div class="flex items-center gap-1">
-                  <button type="button" class="btn btn-primary btn-sm"
+                  <button type="button" class="btn btn-default btn-sm"
                           [disabled]="busy() === r.tenantRequestId" (click)="approve(r)">
-                    Approve
+                    <app-icon name="checkCircle" />Approve
                   </button>
                   <button type="button" class="btn btn-ghost btn-sm"
                           [disabled]="busy() === r.tenantRequestId" (click)="reject(r)">
-                    Reject
+                    <app-icon name="xCircle" />Reject
                   </button>
                 </div>
               } @else {

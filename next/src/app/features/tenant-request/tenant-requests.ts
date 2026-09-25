@@ -143,7 +143,9 @@ export class TenantRequests implements OnInit {
   /** The colour of a card's top rule. Amber is the only one that asks for anything. */
   statusAccent(status: string): string {
     switch (status) {
-      case 'Pending':  return 'var(--color-warn-600)';
+      // --series-warn is warn-600 in light and a light amber in dark; the raw warn-600 was a
+      // dark-brown bar that vanished on the dark card exactly where it mattered.
+      case 'Pending':  return 'var(--series-warn)';
       case 'Approved': return 'var(--color-ok-500)';
       // Not red: a refused request is an ordinary outcome, and spending the alarm colour here
       // would blunt what it means on the screens where something has actually gone wrong.

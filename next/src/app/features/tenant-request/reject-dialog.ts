@@ -23,7 +23,7 @@ import { FormDialog } from '../../shared/ui/form-dialog';
   template: `
     <app-form-dialog [heading]="'Reject the request from ' + data.organisationName + '?'"
         subtitle="No tenant or account is created. The request is kept, marked rejected."
-        confirmLabel="Reject request" [saving]="saving()"
+        confirmLabel="Reject request" [danger]="true" [saving]="saving()"
         (cancelled)="ref.close(null)" (confirmed)="submit()">
       <app-field label="Reason" for="rejectReason"
                  hint="Optional, and only visible to platform administrators here.">
