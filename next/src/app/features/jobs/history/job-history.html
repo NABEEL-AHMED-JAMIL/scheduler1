@@ -144,11 +144,11 @@
 
           <div class="min-w-0">
             <div class="detail-head">Runs in this view</div>
-            <!-- All eight statuses, always: four columns on a tablet, two where this sits in a narrow column
-                 (a phone, and from lg where the column is a quarter wide -- four there broke "COMPLETED"
-                 mid-word), so no cell is ever left blank. A status with no runs shows 0, muted --
+            <!-- All eight statuses, always, as four rows of two at every width: this column is never
+                 much over 300px -- half the card from md, a quarter from xl -- and four across broke
+                 "COMPLETED" and "INTERRUPT" mid-word. A status with no runs shows 0, muted --
                  "none yet" is information; a blank square is not. -->
-            <app-stat-strip [items]="runTiles()" [cols]="2" [smCols]="4" [lgCols]="2" [summary]="runTotal()"
+            <app-stat-strip [items]="runTiles()" [cols]="2" [summary]="runTotal()"
                             label="Runs in this view by status" />
           </div>
 
@@ -277,19 +277,22 @@
         <tr>
           <th>Run</th>
           @if (isAllJobs()) { <th>Job</th> }
-          <th>Queued</th>
+          <!-- Queued waits for xl: at 1024 it pushed Status and Logs past the card edge, and
+               Started is the time that matters. -->
+          <th class="hidden xl:table-cell">Queued</th>
           <th>Started</th>
           <th>Ended</th>
           <th>Duration</th>
           <th>Message</th>
-          <th class="text-right">Status</th>
-          <th class="w-16"></th>
+          <!-- Status and the Logs link share one cell pinned to the right edge, as Failed runs on
+               Reports does, so a narrow screen scrolls the times away rather than the outcome. -->
+          <th class="text-right col-pin-right">Status</th>
         </tr>
       </thead>
       <tbody>
         @for (run of paged(); track run.jobQueueId) {
           <tr>
-            <td class="mono text-[color:var(--text-muted)]">
+            <td class="mono text-[color:var(--text-muted)] whitespace-nowrap">
               #{{ run.jobQueueId }}
               @if (run.jobSend) {
                 <app-icon name="send" size="0.8em" class="icon-muted ml-1"
@@ -302,7 +305,7 @@
                    title="Open this job's own history">#{{ run.jobId }}</a>
               </td>
             }
-            <td class="whitespace-nowrap text-[color:var(--text-muted)]">
+            <td class="hidden xl:table-cell whitespace-nowrap text-[color:var(--text-muted)]">
               {{ run.dateCreated ? (run.dateCreated | serverTime:'d MMM, HH:mm:ss') : '—' }}
             </td>
             <td class="whitespace-nowrap text-[color:var(--text-secondary)]">
@@ -320,7 +323,7 @@
             <td class="tabular text-[color:var(--text-secondary)] whitespace-nowrap">
               {{ duration(run) || '—' }}
             </td>
-            <td class="max-w-96">
+            <td class="max-w-72 xl:max-w-96">
               @if (run.jobStatusMessage) {
                 <!-- A truncated line with a tooltip is unreadable for the messages that matter:
                      a failure reason runs to a paragraph and a tooltip cannot be selected or
@@ -340,27 +343,29 @@
                 <span class="text-[color:var(--text-muted)]">—</span>
               }
             </td>
-            <td class="text-right"><app-status [label]="run.jobStatus" /></td>
-            <td class="text-right">
-              <!-- run.jobId, not jobId(). This screen serves TWO routes: jobs/:jobId/history for
-                   one job, and jobs/history for the dashboard's TOTAL row, which drills into an
-                   hour ACROSS EVERY JOB and therefore has no id in the path. On that view every
-                   row belongs to a different job, so the screen-level id was never the right one
-                   -- it produced /jobs//runs/5524/logs there, and /jobs/undefined/runs/5524/logs
-                   for anyone who reached the screen through a link whose own id was missing. The
-                   column two cells to the left has always linked by run.jobId; this one did not.
-                   Withheld entirely on the row where the run does not name its job, because a
-                   Logs button that cannot say whose logs is worse than no button. -->
-              @if (run.jobId) {
-                <a class="btn btn-ghost btn-sm"
-                   [routerLink]="['/operations/jobs', run.jobId, 'runs', run.jobQueueId, 'logs']"><app-icon name="file" />Logs</a>
-              }
+            <td class="text-right col-pin-right">
+              <div class="flex items-center justify-end gap-1">
+                <app-status [label]="run.jobStatus" />
+                <!-- run.jobId, not jobId(). This screen serves TWO routes: jobs/:jobId/history for
+                     one job, and jobs/history for the dashboard's TOTAL row, which drills into an
+                     hour ACROSS EVERY JOB and therefore has no id in the path. On that view every
+                     row belongs to a different job, so the screen-level id was never the right one
+                     -- it produced /jobs//runs/5524/logs there, and /jobs/undefined/runs/5524/logs
+                     for anyone who reached the screen through a link whose own id was missing. The
+                     Job column has always linked by run.jobId; this one did not.
+                     Withheld entirely on the row where the run does not name its job, because a
+                     Logs button that cannot say whose logs is worse than no button. -->
+                @if (run.jobId) {
+                  <a class="btn btn-ghost btn-sm"
+                     [routerLink]="['/operations/jobs', run.jobId, 'runs', run.jobQueueId, 'logs']"><app-icon name="file" />Logs</a>
+                }
+              </div>
             </td>
           </tr>
 
           @if (isMessageOpen(run.jobQueueId) && run.jobStatusMessage) {
             <tr>
-              <td [attr.colspan]="isAllJobs() ? 9 : 8" class="!p-0">
+              <td [attr.colspan]="isAllJobs() ? 8 : 7" class="!p-0">
                 <div class="detail-panel">
                   <div class="flex items-baseline gap-2 mb-1.5">
                     <h3 class="text-xs font-semibold uppercase tracking-wider
