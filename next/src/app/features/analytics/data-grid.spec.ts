@@ -936,3 +936,47 @@ describe('the filter row header, audit 09-22 (deferred)', () => {
     }
   });
 });
+
+/**
+ * Owner, 2026-09-24: long text in the grid should wrap on request. Cells stay one truncated line by default
+ * (a dense grid reads down columns), and "Wrap text" shows each value in full inside its column's width.
+ * The choice is part of the dataset's remembered layout, like widths and hidden columns.
+ */
+describe('wrap text', () => {
+  const wrapButton = (grid: ReturnType<typeof gridWith>) => grid.button('Wrap text');
+
+  it('is off by default: one truncated line per cell', () => {
+    const grid = gridWith();
+    expect(wrapButton(grid).getAttribute('aria-pressed')).toBe('false');
+    expect(grid.cell(0, 0).classList.contains('whitespace-nowrap')).toBe(true);
+    expect(grid.cell(0, 0).classList.contains('truncate')).toBe(true);
+  });
+
+  it('wraps every cell in full when switched on, and back when switched off', () => {
+    const grid = gridWith();
+    wrapButton(grid).click();
+    grid.render();
+    expect(wrapButton(grid).getAttribute('aria-pressed')).toBe('true');
+    const cell = grid.cell(0, 0);
+    expect(cell.classList.contains('whitespace-pre-wrap')).toBe(true);
+    expect(cell.classList.contains('truncate')).toBe(false);
+    expect(cell.querySelector('.truncate')).toBeNull();
+
+    wrapButton(grid).click();
+    grid.render();
+    expect(grid.cell(0, 0).classList.contains('truncate')).toBe(true);
+  });
+
+  it('is remembered with the dataset layout', () => {
+    localStorage.clear();
+    const first = gridWith({ storageKey: 'wrap-test' });
+    wrapButton(first).click();
+    first.render();
+
+    const again = gridWith({ storageKey: 'wrap-test' });
+    again.render();
+    expect(wrapButton(again).getAttribute('aria-pressed')).toBe('true');
+    expect(again.cell(0, 0).classList.contains('whitespace-pre-wrap')).toBe(true);
+    localStorage.clear();
+  });
+});

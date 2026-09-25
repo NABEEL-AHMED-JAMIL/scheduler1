@@ -182,6 +182,16 @@ type Pending = '' | 'sort' | 'search' | 'filter';
           }
         </button>
 
+        <!-- Owner, 2026-09-24: long values wrap on request. One truncated line stays the default --
+             a dense grid is read down its columns -- and the choice is remembered with the layout. -->
+        <button type="button" class="btn btn-xs"
+                [class.btn-primary]="wrapText()" [class.btn-default]="!wrapText()"
+                [attr.aria-pressed]="wrapText()"
+                title="Show long values in full, wrapped inside each column"
+                (click)="toggleWrap()">
+          <app-icon name="wrapText" />Wrap text
+        </button>
+
         <div class="relative">
           <button #columnsTrigger type="button" class="btn btn-default btn-xs"
                   [attr.aria-expanded]="columnsPanelOpen()"
@@ -375,8 +385,9 @@ type Pending = '' | 'sort' | 'search' | 'filter';
                     <!-- The CELL is the control, not a button inside it. A dense grid holds
                          rows times columns of these, and a focusable button in every one of
                          them would make Tab a journey rather than a way in. -->
-                    <td class="mono text-xs whitespace-nowrap truncate cursor-default
-                               focus:outline-none focus-visible:ring-2"
+                    <td class="mono text-xs cursor-default focus:outline-none focus-visible:ring-2"
+                        [class.whitespace-nowrap]="!wrapText()" [class.truncate]="!wrapText()"
+                        [class.whitespace-pre-wrap]="wrapText()" [class.align-top]="wrapText()"
                         [style.width.px]="column.width"
                         [style.minWidth.px]="column.width"
                         [style.maxWidth.px]="column.maxWidth"
@@ -391,7 +402,7 @@ type Pending = '' | 'sort' | 'search' | 'filter';
                         @if (row[column.index] === null) {
                           <span class="text-[color:var(--text-muted)] italic">null</span>
                         } @else {
-                          <span class="truncate">{{ row[column.index] }}</span>
+                          <span class="min-w-0" [class.truncate]="!wrapText()">{{ row[column.index] }}</span>
                         }
                         @if (cellFocused() && isFocused(r, c)) {
                           <!-- Shown on the FOCUSED cell rather than on hover: a control that
@@ -537,6 +548,8 @@ export class DataGrid {
   protected readonly searchDraft = signal('');
   protected readonly filterRowOpen = signal(false);
   protected readonly columnsPanelOpen = signal(false);
+  /** Long values in full, wrapped inside their column, instead of one truncated line. Remembered with the layout. */
+  protected readonly wrapText = signal(false);
   private readonly injector = inject(Injector);
   private readonly columnsTrigger = viewChild<ElementRef<HTMLButtonElement>>('columnsTrigger');
   private readonly columnsPanel = viewChild<ElementRef<HTMLElement>>('columnsPanel');
@@ -589,6 +602,7 @@ export class DataGrid {
         const saved = readLayout(key);
         this.widthOverrides.set(saved.widths);
         this.hiddenOverrides.set(saved.hidden);
+        this.wrapText.set(saved.wrap);
       });
     });
 
@@ -1088,7 +1102,12 @@ export class DataGrid {
     for (const [name, isHidden] of Object.entries(this.hiddenOverrides())) {
       if (isHidden) hidden[name] = true;
     }
-    writeLayout(key, { widths, hidden });
+    writeLayout(key, { widths, hidden, wrap: this.wrapText() });
+  }
+
+  protected toggleWrap(): void {
+    this.wrapText.set(!this.wrapText());
+    this.persist();
   }
 }
 
@@ -1114,6 +1133,8 @@ function sortActionFor(column: string, direction: 'ASC' | 'DESC' | null): string
 interface StoredLayout {
   widths: Record<string, number | null>;
   hidden: Record<string, boolean>;
+  /** Wrap long values (absent in layouts stored before 2026-09-24: off). */
+  wrap: boolean;
 }
 
 /**
@@ -1123,7 +1144,7 @@ interface StoredLayout {
  * than the error one.
  */
 function readLayout(key: string): StoredLayout {
-  const empty: StoredLayout = { widths: {}, hidden: {} };
+  const empty: StoredLayout = { widths: {}, hidden: {}, wrap: false };
   try {
     const raw = localStorage.getItem(STORE_PREFIX + key);
     if (!raw) return empty;
@@ -1131,6 +1152,7 @@ function readLayout(key: string): StoredLayout {
     return {
       widths: isRecord(parsed.widths) ? parsed.widths as Record<string, number> : {},
       hidden: isRecord(parsed.hidden) ? parsed.hidden as Record<string, boolean> : {},
+      wrap: parsed.wrap === true,
     };
   } catch {
     // Unreadable or written by an older shape. Starting from the dataset's own layout is right.
