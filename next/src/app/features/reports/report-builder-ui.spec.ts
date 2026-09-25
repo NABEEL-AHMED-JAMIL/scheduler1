@@ -64,6 +64,20 @@ describe('Report builder', () => {
     expect([...order.querySelectorAll('button')].map(b => b.getAttribute('aria-pressed'))).toEqual(['true', 'false']);
   });
 
+  it('uses app-segmented for the chart kind, with refused kinds disabled and saying why', () => {
+    const { el, pivot, fixture } = builder();
+    pivot.setMeasure('avg');
+    fixture.detectChanges();
+    const picker = el.querySelector('app-segmented [aria-label="Chart kind"]')!;
+    expect(picker).not.toBeNull();
+    const donut = [...picker.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent!.trim() === 'Donut')!;
+    expect(donut.disabled).toBe(true);
+    expect(donut.getAttribute('title')).toContain('cannot be added');
+    const line = [...picker.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent!.trim() === 'Line')!;
+    line.click();
+    expect(pivot.chart()).toBe('line');
+  });
+
   it('shows CSV as busy while it builds, and calls the bucket export "Save to bucket"', () => {
     const { el, pivot, fixture } = builder();
     pivot.export('csv');
@@ -174,6 +188,13 @@ describe('ReportDestinationDialog, sending', () => {
     expect(close).not.toHaveBeenCalled();
     expect(d.submitUrl()).toBe('https://hooks.example/report');
     expect(el.textContent).toContain('Unknown endpoint.');
+  });
+
+  it('says Submitting… while an endpoint export is on its way', () => {
+    const { d, fixture, el } = dialog(() => NEVER);
+    d.submit();
+    fixture.detectChanges();
+    expect([...el.querySelectorAll('button')].map(b => b.textContent!.trim())).toContain('Submitting…');
   });
 
   it('closes once the export is accepted', () => {

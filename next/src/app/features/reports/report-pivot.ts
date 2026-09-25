@@ -138,6 +138,12 @@ export class ReportPivot {
 
   private readonly injector = inject(Injector);
 
+  /** Every chart kind, the ones this measure cannot draw honestly disabled with the reason. */
+  readonly chartKindOptions = computed<SegmentOption<ChartKind>[]>(() =>
+    this.chartKinds.map(kind => ({
+      id: kind, label: CHART_LABELS[kind], disabled: !this.kindAllowed(kind), title: this.kindRefusal(kind),
+    })));
+
   /** The row-order choice, worded for the dimension on the rows. */
   readonly rowOrderOptions = computed<SegmentOption<'total' | 'natural'>[]>(() => [
     { id: 'total', label: 'Highest first' },

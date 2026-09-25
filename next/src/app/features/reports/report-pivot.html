@@ -89,17 +89,9 @@
     <h2 class="text-sm font-semibold mr-2">Chart</h2>
     <!-- Disabled rather than hidden: a control that vanishes when the measure changes reads
          as a bug, while a disabled one with a reason teaches why a donut of medians is not
-         a thing. The console's .seg by hand, because app-segmented has no disabled option. -->
-    <div class="seg flex-wrap" role="group" aria-label="Chart kind">
-      @for (option of chartKinds; track option) {
-        <button type="button" class="seg-btn"
-                [class.seg-on]="chart() === option"
-                [disabled]="!kindAllowed(option)"
-                [attr.aria-pressed]="chart() === option"
-                [title]="kindRefusal(option)"
-                (click)="chart.set(option)">{{ chartLabels[option] }}</button>
-      }
-    </div>
+         a thing. Wraps on a phone: ten kinds do not fit one row. -->
+    <app-segmented class="[&_.seg]:flex-wrap" ariaLabel="Chart kind" [options]="chartKindOptions()"
+                   [value]="chart()" (valueChange)="chart.set($event)" />
     @if (!measureIsAdditive()) {
       <span class="text-[11px] text-[color:var(--text-muted)] ml-1">
         Totalling charts are off: {{ measureLabels[measure()].toLowerCase() }} cannot be added up.
