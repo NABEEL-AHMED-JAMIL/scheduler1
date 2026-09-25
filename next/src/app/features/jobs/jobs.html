@@ -207,7 +207,7 @@
                 <app-status [label]="job.jobRunningStatus" />
                 @if (isStalled(job)) {
                   <span class="pill pill-warn shrink-0"
-                        [title]="'No update for ' + stalledFor(job) + '. The worker may have stopped reporting — check its logs and its callback token.'">
+                        [title]="stallHint(job)">
                     <app-icon name="alert" size="0.8em" />Stalled
                   </span>
                 }

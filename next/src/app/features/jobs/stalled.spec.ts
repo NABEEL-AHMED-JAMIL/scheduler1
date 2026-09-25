@@ -1,16 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { STALLED_AFTER_MS, isInFlight, isStalled, inFlightFor, stalledFor } from './stalled';
+import { isInFlight, isStalled, stalledFor, stallHint } from './stalled';
 
 const NOW = new Date('2026-08-24T12:00:00Z').getTime();
 const ago = (ms: number) => new Date(NOW - ms).toISOString();
 /**
  * The same instant in the format the API actually sends: Java LocalDateTime, no offset, written
- * in the zone ModelApplication pins (America/Chicago).
- *
- * Every case here used `ago()` and therefore a Z-suffixed string, which the REST API never
- * produces — so nothing exercised the naive path the jobs list is actually fed. Building it by
- * stripping the Z off an ISO string would be wrong in the other direction: that yields a UTC wall
- * clock, and reading it as Chicago moves it five hours.
+ * in the zone ModelApplication pins (America/Chicago). The age in the tooltip has to be read from
+ * this format, not only from a Z-suffixed string the REST API never produces.
  */
 const agoAsTheApiSendsIt = (ms: number) => {
   const format = new Intl.DateTimeFormat('en-CA', {
@@ -39,56 +35,28 @@ describe('in flight', () => {
     });
 });
 
-describe('stall detection', () => {
-  it('does not accuse a run that is merely slow', () => {
-    expect(isStalled({ jobRunningStatus: 'Start', lastJobRun: ago(29 * MINUTE) }, NOW)).toBe(false);
+/**
+ * MIG-63: the verdict is the server's (process.util.RunStall, serialised on every SourceJobDto
+ * as `stalled`). The console used to run its own copy of the thirty-minute rule; two copies of
+ * one rule is two chances to disagree, so the console now only reads the flag.
+ */
+describe('stall verdict comes from the server', () => {
+  it('shows a run the server marks stalled, even when the timestamps say it is fresh', () => {
+    expect(isStalled({ stalled: true, jobRunningStatus: 'Start', lastJobRun: ago(2 * MINUTE) })).toBe(true);
   });
 
-  it('flags a run once it passes the threshold', () => {
-    expect(isStalled({ jobRunningStatus: 'Start', lastJobRun: ago(31 * MINUTE) }, NOW)).toBe(true);
+  it('shows a run the server marks stalled, even when the status looks finished', () => {
+    expect(isStalled({ stalled: true, jobRunningStatus: 'Completed', lastJobRun: ago(HOUR) })).toBe(true);
   });
 
-  it('flags it just the same when the time arrives in the API\'s own format', () => {
-    // Read as local time on any host west of UTC this start looked like the future, inFlightFor
-    // returned null on its negative-elapsed guard, and isStalled answered false for every job in
-    // flight -- the safety net was off everywhere and nothing said so.
-    expect(isStalled({ jobRunningStatus: 'Start', lastJobRun: agoAsTheApiSendsIt(31 * MINUTE) }, NOW))
-      .toBe(true);
+  it('does not show a run the server clears, however long the timestamps say it has been quiet', () => {
+    // job 1193's shape -- in Start for six hours -- which the old client rule would have flagged.
+    expect(isStalled({ stalled: false, jobRunningStatus: 'Start', lastJobRun: ago(6 * HOUR) })).toBe(false);
   });
 
-  it('reports the same age whichever of the two formats it is given', () => {
-    expect(inFlightFor({ jobRunningStatus: 'Running', lastJobRun: agoAsTheApiSendsIt(45 * MINUTE) }, NOW))
-      .toBe(inFlightFor({ jobRunningStatus: 'Running', lastJobRun: ago(45 * MINUTE) }, NOW));
-  });
-
-  it('treats the threshold itself as not yet stalled', () => {
-    // Exactly at the boundary the run has had precisely its allowance and no more.
-    expect(isStalled({ jobRunningStatus: 'Start', lastJobRun: ago(STALLED_AFTER_MS) }, NOW)).toBe(false);
-    expect(isStalled({ jobRunningStatus: 'Start', lastJobRun: ago(STALLED_AFTER_MS + 1) }, NOW)).toBe(true);
-  });
-
-  it('never flags a finished run, however old', () => {
-    // The whole point: an old Completed run is history, not a problem.
-    for (const status of ['Completed', 'Failed', 'Skip']) {
-      expect(isStalled({ jobRunningStatus: status, lastJobRun: ago(10 * 24 * HOUR) }, NOW)).toBe(false);
-    }
-  });
-
-  it('says nothing when there is no start time to measure from', () => {
-    expect(isStalled({ jobRunningStatus: 'Start', lastJobRun: null }, NOW)).toBe(false);
-    expect(isStalled({ jobRunningStatus: 'Start' }, NOW)).toBe(false);
-  });
-
-  it('ignores an unparseable timestamp rather than flagging on NaN', () => {
-    expect(isStalled({ jobRunningStatus: 'Start', lastJobRun: 'not a date' }, NOW)).toBe(false);
-  });
-
-  it('does not flag a run that claims to start in the future', () => {
-    // A clock or timezone disagreement between app and database, not a stalled worker --
-    // and flagging it would light up every row on a host whose zone is offset.
-    const future = new Date(NOW + 5 * HOUR).toISOString();
-    expect(isStalled({ jobRunningStatus: 'Start', lastJobRun: future }, NOW)).toBe(false);
-    expect(inFlightFor({ jobRunningStatus: 'Start', lastJobRun: future }, NOW)).toBeNull();
+  it('does not invent a verdict when the server sent none', () => {
+    expect(isStalled({ jobRunningStatus: 'Running', lastJobRun: ago(10 * 24 * HOUR) })).toBe(false);
+    expect(isStalled({ stalled: null, jobRunningStatus: 'Running', lastJobRun: ago(10 * 24 * HOUR) })).toBe(false);
   });
 });
 
@@ -101,36 +69,32 @@ describe('age wording', () => {
     [72 * HOUR, '3 days'],
     [24 * HOUR + 30 * MINUTE, '24 hours'],
   ])('%dms reads as %s', (elapsed, expected) => {
-    expect(stalledFor({ jobRunningStatus: 'Start', lastJobRun: ago(elapsed) }, NOW)).toBe(expected);
+    expect(stalledFor({ lastJobRun: ago(elapsed) }, NOW)).toBe(expected);
   });
 
-  it('is empty when there is nothing to report, so no tooltip says "for "', () => {
-    expect(stalledFor({ jobRunningStatus: 'Completed', lastJobRun: ago(HOUR) }, NOW)).toBe('');
-    expect(stalledFor({ jobRunningStatus: 'Start', lastJobRun: null }, NOW)).toBe('');
+  it('reads the API\'s own offset-less format as the same age', () => {
+    expect(stalledFor({ lastJobRun: agoAsTheApiSendsIt(45 * MINUTE) }, NOW)).toBe('45 minutes');
   });
-});
 
-describe('the run this was built for', () => {
-  it('flags job 1193: dispatched, worked, but every callback rejected', () => {
-    // The worker finished and wrote 52 files; the run stayed in Start because each status
-    // callback came back 401. Six hours in flight with no update is the shape of that failure.
-    const job = { jobRunningStatus: 'Start', lastJobRun: ago(6 * HOUR) };
-    expect(isStalled(job, NOW)).toBe(true);
-    expect(stalledFor(job, NOW)).toBe('6 hours');
+  it('is empty when there is no age to report', () => {
+    expect(stalledFor({ lastJobRun: null }, NOW)).toBe('');
+    expect(stalledFor({}, NOW)).toBe('');
+    expect(stalledFor({ lastJobRun: 'not a date' }, NOW)).toBe('');
+    // A clock disagreement between this browser and the server is not a negative age.
+    expect(stalledFor({ lastJobRun: new Date(NOW + 5 * HOUR).toISOString() }, NOW)).toBe('');
   });
 });
 
-describe('a run that has only just started', () => {
-  it('is not stalled, however old the job is', () => {
-    // The regression: a socket status push set jobRunningStatus without touching lastJobRun,
-    // so a job whose previous run was hours ago was flagged the moment a new run began. The
-    // fix stamps the event's own time, and this is what that must produce.
-    const justStarted = { jobRunningStatus: 'Running', lastJobRun: ago(2 * MINUTE) };
-    expect(isStalled(justStarted, NOW)).toBe(false);
+describe('badge tooltip', () => {
+  it('reads exactly as before for a run the server flagged', () => {
+    expect(stallHint({ stalled: true, jobRunningStatus: 'Start', lastJobRun: ago(6 * HOUR) }, NOW)).toBe(
+      'No update for 6 hours. The worker may have stopped reporting — check its logs and its callback token.');
   });
 
-  it('is still caught once it goes quiet for long enough', () => {
-    // Same run, no further updates -- which is exactly what the warning means by "no update".
-    expect(isStalled({ jobRunningStatus: 'Running', lastJobRun: ago(45 * MINUTE) }, NOW)).toBe(true);
+  it('never says "for ." when this browser cannot measure the age the server judged', () => {
+    // The server decided on its own clock; a drifting browser clock can put lastJobRun in the
+    // future from here, which is no reason to print a broken sentence.
+    expect(stallHint({ stalled: true, lastJobRun: new Date(NOW + HOUR).toISOString() }, NOW)).toBe(
+      'No update for over half an hour. The worker may have stopped reporting — check its logs and its callback token.');
   });
 });

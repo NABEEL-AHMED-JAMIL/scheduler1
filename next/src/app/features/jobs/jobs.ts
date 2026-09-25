@@ -25,7 +25,7 @@ import { Router } from '@angular/router';
 import { createPager } from '../../shared/ui/pager';
 import { Pagination } from '../../shared/ui/pagination';
 import { copyText } from '../../shared/ui/clipboard.util';
-import { isInFlight, isStalled, stalledFor } from './stalled';
+import { isInFlight, isStalled, stallHint } from './stalled';
 import { notifyChips, notifyCount, notifySentence } from './notify-summary';
 import { JobAssistant } from './assistant/job-assistant';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
@@ -63,6 +63,11 @@ export interface SourceJob {
   /** Base seconds before a retry; the wait doubles per attempt. */
   retryBackoffSeconds?: number;
   lastJobRun?: string;
+  /**
+   * The server's stall verdict (MIG-63, process.util.RunStall): in flight and silent for more
+   * than thirty minutes. The console shows it as-is and never works it out for itself.
+   */
+  stalled?: boolean;
   dateCreated?: string;
   assignedUsername?: string;
   completeJob?: boolean;
@@ -76,21 +81,8 @@ export interface SourceJob {
   };
 }
 
-/** Statuses where an in-flight run means a manual action would collide. */
-
-/**
- * How long a run may sit in a non-terminal state before it is treated as stranded.
- *
- * A run that never reports back leaves the job showing Queue, Start or Running for ever, and
- * nothing on screen says anything is wrong -- which is exactly what happened when a worker
- * held a stale callback token: it did the work, wrote every file, and every status callback
- * came back 401, so the job sat in Start looking busy. Half an hour is far longer than any
- * run here takes, so passing it means something has gone quiet rather than slow.
- */
 /** How many runs the in-panel strip shows before it stops being readable. */
 const RECENT_RUN_BARS = 24;
-
-const STALLED_AFTER_MS = 30 * 60 * 1000;
 
 /**
  * How many of a bulk action's calls may be in flight at once.
@@ -306,12 +298,13 @@ export class Jobs implements OnInit {
       return;
     }
     if (event.type === 'job.status' && event.jobRunningStatus) {
-      const patch: Partial<SourceJob> = { jobRunningStatus: event.jobRunningStatus };
+      // The row's `stalled` is the server's verdict as of the last read. A push is the run
+      // reporting in, so whatever it now says -- a fresh in-flight state or a finish -- the
+      // server's rule answers "not stalled", and a stale `true` must not outlive the report.
+      const patch: Partial<SourceJob> = { jobRunningStatus: event.jobRunningStatus, stalled: false };
       // A status push carries the new status but not a new lastJobRun, so the row kept the
-      // previous run's timestamp. The stall check measures from that field, so a run that had
-      // only just started over the socket was flagged as stalled the instant it began.
-      // The event's own `at` is when this run reached this state, which is precisely the
-      // "last update" the warning talks about.
+      // previous run's timestamp. The event's own `at` is when this run reached this state,
+      // which is precisely the "last update" the Stalled tooltip measures from.
       if (isInFlight({ jobRunningStatus: event.jobRunningStatus })) {
         patch.lastJobRun = event.at ?? new Date().toISOString();
       }
@@ -485,9 +478,9 @@ export class Jobs implements OnInit {
   /** A run already in flight would collide with a manual run or skip. */
   readonly isInFlight = isInFlight;
 
-  /** In flight far too long -- the run is not slow, it has stopped reporting. */
+  /** In flight far too long -- the run is not slow, it has stopped reporting. The server decides. */
   readonly isStalled = (job: SourceJob) => isStalled(job);
-  readonly stalledFor = (job: SourceJob) => stalledFor(job);
+  readonly stallHint = (job: SourceJob) => stallHint(job);
 
   readonly recentRunBars = RECENT_RUN_BARS;
 

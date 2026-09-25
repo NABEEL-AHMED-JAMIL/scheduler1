@@ -6,8 +6,13 @@
  * callback token did all of its work and wrote every output file, but each status callback was
  * rejected with 401, so the job sat in Start looking busy while being entirely finished.
  *
- * The clock is a parameter rather than a call to `Date.now()` inside the check, so the threshold
- * can be tested at an exact age instead of by waiting half an hour.
+ * MIG-63: the verdict is the server's. The thirty-minute rule that used to live here now lives in
+ * process (process.util.RunStall) and every SourceJobDto carries it as `stalled`. This file only
+ * reads that flag and words the badge; it does not judge a run itself, so the console and the
+ * server can never disagree about which runs are stalled.
+ *
+ * The clock is a parameter rather than a call to `Date.now()` inside the wording, so the age can
+ * be tested exactly instead of by waiting.
  */
 
 import { instantMs } from '../../core/instant';
@@ -15,50 +20,52 @@ import { instantMs } from '../../core/instant';
 /** A run has been dispatched and has not yet reported a verdict. */
 export const IN_FLIGHT = ['queue', 'start', 'running'];
 
-/** Far longer than any run here takes, so crossing it means quiet rather than slow. */
-export const STALLED_AFTER_MS = 30 * 60 * 1000;
-
-/** Only the two fields the judgement needs, so run rows work as well as job rows. */
+/** Only the fields the badge needs, so run rows work as well as job rows. */
 export interface StallCandidate {
+  /** The server's verdict (SourceJobDto.stalled). Absent means the server gave none. */
+  stalled?: boolean | null;
   jobRunningStatus?: string | null;
   lastJobRun?: string | null;
 }
 
+/** Whether a manual run or skip would collide with a run already under way. Not a stall check. */
 export function isInFlight(job: StallCandidate): boolean {
   return IN_FLIGHT.includes((job.jobRunningStatus ?? '').toLowerCase());
 }
 
+/** The server's stall verdict, and nothing else. */
+export function isStalled(job: StallCandidate): boolean {
+  return job.stalled === true;
+}
+
 /**
- * How long the run has been in flight, or null when that cannot be said: it is not in flight,
- * it has no start time, the start time is unparseable, or it starts in the future. A future
- * start is a real clock disagreement between the app and the database, not a stall, and calling
- * it one would flag every job on a host whose clock drifts.
+ * How long since the run last reported, in the roundest unit that still tells you something --
+ * wording for a badge the server has already decided to show. Empty when the age cannot be said:
+ * no timestamp, an unparseable one, or one in the future from this browser's clock.
+ *
+ * Through instantMs, which reads an offset-less timestamp in the zone the server pins rather
+ * than in the reader's own; `new Date(...)` would put the age hours out for anyone elsewhere.
  */
-export function inFlightFor(job: StallCandidate, now: number = Date.now()): number | null {
-  if (!isInFlight(job) || !job.lastJobRun) return null;
-  // Through instantOf, which reads an offset-less timestamp in the zone the server pins rather
-  // than in the reader's own. `new Date(...)` reads it as the reader's local time, which is right
-  // only for a viewer sitting in the same zone as the server and silently hours out for anyone
-  // else -- and an age that is hours too large is exactly what this function reports a stall on.
-  const started = instantMs(job.lastJobRun);
-  if (started === null) return null;
-  const elapsed = now - started;
-  return elapsed < 0 ? null : elapsed;
-}
-
-export function isStalled(job: StallCandidate, now: number = Date.now()): boolean {
-  const elapsed = inFlightFor(job, now);
-  return elapsed !== null && elapsed > STALLED_AFTER_MS;
-}
-
-/** The age in the roundest unit that still tells you something. */
 export function stalledFor(job: StallCandidate, now: number = Date.now()): string {
-  const elapsed = inFlightFor(job, now);
-  if (elapsed === null) return '';
+  if (!job.lastJobRun) return '';
+  const started = instantMs(job.lastJobRun);
+  if (started === null) return '';
+  const elapsed = now - started;
+  if (elapsed < 0) return '';
   const minutes = Math.floor(elapsed / 60000);
   if (minutes < 120) return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
   const hours = Math.floor(minutes / 60);
   if (hours < 48) return `${hours} hours`;
   const days = Math.floor(hours / 24);
   return `${days} ${days === 1 ? 'day' : 'days'}`;
+}
+
+/**
+ * The Stalled badge's tooltip. The server judged the run on its own clock, so this browser may be
+ * unable to measure the age (a drifting clock puts lastJobRun in the future); the sentence then
+ * falls back to the threshold the server applies rather than reading "No update for .".
+ */
+export function stallHint(job: StallCandidate, now: number = Date.now()): string {
+  const age = stalledFor(job, now) || 'over half an hour';
+  return `No update for ${age}. The worker may have stopped reporting — check its logs and its callback token.`;
 }
