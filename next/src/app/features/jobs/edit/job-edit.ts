@@ -155,7 +155,12 @@ export class JobEdit implements OnInit {
       error: () => this.toast.error('Could not load the task list.'),
     });
 
-    this.form.get('executionType')!.valueChanges.subscribe(v => this.executionValue.set(v));
+    // A Manual job has no schedule: the section is hidden, and its required fields (start date...) must not
+    // hold the form invalid with nothing on screen to fix -- a Manual job could not be created or saved.
+    this.form.get('executionType')!.valueChanges.subscribe(v => {
+      this.executionValue.set(v);
+      this.applyExecution(v);
+    });
     this.scheduler.get('frequency')!.valueChanges.subscribe(v => this.frequencyValue.set(v));
     this.schedule.set(this.scheduler.getRawValue());
     this.scheduler.valueChanges.subscribe(() => this.schedule.set(this.scheduler.getRawValue()));
@@ -194,6 +199,7 @@ export class JobEdit implements OnInit {
           skipJob: job.skipJob,
         });
         this.executionValue.set(job.execution);
+        this.applyExecution(job.execution);
         if (job.scheduler) {
           this.scheduler.patchValue({
             schedulerId: job.scheduler.schedulerId,
@@ -256,6 +262,13 @@ export class JobEdit implements OnInit {
     const end = schedule['endDate'];
     return end ? `${text}, until ${end} inclusive.` : `${text}.`;
   });
+
+  /** The schedule only counts for a scheduled job; disabled controls are skipped by validation. */
+  private applyExecution(execution: string): void {
+    const scheduler = this.form.get('scheduler')!;
+    if (execution === 'Manual') scheduler.disable({ emitEvent: false });
+    else scheduler.enable({ emitEvent: false });
+  }
 
   save(): void {
     // Nothing was read, so there is nothing to update (the form is not shown either).

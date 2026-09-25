@@ -77,3 +77,25 @@ describe('JobEdit save', () => {
     expect(errors[0]).toBeTruthy();
   });
 });
+
+/**
+ * Owner's tenant-user review, 2026-09-24: a Manual job could not be created or saved. The Schedule section is
+ * hidden for Manual, but its start date stayed required, so the form was invalid with nothing highlighted.
+ */
+describe('JobEdit with Manual execution', () => {
+  it('saves a Manual job without a start date', () => {
+    const { component, writes, errors } = editor(() => of({ status: 'SUCCESS', data: JOB }));
+    expect(component.form.valid).toBe(true);
+    component.save();
+    expect(errors).toHaveLength(0);
+    expect(writes).toHaveLength(1);
+  });
+
+  it('still requires a start date once the job is scheduled', () => {
+    const { component } = editor(() => of({ status: 'SUCCESS', data: JOB }));
+    component.form.patchValue({ executionType: 'Auto', scheduler: { startDate: '' } });
+    expect(component.form.valid).toBe(false);
+    component.form.patchValue({ executionType: 'Manual' });
+    expect(component.form.valid).toBe(true);
+  });
+});
