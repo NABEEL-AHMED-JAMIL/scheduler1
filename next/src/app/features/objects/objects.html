@@ -19,7 +19,18 @@
     <!-- The connections themselves, rather than a line of text telling you to go and find them
          in the select. There are usually more than a handful, and picking one is the only thing
          to do on this screen until something is chosen. -->
-    @if (buckets().length) {
+    @if (bucketsLoading() && !buckets().length) {
+      <div class="card p-10 text-center text-sm text-[color:var(--text-muted)]">
+        <div class="spinner mx-auto mb-3" role="status" aria-label="Loading"></div>
+        Loading connections…
+      </div>
+    } @else if (bucketsError()) {
+      <div class="card p-10 text-center">
+        <app-icon name="alert" size="1.75rem" class="icon-crit block mx-auto mb-3" />
+        <p class="text-sm text-crit-500">{{ bucketsError() }}</p>
+        <button type="button" class="btn btn-default btn-sm mt-4" (click)="loadBuckets()"><app-icon name="refresh" />Try again</button>
+      </div>
+    } @else if (buckets().length) {
       <div class="flex flex-col gap-3">
         <div class="flex flex-wrap items-baseline gap-2">
           <h2 class="text-sm font-semibold">Connections</h2>
@@ -31,7 +42,7 @@
         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           @for (b of buckets(); track b.bucket) {
             <button type="button" class="card p-4 text-left flex items-start gap-3 transition-colors
-                                         hover:border-brand-400"
+                                         hover:border-[color:var(--border-strong)]"
                     (click)="onBucketChange(b.bucket)">
               <span class="stat-glyph shrink-0">
                 <app-icon [name]="providerIcon(b.provider)" />
@@ -85,9 +96,10 @@
           <button type="button" class="btn btn-default btn-sm" (click)="share()" [disabled]="actionBusy()">
             Email {{ visibleSelection().length }}
           </button>
-          <button type="button" class="btn btn-danger btn-sm" (click)="removeSelected()"
+          <!-- btn-danger is the confirm's; the confirm that follows is the destructive step. -->
+          <button type="button" class="btn btn-default btn-sm btn-intent-crit" (click)="removeSelected()"
                   [disabled]="actionBusy()">
-            Delete {{ visibleSelection().length }}
+            <app-icon name="trash" />Delete {{ visibleSelection().length }}
           </button>
         }
 
@@ -97,32 +109,32 @@
         <!-- Two inputs rather than one: webkitdirectory is a property of the INPUT, not of the
              click, so a single control cannot offer both a file picker and a folder picker. The
              browser also words the dialogs differently, which is the clearer of the two. -->
-        <label class="btn btn-default btn-sm cursor-pointer"
+        <!-- sr-only, not hidden: display:none takes the input out of the tab order, and the
+             label cannot be reached or pressed from the keyboard. The ring shows on the label. -->
+        <label class="btn btn-default btn-sm cursor-pointer has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-[color:var(--focus-ring)]"
                [class.opacity-60]="uploading()" [class.pointer-events-none]="uploading()">
-          Upload
-          <input type="file" multiple class="hidden" (change)="onUpload($event)" />
+          <app-icon name="upload" />Upload
+          <input type="file" multiple class="sr-only" (change)="onUpload($event)" />
         </label>
 
-        <label class="btn btn-default btn-sm cursor-pointer"
+        <label class="btn btn-default btn-sm cursor-pointer has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-[color:var(--focus-ring)]"
                [class.opacity-60]="uploading()" [class.pointer-events-none]="uploading()"
                title="Every file inside the folder, keeping its sub-folders">
-          Upload folder
-          <input type="file" webkitdirectory multiple class="hidden" (change)="onUpload($event)" />
+          <app-icon name="folder" />Upload folder
+          <input type="file" webkitdirectory multiple class="sr-only" (change)="onUpload($event)" />
         </label>
 
         <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
-          {{ loading() ? 'Loading…' : 'Refresh' }}
+          <app-icon name="refresh" [class.spin]="loading()" />Refresh
         </button>
       </div>
 
       @if (uploading()) {
         <!-- A folder can be hundreds of files, and a spinner that says only "working" leaves the
              reader unable to tell a slow upload from a stuck one. -->
-        <div class="flex items-center gap-3 text-xs text-[color:var(--text-muted)]">
-          <div class="h-1 flex-1 rounded-full bg-sunken overflow-hidden">
-            <div class="h-full rounded-full transition-[width]"
-                 [style.background]="'var(--heat)'"
-                 [style.width.%]="(uploadDone() / uploadTotal()) * 100"></div>
+        <div class="flex items-center gap-3 px-4 py-2 border-b border-subtle text-xs text-[color:var(--text-muted)]">
+          <div class="progress flex-1" role="progressbar" aria-label="Upload" [attr.aria-valuenow]="uploadDone()" aria-valuemin="0" [attr.aria-valuemax]="uploadTotal()">
+            <div class="progress-bar" [style.width.%]="(uploadDone() / uploadTotal()) * 100"></div>
           </div>
           <span class="tabular shrink-0">
             {{ uploadDone() }} of {{ uploadTotal() }} uploaded@if (uploadFailures().length) {
@@ -135,8 +147,11 @@
       <!-- Filter bar -->
       <div class="flex flex-wrap items-center gap-3 px-4 py-2.5 border-b text-sm border-subtle"
           >
-        <input class="input max-w-56" placeholder="Filter by name"
-               [value]="search()" (input)="search.set($any($event.target).value)" />
+        <div class="search-field max-w-56">
+          <app-icon name="search" size="0.95em" />
+          <input class="input" placeholder="Find a file…" aria-label="Filter by name"
+                 [value]="search()" (input)="search.set($any($event.target).value)" />
+        </div>
         <input type="date" class="input max-w-40" aria-label="Modified from"
                [value]="dateFrom()" (change)="dateFrom.set($any($event.target).value)" />
         <input type="date" class="input max-w-40" aria-label="Modified to"
@@ -147,11 +162,11 @@
         <span class="text-[color:var(--text-muted)] text-xs">
           {{ counts().folders }} folder{{ counts().folders === 1 ? '' : 's' }} ·
           {{ counts().files }} file{{ counts().files === 1 ? '' : 's' }}
-          @if (counts().bytes) { · {{ formatBytes(counts().bytes) }} }
+          @if (counts().bytes) { · {{ humanSize(counts().bytes) }} }
         </span>
         @if (hasInsights()) {
           <button type="button" class="btn btn-ghost btn-sm ml-auto"
-                  [class.text-accent]="showInsights()"
+                  [class.text-accent]="showInsights()" [attr.aria-expanded]="showInsights()"
                   (click)="showInsights.set(!showInsights())">
             <app-icon name="chart" />{{ showInsights() ? 'Hide' : 'Insights' }}
           </button>
@@ -191,13 +206,20 @@
       }
 
       @if (error()) {
-        <div class="p-10 text-center">
+        <div class="px-6 py-14 text-center">
+          <app-icon name="alert" size="1.75rem" class="icon-crit block mx-auto mb-3" />
           <p class="text-sm text-crit-500">{{ error() }}</p>
-          <button type="button" class="btn btn-default btn-sm mt-3" (click)="load()"><app-icon name="refresh" />Try again</button>
+          <button type="button" class="btn btn-default btn-sm mt-4" (click)="load()"><app-icon name="refresh" />Try again</button>
         </div>
       } @else if (loading() && !objects().length) {
-        <div class="p-12 text-center text-sm text-[color:var(--text-muted)]">Loading…</div>
+        <div class="px-6 py-14 text-center text-sm text-[color:var(--text-muted)]">
+          <div class="spinner mx-auto mb-3" role="status" aria-label="Loading"></div>
+          Loading…
+        </div>
       } @else {
+        <!-- A reload keeps the rows but blurs and blocks them: the previous folder's Delete must
+             not stay clickable while the next listing is on its way. -->
+        <app-blur-loader [active]="loading()" label="Loading…">
         <div class="overflow-x-auto scroll-table">
           <table class="table-modern">
             <thead>
@@ -210,7 +232,7 @@
                 <th class="w-40">Modified</th>
                 <th class="w-24 text-right">Size</th>
                 <th class="w-36">Type</th>
-                <th class="w-16"></th>
+                <th class="w-16"><span class="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>
@@ -240,7 +262,7 @@
                     {{ entry.lastModified ? (entry.lastModified | serverTime:'d MMM yyyy, HH:mm') : '—' }}
                   </td>
                   <td class="text-right text-[color:var(--text-secondary)] tabular">
-                    {{ entry.folder ? '—' : formatBytes(entry.size) }}
+                    {{ entry.folder ? '—' : humanSize(entry.size) }}
                   </td>
                   <td class="text-[color:var(--text-muted)] max-w-36 truncate"
                       [title]="entry.contentType">{{ entry.folder ? '—' : (entry.contentType || '—') }}</td>
@@ -280,7 +302,7 @@
                 <tr>
                   <td colspan="6" class="!py-14 text-center">
                     <p class="text-sm text-[color:var(--text-secondary)]">
-                      @if (search()) { Nothing matches "{{ search() }}". }
+                      @if (hasFilters()) { No files match these filters. }
                       @else { This folder is empty. }
                     </p>
                   </td>
@@ -289,6 +311,7 @@
             </tbody>
           </table>
         </div>
+        </app-blur-loader>
 
         @if (nextToken()) {
           <div class="px-4 py-3 border-t text-center border-subtle">

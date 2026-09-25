@@ -16,10 +16,9 @@ import { RankedBar } from '../../shared/charts/ranked-bar';
 import { FileChat } from './chat/file-chat';
 import { PromptDialog } from './dialogs/prompt-dialog';
 import { ShareDialog, ShareResult } from './dialogs/share-dialog';
-import { HttpClient } from '@angular/common/http';
-import { API_BASE } from '../../core/api/api.config';
 import { Icon } from '../../shared/ui/icon';
 import { formatSize } from '../../shared/ui/format-size';
+import { BlurLoader } from '../../shared/ui/blur-loader';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 
 interface Crumb { name: string; prefix: string; }
@@ -29,17 +28,22 @@ const SLOW_PROVIDERS = ['FTP', 'FTPS'];
 
 @Component({
   selector: 'app-objects',
-  imports: [Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, FileChat, Donut, RankedBar, Combobox],
+  imports: [Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, FileChat, Donut, RankedBar, Combobox, BlurLoader],
   templateUrl: './objects.html',
 })
 export class Objects implements OnInit {
   private readonly storage = inject(StorageService);
   private readonly toast = inject(ToastService);
   private readonly dialog = inject(Dialog);
-  private readonly http = inject(HttpClient);
   private readonly injector = inject(Injector);
 
   readonly buckets = signal<BucketSummary[]>([]);
+  /**
+   * The connection list's own states. Without them the screen said "No storage is connected yet"
+   * while the list was still on its way, and again when it could not be read at all.
+   */
+  readonly bucketsLoading = signal(false);
+  readonly bucketsError = signal('');
   readonly bucketOptions = computed(() => this.buckets().map(b => ({ value: b.bucket, label: b.label || b.bucket, hint: b.provider })));
 
   /** FTP is a different kind of thing from an object store, and the card should say so. */
@@ -180,15 +184,25 @@ export class Objects implements OnInit {
 
   private readonly route = inject(ActivatedRoute);
 
-  ngOnInit(): void {
+  ngOnInit(): void { this.loadBuckets(); }
+
+  loadBuckets(): void {
+    this.bucketsLoading.set(true);
+    this.bucketsError.set('');
     this.storage.buckets().subscribe({
       next: response => {
-        if (response.status === API_SUCCESS) {
-          this.buckets.set(response.data ?? []);
-          this.openDeepLink();
+        this.bucketsLoading.set(false);
+        if (response.status !== API_SUCCESS) {
+          this.bucketsError.set(response.message || 'Could not load storage connections.');
+          return;
         }
+        this.buckets.set(response.data ?? []);
+        this.openDeepLink();
       },
-      error: () => this.toast.error('Could not load storage connections.'),
+      error: err => {
+        this.bucketsLoading.set(false);
+        this.bucketsError.set(err?.error?.message || 'Could not load storage connections.');
+      },
     });
   }
 
@@ -220,7 +234,8 @@ export class Objects implements OnInit {
     this.prefix.set('');
     this.crumbs.set([]);
     this.selected.set(new Set());
-    this.search.set('');
+    // Every filter, not only the search: a date range carried silently into the next connection.
+    this.clearFilters();
     if (value) this.load();
   }
 
@@ -414,7 +429,7 @@ export class Objects implements OnInit {
       const into = this.prefix() || 'the top of this bucket';
       const ok = await confirmWith(this.dialog, {
         title: `Upload ${this.count(worth.length, 'file')}?`,
-        body: `${this.size(bytes)} into ${into}`
+        body: `${this.humanSize(bytes)} into ${into}`
           + (folders.size ? `, recreating ${this.count(folders.size, 'sub-folder')}.` : '.')
           + (chosen.length > worth.length
             ? ` ${this.count(chosen.length - worth.length, 'empty file')} will be skipped.` : ''),
@@ -423,18 +438,6 @@ export class Objects implements OnInit {
       if (!ok) return;
     }
     this.uploadAll(chosen);
-  }
-
-  /** Bytes as a person reads them, for a sentence rather than a column. */
-  private size(bytes: number): string {
-    const units = ['B', 'KB', 'MB', 'GB'];
-    let value = bytes;
-    let unit = 0;
-    while (value >= 1024 && unit < units.length - 1) {
-      value /= 1024;
-      unit++;
-    }
-    return `${value >= 10 || unit === 0 ? Math.round(value) : value.toFixed(1)} ${units[unit]}`;
   }
 
   /**
@@ -661,9 +664,7 @@ export class Objects implements OnInit {
     const bucket = this.bucket();
     // The dialog sends, and stays open until the server answers, so a refusal is shown beside
     // what was typed rather than after it has gone.
-    const send = (result: ShareResult) => this.http.post<ApiResponse>(`${API_BASE}/fileShare.json/send`, {
-      bucket, keys, recipientEmail: result.recipientEmail, message: result.message,
-    });
+    const send = (result: ShareResult) => this.storage.share(bucket, keys, result.recipientEmail, result.message);
     this.dialog.open<ShareResult>(ShareDialog, {
       hasBackdrop: true,
       data: { count: keys.length, send },
@@ -688,15 +689,5 @@ export class Objects implements OnInit {
         if (++failed === 1) this.toast.error('Some files could not be downloaded.');
       },
     }));
-  }
-
-  formatBytes(bytes?: number): string {
-    if (bytes === undefined || bytes === null) return '—';
-    if (bytes < 1024) return `${bytes} B`;
-    const units = ['KB', 'MB', 'GB', 'TB'];
-    let value = bytes / 1024;
-    let unit = 0;
-    while (value >= 1024 && unit < units.length - 1) { value /= 1024; unit++; }
-    return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[unit]}`;
   }
 }

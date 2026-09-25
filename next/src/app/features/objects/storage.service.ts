@@ -136,10 +136,9 @@ export class StorageService {
     URL.revokeObjectURL(url);
   }
 
-  /** Inline URL for an <img>; previewObject streams the bytes where downloadObject
-      attaches them. */
-  previewUrl(bucket: string, key: string): string {
-    return `${this.base}/previewObject?bucket=${encodeURIComponent(bucket)}&key=${encodeURIComponent(key)}`;
+  /** Emails one file, or several as a ZIP, to one address. */
+  share(bucket: string, keys: string[], recipientEmail: string, message: string): Observable<ApiResponse> {
+    return this.http.post<ApiResponse>(`${API_BASE}/fileShare.json/send`, { bucket, keys, recipientEmail, message });
   }
 
   upload(bucket: string, prefix: string, file: File): Observable<ApiResponse> {
