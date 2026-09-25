@@ -498,15 +498,38 @@ export class TaskEdit implements OnInit {
   }
 
   private findTag(field: PipelineField): string | null {
-    const parent = (field.tagParent ?? '').trim();
+    const row = this.tagRowFor(field);
+    return row ? (row.getRawValue().tagValue ?? '') : null;
+  }
+
+  /**
+   * The payload's root element when the tags carry one: a row that is its own parent ({csvCheck/csvCheck}). A task
+   * created through the API or a bulk import is stored this way, every setting parented to that root.
+   */
+  private rootTag(): string | null {
     for (const group of this.tags.controls) {
       const value = group.getRawValue();
-      if ((value.tagKey ?? '').trim() === field.tagKey
-          && (value.tagParent ?? '').trim() === parent) {
-        return value.tagValue ?? '';
-      }
+      const key = (value.tagKey ?? '').trim();
+      if (key && key === (value.tagParent ?? '').trim()) return key;
     }
     return null;
+  }
+
+  /**
+   * The tag row a form field reads and writes. A field with no parent means "top level", which in a root-wrapped
+   * payload is a child of the root: matching the parent exactly opened every field blank there, and a save then
+   * pushed a parentless duplicate beside each saved setting. The root row itself is never a setting.
+   */
+  private tagRowFor(field: PipelineField): FormGroup | null {
+    const parent = (field.tagParent ?? '').trim();
+    const root = parent ? null : this.rootTag();
+    const match = this.tags.controls.find(group => {
+      const value = group.getRawValue();
+      const key = (value.tagKey ?? '').trim();
+      const tagParent = (value.tagParent ?? '').trim();
+      return key === field.tagKey && key !== tagParent && (tagParent === parent || (root !== null && tagParent === root));
+    });
+    return (match as FormGroup) ?? null;
   }
 
   /**
@@ -525,11 +548,7 @@ export class TaskEdit implements OnInit {
       const value = field.fieldType === 'checkbox' ? String(!!raw) : String(raw ?? '');
       const parent = (field.tagParent ?? '').trim();
 
-      const match = this.tags.controls.find(group => {
-        const current = group.getRawValue();
-        return (current.tagKey ?? '').trim() === field.tagKey
-            && (current.tagParent ?? '').trim() === parent;
-      });
+      const match = this.tagRowFor(field);
 
       if (!value) {
         // A blank answer means no tag at all rather than an empty one: an empty
@@ -542,7 +561,8 @@ export class TaskEdit implements OnInit {
       } else {
         this.tags.push(this.fb.group({
           tagKey: [field.tagKey],
-          tagParent: [parent],
+          // A new setting in a root-wrapped payload goes under the root like its siblings.
+          tagParent: [parent || this.rootTag() || ''],
           tagValue: [value],
         }), { emitEvent: false });
       }
