@@ -28,7 +28,7 @@
 
           <app-field label="Kafka connection" for="taskProfile"
                      hint="The connection the topic publishes through. Pick it first; its topics come next.">
-            <app-combobox id="taskProfile" [selected]="selectedProfileId()" (selectedChange)="pickProfile($event)"
+            <app-combobox id="taskProfile" [selected]="selectedProfileId()" [selectedLabel]="selectedProfileLabel()" (selectedChange)="pickProfile($event)"
                           placeholder="Search connections…" clearLabel="None"
                           [options]="profileOptions()" />
           </app-field>

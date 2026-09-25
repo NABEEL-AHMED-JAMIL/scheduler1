@@ -23,6 +23,7 @@ import { TaskType, TaskTypeDialog } from '../task-types/task-type-dialog';
 import { parseTopicPartition } from '../../../shared/ui/topic';
 import { HttpParams } from '@angular/common/http';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
+import { profileLabel } from './platform-default';
 
 /** As much of a tenant.json/listTenants row as this screen reads. */
 export interface TenantName {
@@ -47,7 +48,8 @@ export interface KafkaProfile {
   tenantId?: number | null;
   profileName: string;
   environmentLabel?: string;
-  bootstrapServers: string;
+  /** Absent on a profile the caller is shown but does not own (readOnly). */
+  bootstrapServers?: string;
   securityProtocol: string;
   saslMechanism?: string;
   saslUsername?: string;
@@ -70,6 +72,14 @@ export interface KafkaProfile {
   lastTestedAt?: string;
   lastTestMessage?: string;
   dateCreated?: string;
+  /** The platform's own profile: no workspace owns it. */
+  platform?: boolean;
+  /**
+   * Shown, not the caller's: the platform default as a workspace with no Kafka of its own sees it,
+   * with its brokers, login and last test message left out. The server refuses every edit, test,
+   * default change and delete on it; the screen does not offer them.
+   */
+  readOnly?: boolean;
 }
 
 @Component({
@@ -145,8 +155,13 @@ export class KafkaConnections implements OnInit {
     const id = type.sourceTaskTypeId!;
     if (!topic) { this.toast.error('This topic has no Kafka topic name to check.'); return; }
     this.testingTopic.set(id);
-    this.http.get<ApiResponse>(`${API_BASE}/kafkaConnectionProfile.json/testTopic`,
-      { params: { topicName: topic, kafkaConnectionProfileId: String(profile.kafkaConnectionProfileId) } }).subscribe({
+    // A profile the caller only sees cannot be named to the server (it reads as not found); the
+    // topic is tested on the connection that resolves for the caller, which for a workspace shown
+    // the platform default is that one.
+    const params: Record<string, string> = profile.readOnly
+      ? { topicName: topic }
+      : { topicName: topic, kafkaConnectionProfileId: String(profile.kafkaConnectionProfileId) };
+    this.http.get<ApiResponse>(`${API_BASE}/kafkaConnectionProfile.json/testTopic`, { params }).subscribe({
       next: r => {
         this.testingTopic.set(null);
         // Reachable but read by nobody is the case that strands a run at Start; it passes the
@@ -233,8 +248,11 @@ export class KafkaConnections implements OnInit {
   }
 
   addTopic(profile: KafkaProfile): void {
+    // Under the platform default a workspace adds its topic unrouted: that is what lands it there,
+    // and it keeps following the workspace's default once the workspace brings its own Kafka.
     this.dialog.open<boolean>(TaskTypeDialog, { data: {
-      profiles: this.profiles(), defaultProfileId: profile.kafkaConnectionProfileId, profileName: profile.profileName,
+      profiles: this.profiles(), defaultProfileId: profile.readOnly ? null : profile.kafkaConnectionProfileId,
+      profileName: this.displayName(profile),
       tenantId: profile.tenantId ?? null, tenants: this.tenants(),
     } }).closed.subscribe(saved => { if (saved) this.loadTopics(); });
   }
@@ -372,14 +390,26 @@ export class KafkaConnections implements OnInit {
       if (!term) return true;
       // Only a platform administrator has a workspace column to read, so only their search matches on one.
       const workspace = this.canSeeWorkspace() ? this.workspaceName(p) : '';
-      return `${p.profileName} ${p.environmentLabel ?? ''} ${p.bootstrapServers} ${workspace}`
+      return `${p.profileName} ${p.environmentLabel ?? ''} ${p.bootstrapServers ?? ''} ${workspace}`
         .toLowerCase().includes(term);
     });
     return this.mine(rows).slice().sort((a, b) => a.profileName.localeCompare(b.profileName));
   });
 
+  /** Whether the row is the caller's to edit, test, make default or delete. */
+  canManage(profile: KafkaProfile): boolean { return !profile.readOnly; }
+
+  /** The name as the rail and the pane show it: a platform default says so. */
+  displayName(profile: KafkaProfile): string { return profileLabel(profile); }
+
+  /** The broker list, or -- on a row the caller only sees -- whose it is. */
+  brokersText(profile: KafkaProfile): string {
+    return profile.readOnly || !profile.bootstrapServers ? 'Managed by the platform' : profile.bootstrapServers;
+  }
+
+  /** The workspace's own profiles only: the platform default it is shown is not one of them. */
   readonly summary = computed(() => {
-    const list = this.profiles();
+    const list = this.profiles().filter(p => !p.readOnly);
     return {
       total: list.length,
       active: list.filter(p => p.status === 'Active').length,

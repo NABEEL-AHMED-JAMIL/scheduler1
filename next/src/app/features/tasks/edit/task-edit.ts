@@ -12,6 +12,7 @@ import { Icon } from '../../../shared/ui/icon';
 import { LoadError } from '../../../shared/ui/load-error';
 import { FieldChoice, Pipeline, PipelineField, parseFieldChoices } from '../../settings/pipelines/pipeline-dialog';
 import { TaskReference, TaskReferenceKind } from '../../settings/configuration/configuration.models';
+import { isPlatformDefault, profileLabel } from '../../settings/kafka/platform-default';
 
 @Component({
   selector: 'app-task-edit',
@@ -108,16 +109,29 @@ export class TaskEdit implements OnInit {
    * alternative. The profile is a step in the pick, not part of the task -- the task keeps
    * only its topic.
    */
-  readonly profiles = signal<{ kafkaConnectionProfileId: number; profileName: string; environmentLabel?: string; isDefault?: boolean; tenantId?: number | null; tenantName?: string }[]>([]);
+  readonly profiles = signal<{ kafkaConnectionProfileId: number; profileName: string; environmentLabel?: string; isDefault?: boolean; tenantId?: number | null; tenantName?: string; status?: string }[]>([]);
+  /** Whether fetchAllProfiles has answered: an empty answer is still an answer. */
+  private profilesLoaded = false;
   readonly selectedProfileId = signal<number | null>(null);
   readonly topicsLoading = signal(false);
   /** The topic the task was opened with, named before its profile's list has arrived. */
   readonly loadedTopicLabel = signal('');
   readonly profileOptions = computed<ComboboxOption[]>(() => this.profiles().map(p => ({
     value: String(p.kafkaConnectionProfileId),
-    label: p.profileName,
-    hint: [p.environmentLabel, p.tenantName, p.isDefault ? 'default' : ''].filter(Boolean).join(' · '),
+    label: profileLabel(p),
+    hint: [p.environmentLabel, p.tenantName, p.isDefault && !isPlatformDefault(p) ? 'default' : ''].filter(Boolean).join(' · '),
   })));
+  /**
+   * What the connection box shows for its value, handed to it as `selectedLabel` so a value the
+   * options do not include -- a topic naming a connection this caller is not shown -- reads as a
+   * connection rather than as a bare id.
+   */
+  readonly selectedProfileLabel = computed(() => {
+    const id = this.selectedProfileId();
+    if (id == null) return '';
+    const row = this.profiles().find(p => p.kafkaConnectionProfileId === id);
+    return row ? profileLabel(row) : `Connection ${id}`;
+  });
 
   /** A pick in the profile box: its topics replace the list, and a topic not on it is cleared. */
   pickProfile(id: string): void {
@@ -148,7 +162,7 @@ export class TaskEdit implements OnInit {
   /**
    * An edited task names a topic; the profile box has to land on that topic's profile so the
    * list it opens with contains it. The topic row says which profile; an unrouted topic (none)
-   * rides on the workspace's default profile, the same rule the Kafka pane applies.
+   * goes where KafkaConnectionResolver sends it -- see unroutedProfileFor.
    */
   private seedProfileForTopic(topicId: number, tenantId: number | null): void {
     this.http.get<ApiResponse<any[]>>(`${API_BASE}/setting.json/topics`, { params: { ids: topicId } }).subscribe({
@@ -157,8 +171,7 @@ export class TaskEdit implements OnInit {
         if (!row) return;
         this.loadedTopicLabel.set(row.serviceName ?? '');
         const profileId: number | null = row.kafkaConnectionProfileId
-          ?? this.profiles().find(p => p.isDefault && (tenantId == null || p.tenantId === tenantId))?.kafkaConnectionProfileId
-          ?? null;
+          ?? this.unroutedProfileFor(tenantId ?? row.tenantId ?? null);
         if (profileId == null) return;
         this.selectedProfileId.set(profileId);
         this.loadTopicsFor(profileId);
@@ -167,10 +180,27 @@ export class TaskEdit implements OnInit {
     });
   }
 
+  /**
+   * The connection a topic that names none publishes through, by the resolver's rule: the
+   * workspace's own default; else, for a workspace with no Kafka profile of its own at all, the
+   * platform default (a workspace with some but no default is refused, so it gets nothing). The
+   * list is the caller's: a tenant sees its own rows, or -- with none -- the platform default
+   * alone; a platform administrator sees every workspace's and the platform's.
+   */
+  private unroutedProfileFor(tenantId: number | null): number | null {
+    const rows = this.profiles();
+    const own = tenantId == null ? rows.filter(p => p.tenantId != null) : rows.filter(p => p.tenantId === tenantId);
+    const ownDefault = own.find(p => p.isDefault);
+    if (ownDefault) return ownDefault.kafkaConnectionProfileId;
+    if (tenantId != null && own.length) return null;
+    return rows.find(isPlatformDefault)?.kafkaConnectionProfileId ?? null;
+  }
+
   ngOnInit(): void {
     this.http.get<ApiResponse<any[]>>(`${API_BASE}/kafkaConnectionProfile.json/fetchAllProfiles`).subscribe({
       next: response => {
-        if (response.status !== API_SUCCESS) return;
+        this.profilesLoaded = true;
+        if (response.status !== API_SUCCESS) { this.flushPendingTopicSeed(); return; }
         const rows = (response.data ?? []).filter((p: any) => p.status !== 'Delete');
         this.profiles.set(rows);
         // A new task starts on the workspace's default connection when there is exactly one
@@ -180,10 +210,10 @@ export class TaskEdit implements OnInit {
           if (defaults.length === 1) { this.selectedProfileId.set(defaults[0].kafkaConnectionProfileId); this.loadTopicsFor(defaults[0].kafkaConnectionProfileId); }
         }
         // An edited task's topic may have arrived before the profiles did.
-        const pending = this.pendingTopicSeed;
-        if (pending) { this.pendingTopicSeed = null; this.seedProfileForTopic(pending.topicId, pending.tenantId); }
+        this.flushPendingTopicSeed();
       },
-      error: () => this.toast.error('Could not load the Kafka connections.'),
+      // The topic is still named without the list; only the connection box stays empty.
+      error: () => { this.profilesLoaded = true; this.flushPendingTopicSeed(); this.toast.error('Could not load the Kafka connections.'); },
     });
 
     // A new task has no workspace yet to ask for; an edited one asks once loadTask knows its tenant.
@@ -207,6 +237,11 @@ export class TaskEdit implements OnInit {
     });
 
     if (this.isEdit()) this.loadTask();
+  }
+
+  private flushPendingTopicSeed(): void {
+    const pending = this.pendingTopicSeed;
+    if (pending) { this.pendingTopicSeed = null; this.seedProfileForTopic(pending.topicId, pending.tenantId); }
   }
 
   retryLoad(): void { this.loadTask(); }
@@ -243,8 +278,9 @@ export class TaskEdit implements OnInit {
         this.loadReferences(this.taskTenantId);
         const topicId = task.sourceTaskType?.sourceTaskTypeId ?? null;
         if (topicId != null) {
-          // The profile list decides where an unrouted topic lands; wait for it if it is not here yet.
-          if (this.profiles().length) this.seedProfileForTopic(topicId, this.taskTenantId);
+          // The profile list decides where an unrouted topic lands; wait for it if it is not here
+          // yet. An empty list is an answer: waiting on its length left the seed pending forever.
+          if (this.profilesLoaded) this.seedProfileForTopic(topicId, this.taskTenantId);
           else this.pendingTopicSeed = { topicId, tenantId: this.taskTenantId };
         }
         const existing = task.xmlTagsInfo ?? task.tagsInfo ?? [];

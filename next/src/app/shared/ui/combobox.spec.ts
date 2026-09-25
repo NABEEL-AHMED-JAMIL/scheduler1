@@ -49,6 +49,23 @@ describe('Combobox', () => {
     expect(box.displayValue()).toBe('Claims intake');
   });
 
+  it('shows a `selected` value by label even when its options arrive after it', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [Combobox] });
+    const fixture = TestBed.createComponent(Combobox);
+    fixture.componentRef.setInput('selected', 1009);
+    fixture.componentRef.setInput('selectedLabel', 'Platform Local Broker [PF] (platform default)');
+    fixture.detectChanges();
+    const input = (fixture.nativeElement as HTMLElement).querySelector('input') as HTMLInputElement;
+    // Before the list: the label it was handed, never the bare id.
+    expect(input.value).toBe('Platform Local Broker [PF] (platform default)');
+
+    fixture.componentRef.setInput('selectedLabel', '');
+    fixture.componentRef.setInput('options', [{ value: '1009', label: 'Platform Local Broker' }]);
+    fixture.detectChanges();
+    expect(input.value).toBe('Platform Local Broker');
+  });
+
   it('matches the hint as well as the label, so a Kafka topic finds its row', () => {
     const box = make();
     box.onInput('billing-intake');
