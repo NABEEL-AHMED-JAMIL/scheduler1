@@ -1,8 +1,8 @@
 import { Component, HostListener, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { LowerCasePipe } from '@angular/common';
 import { AuthService } from '../../core/auth/auth.service';
+import { roleLabel } from '../../core/auth/auth.models';
 import { ThemeService } from '../../core/theme.service';
 import { Icon } from '../../shared/ui/icon';
 import { BrandMark } from '../../shared/ui/brand-mark';
@@ -40,7 +40,7 @@ interface NavItem {
 
 @Component({
   selector: 'app-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, LowerCasePipe, Icon, BrandMark, NotificationBell],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, Icon, BrandMark, NotificationBell],
   templateUrl: './shell.html',
 })
 export class Shell {
@@ -50,6 +50,9 @@ export class Shell {
 
   readonly openMenu = signal<string | null>(null);
   readonly mobileOpen = signal(false);
+
+  /** The role as the profile and user screens name it, not the enum lowercased. */
+  readonly roleText = computed(() => roleLabel(this.auth.role()));
 
   /**
    * Only `openMenu` drove a dropdown trigger's highlight, so a section with no menu open --
@@ -235,6 +238,11 @@ export class Shell {
     }));
   }
 
+  /** An id for a nav panel, so its trigger can say which panel it controls. Labels have spaces. */
+  menuId(label: string): string {
+    return 'nav-menu-' + label.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  }
+
   toggleMenu(label: string): void {
     this.openMenu.update(current => (current === label ? null : label));
   }
@@ -247,17 +255,39 @@ export class Shell {
 
   @HostListener('document:click', ['$event'])
   onDocumentClick(event: MouseEvent): void {
-    // Any click that isn't inside an open menu closes it -- the CDK overlay is reserved for
-    // menus that need positioning; a nav dropdown anchored to its trigger doesn't.
-    const target = event.target as HTMLElement;
-    if (!target.closest('[data-nav-menu]')) {
+    // Any click that isn't inside the open menu closes it -- the CDK overlay is reserved for
+    // menus that need positioning; a nav dropdown anchored to its trigger doesn't. Each wrapper
+    // names its menu, so a click on the bell (or another trigger) is not "inside" this one: the
+    // bell's panel used to open on top of the account menu instead of replacing it. A click on
+    // another trigger still works, because its toggleMenu ran first and made it the open one.
+    const menu = (event.target as HTMLElement).closest('[data-nav-menu]');
+    if (menu?.getAttribute('data-nav-menu') !== this.openMenu()) {
+      this.openMenu.set(null);
+    }
+  }
+
+  /**
+   * Tabbing out of a panel closes it, rather than leaving it open over the page behind the
+   * focus. A null relatedTarget (a click on something unfocusable, the window losing focus) is
+   * left to the click handler, which knows whether the click was inside.
+   */
+  onMenuFocusOut(event: FocusEvent, key: string): void {
+    const next = event.relatedTarget as Node | null;
+    if (next && this.openMenu() === key && !(event.currentTarget as HTMLElement).contains(next)) {
       this.openMenu.set(null);
     }
   }
 
   @HostListener('document:keydown.escape')
   onEscape(): void {
+    // Closing the panel removes the link that had focus, which drops focus to the page body and
+    // sends the next Tab back to the top. Hand it to the trigger instead -- but only when focus
+    // was in this menu, so an Escape meant for a dialog does not pull focus into the header.
+    const open = this.openMenu();
+    const wrapper = document.activeElement?.closest('[data-nav-menu]');
+    const inOpenMenu = open !== null && wrapper?.getAttribute('data-nav-menu') === open;
     this.openMenu.set(null);
     this.mobileOpen.set(false);
+    if (inOpenMenu) wrapper!.querySelector<HTMLElement>(':scope > button')?.focus();
   }
 }

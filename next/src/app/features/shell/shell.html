@@ -1,8 +1,10 @@
 <div class="min-h-screen flex flex-col">
+  <!-- The header holds a dozen tab stops before the page starts; a keyboard user skips them here. -->
+  <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-2 focus:z-[60] btn btn-default btn-sm">Skip to content</a>
   <header class="sticky top-0 z-40 border-b bg-raised border-subtle">
     <div class="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8 h-14 flex items-center gap-1">
 
-      <a routerLink="/" class="mr-4">
+      <a routerLink="/" class="mr-4 shrink-0">
         <app-brand-mark [hideOnMobile]="true" />
       </a>
 
@@ -19,9 +21,10 @@
               {{ item.label }}
             </a>
           } @else {
-            <div class="relative" data-nav-menu>
+            <div class="relative" [attr.data-nav-menu]="item.label" (focusout)="onMenuFocusOut($event, item.label)">
               <button type="button" (click)="toggleMenu(item.label)"
-                      aria-haspopup="true" [attr.aria-expanded]="openMenu() === item.label"
+                      [attr.aria-expanded]="openMenu() === item.label"
+                      [attr.aria-controls]="menuId(item.label)"
                       class="px-2.5 py-1.5 rounded-md text-sm font-medium inline-flex items-center gap-1
                              whitespace-nowrap text-[color:var(--text-secondary)]
                              hover:text-[color:var(--text-primary)]
@@ -34,8 +37,8 @@
                           [class.rotate-180]="openMenu() === item.label" />
               </button>
               @if (openMenu() === item.label) {
-                <div class="absolute left-0 top-full mt-1 min-w-72 rounded-lg border shadow-lg p-1 z-50 bg-raised border-subtle"
-                    >
+                <div [id]="menuId(item.label)"
+                     class="absolute left-0 top-full mt-1 min-w-72 rounded-lg border shadow-lg p-1 z-50 bg-raised border-subtle">
                   @for (child of item.children; track child.path) {
                     <a [routerLink]="child.path" (click)="openMenu.set(null)"
                        routerLinkActive="nav-child-active"
@@ -73,24 +76,29 @@
           }
         </button>
 
-        <div class="relative" data-nav-menu>
+        <div class="relative" data-nav-menu="__user" (focusout)="onMenuFocusOut($event, '__user')">
           <button type="button" (click)="toggleMenu('__user')"
-                  aria-label="Account menu" aria-haspopup="true" [attr.aria-expanded]="openMenu() === '__user'"
+                  aria-label="Account menu" [attr.aria-expanded]="openMenu() === '__user'"
+                  aria-controls="user-menu"
                   class="flex items-center gap-2 px-1.5 py-1 rounded-md hover:bg-[color:var(--surface-sunken)]">
             @if (auth.avatarUrl()) {
               <img [src]="auth.avatarUrl()" alt="" class="avatar-img size-7" />
             } @else {
               <span class="avatar-initials size-7 text-[11px]">{{ auth.initials() }}</span>
             }
-            <span class="text-sm font-medium hidden sm:block">{{ auth.displayName() }}</span>
+            <!-- Between xl and 2xl the full nav and a name do not both fit, so only the avatar shows;
+                 the name is in the panel's header. The cap stops a long name or an email
+                 fallback pushing the page wider than the screen. -->
+            <span class="text-sm font-medium hidden sm:block xl:hidden 2xl:block max-w-36 truncate"
+                  [title]="auth.displayName()">{{ auth.displayName() }}</span>
           </button>
           @if (openMenu() === '__user') {
-            <div class="absolute right-0 top-full mt-1 w-56 rounded-lg border shadow-lg py-1 z-50 bg-raised border-subtle"
-                >
+            <div id="user-menu"
+                 class="absolute right-0 top-full mt-1 w-56 rounded-lg border shadow-lg py-1 z-50 bg-raised border-subtle">
               <div class="px-3 py-2 border-b border-subtle">
                 <div class="text-sm font-medium truncate">{{ auth.displayName() }}</div>
                 <div class="text-xs text-[color:var(--text-muted)] mt-0.5">
-                  {{ auth.role()?.replace('_', ' ') | lowercase }}
+                  {{ roleText() }}
                 </div>
               </div>
               <a routerLink="/profile" (click)="openMenu.set(null)"
@@ -100,6 +108,10 @@
               <a routerLink="/notifications" (click)="openMenu.set(null)"
                  class="menu-item text-sm">
                 <app-icon name="bell" size="0.95em" />Notifications
+              </a>
+              <a routerLink="/docs" (click)="openMenu.set(null)"
+                 class="menu-item text-sm">
+                <app-icon name="info" size="0.95em" />Setup guide
               </a>
               <button type="button" (click)="auth.logout()"
                       class="menu-item text-sm">
@@ -154,7 +166,7 @@
     }
   </header>
 
-  <main class="flex-1 mx-auto max-w-[1600px] w-full px-4 sm:px-6 lg:px-8 pt-8 pb-12">
+  <main id="main" tabindex="-1" class="outline-none flex-1 mx-auto max-w-[1600px] w-full px-4 sm:px-6 lg:px-8 pt-8 pb-12">
     <router-outlet />
   </main>
 </div>

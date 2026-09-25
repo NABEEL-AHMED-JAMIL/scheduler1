@@ -18,7 +18,7 @@ import { Component, input } from '@angular/core';
       </div>
     } @else {
       <div class="size-7 rounded-md grid place-items-center text-sm font-bold bg-[var(--btn-primary-bg)] text-[color:var(--btn-primary-fg)]">E</div>
-      <span class="font-semibold text-sm tracking-tight"
+      <span class="font-semibold text-sm tracking-tight whitespace-nowrap"
             [class.hidden]="hideOnMobile()" [class.sm:block]="hideOnMobile()">ETL Console</span>
     }
   `,

@@ -135,4 +135,136 @@ describe('shell navigation', () => {
 
     expect(configurationFor('PLATFORM_ADMIN')).toContain('/configuration/engine');
   });
+
+  /** Build the shell as a rendered component so keyboard focus can be checked. */
+  async function rendered(role?: string) {
+    if (role) {
+      const claims = btoa(JSON.stringify({ sub: 'a@example.com', appUserId: 5, userRole: role }))
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      localStorage.setItem('etl_auth_user', JSON.stringify({
+        username: 'a@example.com', userRole: role, appUserId: 5,
+        accessToken: `header.${claims}.unsigned`, refreshToken: 'r',
+      }));
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [provideZonelessChangeDetection(), provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
+      });
+    }
+    const fixture = TestBed.createComponent(Shell);
+    fixture.autoDetectChanges();
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+    return { fixture, shell: fixture.componentInstance, el };
+  }
+
+  const escape = () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+
+  describe('header menus and the keyboard', () => {
+    it('puts focus back on the trigger when Escape closes a menu', async () => {
+      const { fixture, shell: s, el } = await rendered();
+      s.toggleMenu('Operations');
+      await fixture.whenStable();
+      const menu = el.querySelector<HTMLElement>('[data-nav-menu="Operations"]')!;
+      const link = menu.querySelector<HTMLElement>('a')!;
+      link.focus();
+      expect(document.activeElement).toBe(link);
+
+      escape();
+      await fixture.whenStable();
+
+      expect(s.openMenu()).toBeNull();
+      expect(document.activeElement).toBe(menu.querySelector(':scope > button'));
+    });
+
+    it('does not move focus on Escape when no menu is open', async () => {
+      const { fixture, el } = await rendered();
+      const outside = document.createElement('input');
+      document.body.appendChild(outside);
+      outside.focus();
+      escape();
+      await fixture.whenStable();
+      expect(document.activeElement).toBe(outside);
+      outside.remove();
+      expect(el).toBeTruthy();
+    });
+
+    it('closes a menu when focus tabs out of it, and keeps it open while focus moves inside', async () => {
+      const { fixture, shell: s, el } = await rendered();
+      s.toggleMenu('Operations');
+      await fixture.whenStable();
+      const menu = el.querySelector<HTMLElement>('[data-nav-menu="Operations"]')!;
+      const [first, second] = Array.from(menu.querySelectorAll<HTMLElement>('a'));
+
+      first.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: second }));
+      expect(s.openMenu()).toBe('Operations');
+
+      const outside = el.querySelector<HTMLElement>('main')!;
+      second.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: outside }));
+      expect(s.openMenu()).toBeNull();
+    });
+
+    it('describes the panels as disclosures: expanded and controls, not a menu popup', async () => {
+      const { fixture, shell: s, el } = await rendered();
+      s.toggleMenu('Object Browser');
+      await fixture.whenStable();
+      expect(el.querySelector('[aria-haspopup]')).toBeNull();
+      const trigger = el.querySelector<HTMLElement>('[data-nav-menu="Object Browser"] > button')!;
+      const panel = el.querySelector<HTMLElement>('#' + trigger.getAttribute('aria-controls'));
+      expect(panel).not.toBeNull();
+      expect(panel!.querySelector('a[href="/objects/files"]')).not.toBeNull();
+    });
+
+    it('offers a skip link to the main content', async () => {
+      const { el } = await rendered();
+      const skip = el.querySelector<HTMLAnchorElement>('a[href="#main"]');
+      expect(skip?.textContent).toContain('Skip to content');
+      expect(el.querySelector('main')?.id).toBe('main');
+      expect(el.querySelector('main')?.getAttribute('tabindex')).toBe('-1');
+    });
+
+    it('closes an open header menu when the bell is clicked, instead of stacking the two', async () => {
+      const { fixture, shell: s, el } = await rendered();
+      s.toggleMenu('__user');
+      await fixture.whenStable();
+      const bell = el.querySelector<HTMLElement>('[data-nav-menu="__bell"] button')!;
+      bell.click();
+      await fixture.whenStable();
+      expect(s.openMenu()).toBeNull();
+    });
+
+    it('keeps the menu open when a click lands inside it', async () => {
+      const { fixture, shell: s, el } = await rendered();
+      s.toggleMenu('__user');
+      await fixture.whenStable();
+      el.querySelector<HTMLElement>('[data-nav-menu="__user"] .border-b')!.click();
+      expect(s.openMenu()).toBe('__user');
+    });
+  });
+
+  describe('account menu', () => {
+    it('names the role as the rest of the app does', async () => {
+      const { fixture, shell: s, el } = await rendered('TENANT_ADMIN');
+      s.toggleMenu('__user');
+      await fixture.whenStable();
+      expect(el.querySelector('[data-nav-menu="__user"]')!.textContent).toContain('Tenant administrator');
+      localStorage.removeItem('etl_auth_user');
+    });
+
+    it('links to the setup guide', async () => {
+      const { fixture, shell: s, el } = await rendered();
+      s.toggleMenu('__user');
+      await fixture.whenStable();
+      expect(el.querySelector('[data-nav-menu="__user"] a[href="/docs"]')).not.toBeNull();
+    });
+
+    it('caps the name beside the avatar so a long one cannot widen the page, and keeps it in a tooltip', async () => {
+      const { el } = await rendered();
+      const name = el.querySelector<HTMLElement>('[data-nav-menu="__user"] > button span.truncate');
+      expect(name).not.toBeNull();
+      expect(name!.className).toContain('max-w-36');
+      expect(name!.className).toContain('xl:hidden');
+      expect(name!.className).toContain('2xl:block');
+      expect(name!.hasAttribute('title')).toBe(true);
+    });
+  });
 });

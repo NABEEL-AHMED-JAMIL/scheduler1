@@ -1,8 +1,8 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { ElementRef } from '@angular/core';
+import { ElementRef, provideZonelessChangeDetection } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Router } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { NotificationBell } from './notification-bell';
 
@@ -190,5 +190,65 @@ describe('Notification bell when marking is refused', () => {
     built.bell.markAllRead();
 
     expect(built.bell.unread()).toBe(158);
+  });
+});
+
+describe('Notification bell and the keyboard', () => {
+  /** Rendered for real, because focus only exists in a document. */
+  async function renderedOpen() {
+    const get = vi.fn((url: string) =>
+      of(url.endsWith('/unreadCount')
+        ? { status: 'SUCCESS', data: 2 }
+        : { status: 'SUCCESS', data: [note(1, false, '/operations/jobs'), note(2, false)] }));
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideZonelessChangeDetection(),
+        provideRouter([]),
+        { provide: HttpClient, useValue: { get, post: vi.fn(() => of({ status: 'SUCCESS' })) } },
+      ],
+    });
+    const fixture = TestBed.createComponent(NotificationBell);
+    fixture.autoDetectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    el.querySelector<HTMLElement>('button')!.click();
+    await fixture.whenStable();
+    return { fixture, bell: fixture.componentInstance, el };
+  }
+
+  afterEach(() => TestBed.resetTestingModule());
+
+  it('hands focus back to the bell when Escape closes the panel', async () => {
+    const { fixture, bell, el } = await renderedOpen();
+    const row = el.querySelector<HTMLElement>('#notif-panel li button')!;
+    row.focus();
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await fixture.whenStable();
+
+    expect(bell.open()).toBe(false);
+    expect(document.activeElement).toBe(el.querySelector('button'));
+  });
+
+  it('closes when focus tabs out of it, and stays open while focus moves inside', async () => {
+    const { bell, el } = await renderedOpen();
+    const [first, second] = Array.from(el.querySelectorAll<HTMLElement>('#notif-panel li button'));
+
+    first.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: second }));
+    expect(bell.open()).toBe(true);
+
+    const outside = document.createElement('button');
+    document.body.appendChild(outside);
+    second.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: outside }));
+    expect(bell.open()).toBe(false);
+    outside.remove();
+  });
+
+  it('is a disclosure: the bell names the panel it controls and claims no menu popup', async () => {
+    const { el } = await renderedOpen();
+    const trigger = el.querySelector<HTMLElement>('button')!;
+    expect(trigger.hasAttribute('aria-haspopup')).toBe(false);
+    expect(trigger.getAttribute('aria-controls')).toBe('notif-panel');
+    expect(el.querySelector('#notif-panel')).not.toBeNull();
   });
 });

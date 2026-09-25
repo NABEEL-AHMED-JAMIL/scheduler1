@@ -34,9 +34,9 @@ const FETCH_ROWS = 20;
   selector: 'app-notification-bell',
   imports: [Icon, RouterLink],
   template: `
-    <div class="relative" data-nav-menu>
+    <div class="relative" data-nav-menu="__bell" (focusout)="onFocusOut($event)">
       <button type="button" class="btn btn-ghost btn-icon relative" (click)="toggle()"
-              aria-haspopup="true" [attr.aria-expanded]="open()"
+              [attr.aria-expanded]="open()" aria-controls="notif-panel"
               [attr.aria-label]="unread() ? unread() + ' unread notifications' : 'Notifications'">
         <app-icon name="bell" size="1.05em" />
         @if (unread()) {
@@ -45,7 +45,7 @@ const FETCH_ROWS = 20;
       </button>
 
       @if (open()) {
-        <div class="bell-panel fixed inset-x-2 top-14 mt-1 sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:w-80 rounded-lg border shadow-lg z-50 overflow-hidden bg-raised border-subtle"
+        <div id="notif-panel" class="bell-panel fixed inset-x-2 top-14 mt-1 sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:w-80 rounded-lg border shadow-lg z-50 overflow-hidden bg-raised border-subtle"
             >
           <div class="flex items-center gap-2 px-3 py-2 border-b border-subtle"
               >
@@ -182,7 +182,23 @@ export class NotificationBell implements OnInit, OnDestroy {
 
   @HostListener('document:keydown.escape')
   onEscape(): void {
+    // Closing removes the row that had focus, which would drop focus to the page body. When
+    // focus was in here, give it back to the bell; an Escape aimed elsewhere leaves focus alone.
+    const host = this.elementRef.nativeElement as HTMLElement;
+    const refocus = this.open() && host.contains(document.activeElement);
     this.open.set(false);
+    if (refocus) host.querySelector<HTMLElement>('button')?.focus();
+  }
+
+  /**
+   * Tabbing out of the panel closes it rather than leaving it open behind the focus. A null
+   * relatedTarget (a click on something unfocusable) is the click handler's to judge.
+   */
+  onFocusOut(event: FocusEvent): void {
+    const next = event.relatedTarget as Node | null;
+    if (next && this.open() && !this.elementRef.nativeElement.contains(next)) {
+      this.open.set(false);
+    }
   }
 
   private load(): void {
