@@ -1650,13 +1650,6 @@ html.dark .access-cell-exception { background: color-mix(in oklab, var(--color-w
 /* Tenant code chip (Administration → Tenants): the code is what people type into bucket names,
    IAM policies and scripts, so it copies on click. The icon only appears on hover so a column of
    chips reads as text; the whole chip goes green for a moment when the clipboard really changed. */
-.tenant-code { display: inline-flex; align-items: center; gap: 0.35rem; margin-top: 0.2rem; padding: 0.1rem 0.45rem; border-radius: 0.375rem; max-width: 100%; background: var(--surface-sunken); color: var(--text-secondary); cursor: pointer; transition: background 120ms, color 120ms; }
-.tenant-code .mono { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
-.tenant-code app-icon { opacity: 0; transition: opacity 120ms; flex: none; }
-.tenant-code:hover, .tenant-code:focus-visible { background: color-mix(in oklab, var(--surface-inverse) 8%, var(--surface-sunken)); color: var(--text-primary); }
-.tenant-code:hover app-icon, .tenant-code:focus-visible app-icon, .tenant-code.is-copied app-icon { opacity: 1; }
-.tenant-code.is-copied { background: var(--color-ok-100); color: var(--color-ok-500); }
-html.dark .tenant-code.is-copied { background: color-mix(in oklab, var(--color-ok-500) 25%, transparent); color: var(--color-ok-400); }
 
 /* Kafka profile environment chip: a small "env" key before the value, so a coloured word under
    a profile name reads as "environment: prod" rather than as a status. */
@@ -1734,7 +1727,6 @@ html.dark .lookup-rail-glyph.is-managed { background: color-mix(in oklab, var(--
 html.dark .kafka-rail-env-crit { color: var(--color-crit-400); }
 .kafka-test-ok { background: color-mix(in oklab, var(--color-ok-500) 7%, var(--surface-inset)); }
 .kafka-test-crit { background: color-mix(in oklab, var(--color-crit-500) 8%, var(--surface-inset)); }
-.kafka-detail-grid { display: grid; grid-template-columns: 1fr; }
 .kafka-detail-section { padding: 1rem 1.25rem; min-width: 0; }
 .kafka-detail-section + .kafka-detail-section { border-left: 1px solid var(--border-subtle); }
 .kafka-detail-section .section-title { margin: 0 0 0.6rem; }
@@ -1743,7 +1735,6 @@ html.dark .kafka-rail-env-crit { color: var(--color-crit-400); }
 .kafka-dl dd { margin: 0; min-width: 0; }
 .kafka-props { margin: 0; font-family: var(--font-mono); font-size: 11px; background: var(--surface-sunken); border-radius: 0.375rem; padding: 0.5rem 0.6rem; white-space: pre-wrap; word-break: break-all; }
 @media (max-width: 900px) {
-  .kafka-detail-grid { grid-template-columns: 1fr; }
   .kafka-detail-section + .kafka-detail-section { border-left: 0; border-top: 1px solid var(--border-subtle); }
 }
 .kafka-topics { padding-top: 0.75rem; }
