@@ -23,7 +23,7 @@
   </div>
 
   @if (loading()) {
-    <div class="card p-12 text-center text-sm text-[color:var(--text-muted)]"><div class="spinner mx-auto mb-3"></div>Loading…</div>
+    <div class="card p-12 text-center text-sm text-[color:var(--text-muted)]"><div class="spinner mx-auto mb-3" role="status" aria-label="Loading"></div>Loading…</div>
   } @else if (loadError()) {
     <div class="card p-12 text-center" role="alert">
       <app-icon name="alert" size="1.5rem" class="icon-crit block mx-auto mb-2" />
@@ -91,20 +91,20 @@
           } @else {
             <div class="overflow-x-auto">
               <table class="table-modern prompt-vars" formArrayName="variables">
-                <thead><tr><th>Name</th><th>Type</th><th>Required</th><th>Sample value <span class="font-normal text-[color:var(--text-muted)]">· or a file</span></th><th class="w-20"></th></tr></thead>
+                <thead><tr><th>Name</th><th>Type</th><th>Required</th><th>Sample value <span class="font-normal text-[color:var(--text-muted)]">· or a file</span></th><th class="w-20"><span class="sr-only">Actions</span></th></tr></thead>
                 <tbody>
                   @for (g of variables.controls; track $index; let i = $index) {
                     <tr [formGroupName]="i">
-                      <td><input class="input mono" formControlName="name" placeholder="claim_id" (input)="onVariableChanged()" /></td>
+                      <td><input class="input mono" formControlName="name" placeholder="claim_id" [attr.aria-label]="'Variable ' + (i + 1) + ' name'" (input)="onVariableChanged()" /></td>
                       <td>
-                        <select class="input" formControlName="type">
+                        <select class="input" formControlName="type" [attr.aria-label]="'Variable ' + (i + 1) + ' type'">
                           <option value="text">text</option>
                           <option value="number">number</option>
                           <option value="url">url</option>
                           <option value="file">file → text</option>
                         </select>
                       </td>
-                      <td class="text-center"><input type="checkbox" class="checkbox" formControlName="required" /></td>
+                      <td class="text-center"><input type="checkbox" class="checkbox" formControlName="required" [attr.aria-label]="'Variable ' + (i + 1) + ' required'" /></td>
                       <td>
                         @if (sourceOf(g.get('name')!.value); as src) {
                           <span class="var-source" [title]="src.bucket + '/' + src.key">
@@ -114,13 +114,13 @@
                             <button type="button" class="btn btn-ghost btn-icon btn-xs" aria-label="Use the sample instead" (click)="clearSource(g.get('name')!.value)"><app-icon name="close" size="0.8em" /></button>
                           </span>
                         } @else {
-                          <input class="input" formControlName="sample" placeholder="what Try it uses" />
+                          <input class="input" formControlName="sample" placeholder="what Try it uses" [attr.aria-label]="'Variable ' + (i + 1) + ' sample value'" />
                         }
                       </td>
                       <td class="whitespace-nowrap">
                         <button type="button" class="btn btn-ghost btn-icon btn-sm" [attr.aria-label]="'Fill from a file'" title="Try it with a file from a bucket: any type the file chat can read"
                                 [disabled]="reading() === g.get('name')!.value" (click)="fromFile(g.get('name')!.value)">
-                          <app-icon name="folder" [class.spin]="reading() === g.get('name')!.value" />
+                          <app-icon name="folder" [busy]="reading() === g.get('name')!.value" />
                         </button>
                         <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Remove variable" (click)="removeVariable(i)"><app-icon name="trash" class="icon-crit" /></button>
                       </td>
@@ -131,7 +131,7 @@
             </div>
           }
           @if (undeclared().length) {
-            <p class="text-xs text-warn-600 mt-1.5">The template names {{ undeclared().join(', ') }} — rows were added above; give them a sample.</p>
+            <p class="text-xs text-warn-500 mt-1.5">The template names {{ undeclared().join(', ') }} — rows were added above; give them a sample.</p>
           }
         </div>
 
@@ -170,13 +170,13 @@
           <h2 class="section-title">Try it</h2>
           <span class="text-xs text-[color:var(--text-muted)]">runs the page as it is, with the samples · recorded as a try</span>
           <button type="button" class="btn btn-primary btn-sm ml-auto" (click)="tryIt()" [disabled]="trying()">
-            <app-icon name="play" [class.spin]="trying()" />{{ trying() ? 'Running…' : 'Run' }}
+            <app-icon name="play" [busy]="trying()" />{{ trying() ? 'Running…' : 'Run' }}
           </button>
         </div>
         @if (connection(); as c) {
           <p class="text-xs text-[color:var(--text-muted)] mt-1">On <b>{{ c.name }}</b> · {{ c.provider }} · <span class="mono">{{ form.get('model')?.value || c.defaultModel }}</span>@if (c.dailyTokenBudget) { · {{ c.tokensToday | number }} of {{ c.dailyTokenBudget | number }} tokens today }</p>
         } @else {
-          <p class="text-xs text-warn-600 mt-1">No connection to run on — pick one above, or set a workspace default under Model connections.</p>
+          <p class="text-xs text-warn-500 mt-1">No connection to run on — pick one above, or set a workspace default under Model connections.</p>
         }
 
         @if (trySourceList().length) {
