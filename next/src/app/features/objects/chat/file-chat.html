@@ -1,5 +1,5 @@
 <div class="fixed bottom-4 right-4 z-50 w-[32rem] max-w-[calc(100vw-2rem)] card shadow-2xl
-            flex flex-col overflow-hidden"
+            flex flex-col overflow-hidden" role="region" [attr.aria-label]="'Chat about ' + fileName()"
      [style.height]="minimized() ? 'auto' : 'min(38rem, calc(100vh - 3rem))'">
 
   <div class="flex items-center gap-2 px-3.5 py-2.5 border-b shrink-0 border-subtle"
@@ -7,7 +7,7 @@
     <span class="text-sm font-medium mr-auto truncate" [title]="fileName()">{{ fileName() }}</span>
     <button type="button" class="btn btn-ghost btn-sm" (click)="viewRequested.emit()"><app-icon name="eye" />View</button>
     <button type="button" class="btn btn-ghost btn-icon"
-            (click)="minimized.set(!minimized())"
+            (click)="minimized.set(!minimized())" [attr.aria-expanded]="!minimized()"
             [attr.aria-label]="minimized() ? 'Expand' : 'Minimise'">
       <app-icon [name]="minimized() ? 'chevronRight' : 'chevronDown'" />
     </button>
@@ -50,8 +50,7 @@
              UI has always dropped it. Someone asking "summarise this" deserves to know the
              summary covers the opening section, before they ask rather than after. -->
         @if (coverage()?.truncated) {
-          <div class="flex items-start gap-2 rounded-lg px-3 py-2 text-xs"
-               style="background: color-mix(in oklab, var(--color-warn-500) 12%, transparent);">
+          <div class="flex items-start gap-2 rounded-lg px-3 py-2 text-xs bg-warn-500/12">
             <app-icon name="alert" class="icon-warn mt-0.5 shrink-0" size="0.85em" />
             <span class="text-[color:var(--text-secondary)]">
               This file is longer than the model can read at once. Answers cover the first
@@ -63,9 +62,9 @@
           <!-- Distinct from the truncation warning above, and mutually exclusive with it: this
                file isn't being cut short, but answers are drawn from indexed excerpts judged
                relevant to each question rather than the whole text every time. -->
-          <div class="flex items-start gap-2 rounded-lg px-3 py-2 text-xs"
-               style="background: color-mix(in oklab, var(--color-brand-500) 10%, transparent);">
-            <app-icon name="info" class="mt-0.5 shrink-0" style="color: var(--color-brand-500);" size="0.85em" />
+          <!-- Theme tokens: brand-500 is near-black and vanished, tint and icon both, in dark. -->
+          <div class="flex items-start gap-2 rounded-lg px-3 py-2 text-xs bg-accent-soft">
+            <app-icon name="info" class="icon-info mt-0.5 shrink-0" size="0.85em" />
             <span class="text-[color:var(--text-secondary)]">
               Answers are drawn from indexed excerpts of this file most relevant to each question.
             </span>
@@ -78,7 +77,7 @@
         }
       }
 
-      @for (message of messages(); track $index) {
+      @for (message of messages(); track $index; let mi = $index) {
         @if (message.role === 'user') {
             <!-- The person's own picture, the same one the header shows, so a transcript reads
                  as a conversation rather than two anonymous columns. items-end keeps the avatar
@@ -103,8 +102,7 @@
                           [name]="auth.displayName()" [size]="1.5" class="shrink-0" />
             </div>
         } @else if (message.role === 'error') {
-          <div class="flex items-start gap-2 rounded-lg px-3 py-2 text-sm"
-               style="background: color-mix(in oklab, var(--color-crit-500) 12%, transparent);">
+          <div class="flex items-start gap-2 rounded-lg px-3 py-2 text-sm bg-crit-500/12">
             <app-icon name="alert" class="icon-crit mt-0.5 shrink-0" size="0.9em" />
             <span class="text-crit-500 min-w-0 break-words">{{ message.text }}</span>
             <!-- Also disabled while there is nothing to send to: retry() drops the failed
@@ -122,9 +120,8 @@
               <!-- A glyph, not a picture: the assistant has no profile, and giving it a face
                    invites the reader to treat its answers as somebody's. Tinted from the accent
                    so it carries in both themes. -->
-              <span class="shrink-0 grid place-items-center rounded-full size-6 mt-0.5"
-                    style="background: color-mix(in oklab, var(--accent-text) 16%, var(--surface-raised));
-                           color: var(--accent-text);" aria-hidden="true">
+              <span class="shrink-0 grid place-items-center rounded-full size-6 mt-0.5 bg-accent-soft text-accent"
+                    aria-hidden="true">
                 <app-icon name="sparkle" size="0.8em" />
               </span>
               <div class="min-w-0 flex-1">
@@ -136,31 +133,35 @@
             @if (message.files?.length) {
               <div class="flex flex-wrap gap-1.5 mt-1.5">
                 @for (file of message.files; track file.filename) {
+                  <!-- Busy state is keyed by reply + file name: every reply's first CSV is called
+                       <base>-export.csv, so a name alone marked the chip in every earlier reply. -->
                   <button type="button" class="btn btn-ghost btn-sm"
-                          [disabled]="converting() === file.filename"
-                          (click)="download(file)"
+                          [disabled]="converting() === busyKey(mi, file)"
+                          (click)="download(file, mi)"
                           [title]="file.pendingExport
                              ? 'Converted to ' + file.pendingExport.targetFormat + ' before download'
                              : 'Download ' + file.filename">
-                    <app-icon [name]="converting() === file.filename ? 'refresh' : 'download'"
-                              [class.spin]="converting() === file.filename"
+                    <app-icon [name]="converting() === busyKey(mi, file) ? 'refresh' : 'download'"
+                              [class.spin]="converting() === busyKey(mi, file)"
                               class="icon-info" size="0.85em" />
-                    {{ converting() === file.filename ? 'Converting…' : file.filename }}
+                    {{ converting() === busyKey(mi, file) ? 'Converting…' : file.filename }}
                   </button>
                   <!-- The second way out. A download is no use to a reader on a machine that
                        blocks them, or on a phone; the server converts identically either way. -->
                   <button type="button" class="btn btn-ghost btn-sm"
                           [disabled]="!!emailing() || !!converting()"
-                          (click)="emailExport(file)"
+                          (click)="emailExport(file, mi)"
                           [title]="'Email ' + file.filename + ' as an attachment'">
-                    <app-icon name="send" [busy]="emailing() === file.filename"
+                    <app-icon name="send" [busy]="emailing() === busyKey(mi, file)"
                               class="icon-info" size="0.85em" />
-                    {{ emailing() === file.filename ? 'Sending…' : 'Email' }}
+                    {{ emailing() === busyKey(mi, file) ? 'Sending…' : 'Email' }}
                   </button>
                 }
               </div>
             }
-            <div class="flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100
+            <!-- Hover-revealed from sm up only: a phone has no hover, and the only way to copy,
+                 email or regenerate an answer there was to tap buttons it could not see. -->
+            <div class="flex items-center gap-1 mt-1 sm:opacity-0 sm:group-hover:opacity-100
                         focus-within:opacity-100 transition-opacity">
               <button type="button" class="btn btn-default btn-sm" (click)="copyMessage($index, message.text)">
                 <app-icon [name]="copiedIndex() === $index ? 'check' : 'copy'"
@@ -221,6 +222,7 @@
            dead end -- changing agent re-runs prepare() and can clear it -- and locking the
            composer on it took away the reason to bother. -->
       <textarea #composer class="input resize-none text-sm" rows="1" placeholder="Message"
+                [attr.aria-label]="'Message about ' + fileName()"
                 [value]="draft()" (input)="draft.set($any($event.target).value)"
                 (keydown)="onKeydown($event)"
                 [disabled]="preparing()"></textarea>
