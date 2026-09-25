@@ -1,10 +1,10 @@
 <div class="page">
   <div class="page-head">
     <div>
-      <button type="button" class="btn btn-ghost btn-sm -ml-2 mb-1" (click)="back()">
-        <app-icon name="arrowLeft" />Back
-      </button>
-      <h1 class="page-title">Bulk {{ noun() }}</h1>
+      <!-- A link to its own list, like every other sub-page's back link: location.back() left
+           the console when the page was opened directly or in a new tab. -->
+      <a [routerLink]="config().backTo" class="text-sm text-accent hover:underline">← Back to {{ noun() }}</a>
+      <h1 class="page-title mt-1">Bulk {{ noun() }}</h1>
       <p class="page-subtitle">
         Import many {{ noun() }} from a spreadsheet, or export what is already here.
       </p>
@@ -21,39 +21,29 @@
         importer expects.
       </p>
 
-      <div class="dropzone mt-4" [class.dropzone-active]="dragging()"
-           (dragover)="onDragOver($event)" (dragleave)="onDragLeave()" (drop)="onDrop($event)">
-        @if (file(); as picked) {
-          <app-icon name="file" size="1.75rem" class="icon-info" />
-          <p class="mt-2 text-sm font-medium break-all">{{ picked.name }}</p>
-          <p class="text-xs text-[color:var(--text-muted)] mt-0.5">{{ fileSize() }}</p>
-          @if (uploading()) {
-            <div class="progress mt-3"><div class="progress-bar" [style.width.%]="progress()"></div></div>
-            <p class="text-xs text-[color:var(--text-muted)] mt-1.5">{{ progress() }}% uploaded</p>
-          } @else {
-            <div class="flex items-center justify-center gap-2 mt-3">
-              <button type="button" class="btn btn-primary btn-sm" (click)="upload()">
-                <app-icon name="upload" />Upload
-              </button>
-              <button type="button" class="btn btn-ghost btn-sm" (click)="clearFile()">
-                <app-icon name="close" />Remove
-              </button>
-            </div>
-          }
+      <!-- The shared dropzone, which this markup was extracted into -- its dragleave handling
+           keeps the highlight on while the pointer crosses the icon and text. -->
+      <app-file-dropzone class="block mt-4" [file]="file()" (fileChange)="onFile($event)"
+                         accept=".xlsx,.xls" prompt="Drop a spreadsheet here" hint=".xlsx or .xls" />
+
+      @if (file()) {
+        @if (uploading()) {
+          <div class="progress mt-3" role="progressbar" aria-label="Upload progress"
+               aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="progress()">
+            <div class="progress-bar" [style.width.%]="progress()"></div>
+          </div>
+          <p class="text-xs text-[color:var(--text-muted)] mt-1.5" aria-hidden="true">{{ progress() }}% uploaded</p>
         } @else {
-          <app-icon name="upload" size="1.75rem" class="icon-muted" />
-          <p class="mt-2 text-sm">Drop a spreadsheet here</p>
-          <p class="text-xs text-[color:var(--text-muted)] mt-0.5">.xlsx or .xls</p>
-          <label class="btn btn-default btn-sm mt-3 cursor-pointer">
-            <app-icon name="folder" />Choose a file
-            <input type="file" class="sr-only" accept=".xlsx,.xls" (change)="onPick($event)" />
-          </label>
+          <div class="flex items-center gap-2 mt-3">
+            <button type="button" class="btn btn-primary btn-sm" (click)="upload()">
+              <app-icon name="upload" />Upload
+            </button>
+          </div>
         }
-      </div>
+      }
 
       @if (result(); as r) {
-        <div class="card flex items-start gap-2 px-4 py-2.5 text-sm mt-4"
-             [style.border-color]="r.ok ? 'var(--color-ok-500)' : 'var(--color-crit-500)'">
+        <div class="card flex items-start gap-2 px-4 py-2.5 text-sm mt-4" role="status">
           <app-icon [name]="r.ok ? 'checkCircle' : 'xCircle'"
                     [class]="r.ok ? 'icon-ok' : 'icon-crit'" class="mt-0.5 shrink-0" />
           <span>{{ r.message }}</span>
