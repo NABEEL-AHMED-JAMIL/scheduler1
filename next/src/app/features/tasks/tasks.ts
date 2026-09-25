@@ -162,9 +162,10 @@ export class Tasks implements OnInit {
       } }).subscribe({
       next: response => {
         this.linkedLoading.set(null);
-        if (response.status === API_SUCCESS) {
-          this.linkedJobs.update(map => ({ ...map, [task.taskDetailId]: response.data ?? [] }));
-        }
+        // A refusal settles the drawer like a failed request does, so it says it could not
+        // read the jobs instead of showing the heading over nothing.
+        const jobs = response.status === API_SUCCESS ? response.data ?? [] : [];
+        this.linkedJobs.update(map => ({ ...map, [task.taskDetailId]: jobs }));
       },
       error: () => {
         this.linkedLoading.set(null);
@@ -213,7 +214,7 @@ export class Tasks implements OnInit {
             if (created.status === API_SUCCESS) {
               this.toast.success(`Copied as "${payload.taskName}" — it starts inactive.`);
               this.load();
-            } else { this.toast.error(created.message); }
+            } else { this.toast.error(created.message || 'The copy could not be created.'); }
           },
           error: err => {
             this.busyTask.set(null);
@@ -250,12 +251,6 @@ export class Tasks implements OnInit {
     });
   }
 
-  /**
-   * Deleting a task also deletes every job bound to it -- the endpoint cascades through
-   * statusChangeSourceJobWithSourceTaskId -- so the count goes in the prompt rather than
-   * being discovered afterwards. taskStatus has to be in the payload: the endpoint cascades
-   * to the jobs unconditionally but only marks the task itself when that field is present.
-   */
   /** A task still in use cannot be deleted; the server refuses too, this just says so sooner. */
   inUse(task: SourceTask): boolean {
     return (task.totalLinksJobs ?? 0) > 0;
@@ -286,12 +281,10 @@ export class Tasks implements OnInit {
       next: response => {
         this.busyTask.set(null);
         if (response.status === API_SUCCESS) {
-          this.toast.success(linked
-            ? `${task.taskName} and ${linked} job${linked > 1 ? 's' : ''} deleted.`
-            : `${task.taskName} deleted.`);
+          this.toast.success(`${task.taskName} deleted.`);
           this.load();
         } else {
-          this.toast.error(response.message);
+          this.toast.error(response.message || 'Delete failed.');
         }
       },
       error: err => {

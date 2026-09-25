@@ -467,7 +467,7 @@ export class Jobs implements OnInit {
               const newId = Number(/jobId (\d+)/.exec(created.message ?? '')?.[1]);
               if (Number.isFinite(newId)) this.refreshOne(newId);
               else this.load();
-            } else { this.toast.error(created.message); }
+            } else { this.toast.error(created.message || 'The copy could not be created.'); }
           },
           error: err => {
             this.busyJob.set(null);
@@ -616,7 +616,7 @@ export class Jobs implements OnInit {
           if (action === 'run') this.patchJob(job.jobId, { jobRunningStatus: 'Queue' });
           else this.refreshOne(job.jobId);
         } else {
-          this.toast.error(response.message);
+          this.toast.error(response.message || 'That action failed.');
         }
       },
       error: err => {
@@ -652,7 +652,7 @@ export class Jobs implements OnInit {
           this.toast.success(`${job.jobName} ${activating ? 'activated' : 'deactivated'}.`);
           this.patchJob(job.jobId, { jobStatus: activating ? 'Active' : 'Inactive' });
         } else {
-          this.toast.error(response.message);
+          this.toast.error(response.message || 'Could not change the status.');
         }
       },
       error: err => { this.busyJob.set(null); this.toast.error(err?.error?.message || 'Could not change the status.'); },
@@ -678,7 +678,7 @@ export class Jobs implements OnInit {
           this.toast.success(`${job.jobName} deleted.`);
           this.jobs.update(list => list.filter(row => row.jobId !== job.jobId));
         } else {
-          this.toast.error(response.message);
+          this.toast.error(response.message || 'Delete failed.');
         }
       },
       error: err => { this.busyJob.set(null); this.toast.error(err?.error?.message || 'Delete failed.'); },
