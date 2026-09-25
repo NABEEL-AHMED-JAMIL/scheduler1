@@ -81,7 +81,7 @@ describe('Users -- reset password is checked inside its dialog', () => {
 });
 
 describe('Users -- a card\'s role rule comes from ROLE_META', () => {
-  it('takes every accent from ROLE_META, the tenant admin\'s included (it flips in dark)', () => {
+  it('takes every accent from ROLE_META, the tenant administrator\'s included (it flips in dark)', () => {
     const screen = usersScreen();
     for (const role of ['TENANT_USER', 'TENANT_ADMIN', 'PLATFORM_ADMIN'] as const) {
       expect(screen.roleAccent(role)).toBe(ROLE_META[role].accent);
