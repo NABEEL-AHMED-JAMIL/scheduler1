@@ -1480,7 +1480,10 @@ html.dark {
   .page-form   { @apply space-y-5; }
   .page-tool   { @apply space-y-5; }
 
-  .page-head       { @apply flex flex-wrap items-end justify-between gap-3 mb-1; }
+  /* No margin of its own: the page stack spaces it. Tailwind 4's space-y-* is a margin-block-end on
+     every child but the last, so the mb-1 this had REPLACED the stack's 1.25rem with 0.25rem and every
+     screen's heading sat 4px above its content (under Tailwind 3 it was added on top). */
+  .page-head       { @apply flex flex-wrap items-end justify-between gap-3; }
   /* The action group stays on the right even when a long subtitle wraps it onto its own row:
      with justify-between alone a lone second-row item sat flush left under the text. The
      subtitle is capped so on a wide screen it does not push the actions down at all. */
@@ -1860,3 +1863,21 @@ html.dark .btn-circle-danger:hover:not(:disabled) { background: color-mix(in okl
 
 /* Configuration values: a secret is shown as a mask and never as its value. */
 .secret-mask { letter-spacing: 0.12em; color: var(--text-muted); user-select: none; }
+
+/*
+ * A component used as a block in a stack. Tailwind 4's space-y-* spaces a stack with margin-block-end
+ * on its children, and an Angular component's host element (<app-billing-brief>, <app-table-shell>...)
+ * is an unknown tag -- inline by default -- where a vertical margin does nothing: the card after it
+ * sat flush against it (the dashboard's billing card touched the charts below it). Any direct child
+ * of a stack that is not a known HTML element becomes a block. Zero specificity (:where), so a
+ * component that sets its own :host display keeps it.
+ */
+@layer base {
+  :where(.page, .page-form, .page-tool, [class*="space-y-"]) > :where(:not(
+    div, section, form, header, footer, nav, article, aside, main, p, h1, h2, h3, h4, h5, h6, ul, ol, dl,
+    table, details, summary, figure, pre, blockquote, hr, span, a, button, label, img, svg, canvas, input,
+    select, textarea, fieldset, legend, output, progress, meter, video, audio, iframe, template, slot, br
+  )) {
+    display: block;
+  }
+}
