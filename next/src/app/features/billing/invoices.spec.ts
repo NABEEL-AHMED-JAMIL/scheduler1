@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Dialog } from '@angular/cdk/dialog';
-import { of } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { Invoices } from './invoices';
 import { BillingApi } from './billing.service';
 import { WorkspacePicker } from './workspace-picker';
@@ -100,3 +100,27 @@ describe('Invoices tiles in the currency billed', () => {
     expect(tile).not.toContain('140');
   });
 });
+
+/** Audit 09-22: the rail agrees with the pane, and a statement is made once per click. */
+describe('Invoices, rail tone and statement', () => {
+  it('draws an issued or partly paid bill in the tone the pane gives it (warn), not a near-black info dot', () => {
+    const { component } = page(false);
+    expect(component.tone({ ...component.rows()[0], status: 'issued', pendingPayments: 0 })).toBe('warn');
+    expect(component.tone({ ...component.rows()[0], status: 'partially_paid', pendingPayments: 0 })).toBe('warn');
+  });
+
+  it('ignores a second Statement while the first is being made, and says so when it cannot be opened', () => {
+    const { component, api, toast } = page(false);
+    const reply = new Subject<any>();
+    (api.statement as any).mockReturnValue(reply);
+    (api.documentBlob as any).mockReturnValue(throwError(() => new Error('gone')));
+    component.statement();
+    component.statement();
+    expect(api.statement).toHaveBeenCalledTimes(1);
+    expect(component.statementBusy()).toBe(true);
+    reply.next({ status: API_SUCCESS, message: 'Statement ready.', data: { documentId: 5 } });
+    expect(component.statementBusy()).toBe(false);
+    expect(toast.error).toHaveBeenCalledWith('Could not open the statement.');
+  });
+});
+

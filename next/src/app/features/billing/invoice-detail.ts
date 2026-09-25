@@ -12,7 +12,7 @@ import { Icon } from '../../shared/ui/icon';
 import { CopyButton } from '../../shared/ui/copy-button';
 import { copyText } from '../../shared/ui/clipboard.util';
 import { formatSize } from '../../shared/ui/format-size';
-import { DocumentViewDialog } from './document-view-dialog';
+import { DOC_VIEW_TITLE_ID, DocumentViewDialog } from './document-view-dialog';
 import { BillingApi, DOCUMENT_KIND_LABEL, InvoiceDetail as Detail, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE, PaymentRow, InvoiceLine, AppliedTier, PAYMENT_METHODS, paymentMethodLabel } from './billing.service';
 import { daysOverdue, formatMoney, formatQuantity, formatUnitPrice, moneyDigits } from './billing-format';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
@@ -109,6 +109,9 @@ export class InvoicePane implements OnDestroy {
   ngOnDestroy(): void { this.revokeQr(); }
 
   private reset(): void {
+    // The previous invoice goes with its number: left in place, its Issue / Void / Record
+    // payment stayed live under the new number until the new one arrived.
+    this.invoice.set(null);
     this.paying.set(false); this.addingLine.set(false); this.crediting.set(false); this.payAmount.set(''); this.payReference.set(''); this.payNote.set(''); this.paySlip.set(null);
   }
 
@@ -160,7 +163,7 @@ export class InvoicePane implements OnDestroy {
   openDocument(documentId: number): void {
     const doc = this.invoice()?.documents.find(d => d.documentId === documentId);
     if (!doc) return;
-    this.dialog.open<void>(DocumentViewDialog, { data: doc, hasBackdrop: true });
+    this.dialog.open<void>(DocumentViewDialog, { data: doc, hasBackdrop: true, ariaLabelledBy: DOC_VIEW_TITLE_ID });
   }
   downloadDocument(documentId: number, fileName: string): void {
     this.api.documentBlob(documentId).subscribe({ next: b => BillingApi.save(b, fileName), error: () => this.toast.error('Could not download the document.') });
@@ -223,7 +226,7 @@ export class InvoicePane implements OnDestroy {
     if (!this.lineDescription().trim() || !(q > 0) || Number.isNaN(p)) { this.toast.error('A description, a quantity and a price.'); return; }
     this.busy.set('line');
     this.api.addLine(i.invoiceId, this.lineDescription().trim(), q, p).subscribe({
-      next: r => { this.busy.set(''); if (r.status !== API_SUCCESS) { this.toast.error(r.message); return; } this.addingLine.set(false); this.lineDescription.set(''); this.linePrice.set(''); this.refresh(); },
+      next: r => { this.busy.set(''); if (r.status !== API_SUCCESS) { this.toast.error(r.message); return; } this.toast.success(r.message); this.addingLine.set(false); this.lineDescription.set(''); this.linePrice.set(''); this.refresh(); },
       error: err => { this.busy.set(''); this.toast.error(err?.error?.message || 'The line could not be added.'); },
     });
   }
