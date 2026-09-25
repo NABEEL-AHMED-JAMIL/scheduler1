@@ -128,7 +128,8 @@ describe('whose numbers the dashboard shows', () => {
 /**
  * MIG-103 (ADR-023): a request the server refuses -- a date that is not a date -- is an HTTP 200
  * carrying status ERROR and a sentence. The first load used to drop it and show empty tiles; it now
- * says why, once, and still stops the spinner.
+ * says why, once, and still stops the spinner. Since the UI audit it says so on the page, where
+ * the tiles and charts would have been, with Try again -- not in a toast that fades.
  */
 describe('a refused dashboard load', () => {
   it('shows the server sentence once and stops loading', () => {
@@ -151,7 +152,8 @@ describe('a refused dashboard load', () => {
 
     dashboard.load();
 
-    expect(errors).toEqual(['Invalid date -- expected yyyy-MM-dd.']);
+    expect(dashboard.error()).toBe('Invalid date -- expected yyyy-MM-dd.');
+    expect(errors).toEqual([]);
     expect(dashboard.loading()).toBe(false);
   });
 });
