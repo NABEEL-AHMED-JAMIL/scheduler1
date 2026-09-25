@@ -8,10 +8,10 @@
       @if (isPlatformAdmin()) {
         <app-combobox class="w-56" [selected]="workspaces.effective()" (selectedChange)="pickTenant($event)" placeholder="Workspace" [allowClear]="false" [options]="workspaces.options()" />
       }
-      <div class="flex items-center gap-1">
-        <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="shiftMonth(-1)" aria-label="Previous month"><app-icon name="chevronLeft" /></button>
-        <span class="text-sm font-medium min-w-36 text-center">{{ monthLabel() }}</span>
-        <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="shiftMonth(1)" [disabled]="isCurrentMonth()" aria-label="Next month"><app-icon name="chevronRight" /></button>
+      <div class="btn-join" role="group" aria-label="Month">
+        <button type="button" class="btn btn-default btn-icon btn-sm" (click)="shiftMonth(-1)" aria-label="Previous month"><app-icon name="chevronLeft" /></button>
+        <span class="btn btn-default btn-sm btn-label min-w-32" aria-live="polite">{{ monthLabel() }}</span>
+        <button type="button" class="btn btn-default btn-icon btn-sm" (click)="shiftMonth(1)" [disabled]="isCurrentMonth()" aria-label="Next month"><app-icon name="chevronRight" /></button>
       </div>
       <button type="button" class="btn btn-default btn-sm" (click)="refresh()" [disabled]="loading()" title="Price the last minutes' events now"><app-icon name="refresh" [class.spin]="loading()" />Refresh</button>
       <button type="button" class="btn btn-default btn-sm" (click)="exportCsv()" [disabled]="loading() || !lines().length" title="The lines below as a CSV"><app-icon name="download" />Export CSV</button>
@@ -31,7 +31,7 @@
       <button type="button" class="btn btn-default btn-sm mt-3" (click)="load()"><app-icon name="refresh" />Try again</button>
     </div>
   } @else {
-    <p class="text-xs text-[color:var(--text-muted)] mb-3">
+    <p class="text-xs text-[color:var(--text-muted)]">
       @if (rateCard(); as card) {
         Priced with <b>{{ card.name }}</b> v{{ card.version }}@if (card.tenantSpecific) { <span class="pill pill-brand ml-1">This workspace's card</span> } · {{ currency() }}
         @if (isPlatformAdmin()) { · <a routerLink="/billing/rates" class="link-inline">rate cards</a> }

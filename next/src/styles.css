@@ -1489,6 +1489,17 @@ html.dark {
      subtitle is capped so on a wide screen it does not push the actions down at all. */
   .page-head > :last-child:not(:first-child) { margin-left: auto; }
   .page-head > :first-child { max-width: 64rem; min-width: 0; }
+  /* A heading's actions are .btn-sm; a field among them (workspace picker, date range, search)
+     took the full 2.25rem .input and stood a third taller than the buttons beside it. Same padding,
+     line and border as .btn-sm, so the row lines up by construction. */
+  .page-head:has(.btn-sm) .input { min-height: 0; @apply px-2.5 py-1 text-xs; }
+  /* Joined controls: a stepper such as "< September 2026 >" built from .btn-sm pieces, one box. */
+  .btn-join { @apply inline-flex items-stretch; }
+  .btn-join > .btn { @apply rounded-none; }
+  .btn-join > .btn:first-child { @apply rounded-l-md; }
+  .btn-join > .btn:last-child { @apply rounded-r-md; }
+  .btn-join > .btn + .btn { margin-left: -1px; }
+  .btn-join > .btn-label { @apply cursor-default font-medium; pointer-events: none; }
   .page-title      { @apply text-2xl font-semibold tracking-tight; }
   .page-subtitle   { @apply text-sm text-[color:var(--text-secondary)] mt-1; }
 
@@ -1873,6 +1884,11 @@ html.dark .btn-circle-danger:hover:not(:disabled) { background: color-mix(in okl
  * component that sets its own :host display keeps it.
  */
 @layer base {
+  /* Text a person typed, shown with its own line breaks: one long unbroken token (a pasted URL, a
+     key, "xxxxxxxx...") ran straight out of its card -- a tenant request's purpose did, by 37,000px.
+     It may now break anywhere, but only when it has to. */
+  :where(.whitespace-pre-wrap, .whitespace-pre-line) { overflow-wrap: anywhere; }
+
   :where(.page, .page-form, .page-tool, [class*="space-y-"]) > :where(:not(
     div, section, form, header, footer, nav, article, aside, main, p, h1, h2, h3, h4, h5, h6, ul, ol, dl,
     table, details, summary, figure, pre, blockquote, hr, span, a, button, label, img, svg, canvas, input,
