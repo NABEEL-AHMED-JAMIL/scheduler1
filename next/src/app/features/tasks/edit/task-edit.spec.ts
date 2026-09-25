@@ -15,10 +15,11 @@ import { API_BASE, API_SUCCESS } from '../../../core/api/api.config';
  * would just make the Pipeline field quietly empty or mismatched against Pipeline Forms.
  */
 function taskEditWith(getImpl: (url: string, opts?: any) => any,
-                       postImpl: (url: string, body?: any) => any = () => of({})) {
-  // Every test's editor loads the Kafka connections first; none of them is about that list.
+                       postImpl: (url: string, body?: any) => any = () => of({}),
+                       profiles: any[] = []) {
+  // Every test's editor loads the Kafka connections first; most of them are not about that list.
   const get = vi.fn((url: string, opts?: any) =>
-    url.endsWith('/kafkaConnectionProfile.json/fetchAllProfiles') ? of({ status: API_SUCCESS, data: [] }) : getImpl(url, opts));
+    url.endsWith('/kafkaConnectionProfile.json/fetchAllProfiles') ? of({ status: API_SUCCESS, data: profiles }) : getImpl(url, opts));
   const post = vi.fn(postImpl);
   const toast = { success: vi.fn(), error: vi.fn(), info: () => {} };
   TestBed.resetTestingModule();
@@ -447,5 +448,146 @@ describe('TaskEdit -- Group and Home page choices', () => {
     ]);
     expect(component.groupOptions().map(o => o.value)).toContain(component.form.get('groupId')!.value);
     expect(component.homePageOptions().map(o => o.value)).toContain(component.form.get('homePageId')!.value);
+  });
+});
+
+/**
+ * The owner's task 1854: workspace 2924 has no Kafka profile of its own, its topic names none, and
+ * the resolver sends its runs through the platform default (1009) -- yet the "Kafka connection" box
+ * came up blank, because the editor fell back only to a default of the task's own workspace.
+ * The box follows the resolver now: the topic's own profile, else the workspace's default, else --
+ * only for a workspace with no Kafka of its own -- the platform default.
+ */
+describe('TaskEdit -- the Kafka connection an edited task opens on', () => {
+  const PLATFORM_DEFAULT = { kafkaConnectionProfileId: 1009, profileName: 'Platform Local Broker [PF]',
+    environmentLabel: 'local', isDefault: true, platform: true, readOnly: true, status: 'Active' };
+  const topicRow = (kafkaConnectionProfileId?: number) => ({ sourceTaskTypeId: 11831,
+    serviceName: 'service-1 reference worker', tenantId: 2924, kafkaConnectionProfileId });
+
+  const editor = (profiles: any[], topic = topicRow()) => {
+    const harness = taskEditWith((url, opts) => {
+      if (url.endsWith('/setting.json/topics') && opts?.params?.ids != null) return of({ status: API_SUCCESS, data: [topic] });
+      if (url.endsWith('/setting.json/topics')) return of({ status: API_SUCCESS, data: [topic] });
+      if (url.endsWith('/setting.json/taskReferences')) return references(opts);
+      if (url.endsWith('/pipeline.json/listForTopic')) return forTopic([], opts);
+      if (url.endsWith('/pipeline.json/definition')) return of({ status: API_SUCCESS, data: null });
+      if (url.endsWith('/sourceTask.json/fetchSourceTaskWithSourceTaskId')) {
+        return of({ status: API_SUCCESS, data: { taskDetailId: 1854, taskName: 'Reference run', taskStatus: 'Active',
+          tenantId: 2924, sourceTaskType: { sourceTaskTypeId: 11831 }, pipelineId: '', taskPayload: '<x/>', xmlTagsInfo: [] } });
+      }
+      throw new Error(`unexpected GET ${url}`);
+    }, undefined, profiles);
+    (harness.component as any).taskDetailId = () => '1854';
+    return harness;
+  };
+
+  it('lands an unrouted topic in a workspace with no Kafka on the platform default, and says so', () => {
+    const { component, get } = editor([PLATFORM_DEFAULT]);
+    component.ngOnInit();
+    settle();
+
+    expect(component.selectedProfileId()).toBe(1009);
+    expect(component.selectedProfileLabel()).toBe('Platform Local Broker [PF] (platform default)');
+    expect(component.profileOptions()[0].label).toBe('Platform Local Broker [PF] (platform default)');
+    expect(get).toHaveBeenCalledWith(`${API_BASE}/setting.json/topics`, { params: { kafkaConnectionProfileId: 1009 } });
+    expect(component.loadedTopicLabel()).toBe('service-1 reference worker');
+  });
+
+  it('lands it on the workspace\'s own default when the workspace has one', () => {
+    const own = { kafkaConnectionProfileId: 5, profileName: 'Demo broker', tenantId: 2924, isDefault: true, status: 'Active' };
+    // A platform administrator's list: every workspace's rows and the platform's.
+    const { component } = editor([PLATFORM_DEFAULT, own,
+      { kafkaConnectionProfileId: 7, profileName: 'Globex', tenantId: 2901, isDefault: true, status: 'Active' }]);
+    component.ngOnInit();
+    settle();
+
+    expect(component.selectedProfileId()).toBe(5);
+    expect(component.selectedProfileLabel()).toBe('Demo broker');
+  });
+
+  it('a platform administrator editing a workspace with no Kafka lands on the platform default, not another workspace\'s', () => {
+    const { component } = editor([
+      { kafkaConnectionProfileId: 7, profileName: 'Globex', tenantId: 2901, isDefault: true, status: 'Active' },
+      { ...PLATFORM_DEFAULT, readOnly: false }]);
+    component.ngOnInit();
+    settle();
+
+    expect(component.selectedProfileId()).toBe(1009);
+  });
+
+  it('leaves the box empty for a workspace with Kafka of its own but no default -- the resolver refuses it', () => {
+    const { component } = editor([PLATFORM_DEFAULT,
+      { kafkaConnectionProfileId: 5, profileName: 'Demo broker', tenantId: 2924, isDefault: false, status: 'Inactive' }]);
+    component.ngOnInit();
+    settle();
+
+    expect(component.selectedProfileId()).toBeNull();
+    // The topic is still named, so the field under it is not a bare id either.
+    expect(component.loadedTopicLabel()).toBe('service-1 reference worker');
+  });
+
+  it('keeps the topic\'s own profile over any default', () => {
+    const { component } = editor([PLATFORM_DEFAULT,
+      { kafkaConnectionProfileId: 5, profileName: 'Demo broker', tenantId: 2924, isDefault: true, status: 'Active' },
+      { kafkaConnectionProfileId: 6, profileName: 'Demo audit', tenantId: 2924, isDefault: false, status: 'Active' }],
+      topicRow(6));
+    component.ngOnInit();
+    settle();
+
+    expect(component.selectedProfileId()).toBe(6);
+  });
+
+  it('still names the topic when the connection list came back empty before the task did', () => {
+    const { component } = editor([]);
+    component.ngOnInit();
+    settle();
+
+    expect(component.loadedTopicLabel()).toBe('service-1 reference worker');
+    expect(component.selectedProfileId()).toBeNull();
+  });
+
+  it('names a connection the list does not include rather than showing its bare id', () => {
+    const { component } = editor([], topicRow(4242));
+    component.ngOnInit();
+    settle();
+
+    expect(component.selectedProfileId()).toBe(4242);
+    expect(component.selectedProfileLabel()).toBe('Connection 4242');
+  });
+});
+
+describe('TaskEdit -- a new task starts on the connection its workspace uses', () => {
+  const PLATFORM_DEFAULT = { kafkaConnectionProfileId: 1009, profileName: 'Platform Local Broker [PF]',
+    isDefault: true, platform: true, readOnly: true, status: 'Active' };
+  const editor = (profiles: any[]) => taskEditWith((url, opts) => {
+    if (url.endsWith('/setting.json/topics')) return noTopics;
+    if (url.endsWith('/setting.json/taskReferences')) return references(opts);
+    throw new Error(`unexpected GET ${url}`);
+  }, undefined, profiles);
+
+  it('preselects the platform default in a workspace with no Kafka of its own', () => {
+    const { component, get } = editor([PLATFORM_DEFAULT]);
+    component.ngOnInit();
+    settle();
+
+    expect(component.selectedProfileId()).toBe(1009);
+    expect(get).toHaveBeenCalledWith(`${API_BASE}/setting.json/topics`, { params: { kafkaConnectionProfileId: 1009 } });
+  });
+
+  it('preselects the workspace\'s own default when it has one', () => {
+    const { component } = editor([{ kafkaConnectionProfileId: 5, profileName: 'Demo broker', tenantId: 2924, isDefault: true, status: 'Active' }]);
+    component.ngOnInit();
+    settle();
+
+    expect(component.selectedProfileId()).toBe(5);
+  });
+
+  it('lets a platform administrator, who sees every workspace\'s default, pick', () => {
+    const { component } = editor([{ ...PLATFORM_DEFAULT, readOnly: false },
+      { kafkaConnectionProfileId: 5, profileName: 'Demo broker', tenantId: 2924, isDefault: true, status: 'Active' }]);
+    component.ngOnInit();
+    settle();
+
+    expect(component.selectedProfileId()).toBeNull();
   });
 });

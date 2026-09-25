@@ -224,3 +224,65 @@ describe('when the topics cannot be read', () => {
     expect(screen.topicsError()).toBe('');
   });
 });
+
+/**
+ * A workspace with no Kafka profile of its own is shown the platform default its runs go through,
+ * read-only and without its brokers (fetchAllProfiles, 2026-09-24). The server refuses every write
+ * and probe on it; the screen does not offer them.
+ */
+describe('the platform default, as a workspace with no Kafka of its own sees it', () => {
+  const SHOWN = { kafkaConnectionProfileId: 1009, profileName: 'Platform Local Broker [PF]', environmentLabel: 'local',
+    securityProtocol: 'PLAINTEXT', status: 'Active', isDefault: true, platform: true, readOnly: true,
+    connectionStatus: 'SUCCESS' } as KafkaProfile;
+
+  function tenantScreen(calls: { url: string; options?: any }[] = [], opened: any[] = []) {
+    const screen = screenFor(false, [SHOWN]);
+    const http = TestBed.inject(HttpClient) as any;
+    const original = http.get;
+    http.get = (url: string, options?: any) => { calls.push({ url, options }); return original(url, options); };
+    (screen as any).dialog.open = (component: any, config: any) => { opened.push(config); return { closed: of(false) }; };
+    return screen;
+  }
+
+  it('offers no edit, test, default or delete on it', () => {
+    const screen = tenantScreen();
+    expect(screen.canManage(SHOWN)).toBe(false);
+    expect(screen.canManage(GLOBEX_DEFAULT)).toBe(true);
+  });
+
+  it('names it as the platform default and says the brokers are the platform\'s', () => {
+    const screen = tenantScreen();
+    expect(screen.displayName(SHOWN)).toBe('Platform Local Broker [PF] (platform default)');
+    expect(screen.brokersText(SHOWN)).toBe('Managed by the platform');
+    // Read-only decides it, not whether the server happened to leave the field out.
+    expect(screen.brokersText({ ...SHOWN, bootstrapServers: 'platform-kafka:9092' })).toBe('Managed by the platform');
+    expect(screen.brokersText(GLOBEX_DEFAULT)).toBe('broker:9092');
+  });
+
+  it('is the default the tiles report, but not one of the workspace\'s own profiles', () => {
+    const screen = tenantScreen();
+    expect(screen.defaultProfile()?.kafkaConnectionProfileId).toBe(1009);
+    expect(screen.summary().total).toBe(0);
+    expect(screen.summary().testedOk).toBe(0);
+  });
+
+  it('tests a topic on it by resolving the caller\'s connection, not by naming the platform\'s', () => {
+    const calls: { url: string; options?: any }[] = [];
+    const screen = tenantScreen(calls);
+    screen.testTopic(SHOWN, { sourceTaskTypeId: 42, serviceName: 'Claims', queueTopicPartition: 'topic=x&partitions=[*]' } as any);
+    const call = calls.find(c => c.url.includes('testTopic'))!;
+    expect(call.options.params).toEqual({ topicName: 'x' });
+
+    screen.testTopic(GLOBEX_DEFAULT, { sourceTaskTypeId: 43, serviceName: 'Audit', queueTopicPartition: 'topic=y&partitions=[*]' } as any);
+    expect(calls.filter(c => c.url.includes('testTopic'))[1].options.params)
+      .toEqual({ topicName: 'y', kafkaConnectionProfileId: String(GLOBEX_DEFAULT.kafkaConnectionProfileId) });
+  });
+
+  it('adds a topic under it unrouted, so the topic follows the workspace to its own Kafka later', () => {
+    const opened: any[] = [];
+    const screen = tenantScreen([], opened);
+    screen.addTopic(SHOWN);
+    expect(opened[0].data.defaultProfileId).toBeNull();
+    expect(opened[0].data.profileName).toBe('Platform Local Broker [PF] (platform default)');
+  });
+});
