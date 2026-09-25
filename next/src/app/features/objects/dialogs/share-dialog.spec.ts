@@ -77,3 +77,23 @@ describe('ShareDialog address check', () => {
   });
 });
 
+
+/** Audit 09-22 (deferred): the share dialog is the shared shell, saying Sending... while it sends. */
+describe('ShareDialog shell', () => {
+  it('is app-form-dialog, with Send / Sending… and fields in app-field', () => {
+    const view = dialogSending(() => new Observable(() => {}));
+    const el = view.fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('app-form-dialog h2')?.textContent?.trim()).toBe('Email 2 files');
+    expect(el.querySelector('app-field label[for="to"]')?.textContent).toContain('(required)');
+    const send = () => [...el.querySelectorAll('button')].find(b => /Send/.test(b.textContent!))!;
+    expect(send().textContent!.trim()).toBe('Send');
+    view.submit();
+    expect(send().textContent!.trim()).toBe('Sending…');
+  });
+
+  it('still submits on Enter', () => {
+    const view = dialogSending(() => of({ status: 'SUCCESS' }));
+    (view.fixture.nativeElement as HTMLElement).querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
+    expect(view.close).toHaveBeenCalled();
+  });
+});
