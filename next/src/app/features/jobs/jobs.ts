@@ -309,6 +309,13 @@ export class Jobs implements OnInit {
         patch.lastJobRun = event.at ?? new Date().toISOString();
       }
       this.patchJob(event.jobId, patch);
+      // A finished run moved the schedule on, and the push carries ids only (MIG-151): without this
+      // the row kept showing the run that just happened as "Next run" until a reload. Only a job
+      // this list shows is re-read -- a push for anything else is not a reason to fetch it.
+      if (!isInFlight({ jobRunningStatus: event.jobRunningStatus })
+          && this.jobs().some(job => job.jobId === event.jobId)) {
+        this.refreshOne(event.jobId);
+      }
       return;
     }
     // A toggle or an edit changes fields this event does not carry, so that one row is

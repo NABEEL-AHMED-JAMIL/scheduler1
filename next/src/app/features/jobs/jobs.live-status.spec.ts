@@ -15,7 +15,7 @@ import { JobEvent, JobEventsService } from '../../core/socket/job-events.service
  * at, tenantId (notifications-service JobFeed.status). The row's words -- its name, its owner, its
  * next run -- are the list read's, and a push must never be where they come from.
  */
-function jobsWith(rows: SourceJob[]) {
+function jobsWith(rows: SourceJob[], fresh?: SourceJob) {
   const events = new Subject<JobEvent>();
   const gets: string[] = [];
   TestBed.resetTestingModule();
@@ -23,7 +23,11 @@ function jobsWith(rows: SourceJob[]) {
     providers: [
       {
         provide: HttpClient, useValue: {
-          get: (url: string) => { gets.push(url); return of({ status: 'SUCCESS', data: rows }); },
+          get: (url: string) => {
+            gets.push(url);
+            // The one-row re-read answers with that job; the list read with every row.
+            return of({ status: 'SUCCESS', data: url.endsWith('fetchSourceJobDetailWithSourceJobId') ? fresh : rows });
+          },
           post: () => of({ status: 'SUCCESS', data: [] }),
         },
       },
@@ -70,12 +74,37 @@ describe('an ids-only status push', () => {
     expect(row.scheduler?.nextRunAt).toBe('2026-09-25T09:00:00');
   });
 
-  it('is enough on its own: a status needs no re-read', () => {
+  it('is enough on its own while the run is in flight: no re-read', () => {
     const { events, gets } = jobsWith([nightly()]);
+
+    events.next(idsOnly('Running'));
+
+    expect(gets).toEqual([]);
+  });
+
+  /**
+   * A finished run moves the schedule on, and the push says nothing about it: without a re-read the
+   * row kept showing the run that just happened as "Next run" until the page was reloaded.
+   */
+  it('re-reads that one job when its run finishes, so Next run is current', () => {
+    const moved = { ...nightly(), lastJobRun: '2026-09-24T09:00:00',
+      scheduler: { ...nightly().scheduler!, nextRunAt: '2026-09-26T09:00:00' } };
+    const { jobs, events, gets } = jobsWith([nightly()], moved);
 
     events.next(idsOnly('Completed'));
 
+    expect(gets).toEqual([expect.stringContaining('fetchSourceJobDetailWithSourceJobId')]);
+    expect(jobs.jobs()[0].scheduler?.nextRunAt).toBe('2026-09-26T09:00:00');
+    expect(jobs.jobs()[0].lastJobRun).toBe('2026-09-24T09:00:00');
+  });
+
+  it('does not fetch a finished job this list is not showing', () => {
+    const { jobs, events, gets } = jobsWith([nightly()], { ...nightly(), jobId: 99 });
+
+    events.next({ ...idsOnly('Completed'), jobId: 99 });
+
     expect(gets).toEqual([]);
+    expect(jobs.jobs().map(job => job.jobId)).toEqual([1244]);
   });
 
   it('leaves another job alone', () => {
@@ -91,7 +120,7 @@ describe('an ids-only status push', () => {
    * only the status (and, for a run in flight, when it got there) is taken from a push.
    */
   it('takes nothing else from a push, whatever else it carries', () => {
-    const { jobs, events } = jobsWith([nightly()]);
+    const { jobs, events } = jobsWith([nightly()], { ...nightly(), jobRunningStatus: 'Failed', stalled: false });
 
     events.next({
       ...idsOnly('Failed'),
@@ -99,6 +128,7 @@ describe('an ids-only status push', () => {
       nextRunAt: '2030-01-01T00:00:00', jobStatus: 'Inactive', message: 'The worker gave up.',
     } as JobEvent);
 
-    expect(jobs.jobs()[0]).toEqual({ ...nightly(), jobRunningStatus: 'Failed' });
+    // `stalled` is the server's verdict (MIG-63): a run that just reported is not stalled.
+    expect(jobs.jobs()[0]).toEqual({ ...nightly(), jobRunningStatus: 'Failed', stalled: false });
   });
 });
