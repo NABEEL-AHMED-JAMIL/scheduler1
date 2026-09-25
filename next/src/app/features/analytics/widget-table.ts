@@ -16,19 +16,19 @@ import { readableCell } from '../../shared/charts/number-format';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="overflow-x-auto">
-      <table class="w-full text-xs">
+      <table class="table-modern">
         <thead>
-          <tr class="text-left text-[color:var(--text-muted)]">
+          <tr>
             @for (column of columns(); track column) {
-              <th class="px-2 py-1 font-medium whitespace-nowrap">{{ column }}</th>
+              <th class="whitespace-nowrap">{{ column }}</th>
             }
           </tr>
         </thead>
         <tbody>
           @for (row of rows(); track $index) {
-            <tr class="border-t border-subtle">
+            <tr>
               @for (cell of row; track $index) {
-                <td class="px-2 py-1 whitespace-nowrap tabular">
+                <td class="whitespace-nowrap tabular">
                   @if (cell === null) {
                     <!-- A real null, which is not an empty string and is certainly not a zero. -->
                     <span class="text-[color:var(--text-muted)]" title="null">—</span>
@@ -106,9 +106,8 @@ export interface WidgetTableData {
       </div>
 
       @if (data.truncated) {
-        <p class="text-xs text-crit-500 px-5 pb-2">
-          Partial result — this stopped at the server's row ceiling.
-        </p>
+        <!-- A warning, as the Studio says it: part of the answer, not a failure. -->
+        <p class="px-5 pb-2"><span class="pill pill-warn">Partial result — stopped at the server's row ceiling</span></p>
       }
       @for (note of data.notes; track note) {
         <p class="field-note text-[color:var(--text-muted)] px-5 pb-1">{{ note }}</p>
@@ -122,7 +121,7 @@ export interface WidgetTableData {
       </div>
 
       <div class="flex justify-end gap-2 px-5 py-3 border-t border-subtle">
-        <button type="button" class="btn btn-default btn-sm" (click)="ref.close()" cdkFocusInitial>
+        <button type="button" class="btn btn-ghost btn-sm" (click)="ref.close()" cdkFocusInitial>
           Close
         </button>
       </div>

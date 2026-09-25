@@ -226,21 +226,21 @@
           }
           @case ('table') {
             <div class="mt-1 overflow-x-auto">
-              <table class="w-full text-[11px]">
+              <table class="table-modern">
                 <thead>
-                  <tr class="text-left text-[color:var(--text-muted)]">
-                    <th class="py-0.5 font-medium">
+                  <tr>
+                    <th>
                       {{ measured.exactValues ? 'Value' : 'From' }}
                     </th>
-                    <th class="py-0.5 font-medium text-right">Rows</th>
+                    <th class="text-right">Rows</th>
                   </tr>
                 </thead>
                 <tbody>
                   @for (bar of bars(); track $index) {
                     <tr>
-                      <td class="mono py-0.5 truncate"
+                      <td class="mono truncate"
                           [title]="bar.title">{{ bar.label }}</td>
-                      <td class="tabular py-0.5 text-right">{{ bar.rows }}</td>
+                      <td class="tabular text-right">{{ bar.rows }}</td>
                     </tr>
                   }
                 </tbody>
@@ -286,7 +286,12 @@
       }
     </div>
   } @else if (error(); as failed) {
+    <!-- The way back stays under the failure: it used to replace the button, and the only
+         route to it was collapsing and reopening the row. -->
     <p class="text-[11px] text-crit-500" role="alert">{{ failed }}</p>
+    <button type="button" class="btn btn-default btn-xs self-start" [disabled]="measuring()" (click)="measure()">
+      <app-icon name="refresh" size="0.85em" [busy]="measuring()" />Try again
+    </button>
   } @else {
     <button type="button" class="btn btn-default btn-xs self-start"
             [disabled]="measuring()"

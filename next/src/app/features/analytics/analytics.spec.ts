@@ -1,4 +1,7 @@
 import { DataGrid } from './data-grid';
+import { ColumnCard } from './column-card';
+import { provideZonelessChangeDetection } from '@angular/core';
+import { throwError } from 'rxjs';
 import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { ToastService } from '../../shared/ui/toast.service';
@@ -5521,3 +5524,43 @@ describe('the Studio, drawn to the console pattern', () => {
     expect(text).toContain('Run again');
   });
 });
+
+// Audit 09-22: a column card's failed measurement keeps its way back; its Counts are a .table-modern.
+describe('ColumnCard, audit 09-22', () => {
+  function card(distribution: () => unknown) {
+    const view = viewOf(columnOf({ name: 'col' }));
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection(),
+      { provide: AnalyticsService, useValue: { distribution: vi.fn(distribution) } }] });
+    const fixture = TestBed.createComponent(ColumnCard);
+    fixture.componentRef.setInput('column', view);
+    fixture.componentRef.setInput('connection', 'etl-bucket');
+    fixture.componentRef.setInput('path', 'demo/orders.csv');
+    fixture.detectChanges();
+    return { fixture, card: fixture.componentInstance, el: fixture.nativeElement as HTMLElement };
+  }
+
+  it('keeps a way to measure again under a failed measurement', () => {
+    let calls = 0;
+    const { fixture, card: c, el } = card(() => (calls++ === 0
+      ? throwError(() => ({ error: { message: 'No governor slot is free.' } }))
+      : of({ status: 'SUCCESS', message: '', data: { name: 'col', exactValues: true, bins: [{ value: 'North', rows: 9 }] } })));
+    c.measure();
+    fixture.detectChanges();
+    expect(el.textContent).toContain('No governor slot is free.');
+    const retry = [...el.querySelectorAll('button')].find(b => b.textContent!.includes('Try again'))!;
+    expect(retry.querySelector('app-icon[name="refresh"]')).not.toBeNull();
+    retry.click();
+    fixture.detectChanges();
+    expect(c.distribution()).not.toBeNull();
+  });
+
+  it('draws the Counts table as .table-modern', () => {
+    const { fixture, card: c, el } = card(() => of({ status: 'SUCCESS', message: '', data: { name: 'col', exactValues: true, bins: [{ value: 'North', rows: 9 }] } }));
+    c.measure();
+    c.chooseKind('table');
+    fixture.detectChanges();
+    expect(el.querySelector('table')!.classList).toContain('table-modern');
+  });
+});
+
