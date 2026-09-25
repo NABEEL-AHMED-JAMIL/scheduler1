@@ -53,21 +53,21 @@ export const WIDGET_HEIGHT_MAX = 600;
           @if (v.pivot; as grid) {
             <!-- The grid the server composed. Scrolls inside its own container so a wide cross-tab never makes the page scroll sideways. -->
             <div class="overflow-x-auto">
-              <table class="w-full text-xs">
+              <table class="table-modern">
                 <thead>
-                  <tr class="text-left text-[color:var(--text-muted)]">
-                    <th class="px-2 py-1 font-medium whitespace-nowrap">{{ grid.rowDimension }}</th>
-                    @for (column of grid.columnValues; track column) { <th class="px-2 py-1 font-medium whitespace-nowrap text-right">{{ column }}</th> }
+                  <tr>
+                    <th class="whitespace-nowrap">{{ grid.rowDimension }}</th>
+                    @for (column of grid.columnValues; track column) { <th class="whitespace-nowrap text-right">{{ column }}</th> }
                   </tr>
                 </thead>
                 <tbody>
                   @for (row of pivotRows(grid); track $index) {
-                    <tr class="border-t border-subtle">
-                      <td class="px-2 py-1 whitespace-nowrap">
+                    <tr>
+                      <th scope="row" class="whitespace-nowrap text-left font-normal">
                         @if (row.key === null) { <span class="text-[color:var(--text-muted)]" title="null">—</span> } @else { {{ row.key }} }
-                      </td>
+                      </th>
                       @for (cell of row.cells; track $index) {
-                        <td class="px-2 py-1 whitespace-nowrap tabular text-right">
+                        <td class="whitespace-nowrap tabular text-right">
                           <!-- No rows in that combination is not a zero: a grid that printed 0 would assert a measurement nobody made. -->
                           @if (cell === null) { <span class="text-[color:var(--text-muted)]" title="no rows">—</span> } @else { <span [title]="cell">{{ readable(cell) }}</span> }
                         </td>

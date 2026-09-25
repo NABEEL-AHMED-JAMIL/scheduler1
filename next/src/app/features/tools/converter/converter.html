@@ -1,9 +1,11 @@
 <div class="page-tool">
-  <div>
-    <h1 class="page-title">Document Converter</h1>
-    <p class="page-subtitle">
-      Convert between Office, OpenDocument, PDF, Markdown and image formats.
-    </p>
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Document Converter</h1>
+      <p class="page-subtitle">
+        Convert between Office, OpenDocument, PDF, Markdown and image formats.
+      </p>
+    </div>
   </div>
 
   <div class="card p-4 space-y-4">
@@ -50,7 +52,7 @@
           @if (folderFilterWorthIt()) {
             <div class="search-field max-w-56">
               <app-icon name="search" size="0.95em" />
-              <input class="input" placeholder="Filter folders"
+              <input class="input" placeholder="Find a folder" aria-label="Filter folders"
                      [value]="folderFilter()"
                      (input)="folderFilter.set($any($event.target).value)" />
             </div>
@@ -102,12 +104,17 @@
       }
     }
 
-    @if (sourceName() && !family()) {
+    @if (sourceName() && formatsError()) {
+      <p class="text-sm text-crit-500 flex items-center gap-2" role="alert">
+        <app-icon name="alert" class="shrink-0" />{{ formatsError() }}
+        <button type="button" class="btn btn-default btn-xs" (click)="loadFormats()"><app-icon name="refresh" />Try again</button>
+      </p>
+    } @else if (sourceName() && !family()) {
       <p class="text-sm text-warn-500">".{{ extension() }}" isn't a format this can convert.</p>
     } @else if (family()) {
       <p class="text-sm text-[color:var(--text-secondary)]">
         Detected as {{ family()!.label }}
-        @if (mode() === 'upload' && file()) { · {{ (file()!.size / 1024).toFixed(0) }} KB }
+        @if (mode() === 'upload' && file()) { · {{ size(file()!.size) }} }
       </p>
     }
 
@@ -181,7 +188,7 @@
 
   <div class="card overflow-hidden">
     <button type="button" class="w-full flex items-center gap-2 px-4 py-3 text-sm font-semibold"
-            (click)="showFormats.set(!showFormats())">
+            [attr.aria-expanded]="showFormats()" (click)="showFormats.set(!showFormats())">
       <span class="mr-auto">Supported formats</span>
       <app-icon [name]="showFormats() ? 'chevronDown' : 'chevronRight'"
                 class="text-[color:var(--text-muted)]" />
@@ -218,27 +225,15 @@
     }
   </div>
 
-  <div class="card overflow-hidden">
-    <div class="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-subtle"
-        >
-      <h2 class="text-sm font-semibold mr-auto">
-        Recent conversions
-        <span class="text-[color:var(--text-muted)] font-normal">({{ tasks().length }})</span>
-      </h2>
+  <app-table-shell heading="Recent conversions" [shown]="pagedTasks().length" [total]="tasks().length"
+                   [loading]="tasksLoading()" [error]="tasksError()" (retry)="loadTasks()"
+                   [isEmpty]="!tasks().length" emptyIcon="file"
+                   emptyMessage="Nothing converted yet. Finished conversions are listed here with a link to the bucket.">
+    <ng-container toolbar>
       <button type="button" class="btn btn-default btn-sm" (click)="loadTasks()" [disabled]="tasksLoading()">
         <app-icon name="refresh" [class.spin]="tasksLoading()" />Refresh
       </button>
-    </div>
-
-    @if (!tasks().length) {
-      <div class="px-4 py-10 text-center">
-        <app-icon name="file" size="1.6em" class="icon-muted" />
-        <p class="mt-2 text-sm text-[color:var(--text-muted)]">
-          Nothing converted yet. Finished conversions are listed here with a link to the bucket.
-        </p>
-      </div>
-    } @else {
-      <div class="overflow-x-auto">
+    </ng-container>
         <table class="table-modern">
           <thead>
             <tr>
@@ -247,11 +242,11 @@
               <th>Size</th>
               <th>Location</th>
               <th>Created</th>
-              <th class="w-28 text-right">View</th>
+              <th class="w-28"><span class="sr-only">Actions</span></th>
             </tr>
           </thead>
           <tbody>
-            @for (task of tasks(); track task.documentConverterTaskId) {
+            @for (task of pagedTasks(); track task.documentConverterTaskId) {
               <tr>
                 <td class="max-w-64">
                   <div class="font-medium truncate" [title]="task.taskName">{{ task.taskName }}</div>
@@ -306,7 +301,7 @@
             }
           </tbody>
         </table>
-      </div>
-    }
-  </div>
+    <app-pagination pager [total]="tasks().length" [page]="taskPager.page()" [size]="taskPager.size()"
+                    (goTo)="taskPager.goTo($event, tasks().length)" (setSize)="taskPager.setSize($event)" />
+  </app-table-shell>
 </div>

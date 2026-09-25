@@ -6,7 +6,8 @@
     </div>
     <div class="flex items-center gap-2 flex-wrap">
       @if (isPlatformAdmin()) {
-        <app-combobox class="w-56" [selected]="workspaces.effective()" (selectedChange)="pickTenant($event)" placeholder="Workspace" [allowClear]="false" [options]="workspaces.options()" />
+        <label for="usageWorkspace" class="sr-only">Workspace</label>
+        <app-combobox id="usageWorkspace" class="w-56" [selected]="workspaces.effective()" (selectedChange)="pickTenant($event)" placeholder="Workspace" [allowClear]="false" [options]="workspaces.options()" />
       }
       <div class="btn-join" role="group" aria-label="Month">
         <button type="button" class="btn btn-default btn-icon btn-sm" (click)="shiftMonth(-1)" aria-label="Previous month"><app-icon name="chevronLeft" /></button>
@@ -113,13 +114,17 @@
                 <td class="text-right tabular text-xs text-[color:var(--text-muted)] hidden md:table-cell whitespace-nowrap">{{ fmtRate(line) }}
                   @for (t of line.tiers; track t.from) { <div class="text-[11px]">{{ fmtUnits(line, t.units) }} at {{ fmtUnitPrice(t.unit_price, line.per, line.unit) }}</div> }</td>
                 <td class="text-right tabular font-medium">{{ fmtAmount(line.amount) }}</td>
-                <td><app-icon [name]="openLine()?.meter === line.meter ? 'chevronDown' : 'chevronRight'" size="0.9em" class="icon-muted" /></td>
+                <td><button type="button" class="btn btn-ghost btn-icon btn-xs" [attr.aria-expanded]="openLine()?.meter === line.meter"
+                            [attr.aria-label]="'Show what is behind ' + line.label" (click)="$event.stopPropagation(); toggleLine(line)">
+                  <app-icon [name]="openLine()?.meter === line.meter ? 'chevronDown' : 'chevronRight'" size="0.9em" class="icon-muted" /></button></td>
               </tr>
               @if (openLine()?.meter === line.meter) {
                 <tr class="bg-sunken">
                   <td colspan="7" class="!py-3">
                     @if (subjectsLoading()) {
                       <span class="text-xs text-[color:var(--text-muted)]"><span class="spinner inline-block align-middle mr-2"></span>Reading the events…</span>
+                    } @else if (subjectsError()) {
+                      <span class="text-xs text-crit-500" role="alert">{{ subjectsError() }}</span>
                     } @else if (!subjects().length) {
                       <span class="text-xs text-[color:var(--text-muted)]">No subject recorded on these events.</span>
                     } @else {
@@ -144,7 +149,13 @@
             }
             @if (lines().length) {
               <tr class="border-t-2 border-strong">
-                <td class="font-semibold" colspan="5">Month to date</td>
+                <!-- One cell per column, hidden with the same breakpoints as the header: a colspan
+                     counts hidden columns too, which pushed the total past Amount on a phone. -->
+                <td class="font-semibold">Month to date</td>
+                <td class="hidden md:table-cell"></td>
+                <td></td>
+                <td class="hidden lg:table-cell"></td>
+                <td class="hidden md:table-cell"></td>
                 <td class="text-right tabular font-semibold">{{ fmtAmount(total()) }}</td>
                 <td></td>
               </tr>

@@ -25,12 +25,12 @@ interface OverviewTile { chart: OverviewChart; view: WidgetView | null; kind: st
   selector: 'app-dataset-overview',
   imports: [Icon, StatTile, AnalyticsWidget, WidgetChart, BarChart, RankedBar],
   template: `
+    <!-- Complete only. Rows, columns and size on disk are in the dataset strip right above this
+         tab, which chose a strip over tiles on purpose; repeating them here as headline tiles
+         brought back the "208 B" false headline, and read "0 rows" while the overview loaded. -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-      <app-stat-tile label="Rows" [value]="(rows() ?? 0).toLocaleString()" icon="list" tone="info" [foot]="multiFile() ? 'across every file the pattern matches' : 'exact, from the read'" />
-      <app-stat-tile label="Columns" [value]="columns()" icon="layers" tone="info" [foot]="typeMix()" />
       <app-stat-tile label="Complete" [value]="completeness() === null ? '—' : completeness() + '%'" icon="check" [tone]="completeness() === null ? 'muted' : completeness()! >= 99 ? 'ok' : completeness()! >= 90 ? 'warn' : 'crit'"
                      [foot]="gaps() ? gaps() + ' column' + (gaps() === 1 ? '' : 's') + ' with missing values' : 'no missing values'" />
-      <app-stat-tile label="On disk" [value]="sizeText()" icon="cloud" tone="muted" [foot]="modified() || 'size as listed'" />
     </div>
 
     @if (loading()) {
@@ -53,7 +53,7 @@ interface OverviewTile { chart: OverviewChart; view: WidgetView | null; kind: st
     } @else {
       <div class="flex items-center justify-between gap-2 mt-4 mb-2">
         <p class="text-xs text-[color:var(--text-muted)]">{{ tiles().length }} chart{{ tiles().length === 1 ? '' : 's' }} chosen from the columns, read in {{ overview()?.durationMs ?? 0 }} ms. Each opens in the Canvas as the analysis it is.</p>
-        <button type="button" class="btn btn-ghost btn-sm" (click)="load(true)" [disabled]="loading()"><app-icon name="refresh" />Read again</button>
+        <button type="button" class="btn btn-default btn-sm" (click)="load(true)" [disabled]="loading()"><app-icon name="refresh" [class.spin]="loading()" />Refresh</button>
       </div>
       <div class="widget-grid">
         @for (tile of tiles(); track tile.chart.title) {

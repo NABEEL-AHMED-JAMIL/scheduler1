@@ -40,6 +40,8 @@ export class BillingDocuments implements OnInit, OnDestroy {
   readonly previewUrl = signal<string | null>(null);
   readonly previewLoading = signal(false);
   readonly previewError = signal('');
+  /** A statement is being made: a second click would file a second one. */
+  readonly statementBusy = signal(false);
   readonly kindLabel = DOCUMENT_KIND_LABEL;
   readonly kinds = DOCUMENT_KINDS;
   readonly humanSize = formatSize;
@@ -109,10 +111,12 @@ export class BillingDocuments implements OnInit, OnDestroy {
   open(d: DocumentRow): void { this.api.documentBlob(d.documentId).subscribe({ next: b => BillingApi.open(b), error: () => this.toast.error('Could not open the document.') }); }
   download(d: DocumentRow): void { this.api.documentBlob(d.documentId).subscribe({ next: b => BillingApi.save(b, d.fileName), error: () => this.toast.error('Could not download the document.') }); }
   statement(): void {
+    if (this.statementBusy()) return;
+    this.statementBusy.set(true);
     const y = this.year();
     this.api.statement(`${y}-01-01`, `${y}-12-31`, this.workspaces.tenantId()).subscribe({
-      next: r => { if (r.status !== API_SUCCESS || !r.data) { this.toast.error(r.message); return; } this.toast.success(r.message); this.wanted = r.data.documentId; this.load(); },
-      error: err => this.toast.error(err?.error?.message || 'The statement could not be prepared.'),
+      next: r => { this.statementBusy.set(false); if (r.status !== API_SUCCESS || !r.data) { this.toast.error(r.message); return; } this.toast.success(r.message); this.wanted = r.data.documentId; this.load(); },
+      error: err => { this.statementBusy.set(false); this.toast.error(err?.error?.message || 'The statement could not be prepared.'); },
     });
   }
 }

@@ -114,4 +114,11 @@ export class RateCards implements OnInit {
     const data: RateCardEditorData = { base, workspaces: this.workspaces.options(), tenantId };
     this.dialog.open<RateCard | null>(RateCardEditor, sidePanelConfig(data, 'wide')).closed.subscribe(saved => { if (saved) this.load(saved.version); });
   }
+
+  /**
+   * A workspace's own card from a default one. The editor's For box does the choosing: this
+   * screen has no workspace picker, so preselecting the one last picked on Invoices or
+   * Documents started the card for a workspace nobody chose here.
+   */
+  forOneWorkspace(base: RateCard): void { this.newVersion(base, null); }
 }

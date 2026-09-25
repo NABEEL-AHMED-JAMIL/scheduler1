@@ -13,6 +13,7 @@ import { copyText } from '../../../shared/ui/clipboard.util';
 import { ChatFile, parseDownloadableFiles, stripExportFences } from './chat-export';
 import { ShareDialog, ShareResult } from '../dialogs/share-dialog';
 import { Subscription, finalize } from 'rxjs';
+import { StorageService } from '../storage.service';
 
 interface ChatMessage {
   role: 'user' | 'assistant' | 'error';
@@ -586,21 +587,24 @@ export class FileChat implements OnInit, OnDestroy {
    * A plain fence is already the file; one carrying pendingExport is source text the server
    * turns into xlsx, docx or pdf before it can be saved.
    */
-  download(file: ChatFile): void {
+  /** Which chip a busy state belongs to: the reply it sits in, and its file name. */
+  busyKey(messageIndex: number, file: ChatFile): string { return `${messageIndex}:${file.filename}`; }
+
+  download(file: ChatFile, messageIndex = -1): void {
     if (!file.pendingExport) {
-      this.save(new Blob([file.content], { type: file.mimeType }), file.filename);
+      StorageService.saveBlob(new Blob([file.content], { type: file.mimeType }), file.filename);
       return;
     }
     if (this.converting()) return;
     const pending = file.pendingExport;
-    this.converting.set(file.filename);
+    this.converting.set(this.busyKey(messageIndex, file));
     this.http.post<ApiResponse<string>>(`${API_BASE}/fileChat.json/exportFile`, {
       content: file.content, sourceFormat: pending.sourceFormat, targetFormat: pending.targetFormat,
     }).subscribe({
       next: response => {
         this.converting.set(null);
         if (response.status === API_SUCCESS && response.data) {
-          this.save(this.blobFromBase64(String(response.data), pending.mimeType), pending.filename);
+          StorageService.saveBlob(this.blobFromBase64(String(response.data), pending.mimeType), pending.filename);
         } else {
           this.toast.error(response.message || 'Could not convert this file.');
         }
@@ -666,7 +670,7 @@ export class FileChat implements OnInit, OnDestroy {
     });
   }
 
-  emailExport(file: ChatFile): void {
+  emailExport(file: ChatFile, messageIndex = -1): void {
     if (this.emailing() || this.converting()) return;
     const pending = file.pendingExport;
     const format = pending ? pending.targetFormat : fileExtension(file.filename);
@@ -679,7 +683,7 @@ export class FileChat implements OnInit, OnDestroy {
           ? `The reply is converted to .${format} and sent as an attachment.`
           : `${file.filename} is sent as an attachment.`,
         send: (result: ShareResult) => {
-          this.emailing.set(file.filename);
+          this.emailing.set(this.busyKey(messageIndex, file));
           return this.http.post<ApiResponse>(`${API_BASE}/fileChat.json/emailExport`, {
             content: file.content,
             sourceFormat: pending ? pending.sourceFormat : 'txt',
@@ -699,15 +703,6 @@ export class FileChat implements OnInit, OnDestroy {
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
     return new Blob([bytes], { type: mimeType });
-  }
-
-  private save(blob: Blob, filename: string): void {
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    link.click();
-    URL.revokeObjectURL(url);
   }
 
   onKeydown(event: KeyboardEvent): void {

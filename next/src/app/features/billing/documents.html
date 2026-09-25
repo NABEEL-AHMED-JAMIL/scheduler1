@@ -6,7 +6,7 @@
     </div>
     <div class="flex items-center gap-2 flex-wrap">
       <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()"><app-icon name="refresh" [class.spin]="loading()" />Refresh</button>
-      <button type="button" class="btn btn-primary btn-sm" (click)="statement()" [title]="'The ' + year() + ' invoices and payments as one PDF'"><app-icon name="file" />Statement {{ year() }}</button>
+      <button type="button" class="btn btn-primary btn-sm" (click)="statement()" [disabled]="statementBusy()" [title]="'The ' + year() + ' invoices and payments as one PDF'"><app-icon name="file" [busy]="statementBusy()" />Statement {{ year() }}</button>
     </div>
   </div>
 

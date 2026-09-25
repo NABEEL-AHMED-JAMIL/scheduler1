@@ -1,8 +1,9 @@
 <div class="card shadow-2xl max-w-[calc(100vw-2rem)] max-h-[88vh] flex flex-col overflow-hidden" [style.width.rem]="widthRem()">
-  <div class="flex items-center gap-3 px-4 py-2.5 border-b shrink-0 border-subtle"
-      >
+  <!-- Wraps below sm: icon + name + Close on the first line, the actions under them. As one
+       non-wrapping row it needed ~430px, and the card's overflow-hidden clipped Close off a phone. -->
+  <div class="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5 border-b shrink-0 border-subtle">
     <app-icon [name]="kindIcon()" class="icon-info shrink-0" size="1.05em" />
-    <div class="min-w-0 mr-auto">
+    <div class="min-w-0 mr-auto max-sm:basis-[calc(100%-5rem)]">
       <div class="text-sm font-medium truncate leading-tight" [title]="data.name">{{ data.name }}</div>
       <div class="text-[11px] text-[color:var(--text-muted)] flex items-center gap-2 leading-tight mt-0.5">
         <span class="uppercase">{{ kindLabel() }}</span>
@@ -12,15 +13,18 @@
         }
       </div>
     </div>
+    <button type="button" class="btn btn-ghost btn-icon shrink-0 sm:order-last" (click)="close()" aria-label="Close">
+      <app-icon name="close" />
+    </button>
 
     @if (kind() === 'image' && !loading() && !error()) {
       <div class="flex items-center gap-1 mr-1">
         <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="zoomBy(-0.25)"
-                [disabled]="zoom() <= 0.25" title="Zoom out"><app-icon name="minus" /></button>
+                [disabled]="zoom() <= 0.25" title="Zoom out" aria-label="Zoom out"><app-icon name="minus" /></button>
         <button type="button" class="btn btn-ghost btn-sm min-w-14 tabular" (click)="resetZoom()"
                 title="Reset to fit">{{ zoomLabel() }}</button>
         <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="zoomBy(0.25)"
-                [disabled]="zoom() >= 4" title="Zoom in"><app-icon name="plus" class="icon-ok" /></button>
+                [disabled]="zoom() >= 4" title="Zoom in" aria-label="Zoom in"><app-icon name="plus" /></button>
       </div>
     }
 
@@ -65,9 +69,6 @@
     <button type="button" class="btn btn-default btn-sm" (click)="download()">
       <app-icon name="download" />Download
     </button>
-    <button type="button" class="btn btn-ghost btn-icon" (click)="close()" aria-label="Close">
-      <app-icon name="close" />
-    </button>
   </div>
 
   <div class="flex-1 overflow-auto min-h-48 bg-sunken"
@@ -92,31 +93,17 @@
       </div>
     } @else {
       @switch (kind()) {
-        @case ('none') {
-          <div class="flex flex-col items-center justify-center py-20 gap-3 px-6 text-center">
-            <app-icon name="file" size="1.75rem" class="icon-muted" />
-            <div>
-              <p class="text-sm font-medium">No inline preview for this file type</p>
-              <p class="text-xs text-[color:var(--text-muted)] mt-1">
-                {{ extension() ? '.' + extension() + ' files' : 'Files of this type' }} open in
-                whatever application you have for them.
-              </p>
-            </div>
-            <button type="button" class="btn btn-primary btn-sm mt-1" (click)="download()">
-              <app-icon name="download" />Download
-            </button>
-          </div>
-        }
         @case ('image') {
-          <div class="min-h-full flex items-center justify-center p-4"
+          <button type="button" class="min-h-full w-full flex items-center justify-center p-4"
                [class.cursor-zoom-in]="zoom() === 1" [class.cursor-zoom-out]="zoom() > 1"
+               [attr.aria-label]="zoom() === 1 ? 'Zoom to 200%' : 'Fit'"
                (click)="toggleZoom()">
             <img [src]="mediaUrl()" [alt]="data.name"
                  class="rounded shadow-sm transition-transform duration-150 origin-center"
                  [style.transform]="'scale(' + zoom() + ')'"
                  [style.max-width]="zoom() === 1 ? '100%' : 'none'"
                  [style.max-height]="zoom() === 1 ? '70vh' : 'none'" />
-          </div>
+          </button>
         }
         @case ('pdf') {
           <div class="h-[72vh]"><app-pdf-viewer [src]="mediaUrl()" /></div>
@@ -138,7 +125,8 @@
                 <button type="button" class="btn btn-ghost btn-sm" [disabled]="!tableHasMore() || tableLoading()" (click)="tablePage(1)">Next<app-icon name="chevronRight" /></button>
               </span>
             </div>
-            <div class="overflow-auto rounded border border-subtle bg-code max-h-[68vh]" [class.opacity-60]="tableLoading()">
+            <app-blur-loader [active]="tableLoading()" label="Loading rows…">
+            <div class="overflow-auto rounded border border-subtle bg-code max-h-[68vh]">
               <table class="table-modern preview-grid">
                 <thead>
                   <tr>
@@ -161,6 +149,7 @@
                 </tbody>
               </table>
             </div>
+            </app-blur-loader>
           }
         }
         @case ('document') {
@@ -209,13 +198,13 @@
         @case ('video') {
           <div class="flex items-center justify-center py-2">
             <video [src]="mediaUrl()" controls playsinline
-                   class="max-w-full max-h-[70vh] rounded shadow-sm bg-black"></video>
+                   class="max-w-full max-h-[70vh] rounded shadow-sm bg-code"></video>
           </div>
         }
         @default {
           @if (editing()) {
             <textarea class="input mono text-xs leading-relaxed w-full h-[70vh] resize-none"
-                      spellcheck="false"
+                      spellcheck="false" [attr.aria-label]="'Contents of ' + data.name"
                       [value]="draft()"
                       (input)="draft.set($any($event.target).value)"></textarea>
           } @else {

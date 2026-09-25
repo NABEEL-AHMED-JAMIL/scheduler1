@@ -278,6 +278,8 @@ export class Reports implements OnInit {
   // ---- Model calls in the range, per prompt.
   readonly aiUsage = signal<AiUsageRow[]>([]);
   readonly aiUsageLoading = signal(false);
+  /** The usage read failed: shown as such, not as a page without AI calls. */
+  readonly aiUsageError = signal('');
   readonly failuresLoading = signal(false);
   readonly failuresError = signal('');
 
@@ -868,12 +870,17 @@ export class Reports implements OnInit {
     if (!anyFailed) { this.failures.set([]); return; }
     this.failuresLoading.set(true);
     this.failuresError.set('');
+    // The range this answer belongs to, as the cost, usage and prior-period reads already do:
+    // two quick range changes could otherwise land the older answer last.
+    const asked = { start: this.startDate(), end: this.endDate() };
+    const stale = () => asked.start !== this.startDate() || asked.end !== this.endDate();
     this.http.post<ApiResponse<{ sourceJobQueues?: QueueLog[] }>>(
       `${API_BASE}/message.json/fetchLogs`,
       { fromDate: this.startDate(), toDate: this.endDate(), jobStatuses: [...FAILED] },
     ).subscribe({
       next: response => {
         this.failuresLoading.set(false);
+        if (stale()) return;
         if (response.status !== API_SUCCESS) {
           this.failuresError.set(response.message || 'Could not read the failure detail.');
           return;
@@ -895,6 +902,7 @@ export class Reports implements OnInit {
       },
       error: err => {
         this.failuresLoading.set(false);
+        if (stale()) return;
         this.failuresError.set(err?.error?.message || 'Could not read the failure detail.');
       },
     });
@@ -928,17 +936,28 @@ export class Reports implements OnInit {
   readonly formatMoney = formatMoney;
 
   /** Model calls per prompt for the same range; a page without any AI simply has no section. */
-  private loadAiUsage(): void {
+  loadAiUsage(): void {
     const asked = { start: this.startDate(), end: this.endDate() };
     this.loadAiCost();
     this.aiUsageLoading.set(true);
+    this.aiUsageError.set('');
     this.http.get<ApiResponse<AiUsageRow[]>>(`${API_BASE}/aiPrompt.json/usage`, { params: { from: asked.start, to: asked.end } }).subscribe({
       next: response => {
         if (asked.start !== this.startDate() || asked.end !== this.endDate()) return;
         this.aiUsageLoading.set(false);
-        this.aiUsage.set(response.status === API_SUCCESS ? (response.data ?? []) : []);
+        if (response.status !== API_SUCCESS) {
+          this.aiUsage.set([]);
+          this.aiUsageError.set(response.message || 'Could not read the model calls for this range.');
+          return;
+        }
+        this.aiUsage.set(response.data ?? []);
       },
-      error: () => { this.aiUsageLoading.set(false); this.aiUsage.set([]); },
+      error: err => {
+        if (asked.start !== this.startDate() || asked.end !== this.endDate()) return;
+        this.aiUsageLoading.set(false);
+        this.aiUsage.set([]);
+        this.aiUsageError.set(err?.error?.message || 'Could not read the model calls for this range.');
+      },
     });
   }
 

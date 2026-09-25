@@ -130,6 +130,8 @@ export class Billing implements OnInit {
   readonly openLine = signal<MeterLine | null>(null);
   readonly subjects = signal<SubjectRow[]>([]);
   readonly subjectsLoading = signal(false);
+  /** A drill-down that could not be read says so, rather than "No subject recorded". */
+  readonly subjectsError = signal('');
 
   ngOnInit(): void {
     this.workspaces.ready(() => this.load());
@@ -200,16 +202,20 @@ export class Billing implements OnInit {
    * platform administrator re-prices every workspace; a workspace administrator only their own.
    */
   refresh(): void {
+    this.loading.set(true);
     const roll = this.isPlatformAdmin() ? this.api.refreshUsage() : this.api.refreshWorkspace();
     roll.subscribe({ next: () => this.load(), error: () => this.load() });
   }
 
   toggleLine(line: MeterLine): void {
     if (this.openLine()?.meter === line.meter) { this.openLine.set(null); return; }
-    this.openLine.set(line); this.subjects.set([]); this.subjectsLoading.set(true);
+    this.openLine.set(line); this.subjects.set([]); this.subjectsError.set(''); this.subjectsLoading.set(true);
     this.api.subjects(this.query(), line.meter, SUBJECTS_SHOWN).subscribe({
-      next: r => { this.subjectsLoading.set(false); this.subjects.set((r.data?.rows ?? []).map(s => ({ ...s, quantity: Number(s.quantity), events: Number(s.events) }))); },
-      error: () => this.subjectsLoading.set(false),
+      next: r => {
+        this.subjectsLoading.set(false);
+        if (r.status !== API_SUCCESS) { this.subjectsError.set(r.message || 'The events behind this line could not be read.'); return; }
+        this.subjects.set((r.data?.rows ?? []).map(s => ({ ...s, quantity: Number(s.quantity), events: Number(s.events) }))); },
+      error: err => { this.subjectsLoading.set(false); this.subjectsError.set(err?.error?.message || 'The events behind this line could not be read.'); },
     });
   }
 

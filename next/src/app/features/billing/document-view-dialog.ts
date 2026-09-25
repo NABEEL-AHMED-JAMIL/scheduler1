@@ -7,6 +7,9 @@ import { PdfViewer } from '../objects/preview/pdf-viewer';
 import { BillingApi, DOCUMENT_KIND_LABEL, DocumentRow } from './billing.service';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 
+/** The dialog's heading id, for the opener's ariaLabelledBy: the CDK role="dialog" otherwise has no name. */
+export const DOC_VIEW_TITLE_ID = 'doc-view-title';
+
 /**
  * A billing document read in place -- the same modal the Object Browser opens a file in, with
  * the console's own PDF viewer, so an invoice's PDF or a payment slip is looked at without
@@ -20,7 +23,7 @@ import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
       <div class="flex items-center gap-3 px-4 py-2.5 border-b shrink-0 border-subtle">
         <app-icon name="file" class="icon-info shrink-0" size="1.05em" />
         <div class="min-w-0 mr-auto">
-          <div class="text-sm font-medium truncate leading-tight" [title]="data.fileName">{{ data.number || data.fileName }}</div>
+          <h2 [id]="titleId" class="text-sm font-medium truncate leading-tight" [title]="data.fileName">{{ data.number || data.fileName }}</h2>
           <div class="text-[11px] text-[color:var(--text-muted)] flex items-center gap-2 leading-tight mt-0.5">
             <span class="uppercase">{{ kindLabel[data.kind] }}</span>
             @if (data.sizeBytes) { <span>·</span><span>{{ humanSize(data.sizeBytes) }}</span> }
@@ -29,7 +32,7 @@ import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
           </div>
         </div>
         <button type="button" class="btn btn-ghost btn-sm" (click)="download()" [disabled]="!blob()"><app-icon name="download" />Download</button>
-        <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="openTab()" [disabled]="!blob()" title="Open in a new tab"><app-icon name="external" /></button>
+        <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="openTab()" [disabled]="!blob()" title="Open in a new tab" aria-label="Open in a new tab"><app-icon name="external" /></button>
         <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="ref.close()" aria-label="Close"><app-icon name="close" /></button>
       </div>
       <div class="flex-1 min-h-0 h-[72vh] flex flex-col">
@@ -53,6 +56,7 @@ import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
   `,
 })
 export class DocumentViewDialog implements OnInit, OnDestroy {
+  readonly titleId = DOC_VIEW_TITLE_ID;
   readonly ref = inject<DialogRef<void>>(DialogRef);
   readonly data = inject<DocumentRow>(DIALOG_DATA);
   private readonly api = inject(BillingApi);

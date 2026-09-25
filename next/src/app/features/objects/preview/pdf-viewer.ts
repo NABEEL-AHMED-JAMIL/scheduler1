@@ -20,25 +20,25 @@ import { Icon } from '../../../shared/ui/icon';
         <div class="flex items-center gap-1 px-3 py-1.5 border-b shrink-0 border-subtle bg-raised"
             >
           <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="go(-1)"
-                  [disabled]="page() <= 1" title="Previous page">
+                  [disabled]="page() <= 1" title="Previous page" aria-label="Previous page">
             <app-icon name="chevronLeft" />
           </button>
           <span class="text-xs tabular px-1">
             {{ page() }} <span class="text-[color:var(--text-muted)]">of {{ pageCount() }}</span>
           </span>
           <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="go(1)"
-                  [disabled]="page() >= pageCount()" title="Next page">
+                  [disabled]="page() >= pageCount()" title="Next page" aria-label="Next page">
             <app-icon name="chevronRight" />
           </button>
 
           <span class="w-px h-4 mx-1.5 bg-subtle"></span>
 
           <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="zoomBy(-0.25)"
-                  [disabled]="scale() <= 0.5" title="Zoom out"><app-icon name="minus" /></button>
+                  [disabled]="scale() <= 0.5" title="Zoom out" aria-label="Zoom out"><app-icon name="minus" /></button>
           <button type="button" class="btn btn-ghost btn-sm min-w-14 tabular" (click)="fit()"
                   title="Fit to width">{{ zoomLabel() }}</button>
           <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="zoomBy(0.25)"
-                  [disabled]="scale() >= 3" title="Zoom in"><app-icon name="plus" /></button>
+                  [disabled]="scale() >= 3" title="Zoom in" aria-label="Zoom in"><app-icon name="plus" /></button>
 
           @if (rendering()) {
             <app-icon name="refresh" class="spin icon-muted ml-2" size="0.9em" />
@@ -51,6 +51,15 @@ import { Icon } from '../../../shared/ui/icon';
           <div class="flex flex-col items-center justify-center gap-3 py-20 text-center">
             <app-icon name="alert" size="1.75rem" class="icon-crit" />
             <p class="text-sm text-crit-500">{{ error() }}</p>
+            @if (src(); as url) {
+              <button type="button" class="btn btn-default btn-sm" (click)="open(url)"><app-icon name="refresh" />Try again</button>
+            }
+          </div>
+        } @else if (pageError()) {
+          <!-- One page that will not draw; the toolbar still moves to the others. -->
+          <div class="flex flex-col items-center justify-center gap-3 py-20 text-center" role="alert">
+            <app-icon name="alert" size="1.75rem" class="icon-crit" />
+            <p class="text-sm text-crit-500">{{ pageError() }}</p>
           </div>
         } @else if (!pageCount()) {
           <div class="flex flex-col items-center justify-center gap-3 py-20">
@@ -59,7 +68,7 @@ import { Icon } from '../../../shared/ui/icon';
           </div>
         }
         <canvas #canvas class="rounded shadow-sm max-w-full"
-                [class.hidden]="!pageCount() || !!error()"></canvas>
+                [class.hidden]="!pageCount() || !!error() || !!pageError()"></canvas>
       </div>
     </div>
   `,
@@ -74,7 +83,10 @@ export class PdfViewer implements OnDestroy {
   readonly pageCount = signal(0);
   readonly scale = signal(1);
   readonly rendering = signal(false);
+  /** The document could not be opened: terminal until Try again. */
   readonly error = signal('');
+  /** The page on screen could not be drawn: cleared by the next draw, so other pages still show. */
+  readonly pageError = signal('');
 
   readonly zoomLabel = computed(() => `${Math.round(this.scale() * 100)}%`);
 
@@ -94,7 +106,7 @@ export class PdfViewer implements OnDestroy {
     });
   }
 
-  private async open(url: string): Promise<void> {
+  async open(url: string): Promise<void> {
     try {
       this.error.set('');
       this.pageCount.set(0);
@@ -139,8 +151,10 @@ export class PdfViewer implements OnDestroy {
       this.renderTask = null;
     }
     this.rendering.set(true);
+    this.pageError.set('');
+    const wanted = this.page();
     try {
-      const page = await this.doc.getPage(this.page());
+      const page = await this.doc.getPage(wanted);
       const viewport = page.getViewport({ scale: this.scale() });
       const canvas = this.canvasRef().nativeElement;
       const context = canvas.getContext('2d');
@@ -156,7 +170,7 @@ export class PdfViewer implements OnDestroy {
       this.renderTask = null;
     } catch (err: any) {
       if (err?.name !== 'RenderingCancelledException' && !this.destroyed) {
-        this.error.set('This page could not be drawn.');
+        this.pageError.set(`Page ${wanted} could not be drawn.`);
       }
     } finally {
       if (!this.destroyed) this.rendering.set(false);

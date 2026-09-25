@@ -1006,7 +1006,7 @@ describe('the dataset registry', () => {
   it('says that a registered dataset holds no data of its own', () => {
     const { text } = registryWith();
     expect(text()).toContain('no rows are scanned and no query permit is spent');
-    expect(text()).toContain('deleting one never touches a file');
+    expect(text()).toContain('removing one never touches a file');
   });
 
   it('lists what this workspace has saved, with the format the server decided', () => {
@@ -1426,16 +1426,9 @@ describe('the three summary kinds', () => {
 });
 
 describe('finding a report among many', () => {
-  it('collapses the list when a report is opened', () => {
-    // Twenty-eight entries at full height pushed every widget below the fold, so opening a
-    // report showed a list of reports.
-    const harness = boardWith({ widgets: [widgetOn()] });
-    expect(harness.board.listOpen()).toBe(true);
-
-    harness.board.openDashboard(BOARD);
-
-    expect(harness.board.listOpen()).toBe(false);
-  });
+  // "collapses the list when a report is opened" pinned a listOpen signal nothing rendered: the
+  // rail sits beside the board (lookup-split), so there was no list to collapse and no "Show the
+  // list" to bring it back. The signal went with the audit (09-22), and so did the test.
 
   it('narrows by name and by description', () => {
     const harness = boardWith({ widgets: [widgetOn()] });
@@ -2223,5 +2216,134 @@ describe('how wide a chart draws in a board row', () => {
       fixture.componentRef.setInput('kind', kind);
       expect(fixture.componentInstance.shell(), kind).toContain('max-w-3xl');
     }
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Audit 09-22: the Dashboards screen and the registry as drawn.
+
+describe('Dashboards, audit 09-22', () => {
+  it('closes the create form once the board exists, and says Creating... while it is made', () => {
+    const rendered = renderedBoard();
+    const reply = new Subject<any>();
+    rendered.api.saveDashboard.mockReturnValueOnce(reply as any);
+    rendered.board.createOpen.set(true);
+    rendered.board.newName.set('Quarter end');
+    rendered.fixture.detectChanges();
+    rendered.board.createDashboard();
+    expect(rendered.text()).toContain('Creating…');
+    reply.next(SERVER_RESPONSE({ ...BOARD, analyticsDashboardId: 12, dashboardName: 'Quarter end' }));
+    expect(rendered.board.createOpen()).toBe(false);
+  });
+
+  it('marks a partial tile as a warning, the way the Studio does, not as an error', () => {
+    const rendered = renderedBoard({ widgets: [widgetOn({ visualizationType: 'table' })] });
+    rendered.finishAnalysis(analysisResult({ truncated: true }));
+    rendered.text();
+    const el = rendered.fixture.nativeElement as HTMLElement;
+    const partial = [...el.querySelectorAll('.pill')].find(p => /partial/i.test(p.textContent!));
+    expect(partial?.classList).toContain('pill-warn');
+    expect([...el.querySelectorAll('.text-crit-500')].some(p => p.textContent!.includes('Partial'))).toBe(false);
+  });
+
+  it('puts the "Drawn as" select back when the choice could not be saved', () => {
+    const rendered = renderedBoard({ widgets: [widgetOn({ visualizationType: 'table' })] });
+    rendered.finishAnalysis();
+    rendered.text();
+    rendered.api.saveWidget.mockReturnValueOnce(of(SERVER_REFUSAL('Only its owner can change this board.')) as any);
+    const select = (rendered.fixture.nativeElement as HTMLElement).querySelector<HTMLSelectElement>('select.widget-kind')!;
+    const before = select.value;
+    const other = [...select.options].find(o => !o.disabled && o.value !== before)!.value;
+    select.value = other;
+    select.dispatchEvent(new Event('change'));
+    rendered.fixture.detectChanges();
+    expect(select.value).toBe(before);
+  });
+
+  it('asks to remove a widget in one verb: "Remove this widget?" / Remove', async () => {
+    const stub = configure({ widgets: [widgetOn()] });
+    const open = vi.fn((_c: unknown, _config: any) => ({ closed: of(false) }));
+    TestBed.overrideProvider(Dialog, { useValue: { open } });
+    const board = TestBed.runInInjectionContext(() => new Dashboards());
+    board.ngOnInit();
+    board.openDashboard(BOARD);
+    await board.removeWidget(widgetOn());
+    const data = open.mock.calls[0][1].data;
+    expect(data.title).toBe('Remove this widget?');
+    expect(data.confirmLabel).toBe('Remove');
+    expect(stub.deleteWidget).not.toHaveBeenCalled();
+  });
+
+  it('shows a rail that failed to load with the alert icon and a refresh Try again', () => {
+    const stub = configure({});
+    stub.api.fetchAllDashboards.mockReturnValue(of(SERVER_REFUSAL('The dashboards could not be read.')) as any);
+    const fixture = TestBed.createComponent(Dashboards);
+    fixture.detectChanges();
+    const rail = (fixture.nativeElement as HTMLElement).querySelector('.lookup-rail')!;
+    expect(rail.textContent).toContain('The dashboards could not be read.');
+    expect(rail.querySelector('app-icon[name="alert"]')).not.toBeNull();
+    const retry = [...rail.querySelectorAll('button')].find(b => b.textContent!.includes('Try again'))!;
+    expect(retry.querySelector('app-icon[name="refresh"]')).not.toBeNull();
+  });
+});
+
+describe('the dataset registry, audit 09-22', () => {
+  function registry(datasets: object[], open = vi.fn((_c: unknown, _config: any) => ({ closed: of(false) }))) {
+    TestBed.resetTestingModule();
+    const fetch = new Subject<any>();
+    TestBed.configureTestingModule({ providers: [
+      { provide: AnalyticsService, useValue: { fetchAllDatasets: () => fetch, registerDataset: vi.fn(), deleteDataset: vi.fn() } },
+      { provide: Dialog, useValue: { open } },
+    ] });
+    const fixture = TestBed.createComponent(DatasetRegistry);
+    fixture.componentRef.setInput('connection', 'minio-main');
+    fixture.componentRef.setInput('path', 'daily/sales-2026.csv');
+    fixture.detectChanges();
+    return { fixture, fetch, open, el: fixture.nativeElement as HTMLElement };
+  }
+  const SALES = { analyticsDatasetId: 3, datasetName: 'Sales', connectionAlias: 'minio-main', datasetPath: 'daily/sales-2026.csv', datasetFormat: 'CSV' };
+
+  it('spins Refresh while it reads', () => {
+    const { el } = registry([]);
+    const refresh = [...el.querySelectorAll('button')].find(b => b.textContent!.includes('Refresh'))!;
+    expect(refresh.querySelector('app-icon')!.classList).toContain('spin');
+  });
+
+  it('names the remove button, and says "Remove" everywhere rather than Forget and delete', async () => {
+    const { el, fixture, fetch, open } = registry([SALES]);
+    fetch.next(SERVER_RESPONSE([SALES]));
+    fixture.detectChanges();
+    const remove = el.querySelector<HTMLButtonElement>('button[aria-label="Remove Sales from the registry"]')!;
+    expect(remove).not.toBeNull();
+    expect(remove.classList).toContain('btn-intent-crit');
+    await fixture.componentInstance.forget(SALES as any);
+    expect(open.mock.calls[0][1].data.confirmLabel).toBe('Remove');
+    expect(el.textContent).not.toContain('Forget');
+  });
+
+  it('says removing a name never touches a file', () => {
+    const { el, fixture, fetch } = registry([]);
+    fetch.next(SERVER_RESPONSE([]));
+    fixture.detectChanges();
+    expect(el.textContent).toContain('removing one never touches a file');
+  });
+});
+
+describe('adding a widget, audit 09-22', () => {
+  it('lays the form out with app-field, and says when the height is out of range', () => {
+    const rendered = renderedBoard({ widgets: [widgetOn()] });
+    rendered.board.openAdd();
+    rendered.text();
+    const el = rendered.fixture.nativeElement as HTMLElement;
+    expect(el.querySelectorAll('app-field').length).toBeGreaterThanOrEqual(5);
+    expect(el.querySelector('app-field label[for="w-title"]')?.textContent).toContain('(required)');
+    rendered.board.addTitle.set('Revenue');
+    rendered.board.addSourceId.set('11');
+    rendered.board.addHeight.set('20');
+    const text = rendered.text();
+    expect(text).toContain(`Between ${rendered.board.heightMin} and ${rendered.board.heightMax}`);
+    expect(rendered.board.canAdd()).toBe(false);
+    rendered.board.addHeight.set('200');
+    expect(rendered.board.canAdd()).toBe(true);
   });
 });

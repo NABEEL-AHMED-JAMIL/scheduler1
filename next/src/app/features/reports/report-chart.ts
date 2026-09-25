@@ -81,8 +81,12 @@ interface Bar { x: number; y: number; w: number; h: number; fill: string; hint: 
   // starting guess for ever and never grew into the card.
   styles: [':host { display: block; }'],
   template: `
+    @if (!pivot().rowLabels.length) {
+      <!-- A search that matches no row hands over an empty pivot; bare gridlines said nothing. -->
+      <p class="text-sm text-[color:var(--text-muted)] py-8 text-center">{{ emptyMessage() }}</p>
+    } @else {
     <svg [attr.viewBox]="'0 0 ' + W + ' ' + H" width="100%" [attr.height]="H"
-         role="img" [attr.aria-label]="kind() + ' chart of the report'">
+         role="img" [attr.aria-label]="chartLabels[kind()] + ' of ' + (label() || 'the report')">
       @for (line of gridLines(); track $index) {
         <line [attr.x1]="line.x1" [attr.x2]="line.x2" [attr.y1]="line.y" [attr.y2]="line.y"
               [attr.stroke]="'var(--border-subtle)'" />
@@ -128,6 +132,7 @@ interface Bar { x: number; y: number; w: number; h: number; fill: string; hint: 
               [attr.fill]="'var(--text-muted)'" font-size="10">{{ c.label }}</text>
       }
     </svg>
+    }
   `,
 })
 export class ReportChart {
@@ -135,6 +140,10 @@ export class ReportChart {
   readonly measure = input.required<Measure>();
   readonly kind = input.required<ChartKind>();
   readonly colorFor = input.required<(label: string) => string>();
+  /** What the chart is of -- the report title -- for its accessible name. */
+  readonly label = input('');
+  readonly emptyMessage = input('No rows to chart.');
+  readonly chartLabels = CHART_LABELS;
   /** Which axis, if either, carries the Day dimension. */
   readonly dayAxis = input<'row' | 'col' | 'none'>('none');
 

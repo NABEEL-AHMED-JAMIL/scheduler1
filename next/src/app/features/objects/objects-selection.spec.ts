@@ -35,6 +35,7 @@ function browserWithHiddenSelection() {
         listObjects: () => of(OK({ objects: [SALES, NOTES] })),
         deleteObjects: (_bucket: string, keys: string[]) => { deleted.push(keys); return of(OK(null)); },
         download: (_bucket: string, key: string) => { downloaded.push(key); return of(new Blob()); },
+        share: (_bucket: string, keys: string[]) => { shared.push(keys); return of(OK(null)); },
       } },
       // Every dialog answers yes: the share form with an address, the delete confirm with true.
       // The share dialog sends by itself (ShareOptions.send); this is the person pressing Send.

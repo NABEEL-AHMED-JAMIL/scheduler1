@@ -1,4 +1,7 @@
 import { DataGrid } from './data-grid';
+import { ColumnCard } from './column-card';
+import { provideZonelessChangeDetection } from '@angular/core';
+import { throwError } from 'rxjs';
 import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { ToastService } from '../../shared/ui/toast.service';
@@ -5422,3 +5425,142 @@ describe('the dates the Studio shows', () => {
     expect(studio.runWhen({ dateCreated: 'not a date' } as any)).toBe('not a date');
   });
 });
+
+// ---------------------------------------------------------------------------------------------
+// Audit 09-22: the Studio as drawn -- the console's own tabs, a keyboard way into a column,
+// states that do not contradict each other, and a toast after every change that worked.
+
+describe('the Studio, drawn to the console pattern', () => {
+  it('uses the console .tab / .tab-active for the dataset views, not a blue underline of its own', () => {
+    const grid = gridWith();
+    const el = grid.fixture.nativeElement as HTMLElement;
+    const tabs = [...el.querySelectorAll('[aria-label="Dataset views"] button')];
+    expect(tabs.length).toBeGreaterThan(3);
+    for (const tab of tabs) expect(tab.classList).toContain('tab');
+    expect(tabs.filter(t => t.classList.contains('tab-active')).map(t => t.textContent!.trim())).toEqual(['Data']);
+    expect(el.innerHTML).not.toContain('border-[color:var(--chart-0)]');
+  });
+
+  it('opens a Compact column from a named button that says whether it is open', () => {
+    const grid = scanned('compact', [columnOf({ name: 'amount' })]);
+    const el = grid.fixture.nativeElement as HTMLElement;
+    const toggle = el.querySelector<HTMLButtonElement>('button[aria-label="Show details for amount"]')!;
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    toggle.click();
+    grid.fixture.detectChanges();
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(toggle.closest('tr')!.hasAttribute('aria-expanded')).toBe(false);
+  });
+
+  it('does not say "Nothing saved yet" under a library that failed to load', () => {
+    const console = consoleWith();
+    console.answers.saved!.next(SERVER_REFUSAL('Data could not be fetched.'));
+    const text = console.show();
+    expect(text).toContain('Data could not be fetched.');
+    expect(text).not.toContain('Nothing saved yet');
+  });
+
+  it('does not say "Nothing has been run here yet" under a history that failed to load, and offers Try again', () => {
+    const console = consoleWith();
+    console.studio.showTab('activity');
+    console.fixture.detectChanges();
+    console.answers.runs!.next(SERVER_REFUSAL('History is unavailable.'));
+    const text = console.show();
+    expect(text).toContain('History is unavailable.');
+    expect(text).not.toContain('Nothing has been run here yet');
+    const before = console.fetchRecentRuns.mock.calls.length;
+    const retry = [...(console.fixture.nativeElement as HTMLElement).querySelectorAll('button')].find(b => b.textContent!.trim() === 'Try again')!;
+    retry.click();
+    expect(console.fetchRecentRuns.mock.calls.length).toBe(before + 1);
+  });
+
+  it('spins the run-history Refresh while it reads', () => {
+    const console = consoleWith();
+    console.studio.showTab('activity');
+    console.fixture.detectChanges();
+    const refresh = [...(console.fixture.nativeElement as HTMLElement).querySelectorAll('button')].find(b => b.textContent!.trim() === 'Refresh')!;
+    expect(refresh.querySelector('app-icon')!.classList).toContain('spin');
+  });
+
+  it('names a removable filter chip by what pressing it does', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    canvas.studio.crossFilter('region', 'north');
+    const el = canvas.fixture.nativeElement as HTMLElement;
+    canvas.show();
+    expect([...el.querySelectorAll('button.pill')].some(b => (b.getAttribute('aria-label') ?? '').startsWith('Remove filter '))).toBe(true);
+  });
+
+  it('draws the Canvas grids with .table-modern, like the SQL result beside them', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    canvas.show();
+    const el = canvas.fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('table.w-full.text-sm')).toBeNull();
+    expect(el.querySelectorAll('table.table-modern').length).toBeGreaterThan(0);
+  });
+
+  it('confirms a rename and a delete with a toast, as every other screen does', async () => {
+    const console = consoleWith();
+    const toast = TestBed.inject(ToastService);
+    const success = vi.spyOn(toast, 'success');
+    console.answers.saved!.next(SERVER_RESPONSE([SAVED]));
+    console.studio.startRename(SAVED);
+    console.studio.renameName.set('Monthly totals');
+    console.studio.applyRename();
+    console.answers.rename!.next(SERVER_RESPONSE(null));
+    expect(success).toHaveBeenCalledWith('Renamed to "Monthly totals".');
+
+    await console.studio.removeSaved(SAVED);
+    console.answers.remove!.next(SERVER_RESPONSE(null));
+    expect(success).toHaveBeenCalledWith('"Daily totals" deleted.');
+  });
+
+  it('offers Run again under a canvas analysis that did not run', () => {
+    const canvas = canvasWith();
+    canvas.studio.analysisError.set('No governor slot is free.');
+    const text = canvas.show();
+    expect(text).toContain('No governor slot is free.');
+    expect(text).toContain('Run again');
+  });
+});
+
+// Audit 09-22: a column card's failed measurement keeps its way back; its Counts are a .table-modern.
+describe('ColumnCard, audit 09-22', () => {
+  function card(distribution: () => unknown) {
+    const view = viewOf(columnOf({ name: 'col' }));
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection(),
+      { provide: AnalyticsService, useValue: { distribution: vi.fn(distribution) } }] });
+    const fixture = TestBed.createComponent(ColumnCard);
+    fixture.componentRef.setInput('column', view);
+    fixture.componentRef.setInput('connection', 'etl-bucket');
+    fixture.componentRef.setInput('path', 'demo/orders.csv');
+    fixture.detectChanges();
+    return { fixture, card: fixture.componentInstance, el: fixture.nativeElement as HTMLElement };
+  }
+
+  it('keeps a way to measure again under a failed measurement', () => {
+    let calls = 0;
+    const { fixture, card: c, el } = card(() => (calls++ === 0
+      ? throwError(() => ({ error: { message: 'No governor slot is free.' } }))
+      : of({ status: 'SUCCESS', message: '', data: { name: 'col', exactValues: true, bins: [{ value: 'North', rows: 9 }] } })));
+    c.measure();
+    fixture.detectChanges();
+    expect(el.textContent).toContain('No governor slot is free.');
+    const retry = [...el.querySelectorAll('button')].find(b => b.textContent!.includes('Try again'))!;
+    expect(retry.querySelector('app-icon[name="refresh"]')).not.toBeNull();
+    retry.click();
+    fixture.detectChanges();
+    expect(c.distribution()).not.toBeNull();
+  });
+
+  it('draws the Counts table as .table-modern', () => {
+    const { fixture, card: c, el } = card(() => of({ status: 'SUCCESS', message: '', data: { name: 'col', exactValues: true, bins: [{ value: 'North', rows: 9 }] } }));
+    c.measure();
+    c.chooseKind('table');
+    fixture.detectChanges();
+    expect(el.querySelector('table')!.classList).toContain('table-modern');
+  });
+});
+

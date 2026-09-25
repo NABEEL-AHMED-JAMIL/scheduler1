@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { Observable } from 'rxjs';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 
@@ -36,7 +36,14 @@ export interface ShareResult { recipientEmail: string; message: string; }
 
         <label class="label mt-3" for="to">Recipient</label>
         <input id="to" type="email" class="input" cdkFocusInitial placeholder="name@example.com"
-               [value]="email()" (input)="email.set($any($event.target).value)" />
+               [class.input-invalid]="showAddressError()"
+               [attr.aria-invalid]="showAddressError() ? 'true' : null"
+               [attr.aria-describedby]="showAddressError() ? 'to-error' : null"
+               [value]="email()" (input)="email.set($any($event.target).value)" (blur)="touched.set(true)" />
+        <!-- Send stays off for an incomplete address; this says why, once the box is left. -->
+        @if (showAddressError()) {
+          <p id="to-error" class="field-note text-crit-500">Enter a full email address, like name&#64;example.com.</p>
+        }
 
         <label class="label mt-3" for="note">Message</label>
         <textarea id="note" class="input resize-y min-h-20" placeholder="Optional note"
@@ -62,6 +69,9 @@ export class ShareDialog {
   readonly message = signal('');
   readonly sending = signal(false);
   readonly error = signal('');
+  /** Left the recipient box at least once, or tried to send. */
+  readonly touched = signal(false);
+  readonly showAddressError = computed(() => this.touched() && !!this.email().trim() && !this.valid());
 
   valid(): boolean {
     // Deliberately loose: the server is the authority on deliverability, this only
@@ -71,6 +81,7 @@ export class ShareDialog {
 
   submit(event: Event): void {
     event.preventDefault();
+    this.touched.set(true);
     if (!this.valid() || this.sending()) return;
     const result = { recipientEmail: this.email().trim(), message: this.message().trim() };
     if (!this.data.send) { this.ref.close(result); return; }

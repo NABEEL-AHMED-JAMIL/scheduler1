@@ -119,8 +119,9 @@ describe('RateCards, as rendered', () => {
     const { el } = rendered();                                   // v2, the default in effect, has free churn
     const cells = [...el.querySelectorAll('.lookup-entry-table tbody td:nth-child(2)')].map(td => td.textContent!.trim());
     expect(cells).toContain('Free');
-    expect(cells).toContain('Tiered');
-    expect(cells).not.toContain('tiered');
+    // A tiered cell now also carries its bands below lg; the label still leads it.
+    expect(cells.some(c => c.startsWith('Tiered'))).toBe(true);
+    expect(cells.some(c => c.startsWith('tiered'))).toBe(false);
   });
 
   it("dates today by the viewer's calendar, so a card starting tomorrow is not in effect tonight", () => {
@@ -196,3 +197,65 @@ describe('RateCardEditor', () => {
     expect(ref.close).toHaveBeenCalledWith(expect.objectContaining({ version: 9 }));
   });
 });
+
+/** Audit 09-22: the page as drawn -- one primary action, tier prices at any width, neutral workspace glyph. */
+describe('RateCards, rendered', () => {
+  function view() {
+    const api = { rateCards: vi.fn(() => of({ status: API_SUCCESS, data: { cards: CARDS } })), saveRateCard: vi.fn() };
+    const dialog = { open: vi.fn(() => ({ closed: of(null) })) };
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [
+      { provide: BillingApi, useValue: api }, { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } }, { provide: Dialog, useValue: dialog },
+      { provide: WorkspacePicker, useValue: { tenantId: () => '2905', options: () => [{ value: '2905', label: 'MedAxis' }], ready: (then: () => void) => then() } },
+    ] });
+    const fixture = TestBed.createComponent(RateCards);
+    fixture.detectChanges();
+    return { fixture, dialog, component: fixture.componentInstance, el: fixture.nativeElement as HTMLElement };
+  }
+
+  it('has one primary action in view: the pane\'s New version from this', () => {
+    const { el } = view();
+    const primaries = [...el.querySelectorAll('.btn-primary')].map(b => b.textContent!.trim());
+    expect(primaries).toEqual(['New version from this']);
+  });
+
+  it('prints a tiered meter\'s bands under its price, for widths that hide the Tiers column', () => {
+    const { el } = view();
+    const row = [...el.querySelectorAll('.lookup-entry-table tbody tr')].find(tr => tr.textContent!.includes('Model tokens in'))!;
+    const price = row.querySelectorAll('td')[1];
+    const narrow = price.querySelector('.lg\\:hidden');
+    expect(narrow?.textContent).toContain('1,500 and up: $0.02 per 1,000 tokens');
+  });
+
+  it('draws a workspace card with a neutral glyph, not the warning amber of a managed lookup', () => {
+    const { el } = view();
+    const glyphs = [...el.querySelectorAll('.lookup-rail-glyph')];
+    expect(glyphs.some(g => g.classList.contains('is-managed'))).toBe(false);
+  });
+
+  it('starts "A card for one workspace" with no workspace chosen, rather than one picked on another screen', () => {
+    const { component, dialog } = view();
+    component.forOneWorkspace(component.cards()[3]);
+    const data = (dialog.open.mock.calls[0] as unknown as [unknown, { data: { tenantId: number | null } }])[1].data;
+    expect(data.tenantId).toBeNull();
+  });
+});
+
+describe('RateCardEditor, rendered', () => {
+  it('labels its fields with app-field: required stars, hints as field notes, no local .hint', () => {
+    const base = RateCards.numeric(CARDS[3] as unknown as RateCard);
+    editor(base);
+    const fixture = TestBed.createComponent(RateCardEditor);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const label = (id: string) => el.querySelector(`label[for="${id}"]`)!;
+    expect(label('rcName').textContent).toContain('(required)');
+    expect(label('rcFrom').textContent).toContain('(required)');
+    expect(label('rcNote').textContent).not.toContain('(required)');
+    expect(el.querySelector('.hint')).toBeNull();
+    expect([...el.querySelectorAll('.field-note')].map(n => n.textContent!.trim())).toContain('Prices bills for periods that start on or after this day.');
+    // The changed-row rule is the console's one (styles.css .lookup-entry-table tr.is-changed), not a near-black local copy.
+    expect(el.querySelector('table.rate-edit')!.classList).toContain('lookup-entry-table');
+  });
+});
+

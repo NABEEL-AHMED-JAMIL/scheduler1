@@ -23,7 +23,7 @@
       <ng-template #pageMenu>
         <div cdkMenu class="card shadow-xl py-1 min-w-52 text-sm">
           <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="editAccount()"><app-icon name="edit" />Billing profile</button>
-          <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="statement()"><app-icon name="file" />Statement for this year</button>
+          <button cdkMenuItem class="menu-item" [cdkMenuItemDisabled]="statementBusy()" (cdkMenuItemTriggered)="statement()"><app-icon name="file" [busy]="statementBusy()" />Statement for this year</button>
         </div>
       </ng-template>
     </div>
@@ -79,7 +79,8 @@
           @for (r of visible(); track r.invoiceId) {
             <li role="presentation">
               <button type="button" class="lookup-rail-item" role="option" [attr.aria-selected]="selectedNumber() === r.number" [class.is-selected]="selectedNumber() === r.number" (click)="select(r)">
-                <span class="kafka-rail-dot" [class]="'kafka-rail-dot bill-dot-' + tone(r)" [title]="statusLabel[r.status]"></span>
+                <span class="kafka-rail-dot" [class]="'kafka-rail-dot bill-dot-' + tone(r)" [title]="statusLabel[r.status]" aria-hidden="true"></span>
+                <span class="sr-only">{{ statusLabel[r.status] }}</span>
                 <span class="min-w-0 flex-1">
                   <span class="lookup-rail-key mono">{{ r.number }}</span>
                   <span class="lookup-rail-sub">

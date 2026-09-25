@@ -121,7 +121,7 @@ export class Invoices implements OnInit {
   overdueDays(r: InvoiceRow): number { return daysOverdue(r.dueAt); }
   /** The rail's dot: what the row's state means for the reader. */
   tone(r: InvoiceRow): string {
-    return r.status === 'overdue' ? 'crit' : (r.pendingPayments ?? 0) > 0 ? 'warn' : r.status === 'paid' ? 'ok' : r.status === 'draft' || r.status === 'void' ? 'muted' : 'info';
+    return r.status === 'overdue' ? 'crit' : (r.pendingPayments ?? 0) > 0 ? 'warn' : r.status === 'paid' ? 'ok' : r.status === 'draft' || r.status === 'void' ? 'muted' : 'warn';
   }
   docsLabel(r: InvoiceRow): string {
     const short: Record<string, string> = { invoice: 'PDF', credit_note: 'PDF', payment_slip: 'slip', receipt: 'receipt', statement: 'statement' };
@@ -146,11 +146,21 @@ export class Invoices implements OnInit {
       .closed.subscribe(saved => { if (saved) this.toast.success('Billing profile saved.'); });
   }
 
+  /** A statement is being made: a second click would file a second one. */
+  readonly statementBusy = signal(false);
+
   statement(): void {
+    if (this.statementBusy()) return;
+    this.statementBusy.set(true);
     const year = new Date().getFullYear();
     this.api.statement(`${year}-01-01`, `${year}-12-31`, this.workspaces.tenantId()).subscribe({
-      next: r => { if (r.status !== API_SUCCESS || !r.data) { this.toast.error(r.message); return; } this.toast.success(r.message); this.api.documentBlob(r.data.documentId).subscribe(b => BillingApi.open(b)); },
-      error: err => this.toast.error(err?.error?.message || 'The statement could not be prepared.'),
+      next: r => {
+        this.statementBusy.set(false);
+        if (r.status !== API_SUCCESS || !r.data) { this.toast.error(r.message); return; }
+        this.toast.success(r.message);
+        this.api.documentBlob(r.data.documentId).subscribe({ next: b => BillingApi.open(b), error: () => this.toast.error('Could not open the statement.') });
+      },
+      error: err => { this.statementBusy.set(false); this.toast.error(err?.error?.message || 'The statement could not be prepared.'); },
     });
   }
 }

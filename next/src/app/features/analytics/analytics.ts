@@ -2965,6 +2965,7 @@ export class Analytics implements OnInit {
         // was given, and it is what Update has to point at from here on.
         this.loadedQuery.set(response.data);
         this.saveName.set(response.data.queryName ?? query.queryName);
+        this.toast.success(`"${response.data.queryName ?? query.queryName}" saved.`);
         this.loadSavedQueries();
       },
       error: err => {
@@ -3030,6 +3031,7 @@ export class Analytics implements OnInit {
           this.loadedQuery.set({ ...loaded, queryName: name });
           this.saveName.set(name);
         }
+        this.toast.success(`Renamed to "${name}".`);
         this.loadSavedQueries();
       },
       error: err => {
@@ -3064,6 +3066,7 @@ export class Analytics implements OnInit {
           return;
         }
         if (this.loadedQuery()?.analyticsQueryId === id) this.loadedQuery.set(null);
+        this.toast.success(`"${query.queryName}" deleted.`);
         this.loadSavedQueries();
       },
       error: err => {
@@ -4862,6 +4865,7 @@ export class Analytics implements OnInit {
           return;
         }
         this.loadedAnalysis.set(response.data);
+        this.toast.success(`"${response.data.analysisName ?? this.analysisName().trim()}" saved.`);
         this.loadAnalyses();
       },
       error: err => {

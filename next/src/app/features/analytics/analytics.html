@@ -261,13 +261,10 @@
                      body scrolling sideways. -->
                 <div class="flex flex-wrap gap-1">
                   @for (item of group.tabs; track item.id) {
-                    <button type="button"
-                            class="px-3 py-1.5 text-sm border-b-2 -mb-px transition-colors
-                                   whitespace-nowrap"
-                            [class.border-transparent]="tab() !== item.id"
-                            [class.text-[color:var(--text-muted)]]="tab() !== item.id"
-                            [class.font-semibold]="tab() === item.id"
-                            [class.border-[color:var(--chart-0)]]="tab() === item.id"
+                    <!-- The console's .tab / .tab-active: the blue --chart-0 underline made this
+                         the one tab row in the app that looked like no other. -->
+                    <button type="button" class="tab whitespace-nowrap"
+                            [class.tab-active]="tab() === item.id"
                             [attr.aria-current]="tab() === item.id ? 'true' : null"
                             [id]="'a-tab-' + item.id"
                             [attr.tabindex]="tab() === item.id ? 0 : -1"
@@ -324,7 +321,7 @@
                 <h3 class="text-sm font-semibold text-crit-500">The rows could not be read</h3>
                 <p class="text-sm text-[color:var(--text-secondary)] mt-1">{{ error() }}</p>
                 <button type="button" class="btn btn-default btn-sm mt-3" (click)="retry()">
-                  Try again
+                  <app-icon name="refresh" />Try again
                 </button>
               </div>
             </div>
@@ -468,12 +465,18 @@
                   <!-- The whole row opens the card. A dense table is scanned, and asking a reader
                        to hit a 16px chevron in a row they are already pointing at is the kind of
                        target that gets missed twice before it is hit once. -->
+                  <!-- The row click stays as the mouse convenience; the chevron is the real
+                       control, reachable by keyboard and announced as expanded or not. -->
                   <tr class="cursor-pointer hover:bg-[color:var(--surface-sunken)]"
-                      (click)="toggleColumn(row.name)"
-                      [attr.aria-expanded]="isColumnOpen(row.name)">
+                      (click)="toggleColumn(row.name)">
                     <td class="align-middle">
-                      <app-icon [name]="isColumnOpen(row.name) ? 'chevronDown' : 'chevronRight'"
-                                size="0.85em" class="icon-muted" />
+                      <button type="button" class="btn btn-ghost btn-icon btn-xs"
+                              [attr.aria-expanded]="isColumnOpen(row.name)"
+                              [attr.aria-label]="'Show details for ' + row.name"
+                              (click)="$event.stopPropagation(); toggleColumn(row.name)">
+                        <app-icon [name]="isColumnOpen(row.name) ? 'chevronDown' : 'chevronRight'"
+                                  size="0.85em" class="icon-muted" />
+                      </button>
                     </td>
                     <td class="mono text-xs whitespace-nowrap max-w-64 truncate"
                         [title]="row.name">{{ row.name }}</td>
@@ -922,16 +925,14 @@
                 <span class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">
                   Top-N
                 </span>
-                <div class="flex rounded overflow-hidden border border-subtle">
-                  <button type="button" class="px-2 py-1 text-xs transition-colors"
-                          [class.bg-sunken]="topNActive()"
-                          [class.pill-solid-brand]="!topNActive()"
+                <div class="seg" role="group" aria-label="Top-N">
+                  <button type="button" class="seg-btn"
+                          [class.seg-on]="!topNActive()"
                           [attr.aria-pressed]="!topNActive()"
                           (click)="setTopN(null)">All</button>
                   @for (choice of topNChoices; track choice) {
-                    <button type="button" class="px-2 py-1 text-xs transition-colors"
-                            [class.bg-sunken]="topNLimit() !== choice"
-                            [class.pill-solid-brand]="topNLimit() === choice"
+                    <button type="button" class="seg-btn"
+                            [class.seg-on]="topNLimit() === choice"
                             [attr.aria-pressed]="topNLimit() === choice"
                             (click)="setTopN(choice); topNCustom.set('')">{{ choice }}</button>
                   }
@@ -942,7 +943,7 @@
                        (change)="setCustomTopN($any($event.target).value)" />
                 @if (topNActive()) {
                   <label class="flex items-center gap-1.5 text-xs">
-                    <input type="checkbox" [checked]="topNOther()"
+                    <input type="checkbox" class="checkbox" [checked]="topNOther()"
                            (change)="topNOther.set($any($event.target).checked)" />
                     roll the rest into an Other bucket
                   </label>
@@ -1054,6 +1055,7 @@
                           [title]="chip.kind === 'drill'
                             ? 'Climb back out of this drill step'
                             : 'Remove this filter'"
+                          [attr.aria-label]="(chip.kind === 'drill' ? 'Climb out of ' : 'Remove filter ') + chip.label"
                           (click)="removeChip(chip)">
                     {{ chip.label }}<app-icon name="close" size="0.8em" />
                   </button>
@@ -1080,6 +1082,8 @@
                     refusals rather than faults — a dataset this account cannot reach, or a
                     governor with no slot free.
                   </p>
+                  <button type="button" class="btn btn-default btn-sm mt-3" [disabled]="!canAnalyse()"
+                          (click)="runAnalysis()"><app-icon name="refresh" />Run again</button>
                 </div>
               </div>
             } @else {
@@ -1244,30 +1248,30 @@
                           </p>
                         } @else if (pivot()) {
                           <div class="overflow-x-auto">
-                            <table class="w-full text-sm">
+                            <table class="table-modern">
                               <thead>
-                                <tr class="text-left text-[color:var(--text-muted)]">
-                                  <th class="px-2 py-1.5 font-medium whitespace-nowrap">
+                                <tr>
+                                  <th class="font-medium whitespace-nowrap">
                                     {{ pivot()!.rowDimension }} ↓ · {{ pivot()!.columnDimension }} →
                                   </th>
                                   @for (column of pivot()!.columns; track column) {
-                                    <th class="px-2 py-1.5 font-medium whitespace-nowrap tabular text-right">
+                                    <th class="font-medium whitespace-nowrap tabular text-right">
                                       {{ column || '(null)' }}
                                     </th>
                                   }
                                   @if (pivot()!.additive) {
-                                    <th class="px-2 py-1.5 font-medium whitespace-nowrap text-right">Total</th>
+                                    <th class="font-medium whitespace-nowrap text-right">Total</th>
                                   }
                                 </tr>
                               </thead>
                               <tbody>
                                 @for (row of pivot()!.rows; track row.label) {
-                                  <tr class="border-t border-subtle">
-                                    <th scope="row" class="px-2 py-1.5 text-left font-normal whitespace-nowrap">
+                                  <tr>
+                                    <th scope="row" class="text-left font-normal whitespace-nowrap">
                                       {{ row.label || '(null)' }}
                                     </th>
                                     @for (cell of row.values; track $index) {
-                                      <td class="px-2 py-1.5 text-right tabular whitespace-nowrap">
+                                      <td class="text-right tabular whitespace-nowrap">
                                         @if (cell === null) {
                                           <!-- Empty, never zero. A combination with no rows and a
                                                combination that measured zero are different facts,
@@ -1284,7 +1288,7 @@
                                            carried no title to read the exact figure from. The
                                            cells in the same row already go through readableCell;
                                            the total beside them now does too. -->
-                                      <td class="px-2 py-1.5 text-right tabular font-medium whitespace-nowrap"
+                                      <td class="text-right tabular font-medium whitespace-nowrap"
                                           [title]="row.total === null ? 'no rows' : row.total">
                                         {{ row.total === null ? '—' : readableFigure(row.total) }}
                                       </td>
@@ -1327,11 +1331,11 @@
 
                       @default {
                         <div class="overflow-x-auto">
-                          <table class="w-full text-sm">
+                          <table class="table-modern">
                             <thead>
-                              <tr class="text-left text-[color:var(--text-muted)]">
+                              <tr>
                                 @for (column of analysisResult()!.columns; track column.name) {
-                                  <th class="px-2 py-1.5 font-medium whitespace-nowrap"
+                                  <th class="font-medium whitespace-nowrap"
                                       [class.text-right]="column.role === 'MEASURE'">
                                     {{ column.name }}
                                     <!-- The type, said on the header. It is what decides how the
@@ -1344,15 +1348,15 @@
                                   </th>
                                 }
                                 @if (drillDimension()) {
-                                  <th class="px-2 py-1.5"></th>
+                                  <th ></th>
                                 }
                               </tr>
                             </thead>
                             <tbody>
                               @for (row of analysisRows(); track $index) {
-                                <tr class="border-t border-subtle">
+                                <tr>
                                   @for (cell of row.cells; track $index) {
-                                    <td class="px-2 py-1.5 whitespace-nowrap"
+                                    <td class="whitespace-nowrap"
                                         [class.text-right]="cell.column.role === 'MEASURE'"
                                         [class.tabular]="cell.column.role === 'MEASURE'">
                                       @if (cell.isNull) {
@@ -1385,7 +1389,7 @@
                                     </td>
                                   }
                                   @if (drillDimension()) {
-                                    <td class="px-2 py-1.5 text-right">
+                                    <td class="text-right">
                                       <!-- Withheld on a row that cannot name a value for the
                                            drill dimension at all, rather than offered and then
                                            turned into a drill into the no-value group. -->
@@ -1497,8 +1501,8 @@
                   </h3>
                   <button type="button" class="btn btn-ghost btn-xs"
                           aria-label="Refresh the saved analysis list"
-                          (click)="loadAnalyses()">
-                    <app-icon name="refresh" />
+                          [disabled]="analysesLoading()" (click)="loadAnalyses()">
+                    <app-icon name="refresh" [class.spin]="analysesLoading()" />
                   </button>
                 </div>
                 @if (analysisOpenError()) {
@@ -1904,7 +1908,11 @@
                   </span>
                 </div>
 
-                @if (savedError()) {
+                <!-- loading / error / empty / list, in that order: a failed first load used to
+                     show its error AND "Nothing saved yet", two statements that contradict. -->
+                @if (savedLoading()) {
+                  <p class="text-xs text-[color:var(--text-muted)] py-4 text-center">Reading…</p>
+                } @else if (savedError()) {
                   <!-- With a way back. The library is fetched once, on the first visit to this
                        tab, so a failure with no retry beside it would leave the card dead for
                        the rest of the session. -->
@@ -1913,10 +1921,6 @@
                     <button type="button" class="link-inline ml-1"
                             (click)="loadSavedQueries()">Try again</button>
                   </p>
-                }
-
-                @if (savedLoading()) {
-                  <p class="text-xs text-[color:var(--text-muted)] py-4 text-center">Reading…</p>
                 } @else if (!savedQueries().length) {
                   <p class="text-xs text-[color:var(--text-muted)] py-4 text-center">
                     Nothing saved yet. Name a query above and it will be here next time.
@@ -2148,7 +2152,7 @@
               </span>
               <button type="button" class="btn btn-default btn-sm ml-auto"
                       [disabled]="runsLoading()" (click)="loadRuns()">
-                <app-icon name="refresh" />Refresh
+                <app-icon name="refresh" [class.spin]="runsLoading()" />Refresh
               </button>
             </div>
 
@@ -2190,12 +2194,14 @@
               }
             }
 
-            @if (runsError()) {
-              <p class="text-xs text-crit-500" role="alert">{{ runsError() }}</p>
-            }
-
+            <!-- A failed load is not an empty history: the empty line sits behind the error. -->
             @if (runsLoading()) {
               <p class="text-xs text-[color:var(--text-muted)] py-4 text-center">Reading…</p>
+            } @else if (runsError()) {
+              <p class="text-xs text-crit-500" role="alert">
+                {{ runsError() }}
+                <button type="button" class="link-inline ml-1" (click)="loadRuns()">Try again</button>
+              </p>
             } @else if (!recentRuns().length) {
               <p class="text-xs text-[color:var(--text-muted)] py-4 text-center">
                 Nothing has been run here yet.

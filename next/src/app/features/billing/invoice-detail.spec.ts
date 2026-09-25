@@ -1,9 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { Component, ViewChild } from '@angular/core';
+import { Component, ViewChild, signal } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { Dialog } from '@angular/cdk/dialog';
-import { of } from 'rxjs';
+import { NEVER, of } from 'rxjs';
 import { InvoicePane } from './invoice-detail';
 import { BillingApi } from './billing.service';
 import { AuthService } from '../../core/auth/auth.service';
@@ -111,3 +111,50 @@ describe('InvoicePane', () => {
     expect(text).not.toMatch(/\bmanual\b/);
   });
 });
+
+/** A host whose number is a signal, so switching invoices reaches the pane without a zone. */
+@Component({ imports: [InvoicePane], template: `<app-invoice-pane [number]="number()" />` })
+class SwitchHost { readonly number = signal('INV-2026-08-0006'); @ViewChild(InvoicePane) pane!: InvoicePane; }
+
+/** Audit 09-22: what the pane shows between two invoices, and after a manual line. */
+describe('InvoicePane, switching and adding', () => {
+  function mount() {
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: () => 'blob:qr', revokeObjectURL: () => {} }));
+    let calls = 0;
+    const api = {
+      invoice: vi.fn(() => (calls++ === 0 ? of({ status: API_SUCCESS, data: DETAIL }) : NEVER)),
+      addLine: vi.fn(() => of({ status: API_SUCCESS, message: 'Line added.' })),
+      documentBlob: vi.fn(() => of(new Blob(['%PDF']))), qrBlob: vi.fn(() => of(new Blob(['png']))),
+    };
+    const toast = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [SwitchHost], providers: [provideRouter([]),
+      { provide: BillingApi, useValue: api }, { provide: ToastService, useValue: toast },
+      { provide: Dialog, useValue: { open: () => ({ closed: of(true) }) } }, { provide: AuthService, useValue: { isPlatformAdmin: () => true } },
+    ] });
+    const fixture = TestBed.createComponent(SwitchHost);
+    fixture.detectChanges();
+    return { fixture, api, toast, pane: fixture.componentInstance.pane };
+  }
+
+  it('does not leave the previous invoice live, with its actions, while the next one loads', () => {
+    const { fixture, pane } = mount();
+    expect(pane.invoice()?.number).toBe('INV-2026-08-0006');
+    fixture.componentInstance.number.set('INV-2026-09-0007');
+    fixture.detectChanges();
+    expect(pane.loading()).toBe(true);
+    expect(pane.invoice()).toBeNull();
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Loading INV-2026-09-0007');
+  });
+
+  it('confirms a manual line the way it confirms every other change', () => {
+    const { pane, api, toast } = mount();
+    pane.lineDescription.set('Onboarding support');
+    pane.lineQuantity.set('1');
+    pane.linePrice.set('3.02');
+    pane.addLine();
+    expect(api.addLine).toHaveBeenCalled();
+    expect(toast.success).toHaveBeenCalledWith('Line added.');
+  });
+});
+

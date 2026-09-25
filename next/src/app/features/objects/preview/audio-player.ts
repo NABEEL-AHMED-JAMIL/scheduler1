@@ -15,7 +15,13 @@ import { Icon } from '../../../shared/ui/icon';
       <audio #el [src]="src()" preload="metadata"
              (loadedmetadata)="onMeta()" (timeupdate)="onTime()"
              (play)="playing.set(true)" (pause)="playing.set(false)"
-             (ended)="playing.set(false)" class="hidden"></audio>
+             (ended)="playing.set(false)" (error)="failed.set(true)" class="hidden"></audio>
+
+      @if (failed()) {
+        <p class="text-sm text-crit-500 mb-3 flex items-center gap-2" role="alert">
+          <app-icon name="alert" size="0.95em" class="shrink-0" />This audio could not be played here. Download it to listen.
+        </p>
+      }
 
       <div class="flex items-center gap-3">
         <button type="button" class="audio-play" (click)="toggle()"
@@ -37,7 +43,7 @@ import { Icon } from '../../../shared/ui/icon';
         </span>
 
         <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="cycleRate()"
-                [title]="'Playback speed — ' + rate() + 'x'">
+                [title]="'Playback speed — ' + rate() + 'x'" [attr.aria-label]="'Playback speed ' + rate() + 'x'">
           <span class="text-xs tabular font-medium">{{ rate() }}x</span>
         </button>
 
@@ -58,6 +64,8 @@ export class AudioPlayer {
   readonly duration = signal(0);
   readonly muted = signal(false);
   readonly rate = signal(1);
+  /** An unsupported codec, a broken file, or a play() the browser refused. */
+  readonly failed = signal(false);
 
   private audio(): HTMLAudioElement { return this.el().nativeElement; }
 
@@ -70,7 +78,8 @@ export class AudioPlayer {
 
   toggle(): void {
     const audio = this.audio();
-    audio.paused ? audio.play() : audio.pause();
+    if (!audio.paused) { audio.pause(); return; }
+    audio.play()?.catch(() => this.failed.set(true));
   }
 
   seek(value: string): void {

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
+import { provideRouter } from '@angular/router';
 import { BillingBrief } from './billing-brief';
 import { BillingApi } from './billing.service';
 import { AuthService } from '../../core/auth/auth.service';
@@ -35,5 +36,31 @@ describe('BillingBrief', () => {
     const { component, api } = brief(false);
     expect(api.summary).not.toHaveBeenCalled();
     expect(component.summary()).toBeNull();
+  });
+
+  it('stays quietly absent when the workspace has nothing yet (all zeros)', () => {
+    const api = { summary: vi.fn(() => of({ status: API_SUCCESS, data: { currency: 'USD', monthToDate: '0', periodStart: '2026-09-01',
+      openBalance: '0', openCount: 0, overdueBalance: '0', overdueCount: 0, pendingSlips: 0 } })) };
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [provideRouter([]),
+      { provide: BillingApi, useValue: api }, { provide: AuthService, useValue: { isTenantAdmin: () => true, isPlatformAdmin: () => false } },
+    ] });
+    const fixture = TestBed.createComponent(BillingBrief);
+    fixture.detectChanges();
+    expect(fixture.componentInstance.summary()).not.toBeNull();
+    expect(fixture.componentInstance.hasSomething()).toBe(false);
+    expect(fixture.nativeElement.querySelector('.card')).toBeNull();
+  });
+
+  it('shows the card once there is a figure to show', () => {
+    TestBed.resetTestingModule();
+    const api = { summary: vi.fn(() => of({ status: API_SUCCESS, data: { currency: 'USD', monthToDate: '12.5', periodStart: '2026-09-01',
+      openBalance: '0', openCount: 0, overdueBalance: '0', overdueCount: 0, pendingSlips: 0 } })) };
+    TestBed.configureTestingModule({ providers: [provideRouter([]),
+      { provide: BillingApi, useValue: api }, { provide: AuthService, useValue: { isTenantAdmin: () => true, isPlatformAdmin: () => false } },
+    ] });
+    const fixture = TestBed.createComponent(BillingBrief);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.card')).not.toBeNull();
   });
 });

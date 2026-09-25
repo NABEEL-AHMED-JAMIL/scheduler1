@@ -1,7 +1,9 @@
 import {
-  Component, DestroyRef, ElementRef, computed, effect, inject, input, output, signal, untracked,
+  Component, DestroyRef, ElementRef, Injector, afterNextRender, computed, effect, inject, input, output,
+  signal, untracked, viewChild,
 } from '@angular/core';
 import { Icon } from '../../shared/ui/icon';
+import { BlurLoader } from '../../shared/ui/blur-loader';
 import { copyText } from '../../shared/ui/clipboard.util';
 import { FilterClause, FilterOperator, OPERAND_COUNT } from './analytics.service';
 import { FILTER_OPERATORS, isDateType, isNumericType } from './filter-builder';
@@ -149,7 +151,7 @@ type Pending = '' | 'sort' | 'search' | 'filter';
  */
 @Component({
   selector: 'app-data-grid',
-  imports: [Icon],
+  imports: [Icon, BlurLoader],
   host: { class: 'block min-w-0' },
   template: `
     <div class="flex flex-col gap-2 min-w-0">
@@ -170,8 +172,8 @@ type Pending = '' | 'sort' | 'search' | 'filter';
                  (keydown.enter)="flushSearch()" />
         </label>
 
-        <button type="button" class="btn btn-default btn-xs"
-                [class.pill-solid-brand]="filterRowOpen()"
+        <button type="button" class="btn btn-xs"
+                [class.btn-primary]="filterRowOpen()" [class.btn-default]="!filterRowOpen()"
                 [attr.aria-expanded]="filterRowOpen()"
                 (click)="filterRowOpen.set(!filterRowOpen())">
           <app-icon name="filter" />Filters
@@ -181,9 +183,10 @@ type Pending = '' | 'sort' | 'search' | 'filter';
         </button>
 
         <div class="relative">
-          <button type="button" class="btn btn-default btn-xs"
+          <button #columnsTrigger type="button" class="btn btn-default btn-xs"
                   [attr.aria-expanded]="columnsPanelOpen()"
-                  (click)="columnsPanelOpen.set(!columnsPanelOpen())">
+                  (keydown.escape)="closeColumns()"
+                  (click)="toggleColumnsPanel()">
             <app-icon name="eye" />Columns
             @if (hiddenCount()) {
               <span class="pill pill-neutral ml-1">{{ hiddenCount() }} hidden</span>
@@ -195,9 +198,11 @@ type Pending = '' | 'sort' | 'search' | 'filter';
                  instead of outliving it. -->
             <div class="fixed inset-0 z-10" aria-hidden="true"
                  (click)="columnsPanelOpen.set(false)"></div>
-            <div class="card absolute right-0 top-full mt-1 z-20 p-2 w-56 max-h-72 overflow-y-auto
+            <!-- Escape closes it and focus goes back to Columns, as a cdkMenu would. -->
+            <div #columnsPanel class="card absolute right-0 top-full mt-1 z-20 p-2 w-56 max-h-72 overflow-y-auto
                         shadow-xl"
-                 role="group" aria-label="Which columns are shown">
+                 role="group" aria-label="Which columns are shown"
+                 (keydown.escape)="closeColumns()">
               <p class="text-[11px] text-[color:var(--text-muted)] px-1 pb-1">
                 Hiding a column hides it here only — it is still read, still searched and still
                 counted on the server.
@@ -205,7 +210,7 @@ type Pending = '' | 'sort' | 'search' | 'filter';
               @for (column of allColumns(); track column.name) {
                 <label class="flex items-center gap-2 px-1 py-1 text-xs cursor-pointer rounded
                               hover:bg-sunken">
-                  <input type="checkbox" [checked]="!column.hidden"
+                  <input type="checkbox" class="checkbox" [checked]="!column.hidden"
                          [disabled]="!column.hidden && visibleColumns().length === 1"
                          (change)="toggleColumn(column.name)" />
                   <span class="truncate" [title]="column.name">{{ column.name }}</span>
@@ -273,8 +278,9 @@ type Pending = '' | 'sort' | 'search' | 'filter';
       <!-- The rows scroll sideways inside this box. The page body never does: a 200-column file
            would otherwise push the toolbar above and the pager below off to the left. -->
       <div class="card overflow-hidden">
-        <div class="overflow-x-auto scroll-table" [attr.aria-busy]="loading() ? 'true' : null"
-             [class.opacity-60]="loading()">
+        <!-- A reload keeps the rows under the shared blur and spinner rather than dimming them. -->
+        <app-blur-loader [active]="loading() && rows().length > 0" [label]="busyLabel()">
+        <div class="overflow-x-auto scroll-table" [attr.aria-busy]="loading() ? 'true' : null">
           <table class="table-modern" role="grid">
             <caption class="sr-only">{{ caption() }}</caption>
             <thead>
@@ -313,9 +319,9 @@ type Pending = '' | 'sort' | 'search' | 'filter';
                            the reader actually hears, and neither of them lies. -->
                       <span class="ml-auto w-1.5 h-4 shrink-0 rounded cursor-col-resize
                                    hover:bg-[color:var(--border-strong)]
-                                   focus-visible:bg-[color:var(--color-brand-500)] focus:outline-none"
+                                   focus-visible:bg-[color:var(--focus-ring)] focus:outline-none"
                             role="separator" aria-orientation="vertical" tabindex="0"
-                            [class.bg-[color:var(--color-brand-500)]]="resizing() === column.name"
+                            [class.bg-[color:var(--accent-mark)]]="resizing() === column.name"
                             [attr.aria-label]="'Resize ' + column.name +
                                                ' — arrow keys to size, delete to reset'"
                             [attr.aria-valuenow]="column.width ?? autoWidth"
@@ -409,6 +415,7 @@ type Pending = '' | 'sort' | 'search' | 'filter';
             </tbody>
           </table>
         </div>
+        </app-blur-loader>
 
         @if (!rows().length) {
           <div class="px-6 py-12 text-center">
@@ -530,6 +537,24 @@ export class DataGrid {
   protected readonly searchDraft = signal('');
   protected readonly filterRowOpen = signal(false);
   protected readonly columnsPanelOpen = signal(false);
+  private readonly injector = inject(Injector);
+  private readonly columnsTrigger = viewChild<ElementRef<HTMLButtonElement>>('columnsTrigger');
+  private readonly columnsPanel = viewChild<ElementRef<HTMLElement>>('columnsPanel');
+
+  /** Opens the panel with focus on its first checkbox, or closes it. */
+  protected toggleColumnsPanel(): void {
+    if (this.columnsPanelOpen()) { this.closeColumns(); return; }
+    this.columnsPanelOpen.set(true);
+    afterNextRender(() => this.columnsPanel()?.nativeElement.querySelector<HTMLElement>('input')?.focus(),
+      { injector: this.injector });
+  }
+
+  /** Closes the panel and puts focus back on the button that opened it. */
+  protected closeColumns(): void {
+    if (!this.columnsPanelOpen()) return;
+    this.columnsPanelOpen.set(false);
+    this.columnsTrigger()?.nativeElement.focus();
+  }
   protected readonly resizing = signal('');
   protected readonly focusRow = signal(0);
   protected readonly focusCol = signal(0);

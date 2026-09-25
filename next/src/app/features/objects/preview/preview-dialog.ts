@@ -5,6 +5,7 @@ import { API_SUCCESS } from '../../../core/api/api.config';
 
 import { Icon } from '../../../shared/ui/icon';
 import { AudioPlayer } from './audio-player';
+import { BlurLoader } from '../../../shared/ui/blur-loader';
 import { PdfViewer } from './pdf-viewer';
 import { copyText } from '../../../shared/ui/clipboard.util';
 import { formatSize } from '../../../shared/ui/format-size';
@@ -26,7 +27,7 @@ export interface PreviewData {
  * one, the entries of an archive, and -- for a name nobody registered -- a look at the bytes,
  * shown as text when they are text and as a hex glance when they are not.
  */
-type PreviewKind = 'text' | 'json' | 'markdown' | 'table' | 'document' | 'archive' | 'image' | 'pdf' | 'audio' | 'video' | 'sniff' | 'binary' | 'none';
+type PreviewKind = 'text' | 'json' | 'markdown' | 'table' | 'document' | 'archive' | 'image' | 'pdf' | 'audio' | 'video' | 'sniff' | 'binary';
 
 /** Read as text and shown as code: the config, the log, the source a bucket fills up with. */
 const TEXT_LIKE = ['txt', 'log', 'xml', 'yaml', 'yml', 'properties', 'ini', 'toml', 'env', 'conf', 'cfg', 'sql',
@@ -43,7 +44,7 @@ const VIDEO = ['mp4', 'webm', 'ogv', 'mov', 'm4v'];
 
 @Component({
   selector: 'app-preview-dialog',
-  imports: [Icon, ServerTimePipe, AudioPlayer, PdfViewer],
+  imports: [Icon, ServerTimePipe, AudioPlayer, PdfViewer, BlurLoader],
   templateUrl: './preview-dialog.html',
 })
 export class PreviewDialog implements OnInit {
@@ -63,7 +64,7 @@ export class PreviewDialog implements OnInit {
     inject(DestroyRef).onDestroy(() => this.releaseUrl());
   }
 
-  readonly kind = signal<PreviewKind>('none');
+  readonly kind = signal<PreviewKind>('sniff');
   /**
    * The dialog's width, bound as a style. It was two class bindings, and Tailwind generates only
    * the classes it finds written out -- w-[76rem] never made it into the build, so a table opened
@@ -178,7 +179,6 @@ export class PreviewDialog implements OnInit {
     this.kind.set(this.kindFor(extension));
 
     switch (this.kind()) {
-      case 'none': this.loading.set(false); return;
       case 'text': case 'markdown': this.loadText(); return;
       // JSON is a table when it is a list of records, and text otherwise; ask, then decide.
       case 'json': this.loadTable(0, undefined, () => { this.kind.set('json'); this.loadText(); }); return;

@@ -14,6 +14,9 @@ import { formatSize } from '../../../shared/ui/format-size';
 import { Segmented, SegmentOption } from '../../../shared/ui/segmented';
 import { FileDropzone } from '../../../shared/ui/file-dropzone';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
+import { TableShell } from '../../../shared/ui/data-table';
+import { Pagination } from '../../../shared/ui/pagination';
+import { createPager } from '../../../shared/ui/pager';
 
 interface FormatFamily {
   key: string;
@@ -48,7 +51,7 @@ interface ConvertResult {
 
 @Component({
   selector: 'app-converter',
-  imports: [Icon, RouterLink, ServerTimePipe, Segmented, FileDropzone, Combobox],
+  imports: [Icon, RouterLink, ServerTimePipe, Segmented, FileDropzone, Combobox, TableShell, Pagination],
   templateUrl: './converter.html',
 })
 export class Converter implements OnInit {
@@ -60,6 +63,8 @@ export class Converter implements OnInit {
   readonly outputFormat = signal('');
   readonly converting = signal(false);
   readonly result = signal<ConvertResult | null>(null);
+  /** The supported-formats read failed: said as such, not as "this file can't be converted". */
+  readonly formatsError = signal('');
   readonly showFormats = signal(false);
 
   private readonly dialog = inject(Dialog);
@@ -120,6 +125,9 @@ export class Converter implements OnInit {
 
   readonly tasks = signal<ConverterTask[]>([]);
   readonly tasksLoading = signal(false);
+  readonly tasksError = signal('');
+  readonly taskPager = createPager<ConverterTask>();
+  readonly pagedTasks = computed(() => this.taskPager.slice(this.tasks()));
 
   readonly extension = computed(() => {
     const name = this.mode() === 'upload'
@@ -260,14 +268,30 @@ export class Converter implements OnInit {
       next: r => { if (r.status === API_SUCCESS) this.buckets.set(r.data ?? []); },
       error: () => { /* upload mode still works with no bucket list */ },
     });
+    this.loadFormats();
+  }
+
+  loadFormats(): void {
+    this.formatsError.set('');
     this.http.get<ApiResponse<FormatFamily[]>>(`${API_BASE}/documentConverter.json/supportedFormats`)
       .subscribe({
         next: response => {
           if (response.status === API_SUCCESS) this.families.set(response.data ?? []);
+          else this.formatsError.set('Could not load the supported formats.');
         },
-        error: () => this.toast.error('Could not load the supported formats.'),
+        error: () => this.formatsError.set('Could not load the supported formats.'),
       });
   }
+
+  /**
+   * A result belongs to the source and target that produced it. Picking another bucket file,
+   * another target or the other mode left the old "Ready to download" card offering the old
+   * output under the new selection.
+   */
+  private readonly clearStaleResult = effect(() => {
+    this.sourceName(); this.outputFormat(); this.mode();
+    untracked(() => this.result.set(null));
+  });
 
   onFile(file: File | null): void {
     this.file.set(file);
@@ -363,13 +387,18 @@ export class Converter implements OnInit {
    */
   loadTasks(): void {
     this.tasksLoading.set(true);
+    this.tasksError.set('');
     this.http.get<ApiResponse<ConverterTask[]>>(`${API_BASE}/documentConverter.json/fetchAllTasks`)
       .subscribe({
         next: response => {
           this.tasksLoading.set(false);
-          if (response.status === API_SUCCESS) this.tasks.set(response.data ?? []);
+          if (response.status !== API_SUCCESS) { this.tasksError.set(response.message || 'Could not read the recent conversions.'); return; }
+          this.tasks.set(response.data ?? []);
         },
-        error: () => this.tasksLoading.set(false),
+        error: err => {
+          this.tasksLoading.set(false);
+          this.tasksError.set(err?.error?.message || 'Could not read the recent conversions.');
+        },
       });
   }
 

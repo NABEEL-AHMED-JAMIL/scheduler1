@@ -1,5 +1,6 @@
-import { Component, computed, inject, input, signal, effect} from '@angular/core';
+import { Component, Injector, afterNextRender, computed, inject, input, signal, effect, untracked } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { finalize } from 'rxjs';
 import { Dialog } from '@angular/cdk/dialog';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { ToastService } from '../../shared/ui/toast.service';
@@ -10,7 +11,8 @@ import { TableShell } from '../../shared/ui/data-table';
 import { createPager } from '../../shared/ui/pager';
 import { Pagination } from '../../shared/ui/pagination';
 import { CHART_LABELS, ChartKind, RADAR_ROWS, ReportChart } from './report-chart';
-import { ReportDestinationDialog } from './report-destination-dialog';
+import { ReportDestinationDialog, ReportDestinationResult } from './report-destination-dialog';
+import { Segmented, SegmentOption } from '../../shared/ui/segmented';
 import {
   DIMENSIONS, Dimension, dimensionFor, MEASURE_GROUPS, MEASURE_LABELS, Measure, RunData, RunRow,
   COUNTING, EXECUTION, EXEC_SECONDS, JOB_NAME, NO_DURATION, RUN_ID, SECONDS, Pivot, aggregate,
@@ -36,7 +38,7 @@ const EMPTY: RunData = { task: [], status: [], owner: [], day: [], job: [], tena
  */
 @Component({
   selector: 'app-report-pivot',
-  imports: [Icon, StatusPill, TableShell, ReportChart, Pagination],
+  imports: [Icon, StatusPill, TableShell, ReportChart, Pagination, Segmented],
   templateUrl: './report-pivot.html',
   // The spacing used to come from the .page wrapper this markup sat inside. Without it the
   // shape card, the chart and the grid render flush against each other, and an Angular host is
@@ -123,7 +125,24 @@ export class ReportPivot {
     effect(() => {
       if (!this.kindAllowed(this.chart())) this.chart.set('grouped');
     });
+    /*
+     * The drawer lists the runs behind one cell of one view. A new filter, measure or dimension
+     * makes a different grid, and the drawer went on listing the old view's runs under the old
+     * title; closing it is the honest answer.
+     */
+    effect(() => {
+      this.data(); this.rowDim(); this.colDim(); this.measure();
+      untracked(() => this.closeDrill());
+    });
   }
+
+  private readonly injector = inject(Injector);
+
+  /** The row-order choice, worded for the dimension on the rows. */
+  readonly rowOrderOptions = computed<SegmentOption<'total' | 'natural'>[]>(() => [
+    { id: 'total', label: 'Highest first' },
+    { id: 'natural', label: this.rowDim().key === 'day' ? 'By date' : 'A → Z' },
+  ]);
 
   /**
    * Colour by meaning where a label has one, by position otherwise.
@@ -366,16 +385,23 @@ export class ReportPivot {
     const pivot = this.pivot();
     this.drillTitle.set(`${pivot.rowLabels[rowIndex]} · ${pivot.colLabels[colIndex]}`);
     this.drillRows.set(pivot.cellRows[rowIndex][colIndex]);
+    this.focusDrill();
   }
   drillRow(rowIndex: number): void {
     const pivot = this.pivot();
     this.drillTitle.set(`${pivot.rowLabels[rowIndex]} · everything`);
     this.drillRows.set(pivot.cellRows[rowIndex].flat());
+    this.focusDrill();
   }
   drillColumn(colIndex: number): void {
     const pivot = this.pivot();
     this.drillTitle.set(`All · ${pivot.colLabels[colIndex]}`);
     this.drillRows.set(this.data().rows.filter(r => r[this.colDim().idx] === colIndex));
+    this.focusDrill();
+  }
+  /** Moves focus into the drawer, so a keyboard reader lands on what just opened. */
+  private focusDrill(): void {
+    afterNextRender(() => document.getElementById('drill-heading')?.focus(), { injector: this.injector });
   }
   closeDrill(): void { this.drillRows.set([]); this.drillTitle.set(''); }
 
@@ -451,26 +477,34 @@ export class ReportPivot {
     });
   }
 
+  /*
+   * The destination dialog sends, and stays open until the server answers: a refusal (an unknown
+   * bucket, an endpoint that will not take it) is shown beside what was typed rather than as a
+   * toast after the dialog has gone.
+   */
   saveToBucket(format: 'csv' | 'xlsx'): void {
-    this.dialog.open<{ bucket: string; folder: string }>(ReportDestinationDialog, {
+    const send = (r: ReportDestinationResult) =>
+      this.exportRequest({ ...this.grid(), format, destination: 'bucket', bucket: r.bucket, folder: r.folder }, 'bucket');
+    this.dialog.open<ReportDestinationResult & { message?: string }>(ReportDestinationDialog, {
       hasBackdrop: true,
-      data: { kind: 'bucket' },
-    }).closed.subscribe(result => {
-      if (!result) return;
-      this.send({ ...this.grid(), format, destination: 'bucket', bucket: result.bucket, folder: result.folder },
-        'bucket', response => this.toast.success(response.message));
-    });
+      data: { kind: 'bucket', send },
+    }).closed.subscribe(result => { if (result?.message) this.toast.success(result.message); });
   }
 
   submit(format: 'csv' | 'xlsx'): void {
-    this.dialog.open<{ submitUrl: string }>(ReportDestinationDialog, {
+    const send = (r: ReportDestinationResult) =>
+      this.exportRequest({ ...this.grid(), format, destination: 'submit', submitUrl: r.submitUrl }, 'submit');
+    this.dialog.open<ReportDestinationResult & { message?: string }>(ReportDestinationDialog, {
       hasBackdrop: true,
-      data: { kind: 'submit' },
-    }).closed.subscribe(result => {
-      if (!result) return;
-      this.send({ ...this.grid(), format, destination: 'submit', submitUrl: result.submitUrl },
-        'submit', response => this.toast.success(response.message));
-    });
+      data: { kind: 'submit', send },
+    }).closed.subscribe(result => { if (result?.message) this.toast.success(result.message); });
+  }
+
+  /** The export POST for a destination dialog, marking the toolbar busy while it runs. */
+  private exportRequest(body: unknown, tag: string) {
+    this.exporting.set(tag);
+    return this.http.post<ApiResponse<unknown>>(`${API_BASE}/report.json/export`, body)
+      .pipe(finalize(() => this.exporting.set(null)));
   }
 
   private send(body: unknown, tag: string, onOk: (response: ApiResponse<unknown>) => void): void {

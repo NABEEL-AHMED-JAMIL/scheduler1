@@ -6,7 +6,7 @@
     </div>
     <div class="flex items-center gap-2 flex-wrap">
       <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()"><app-icon name="refresh" [class.spin]="loading()" />Refresh</button>
-      <button type="button" class="btn btn-primary btn-sm" (click)="newVersion()" [disabled]="loading() || !cards().length" title="Draft a new version from the selected card">
+      <button type="button" class="btn btn-default btn-sm" (click)="newVersion()" [disabled]="loading() || !cards().length" title="Draft a new version from the selected card">
         <app-icon name="plus" />New version
       </button>
     </div>
@@ -52,7 +52,7 @@
           @for (c of visible(); track c.version) {
             <li role="presentation">
               <button type="button" class="lookup-rail-item" role="option" [attr.aria-selected]="selectedVersion() === c.version" [class.is-selected]="selectedVersion() === c.version" (click)="select(c)">
-                <span class="lookup-rail-glyph" [class.is-list]="c.tenant_id == null" [class.is-managed]="c.tenant_id != null"><app-icon [name]="c.tenant_id == null ? 'globe' : 'building'" size="0.9em" /></span>
+                <span class="lookup-rail-glyph" [class.is-list]="c.tenant_id == null"><app-icon [name]="c.tenant_id == null ? 'globe' : 'building'" size="0.9em" /></span>
                 <span class="min-w-0 flex-1">
                   <span class="lookup-rail-key">{{ c.name }} <span class="mono font-normal text-[color:var(--text-muted)]">v{{ c.version }}</span></span>
                   <span class="lookup-rail-sub">
@@ -97,7 +97,7 @@
             <ng-template #cardMenu>
               <div cdkMenu class="card shadow-xl py-1 min-w-56 text-sm">
                 @if (c.tenant_id == null) {
-                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="newVersion(c, workspaces.tenantId() ? +workspaces.tenantId()! : null)"><app-icon name="building" />A card for one workspace</button>
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="forOneWorkspace(c)"><app-icon name="building" />A card for one workspace</button>
                 }
                 @if (c.based_on_version) {
                   <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="selectVersion(c.based_on_version!)"><app-icon name="history" />Show v{{ c.based_on_version }} it was drafted from</button>
@@ -121,7 +121,9 @@
                   @for (i of g.items; track i.meter) {
                     <tr [class.is-changed]="changedAgainstBase(c).includes(i.label ?? i.meter)">
                       <td><div>{{ i.label ?? i.meter }}</div><div class="text-[11px] mono text-[color:var(--text-muted)]">{{ i.meter }}</div></td>
-                      <td class="text-right tabular text-sm whitespace-nowrap">{{ i.tiers?.length ? 'Tiered' : price(i, c.currency) }}</td>
+                      <td class="text-right tabular text-sm whitespace-nowrap">{{ i.tiers?.length ? 'Tiered' : price(i, c.currency) }}
+                        <!-- The Tiers column is lg-only; below it the bands sit under the price, as Cost & usage prints them. -->
+                        @if (i.tiers?.length) { <div class="lg:hidden text-[11px] text-[color:var(--text-muted)] whitespace-normal">@for (t of tierText(i, c.currency); track t) { <div>{{ t }}</div> }</div> }</td>
                       <td class="text-right tabular text-sm hidden md:table-cell">{{ i.included_quantity ? units(i, i.included_quantity) : '—' }}</td>
                       <td class="hidden lg:table-cell text-xs">
                         @for (t of tierText(i, c.currency); track t) { <div>{{ t }}</div> } @empty { <span class="text-[color:var(--text-muted)]">Flat</span> }

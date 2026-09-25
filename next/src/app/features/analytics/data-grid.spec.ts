@@ -878,3 +878,45 @@ describe('the table itself', () => {
     expect(grid.text()).not.toContain('Next');
   });
 });
+
+// ---------------------------------------------------------------------------------------------
+// Audit 09-22: the grid in the dark theme, from the keyboard, and while it reloads.
+
+describe('the grid, audit 09-22', () => {
+  it('shows a focused or dragged resize handle in theme tokens, not near-black brand-500', () => {
+    const grid = gridWith();
+    const handle = grid.handles()[0];
+    expect(handle.className).not.toContain('brand-500');
+    expect(handle.className).toContain('focus-visible:bg-[color:var(--focus-ring)]');
+  });
+
+  it('closes the Columns panel on Escape and hands focus back to its button', () => {
+    const grid = gridWith();
+    grid.openColumns();
+    const panel = grid.element.querySelector<HTMLElement>('[aria-label="Which columns are shown"]')!;
+    key(panel, 'Escape');
+    grid.render();
+    expect(grid.element.querySelector('[aria-label="Which columns are shown"]')).toBeNull();
+    expect(document.activeElement).toBe(grid.button('Columns'));
+  });
+
+  it('draws the column checkboxes as the console .checkbox', () => {
+    const grid = gridWith();
+    grid.openColumns();
+    for (const box of grid.checkboxes()) expect(box.classList).toContain('checkbox');
+  });
+
+  it('blurs rows under the shared loader while it reloads, instead of dimming them', () => {
+    const grid = gridWith({ loading: true });
+    expect(grid.element.querySelector('.opacity-60')).toBeNull();
+    expect(grid.element.querySelector('app-blur-loader .blur-loader.is-loading table')).not.toBeNull();
+  });
+
+  it('shows an open Filters row as a primary button, not a pill fill on a .btn', () => {
+    const grid = gridWith();
+    grid.openFilters();
+    const toggle = grid.button('Filters');
+    expect(toggle.classList).not.toContain('pill-solid-brand');
+    expect(toggle.classList).toContain('btn-primary');
+  });
+});

@@ -1,5 +1,6 @@
 import { Component, computed, input, output } from '@angular/core';
 import { Icon } from '../../shared/ui/icon';
+import { Segmented, SegmentOption } from '../../shared/ui/segmented';
 import {
   DatasetColumn, FilterClause, FilterGroup, FilterNode, FilterOperator, OPERAND_COUNT,
   isFilterGroup,
@@ -217,7 +218,7 @@ interface BuilderRow {
   // Self-referencing on purpose -- see the class note. Angular resolves the forward reference
   // for a standalone component that imports itself, which is what makes the recursion possible
   // without a second near-identical component for "a group inside a group".
-  imports: [Icon, FilterBuilder],
+  imports: [Icon, FilterBuilder, Segmented],
   template: `
     <div class="flex flex-col gap-2 rounded-md p-2 min-w-0"
          [class.border]="depth() > 0"
@@ -227,16 +228,8 @@ interface BuilderRow {
       <div class="flex flex-wrap items-center gap-2 min-w-0">
         <!-- AND and OR as two buttons rather than a select. The choice governs every row under
              it, and a closed select saying "AND" reads as a label rather than as a control. -->
-        <div class="flex rounded overflow-hidden border border-subtle shrink-0">
-          @for (choice of ['AND', 'OR']; track choice) {
-            <button type="button" class="px-2 py-0.5 text-[11px] font-semibold transition-colors"
-                    [class.bg-sunken]="model().op !== choice"
-                    [class.text-[color:var(--text-muted)]]="model().op !== choice"
-                    [class.pill-solid-brand]="model().op === choice"
-                    [attr.aria-pressed]="model().op === choice"
-                    (click)="setOp($any(choice))">{{ choice }}</button>
-          }
-        </div>
+        <app-segmented class="shrink-0" ariaLabel="Match" [options]="opOptions" [value]="model().op"
+                       (valueChange)="setOp($event)" />
         <span class="text-[11px] text-[color:var(--text-muted)]">
           {{ model().op === 'AND' ? 'every condition below must hold' : 'any one condition below is enough' }}
         </span>
@@ -253,8 +246,9 @@ interface BuilderRow {
             </button>
           }
           @if (depth() > 0) {
-            <button type="button" class="btn btn-ghost btn-xs" (click)="removed.emit()"
-                    title="Remove this group and everything in it">
+            <button type="button" class="btn btn-ghost btn-icon btn-xs" (click)="removed.emit()"
+                    title="Remove this group and everything in it"
+                    aria-label="Remove this group and everything in it">
               <app-icon name="close" />
             </button>
           }
@@ -387,6 +381,7 @@ export class FilterBuilder {
   readonly columns = input.required<DatasetColumn[]>();
   /** 0 at the top. Drives the indent, and whether this group can be removed or nested into. */
   readonly depth = input(0);
+  readonly opOptions: SegmentOption<'AND' | 'OR'>[] = [{ id: 'AND', label: 'AND' }, { id: 'OR', label: 'OR' }];
 
   readonly changed = output<FilterGroup>();
   /** Emitted by a nested group asking its parent to drop it. Never fired at depth 0. */
