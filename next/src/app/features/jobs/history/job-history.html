@@ -138,10 +138,11 @@
 
           <div class="min-w-0">
             <div class="detail-head">Runs in this view</div>
-            <!-- All eight statuses, always: two full rows at four columns (four rows of two on a
-                 phone), so no cell is ever left blank. A status with no runs shows 0, muted --
+            <!-- All eight statuses, always: four columns on a tablet, two where this sits in a narrow column
+                 (a phone, and from lg where the column is a quarter wide -- four there broke "COMPLETED"
+                 mid-word), so no cell is ever left blank. A status with no runs shows 0, muted --
                  "none yet" is information; a blank square is not. -->
-            <app-stat-strip [items]="runTiles()" [cols]="2" [smCols]="4" [summary]="runTotal()"
+            <app-stat-strip [items]="runTiles()" [cols]="2" [smCols]="4" [lgCols]="2" [summary]="runTotal()"
                             label="Runs in this view by status" />
           </div>
 

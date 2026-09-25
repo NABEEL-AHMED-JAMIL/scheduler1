@@ -153,6 +153,7 @@ export class JobHistory {
   readonly emptyMessage = computed(() =>
     this.statusFilter() || this.search().trim() ? 'No runs match the current filters.'
       : this.isDrillDown() ? 'No runs in this hour.'
+      : !this.jobId() ? 'Open a job, or pick an hour on the dashboard, to see its runs.'
       : 'This job has never run.');
 
   /** Counts per status, so the shape of a job's history reads at a glance. */
@@ -312,8 +313,8 @@ export class JobHistory {
     this.error.set('');
     if (!this.isDrillDown() && !this.jobId()) {
       // Nothing identifies what to show. Reachable only by hand-editing the URL.
+      // A prompt, not an error: the empty message says what to do (emptyMessage).
       this.loading.set(false);
-      this.error.set('Open a job, or pick an hour on the dashboard, to see runs.');
       return;
     }
 

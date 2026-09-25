@@ -107,3 +107,13 @@ describe('Run history stat strips', () => {
     expect(h.durationTiles()).toEqual([]);
   });
 });
+
+describe('Run history with no job chosen', () => {
+  /** Tenant-user review: with no job picked the page showed a red error with "Try again" -- it only needs a pick. */
+  it('is a neutral prompt, not an error', () => {
+    const h = history({});
+    h.load();
+    expect(h.error()).toBe('');
+    expect(h.emptyMessage()).toBe('Open a job, or pick an hour on the dashboard, to see its runs.');
+  });
+});
