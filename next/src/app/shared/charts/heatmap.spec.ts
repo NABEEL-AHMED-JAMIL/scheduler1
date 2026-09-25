@@ -110,3 +110,35 @@ describe('a range longer than a week', () => {
     expect(heatmap.tooltip('Monday', cell)).toBe('Monday 9a — 3 runs');
   });
 });
+
+/**
+ * On a 390px phone the 24 hour columns shared about 170px, so each cell was a 7px dot: far below a
+ * usable tap target. The test DOM has no layout, so this pins the rule that prevents it: a 24px
+ * floor per hour, a scroller of its own around the grid, and the day names held in view.
+ */
+describe('the heatmap on a narrow screen', () => {
+  function render() {
+    TestBed.resetTestingModule();
+    const fixture = TestBed.configureTestingModule({ imports: [Host] }).createComponent(Host);
+    fixture.componentInstance.data.set([{ day: 'Monday', hour: 9, value: 3 }]);
+    fixture.detectChanges();
+    return fixture.nativeElement as HTMLElement;
+  }
+
+  it('gives every hour at least 1.5rem and scrolls sideways inside its own box', () => {
+    const el = render();
+    const grid = el.querySelector<HTMLElement>('.grid')!;
+    expect(grid.style.gridTemplateColumns).toContain('minmax(1.5rem, 1fr)');
+    expect(grid.classList).toContain('w-max');
+    expect(grid.classList).toContain('min-w-full');
+    expect(grid.parentElement!.classList).toContain('overflow-x-auto');
+  });
+
+  it('keeps the day names pinned and opaque while the hours scroll under them', () => {
+    const el = render();
+    const day = [...el.querySelectorAll<HTMLElement>('.grid > span')].find(s => s.textContent!.trim() === 'Mon')!;
+    expect(day.classList).toContain('sticky');
+    expect(day.classList).toContain('left-0');
+    expect(day.className).toContain('bg-[color:var(--surface-raised)]');
+  });
+});
