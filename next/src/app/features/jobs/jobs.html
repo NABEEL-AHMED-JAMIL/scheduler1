@@ -282,10 +282,15 @@
                     <div>
                       <dt class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">Task</dt>
                       <dd class="mt-1">
-                        <a class="link-inline" [routerLink]="['/operations/tasks', job.taskDetail!.taskDetailId, 'edit']">
-                          <app-icon name="link" size="0.85em" class="icon-info" />
-                          #{{ job.taskDetail!.taskDetailId }} {{ job.taskDetail!.taskName }}
-                        </a>
+                        <!-- The task editor is an admin's; anyone else gets the name, not a link to a refusal. -->
+                        @if (canManageTasks()) {
+                          <a class="link-inline" [routerLink]="['/operations/tasks', job.taskDetail!.taskDetailId, 'edit']">
+                            <app-icon name="link" size="0.85em" class="icon-info" />
+                            #{{ job.taskDetail!.taskDetailId }} {{ job.taskDetail!.taskName }}
+                          </a>
+                        } @else {
+                          <span>#{{ job.taskDetail!.taskDetailId }} {{ job.taskDetail!.taskName }}</span>
+                        }
                       </dd>
                     </div>
                   }

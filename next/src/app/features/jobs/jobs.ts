@@ -193,6 +193,8 @@ export class Jobs implements OnInit {
     [...new Set(this.jobs().map(j => j.execution).filter(Boolean))].sort() as string[]);
 
   private readonly auth = inject(AuthService);
+  /** The task editor is admin-only: others see a task's name, not a link to a refusal. */
+  protected readonly canManageTasks = computed(() => this.auth.canManageTasks());
 
   /** Narrows the list to rows this person created. Not persisted -- see MineFilter. */
 

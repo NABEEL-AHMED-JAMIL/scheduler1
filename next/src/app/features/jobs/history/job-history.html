@@ -151,10 +151,14 @@
               <dl class="detail-list">
                 <dt>Task</dt>
                 <dd class="truncate">
-                  <a class="text-accent hover:underline"
-                     [routerLink]="['/operations/tasks', task.taskDetailId, 'edit']">
+                  @if (canManageTasks()) {
+                    <a class="text-accent hover:underline"
+                       [routerLink]="['/operations/tasks', task.taskDetailId, 'edit']">
+                      {{ task.taskName }}
+                    </a>
+                  } @else {
                     {{ task.taskName }}
-                  </a>
+                  }
                 </dd>
                 <dt>Type</dt><dd class="truncate">{{ task.sourceTaskType?.serviceName || '—' }}</dd>
                 <dt>Topic</dt><dd class="mono truncate">{{ topicOf(task.sourceTaskType?.queueTopicPartition) }}</dd>

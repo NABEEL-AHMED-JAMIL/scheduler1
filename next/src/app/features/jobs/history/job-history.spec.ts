@@ -1,3 +1,4 @@
+import { AuthService } from '../../../core/auth/auth.service';
 import { describe, it, expect } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
@@ -12,6 +13,7 @@ function history(route: { jobId?: string; targetDate?: string; targetHr?: string
     { provide: HttpClient, useValue: { get: () => of({ status: 'SUCCESS', data: {} }) } },
     { provide: Router, useValue: { navigate: () => {} } },
     { provide: ToastService, useValue: { success: () => {}, error: () => {}, info: () => {} } },
+    { provide: AuthService, useValue: { canManageTasks: () => true } },
   ] });
   const component = TestBed.runInInjectionContext(() => new JobHistory());
   (component as any).jobId = () => route.jobId ?? '';

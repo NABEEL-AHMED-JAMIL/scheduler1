@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 
 import { Router, RouterLink } from '@angular/router';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
+import { AuthService } from '../../../core/auth/auth.service';
 import { TableShell } from '../../../shared/ui/data-table';
 import { StatusPill } from '../../../shared/ui/status-pill';
 import { StatusFilterChip } from '../../../shared/ui/status-filter-chip';
@@ -86,6 +87,9 @@ export class JobHistory {
   readonly targetHr = input<string>('');
 
   private readonly http = inject(HttpClient);
+  private readonly auth = inject(AuthService);
+  /** The task editor is admin-only: others see a task's name, not a link to a refusal. */
+  protected readonly canManageTasks = computed(() => this.auth.canManageTasks());
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
 
