@@ -342,7 +342,7 @@ type Pending = '' | 'sort' | 'search' | 'filter';
                      has scrolled away. -->
                 <tr class="bg-sunken">
                   @for (column of viewColumns(); track column.name) {
-                    <th scope="col" style="position: static" class="font-normal normal-case">
+                    <th scope="col" class="!static font-normal normal-case">
                       <div class="flex items-center gap-1">
                         <select class="input min-h-0 py-0.5 pl-1.5 pr-6 text-[11px] w-auto min-w-0"
                                 [attr.aria-label]="'Filter operator for ' + column.name"
