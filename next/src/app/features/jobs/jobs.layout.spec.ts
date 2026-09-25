@@ -68,3 +68,21 @@ describe('Jobs table layout', () => {
     expect(classesOf(html, '[cdkMenuTriggerFor]="menu"')).toContain('col-pin-right');
   });
 });
+
+describe('Job assistant layout', () => {
+  it('spaces the answer cards on the full page as well as in the dock', async () => {
+    const html = await read('assistant/job-assistant.html');
+    const at = html.indexOf('@for (turn of turns(); track turn.id)');
+    const wrapper = html.slice(html.lastIndexOf('<div', at), at);
+    // Static, not behind compact(): on the full page the cards sat flush against each other.
+    expect(/\sclass="([^"]*)"/.exec(wrapper)?.[1].split(/\s+/)).toEqual(expect.arrayContaining(['flex', 'flex-col', 'gap-3']));
+    expect(wrapper).not.toContain('[class.gap-3]');
+  });
+
+  it('gives a fact its full width in the dock rather than half of it', async () => {
+    const html = await read('assistant/job-assistant.html');
+    const facts = html.slice(html.indexOf("@case ('facts')"));
+    const dl = facts.slice(facts.indexOf('<dl'), facts.indexOf('>', facts.indexOf('<dl')) + 1);
+    expect(dl).toContain('[class.sm:grid-cols-2]="!compact()"');
+  });
+});

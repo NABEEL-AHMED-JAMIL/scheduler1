@@ -124,9 +124,10 @@
       </div>
     }
 
-    <div [class.flex-1]="compact()" [class.min-h-0]="compact()"
-         [class.overflow-y-auto]="compact()" [class.flex]="compact()"
-         [class.flex-col]="compact()" [class.gap-3]="compact()">
+    <!-- A column with a gap everywhere; only the dock makes it a scroll panel. With the gap behind
+         compact() too, the full page stacked its answer cards flush against each other. -->
+    <div class="flex flex-col gap-3"
+         [class.flex-1]="compact()" [class.min-h-0]="compact()" [class.overflow-y-auto]="compact()">
     @for (turn of turns(); track turn.id) {
       <div class="card p-4">
         <div class="flex items-baseline gap-2 pb-3 mb-3 border-b border-subtle">
@@ -169,10 +170,13 @@
             }
 
             @case ('facts') {
-              <dl class="grid sm:grid-cols-2 gap-x-6 gap-y-2 mt-3">
+              <!-- One column in the dock: at its width two columns left a failure reason about
+                   150px, and the label column took a hundred of those. -->
+              <dl class="grid gap-x-6 gap-y-2 mt-3" [class.sm:grid-cols-2]="!compact()">
                 @for (row of block.rows; track row.label) {
                   <div class="flex gap-2 text-sm">
-                    <dt class="text-[color:var(--text-muted)] shrink-0 min-w-24">{{ row.label }}</dt>
+                    <dt class="text-[color:var(--text-muted)] shrink-0"
+                        [class.min-w-24]="!compact()" [class.min-w-10]="compact()">{{ row.label }}</dt>
                     <dd class="min-w-0 break-words">{{ row.value }}</dd>
                   </div>
                 }
