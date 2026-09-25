@@ -32,12 +32,21 @@ export interface JobEvent {
    */
   type: 'job.status' | 'job.log' | 'job.deleted' | 'job.toggled' | 'job.updated';
   jobId: number;
+  /** The run. Absent on a status the platform announces without one (Queue on enqueue, for instance). */
   jobQueueId?: number;
   jobRunningStatus?: string;
+  /** A log line's text: `job.log` only. A status push carries no words (MIG-151). */
   message?: string;
   tenantId?: number;
   at?: string;
 }
+
+/*
+ * A push names; it does not describe (MIG-151, owner decision 2026-09-24). `job.status` is ids only --
+ * type, jobId, jobQueueId, jobRunningStatus, at, tenantId -- and the job's name, owner and next run
+ * are whatever the screen last read from the API. The jobs table takes the status and nothing else
+ * from a push (jobs.live-status.spec.ts), and re-reads a row when a push says only that it changed.
+ */
 
 /**
  * The STOMP endpoint is registered as "/ws", but the app serves under a /api/v1 context
