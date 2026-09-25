@@ -67,9 +67,13 @@
             it appears here.
           </p>
         </div>
-        <a routerLink="/configuration/storage-connections" class="btn btn-primary btn-sm">
-          <app-icon name="plus" />Add a connection
-        </a>
+        @if (canConnectStorage()) {
+          <a routerLink="/configuration/storage-connections" class="btn btn-primary btn-sm">
+            <app-icon name="plus" />Add a connection
+          </a>
+        } @else {
+          <p class="text-sm text-[color:var(--text-muted)]">Ask an administrator of your workspace to connect storage.</p>
+        }
       </div>
     }
   } @else {

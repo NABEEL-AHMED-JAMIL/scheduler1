@@ -59,6 +59,8 @@ export class Queue implements OnInit {
 
   readonly statuses = STATUSES;
   readonly rows = signal<QueueRow[]>([]);
+  /** Job names by id: a run carries only its job's id, and a bare number told a reader nothing. */
+  private readonly jobNames = signal<Map<number, string>>(new Map());
   readonly loading = signal(true);
   readonly error = signal('');
   readonly search = signal('');
@@ -99,6 +101,7 @@ export class Queue implements OnInit {
     if (!term) return shown;
     return shown.filter(row =>
       String(row.jobId).includes(term)
+      || (this.jobNames().get(row.jobId) ?? '').toLowerCase().includes(term)
       || String(row.jobQueueId).includes(term)
       || (row.jobStatusMessage ?? '').toLowerCase().includes(term));
   });
@@ -267,7 +270,26 @@ export class Queue implements OnInit {
 
   readonly outcomeColor = statusColor;
 
-  ngOnInit(): void { this.load(); }
+  ngOnInit(): void {
+    this.load();
+    this.loadJobNames();
+  }
+
+  /** The run's job by name, or its number when the list does not have it. */
+  jobName(row: { jobId: number }): string {
+    return this.jobNames().get(row.jobId) ?? `Job #${row.jobId}`;
+  }
+
+  private loadJobNames(): void {
+    this.http.get<ApiResponse<{ jobId: number; jobName?: string }[]>>(`${API_BASE}/sourceJob.json/listSourceJob`).subscribe({
+      next: response => {
+        if (response.status !== API_SUCCESS) return;
+        this.jobNames.set(new Map((response.data ?? [])
+          .filter(job => job.jobName).map(job => [job.jobId, job.jobName!] as [number, string])));
+      },
+      error: () => { /* the numbers stay; names are a nicety */ },
+    });
+  }
 
   load(): void {
     this.loading.set(true);

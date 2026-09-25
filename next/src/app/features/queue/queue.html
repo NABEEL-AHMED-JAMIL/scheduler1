@@ -1,8 +1,8 @@
 <div class="page">
   <div class="page-head">
     <div>
-      <h1 class="page-title">Queue Messages</h1>
-      <p class="page-subtitle">What is in flight right now, rather than what already finished.</p>
+      <h1 class="page-title">Queue</h1>
+      <p class="page-subtitle">Every run in the chosen dates — waiting, running and finished.</p>
     </div>
     <div class="flex items-center gap-2">
       @if (hasInsights()) {
@@ -136,7 +136,10 @@
         @for (row of paged(); track row.jobQueueId) {
           <tr>
             <td class="mono text-[color:var(--text-muted)]">#{{ row.jobQueueId }}</td>
-            <td class="mono">{{ row.jobId }}</td>
+            <td class="max-w-56">
+              <span class="block truncate" [title]="jobName(row)">{{ jobName(row) }}</span>
+              <span class="mono text-[11px] text-[color:var(--text-muted)]">#{{ row.jobId }}</span>
+            </td>
             <td class="whitespace-nowrap text-[color:var(--text-secondary)]">
               {{ row.dateCreated ? (row.dateCreated | serverTime:'d MMM, HH:mm:ss') : '—' }}
             </td>

@@ -35,7 +35,7 @@ function view(opts: { buckets?: () => Observable<unknown>; list?: () => Observab
         if (config?.data?.send) { const typed = { recipientEmail: 'a@b.example', message: '' }; config.data.send(typed).subscribe(); return { closed: of(typed) }; }
         return { closed: of(true) };
       } } },
-      { provide: AuthService, useValue: { user: () => null, displayName: () => 'Tester' } },
+      { provide: AuthService, useValue: { user: () => null, displayName: () => 'Tester', isTenantAdmin: () => true } },
     ],
   });
   const fixture = TestBed.createComponent(Objects);

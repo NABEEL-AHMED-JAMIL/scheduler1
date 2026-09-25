@@ -421,6 +421,11 @@ export const routes: Routes = [
       { path: 'settings/kafka', redirectTo: 'configuration/kafka' },
       { path: 'settings/lookup', redirectTo: 'configuration/values' },
       { path: 'objects', redirectTo: 'objects/files' },
+      // Last: an address that matches no page shows "Page not found" inside the layout.
+      {
+        path: '**',
+        loadComponent: () => import('./features/not-found/not-found').then(m => m.NotFound),
+      },
     ],
   },
   { path: '**', redirectTo: '' },

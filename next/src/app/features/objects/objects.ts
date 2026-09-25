@@ -5,6 +5,7 @@ import { EMPTY, catchError, from, mergeMap, of, tap } from 'rxjs';
 
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
+import { AuthService } from '../../core/auth/auth.service';
 import { BucketSummary, ObjectSummary, StorageService } from './storage.service';
 import { API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { ToastService } from '../../shared/ui/toast.service';
@@ -33,6 +34,9 @@ const SLOW_PROVIDERS = ['FTP', 'FTPS'];
 })
 export class Objects implements OnInit {
   private readonly storage = inject(StorageService);
+  private readonly auth = inject(AuthService);
+  /** Connecting storage is an administrator's (the connections page is TENANT_ADMIN); others are told whom to ask. */
+  protected readonly canConnectStorage = computed(() => this.auth.isTenantAdmin());
   private readonly toast = inject(ToastService);
   private readonly dialog = inject(Dialog);
   private readonly injector = inject(Injector);
