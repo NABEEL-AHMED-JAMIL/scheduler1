@@ -107,7 +107,7 @@
                      colour alone is not a signal everybody receives. -->
                 <span class="rounded-full shrink-0 p-[2px]"
                       [style.box-shadow]="'0 0 0 2px ' + statusRing(user.status)">
-                  <app-avatar [appUserId]="user.appUserId"
+                  <app-avatar [appUserId]="avatarOwner(user)"
                               [name]="user.fullName || user.username" [size]="2.75" />
                 </span>
                 <div class="min-w-0 flex-1">
@@ -312,7 +312,7 @@
                  split across three columns they cost a third of the table's width to say it. -->
             <td class="max-w-72">
               <div class="flex items-center gap-2.5 min-w-0">
-                <app-avatar [appUserId]="user.appUserId"
+                <app-avatar [appUserId]="avatarOwner(user)"
                             [name]="user.fullName || user.username" [size]="2" class="shrink-0" />
                 <div class="min-w-0">
                   <div class="flex items-center gap-1.5">

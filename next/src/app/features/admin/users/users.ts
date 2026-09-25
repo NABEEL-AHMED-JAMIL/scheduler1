@@ -527,6 +527,14 @@ export class Users implements OnInit {
   }
 
   /** Ring around the avatar: the same fact the status pill carries, said in the portrait. */
+  /**
+   * Whose picture to ask the server for: only someone the list says has one (avatarKey is omitted
+   * when there is none). Asking for everyone sent a request per person per load, most of them 404s.
+   */
+  avatarOwner(user: AppUser): number | null {
+    return user.avatarKey ? user.appUserId : null;
+  }
+
   statusRing(status: string): string {
     return status === 'Active' ? 'var(--color-ok-500)' : 'var(--text-muted)';
   }
