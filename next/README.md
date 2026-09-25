@@ -1,6 +1,6 @@
 # ETL Console — frontend (Angular 22)
 
-The rewrite of `../src` (Angular 8). Same backend, new application. Feature parity is being reached **one feature at a time** — see [`../../.ai/discovery/features.md`](../../.ai/discovery/features.md) for what has made the crossing and what has not.
+The ETL Console. It replaced the Angular 8 console that lived in `../src`, which was retired and removed in 2026-09 (MIG-260); this is the only frontend.
 
 ## Running
 
