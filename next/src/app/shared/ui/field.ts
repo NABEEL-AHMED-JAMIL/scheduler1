@@ -1,4 +1,4 @@
-import { Component, computed, input } from '@angular/core';
+import { Component, ElementRef, afterRenderEffect, computed, inject, input } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { of, startWith, switchMap } from 'rxjs';
 import { Icon } from './icon';
@@ -23,10 +23,10 @@ import { AbstractControl } from '@angular/forms';
       </label>
       <ng-content />
       @if (hint() && !message()) {
-        <p class="field-note text-[color:var(--text-muted)]">{{ hint() }}</p>
+        <p class="field-note text-[color:var(--text-muted)]" [id]="noteId">{{ hint() }}</p>
       }
       @if (message()) {
-        <p class="field-note text-crit-500 flex items-start gap-1.5" role="alert">
+        <p class="field-note text-crit-500 flex items-start gap-1.5" role="alert" [id]="noteId">
           <app-icon name="alert" size="0.9em" class="mt-px shrink-0" />
           <span>{{ message() }}</span>
         </p>
@@ -41,6 +41,37 @@ export class Field {
   readonly hint = input<string>('');
   readonly submitted = input(false);
   readonly required = input(false);
+  /**
+   * An error from somewhere other than the control's validators -- the server refused the
+   * value, a connection test failed. Shown in the same place and the same way, ahead of them.
+   */
+  readonly error = input('');
+
+  private static nextNote = 0;
+  /** The note under the control -- hint or error -- which the control names in aria-describedby. */
+  readonly noteId = `field-note-${++Field.nextNote}`;
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+
+  constructor() {
+    // The control is the caller's, projected in, so the link is made on the element itself:
+    // aria-describedby to the note while one shows, aria-invalid while it is an error. Any
+    // description the caller set is kept.
+    afterRenderEffect(() => {
+      const id = this.for();
+      const describe = !!(this.message() || this.hint());
+      const invalid = !!this.message();
+      if (!id) return;
+      const control = [...this.host.nativeElement.querySelectorAll<HTMLElement>('[id]')].find(e => e.id === id);
+      if (!control) return;
+      const others = (control.getAttribute('aria-describedby') ?? '').split(/\s+/)
+        .filter(token => token && token !== this.noteId);
+      const tokens = describe ? [...others, this.noteId] : others;
+      if (tokens.length) control.setAttribute('aria-describedby', tokens.join(' '));
+      else control.removeAttribute('aria-describedby');
+      if (invalid) control.setAttribute('aria-invalid', 'true');
+      else control.removeAttribute('aria-invalid');
+    });
+  }
   /** Per-error overrides, keyed by validator name, for when the generic wording is too vague. */
   readonly errorMessages = input<Record<string, string>>({});
 
@@ -63,6 +94,7 @@ export class Field {
    * control type, and nothing to remember at the call site.
    */
   readonly message = computed(() => {
+    if (this.error()) return this.error();
     this.controlEvent();
     const control = this.control();
     if (!control || !control.errors) return '';
