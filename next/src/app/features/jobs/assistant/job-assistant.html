@@ -140,7 +140,7 @@
 
             @case ('text') {
               <p class="text-sm leading-relaxed"
-                 [class.text-[color:var(--color-warn-600)]]="turn.answer.refused">
+                 [class.text-warn-500]="turn.answer.refused">
                 @if (turn.answer.refused) { <app-icon name="alert" size="0.9em" class="icon-warn mr-1" /> }
                 {{ block.text }}
               </p>

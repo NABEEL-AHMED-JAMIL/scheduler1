@@ -378,7 +378,7 @@
           @if (isMessageOpen(run.jobQueueId) && run.jobStatusMessage) {
             <tr>
               <td [attr.colspan]="isAllJobs() ? 9 : 8" class="!p-0">
-                <div class="px-4 py-3 border-l-2 border-brand-500">
+                <div class="detail-panel">
                   <div class="flex items-baseline gap-2 mb-1.5">
                     <h3 class="text-xs font-semibold uppercase tracking-wider
                                text-[color:var(--text-secondary)]">Message · run #{{ run.jobQueueId }}</h3>

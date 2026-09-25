@@ -129,7 +129,7 @@
         <app-ranked-bar [data]="topGaps()" [max]="8" [showPercent]="false" [sorted]="false" />
 
         @if (lateEntries()) {
-          <p class="flex items-start gap-1.5 mt-2 text-[11px] text-[color:var(--color-warn-600)]">
+          <p class="flex items-start gap-1.5 mt-2 text-[11px] text-warn-500">
             <app-icon name="alert" size="0.9em" class="icon-warn mt-px shrink-0" />
             {{ lateEntries() }} {{ lateEntries() === 1 ? 'entry was' : 'entries were' }} recorded
             after this run finished, so the gap before {{ lateEntries() === 1 ? 'it' : 'them' }}

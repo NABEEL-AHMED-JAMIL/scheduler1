@@ -187,7 +187,9 @@ export class JobLogs implements OnInit, OnDestroy {
       ...g,
       color: g.value > avg * 2 && g.value > 5
         ? 'var(--color-warn-500)'
-        : 'var(--color-brand-500)',
+        // --accent-mark, not brand-500: that step is the dark card's own colour, so every
+        // ordinary gap vanished in dark and only the stalls showed.
+        : 'var(--accent-mark)',
       stalled: g.value > avg * 2 && g.value > 5,
     }));
   });
