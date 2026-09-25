@@ -14,20 +14,22 @@ const source = {
 };
 
 /** Records what was posted and what was said, so a refused save can be told from a silent one. */
-function dialogFor() {
+function dialogFor(connection: Record<string, unknown> = source) {
   const posted: string[] = [];
   const errors: string[] = [];
   const infos: string[] = [];
+  const bodies: any[] = [];
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
     providers: [
-      { provide: DIALOG_DATA, useValue: { connection: source } },
+      { provide: DIALOG_DATA, useValue: { connection } },
       { provide: DialogRef, useValue: { close: () => {} } },
       {
         provide: HttpClient,
         useValue: {
-          post: (url: string) => {
+          post: (url: string, body: unknown) => {
             posted.push(url);
+            bodies.push(body);
             return of({ status: 'SUCCESS', message: 'Copied.', data: [] });
           },
         },
@@ -42,7 +44,7 @@ function dialogFor() {
       },
     ],
   });
-  return { dialog: TestBed.runInInjectionContext(() => new CloneDialog()), posted, errors, infos };
+  return { dialog: TestBed.runInInjectionContext(() => new CloneDialog()), posted, errors, infos, bodies };
 }
 
 describe('CloneDialog alias', () => {
@@ -84,5 +86,24 @@ describe('CloneDialog bucket discovery', () => {
     expect(errors).toEqual([]);
     expect(infos).toHaveLength(1);
     expect(dialog.discovered()).toEqual([]);
+  });
+});
+
+/**
+ * An FTP or FTPS server has no bucket. The clone dialog offered a Bucket box and "List buckets"
+ * for every provider, where the connection dialog gates the same field on the provider.
+ */
+describe('CloneDialog on an FTP connection', () => {
+  const ftp = { storageConnectionId: 9, connectionName: 'Partner FTP', alias: 'partner-ftp', provider: 'FTPS', bucketName: 'stale' };
+
+  it('knows an FTP source has no bucket, and an object store has one', () => {
+    expect(dialogFor(ftp).dialog.hasBucket()).toBe(false);
+    expect(dialogFor({ ...source, provider: 'MINIO' }).dialog.hasBucket()).toBe(true);
+  });
+
+  it('sends no bucket for an FTP copy', () => {
+    const { dialog, bodies } = dialogFor(ftp);
+    dialog.save();
+    expect(bodies[0].bucketName).toBeNull();
   });
 });

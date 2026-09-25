@@ -56,7 +56,6 @@ export class ConnectionDialog {
   readonly discovering = signal(false);
   readonly discovered = signal<string[]>([]);
   readonly bucketOptions = computed(() => this.discovered().map(name => ({ value: name, label: name })));
-  readonly discoverError = signal('');
 
   readonly isEdit = computed(() => !!this.data.connection);
   readonly provider = signal<string>(this.data.connection?.provider ?? 'MINIO');
@@ -132,7 +131,6 @@ export class ConnectionDialog {
     this.form.get('provider')!.valueChanges.subscribe(value => {
       this.provider.set(value);
       this.discovered.set([]);
-      this.discoverError.set('');
       // FTPS defaults to the implicit port so the common case needs no thought.
       if (value === 'FTPS' && !this.form.get('port')!.value) this.form.get('port')!.setValue(990);
       if (value === 'FTP' && !this.form.get('port')!.value) this.form.get('port')!.setValue(21);
@@ -198,21 +196,22 @@ export class ConnectionDialog {
 
   discover(): void {
     this.discovering.set(true);
-    this.discoverError.set('');
     this.http.post<ApiResponse<string[]>>(`${API_BASE}/storageConnection.json/discoverBuckets`,
       this.form.getRawValue()).subscribe({
       next: response => {
         this.discovering.set(false);
+        // Reported as the clone dialog reports it: a loose red line under the field read an
+        // empty-but-working server as a failure.
         if (response.status === API_SUCCESS) {
           this.discovered.set(response.data ?? []);
-          if (!(response.data ?? []).length) this.discoverError.set(response.message);
+          if (!(response.data ?? []).length) this.toast.info(response.message || 'No buckets came back.');
         } else {
-          this.discoverError.set(response.message);
+          this.toast.error(response.message || 'Could not list buckets.');
         }
       },
       error: err => {
         this.discovering.set(false);
-        this.discoverError.set(err?.error?.message || 'Could not list buckets.');
+        this.toast.error(err?.error?.message || 'Could not list buckets.');
       },
     });
   }

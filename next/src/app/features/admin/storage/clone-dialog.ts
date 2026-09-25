@@ -44,6 +44,7 @@ import { ALIAS_PATTERN } from './connection-dialog';
                  [ngModelOptions]="{standalone: true}" />
         </app-field>
 
+        @if (hasBucket()) {
         <app-field label="Bucket" for="bucket"
                    [hint]="discovered().length
                      ? 'Pick one that exists, or type another.'
@@ -69,6 +70,7 @@ import { ALIAS_PATTERN } from './connection-dialog';
           @if (discovering()) { <app-icon name="refresh" class="spin" /> }
           {{ discovering() ? 'Looking…' : 'List buckets on this server' }}
         </button>
+        }
 
         <p class="field-note text-[color:var(--text-muted)]">
           Credentials and connection settings are copied on the server, so nothing secret passes
@@ -89,6 +91,11 @@ export class CloneDialog {
   readonly discovering = signal(false);
   readonly discovered = signal<string[]>([]);
   readonly aliasPattern = ALIAS_PATTERN;
+
+  /** FTP and FTPS have no bucket; the connection dialog gates the same field on the provider. */
+  hasBucket(): boolean {
+    return !['FTP', 'FTPS'].includes(String(this.data.connection.provider ?? '').toUpperCase());
+  }
 
   connectionName = `${this.data.connection.connectionName} (copy)`;
   alias = `${this.data.connection.alias}-copy`;
@@ -143,7 +150,7 @@ export class CloneDialog {
     this.http.post<ApiResponse>(
       `${API_BASE}/storageConnection.json/cloneConnection`,
       { connectionName: this.connectionName, alias: this.alias,
-        bucketName: this.bucketName.trim() || null },
+        bucketName: this.hasBucket() ? (this.bucketName.trim() || null) : null },
       { params: { sourceId: String(this.data.connection.storageConnectionId) } }).subscribe({
       next: response => {
         this.saving.set(false);

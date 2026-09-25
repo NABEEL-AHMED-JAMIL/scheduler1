@@ -1,8 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { HttpClient } from '@angular/common/http';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
+import { ToastService } from '../../../shared/ui/toast.service';
 import { ConnectionDialog } from './connection-dialog';
 
 /**
@@ -66,5 +67,44 @@ describe('ConnectionDialog S3 credential rules', () => {
     // does not even show.
     expect(requires(dialog, 'accessKey')).toBe(false);
     expect(requires(dialog, 'secretKey')).toBe(false);
+  });
+});
+
+/**
+ * The discover answer was a loose red line under the field, including the server's "nothing to
+ * list" success -- which read as the connection having failed. It is reported the way the clone
+ * dialog reports it: a failure as an error toast, an empty list as information.
+ */
+describe('ConnectionDialog bucket discovery', () => {
+  function discoverWith(answer: unknown) {
+    const toast = { error: vi.fn(), info: vi.fn(), success: vi.fn() };
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: DIALOG_DATA, useValue: {} },
+        { provide: DialogRef, useValue: { close: () => {} } },
+        { provide: HttpClient, useValue: { get: () => of({ status: 'SUCCESS', message: '', data: [] }), post: () => answer } },
+        { provide: ToastService, useValue: toast },
+      ],
+    });
+    const dialog = TestBed.runInInjectionContext(() => new ConnectionDialog());
+    dialog.discover();
+    return { dialog, toast };
+  }
+
+  it('reports a refusal as an error', () => {
+    const { toast } = discoverWith(of({ status: 'ERROR', message: 'Access denied.' }));
+    expect(toast.error).toHaveBeenCalledWith('Access denied.');
+  });
+
+  it('reports a failed request as an error', () => {
+    const { toast } = discoverWith(throwError(() => ({ error: {} })));
+    expect(toast.error).toHaveBeenCalledWith('Could not list buckets.');
+  });
+
+  it('reports an empty list as information, not a failure', () => {
+    const { toast } = discoverWith(of({ status: 'SUCCESS', message: 'No buckets on this server.', data: [] }));
+    expect(toast.info).toHaveBeenCalledWith('No buckets on this server.');
+    expect(toast.error).not.toHaveBeenCalled();
   });
 });

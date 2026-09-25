@@ -1,7 +1,7 @@
 <div class="page">
   <div class="page-head">
     <div>
-    <h1 class="page-title">Storage Connections</h1>
+    <h1 class="page-title">Storage connections</h1>
     <p class="page-subtitle">
       S3, Azure, MinIO or FTP/FTPS. Passwords, secret keys and connection strings are encrypted
       and never sent back to the browser.
@@ -71,24 +71,24 @@
     <ng-container toolbar>
       <app-view-toggle [(value)]="view" key="storage" cardsIcon="layers" />
 
-      <select class="input max-w-36" [value]="providerFilter()"
-              (change)="providerFilter.set($any($event.target).value)">
+      <select class="input max-w-36" [value]="providerFilter()" aria-label="Filter by provider"
+              (change)="providerFilter.set($any($event.target).value); pager.reset()">
         <option value="">All providers</option>
         @for (p of providers(); track p) { <option [value]="p">{{ p }}</option> }
       </select>
       @if (canSeeWorkspace()) {
         <select class="input max-w-48" [value]="workspaceFilter()" aria-label="Workspace"
-                (change)="workspaceFilter.set($any($event.target).value)">
+                (change)="workspaceFilter.set($any($event.target).value); pager.reset()">
           <option value="">All workspaces</option>
           @for (w of workspaces(); track w.id) { <option [value]="w.id">{{ w.name }}</option> }
         </select>
       }
       <div class="search-field max-w-56">
         <app-icon name="search" size="0.95em" />
-        <input class="input" placeholder="Search name, alias or host"
-               [value]="search()" (input)="search.set($any($event.target).value)" />
+        <input class="input" placeholder="Search name, alias or host" aria-label="Search connections"
+               [value]="search()" (input)="search.set($any($event.target).value); pager.reset()" />
       </div>
-      <app-mine-filter [(only)]="onlyMine" />
+      <app-mine-filter [(only)]="onlyMine" (onlyChange)="pager.reset()" />
 
       @if (hasFilters()) {
         <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()"><app-icon name="close" />Clear</button>
@@ -97,7 +97,7 @@
 
     @if (view() === 'cards') {
       <div class="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
-        @for (c of filtered(); track c.storageConnectionId) {
+        @for (c of paged(); track c.storageConnectionId) {
           <article class="card p-4 flex flex-col gap-3"
                    [class.opacity-55]="testing() === c.storageConnectionId">
             <div class="flex items-start gap-2.5">
@@ -192,11 +192,11 @@
           <th>Created by</th>
           <th>Updated by</th>
           <th class="text-right">State</th>
-          <th class="w-12"></th>
+          <th class="w-12"><span class="sr-only">Actions</span></th>
         </tr>
       </thead>
       <tbody>
-        @for (c of filtered(); track c.storageConnectionId) {
+        @for (c of paged(); track c.storageConnectionId) {
           <tr [class.opacity-55]="testing() === c.storageConnectionId">
             <td>
               <input type="checkbox" class="checkbox"
@@ -284,5 +284,7 @@
       </tbody>
     </table>
     }
+    <app-pagination pager [total]="filtered().length" [page]="pager.page()" [size]="pager.size()"
+                    (goTo)="goToPage($event)" (setSize)="setPageSize($event)" />
   </app-table-shell>
 </div>

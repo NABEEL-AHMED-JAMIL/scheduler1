@@ -21,6 +21,8 @@ import type { TenantName } from '../../settings/kafka/kafka-connections';
 import { ViewToggle } from '../../../shared/ui/view-toggle';
 import { kafkaDependencyNote, kafkaProfilesUsing } from './kafka-dependents';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
+import { createPager } from '../../../shared/ui/pager';
+import { Pagination } from '../../../shared/ui/pagination';
 
 interface StorageConnection {
   /** Owning workspace; null for the two platform buckets. */
@@ -53,7 +55,7 @@ interface StorageConnection {
 
 @Component({
   selector: 'app-storage-connections',
-  imports: [MineFilter, ViewToggle, StatTile, Icon, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, CopyButton],
+  imports: [MineFilter, ViewToggle, StatTile, Icon, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, CopyButton, Pagination],
   templateUrl: './storage-connections.html',
 })
 export class StorageConnections implements OnInit {
@@ -116,6 +118,12 @@ export class StorageConnections implements OnInit {
         || (c.host ?? '').toLowerCase().includes(term);
     });
   });
+
+  /** Paged like Users; "on screen" for the bulk tick means this page. */
+  readonly pager = createPager<StorageConnection>();
+  readonly paged = computed(() => this.pager.slice(this.filtered()));
+  goToPage(next: number): void { this.pager.goTo(next, this.filtered().length); }
+  setPageSize(size: number): void { this.pager.setSize(size); }
 
   /** True while anything narrows the table, which is when the tiles need saying out loud. */
   readonly isFiltered = computed(() =>
@@ -202,18 +210,21 @@ export class StorageConnections implements OnInit {
     // named here, while the delete can still be called off.
     const kafka = kafkaDependencyNote(await kafkaProfilesUsing(this.http, connection.alias));
     const ok = await confirmWith(this.dialog, {
-      title: 'Delete connection',
+      title: `Delete ${connection.connectionName}?`,
       body: `"${connection.connectionName}" will be removed. Jobs and tasks pointing at "${connection.alias}" will stop resolving.`
         + (kafka ? ` ${kafka}` : ''),
-      confirmLabel: 'Delete',
+      confirmLabel: 'Delete connection',
       danger: true,
     });
     if (!ok) return;
 
+    // The row dims and its menu locks while the delete is out, as it does during a test.
+    this.testing.set(connection.storageConnectionId);
     this.http.delete<ApiResponse>(`${API_BASE}/storageConnection.json/deleteConnection`, {
       params: { storageConnectionId: String(connection.storageConnectionId) },
     }).subscribe({
       next: response => {
+        this.testing.set(null);
         if (response.status === API_SUCCESS) {
           this.toast.success(`${connection.connectionName} deleted.`);
           this.load();
@@ -221,7 +232,7 @@ export class StorageConnections implements OnInit {
           this.toast.error(response.message);
         }
       },
-      error: err => this.toast.error(err?.error?.message || 'Delete failed.'),
+      error: err => { this.testing.set(null); this.toast.error(err?.error?.message || 'Delete failed.'); },
     });
   }
 
@@ -276,6 +287,7 @@ export class StorageConnections implements OnInit {
     this.search.set('');
     this.providerFilter.set('');
     this.onlyMine.set(false);
+    this.pager.reset();
   }
 
   /**
@@ -323,14 +335,14 @@ export class StorageConnections implements OnInit {
 
   /** Ticks or clears everything currently on screen, not everything that exists. */
   toggleAll(): void {
-    const shown = this.filtered().map(c => c.storageConnectionId);
+    const shown = this.paged().map(c => c.storageConnectionId);
     this.selected.set(shown.every(id => this.selected().has(id))
       ? new Set()
       : new Set(shown));
   }
 
   readonly allShownSelected = computed(() => {
-    const shown = this.filtered();
+    const shown = this.paged();
     return shown.length > 0 && shown.every(c => this.selected().has(c.storageConnectionId));
   });
 

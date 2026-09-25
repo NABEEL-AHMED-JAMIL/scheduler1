@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
 import { Dialog } from '@angular/cdk/dialog';
-import { of } from 'rxjs';
+import { of, Subject } from 'rxjs';
+import { ToastService } from '../../../shared/ui/toast.service';
 import { AuthService } from '../../../core/auth/auth.service';
 import { StorageConnections } from './storage-connections';
 
@@ -99,5 +100,55 @@ describe('StorageConnections bulk test', () => {
     component.toggleSelected(2);
     component.load();
     expect([...component.selected()]).toEqual([1]);
+  });
+});
+
+describe('StorageConnections delete', () => {
+  function withDelete(answer: Subject<any>) {
+    const opened: any[] = [];
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: HttpClient, useValue: { get: () => of({ status: 'SUCCESS', message: '', data: [] }), delete: () => answer.asObservable() } },
+        { provide: Dialog, useValue: { open: (_: unknown, config: any) => { opened.push(config.data); return { closed: of(true) }; } } },
+        { provide: AuthService, useValue: { user: () => ({ appUserId: 1 }) } },
+        { provide: ToastService, useValue: { success: () => {}, error: () => {} } },
+      ],
+    });
+    const component = TestBed.runInInjectionContext(() => new StorageConnections());
+    component.connections.set(rows);
+    return { component, opened };
+  }
+
+  it('names the connection and the action, as Users and Tenants do', async () => {
+    const { component, opened } = withDelete(new Subject());
+    await component.remove(rows[0] as any);
+    expect(opened[0]).toEqual(expect.objectContaining({ title: 'Delete alpha?', confirmLabel: 'Delete connection', danger: true }));
+  });
+
+  it('marks the row busy while the delete is in flight, then clears it', async () => {
+    const answer = new Subject<any>();
+    const { component } = withDelete(answer);
+    await component.remove(rows[0] as any);
+    expect(component.testing()).toBe(1);
+    answer.next({ status: 'SUCCESS', message: '' });
+    expect(component.testing()).toBeNull();
+  });
+});
+
+describe('StorageConnections paging', () => {
+  const many = Array.from({ length: 60 }, (_, i) => ({
+    storageConnectionId: i + 1, connectionName: `c${String(i + 1).padStart(2, '0')}`, alias: `a${i}`, provider: 'S3', status: 'Active',
+  }));
+
+  it('shows one page at a time and ticks only the rows on it', () => {
+    const { component } = componentWith(many);
+    component.connections.set(many as any);
+    expect(component.paged()).toHaveLength(50);
+    component.toggleAll();
+    expect(component.selected().size).toBe(50);
+    component.goToPage(2);
+    expect(component.paged()).toHaveLength(10);
+    expect(component.allShownSelected()).toBe(false);
   });
 });
