@@ -1,6 +1,9 @@
 import { Component, input } from '@angular/core';
 import { Icon } from './icon';
 
+/** The intent tints shared by the stat tile and the stat strip: the icon-* helpers in styles.css. */
+export type StatTone = 'ok' | 'warn' | 'crit' | 'info' | 'muted';
+
 /**
  * The KPI tile that sits above a page's table. Six screens had hand-rolled copies of the
  * same three divs, which is how they drifted apart in the first place -- one class per
@@ -34,5 +37,5 @@ export class StatTile {
   readonly foot = input('');
   readonly icon = input('');
   /** Matches the icon-* helpers in styles.css, so the tint follows the same palette as everywhere else. */
-  readonly tone = input<'ok' | 'warn' | 'crit' | 'info' | 'muted'>('muted');
+  readonly tone = input<StatTone>('muted');
 }

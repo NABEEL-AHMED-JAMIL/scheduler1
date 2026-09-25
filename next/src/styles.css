@@ -440,6 +440,52 @@
   .kpi-value { @apply font-semibold; font-size: clamp(1.125rem, 16cqi, 1.5rem); line-height: 1.2;
     overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
   .stat-foot  { @apply mt-0.5 text-[11px] text-[color:var(--text-muted)]; }
+
+  /* app-stat-strip: the compact row of small counts. Tiles on the raised surface, separated by
+     1px of the border colour showing through the gap. Columns come from grid-cols-* classes
+     on the host (see stat-strip.ts); everything here is min-width 0 and wraps anywhere, so a
+     long value or label breaks inside its tile instead of pushing the strip wider. */
+  .stat-strip {
+    display: grid; gap: 1px; overflow: hidden; min-width: 0;
+    background: var(--border-subtle);
+    border: 1px solid var(--border-subtle);
+    @apply rounded-lg;
+  }
+  .stat-strip-cell { display: flex; min-width: 0; background: var(--surface-raised); }
+  .stat-strip-item {
+    display: flex; align-items: center; justify-content: center; gap: 0.625rem;
+    width: 100%; min-width: 0; padding: 0.625rem 0.75rem;
+    text-align: center; color: inherit; font: inherit;
+  }
+  .stat-strip.is-start .stat-strip-item { justify-content: flex-start; text-align: start; }
+  .stat-strip.is-md .stat-strip-item { padding: 0.75rem 1rem; }
+  .stat-strip-text { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
+  /* First in the DOM so it is read after its label, drawn first so it leads visually. */
+  .stat-strip-value {
+    order: -1; font-weight: 600; font-size: 0.875rem; line-height: 1.1;
+    font-variant-numeric: tabular-nums; overflow-wrap: anywhere;
+  }
+  .stat-strip.is-md .stat-strip-value { font-size: 1.125rem; }
+  .stat-strip-value.is-quiet { color: var(--text-muted); }
+  .stat-strip-label {
+    font-size: 10px; line-height: 1.25; text-transform: uppercase; letter-spacing: 0.025em;
+    color: var(--text-muted); overflow-wrap: anywhere;
+  }
+  .stat-strip-foot { font-size: 11px; line-height: 1.25; color: var(--text-muted); overflow-wrap: anywhere; }
+  .stat-strip-glyph { display: inline-flex; flex-shrink: 0; }
+  .stat-strip-dot { width: 0.5rem; height: 0.5rem; border-radius: 9999px; background: currentColor; flex-shrink: 0; }
+  .stat-strip-live { margin-inline-start: auto; }
+  .stat-strip-item.is-action { cursor: pointer; transition: background-color 120ms; }
+  .stat-strip-item.is-action:hover,
+  .stat-strip-item[aria-pressed="true"] { background: var(--surface-sunken); }
+  .stat-strip-item[aria-pressed="true"] { box-shadow: inset 0 -2px 0 var(--accent-mark-strong); }
+  /* Inset: the strip clips its corners, which would cut off the usual outset ring. */
+  .stat-strip-item.is-action:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; border-radius: 0; }
+  .stat-strip-summary {
+    grid-column: 1 / -1; display: flex; align-items: baseline; justify-content: center; gap: 0.375rem;
+    padding: 0.375rem 0.5rem; background: var(--surface-sunken);
+  }
+  .stat-strip-summary .stat-strip-value { font-size: 0.75rem; }
   /* The glyph sits on the sunken surface so it reads as a quiet marker beside the number
      rather than a second thing competing with it for attention. */
   /* The native control inherits nothing useful, so give it the brand colour and a focus
