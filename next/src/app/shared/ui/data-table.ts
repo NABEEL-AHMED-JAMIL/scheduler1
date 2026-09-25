@@ -1,6 +1,7 @@
 import { Component, input, output } from '@angular/core';
 import { Icon } from './icon';
 import { BlurLoader } from './blur-loader';
+import { LoadError } from './load-error';
 
 /**
  * Shared chrome for the list screens: a titled card with a filter slot, plus consistent
@@ -10,7 +11,7 @@ import { BlurLoader } from './blur-loader';
  */
 @Component({
   selector: 'app-table-shell',
-  imports: [Icon, BlurLoader],
+  imports: [Icon, BlurLoader, LoadError],
   template: `
     <div class="card overflow-hidden">
       <div class="table-toolbar flex flex-wrap items-center gap-2 px-4 py-3 border-b border-subtle"
@@ -48,13 +49,7 @@ import { BlurLoader } from './blur-loader';
           Loading…
         </div>
       } @else if (error() && !loading()) {
-        <div class="px-6 py-14 text-center">
-          <app-icon name="alert" size="1.75rem" class="icon-crit block mx-auto mb-3" />
-          <p class="text-sm text-crit-500">{{ error() }}</p>
-          <button type="button" class="btn btn-default btn-sm mt-4" (click)="retry.emit()">
-            <app-icon name="refresh" />Try again
-          </button>
-        </div>
+        <app-load-error [message]="error()" (retry)="retry.emit()" />
       } @else if (isEmpty() && !loading()) {
         <div class="px-6 py-14 text-center">
           <app-icon [name]="emptyIcon()" size="1.75rem"
