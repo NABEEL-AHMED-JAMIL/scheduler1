@@ -13,7 +13,7 @@ import { BlurLoader } from './blur-loader';
   imports: [Icon, BlurLoader],
   template: `
     <div class="card overflow-hidden">
-      <div class="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-subtle"
+      <div class="table-toolbar flex flex-wrap items-center gap-2 px-4 py-3 border-b border-subtle"
           >
         <h2 class="text-sm font-semibold mr-auto">
           {{ heading() }}

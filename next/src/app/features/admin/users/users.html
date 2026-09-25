@@ -379,7 +379,7 @@
                   </span>
                 </button>
               } @else {
-                <span class="text-[color:var(--text-muted)] text-sm">All pages</span>
+                <span class="text-[color:var(--text-muted)]">All pages</span>
               }
             </td>
 
@@ -396,7 +396,7 @@
               } @else { — }
             </td>
 
-            <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-sm">
+            <td class="text-[color:var(--text-secondary)] whitespace-nowrap">
               @if (user.lastLoginAt) {
                 {{ user.lastLoginAt | serverTime:'d MMM yyyy' }}
                 <div class="text-xs text-[color:var(--text-muted)]">
@@ -428,14 +428,14 @@
                     </div>
                   }
                 } @else {
-                  <span class="text-[color:var(--text-muted)] text-sm">Nothing yet</span>
+                  <span class="text-[color:var(--text-muted)]">Nothing yet</span>
                 }
               } @else { <span class="text-[color:var(--text-muted)]">—</span> }
             </td>
 
             <!-- When, and by whom, in one cell. The editor line appears only when it was somebody
                  other than the author -- otherwise it restates the line above it. -->
-            <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-sm">
+            <td class="text-[color:var(--text-secondary)] whitespace-nowrap">
               {{ user.dateCreated ? (user.dateCreated | serverTime:'d MMM yyyy') : '—' }}
               @if (user.createdByName) {
                 <div class="text-xs text-[color:var(--text-muted)]">by {{ user.createdByName }}</div>

@@ -1496,6 +1496,10 @@ html.dark {
      took the full 2.25rem .input and stood a third taller than the buttons beside it. Same padding,
      line and border as .btn-sm, so the row lines up by construction. */
   .page-head:has(.btn-sm) .input { min-height: 0; @apply px-2.5 py-1 text-xs; }
+  /* A list's toolbar (app-table-shell) held a 30px view toggle, 36px filters and 26px buttons in one
+     row. Every control there is the view toggle's height, and the filters take the compact type. */
+  .table-toolbar .input { min-height: 1.875rem; @apply px-2.5 py-1 text-xs; }
+  .table-toolbar .btn-sm { min-height: 1.875rem; }
   /* Joined controls: a stepper such as "< September 2026 >" built from .btn-sm pieces, one box. */
   .btn-join { @apply inline-flex items-stretch; }
   .btn-join > .btn { @apply rounded-none; }
@@ -1520,6 +1524,10 @@ html.dark {
 @layer components {
   /* A sortable header has to look clickable before it is clicked. */
   .th-sort {
+    /* A <button> resets text-transform, so a sortable heading read "Person" beside a plain one's
+       "WORKLOAD" in the same header row. It takes the th's case and spacing like its neighbours. */
+    text-transform: inherit;
+    letter-spacing: inherit;
     @apply cursor-pointer select-none inline-flex items-center gap-1
            hover:text-[color:var(--text-primary)];
   }
