@@ -57,7 +57,7 @@
       }
       <div class="search-field max-w-56">
         <app-icon name="search" size="0.95em" />
-        <input class="input" placeholder="Search key, value or description" aria-label="Search"
+        <input class="input" placeholder="Search key, value or description" aria-label="Search configuration values"
                [value]="search()" (input)="search.set($any($event.target).value)" />
       </div>
     </ng-container>
@@ -70,7 +70,7 @@
           <th>Kind</th>
           <th>Value</th>
           <th>Used by</th>
-          <th class="w-32"></th>
+          <th class="w-32"><span class="sr-only">Actions</span></th>
         </tr>
       </thead>
       <tbody>

@@ -28,7 +28,7 @@
       }
       <div class="search-field max-w-56">
         <app-icon name="search" size="0.95em" />
-        <input class="input" placeholder="Search name, value or description" aria-label="Search"
+        <input class="input" placeholder="Search name, value or description" aria-label="Search entries"
                [value]="search()" (input)="search.set($any($event.target).value)" />
       </div>
     </ng-container>
@@ -41,7 +41,7 @@
           <th>{{ isHomePage() ? 'Address' : 'Value' }}</th>
           <th>Used by</th>
           <th>Last changed</th>
-          <th class="w-24"></th>
+          <th class="w-24"><span class="sr-only">Actions</span></th>
         </tr>
       </thead>
       <tbody>
