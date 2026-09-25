@@ -46,7 +46,20 @@
         <div class="card flex items-start gap-2 px-4 py-2.5 text-sm mt-4" role="status">
           <app-icon [name]="r.ok ? 'checkCircle' : 'xCircle'"
                     [class]="r.ok ? 'icon-ok' : 'icon-crit'" class="mt-0.5 shrink-0" />
-          <span>{{ r.message }}</span>
+          <div class="min-w-0 flex-1">
+            <p>{{ r.message }}</p>
+            @if (r.rows.length) {
+              <ul class="bulk-rows mt-1.5 list-disc pl-4 space-y-0.5 text-xs text-[color:var(--text-muted)] break-words max-h-60 overflow-y-auto">
+                @for (row of rowsShown(); track $index) { <li>{{ row }}</li> }
+              </ul>
+              @if (rowsHidden()) {
+                <p class="text-xs mt-1 text-[color:var(--text-muted)]">and {{ rowsHidden() }} more</p>
+              }
+              <button type="button" class="btn btn-ghost btn-xs mt-1.5" (click)="copyRows()">
+                <app-icon name="copy" />Copy all {{ r.rows.length }} {{ r.rows.length === 1 ? 'reason' : 'reasons' }}
+              </button>
+            }
+          </div>
         </div>
       }
     </div>

@@ -2,7 +2,8 @@ import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
-import { Subject, throwError } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
+import { HttpEventType } from '@angular/common/http';
 import { BulkTransfer } from './bulk-transfer';
 import { ToastService } from '../../shared/ui/toast.service';
 
@@ -71,5 +72,46 @@ describe('Bulk import / export', () => {
     expect(bar?.getAttribute('aria-valuenow')).toBe('40');
     expect(bar?.getAttribute('aria-valuemin')).toBe('0');
     expect(bar?.getAttribute('aria-valuemax')).toBe('100');
+  });
+
+  /**
+   * A rejected sheet comes back as "Total 3 source jobs invalid." with each bad row's reason in
+   * data. The card showed only the total, so nobody could tell which rows to fix.
+   */
+  describe('a rejected sheet', () => {
+    const answer = (body: unknown) => ({ post: () => of({ type: HttpEventType.Response, body }) });
+    const send = (http: Record<string, unknown>) => {
+      const view = page(http);
+      view.component.onFile(new File(['x'], 'jobs.xlsx'));
+      view.component.upload();
+      view.fixture.detectChanges();
+      const items = () => [...view.el.querySelectorAll('.bulk-rows li')].map(li => li.textContent!.trim());
+      return { ...view, items };
+    };
+
+    it('lists the reason for each row', () => {
+      const { items, el } = send(answer({ status: 'ERROR', message: 'Total 2 source jobs invalid.',
+        data: ['Row 3: Job name is required.\n', 'Row 7: Task 99 not found.\n'] }));
+      expect(el.textContent).toContain('Total 2 source jobs invalid.');
+      expect(items()).toEqual(['Row 3: Job name is required.', 'Row 7: Task 99 not found.']);
+      expect(el.textContent).toContain('Copy all 2 reasons');
+    });
+
+    it('lists the first twenty and says how many more there are', () => {
+      const data = Array.from({ length: 25 }, (_, i) => `Row ${i + 2}: bad.`);
+      const { items, el } = send(answer({ status: 'ERROR', message: 'Total 25 source jobs invalid.', data }));
+      expect(items()).toHaveLength(20);
+      expect(el.textContent).toContain('and 5 more');
+    });
+
+    it('lists nothing for a sheet that went in', () => {
+      const { el } = send(answer({ status: 'SUCCESS', message: 'Upload complete.', data: ['ignored'] }));
+      expect(el.querySelector('.bulk-rows')).toBeNull();
+    });
+
+    it('lists the reasons from a refusal too', () => {
+      const { items } = send({ post: () => throwError(() => ({ status: 400, error: { message: 'Total 1 source task invalid.', data: ['Row 4: bad cron.'] } })) });
+      expect(items()).toEqual(['Row 4: bad cron.']);
+    });
   });
 });

@@ -5,6 +5,15 @@ import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { Icon } from '../../shared/ui/icon';
 import { ToastService } from '../../shared/ui/toast.service';
 import { FileDropzone } from '../../shared/ui/file-dropzone';
+import { copyText } from '../../shared/ui/clipboard.util';
+
+/** How many of a rejected sheet's row reasons the card lists before "and N more". */
+const ROWS_SHOWN = 20;
+
+/** The server's per-row reasons (ResponseDto.data on a rejected sheet): strings, each ending in a newline. */
+export function rowsOf(data: unknown): string[] {
+  return Array.isArray(data) ? data.filter((x): x is string => typeof x === 'string').map(x => x.trim()).filter(Boolean) : [];
+}
 
 type Kind = 'job' | 'task';
 
@@ -52,7 +61,13 @@ export class BulkTransfer {
   readonly uploading = signal(false);
   readonly progress = signal(0);
   readonly downloading = signal('');
-  readonly result = signal<{ ok: boolean; message: string } | null>(null);
+  readonly result = signal<{ ok: boolean; message: string; rows: string[] } | null>(null);
+  /**
+   * A rejected sheet names every bad row, and the card showed only "Total 3 source jobs invalid.",
+   * so there was no way to know what to fix. The first rows are listed, and all of them can be copied.
+   */
+  readonly rowsShown = computed(() => this.result()?.rows.slice(0, ROWS_SHOWN) ?? []);
+  readonly rowsHidden = computed(() => Math.max(0, (this.result()?.rows.length ?? 0) - ROWS_SHOWN));
 
   /**
    * A pick or a drop from the shared dropzone, or its Remove (null). The picker's accept filter
@@ -95,15 +110,22 @@ export class BulkTransfer {
           const response = event.body as ApiResponse;
           const ok = response?.status === API_SUCCESS;
           // The result card says how it went and stays; a toast saying the same was twice.
-          this.result.set({ ok, message: response?.message || (ok ? 'Upload complete.' : 'The upload failed.') });
+          this.result.set({ ok, message: response?.message || (ok ? 'Upload complete.' : 'The upload failed.'),
+            rows: ok ? [] : rowsOf(response?.data) });
           if (ok) this.file.set(null);
         }
       },
       error: err => {
         this.uploading.set(false);
-        this.result.set({ ok: false, message: err?.error?.message || 'The file could not be uploaded.' });
+        this.result.set({ ok: false, message: err?.error?.message || 'The file could not be uploaded.', rows: rowsOf(err?.error?.data) });
       },
     });
+  }
+
+  async copyRows(): Promise<void> {
+    const rows = this.result()?.rows ?? [];
+    if (await copyText(rows.join('\n'))) this.toast.success(`Copied ${rows.length} ${rows.length === 1 ? 'reason' : 'reasons'}.`);
+    else this.toast.error('The reasons could not be copied.');
   }
 
   download(which: 'template' | 'exportAll'): void {

@@ -45,7 +45,7 @@ const FETCH_ROWS = 20;
       </button>
 
       @if (open()) {
-        <div class="absolute right-0 top-full mt-1 w-80 rounded-lg border shadow-lg z-50 overflow-hidden bg-raised border-subtle"
+        <div class="bell-panel fixed inset-x-2 top-14 mt-1 sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:w-80 rounded-lg border shadow-lg z-50 overflow-hidden bg-raised border-subtle"
             >
           <div class="flex items-center gap-2 px-3 py-2 border-b border-subtle"
               >

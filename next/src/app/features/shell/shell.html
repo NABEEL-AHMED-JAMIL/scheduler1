@@ -117,7 +117,7 @@
     </div>
 
     @if (mobileOpen()) {
-      <nav class="xl:hidden border-t px-3 py-2 space-y-0.5 border-subtle">
+      <nav class="mobile-nav xl:hidden border-t px-3 py-2 space-y-0.5 border-subtle max-h-[calc(100dvh-3.5rem-1px)] overflow-y-auto overscroll-contain">
         @for (item of nav(); track item.label) {
           @if (item.path) {
             <a [routerLink]="item.path" (click)="mobileOpen.set(false)"

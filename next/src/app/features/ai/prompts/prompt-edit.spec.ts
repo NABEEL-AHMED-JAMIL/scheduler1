@@ -157,3 +157,45 @@ describe('PromptEdit when the prompt cannot be read', () => {
     expect(view.post.mock.calls.filter(c => String(c[0]).endsWith('/aiPrompt.json/save'))).toHaveLength(0);
   });
 });
+
+/**
+ * The variables table tracked its rows by position. Removing the first row kept the first row's
+ * DOM (and its form bindings) on screen, so the name you just removed was still shown and typing
+ * into it changed nothing the form would save.
+ */
+describe('PromptEdit variables table after a removal', () => {
+  function rendered() {
+    const get = vi.fn((url: string) => of({ status: API_SUCCESS, data: url.endsWith('/aiConnection.json/list') ? [] : {} }));
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [
+      { provide: HttpClient, useValue: { get, post: vi.fn(() => of({ status: API_SUCCESS, data: {} })) } },
+      { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn(), info: () => {} } },
+      provideRouter([]),
+      { provide: AuthService, useValue: { isPlatformAdmin: () => false, canManageAgents: () => true, user: () => ({ appUserId: 1 }) } },
+    ] });
+    const fixture = TestBed.createComponent(PromptEdit);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const inputs = (label: string) => Array.from(el.querySelectorAll<HTMLInputElement>('table.prompt-vars tbody tr input'))
+      .filter(i => (i.getAttribute('aria-label') ?? '').endsWith(label));
+    return { fixture, component: fixture.componentInstance, inputs };
+  }
+
+  it('shows the rows that are left, and edits reach the right variable', () => {
+    const { fixture, component, inputs } = rendered();
+    component.addVariable({ name: 'alpha', sample: 'A' });
+    component.addVariable({ name: 'beta', sample: 'B' });
+    component.addVariable({ name: 'gamma', sample: 'C' });
+    fixture.detectChanges();
+
+    component.removeVariable(0);
+    fixture.detectChanges();
+
+    expect(inputs(' name').map(i => i.value)).toEqual(['beta', 'gamma']);
+    expect(inputs(' sample value').map(i => i.value)).toEqual(['B', 'C']);
+    const sample = inputs(' sample value')[0];
+    sample.value = 'typed';
+    sample.dispatchEvent(new Event('input'));
+    expect(component.variables.at(0).value.sample).toBe('typed');
+  });
+});

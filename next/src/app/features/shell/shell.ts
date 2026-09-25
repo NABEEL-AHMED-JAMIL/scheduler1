@@ -62,7 +62,11 @@ export class Shell {
 
   constructor() {
     this.router.events.pipe(takeUntilDestroyed()).subscribe(event => {
-      if (event instanceof NavigationEnd) this.currentUrl.set(event.urlAfterRedirects);
+      if (event instanceof NavigationEnd) {
+        this.currentUrl.set(event.urlAfterRedirects);
+        // Back/forward and programmatic navigation leave the phone menu open otherwise.
+        this.mobileOpen.set(false);
+      }
     });
   }
 

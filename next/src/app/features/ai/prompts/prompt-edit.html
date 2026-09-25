@@ -93,7 +93,7 @@
               <table class="table-modern prompt-vars" formArrayName="variables">
                 <thead><tr><th>Name</th><th>Type</th><th>Required</th><th>Sample value <span class="font-normal text-[color:var(--text-muted)]">· or a file</span></th><th class="w-20"><span class="sr-only">Actions</span></th></tr></thead>
                 <tbody>
-                  @for (g of variables.controls; track $index; let i = $index) {
+                  @for (g of variables.controls; track g; let i = $index) {
                     <tr [formGroupName]="i">
                       <td><input class="input mono" formControlName="name" placeholder="claim_id" [attr.aria-label]="'Variable ' + (i + 1) + ' name'" (input)="onVariableChanged()" /></td>
                       <td>
