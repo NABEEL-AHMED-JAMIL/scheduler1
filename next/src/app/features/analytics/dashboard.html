@@ -35,7 +35,7 @@
         <input id="dashName" class="input" placeholder="Sales overview" aria-label="New dashboard name" [value]="newName()" (input)="newName.set($any($event.target).value)" /></label>
       <label class="flex-[2] min-w-56"><span class="label">What it is for (optional)</span>
         <input id="dashDescription" class="input" placeholder="September orders at a glance" aria-label="Dashboard description" [value]="newDescription()" (input)="newDescription.set($any($event.target).value)" /></label>
-      <button type="button" class="btn btn-primary btn-sm" [disabled]="!canCreate()" (click)="createDashboard()"><app-icon name="plus" />Create</button>
+      <button type="button" class="btn btn-primary btn-sm" [disabled]="!canCreate()" (click)="createDashboard()"><app-icon name="plus" [busy]="creating()" />{{ creating() ? 'Creating…' : 'Create' }}</button>
       <button type="button" class="btn btn-ghost btn-sm" (click)="createOpen.set(false)">Cancel</button>
       @if (createError()) { <p class="text-xs text-crit-500 basis-full">{{ createError() }}</p> }
     </div>
@@ -52,7 +52,11 @@
       @if (loading() && !dashboards().length) {
         <div class="lookup-rail-empty"><app-icon name="refresh" class="spin icon-muted" /> Reading the dashboards…</div>
       } @else if (error()) {
-        <div class="lookup-rail-empty text-crit-500">{{ error() }}<button type="button" class="btn btn-default btn-sm mt-2" (click)="loadDashboards()">Try again</button></div>
+        <div class="lookup-rail-empty">
+          <app-icon name="alert" size="1.4rem" class="icon-crit" />
+          <span class="text-crit-500">{{ error() }}</span>
+          <button type="button" class="btn btn-default btn-sm mt-2" (click)="loadDashboards()"><app-icon name="refresh" />Try again</button>
+        </div>
       } @else if (!dashboards().length) {
         <div class="lookup-rail-empty">
           <app-icon name="chart" size="1.4rem" class="icon-muted" />
@@ -85,7 +89,7 @@
       } @else if (boardError()) {
         <div class="lookup-entries-empty lookup-detail-empty">
           <app-icon name="alert" size="1.5rem" class="icon-crit" /><p class="text-crit-500">{{ boardError() }}</p>
-          @if (board()?.analyticsDashboardId) { <button type="button" class="btn btn-default btn-sm mt-2" (click)="openDashboard(board()!)">Try again</button> }
+          @if (board()?.analyticsDashboardId) { <button type="button" class="btn btn-default btn-sm mt-2" (click)="openDashboard(board()!)"><app-icon name="refresh" />Try again</button> }
         </div>
       } @else if (board(); as open) {
         <header class="lookup-detail-head">
@@ -157,7 +161,7 @@
           <div class="bill-form flex-col items-stretch">
             <div class="flex flex-wrap items-end gap-2 min-w-0">
               <label class="flex flex-col gap-1 min-w-0">
-                <span class="label" for="b-filter-dataset">Filter the widgets that read</span>
+                <span class="label">Filter the widgets that read</span>
                 <!-- One dataset: a condition naming a column another file lacks is a hard refusal, so an unscoped filter would turn half a board into error tiles. -->
                 <select id="b-filter-dataset" class="input w-auto min-w-0 max-w-full" [value]="boardFilterOn()" (change)="chooseFilterDataset($any($event.target).value)">
                   <option value="">nothing yet — pick a dataset</option>
@@ -239,14 +243,14 @@
                         @if (run?.view; as view) {
                           @if (hasMoreRows(view)) { <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="expandTable(widget, view)"><app-icon name="table" />Show all rows</button> }
                         }
-                        <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="removeWidget(widget)"><app-icon name="trash" class="icon-crit" />Take off the board</button>
+                        <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="removeWidget(widget)"><app-icon name="trash" class="icon-crit" />Remove from board</button>
                       </div>
                     </ng-template>
                   </ng-container>
 
                   @if (run?.view; as view) {
                     @if (boardFilterCount()) { @if (boardFilterNote(widget); as note) { <p class="field-note text-[color:var(--text-muted)] truncate" [title]="note">{{ note }}</p> } }
-                    @if (view.truncated) { <p class="text-xs text-crit-500">Partial result — this stopped at the server's row ceiling.</p> }
+                    @if (view.truncated) { <p><span class="pill pill-warn">Partial result — stopped at the server's row ceiling</span></p> }
                     <app-widget-chart [view]="view" [kind]="drawn(widget, view)" [height]="heightOf(widget)" [clickable]="narrows(widget, view)" layout="row" (picked)="narrowTo(widget, $event)" />
                     @if (captionOf(widget); as caption) { <p class="text-xs text-[color:var(--text-secondary)] mt-2">{{ caption }}</p> }
                   }
@@ -256,7 +260,7 @@
                       <label class="min-w-0 flex items-center gap-1 text-[11px] text-[color:var(--text-muted)]">
                         <span class="sr-only">How to draw {{ widget.widgetTitle }}</span>
                         <!-- Listed and inert with the reason, never quietly missing. -->
-                        <select class="input py-0.5 text-[11px] max-w-full min-w-0 truncate widget-kind" [value]="drawn(widget, view)" (change)="setVisualization(widget, $any($event.target).value)">
+                        <select class="input py-0.5 text-[11px] max-w-full min-w-0 truncate widget-kind" [value]="drawn(widget, view)" (change)="setVisualization(widget, $any($event.target).value, $any($event.target))">
                           @for (kind of kinds; track kind.id) {
                             <option [value]="kind.id" [disabled]="!!view.issues[kind.id]" [selected]="kind.id === drawn(widget, view)" [title]="view.issues[kind.id] || kind.label">{{ kind.label }}{{ view.issues[kind.id] ? ' — ' + view.issues[kind.id] : '' }}</option>
                           }

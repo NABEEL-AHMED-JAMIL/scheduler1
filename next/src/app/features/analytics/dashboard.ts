@@ -1318,14 +1318,6 @@ export class Dashboards implements OnInit, OnDestroy {
   readonly loading = signal(false);
   readonly error = signal('');
 
-  /**
-   * Whether the report list is showing.
-   *
-   * Open until a board is opened, then collapsed. The list is how you FIND a report; once you
-   * have one, it is twenty-eight rows between you and the thing you asked for.
-   */
-  readonly listOpen = signal(true);
-
   /** Narrows the list by name. Only offered past eight reports; see the template. */
   readonly listFilter = signal('');
 
@@ -1541,6 +1533,8 @@ export class Dashboards implements OnInit, OnDestroy {
         }
         this.newName.set('');
         this.newDescription.set('');
+        // The form closes with the board made; left open, an empty create form sat above it.
+        this.createOpen.set(false);
         this.loadDashboards();
         // Opened rather than merely listed, and it costs nothing: a board with no widgets on it
         // runs no queries, so this is the one open that is free.
@@ -1586,9 +1580,6 @@ export class Dashboards implements OnInit, OnDestroy {
   openDashboard(item: Dashboard): void {
     const id = item.analyticsDashboardId;
     if (!id) return;
-    // Collapse the list. Opening a report should show the report, not leave twenty-eight rows
-    // between the reader and the thing they clicked. "Show the list" brings it straight back.
-    this.listOpen.set(false);
     this.loadBoard(id, 'all');
   }
 
@@ -1757,7 +1748,7 @@ export class Dashboards implements OnInit, OnDestroy {
     const boardId = this.board()?.analyticsDashboardId;
     if (!id || !boardId) return;
     const confirmed = await confirmWith(this.dialog, {
-      title: 'Take this widget off the board?',
+      title: 'Remove this widget?',
       body: `"${widget.widgetTitle}" will be removed from this dashboard. What it points at — `
         + 'the saved analysis or saved query — is untouched.',
       confirmLabel: 'Remove',
@@ -1792,13 +1783,19 @@ export class Dashboards implements OnInit, OnDestroy {
    * whole reason a widget is a reference plus a visualization rather than a stored picture. A
    * kind change that re-queried would make picking a chart cost a permit.
    */
-  setVisualization(widget: DashboardWidget, kind: string): void {
+  setVisualization(widget: DashboardWidget, kind: string, select?: HTMLSelectElement): void {
     const id = widget.analyticsDashboardWidgetId;
     if (!id || kind === widget.visualizationType) return;
     this.widgetError.set('');
+    // On a refusal nothing the select binds to changes, so neither [value] nor [selected]
+    // re-fires and it would go on showing the refused kind over the chart still drawn the old
+    // way. Put it back by hand.
+    const previous = select ? this.drawnKindOf(widget) : '';
+    const restore = () => { if (select) select.value = previous; };
     this.analytics.saveWidget({ ...widget, visualizationType: kind }).subscribe({
       next: response => {
         if (response.status !== API_SUCCESS || !response.data) {
+          restore();
           this.widgetError.set(response.message || 'That choice could not be saved.');
           return;
         }
@@ -1810,6 +1807,7 @@ export class Dashboards implements OnInit, OnDestroy {
         } : board);
       },
       error: err => {
+        restore();
         this.widgetError.set(err?.error?.message || 'That choice could not be saved.');
       },
     });
@@ -1901,6 +1899,12 @@ export class Dashboards implements OnInit, OnDestroy {
   captionOf(widget: DashboardWidget): string {
     const caption = widgetConfigOf(widget).caption;
     return typeof caption === 'string' ? caption.trim() : '';
+  }
+
+  /** What the tile's select is showing now: the drawn kind of its last run, else the saved one. */
+  private drawnKindOf(widget: DashboardWidget): string {
+    const view = this.runs()[widget.analyticsDashboardWidgetId!]?.view;
+    return view ? this.drawn(widget, view) : (widget.visualizationType ?? '');
   }
 
   drawn(widget: DashboardWidget, view: WidgetView): WidgetVisualization {
@@ -2263,7 +2267,7 @@ export class Dashboards implements OnInit, OnDestroy {
         </span>
         <button type="button" class="btn btn-default btn-sm ml-auto"
                 [disabled]="loading()" (click)="load()">
-          <app-icon name="refresh" />
+          <app-icon name="refresh" [class.spin]="loading()" />
           Refresh
         </button>
       </div>
@@ -2308,7 +2312,7 @@ export class Dashboards implements OnInit, OnDestroy {
       } @else if (!datasets().length) {
         <p class="text-xs text-[color:var(--text-muted)] py-2">
           Nothing registered yet. A registered dataset is a name for a connection and a path —
-          it holds no data of its own, and deleting one never touches a file.
+          it holds no data of its own, and removing one never touches a file.
         </p>
       } @else {
         <ul class="space-y-1">
@@ -2325,7 +2329,9 @@ export class Dashboards implements OnInit, OnDestroy {
               <span class="text-[11px] mono text-[color:var(--text-muted)] truncate max-w-72">
                 {{ item.connectionAlias }}/{{ item.datasetPath }}
               </span>
-              <button type="button" class="btn btn-ghost btn-xs shrink-0" title="Forget this name"
+              <button type="button" class="btn btn-ghost btn-icon btn-xs btn-intent-crit shrink-0"
+                      title="Remove from the registry"
+                      [attr.aria-label]="'Remove ' + item.datasetName + ' from the registry'"
                       (click)="forget(item)">
                 <app-icon name="trash" />
               </button>
@@ -2435,10 +2441,10 @@ export class DatasetRegistry implements OnInit {
     const id = item.analyticsDatasetId;
     if (!id) return;
     const confirmed = await confirmWith(this.dialog, {
-      title: 'Forget this dataset?',
+      title: 'Remove this dataset from the registry?',
       body: `"${item.datasetName}" will be removed from the registry. The file it names is not `
         + 'touched — this registry holds names, never data.',
-      confirmLabel: 'Forget',
+      confirmLabel: 'Remove',
       danger: true,
     });
     if (!confirmed) return;
