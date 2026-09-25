@@ -1883,6 +1883,16 @@ html.dark .btn-circle-danger:hover:not(:disabled) { background: color-mix(in okl
 /* The code itself stays on white so a phone can scan it; the empty placeholder has nothing to
    scan and sat as a glaring white square on the dark pane. */
 .bill-qr-blank { background: var(--surface-raised); }
+
+/* The sign-in page's right-hand panel: a faint 44px grid behind the preview. That panel is dark
+   in both themes (bg-ink-900), so the lines are plain white; the panel sets their opacity. Was an
+   inline style on the element. */
+.login-grid-lines {
+  background-image:
+    linear-gradient(to right, #fff 1px, transparent 1px),
+    linear-gradient(to bottom, #fff 1px, transparent 1px);
+  background-size: 44px 44px;
+}
 .bill-qr figcaption { font-size: 10px; color: var(--text-muted); }
 .bill-form { display: flex; align-items: flex-end; gap: 0.5rem; flex-wrap: wrap; padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border-subtle); background: var(--surface-sunken); }
 .bill-totals { display: grid; grid-template-columns: max-content max-content; justify-content: end; gap: 0.2rem 2rem; padding: 0.6rem 1.25rem 0.4rem; font-size: 13px; }
