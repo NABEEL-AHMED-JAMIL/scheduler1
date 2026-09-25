@@ -5,8 +5,10 @@
     </a>
     <div class="flex items-start gap-3">
       <h1 class="page-title mt-1 mr-auto">Run logs</h1>
-      <button type="button" class="btn btn-default btn-sm mt-1" (click)="load()" [disabled]="loading()">
-        <app-icon name="refresh" [class.spin]="loading()" />Refresh
+      <!-- The one Refresh: the quiet re-read, so the entries stay put while it runs. -->
+      <button type="button" class="btn btn-default btn-sm mt-1" (click)="refresh()"
+              [disabled]="loading() || refreshing()">
+        <app-icon name="refresh" [class.spin]="loading() || refreshing()" />Refresh
       </button>
     </div>
     <p class="page-subtitle">
@@ -18,6 +20,7 @@
   @if (job() || run(); as _) {
     <div class="card">
       <button type="button" class="w-full flex items-center gap-2 px-4 py-2.5 text-left"
+              [attr.aria-expanded]="showDetail()"
               (click)="showDetail.set(!showDetail())">
         <app-icon name="briefcase" class="icon-info" />
         <span class="text-sm font-semibold">Job &amp; queue detail</span>
@@ -129,7 +132,7 @@
         <app-ranked-bar [data]="topGaps()" [max]="8" [showPercent]="false" [sorted]="false" />
 
         @if (lateEntries()) {
-          <p class="flex items-start gap-1.5 mt-2 text-[11px] text-[color:var(--color-warn-600)]">
+          <p class="flex items-start gap-1.5 mt-2 text-[11px] text-warn-500">
             <app-icon name="alert" size="0.9em" class="icon-warn mt-px shrink-0" />
             {{ lateEntries() }} {{ lateEntries() === 1 ? 'entry was' : 'entries were' }} recorded
             after this run finished, so the gap before {{ lateEntries() === 1 ? 'it' : 'them' }}
@@ -154,18 +157,11 @@
                    [emptyMessage]="search() ? 'No entries match your search.' : 'This run reported no log entries.'"
                    (retry)="load()">
     <ng-container toolbar>
-      <div class="seg">
-        @for (mode of views; track mode.key) {
-          <button type="button" class="seg-btn" [class.seg-on]="view() === mode.key"
-                  (click)="view.set(mode.key)">
-            <app-icon [name]="mode.icon" size="0.9em" />{{ mode.label }}
-          </button>
-        }
-      </div>
+      <app-segmented [(value)]="view" [options]="views" ariaLabel="Log layout" />
 
       <div class="search-field max-w-56">
         <app-icon name="search" size="0.95em" />
-        <input class="input" placeholder="Search entries"
+        <input class="input" placeholder="Search entries" aria-label="Search log entries"
                [value]="search()" (input)="search.set($any($event.target).value)" />
       </div>
       @if (search()) {
@@ -174,12 +170,14 @@
 
       @if (hasInsights()) {
         <button type="button" class="btn btn-default btn-sm" [class.text-accent]="showInsights()"
+                [attr.aria-expanded]="showInsights()"
                 (click)="showInsights.set(!showInsights())" title="Where this run waited between entries">
           <app-icon name="chart" />{{ showInsights() ? 'Hide timing' : 'Timing' }}
         </button>
       }
       @if (stillRunning()) {
         <button type="button" class="btn btn-default btn-sm" [class.btn-intent-ok]="autoRefreshing()"
+                [attr.aria-pressed]="autoRefreshing()"
                 (click)="toggleLive()"
                 [title]="autoRefreshing() ? 'Following this run — checking every 5s'
                                           : 'Not following; refresh by hand'">
@@ -187,9 +185,6 @@
           {{ autoRefreshing() ? 'Live' : 'Paused' }}
         </button>
       }
-      <button type="button" class="btn btn-default btn-sm" [disabled]="refreshing()" (click)="refresh()">
-        <app-icon name="refresh" [class.spin]="refreshing()" />Refresh
-      </button>
     </ng-container>
 
     @switch (view()) {

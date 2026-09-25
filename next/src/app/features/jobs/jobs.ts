@@ -27,7 +27,7 @@ import { Pagination } from '../../shared/ui/pagination';
 import { copyText } from '../../shared/ui/clipboard.util';
 import { isInFlight, isStalled, stallHint } from './stalled';
 import { notifyChips, notifyCount, notifySentence } from './notify-summary';
-import { JobAssistant } from './assistant/job-assistant';
+import { AssistantDock } from './assistant/assistant-dock';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { clonePayload } from './job-clone';
 
@@ -95,7 +95,7 @@ const BULK_CONCURRENCY = 4;
 
 @Component({
   selector: 'app-jobs',
-  imports: [MineFilter, JobAssistant, Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Pagination, BarChart],
+  imports: [MineFilter, AssistantDock, Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Pagination, BarChart],
   templateUrl: './jobs.html',
 })
 export class Jobs implements OnInit {
@@ -120,12 +120,6 @@ export class Jobs implements OnInit {
       idle:      of(job => !status(job)),
       total:     all.length,
     };
-  });
-
-  /** Only worth showing while something is actually moving. */
-  readonly anyInFlight = computed(() => {
-    const counts = this.liveCounts();
-    return counts.running + counts.starting > 0;
   });
 
   /** The assistant as a panel over the list, rather than a page that replaces it. */
@@ -205,7 +199,6 @@ export class Jobs implements OnInit {
   });
 
   readonly paged = computed(() => this.pager.slice(this.filtered()));
-  readonly totalPages = computed(() => this.pager.totalPagesFor(this.filtered().length));
 
   /**
    * A run cannot be stacked on top of one already in flight, and a deleted job has nothing to
@@ -467,7 +460,7 @@ export class Jobs implements OnInit {
               const newId = Number(/jobId (\d+)/.exec(created.message ?? '')?.[1]);
               if (Number.isFinite(newId)) this.refreshOne(newId);
               else this.load();
-            } else { this.toast.error(created.message); }
+            } else { this.toast.error(created.message || 'The copy could not be created.'); }
           },
           error: err => {
             this.busyJob.set(null);
@@ -616,7 +609,7 @@ export class Jobs implements OnInit {
           if (action === 'run') this.patchJob(job.jobId, { jobRunningStatus: 'Queue' });
           else this.refreshOne(job.jobId);
         } else {
-          this.toast.error(response.message);
+          this.toast.error(response.message || 'That action failed.');
         }
       },
       error: err => {
@@ -652,7 +645,7 @@ export class Jobs implements OnInit {
           this.toast.success(`${job.jobName} ${activating ? 'activated' : 'deactivated'}.`);
           this.patchJob(job.jobId, { jobStatus: activating ? 'Active' : 'Inactive' });
         } else {
-          this.toast.error(response.message);
+          this.toast.error(response.message || 'Could not change the status.');
         }
       },
       error: err => { this.busyJob.set(null); this.toast.error(err?.error?.message || 'Could not change the status.'); },
@@ -678,7 +671,7 @@ export class Jobs implements OnInit {
           this.toast.success(`${job.jobName} deleted.`);
           this.jobs.update(list => list.filter(row => row.jobId !== job.jobId));
         } else {
-          this.toast.error(response.message);
+          this.toast.error(response.message || 'Delete failed.');
         }
       },
       error: err => { this.busyJob.set(null); this.toast.error(err?.error?.message || 'Delete failed.'); },

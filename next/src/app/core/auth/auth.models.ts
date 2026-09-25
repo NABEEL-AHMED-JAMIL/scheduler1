@@ -36,7 +36,8 @@ export const ROLE_META: Record<UserRole, { label: string; hint: string; pill: st
     label: 'Tenant administrator',
     hint: 'Also configures tasks, connections and users.',
     pill: 'pill pill-brand',
-    accent: 'var(--color-brand-500)',
+    // The flipping mark token: brand-500 is the dark card's own colour, so the rule vanished there.
+    accent: 'var(--accent-mark)',
   },
   PLATFORM_ADMIN: {
     label: 'Platform administrator',

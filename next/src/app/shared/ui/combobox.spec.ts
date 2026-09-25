@@ -97,4 +97,68 @@ describe('Combobox', () => {
       expect(box.displayValue()).toBe('Audit alerts');
     });
   });
+  /**
+   * UI audit B.0: the box said role=combobox but never pointed at its list, the options had no
+   * ids, and the highlighted row was an inline background -- so a screen reader heard nothing as
+   * the arrow keys moved. A toolbar box outside a field had no name but its placeholder.
+   */
+  describe('what a screen reader is told', () => {
+    function rendered(inputs: Record<string, unknown> = {}) {
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({ imports: [Combobox] });
+      const fixture = TestBed.createComponent(Combobox);
+      fixture.componentRef.setInput('options', [
+        { value: '10', label: 'Claims intake' },
+        { value: '20', label: 'Billing intake' },
+      ]);
+      for (const [k, v] of Object.entries(inputs)) fixture.componentRef.setInput(k, v);
+      fixture.detectChanges();
+      const el = fixture.nativeElement as HTMLElement;
+      const input = el.querySelector('input[role="combobox"]') as HTMLInputElement;
+      return { fixture, el, input, box: fixture.componentInstance };
+    }
+
+    it('points the box at its list and at the highlighted option', () => {
+      const { fixture, el, input, box } = rendered();
+      box.onInput('intake');
+      box.onKeydown(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
+      fixture.detectChanges();
+      const list = el.querySelector('[role="listbox"]')!;
+      expect(list.id).toBeTruthy();
+      expect(input.getAttribute('aria-controls')).toBe(list.id);
+      const options = [...el.querySelectorAll('[role="option"]')].filter(o => o.textContent!.includes('intake'));
+      const active = input.getAttribute('aria-activedescendant');
+      expect(active).toBe(options[1].id);
+      expect(options[1].classList).toContain('is-active');
+      expect((options[1] as HTMLElement).style.background).toBe('');
+    });
+
+    it('marks the chosen option selected', () => {
+      const { fixture, el, box } = rendered();
+      box.writeValue('20');
+      box.onInput('intake');
+      fixture.detectChanges();
+      const options = [...el.querySelectorAll('[role="option"]')].filter(o => o.textContent!.includes('intake'));
+      expect(options.map(o => o.getAttribute('aria-selected'))).toEqual(['false', 'true']);
+    });
+
+    it('gives two boxes on one page different list ids', () => {
+      const a = rendered();
+      a.box.onFocus(); a.fixture.detectChanges();
+      const first = a.el.querySelector('[role="listbox"]')!.id;
+      const b = rendered();
+      b.box.onFocus(); b.fixture.detectChanges();
+      expect(b.el.querySelector('[role="listbox"]')!.id).not.toBe(first);
+    });
+
+    it('takes a name for a box outside a labelled field', () => {
+      const { input } = rendered({ ariaLabel: 'Filter by topic' });
+      expect(input.getAttribute('aria-label')).toBe('Filter by topic');
+    });
+
+    it('leaves the name to the field label when none is given', () => {
+      const { input } = rendered();
+      expect(input.hasAttribute('aria-label')).toBe(false);
+    });
+  });
 });

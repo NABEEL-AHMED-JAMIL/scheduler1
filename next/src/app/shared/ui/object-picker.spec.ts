@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { ObjectPicker } from './object-picker';
 import { StorageService } from '../../features/objects/storage.service';
 import { API_SUCCESS } from '../../core/api/api.config';
@@ -53,5 +53,61 @@ describe('ObjectPicker', () => {
     expect(component.offered(byName['alpha.pdf'])).toBe(true);
     expect(component.offered(byName['zeta.csv'])).toBe(false);
     expect(component.rows().length).toBe(4);
+  });
+  /**
+   * A folder that could not be read showed "Nothing in this folder." -- a statement about the
+   * bucket that was not true. It now says it could not read it, with Try again.
+   */
+  describe('when a read fails', () => {
+    function failing(answers: unknown[]) {
+      const listObjects = vi.fn(() => answers.shift() as any);
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({ providers: [
+        { provide: StorageService, useValue: { buckets: () => of({ status: API_SUCCESS, data: [] }), listObjects } },
+        { provide: DialogRef, useValue: { close: vi.fn() } },
+        { provide: DIALOG_DATA, useValue: { bucket: 'b1', prefix: 'docs/' } },
+      ] });
+      const component = TestBed.runInInjectionContext(() => new ObjectPicker());
+      return { component, listObjects };
+    }
+
+    it('keeps the server\'s reason for a refusal', () => {
+      const { component } = failing([of({ status: 'ERROR', message: 'Access denied to b1.' })]);
+      expect(component.loading()).toBe(false);
+      expect(component.error()).toBe('Access denied to b1.');
+    });
+
+    it('says so for a failed request too', () => {
+      const { component } = failing([throwError(() => ({ error: {} }))]);
+      expect(component.error()).toBeTruthy();
+    });
+
+    it('reads the same folder again on Try again, and clears the error when it can', () => {
+      const { component, listObjects } = failing([
+        of({ status: 'ERROR', message: 'Busy.' }),
+        of({ status: API_SUCCESS, data: { objects: [{ name: 'a.txt', key: 'docs/a.txt', folder: false }] } }),
+      ]);
+      component.retry();
+      expect(listObjects).toHaveBeenLastCalledWith('b1', 'docs/', undefined, 200);
+      expect(component.error()).toBe('');
+      expect(component.rows().map(r => r.key)).toEqual(['docs/a.txt']);
+    });
+
+    it('reads the bucket list again when that is what failed', () => {
+      const buckets = vi.fn()
+        .mockReturnValueOnce(of({ status: 'ERROR', message: 'No buckets for you.' }))
+        .mockReturnValueOnce(of({ status: API_SUCCESS, data: [{ bucket: 'b2' }] }));
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({ providers: [
+        { provide: StorageService, useValue: { buckets, listObjects: vi.fn() } },
+        { provide: DialogRef, useValue: { close: vi.fn() } },
+        { provide: DIALOG_DATA, useValue: {} },
+      ] });
+      const component = TestBed.runInInjectionContext(() => new ObjectPicker());
+      expect(component.error()).toBe('No buckets for you.');
+      component.retry();
+      expect(component.error()).toBe('');
+      expect(component.buckets().map(b => b.bucket)).toEqual(['b2']);
+    });
   });
 });

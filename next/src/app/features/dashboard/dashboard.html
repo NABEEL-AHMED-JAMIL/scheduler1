@@ -20,99 +20,95 @@
                (change)="endDate.set($any($event.target).value)" />
       </div>
       <button type="button" class="btn btn-primary btn-sm" (click)="applyRange()"><app-icon name="filter" />Apply</button>
-      <button type="button" class="btn btn-ghost btn-sm" (click)="resetRange()"><app-icon name="refresh" />Reset</button>
+      <button type="button" class="btn btn-ghost btn-sm" (click)="resetRange()"><app-icon name="calendar" />Last 7 days</button>
     </div>
   </div>
 
-  <!-- KPI tiles -->
-  <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-    @for (tile of [
-      { label: 'Total jobs',   value: totalJobs(),  tone: 'brand' },
-      { label: 'Active jobs',  value: activeJobs(), tone: 'ok' },
-      { label: 'Running now',  value: runningNow(), tone: 'brand' },
-      { label: 'Completed',    value: completed(),  tone: 'ok' },
-      { label: 'Failed',       value: failed(),     tone: 'crit' },
-      { label: 'Unread',       value: unread(),     tone: 'warn', link: '/notifications' }
-    ]; track tile.label) {
-      <a class="card p-4 block kpi-tile hover:shadow-md transition-shadow"
-         [routerLink]="tile.link || null" [class.cursor-default]="!tile.link">
-        <div class="text-[11px] font-semibold uppercase tracking-wider text-[color:var(--text-muted)]">
-          {{ tile.label }}
-        </div>
-        <div class="mt-1.5 kpi-value"
-             [class.text-ok-500]="tile.tone === 'ok'"
-             [class.text-crit-500]="tile.tone === 'crit'"
-             [class.text-warn-500]="tile.tone === 'warn'">{{ tile.value }}</div>
-      </a>
-    }
-  </div>
+  @if (error()) {
+    <!-- The tiles and charts could not be read: one reason, with Try again, rather than zeros
+         and empty charts that read exactly like a quiet week. -->
+    <div class="card"><app-load-error [message]="error()" (retry)="load()" /></div>
+  } @else {
+    <!-- KPI tiles. Only Unread goes anywhere, so only it is a link. -->
+    <app-blur-loader [active]="loading()" label="Loading…">
+      <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+        <app-stat-tile label="Total jobs"  [value]="totalJobs()"  icon="briefcase" tone="info" />
+        <app-stat-tile label="Active jobs" [value]="activeJobs()" icon="zap" tone="ok" />
+        <app-stat-tile label="Running now" [value]="runningNow()" icon="play" tone="info" />
+        <app-stat-tile label="Completed"   [value]="completed()"  icon="checkCircle" tone="ok" />
+        <app-stat-tile label="Failed"      [value]="failed()"     icon="xCircle" tone="crit" />
+        <a routerLink="/notifications" class="block rounded-[var(--radius-card)] hover:shadow-md transition-shadow"
+           [attr.aria-label]="unread() + ' unread notifications'">
+          <app-stat-tile label="Unread" [value]="unread()" icon="bell" tone="warn" />
+        </a>
+      </div>
+    </app-blur-loader>
+  }
 
   <app-billing-brief [compact]="true" />
 
-  <!-- Charts -->
-  <div class="grid lg:grid-cols-3 gap-4">
-    <div class="card p-4">
-      <h2 class="text-sm font-semibold mb-3">Job status</h2>
-      <app-donut [data]="statusCategories()" totalLabel="jobs" />
-    </div>
+  @if (!error()) {
+    <app-blur-loader [active]="loading()">
+      <div class="space-y-5">
+        <!-- Charts -->
+        <div class="grid lg:grid-cols-3 gap-4">
+          <div class="card p-4">
+            <h2 class="text-sm font-semibold mb-3">Job status</h2>
+            <app-donut [data]="statusCategories()" totalLabel="jobs" />
+          </div>
 
-    <div class="card p-4">
-      <!-- jobRunningStatistics counts jobs by the state of their latest run, not runs: a job
-           that ran two hundred times contributes one. Labelled "runs" it read as a run count and
-           disagreed with the two charts beside it, which do count runs. -->
-      <h2 class="text-sm font-semibold mb-3">Jobs by last outcome</h2>
-      <app-donut [data]="jobRunning()" totalLabel="jobs" [colorFor]="outcomeColor" />
-    </div>
+          <div class="card p-4">
+            <!-- jobRunningStatistics counts jobs by the state of their latest run, not runs: a job
+                 that ran two hundred times contributes one. Labelled "runs" it read as a run count and
+                 disagreed with the two charts beside it, which do count runs. -->
+            <h2 class="text-sm font-semibold mb-3">Jobs by last outcome</h2>
+            <app-donut [data]="jobRunning()" totalLabel="jobs" [colorFor]="outcomeColor" />
+          </div>
 
-    <div class="card p-4">
-      <h2 class="text-sm font-semibold mb-3">Queue volume by day</h2>
-      <app-bar-chart [data]="weeklyBars()" [height]="104" emptyMessage="No runs in this range." />
-    </div>
-  </div>
+          <div class="card p-4">
+            <h2 class="text-sm font-semibold mb-3">Queue volume by day</h2>
+            <app-bar-chart [data]="weeklyBars()" [height]="104" emptyMessage="No runs in this range." />
+          </div>
+        </div>
 
-  <!-- Hour x weekday heatmap -->
-  <div class="card p-4">
-    <div class="flex flex-wrap items-baseline gap-2 mb-4">
-      <h2 class="text-sm font-semibold">Queue activity by hour</h2>
-      <span class="text-xs text-[color:var(--text-muted)]">
-        Click any cell to see which jobs ran in that hour
-      </span>
-    </div>
-    <app-heatmap [data]="heatCells()" [selected]="selectedHeat()" (cellClicked)="onHeatCell($event)" />
-  </div>
+        <!-- Hour x weekday heatmap -->
+        <div class="card p-4">
+          <div class="flex flex-wrap items-baseline gap-2 mb-4">
+            <h2 class="text-sm font-semibold">Queue activity by hour</h2>
+            <span class="text-xs text-[color:var(--text-muted)]">
+              Click any cell to see which jobs ran in that hour
+            </span>
+          </div>
+          <app-heatmap [data]="heatCells()" [selected]="selectedHeat()" (cellClicked)="onHeatCell($event)" />
+        </div>
+      </div>
+    </app-blur-loader>
+  }
 
   <!-- Drill-down breakdown -->
   @if (selectedCell(); as cell) {
-    <div class="card overflow-hidden">
-      <div class="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-subtle"
-          >
-        <h2 class="text-sm font-semibold mr-auto">
-          Jobs in {{ cell.date }} at {{ hourLabel(cell.hr) }}
-          @if (breakdown().length) {
-            <span class="font-normal text-[color:var(--text-muted)]">
-              ({{ filteredBreakdown().length }} of {{ breakdown().length }})
-            </span>
-          }
-        </h2>
+    <!-- The table shell's loading, error (with Try again) and empty states; the card used to
+         hand-roll them and had no error state, so a failed read said "No jobs ran in this hour." -->
+    <app-table-shell [heading]="'Jobs in ' + cell.date + ' at ' + hourLabel(cell.hr)"
+                     [loading]="breakdownLoading()" [error]="breakdownError()"
+                     [isEmpty]="!filteredBreakdown().length"
+                     [shown]="breakdownRows().length ? filteredBreakdown().length : null"
+                     [total]="breakdownRows().length ? breakdownRows().length : null"
+                     [emptyMessage]="breakdownSearch() ? 'No jobs match your search.' : 'No jobs ran in this hour.'"
+                     emptyIcon="clock"
+                     (retry)="retryBreakdown()">
+      <ng-container toolbar>
         <div class="search-field max-w-56">
           <app-icon name="search" size="0.95em" />
-          <input class="input" placeholder="Search job id or name"
+          <input class="input" placeholder="Search job id or name" aria-label="Search jobs in this hour"
                  [value]="breakdownSearch()" (input)="breakdownSearch.set($any($event.target).value)" />
         </div>
         <button type="button" class="btn btn-ghost btn-sm" (click)="clearCell()"><app-icon name="close" />Close</button>
-      </div>
+      </ng-container>
 
-      @if (breakdownLoading()) {
-        <p class="p-10 text-center text-sm text-[color:var(--text-muted)]">Loading…</p>
-      } @else if (!filteredBreakdown().length) {
-        <p class="p-10 text-center text-sm text-[color:var(--text-secondary)]">
-          {{ breakdownSearch() ? 'No jobs match your search.' : 'No jobs ran in this hour.' }}
-        </p>
-      } @else {
-        <!-- A busy hour returns every job that ran in it: one cell held 500 rows and ran the
-             page to 27,000px, with the heatmap and the close button long since scrolled away.
-             The rows scroll in their own box, and the pager keeps that box a readable size. -->
-        <div class="overflow-x-auto scroll-table">
+      <!-- A busy hour returns every job that ran in it: one cell held 500 rows and ran the page
+           to 27,000px. The shell scrolls the rows in their own box, and the pager keeps that box
+           a readable size. -->
           <table class="table-modern">
             <thead>
               <tr>
@@ -227,14 +223,13 @@
               </tfoot>
             }
           </table>
-        </div>
 
-        <!-- Outside the scroll box, so the controls do not scroll away with the rows. -->
-        <app-pagination [total]="filteredBreakdown().length" [page]="breakdownPager.page()"
+        <!-- In the shell's pager slot, outside the scroll box, so the controls do not scroll
+             away with the rows. -->
+        <app-pagination pager [total]="filteredBreakdown().length" [page]="breakdownPager.page()"
                         [size]="breakdownPager.size()"
                         (goTo)="goToBreakdownPage($event)"
                         (setSize)="setBreakdownPageSize($event)" />
-      }
-    </div>
+    </app-table-shell>
   }
 </div>

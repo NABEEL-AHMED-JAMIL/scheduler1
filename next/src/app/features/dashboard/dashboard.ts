@@ -12,6 +12,12 @@ import { createPager } from '../../shared/ui/pager';
 import { Pagination } from '../../shared/ui/pagination';
 import { Icon } from '../../shared/ui/icon';
 import { statusColor } from '../../shared/charts/status-color';
+import { localIsoDaysAgo } from '../../shared/ui/local-day';
+import { StatTile } from '../../shared/ui/stat-tile';
+import { TableShell } from '../../shared/ui/data-table';
+import { BlurLoader } from '../../shared/ui/blur-loader';
+import { LoadError } from '../../shared/ui/load-error';
+import { Observable } from 'rxjs';
 
 const DAY_ORDER = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -31,7 +37,7 @@ type BreakdownKey = typeof BREAKDOWN_COLUMNS[number];
 
 @Component({
   selector: 'app-dashboard',
-  imports: [Pagination, Icon, RouterLink, Donut, BarChart, Heatmap, BillingBrief],
+  imports: [Pagination, Icon, RouterLink, Donut, BarChart, Heatmap, BillingBrief, StatTile, TableShell, BlurLoader, LoadError],
   templateUrl: './dashboard.html',
 })
 export class Dashboard implements OnInit {
@@ -51,8 +57,8 @@ export class Dashboard implements OnInit {
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
 
-  readonly startDate = signal(this.isoDaysAgo(6));
-  readonly endDate = signal(this.isoDaysAgo(0));
+  readonly startDate = signal(localIsoDaysAgo(6));
+  readonly endDate = signal(localIsoDaysAgo(0));
 
   readonly jobStatus = signal<NameValue[]>([]);
   readonly jobRunning = signal<NameValue[]>([]);
@@ -62,6 +68,13 @@ export class Dashboard implements OnInit {
   readonly unread = signal(0);
 
   readonly loading = signal(true);
+  /**
+   * Why the tiles and charts could not be read. A failed chart used to be silently empty --
+   * indistinguishable from "no activity" -- so the first reason is kept and shown with Try again.
+   */
+  readonly error = signal('');
+  /** The same for the hour drill-down, which said "No jobs ran in this hour." after a failure. */
+  readonly breakdownError = signal('');
   readonly breakdownLoading = signal(false);
   readonly selectedCell = signal<{ date: string; hr: number } | null>(null);
   readonly breakdownSearch = signal('');
@@ -138,8 +151,11 @@ export class Dashboard implements OnInit {
     return summed;
   });
 
+  /** The jobs in the hour, without the endpoint's TOTAL row. */
+  readonly breakdownRows = computed(() => this.breakdown().filter(row => !this.isSummaryRow(row)));
+
   readonly filteredBreakdown = computed(() => {
-    const rows = this.breakdown().filter(row => !this.isSummaryRow(row));
+    const rows = this.breakdownRows();
     const term = this.breakdownSearch().trim().toLowerCase();
     if (!term) return rows;
     return rows.filter(row =>
@@ -150,28 +166,32 @@ export class Dashboard implements OnInit {
 
   load(): void {
     this.loading.set(true);
+    this.error.set('');
     const from = this.startDate();
     const to = this.endDate();
 
-    this.dashboard.jobStatus(from, to).subscribe({
-      // A refusal (a date that is not a date) is a 200 carrying ERROR and a sentence (MIG-103). Said
-      // once, here: the other tiles are refused for the same reason.
-      next: r => {
-        if (r.status === API_SUCCESS) this.jobStatus.set(r.data ?? []);
-        else this.toast.error(r.message);
-        this.loading.set(false);
-      },
-      error: () => this.loading.set(false),
-    });
-    this.dashboard.jobRunning(from, to).subscribe({
-      next: r => { if (r.status === API_SUCCESS) this.jobRunning.set(r.data ?? []); },
-    });
-    this.dashboard.weekly(from, to).subscribe({
-      next: r => { if (r.status === API_SUCCESS) this.weekly.set(r.data ?? []); },
-    });
-    this.dashboard.hourly(from, to).subscribe({
-      next: r => { if (r.status === API_SUCCESS) this.hourly.set(r.data ?? []); },
-    });
+    // Loading until all four have answered, and the first failure's reason kept. A refusal (a
+    // date that is not a date) is a 200 carrying ERROR and a sentence (MIG-103); every tile is
+    // refused for the same reason, so one sentence is shown, once.
+    let pending = 4;
+    const settle = () => { if (--pending === 0) this.loading.set(false); };
+    const fail = (message: string | undefined) => {
+      if (!this.error()) this.error.set(message || 'The dashboard could not be read.');
+    };
+    const read = <T>(request: Observable<ApiResponse<T>>, into: (data: T | undefined) => void) =>
+      request.subscribe({
+        next: r => {
+          if (r.status === API_SUCCESS) into(r.data);
+          else fail(r.message);
+          settle();
+        },
+        error: err => { fail(err?.error?.message); settle(); },
+      });
+
+    read(this.dashboard.jobStatus(from, to), data => this.jobStatus.set(data ?? []));
+    read(this.dashboard.jobRunning(from, to), data => this.jobRunning.set(data ?? []));
+    read(this.dashboard.weekly(from, to), data => this.weekly.set(data ?? []));
+    read(this.dashboard.hourly(from, to), data => this.hourly.set(data ?? []));
     this.http.get<ApiResponse<number>>(`${API_BASE}/notification.json/unreadCount`).subscribe({
       next: r => { if (r.status === API_SUCCESS) this.unread.set(Number(r.data ?? 0)); },
       error: () => { /* the tile simply shows zero */ },
@@ -186,23 +206,35 @@ export class Dashboard implements OnInit {
   selectCell(date: string, hr: number, count: number): void {
     if (!count || !date) return;
     this.selectedCell.set({ date, hr });
+    this.readBreakdown(date, hr);
+  }
+
+  /** Try again on the drill-down: the same hour, read afresh. */
+  retryBreakdown(): void {
+    const cell = this.selectedCell();
+    if (cell) this.readBreakdown(cell.date, cell.hr);
+  }
+
+  private readBreakdown(date: string, hr: number): void {
     this.breakdownLoading.set(true);
+    this.breakdownError.set('');
     this.breakdown.set([]);
     this.dashboard.breakdown(date, hr).subscribe({
       next: r => {
         this.breakdownLoading.set(false);
         if (r.status === API_SUCCESS) this.breakdown.set(r.data ?? []);
-        else this.toast.error(r.message);
+        else this.breakdownError.set(r.message || 'Could not load that hour.');
       },
       error: err => {
         this.breakdownLoading.set(false);
-        this.toast.error(err?.error?.message || 'Could not load that hour.');
+        this.breakdownError.set(err?.error?.message || 'Could not load that hour.');
       },
     });
   }
 
   clearCell(): void {
     this.selectedCell.set(null);
+    this.breakdownError.set('');
     this.breakdown.set([]);
     this.breakdownSearch.set('');
   }
@@ -282,8 +314,8 @@ export class Dashboard implements OnInit {
   applyRange(): void { this.load(); this.clearCell(); }
 
   resetRange(): void {
-    this.startDate.set(this.isoDaysAgo(6));
-    this.endDate.set(this.isoDaysAgo(0));
+    this.startDate.set(localIsoDaysAgo(6));
+    this.endDate.set(localIsoDaysAgo(0));
     this.applyRange();
   }
 
@@ -299,11 +331,5 @@ export class Dashboard implements OnInit {
 
   private valueOf(data: NameValue[], name: string): number {
     return data.find(d => (d.name ?? '').toLowerCase() === name)?.value ?? 0;
-  }
-
-  private isoDaysAgo(days: number): string {
-    const date = new Date();
-    date.setDate(date.getDate() - days);
-    return date.toISOString().slice(0, 10);
   }
 }

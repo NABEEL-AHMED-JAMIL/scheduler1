@@ -77,4 +77,18 @@ describe('JobLogs', () => {
     expect(toolbar).toBeTruthy();
     expect(toolbar!.closest('app-table-shell')).not.toBeNull();
   });
+  /**
+   * Two Refresh buttons: the header's called load() (the blanking reload) and the toolbar's
+   * refresh() (the quiet one), each with its own spinner, so they span independently. One is
+   * kept, in the header, and it is the quiet one (UI audit, Low).
+   */
+  it('has one Refresh, and it re-reads without blanking the entries', () => {
+    const { fixture, el } = page();
+    const refreshes = [...el.querySelectorAll('button')].filter(b => b.textContent!.trim() === 'Refresh');
+    expect(refreshes).toHaveLength(1);
+    refreshes[0].click();
+    fixture.detectChanges();
+    expect(el.querySelectorAll('.log-timeline li').length).toBe(3);
+    TestBed.inject(HttpTestingController).match(() => true).forEach(r => r.flush({ status: API_SUCCESS, data: LOGS }));
+  });
 });

@@ -4,6 +4,7 @@ import { HttpClient } from '@angular/common/http';
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
+import { localIsoDaysAgo } from '../../shared/ui/local-day';
 import { ToastService } from '../../shared/ui/toast.service';
 import { confirmWith } from '../../shared/ui/confirm';
 import { TableShell } from '../../shared/ui/data-table';
@@ -64,14 +65,16 @@ export class Queue implements OnInit {
   readonly selectedStatuses = signal<string[]>([]);
   // fetchLogs requires a date range, so the page opens on the last seven days rather than
   // erroring with "FromDate missing" before the user has touched anything.
-  readonly fromDate = signal(Queue.isoDaysAgo(6));
-  readonly toDate = signal(Queue.isoDaysAgo(0));
+  readonly fromDate = signal(localIsoDaysAgo(6));
+  readonly toDate = signal(localIsoDaysAgo(0));
 
-  private static isoDaysAgo(days: number): string {
-    const date = new Date();
-    date.setDate(date.getDate() - days);
-    return date.toISOString().slice(0, 10);
-  }
+  /**
+   * Whether anything is narrowed, for Clear. The dates are never empty, so testing them for a
+   * value made Clear permanent; they count once they differ from the default week.
+   */
+  readonly hasFilters = computed(() =>
+    !!this.search() || this.selectedStatuses().length > 0
+    || this.fromDate() !== localIsoDaysAgo(6) || this.toDate() !== localIsoDaysAgo(0));
 
   /**
    * The messages every visualisation on this page describes. ONE computed, deliberately.
@@ -270,8 +273,8 @@ export class Queue implements OnInit {
     this.loading.set(true);
     this.error.set('');
     const body: any = {
-      fromDate: this.fromDate() || Queue.isoDaysAgo(6),
-      toDate: this.toDate() || Queue.isoDaysAgo(0),
+      fromDate: this.fromDate() || localIsoDaysAgo(6),
+      toDate: this.toDate() || localIsoDaysAgo(0),
     };
 
     this.http.post<ApiResponse<QueueRow[] | { jobQueues?: QueueRow[] }>>(
@@ -303,8 +306,8 @@ export class Queue implements OnInit {
   clearFilters(): void {
     this.search.set('');
     this.selectedStatuses.set([]);
-    this.fromDate.set(Queue.isoDaysAgo(6));
-    this.toDate.set(Queue.isoDaysAgo(0));
+    this.fromDate.set(localIsoDaysAgo(6));
+    this.toDate.set(localIsoDaysAgo(0));
     this.load();
   }
 

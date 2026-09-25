@@ -5,6 +5,9 @@ export interface SegmentOption<T extends string> {
   id: T;
   label: string;
   icon?: string;
+  /** Offered but not choosable here -- shown greyed, with `title` saying why. */
+  disabled?: boolean;
+  title?: string;
 }
 
 /**
@@ -26,6 +29,7 @@ export interface SegmentOption<T extends string> {
       @for (option of options(); track option.id) {
         <button type="button" class="seg-btn" [class.seg-on]="value() === option.id"
                 [attr.aria-pressed]="value() === option.id"
+                [disabled]="!!option.disabled" [attr.title]="option.title || null"
                 (click)="value.set(option.id)">
           @if (option.icon) { <app-icon [name]="option.icon" size="0.9em" /> }
           {{ option.label }}

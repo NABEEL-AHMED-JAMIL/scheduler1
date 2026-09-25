@@ -1,12 +1,19 @@
 <div class="page">
   <div>
     <a routerLink="/operations/jobs" class="text-sm text-accent hover:underline">← Back to jobs</a>
-    <h1 class="page-title mt-1">
-      Run history
-      @if (jobName()) {
-        <span class="text-[color:var(--text-secondary)] font-normal">— {{ jobName() }}</span>
-      }
-    </h1>
+    <!-- A header Refresh, laid out as Run logs has it: this is the screen people watch while
+         a job runs, and it had no way to re-read short of reloading the page. -->
+    <div class="flex items-start gap-3">
+      <h1 class="page-title mt-1 mr-auto">
+        Run history
+        @if (jobName()) {
+          <span class="text-[color:var(--text-secondary)] font-normal">— {{ jobName() }}</span>
+        }
+      </h1>
+      <button type="button" class="btn btn-default btn-sm mt-1 shrink-0" (click)="load()" [disabled]="loading()">
+        <app-icon name="refresh" [class.spin]="loading()" />Refresh
+      </button>
+    </div>
     <p class="page-subtitle">
       @if (isDrillDown()) {
         {{ jobStatus() || 'All' }} runs
@@ -31,7 +38,7 @@
         on {{ targetDate() }} at {{ hourLabel(targetHr()) }}
       </span>
       <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="clearDrillDown()">
-        <app-icon name="refresh" />{{ isAllJobs() ? 'Back to dashboard' : 'Show all runs' }}
+        <app-icon [name]="isAllJobs() ? 'arrowLeft' : 'close'" />{{ isAllJobs() ? 'Back to dashboard' : 'Show all runs' }}
       </button>
     </div>
   }
@@ -53,13 +60,14 @@
           <!-- Opens beside the history rather than replacing it: the questions are usually
                about what is on screen, and leaving the page to ask them lost that context. -->
           <button type="button" class="btn btn-default btn-sm shrink-0"
-                  [class.btn-intent-ok]="assistantOpen()"
+                  [class.btn-intent-ok]="assistantOpen()" [attr.aria-expanded]="assistantOpen()"
                   (click)="assistantOpen.set(!assistantOpen())">
             <app-icon name="chat" />Ask about this job
           </button>
         }
 
         <button type="button" class="btn btn-ghost btn-icon btn-sm shrink-0"
+                [attr.aria-expanded]="showDetail()"
                 [attr.aria-label]="showDetail() ? 'Collapse job detail' : 'Expand job detail'"
                 (click)="showDetail.set(!showDetail())">
           <app-icon [name]="showDetail() ? 'chevronDown' : 'chevronRight'" class="icon-muted" />
@@ -202,7 +210,7 @@
       @for (item of summary(); track item.status) {
         <app-status-filter-chip [status]="item.status" [count]="item.count"
                                  [selected]="statusFilter() === item.status"
-                                 (toggle)="statusFilter.set(statusFilter() === item.status ? '' : item.status)" />
+                                 (toggle)="setStatusFilter(statusFilter() === item.status ? '' : item.status)" />
       }
     </div>
   }
@@ -273,17 +281,17 @@
 
   <app-table-shell heading="Runs" [loading]="loading()" [error]="error()"
                    [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="runs().length"
-                   [emptyMessage]="statusFilter() ? 'No runs with that status.' : 'This job has never run.'"
+                   [emptyMessage]="emptyMessage()"
                    (retry)="load()">
     <ng-container toolbar>
       <div class="search-field max-w-56">
         <app-icon name="search" size="0.95em" />
-        <input class="input" placeholder="Search run id or message"
-               [value]="search()" (input)="search.set($any($event.target).value)" />
+        <input class="input" placeholder="Search run id or message" aria-label="Search runs"
+               [value]="search()" (input)="setSearch($any($event.target).value)" />
       </div>
       @if (statusFilter() || search()) {
         <button type="button" class="btn btn-ghost btn-sm"
-                (click)="statusFilter.set(''); search.set('')">
+                (click)="clearFilters()">
           <app-icon name="close" />Clear
         </button>
       }
@@ -304,13 +312,13 @@
         </tr>
       </thead>
       <tbody>
-        @for (run of filtered(); track run.jobQueueId) {
+        @for (run of paged(); track run.jobQueueId) {
           <tr>
             <td class="mono text-[color:var(--text-muted)]">
               #{{ run.jobQueueId }}
               @if (run.jobSend) {
                 <app-icon name="send" size="0.8em" class="icon-muted ml-1"
-                          title="Reached the queue" />
+                          label="Reached the queue" title="Reached the queue" />
               }
             </td>
             @if (isAllJobs()) {
@@ -378,7 +386,7 @@
           @if (isMessageOpen(run.jobQueueId) && run.jobStatusMessage) {
             <tr>
               <td [attr.colspan]="isAllJobs() ? 9 : 8" class="!p-0">
-                <div class="px-4 py-3 border-l-2 border-brand-500">
+                <div class="detail-panel">
                   <div class="flex items-baseline gap-2 mb-1.5">
                     <h3 class="text-xs font-semibold uppercase tracking-wider
                                text-[color:var(--text-secondary)]">Message · run #{{ run.jobQueueId }}</h3>
@@ -397,37 +405,13 @@
         }
       </tbody>
     </table>
+
+    <app-pagination pager [total]="filtered().length" [page]="pager.page()" [size]="pager.size()"
+                    (goTo)="goToPage($event)" (setSize)="setPageSize($event)" />
   </app-table-shell>
 </div>
 
 @if (assistantOpen() && !isAllJobs()) {
-  <div class="fixed bottom-4 right-4 z-50 w-[34rem] max-w-[calc(100vw-2rem)] card shadow-2xl
-              flex flex-col overflow-hidden"
-       [style.height]="assistantMinimised() ? 'auto' : 'min(40rem, calc(100vh - 3rem))'">
-    <div class="flex items-center gap-2 px-3.5 py-2.5 border-b shrink-0 border-subtle"
-        >
-      <app-icon name="chat" size="0.95em" class="icon-info shrink-0" />
-      <span class="text-sm font-medium mr-auto truncate">
-        Job assistant
-        <span class="text-[color:var(--text-muted)] font-normal">#{{ jobId() }}</span>
-      </span>
-      <a class="btn btn-ghost btn-sm" [routerLink]="['/operations/jobs', jobId(), 'assistant']"
-         title="Open the full page">
-        <app-icon name="maximize" />Full page
-      </a>
-      <button type="button" class="btn btn-ghost btn-icon"
-              (click)="assistantMinimised.set(!assistantMinimised())"
-              [attr.aria-label]="assistantMinimised() ? 'Expand' : 'Minimise'">
-        <app-icon [name]="assistantMinimised() ? 'chevronRight' : 'chevronDown'" />
-      </button>
-      <button type="button" class="btn btn-ghost btn-icon" (click)="assistantOpen.set(false)"
-              aria-label="Close"><app-icon name="close" /></button>
-    </div>
-
-    @if (!assistantMinimised()) {
-      <div class="flex-1 min-h-0 overflow-hidden flex flex-col">
-        <app-job-assistant [jobId]="jobId()" [compact]="true" />
-      </div>
-    }
-  </div>
+  <app-assistant-dock [jobId]="jobId()" [jobName]="jobName()"
+                      [(minimised)]="assistantMinimised" (closed)="assistantOpen.set(false)" />
 }

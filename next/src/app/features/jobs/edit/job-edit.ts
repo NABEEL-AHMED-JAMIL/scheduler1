@@ -9,6 +9,8 @@ import { LIST_LIMIT } from '../../../core/api/list-limit';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { Field } from '../../../shared/ui/field';
 import { Icon } from '../../../shared/ui/icon';
+import { LoadError } from '../../../shared/ui/load-error';
+import { NOTIFY_OPTIONS } from '../notify-summary';
 import { Combobox, ComboboxOption } from '../../../shared/ui/combobox';
 
 const FREQUENCIES = [
@@ -60,7 +62,7 @@ function endAfterStart(group: AbstractControl): ValidationErrors | null {
 
 @Component({
   selector: 'app-job-edit',
-  imports: [Icon, ReactiveFormsModule, RouterLink, Field, Combobox],
+  imports: [Icon, ReactiveFormsModule, RouterLink, Field, Combobox, LoadError],
   templateUrl: './job-edit.html',
 })
 export class JobEdit implements OnInit {
@@ -73,6 +75,7 @@ export class JobEdit implements OnInit {
 
   readonly frequencies = FREQUENCIES;
   readonly days = DAYS;
+  readonly notifyOptions = NOTIFY_OPTIONS;
   readonly monthDays = Array.from({ length: 31 }, (_, i) => i + 1);
 
   readonly tasks = signal<any[]>([]);
@@ -84,6 +87,11 @@ export class JobEdit implements OnInit {
   })));
   readonly saving = signal(false);
   readonly loading = signal(false);
+  /**
+   * Why the job could not be read. While it is set the page shows the reason and Try again
+   * instead of the form: an empty "Edit job" form would save as an update with no job id.
+   */
+  readonly loadError = signal('');
   readonly submitted = signal(false);
   readonly selectedDays = signal<string[]>([]);
 
@@ -156,14 +164,17 @@ export class JobEdit implements OnInit {
     if (this.isEdit()) this.loadJob();
   }
 
+  retryLoad(): void { this.loadJob(); }
+
   private loadJob(): void {
     this.loading.set(true);
+    this.loadError.set('');
     this.http.get<ApiResponse<any>>(`${API_BASE}/sourceJob.json/fetchSourceJobDetailWithSourceJobId`,
       { params: { jobId: this.jobId() } }).subscribe({
       next: response => {
         this.loading.set(false);
         if (response.status !== API_SUCCESS || !response.data) {
-          this.toast.error(response.message || 'That job could not be loaded.');
+          this.loadError.set(response.message || 'That job could not be loaded.');
           return;
         }
         const job = response.data;
@@ -201,7 +212,7 @@ export class JobEdit implements OnInit {
       },
       error: err => {
         this.loading.set(false);
-        this.toast.error(err?.error?.message || 'That job could not be loaded.');
+        this.loadError.set(err?.error?.message || 'That job could not be loaded.');
       },
     });
   }
@@ -247,6 +258,8 @@ export class JobEdit implements OnInit {
   });
 
   save(): void {
+    // Nothing was read, so there is nothing to update (the form is not shown either).
+    if (this.loadError()) return;
     this.submitted.set(true);
     if (this.form.invalid) {
       this.form.markAllAsTouched();
@@ -293,7 +306,7 @@ export class JobEdit implements OnInit {
           this.toast.success(this.isEdit() ? 'Job updated.' : 'Job created.');
           this.router.navigate(['/operations/jobs']);
         } else {
-          this.toast.error(response.message);
+          this.toast.error(response.message || 'The job could not be saved.');
         }
       },
       error: err => {

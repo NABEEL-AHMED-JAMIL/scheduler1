@@ -24,6 +24,22 @@ export class DictationService {
     typeof window !== 'undefined' &&
     !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
 
+  /**
+   * Drops the microphone now -- a composer closing mid-sentence. Unlike stop(), abort() hands
+   * back no final transcript, and the session's result handler is cut first so nothing said
+   * lands in a field that is going away. Given an id, only that composer's session is ended;
+   * with none, whatever is listening is.
+   */
+  abort(id?: string): void {
+    const session = this.recognition;
+    if (!session) return;
+    if (id !== undefined && this.owner() !== null && this.owner() !== id) return;
+    this.recognition = null;
+    this.owner.set(null);
+    session.onresult = null;
+    session.abort();
+  }
+
   listeningFor(id: string): boolean {
     return this.owner() === id;
   }

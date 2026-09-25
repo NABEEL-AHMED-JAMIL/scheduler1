@@ -9,12 +9,13 @@ import { ToastService } from '../../../shared/ui/toast.service';
 import { Field } from '../../../shared/ui/field';
 import { Combobox, ComboboxOption } from '../../../shared/ui/combobox';
 import { Icon } from '../../../shared/ui/icon';
+import { LoadError } from '../../../shared/ui/load-error';
 import { FieldChoice, Pipeline, PipelineField, parseFieldChoices } from '../../settings/pipelines/pipeline-dialog';
 import { TaskReference, TaskReferenceKind } from '../../settings/configuration/configuration.models';
 
 @Component({
   selector: 'app-task-edit',
-  imports: [Icon, ReactiveFormsModule, RouterLink, Field, Combobox],
+  imports: [Icon, ReactiveFormsModule, RouterLink, Field, Combobox, LoadError],
   templateUrl: './task-edit.html',
 })
 export class TaskEdit implements OnInit {
@@ -41,6 +42,11 @@ export class TaskEdit implements OnInit {
   readonly pipelines = signal<Pipeline[]>([]);
   readonly saving = signal(false);
   readonly loading = signal(false);
+  /**
+   * Why the task could not be read. While it is set the page shows the reason and Try again
+   * instead of the form: an empty "Edit task" form would save as an update with no task id.
+   */
+  readonly loadError = signal('');
   readonly submitted = signal(false);
 
   /**
@@ -133,7 +139,7 @@ export class TaskEdit implements OnInit {
         if (ticket !== this.topicsTicket) return;
         this.topicsLoading.set(false);
         if (response.status === API_SUCCESS) this.taskTypes.set(response.data ?? []);
-        else this.toast.error(response.message);
+        else this.toast.error(response.message || 'Could not load the topics.');
       },
       error: () => { if (ticket === this.topicsTicket) { this.topicsLoading.set(false); this.toast.error('Could not load the topics.'); } },
     });
@@ -203,8 +209,11 @@ export class TaskEdit implements OnInit {
     if (this.isEdit()) this.loadTask();
   }
 
+  retryLoad(): void { this.loadTask(); }
+
   private loadTask(): void {
     this.loading.set(true);
+    this.loadError.set('');
     // The endpoint's parameter is sourceTaskId; sending taskDetailId returned 400 and the
     // form loaded with an empty payload and no tags.
     this.http.get<ApiResponse<any>>(`${API_BASE}/sourceTask.json/fetchSourceTaskWithSourceTaskId`,
@@ -212,7 +221,7 @@ export class TaskEdit implements OnInit {
       next: response => {
         this.loading.set(false);
         if (response.status !== API_SUCCESS || !response.data) {
-          this.toast.error(response.message || 'That task could not be loaded.');
+          this.loadError.set(response.message || 'That task could not be loaded.');
           return;
         }
         const task = response.data;
@@ -245,7 +254,7 @@ export class TaskEdit implements OnInit {
       },
       error: err => {
         this.loading.set(false);
-        this.toast.error(err?.error?.message || 'That task could not be loaded.');
+        this.loadError.set(err?.error?.message || 'That task could not be loaded.');
       },
     });
   }
@@ -537,6 +546,8 @@ export class TaskEdit implements OnInit {
   }
 
   save(): void {
+    // Nothing was read, so there is nothing to update (the form is not shown either).
+    if (this.loadError()) return;
     this.submitted.set(true);
     // Belt and braces: the fields sync as they are typed, but a value restored by the browser
     // or set programmatically would not have fired an input event.
@@ -636,7 +647,7 @@ export class TaskEdit implements OnInit {
           this.toast.success(this.isEdit() ? 'Task updated.' : 'Task created.');
           this.router.navigate(['/operations/tasks']);
         } else {
-          this.toast.error(response.message);
+          this.toast.error(response.message || 'The task could not be saved.');
         }
       },
       error: err => {

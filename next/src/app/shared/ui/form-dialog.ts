@@ -31,12 +31,14 @@ import { Icon } from './icon';
         <ng-content select="[footer-start]" />
         <div class="ml-auto flex gap-2">
           <button type="button" class="btn btn-default btn-sm" [disabled]="saving()"
-                  (click)="cancelled.emit()">Cancel</button>
-          <button type="button" class="btn btn-sm" [class.btn-primary]="!danger()" [class.btn-danger]="danger()"
-                  [disabled]="saving() || confirmDisabled()" (click)="confirmed.emit()">
-            @if (saving()) { <app-icon name="refresh" class="spin" /> }
-            {{ saving() ? 'Saving…' : confirmLabel() }}
-          </button>
+                  (click)="cancelled.emit()">{{ cancelLabel() }}</button>
+          @if (showConfirm()) {
+            <button type="button" class="btn btn-sm" [class.btn-primary]="!danger()" [class.btn-danger]="danger()"
+                    [disabled]="saving() || confirmDisabled()" (click)="confirmed.emit()">
+              @if (saving()) { <app-icon name="refresh" class="spin" /> }
+              {{ saving() ? busyLabel() : confirmLabel() }}
+            </button>
+          }
         </div>
       </div>
     </div>
@@ -46,6 +48,12 @@ export class FormDialog {
   readonly heading = input.required<string>();
   readonly subtitle = input('');
   readonly confirmLabel = input('Save');
+  /** What the confirm says while `saving` is on -- "Sending…", "Deleting…". */
+  readonly busyLabel = input('Saving…');
+  /** "Close" for a dialog that only shows something; "Cancel" for one that would change it. */
+  readonly cancelLabel = input('Cancel');
+  /** Off for a read-only dialog: nothing to confirm, so the footer is the dismissal alone. */
+  readonly showConfirm = input(true);
   readonly saving = input(false);
   /**
    * 'wide' for forms with enough fields that the default column runs to two screens of

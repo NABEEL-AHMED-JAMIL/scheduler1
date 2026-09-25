@@ -7,13 +7,13 @@
     <div class="flex items-center gap-2">
       @if (hasInsights()) {
         <button type="button" class="btn btn-ghost btn-sm"
-                [class.text-accent]="showInsights()"
+                [class.text-accent]="showInsights()" [attr.aria-expanded]="showInsights()"
                 (click)="showInsights.set(!showInsights())">
           <app-icon name="chart" />{{ showInsights() ? 'Hide charts' : 'Charts' }}
         </button>
       }
       <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
-        <app-icon name="refresh" [class.spin]="loading()" />{{ loading() ? 'Loading…' : 'Refresh' }}
+        <app-icon name="refresh" [class.spin]="loading()" />Refresh
       </button>
     </div>
   </div>
@@ -106,16 +106,16 @@
                    emptyIcon="clock"
                    (retry)="load()">
     <ng-container toolbar>
-      <input type="date" class="input max-w-40" [value]="fromDate()"
+      <input type="date" class="input max-w-40" aria-label="From date" [value]="fromDate()"
              (change)="fromDate.set($any($event.target).value); load()" />
-      <input type="date" class="input max-w-40" [value]="toDate()"
+      <input type="date" class="input max-w-40" aria-label="To date" [value]="toDate()"
              (change)="toDate.set($any($event.target).value); load()" />
       <div class="search-field max-w-56">
         <app-icon name="search" size="0.95em" />
-        <input class="input" placeholder="Search job, run or message"
+        <input class="input" placeholder="Search job, run or message" aria-label="Search queue messages"
                [value]="search()" (input)="search.set($any($event.target).value); pager.reset()" />
       </div>
-      @if (search() || selectedStatuses().length || fromDate() || toDate()) {
+      @if (hasFilters()) {
         <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()"><app-icon name="close" />Clear</button>
       }
     </ng-container>
@@ -153,7 +153,7 @@
             <td class="text-right"><app-status [label]="row.jobStatus" /></td>
             <td class="text-right">
               @if (inFlight(row)) {
-                <button type="button" class="btn btn-ghost btn-icon" [cdkMenuTriggerFor]="menu"
+                <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="menu"
                         aria-label="Actions">
                   <app-icon name="dots" size="1.05em" />
                 </button>

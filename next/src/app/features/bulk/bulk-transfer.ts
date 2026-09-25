@@ -1,9 +1,10 @@
-import { Component, computed, inject, input, signal } from '@angular/core';
+import { Component, computed, inject, input, signal, viewChild } from '@angular/core';
 import { HttpClient, HttpEventType } from '@angular/common/http';
-import { Location } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { Icon } from '../../shared/ui/icon';
 import { ToastService } from '../../shared/ui/toast.service';
+import { FileDropzone } from '../../shared/ui/file-dropzone';
 
 type Kind = 'job' | 'task';
 
@@ -34,74 +35,43 @@ const ROUTES: Record<Kind, Endpoints> = {
 
 @Component({
   selector: 'app-bulk-transfer',
-  imports: [Icon],
+  imports: [Icon, RouterLink, FileDropzone],
   templateUrl: './bulk-transfer.html',
 })
 export class BulkTransfer {
   private readonly http = inject(HttpClient);
   private readonly toast = inject(ToastService);
-  private readonly location = inject(Location);
+  private readonly dropzone = viewChild(FileDropzone);
 
   readonly kind = input.required<Kind>();
 
   readonly config = computed(() => ROUTES[this.kind()]);
   readonly noun = computed(() => this.config().noun);
 
-  readonly dragging = signal(false);
   readonly file = signal<File | null>(null);
   readonly uploading = signal(false);
   readonly progress = signal(0);
   readonly downloading = signal('');
   readonly result = signal<{ ok: boolean; message: string } | null>(null);
 
-  readonly fileSize = computed(() => {
-    const f = this.file();
-    if (!f) return '';
-    return f.size < 1024 ? `${f.size} B`
-      : f.size < 1024 * 1024 ? `${(f.size / 1024).toFixed(1)} KB`
-      : `${(f.size / 1024 / 1024).toFixed(1)} MB`;
-  });
-
-  back(): void {
-    this.location.back();
-  }
-
-  onDragOver(event: DragEvent): void {
-    event.preventDefault();
-    this.dragging.set(true);
-  }
-
-  onDragLeave(): void {
-    this.dragging.set(false);
-  }
-
-  onDrop(event: DragEvent): void {
-    event.preventDefault();
-    this.dragging.set(false);
-    const dropped = event.dataTransfer?.files?.[0];
-    if (dropped) this.accept(dropped);
-  }
-
-  onPick(event: Event): void {
-    const picked = (event.target as HTMLInputElement).files?.[0];
-    if (picked) this.accept(picked);
-    (event.target as HTMLInputElement).value = '';
-  }
-
-  private accept(file: File): void {
-    const name = file.name.toLowerCase();
-    if (!name.endsWith('.xlsx') && !name.endsWith('.xls')) {
-      this.toast.error('Upload the spreadsheet template — .xlsx or .xls.');
-      return;
-    }
-    this.file.set(file);
-    this.result.set(null);
-  }
-
-  clearFile(): void {
-    this.file.set(null);
+  /**
+   * A pick or a drop from the shared dropzone, or its Remove (null). The picker's accept filter
+   * does not reach a drop, so a file that is not a spreadsheet is refused here and the zone is
+   * cleared, rather than left showing a file this screen will not send.
+   */
+  onFile(file: File | null): void {
     this.result.set(null);
     this.progress.set(0);
+    if (file) {
+      const name = file.name.toLowerCase();
+      if (!name.endsWith('.xlsx') && !name.endsWith('.xls')) {
+        this.toast.error('Upload the spreadsheet template — .xlsx or .xls.');
+        this.file.set(null);
+        this.dropzone()?.file.set(null);
+        return;
+      }
+    }
+    this.file.set(file);
   }
 
   upload(): void {
@@ -124,16 +94,14 @@ export class BulkTransfer {
           this.uploading.set(false);
           const response = event.body as ApiResponse;
           const ok = response?.status === API_SUCCESS;
+          // The result card says how it went and stays; a toast saying the same was twice.
           this.result.set({ ok, message: response?.message || (ok ? 'Upload complete.' : 'The upload failed.') });
-          if (ok) { this.toast.success(response.message); this.file.set(null); }
-          else this.toast.error(response?.message || 'The upload failed.');
+          if (ok) this.file.set(null);
         }
       },
       error: err => {
         this.uploading.set(false);
-        const message = err?.error?.message || 'The file could not be uploaded.';
-        this.result.set({ ok: false, message });
-        this.toast.error(message);
+        this.result.set({ ok: false, message: err?.error?.message || 'The file could not be uploaded.' });
       },
     });
   }
@@ -162,10 +130,26 @@ export class BulkTransfer {
         anchor.click();
         URL.revokeObjectURL(url);
       },
-      error: err => {
+      error: async err => {
         this.downloading.set('');
-        this.toast.error(err?.error?.message || 'The file could not be downloaded.');
+        this.toast.error(await refusalOf(err) || 'The file could not be downloaded.');
       },
     });
+  }
+}
+
+/**
+ * The server's reason for a refused download. The request asks for a blob, so a refusal's body
+ * arrives as a Blob too, and `err.error.message` was always undefined: it has to be read and
+ * parsed. Anything that is not a JSON envelope with a message (an HTML error page) gives ''.
+ */
+export async function refusalOf(err: any): Promise<string> {
+  const body = err?.error;
+  if (!(body instanceof Blob)) return body?.message ?? '';
+  try {
+    const parsed = JSON.parse(await body.text());
+    return typeof parsed?.message === 'string' ? parsed.message : '';
+  } catch {
+    return '';
   }
 }

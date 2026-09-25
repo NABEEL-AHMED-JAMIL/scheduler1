@@ -24,8 +24,13 @@ export interface ComboboxOption {
   imports: [Icon],
   template: `
     <div class="relative">
+      <!-- The box names its list and the row the arrow keys are on, so a screen reader
+           follows the highlight; before, the highlight was only a background colour. -->
       <input #inputEl [id]="id()" class="input pr-7" type="text" role="combobox"
              aria-autocomplete="list" [attr.aria-expanded]="open()" autocomplete="off"
+             [attr.aria-controls]="open() ? listId : null"
+             [attr.aria-activedescendant]="activeOptionId()"
+             [attr.aria-label]="ariaLabel() || null"
              [value]="displayValue()" [placeholder]="placeholder()" [disabled]="disabled()"
              (focus)="onFocus()" (blur)="onBlur()"
              (input)="onInput($any($event.target).value)" (keydown)="onKeydown($event)" />
@@ -37,10 +42,12 @@ export interface ComboboxOption {
         </button>
       }
       @if (open()) {
-        <div class="card absolute left-0 right-0 top-full mt-1 z-20 max-h-64 overflow-y-auto p-1 shadow-lg" role="listbox">
+        <div class="card absolute left-0 right-0 top-full mt-1 z-20 max-h-64 overflow-y-auto p-1 shadow-lg" role="listbox"
+             [id]="listId">
           @if (allowClear()) {
             <button type="button" role="option" class="menu-item"
-                    [style.background]="highlighted() === -1 ? 'var(--surface-sunken)' : null"
+                    [id]="listId + '-clear'" [attr.aria-selected]="!value()"
+                    [class.is-active]="highlighted() === -1"
                     (mousedown)="selectClear($event)">
               {{ clearLabel() }}
             </button>
@@ -54,7 +61,8 @@ export interface ComboboxOption {
           }
           @for (opt of filtered(); track opt.value; let i = $index) {
             <button type="button" role="option" class="menu-item"
-                    [style.background]="i === highlighted() ? 'var(--surface-sunken)' : null"
+                    [id]="listId + '-' + i" [attr.aria-selected]="opt.value === value()"
+                    [class.is-active]="i === highlighted()"
                     [title]="opt.hint || ''"
                     (mousedown)="selectOption(opt, $event)">
               {{ opt.label }}
@@ -78,7 +86,16 @@ export interface ComboboxOption {
   }],
 })
 export class Combobox implements ControlValueAccessor {
+  private static nextList = 0;
+  /** Unique per box, so two boxes on a page never share option ids. */
+  readonly listId = `combobox-list-${++Combobox.nextList}`;
+
   readonly id = input<string>('');
+  /**
+   * The name for a box with no `<label for>` -- a toolbar filter. Inside `app-field` the label
+   * already names it, so this stays empty and no attribute is written.
+   */
+  readonly ariaLabel = input('');
   readonly placeholder = input('Type to search…');
   readonly options = input<ComboboxOption[]>([]);
   /** Whether an explicit "no value" row shows at the top of the list. */
@@ -144,6 +161,12 @@ export class Combobox implements ControlValueAccessor {
     if (!q || this.remote()) return opts;
     return opts.filter(o =>
       o.label.toLowerCase().includes(q) || (o.hint ?? '').toLowerCase().includes(q));
+  });
+
+  /** The option the arrow keys are on, for aria-activedescendant; none while closed. */
+  readonly activeOptionId = computed(() => {
+    const i = this.highlighted();
+    return this.open() && i >= 0 && i < this.filtered().length ? `${this.listId}-${i}` : null;
   });
 
   /** The box shows the live filter text while open, and the resolved label once closed. */
