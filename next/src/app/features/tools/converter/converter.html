@@ -15,93 +15,21 @@
       <app-file-dropzone [file]="file()" (fileChange)="onFile($event)"
                          prompt="Drop a document here" />
     } @else {
-      <div class="form-grid">
-        <div class="field">
-          <label class="label" for="cbucket">Bucket</label>
-          <app-combobox id="cbucket" [selected]="bucket()" (selectedChange)="onBucketChange($event)"
-                        placeholder="Choose a bucket" [allowClear]="false" [options]="bucketOptions()" />
-        </div>
-
-        <div class="field">
-          <label class="label" for="cfile">File</label>
-          <app-combobox id="cfile" [selected]="selectedKey()" (selectedChange)="selectedKey.set($event)"
-                        [placeholder]="loadingObjects() ? 'Reading the bucket…'
-                           : !bucket() ? 'Choose a bucket first'
-                           : convertibleObjects().length ? 'Search files…'
-                           : (folders().length ? 'Open a folder below' : 'Nothing convertible here')"
-                        clearLabel="None" [options]="fileOptions()" />
-        </div>
+      <!-- The console's one file picker: buckets, folders, a filter, paging, and a read that
+           fails says so with Try again. -->
+      <div class="flex flex-wrap items-center gap-3">
+        <button type="button" class="btn btn-default btn-sm" (click)="chooseFile()">
+          <app-icon name="folder" />{{ selectedKey() ? 'Choose another file…' : 'Choose a file…' }}
+        </button>
+        @if (selectedKey()) {
+          <span class="text-sm min-w-0 truncate" [title]="bucket() + '/' + selectedKey()">
+            <span class="font-medium">{{ sourceName() }}</span>
+            <span class="mono text-xs text-[color:var(--text-muted)]"> · {{ bucket() }}/{{ selectedKey() }}</span>
+          </span>
+        } @else {
+          <span class="text-sm text-[color:var(--text-muted)]">No file chosen yet.</span>
+        }
       </div>
-
-      @if (bucket()) {
-        <!-- A document is rarely at the root of a bucket, so there has to be a way in. -->
-        <div class="flex flex-wrap items-center gap-1.5 text-sm">
-          <app-icon name="folder" size="0.9em" class="icon-muted" />
-          <button type="button" class="link-inline mono" (click)="goTo('')">{{ bucket() }}</button>
-          @for (crumb of crumbs(); track crumb.prefix) {
-            <span class="text-[color:var(--text-muted)]">/</span>
-            <button type="button" class="link-inline mono"
-                    (click)="goTo(crumb.prefix)">{{ crumb.name }}</button>
-          }
-          @if (loadingObjects()) {
-            <span class="text-xs text-[color:var(--text-muted)] ml-1">reading…</span>
-          }
-        </div>
-
-        @if (folders().length) {
-          @if (folderFilterWorthIt()) {
-            <div class="search-field max-w-56">
-              <app-icon name="search" size="0.95em" />
-              <input class="input" placeholder="Find a folder" aria-label="Filter folders"
-                     [value]="folderFilter()"
-                     (input)="folderFilter.set($any($event.target).value)" />
-            </div>
-          }
-
-          <!-- A bucket can hold hundreds of folders at one level (etl-avatar has one per user),
-               which as a plain wrapping row pushed the rest of the screen off the bottom. -->
-          <div class="folder-picker flex flex-wrap gap-1.5">
-            @for (folder of filteredFolders(); track folder.key) {
-              <button type="button" class="btn btn-default btn-sm"
-                      (click)="openFolder(folder.key)">
-                <app-icon name="folder" size="0.85em" class="icon-info" />{{ folder.name }}
-              </button>
-            }
-            @if (!filteredFolders().length) {
-              <p class="text-xs text-[color:var(--text-muted)]">
-                No folder here matches "{{ folderFilter() }}".
-              </p>
-            }
-          </div>
-
-          @if (folderFilterWorthIt()) {
-            <p class="text-xs text-[color:var(--text-muted)]">
-              {{ filteredFolders().length }} of {{ folders().length }} folders
-            </p>
-          }
-        }
-
-        @if (nextToken()) {
-          <button type="button" class="btn btn-ghost btn-sm" (click)="loadMore()"
-                  [disabled]="loadingObjects()">
-            <app-icon name="refresh" size="0.85em" [class.spin]="loadingObjects()" />
-            {{ loadingObjects() ? 'Loading…' : 'This folder has more — load more' }}
-          </button>
-        }
-
-        @if (browseError()) {
-          <p class="text-xs text-crit-500 flex items-center gap-2" role="alert">
-            {{ browseError() }}
-            <button type="button" class="link-inline" (click)="retryBrowse()">Try again</button>
-          </p>
-        }
-
-        @if (nothingHere()) {
-          <p class="text-xs text-[color:var(--text-muted)]">
-            Nothing here. Go back up and try another folder.
-          </p>
-        }
-      }
     }
 
     @if (sourceName() && formatsError()) {
