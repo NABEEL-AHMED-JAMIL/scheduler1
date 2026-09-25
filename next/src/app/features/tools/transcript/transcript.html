@@ -45,14 +45,29 @@
         </div>
 
         @if (folders().length) {
-          <div class="flex flex-wrap gap-1.5">
-            @for (folder of folders(); track folder.key) {
+          @if (folderFilterWorthIt()) {
+            <div class="search-field max-w-56">
+              <app-icon name="search" size="0.95em" />
+              <input class="input" placeholder="Find a folder" aria-label="Filter folders"
+                     [value]="folderFilter()" (input)="folderFilter.set($any($event.target).value)" />
+            </div>
+          }
+          <!-- Boxed and scrolling, as the converter does: hundreds of folders at one level
+               otherwise pushed the rest of the screen off the bottom. -->
+          <div class="folder-picker flex flex-wrap gap-1.5">
+            @for (folder of filteredFolders(); track folder.key) {
               <button type="button" class="btn btn-default btn-sm"
                       (click)="openFolder(folder.key)">
                 <app-icon name="folder" size="0.85em" class="icon-info" />{{ folder.name }}
               </button>
             }
+            @if (!filteredFolders().length) {
+              <p class="text-xs text-[color:var(--text-muted)]">No folder here matches "{{ folderFilter() }}".</p>
+            }
           </div>
+          @if (folderFilterWorthIt()) {
+            <p class="text-xs text-[color:var(--text-muted)]">{{ filteredFolders().length }} of {{ folders().length }} folders</p>
+          }
         }
 
         @if (nextToken()) {
@@ -98,7 +113,13 @@
   </div>
 
   @if (error()) {
-    <div class="card p-4"><p class="text-sm text-crit-500">{{ error() }}</p></div>
+    <div class="card p-4 flex flex-wrap items-center gap-2" role="alert">
+      <app-icon name="alert" class="icon-crit shrink-0" />
+      <p class="text-sm text-crit-500 flex-1 min-w-0">{{ error() }}</p>
+      <button type="button" class="btn btn-default btn-sm" (click)="extract()" [disabled]="extracting()">
+        <app-icon name="refresh" />Try again
+      </button>
+    </div>
   }
 
   @if (transcript()) {
@@ -115,8 +136,9 @@
                        ariaLabel="Choose how to read the transcript" />
 
         @if (reader.supported) {
-          <button type="button" class="btn btn-default btn-sm" (click)="toggleReading()"
-                  [attr.aria-label]="reader.state() === 'playing' ? 'Pause reading' : 'Read the transcript aloud'">
+          <!-- The visible words name it: an aria-label saying "Read the transcript aloud" over a
+               button that says "Resume" is two names for one control (WCAG 2.5.3). -->
+          <button type="button" class="btn btn-default btn-sm" (click)="toggleReading()">
             <app-icon [name]="reader.state() === 'playing' ? 'pause' : 'play'" />
             {{ reader.state() === 'idle' ? 'Read aloud' : reader.state() === 'playing' ? 'Pause' : 'Resume' }}
           </button>

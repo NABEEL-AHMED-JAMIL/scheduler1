@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, computed, effect, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, effect, inject, signal , untracked } from '@angular/core';
 import { Combobox } from '../../../shared/ui/combobox';
 import { HttpClient } from '@angular/common/http';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
@@ -110,6 +110,14 @@ export class Transcript implements OnInit, OnDestroy {
 
   /** Folders at this level, so audio nested inside them can be reached. */
   readonly folders = computed(() => this.objects().filter(o => o.folder));
+  /** A bucket can hold hundreds of folders at one level; past a dozen they get a filter. */
+  readonly folderFilter = signal('');
+  readonly filteredFolders = computed(() => {
+    const q = this.folderFilter().trim().toLowerCase();
+    const all = this.folders();
+    return q ? all.filter(f => (f.name ?? '').toLowerCase().includes(q)) : all;
+  });
+  readonly folderFilterWorthIt = computed(() => this.folders().length > 12);
 
   readonly bucketOptions = computed(() => this.buckets().map(b => ({ value: b.bucket, label: b.label || b.bucket, hint: b.provider })));
   readonly fileOptions = computed(() => this.audioObjects().map(o => ({ value: o.key, label: o.name, hint: o.key })));
@@ -178,6 +186,7 @@ export class Transcript implements OnInit, OnDestroy {
   private browse(prefix: string, append = false): void {
     this.prefix.set(prefix);
     this.selectedKey.set('');
+    if (!append) this.folderFilter.set('');
     this.browseError.set('');
     this.loadingObjects.set(true);
     // Only the newest listing may write: clicking through folders quickly would otherwise let
@@ -307,6 +316,17 @@ export class Transcript implements OnInit, OnDestroy {
     // since the controls only appear when there is a transcript.
     effect(() => {
       if (!this.transcript()) this.reader.stop();
+    });
+
+    // A transcript belongs to the file it came from. Picking another bucket file left the
+    // previous one's text (or its error) under the new selection, as a new upload never did.
+    // Only on a change of file: the first run is the component starting, not a new pick.
+    let lastKey = this.selectedKey();
+    effect(() => {
+      const key = this.selectedKey();
+      if (key === lastKey) return;
+      lastKey = key;
+      untracked(() => { this.transcript.set(''); this.error.set(''); });
     });
   }
 
