@@ -9,6 +9,7 @@ export const routes: Routes = [
     // logged out -- and signing in again from there wrote a second session over the first with
     // no logout in between. The redirect below catches them instead.
     path: 'login',
+    title: 'Sign in',
     canMatch: [anonymousOnly],
     loadComponent: () => import('./features/login/login').then(m => m.Login),
   },
@@ -28,6 +29,7 @@ export const routes: Routes = [
   {
     // Public: whoever is asking for a workspace has no account yet, which is the ask.
     path: 'request-workspace',
+    title: 'Request a workspace',
     loadComponent: () =>
       import('./features/tenant-request/request-workspace').then(m => m.RequestWorkspace),
   },
@@ -35,6 +37,7 @@ export const routes: Routes = [
     // Public like the landing page: the setup guide describes the console's own screens and
     // carries nothing tenant-specific, so it can be linked to and read before signing in.
     path: 'docs',
+    title: 'Setup guide',
     loadComponent: () => import('./features/docs/docs').then(m => m.Docs),
   },
   {
@@ -55,28 +58,33 @@ export const routes: Routes = [
       },
       {
         path: 'dashboard',
+        title: 'Dashboard',
         loadComponent: () => import('./features/dashboard/dashboard').then(m => m.Dashboard),
       },
       {
         path: 'operations/jobs',
+        title: 'Source Jobs',
         loadComponent: () => import('./features/jobs/jobs').then(m => m.Jobs),
         data: { pageKey: 'jobs' },
         canActivate: [pageGuard],
       },
       {
         path: 'operations/jobs/new',
+        title: 'New job',
         loadComponent: () => import('./features/jobs/edit/job-edit').then(m => m.JobEdit),
         data: { pageKey: 'jobs' },
         canActivate: [pageGuard],
       },
       {
         path: 'operations/jobs/:jobId/edit',
+        title: 'Edit job',
         loadComponent: () => import('./features/jobs/edit/job-edit').then(m => m.JobEdit),
         data: { pageKey: 'jobs' },
         canActivate: [pageGuard],
       },
       {
         path: 'operations/jobs/:jobId/assistant',
+        title: 'Job assistant',
         loadComponent: () =>
           import('./features/jobs/assistant/job-assistant').then(m => m.JobAssistant),
         data: { pageKey: 'jobs' },
@@ -84,12 +92,14 @@ export const routes: Routes = [
       },
       {
         path: 'operations/jobs/:jobId/runs/:jobQueueId/logs',
+        title: 'Run logs',
         loadComponent: () => import('./features/jobs/logs/job-logs').then(m => m.JobLogs),
         data: { pageKey: 'jobs' },
         canActivate: [pageGuard],
       },
       {
         path: 'operations/queue',
+        title: 'Queue',
         loadComponent: () => import('./features/queue/queue').then(m => m.Queue),
         data: { pageKey: 'queue' },
         canActivate: [pageGuard],
@@ -98,6 +108,7 @@ export const routes: Routes = [
         // Same screen without a job: the dashboard's TOTAL row drills into an hour across
         // every job, which has no single id to put in the path.
         path: 'operations/jobs/history',
+        title: 'Run history',
         loadComponent: () =>
           import('./features/jobs/history/job-history').then(m => m.JobHistory),
         data: { pageKey: 'jobs' },
@@ -105,6 +116,7 @@ export const routes: Routes = [
       },
       {
         path: 'operations/jobs/:jobId/history',
+        title: 'Job history',
         loadComponent: () =>
           import('./features/jobs/history/job-history').then(m => m.JobHistory),
         data: { pageKey: 'jobs' },
@@ -115,12 +127,14 @@ export const routes: Routes = [
         // Ungated, a tenant user could fill in a task name, type, pipeline and the whole XML
         // payload and only be told no when they pressed Save, with the work lost.
         path: 'operations/tasks/new',
+        title: 'New task',
         loadComponent: () => import('./features/tasks/edit/task-edit').then(m => m.TaskEdit),
         data: { pageKey: 'tasks', minRole: 'TENANT_ADMIN' },
         canActivate: [pageGuard, roleGuard],
       },
       {
         path: 'operations/tasks/:taskDetailId/edit',
+        title: 'Edit task',
         loadComponent: () => import('./features/tasks/edit/task-edit').then(m => m.TaskEdit),
         data: { pageKey: 'tasks', minRole: 'TENANT_ADMIN' },
         canActivate: [pageGuard, roleGuard],
@@ -129,6 +143,7 @@ export const routes: Routes = [
         // The list itself stays open: listSourceTask is TENANT_USER on purpose, and a job
         // points at a task, so seeing them is part of reading the console.
         path: 'operations/tasks',
+        title: 'Source Tasks',
         loadComponent: () => import('./features/tasks/tasks').then(m => m.Tasks),
         data: { pageKey: 'tasks' },
         canActivate: [pageGuard],
@@ -139,6 +154,7 @@ export const routes: Routes = [
         // setup, not the Administration menu's people/tenant management. The old admin/storage
         // path is kept as a redirect below so an old bookmark or link still lands.
         path: 'configuration/storage-connections',
+        title: 'Storage Connections',
         loadComponent: () =>
           import('./features/admin/storage/storage-connections').then(m => m.StorageConnections),
         data: { minRole: 'TENANT_ADMIN' },
@@ -149,6 +165,7 @@ export const routes: Routes = [
         // which connections a caller may reach is settled per request against each connection's
         // own tenant, not by a role on the route.
         path: 'objects/analytics',
+        title: 'Analytics Studio',
         loadComponent: () => import('./features/analytics/analytics').then(m => m.Analytics),
         data: { pageKey: 'analytics' },
         canActivate: [pageGuard],
@@ -166,6 +183,7 @@ export const routes: Routes = [
         // rule the server already enforces per request -- and it would be the wrong one, since
         // dashboards are read and built by the same TENANT_USER who may open a dataset.
         path: 'objects/analytics/dashboards',
+        title: 'Saved Analyses',
         loadComponent: () => import('./features/analytics/dashboard').then(m => m.Dashboards),
         data: { pageKey: 'analytics-dashboards' },
         canActivate: [pageGuard],
@@ -177,24 +195,28 @@ export const routes: Routes = [
       { path: 'ai/agents', redirectTo: 'assistants/prompts' },
       {
         path: 'assistants/prompts',
+        title: 'Prompts',
         loadComponent: () => import('./features/ai/prompts/prompts').then(m => m.Prompts),
         data: { pageKey: 'ai-prompts' },
         canActivate: [pageGuard],
       },
       {
         path: 'assistants/prompts/new',
+        title: 'New prompt',
         loadComponent: () => import('./features/ai/prompts/prompt-edit').then(m => m.PromptEdit),
         data: { pageKey: 'ai-prompts', minRole: 'TENANT_ADMIN' },
         canActivate: [pageGuard, roleGuard],
       },
       {
         path: 'assistants/prompts/:promptId/edit',
+        title: 'Edit prompt',
         loadComponent: () => import('./features/ai/prompts/prompt-edit').then(m => m.PromptEdit),
         data: { pageKey: 'ai-prompts', minRole: 'TENANT_ADMIN' },
         canActivate: [pageGuard, roleGuard],
       },
       {
         path: 'assistants/connections',
+        title: 'Model connections',
         loadComponent: () => import('./features/ai/connections/connections').then(m => m.Connections),
         data: { minRole: 'TENANT_ADMIN' },
         canActivate: [roleGuard],
@@ -203,12 +225,14 @@ export const routes: Routes = [
       { path: 'ai/models', redirectTo: 'assistants/connections' },
       {
         path: 'administration/users',
+        title: 'Users',
         loadComponent: () => import('./features/admin/users/users').then(m => m.Users),
         data: { minRole: 'TENANT_ADMIN' },
         canActivate: [roleGuard],
       },
       {
         path: 'administration/access-profiles',
+        title: 'Access profiles',
         loadComponent: () =>
           import('./features/admin/access-profiles/access-profiles').then(m => m.AccessProfiles),
         data: { minRole: 'TENANT_ADMIN' },
@@ -216,27 +240,32 @@ export const routes: Routes = [
       },
       {
         path: 'administration/tenants',
+        title: 'Tenants',
         loadComponent: () => import('./features/admin/tenants/tenants').then(m => m.Tenants),
         data: { minRole: 'PLATFORM_ADMIN' },
         canActivate: [roleGuard],
       },
       {
         path: 'profile',
+        title: 'Your profile',
         loadComponent: () => import('./features/profile/profile').then(m => m.Profile),
       },
       {
         path: 'notifications',
+        title: 'Notifications',
         loadComponent: () =>
           import('./features/notifications/notifications').then(m => m.Notifications),
       },
       {
         path: 'tools/converter',
+        title: 'Document Converter',
         loadComponent: () => import('./features/tools/converter/converter').then(m => m.Converter),
         data: { pageKey: 'tools-converter' },
         canActivate: [pageGuard],
       },
       {
         path: 'tools/transcript',
+        title: 'Audio Transcript',
         loadComponent: () => import('./features/tools/transcript/transcript').then(m => m.Transcript),
         data: { pageKey: 'tools-transcript' },
         canActivate: [pageGuard],
@@ -246,6 +275,7 @@ export const routes: Routes = [
       { path: 'settings/task-types', redirectTo: 'configuration/kafka' },
       {
         path: 'configuration/pipelines',
+        title: 'Pipelines',
         loadComponent: () =>
           import('./features/settings/pipelines/pipelines').then(m => m.Pipelines),
         data: { minRole: 'TENANT_ADMIN' },
@@ -268,42 +298,49 @@ export const routes: Routes = [
         // Cost & usage: a tenant administrator's own workspace, a platform administrator's any. Role-gated
         // only, TENANT_ADMIN at the floor: Identity retired the 'billing' page key (MIG-34).
         path: 'billing/usage',
+        title: 'Cost & usage',
         loadComponent: () => import('./features/billing/billing').then(m => m.Billing),
         data: { minRole: 'TENANT_ADMIN' },
         canActivate: [pageGuard, roleGuard],
       },
       {
         path: 'billing/invoices',
+        title: 'Invoices',
         loadComponent: () => import('./features/billing/invoices').then(m => m.Invoices),
         data: { minRole: 'TENANT_ADMIN' },
         canActivate: [pageGuard, roleGuard],
       },
       {
         path: 'billing/invoices/:number',
+        title: 'Invoice',
         loadComponent: () => import('./features/billing/invoices').then(m => m.Invoices),
         data: { minRole: 'TENANT_ADMIN' },
         canActivate: [pageGuard, roleGuard],
       },
       {
         path: 'billing/documents',
+        title: 'Billing documents',
         loadComponent: () => import('./features/billing/documents').then(m => m.BillingDocuments),
         data: { minRole: 'TENANT_ADMIN' },
         canActivate: [pageGuard, roleGuard],
       },
       {
         path: 'billing/analytics',
+        title: 'Billing analytics',
         loadComponent: () => import('./features/billing/billing-analytics').then(m => m.BillingAnalyticsPage),
         data: { minRole: 'PLATFORM_ADMIN' },
         canActivate: [roleGuard],
       },
       {
         path: 'billing/rates',
+        title: 'Rate cards',
         loadComponent: () => import('./features/billing/rate-cards').then(m => m.RateCards),
         data: { minRole: 'PLATFORM_ADMIN' },
         canActivate: [roleGuard],
       },
       {
         path: 'administration/tenant-requests',
+        title: 'Workspace Requests',
         loadComponent: () =>
           import('./features/tenant-request/tenant-requests').then(m => m.TenantRequests),
         data: { minRole: 'PLATFORM_ADMIN' },
@@ -311,11 +348,13 @@ export const routes: Routes = [
       },
       {
         path: 'unauthorized',
+        title: 'Not available',
         loadComponent: () =>
           import('./features/unauthorized/unauthorized').then(m => m.Unauthorized),
       },
       {
         path: 'operations/jobs/bulk',
+        title: 'Bulk jobs',
         loadComponent: () => import('./features/bulk/bulk-transfer').then(m => m.BulkTransfer),
         data: { pageKey: 'jobs', kind: 'job' },
         canActivate: [pageGuard],
@@ -325,12 +364,14 @@ export const routes: Routes = [
         // sits under SourceTaskRestApi's class-level TENANT_ADMIN, so there is no state in
         // which it does anything for a tenant user.
         path: 'operations/tasks/bulk',
+        title: 'Bulk tasks',
         loadComponent: () => import('./features/bulk/bulk-transfer').then(m => m.BulkTransfer),
         data: { pageKey: 'tasks', kind: 'task', minRole: 'TENANT_ADMIN' },
         canActivate: [pageGuard, roleGuard],
       },
       {
         path: 'operations/reports',
+        title: 'Reports',
         loadComponent: () =>
           import('./features/reports/reports').then(m => m.Reports),
         data: { pageKey: 'reports' },
@@ -338,6 +379,7 @@ export const routes: Routes = [
       },
       {
         path: 'configuration/kafka',
+        title: 'Kafka & Topics',
         loadComponent: () =>
           import('./features/settings/kafka/kafka-connections').then(m => m.KafkaConnections),
         data: { minRole: 'TENANT_ADMIN' },
@@ -348,6 +390,7 @@ export const routes: Routes = [
       // pages and groups a task points at. The old address lands on the nearest of them.
       {
         path: 'configuration/values',
+        title: 'Configuration values',
         loadComponent: () =>
           import('./features/settings/configuration/config-values').then(m => m.ConfigValues),
         data: { minRole: 'TENANT_ADMIN' },
@@ -357,6 +400,7 @@ export const routes: Routes = [
         // Platform-wide: the fetch limit and the crons' watermarks are the engine's, not a
         // workspace's, and every call behind this screen is PLATFORM_ADMIN on the server.
         path: 'configuration/engine',
+        title: 'Engine settings',
         loadComponent: () =>
           import('./features/settings/configuration/engine-settings').then(m => m.EngineSettings),
         data: { minRole: 'PLATFORM_ADMIN' },
@@ -364,6 +408,7 @@ export const routes: Routes = [
       },
       {
         path: 'configuration/home-pages',
+        title: 'Home pages',
         loadComponent: () =>
           import('./features/settings/configuration/task-references').then(m => m.TaskReferences),
         data: { minRole: 'TENANT_ADMIN', kind: 'HOME_PAGE' },
@@ -371,6 +416,7 @@ export const routes: Routes = [
       },
       {
         path: 'configuration/task-groups',
+        title: 'Task groups',
         loadComponent: () =>
           import('./features/settings/configuration/task-references').then(m => m.TaskReferences),
         data: { minRole: 'TENANT_ADMIN', kind: 'TASK_GROUP' },
@@ -385,6 +431,7 @@ export const routes: Routes = [
         // readable role lands on /unauthorized rather than on a page that is nothing but
         // storage calls, every one of which comes back refused.
         path: 'objects/files',
+        title: 'Browse files',
         loadComponent: () => import('./features/objects/objects').then(m => m.Objects),
         data: { pageKey: 'objects', minRole: 'TENANT_USER' },
         canActivate: [pageGuard, roleGuard],
@@ -424,6 +471,7 @@ export const routes: Routes = [
       // Last: an address that matches no page shows "Page not found" inside the layout.
       {
         path: '**',
+        title: 'Page not found',
         loadComponent: () => import('./features/not-found/not-found').then(m => m.NotFound),
       },
     ],
