@@ -304,3 +304,32 @@ describe('authInterceptor', () => {
     expect(loggedOut).toBe(false);
   });
 });
+
+/**
+ * A request that never reached the server (network down, API stopped) came back with the
+ * browser's own words, "Failed to fetch" or "Http failure response ... 0 Unknown Error", and
+ * every screen's `err.error.message || fallback` showed that to people (UI audit, Low).
+ */
+describe('authInterceptor when the server cannot be reached', () => {
+  function sendFailing(error: HttpErrorResponse) {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [{ provide: AuthService, useValue: { accessToken: 't' } }] });
+    let caught: HttpErrorResponse | undefined;
+    TestBed.runInInjectionContext(() => authInterceptor(new HttpRequest('GET', '/api/v1/x'),
+      (() => throwError(() => error)) as any)).subscribe({ error: e => { caught = e; } });
+    return caught!;
+  }
+
+  it('says so in plain words', () => {
+    const caught = sendFailing(new HttpErrorResponse({ status: 0, error: new TypeError('Failed to fetch'), url: '/api/v1/x' }));
+    expect(caught).toBeInstanceOf(HttpErrorResponse);
+    expect(caught.status).toBe(0);
+    expect(caught.error.message).toBe('Could not reach the server. Check your connection and try again.');
+  });
+
+  it('leaves every other failure as the server sent it', () => {
+    const body = { status: 'ERROR', message: 'Busy.' };
+    const caught = sendFailing(new HttpErrorResponse({ status: 500, error: body }));
+    expect(caught.error).toBe(body);
+  });
+});
