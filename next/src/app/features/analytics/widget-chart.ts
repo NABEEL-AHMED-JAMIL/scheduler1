@@ -115,6 +115,8 @@ export class WidgetChart {
   /** Whether a bar may be clicked to narrow: the host decides, the chart only offers. */
   readonly clickable = input(false);
   readonly picked = output<Mark>();
+  /** How many rows a table or a cross-tab draws. A board shows five until "Show all" is pressed. */
+  readonly maxRows = input(WIDGET_ROWS);
   /** 'tile' in a grid cell; 'row' when the widget has a whole row and compact kinds should not sprawl. */
   readonly layout = input<'tile' | 'row'>('tile');
 
@@ -148,8 +150,8 @@ export class WidgetChart {
   measureName(view: WidgetView): string { return (view.columns[view.columns.length - 1] ?? '').replace(/_/g, ' '); }
   dimensionName(view: WidgetView): string { return (view.columns[0] ?? '').replace(/_/g, ' '); }
   readable(cell: string): string { return readableCell(cell); }
-  tileRows(view: WidgetView): (string | null)[][] { return view.rows.slice(0, WIDGET_ROWS); }
-  pivotRows(grid: PivotGrid): NonNullable<PivotGrid['rows']> { return (grid.rows ?? []).slice(0, WIDGET_ROWS); }
+  tileRows(view: WidgetView): (string | null)[][] { return view.rows.slice(0, this.maxRows()); }
+  pivotRows(grid: PivotGrid): NonNullable<PivotGrid['rows']> { return (grid.rows ?? []).slice(0, this.maxRows()); }
 
   points(view: WidgetView): Point[] { return view.marks.map(mark => ({ label: mark.name, value: mark.value })); }
   /** The same series accumulated; the kind is refused over a rank-ordered result, so the order is the dimension's own. */
