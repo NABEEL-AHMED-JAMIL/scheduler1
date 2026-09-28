@@ -76,7 +76,7 @@
           <!-- The indent is the glyph plus the row gap, so the line starts under the title. -->
           <div class="notification-actions flex items-center gap-1 shrink-0 w-full sm:w-auto pl-[calc(1.1em+0.75rem)] sm:pl-0">
             <span class="text-xs text-[color:var(--text-muted)] whitespace-nowrap mr-auto sm:mr-0">
-              {{ when(item.dateCreated) | serverTime: 'd MMM, HH:mm' }}
+              {{ when(item.dateCreated) | serverTime: 'recent' }}
             </span>
 
             @if (!item.read) {

@@ -101,7 +101,7 @@
               }
               @if (row.setAt) {
                 <div class="text-xs text-[color:var(--text-muted)]">
-                  set on {{ row.setAt | serverTime:'d MMM y, HH:mm' }}@if (row.setByName) { by {{ row.setByName }}}
+                  set on {{ row.setAt | serverTime:'dateTime' }}@if (row.setByName) { by {{ row.setByName }}}
                 </div>
               }
             </td>

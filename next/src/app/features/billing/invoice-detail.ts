@@ -90,7 +90,7 @@ export class InvoicePane implements OnDestroy {
     if (!i) return [];
     const out: HistoryEntry[] = [];
     if (i.dateCreated) out.push({ at: i.dateCreated, text: `Draft ${i.number} built from the meter${i.createdByName ? ' by ' + i.createdByName : ''}`, tone: 'muted' });
-    if (i.issuedAt) out.push({ at: i.issuedAt, text: `${i.kind === 'credit_note' ? 'Credit note' : 'Invoice'} issued for ${this.money(i.total)}${i.dueAt ? ', due ' + this.serverTime.transform(i.dueAt, 'd MMM yyyy') : ''}`, tone: 'ok' });
+    if (i.issuedAt) out.push({ at: i.issuedAt, text: `${i.kind === 'credit_note' ? 'Credit note' : 'Invoice'} issued for ${this.money(i.total)}${i.dueAt ? ', due ' + this.serverTime.transform(i.dueAt, 'date') : ''}`, tone: 'ok' });
     for (const p of i.payments) {
       out.push({ at: p.dateCreated, text: `Payment of ${this.money(Number(p.amount))} ${p.method === 'credit_note' ? 'credited (' + p.reference + ')' : 'submitted' + (p.submittedBy ? ' by ' + p.submittedBy : '') + (p.reference ? ' · ' + p.reference : '')}`, tone: 'muted' });
       if (p.verifiedAt && p.method !== 'credit_note') out.push({ at: p.verifiedAt, text: p.status === 'verified' ? `Verified${p.verifiedBy ? ' by ' + p.verifiedBy : ''} · receipt ${p.receiptNumber}` : `Rejected${p.verifiedBy ? ' by ' + p.verifiedBy : ''}${p.note ? ' · ' + p.note : ''}`, tone: p.status === 'verified' ? 'ok' : 'crit' });
