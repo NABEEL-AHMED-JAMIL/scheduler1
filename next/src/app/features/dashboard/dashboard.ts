@@ -1,12 +1,13 @@
 import { BillingBrief } from '../billing/billing-brief';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { Router, RouterLink } from '@angular/router';
+import { Component, DestroyRef, Injector, OnInit, afterNextRender, computed, inject, signal } from '@angular/core';
+import { DatePipe } from '@angular/common';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Donut } from '../../shared/charts/donut';
-import { BarChart } from '../../shared/charts/bar-chart';
+import { Bar, BarChart } from '../../shared/charts/bar-chart';
+import { daySeries } from '../../shared/charts/day-series';
 import { HeatCell, HeatSelection, Heatmap } from '../../shared/charts/heatmap';
 import { DashboardService, HourCell, JobBreakdown, NameValue } from './dashboard.service';
-import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
+import { API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { ToastService } from '../../shared/ui/toast.service';
 import { createPager } from '../../shared/ui/pager';
 import { Pagination } from '../../shared/ui/pagination';
@@ -17,9 +18,15 @@ import { StatTile } from '../../shared/ui/stat-tile';
 import { TableShell } from '../../shared/ui/data-table';
 import { BlurLoader } from '../../shared/ui/blur-loader';
 import { LoadError } from '../../shared/ui/load-error';
-import { Observable } from 'rxjs';
+import { Observable, Subscription, debounceTime, filter } from 'rxjs';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { JobEventsService } from '../../core/socket/job-events.service';
+import { UnreadCountService } from '../../core/notifications/unread-count.service';
+import { AuthService } from '../../core/auth/auth.service';
 
-const DAY_ORDER = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const WEEKDAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const WEEKDAY = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
  * Status keys shown in the breakdown table, in lifecycle order.
@@ -37,7 +44,7 @@ type BreakdownKey = typeof BREAKDOWN_COLUMNS[number];
 
 @Component({
   selector: 'app-dashboard',
-  imports: [Pagination, Icon, RouterLink, Donut, BarChart, Heatmap, BillingBrief, StatTile, TableShell, BlurLoader, LoadError],
+  imports: [DatePipe, Pagination, Icon, RouterLink, Donut, BarChart, Heatmap, BillingBrief, StatTile, TableShell, BlurLoader, LoadError],
   templateUrl: './dashboard.html',
 })
 export class Dashboard implements OnInit {
@@ -53,19 +60,45 @@ export class Dashboard implements OnInit {
   }
 
   private readonly dashboard = inject(DashboardService);
-  private readonly http = inject(HttpClient);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+  private readonly auth = inject(AuthService);
 
+  /**
+   * The counts drill into Run history, which is the Jobs page. Without that page (a tenant user's
+   * access profile) every count landed on /unauthorized, so for them they are figures, not links.
+   */
+  readonly canOpenJobs = computed(() => this.auth.canOpen('jobs'));
+  private readonly injector = inject(Injector);
+
+  /** What the date boxes hold, which may be half-edited. */
   readonly startDate = signal(localIsoDaysAgo(6));
   readonly endDate = signal(localIsoDaysAgo(0));
+  /**
+   * The range the page last read. The subtitle, the day axis and Try again follow this one, so
+   * editing a box without pressing Apply does not relabel figures that are still the old range's.
+   */
+  readonly appliedStart = signal(localIsoDaysAgo(6));
+  readonly appliedEnd = signal(localIsoDaysAgo(0));
+
+  /**
+   * Why the boxes cannot be applied. From after To used to answer with zeros that read like a quiet
+   * week, and a cleared box sent an empty date the server refused.
+   */
+  readonly rangeError = computed(() => {
+    const iso = /^\d{4}-\d{2}-\d{2}$/;
+    if (!iso.test(this.startDate()) || !iso.test(this.endDate())) return 'Pick a date in both fields.';
+    return this.startDate() <= this.endDate() ? '' : 'From must be on or before To.';
+  });
 
   readonly jobStatus = signal<NameValue[]>([]);
   readonly jobRunning = signal<NameValue[]>([]);
-  readonly weekly = signal<NameValue[]>([]);
   readonly hourly = signal<HourCell[]>([]);
   readonly breakdown = signal<JobBreakdown[]>([]);
-  readonly unread = signal(0);
+  /** The same signal the bell's badge shows, so marking read in one clears the other. */
+  private readonly unreadCount = inject(UnreadCountService);
+  readonly unread = this.unreadCount.count;
 
   readonly loading = signal(true);
   /**
@@ -81,6 +114,17 @@ export class Dashboard implements OnInit {
   readonly breakdownSearch = signal('');
 
   readonly columns = BREAKDOWN_COLUMNS;
+
+  /**
+   * The statuses this hour has runs in. Nine columns, most of them zero, pushed Total off the
+   * right edge at tablet and phone widths. Judged on the whole hour rather than the search
+   * results, so columns do not come and go while typing; the sums still cover every status.
+   */
+  readonly visibleColumns = computed<readonly BreakdownKey[]>(() => {
+    const rows = this.breakdownRows();
+    const shown = BREAKDOWN_COLUMNS.filter(key => rows.some(row => this.countFor(row, key) > 0));
+    return shown.length ? shown : BREAKDOWN_COLUMNS;
+  });
 
   // ---- KPI tiles ----------------------------------------------------------
   // jobStatusStatistics carries an "All" bucket alongside the real statuses, so it is the
@@ -111,10 +155,26 @@ export class Dashboard implements OnInit {
   readonly failed      = computed(() => this.valueOf(this.jobRunning(), 'failed'));
 
   // ---- charts -------------------------------------------------------------
-  readonly weeklyBars = computed(() =>
-    this.weekly().map(d => ({ name: d.name, value: d.value })));
+  /**
+   * Runs per day, every day of the applied range present. The weekly endpoint answered one row
+   * per day that had runs, named only by weekday: over a month "Thu" came four times, and a quiet
+   * day vanished, so two bursts a week apart drew as steady traffic. The hourly cells carry their
+   * date and are read with the same filters, so the days are added up from them instead.
+   */
+  readonly dayBars = computed<Bar[]>(() => {
+    const counts = new Map<string, number>();
+    for (const cell of this.hourly()) counts.set(cell.date, (counts.get(cell.date) ?? 0) + (cell.count ?? 0));
+    if (!counts.size) return [];
+    const { bars } = daySeries(counts, this.appliedStart(), this.appliedEnd());
+    // A week or less reads better as "Thu 24"; longer ranges keep the dated labels, which never repeat.
+    if (bars.length > 7) return bars;
+    return bars.map(bar => {
+      const at = new Date(bar.meta + 'T00:00:00Z');
+      return { ...bar, name: `${WEEKDAY_SHORT[at.getUTCDay()]} ${at.getUTCDate()}` };
+    });
+  });
 
-  /** Run outcomes keep their status colours so a chart matches the pills in the tables. */
+  /** Job and run statuses keep their status colours so a chart matches the pills in the tables. */
   readonly outcomeColor = statusColor;
 
   /** Hour-by-weekday cells for the heatmap; the date rides along so a click can drill in. */
@@ -125,6 +185,13 @@ export class Dashboard implements OnInit {
       value: cell.count,
       key: cell.date,
     })));
+
+  /** The drill-down's heading, which also names the region it scrolls to. */
+  readonly drillHeading = computed(() => {
+    const cell = this.selectedCell();
+    if (!cell) return '';
+    return 'Jobs on ' + (cell.day ? cell.day + ' ' : '') + this.dateLabel(cell.date) + ' at ' + this.hourLabel(cell.hr);
+  });
 
   readonly selectedHeat = computed(() => {
     const cell = this.selectedCell();
@@ -166,40 +233,147 @@ export class Dashboard implements OnInit {
       String(row.jobId).includes(term) || (row.jobName ?? '').toLowerCase().includes(term));
   });
 
-  ngOnInit(): void { this.load(); }
+  ngOnInit(): void {
+    this.restoreFromUrl();
+    this.load();
+    // Without the live feed (a dropped socket, a proxy that refuses it) the page falls back to
+    // reading every minute; while the feed is up the events above are enough.
+    this.poll = setInterval(() => { if (!this.jobEvents.connected()) this.load({ quiet: true }); }, 60_000);
+    const cell = this.selectedCell();
+    if (cell) { this.readBreakdown(cell.date, cell.hr); this.revealDrill(); }
+  }
 
-  load(): void {
-    this.loading.set(true);
-    this.error.set('');
-    const from = this.startDate();
-    const to = this.endDate();
+  /**
+   * The view lives in the address, so Back from a count's run history returns to the same range,
+   * hour and search rather than a fresh page. replaceUrl: changing the view adds no history
+   * entries, so one Back still leaves the dashboard.
+   */
+  private syncUrl(): void {
+    const cell = this.selectedCell();
+    this.router.navigate([], {
+      relativeTo: this.route,
+      replaceUrl: true,
+      queryParams: {
+        from: this.appliedStart(), to: this.appliedEnd(),
+        date: cell?.date ?? null, hr: cell?.hr ?? null,
+        q: cell ? this.breakdownSearch().trim() || null : null,
+      },
+    });
+  }
 
-    // Loading until all four have answered, and the first failure's reason kept. A refusal (a
+  /** Reads the address back; anything that is not a real range, date or hour is ignored. */
+  private restoreFromUrl(): void {
+    const query = this.route.snapshot.queryParamMap;
+    const from = query.get('from') ?? '';
+    const to = query.get('to') ?? '';
+    if (ISO_DAY.test(from) && ISO_DAY.test(to) && from <= to) {
+      this.startDate.set(from); this.endDate.set(to);
+      this.appliedStart.set(from); this.appliedEnd.set(to);
+    }
+    const date = query.get('date') ?? '';
+    const hr = Number(query.get('hr'));
+    if (!ISO_DAY.test(date) || query.get('hr') === null || !Number.isInteger(hr) || hr < 0 || hr > 23) return;
+    // The cell's other dates are not known until the hours load; see coverDates.
+    const day = WEEKDAY[new Date(date + 'T00:00:00Z').getUTCDay()];
+    this.selectedCell.set({ date, hr, day, dates: [date] });
+    this.breakdownSearch.set(query.get('q') ?? '');
+  }
+
+  /**
+   * A cell restored from the address knows only its own date. Once the hours are in, it lists every
+   * date its weekday and hour covers, the same as a clicked cell.
+   */
+  private coverDates(): void {
+    const cell = this.selectedCell();
+    if (!cell || cell.dates.length > 1) return;
+    const dates = [...new Set(this.hourly()
+      .filter(h => h.dayCode === cell.day && h.hr === cell.hr && h.count > 0)
+      .map(h => h.date))].sort();
+    if (dates.length > 1 && dates.includes(cell.date)) this.selectedCell.set({ ...cell, dates });
+  }
+
+  onBreakdownSearch(term: string): void {
+    this.breakdownSearch.set(term);
+    this.syncUrl();
+  }
+
+  /**
+   * The reads in flight. A new Apply cancels the old set: a slow answer from the earlier range used
+   * to land after the newer one and overwrite its tiles, and turn the loader off while the newer
+   * reads were still out. Same for the drill-down, where two quick clicks could fill the second
+   * hour's table with the first hour's jobs.
+   */
+  private loadSub = new Subscription();
+  private breakdownSub?: Subscription;
+
+  private readonly jobEvents = inject(JobEventsService);
+  private readonly destroyRef = inject(DestroyRef);
+  private poll: ReturnType<typeof setInterval> | null = null;
+
+  /** When the figures were last read in full, for the "Updated" line beside the range. */
+  readonly updatedAt = signal<Date | null>(null);
+
+  constructor() {
+    this.destroyRef.onDestroy(() => {
+      this.loadSub.unsubscribe();
+      this.breakdownSub?.unsubscribe();
+      if (this.poll) clearInterval(this.poll);
+    });
+    // The page used to read once: Running now stayed at whatever it was when the page opened. A
+    // job changing state re-reads the figures, once per burst, without the loader. Log lines
+    // change no figure.
+    this.jobEvents.events.pipe(
+      filter(event => event.type !== 'job.log'),
+      debounceTime(2000),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe(() => this.load({ quiet: true }));
+  }
+
+  /**
+   * `quiet` is a background re-read: no loader, and a failure keeps the figures already on
+   * screen rather than replacing the page with an error for a read nobody asked for.
+   */
+  load(options: { quiet?: boolean } = {}): void {
+    const quiet = !!options.quiet;
+    this.loadSub.unsubscribe();
+    this.loadSub = new Subscription();
+    if (!quiet) {
+      this.loading.set(true);
+      this.error.set('');
+    }
+    const from = this.appliedStart();
+    const to = this.appliedEnd();
+
+    // Loading until all three have answered, and the first failure's reason kept. A refusal (a
     // date that is not a date) is a 200 carrying ERROR and a sentence (MIG-103); every tile is
     // refused for the same reason, so one sentence is shown, once.
-    let pending = 4;
-    const settle = () => { if (--pending === 0) this.loading.set(false); };
+    let pending = 3;
+    let failed = false;
+    const settle = () => {
+      if (--pending > 0) return;
+      this.loading.set(false);
+      if (failed) return;
+      this.error.set('');
+      this.updatedAt.set(new Date());
+    };
     const fail = (message: string | undefined) => {
-      if (!this.error()) this.error.set(message || 'The dashboard could not be read.');
+      failed = true;
+      if (!quiet && !this.error()) this.error.set(message || 'The dashboard could not be read.');
     };
     const read = <T>(request: Observable<ApiResponse<T>>, into: (data: T | undefined) => void) =>
-      request.subscribe({
+      this.loadSub.add(request.subscribe({
         next: r => {
           if (r.status === API_SUCCESS) into(r.data);
           else fail(r.message);
           settle();
         },
         error: err => { fail(err?.error?.message); settle(); },
-      });
+      }));
 
     read(this.dashboard.jobStatus(from, to), data => this.jobStatus.set(data ?? []));
     read(this.dashboard.jobRunning(from, to), data => this.jobRunning.set(data ?? []));
-    read(this.dashboard.weekly(from, to), data => this.weekly.set(data ?? []));
-    read(this.dashboard.hourly(from, to), data => this.hourly.set(data ?? []));
-    this.http.get<ApiResponse<number>>(`${API_BASE}/notification.json/unreadCount`).subscribe({
-      next: r => { if (r.status === API_SUCCESS) this.unread.set(Number(r.data ?? 0)); },
-      error: () => { /* the tile simply shows zero */ },
-    });
+    read(this.dashboard.hourly(from, to), data => { this.hourly.set(data ?? []); this.coverDates(); });
+    this.unreadCount.refresh();
   }
 
   /** Clicking an hour cell drills into which jobs ran in that exact hour. */
@@ -212,6 +386,23 @@ export class Dashboard implements OnInit {
     const dayName = day ?? this.hourly().find(h => h.date === date)?.dayCode ?? '';
     this.selectedCell.set({ date, hr, day: dayName, dates: dates?.length ? dates : [date] });
     this.readBreakdown(date, hr);
+    this.revealDrill();
+    this.syncUrl();
+  }
+
+  /**
+   * The table opens below the heatmap, under the fold on a laptop and far below it on a phone, so
+   * a click looked like it did nothing. It is brought into view and takes focus, so a keyboard or
+   * screen-reader user lands on what just opened.
+   */
+  private revealDrill(): void {
+    afterNextRender(() => {
+      const drill = document.getElementById('dash-drill');
+      if (!drill) return;
+      const calm = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+      drill.scrollIntoView({ block: 'start', behavior: calm ? 'auto' : 'smooth' });
+      drill.focus({ preventScroll: true });
+    }, { injector: this.injector });
   }
 
   /** "24 Sep" from "2026-09-24", read as a calendar date (no time zone to shift it a day). */
@@ -228,6 +419,7 @@ export class Dashboard implements OnInit {
     this.selectedCell.set({ ...cell, date });
     this.breakdownSearch.set('');
     this.readBreakdown(date, cell.hr);
+    this.syncUrl();
   }
 
   /** Try again on the drill-down: the same hour, read afresh. */
@@ -240,7 +432,8 @@ export class Dashboard implements OnInit {
     this.breakdownLoading.set(true);
     this.breakdownError.set('');
     this.breakdown.set([]);
-    this.dashboard.breakdown(date, hr).subscribe({
+    this.breakdownSub?.unsubscribe();
+    this.breakdownSub = this.dashboard.breakdown(date, hr).subscribe({
       next: r => {
         this.breakdownLoading.set(false);
         if (r.status === API_SUCCESS) this.breakdown.set(r.data ?? []);
@@ -254,10 +447,13 @@ export class Dashboard implements OnInit {
   }
 
   clearCell(): void {
+    this.breakdownSub?.unsubscribe();
+    this.breakdownLoading.set(false);
     this.selectedCell.set(null);
     this.breakdownError.set('');
     this.breakdown.set([]);
     this.breakdownSearch.set('');
+    this.syncUrl();
   }
 
   /**
@@ -270,6 +466,7 @@ export class Dashboard implements OnInit {
    * showed nothing.
    */
   openCount(row: JobBreakdown, status: string, count: number): void {
+    if (!this.canOpenJobs()) return;
     if (!count) {
       const label = status === 'Total' ? '' : status.toLowerCase() + ' ';
       this.toast.info(`No ${label}runs for ${row.jobName} in this hour.`);
@@ -300,6 +497,7 @@ export class Dashboard implements OnInit {
    * happened to be null. Migrating that row into a <tfoot> is what dropped the click.
    */
   openTotal(status: string, count: number): void {
+    if (!this.canOpenJobs()) return;
     if (!count) {
       const label = status === 'Total' ? '' : status.toLowerCase() + ' ';
       this.toast.info(`No ${label}runs in this hour.`);
@@ -332,7 +530,13 @@ export class Dashboard implements OnInit {
       .map(s => ({ ...s, pct: (s.count / total) * 100 }));
   }
 
-  applyRange(): void { this.load(); this.clearCell(); }
+  applyRange(): void {
+    if (this.rangeError()) return;
+    this.appliedStart.set(this.startDate());
+    this.appliedEnd.set(this.endDate());
+    this.load();
+    this.clearCell();
+  }
 
   resetRange(): void {
     this.startDate.set(localIsoDaysAgo(6));

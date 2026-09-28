@@ -7,6 +7,7 @@ import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { instantMs } from '../../core/instant';
 import { Icon } from '../../shared/ui/icon';
 import { notificationTarget } from '../notifications/notification-links';
+import { UnreadCountService } from '../../core/notifications/unread-count.service';
 
 interface Note {
   notificationId: number;
@@ -124,9 +125,11 @@ export class NotificationBell implements OnInit, OnDestroy {
    *
    * This used to be a tally of the unread rows among the twenty this component fetches, so a
    * user with more than twenty unread saw a badge that stopped at twenty and disagreed with the
-   * dashboard tile -- which reads the endpoint below. Same number, same source, one truth.
+   * dashboard tile -- which reads the endpoint below. Same number, same source, one truth: the
+   * tile shows this very signal, so marking read here clears it there too.
    */
-  readonly unread = signal(0);
+  private readonly unreadCount = inject(UnreadCountService);
+  readonly unread = this.unreadCount.count;
 
   /**
    * What the panel lists: unread first, then the newest read rows to fill the space.
@@ -188,12 +191,7 @@ export class NotificationBell implements OnInit, OnDestroy {
   private load(): void {
     // The count comes from the server rather than from the rows below, because the rows below are
     // one small window onto the mailbox and the badge is a statement about all of it.
-    this.http.get<ApiResponse<number>>(`${API_BASE}/notification.json/unreadCount`).subscribe({
-      next: response => {
-        if (response.status === API_SUCCESS) this.unread.set(Number(response.data ?? 0));
-      },
-      error: () => {},
-    });
+    this.unreadCount.refresh();
     this.http.get<ApiResponse<any>>(`${API_BASE}/notification.json/list`,
       { params: { page: '1', limit: String(FETCH_ROWS) } }).subscribe({
       next: response => {
@@ -218,7 +216,7 @@ export class NotificationBell implements OnInit, OnDestroy {
               list.map(n => (n.notificationId === note.notificationId ? { ...n, read: true } : n)));
             // The badge is the server's number now, so it no longer falls on its own when a row
             // flips to read; it has to be moved here or it stays put until the next poll.
-            this.unread.update(count => Math.max(0, count - 1));
+            this.unreadCount.markedRead();
           },
           error: () => {},
         });
@@ -232,7 +230,7 @@ export class NotificationBell implements OnInit, OnDestroy {
       next: response => {
         if (response.status !== API_SUCCESS) return;
         this.items.update(list => list.map(n => ({ ...n, read: true })));
-        this.unread.set(0);
+        this.unreadCount.clear();
       },
       error: () => {},
     });
