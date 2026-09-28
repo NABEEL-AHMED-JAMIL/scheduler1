@@ -31,7 +31,8 @@ import { notifyChips, notifyCount, notifySentence } from './notify-summary';
 import { AssistantDock } from './assistant/assistant-dock';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { clonePayload } from './job-clone';
-import { monthDayLabel, weekdayLabel } from './schedule-labels';
+import { clockTime, monthDayLabel, weekdayLabel } from './schedule-labels';
+import { compactDuration, dayLabel } from '../../shared/ui/time-format';
 
 export interface Scheduler {
   schedulerId: number;
@@ -440,10 +441,10 @@ export class Jobs implements OnInit {
           .reverse()
           .map(q => ({
             name: `#${q.jobQueueId}`,
-            // Minutes, to one decimal -- a run under six seconds still shows a bar because of
-            // the chart's floor rather than rounding away to zero.
+            // Seconds, to one decimal. This plotted minutes, so a 25 second run -- most of them --
+            // was labelled 0 and a minute-long one 1; runDurationLabel writes the unit instead.
             value: Math.max(0, Math.round(
-              ((new Date(q.endTime).getTime() - new Date(q.startTime).getTime()) / 60000) * 10) / 10),
+              (new Date(q.endTime).getTime() - new Date(q.startTime).getTime()) / 100) / 10),
             color: statusColor(q.jobStatus),
             meta: q.jobQueueId,
           }));
@@ -507,6 +508,16 @@ export class Jobs implements OnInit {
   readonly stallHint = (job: SourceJob) => stallHint(job);
 
   readonly recentRunBars = RECENT_RUN_BARS;
+
+  /**
+   * How a Recent runs bar is labelled: "25s", "1.5m". The bar chart's own default writes a bare
+   * number, which says nothing about the unit. A property rather than a method, so the template
+   * passes the same function each time and the chart does not recompute its labels.
+   */
+  readonly runDurationLabel = compactDuration;
+
+  /** "24 Sep 2026" for the schedule's start and end days, which the API sends as "2026-09-24". */
+  readonly dayLabel = dayLabel;
 
   readonly stalledCount = computed(() => this.jobs().filter(job => this.isStalled(job)).length);
 
@@ -593,7 +604,7 @@ export class Jobs implements OnInit {
     if (days) parts.push(`on ${days}`);
     const monthDay = monthDayLabel(schedule.dayOfMonth);
     if (monthDay) parts.push(`on the ${monthDay}`);
-    if (schedule.startTime) parts.push(`at ${schedule.startTime.slice(0, 5)}`);
+    if (schedule.startTime) parts.push(`at ${clockTime(schedule.startTime)}`);
     return parts.filter(Boolean).join(' ');
   }
 
@@ -608,7 +619,7 @@ export class Jobs implements OnInit {
     if (job.jobStatus !== 'Active') return { text: 'Paused while inactive — passed slots are recorded as Missed', tone: 'muted' };
     if (schedule.expired) return { text: 'Expired — no further runs', tone: 'warn' };
     if (schedule.lastFlight) return { text: 'Final run scheduled', tone: 'warn' };
-    if (schedule.endDate) return { text: `Ends ${schedule.endDate}`, tone: 'muted' };
+    if (schedule.endDate) return { text: `Ends ${dayLabel(schedule.endDate)}`, tone: 'muted' };
     return null;
   }
 
@@ -626,7 +637,7 @@ export class Jobs implements OnInit {
    */
   async skipNext(job: SourceJob): Promise<void> {
     if (this.busyJob() === job.jobId) return;
-    const slot = this.serverTime.transform(this.nextRun(job), 'd MMM, HH:mm');
+    const slot = this.serverTime.transform(this.nextRun(job), 'recent');
     const ok = await confirmWith(this.dialog, {
       title: 'Skip next run',
       body: slot
@@ -636,7 +647,7 @@ export class Jobs implements OnInit {
     });
     if (!ok) return;
     this.act(job, 'skip', response => {
-      const next = this.serverTime.transform((response.data as { nextRunAt?: string } | null)?.nextRunAt, 'd MMM, HH:mm');
+      const next = this.serverTime.transform((response.data as { nextRunAt?: string } | null)?.nextRunAt, 'recent');
       const skipped = slot ? `Skipped the run on ${slot}.` : 'Skipped the next run.';
       return next ? `${skipped} Next run ${next}.` : skipped;
     });

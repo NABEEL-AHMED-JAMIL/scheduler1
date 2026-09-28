@@ -179,15 +179,15 @@
             <td class="whitespace-nowrap">
               @if (nextRun(job); as nextRunAt) {
                 <div class="text-[color:var(--text-secondary)]">
-                  Next {{ nextRunAt | serverTime:'d MMM, HH:mm' }}
+                  Next {{ nextRunAt | serverTime:'recent' }}
                 </div>
               }
               <div class="text-xs text-[color:var(--text-muted)]">
-                {{ job.lastJobRun ? ('Last ' + (when(job.lastJobRun) | serverTime:'d MMM, HH:mm')) : 'Never run' }}
+                {{ job.lastJobRun ? ('Last ' + (when(job.lastJobRun) | serverTime:'recent')) : 'Never run' }}
               </div>
             </td>
             <td class="hidden xl:table-cell text-[color:var(--text-secondary)] whitespace-nowrap">
-              {{ job.dateCreated ? (job.dateCreated | serverTime:'d MMM yyyy') : '—' }}
+              {{ job.dateCreated ? (job.dateCreated | serverTime:'date') : '—' }}
             </td>
             <td>
               <div class="flex items-center gap-1.5">
@@ -273,8 +273,8 @@
                     { label: 'Output',      value: job.taskDetail?.outputFolder, mono: true },
                     { label: 'Home page',   value: job.taskDetail?.homePageId },
                     { label: 'Assigned to', value: job.assignedUsername },
-                    { label: 'Starts',      value: job.scheduler?.startDate },
-                    { label: 'Ends',        value: job.scheduler?.endDate }
+                    { label: 'Starts',      value: dayLabel(job.scheduler?.startDate) },
+                    { label: 'Ends',        value: dayLabel(job.scheduler?.endDate) }
                   ]; track item.label) {
                     @if (item.value) {
                       <div>
@@ -379,7 +379,7 @@
                                text-[color:var(--text-secondary)]">Recent runs</h3>
                     @if (runsByJob()[job.jobId]?.length) {
                       <span class="text-[11px] text-[color:var(--text-muted)]">
-                        Last {{ recentRunBars }} runs, oldest first · minutes per run — click a bar for its logs
+                        Last {{ recentRunBars }} runs, oldest first · how long each took — click a bar for its logs
                       </span>
                     }
                     <a class="link-inline text-xs ml-auto" [routerLink]="['/operations/jobs', job.jobId, 'history']">
@@ -392,7 +392,7 @@
                       <app-icon name="refresh" class="spin" size="0.9em" /> Loading run history…
                     </p>
                   } @else if (runsByJob()[job.jobId]?.length) {
-                    <app-bar-chart [data]="runsByJob()[job.jobId]!" [height]="120" [clickable]="true"
+                    <app-bar-chart [data]="runsByJob()[job.jobId]!" [height]="120" [clickable]="true" [format]="runDurationLabel"
                                    (barClicked)="openRunLogs(job, $event)" />
                   } @else {
                     <p class="text-xs text-[color:var(--text-muted)] py-6 text-center">

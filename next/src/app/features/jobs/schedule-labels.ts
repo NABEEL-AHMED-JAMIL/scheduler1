@@ -32,3 +32,14 @@ export function monthDayLabel(dayOfMonth?: number | null): string {
   const suffix = { 1: 'st', 2: 'nd', 3: 'rd' }[dayOfMonth % 10] ?? 'th';
   return `${dayOfMonth}${suffix}`;
 }
+
+/**
+ * A schedule's time of day as the console writes one, "09:30". The API stores it as "09:30:00",
+ * and the seconds are always zero -- the editor only sets hours and minutes -- so printing them
+ * made every schedule look more precise than it is, and unlike every other time on screen.
+ */
+export function clockTime(value?: string | null): string {
+  const text = String(value ?? '').trim();
+  const match = /^(\d{1,2}):(\d{2})/.exec(text);
+  return match ? `${match[1].padStart(2, '0')}:${match[2]}` : text;
+}

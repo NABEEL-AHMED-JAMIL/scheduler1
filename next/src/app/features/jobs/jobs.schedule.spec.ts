@@ -74,7 +74,7 @@ describe('a Manual job does not advertise the schedule it no longer runs on', ()
 
   it('says the timetable is held rather than counting down to its end date', () => {
     const jobs = jobsFor();
-    // Not "Ends 2027-03-31": that note is about a timetable that is running, which this is not.
+    // Not "Ends 31 Mar 2027": that note is about a timetable that is running, which this is not.
     expect(jobs.scheduleNote(manualJobKeepingItsSchedule())).toEqual({
       text: 'Schedule kept, paused while Manual', tone: 'muted',
     });
@@ -101,7 +101,7 @@ describe('an Auto job still says everything it knows', () => {
 
   it('still reports when the timetable stops', () => {
     const jobs = jobsFor();
-    expect(jobs.scheduleNote(autoJob())).toEqual({ text: 'Ends 2027-03-31', tone: 'muted' });
+    expect(jobs.scheduleNote(autoJob())).toEqual({ text: 'Ends 31 Mar 2027', tone: 'muted' });
   });
 
   it('offers Skip next run', () => {
