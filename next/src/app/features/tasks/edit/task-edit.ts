@@ -5,6 +5,7 @@ import { HttpClient } from '@angular/common/http';
 import { Router, RouterLink } from '@angular/router';
 import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
+import { isMissingRecord, isRecordId } from '../../../core/api/missing-record';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { Field } from '../../../shared/ui/field';
 import { Combobox, ComboboxOption } from '../../../shared/ui/combobox';
@@ -48,6 +49,8 @@ export class TaskEdit implements OnInit {
    * instead of the form: an empty "Edit task" form would save as an update with no task id.
    */
   readonly loadError = signal('');
+  /** The task does not exist, so Try again is replaced with Back to tasks. */
+  readonly loadMissing = signal(false);
   readonly submitted = signal(false);
 
   /**
@@ -248,15 +251,26 @@ export class TaskEdit implements OnInit {
   retryLoad(): void { this.loadTask(); }
 
   private loadTask(): void {
-    this.loading.set(true);
     this.loadError.set('');
+    this.loadMissing.set(false);
+    // An id that is not a number cannot name a task; asking anyway answered with the server's
+    // "not valid" sentence and a Try again that could only fail again.
+    if (!isRecordId(this.taskDetailId())) {
+      this.missing('That link does not point to a task.');
+      return;
+    }
+    this.loading.set(true);
     // The endpoint's parameter is sourceTaskId; sending taskDetailId returned 400 and the
     // form loaded with an empty payload and no tags.
     this.http.get<ApiResponse<any>>(`${API_BASE}/sourceTask.json/fetchSourceTaskWithSourceTaskId`,
       { params: { sourceTaskId: this.taskDetailId() } }).subscribe({
       next: response => {
         this.loading.set(false);
-        if (response.status !== API_SUCCESS || !response.data) {
+        if (isMissingRecord(response) || (response.status === API_SUCCESS && !response.data)) {
+          this.missing(`Task #${String(this.taskDetailId()).trim()} does not exist or was deleted.`);
+          return;
+        }
+        if (response.status !== API_SUCCESS) {
           this.loadError.set(response.message || 'That task could not be loaded.');
           return;
         }
@@ -291,9 +305,20 @@ export class TaskEdit implements OnInit {
       },
       error: err => {
         this.loading.set(false);
-        this.loadError.set(err?.error?.message || 'That task could not be loaded.');
+        if (isMissingRecord(err)) this.missing(`Task #${String(this.taskDetailId()).trim()} does not exist or was deleted.`);
+        else this.loadError.set(err?.error?.message || 'That task could not be loaded.');
       },
     });
+  }
+
+  /**
+   * The task is not there to load: the server's "SourceTask not found with 999999." read as a
+   * fault, and its Try again could never succeed. The page says it plainly and offers Back to tasks.
+   */
+  private missing(reason: string): void {
+    this.loading.set(false);
+    this.loadError.set(reason);
+    this.loadMissing.set(true);
   }
 
   /**

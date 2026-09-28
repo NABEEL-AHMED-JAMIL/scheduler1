@@ -83,3 +83,30 @@ describe('TaskEdit refusals with no message', () => {
     expect(errors[0]).toBeTruthy();
   });
 });
+
+/**
+ * A task that does not exist said "SourceTask not found with 999999." (the server's class name and
+ * a bare number) and offered Try again, which could only fail again; an id that is not a number
+ * was sent to the server anyway (UI audit, Low).
+ */
+describe('TaskEdit for a task that does not exist', () => {
+  it('says so in plain words, with no Try again', () => {
+    const { component } = editor(() => of({ status: 'ERROR', message: 'SourceTask not found with 999999.' }), { id: '999999' });
+    expect(component.loadError()).toBe('Task #999999 does not exist or was deleted.');
+    expect(component.loadMissing()).toBe(true);
+  });
+
+  it('does not ask the server about an id that is not a number', () => {
+    let asked = 0;
+    const { component } = editor(() => { asked++; return of({ status: API_SUCCESS, data: TASK }); }, { id: 'abc' });
+    expect(asked).toBe(0);
+    expect(component.loadError()).toBe('That link does not point to a task.');
+    expect(component.loadMissing()).toBe(true);
+  });
+
+  it('keeps Try again for a failure that might pass', () => {
+    const { component } = editor(() => of({ status: 'ERROR', message: 'The database is busy.' }), { id: '7714' });
+    expect(component.loadError()).toBe('The database is busy.');
+    expect(component.loadMissing()).toBe(false);
+  });
+});
