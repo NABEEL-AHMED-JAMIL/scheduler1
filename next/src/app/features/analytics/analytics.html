@@ -272,13 +272,13 @@
     @if (saveDialogOpen()) {
       <div class="fixed inset-0 z-[60] bg-black/40 grid place-items-center p-4"
            (click)="$event.target === $event.currentTarget && closeSaveDialog()">
-        <app-form-dialog role="dialog" aria-modal="true" aria-labelledby="a-save-heading"
+        <app-form-dialog role="dialog" aria-modal="true" aria-label="Save analysis"
                          heading="Save analysis"
                          [confirmLabel]="'Save as new'" [saving]="savingAnalysis()"
                          [confirmDisabled]="!canSaveAnalysis()"
                          (cancelled)="closeSaveDialog()" (confirmed)="saveAnalysis(false)">
           <div class="flex flex-col gap-2">
-            <label id="a-save-heading" class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]"
+            <label class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]"
                    for="a-save-name">Name</label>
             <input id="a-save-name" class="input w-full" placeholder="Name this analysis"
                    [value]="analysisName()"
