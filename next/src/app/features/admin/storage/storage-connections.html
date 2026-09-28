@@ -120,7 +120,7 @@
               <div class="shrink-0 flex items-center gap-1">
                 <app-status [label]="c.status" [quiet]="true" />
                 <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="cardMenu"
-                        [disabled]="testing() === c.storageConnectionId" aria-label="Actions">
+                        [disabled]="testing() === c.storageConnectionId" [attr.aria-label]="'Actions for ' + c.connectionName">
                   <app-icon name="dots" size="1.05em" />
                 </button>
                 <ng-template #cardMenu>
@@ -265,7 +265,7 @@
             <td class="text-right"><app-status [label]="c.status" [quiet]="true" /></td>
             <td class="text-right">
               <button type="button" class="btn btn-ghost btn-icon" [cdkMenuTriggerFor]="menu"
-                      [disabled]="testing() === c.storageConnectionId" aria-label="Actions">
+                      [disabled]="testing() === c.storageConnectionId" [attr.aria-label]="'Actions for ' + c.connectionName">
                 <app-icon name="dots" size="1.05em" />
               </button>
               <ng-template #menu>

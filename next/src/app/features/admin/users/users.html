@@ -461,7 +461,7 @@
                 </span>
               } @else {
               <button type="button" class="btn btn-ghost btn-icon" [cdkMenuTriggerFor]="menu"
-                      [disabled]="busy() === user.appUserId" aria-label="Actions">
+                      [disabled]="busy() === user.appUserId" [attr.aria-label]="'Actions for ' + user.username">
                 <app-icon name="dots" size="1.05em" />
               </button>
               <ng-template #menu>
