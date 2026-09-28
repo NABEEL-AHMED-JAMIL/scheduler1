@@ -1,4 +1,5 @@
 import { Bar } from './bar-chart';
+import { dayLabel } from '../ui/time-format';
 
 /** The longest axis worth drawing. Beyond this the answer is a narrower range, not more bars. */
 export const MAX_DAYS = 366;
@@ -40,14 +41,16 @@ export function daySeries(
   const capped = span > maxDays;
   const start = capped ? new Date(end.getTime() - (maxDays - 1) * DAY_MS) : begin;
 
-  // Once the axis crosses a year, MM-DD is ambiguous: a 366-day span can begin and end with
-  // the same label.
+  // Days are written as the console writes them: "24 Sep", with the year added once the axis
+  // crosses one, where "24 Sep" alone is ambiguous -- a 366-day span can begin and end with the
+  // same label. They used to be the raw "09-24" and "2026-09-24". `meta` keeps the ISO day.
   const crossesYear = start.getUTCFullYear() !== end.getUTCFullYear();
 
   const bars: Bar[] = [];
   for (const at = new Date(start); at <= end; at.setUTCDate(at.getUTCDate() + 1)) {
     const key = at.toISOString().slice(0, 10);
-    bars.push({ name: crossesYear ? key : key.slice(5), value: counts.get(key) ?? 0, meta: key });
+    const label = dayLabel(key);
+    bars.push({ name: crossesYear ? label : label.replace(/ \d{4}$/, ''), value: counts.get(key) ?? 0, meta: key });
   }
   return { bars, capped };
 }

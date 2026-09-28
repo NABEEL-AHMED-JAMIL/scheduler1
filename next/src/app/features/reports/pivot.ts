@@ -6,6 +6,8 @@
  * than one that fails to draw.
  */
 
+import { dayLabel, formatDuration } from '../../shared/ui/time-format';
+
 /** Columnar rows as the server sends them: dimension values are indexes into dictionaries. */
 export interface RunData {
   task: string[];
@@ -292,26 +294,25 @@ export function buildPivot(data: RunData, rowDim: Dimension, colDim: Dimension,
            grand: aggregate(data.rows, measure), cellRows };
 }
 
-/** Seconds as a person reads them. */
 /**
- * A duration in words. NEGATIVE is the no-data sentinel; ZERO is a real, instant run.
+ * A tally as a number, a duration as the console writes one (shared/ui/time-format.ts).
  *
- * `if (!value) return '—'` conflated the two, so a run that finished inside a second -- which
- * rounds to 0 in the query -- was reported as "no duration recorded", and a gridline at the
- * origin was labelled with an em dash instead of 0s. Every caller already guards the sentinel
- * with `>= 0` before calling, so returning a real answer for a real zero is what they expect.
+ * formatDuration keeps the two answers this page depends on apart: NO_DURATION, and any other
+ * negative, is the dash for "no duration recorded", while a real zero -- a run that finished
+ * inside a second, which the query rounds to 0 -- is "0s". The execution measures live below a
+ * second, and "230ms" is the whole answer there where "0s" would be none of it. This page had its
+ * own humanSeconds, which wrote that "0.23s" and rounded differently from the jobs pages; it now
+ * shares their formatter.
  */
-export function humanSeconds(value: number): string {
-  if (value < 0) return '—';
-  if (value === 0) return '0s';
-  // Sub-ten-second values keep their decimals: the execution measures live down here, and
-  // "0.23s" is the whole answer where "0s" is none of it.
-  if (value < 10) return `${Math.round(value * 100) / 100}s`;
-  if (value < 60) return `${Math.round(value)}s`;
-  if (value < 3600) return `${Math.floor(value / 60)}m ${Math.round(value % 60)}s`;
-  return `${Math.floor(value / 3600)}h ${Math.round((value % 3600) / 60)}m`;
+export function formatMeasure(value: number, measure: Measure): string {
+  return COUNTING.has(measure) ? value.toLocaleString() : formatDuration(value);
 }
 
-export function formatMeasure(value: number, measure: Measure): string {
-  return COUNTING.has(measure) ? value.toLocaleString() : humanSeconds(value);
+/**
+ * The same runs with the Day dictionary written as days ("24 Sep 2026"), for a grid and a chart a
+ * person reads. The rows only index into the dictionary, so order and grouping are unchanged;
+ * the host page keeps the ISO days for its own keys, sorting and filters.
+ */
+export function withReadableDays(data: RunData): RunData {
+  return { ...data, day: data.day.map(day => dayLabel(day)) };
 }

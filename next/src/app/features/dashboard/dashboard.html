@@ -3,9 +3,10 @@
     <div>
       <h1 class="page-title">Dashboard</h1>
       <p class="page-subtitle">
-        Showing {{ appliedStart() }} to {{ appliedEnd() }}@if (scopeLabel(); as scope) {, {{ scope }}}
+        <!-- The range as the console writes a day ("24 Sep 2026"); the date boxes keep the ISO value. -->
+        Showing {{ dayLabel(appliedStart()) }} to {{ dayLabel(appliedEnd()) }}@if (scopeLabel(); as scope) {, {{ scope }}}
         <!-- The figures follow job events on their own; this says how fresh they are. -->
-        @if (updatedAt(); as at) { · Updated {{ at | date:'shortTime' }} }
+        @if (updatedAt(); as at) { · Updated {{ at | serverTime:'time' }} }
       </p>
     </div>
     <!-- Wraps: a date field has an intrinsic minimum width and two of them plus the
@@ -138,7 +139,7 @@
             <div class="seg max-w-full overflow-x-auto" role="group" [attr.aria-label]="'Dates in this cell'">
               @for (date of cell.dates; track date) {
                 <button type="button" class="seg-btn tabular" [class.seg-on]="date === cell.date"
-                        [attr.aria-pressed]="date === cell.date" (click)="pickDate(date)">{{ dateLabel(date) }}</button>
+                        [attr.aria-pressed]="date === cell.date" (click)="pickDate(date)">{{ date | serverTime:'day' }}</button>
               }
             </div>
           }

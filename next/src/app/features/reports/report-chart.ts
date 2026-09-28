@@ -238,8 +238,8 @@ export class ReportChart {
        * rounded to 0, 0, 0, 1, 1 and rendered "0s 0s 0s 1s 1s": five gridlines carrying two
        * distinct labels, telling the reader nothing about where a point sits between them.
        *
-       * humanSeconds already picks the unit that suits each value -- decimals below ten seconds,
-       * whole seconds below a minute, minutes and hours above -- so handing it the real number is
+       * formatDuration already picks the unit that suits each value -- milliseconds below a
+       * second, tenths below a minute, minutes and hours above -- so handing it the real number is
        * all that is needed. Counting measures are unaffected: compactNumber rounds inside itself
        * below a thousand, so a tally axis prints exactly what it printed before.
        *

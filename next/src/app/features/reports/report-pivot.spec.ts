@@ -297,9 +297,24 @@ describe('ReportPivot with many rows', () => {
     const pivot = pivotFor({ ...many, day, rows });
     pivot.setRowDim('day');
     expect(pivot.rowOrder()).toBe('natural');
-    expect(pivot.pivot().rowLabels[0]).toBe('2026-08-01');
+    expect(pivot.pivot().rowLabels[0]).toBe('1 Aug 2026');
     expect(pivot.chartPivot().rowLabels.length).toBe(20);
     expect(pivot.chartHidden()).toBe(0);
+  });
+
+  /** MIG-295: a Day reads "1 Aug 2026" wherever this builder writes one, never the ISO key. */
+  it('writes days the console\'s way in the headers, the drill-down and the export', () => {
+    const day = ['2026-08-01', '2026-08-02'];
+    const rows = [[0, 0, 0, 0, 10, 'job', 1, 0, 1], [0, 1, 0, 1, 20, 'job', 2, 0, 1]] as RunRow[];
+    const pivot = pivotFor({ ...manyTasks(1), day, rows });
+    pivot.setColDim('day');
+    expect(pivot.pivot().colLabels).toEqual(['1 Aug 2026', '2 Aug 2026']);
+    expect(pivot.dayAxis()).toBe('col');
+    expect(pivot.labelOf(rows[1], 3)).toBe('2 Aug 2026');
+    pivot.export('csv');
+    expect(lastExport!.columns).toEqual(['Task', '1 Aug 2026', '2 Aug 2026', 'All']);
+    expect(lastExport!.title).toContain('(1 Aug 2026 to 31 Aug 2026)');
+    expect(JSON.stringify(lastExport)).not.toContain('2026-08-0');
   });
 
   it('a small grid is handed through untouched', () => {

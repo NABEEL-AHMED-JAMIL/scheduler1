@@ -168,7 +168,7 @@
                                : successRate() >= 90 ? 'ok'
                                : successRate() >= 70 ? 'warn' : 'crit'"
                        [foot]="successFoot()" />
-        <app-stat-tile label="Median duration" [value]="humanSeconds(medianDuration())"
+        <app-stat-tile label="Median duration" [value]="formatDuration(medianDuration())"
                        icon="clock" [foot]="durationFoot()" />
       </div>
     </section>
@@ -201,7 +201,7 @@
             is inside every figure — the once-a-minute poll is most of the spread below.
             @if (untimed()) { {{ untimed() }} run(s) with no recorded end time are excluded. }
           </p>
-          <app-histogram [values]="durations()" [format]="formatSeconds" [height]="132"
+          <app-histogram [values]="durations()" [format]="formatDuration" [height]="132"
                          emptyMessage="No run has finished in this range yet." />
         </div>
 
@@ -306,13 +306,13 @@
                   {{ task.successRate >= 0 ? task.successRate + '%' : '—' }}
                 </td>
                 <td class="text-right tabular mono text-xs">
-                  {{ task.median >= 0 ? humanSeconds(task.median) : '—' }}
+                  {{ formatDuration(task.median) }}
                 </td>
                 <td class="text-right tabular mono text-xs hidden xl:table-cell">
-                  {{ task.slowest >= 0 ? humanSeconds(task.slowest) : '—' }}
+                  {{ formatDuration(task.slowest) }}
                 </td>
                 <td class="hidden md:table-cell mono text-xs
-                           text-[color:var(--text-muted)]">{{ task.lastDay || '—' }}</td>
+                           text-[color:var(--text-muted)]">{{ task.lastDay ? dayLabel(task.lastDay) : '—' }}</td>
                 <td class="text-right col-pin-right">
                   <span class="pill"
                         [class.pill-ok]="task.tone === 'ok'"
@@ -411,9 +411,9 @@
                          [title]="failure.message">{{ failure.message }}</div>
                   </td>
                   <td class="hidden lg:table-cell mono text-xs
-                             text-[color:var(--text-muted)] whitespace-nowrap">{{ failure.when ? (failure.when | serverTime: 'd MMM, HH:mm:ss') : '—' }}</td>
+                             text-[color:var(--text-muted)] whitespace-nowrap">{{ failure.when ? (failure.when | serverTime: 'recentSec') : '—' }}</td>
                   <td class="text-right hidden md:table-cell mono text-xs">
-                    {{ failure.seconds >= 0 ? humanSeconds(failure.seconds) : '—' }}
+                    {{ formatDuration(failure.seconds) }}
                   </td>
                   <td class="text-right col-pin-right">
                     <div class="flex items-center justify-end gap-2">
@@ -493,10 +493,10 @@
                   <td class="text-right tabular hidden md:table-cell text-[color:var(--text-muted)]">{{ r.tries }}</td>
                   <td class="text-right tabular">{{ r.tokensIn | number }}</td>
                   <td class="text-right tabular">{{ r.tokensOut | number }}</td>
-                  <td class="text-right tabular mono text-xs hidden lg:table-cell">{{ (r.medianMs / 1000) | number: '1.1-1' }} s</td>
+                  <td class="text-right tabular mono text-xs hidden lg:table-cell">{{ formatDuration(r.medianMs / 1000) }}</td>
                   <!-- The viewer's own time: sliced, the UTC string put a 22:59 Chicago call at "03:59" the next day. -->
                   <td class="hidden lg:table-cell mono text-xs text-[color:var(--text-muted)] whitespace-nowrap"
-                      [title]="r.lastAt ? (r.lastAt | serverTime: 'd MMM y, HH:mm:ss') : ''">{{ r.lastAt ? (r.lastAt | serverTime: 'd MMM, HH:mm') : '—' }}</td>
+                      [title]="r.lastAt ? (r.lastAt | serverTime: 'dateTimeSec') : ''">{{ r.lastAt ? (r.lastAt | serverTime: 'recent') : '—' }}</td>
                 </tr>
               }
             </tbody>

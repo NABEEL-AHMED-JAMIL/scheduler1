@@ -56,17 +56,19 @@ describe('DatasetOverview', () => {
     expect(host.profiled).toBe(OVERVIEW.profile);
     const tiles = component.tiles();
     expect(tiles.map(t => t.kind)).toEqual(['line', 'ranked', 'table', 'table', 'ranked']);
-    expect(tiles[0].view?.marks.map(m => m.name)).toEqual(['09-01', '09-02']);      // day labels, not full dates
-    expect([shortDate('2024-03-01', 'MONTH'), shortDate('2024-07-01', 'QUARTER'), shortDate('2024-01-01', 'YEAR'), shortDate('2024-03-05', 'WEEK')]).toEqual(['Mar 24', 'Q3 24', '2024', '03-05']);
+    expect(tiles[0].view?.marks.map(m => m.name)).toEqual(['1 Sep', '2 Sep']);      // short days; the year is in the foot
+    // A month is "Mar 2024", never "Mar 24", which beside days written "24 Sep" reads as a day.
+    expect([shortDate('2024-03-01', 'MONTH'), shortDate('2024-07-01', 'QUARTER'), shortDate('2024-01-01', 'YEAR'), shortDate('2024-03-05', 'WEEK')]).toEqual(['Mar 2024', 'Q3 2024', '2024', '5 Mar']);
     expect(component.stateOf(tiles[0])).toBe('ready');
     expect(component.stateOf(tiles[2])).toBe('ready');                              // bins, no view
     expect(component.stateOf(tiles[3])).toBe('failed');
-    expect(component.footOf(tiles[0])).toBe('2 rows · by day · 2026-09-01 to 2026-09-02');
+    expect(component.footOf(tiles[0])).toBe('2 rows · by day · 1 Sep 2026 to 2 Sep 2026');
     expect(component.footOf(tiles[2])).toBe('2 bins');
     expect(component.binBars(OVERVIEW.charts[2].distribution!).map(b => b.name)).toEqual(['48.19 – 116.28', '116.28 – 184.37']);
     expect(tiles[4].view?.marks).toEqual([{ name: 'amount', value: 12.5 }]);
     const screen = text();
     expect(screen).toContain('Rows over time');
+    expect(screen).toContain('read in 946ms');
     expect(screen).toContain('Refused for the test.');
     expect(screen).not.toContain('Most common');                                    // one row is not a mode
     expect(screen).toContain('5 charts chosen from the columns');

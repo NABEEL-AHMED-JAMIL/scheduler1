@@ -3,6 +3,7 @@ import {
 } from '@angular/core';
 
 import { compactNumber, compactTenths } from './number-format';
+import { compactDuration, formatDuration } from '../ui/time-format';
 
 export interface BarSegment { label: string; value: number; color: string; }
 
@@ -205,7 +206,25 @@ export class BarChart {
    * "1,235" but nothing at all. Callers that need the exact figure pass their own formatter.
    */
   readonly format = input<(value: number) => string>(compactNumber);
+  /**
+   * What the values are. 'duration' reads them as seconds: the label above a bar is the short
+   * form ("25s", "3.4m") and the tooltip the full one ("25.3s", "3m 20s"), as every other duration
+   * in the console is written. The run charts plotted minutes through the number format before
+   * this, so a 25 second run was labelled 0.
+   *
+   * A string rather than a formatter bound from the template: binding a function-typed property
+   * to an input crashes the Angular 22 compiler (see shared/ui/combobox.ts).
+   */
+  readonly unit = input<'number' | 'duration'>('number');
   readonly barClicked = output<Bar>();
+
+  /** How a value is written above its bar, before any fallback for width. */
+  private readonly labelFormat = computed(() =>
+    this.unit() === 'duration' ? compactDuration : this.format());
+
+  /** How a value is written where there is room for all of it: the tooltip and the summary. */
+  private readonly hintFormat = computed(() =>
+    this.unit() === 'duration' ? formatDuration : this.format());
 
   /**
    * The component's own width, so the axis can be laid out in pixels rather than in guesses.
@@ -339,11 +358,12 @@ export class BarChart {
     const data = this.data();
     if (!data.length) return null;
     const pitch = this.pitch();
-    const format = this.format();
+    const format = this.labelFormat();
     if (!pitch) return data.length <= 24 ? format : null;
     const fits = (f: (value: number) => string) => pitch >= Math.max(VALUE_PX, widestText(data.map(bar => f(bar.value))));
     if (fits(format)) return format;
-    if (format === compactNumber) return null;
+    // Nothing shorter to fall back to. A duration is never written as "1.2K" seconds.
+    if (format === compactNumber || format === compactDuration) return null;
     // Tenths first: "14.8M" over seven bars that "15M" would label identically.
     if (fits(compactTenths)) return compactTenths;
     if (fits(compactNumber)) return compactNumber;
@@ -369,7 +389,7 @@ export class BarChart {
     const data = this.data();
     if (!data.length) return [];
     const max = this.maxValue();
-    const format = this.format();
+    const format = this.labelFormat();
     // The reserve has to match the branch the template actually renders. It was a flat 32
     // even when no value line was drawn, which shortened every bar on a >24-bar chart by 14px.
     const track = Math.max(this.height() - (this.showValues() ? RESERVE_WITH_VALUES : RESERVE_AXIS_ONLY), 18);
@@ -412,7 +432,7 @@ export class BarChart {
        * there, only ever served to overstate the middle of the range.
        *
        * max === 0 no longer empties the chart. Every value being zero is a real answer and a
-       * different one from "no data": a job whose runs all round to 0.0 minutes used to hit
+       * different one from "no data": a job whose runs all rounded to 0.0 minutes used to hit
        * the empty state and print "nothing to show" beside a caption saying the runs exist.
        */
       const px = max > 0 && bar.value > 0
@@ -431,7 +451,7 @@ export class BarChart {
         // hanging 10px into the card's padding, pointing at nothing.
         align: !labelled ? 'center' : index === starts[0] ? 'start' : index === last ? 'end' : 'center',
         display: (this.valueFormat() ?? format)(bar.value),
-        hint: this.hintFor(bar, format),
+        hint: this.hintFor(bar, this.hintFormat()),
         px: px,
         stack: this.stackFor(bar, px),
       };
@@ -489,7 +509,7 @@ export class BarChart {
   protected readonly summary = computed(() => {
     const data = this.data();
     if (!data.length) return this.emptyMessage();
-    const format = this.format();
+    const format = this.hintFormat();
     const peak = data.reduce((a, b) => (b.value > a.value ? b : a), data[0]);
     return `Bar chart of ${data.length} values from ${data[0].name} to ${data[data.length - 1].name}; `
       + `highest is ${peak.name} at ${format(peak.value)}.`;

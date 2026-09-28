@@ -99,7 +99,7 @@ describe('a range longer than a week', () => {
 
   it('says how many dates a cell covers', () => {
     const heatmap = heatmapWith(thursdays);
-    expect(heatmap.tooltip('Thursday', heatmap.rows()[0].cells[22])).toBe('Thursday 10p — 28 runs across 4 dates');
+    expect(heatmap.tooltip('Thursday', heatmap.rows()[0].cells[22])).toBe('Thursday 22:00–23:00 — 28 runs across 4 dates');
   });
 
   it('keeps one date as the cell key when only one date is in it', () => {
@@ -107,7 +107,41 @@ describe('a range longer than a week', () => {
     const cell = heatmap.rows()[0].cells[9];
     expect(cell.key).toBe('2026-09-21');
     expect(cell.keys).toEqual(['2026-09-21']);
-    expect(heatmap.tooltip('Monday', cell)).toBe('Monday 9a — 3 runs');
+    expect(heatmap.tooltip('Monday', cell)).toBe('Monday 09:00–10:00 — 3 runs on 21 Sep 2026');
+  });
+});
+
+/**
+ * The console's 24-hour clock (MIG-295). The grid used to say "12a", "10p" and print the cell's
+ * raw "2026-09-24" in the hover pill, beside tables that write "24 Sep 2026, 22:06".
+ */
+describe('how the heatmap writes an hour and a day', () => {
+  function render(cells: { day: string; hour: number; value: number; key?: string }[]) {
+    TestBed.resetTestingModule();
+    const fixture = TestBed.configureTestingModule({ imports: [Host] }).createComponent(Host);
+    fixture.componentInstance.data.set(cells);
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  it('labels the axis with two-digit 24-hour hours, every other one', () => {
+    const el = render([{ day: 'Monday', hour: 9, value: 3 }]).nativeElement as HTMLElement;
+    const ticks = [...el.querySelectorAll<HTMLElement>('.grid > span.text-center')].map(s => s.textContent!.trim());
+    expect(ticks.filter(Boolean)).toEqual(
+      ['00', '02', '04', '06', '08', '10', '12', '14', '16', '18', '20', '22']);
+  });
+
+  it('says the hour as a range and the date as a day in the hover pill', () => {
+    const fixture = render([{ day: 'Thursday', hour: 22, value: 9, key: '2026-09-24' }]);
+    const heatmap = fixture.debugElement.children[0].componentInstance as Heatmap;
+    heatmap.hovered.set({ day: 'Thursday', cell: heatmap.rows()[0].cells[22] });
+    fixture.detectChanges();
+    const pill = (fixture.nativeElement as HTMLElement).querySelector('.h-6 > span')!.textContent!.replace(/\s+/g, ' ');
+    expect(pill).toContain('Thursday 22:00–23:00');
+    expect(pill).toContain('9 runs');
+    expect(pill).toContain('24 Sep 2026');
+    expect(pill).not.toContain('2026-09-24');
+    expect(pill).not.toMatch(/\d[ap]\b/);
   });
 });
 

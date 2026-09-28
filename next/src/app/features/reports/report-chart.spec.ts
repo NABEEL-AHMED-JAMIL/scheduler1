@@ -57,9 +57,9 @@ describe('the y axis under a sub-second measure', () => {
 
     // Rounded first, these five read "0s 0s 1s 1s 1s": five lines carrying two distinct labels,
     // and a bar reaching 23% of the plot height measured against the second of them as 0s while
-    // its own tooltip said 0.23s.
+    // its own tooltip said 230ms.
     expect((chart as any).gridLines().map((line: any) => line.label))
-      .toEqual(['0s', '0.25s', '0.5s', '0.75s', '1s']);
+      .toEqual(['0s', '250ms', '500ms', '750ms', '1s']);
   });
 
   it('gives a reader five different numbers to measure a bar against', () => {
@@ -70,7 +70,7 @@ describe('the y axis under a sub-second measure', () => {
   });
 
   it('still writes a counting axis in whole numbers, which is what a tally is', () => {
-    // humanSeconds picks its own precision per magnitude; compactNumber rounds inside itself. The
+    // formatDuration picks its own precision per magnitude; compactNumber rounds inside itself. The
     // tick is handed over raw to both, so a count axis prints exactly what it printed before --
     // 1.5 runs is not a figure this page has ever shown.
     const runs = pivotOf(['a', 'b'], ['Completed', 'Failed'], [[6, 2], [3, 1]]);

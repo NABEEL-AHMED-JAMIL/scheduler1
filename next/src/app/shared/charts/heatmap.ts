@@ -1,4 +1,5 @@
 import { Component, computed, input, output, signal } from '@angular/core';
+import { axisHour, dayLabel, hourRange } from '../ui/time-format';
 
 /**
  * `key` is what a click drills into (the dashboard's date). A range longer than a week brings the
@@ -27,9 +28,11 @@ const HOURS = Array.from({ length: 24 }, (_, i) => i);
           <div class="grid gap-1 w-max min-w-full"
                [style.grid-template-columns]="'3.25rem repeat(24, minmax(1.5rem, 1fr))'">
             <span class="sticky left-0 z-10 bg-[color:var(--surface-raised)]"></span>
+            <!-- Two digits on a 24-hour clock ("06", "22"): a column is about 12px wide on a phone,
+                 which "22:00" would overrun. The pill and the drill-down say the full hour. -->
             @for (hour of hours; track hour) {
               <span class="text-[10px] text-center text-[color:var(--text-muted)] tabular">
-                @if (hour % 2 === 0) { {{ hourLabel(hour) }} }
+                @if (hour % 2 === 0) { {{ axisHour(hour) }} }
               </span>
             }
 
@@ -74,11 +77,11 @@ const HOURS = Array.from({ length: 24 }, (_, i) => i);
           @if (hovered(); as hover) {
             <span class="text-xs px-2 py-1 rounded-md tabular"
                   style="background: var(--surface-sunken); color: var(--text-primary);">
-              <span class="font-medium">{{ hover.day }} {{ hourLabel(hover.cell.hour) }}</span>
+              <span class="font-medium">{{ hover.day }} {{ hourRange(hover.cell.hour) }}</span>
               <span class="text-[color:var(--text-secondary)]">
                 &middot; {{ hover.cell.value }} run{{ hover.cell.value === 1 ? '' : 's' }}
                 @if ((hover.cell.keys?.length ?? 0) > 1) { &middot; across {{ hover.cell.keys!.length }} dates }
-                @else if (hover.cell.key) { &middot; {{ hover.cell.key }} }
+                @else if (hover.cell.key) { &middot; {{ dayLabel(hover.cell.key) }} }
               </span>
             </span>
           }
@@ -146,16 +149,20 @@ export class Heatmap {
     return !!selection && selection.day === day && selection.hour === hour;
   }
 
+  /**
+   * What a screen reader hears for a cell, and what the pill says: the hour as the bucket it is
+   * ("22:00–23:00", which is what the drill-down lists) and, for a single date, which one.
+   */
   tooltip(day: string, cell: HeatCell): string {
-    if (!cell.value) return `${day} ${this.hourLabel(cell.hour)} — no runs`;
+    const at = `${day} ${hourRange(cell.hour)}`;
+    if (!cell.value) return `${at} — no runs`;
     const dates = cell.keys?.length ?? 0;
-    return `${day} ${this.hourLabel(cell.hour)} — ${cell.value} run${cell.value === 1 ? '' : 's'}`
-      + (dates > 1 ? ` across ${dates} dates` : '');
+    return `${at} — ${cell.value} run${cell.value === 1 ? '' : 's'}`
+      + (dates > 1 ? ` across ${dates} dates` : cell.key ? ` on ${dayLabel(cell.key)}` : '');
   }
 
-  hourLabel(hour: number): string {
-    if (hour === 0) return '12a';
-    if (hour === 12) return '12p';
-    return hour < 12 ? `${hour}a` : `${hour - 12}p`;
-  }
+  /** The console's one way of writing an hour and a day (shared/ui/time-format.ts), for the template. */
+  protected readonly axisHour = axisHour;
+  protected readonly hourRange = hourRange;
+  protected readonly dayLabel = dayLabel;
 }

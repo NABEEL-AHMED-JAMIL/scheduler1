@@ -12,6 +12,15 @@ class Host {
   readonly format = signal<(value: number) => string>((value: number) => String(value));
 }
 
+/** A run chart, as the jobs list and history bind one: seconds, with unit="duration". */
+@Component({
+  imports: [BarChart],
+  template: `<app-bar-chart [data]="data()" [height]="120" unit="duration" />`,
+})
+class DurationHost {
+  readonly data = signal<Bar[]>([]);
+}
+
 function barsFor(data: Bar[]) {
   // Reset first: configureTestingModule throws once the module has been instantiated, so a
   // test that measures several bar counts could not otherwise call this more than once.
@@ -326,5 +335,66 @@ describe('a roll-up bar that dwarfs the data', () => {
       { name: 'Rest', value: 100, inert: true },
     ];
     expect(chartAt(900, allInert).maxValue()).toBe(100);
+  });
+});
+
+/**
+ * The run charts plotted minutes to one decimal through the number format, so a 25 second run was
+ * labelled "0" and its tooltip "#7336: 0.4". With unit="duration" the values are seconds and read
+ * as every other duration in the console does (MIG-295).
+ */
+describe('a chart of how long runs took', () => {
+  function durationChart(data: Bar[], width = 0) {
+    TestBed.resetTestingModule();
+    const fixture = TestBed.configureTestingModule({ imports: [DurationHost] }).createComponent(DurationHost);
+    fixture.componentInstance.data.set(data);
+    fixture.detectChanges();
+    const chart = fixture.debugElement.children[0].componentInstance as BarChart;
+    if (width) {
+      (chart as any).measured.set(width);
+      fixture.detectChanges();
+    }
+    return { chart, el: fixture.nativeElement as HTMLElement };
+  }
+
+  const runs: Bar[] = [
+    { name: '#7336', value: 25.25 }, { name: '#7337', value: 27 }, { name: '#7338', value: 41 },
+    { name: '#7339', value: 50.2 }, { name: '#7340', value: 60.3 }, { name: '#7341', value: 200 },
+  ];
+
+  it('labels a 25 second run 25s, not 0', () => {
+    const { chart } = durationChart(runs, 600);
+    expect(chart.bars().map(bar => bar.display)).toEqual(['25s', '27s', '41s', '50s', '1m', '3.3m']);
+  });
+
+  it('gives the full duration in the tooltip', () => {
+    const { chart } = durationChart(runs, 600);
+    expect(chart.bars()[0].hint).toBe('#7336: 25.3s');
+    expect(chart.bars()[5].hint).toBe('#7341: 3m 20s');
+  });
+
+  it('draws the short label above the bar', () => {
+    const { el } = durationChart(runs, 600);
+    const labels = [...el.querySelectorAll('span.text-\\[10px\\].tabular')].map(s => s.textContent!.trim());
+    expect(labels).toContain('25s');
+    expect(labels).not.toContain('0');
+  });
+
+  it('says a sub-second run was one, rather than zero', () => {
+    const { chart } = durationChart([{ name: '#1', value: 0.42 }, { name: '#2', value: 12 }], 600);
+    expect(chart.bars()[0].display).toBe('<1s');
+    expect(chart.bars()[0].hint).toBe('#1: 420ms');
+  });
+
+  it('withholds the labels rather than writing a duration as a plain number when none fits', () => {
+    const many: Bar[] = Array.from({ length: 80 }, (_, at) => ({ name: '#' + at, value: 3000 + at }));
+    const { chart } = durationChart(many, 400);
+    expect((chart as any).showValues()).toBe(false);
+    expect(chart.bars()[0].hint).toBe('#0: 50m');
+  });
+
+  it('leaves a chart of counts as it was', () => {
+    const bars = barsFor([{ name: 'x', value: 25 }]);
+    expect(bars[0].display).toBe('25');
   });
 });
