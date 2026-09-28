@@ -75,7 +75,7 @@
             </td>
             <td class="text-xs text-[color:var(--text-secondary)] whitespace-nowrap">
               @if (row.updatedAt || row.createdAt) {
-                {{ (row.updatedAt || row.createdAt) | serverTime:'d MMM y' }}
+                {{ (row.updatedAt || row.createdAt) | serverTime:'date' }}
                 @if (row.updatedByName || row.createdByName) { by {{ row.updatedByName || row.createdByName }}}
               } @else { — }
             </td>

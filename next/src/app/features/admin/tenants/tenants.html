@@ -138,7 +138,7 @@
                 </td>
               }
               <td class="whitespace-nowrap text-[color:var(--text-secondary)]">
-                {{ tenant.dateCreated ? (tenant.dateCreated | serverTime: 'mediumDate') : '—' }}
+                {{ tenant.dateCreated ? (tenant.dateCreated | serverTime: 'date') : '—' }}
               </td>
               <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
                 {{ tenant.createdByName || '—' }}
@@ -202,7 +202,7 @@
                                    copiedLabel="Tenant code copied" (copy)="copyCode(tenant)" />
                 </span>
                 @if (tenant.dateCreated) {
-                  <span>since {{ tenant.dateCreated | serverTime: 'mediumDate' }}</span>
+                  <span>since {{ tenant.dateCreated | serverTime: 'date' }}</span>
                 }
               </div>
               @if (tenant.adminName || tenant.adminEmail) {

@@ -19,6 +19,8 @@ import { StorageService } from '../objects/storage.service';
 import { Donut } from '../../shared/charts/donut';
 import { statusColor } from '../../shared/charts/status-color';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
+import { formatDuration } from '../../shared/ui/time-format';
+import { instantMs } from '../../core/instant';
 import { Field } from '../../shared/ui/field';
 import { StatTile } from '../../shared/ui/stat-tile';
 
@@ -215,17 +217,18 @@ export class Profile implements OnInit {
    *
    * Written out in words rather than as a clock, because these are read at a glance and "1h 4m"
    * is the answer to "did that take longer than usual", which a reader can only get from
-   * "01:04:12" by doing the subtraction themselves.
+   * "01:04:12" by doing the subtraction themselves. In formatDuration's words, so a run reads the
+   * same here as on Jobs and Queue (MIG-295).
+   *
+   * Both ends through instantMs: a run still going is measured against Date.now(), a real instant,
+   * and new Date() read the server's wall-clock start as the reader's own, hours off outside Chicago.
    */
   runDuration(run: ActivityRun): string {
-    if (!run.startTime) return '';
-    const started = new Date(run.startTime).getTime();
-    const finished = run.endTime ? new Date(run.endTime).getTime() : Date.now();
-    const seconds = Math.max(0, Math.round((finished - started) / 1000));
-    if (seconds < 60) return `${seconds}s`;
-    const minutes = Math.floor(seconds / 60);
-    if (minutes < 60) return `${minutes}m ${seconds % 60}s`;
-    return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+    const started = instantMs(run.startTime);
+    if (started === null) return '';
+    const finished = run.endTime ? instantMs(run.endTime) : Date.now();
+    if (finished === null) return '';
+    return formatDuration(Math.max(0, (finished - started) / 1000));
   }
 
   /** True while a run has started and not finished, so the duration reads as "so far". */

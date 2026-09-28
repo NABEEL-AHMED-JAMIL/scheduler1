@@ -169,6 +169,16 @@ describe('Notification bell timestamps', () => {
     expect(bell.ago('2026-09-14T17:02:13')).toBe(bell.ago('2026-09-14T22:02:13Z'));
   });
 
+  it('writes a notification older than a month as its day, "5 Aug 2026", never "8/5/2026"', () => {
+    // MIG-295: this was toLocaleDateString(), the one date in the shell in the browser's own order.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-24T17:00:00Z'));
+    const { bell } = build();
+
+    // Noon in Chicago (17:00Z) is still 5 Aug everywhere from Hawaii to Dhaka.
+    expect(bell.ago('2026-08-05T12:00:00')).toBe('5 Aug 2026');
+  });
+
   it('renders nothing rather than "Invalid Date" for a missing timestamp', () => {
     const { bell } = build();
 

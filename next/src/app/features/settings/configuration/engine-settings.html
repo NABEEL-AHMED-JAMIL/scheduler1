@@ -60,7 +60,7 @@
             </td>
             <td class="text-xs text-[color:var(--text-secondary)] whitespace-nowrap">
               @if (s.updatedAt) {
-                {{ s.updatedAt | serverTime:'d MMM y, HH:mm' }}@if (s.updatedByName) { by {{ s.updatedByName }}}
+                {{ s.updatedAt | serverTime:'dateTime' }}@if (s.updatedByName) { by {{ s.updatedByName }}}
               } @else { — }
             </td>
             <td>

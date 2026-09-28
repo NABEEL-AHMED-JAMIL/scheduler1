@@ -96,4 +96,14 @@ describe('FileChat panel', () => {
     expect(save).toHaveBeenCalledWith(expect.any(Blob), 'notes.txt');
     save.mockRestore();
   });
+
+  // MIG-295: each message's time is on the console's 24-hour clock, not the browser's "10:06 PM".
+  it('stamps a message with its 24-hour time', () => {
+    const { el, chat, fixture } = panel();
+    chat.messages.set([{ role: 'assistant', text: 'late answer', at: new Date(2026, 8, 24, 22, 6).getTime() }]);
+    fixture.detectChanges();
+    const stamps = [...el.querySelectorAll('time')].map(t => t.textContent!.trim());
+    expect(stamps).toContain('22:06');
+    expect(stamps.join(' ')).not.toMatch(/AM|PM/);
+  });
 });

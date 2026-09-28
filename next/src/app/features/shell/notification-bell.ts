@@ -1,5 +1,5 @@
 import {
-  Component, ElementRef, HostListener, OnDestroy, OnInit, computed, inject, signal,
+  Component, ElementRef, HostListener, LOCALE_ID, OnDestroy, OnInit, computed, inject, signal,
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -8,6 +8,7 @@ import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { UnreadCountService } from '../../core/notifications/unread-count.service';
 import { instantMs } from '../../core/instant';
 import { Icon } from '../../shared/ui/icon';
+import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { openableTarget } from '../notifications/notification-links';
 import { AuthService } from '../../core/auth/auth.service';
 
@@ -135,6 +136,7 @@ export class NotificationBell implements OnInit, OnDestroy {
   private readonly elementRef = inject(ElementRef<HTMLElement>);
   private readonly store = inject(UnreadCountService);
   private readonly auth = inject(AuthService);
+  private readonly clock = new ServerTimePipe(inject(LOCALE_ID));
 
   readonly open = signal(false);
   readonly items = signal<Note[]>([]);
@@ -302,6 +304,8 @@ export class NotificationBell implements OnInit, OnDestroy {
     const hours = Math.round(mins / 60);
     if (hours < 24) return `${hours}h ago`;
     const days = Math.round(hours / 24);
-    return days < 30 ? `${days}d ago` : new Date(then).toLocaleDateString();
+    // Past a month, the day itself: "24 Sep 2026", as every date in the console is written. It was
+    // toLocaleDateString(), which wrote "9/24/2026" in the US and "24/09/2026" elsewhere (MIG-295).
+    return days < 30 ? `${days}d ago` : this.clock.transform(then, 'date') ?? '';
   }
 }

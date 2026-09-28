@@ -148,7 +148,8 @@ describe('uploading a certificate', () => {
 
     expect(text()).toContain('prod.kafka.example.com');
     expect(text()).toContain('Example Root CA');
-    expect(text()).toContain('2027-04-01');
+    expect(text()).toContain('1 Apr 2027');
+    expect(text()).not.toContain('2027-04-01');
   });
 
   it('says plainly when the certificate has already expired', () => {
@@ -160,7 +161,7 @@ describe('uploading a certificate', () => {
     })));
     choose('ca', 'ca.pem');
 
-    expect(text()).toContain('expired on 2024-01-09');
+    expect(text()).toContain('expired on 9 Jan 2024');
   });
 
   it('builds the truststore itself rather than leaving a step to remember', () => {

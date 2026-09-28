@@ -33,7 +33,7 @@ import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
           <div><dt class="stat-label">Owed</dt><dd class="m-0 text-[1.05rem] font-semibold tabular" [class.text-crit-500]="s.overdueCount > 0">{{ money(s.openBalance, s.currency) }}</dd>
             <dd class="m-0 text-[11px] text-[color:var(--text-muted)]">{{ s.openCount ? s.openCount + ' open invoice' + (s.openCount === 1 ? '' : 's') : 'nothing outstanding' }}@if (s.overdueCount) { · <span class="text-crit-500">{{ s.overdueCount }} overdue</span> }</dd></div>
           @if (s.nextDueNumber) {
-            <div><dt class="stat-label">Next due</dt><dd class="m-0 text-[1.05rem] font-semibold tabular">{{ s.nextDueAt | serverTime: 'd MMM' }}</dd>
+            <div><dt class="stat-label">Next due</dt><dd class="m-0 text-[1.05rem] font-semibold tabular">{{ s.nextDueAt | serverTime: 'day' }}</dd>
               <dd class="m-0 text-[11px] text-[color:var(--text-muted)]"><a class="link-inline mono" [routerLink]="['/billing/invoices', s.nextDueNumber]">{{ s.nextDueNumber }}</a> · {{ money(s.nextDueBalance ?? 0, s.currency) }}{{ overdueDays(s.nextDueAt) ? ' · ' + overdueDays(s.nextDueAt) + ' d late' : '' }}</dd></div>
           } @else if (s.latestNumber) {
             <div><dt class="stat-label">Last invoice</dt><dd class="m-0 text-[1.05rem] font-semibold"><span class="pill" [class]="'pill ' + statusTone[s.latestStatus ?? '']">{{ statusLabel[s.latestStatus ?? ''] }}</span></dd>

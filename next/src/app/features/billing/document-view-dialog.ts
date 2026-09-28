@@ -27,7 +27,7 @@ export const DOC_VIEW_TITLE_ID = 'doc-view-title';
           <div class="text-[11px] text-[color:var(--text-muted)] flex items-center gap-2 leading-tight mt-0.5">
             <span class="uppercase">{{ kindLabel[data.kind] }}</span>
             @if (data.sizeBytes) { <span>·</span><span>{{ humanSize(data.sizeBytes) }}</span> }
-            <span>·</span><span>{{ data.issuedAt | serverTime: 'd MMM yyyy, HH:mm' }}</span>
+            <span>·</span><span>{{ data.issuedAt | serverTime: 'dateTime' }}</span>
             @if (data.createdByName) { <span>·</span><span>{{ data.createdByName }}</span> }
           </div>
         </div>

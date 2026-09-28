@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, computed, effect, inject, input, output, signal, viewChild, ElementRef } from '@angular/core';
+import { Component, LOCALE_ID, OnDestroy, OnInit, computed, effect, inject, input, output, signal, viewChild, ElementRef } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { ToastService } from '../../../shared/ui/toast.service';
@@ -15,6 +15,7 @@ import { ShareDialog, ShareResult } from '../dialogs/share-dialog';
 import { Subscription, finalize } from 'rxjs';
 import { StorageService } from '../storage.service';
 import { DictationService } from '../../../shared/ui/dictation.service';
+import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 
 interface ChatMessage {
   role: 'user' | 'assistant' | 'error';
@@ -88,6 +89,7 @@ export class FileChat implements OnInit, OnDestroy {
 
   private readonly http = inject(HttpClient);
   private readonly toast = inject(ToastService);
+  private readonly clock = new ServerTimePipe(inject(LOCALE_ID));
   /** Whose picture sits beside their own messages. */
   readonly auth = inject(AuthService);
   private readonly dialog = inject(Dialog);
@@ -684,7 +686,8 @@ export class FileChat implements OnInit, OnDestroy {
   }
 
   /**
-   * The clock time a message was sent, in the reader's own locale.
+   * The clock time a message was sent: "22:06", on the console's 24-hour clock (MIG-295). It was
+   * toLocaleTimeString, which wrote "10:06 PM" for a US browser.
    *
    * Time only, not the date: a conversation is read in the session that produced it, and
    * history expires after thirty minutes, so a date would be noise on every line.
@@ -693,6 +696,6 @@ export class FileChat implements OnInit, OnDestroy {
     if (!at) {
       return '';
     }
-    return new Date(at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    return this.clock.transform(at, 'time') ?? '';
   }
 }

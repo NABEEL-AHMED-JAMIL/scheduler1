@@ -11,6 +11,7 @@ import { Icon } from '../../../shared/ui/icon';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { copyText } from '../../../shared/ui/clipboard.util';
 import { formatSize } from '../../../shared/ui/format-size';
+import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { KafkaProfile } from './kafka-connections';
 import {
   KAFKA_SECRET_BUCKET, KAFKA_SECRET_ROOT, KafkaSecret, KafkaSecretService,
@@ -90,7 +91,7 @@ const STORE_FIELDS: Record<'truststore' | 'keystore', StoreFields> = {
  */
 @Component({
   selector: 'app-kafka-tls-section',
-  imports: [ReactiveFormsModule, NgTemplateOutlet, Field, Icon],
+  imports: [ReactiveFormsModule, NgTemplateOutlet, Field, Icon, ServerTimePipe],
   // formControlName resolves its container with @Host(), which stops at a component boundary --
   // so without this the controls in here would not find the dialog's [formGroup] and every one
   // of them would throw at first render. Handing the parent's directive down is the supported
@@ -425,13 +426,15 @@ const STORE_FIELDS: Record<'truststore' | 'keystore', StoreFields> = {
                          text-[color:var(--text-muted)]">
                 <dt>Subject</dt><dd class="truncate text-[color:var(--text-secondary)]">{{ stored.subject }}</dd>
                 <dt>Issuer</dt><dd class="truncate text-[color:var(--text-secondary)]">{{ stored.issuer }}</dd>
-                <dt>Expires</dt><dd class="text-[color:var(--text-secondary)]">{{ stored.expiresOn }}</dd>
+                <!-- The certificate's last day as every date is written here, "1 Apr 2027", not the
+                     raw "2027-04-01" the server hands back (MIG-295). -->
+                <dt>Expires</dt><dd class="text-[color:var(--text-secondary)]">{{ stored.expiresOn | serverTime:'date' }}</dd>
               </dl>
             }
             @if (stored.expired) {
               <p class="field-note text-crit-500 flex items-start gap-1.5" role="alert">
                 <app-icon name="alert" size="0.9em" class="mt-px shrink-0" />
-                <span>This certificate expired on {{ stored.expiresOn }}. The broker will refuse
+                <span>This certificate expired on {{ stored.expiresOn | serverTime:'date' }}. The broker will refuse
                       the connection until it is replaced with a current one.</span>
               </p>
             }

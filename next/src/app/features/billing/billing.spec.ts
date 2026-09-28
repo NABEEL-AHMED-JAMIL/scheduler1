@@ -110,7 +110,7 @@ describe('Billing', () => {
     vi.useFakeTimers(); vi.setSystemTime(new Date('2026-09-19T10:00:00'));
     try {
       const { component } = page();
-      expect(component.dayBars().map(b => b.name)).toEqual(['09-16', '09-17', '09-18']);
+      expect(component.dayBars().map(b => b.name)).toEqual(['16 Sep', '17 Sep', '18 Sep']);
       expect(component.dayBars()[2].segments?.map(s => s.label)).toEqual(['Seats', 'Storage', 'Model calls']);
       expect(component.yesterday()).toBe(9.8);                                   // the 18th, by date
       // Seven calendar days back from the 19th: the 12th..18th -- four quiet days count as zero.
@@ -118,6 +118,20 @@ describe('Billing', () => {
       expect(component.forecast()).toBeCloseTo(component.total() + perDay * (component.daysInMonth() - 19), 6);
       component.shiftMonth(-1);
       expect(component.forecast()).toBeNull();
+    } finally { vi.useRealTimers(); }
+  });
+
+  // MIG-295: the month picker and the comparison name a billing period as the invoice heads it,
+  // in the console's words rather than the browser's language, and never as a bare "Aug".
+  it('names the month on screen and the one before it in full', () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date('2026-09-19T10:00:00'));
+    try {
+      const { component } = page();
+      expect(component.monthLabel()).toBe('September 2026');
+      expect(component.previousLabel()).toBe('August 2026');
+      component.shiftMonth(-8);
+      expect(component.monthLabel()).toBe('January 2026');
+      expect(component.previousLabel()).toBe('December 2025');
     } finally { vi.useRealTimers(); }
   });
 
