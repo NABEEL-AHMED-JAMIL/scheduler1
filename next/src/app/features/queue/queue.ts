@@ -397,10 +397,12 @@ export class Queue implements OnInit {
 
   /** Force a stuck run to a terminal state so it stops occupying the queue. */
   async forceStatus(row: QueueRow, status: 'Failed' | 'Interrupt'): Promise<void> {
+    // The words people read; the status names are the server's ("Mark Interrupt" read as a typo).
+    const label = status === 'Failed' ? 'failed' : 'interrupted';
     const ok = await confirmWith(this.dialog, {
-      title: `Mark run as ${status}`,
-      body: `Run #${row.jobQueueId} of ${this.jobName(row)} will be recorded as ${status}. Use this when a run is stuck and the worker will not report back.`,
-      confirmLabel: `Mark ${status}`,
+      title: `Mark run as ${label}`,
+      body: `Run #${row.jobQueueId} of ${this.jobName(row)} will be recorded as ${label}. Use this when a run is stuck and the worker will not report back.`,
+      confirmLabel: `Mark ${label}`,
       danger: true,
     });
     if (!ok) return;
@@ -415,7 +417,7 @@ export class Queue implements OnInit {
     this.http.delete<ApiResponse>(url, { params: { jobQId: String(row.jobQueueId) } }).subscribe({
       next: response => {
         if (response.status === API_SUCCESS) {
-          this.toast.success(`Run #${row.jobQueueId} marked ${status}.`);
+          this.toast.success(`Run #${row.jobQueueId} marked ${label}.`);
           this.load();
         } else { this.toast.error(response.message); }
       },
