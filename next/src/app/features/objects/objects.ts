@@ -56,6 +56,23 @@ export class Objects implements OnInit {
   readonly bucketOptions = computed(() => this.buckets().map(b => ({ value: b.bucket, label: b.label || b.bucket, hint: b.provider })));
 
   /** FTP is a different kind of thing from an object store, and the card should say so. */
+  /** A connection's last test, in words for its card. */
+  connectionState(status: string | undefined): string {
+    switch ((status ?? '').toUpperCase()) {
+      case 'SUCCESS': return 'Connected';
+      case 'FAILED': return 'Last test failed';
+      default: return 'Not tested';
+    }
+  }
+
+  connectionTone(status: string | undefined): string {
+    switch ((status ?? '').toUpperCase()) {
+      case 'SUCCESS': return 'pill-ok';
+      case 'FAILED': return 'pill-crit';
+      default: return 'pill-neutral';
+    }
+  }
+
   providerIcon(provider: string): string {
     const kind = (provider || '').toUpperCase();
     if (kind === 'FTP' || kind === 'FTPS') return 'server';

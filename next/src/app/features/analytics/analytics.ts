@@ -1,4 +1,4 @@
-import { Component, LOCALE_ID, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, Injector, LOCALE_ID, OnInit, afterNextRender, computed, inject, signal } from '@angular/core';
 import { Dialog } from '@angular/cdk/dialog';
 import { forkJoin, of } from 'rxjs';
 import { API_SUCCESS } from '../../core/api/api.config';
@@ -596,8 +596,35 @@ const DATE_ONLY_TYPE = /^DATE$/i;
     DatasetRegistry, RouterLink, ColumnCard, DatasetOverview,
   ],
   templateUrl: './analytics.html',
+  host: { '(document:keydown.escape)': 'onEscape()' },
 })
 export class Analytics implements OnInit {
+  /**
+   * The file picker slides in over the page (owner, 2026-09-28). It used to keep a 260px column
+   * beside the data for good, when it is only needed to choose what to read; the data now has the
+   * full width, and the panel gets out of the way once something is picked.
+   */
+  readonly filesOpen = signal(false);
+  private readonly panelInjector = inject(Injector);
+  private filesTrigger: HTMLElement | null = null;
+
+  openFiles(trigger?: EventTarget | null): void {
+    this.filesTrigger = trigger instanceof HTMLElement ? trigger : null;
+    this.filesOpen.set(true);
+    // Focus goes into the panel, so a keyboard user is where the list is.
+    afterNextRender(() => document.querySelector<HTMLElement>('#files-panel select, #files-panel button')?.focus(),
+      { injector: this.panelInjector });
+  }
+
+  closeFiles(): void {
+    if (!this.filesOpen()) return;
+    this.filesOpen.set(false);
+    // Back to the button that opened it, rather than to the top of the page.
+    this.filesTrigger?.focus?.();
+  }
+
+  onEscape(): void { this.closeFiles(); }
+
 
   private readonly storage = inject(StorageService);
   /** Server times, read and written as the rest of the console does. */
@@ -1114,6 +1141,7 @@ export class Analytics implements OnInit {
 
   openFile(entry: ObjectSummary): void {
     if (!this.readable(entry.key)) return;
+    this.closeFiles();
 
     /*
      * Clicking the file that is ALREADY open does nothing.
@@ -1153,6 +1181,7 @@ export class Analytics implements OnInit {
    * every matching file rather than one of them.
    */
   openFolderAsDataset(extension: string): void {
+    this.closeFiles();
     this.selected.set(null);
     this.load(`${this.prefix()}*.${extension}`);
   }

@@ -7,14 +7,32 @@
         engine reads the object store directly, so the browser only ever receives a page.
       </p>
     </div>
+    <!-- The file picker is a panel over the page, so the data keeps the full width. -->
+    <button type="button" class="btn btn-default btn-sm shrink-0" aria-controls="files-panel"
+            [attr.aria-expanded]="filesOpen()" (click)="openFiles($event.currentTarget)">
+      <app-icon name="folder" />Files
+    </button>
   </div>
 
-  <!-- Three columns on a wide screen, stacked below it. The rail is the same connection ->
-       folder -> file walk the Object Browser does, and uses that screen's own service. -->
-  <div class="grid gap-3 lg:grid-cols-[260px_minmax(0,1fr)]">
+  <!-- The data has the full width. The storage rail is the same connection -> folder -> file walk
+       the Object Browser does, and uses that screen's own service; it slides in from the left when
+       Files is pressed and goes away once something is picked (owner, 2026-09-28). -->
+  <div class="grid gap-3">
 
+    @if (filesOpen()) {
+      <div class="fixed inset-0 z-50 bg-black/40" aria-hidden="true" (click)="closeFiles()"></div>
+    }
     <!-- ── the storage rail ─────────────────────────────────────────────────────────── -->
-    <div class="card p-4 flex flex-col gap-2 min-w-0 self-start">
+    <div id="files-panel" role="dialog" aria-modal="true" aria-labelledby="files-panel-title"
+         class="files-panel card p-4 flex flex-col gap-2 min-w-0 fixed inset-y-0 left-0 z-50 w-[320px] max-w-[90vw]
+                rounded-none border-y-0 border-l-0 overflow-y-auto shadow-xl"
+         [class.hidden]="!filesOpen()">
+      <div class="flex items-center gap-2 -mt-1 mb-1">
+        <h2 id="files-panel-title" class="text-base font-semibold mr-auto">Files</h2>
+        <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Close files" (click)="closeFiles()">
+          <app-icon name="close" />
+        </button>
+      </div>
       <div>
         <label class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]"
                for="a-conn">Connection</label>
@@ -166,6 +184,10 @@
           <p class="mt-1 text-xs text-[color:var(--text-muted)]">
             CSV, TSV, JSON and Parquet. A whole folder can be read as one dataset.
           </p>
+          <button type="button" class="btn btn-primary btn-sm mt-4" aria-controls="files-panel"
+                  (click)="openFiles($event.currentTarget)">
+            <app-icon name="folder" />Choose a file
+          </button>
         </div>
       } @else {
 

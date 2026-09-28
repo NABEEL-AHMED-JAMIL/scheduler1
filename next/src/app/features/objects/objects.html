@@ -64,17 +64,49 @@
 
         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           @for (b of buckets(); track b.bucket) {
-            <button type="button" class="card p-4 text-left flex items-start gap-3 transition-colors
+            <!-- Each card says what the connection is and whose it is, not only its name: the
+                 bucket and region it reads, how its last test went, and who made it when. -->
+            <button type="button" class="connection-card card p-0 text-left flex flex-col transition-colors
                                          hover:border-[color:var(--border-strong)]"
+                    [attr.aria-label]="'Browse ' + b.label"
                     (click)="onBucketChange(b.bucket)">
-              <span class="stat-glyph shrink-0">
-                <app-icon [name]="providerIcon(b.provider)" />
+              <span class="flex items-start gap-3 p-4 pb-3 w-full">
+                <span class="stat-glyph shrink-0">
+                  <app-icon [name]="providerIcon(b.provider)" />
+                </span>
+                <span class="min-w-0 flex-1">
+                  <span class="block font-medium truncate" [title]="b.label">{{ b.label }}</span>
+                  <span class="block mono text-xs text-[color:var(--text-muted)] truncate"
+                        [title]="b.bucket">{{ b.bucket }}</span>
+                </span>
+                <span class="pill shrink-0" [class]="connectionTone(b.connectionStatus)">{{ connectionState(b.connectionStatus) }}</span>
               </span>
-              <span class="min-w-0 flex-1">
-                <span class="block font-medium truncate" [title]="b.label">{{ b.label }}</span>
-                <span class="block mono text-xs text-[color:var(--text-muted)] truncate"
-                      [title]="b.bucket">{{ b.bucket }}</span>
-                <span class="pill pill-neutral mt-2 inline-block">{{ b.provider }}</span>
+              @if (b.description) {
+                <span class="block px-4 text-xs text-[color:var(--text-secondary)] line-clamp-2 break-words"
+                      [title]="b.description">{{ b.description }}</span>
+              }
+              <span class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 px-4 pt-3 pb-4 text-xs w-full">
+                @if (b.bucketName) {
+                  <span class="text-[color:var(--text-muted)]">Bucket</span>
+                  <span class="mono truncate" [title]="b.bucketName">{{ b.bucketName }}</span>
+                }
+                @if (b.region) {
+                  <span class="text-[color:var(--text-muted)]">Region</span>
+                  <span class="truncate">{{ b.region }}</span>
+                }
+                <span class="text-[color:var(--text-muted)]">Provider</span>
+                <span>{{ b.provider }}</span>
+              </span>
+              <span class="mt-auto flex items-center gap-2 px-4 py-2.5 border-t border-subtle text-xs text-[color:var(--text-muted)] w-full">
+                @if (b.createdByName || b.dateCreated) {
+                  <app-icon name="user" size="0.9em" class="shrink-0" />
+                  <span class="min-w-0 truncate">
+                    Created{{ b.createdByName ? ' by ' + b.createdByName : '' }}{{ b.dateCreated ? ' · ' + (b.dateCreated | serverTime:'date') : '' }}
+                  </span>
+                }
+                <span class="ml-auto shrink-0 inline-flex items-center gap-1 font-medium text-[color:var(--text-secondary)]">
+                  Browse<app-icon name="chevronRight" size="0.9em" />
+                </span>
               </span>
             </button>
           }

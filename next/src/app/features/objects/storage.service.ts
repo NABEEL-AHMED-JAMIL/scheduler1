@@ -7,6 +7,15 @@ export interface BucketSummary {
   label: string;
   bucket: string;
   provider: string;
+  // What the connection card shows (storage-service, 2026-09-28); older servers leave them out.
+  bucketName?: string;
+  region?: string;
+  description?: string;
+  /** How the last connection test went: SUCCESS, FAILED or UNTESTED. */
+  connectionStatus?: string;
+  /** Server wall-clock, like every timestamp this API sends. */
+  dateCreated?: string;
+  createdByName?: string;
 }
 
 export interface ObjectSummary {
