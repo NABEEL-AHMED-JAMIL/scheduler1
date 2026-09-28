@@ -35,6 +35,7 @@ import {
 } from './analytics.service';
 import { ToastService } from '../../shared/ui/toast.service';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
+import { formatDuration } from '../../shared/ui/time-format';
 
 /**
  * The tabs a dataset is read through -- document 02's ten.
@@ -2026,7 +2027,7 @@ export class Analytics implements OnInit {
   modifiedAt(): string {
     const raw = this.selected()?.lastModified;
     if (!raw) return '';
-    return this.timeOf(raw, 'd MMM yyyy, HH:mm');
+    return this.timeOf(raw, 'dateTime');
   }
 
   /**
@@ -3105,7 +3106,7 @@ export class Analytics implements OnInit {
   runWhen(run: QueryRun): string {
     const raw = run.dateCreated;
     if (!raw) return '';
-    return this.timeOf(raw, 'd MMM yyyy, HH:mm');
+    return this.timeOf(raw, 'dateTime');
   }
 
   /**
@@ -3116,10 +3117,12 @@ export class Analytics implements OnInit {
    * response time, because the two differ most exactly when the module is under load.
    */
   runTook(run: QueryRun): string {
-    const ms = run.durationMs;
-    if (ms === null || ms === undefined) return '';
-    return ms < 1000 ? `${ms} ms` : `${(ms / 1000).toLocaleString(undefined,
-      { maximumFractionDigits: 1 })} s`;
+    return this.took(run.durationMs);
+  }
+
+  /** Milliseconds as the console writes a duration ("340ms", "4.2s"); nothing when unmeasured. */
+  took(ms: number | null | undefined): string {
+    return ms === null || ms === undefined ? '' : formatDuration(ms / 1000);
   }
 
   /**
@@ -5008,6 +5011,6 @@ export class Analytics implements OnInit {
   analysisWhen(saved: SavedAnalysis): string {
     const raw = saved.dateUpdated || saved.dateCreated;
     if (!raw) return '';
-    return this.timeOf(raw, 'd MMM yyyy, HH:mm');
+    return this.timeOf(raw, 'dateTime');
   }
 }

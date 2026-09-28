@@ -7,6 +7,7 @@ import { formatSize } from '../../shared/ui/format-size';
 import { BarChart, Bar } from '../../shared/charts/bar-chart';
 import { RankedBar } from '../../shared/charts/ranked-bar';
 import { readableCell } from '../../shared/charts/number-format';
+import { dayLabel, formatDuration } from '../../shared/ui/time-format';
 import { AnalyticsService, AnalysisRequest, DatasetOverview as OverviewData, DatasetProfile, OverviewChart } from './analytics.service';
 import { AnalyticsWidget, WidgetState } from './analytics-widget';
 import { WidgetChart } from './widget-chart';
@@ -52,7 +53,7 @@ interface OverviewTile { chart: OverviewChart; view: WidgetView | null; kind: st
       </div>
     } @else {
       <div class="flex items-center justify-between gap-2 mt-4 mb-2">
-        <p class="text-xs text-[color:var(--text-muted)]">{{ tiles().length }} chart{{ tiles().length === 1 ? '' : 's' }} chosen from the columns, read in {{ overview()?.durationMs ?? 0 }} ms. Each opens in the Canvas as the analysis it is.</p>
+        <p class="text-xs text-[color:var(--text-muted)]">{{ tiles().length }} chart{{ tiles().length === 1 ? '' : 's' }} chosen from the columns, read in {{ took() }}. Each opens in the Canvas as the analysis it is.</p>
         <button type="button" class="btn btn-default btn-sm" (click)="load(true)" [disabled]="loading()"><app-icon name="refresh" [class.spin]="loading()" />Refresh</button>
       </div>
       <div class="widget-grid">
@@ -106,6 +107,8 @@ export class DatasetOverview {
   readonly loading = signal(false);
   readonly error = signal('');
   readonly overview = signal<OverviewData | null>(null);
+  /** How long the engine took to read the overview, as the console writes a duration. */
+  readonly took = computed(() => formatDuration((this.overview()?.durationMs ?? 0) / 1000));
   private inFlight: Subscription | null = null;
 
   readonly figure = (value: number): string => readableCell(String(value));
@@ -172,8 +175,9 @@ export class DatasetOverview {
     if (tile.chart.kind === 'spread') return `${tile.chart.distribution?.bins?.length ?? 0} ${tile.chart.distribution?.exactValues ? 'values' : 'bins'}`;
     if (tile.chart.kind === 'completeness') return `${tile.view?.rowCount ?? 0} column${tile.view?.rowCount === 1 ? '' : 's'} with gaps`;
     const grain = tile.chart.request?.grains?.[0];
-    const span = tile.chart.kind === 'rowsOverTime' && tile.chart.result?.rows?.length
-      ? ` · ${String(tile.chart.result.rows[0][0]).slice(0, 10)} to ${String(tile.chart.result.rows[tile.chart.result.rows.length - 1][0]).slice(0, 10)}` : '';
+    const rows = tile.chart.result?.rows ?? [];
+    const span = tile.chart.kind === 'rowsOverTime' && rows.length
+      ? ` · ${spanDate(String(rows[0][0]), grain)} to ${spanDate(String(rows[rows.length - 1][0]), grain)}` : '';
     return `${tile.view?.rowCount ?? 0} row${tile.view?.rowCount === 1 ? '' : 's'}${grain ? ' · by ' + grain.toLowerCase() : ''}${span}${tile.view?.truncated ? ' · partial' : ''}`;
   }
   valueBars(d: NonNullable<OverviewChart['distribution']>): { name: string; value: number }[] {
@@ -188,15 +192,23 @@ export class DatasetOverview {
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /**
- * A bucket's date as a line has room for -- six characters a label. A day keeps "09-01" (the
- * year is in the tile's foot); a month reads "Sep 26"; a quarter "Q3 26"; a year itself.
+ * A bucket's date as a line has room for. A day (or a week, by its first day) reads "1 Sep", the
+ * console's short day, with the year in the tile's foot; a month "Sep 2026"; a quarter "Q3 2026";
+ * a year itself. The day used to be "09-01" and the month "Sep 26" -- which, beside days written
+ * "24 Sep", reads as the 26th of September.
  */
 export function shortDate(name: string, grain: string | null | undefined): string {
   const y = name.slice(0, 4), m = Number(name.slice(5, 7));
-  if (grain === 'MONTH') return m >= 1 && m <= 12 ? `${MONTHS[m - 1]} ${y.slice(2)}` : name.slice(0, 7);
-  if (grain === 'QUARTER') return m >= 1 && m <= 12 ? `Q${Math.ceil(m / 3)} ${y.slice(2)}` : name.slice(0, 7);
+  if (grain === 'MONTH') return m >= 1 && m <= 12 ? `${MONTHS[m - 1]} ${y}` : name.slice(0, 7);
+  if (grain === 'QUARTER') return m >= 1 && m <= 12 ? `Q${Math.ceil(m / 3)} ${y}` : name.slice(0, 7);
   if (grain === 'YEAR') return y;
-  return name.slice(5, 10);
+  const day = dayLabel(name);
+  return day === name ? name : day.replace(/ \d{4}$/, '');
+}
+
+/** The ends of a tile's time span in its foot: a whole day ("1 Sep 2026"), or the bucket's own name. */
+function spanDate(name: string, grain: string | null | undefined): string {
+  return grain === 'MONTH' || grain === 'QUARTER' || grain === 'YEAR' ? shortDate(name, grain) : dayLabel(name);
 }
 
 function emptyView(): WidgetView {

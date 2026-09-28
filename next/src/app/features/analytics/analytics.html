@@ -1117,7 +1117,7 @@
                     @if (analysisResult()!.durationMs !== null
                          && analysisResult()!.durationMs !== undefined) {
                       <span class="text-[color:var(--text-muted)]">
-                        {{ analysisResult()!.durationMs }} ms in the engine
+                        {{ took(analysisResult()!.durationMs) }} in the engine
                       </span>
                     }
                   </div>

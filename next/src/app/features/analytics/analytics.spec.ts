@@ -1786,7 +1786,7 @@ describe('the run history', () => {
     const text = console.show();
 
     expect(text).toContain('ran');
-    expect(text).toContain('340 ms');
+    expect(text).toContain('340ms');
     expect(text).toContain('1 rows');
     expect(text).toContain('select sum(amount) from dataset');
   });
@@ -1815,8 +1815,10 @@ describe('the run history', () => {
 
   it('writes a duration in the unit a reader can hold', () => {
     const console = consoleWith();
-    expect(console.studio.runTook(runOf({ durationMs: 340 }))).toBe('340 ms');
-    expect(console.studio.runTook(runOf({ durationMs: 4200 }))).toBe('4.2 s');
+    // The console's one way of writing a duration (MIG-295), not "340 ms" and "4.2 s".
+    expect(console.studio.runTook(runOf({ durationMs: 340 }))).toBe('340ms');
+    expect(console.studio.runTook(runOf({ durationMs: 4200 }))).toBe('4.2s');
+    expect(console.studio.runTook(runOf({ durationMs: 200_000 }))).toBe('3m 20s');
     expect(console.studio.runTook(runOf({ durationMs: null }))).toBe('');
   });
 

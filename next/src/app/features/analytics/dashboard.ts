@@ -2236,12 +2236,12 @@ export class Dashboards implements OnInit, OnDestroy {
    */
   when(raw: string | undefined): string {
     if (!raw) return '';
-    return this.timeOf(raw, 'd MMM yyyy, HH:mm');
+    return this.timeOf(raw, 'dateTime');
   }
 
   /** The time a tile ran, to the second: a figure with no time against it is a figure on trust. */
   clock(at: number): string {
-    return this.timeOf(new Date(at), 'HH:mm:ss');
+    return this.timeOf(new Date(at), 'timeSec');
   }
 }
 
