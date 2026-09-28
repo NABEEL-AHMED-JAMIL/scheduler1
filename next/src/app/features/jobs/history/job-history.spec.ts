@@ -3,9 +3,11 @@ import { describe, it, expect } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { of } from 'rxjs';
+import { signal } from '@angular/core';
+import { Subject, of } from 'rxjs';
 import { JobHistory } from './job-history';
 import { ToastService } from '../../../shared/ui/toast.service';
+import { JobEventsService } from '../../../core/socket/job-events.service';
 
 function history(route: { jobId?: string; targetDate?: string; targetHr?: string } = { jobId: '41' }) {
   TestBed.resetTestingModule();
@@ -14,6 +16,7 @@ function history(route: { jobId?: string; targetDate?: string; targetHr?: string
     { provide: Router, useValue: { navigate: () => {} } },
     { provide: ToastService, useValue: { success: () => {}, error: () => {}, info: () => {} } },
     { provide: AuthService, useValue: { canManageTasks: () => true } },
+    { provide: JobEventsService, useValue: { events: new Subject(), connected: signal(false) } },
   ] });
   const component = TestBed.runInInjectionContext(() => new JobHistory());
   (component as any).jobId = () => route.jobId ?? '';

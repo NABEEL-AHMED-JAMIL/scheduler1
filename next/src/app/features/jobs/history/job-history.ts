@@ -1,9 +1,12 @@
-import { Component, computed, effect, inject, input, signal } from '@angular/core';
+import { Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Subscription, debounceTime, filter } from 'rxjs';
 
 import { Router, RouterLink } from '@angular/router';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { AuthService } from '../../../core/auth/auth.service';
+import { JobEventsService } from '../../../core/socket/job-events.service';
 import { TableShell } from '../../../shared/ui/data-table';
 import { StatusPill } from '../../../shared/ui/status-pill';
 import { StatusFilterChip } from '../../../shared/ui/status-filter-chip';
@@ -92,6 +95,13 @@ export class JobHistory {
   protected readonly canManageTasks = computed(() => this.auth.canManageTasks());
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
+  private readonly jobEvents = inject(JobEventsService);
+
+  /** Shown as "Live" beside Refresh: while the feed is up, new runs arrive without a click. */
+  readonly live = this.jobEvents.connected;
+  private request?: Subscription;
+  private everConnected = false;
+  private missedEvents = false;
 
   readonly runs = signal<JobQueue[]>([]);
   readonly loading = signal(true);
@@ -286,6 +296,33 @@ export class JobHistory {
       this.loadDetail();
     });
 
+    /*
+     * The screen people watch while a job runs, so it follows the job-status feed the way Queue
+     * does. A push is re-read rather than patched in: Queue, Start and Running pushes carry no
+     * run id, and a new run is not in the list at all. Debounced, because one run sends four
+     * pushes a few seconds apart and that burst should cost one read. An hour drill-down across
+     * every job follows every job; otherwise only this job's pushes matter.
+     */
+    this.jobEvents.events.pipe(
+      filter(event => event.type === 'job.status'
+        && (this.isAllJobs() || String(event.jobId) === this.jobId())),
+      debounceTime(1000),
+      takeUntilDestroyed(),
+    ).subscribe(() => this.load({ silent: true }));
+
+    // Pushes lost while the socket was down are not replayed, so a gap costs one re-read.
+    effect(() => {
+      if (!this.jobEvents.connected()) {
+        if (this.everConnected) this.missedEvents = true;
+        return;
+      }
+      this.everConnected = true;
+      if (this.missedEvents) {
+        this.missedEvents = false;
+        this.load({ silent: true });
+      }
+    });
+
     // The list endpoint is the only place the job's name is available.
     this.http.get<ApiResponse<any[]>>(`${API_BASE}/sourceJob.json/listSourceJob`).subscribe({
       next: response => {
@@ -308,9 +345,19 @@ export class JobHistory {
   /** True when drilling into an hour across every job rather than into one job. */
   readonly isAllJobs = computed(() => !this.jobId());
 
-  load(): void {
-    this.loading.set(true);
-    this.error.set('');
+  /**
+   * @param silent a re-read the reader did not ask for (a status push): the rows on screen stay
+   *               put rather than blanking under the table's loading state, and a failed re-read
+   *               keeps them instead of swapping them for an error.
+   */
+  load(options: { silent?: boolean } = {}): void {
+    // Untracked: the route effect calls this, and reading the rows there would make every
+    // answer that lands re-run the effect and read again.
+    const silent = !!options.silent && untracked(() => this.runs().length > 0);
+    if (!silent) {
+      this.loading.set(true);
+      this.error.set('');
+    }
     if (!this.isDrillDown() && !this.jobId()) {
       // Nothing identifies what to show. Reachable only by hand-editing the URL.
       // A prompt, not an error: the empty message says what to do (emptyMessage).
@@ -335,10 +382,16 @@ export class JobHistory {
           `${API_BASE}/sourceJob.json/fetchSourceJobQueueListWithJobId`,
           { params: { jobId: this.jobId() } });
 
-    request.subscribe({
+    // Only the latest read may land: a push arriving mid-read must not let an older answer
+    // overwrite a newer one.
+    this.request?.unsubscribe();
+    this.request = request.subscribe({
       next: response => {
         this.loading.set(false);
-        if (response.status !== API_SUCCESS) { this.error.set(response.message); return; }
+        if (response.status !== API_SUCCESS) {
+          if (!silent) this.error.set(response.message);
+          return;
+        }
         const data = response.data ?? {};
         // The two endpoints name the same list differently.
         this.runs.set(data.sourceJobQueues ?? data.jobQueues ?? []);
@@ -346,7 +399,7 @@ export class JobHistory {
       },
       error: err => {
         this.loading.set(false);
-        this.error.set(err?.error?.message || 'Could not load the run history.');
+        if (!silent) this.error.set(err?.error?.message || 'Could not load the run history.');
       },
     });
   }

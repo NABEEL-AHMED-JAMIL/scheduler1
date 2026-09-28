@@ -1,8 +1,8 @@
 <div class="page">
   <div>
     <a routerLink="/operations/jobs" class="text-sm text-accent hover:underline">← Back to jobs</a>
-    <!-- A header Refresh, laid out as Run logs has it: this is the screen people watch while
-         a job runs, and it had no way to re-read short of reloading the page. -->
+    <!-- The screen people watch while a job runs: it follows the job-status feed (Live), and
+         the header Refresh, laid out as Run logs has it, stays for when the feed is down. -->
     <div class="flex items-start gap-3">
       <h1 class="page-title mt-1 mr-auto">
         Run history
@@ -10,9 +10,17 @@
           <span class="text-[color:var(--text-secondary)] font-normal">— {{ jobName() }}</span>
         }
       </h1>
-      <button type="button" class="btn btn-default btn-sm mt-1 shrink-0" (click)="load()" [disabled]="loading()">
-        <app-icon name="refresh" [class.spin]="loading()" />Refresh
-      </button>
+      <div class="flex items-center gap-2 mt-1 shrink-0">
+        @if (live()) {
+          <span class="inline-flex items-center gap-1.5 text-[11px] text-[color:var(--text-muted)] mr-1"
+                title="Connected — new runs appear as the pipeline reports them">
+            <span class="live-dot live-on"></span>Live
+          </span>
+        }
+        <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
+          <app-icon name="refresh" [class.spin]="loading()" />Refresh
+        </button>
+      </div>
     </div>
     <p class="page-subtitle">
       @if (isDrillDown()) {
