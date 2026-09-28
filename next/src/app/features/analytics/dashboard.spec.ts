@@ -2306,7 +2306,8 @@ describe('how a board lays out its widgets', () => {
     const tiles = [...el.querySelectorAll<HTMLElement>('.dash-grid > app-analytics-widget')];
     expect(tiles.map(tile => tile.dataset['span'])).toEqual(['3', '6', '12']);
     expect(tiles[0].classList).toContain('lg:col-span-3');
-    expect(tiles[1].classList).toContain('lg:col-span-6');
+    // The chart fills the row the figure started, since the table after it cannot fit (fillRows).
+    expect(tiles[1].classList).toContain('lg:col-span-9');
     expect(tiles[2].classList).toContain('sm:col-span-12');
     // Grid children shrink below their content only when told to.
     for (const tile of tiles) expect(tile.classList).toContain('min-w-0');

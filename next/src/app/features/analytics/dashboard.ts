@@ -1056,14 +1056,33 @@ export const TILE_ROWS = 5;
 export type WidgetSpan = 3 | 6 | 12;
 
 /**
- * The column classes for each width, written out whole so Tailwind finds them in this file.
- * One column on a phone; from sm up a figure takes half and anything else the row; from lg up a
- * figure is a quarter, a chart a half and a table the whole row.
+ * Widths within a row of twelve, in board order: the last tile of a row stretches to the row's end
+ * whenever the next tile cannot fit beside it, and the last row is filled too. A figure (3) beside
+ * a chart (6) with a table after them left a quarter of the row empty.
  */
-const SPAN_CLASSES: Record<WidgetSpan, string> = {
-  3: 'min-w-0 sm:col-span-6 lg:col-span-3',
-  6: 'min-w-0 sm:col-span-12 lg:col-span-6',
-  12: 'min-w-0 sm:col-span-12',
+export function fillRows(spans: readonly number[]): number[] {
+  const out = [...spans];
+  let used = 0;
+  for (let i = 0; i < out.length; i++) {
+    if (used > 0 && used + out[i] > 12) {
+      out[i - 1] += 12 - used;
+      used = 0;
+    }
+    used += out[i];
+    if (used >= 12) used = 0;
+  }
+  if (used > 0 && out.length) out[out.length - 1] += 12 - used;
+  return out;
+}
+
+/**
+ * The column classes, written out whole so Tailwind finds them in this file. One column on a phone;
+ * from sm up a figure takes half and anything else the row; from lg up a figure is a quarter, a
+ * chart a half and a table the whole row -- each row then filled by fillRows.
+ */
+const SM_SPAN: Record<number, string> = { 6: 'sm:col-span-6', 12: 'sm:col-span-12' };
+const LG_SPAN: Record<number, string> = {
+  3: 'lg:col-span-3', 6: 'lg:col-span-6', 9: 'lg:col-span-9', 12: 'lg:col-span-12',
 };
 
 /** The kinds that are a grid of rows, and so need the whole width to be read. */
@@ -1919,8 +1938,20 @@ export class Dashboards implements OnInit, OnDestroy {
     return ROW_KINDS.has(kind) || !KINDS.some(known => known.id === kind) ? 12 : 6;
   }
 
+  /** Each widget's widths at sm and lg, with every row filled (fillRows). */
+  private readonly filledSpans = computed(() => {
+    const widgets = this.widgets();
+    const natural = widgets.map(widget => this.spanOf(widget));
+    const sm = fillRows(natural.map(span => (span === 3 ? 6 : 12)));
+    const lg = fillRows(natural);
+    return new Map(widgets.map((widget, i) => [widget, { sm: sm[i], lg: lg[i] }]));
+  });
+
   spanClass(widget: DashboardWidget): string {
-    return SPAN_CLASSES[this.spanOf(widget)];
+    const filled = this.filledSpans().get(widget);
+    const sm = filled?.sm ?? (this.spanOf(widget) === 3 ? 6 : 12);
+    const lg = filled?.lg ?? this.spanOf(widget);
+    return `min-w-0 ${SM_SPAN[sm] ?? 'sm:col-span-12'} ${LG_SPAN[lg] ?? 'lg:col-span-12'}`;
   }
 
   /** How many rows the tile's table draws: TILE_ROWS, or all of them once "Show all" is pressed. */
