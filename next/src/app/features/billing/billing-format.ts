@@ -2,6 +2,7 @@
  * How billing figures read on every billing screen -- one place, so a rate on Cost & usage,
  * on an invoice and on a rate card is the same string, and a byte count is never "0 GB".
  */
+import { formatDate } from '@angular/common';
 
 /** A byte meter is counted in bytes and priced per GB: the `per` a rate card carries for it. */
 export const BYTES_PER_GB = 1024 * 1024 * 1024;
@@ -103,10 +104,17 @@ export function daysInMonth(d: Date): number { return new Date(d.getFullYear(), 
 /** "2026-09": the month a period is closed under. */
 export function yearMonth(d: Date): string { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
 
-/** "2026-09" (or a first-of-month date) as the console writes a month: "Sep 2026". */
+/**
+ * "2026-09" (or a first-of-month date) as a chart's axis writes a month: "Sep 2026", the month as
+ * "24 Sep 2026" abbreviates it. Only where twelve bars share an axis; a billing period in a list or
+ * a heading is the full 'month' format from time-format.ts, "September 2026" (MIG-295).
+ *
+ * Through Angular's formatDate, which reads "2026-09-01" as that calendar day, rather than
+ * toLocaleDateString, which follows the browser's language instead of the console's.
+ */
 export function monthShort(month: string): string {
-  const [y, m] = month.split('-').map(Number);
-  return new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+  const match = /^(\d{4})-(\d{2})/.exec(month ?? '');
+  return match ? formatDate(`${match[1]}-${match[2]}-01`, 'MMM yyyy', 'en-US') : String(month ?? '');
 }
 
 /** The viewer's own calendar day as yyyy-MM-dd. toISOString() is UTC, and in the evening already says tomorrow. */

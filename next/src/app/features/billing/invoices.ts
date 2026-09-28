@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, LOCALE_ID, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
@@ -10,7 +10,8 @@ import { ToastService } from '../../shared/ui/toast.service';
 import { Icon } from '../../shared/ui/icon';
 import { StatTile } from '../../shared/ui/stat-tile';
 import { BillingApi, InvoiceRow, INVOICE_STATUSES, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE } from './billing.service';
-import { MoneyTotals, addMoney, daysOverdue, formatMoney, formatTotals, yearMonth, monthShort } from './billing-format';
+import { MoneyTotals, addMoney, daysOverdue, formatMoney, formatTotals, yearMonth } from './billing-format';
+import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { BillingAccountDialog } from './billing-account-dialog';
 import { InvoicePane } from './invoice-detail';
 import { WorkspacePicker } from './workspace-picker';
@@ -32,6 +33,7 @@ export class Invoices implements OnInit {
   private readonly toast = inject(ToastService);
   private readonly dialog = inject(Dialog);
   private readonly router = inject(Router);
+  private readonly clock = new ServerTimePipe(inject(LOCALE_ID));
   private readonly route = inject(ActivatedRoute);
   readonly workspaces = inject(WorkspacePicker);
 
@@ -117,7 +119,8 @@ export class Invoices implements OnInit {
   clearFilters(): void { this.search.set(''); this.status.set(''); }
   money(v: number, currency = 'USD'): string { return formatMoney(v, currency); }
   totals(t: MoneyTotals): string { return formatTotals(t); }
-  period(r: InvoiceRow): string { return monthShort(r.periodStart); }
+  /** The billing period as the invoice itself heads it, "September 2026" (MIG-295). */
+  period(r: InvoiceRow): string { return this.clock.transform(r.periodStart, 'month') ?? r.periodStart; }
   overdueDays(r: InvoiceRow): number { return daysOverdue(r.dueAt); }
   /** The rail's dot: what the row's state means for the reader. */
   tone(r: InvoiceRow): string {

@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, LOCALE_ID, OnInit, computed, inject, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { API_SUCCESS } from '../../core/api/api.config';
@@ -43,7 +43,10 @@ export class Billing implements OnInit {
 
   /** The month on screen, as its first day. */
   readonly month = signal(firstOfMonth(new Date()));
-  readonly monthLabel = computed(() => new Date(this.month() + 'T00:00:00').toLocaleDateString(undefined, { month: 'long', year: 'numeric' }));
+  /** Months and days as the console writes them (MIG-295); month() is a calendar day, which the pipe keeps on its own day. */
+  private readonly clock = new ServerTimePipe(inject(LOCALE_ID));
+  /** "September 2026". It went through toLocaleDateString, so it followed the browser's language, not the console's. */
+  readonly monthLabel = computed(() => this.clock.transform(this.month(), 'month') ?? '');
   readonly isCurrentMonth = computed(() => this.month() === firstOfMonth(new Date()));
 
   readonly loading = signal(false);
@@ -120,7 +123,8 @@ export class Billing implements OnInit {
 
   // ---- by day, stacked by service ----
   readonly dayBars = computed<Bar[]>(() => this.days().map(d => ({
-    name: d.day.slice(5),
+    // "16 Sep", not the raw "09-16" cut from the ISO day, which read as a US month-first date.
+    name: this.clock.transform(d.day, 'day') ?? d.day,
     value: Math.round(d.amount * 100) / 100,
     segments: Object.entries(d.byService).map(([service, amount]) => ({ label: service, value: Math.round(amount * 100) / 100, color: this.serviceColor().get(service) ?? chartColor(5) })),
   })));
@@ -145,7 +149,8 @@ export class Billing implements OnInit {
     this.load();
   }
 
-  readonly previousLabel = computed(() => { const d = new Date(this.month() + 'T00:00:00'); d.setMonth(d.getMonth() - 1); return d.toLocaleDateString(undefined, { month: 'short' }); });
+  /** The month before, named in full ("August 2026") as every billing period is, not a bare "Aug". */
+  readonly previousLabel = computed(() => { const d = new Date(this.month() + 'T00:00:00'); d.setMonth(d.getMonth() - 1); return this.clock.transform(firstOfMonth(d), 'month') ?? ''; });
 
   /** The month on screen as a range, for the platform administrator's picked workspace. */
   private query(month = this.month()): UsageQuery {
