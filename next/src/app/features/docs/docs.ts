@@ -3,6 +3,7 @@ import { RouterLink } from '@angular/router';
 import { Icon } from '../../shared/ui/icon';
 import { BrandMark } from '../../shared/ui/brand-mark';
 import { ThemeService } from '../../core/theme.service';
+import { AuthService } from '../../core/auth/auth.service';
 
 interface Section { id: string; title: string; }
 
@@ -71,7 +72,13 @@ interface Step {
                     (click)="theme.toggle()">
               <app-icon [name]="theme.theme() === 'dark' ? 'sun' : 'moon'" />
             </button>
-            <a routerLink="/login" class="btn btn-primary btn-sm">Sign in</a>
+            <!-- The guide is linked from the console's account menu, so a reader may well be signed
+                 in already; telling them to sign in again was wrong. -->
+            @if (auth.isLoggedIn()) {
+              <a routerLink="/dashboard" class="btn btn-primary btn-sm">Back to console</a>
+            } @else {
+              <a routerLink="/login" class="btn btn-primary btn-sm">Sign in</a>
+            }
           </div>
         </div>
       </header>
@@ -105,6 +112,19 @@ interface Step {
             run before a task exists, and a task cannot write anywhere before a storage
             connection does.
           </p>
+
+          <!-- The side contents only fit from lg up; below that the same list folds away here. -->
+          <details #tocSmall class="lg:hidden mt-6 card p-4">
+            <summary class="text-sm font-medium cursor-pointer">On this page</summary>
+            <ul class="mt-3 flex flex-col gap-1.5 text-sm">
+              @for (s of sections; track s.id) {
+                <li>
+                  <a class="text-[color:var(--text-secondary)] hover:underline"
+                     [href]="'#' + s.id" (click)="jump($event, s.id); tocSmall.open = false">{{ s.title }}</a>
+                </li>
+              }
+            </ul>
+          </details>
 
           <div class="mt-6 card p-4 flex items-start gap-2.5">
             <app-icon name="info" class="icon-info mt-0.5 shrink-0" />
@@ -245,12 +265,19 @@ interface Step {
             <div class="min-w-0">
               <h2 class="text-base font-semibold">That is the whole setup</h2>
               <p class="mt-1 text-sm text-[color:var(--text-secondary)]">
-                Sign in and work down the list. Each screen names what it needs.
+                {{ auth.isLoggedIn() ? 'Work down the list in the console.' : 'Sign in and work down the list.' }}
+                Each screen names what it needs.
               </p>
             </div>
-            <a routerLink="/login" class="btn btn-primary ml-auto">
-              Sign in<app-icon name="arrowRight" size="0.95em" />
-            </a>
+            @if (auth.isLoggedIn()) {
+              <a routerLink="/dashboard" class="btn btn-primary ml-auto">
+                Back to console<app-icon name="arrowRight" size="0.95em" />
+              </a>
+            } @else {
+              <a routerLink="/login" class="btn btn-primary ml-auto">
+                Sign in<app-icon name="arrowRight" size="0.95em" />
+              </a>
+            }
           </section>
         </main>
       </div>
@@ -258,7 +285,11 @@ interface Step {
       <footer class="mt-auto border-t border-subtle">
         <div class="mx-auto w-full max-w-6xl px-5 py-6 flex flex-wrap items-center gap-3">
           <a routerLink="/" class="link-inline text-sm">← Back to the front page</a>
-          <a routerLink="/login" class="link-inline ml-auto text-sm">Sign in</a>
+          @if (auth.isLoggedIn()) {
+            <a routerLink="/dashboard" class="link-inline ml-auto text-sm">Back to console</a>
+          } @else {
+            <a routerLink="/login" class="link-inline ml-auto text-sm">Sign in</a>
+          }
         </div>
       </footer>
     </div>
@@ -266,6 +297,7 @@ interface Step {
 })
 export class Docs implements AfterViewInit {
   readonly theme = inject(ThemeService);
+  readonly auth = inject(AuthService);
   private readonly host = inject(ElementRef<HTMLElement>);
   // inject() only works in an injection context, so DestroyRef is taken here rather than
   // inside ngAfterViewInit, where the call would throw.
@@ -436,7 +468,7 @@ export class Docs implements AfterViewInit {
     {
       id: 'report', title: 'Report on what happened',
       intro: 'Runs roll up into a report you can group and measure, then take away.',
-      where: 'Reports',
+      where: 'Operations → Reports',
       notes: [
         'The task table has a column per outcome — Completed, Failed, Interrupted, Skipped, Missed — '
         + 'so a task that was skipped six times this week shows six skipped runs, not six fewer.',
