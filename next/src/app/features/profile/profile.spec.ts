@@ -63,3 +63,25 @@ describe('Profile for a tenant user without Source Jobs', () => {
     expect(again.canOpenJobs()).toBe(false);
   });
 });
+
+// MIG-295: a run on the profile reads as it does on Jobs and Queue, and one still going is timed
+// from the server's clock rather than from the reader's.
+describe('Profile run durations', () => {
+  it('writes how long a run took with the console-wide duration words', () => {
+    const { component } = profile();
+    expect(component.runDuration({ startTime: '2026-09-24T22:00:00', endTime: '2026-09-24T22:00:25.300' } as any)).toBe('25.3s');
+    expect(component.runDuration({ startTime: '2026-09-24T22:00:00', endTime: '2026-09-24T22:03:20' } as any)).toBe('3m 20s');
+    expect(component.runDuration({ startTime: '2026-09-24T21:00:00', endTime: '2026-09-24T22:05:00' } as any)).toBe('1h 5m');
+    expect(component.runDuration({} as any)).toBe('');
+  });
+
+  it('times a run still going from the server clock, not the reader own', () => {
+    vi.useFakeTimers();
+    try {
+      // 17:00 on the server's clock (America/Chicago, CDT) is 22:00Z; two minutes later is 22:02Z.
+      vi.setSystemTime(new Date('2026-09-24T22:02:00Z'));
+      const { component } = profile();
+      expect(component.runDuration({ startTime: '2026-09-24T17:00:00' } as any)).toBe('2m');
+    } finally { vi.useRealTimers(); }
+  });
+});
