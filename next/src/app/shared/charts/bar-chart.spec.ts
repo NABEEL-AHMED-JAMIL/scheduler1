@@ -114,6 +114,23 @@ describe('BarChart axis labels', () => {
   });
 
   /**
+   * The anchoring was text-align, which a line wider than its box ignores: it overflows to the
+   * right whatever the alignment, so the last date still hung a few px off the card. A flex box
+   * justified to the end overflows toward the start.
+   */
+  it('anchors with flex, which also holds for a label wider than its bar', () => {
+    TestBed.resetTestingModule();
+    const fixture = TestBed.configureTestingModule({ imports: [Host] }).createComponent(Host);
+    fixture.componentInstance.data.set(days(31));
+    fixture.detectChanges();
+    const labels = [...(fixture.nativeElement as HTMLElement).querySelectorAll('button > span:last-child')];
+    expect(labels[0].classList).toContain('justify-start');
+    expect(labels[30].classList).toContain('justify-end');
+    expect(labels[30].classList).toContain('flex');
+    expect(labels[30].classList).not.toContain('text-right');
+  });
+
+  /**
    * Labels used to be drawn only when newGroup AND labelled were both true, and the two rules
    * were computed independently. On job history -- 24 runs whose names are dates, ten on one
    * day and fourteen on the next -- the intersection was a single index, so the axis carried

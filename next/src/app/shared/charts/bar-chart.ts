@@ -148,11 +148,14 @@ const RESERVE_AXIS_ONLY = 18;
             <!-- The label overflows its own cell on purpose: at a 14px pitch no date fits, and
                  the neighbours it spills over are empty by construction. The edge labels are
                  anchored inward instead so they do not hang off the card. -->
-            <span class="block text-[10px] text-[color:var(--text-muted)] w-full h-3.5
+            <!-- Flex, not text-align: a line wider than its box overflows to the right whatever
+                 text-align says, so the last label hung off the card by a few px. A flex-end item
+                 overflows toward the start instead. -->
+            <span class="flex text-[10px] text-[color:var(--text-muted)] w-full h-3.5
                          leading-[0.875rem] overflow-visible"
-                  [class.text-center]="bar.align === 'center'"
-                  [class.text-left]="bar.align === 'start'"
-                  [class.text-right]="bar.align === 'end'">
+                  [class.justify-center]="bar.align === 'center'"
+                  [class.justify-start]="bar.align === 'start'"
+                  [class.justify-end]="bar.align === 'end'">
               @if (bar.labelled) {
                 <span class="whitespace-nowrap">{{ bar.name }}</span>
               }
