@@ -24,6 +24,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { JobEventsService } from '../../core/socket/job-events.service';
 import { UnreadCountService } from '../../core/notifications/unread-count.service';
 import { AuthService } from '../../core/auth/auth.service';
+import { workspaceName } from '../../shared/ui/workspace-name';
 
 const WEEKDAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const WEEKDAY = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -75,6 +76,13 @@ export class Dashboard implements OnInit {
    * access profile) every count landed on /unauthorized, so for them they are figures, not links.
    */
   readonly canOpenJobs = computed(() => this.auth.canOpen('jobs'));
+  /**
+   * A platform administrator's hour lists every workspace's jobs, and two workspaces can each have
+   * a "Nightly import" (review dashboard#17), so they get a Workspace column. Everyone else's hour
+   * is one workspace, where the column would repeat the same name on every row.
+   */
+  readonly seesWorkspaces = computed(() => this.auth.isPlatformAdmin());
+  workspaceName(row: JobBreakdown): string { return workspaceName(row); }
   private readonly injector = inject(Injector);
 
   /** What the date boxes hold, which may be half-edited. */
@@ -209,8 +217,15 @@ export class Dashboard implements OnInit {
   readonly drillHeading = computed(() => {
     const cell = this.selectedCell();
     if (!cell) return '';
-    return 'Jobs on ' + (cell.day ? cell.day + ' ' : '') + dayLabel(cell.date) + ', ' + hourRange(cell.hr);
+    const whose = this.drillAllWorkspaces() ? 'Jobs in all workspaces on ' : 'Jobs on ';
+    return whose + (cell.day ? cell.day + ' ' : '') + dayLabel(cell.date) + ', ' + hourRange(cell.hr);
   });
+
+  /**
+   * Whether this hour adds up every workspace. The server says so on the TOTAL row, for a platform
+   * administrator only (MIG-296); the page's scopeLabel is about the range's totals, not this hour.
+   */
+  readonly drillAllWorkspaces = computed(() => this.breakdown().some(row => !!row.allWorkspaces));
 
   /** "24 Sep 2026" from the ISO day the range is held in, for the subtitle. */
   readonly dayLabel = dayLabel;
@@ -251,8 +266,11 @@ export class Dashboard implements OnInit {
     const rows = this.breakdownRows();
     const term = this.breakdownSearch().trim().toLowerCase();
     if (!term) return rows;
+    // The workspace only where its column shows, or a row would match on something nobody can see.
+    const workspaces = this.seesWorkspaces();
     return rows.filter(row =>
-      String(row.jobId).includes(term) || (row.jobName ?? '').toLowerCase().includes(term));
+      String(row.jobId).includes(term) || (row.jobName ?? '').toLowerCase().includes(term)
+      || (workspaces && workspaceName(row).toLowerCase().includes(term)));
   });
 
   ngOnInit(): void {

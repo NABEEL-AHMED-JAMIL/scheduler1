@@ -10,12 +10,20 @@ import { API_BASE, ApiResponse } from '../../core/api/api.config';
 export interface NameValue { name: string; value: number; tenantId?: number; allWorkspaces?: boolean; }
 export interface HourCell { dayCode: string; hr: number; date: string; count: number; }
 
+/**
+ * One job's runs in an hour. tenantId is the job's workspace, and tenantName comes with it for a
+ * platform administrator, whose hour covers every workspace; the TOTAL row then carries
+ * allWorkspaces (MIG-296).
+ */
 export interface JobBreakdown {
   jobId: number;
   jobName: string;
   queue: number; start: number; running: number; failed: number;
   completed: number; skip: number; interrupt: number; missed: number;
   stop?: number; total: number;
+  tenantId?: number | null;
+  tenantName?: string | null;
+  allWorkspaces?: boolean;
 }
 
 @Injectable({ providedIn: 'root' })

@@ -145,7 +145,8 @@
           }
           <div class="search-field max-w-56">
             <app-icon name="search" size="0.95em" />
-            <input class="input" placeholder="Search job id or name" aria-label="Search jobs in this hour"
+            <input class="input" [placeholder]="seesWorkspaces() ? 'Search job id, name or workspace' : 'Search job id or name'"
+                   aria-label="Search jobs in this hour"
                    [value]="breakdownSearch()" (input)="onBreakdownSearch($any($event.target).value)" />
           </div>
           <button type="button" class="btn btn-ghost btn-sm" (click)="clearCell()"><app-icon name="close" />Close</button>
@@ -158,6 +159,10 @@
               <thead>
                 <tr>
                   <th>Job</th>
+                  <!-- Whose job it is, for the one role whose hour mixes workspaces. -->
+                  @if (seesWorkspaces()) {
+                    <th>Workspace</th>
+                  }
                   @for (column of visibleColumns(); track column) {
                     <th class="text-right">{{ column }}</th>
                   }
@@ -174,6 +179,11 @@
                       <div class="font-medium truncate" [title]="row.jobName">{{ row.jobName }}</div>
                       <div class="mono text-[color:var(--text-muted)]">#{{ row.jobId }}</div>
                     </td>
+                    @if (seesWorkspaces()) {
+                      <td class="max-w-48 truncate text-[color:var(--text-secondary)]" [title]="workspaceName(row)">
+                        {{ workspaceName(row) }}
+                      </td>
+                    }
                     @for (column of visibleColumns(); track column) {
                       <td class="text-right tabular !p-0">
                         <!-- Without the Jobs page the counts would land on /unauthorized: figures, not links. -->
@@ -233,6 +243,11 @@
                         · {{ filteredBreakdown().length }} job{{ filteredBreakdown().length === 1 ? '' : 's' }}
                       </span>
                     </td>
+                    <!-- A blank under Workspace keeps each total under its own heading, and lets the
+                         Columns menu hide this cell along with the column. -->
+                    @if (seesWorkspaces()) {
+                      <td></td>
+                    }
                     @for (column of visibleColumns(); track column) {
                       <td class="text-right tabular font-semibold !p-0">
                         @if (canOpenJobs()) {
