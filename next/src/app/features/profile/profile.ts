@@ -142,16 +142,19 @@ export class Profile implements OnInit {
    * Covers every editable field, not just the name. It was name-only, so a corrected phone
    * number left the button disabled and the change silently unsaveable.
    *
-   * A blank name still blocks the save -- the server rejects it -- but a blank phone or title
-   * is a legitimate edit that clears the field.
+   * A blank phone or title is a legitimate edit that clears the field. A blank name is a change
+   * too, and one the server refuses; it used to count as "nothing changed", which hid Save and
+   * Cancel without a word. nameMissing blocks it instead, and the field says why.
    */
   readonly detailsChanged = computed(() => {
     const p = this.profile();
-    if (!this.name().trim()) return false;
     return this.name().trim() !== (p?.fullName ?? '').trim()
         || this.phone().trim() !== (p?.phoneNumber ?? '').trim()
         || this.position().trim() !== (p?.position ?? '').trim();
   });
+
+  readonly nameMissing = computed(() => !this.name().trim());
+  readonly nameError = computed(() => (this.nameMissing() && this.detailsChanged() ? 'Display name is required.' : ''));
 
   /**
    * Where a picture is written. MinIO first: it is the store this platform actually runs,
@@ -318,7 +321,7 @@ export class Profile implements OnInit {
   }
 
   saveName(): void {
-    if (!this.detailsChanged()) return;
+    if (!this.detailsChanged() || this.nameMissing()) return;
     // The component empties `value` on an invalid number, so without this a bad entry looks
     // like a deliberate clearing: Save lights up and the stored number is wiped while the
     // person believes they corrected it.

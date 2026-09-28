@@ -119,7 +119,7 @@
                items-start keeps the inputs on a shared baseline when one note wraps to two
                lines and its neighbours do not. -->
           <div class="form-grid items-start">
-            <app-field label="Display name" for="fullName"
+            <app-field label="Display name" for="fullName" [required]="true" [error]="nameError()"
                        hint="Shown in the header and wherever a job records who assigned it.">
               <input id="fullName" class="input" placeholder="Your name"
                      [value]="name()" (input)="name.set($any($event.target).value)"
@@ -145,7 +145,7 @@
           @if (detailsChanged()) {
             <div class="flex gap-2 mt-4">
               <button type="button" class="btn btn-primary btn-sm"
-                      [disabled]="savingName()" (click)="saveName()">
+                      [disabled]="savingName() || nameMissing()" (click)="saveName()">
                 <app-icon name="save" [busy]="savingName()" />
                 {{ savingName() ? 'Saving…' : 'Save details' }}
               </button>
