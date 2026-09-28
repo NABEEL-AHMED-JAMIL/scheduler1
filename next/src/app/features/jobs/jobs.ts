@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, effect, inject, signal } from '@angular/core';
+import { Component, LOCALE_ID, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 
 import { RouterLink } from '@angular/router';
@@ -616,18 +616,40 @@ export class Jobs implements OnInit {
     this.act(job, 'run', `${job.jobName} queued to run.`);
   }
 
-  skipNext(job: SourceJob): void {
-    this.act(job, 'skip', `Next run of ${job.jobName} skipped.`);
+  /** Dates in the Skip dialog and toast, on the server's clock like the Next run column. */
+  private readonly serverTime = new ServerTimePipe(inject(LOCALE_ID));
+
+  /**
+   * Skipping cannot be undone, and it used to fire from the menu with no question and a toast that
+   * never said which run went. It asks first, naming the run, and says which one it skipped and when
+   * the next one is (owner decision 2026-09-28).
+   */
+  async skipNext(job: SourceJob): Promise<void> {
+    if (this.busyJob() === job.jobId) return;
+    const slot = this.serverTime.transform(this.nextRun(job), 'd MMM, HH:mm');
+    const ok = await confirmWith(this.dialog, {
+      title: 'Skip next run',
+      body: slot
+        ? `The run on ${slot} will be skipped and recorded as Skipped. Later runs stay on schedule.`
+        : 'The next scheduled run will be skipped and recorded as Skipped. Later runs stay on schedule.',
+      confirmLabel: 'Skip run',
+    });
+    if (!ok) return;
+    this.act(job, 'skip', response => {
+      const next = this.serverTime.transform((response.data as { nextRunAt?: string } | null)?.nextRunAt, 'd MMM, HH:mm');
+      const skipped = slot ? `Skipped the run on ${slot}.` : 'Skipped the next run.';
+      return next ? `${skipped} Next run ${next}.` : skipped;
+    });
   }
 
-  private act(job: SourceJob, action: JobAction, successMessage: string): void {
+  private act(job: SourceJob, action: JobAction, successMessage: string | ((response: ApiResponse) => string)): void {
     const request = jobActionRequest(action, job.jobId);
     this.busyJob.set(job.jobId);
     this.http.request<ApiResponse>(request.method, request.url, { body: request.body }).subscribe({
       next: response => {
         this.busyJob.set(null);
         if (response.status === API_SUCCESS) {
-          this.toast.success(successMessage);
+          this.toast.success(typeof successMessage === 'function' ? successMessage(response) : successMessage);
           // The pipeline pushes the real status moments later; this stops the row looking
           // untouched in the meantime.
           if (action === 'run') this.patchJob(job.jobId, { jobRunningStatus: 'Queue' });
@@ -755,9 +777,11 @@ export class Jobs implements OnInit {
   }
 
   /**
-   * A queued, running or failed job cannot be deleted -- the legacy screen refused the whole
-   * batch in that case rather than deleting part of it, so the selection stays intact and the
-   * user can see which rows are the problem.
+   * One delete rule for the row menu and the bulk action: not while a run is queued or running.
+   * The whole batch is refused rather than part of it, so the selection stays intact and the user
+   * can see which rows are the problem. A Failed job used to be refused here too, while the row
+   * menu (and the server) deleted it without complaint; the owner settled it (2026-09-28): a
+   * Failed job can be deleted from both.
    */
   deleteSelected(): void {
     const jobs = this.selectedJobs();
@@ -765,11 +789,10 @@ export class Jobs implements OnInit {
       this.toast.error('Select at least one job to delete.');
       return;
     }
-    const blocked = jobs.filter(job =>
-      this.isInFlight(job) || (job.jobRunningStatus ?? '').toLowerCase() === 'failed');
+    const blocked = jobs.filter(job => this.isInFlight(job));
     if (blocked.length) {
       const names = blocked.slice(0, 3).map(job => `#${job.jobId} (${job.jobRunningStatus})`).join(', ');
-      this.toast.error(`Cannot delete while ${blocked.length > 3 ? `${blocked.length} jobs are` : names + ' is'} queued, running or failed.`);
+      this.toast.error(`Cannot delete while ${blocked.length > 3 ? `${blocked.length} jobs are` : names + ' is'} queued or running. Wait for the run to finish.`);
       return;
     }
     this.confirmBulk({

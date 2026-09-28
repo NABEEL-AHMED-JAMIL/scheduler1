@@ -48,9 +48,9 @@ describe('Jobs: a refusal with no message still says something', () => {
     expect(errors[0]).toBeTruthy();
   });
 
-  it('Skip next run', () => {
+  it('Skip next run', async () => {
     const { jobs, errors } = jobsRefusingEverything();
-    jobs.skipNext(JOB);
+    await jobs.skipNext(JOB);
     expect(errors[0]).toBeTruthy();
   });
 
