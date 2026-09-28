@@ -651,7 +651,10 @@ export class Jobs implements OnInit {
     const ok = await confirmWith(this.dialog, {
       title: activating ? 'Activate job' : 'Deactivate job',
       body: activating
-        ? `"${job.jobName}" will resume running on its schedule.`
+        // A Manual job has no schedule to resume: activating it only makes it runnable again.
+        ? (job.execution === 'Manual'
+          ? `"${job.jobName}" can be run again.`
+          : `"${job.jobName}" will resume running on its schedule.`)
         : `"${job.jobName}" will stop running. Slots that pass while it is off are recorded as Missed rather than replayed when you turn it back on.`,
       confirmLabel: activating ? 'Activate' : 'Deactivate',
       // Turning a schedule off is confirmed as dangerous, like Delete here and the user and

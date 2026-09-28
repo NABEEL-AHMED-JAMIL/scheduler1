@@ -66,9 +66,9 @@ export class ReportPivot {
     const measure = this.measure();
     if (COUNTING.has(measure)) return '';
     return EXECUTION.has(measure)
-      ? 'Execution time only — the wait before the worker picked each run up is excluded.'
-      : 'Timed from when each run was queued, so the dispatcher\'s wait is inside every figure.'
-        + ' The Execution measures have it taken out.';
+      ? 'Execution time only — the time each run waited in the queue is left out.'
+      : 'Timed from when each run was queued, so each figure includes the time it waited to start.'
+        + ' The Execution measures leave the wait out.';
   });
   readonly humanSeconds = humanSeconds;
 

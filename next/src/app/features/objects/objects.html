@@ -293,7 +293,7 @@
                         }
                         <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="copy(entry.key, 'Path')"><app-icon name="copy" />Copy path</button>
                         @if (entry.etag) {
-                          <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="copy(entry.etag!, 'ETag')"><app-icon name="copy" />Copy ETag</button>
+                          <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="copy(entry.etag!, 'ETag')"><app-icon name="copy" />Copy checksum (ETag)</button>
                         }
                         <div class="my-1 border-t border-subtle"></div>
                         <button cdkMenuItem class="menu-item menu-item-danger"

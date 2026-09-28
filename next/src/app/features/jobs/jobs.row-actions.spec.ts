@@ -49,6 +49,15 @@ describe('Jobs row: Deactivate and Delete', () => {
     expect(confirms[0].danger).toBeFalsy();
   });
 
+  /** A Manual job has no schedule: activating it said it would "resume running on its schedule". */
+  it('does not promise a schedule when activating a Manual job', async () => {
+    const { jobs, confirms } = jobsWithRequestsInFlight();
+    await jobs.toggleStatus({ ...JOB, jobStatus: 'Inactive', execution: 'Manual' });
+    expect(confirms[0].body).toBe('"Nightly export" can be run again.');
+    await jobs.toggleStatus({ ...JOB, jobId: 42, jobStatus: 'Inactive', execution: 'Auto' });
+    expect(confirms[1].body).toContain('resume running on its schedule');
+  });
+
   /** The row was not locked, so a second click while the first request was out sent it twice. */
   it('locks the row while the status change is out, and sends it once', async () => {
     const { jobs, requests } = jobsWithRequestsInFlight();

@@ -3,7 +3,7 @@
     <div>
       <h1 class="page-title">Your profile</h1>
       <p class="page-subtitle">
-        How you appear across the console. Your role and tenant are set by an administrator.
+        How you appear across the console. Your role and workspace are set by an administrator.
       </p>
     </div>
   </div>
@@ -165,8 +165,8 @@
               <dd>{{ roleLabel(me.userRole) }}</dd>
             </div>
             <div>
-              <dt class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">Tenant</dt>
-              <dd>{{ me.tenantName || (me.tenantId ? '#' + me.tenantId : 'All tenants') }}</dd>
+              <dt class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">Workspace</dt>
+              <dd>{{ me.tenantName || (me.tenantId ? '#' + me.tenantId : 'All workspaces') }}</dd>
             </div>
             <div>
               <dt class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">State</dt>
