@@ -41,7 +41,7 @@
                       [clearLabel]="topicFilter() ? 'All pipelines on this topic' : 'All pipelines'"
                       [options]="pipelineComboOptions()" />
       </div>
-      <div class="search-field max-w-56">
+      <div class="search-field max-w-64">
         <app-icon name="search" size="0.95em" />
         <input class="input" placeholder="Search id, name, topic or pipeline" aria-label="Search tasks"
                [value]="search()" (input)="search.set($any($event.target).value); pager.reset()" />

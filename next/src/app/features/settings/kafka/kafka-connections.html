@@ -50,7 +50,7 @@
       <div class="lookup-rail-tools">
         <div class="search-field">
           <app-icon name="search" size="0.95em" />
-          <input class="input" placeholder="Find by name, broker or workspace" aria-label="Find a profile"
+          <input class="input" placeholder="Find name, broker, workspace" aria-label="Find a profile"
                  [value]="search()" (input)="search.set($any($event.target).value)" />
         </div>
         <!-- Each filter gets the rail's full width: two selects side by side in 275px cut

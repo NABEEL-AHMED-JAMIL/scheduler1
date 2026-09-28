@@ -45,7 +45,7 @@
         <option value="text">Text</option>
         <option value="json">JSON</option>
       </select>
-      <div class="search-field max-w-56">
+      <div class="search-field max-w-64">
         <app-icon name="search" size="0.95em" />
         <input class="input" placeholder="Search name, model or variable" aria-label="Search prompts" [value]="search()" (input)="search.set($any($event.target).value)" />
       </div>

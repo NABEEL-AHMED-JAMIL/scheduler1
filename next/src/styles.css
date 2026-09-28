@@ -878,8 +878,9 @@
     border-color: var(--border-strong);
   }
   /* A search box should say so before it is read. The icon is decorative -- the
-     placeholder carries the meaning for screen readers. */
-  .search-field { @apply relative inline-flex items-center; }
+     placeholder carries the meaning for screen readers. w-full so the max-w-* a page puts on it
+     takes effect: an inline-flex box shrank to the input's intrinsic 191px and cut placeholders. */
+  .search-field { @apply relative inline-flex items-center w-full; }
   .search-field > app-icon {
     @apply absolute left-2.5 pointer-events-none text-[color:var(--text-muted)];
   }
