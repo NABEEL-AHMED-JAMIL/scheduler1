@@ -21,10 +21,19 @@
         importer expects.
       </p>
 
+      <!-- The template is where an import starts, so it sits here rather than in the Export
+           card, where "start from the template" sent people looking for it. -->
+      <button type="button" class="btn btn-default btn-sm mt-3"
+              [disabled]="downloading() === 'template'" (click)="download('template')">
+        <app-icon [name]="downloading() === 'template' ? 'refresh' : 'table'"
+                  [class.spin]="downloading() === 'template'" />Download the import template
+      </button>
+
       <!-- The shared dropzone, which this markup was extracted into -- its dragleave handling
-           keeps the highlight on while the pointer crosses the icon and text. -->
+           keeps the highlight on while the pointer crosses the icon and text. .xlsx only: the
+           importer cannot read an old .xls workbook. -->
       <app-file-dropzone class="block mt-4" [file]="file()" (fileChange)="onFile($event)"
-                         accept=".xlsx,.xls" prompt="Drop a spreadsheet here" hint=".xlsx or .xls" />
+                         accept=".xlsx" prompt="Drop a spreadsheet here" hint=".xlsx workbook, from the import template" />
 
       @if (file()) {
         @if (uploading()) {
@@ -69,33 +78,14 @@
         <app-icon name="download" class="icon-info" />Export
       </h2>
       <p class="text-xs text-[color:var(--text-muted)] mt-1 leading-snug">
-        The template is an empty sheet with the right columns. The export is every
-        {{ noun().slice(0, -1) }} you can currently see.
+        Every {{ noun().slice(0, -1) }} you can currently see, as a spreadsheet.
       </p>
 
-      <div class="mt-4 space-y-2">
-        <button type="button" class="btn btn-default btn-sm w-full justify-start"
-                [disabled]="downloading() === 'template'" (click)="download('template')">
-          <app-icon [name]="downloading() === 'template' ? 'refresh' : 'table'"
-                    [class.spin]="downloading() === 'template'" />
-          <span class="text-left">
-            Import template
-            <span class="block text-xs text-[color:var(--text-muted)] font-normal">
-              Blank sheet with the expected columns
-            </span>
-          </span>
-        </button>
-
-        <button type="button" class="btn btn-default btn-sm w-full justify-start"
+      <div class="mt-4">
+        <button type="button" class="btn btn-default btn-sm"
                 [disabled]="downloading() === 'exportAll'" (click)="download('exportAll')">
           <app-icon [name]="downloading() === 'exportAll' ? 'refresh' : 'download'"
-                    [class.spin]="downloading() === 'exportAll'" />
-          <span class="text-left">
-            Export all {{ noun() }}
-            <span class="block text-xs text-[color:var(--text-muted)] font-normal">
-              Everything in your workspace, as a spreadsheet
-            </span>
-          </span>
+                    [class.spin]="downloading() === 'exportAll'" />Export all {{ noun() }}
         </button>
       </div>
     </div>

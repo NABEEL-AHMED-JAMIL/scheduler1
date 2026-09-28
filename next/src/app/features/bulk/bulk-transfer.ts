@@ -6,6 +6,7 @@ import { Icon } from '../../shared/ui/icon';
 import { ToastService } from '../../shared/ui/toast.service';
 import { FileDropzone } from '../../shared/ui/file-dropzone';
 import { copyText } from '../../shared/ui/clipboard.util';
+import { localIsoDay } from '../../shared/ui/local-day';
 
 /** How many of a rejected sheet's row reasons the card lists before "and N more". */
 const ROWS_SHOWN = 20;
@@ -79,15 +80,15 @@ export class BulkTransfer {
   /**
    * A pick or a drop from the shared dropzone, or its Remove (null). The picker's accept filter
    * does not reach a drop, so a file that is not a spreadsheet is refused here and the zone is
-   * cleared, rather than left showing a file this screen will not send.
+   * cleared, rather than left showing a file this screen will not send. Only .xlsx: the importer
+   * reads the newer workbook format, and an old .xls was taken here only to be refused by the server.
    */
   onFile(file: File | null): void {
     this.result.set(null);
     this.progress.set(0);
     if (file) {
-      const name = file.name.toLowerCase();
-      if (!name.endsWith('.xlsx') && !name.endsWith('.xls')) {
-        this.toast.error('Upload the spreadsheet template — .xlsx or .xls.');
+      if (!file.name.toLowerCase().endsWith('.xlsx')) {
+        this.toast.error('Upload an .xlsx workbook — start from the import template.');
         this.file.set(null);
         this.dropzone()?.file.set(null);
         return;
@@ -143,8 +144,8 @@ export class BulkTransfer {
   download(which: 'template' | 'exportAll'): void {
     const path = which === 'template' ? this.config().template : this.config().exportAll;
     const fallback = which === 'template'
-      ? `${this.noun()}-template.xlsx`
-      : `${this.noun()}-export.xlsx`;
+      ? `${this.noun()}-import-template.xlsx`
+      : `${this.noun()}-export-${localIsoDay(new Date())}.xlsx`;
 
     this.downloading.set(which);
     this.http.get(`${API_BASE}${path}`, { responseType: 'blob', observe: 'response' }).subscribe({
@@ -152,10 +153,13 @@ export class BulkTransfer {
         this.downloading.set('');
         const blob = response.body;
         if (!blob) { this.toast.error('The server returned an empty file.'); return; }
-        // The filename the server chose is the useful one; fall back only when it withholds it.
+        // A name the server chose on purpose is kept. Its generic "BatchDownload-<date>-<uuid>" is
+        // not: it is the same for the template and the export, so the two could not be told apart
+        // in a downloads folder, and this screen's own name says which one it is.
         const disposition = response.headers.get('content-disposition') ?? '';
         const match = /filename\*?=(?:UTF-8''|")?([^";]+)/i.exec(disposition);
-        const name = match ? decodeURIComponent(match[1].replace(/"$/, '')) : fallback;
+        const served = match ? decodeURIComponent(match[1].replace(/"$/, '')) : '';
+        const name = served && !served.startsWith('BatchDownload-') ? served : fallback;
 
         const url = URL.createObjectURL(blob);
         const anchor = document.createElement('a');

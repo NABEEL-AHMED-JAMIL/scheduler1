@@ -1,11 +1,12 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
 import { Subject, of, throwError } from 'rxjs';
-import { HttpEventType } from '@angular/common/http';
+import { HttpEventType, HttpHeaders } from '@angular/common/http';
 import { BulkTransfer } from './bulk-transfer';
 import { ToastService } from '../../shared/ui/toast.service';
+import { localIsoDay } from '../../shared/ui/local-day';
 
 function page(http: Record<string, unknown> = {}) {
   const errors: string[] = [];
@@ -58,6 +59,30 @@ describe('Bulk import / export', () => {
     expect(errors[0]).toContain('.xlsx');
     component.onFile(new File(['x'], 'orders.xlsx'));
     expect(component.file()?.name).toBe('orders.xlsx');
+  });
+
+  /**
+   * The importer reads the sheet as an .xlsx workbook (XSSF), so an .xls was offered by the
+   * picker and then refused by the server (UI review jobs#15).
+   */
+  it('refuses an old .xls workbook, and offers only .xlsx', () => {
+    const { component, errors, el } = page();
+    component.onFile(new File(['x'], 'orders.xls'));
+    expect(component.file()).toBeNull();
+    expect(errors[0]).toContain('.xlsx');
+    expect(el.querySelector('input[type="file"]')?.getAttribute('accept')).toBe('.xlsx');
+  });
+
+  /**
+   * The Import card said "Start from the template" and the template sat in the Export card
+   * (UI review tasks#19, jobs#15): the template is part of importing, so it lives there.
+   */
+  it('keeps the import template in the Import card', () => {
+    const { el } = page();
+    const [importCard, exportCard] = [...el.querySelectorAll('.card')] as HTMLElement[];
+    expect(importCard.textContent).toContain('Import');
+    expect([...importCard.querySelectorAll('button')].some(b => /template/i.test(b.textContent!))).toBe(true);
+    expect([...exportCard.querySelectorAll('button')].some(b => /template/i.test(b.textContent!))).toBe(false);
   });
 
   /** The upload's only feedback is its bar; it is announced as a progress bar with a value. */
@@ -125,5 +150,41 @@ describe('Bulk import / export', () => {
       const { items } = send({ post: () => throwError(() => ({ status: 400, error: { message: 'Total 1 source task invalid.', data: ['Row 4: bad cron.'] } })) });
       expect(items()).toEqual(['Row 4: bad cron.']);
     });
+  });
+});
+
+/**
+ * Both downloads arrived as the server's "BatchDownload-<date>-<uuid>.xlsx", so the template and
+ * the export could not be told apart in a downloads folder (UI review tasks#19).
+ */
+describe('Bulk download names', () => {
+  const saved: string[] = [];
+  const original = { create: URL.createObjectURL, revoke: URL.revokeObjectURL };
+  afterEach(() => {
+    URL.createObjectURL = original.create;
+    URL.revokeObjectURL = original.revoke;
+    vi.restoreAllMocks();
+    saved.length = 0;
+  });
+
+  function download(which: 'template' | 'exportAll', disposition: string) {
+    URL.createObjectURL = () => 'blob:x';
+    URL.revokeObjectURL = () => {};
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) { saved.push(this.download); });
+    const { component } = page({ get: () => of({ body: new Blob(['x']),
+      headers: new HttpHeaders({ 'content-disposition': disposition }) }) });
+    component.download(which);
+    return saved[0];
+  }
+
+  it('names the template and the export for what they are, not the server\'s generic name', () => {
+    expect(download('template', 'attachment; filename=BatchDownload-2026-09-28-1a2b.xlsx')).toBe('tasks-import-template.xlsx');
+    saved.length = 0;
+    expect(download('exportAll', 'attachment; filename=BatchDownload-2026-09-28-1a2b.xlsx'))
+      .toBe(`tasks-export-${localIsoDay(new Date())}.xlsx`);
+  });
+
+  it('keeps a name the server chose on purpose', () => {
+    expect(download('exportAll', 'attachment; filename="tasks-export-2026-09-28.xlsx"')).toBe('tasks-export-2026-09-28.xlsx');
   });
 });
