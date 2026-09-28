@@ -16,6 +16,29 @@
   </div>
 
   @if (!bucket()) {
+    @if (unknownLink(); as link) {
+      <!-- A sibling in the page stack, so it sits above whichever branch follows: the
+           connections grid or the empty card. -->
+      <div class="card p-4 flex items-start gap-3" role="status">
+        <app-icon name="alert" class="icon-warn shrink-0 mt-0.5" />
+        <div class="text-sm min-w-0">
+          <p class="font-medium break-words">
+            No connection in this workspace serves <span class="mono">{{ link.bucket }}</span>
+          </p>
+          <p class="text-[color:var(--text-secondary)] mt-1 break-words">
+            The link pointed at <span class="mono">{{ link.bucket }}/{{ link.prefix }}</span>.
+            @if (canConnectStorage()) {
+              Add a connection for that bucket to browse it here, or pick one below.
+            } @else {
+              An administrator of your workspace can add a connection for it; meanwhile pick one below.
+            }
+          </p>
+          @if (canConnectStorage()) {
+            <a routerLink="/configuration/storage-connections" class="link-inline mt-2">Storage connections</a>
+          }
+        </div>
+      </div>
+    }
     <!-- The connections themselves, rather than a line of text telling you to go and find them
          in the select. There are usually more than a handful, and picking one is the only thing
          to do on this screen until something is chosen. -->

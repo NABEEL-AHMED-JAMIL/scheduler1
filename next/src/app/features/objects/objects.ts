@@ -48,6 +48,11 @@ export class Objects implements OnInit {
    */
   readonly bucketsLoading = signal(false);
   readonly bucketsError = signal('');
+  /**
+   * A ?bucket= link no connection here serves (Jobs' "View in bucket", a run log's path, the
+   * Converter). The picker still shows, but with a word on why the link did not open.
+   */
+  readonly unknownLink = signal<{ bucket: string; prefix: string } | null>(null);
   readonly bucketOptions = computed(() => this.buckets().map(b => ({ value: b.bucket, label: b.label || b.bucket, hint: b.provider })));
 
   /** FTP is a different kind of thing from an object store, and the card should say so. */
@@ -213,15 +218,20 @@ export class Objects implements OnInit {
   /**
    * ?bucket=&prefix= opens the browser straight at a folder. A job's row links here with the
    * bucket its task writes to, and without this the link landed on an empty browser with
-   * nothing selected. Waits for the bucket list so an unknown bucket can be ignored rather
-   * than left selected and failing to load.
+   * nothing selected. Waits for the bucket list so an unknown bucket is not left selected and
+   * failing to load; it is named in a notice over the picker instead, because dropping it
+   * silently left the reader on a list of connections with no idea why.
    */
   private openDeepLink(): void {
     const params = this.route.snapshot.queryParamMap;
     const bucket = params.get('bucket');
-    if (!bucket || !this.buckets().some(b => b.bucket === bucket)) return;
-
+    if (!bucket) return;
     const prefix = params.get('prefix') || '';
+    if (!this.buckets().some(b => b.bucket === bucket)) {
+      this.unknownLink.set({ bucket, prefix });
+      return;
+    }
+
     this.bucket.set(bucket);
     this.prefix.set(prefix);
     this.crumbs.set(prefix
@@ -234,6 +244,7 @@ export class Objects implements OnInit {
   }
 
   onBucketChange(value: string): void {
+    this.unknownLink.set(null);
     this.bucket.set(value);
     this.prefix.set('');
     this.crumbs.set([]);
