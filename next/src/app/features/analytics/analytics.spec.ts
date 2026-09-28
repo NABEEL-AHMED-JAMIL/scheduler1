@@ -40,6 +40,17 @@ import { API_SUCCESS } from '../../core/api/api.config';
 const SERVER_RESPONSE = <T>(data: T) => ({ status: 'SUCCESS' as const, message: '', data });
 const SERVER_REFUSAL = (message: string) => ({ status: 'ERROR' as const, message, data: undefined });
 
+/**
+ * Every tooltip on the screen, joined. The owner asked (2026-09-28) for the long explanatory
+ * paragraphs to become one line or a tooltip, so several hedges these specs guard now live in a
+ * title attribute: still on the screen, still next to the figure, and still worth pinning.
+ */
+function tipsIn(fixture: { nativeElement: unknown; detectChanges(): void }): string {
+  fixture.detectChanges();
+  return [...(fixture.nativeElement as HTMLElement).querySelectorAll('[title]')]
+    .map(element => element.getAttribute('title') ?? '').join(' ').replace(/\s+/g, ' ');
+}
+
 const MINIO: BucketSummary = { label: 'MinIO Main', bucket: 'minio-main', provider: 'MINIO' };
 const S3: BucketSummary = { label: 'Reports S3', bucket: 'reports-s3', provider: 'S3' };
 const AZURE: BucketSummary = { label: 'Blob Archive', bucket: 'blob-archive', provider: 'AZURE' };
@@ -835,6 +846,8 @@ describe('the three figures that are not exact', () => {
         }
         return ((fixture.nativeElement as HTMLElement).textContent ?? '').replace(/\s+/g, ' ');
       },
+      /** The tooltips, where the longer hedges went (owner, 2026-09-28). */
+      tips(): string { return tipsIn(fixture); },
       /** The statistic labels on the profile cards, which is where "min" is or is not said. */
       statLabels() {
         return [...(fixture.nativeElement as HTMLElement).querySelectorAll('dt')]
@@ -860,10 +873,13 @@ describe('the three figures that are not exact', () => {
   it('still gives a real clean bill when it actually examined something', () => {
     // The control. A gate that refused to say "clean" in every case would pass the test above
     // while making the tab useless on the datasets that are genuinely fine.
-    const text = renderedStudio().show([columnOf()], 5000, 'quality');
+    const studio = renderedStudio();
+    const text = studio.show([columnOf()], 5000, 'quality');
 
     expect(text).toContain('Nothing needs attention.');
-    expect(text).toContain('Checked 1 column:');
+    expect(text).toContain('Checked 1 column for');
+    // What "checked" covered, stated exactly -- one line on screen, the list as its tooltip.
+    expect(studio.tips()).toContain('none is more than 5% empty');
   });
 
   it('does not claim a column is completely full when the engine only rounded to 100', () => {
@@ -965,8 +981,9 @@ describe('the three figures that are not exact', () => {
   });
 
   it('says out loud that duplicate rows were not counted', () => {
-    const text = renderedStudio().show([columnOf()], 1000, 'quality');
-    expect(text).toContain('Duplicate rows are not part of this check');
+    const studio = renderedStudio();
+    studio.show([columnOf()], 1000, 'quality');
+    expect(studio.tips()).toContain('Duplicate rows are not part of this check');
   });
 
   it('writes a percentage the way the engine measured it, without rounding it further', () => {
@@ -1252,6 +1269,9 @@ function consoleWith(over: { objects?: ObjectSummary[]; confirms?: boolean } = {
         useValue: {
           schema, preview, profile, query, fetchAllQueries, fetchRecentRuns, saveQuery,
           renameQuery, deleteQuery, download, writeBack, cancel,
+          // Reached from the Charts empty state's "Build one in Canvas", which reads the
+          // saved-analysis list on arrival like any other way into the Canvas.
+          fetchAllAnalyses: () => new Subject<any>().asObservable(),
         },
       },
       // confirmWith resolves as soon as the dialog "closes", so this is the reader saying yes or
@@ -1317,12 +1337,14 @@ describe('the console before anything has run', () => {
   });
 
   it('names the two tables the SQL is allowed to use, because that naming IS the interface', () => {
-    const text = consoleWith().show();
+    const console = consoleWith();
+    const text = console.show();
 
     expect(text).toContain('What your SQL can name');
     expect(text).toContain('dataset');
     expect(text).toContain('minio-main/daily/sales-2026.csv');
-    expect(text).toContain('there is no bucket, URL or path to write');
+    expect(text).toContain('never a path');
+    expect(tipsIn(console.fixture)).toContain('there is no bucket, URL or path to write');
   });
 });
 
@@ -1785,7 +1807,8 @@ describe('the run history', () => {
     console.answers.runs!.next(SERVER_RESPONSE([runOf()]));
     const text = console.show();
 
-    expect(text).toContain('ran');
+    // Sentence case, like every other chip in the console.
+    expect(text).toContain('Ran');
     expect(text).toContain('340ms');
     expect(text).toContain('1 rows');
     expect(text).toContain('select sum(amount) from dataset');
@@ -1839,7 +1862,7 @@ describe('the run history', () => {
     const console = activityWith();
     console.answers.runs!.next(SERVER_RESPONSE([runOf()]));
 
-    expect(console.show()).toContain('wall clock inside the query engine');
+    expect(tipsIn(console.fixture)).toContain('inside the query engine, not counting the network');
   });
 
   it('says plainly when nothing has been run in the workspace', () => {
@@ -1867,22 +1890,25 @@ describe('the console does not disturb the tabs beside it', () => {
     expect(console.studio.tab()).toBe('overview');
   });
 
-  it('groups the ten rather than laying them out as one unreadable row', () => {
-    // Ten equal tabs wrap into a second line of undifferentiated words. Grouped, the row wraps
-    // at the boundaries and each cluster carries what it costs -- which is the axis they are
-    // grouped on, so a reader knows whether a click spends a query before they make it.
+  it('keeps the three groups, drawn as a divider rather than all-caps headings', () => {
+    // The groups are by what each tab COSTS, and stay. Their headings -- THE FILE, ITS COLUMNS,
+    // QUESTIONS -- made the strip three rows tall on a phone and are gone (owner, 2026-09-28):
+    // a thin divider marks the boundary and each group's reason is its tabs' tooltip.
     const console = consoleWith();
     expect(console.studio.tabGroups.map(group => group.label))
       .toEqual(['The file', 'Its columns', 'Questions']);
-    // Every tab is in exactly one group, and the flat list is built from them rather than kept
-    // beside them -- two lists is where the second one stops matching.
     expect(console.studio.tabGroups.flatMap(group => group.tabs).length)
       .toBe(console.studio.tabs.length);
     expect(console.studio.tabGroups[1].tabs.map(tab => tab.id))
-      // 'columns' drew the same scan this table reads, one card per column. The card
-      // moved under the Compact row it describes and the tab went with it.
       .toEqual(['compact', 'profile', 'quality']);
-    expect(console.show()).toContain('Its columns');
+
+    const strip = (console.fixture.nativeElement as HTMLElement).querySelector('[role="tablist"]')!;
+    expect(strip.textContent).not.toContain('Its columns');
+    const dividers = strip.querySelectorAll('.tab-divider');
+    expect(dividers.length).toBe(2);
+    dividers.forEach(divider => expect(divider.getAttribute('aria-hidden')).toBe('true'));
+    const compact = strip.querySelector('#a-tab-compact')!;
+    expect(compact.getAttribute('title')).toBe(console.studio.tabGroups[1].hint);
   });
 
   it('clears a result when another file is opened, and keeps the statement', () => {
@@ -2023,6 +2049,13 @@ describe('the kinds offered change with the columns', () => {
     return studio.chartKinds().filter(kind => !kind.issue).map(kind => kind.id);
   }
 
+  /** One kind in the segmented switch, by the label on it. */
+  function kindButton(fixture: { nativeElement: unknown; detectChanges(): void }, label: string) {
+    fixture.detectChanges();
+    return [...(fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('.seg-btn')]
+      .find(button => button.textContent!.trim() === label)!;
+  }
+
   it('offers a ring for a handful of categories', () => {
     const { studio } = charted(categories(4));
 
@@ -2038,7 +2071,11 @@ describe('the kinds offered change with the columns', () => {
     expect(donut.issue).toContain('ring of 40 slices');
     expect(offered(console.studio)).not.toContain('donut');
     // On the screen, not only in the signal: the reason is what stops a reader hunting for it.
-    expect(console.show()).toContain('A ring of 40 slices cannot be read');
+    // It is the inert kind's tooltip, and the kind is aria-disabled rather than disabled so the
+    // tooltip still shows.
+    const button = kindButton(console.fixture, 'Share of the total');
+    expect(button.getAttribute('title')).toContain('A ring of 40 slices cannot be read');
+    expect(button.getAttribute('aria-disabled')).toBe('true');
   });
 
   it('stops drawing bars in result order once no name can fit under one', () => {
@@ -2060,7 +2097,7 @@ describe('the kinds offered change with the columns', () => {
 
     expect(offered(console.studio)).toEqual(['histogram']);
     expect(console.studio.chartKind()).toBe('histogram');
-    expect(console.show()).toContain('a length cannot be negative');
+    expect(tipsIn(console.fixture)).toContain('a length cannot be negative');
   });
 
   it('bins the result as ROWS, and keeps a negative value on the axis', () => {
@@ -2089,7 +2126,7 @@ describe('the kinds offered change with the columns', () => {
     }));
 
     expect(offered(console.studio)).toEqual(['histogram']);
-    expect(console.show()).toContain('This result has one column, so there is nothing to label');
+    expect(tipsIn(console.fixture)).toContain('This result has one column, so there is nothing to label');
   });
 
   it('refuses a distribution of too few numbers to have a shape', () => {
@@ -2660,8 +2697,9 @@ describe('the filter tree reaches the request with its shape intact', () => {
     // was RUN, so a note promising it inherits what is typed would be the same mistake again.
     const canvas = canvasWith();
 
-    expect(canvas.show()).toContain('once you run it');
-    expect(canvas.show()).toContain('Data tab');
+    // The Filters heading's tooltip now (owner, 2026-09-28), in place of a paragraph under it.
+    expect(tipsIn(canvas.fixture)).toContain('once you run it');
+    expect(tipsIn(canvas.fixture)).toContain('Data tab');
   });
 });
 
@@ -3567,12 +3605,15 @@ describe('saving an analysis: the configuration, never the rows', () => {
     // and answers a different question.
     const canvas = canvasWith();
     canvas.studio.setDimension(0, 'region');
+    // From the saved panel, where the row is; the panel stays open to say why it did not open.
+    canvas.studio.openSaved();
     canvas.studio.openAnalysis({
       analysisName: 'Broken', connectionAlias: 'minio-main', datasetPath: 'daily/sales-2026.csv',
       analysisConfig: '{not json',
     });
 
     expect(canvas.studio.dimensions()).toEqual(['region']);
+    expect(canvas.studio.savedOpen()).toBe(true);
     expect(canvas.show()).toContain('its saved configuration is not readable');
   });
 
@@ -3959,7 +4000,7 @@ describe('Profile and Columns are what document 06 says they are', () => {
     // Reworded with the counted distribution. The second pass is still a second pass, but it is
     // now BUYABLE per column rather than simply absent -- saying it is "not here" directly above
     // a button that fetches it would be the screen contradicting itself.
-    expect(grid.show()).toContain('a SECOND pass over the file');
+    expect(tipsIn(grid.fixture)).toContain('a second pass over the file');
     expect(grid.show()).toContain('Measure values');
   });
 
@@ -3979,9 +4020,9 @@ describe('Profile and Columns are what document 06 says they are', () => {
     ]);
     const text = grid.show();
 
-    expect(text).toContain('What the columns are');
-    expect(text).toContain('How complete they are');
-    expect(text).toContain('How many different values they hold (estimated)');
+    expect(text).toContain('Types');
+    expect(text).toContain('Completeness, in columns');
+    expect(text).toContain('Distinct values (estimated)');
     // Two BIGINT columns and one VARCHAR, grouped on the short type.
     expect(grid.studio.typeBands())
       .toEqual([
@@ -4000,7 +4041,9 @@ describe('Profile and Columns are what document 06 says they are', () => {
     ]);
 
     expect(grid.studio.completenessBands().map(band => band.value)).toEqual([1, 0, 0, 1, 1]);
-    expect(grid.show()).toContain('A count of columns in each band, not of rows or values');
+    // In the heading, where the band is read, and in full as its tooltip.
+    expect(grid.show()).toContain('Completeness, in columns');
+    expect(tipsIn(grid.fixture)).toContain('A count of columns in each band, not of rows or values');
   });
 
   it('refuses to let the averaged percentage read as a share of the values in the file', () => {
@@ -4010,8 +4053,9 @@ describe('Profile and Columns are what document 06 says they are', () => {
     ]);
 
     expect(grid.studio.averageFilled()).toBe(75);
-    expect(grid.show()).toContain('not the share of values in the file that are present');
-    expect(grid.show()).toContain('weights every column the same');
+    expect(grid.show()).toContain('averaged over the columns');
+    expect(tipsIn(grid.fixture)).toContain('Not a share of cells');
+    expect(tipsIn(grid.fixture)).toContain('each weighted the same');
   });
 
   it('bands cardinality off the sketch, and labels the whole chart estimated', () => {
@@ -4023,7 +4067,8 @@ describe('Profile and Columns are what document 06 says they are', () => {
     expect(grid.studio.cardinalityBands().find(band => band.name === 'Under 10')!.value).toBe(1);
     expect(grid.studio.cardinalityBands()
       .find(band => band.name === 'Almost every row different')!.value).toBe(1);
-    expect(grid.show()).toContain('rests on the distinct-value sketch rather than a count');
+    expect(grid.show()).toContain('Distinct values (estimated)');
+    expect(tipsIn(grid.fixture)).toContain('rests on the distinct-value sketch');
   });
 });
 
@@ -4045,7 +4090,7 @@ describe('the Compact view is dense, and every figure in it carries its own hedg
 
     expect(grid.studio.compactRows()[0].sample).toBe('9.50');
     expect(grid.studio.compactRows()[0].sampleKind).toBe('value');
-    expect(grid.show()).toContain('the first value on the page the Data tab is holding');
+    expect(tipsIn(grid.fixture)).toContain("the sample is the first value on the Data tab's current page");
   });
 
   it('tells a null, a blank and an empty page apart', () => {
@@ -4213,7 +4258,8 @@ describe('Activity promotes the run history, and leads with the refusals', () =>
     expect(text).toContain('2 refused');
     expect(text).toContain('1 failed');
     expect(text).toContain('1 stopped or timed out');
-    expect(text).toContain('never reached the engine');
+    // What a refusal is, as the refused count's tooltip rather than a paragraph under it.
+    expect(tipsIn(console.fixture)).toContain('never reached the engine');
   });
 
   it('says how many of the runs were against the file that is open', () => {
@@ -4239,17 +4285,22 @@ describe('Activity promotes the run history, and leads with the refusals', () =>
 });
 
 describe('the dashboard and the registry are reachable from the workspace', () => {
-  it('offers the dashboards by name from the Details tab', () => {
+  it('offers the dashboards by name from the file header\'s menu', () => {
     // Both halves of dashboard.ts shipped wired into nothing: a board had no route and no link,
-    // and the registry had no caller at all. This is the way in.
+    // and the registry had no caller at all. This is the way in -- the "Where this is" card that
+    // held it is gone (owner, 2026-09-28) and its two actions are the header's ⋯ menu.
     const grid = gridWith();
     grid.studio.showTab('overview');
-    const text = grid.show();
+    grid.fixture.detectChanges();
+    const more = (grid.fixture.nativeElement as HTMLElement)
+      .querySelector<HTMLButtonElement>('button[aria-label="More for this file"]')!;
+    more.click();
+    grid.fixture.detectChanges();
 
-    const link = (grid.fixture.nativeElement as HTMLElement)
-      .querySelector('a[href="/objects/analytics/dashboards"]');
+    // The menu is an overlay, so it is drawn under <body> rather than inside the component.
+    const link = document.querySelector('a[href="/objects/analytics/dashboards"]');
     expect(link).not.toBeNull();
-    expect(text).toContain('a dashboard re-runs saved analyses every time it opens');
+    expect(document.body.textContent).toContain('Name this dataset');
   });
 
   it('does not create the registry until somebody asks for it', () => {
@@ -4992,6 +5043,8 @@ describe('what a saved analysis records is what was on screen', () => {
 
   it('shows what a delete actually removed, in the server’s own words', async () => {
     const canvas = canvasWith();
+    // Deleted from the saved panel, which is where the notice is read.
+    canvas.studio.openSaved();
     await canvas.studio.removeAnalysis({
       analyticsAnalysisId: 7, analysisName: 'Q3 draft', connectionAlias: 'minio-main',
       datasetPath: 'daily/sales-2026.csv', analysisConfig: '{}',
@@ -5566,3 +5619,335 @@ describe('ColumnCard, audit 09-22', () => {
   });
 });
 
+
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * The redesign the owner approved on 2026-09-28: the same nine tabs as real ARIA tabs in one row
+ * that scrolls on a phone, a compact file header, a KPI strip on the Overview, Save and Open saved
+ * in the Canvas result's own header, a Charts empty state that goes somewhere, and an Activity
+ * list that leads with what a person ran.
+ */
+describe('the tab strip is a real tablist', () => {
+  const strip = (fixture: { nativeElement: unknown }) =>
+    (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>('[role="tablist"]')!;
+  const tabsOf = (fixture: { nativeElement: unknown }) =>
+    [...strip(fixture).querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+
+  it('marks the open tab selected, gives it the one Tab stop, and points it at the panel', () => {
+    const grid = gridWith();
+    grid.studio.showTab('profile');
+    grid.fixture.detectChanges();
+
+    const tabs = tabsOf(grid.fixture);
+    expect(tabs.map(tab => tab.textContent!.trim())).toEqual([
+      'Overview', 'Data', 'Compact', 'Profile', 'Quality', 'Canvas', 'SQL', 'Charts', 'Activity',
+    ]);
+    const open = tabs.filter(tab => tab.getAttribute('aria-selected') === 'true');
+    expect(open.map(tab => tab.id)).toEqual(['a-tab-profile']);
+    expect(tabs.filter(tab => tab.getAttribute('tabindex') === '0')).toEqual(open);
+    expect(tabs.filter(tab => tab.getAttribute('tabindex') === '-1').length).toBe(8);
+    // Only the open tab names a panel: the others' panels are not in the page.
+    expect(open[0].getAttribute('aria-controls')).toBe('a-panel');
+    expect(tabs.filter(tab => tab.hasAttribute('aria-controls')).length).toBe(1);
+
+    const panel = (grid.fixture.nativeElement as HTMLElement).querySelector('#a-panel')!;
+    expect(panel.getAttribute('role')).toBe('tabpanel');
+    expect(panel.getAttribute('aria-labelledby')).toBe('a-tab-profile');
+  });
+
+  it('moves focus with the arrows, Home and End, and opens nothing until Enter or a click', () => {
+    const grid = gridWith();
+    grid.studio.showTab('overview');
+    grid.fixture.detectChanges();
+    const press = (key: string) => {
+      const target = document.activeElement as HTMLElement;
+      target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+      return (document.activeElement as HTMLElement).id;
+    };
+    tabsOf(grid.fixture)[0].focus();
+
+    expect(press('ArrowRight')).toBe('a-tab-data');
+    expect(press('ArrowRight')).toBe('a-tab-compact');
+    expect(press('End')).toBe('a-tab-activity');
+    // Wraps, so the strip is a ring rather than two dead ends.
+    expect(press('ArrowRight')).toBe('a-tab-overview');
+    expect(press('ArrowLeft')).toBe('a-tab-activity');
+    expect(press('Home')).toBe('a-tab-overview');
+    // Manual activation: arrowing across Compact did not start the scan it would cost.
+    expect(grid.studio.tab()).toBe('overview');
+    expect(grid.profile).not.toHaveBeenCalled();
+
+    (document.activeElement as HTMLElement).dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    (document.activeElement as HTMLButtonElement).click();
+    grid.fixture.detectChanges();
+    expect(grid.studio.tab()).toBe('data');
+  });
+
+  it('leaves an unhandled key alone, so the page keeps its own shortcuts', () => {
+    const grid = gridWith();
+    const event = new KeyboardEvent('keydown', { key: 'PageDown', cancelable: true });
+    grid.studio.onTabStripKey(event, 'data');
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  it('scrolls sideways on a phone rather than wrapping into rows (source scan)', async () => {
+    const fs = (await import(/* @vite-ignore */ ['node', 'fs'].join(':'))) as { readFileSync(p: string, e: 'utf8'): string };
+    const root = (globalThis as unknown as { process: { cwd(): string } }).process.cwd();
+    const html = fs.readFileSync(`${root}/src/app/features/analytics/analytics.html`, 'utf8');
+    const opening = html.slice(0, html.indexOf('role="tablist"'));
+    const classes = opening.slice(opening.lastIndexOf('class="') + 7);
+    expect(classes).toContain('overflow-x-auto');
+    expect(classes).not.toContain('flex-wrap');
+    // Each tab keeps its width and its words on one line inside the scroll box.
+    expect(html).toMatch(/role="tab" class="tab whitespace-nowrap shrink-0/);
+  });
+});
+
+describe('the file header', () => {
+  it('says the file in one line of facts, with its path truncated beneath', () => {
+    const grid = gridWith();
+    const text = grid.show();
+    expect(text).toContain('sales-2026.csv');
+    expect(text).toMatch(/250 rows · 2 columns · 4\.0 KB · \d{1,2} Sep 2026, \d{2}:\d{2}/);
+    const path = [...(grid.fixture.nativeElement as HTMLElement).querySelectorAll('p.mono.truncate')]
+      .find(line => line.textContent!.includes('minio-main/daily/sales-2026.csv'))!;
+    expect(path.getAttribute('title')).toBe('minio-main/daily/sales-2026.csv');
+  });
+
+  it('keeps Files beside the file, opening the panel on the right', () => {
+    const grid = gridWith();
+    const files = (grid.fixture.nativeElement as HTMLElement)
+      .querySelector<HTMLButtonElement>('button[aria-controls="files-panel"]')!;
+    files.click();
+    grid.fixture.detectChanges();
+    expect(grid.studio.filesOpen()).toBe(true);
+    expect(files.getAttribute('aria-expanded')).toBe('true');
+  });
+});
+
+describe('the Overview KPI strip', () => {
+  it('shows a dash for what the profile has not said yet, never a zero', () => {
+    const grid = gridWith();
+    grid.studio.showTab('overview');
+    const stats = new Map(grid.studio.overviewStats().map(item => [item.label, item]));
+    expect(stats.get('Rows')!.value).toBe('250');
+    expect(stats.get('Columns')!.value).toBe(2);
+    expect(stats.get('Complete')!.value).toBe('—');
+    expect(stats.get('Quality issues')!.value).toBe('—');
+    expect(stats.get('Quality issues')!.clickable).toBe(false);
+  });
+
+  it('counts the Quality tab\'s findings, and the tile goes there', () => {
+    const grid = gridWith();
+    grid.studio.adoptProfile(profileOf([
+      columnOf({ name: 'amount', nullPercentage: 0, completeness: 100 }),
+      columnOf({ name: 'empty', nullPercentage: 100, completeness: 0, approxDistinct: 0, allNull: true }),
+    ]));
+    grid.studio.showTab('overview');
+    grid.fixture.detectChanges();
+    const stats = new Map(grid.studio.overviewStats().map(item => [item.label, item]));
+    const issues = stats.get('Quality issues')!;
+
+    expect(issues.value).toBe(grid.studio.qualityFindings().length);
+    expect(issues.value).toBeGreaterThan(0);
+    expect(stats.get('Complete')!.value).toBe('50%');
+    expect(stats.get('Complete')!.hint).toContain('no cell was counted');
+    // The Quality tab says how many too, so the count is visible from any tab.
+    const quality = (grid.fixture.nativeElement as HTMLElement).querySelector('#a-tab-quality')!;
+    expect(quality.textContent).toContain(String(issues.value));
+
+    grid.studio.onOverviewStat(issues);
+    expect(grid.studio.tab()).toBe('quality');
+  });
+});
+
+describe('saving from the Canvas result', () => {
+  it('asks for the name in a small dialog, and closes it once the server has saved', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    const el = canvas.fixture.nativeElement as HTMLElement;
+    const save = [...el.querySelectorAll<HTMLButtonElement>('#a-panel button')]
+      .find(button => button.textContent!.trim() === 'Save')!;
+    save.click();
+    canvas.fixture.detectChanges();
+
+    expect(canvas.studio.saveDialogOpen()).toBe(true);
+    const name = el.querySelector<HTMLInputElement>('#a-save-name')!;
+    name.value = 'Sales by region';
+    name.dispatchEvent(new Event('input'));
+    canvas.fixture.detectChanges();
+    [...el.querySelectorAll<HTMLButtonElement>('app-form-dialog button')]
+      .find(button => button.textContent!.trim() === 'Save as new')!.click();
+
+    expect(canvas.saveAnalysis).toHaveBeenCalledTimes(1);
+    expect(canvas.saveAnalysis.mock.calls[0][0].analysisName).toBe('Sales by region');
+    canvas.answers.saveAnalysis!.next(SERVER_RESPONSE({
+      analyticsAnalysisId: 9, analysisName: 'Sales by region', connectionAlias: 'minio-main',
+      datasetPath: 'daily/sales-2026.csv',
+    }));
+    expect(canvas.studio.saveDialogOpen()).toBe(false);
+  });
+
+  it('keeps the dialog open over a refusal, with the server\'s sentence in it', () => {
+    const canvas = canvasWith();
+    canvas.studio.openSaveDialog();
+    canvas.studio.analysisName.set('Sales');
+    canvas.studio.saveAnalysis(false);
+    canvas.answers.saveAnalysis!.next(SERVER_REFUSAL('That name is taken.'));
+
+    expect(canvas.studio.saveDialogOpen()).toBe(true);
+    expect(canvas.show()).toContain('That name is taken.');
+  });
+
+  it('closes the dialog before the panel on Escape, one thing at a time', () => {
+    const canvas = canvasWith();
+    canvas.studio.openSaved();
+    canvas.studio.openSaveDialog();
+    canvas.studio.onEscape();
+    expect(canvas.studio.saveDialogOpen()).toBe(false);
+    expect(canvas.studio.savedOpen()).toBe(true);
+    canvas.studio.onEscape();
+    expect(canvas.studio.savedOpen()).toBe(false);
+  });
+
+  it('has no save card or saved list stacked under the result any more', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    const text = canvas.show();
+    expect(text).not.toContain('Save this analysis');
+    expect(canvas.studio.savedOpen()).toBe(false);
+  });
+});
+
+describe('opening a saved analysis from the panel', () => {
+  const SAVED_ONE = {
+    analyticsAnalysisId: 4, analysisName: 'Amount by region', connectionAlias: 'minio-main',
+    datasetPath: 'daily/sales-2026.csv', visualizationType: 'bar',
+    analysisConfig: JSON.stringify({ dimensions: ['region'], measure: { aggregation: 'SUM', field: 'amount' } }),
+  } as SavedAnalysis;
+
+  it('lists them in the right-hand panel, read once on arrival at Canvas', () => {
+    const canvas = canvasWith();
+    canvas.answers.analyses!.next(SERVER_RESPONSE([SAVED_ONE]));
+    canvas.studio.openSaved();
+    canvas.fixture.detectChanges();
+
+    expect(canvas.fetchAllAnalyses).toHaveBeenCalledTimes(1);
+    const panel = (canvas.fixture.nativeElement as HTMLElement).querySelector('#saved-panel')!;
+    expect(panel.classList).not.toContain('hidden');
+    expect(panel.textContent).toContain('Amount by region');
+    expect(panel.className).toContain('w-[480px]');
+    expect(panel.className).toContain('right-0');
+  });
+
+  it('puts one on the Canvas without running it, and gets out of the way', () => {
+    const canvas = canvasWith();
+    canvas.answers.analyses!.next(SERVER_RESPONSE([SAVED_ONE]));
+    canvas.studio.openSaved();
+    canvas.fixture.detectChanges();
+    const row = [...(canvas.fixture.nativeElement as HTMLElement)
+      .querySelectorAll<HTMLButtonElement>('#saved-panel button')]
+      .find(button => button.textContent!.includes('Amount by region'))!;
+    row.click();
+
+    expect(canvas.studio.dimensions()).toEqual(['region']);
+    expect(canvas.studio.loadedAnalysis()?.analyticsAnalysisId).toBe(4);
+    expect(canvas.analyze).not.toHaveBeenCalled();
+    expect(canvas.studio.savedOpen()).toBe(false);
+  });
+
+  it('deletes from the panel, behind the same confirmation', async () => {
+    const canvas = canvasWith();
+    canvas.answers.analyses!.next(SERVER_RESPONSE([SAVED_ONE]));
+    canvas.studio.openSaved();
+    canvas.fixture.detectChanges();
+    (canvas.fixture.nativeElement as HTMLElement)
+      .querySelector<HTMLButtonElement>('#saved-panel button[aria-label="Delete Amount by region"]')!.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(canvas.confirmBody()).toContain('any dashboard tile showing it');
+    expect(canvas.deleteAnalysis).toHaveBeenCalledWith(4);
+  });
+});
+
+describe('Activity leads with what a person ran', () => {
+  const RUNS = () => [
+    runOf({ analyticsQueryRunId: 1, queryText: '-- schema' }),
+    runOf({ analyticsQueryRunId: 2, queryText: '-- preview page=0' }),
+    runOf({ analyticsQueryRunId: 3, queryText: '-- overview' }),
+    runOf({ analyticsQueryRunId: 4, queryText: 'select count(*) from dataset' }),
+    runOf({ analyticsQueryRunId: 5, queryText: '-- profile' }),
+    // A refused internal read stays in view: somebody reached for a file they could not open.
+    runOf({ analyticsQueryRunId: 6, queryText: '-- schema', runStatus: 'REFUSED',
+            errorMessage: 'You cannot read this connection.' }),
+  ];
+
+  it('names each run\'s kind from the descriptor the server wrote', () => {
+    const console = activityWith();
+    const kinds = RUNS().map(run => console.studio.runKind(run));
+    expect(kinds).toEqual(['schema', 'preview', 'overview', 'SQL', 'profile', 'schema']);
+  });
+
+  it('hides the schema, preview and overview reads behind "Show internal steps"', () => {
+    const console = activityWith();
+    console.answers.runs!.next(SERVER_RESPONSE(RUNS()));
+
+    expect(console.studio.visibleRuns().map(run => run.analyticsQueryRunId)).toEqual([4, 5, 6]);
+    expect(console.show()).toContain('3 internal steps are hidden.');
+    expect(console.show()).toContain('You cannot read this connection.');
+
+    const toggle = [...(console.fixture.nativeElement as HTMLElement).querySelectorAll('label')]
+      .find(label => label.textContent!.includes('Show internal steps'))!
+      .querySelector<HTMLInputElement>('input')!;
+    toggle.click();
+    console.fixture.detectChanges();
+
+    expect(console.studio.showInternalRuns()).toBe(true);
+    expect(console.studio.visibleRuns().length).toBe(6);
+    expect(console.show()).not.toContain('internal steps are hidden');
+  });
+
+  it('draws one compact row per run, with Open in the console only where there is SQL', () => {
+    const console = activityWith();
+    console.answers.runs!.next(SERVER_RESPONSE(RUNS()));
+    console.studio.showInternalRuns.set(true);
+    console.fixture.detectChanges();
+    const el = console.fixture.nativeElement as HTMLElement;
+
+    expect(el.querySelectorAll('#a-panel li').length).toBe(6);
+    const opens = [...el.querySelectorAll('#a-panel button')]
+      .filter(button => button.textContent!.trim() === 'Open in the console');
+    expect(opens.length).toBe(1);
+  });
+});
+
+describe('the Charts tab when there is nothing to draw', () => {
+  it('says where a chart comes from and offers the way there', () => {
+    const console = consoleWith();
+    console.studio.showTab('charts');
+    const el = console.fixture.nativeElement as HTMLElement;
+    console.fixture.detectChanges();
+    const button = (label: string) => [...el.querySelectorAll<HTMLButtonElement>('#a-panel button')]
+      .find(candidate => candidate.textContent!.trim() === label);
+
+    expect(console.show()).toContain('Nothing has run yet — a chart is drawn from a result');
+    button('Write a query')!.click();
+    expect(console.studio.tab()).toBe('sql');
+
+    console.studio.showTab('charts');
+    console.fixture.detectChanges();
+    button('Build one in Canvas')!.click();
+    expect(console.studio.tab()).toBe('canvas');
+  });
+
+  it('stops offering to write a query once there is a result it cannot draw', () => {
+    const console = charted(resultOf({ columns: ['note'], rows: [['a']], rowCount: 1 }));
+    const labels = [...(console.fixture.nativeElement as HTMLElement).querySelectorAll('#a-panel button')]
+      .map(button => button.textContent!.trim());
+    expect(labels).not.toContain('Write a query');
+    expect(labels).toContain('Build one in Canvas');
+  });
+});

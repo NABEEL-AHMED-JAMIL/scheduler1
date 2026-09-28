@@ -2,7 +2,6 @@ import { Component, computed, effect, inject, input, output, signal, untracked }
 import { Subscription } from 'rxjs';
 import { API_SUCCESS } from '../../core/api/api.config';
 import { Icon } from '../../shared/ui/icon';
-import { StatTile } from '../../shared/ui/stat-tile';
 import { formatSize } from '../../shared/ui/format-size';
 import { BarChart, Bar } from '../../shared/charts/bar-chart';
 import { RankedBar } from '../../shared/charts/ranked-bar';
@@ -24,36 +23,31 @@ interface OverviewTile { chart: OverviewChart; view: WidgetView | null; kind: st
  */
 @Component({
   selector: 'app-dataset-overview',
-  imports: [Icon, StatTile, AnalyticsWidget, WidgetChart, BarChart, RankedBar],
+  imports: [Icon, AnalyticsWidget, WidgetChart, BarChart, RankedBar],
   template: `
-    <!-- Complete only. Rows, columns and size on disk are in the dataset strip right above this
-         tab, which chose a strip over tiles on purpose; repeating them here as headline tiles
-         brought back the "208 B" false headline, and read "0 rows" while the overview loaded. -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-      <app-stat-tile label="Complete" [value]="completeness() === null ? '—' : completeness() + '%'" icon="check" [tone]="completeness() === null ? 'muted' : completeness()! >= 99 ? 'ok' : completeness()! >= 90 ? 'warn' : 'crit'"
-                     [foot]="gaps() ? gaps() + ' column' + (gaps() === 1 ? '' : 's') + ' with missing values' : 'no missing values'" />
-    </div>
-
+    <!-- No tiles here. Rows, columns, Complete and Quality are the Studio's KPI strip right above
+         this (owner, 2026-09-28), where the quality count -- which this component cannot see --
+         sits beside the other three. -->
     @if (loading()) {
-      <div class="widget-grid mt-4" aria-busy="true">
+      <div class="widget-grid" aria-busy="true">
         @for (n of [1, 2, 3, 4]; track n) {
           <app-analytics-widget [title]="'Reading the file…'" state="running" [refreshable]="false" />
         }
       </div>
     } @else if (error()) {
-      <div class="card p-8 text-center mt-4">
+      <div class="card p-8 text-center">
         <app-icon name="alert" size="1.6rem" class="icon-crit" />
         <p class="text-sm text-crit-500 mt-2">{{ error() }}</p>
         <button type="button" class="btn btn-default btn-sm mt-3" (click)="load()"><app-icon name="refresh" />Try again</button>
       </div>
     } @else if (!tiles().length) {
-      <div class="card p-8 text-center mt-4 text-sm text-[color:var(--text-muted)]">
+      <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]">
         <app-icon name="chart" size="1.5rem" class="icon-muted" />
         <p class="mt-2">{{ rows() === 0 ? 'The file has no rows, so there is nothing to chart.' : 'No column here lends itself to a chart unasked — a date, a category with a handful of values, or a numeric measure. The Canvas can still ask anything.' }}</p>
       </div>
     } @else {
-      <div class="flex items-center justify-between gap-2 mt-4 mb-2">
-        <p class="text-xs text-[color:var(--text-muted)]">{{ tiles().length }} chart{{ tiles().length === 1 ? '' : 's' }} chosen from the columns, read in {{ took() }}. Each opens in the Canvas as the analysis it is.</p>
+      <div class="flex items-center justify-between gap-2 mb-2">
+        <p class="text-xs text-[color:var(--text-muted)]" title="Each opens in the Canvas as the analysis that drew it.">{{ tiles().length }} chart{{ tiles().length === 1 ? '' : 's' }} chosen from the columns, read in {{ took() }}.</p>
         <button type="button" class="btn btn-default btn-sm" (click)="load(true)" [disabled]="loading()"><app-icon name="refresh" [class.spin]="loading()" />Refresh</button>
       </div>
       <div class="widget-grid">

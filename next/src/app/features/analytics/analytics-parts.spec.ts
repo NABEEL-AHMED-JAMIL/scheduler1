@@ -60,11 +60,12 @@ describe('DatasetOverview', () => {
     return { fixture, el: fixture.nativeElement as HTMLElement };
   }
 
-  it('does not repeat the figures the dataset strip already shows; keeps Complete', () => {
+  it('draws no tiles of its own: Complete is in the Studio\'s KPI strip now', () => {
+    // Owner, 2026-09-28: Rows, Columns, Complete and Quality issues are one strip above the
+    // charts, drawn by the Studio -- the quality count is not something this component can see.
     const { el } = overview();
-    const labels = [...el.querySelectorAll('app-stat-tile')].map(t => t.getAttribute('label') ?? t.textContent!);
-    expect(labels.join(' ')).toContain('Complete');
-    expect(labels.join(' ')).not.toMatch(/\bOn disk\b|\bRows\b|\bColumns\b/);
+    expect(el.querySelectorAll('app-stat-tile').length).toBe(0);
+    expect(el.textContent).toContain('Rows by region');
   });
 
   it('refreshes with the console Refresh button', () => {
