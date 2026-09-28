@@ -280,3 +280,34 @@ describe('Reports builder across a reload', () => {
     expect(fixture.debugElement.query(By.directive(ReportPivot))?.componentInstance).toBe(before);
   });
 });
+
+/**
+ * The Failed tile said 11 beside an outcome mix and task table saying Failed 10 and Interrupt 1.
+ * The tile keeps 11 -- the Failed runs table lists the interrupted run too -- and says the split.
+ */
+describe('the Failed tile', () => {
+  const mixed = (interrupted: number): RunData => ({
+    ...empty,
+    task: ['nightly-load'],
+    status: ['Failed', 'Interrupt'],
+    owner: ['Ada'],
+    day: ['2026-08-01'],
+    rows: [
+      ...Array.from({ length: 10 }, (_, i) => [0, 0, 0, 0, 5, 'job a', i + 1, 0, 1]),
+      ...Array.from({ length: interrupted }, (_, i) => [0, 1, 0, 0, 5, 'job a', 100 + i, 0, 1]),
+    ] as RunRow[],
+  });
+
+  it('counts interrupted runs as failed and says how many there were', () => {
+    const reports = reportsFor();
+    reports.rawData.set(mixed(1));
+    expect(reports.counts().failed).toBe(11);
+    expect(reports.failedFoot()).toBe('10 failed · 1 interrupted');
+  });
+
+  it('says nothing more when nothing was interrupted', () => {
+    const reports = reportsFor();
+    reports.rawData.set(mixed(0));
+    expect(reports.failedFoot()).toBe('');
+  });
+});

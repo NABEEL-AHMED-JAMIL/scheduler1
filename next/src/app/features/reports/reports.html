@@ -159,7 +159,7 @@
         <app-stat-tile label="Runs" [value]="counts().total" icon="play"
                        [foot]="runsFoot()" />
         <app-stat-tile label="Failed" [value]="counts().failed" icon="alert"
-                       [tone]="counts().failed ? 'crit' : 'muted'" />
+                       [tone]="counts().failed ? 'crit' : 'muted'" [foot]="failedFoot()" />
         <!-- A dash, not a zero, when nothing has settled: 0% in red says everything failed,
              which is the opposite of "nothing has finished yet". -->
         <app-stat-tile label="Success rate" icon="check"
