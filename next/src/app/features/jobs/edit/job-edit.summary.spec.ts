@@ -34,10 +34,17 @@ describe('JobEdit schedule summary', () => {
     expect(edit.summary()).toBe('Every 3 days at 02:30.');
   });
 
+  /** A time input with a step, or a value read back from the API, can carry seconds nobody set. */
+  it('writes the time without seconds', () => {
+    const edit = editor();
+    edit.scheduler.patchValue({ startTime: '09:30:00' });
+    expect(edit.summary()).toBe('Every 1 day at 09:30.');
+  });
+
   it('follows the end date', () => {
     const edit = editor();
     edit.scheduler.patchValue({ endDate: '2026-12-31' });
-    expect(edit.summary()).toBe('Every 1 day at 00:00, until 2026-12-31 inclusive.');
+    expect(edit.summary()).toBe('Every 1 day at 00:00, until 31 Dec 2026 inclusive.');
   });
 
   it('follows the day of the month', () => {

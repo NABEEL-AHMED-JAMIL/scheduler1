@@ -14,6 +14,8 @@ import { Icon } from '../../../shared/ui/icon';
 import { LoadError } from '../../../shared/ui/load-error';
 import { NOTIFY_OPTIONS } from '../notify-summary';
 import { SERVER_ZONE } from '../../../core/instant';
+import { dayLabel } from '../../../shared/ui/time-format';
+import { clockTime } from '../schedule-labels';
 import { Combobox, ComboboxOption } from '../../../shared/ui/combobox';
 
 const FREQUENCIES = [
@@ -283,7 +285,7 @@ export class JobEdit implements OnInit {
       return 'Set how often it repeats to see the schedule.';
     }
     const every = String(interval);
-    const time = schedule['startTime'] || '00:00';
+    const time = clockTime(schedule['startTime']) || '00:00';
     const plural = every === '1' ? '' : 's';
     let text: string;
     switch (frequency) {
@@ -311,7 +313,8 @@ export class JobEdit implements OnInit {
       default: text = '';
     }
     const end = schedule['endDate'];
-    return end ? `${text}, until ${end} inclusive.` : `${text}.`;
+    // Written as the rest of the console writes a day; the field itself keeps the ISO value.
+    return end ? `${text}, until ${dayLabel(end)} inclusive.` : `${text}.`;
   });
 
   /**
