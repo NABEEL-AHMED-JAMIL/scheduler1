@@ -67,7 +67,9 @@
         <div class="grid lg:grid-cols-3 gap-4">
           <div class="card p-4">
             <h2 class="text-sm font-semibold mb-3">Job status</h2>
-            <app-donut [data]="statusCategories()" totalLabel="jobs" />
+            <!-- Status colours, so Inactive is amber like its pill rather than the next palette slot,
+                 a pink that read as Failed. -->
+            <app-donut [data]="statusCategories()" totalLabel="jobs" [colorFor]="outcomeColor" />
           </div>
 
           <div class="card p-4">

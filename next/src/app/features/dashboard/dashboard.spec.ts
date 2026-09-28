@@ -217,3 +217,13 @@ describe('which status columns the drill-down shows', () => {
     expect(html).not.toContain('column of columns;');
   });
 });
+
+describe('the job status donut', () => {
+  it('paints statuses in their status colours, so Inactive is not a Failed-like pink', async () => {
+    const fs = (await import(/* @vite-ignore */ ['node', 'fs'].join(':'))) as { readFileSync(p: string, e: 'utf8'): string };
+    const root = (globalThis as unknown as { process: { cwd(): string } }).process.cwd();
+    const html = fs.readFileSync(`${root}/src/app/features/dashboard/dashboard.html`, 'utf8');
+    expect(html).toMatch(/<app-donut \[data\]="statusCategories\(\)"[^>]*\[colorFor\]="outcomeColor"/);
+    expect(dashboardFor().outcomeColor('inactive')).toBe('var(--series-warn-soft)');
+  });
+});

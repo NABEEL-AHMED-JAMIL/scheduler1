@@ -166,7 +166,7 @@ export class Dashboard implements OnInit {
     });
   });
 
-  /** Run outcomes keep their status colours so a chart matches the pills in the tables. */
+  /** Job and run statuses keep their status colours so a chart matches the pills in the tables. */
   readonly outcomeColor = statusColor;
 
   /** Hour-by-weekday cells for the heatmap; the date rides along so a click can drill in. */
