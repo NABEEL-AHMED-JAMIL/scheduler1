@@ -2,9 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
 import { Dialog } from '@angular/cdk/dialog';
-import { of } from 'rxjs';
+import { EMPTY, of } from 'rxjs';
 import { Queue } from './queue';
 import { ToastService } from '../../shared/ui/toast.service';
+import { AuthService } from '../../core/auth/auth.service';
+import { JobEventsService } from '../../core/socket/job-events.service';
+import { signal } from '@angular/core';
 
 /**
  * Tenant-user review, 2026-09-24: the Queue's Job column showed a bare number (2844). The runs carry only the job id,
@@ -19,6 +22,9 @@ function queue() {
     } },
     { provide: Dialog, useValue: { open: () => ({ closed: of(true) }) } },
     { provide: ToastService, useValue: { success: () => {}, error: () => {}, info: () => {} } },
+    // The screen follows the socket and gates its links on the Jobs page; neither is under test here.
+    { provide: AuthService, useValue: { canOpen: () => true } },
+    { provide: JobEventsService, useValue: { events: EMPTY, connected: signal(false) } },
   ] });
   const q = TestBed.runInInjectionContext(() => new Queue());
   q.ngOnInit();

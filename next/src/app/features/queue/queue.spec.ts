@@ -2,9 +2,12 @@ import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
 import { Dialog } from '@angular/cdk/dialog';
-import { of } from 'rxjs';
+import { EMPTY, of } from 'rxjs';
 import { Queue } from './queue';
 import { ToastService } from '../../shared/ui/toast.service';
+import { AuthService } from '../../core/auth/auth.service';
+import { JobEventsService } from '../../core/socket/job-events.service';
+import { signal } from '@angular/core';
 
 function queueFor() {
   TestBed.resetTestingModule();
@@ -15,6 +18,9 @@ function queueFor() {
       { provide: HttpClient, useValue: { post: () => of({ status: 'SUCCESS', data: {} }) } },
       { provide: Dialog, useValue: { open: () => ({ closed: of(true) }) } },
       { provide: ToastService, useValue: { success: () => {}, error: () => {}, info: () => {} } },
+      // The screen follows the socket and gates its links on the Jobs page; neither is under test here.
+      { provide: AuthService, useValue: { canOpen: () => true } },
+      { provide: JobEventsService, useValue: { events: EMPTY, connected: signal(false) } },
     ],
   });
   return TestBed.runInInjectionContext(() => new Queue());
@@ -99,7 +105,8 @@ describe('Queue charts and table describe the same messages', () => {
     queue.search.set('30');
 
     expect(queue.data().length).toBe(1);
-    expect(queue.byJob()).toEqual([{ name: 'Job 30', value: 1 }]);
+    // No job list was read here, so the job is named by its number, as the table names it.
+    expect(queue.byJob()).toEqual([{ name: 'Job #30', value: 1 }]);
     // The one matching row never ended, so no duration bucket has anything in it.
     expect(queue.durations()).toEqual([]);
     const started = queue.flagSplit()[0];
