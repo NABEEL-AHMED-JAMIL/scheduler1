@@ -3,7 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { ToastService } from '../../shared/ui/toast.service';
 import { HttpClient } from '@angular/common/http';
 import { Dialog } from '@angular/cdk/dialog';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { Subject, of } from 'rxjs';
 import {
   Dashboards, DatasetRegistry, analysisView, dateOnly, plainDecimal, queryView, combineFilters } from './dashboard';
@@ -215,6 +215,12 @@ function configure(over: BoardOptions) {
     ],
   });
   return stub;
+}
+
+/** A board with nothing loaded: for the pure helpers that read no API. */
+function bareBoard(): Dashboards {
+  configure({});
+  return TestBed.runInInjectionContext(() => new Dashboards());
 }
 
 function boardWith(over: BoardOptions = {}) {
@@ -592,17 +598,19 @@ describe('what a tile is allowed to claim', () => {
   });
 
   it('draws only a tile\'s worth, and counts the whole result under them', () => {
-    const board = TestBed.runInInjectionContext(() => new Dashboards());
+    const board = bareBoard();
     const view = analysisView(analysisResult({
       rows: Array.from({ length: 30 }, (_, at) => [`r${at}`, '1']),
       rowCount: 30,
     }), 'SUM');
 
-    expect(board.tileRows(view).length).toBe(8);
+    expect(board.tileRows(view).length).toBe(5);
     expect(board.hasMoreRows(view)).toBe(true);
     // The sentence under the tile counts what is DRAWN against the whole result -- not the
     // length of the rows array, which is now the whole result itself.
-    expect(board.counted(view, 'table')).toBe('8 of 30 rows shown');
+    expect(board.counted(view, 'table')).toBe('5 of 30 rows shown');
+    // And once "Show all" is pressed, the whole of it.
+    expect(board.counted(view, 'table', Number.MAX_SAFE_INTEGER)).toBe('30 rows');
   });
 
   it('does not offer a way out of a result the tile is already showing whole', () => {
@@ -610,7 +618,7 @@ describe('what a tile is allowed to claim', () => {
       rows: Array.from({ length: 3 }, (_, at) => [`r${at}`, '1']),
       rowCount: 3,
     }), 'SUM');
-    const board = TestBed.runInInjectionContext(() => new Dashboards());
+    const board = bareBoard();
 
     expect(board.hasMoreRows(view)).toBe(false);
     expect(board.counted(view, 'table')).toBe('3 rows');
@@ -801,14 +809,20 @@ describe('the board on screen', () => {
     expect(rendered.text()).toContain('—');
   });
 
-  it('names what each tile points at, so a title cannot be the only thing said about it', () => {
-    // The saved work's name is not repeated when it is the tile's own title...
-    const same = renderedBoard({ widgets: [widgetOn({ visualizationType: 'table' })] });
-    expect(same.text()).toContain('Saved analysis · minio-main/daily/sales-2026.csv');
-    expect(same.text()).not.toContain('Saved analysis · Revenue by region');
+  it('names what each tile points at in one short line, with the whole path on hover', () => {
+    const sub = (rendered: ReturnType<typeof renderedBoard>) => {
+      rendered.text();
+      return (rendered.fixture.nativeElement as HTMLElement).querySelector<HTMLElement>('app-analytics-widget .widget-sub')!;
+    };
+    // The file's name, not its path; the saved work's name is not repeated when it is the
+    // tile's own title...
+    const same = sub(renderedBoard({ widgets: [widgetOn({ visualizationType: 'table' })] }));
+    expect(same.textContent!.trim()).toBe('sales-2026.csv');
+    expect(same.title).toBe('Saved analysis · minio-main/daily/sales-2026.csv');
     // ...and is when the tile was given a title of its own.
-    const renamed = renderedBoard({ widgets: [widgetOn({ visualizationType: 'table', widgetTitle: 'Where the money is' })] });
-    expect(renamed.text()).toContain('Saved analysis · Revenue by region · minio-main/daily/sales-2026.csv');
+    const renamed = sub(renderedBoard({ widgets: [widgetOn({ visualizationType: 'table', widgetTitle: 'Where the money is' })] }));
+    expect(renamed.textContent!.trim()).toBe('Revenue by region · sales-2026.csv');
+    expect(renamed.title).toBe('Saved analysis · Revenue by region · minio-main/daily/sales-2026.csv');
   });
 });
 
@@ -1252,7 +1266,7 @@ describe('the kinds a result is not allowed to be drawn as', () => {
     const view = analysisView(analysisResult({
       rows: [['jan', '100'], ['feb', '250'], ['mar', '50']], rowCount: 3,
     }), 'SUM', { sortedBy: 'DIMENSION' });
-    const board = TestBed.runInInjectionContext(() => new Dashboards());
+    const board = bareBoard();
 
     expect(view.issues.cumulative).toBe('');
     expect((chart() as any).cumulativePoints(view).map((p: any) => p.value)).toEqual([100, 350, 400]);
@@ -1340,15 +1354,15 @@ describe('what the tile draws, and what it says it drew', () => {
   });
 
   it('counts what the DRAWN kind renders, not what the table would', () => {
-    // "8 of 24 rows shown" under a chart with twenty-four bars in it tells a reader they are
-    // seeing a third of the data while they are seeing all of it.
+    // "5 of 24 rows shown" under a chart with twenty-four bars in it tells a reader they are
+    // seeing a fifth of the data while they are seeing all of it.
     const harness = boardWith({ widgets: [widgetOn()] });
     const view = analysisView(analysisResult({
       rows: Array.from({ length: 24 }, (_, at) => [`m${at}`, String(at + 1)]),
       rowCount: 24,
     }), 'SUM');
 
-    expect(harness.board.counted(view, 'table')).toBe('8 of 24 rows shown');
+    expect(harness.board.counted(view, 'table')).toBe('5 of 24 rows shown');
     expect(harness.board.counted(view, 'bar')).toBe('24 rows');
     expect(harness.board.counted(view, 'ranked')).toBe('24 rows');
   });
@@ -1591,7 +1605,7 @@ describe('stacked bars and the share within each group', () => {
   }
 
   it('counts a cross-tab in groups, not in the source rows behind them', () => {
-    const board = TestBed.runInInjectionContext(() => new Dashboards());
+    const board = bareBoard();
     // The grid is composed by the SERVER and arrives on the result; nothing here derives it.
     const view = analysisView(analysisResult({
       rows: [['north', 'shipped', '300'], ['south', 'shipped', '50']],
@@ -2254,20 +2268,297 @@ describe('the dates a board shows', () => {
 });
 
 /**
- * MIG-212: a board used the whole width for every widget, so six single figures took six full
- * rows. A figure now takes one cell of a grid that fits the width; a table or a chart keeps the row.
+ * The redesign of 2026-09-28: a board is a twelve-column grid, and a widget's width follows what
+ * it draws -- a single figure a quarter, a chart a half, a table the whole row. It replaced a
+ * grid where every chart and table took a full row, so a seven-widget board was 3,200px tall.
  */
 describe('how a board lays out its widgets', () => {
-  const view = (rowCount: number, columns: string[], truncated = false) => ({ rowCount, columns, truncated }) as never;
-
-  it('lets a single figure share the row, and gives anything larger the whole row', () => {
+  it('spans a figure 3, a chart 6 and a table or a cross-tab 12, by the saved kind before it runs', () => {
     const { board } = boardWith();
-    expect(board.isFigure(view(1, ['amount_sum']))).toBe(true);
-    expect(board.isFigure(view(1, ['region', 'amount_sum']))).toBe(true);
-    expect(board.isFigure(view(4, ['region', 'amount_sum']))).toBe(false);
-    expect(board.isFigure(view(1, ['a', 'b', 'c']))).toBe(false);
-    expect(board.isFigure(view(1, ['amount_sum'], true))).toBe(false);
-    expect(board.isFigure(undefined)).toBe(false);
+    const span = (kind: string | null) => board.spanOf(widgetOn({ visualizationType: kind }));
+    expect(span('kpi')).toBe(3);
+    for (const kind of ['ranked', 'bar', 'donut', 'line', 'dimensionSummary', 'comparison']) expect(span(kind), kind).toBe(6);
+    expect(span('table')).toBe(12);
+    expect(span('pivot')).toBe(12);
+    // Nothing saved is a table, and a kind this screen does not know is drawn as one.
+    expect(span(null)).toBe(12);
+    expect(span('sparkles')).toBe(12);
+  });
+
+  it('follows the DRAWN kind once a result is in: a ring this result refuses is a table, the whole row', () => {
+    const harness = boardWith({ widgets: [widgetOn({ visualizationType: 'donut', analyticsAnalysisId: 12 })] });
+    harness.board.openDashboard(BOARD);
+    expect(harness.board.spanOf(harness.board.widgets()[0])).toBe(6);
+    // An average has no total to divide, so the ring is refused and the rows are shown instead.
+    harness.finishAnalysis(analysisResult({ measure: 'avg_amount' }));
+    expect(harness.board.spanOf(harness.board.widgets()[0])).toBe(12);
+  });
+
+  it('puts the span on the tile as column classes, one column on a phone', () => {
+    const rendered = renderedBoard({ widgets: [
+      widgetOn({ analyticsDashboardWidgetId: 100, visualizationType: 'kpi' }),
+      widgetOn({ analyticsDashboardWidgetId: 101, visualizationType: 'ranked' }),
+      widgetOn({ analyticsDashboardWidgetId: 102, visualizationType: 'table' }),
+    ] });
+    rendered.text();
+    const el = rendered.fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('.dash-grid')).not.toBeNull();
+    const tiles = [...el.querySelectorAll<HTMLElement>('.dash-grid > app-analytics-widget')];
+    expect(tiles.map(tile => tile.dataset['span'])).toEqual(['3', '6', '12']);
+    expect(tiles[0].classList).toContain('lg:col-span-3');
+    expect(tiles[1].classList).toContain('lg:col-span-6');
+    expect(tiles[2].classList).toContain('sm:col-span-12');
+    // Grid children shrink below their content only when told to.
+    for (const tile of tiles) expect(tile.classList).toContain('min-w-0');
+  });
+});
+
+describe('a table tile shows five rows and offers the rest', () => {
+  const EIGHT = analysisResult({ rows: Array.from({ length: 8 }, (_, at) => [`r${at}`, String(at + 1)]), rowCount: 8 });
+
+  function tableBoard(kind = 'table') {
+    const rendered = renderedBoard({ widgets: [widgetOn({ visualizationType: kind })] });
+    rendered.finishAnalysis(EIGHT);
+    rendered.text();
+    const el = rendered.fixture.nativeElement as HTMLElement;
+    return { ...rendered, el, toggle: () => el.querySelector<HTMLButtonElement>('.dash-show-all') };
+  }
+
+  it('draws five rows and a "Show all 8" that opens the rest in the tile', () => {
+    const { el, toggle, text } = tableBoard();
+    expect(el.querySelectorAll('app-widget-table tbody tr')).toHaveLength(5);
+    expect(toggle()!.textContent!.trim()).toBe('Show all 8');
+    expect(toggle()!.getAttribute('aria-expanded')).toBe('false');
+    expect(text()).toContain('5 of 8 rows shown');
+
+    toggle()!.click();
+    text();
+    expect(el.querySelectorAll('app-widget-table tbody tr')).toHaveLength(8);
+    expect(toggle()!.textContent!.trim()).toBe('Show fewer');
+    expect(toggle()!.getAttribute('aria-expanded')).toBe('true');
+    expect(text()).toContain('8 rows');
+    // The open table scrolls inside its tile rather than stretching the board.
+    expect(el.querySelector('.dash-rows-open app-widget-table')).not.toBeNull();
+
+    toggle()!.click();
+    text();
+    expect(el.querySelectorAll('app-widget-table tbody tr')).toHaveLength(5);
+  });
+
+  it('offers nothing when the table already shows every row, or when a chart draws every mark', () => {
+    const rendered = renderedBoard({ widgets: [widgetOn({ visualizationType: 'table' })] });
+    rendered.finishAnalysis();
+    rendered.text();
+    expect((rendered.fixture.nativeElement as HTMLElement).querySelector('.dash-show-all')).toBeNull();
+    expect(tableBoard('ranked').toggle()).toBeNull();
+  });
+});
+
+/**
+ * The chart kind used to be a <select> at the foot of every tile. It lives in the tile's menu
+ * now, under "Show as", listing every kind in the picker's order with the ones this result refuses
+ * inert and saying why -- and choosing one still runs nothing.
+ */
+describe('choosing how a tile is drawn, from its menu', () => {
+  function overlay(): HTMLElement { return document.querySelector('.cdk-overlay-container') as HTMLElement; }
+
+  function openKinds() {
+    const rendered = renderedBoard({ widgets: [widgetOn({ visualizationType: 'table' })] });
+    rendered.finishAnalysis();
+    rendered.text();
+    const el = rendered.fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('select.widget-kind')).toBeNull();
+    el.querySelector<HTMLButtonElement>('button[aria-label="Actions for Revenue by region"]')!.click();
+    rendered.fixture.detectChanges();
+    expect(overlay().textContent).toContain('Show as');
+    const kinds = [...overlay().querySelectorAll<HTMLButtonElement>('button.dash-kind')];
+    return { ...rendered, kinds };
+  }
+
+  it('lists every kind, ticks the drawn one, and leaves the refused ones inert with the reason', () => {
+    const { kinds } = openKinds();
+    expect(kinds.map(item => item.dataset['kind'])).toEqual(KIND_IDS);
+    const table = kinds.find(item => item.dataset['kind'] === 'table')!;
+    expect(table.getAttribute('role')).toBe('menuitemradio');
+    expect(table.getAttribute('aria-checked')).toBe('true');
+    // Two rows is not a single figure: refused, and the reason is on the item itself.
+    const kpi = kinds.find(item => item.dataset['kind'] === 'kpi')!;
+    expect(kpi.disabled).toBe(true);
+    expect(kpi.title.length).toBeGreaterThan(0);
+    expect(kpi.textContent).toContain(kpi.title);
+  });
+
+  it('saves the kind picked and redraws the result in hand, running nothing', () => {
+    const { kinds, saveWidget, analyze, fixture } = openKinds();
+    kinds.find(item => item.dataset['kind'] === 'ranked')!.click();
+    fixture.detectChanges();
+    expect(saveWidget).toHaveBeenCalledWith(expect.objectContaining({ visualizationType: 'ranked' }));
+    expect(analyze).toHaveBeenCalledTimes(1);
+    expect((fixture.nativeElement as HTMLElement).querySelector('app-ranked-bar')).not.toBeNull();
+  });
+});
+
+/**
+ * The landing view: every board as a card, and an open board with the whole width. It replaced
+ * four count tiles that meant nothing until a board was open, and a list of boards kept beside
+ * the board at all times.
+ */
+describe('the cards on the landing page', () => {
+  const BOARDS: Dashboard[] = [
+    { ...BOARD, createdByName: 'Claude Demo Admin', dateCreated: '2026-09-24 22:43:00' },
+    { analyticsDashboardId: 8, dashboardName: 'Quarter end', createdByName: 'Ann', dateUpdated: '2026-09-25T03:43:02.920+00:00' },
+  ];
+
+  function landing(over: BoardOptions = {}) {
+    const stub = configure({ dashboards: BOARDS, ...over });
+    const fixture = TestBed.createComponent(Dashboards);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    return { ...stub, fixture, el, board: fixture.componentInstance,
+      cards: () => [...el.querySelectorAll<HTMLAnchorElement>('a.dash-card')],
+      text: () => { fixture.detectChanges(); return el.textContent!.replace(/\s+/g, ' '); } };
+  }
+
+  it('draws one card per board with its name, description, counts, owner and date', () => {
+    const { cards, text, el } = landing({ widgets: [
+      widgetOn({ analyticsDashboardWidgetId: 100 }),
+      widgetOn({ analyticsDashboardWidgetId: 101, analyticsAnalysisId: null, analyticsQueryId: 21 }),
+      widgetOn({ analyticsDashboardWidgetId: 102, analyticsAnalysisId: 12 }),
+    ] });
+    text();
+    expect(cards()).toHaveLength(2);
+    const first = cards()[0].textContent!.replace(/\s+/g, ' ');
+    expect(first).toContain('Month end');
+    expect(first).toContain('What finance asks for');
+    // Three widgets over one file: the two analyses and the query all read sales-2026.csv.
+    expect(first).toContain('3 widgets · 1 file');
+    expect(first).toMatch(/Claude Demo Admin · updated 24 Sep 2026/);
+    expect(cards()[1].textContent).toContain('No description');
+    // The page head is one line now, with no count tiles.
+    expect(el.querySelector('app-stat-tile')).toBeNull();
+    expect(text()).toContain('Pages of saved analyses, re-run each time you open them.');
+    // The last card makes a new board.
+    const create = el.querySelector<HTMLButtonElement>('button.dash-card-new')!;
+    create.click();
+    expect(text()).toContain('What it is for (optional)');
+  });
+
+  it('reads each board once, for its counts, and runs nothing', () => {
+    const { fetchDashboardById, analyze, query, text } = landing();
+    text();
+    expect(fetchDashboardById).toHaveBeenCalledTimes(2);
+    expect(analyze).not.toHaveBeenCalled();
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('offers a search only past a handful of boards', () => {
+    expect(landing().el.querySelector('input[type="search"]')).toBeNull();
+    const many = Array.from({ length: 7 }, (_, at) => ({ analyticsDashboardId: at + 1, dashboardName: `Board ${at + 1}` }));
+    const { el, text } = landing({ dashboards: many });
+    text();
+    const search = el.querySelector<HTMLInputElement>('input[type="search"]')!;
+    expect(search).not.toBeNull();
+    search.value = 'Board 7';
+    search.dispatchEvent(new Event('input'));
+    text();
+    expect([...el.querySelectorAll('a.dash-card')].map(card => card.textContent)).toHaveLength(1);
+  });
+
+  it('invites a first board when there are none', () => {
+    const { el, text } = landing({ dashboards: [] });
+    expect(text()).toContain('No dashboards yet');
+    const create = [...el.querySelectorAll('button')].find(button => button.textContent!.includes('Create a dashboard'))!;
+    create.click();
+    text();
+    expect(el.querySelector('#dashName')).not.toBeNull();
+  });
+});
+
+describe('opening a board and going back', () => {
+  async function page(url = '/') {
+    const stub = configure({ widgets: [widgetOn({ visualizationType: 'table' })] });
+    const router = TestBed.inject(Router);
+    await router.navigateByUrl(url);
+    const fixture = TestBed.createComponent(Dashboards);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    return { ...stub, router, fixture, el, board: fixture.componentInstance,
+      async settle() { await fixture.whenStable(); fixture.detectChanges(); } };
+  }
+
+  it('opens a board from its card, full width, and puts it in the address', async () => {
+    const view = await page();
+    view.el.querySelector<HTMLAnchorElement>('a.dash-card')!.click();
+    await view.settle();
+    expect(view.router.url).toBe('/?board=7');
+    expect(view.board.openId()).toBe(7);
+    expect(view.el.querySelector('h1')!.textContent).toContain('Month end');
+    expect(view.el.querySelector('a.dash-card')).toBeNull();
+    expect(view.el.querySelector('[role="listbox"]')).toBeNull();
+    expect(view.analyze).toHaveBeenCalledTimes(1);
+  });
+
+  it('goes back to the cards from "All dashboards", stopping the board and clearing the address', async () => {
+    const view = await page('/?board=7');
+    expect(view.board.openId()).toBe(7);
+    const back = [...view.el.querySelectorAll('a')].find(link => link.textContent!.includes('All dashboards'))!;
+    back.click();
+    await view.settle();
+    expect(view.board.openId()).toBeNull();
+    expect(view.board.running()).toBe(false);
+    expect(view.router.url).toBe('/');
+    expect(view.el.querySelector('a.dash-card')).not.toBeNull();
+  });
+
+  it('opens the board a link names, and follows Back and Forward', async () => {
+    const view = await page('/?board=7');
+    expect(view.board.openId()).toBe(7);
+    expect(view.fetchDashboardById).toHaveBeenCalledWith(7);
+    expect(view.el.querySelector('h1')!.textContent).toContain('Month end');
+    expect(view.el.textContent).toContain('1 widget');
+    expect(view.el.textContent).toContain('Files this board reads (1)');
+
+    await view.router.navigateByUrl('/');
+    await view.settle();
+    expect(view.board.openId()).toBeNull();
+
+    await view.router.navigateByUrl('/?board=7');
+    await view.settle();
+    expect(view.board.openId()).toBe(7);
+  });
+
+  it('ignores an address that names no board, and says why a board could not be read', async () => {
+    const junk = await page('/?board=abc');
+    expect(junk.board.openId()).toBeNull();
+
+    const view = await page();
+    view.fetchDashboardById.mockReturnValue(of(SERVER_REFUSAL('No such dashboard in this workspace.')) as any);
+    await view.router.navigateByUrl('/?board=404');
+    await view.settle();
+    expect(view.el.textContent).toContain('No such dashboard in this workspace.');
+    expect([...view.el.querySelectorAll('a')].some(link => link.textContent!.includes('All dashboards'))).toBe(true);
+  });
+
+  it('does not carry one board\'s results or filter to the next', async () => {
+    const view = await page('/?board=7');
+    view.finishAnalysis();
+    view.board.boardFilterOn.set('x');
+    expect(view.board.ranCount()).toBe(1);
+    view.board.closeDashboard();
+    expect(view.board.ranCount()).toBe(0);
+    expect(view.board.boardFilterOn()).toBe('');
+  });
+
+  it('shows the facts line: widgets, files, owner, and how the last run went', async () => {
+    const view = await page('/?board=7');
+    view.finishAnalysis();
+    view.fixture.detectChanges();
+    const facts = view.el.querySelector('.dash-facts')!.textContent!.replace(/\s+/g, ' ');
+    expect(facts).toContain('1 widget');
+    expect(facts).toContain('1 file');
+    expect(facts).toContain('Last run: 1 of 1 drew');
   });
 });
 
@@ -2301,6 +2592,8 @@ describe('Dashboards, audit 09-22', () => {
     const rendered = renderedBoard();
     const reply = new Subject<any>();
     rendered.api.saveDashboard.mockReturnValueOnce(reply as any);
+    // The form belongs to the cards, so it is opened from there.
+    rendered.board.closeDashboard();
     rendered.board.createOpen.set(true);
     rendered.board.newName.set('Quarter end');
     rendered.fixture.detectChanges();
@@ -2308,6 +2601,8 @@ describe('Dashboards, audit 09-22', () => {
     expect(rendered.text()).toContain('Creating…');
     reply.next(SERVER_RESPONSE({ ...BOARD, analyticsDashboardId: 12, dashboardName: 'Quarter end' }));
     expect(rendered.board.createOpen()).toBe(false);
+    // And the new board is the one on screen.
+    expect(rendered.board.openId()).toBe(12);
   });
 
   it('marks a partial tile as a warning, the way the Studio does, not as an error', () => {
@@ -2320,18 +2615,15 @@ describe('Dashboards, audit 09-22', () => {
     expect([...el.querySelectorAll('.text-crit-500')].some(p => p.textContent!.includes('Partial'))).toBe(false);
   });
 
-  it('puts the "Drawn as" select back when the choice could not be saved', () => {
+  it('keeps drawing, and ticking, the old kind when the choice could not be saved', () => {
     const rendered = renderedBoard({ widgets: [widgetOn({ visualizationType: 'table' })] });
     rendered.finishAnalysis();
     rendered.text();
     rendered.api.saveWidget.mockReturnValueOnce(of(SERVER_REFUSAL('Only its owner can change this board.')) as any);
-    const select = (rendered.fixture.nativeElement as HTMLElement).querySelector<HTMLSelectElement>('select.widget-kind')!;
-    const before = select.value;
-    const other = [...select.options].find(o => !o.disabled && o.value !== before)!.value;
-    select.value = other;
-    select.dispatchEvent(new Event('change'));
-    rendered.fixture.detectChanges();
-    expect(select.value).toBe(before);
+    rendered.board.setVisualization(rendered.board.widgets()[0], 'ranked');
+    const view = rendered.runOf(100).view!;
+    expect(rendered.board.drawn(rendered.board.widgets()[0], view)).toBe('table');
+    expect(rendered.text()).toContain('Only its owner can change this board.');
   });
 
   it('asks to remove a widget in one verb: "Remove this widget?" / Remove', async () => {
@@ -2348,16 +2640,20 @@ describe('Dashboards, audit 09-22', () => {
     expect(stub.deleteWidget).not.toHaveBeenCalled();
   });
 
-  it('shows a rail that failed to load with the alert icon and a refresh Try again', () => {
+  it('shows a list that failed to load with the alert icon and a refresh Try again', () => {
     const stub = configure({});
     stub.api.fetchAllDashboards.mockReturnValue(of(SERVER_REFUSAL('The dashboards could not be read.')) as any);
     const fixture = TestBed.createComponent(Dashboards);
     fixture.detectChanges();
-    const rail = (fixture.nativeElement as HTMLElement).querySelector('.lookup-rail')!;
-    expect(rail.textContent).toContain('The dashboards could not be read.');
-    expect(rail.querySelector('app-icon[name="alert"]')).not.toBeNull();
-    const retry = [...rail.querySelectorAll('button')].find(b => b.textContent!.includes('Try again'))!;
+    const failed = (fixture.nativeElement as HTMLElement).querySelector('.dash-list-error')!;
+    expect(failed.textContent).toContain('The dashboards could not be read.');
+    expect(failed.querySelector('app-icon[name="alert"]')).not.toBeNull();
+    const retry = [...failed.querySelectorAll('button')].find(b => b.textContent!.includes('Try again'))!;
     expect(retry.querySelector('app-icon[name="refresh"]')).not.toBeNull();
+    stub.api.fetchAllDashboards.mockReturnValue(of(SERVER_RESPONSE([BOARD])) as any);
+    retry.click();
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).querySelector('.dash-card')?.textContent).toContain('Month end');
   });
 });
 
