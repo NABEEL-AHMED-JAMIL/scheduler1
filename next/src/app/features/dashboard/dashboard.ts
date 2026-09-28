@@ -1,6 +1,5 @@
 import { BillingBrief } from '../billing/billing-brief';
 import { Component, DestroyRef, Injector, OnInit, afterNextRender, computed, inject, signal } from '@angular/core';
-import { DatePipe } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Donut } from '../../shared/charts/donut';
 import { Bar, BarChart } from '../../shared/charts/bar-chart';
@@ -14,6 +13,8 @@ import { Pagination } from '../../shared/ui/pagination';
 import { Icon } from '../../shared/ui/icon';
 import { statusColor } from '../../shared/charts/status-color';
 import { localIsoDaysAgo } from '../../shared/ui/local-day';
+import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
+import { dayLabel, hourRange } from '../../shared/ui/time-format';
 import { StatTile } from '../../shared/ui/stat-tile';
 import { TableShell } from '../../shared/ui/data-table';
 import { BlurLoader } from '../../shared/ui/blur-loader';
@@ -48,7 +49,7 @@ type BreakdownKey = typeof BREAKDOWN_COLUMNS[number];
 
 @Component({
   selector: 'app-dashboard',
-  imports: [DatePipe, Pagination, Icon, RouterLink, Donut, BarChart, Heatmap, BillingBrief, StatTile, TableShell, BlurLoader, LoadError],
+  imports: [ServerTimePipe, Pagination, Icon, RouterLink, Donut, BarChart, Heatmap, BillingBrief, StatTile, TableShell, BlurLoader, LoadError],
   templateUrl: './dashboard.html',
 })
 export class Dashboard implements OnInit {
@@ -200,12 +201,19 @@ export class Dashboard implements OnInit {
       key: cell.date,
     })));
 
-  /** The drill-down's heading, which also names the region it scrolls to. */
+  /**
+   * The drill-down's heading, which also names the region it scrolls to: "Jobs on Thursday
+   * 24 Sep 2026, 22:00–23:00". The hour is the bucket the heatmap counted, said as a range; it
+   * used to be "at 10p", on a 12-hour clock nothing else in the console uses.
+   */
   readonly drillHeading = computed(() => {
     const cell = this.selectedCell();
     if (!cell) return '';
-    return 'Jobs on ' + (cell.day ? cell.day + ' ' : '') + this.dateLabel(cell.date) + ' at ' + this.hourLabel(cell.hr);
+    return 'Jobs on ' + (cell.day ? cell.day + ' ' : '') + dayLabel(cell.date) + ', ' + hourRange(cell.hr);
   });
+
+  /** "24 Sep 2026" from the ISO day the range is held in, for the subtitle. */
+  readonly dayLabel = dayLabel;
 
   readonly selectedHeat = computed(() => {
     const cell = this.selectedCell();
@@ -446,13 +454,6 @@ export class Dashboard implements OnInit {
     }, { injector: this.injector });
   }
 
-  /** "24 Sep" from "2026-09-24", read as a calendar date (no time zone to shift it a day). */
-  dateLabel(date: string): string {
-    const [y, m, d] = date.split('-').map(Number);
-    if (!y || !m || !d) return date;
-    return `${d} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m - 1]}`;
-  }
-
   /** Another of the dates the selected cell covers: same weekday and hour, that date's jobs. */
   pickDate(date: string): void {
     const cell = this.selectedCell();
@@ -583,12 +584,6 @@ export class Dashboard implements OnInit {
     this.startDate.set(localIsoDaysAgo(6));
     this.endDate.set(localIsoDaysAgo(0));
     this.applyRange();
-  }
-
-  hourLabel(hr: number): string {
-    if (hr === 0) return '12a';
-    if (hr === 12) return '12p';
-    return hr < 12 ? `${hr}a` : `${hr - 12}p`;
   }
 
   private sum(data: NameValue[]): number {

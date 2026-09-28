@@ -200,6 +200,24 @@ describe('Dashboard drill-down into a cell covering several dates', () => {
     expect(d.selectedHeat()).toEqual({ day: 'Thursday', hour: 22 });
   });
 
+  /** 24-hour clock, days as "24 Sep 2026" (MIG-295): the heading used to read "... at 10p". */
+  it('names the date and the hour it drills into as the console writes them', () => {
+    const { dashboard: d } = dashboard();
+    d.onHeatCell({ day: 'Thursday', hour: 22, key: '2026-09-24', keys: thursdays, value: 28 });
+    expect(d.drillHeading()).toBe('Jobs on Thursday 24 Sep 2026, 22:00–23:00');
+    d.onHeatCell({ day: 'Thursday', hour: 0, key: '2026-09-03', keys: ['2026-09-03'], value: 1 });
+    expect(d.drillHeading()).toBe('Jobs on Thursday 3 Sep 2026, 00:00–01:00');
+  });
+
+  it('writes the range in the subtitle as days, not ISO strings', () => {
+    const { dashboard: d } = dashboard();
+    d.startDate.set('2026-09-18');
+    d.endDate.set('2026-09-24');
+    d.applyRange();
+    expect(d.dayLabel(d.appliedStart())).toBe('18 Sep 2026');
+    expect(d.dayLabel(d.appliedEnd())).toBe('24 Sep 2026');
+  });
+
   it('ignores a date the cell does not hold', () => {
     const { dashboard: d, breakdownDates } = dashboard();
     d.onHeatCell({ day: 'Thursday', hour: 22, key: '2026-09-24', keys: thursdays, value: 28 });
@@ -300,7 +318,7 @@ describe('Dashboard queue volume by day', () => {
     const names = d.dayBars().map(b => b.name);
     expect(names).toHaveLength(30);
     expect(new Set(names).size).toBe(30);
-    expect(names[2]).toBe('09-03');
+    expect(names[2]).toBe('3 Sep');
   });
 
   it('keeps the empty state when the range has no runs at all', () => {
