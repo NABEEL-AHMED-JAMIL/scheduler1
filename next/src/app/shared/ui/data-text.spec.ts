@@ -79,6 +79,14 @@ describe('app-data-text', () => {
     fixture.componentRef.setInput('value', 'North');
     fixture.detectChanges();
     expect((fixture.nativeElement as HTMLElement).style.getPropertyValue('--data-text-lines')).toBe('1');
+    // One line breaks between letters (styles.css), so it runs to its ellipsis instead of stopping
+    // at the last whole word; several lines keep to word breaks, which is how prose is read.
+    expect((fixture.nativeElement as HTMLElement).classList).toContain('data-text-one');
+  });
+
+  it('keeps word breaks when it has several lines to fill', () => {
+    const { host } = render(HUGE, 3);
+    expect(host.classList).not.toContain('data-text-one');
   });
 
   it('puts a capped value in the tooltip, never all 20,000 characters', () => {

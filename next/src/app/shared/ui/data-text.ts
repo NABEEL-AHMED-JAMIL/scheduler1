@@ -6,7 +6,7 @@ import { DIALOG_DATA, Dialog } from '@angular/cdk/dialog';
 import { Icon } from './icon';
 import { SidePanel, sidePanelConfig } from './side-panel';
 import { copyText } from './clipboard.util';
-import { capTitle } from './long-text';
+import { capTitle, clipText } from './long-text';
 
 /**
  * The most of a value handed to the page inline. A clamp shows three lines at most, which is a few
@@ -74,7 +74,7 @@ export interface DataTextPanelData {
   selector: 'app-data-text',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [Icon],
-  host: { class: 'data-text', '[style.--data-text-lines]': 'lines()' },
+  host: { class: 'data-text', '[class.data-text-one]': 'lines() === 1', '[style.--data-text-lines]': 'lines()' },
   template: `
     @if (actionable()) {
       <button #valueBox type="button" class="data-text-value data-text-action" [disabled]="actionDisabled()"
@@ -132,8 +132,11 @@ export class DataText {
     return this.overflow() ?? value.length > this.lines() * LINE_GUESS;
   });
 
+  /** The label as it is spoken and headed: a pivot's row label is itself a value, and can be as long. */
+  private readonly name = computed(() => clipText(this.label(), 80));
+
   protected readonly moreLabel = computed(() =>
-    `Show all ${this.length().toLocaleString()} characters${this.label() ? ' of ' + this.label() : ''}`);
+    `Show all ${this.length().toLocaleString()} characters${this.name() ? ' of ' + this.name() : ''}`);
 
   constructor() {
     afterRenderEffect(() => {
@@ -157,7 +160,7 @@ export class DataText {
   protected open(event: Event): void {
     event.stopPropagation();
     this.dialog.open<void, DataTextPanelData>(DataTextPanel,
-      sidePanelConfig<DataTextPanelData>({ value: this.value() ?? '', label: this.label() }));
+      sidePanelConfig<DataTextPanelData>({ value: this.value() ?? '', label: this.name() }));
   }
 
   private measure(element: HTMLElement): void {
@@ -198,7 +201,6 @@ export class DataText {
         @if (copied() === 'failed') {
           <span class="text-xs text-crit-500" role="alert">The browser refused — select the text and copy it instead.</span>
         }
-        <span class="ml-auto text-xs tabular text-[color:var(--text-muted)] shrink-0">{{ count }} characters</span>
       </div>
     </app-side-panel>
   `,

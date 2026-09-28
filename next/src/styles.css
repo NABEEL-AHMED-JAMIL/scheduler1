@@ -1634,8 +1634,13 @@ html.dark {
     -webkit-line-clamp: var(--data-text-lines, 1);
     line-clamp: var(--data-text-lines, 1);
     overflow-wrap: anywhere;
+    /* Not inherited: a table header is nowrap, and a nowrap value's narrowest width is all of it. */
+    white-space: normal;
     text-align: inherit;
   }
+  /* One line: break between any two letters, so the line runs to its ellipsis. Broken only between
+     words, a single clamped line stops at the last whole word and leaves a gap before "Show all". */
+  .data-text-one .data-text-value { word-break: break-all; }
   /* The value as a button (the Canvas table's click-to-filter cells): a link's look, a value's clamp. */
   .data-text-action {
     @apply underline decoration-dotted underline-offset-2 hover:text-[color:var(--text-primary)]
