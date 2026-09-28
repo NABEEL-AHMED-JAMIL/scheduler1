@@ -22,6 +22,7 @@ import { Observable, Subscription, debounceTime, filter } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { JobEventsService } from '../../core/socket/job-events.service';
 import { UnreadCountService } from '../../core/notifications/unread-count.service';
+import { AuthService } from '../../core/auth/auth.service';
 
 const WEEKDAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const WEEKDAY = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -62,6 +63,13 @@ export class Dashboard implements OnInit {
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly auth = inject(AuthService);
+
+  /**
+   * The counts drill into Run history, which is the Jobs page. Without that page (a tenant user's
+   * access profile) every count landed on /unauthorized, so for them they are figures, not links.
+   */
+  readonly canOpenJobs = computed(() => this.auth.canOpen('jobs'));
   private readonly injector = inject(Injector);
 
   /** What the date boxes hold, which may be half-edited. */
@@ -458,6 +466,7 @@ export class Dashboard implements OnInit {
    * showed nothing.
    */
   openCount(row: JobBreakdown, status: string, count: number): void {
+    if (!this.canOpenJobs()) return;
     if (!count) {
       const label = status === 'Total' ? '' : status.toLowerCase() + ' ';
       this.toast.info(`No ${label}runs for ${row.jobName} in this hour.`);
@@ -488,6 +497,7 @@ export class Dashboard implements OnInit {
    * happened to be null. Migrating that row into a <tfoot> is what dropped the click.
    */
   openTotal(status: string, count: number): void {
+    if (!this.canOpenJobs()) return;
     if (!count) {
       const label = status === 'Total' ? '' : status.toLowerCase() + ' ';
       this.toast.info(`No ${label}runs in this hour.`);

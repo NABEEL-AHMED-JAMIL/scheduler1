@@ -9,6 +9,7 @@ import { DashboardService } from './dashboard.service';
 import { ToastService } from '../../shared/ui/toast.service';
 import { JobEvent, JobEventsService } from '../../core/socket/job-events.service';
 import { UnreadCountService } from '../../core/notifications/unread-count.service';
+import { AuthService } from '../../core/auth/auth.service';
 
 type Answers = Partial<Record<'jobStatus' | 'jobRunning' | 'hourly' | 'breakdown', () => unknown>>;
 const ok = () => of({ status: 'SUCCESS', data: [] });
@@ -36,6 +37,7 @@ function dashboard(answers: Answers = {}, query: Record<string, string> = {}, ev
       { provide: Router, useValue: { navigate: (commands: unknown[], extras: unknown) => { navigations.push({ commands, extras }); } } },
       { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap(query) } } },
       { provide: JobEventsService, useValue: { events, connected } },
+      { provide: AuthService, useValue: { canOpen: () => true } },
     ],
   });
   return { dashboard: TestBed.runInInjectionContext(() => new Dashboard()), calls, breakdownDates, ranges, navigations };

@@ -8,6 +8,7 @@ import { Dashboard } from './dashboard';
 import { DashboardService, JobBreakdown } from './dashboard.service';
 import { ToastService } from '../../shared/ui/toast.service';
 import { JobEventsService } from '../../core/socket/job-events.service';
+import { AuthService } from '../../core/auth/auth.service';
 
 function dashboardFor() {
   TestBed.resetTestingModule();
@@ -19,6 +20,7 @@ function dashboardFor() {
       { provide: Router, useValue: { navigate: () => {} } },
       { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({}) } } },
       { provide: JobEventsService, useValue: { events: EMPTY, connected: signal(false) } },
+      { provide: AuthService, useValue: { canOpen: () => true } },
     ],
   });
   return TestBed.runInInjectionContext(() => new Dashboard());
@@ -84,6 +86,7 @@ describe('drilling into an hour from the breakdown', () => {
         { provide: Router, useValue: { navigate: (path: unknown[]) => { navigated.push(path); } } },
         { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({}) } } },
         { provide: JobEventsService, useValue: { events: EMPTY, connected: signal(false) } },
+        { provide: AuthService, useValue: { canOpen: () => true } },
       ],
     });
     return { dashboard: TestBed.runInInjectionContext(() => new Dashboard()), navigated };
@@ -155,6 +158,7 @@ describe('a refused dashboard load', () => {
         { provide: Router, useValue: { navigate: () => {} } },
         { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({}) } } },
         { provide: JobEventsService, useValue: { events: EMPTY, connected: signal(false) } },
+        { provide: AuthService, useValue: { canOpen: () => true } },
       ],
     });
     const dashboard = TestBed.runInInjectionContext(() => new Dashboard());
@@ -227,3 +231,50 @@ describe('the job status donut', () => {
     expect(dashboardFor().outcomeColor('inactive')).toBe('var(--series-warn-soft)');
   });
 });
+
+/**
+ * The counts drill into Run history, which is the Jobs page. A tenant user whose access profile
+ * leaves Jobs out got clickable counts that all landed on /unauthorized; for them they are figures.
+ */
+describe('drill-down counts for someone without the Jobs page', () => {
+  function withAccess(canOpenJobs: boolean) {
+    const navigated: unknown[][] = [];
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: DashboardService, useValue: {} },
+        { provide: HttpClient, useValue: {} },
+        { provide: ToastService, useValue: { success: () => {}, error: () => {}, info: () => {} } },
+        { provide: Router, useValue: { navigate: (path: unknown[]) => { navigated.push(path); } } },
+        { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({}) } } },
+        { provide: JobEventsService, useValue: { events: EMPTY, connected: signal(false) } },
+        { provide: AuthService, useValue: { canOpen: (page: string) => page === 'jobs' ? canOpenJobs : true } },
+      ],
+    });
+    return { dashboard: TestBed.runInInjectionContext(() => new Dashboard()), navigated };
+  }
+
+  it('does not link the counts', () => {
+    const { dashboard, navigated } = withAccess(false);
+    expect(dashboard.canOpenJobs()).toBe(false);
+    dashboard.openCount(row({ jobId: 42, jobName: 'Nightly', completed: 3 }), 'completed', 3);
+    dashboard.openTotal('Total', 3);
+    expect(navigated).toEqual([]);
+  });
+
+  it('keeps them links for someone who may open Jobs', () => {
+    const { dashboard, navigated } = withAccess(true);
+    expect(dashboard.canOpenJobs()).toBe(true);
+    dashboard.openCount(row({ jobId: 42, jobName: 'Nightly', completed: 3 }), 'completed', 3);
+    expect(navigated).toHaveLength(1);
+  });
+
+  it('renders plain figures rather than buttons in the table (template)', async () => {
+    const fs = (await import(/* @vite-ignore */ ['node', 'fs'].join(':'))) as { readFileSync(p: string, e: 'utf8'): string };
+    const root = (globalThis as unknown as { process: { cwd(): string } }).process.cwd();
+    const html = fs.readFileSync(`${root}/src/app/features/dashboard/dashboard.html`, 'utf8');
+    // The four count sites: row statuses, row Total, footer statuses, footer Total.
+    expect(html.match(/@if \(canOpenJobs\(\)\)/g)).toHaveLength(4);
+  });
+});
+

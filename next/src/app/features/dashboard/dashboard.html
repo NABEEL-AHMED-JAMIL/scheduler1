@@ -158,31 +158,40 @@
                     </td>
                     @for (column of visibleColumns(); track column) {
                       <td class="text-right tabular !p-0">
-                        <button type="button"
-                                class="w-full h-full px-4 py-2.5 text-right tabular rounded-sm
-                                       hover-brand
-                                       focus:outline-none focus:ring-2 focus:ring-[color:var(--focus-ring)]
-                                       disabled:hover:bg-transparent"
-                                [class.text-[color:var(--text-muted)]]="!countFor(row, column)"
-                                [disabled]="!countFor(row, column)"
-                                [title]="countFor(row, column)
-                                  ? 'View the ' + column + ' runs for this job in this hour'
-                                  : 'No ' + column + ' runs'"
-                                (click)="openCount(row, column, countFor(row, column))">
-                          {{ countFor(row, column) }}
-                        </button>
+                        <!-- Without the Jobs page the counts would land on /unauthorized: figures, not links. -->
+                        @if (canOpenJobs()) {
+                          <button type="button"
+                                  class="w-full h-full px-4 py-2.5 text-right tabular rounded-sm
+                                         hover-brand
+                                         focus:outline-none focus:ring-2 focus:ring-[color:var(--focus-ring)]
+                                         disabled:hover:bg-transparent"
+                                  [class.text-[color:var(--text-muted)]]="!countFor(row, column)"
+                                  [disabled]="!countFor(row, column)"
+                                  [title]="countFor(row, column)
+                                    ? 'View the ' + column + ' runs for this job in this hour'
+                                    : 'No ' + column + ' runs'"
+                                  (click)="openCount(row, column, countFor(row, column))">
+                            {{ countFor(row, column) }}
+                          </button>
+                        } @else {
+                          <span class="block px-4 py-2.5 text-right tabular" [class.text-[color:var(--text-muted)]]="!countFor(row, column)">{{ countFor(row, column) }}</span>
+                        }
                       </td>
                     }
                     <td class="text-right tabular font-semibold !p-0 col-pin-right">
-                      <button type="button"
-                              class="w-full h-full px-4 py-2.5 text-right tabular font-semibold rounded-sm
-                                     hover-brand
-                                     focus:outline-none focus:ring-2 focus:ring-[color:var(--focus-ring)]"
-                              [disabled]="!row.total"
-                              title="View every run for this job in this hour"
-                              (click)="openCount(row, 'Total', row.total)">
-                        {{ row.total }}
-                      </button>
+                      @if (canOpenJobs()) {
+                        <button type="button"
+                                class="w-full h-full px-4 py-2.5 text-right tabular font-semibold rounded-sm
+                                       hover-brand
+                                       focus:outline-none focus:ring-2 focus:ring-[color:var(--focus-ring)]"
+                                [disabled]="!row.total"
+                                title="View every run for this job in this hour"
+                                (click)="openCount(row, 'Total', row.total)">
+                          {{ row.total }}
+                        </button>
+                      } @else {
+                        <span class="block px-4 py-2.5 text-right tabular font-semibold">{{ row.total }}</span>
+                      }
                     </td>
                     <td class="hidden md:table-cell">
                       <div class="flex h-2 rounded-full overflow-hidden bg-sunken"
@@ -208,34 +217,42 @@
                     </td>
                     @for (column of visibleColumns(); track column) {
                       <td class="text-right tabular font-semibold !p-0">
+                        @if (canOpenJobs()) {
+                          <button type="button"
+                                  class="w-full h-full px-4 py-2.5 text-right tabular font-semibold rounded-sm
+                                         hover-brand
+                                         focus:outline-none focus:ring-2 focus:ring-[color:var(--focus-ring)]
+                                         disabled:hover:bg-transparent"
+                                  [class.text-[color:var(--text-muted)]]="!countFor(totals, column)"
+                                  [class.font-normal]="!countFor(totals, column)"
+                                  [disabled]="!countFor(totals, column)"
+                                  [title]="countFor(totals, column)
+                                    ? 'View the ' + column + ' runs across every job in this hour'
+                                    : 'No ' + column + ' runs'"
+                                  (click)="openTotal(column, countFor(totals, column))">
+                            {{ countFor(totals, column) }}
+                          </button>
+                        } @else {
+                          <span class="block px-4 py-2.5 text-right tabular font-semibold" [class.text-[color:var(--text-muted)]]="!countFor(totals, column)" [class.font-normal]="!countFor(totals, column)">{{ countFor(totals, column) }}</span>
+                        }
+                      </td>
+                    }
+                    <!-- The pinned cell paints its own ground; the footer row's is inset, not raised. -->
+                    <td class="text-right tabular font-semibold !p-0 col-pin-right bg-[color:var(--surface-inset)]">
+                      @if (canOpenJobs()) {
                         <button type="button"
                                 class="w-full h-full px-4 py-2.5 text-right tabular font-semibold rounded-sm
                                        hover-brand
                                        focus:outline-none focus:ring-2 focus:ring-[color:var(--focus-ring)]
                                        disabled:hover:bg-transparent"
-                                [class.text-[color:var(--text-muted)]]="!countFor(totals, column)"
-                                [class.font-normal]="!countFor(totals, column)"
-                                [disabled]="!countFor(totals, column)"
-                                [title]="countFor(totals, column)
-                                  ? 'View the ' + column + ' runs across every job in this hour'
-                                  : 'No ' + column + ' runs'"
-                                (click)="openTotal(column, countFor(totals, column))">
-                          {{ countFor(totals, column) }}
+                                [disabled]="!totals.total"
+                                title="View every run across every job in this hour"
+                                (click)="openTotal('Total', totals.total)">
+                          {{ totals.total }}
                         </button>
-                      </td>
-                    }
-                    <!-- The pinned cell paints its own ground; the footer row's is inset, not raised. -->
-                    <td class="text-right tabular font-semibold !p-0 col-pin-right bg-[color:var(--surface-inset)]">
-                      <button type="button"
-                              class="w-full h-full px-4 py-2.5 text-right tabular font-semibold rounded-sm
-                                     hover-brand
-                                     focus:outline-none focus:ring-2 focus:ring-[color:var(--focus-ring)]
-                                     disabled:hover:bg-transparent"
-                              [disabled]="!totals.total"
-                              title="View every run across every job in this hour"
-                              (click)="openTotal('Total', totals.total)">
-                        {{ totals.total }}
-                      </button>
+                      } @else {
+                        <span class="block px-4 py-2.5 text-right tabular font-semibold">{{ totals.total }}</span>
+                      }
                     </td>
                     <td class="hidden md:table-cell">
                       <!-- The track behind the segments. It asked for var(--surface), a token
