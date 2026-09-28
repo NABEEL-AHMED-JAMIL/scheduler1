@@ -275,7 +275,9 @@
               <th class="text-right">Median</th>
               <th class="text-right hidden xl:table-cell" title="Slowest finished run">Slowest</th>
               <th class="hidden md:table-cell">Last run</th>
-              <th class="text-right">State</th>
+              <!-- Pinned right: at 1024 the verdict was the column past the card edge, and the
+                   Interrupted, Skipped and Missed columns must stay (see above). -->
+              <th class="text-right col-pin-right">State</th>
             </tr>
           </thead>
           <tbody>
@@ -311,7 +313,7 @@
                 </td>
                 <td class="hidden md:table-cell mono text-xs
                            text-[color:var(--text-muted)]">{{ task.lastDay || '—' }}</td>
-                <td class="text-right">
+                <td class="text-right col-pin-right">
                   <span class="pill"
                         [class.pill-ok]="task.tone === 'ok'"
                         [class.pill-warn]="task.tone === 'warn'"
@@ -383,7 +385,8 @@
                 <th>Error</th>
                 <th class="hidden lg:table-cell">When</th>
                 <th class="text-right hidden md:table-cell">Took</th>
-                <th class="text-right">Outcome</th>
+                <!-- Pinned right, with the Logs link inside it: on a phone both were off-screen. -->
+                <th class="text-right col-pin-right">Outcome</th>
               </tr>
             </thead>
             <tbody>
@@ -412,7 +415,7 @@
                   <td class="text-right hidden md:table-cell mono text-xs">
                     {{ failure.seconds >= 0 ? humanSeconds(failure.seconds) : '—' }}
                   </td>
-                  <td class="text-right">
+                  <td class="text-right col-pin-right">
                     <div class="flex items-center justify-end gap-2">
                       <app-status [label]="failure.status" />
                       <!-- Only rendered when the run has an id to open. Every run in this
