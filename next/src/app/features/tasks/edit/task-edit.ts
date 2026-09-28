@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { Component, ElementRef, Injector, OnInit, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { parseTopicPartition } from '../../../shared/ui/topic';
 import { HttpClient } from '@angular/common/http';
@@ -11,6 +11,7 @@ import { Field } from '../../../shared/ui/field';
 import { Combobox, ComboboxOption } from '../../../shared/ui/combobox';
 import { Icon } from '../../../shared/ui/icon';
 import { LoadError } from '../../../shared/ui/load-error';
+import { focusFirstInvalid } from '../../../shared/ui/focus-first-invalid';
 import { FieldChoice, Pipeline, PipelineField, parseFieldChoices } from '../../settings/pipelines/pipeline-dialog';
 import { TaskReference, TaskReferenceKind, notBlank } from '../../settings/configuration/configuration.models';
 import { isPlatformDefault, profileLabel } from '../../settings/kafka/platform-default';
@@ -27,6 +28,9 @@ export class TaskEdit implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
+  /** Optional so the unit specs, which build the editor without a view, still can. */
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef, { optional: true });
+  private readonly injector = inject(Injector);
 
   readonly taskTypes = signal<any[]>([]);
   private pendingTopicSeed: { topicId: number; tenantId: number | null } | null = null;
@@ -309,6 +313,10 @@ export class TaskEdit implements OnInit {
         else this.loadError.set(err?.error?.message || 'That task could not be loaded.');
       },
     });
+  }
+
+  private focusFirstInvalid(): void {
+    if (this.host) focusFirstInvalid(this.host.nativeElement, this.injector);
   }
 
   /**
@@ -642,6 +650,7 @@ export class TaskEdit implements OnInit {
           || this.form.get('sourceTaskTypeId')!.invalid || this.form.get('taskStatus')!.invalid) {
         this.form.markAllAsTouched();
         this.toast.error('Check the highlighted fields.');
+        this.focusFirstInvalid();
         return;
       }
       this.generatePayloadFromTags(xml => {
@@ -655,6 +664,7 @@ export class TaskEdit implements OnInit {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       this.toast.error('Check the highlighted fields.');
+      this.focusFirstInvalid();
       return;
     }
     this.submitTask();

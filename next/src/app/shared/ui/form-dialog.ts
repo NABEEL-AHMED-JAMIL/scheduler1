@@ -1,5 +1,6 @@
-import { Component, input, output } from '@angular/core';
+import { Component, ElementRef, Injector, inject, input, output } from '@angular/core';
 import { Icon } from './icon';
+import { focusFirstInvalid } from './focus-first-invalid';
 
 /**
  * Shell for the short create/edit dialogs that sit beside a list. Keeps the header, scrolling
@@ -34,7 +35,7 @@ import { Icon } from './icon';
                   (click)="cancelled.emit()">{{ cancelLabel() }}</button>
           @if (showConfirm()) {
             <button type="button" class="btn btn-sm" [class.btn-primary]="!danger()" [class.btn-danger]="danger()"
-                    [disabled]="saving() || confirmDisabled()" (click)="confirmed.emit()">
+                    [disabled]="saving() || confirmDisabled()" (click)="confirm()">
               @if (saving()) { <app-icon name="refresh" class="spin" /> }
               {{ saving() ? busyLabel() : confirmLabel() }}
             </button>
@@ -72,4 +73,16 @@ export class FormDialog {
   readonly confirmDisabled = input(false);
   readonly cancelled = output<void>();
   readonly confirmed = output<void>();
+
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
+
+  /**
+   * The dialog's save runs first (the output is synchronous); if it marked fields to fix, focus
+   * goes to the first of them, so every dialog's "Check the highlighted fields." gets it at once.
+   */
+  confirm(): void {
+    this.confirmed.emit();
+    focusFirstInvalid(this.host.nativeElement, this.injector);
+  }
 }
