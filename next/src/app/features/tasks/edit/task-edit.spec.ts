@@ -591,3 +591,15 @@ describe('TaskEdit -- a new task starts on the connection its workspace uses', (
     expect(component.selectedProfileId()).toBeNull();
   });
 });
+
+/** A name of spaces only was accepted by the editor and stored; the list then showed a blank row. */
+describe('TaskEdit name', () => {
+  it('refuses a name made only of spaces, with the same message as an empty one', () => {
+    const { component } = taskEditWith(() => noTopics);
+    const name = component.form.get('taskName')!;
+    name.setValue('   ');
+    expect(name.errors).toEqual({ required: true });
+    name.setValue(' Nightly load ');
+    expect(name.valid).toBe(true);
+  });
+});

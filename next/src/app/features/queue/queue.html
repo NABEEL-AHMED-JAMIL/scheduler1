@@ -5,6 +5,12 @@
       <p class="page-subtitle">Every run in the chosen dates — waiting, running and finished.</p>
     </div>
     <div class="flex items-center gap-2">
+      @if (live()) {
+        <span class="inline-flex items-center gap-1.5 text-[11px] text-[color:var(--text-muted)] mr-1"
+              title="Connected — the list re-reads as runs report in">
+          <span class="live-dot live-on"></span>Live
+        </span>
+      }
       @if (hasInsights()) {
         <button type="button" class="btn btn-ghost btn-sm"
                 [class.text-accent]="showInsights()" [attr.aria-expanded]="showInsights()"
@@ -126,24 +132,38 @@
           <th>Run</th>
           <th>Job</th>
           <th>Created</th>
-          <th>Duration</th>
+          <!-- Duration waits for md: on a phone Message is the column worth the width. -->
+          <th class="hidden md:table-cell">Duration</th>
           <th>Message</th>
-          <th class="text-right">Status</th>
-          <th class="w-12"></th>
+          <!-- Status and the in-flight menu share one cell pinned to the right edge, as Failed runs
+               on Reports does: on a phone both sat hundreds of pixels past the screen. -->
+          <th class="text-right col-pin-right">Status</th>
         </tr>
       </thead>
       <tbody>
         @for (row of paged(); track row.jobQueueId) {
           <tr>
-            <td class="mono text-[color:var(--text-muted)]">#{{ row.jobQueueId }}</td>
+            <!-- A run and its job lead to their own screens, for anyone whose profile opens Jobs;
+                 anyone else gets the same words without a link the page guard would bounce. -->
+            <td class="mono text-[color:var(--text-muted)] whitespace-nowrap">
+              @if (canOpenJobs()) {
+                <a class="link-inline" [routerLink]="['/operations/jobs', row.jobId, 'runs', row.jobQueueId, 'logs']"
+                   [title]="'Open the run log for #' + row.jobQueueId">#{{ row.jobQueueId }}</a>
+              } @else { #{{ row.jobQueueId }} }
+            </td>
             <td class="max-w-56">
-              <span class="block truncate" [title]="jobName(row)">{{ jobName(row) }}</span>
+              @if (canOpenJobs()) {
+                <a class="link-inline block truncate" [routerLink]="['/operations/jobs', row.jobId, 'history']"
+                   [title]="jobName(row)">{{ jobName(row) }}</a>
+              } @else {
+                <span class="block truncate" [title]="jobName(row)">{{ jobName(row) }}</span>
+              }
               <span class="mono text-[11px] text-[color:var(--text-muted)]">#{{ row.jobId }}</span>
             </td>
             <td class="whitespace-nowrap text-[color:var(--text-secondary)]">
               {{ row.dateCreated ? (row.dateCreated | serverTime:'d MMM, HH:mm:ss') : '—' }}
             </td>
-            <td class="tabular text-[color:var(--text-secondary)] whitespace-nowrap">
+            <td class="hidden md:table-cell tabular text-[color:var(--text-secondary)] whitespace-nowrap">
               @if (duration(row); as d) { {{ d }} }
               @else if (inFlight(row)) { <span class="text-warn-500">in flight</span> }
               @else { — }
@@ -153,22 +173,24 @@
                 {{ row.jobStatusMessage || '—' }}
               </span>
             </td>
-            <td class="text-right"><app-status [label]="row.jobStatus" /></td>
-            <td class="text-right">
-              @if (inFlight(row)) {
-                <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="menu"
-                        aria-label="Actions">
-                  <app-icon name="dots" size="1.05em" />
-                </button>
-                <ng-template #menu>
-                  <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
-                    <button cdkMenuItem class="menu-item menu-item-danger"
-                            (cdkMenuItemTriggered)="forceStatus(row, 'Failed')"><app-icon name="alert" />Mark as failed</button>
-                    <button cdkMenuItem class="menu-item menu-item-danger"
-                            (cdkMenuItemTriggered)="forceStatus(row, 'Interrupt')"><app-icon name="alert" />Mark as interrupted</button>
-                  </div>
-                </ng-template>
-              }
+            <td class="text-right col-pin-right">
+              <div class="flex items-center justify-end gap-1">
+                <app-status [label]="row.jobStatus" />
+                @if (inFlight(row)) {
+                  <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="menu"
+                          aria-label="Actions">
+                    <app-icon name="dots" size="1.05em" />
+                  </button>
+                  <ng-template #menu>
+                    <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                      <button cdkMenuItem class="menu-item menu-item-danger"
+                              (cdkMenuItemTriggered)="forceStatus(row, 'Failed')"><app-icon name="alert" />Mark as failed</button>
+                      <button cdkMenuItem class="menu-item menu-item-danger"
+                              (cdkMenuItemTriggered)="forceStatus(row, 'Interrupt')"><app-icon name="alert" />Mark as interrupted</button>
+                    </div>
+                  </ng-template>
+                }
+              </div>
             </td>
           </tr>
         }

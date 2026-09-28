@@ -186,7 +186,8 @@ export class TableShell implements AfterViewInit {
     }
     if (!table) return;
     const hide = labels.map(label => !!label && label.toLowerCase() !== 'actions' && this.hidden().includes(label));
-    table.querySelectorAll<HTMLTableRowElement>(':scope > thead > tr, :scope > tbody > tr').forEach(row => {
+    // The footer too: without it a total row kept every cell and each figure sat under the wrong heading.
+    table.querySelectorAll<HTMLTableRowElement>(':scope > thead > tr, :scope > tbody > tr, :scope > tfoot > tr').forEach(row => {
       const cells = Array.from(row.children) as HTMLElement[];
       // A detail row spans the whole table in one cell: it has no columns to hide.
       if (cells.length !== labels.length) return;

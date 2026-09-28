@@ -3,7 +3,9 @@
     <div>
       <h1 class="page-title">Dashboard</h1>
       <p class="page-subtitle">
-        Showing {{ startDate() }} to {{ endDate() }}@if (scopeLabel(); as scope) {, {{ scope }}}
+        Showing {{ appliedStart() }} to {{ appliedEnd() }}@if (scopeLabel(); as scope) {, {{ scope }}}
+        <!-- The figures follow job events on their own; this says how fresh they are. -->
+        @if (updatedAt(); as at) { · Updated {{ at | date:'shortTime' }} }
       </p>
     </div>
     <!-- Wraps: a date field has an intrinsic minimum width and two of them plus the
@@ -12,15 +14,26 @@
       <div class="flex-1 min-w-[9.5rem] sm:flex-none">
         <label class="label" for="from">From</label>
         <input id="from" type="date" class="input" [value]="startDate()" [max]="endDate()"
+               [attr.aria-invalid]="!!rangeError() || null"
+               [attr.aria-describedby]="rangeError() ? 'range-error' : null"
                (change)="startDate.set($any($event.target).value)" />
       </div>
       <div class="flex-1 min-w-[9.5rem] sm:flex-none">
         <label class="label" for="to">To</label>
         <input id="to" type="date" class="input" [value]="endDate()" [min]="startDate()"
+               [attr.aria-invalid]="!!rangeError() || null"
+               [attr.aria-describedby]="rangeError() ? 'range-error' : null"
                (change)="endDate.set($any($event.target).value)" />
       </div>
-      <button type="button" class="btn btn-primary btn-sm" (click)="applyRange()"><app-icon name="filter" />Apply</button>
+      <button type="button" class="btn btn-primary btn-sm" [disabled]="!!rangeError()" (click)="applyRange()"><app-icon name="filter" />Apply</button>
       <button type="button" class="btn btn-ghost btn-sm" (click)="resetRange()"><app-icon name="calendar" />Last 7 days</button>
+      <button type="button" class="btn btn-ghost btn-sm" (click)="load()" [disabled]="loading()">
+        <app-icon name="refresh" [class.spin]="loading()" />Refresh
+      </button>
+      <!-- A full row of its own under the boxes, so the reason sits beside the fields it is about. -->
+      @if (rangeError()) {
+        <p id="range-error" class="field-note text-crit-500 basis-full" role="alert">{{ rangeError() }}</p>
+      }
     </div>
   </div>
 
@@ -45,7 +58,7 @@
     </app-blur-loader>
   }
 
-  <app-billing-brief [compact]="true" />
+  <app-billing-brief [compact]="true" [headingLevel]="2" />
 
   @if (!error()) {
     <app-blur-loader [active]="loading()">
@@ -54,7 +67,9 @@
         <div class="grid lg:grid-cols-3 gap-4">
           <div class="card p-4">
             <h2 class="text-sm font-semibold mb-3">Job status</h2>
-            <app-donut [data]="statusCategories()" totalLabel="jobs" />
+            <!-- Status colours, so Inactive is amber like its pill rather than the next palette slot,
+                 a pink that read as Failed. -->
+            <app-donut [data]="statusCategories()" totalLabel="jobs" [colorFor]="outcomeColor" />
           </div>
 
           <div class="card p-4">
@@ -67,7 +82,7 @@
 
           <div class="card p-4">
             <h2 class="text-sm font-semibold mb-3">Queue volume by day</h2>
-            <app-bar-chart [data]="weeklyBars()" [height]="104" emptyMessage="No runs in this range." />
+            <app-bar-chart [data]="dayBars()" [height]="104" emptyMessage="No runs in this range." />
           </div>
         </div>
 
@@ -87,158 +102,182 @@
 
   <!-- Drill-down breakdown -->
   @if (selectedCell(); as cell) {
-    <!-- The table shell's loading, error (with Try again) and empty states; the card used to
-         hand-roll them and had no error state, so a failed read said "No jobs ran in this hour." -->
-    <app-table-shell [heading]="'Jobs on ' + (cell.day ? cell.day + ' ' : '') + dateLabel(cell.date) + ' at ' + hourLabel(cell.hr)"
-                     [loading]="breakdownLoading()" [error]="breakdownError()"
-                     [isEmpty]="!filteredBreakdown().length"
-                     [shown]="breakdownRows().length ? filteredBreakdown().length : null"
-                     [total]="breakdownRows().length ? breakdownRows().length : null"
-                     [emptyMessage]="breakdownSearch() ? 'No jobs match your search.' : 'No jobs ran in this hour.'"
-                     emptyIcon="clock"
-                     (retry)="retryBreakdown()">
-      <ng-container toolbar>
-        <!-- Over more than a week one cell is several dates; the breakdown is for one of them. -->
-        @if (cell.dates.length > 1) {
-          <div class="seg max-w-full overflow-x-auto" role="group" [attr.aria-label]="'Dates in this cell'">
-            @for (date of cell.dates; track date) {
-              <button type="button" class="seg-btn tabular" [class.seg-on]="date === cell.date"
-                      [attr.aria-pressed]="date === cell.date" (click)="pickDate(date)">{{ dateLabel(date) }}</button>
-            }
-          </div>
-        }
-        <div class="search-field max-w-56">
-          <app-icon name="search" size="0.95em" />
-          <input class="input" placeholder="Search job id or name" aria-label="Search jobs in this hour"
-                 [value]="breakdownSearch()" (input)="breakdownSearch.set($any($event.target).value)" />
-        </div>
-        <button type="button" class="btn btn-ghost btn-sm" (click)="clearCell()"><app-icon name="close" />Close</button>
-      </ng-container>
-
-      <!-- A busy hour returns every job that ran in it: one cell held 500 rows and ran the page
-           to 27,000px. The shell scrolls the rows in their own box, and the pager keeps that box
-           a readable size. -->
-          <table class="table-modern">
-            <thead>
-              <tr>
-                <th>Job</th>
-                @for (column of columns; track column) {
-                  <th class="text-right capitalize">{{ column }}</th>
-                }
-                <th class="text-right">Total</th>
-                <th class="w-28">Breakdown</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (row of pagedBreakdown(); track row.jobId) {
-                <tr>
-                  <td class="max-w-64">
-                    <div class="font-medium truncate" [title]="row.jobName">{{ row.jobName }}</div>
-                    <div class="mono text-[color:var(--text-muted)]">#{{ row.jobId }}</div>
-                  </td>
-                  @for (column of columns; track column) {
-                    <td class="text-right tabular !p-0">
-                      <button type="button"
-                              class="w-full h-full px-4 py-2.5 text-right tabular rounded-sm
-                                     hover-brand
-                                     focus:outline-none focus:ring-2 focus:ring-[color:var(--focus-ring)]
-                                     disabled:hover:bg-transparent"
-                              [class.text-[color:var(--text-muted)]]="!countFor(row, column)"
-                              [disabled]="!countFor(row, column)"
-                              [title]="countFor(row, column)
-                                ? 'View the ' + column + ' runs for this job in this hour'
-                                : 'No ' + column + ' runs'"
-                              (click)="openCount(row, column, countFor(row, column))">
-                        {{ countFor(row, column) }}
-                      </button>
-                    </td>
-                  }
-                  <td class="text-right tabular font-semibold !p-0">
-                    <button type="button"
-                            class="w-full h-full px-4 py-2.5 text-right tabular font-semibold rounded-sm
-                                   hover-brand
-                                   focus:outline-none focus:ring-2 focus:ring-[color:var(--focus-ring)]"
-                            [disabled]="!row.total"
-                            title="View every run for this job in this hour"
-                            (click)="openCount(row, 'Total', row.total)">
-                      {{ row.total }}
-                    </button>
-                  </td>
-                  <td>
-                    <div class="flex h-2 rounded-full overflow-hidden bg-sunken"
-                        >
-                      @for (segment of segmentsFor(row); track segment.key) {
-                        <span [style.width.%]="segment.pct"
-                              [style.background]="outcomeColor(segment.key)"
-                              [title]="segment.key + ': ' + segment.count"></span>
-                      }
-                    </div>
-                  </td>
-                </tr>
+    <!-- Opening a cell scrolls here and focuses it. scroll-mt clears the sticky top bar. -->
+    <section id="dash-drill" tabindex="-1" class="scroll-mt-20 outline-none"
+             [attr.aria-label]="drillHeading()">
+      <!-- The table shell's loading, error (with Try again) and empty states; the card used to
+           hand-roll them and had no error state, so a failed read said "No jobs ran in this hour." -->
+      <app-table-shell [heading]="drillHeading()"
+                       [loading]="breakdownLoading()" [error]="breakdownError()"
+                       [isEmpty]="!filteredBreakdown().length"
+                       [shown]="breakdownRows().length ? filteredBreakdown().length : null"
+                       [total]="breakdownRows().length ? breakdownRows().length : null"
+                       [emptyMessage]="breakdownSearch() ? 'No jobs match your search.' : 'No jobs ran in this hour.'"
+                       emptyIcon="clock"
+                       (retry)="retryBreakdown()">
+        <ng-container toolbar>
+          <!-- Over more than a week one cell is several dates; the breakdown is for one of them. -->
+          @if (cell.dates.length > 1) {
+            <div class="seg max-w-full overflow-x-auto" role="group" [attr.aria-label]="'Dates in this cell'">
+              @for (date of cell.dates; track date) {
+                <button type="button" class="seg-btn tabular" [class.seg-on]="date === cell.date"
+                        [attr.aria-pressed]="date === cell.date" (click)="pickDate(date)">{{ dateLabel(date) }}</button>
               }
-            </tbody>
-            @if (breakdownTotal(); as totals) {
-              <tfoot>
-                <tr class="border-t-2 border-strong">
-                  <td class="font-semibold">
-                    Total
-                    <span class="font-normal text-[color:var(--text-muted)]">
-                      · {{ filteredBreakdown().length }} job{{ filteredBreakdown().length === 1 ? '' : 's' }}
-                    </span>
-                  </td>
-                  @for (column of columns; track column) {
-                    <td class="text-right tabular font-semibold !p-0">
-                      <button type="button"
-                              class="w-full h-full px-4 py-2.5 text-right tabular font-semibold rounded-sm
-                                     hover-brand
-                                     focus:outline-none focus:ring-2 focus:ring-[color:var(--focus-ring)]
-                                     disabled:hover:bg-transparent"
-                              [class.text-[color:var(--text-muted)]]="!countFor(totals, column)"
-                              [class.font-normal]="!countFor(totals, column)"
-                              [disabled]="!countFor(totals, column)"
-                              [title]="countFor(totals, column)
-                                ? 'View the ' + column + ' runs across every job in this hour'
-                                : 'No ' + column + ' runs'"
-                              (click)="openTotal(column, countFor(totals, column))">
-                        {{ countFor(totals, column) }}
-                      </button>
-                    </td>
-                  }
-                  <td class="text-right tabular font-semibold !p-0">
-                    <button type="button"
-                            class="w-full h-full px-4 py-2.5 text-right tabular font-semibold rounded-sm
-                                   hover-brand
-                                   focus:outline-none focus:ring-2 focus:ring-[color:var(--focus-ring)]
-                                   disabled:hover:bg-transparent"
-                            [disabled]="!totals.total"
-                            title="View every run across every job in this hour"
-                            (click)="openTotal('Total', totals.total)">
-                      {{ totals.total }}
-                    </button>
-                  </td>
-                  <td>
-                    <!-- The track behind the segments. It asked for var(--surface), a token
-                         defined nowhere, so it resolved to nothing and the groove was invisible
-                         whenever the segments did not fill the row. -->
-                    <div class="flex h-2 rounded-full overflow-hidden bg-sunken">
-                      @for (segment of segmentsFor(totals); track segment.key) {
-                        <span [style.width.%]="segment.pct"
-                              [style.background]="outcomeColor(segment.key)"
-                              [title]="segment.key + ': ' + segment.count"></span>
-                      }
-                    </div>
-                  </td>
-                </tr>
-              </tfoot>
-            }
-          </table>
+            </div>
+          }
+          <div class="search-field max-w-56">
+            <app-icon name="search" size="0.95em" />
+            <input class="input" placeholder="Search job id or name" aria-label="Search jobs in this hour"
+                   [value]="breakdownSearch()" (input)="onBreakdownSearch($any($event.target).value)" />
+          </div>
+          <button type="button" class="btn btn-ghost btn-sm" (click)="clearCell()"><app-icon name="close" />Close</button>
+        </ng-container>
 
-        <!-- In the shell's pager slot, outside the scroll box, so the controls do not scroll
-             away with the rows. -->
-        <app-pagination pager [total]="filteredBreakdown().length" [page]="breakdownPager.page()"
-                        [size]="breakdownPager.size()"
-                        (goTo)="goToBreakdownPage($event)"
-                        (setSize)="setBreakdownPageSize($event)" />
-    </app-table-shell>
+        <!-- A busy hour returns every job that ran in it: one cell held 500 rows and ran the page
+             to 27,000px. The shell scrolls the rows in their own box, and the pager keeps that box
+             a readable size. -->
+            <table class="table-modern">
+              <thead>
+                <tr>
+                  <th>Job</th>
+                  @for (column of visibleColumns(); track column) {
+                    <th class="text-right">{{ column }}</th>
+                  }
+                  <!-- Total is pinned so the key figure stays on screen however far the row
+                       runs; below md the Breakdown bar is dropped so Total is the last column. -->
+                  <th class="text-right col-pin-right">Total</th>
+                  <th class="w-28 hidden md:table-cell">Breakdown</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of pagedBreakdown(); track row.jobId) {
+                  <tr>
+                    <td class="max-w-64">
+                      <div class="font-medium truncate" [title]="row.jobName">{{ row.jobName }}</div>
+                      <div class="mono text-[color:var(--text-muted)]">#{{ row.jobId }}</div>
+                    </td>
+                    @for (column of visibleColumns(); track column) {
+                      <td class="text-right tabular !p-0">
+                        <!-- Without the Jobs page the counts would land on /unauthorized: figures, not links. -->
+                        @if (canOpenJobs()) {
+                          <button type="button"
+                                  class="w-full h-full px-4 py-2.5 text-right tabular rounded-sm
+                                         hover-brand
+                                         focus:outline-none focus:ring-2 focus:ring-[color:var(--focus-ring)]
+                                         disabled:hover:bg-transparent"
+                                  [class.text-[color:var(--text-muted)]]="!countFor(row, column)"
+                                  [disabled]="!countFor(row, column)"
+                                  [title]="countFor(row, column)
+                                    ? 'View the ' + column + ' runs for this job in this hour'
+                                    : 'No ' + column + ' runs'"
+                                  (click)="openCount(row, column, countFor(row, column))">
+                            {{ countFor(row, column) }}
+                          </button>
+                        } @else {
+                          <span class="block px-4 py-2.5 text-right tabular" [class.text-[color:var(--text-muted)]]="!countFor(row, column)">{{ countFor(row, column) }}</span>
+                        }
+                      </td>
+                    }
+                    <td class="text-right tabular font-semibold !p-0 col-pin-right">
+                      @if (canOpenJobs()) {
+                        <button type="button"
+                                class="w-full h-full px-4 py-2.5 text-right tabular font-semibold rounded-sm
+                                       hover-brand
+                                       focus:outline-none focus:ring-2 focus:ring-[color:var(--focus-ring)]"
+                                [disabled]="!row.total"
+                                title="View every run for this job in this hour"
+                                (click)="openCount(row, 'Total', row.total)">
+                          {{ row.total }}
+                        </button>
+                      } @else {
+                        <span class="block px-4 py-2.5 text-right tabular font-semibold">{{ row.total }}</span>
+                      }
+                    </td>
+                    <td class="hidden md:table-cell">
+                      <div class="flex h-2 rounded-full overflow-hidden bg-sunken"
+                          >
+                        @for (segment of segmentsFor(row); track segment.key) {
+                          <span [style.width.%]="segment.pct"
+                                [style.background]="outcomeColor(segment.key)"
+                                [title]="segment.key + ': ' + segment.count"></span>
+                        }
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+              @if (breakdownTotal(); as totals) {
+                <tfoot>
+                  <tr class="border-t-2 border-strong">
+                    <td class="font-semibold">
+                      Total
+                      <span class="font-normal text-[color:var(--text-muted)]">
+                        · {{ filteredBreakdown().length }} job{{ filteredBreakdown().length === 1 ? '' : 's' }}
+                      </span>
+                    </td>
+                    @for (column of visibleColumns(); track column) {
+                      <td class="text-right tabular font-semibold !p-0">
+                        @if (canOpenJobs()) {
+                          <button type="button"
+                                  class="w-full h-full px-4 py-2.5 text-right tabular font-semibold rounded-sm
+                                         hover-brand
+                                         focus:outline-none focus:ring-2 focus:ring-[color:var(--focus-ring)]
+                                         disabled:hover:bg-transparent"
+                                  [class.text-[color:var(--text-muted)]]="!countFor(totals, column)"
+                                  [class.font-normal]="!countFor(totals, column)"
+                                  [disabled]="!countFor(totals, column)"
+                                  [title]="countFor(totals, column)
+                                    ? 'View the ' + column + ' runs across every job in this hour'
+                                    : 'No ' + column + ' runs'"
+                                  (click)="openTotal(column, countFor(totals, column))">
+                            {{ countFor(totals, column) }}
+                          </button>
+                        } @else {
+                          <span class="block px-4 py-2.5 text-right tabular font-semibold" [class.text-[color:var(--text-muted)]]="!countFor(totals, column)" [class.font-normal]="!countFor(totals, column)">{{ countFor(totals, column) }}</span>
+                        }
+                      </td>
+                    }
+                    <!-- The pinned cell paints its own ground; the footer row's is inset, not raised. -->
+                    <td class="text-right tabular font-semibold !p-0 col-pin-right bg-[color:var(--surface-inset)]">
+                      @if (canOpenJobs()) {
+                        <button type="button"
+                                class="w-full h-full px-4 py-2.5 text-right tabular font-semibold rounded-sm
+                                       hover-brand
+                                       focus:outline-none focus:ring-2 focus:ring-[color:var(--focus-ring)]
+                                       disabled:hover:bg-transparent"
+                                [disabled]="!totals.total"
+                                title="View every run across every job in this hour"
+                                (click)="openTotal('Total', totals.total)">
+                          {{ totals.total }}
+                        </button>
+                      } @else {
+                        <span class="block px-4 py-2.5 text-right tabular font-semibold">{{ totals.total }}</span>
+                      }
+                    </td>
+                    <td class="hidden md:table-cell">
+                      <!-- The track behind the segments. It asked for var(--surface), a token
+                           defined nowhere, so it resolved to nothing and the groove was invisible
+                           whenever the segments did not fill the row. -->
+                      <div class="flex h-2 rounded-full overflow-hidden bg-sunken">
+                        @for (segment of segmentsFor(totals); track segment.key) {
+                          <span [style.width.%]="segment.pct"
+                                [style.background]="outcomeColor(segment.key)"
+                                [title]="segment.key + ': ' + segment.count"></span>
+                        }
+                      </div>
+                    </td>
+                  </tr>
+                </tfoot>
+              }
+            </table>
+
+          <!-- In the shell's pager slot, outside the scroll box, so the controls do not scroll
+               away with the rows. -->
+          <app-pagination pager [total]="filteredBreakdown().length" [page]="breakdownPager.page()"
+                          [size]="breakdownPager.size()"
+                          (goTo)="goToBreakdownPage($event)"
+                          (setSize)="setBreakdownPageSize($event)" />
+      </app-table-shell>
+    </section>
   }
 </div>

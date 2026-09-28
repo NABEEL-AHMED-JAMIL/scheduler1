@@ -29,6 +29,19 @@ class Host {}
 })
 class SmallHost {}
 
+@Component({
+  imports: [TableShell],
+  template: `
+    <app-table-shell heading="Totals" [isEmpty]="false">
+      <table class="table-modern">
+        <thead><tr><th>Job</th><th>Failed</th><th>Completed</th><th>Skip</th><th>Total</th></tr></thead>
+        <tbody><tr><td>A</td><td>1</td><td>2</td><td>0</td><td>3</td></tr></tbody>
+        <tfoot><tr><td>Total</td><td>1</td><td>2</td><td>0</td><td>3</td></tr></tfoot>
+      </table>
+    </app-table-shell>`,
+})
+class FooterHost {}
+
 async function render<T>(type: new () => T) {
   const fixture = TestBed.createComponent(type);
   fixture.detectChanges();
@@ -92,5 +105,16 @@ describe('table shell column picker', () => {
   it('stays out of the way on a small table', async () => {
     const { button } = await render(SmallHost);
     expect(button()).toBeUndefined();
+  });
+
+  /** The footer kept every cell while the head and body lost one, so each total sat under the wrong heading. */
+  it('hides the column in the footer too', async () => {
+    const { fixture, el, button, visible } = await render(FooterHost);
+    button()!.click();
+    fixture.detectChanges();
+    Array.from(el.querySelectorAll<HTMLInputElement>('[aria-label="Columns to show"] input'))[1].click();
+    fixture.detectChanges();
+    expect(visible(el.querySelector<HTMLElement>('tfoot tr > :nth-child(2)')!)).toBe(false);
+    expect(visible(el.querySelector<HTMLElement>('tfoot tr > :nth-child(3)')!)).toBe(true);
   });
 });

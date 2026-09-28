@@ -6,7 +6,7 @@ import { confirmWith } from '../../shared/ui/confirm';
 import { RouterLink } from '@angular/router';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { AuthService } from '../../core/auth/auth.service';
-import { NotificationsStore } from '../../core/notifications/notifications.store';
+import { UnreadCountService } from '../../core/notifications/unread-count.service';
 import { roleLabel as labelOf } from '../../core/auth/auth.models';
 import { BillingBrief } from '../billing/billing-brief';
 import { ToastService } from '../../shared/ui/toast.service';
@@ -98,8 +98,8 @@ export class Profile implements OnInit {
    */
   readonly activityFailed = signal(false);
   /** The header badge's count, so marking notifications read elsewhere moves this tile too. */
-  private readonly notifications = inject(NotificationsStore);
-  readonly unread = this.notifications.unread;
+  private readonly notifications = inject(UnreadCountService);
+  readonly unread = this.notifications.count;
 
   /** Where a new picture goes. Avatars are small and personal, so they sit under one prefix
       in whichever bucket is available rather than being scattered per tenant. */
@@ -245,7 +245,7 @@ export class Profile implements OnInit {
       // worse page than one whose activity card says it could not be read.
       error: () => { this.activityLoading.set(false); this.activityFailed.set(true); },
     });
-    this.notifications.refreshUnread();
+    this.notifications.refresh();
   }
 
   load(): void {

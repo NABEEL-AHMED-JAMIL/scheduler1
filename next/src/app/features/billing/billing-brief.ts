@@ -20,7 +20,11 @@ import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
     @if (auth.isTenantAdmin() && hasSomething() && summary(); as s) {
       <div class="card p-4" [class.chart-card]="!compact()">
         <div class="flex items-center justify-between gap-2 mb-3">
-          <h3 class="text-sm font-semibold">{{ auth.isPlatformAdmin() ? 'Billing, every workspace' : 'Your bill' }}</h3>
+          @if (headingLevel() === 2) {
+            <h2 class="text-sm font-semibold">{{ title() }}</h2>
+          } @else {
+            <h3 class="text-sm font-semibold">{{ title() }}</h3>
+          }
           <a routerLink="/billing/usage" class="btn btn-ghost btn-sm"><app-icon name="chart" size="0.9em" />Cost &amp; usage</a>
         </div>
         <dl class="grid grid-cols-[repeat(auto-fit,minmax(9rem,1fr))] gap-x-4 gap-y-3 m-0">
@@ -49,6 +53,12 @@ export class BillingBrief implements OnInit {
   readonly auth = inject(AuthService);
   /** Tighter spacing when it sits in a row of dashboard cards rather than a side column. */
   readonly compact = input(false);
+  /**
+   * h2 where the host has no section heading above the brief (the Dashboard, straight under its
+   * h1), h3 under one (Profile, under the person's name). A fixed h3 skipped a level on the Dashboard.
+   */
+  readonly headingLevel = input<2 | 3>(3);
+  readonly title = computed(() => this.auth.isPlatformAdmin() ? 'Billing, every workspace' : 'Your bill');
   readonly summary = signal<BillingSummary | null>(null);
   readonly statusLabel = INVOICE_STATUS_LABEL;
   readonly statusTone = INVOICE_STATUS_TONE;

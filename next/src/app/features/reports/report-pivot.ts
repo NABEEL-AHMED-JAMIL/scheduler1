@@ -382,6 +382,19 @@ export class ReportPivot {
     return this.data().rows.filter(r => r[this.colDim().idx] === colIndex).length;
   }
 
+  /**
+   * The line under a column header. Only a count measure shows the completion share, and not when
+   * the columns are outcomes: each is one outcome, so the share is always 100 or 0 and read
+   * "0% completed" over the Failed column. One run is "1 run".
+   */
+  columnCaption(colIndex: number): string {
+    const n = this.columnCount(colIndex);
+    const runs = `${n} run${n === 1 ? '' : 's'}`;
+    return this.isCounting() && this.colDim().key !== 'status'
+      ? `${this.columnCompletion(colIndex)}% completed · ${runs}`
+      : runs;
+  }
+
   /** The header strips take the same colours as everything else. */
   toneFor(label: string): string { return statusColor(label); }
 

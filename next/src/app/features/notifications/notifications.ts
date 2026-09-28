@@ -6,7 +6,7 @@ import { Router } from '@angular/router';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { LIST_LIMIT } from '../../core/api/list-limit';
 import { instantOf } from '../../core/instant';
-import { NotificationsStore } from '../../core/notifications/notifications.store';
+import { UnreadCountService } from '../../core/notifications/unread-count.service';
 import { ToastService } from '../../shared/ui/toast.service';
 import { TableShell } from '../../shared/ui/data-table';
 import { Icon } from '../../shared/ui/icon';
@@ -49,7 +49,7 @@ export class Notifications implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
-  private readonly store = inject(NotificationsStore);
+  private readonly store = inject(UnreadCountService);
   private readonly auth = inject(AuthService);
 
   readonly items = signal<Notification[]>([]);
@@ -145,7 +145,7 @@ export class Notifications implements OnInit {
       },
     });
     // Opening the page resyncs the badge with what the list is about to show.
-    this.store.refreshUnread();
+    this.store.refresh();
   }
 
   /**

@@ -124,7 +124,12 @@ export class BulkTransfer {
       },
       error: err => {
         this.uploading.set(false);
-        this.result.set({ ok: false, message: err?.error?.message || 'The file could not be uploaded.', rows: rowsOf(err?.error?.data) });
+        // A 5xx carries the server's catch-all ("Some internal error occurred contact with support."),
+        // which tells the uploader nothing they can act on.
+        const message = err?.status >= 500
+          ? 'The server could not read that file. Check it is the .xlsx import template and try again.'
+          : err?.error?.message || 'The file could not be uploaded.';
+        this.result.set({ ok: false, message, rows: rowsOf(err?.error?.data) });
       },
     });
   }

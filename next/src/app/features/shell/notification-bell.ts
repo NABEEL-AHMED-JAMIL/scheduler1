@@ -5,7 +5,7 @@ import { HttpClient } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router, RouterLink } from '@angular/router';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
-import { NotificationsStore } from '../../core/notifications/notifications.store';
+import { UnreadCountService } from '../../core/notifications/unread-count.service';
 import { instantMs } from '../../core/instant';
 import { Icon } from '../../shared/ui/icon';
 import { openableTarget } from '../notifications/notification-links';
@@ -133,7 +133,7 @@ export class NotificationBell implements OnInit, OnDestroy {
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
   private readonly elementRef = inject(ElementRef<HTMLElement>);
-  private readonly store = inject(NotificationsStore);
+  private readonly store = inject(UnreadCountService);
   private readonly auth = inject(AuthService);
 
   readonly open = signal(false);
@@ -148,9 +148,9 @@ export class NotificationBell implements OnInit, OnDestroy {
    * This used to be a tally of the unread rows among the twenty this component fetches, so a
    * user with more than twenty unread saw a badge that stopped at twenty and disagreed with the
    * dashboard tile -- which reads the server's count. Same number, same source, one truth. It
-   * lives in NotificationsStore so that marking rows on the Notifications page moves it too.
+   * lives in UnreadCountService, so the dashboard tile and the Notifications page move it too.
    */
-  readonly unread = this.store.unread;
+  readonly unread = this.store.count;
 
   constructor() {
     // Rows marked here or on the Notifications page flip in this panel as soon as the server agrees.
@@ -234,7 +234,7 @@ export class NotificationBell implements OnInit, OnDestroy {
   private load(): void {
     // The count comes from the server rather than from the rows below, because the rows below are
     // one small window onto the mailbox and the badge is a statement about all of it.
-    this.store.refreshUnread();
+    this.store.refresh();
     this.http.get<ApiResponse<any>>(`${API_BASE}/notification.json/list`,
       { params: { page: '1', limit: String(FETCH_ROWS) } }).subscribe({
       next: response => {

@@ -1,10 +1,16 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { RouterLink } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Subscription, debounceTime, filter } from 'rxjs';
 
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
-import { localIsoDaysAgo } from '../../shared/ui/local-day';
+import { localIsoDay, localIsoDaysAgo } from '../../shared/ui/local-day';
+import { instantOf } from '../../core/instant';
+import { AuthService } from '../../core/auth/auth.service';
+import { JobEventsService } from '../../core/socket/job-events.service';
 import { ToastService } from '../../shared/ui/toast.service';
 import { confirmWith } from '../../shared/ui/confirm';
 import { TableShell } from '../../shared/ui/data-table';
@@ -49,13 +55,30 @@ const FAILED = new Set(['Failed', 'Interrupt']);
 
 @Component({
   selector: 'app-queue',
-  imports: [Icon, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, StatusFilterChip, Donut, RankedBar, BarChart, SplitBar, Pagination],
+  imports: [Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, StatusFilterChip, Donut, RankedBar, BarChart, SplitBar, Pagination],
   templateUrl: './queue.html',
 })
 export class Queue implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly toast = inject(ToastService);
   private readonly dialog = inject(Dialog);
+  private readonly auth = inject(AuthService);
+  private readonly jobEvents = inject(JobEventsService);
+
+  /** Shown beside Refresh, as on Jobs, so it is clear whether the list is following the runs. */
+  readonly live = this.jobEvents.connected;
+
+  /**
+   * Whether a run and its job may link to the Jobs screens. Those routes are pageKey 'jobs' and
+   * this one is 'queue', so a profile can hold Queue without Jobs; a link the page guard then
+   * bounces is worse than plain text.
+   */
+  readonly canOpenJobs = computed(() => this.auth.canOpen('jobs'));
+
+  /** Whether the socket has ever been up, and whether it has since dropped. See Jobs. */
+  private everConnected = false;
+  private missedEvents = false;
+  private request?: Subscription;
 
   readonly statuses = STATUSES;
   readonly rows = signal<QueueRow[]>([]);
@@ -217,7 +240,8 @@ export class Queue implements OnInit {
       const key = String(row.jobId ?? '—');
       map.set(key, (map.get(key) ?? 0) + 1);
     }
-    return [...map.entries()].map(([name, value]) => ({ name: `Job ${name}`, value }));
+    // Keyed by id so two jobs sharing a name stay two bars; labelled by name, as the table is.
+    return [...map.entries()].map(([id, value]) => ({ name: this.jobName({ jobId: Number(id) }), value }));
   });
 
   /**
@@ -231,8 +255,12 @@ export class Queue implements OnInit {
   readonly byDay = computed(() => {
     const map = new Map<string, number>();
     for (const row of this.data()) {
-      const day = (row.dateCreated ?? '').slice(0, 10);
-      if (!day) continue;
+      // The reader's own day, as the table's times and the range fields are. The stamp's first
+      // ten characters were its UTC date whenever it carried an offset, so a Chicago evening run
+      // landed on tomorrow -- a bar outside the range the reader had picked.
+      const at = instantOf(row.dateCreated);
+      if (!at) continue;
+      const day = localIsoDay(at);
       map.set(day, (map.get(day) ?? 0) + 1);
     }
     const days = [...map.keys()].sort();
@@ -270,6 +298,33 @@ export class Queue implements OnInit {
 
   readonly outcomeColor = statusColor;
 
+  constructor() {
+    /*
+     * The screen says what is in flight right now, so it follows the runs. A status push is
+     * re-read rather than patched in: Queue, Start and Running pushes carry no run id, and a new
+     * run is not in the list at all. Debounced, so a burst of pushes costs one read; the search
+     * and status chips are applied here and the range is in the body, so every filter holds.
+     */
+    this.jobEvents.events.pipe(
+      filter(event => event.type === 'job.status'),
+      debounceTime(1000),
+      takeUntilDestroyed(),
+    ).subscribe(() => this.load({ silent: true }));
+
+    // Pushes lost while the socket was down are not replayed, so a gap costs one re-read.
+    effect(() => {
+      if (!this.jobEvents.connected()) {
+        if (this.everConnected) this.missedEvents = true;
+        return;
+      }
+      this.everConnected = true;
+      if (this.missedEvents) {
+        this.missedEvents = false;
+        this.load({ silent: true });
+      }
+    });
+  }
+
   ngOnInit(): void {
     this.load();
     this.loadJobNames();
@@ -291,15 +346,22 @@ export class Queue implements OnInit {
     });
   }
 
-  load(): void {
-    this.loading.set(true);
+  /**
+   * @param silent a re-read the reader did not ask for: rows already on screen stay put rather
+   *               than blurring under "Refreshing…" on every push.
+   */
+  load(options: { silent?: boolean } = {}): void {
+    if (!options.silent || !this.rows().length) this.loading.set(true);
     this.error.set('');
+    // Only the latest read may land: a push arriving mid-read, or a date changed twice, must not
+    // let an older answer overwrite a newer one.
+    this.request?.unsubscribe();
     const body: any = {
       fromDate: this.fromDate() || localIsoDaysAgo(6),
       toDate: this.toDate() || localIsoDaysAgo(0),
     };
 
-    this.http.post<ApiResponse<QueueRow[] | { jobQueues?: QueueRow[] }>>(
+    this.request = this.http.post<ApiResponse<QueueRow[] | { jobQueues?: QueueRow[] }>>(
       `${API_BASE}/message.json/fetchLogs`, body).subscribe({
       next: response => {
         this.loading.set(false);
@@ -337,7 +399,7 @@ export class Queue implements OnInit {
   async forceStatus(row: QueueRow, status: 'Failed' | 'Interrupt'): Promise<void> {
     const ok = await confirmWith(this.dialog, {
       title: `Mark run as ${status}`,
-      body: `Run #${row.jobQueueId} of job ${row.jobId} will be recorded as ${status}. Use this when a run is stuck and the worker will not report back.`,
+      body: `Run #${row.jobQueueId} of ${this.jobName(row)} will be recorded as ${status}. Use this when a run is stuck and the worker will not report back.`,
       confirmLabel: `Mark ${status}`,
       danger: true,
     });

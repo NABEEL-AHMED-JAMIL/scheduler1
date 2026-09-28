@@ -17,51 +17,60 @@ const HOURS = Array.from({ length: 24 }, (_, i) => i);
     @if (rows().length) {
       <div class="w-full">
         <!-- Grid rather than a table: the columns then share the full width evenly
-             instead of collapsing to content and leaving the card half empty. -->
-        <div class="grid gap-1 w-full"
-             [style.grid-template-columns]="'3.25rem repeat(24, minmax(0, 1fr))'">
-          <span></span>
-          @for (hour of hours; track hour) {
-            <span class="text-[10px] text-center text-[color:var(--text-muted)] tabular">
-              @if (hour % 2 === 0) { {{ hourLabel(hour) }} }
-            </span>
-          }
-
-          @for (row of rows(); track row.day) {
-            <span class="text-xs text-[color:var(--text-secondary)] pr-1 self-center whitespace-nowrap">
-              {{ row.day.slice(0, 3) }}
-            </span>
-            @for (cell of row.cells; track cell.hour) {
-              <!-- ring-offset asked for var(--surface): a token this app never defines (only
-                   --surface-page/-raised/-sunken/-inset/-code/-inverse exist). An invalid
-                   --tw-ring-offset-color invalidates the whole composed box-shadow, so hover,
-                   focus AND selection drew NOTHING, in either theme -- the cell had no
-                   selection affordance at all. The three states now share --focus-ring and
-                   separate by weight: a 1px hint on hover, 2px for focus and for selection. -->
-              <button type="button"
-                      class="aspect-square w-full rounded-[3px] relative
-                             ring-offset-1 ring-offset-[color:var(--surface-raised)]
-                             ring-[color:var(--focus-ring)]
-                             transition-[box-shadow,opacity]
-                             hover:ring-1
-                             focus-visible:outline-none focus-visible:ring-2
-                             disabled:cursor-default"
-                      [style.background]="background(cell.value)"
-                      [class.ring-2]="isSelected(row.day, cell.hour)"
-                      [disabled]="!cell.value"
-                      (mouseenter)="hovered.set({ day: row.day, cell })"
-                      (mouseleave)="hovered.set(null)"
-                      (focus)="hovered.set({ day: row.day, cell })"
-                      (blur)="hovered.set(null)"
-                      (click)="cellClicked.emit({ day: row.day, hour: cell.hour, key: cell.key, keys: cell.keys, value: cell.value })">
-                <span class="sr-only">{{ tooltip(row.day, cell) }}</span>
-              </button>
+             instead of collapsing to content and leaving the card half empty. Each hour keeps
+             at least 24px (a usable tap target), so on a phone the grid scrolls sideways in its
+             own box rather than shrinking every hour to a 7px dot. w-max lets the grid be wider
+             than the box, which the sticky day names need; min-w-full still fills a wide card.
+             Padding right and below only: the ring of an edge cell would be clipped, and on the
+             left the cells would show past the pinned day names. -->
+        <div class="overflow-x-auto overscroll-x-contain pr-1 pb-1">
+          <div class="grid gap-1 w-max min-w-full"
+               [style.grid-template-columns]="'3.25rem repeat(24, minmax(1.5rem, 1fr))'">
+            <span class="sticky left-0 z-10 bg-[color:var(--surface-raised)]"></span>
+            @for (hour of hours; track hour) {
+              <span class="text-[10px] text-center text-[color:var(--text-muted)] tabular">
+                @if (hour % 2 === 0) { {{ hourLabel(hour) }} }
+              </span>
             }
-          }
+
+            @for (row of rows(); track row.day) {
+              <span class="sticky left-0 z-10 self-stretch flex items-center bg-[color:var(--surface-raised)]
+                           text-xs text-[color:var(--text-secondary)] pr-1 whitespace-nowrap">
+                {{ row.day.slice(0, 3) }}
+              </span>
+              @for (cell of row.cells; track cell.hour) {
+                <!-- ring-offset asked for var(--surface): a token this app never defines (only
+                     --surface-page/-raised/-sunken/-inset/-code/-inverse exist). An invalid
+                     --tw-ring-offset-color invalidates the whole composed box-shadow, so hover,
+                     focus AND selection drew NOTHING, in either theme -- the cell had no
+                     selection affordance at all. The three states now share --focus-ring and
+                     separate by weight: a 1px hint on hover, 2px for focus and for selection. -->
+                <button type="button"
+                        class="aspect-square w-full rounded-[3px] relative
+                               ring-offset-1 ring-offset-[color:var(--surface-raised)]
+                               ring-[color:var(--focus-ring)]
+                               transition-[box-shadow,opacity]
+                               hover:ring-1
+                               focus-visible:outline-none focus-visible:ring-2
+                               disabled:cursor-default"
+                        [style.background]="background(cell.value)"
+                        [class.ring-2]="isSelected(row.day, cell.hour)"
+                        [disabled]="!cell.value"
+                        (mouseenter)="hovered.set({ day: row.day, cell })"
+                        (mouseleave)="hovered.set(null)"
+                        (focus)="hovered.set({ day: row.day, cell })"
+                        (blur)="hovered.set(null)"
+                        (click)="cellClicked.emit({ day: row.day, hour: cell.hour, key: cell.key, keys: cell.keys, value: cell.value })">
+                  <span class="sr-only">{{ tooltip(row.day, cell) }}</span>
+                </button>
+              }
+            }
+          </div>
         </div>
 
-        <!-- Reserving the row keeps the legend from jumping as the pointer moves. -->
-        <div class="h-6 mt-2 flex items-center">
+        <!-- Reserving the row keeps the legend from jumping as the pointer moves; my-2 keeps
+             the pill off the legend below as well as the grid above. -->
+        <div class="h-6 my-2 flex items-center">
           @if (hovered(); as hover) {
             <span class="text-xs px-2 py-1 rounded-md tabular"
                   style="background: var(--surface-sunken); color: var(--text-primary);">

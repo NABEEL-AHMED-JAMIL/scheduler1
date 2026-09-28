@@ -380,12 +380,19 @@ export class JobLogs implements OnInit, OnDestroy {
     });
   }
 
-  /** Workers prefix nothing, so severity is inferred from the wording. */
+  /**
+   * Workers prefix nothing, so severity is inferred from the wording.
+   *
+   * The words are matched with their endings: workers write "Failed:", "failed", "Completed:",
+   * and bare stems matched none of them, so every dot was grey. Checked in this order so "Attempt 1
+   * of 3 failed ... Queued for attempt 2" stays red. "rejected" is left out on purpose: "40
+   * accepted, 0 rejected" is a good run.
+   */
   toneOf(detail?: string): string {
     const text = (detail ?? '').toLowerCase();
-    if (/\b(fail|error|exception|could not|unable)\b/.test(text)) return 'var(--color-crit-500)';
-    if (/\b(warn|skip|missed|retry)\b/.test(text)) return 'var(--color-warn-500)';
-    if (/\b(complete|success|done|finished)\b/.test(text)) return 'var(--color-ok-500)';
+    if (/\b(fail\w*|errors?|exceptions?|could not|unable|interrupt\w*)\b/.test(text)) return 'var(--color-crit-500)';
+    if (/\b(warn\w*|skip\w*|missed|retr(y|ying|ied|ies))\b/.test(text)) return 'var(--color-warn-500)';
+    if (/\b(complet(e|ed)|succe(ss|ssful|ssfully|eded)|done|finished)\b/.test(text)) return 'var(--color-ok-500)';
     return 'var(--border-strong)';
   }
 }

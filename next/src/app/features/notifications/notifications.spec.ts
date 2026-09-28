@@ -7,7 +7,7 @@ import { Notifications } from './notifications';
 import { ToastService } from '../../shared/ui/toast.service';
 import { LIST_LIMIT } from '../../core/api/list-limit';
 import { PAGE_SIZES } from '../../shared/ui/pager';
-import { NotificationsStore } from '../../core/notifications/notifications.store';
+import { UnreadCountService } from '../../core/notifications/unread-count.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { useMemoryStorage } from '../../shared/testing/memory-storage';
 
@@ -284,7 +284,7 @@ describe('Notifications mark-read refused by the server', () => {
 
 /**
  * Marking rows here used to leave the header badge stale until its next poll: the page posted on
- * its own and the bell kept its own count. Both go through NotificationsStore now.
+ * its own and the bell kept its own count. Both go through UnreadCountService now.
  */
 describe('Notifications page and the header badge', () => {
   const unread = (id: number, read = false) => ({ notificationId: id, title: 'N' + id, read, dateCreated: '' }) as any;
@@ -292,23 +292,23 @@ describe('Notifications page and the header badge', () => {
   it('drops the badge by one when a row is marked read here', () => {
     const post = vi.fn(() => of({ status: 'SUCCESS' }));
     const { notifications } = build({ get: vi.fn(() => of({ status: 'SUCCESS', data: 3 })), post });
-    const store = TestBed.inject(NotificationsStore);
-    store.refreshUnread();
+    const store = TestBed.inject(UnreadCountService);
+    store.refresh();
 
     notifications.markRead(unread(1));
 
-    expect(store.unread()).toBe(2);
+    expect(store.count()).toBe(2);
   });
 
   it('zeroes the badge on Mark all read', () => {
     const post = vi.fn(() => of({ status: 'SUCCESS' }));
     const { notifications } = build({ get: vi.fn(() => of({ status: 'SUCCESS', data: 3 })), post });
-    const store = TestBed.inject(NotificationsStore);
-    store.refreshUnread();
+    const store = TestBed.inject(UnreadCountService);
+    store.refresh();
 
     notifications.markAllRead();
 
-    expect(store.unread()).toBe(0);
+    expect(store.count()).toBe(0);
   });
 
   it('flips its own rows when the bell marks everything read', () => {
@@ -316,7 +316,7 @@ describe('Notifications page and the header badge', () => {
     const { notifications } = build({ get: vi.fn(() => listOf([unread(1), unread(2)], 2)), post });
     notifications.load();
 
-    TestBed.inject(NotificationsStore).markAllRead().subscribe();
+    TestBed.inject(UnreadCountService).markAllRead().subscribe();
 
     expect(notifications.items().every(n => n.read)).toBe(true);
   });
@@ -326,7 +326,7 @@ describe('Notifications page and the header badge', () => {
     const { notifications } = build({ get: vi.fn(() => listOf([unread(1), unread(2)], 2)), post });
     notifications.load();
 
-    TestBed.inject(NotificationsStore).markRead(2).subscribe();
+    TestBed.inject(UnreadCountService).markRead(2).subscribe();
 
     expect(notifications.items().map(n => n.read)).toEqual([false, true]);
   });
@@ -338,7 +338,7 @@ describe('Notifications page and the header badge', () => {
 
     notifications.load();
 
-    expect(TestBed.inject(NotificationsStore).unread()).toBe(9);
+    expect(TestBed.inject(UnreadCountService).count()).toBe(9);
   });
 });
 

@@ -5,7 +5,7 @@ import { HttpClient } from '@angular/common/http';
 import { Router, provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { NotificationBell } from './notification-bell';
-import { NotificationsStore } from '../../core/notifications/notifications.store';
+import { UnreadCountService } from '../../core/notifications/unread-count.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { useMemoryStorage } from '../../shared/testing/memory-storage';
 
@@ -263,7 +263,7 @@ describe('Notification bell and the Notifications page', () => {
   it('shows the count the page moved, because both read one store', () => {
     const { bell } = opened({ unreadCount: 5, fetched: rows(5, () => true) });
 
-    TestBed.inject(NotificationsStore).markRead(3).subscribe();
+    TestBed.inject(UnreadCountService).markRead(3).subscribe();
 
     expect(bell.unread()).toBe(4);
     expect(bell.items().find(n => n.notificationId === 3)?.read).toBe(true);
@@ -272,7 +272,7 @@ describe('Notification bell and the Notifications page', () => {
   it('flips its rows when the page marks everything read', () => {
     const { bell } = opened({ unreadCount: 5, fetched: rows(5, () => true) });
 
-    TestBed.inject(NotificationsStore).markAllRead().subscribe();
+    TestBed.inject(UnreadCountService).markAllRead().subscribe();
 
     expect(bell.unread()).toBe(0);
     expect(bell.items().every(n => n.read)).toBe(true);
