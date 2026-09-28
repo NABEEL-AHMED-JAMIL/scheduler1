@@ -301,8 +301,8 @@ export function buildPivot(data: RunData, rowDim: Dimension, colDim: Dimension,
  * negative, is the dash for "no duration recorded", while a real zero -- a run that finished
  * inside a second, which the query rounds to 0 -- is "0s". The execution measures live below a
  * second, and "230ms" is the whole answer there where "0s" would be none of it. This page had its
- * own humanSeconds, which wrote "0.23s", "44s" and "1m 30s" slightly differently from the jobs
- * pages; it now shares theirs.
+ * own humanSeconds, which wrote that "0.23s" and rounded differently from the jobs pages; it now
+ * shares their formatter.
  */
 export function formatMeasure(value: number, measure: Measure): string {
   return COUNTING.has(measure) ? value.toLocaleString() : formatDuration(value);
