@@ -109,6 +109,19 @@ describe('a clause is complete or it is not sent', () => {
     expect(clauseComplete({ field: 'region', operator: 'EQ', value: 'north' })).toBe(true);
   });
 
+  // A saved analysis can carry a number where the builder writes text: "UI-REVIEW Big amounts by
+  // city" was saved as {"operator":"GT","value":1000}, and value.trim() threw on it, so the tile
+  // said "n.value.trim is not a function" instead of drawing.
+  it('reads a number stored as an operand as the text it stands for, rather than throwing', () => {
+    const stored = (value: unknown) => ({ field: 'amount', operator: 'GT', value }) as never;
+    expect(() => clauseComplete(stored(1000))).not.toThrow();
+    expect(clauseComplete(stored(1000))).toBe(true);
+    expect(clauseComplete(stored(0))).toBe(true);
+    expect(clauseComplete(stored(null))).toBe(false);
+    const range = { field: 'amount', operator: 'BETWEEN', values: [10, 20] } as never;
+    expect(clauseComplete(range)).toBe(true);
+  });
+
   it('refuses a range with only one bound rather than inventing the other', () => {
     // The whole point of the prune. A BETWEEN with a low and no high is not "everything above
     // the low" -- that is LT's job, and guessing it here would apply a predicate nobody wrote.

@@ -2066,6 +2066,80 @@ describe('a saved filter stored as a bare clause', () => {
 });
 
 /**
+ * A saved filter whose operand was stored as a NUMBER.
+ *
+ * The builder writes every operand as text, but analysis_config is plain JSON and "UI-REVIEW Big
+ * amounts by city" (workspace 2924) holds {"field":"amount","operator":"GT","value":1000}. The
+ * prune called value.trim() on it and the tile read `could not be prepared: n.value.trim is not a
+ * function`. The number is read as the text it stands for, which is what the builder would have
+ * sent, and a zero survives: the wire drops an operand that is falsy.
+ */
+describe('a saved filter whose value is not text', () => {
+  const OVER_1000 = { op: 'AND', clauses: [{ field: 'amount', operator: 'GT', value: 1000 }] } as never;
+
+  it('is sent as the text the builder would have written, rather than throwing', () => {
+    expect(() => combineFilters(OVER_1000, null)).not.toThrow();
+    expect(combineFilters(OVER_1000, null)).toEqual({
+      op: 'AND', clauses: [{ field: 'amount', operator: 'GT', value: '1000' }],
+    });
+  });
+
+  it('keeps a zero, and turns a list of numbers into a list of text', () => {
+    const saved = { op: 'OR', clauses: [
+      { field: 'amount', operator: 'GT', value: 0 },
+      { field: 'amount', operator: 'BETWEEN', values: [10, 20.5] },
+    ] } as never;
+    expect(combineFilters(saved, null)).toEqual({ op: 'OR', clauses: [
+      { field: 'amount', operator: 'GT', value: '0' },
+      { field: 'amount', operator: 'BETWEEN', values: ['10', '20.5'] },
+    ] });
+  });
+
+  it('runs the tile it belongs to, with the condition on the wire', () => {
+    const harness = boardWith({
+      widgets: [widgetOn()],
+      analyses: [{ ...ANALYSIS, analysisConfig: JSON.stringify({
+        dimensions: ['city'], measure: { aggregation: 'SUM', field: 'amount' },
+        filters: { op: 'AND', clauses: [{ field: 'amount', operator: 'GT', value: 1000 }] },
+      }) }],
+    });
+    harness.board.openDashboard(BOARD);
+    expect(harness.analyze).toHaveBeenCalledTimes(1);
+    expect((harness.analyze.mock.calls[0] as any)[0].filters)
+      .toEqual({ op: 'AND', clauses: [{ field: 'amount', operator: 'GT', value: '1000' }] });
+    expect(harness.runOf(100).state).toBe('running');
+  });
+});
+
+/**
+ * What a tile says when building its request throws.
+ *
+ * The throw is still caught per tile (see "a saved filter stored as a bare clause"), but its
+ * message was put on the tile as it came: a reader saw "n.value.trim is not a function", which is
+ * minified code talking. A tile says what happened in a sentence; the exception goes to the console.
+ */
+describe('a tile whose request could not be built', () => {
+  it('says so in a plain sentence and never shows the exception text', () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const harness = boardWith({
+      widgets: [widgetOn()],
+      // grains must be a list; a string has no .some() and the request builder throws on it.
+      analyses: [{ ...ANALYSIS, analysisConfig: JSON.stringify({
+        dimensions: ['region'], measure: { aggregation: 'SUM', field: 'amount' }, grains: 'month',
+      }) }],
+    });
+    harness.board.openDashboard(BOARD);
+    const run = harness.runOf(100);
+    expect(run.state).toBe('failed');
+    expect(run.error).not.toMatch(/is not a function|TypeError|undefined/);
+    expect(run.error).toContain('Revenue by region');
+    expect(run.error).toMatch(/Open it in the Analytics Studio/);
+    expect(logged).toHaveBeenCalled();
+    logged.mockRestore();
+  });
+});
+
+/**
  * Bars side by side, and the hole in the board they fill.
  *
  * A two-dimension result whose measure does not ADD UP had no chart at all. Both stacked kinds

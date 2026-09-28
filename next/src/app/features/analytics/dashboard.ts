@@ -2090,9 +2090,12 @@ export class Dashboards implements OnInit, OnDestroy {
     try {
       this.run(widget, id, epoch);
     } catch (thrown) {
-      const reason = thrown instanceof Error ? thrown.message : String(thrown);
+      // The exception goes to the console and never onto the tile: its message is minified code
+      // ("n.value.trim is not a function"), which tells a reader nothing they can act on.
+      console.error(`Dashboard widget ${id} could not be prepared`, thrown);
       this.settle(id, epoch, { state: 'failed', view: null, queryId: '',
-        error: `"${widget.widgetTitle}" could not be prepared: ${reason}` });
+        error: `"${widget.widgetTitle}" could not be run: something in its saved setup is not in a `
+          + 'shape this page can read. Open it in the Analytics Studio and save it again.' });
     }
   }
 

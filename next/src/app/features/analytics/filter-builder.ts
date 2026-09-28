@@ -101,8 +101,8 @@ export function clauseComplete(clause: FilterClause): boolean {
   if (!clause.field) return false;
   const operands = OPERAND_COUNT[clause.operator];
   if (operands === 0) return true;
-  if (operands === 1) return !!(clause.value && clause.value.trim());
-  const values = (clause.values ?? []).filter(v => !!v && !!v.trim());
+  if (operands === 1) return !!operandText(clause.value).trim();
+  const values = (clause.values ?? []).filter(v => !!operandText(v).trim());
   if (operands === 2) return values.length === 2;
   return values.length > 0;
 }
@@ -131,10 +131,38 @@ export function clauseComplete(clause: FilterClause): boolean {
  */
 export function asFilterGroup(raw: FilterNode | null | undefined): FilterGroup | undefined {
   if (!raw) return undefined;
-  if (isFilterGroup(raw)) return raw;
+  const node = withTextOperands(raw);
+  if (isFilterGroup(node)) return node;
   // A lone clause is an implicit AND of one. OR would read identically for a single condition,
   // but AND is what a second condition should join, so it is the honest default.
-  return { op: 'AND', clauses: [raw] };
+  return { op: 'AND', clauses: [node] };
+}
+
+/**
+ * An operand as text, whatever it was stored as.
+ *
+ * The builder only ever writes strings, but a saved analysis is plain JSON and may hold a number:
+ * "UI-REVIEW Big amounts by city" was saved as {"operator":"GT","value":1000}, and calling .trim()
+ * on it threw before the tile was sent.
+ */
+export function operandText(value: unknown): string {
+  return value === null || value === undefined ? '' : String(value);
+}
+
+/**
+ * A saved node with every operand turned into the text the builder would have typed.
+ *
+ * Done where saved filters come in, so nothing further down meets a number: the wire drops an
+ * operand that is falsy, which would have quietly lost a stored 0 from "amount > 0".
+ */
+function withTextOperands(node: FilterNode): FilterNode {
+  if (isFilterGroup(node)) {
+    return { ...node, clauses: (node.clauses ?? []).map(withTextOperands) };
+  }
+  const clause: FilterClause = { ...node };
+  if (clause.value !== undefined && clause.value !== null) clause.value = operandText(clause.value);
+  if (Array.isArray(clause.values)) clause.values = clause.values.map(operandText);
+  return clause;
 }
 
 export function pruneFilters(group: FilterGroup): FilterGroup {
