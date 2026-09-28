@@ -125,7 +125,8 @@
              [attr.aria-label]="drillHeading()">
       <!-- The table shell's loading, error (with Try again) and empty states; the card used to
            hand-roll them and had no error state, so a failed read said "No jobs ran in this hour." -->
-      <app-table-shell [heading]="drillHeading()"
+      <!-- A fixed key: the heading changes with every hour, and the hidden columns went with it. -->
+    <app-table-shell columnsKey="dashboard-hour" [heading]="drillHeading()"
                        [loading]="breakdownLoading()" [error]="breakdownError()"
                        [isEmpty]="!filteredBreakdown().length"
                        [shown]="breakdownRows().length ? filteredBreakdown().length : null"
