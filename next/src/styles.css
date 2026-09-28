@@ -1795,16 +1795,17 @@ html.dark .lookup-rail-glyph.is-managed { background: color-mix(in oklab, var(--
 .lookup-detail { min-width: 0; display: flex; flex-direction: column; }
 .lookup-detail-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-subtle); }
 .lookup-detail-key { font-size: 1.05rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.lookup-entries { padding: 0.75rem 0 0; }
+.lookup-entries { padding: 0.75rem 0 0; flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
 .lookup-entries-head { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 1.25rem 0.5rem; flex-wrap: wrap; }
 .lookup-entries-head .section-title { margin: 0; }
 .lookup-entries-empty { padding: 2.5rem 1.25rem; text-align: center; font-size: 13px; color: var(--text-secondary); display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
 .lookup-detail-empty { flex: 1; justify-content: center; min-height: 20rem; }
 .lookup-entry-table tbody tr:last-child td { border-bottom: 0; }
-/* The entries scroll inside the pane rather than growing the page: AI_PROVIDER has nineteen
-   and the rail beside it would otherwise be a short column at the top of a long one. The
-   header row stays put while the rows scroll under it. */
-.lookup-entries-scroll { max-height: 26rem; overflow: auto; }
+/* The entries scroll inside the pane rather than growing the page (AI_PROVIDER has nineteen), with
+   the header row staying put. They fill the pane down to the card's foot: the list beside them sets
+   the card's height, and a fixed 26rem box left the table scrolling in a strip with blank space
+   under it (owner, 2026-09-28). At least 26rem when the list is short; it scrolls only past what fits. */
+.lookup-entries-scroll { flex: 1 1 0; min-height: 26rem; overflow: auto; }
 .lookup-entries-scroll thead th { position: sticky; top: 0; z-index: 1; background: var(--surface-raised); }
 @media (max-width: 767px) {
   /* minmax(0, 1fr), not 1fr: a bare 1fr is minmax(auto, 1fr), so a rail item's nowrap subtitle
