@@ -4,6 +4,7 @@
       <a routerLink="/assistants/prompts" class="text-sm text-accent hover:underline">← Back to prompts</a>
       <h1 class="page-title mt-1 flex items-center gap-2">
         {{ isEdit() ? (loaded()?.name || 'Edit prompt') : 'New prompt' }}
+        @if (isPlatformAdmin() && isEdit() && workspaceName()) { <span class="pill pill-neutral" title="Workspace">{{ workspaceName() }}</span> }
         @if (loaded(); as p) { <span class="pill pill-neutral mono">v{{ p.version }}</span> <span class="pill" [class]="'pill ' + (p.status === 'Active' ? 'pill-ok' : 'pill-neutral')">{{ p.status }}</span> }
       </h1>
       <p class="page-subtitle">
@@ -89,15 +90,21 @@
           @if (!variables.length) {
             <p class="text-sm text-[color:var(--text-muted)] rounded-md px-3 py-2 bg-sunken">No variables yet. A prompt without any always says the same thing.</p>
           } @else {
-            <div class="overflow-x-auto">
-              <table class="table-modern prompt-vars" formArrayName="variables">
+            <!-- relative: the scroller contains the sr-only Actions span, which otherwise widened the
+                 whole page by 90px on a phone. The floors stop auto layout crushing the controls;
+                 the table scrolls inside its card instead. -->
+            <div class="overflow-x-auto relative">
+              <table class="table-modern prompt-vars min-w-[36rem]" formArrayName="variables">
                 <thead><tr><th>Name</th><th>Type</th><th>Required</th><th>Sample value <span class="font-normal text-[color:var(--text-muted)]">· or a file</span></th><th class="w-20"><span class="sr-only">Actions</span></th></tr></thead>
                 <tbody>
                   @for (g of variables.controls; track g; let i = $index) {
                     <tr [formGroupName]="i">
-                      <td><input class="input mono" formControlName="name" placeholder="claim_id" [attr.aria-label]="'Variable ' + (i + 1) + ' name'" (input)="onVariableChanged()" /></td>
+                      <td><input class="input mono min-w-28" formControlName="name" placeholder="claim_id" [attr.aria-label]="'Variable ' + (i + 1) + ' name'" (input)="onVariableChanged()"
+                                 [class.input-invalid]="(submitted() || g.get('name')!.touched) && g.get('name')!.invalid"
+                                 [attr.aria-invalid]="(submitted() || g.get('name')!.touched) && g.get('name')!.invalid ? 'true' : null"
+                                 [attr.aria-describedby]="submitted() && variables.invalid ? 'pVarsError' : null" /></td>
                       <td>
-                        <select class="input" formControlName="type" [attr.aria-label]="'Variable ' + (i + 1) + ' type'">
+                        <select class="input min-w-32" formControlName="type" [attr.aria-label]="'Variable ' + (i + 1) + ' type'">
                           <option value="text">text</option>
                           <option value="number">number</option>
                           <option value="url">url</option>
@@ -129,6 +136,9 @@
                 </tbody>
               </table>
             </div>
+          }
+          @if (submitted() && variables.invalid) {
+            <p id="pVarsError" class="text-xs text-crit-500 mt-1.5" role="alert">Variable names use letters, digits and underscores, start with a letter or underscore, and cannot be blank.</p>
           }
           @if (undeclared().length) {
             <p class="text-xs text-warn-500 mt-1.5">The template names {{ undeclared().join(', ') }} — rows were added above; give them a sample.</p>
@@ -174,7 +184,9 @@
           </button>
         </div>
         @if (connection(); as c) {
-          <p class="text-xs text-[color:var(--text-muted)] mt-1">On <b>{{ c.name }}</b> · {{ c.provider }} · <span class="mono">{{ form.get('model')?.value || c.defaultModel }}</span>@if (c.dailyTokenBudget) { · {{ c.tokensToday | number }} of {{ c.dailyTokenBudget | number }} tokens today }</p>
+          <p class="text-xs text-[color:var(--text-muted)] mt-1">On <b>{{ c.name }}</b>@if (isPlatformAdmin() && workspaceName()) { · {{ workspaceName() }} } · {{ c.provider }} · <span class="mono">{{ form.get('model')?.value || c.defaultModel }}</span>@if (c.dailyTokenBudget) { · {{ c.tokensToday | number }} of {{ c.dailyTokenBudget | number }} tokens today }</p>
+        } @else if (needsWorkspace()) {
+          <p class="text-xs text-[color:var(--text-muted)] mt-1">Pick a workspace first; the prompt runs on that workspace's connections.</p>
         } @else {
           <p class="text-xs text-warn-500 mt-1">No connection to run on — pick one above, or set a workspace default under Model connections.</p>
         }

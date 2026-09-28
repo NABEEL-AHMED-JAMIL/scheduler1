@@ -2,7 +2,7 @@ import { Component, OnInit, computed, effect, inject, input, signal, untracked }
 import { HttpClient } from '@angular/common/http';
 import { DecimalPipe } from '@angular/common';
 import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { Router, RouterLink } from '@angular/router';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { AuthService } from '../../../core/auth/auth.service';
@@ -67,7 +67,31 @@ export class PromptEdit implements OnInit {
   });
   get variables(): FormArray<FormGroup> { return this.form.get('variables') as FormArray<FormGroup>; }
 
-  readonly connectionOptions = computed(() => this.connections().map(c => ({
+  private readonly tenantIdValue = toSignal(this.form.get('tenantId')!.valueChanges, { initialValue: null as number | null });
+  /** The workspace the prompt belongs to: the one it was saved in, else the one picked. */
+  readonly effectiveTenantId = computed<number | null>(() => {
+    const t = this.loaded() ? this.loaded()!.tenantId : this.tenantIdValue();
+    return t == null ? null : Number(t);
+  });
+  /** A platform administrator on a new prompt, before a workspace is picked. */
+  readonly needsWorkspace = computed(() => this.isPlatformAdmin() && !this.isEdit() && this.effectiveTenantId() == null);
+  /**
+   * The connections this prompt can run on. A platform administrator's list holds every
+   * workspace's, and the editor offered all of them -- and, with none picked, named another
+   * workspace's default as where Try it would run. A prompt runs on its own workspace's
+   * connections, so that is what is offered. A tenant admin's list is already scoped by the server.
+   */
+  readonly scopedConnections = computed(() => {
+    if (!this.isPlatformAdmin()) return this.connections();
+    if (this.needsWorkspace()) return [];
+    const t = this.effectiveTenantId();
+    return this.connections().filter(c => (c.tenantId == null ? null : Number(c.tenantId)) === t);
+  });
+  /** aiPrompt.json/get carries no tenantName, so the name comes from the workspace list. */
+  readonly workspaceName = computed(() =>
+    this.tenants().find(t => t.tenantId === this.effectiveTenantId())?.tenantName ?? this.loaded()?.tenantName ?? '');
+
+  readonly connectionOptions = computed(() => this.scopedConnections().map(c => ({
     value: String(c.connectionId), label: c.name + (c.isDefault ? ' (default)' : ''), hint: `${c.provider} · ${c.defaultModel}`,
   })));
   readonly tenantOptions = computed(() => this.tenants().map(t => ({ value: String(t.tenantId), label: t.tenantName })));
@@ -79,9 +103,11 @@ export class PromptEdit implements OnInit {
   /** The connection a run would use: the one named, else the workspace default. */
   readonly connection = computed(() => {
     const id = this.connectionIdValue();
-    return id != null ? this.connections().find(c => c.connectionId === Number(id)) ?? null : this.connections().find(c => c.isDefault) ?? null;
+    const list = this.scopedConnections();
+    return id != null ? list.find(c => c.connectionId === Number(id)) ?? null : list.find(c => c.isDefault) ?? null;
   });
   readonly modelHint = computed(() => {
+    if (this.needsWorkspace()) return 'Pick a workspace first; its connections and models are offered here.';
     const c = this.connection();
     return c ? `Blank runs on the connection's default, ${c.defaultModel}.${c.models?.length ? ' Listed: ' + c.models.slice(0, 6).join(', ') + (c.models.length > 6 ? '…' : '') : ''}` : 'Pick a connection, or set a workspace default, so there is somewhere to run.';
   });
@@ -91,7 +117,8 @@ export class PromptEdit implements OnInit {
     return placeholdersOf(this.templateValue() ?? '').filter(n => !declared.has(n));
   });
   private readonly variablesVersion = signal(0);
-  readonly declaredNames = computed(() => { this.variablesVersion(); return this.variables.controls.map(g => (g.get('name')!.value ?? '').trim()).filter(Boolean); });
+  /** Only names a placeholder can use: a chip for "bad-name" would insert a placeholder that never fills. */
+  readonly declaredNames = computed(() => { this.variablesVersion(); return this.variables.controls.map(g => (g.get('name')!.value ?? '').trim()).filter(n => VARIABLE_NAME.test(n)); });
 
   // ---- Try it ---------------------------------------------------------------------------------
   readonly trying = signal(false);
@@ -149,6 +176,12 @@ export class PromptEdit implements OnInit {
       const missing = this.undeclared();
       untracked(() => { for (const name of missing) if (!this.variables.controls.some(g => g.get('name')!.value === name)) this.addVariable({ name, type: 'text', required: true, sample: '' }); });
     });
+    // Picking another workspace on a new prompt drops a connection that workspace does not have.
+    this.form.get('tenantId')!.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => {
+      if (!this.isPlatformAdmin() || this.isEdit()) return;
+      const id = this.form.get('connectionId')!.value;
+      if (id != null && !this.scopedConnections().some(c => c.connectionId === Number(id))) this.form.patchValue({ connectionId: null });
+    });
   }
 
   ngOnInit(): void {
@@ -194,7 +227,7 @@ export class PromptEdit implements OnInit {
 
   addVariable(v?: Partial<PromptVariable>): void {
     this.variables.push(this.fb.group({
-      name: [v?.name ?? '', [Validators.required, Validators.pattern(/^[A-Za-z_][A-Za-z0-9_]*$/)]],
+      name: [v?.name ?? '', [Validators.required, Validators.pattern(VARIABLE_NAME)]],
       type: [v?.type ?? 'text'],
       required: [v?.required ?? true],
       sample: [v?.sample ?? ''],
@@ -228,7 +261,17 @@ export class PromptEdit implements OnInit {
 
   private valid(): boolean {
     this.submitted.set(true);
-    if (this.form.invalid) { this.toast.error('Fill in the name and the message template.'); return false; }
+    // Every control shows its own error now, and the toast names what is actually wrong: it used
+    // to blame the name and template whatever failed, including a variable name or the temperature.
+    this.form.markAllAsTouched();
+    if (this.form.invalid) {
+      const f = this.form;
+      this.toast.error(
+        f.get('name')!.invalid || f.get('userTemplate')!.invalid ? 'Fill in the name and the message template.'
+        : this.variables.invalid ? 'Name every variable with letters, digits and underscores, starting with a letter or underscore.'
+        : 'Check the highlighted fields.');
+      return false;
+    }
     if (this.undeclared().length) { this.toast.error(`Declare ${this.undeclared().map(n => '{{' + n + '}}').join(', ')} as a variable, or take it out of the template.`); return false; }
     if (this.isPlatformAdmin() && !this.isEdit() && this.form.get('tenantId')!.value == null) { this.toast.error('Pick the workspace this prompt belongs to.'); return false; }
     return true;
@@ -273,6 +316,9 @@ export class PromptEdit implements OnInit {
     try { return JSON.stringify(JSON.parse(run.output), null, 2); } catch { return run.output; }
   }
 }
+
+/** What a {{placeholder}} can be called; the server holds variables to the same rule. */
+const VARIABLE_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 /** What GET aiPrompt.json/objectText answers. */
 interface ObjectText {

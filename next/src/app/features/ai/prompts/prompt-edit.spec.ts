@@ -199,3 +199,148 @@ describe('PromptEdit variables table after a removal', () => {
     expect(component.variables.at(0).value.sample).toBe('typed');
   });
 });
+
+/** The editor rendered for real, as a tenant admin unless told otherwise. */
+function renderedEditor(options: { platformAdmin?: boolean; promptId?: string; connections?: unknown[]; tenants?: unknown[]; prompt?: unknown } = {}) {
+  const get = vi.fn((url: string) => {
+    if (url.endsWith('/aiConnection.json/list')) return of({ status: API_SUCCESS, data: options.connections ?? [] });
+    if (url.endsWith('/tenant.json/listTenants')) return of({ status: API_SUCCESS, data: options.tenants ?? [] });
+    if (url.endsWith('/aiPrompt.json/get')) return of({ status: API_SUCCESS, data: options.prompt });
+    return of({ status: API_SUCCESS, data: [] });
+  });
+  const post = vi.fn(() => of({ status: API_SUCCESS, message: 'ok', data: {} }));
+  const toast = { success: vi.fn(), error: vi.fn(), info: () => {} };
+  TestBed.resetTestingModule();
+  TestBed.configureTestingModule({ providers: [
+    { provide: HttpClient, useValue: { get, post } },
+    { provide: ToastService, useValue: toast },
+    provideRouter([]),
+    { provide: AuthService, useValue: { isPlatformAdmin: () => !!options.platformAdmin, canManageAgents: () => true, user: () => ({ appUserId: 1 }) } },
+  ] });
+  const fixture = TestBed.createComponent(PromptEdit);
+  if (options.promptId) fixture.componentRef.setInput('promptId', options.promptId);
+  fixture.detectChanges();
+  const el = fixture.nativeElement as HTMLElement;
+  return { fixture, component: fixture.componentInstance, el, post, toast };
+}
+
+/**
+ * Any invalid control made the toast say "Fill in the name and the message template", even when
+ * both were filled and the problem was a variable's name or the temperature. A bad variable name
+ * got no red mark either.
+ */
+describe('PromptEdit validation says what is actually wrong', () => {
+  it('names the variable rule when a variable name is the problem, and marks that name', () => {
+    const { fixture, component, el, post, toast } = renderedEditor();
+    component.form.patchValue({ name: 'x', userTemplate: 'Hello' });
+    component.addVariable({ name: 'bad-name', sample: 'A' });
+    fixture.detectChanges();
+
+    component.save(true);
+    fixture.detectChanges();
+
+    expect(post).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Name every variable'));
+    const name = el.querySelector<HTMLInputElement>('table.prompt-vars tbody tr input')!;
+    expect(name.classList).toContain('input-invalid');
+    expect(name.getAttribute('aria-invalid')).toBe('true');
+    expect(el.querySelector('#pVarsError')?.textContent).toContain('letters, digits and underscores');
+  });
+
+  it('points at the highlighted fields when a number is out of range', () => {
+    const { fixture, component, el, post, toast } = renderedEditor();
+    component.form.patchValue({ name: 'x', userTemplate: 'Hello' });
+    const temperature = el.querySelector<HTMLInputElement>('#pTemp')!;
+    temperature.value = '5';
+    temperature.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    component.tryIt();
+
+    expect(post).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith('Check the highlighted fields.');
+    expect(component.form.get('temperature')!.touched).toBe(true);
+  });
+
+  it('still asks for the name and template when those are what is missing', () => {
+    const { component, toast } = renderedEditor();
+    component.save(false);
+    expect(toast.error).toHaveBeenCalledWith('Fill in the name and the message template.');
+  });
+
+  it('keeps a badly named variable out of the Insert chips', () => {
+    const { component } = renderedEditor();
+    component.addVariable({ name: 'bad-name' });
+    component.addVariable({ name: 'good_name' });
+    expect(component.declaredNames()).toEqual(['good_name']);
+  });
+});
+
+/**
+ * On a phone the variables table was crushed to the card's width and an absolutely positioned
+ * sr-only header span, contained by nothing nearer than the page, widened the page by 90px.
+ */
+describe('PromptEdit variables table on a narrow screen', () => {
+  it('scrolls the table inside its own box, with a floor under each control', () => {
+    const { fixture, component, el } = renderedEditor();
+    component.addVariable({ name: 'alpha' });
+    fixture.detectChanges();
+    const table = el.querySelector<HTMLElement>('table.prompt-vars')!;
+    expect(table.parentElement!.classList).toContain('overflow-x-auto');
+    expect(table.parentElement!.classList).toContain('relative');
+    expect(table.classList).toContain('min-w-[36rem]');
+    expect(table.querySelector('input.mono')!.classList).toContain('min-w-28');
+    expect(table.querySelector('select')!.classList).toContain('min-w-32');
+  });
+});
+
+/**
+ * A platform administrator sees every workspace's connections. The editor offered all of them,
+ * and with no connection picked it named some other workspace's default as where Try it would run.
+ */
+describe('PromptEdit for a platform administrator', () => {
+  const connections = [
+    { connectionId: 1, tenantId: 10, name: 'Acme Ollama', provider: 'Ollama', defaultModel: 'gemma3:1b', isDefault: true },
+    { connectionId: 2, tenantId: 20, name: 'Globex OpenAI', provider: 'OpenAI', defaultModel: 'gpt-4o-mini', isDefault: true },
+    { connectionId: 3, tenantId: 20, name: 'Globex Claude', provider: 'Anthropic', defaultModel: 'claude', isDefault: false },
+  ];
+  const tenants = [{ tenantId: 10, tenantName: 'Acme' }, { tenantId: 20, tenantName: 'Globex' }];
+
+  it('offers no connection and names no default until a workspace is picked', () => {
+    const { component, el } = renderedEditor({ platformAdmin: true, connections, tenants });
+    expect(component.connectionOptions()).toEqual([]);
+    expect(component.connection()).toBeNull();
+    expect(component.modelHint()).toContain('Pick a workspace first');
+    expect(el.textContent).toContain('Pick a workspace first');
+  });
+
+  it('offers only the picked workspace\'s connections, and its own default', () => {
+    const { component } = renderedEditor({ platformAdmin: true, connections, tenants });
+    component.form.patchValue({ tenantId: 20 });
+    expect(component.connectionOptions().map(o => o.value)).toEqual(['2', '3']);
+    expect(component.connection()?.name).toBe('Globex OpenAI');
+  });
+
+  it('drops a picked connection that the newly picked workspace does not have', () => {
+    const { component } = renderedEditor({ platformAdmin: true, connections, tenants });
+    component.form.patchValue({ tenantId: 20 });
+    component.form.patchValue({ connectionId: 3 });
+    component.form.patchValue({ tenantId: 10 });
+    expect(component.form.get('connectionId')!.value).toBeNull();
+    expect(component.connection()?.name).toBe('Acme Ollama');
+  });
+
+  it('says which workspace a prompt being edited belongs to', () => {
+    const { fixture, el } = renderedEditor({ platformAdmin: true, connections, tenants, promptId: '5', prompt: {
+      promptId: 5, tenantId: 20, name: 'Summarise', userTemplate: 'Hi', outputMode: 'text', version: 2, status: 'Active', variables: [],
+    } });
+    fixture.detectChanges();
+    expect(el.querySelector('h1')!.textContent).toContain('Globex');
+  });
+
+  it('changes nothing for a tenant administrator, whose list the server already scoped', () => {
+    const { component } = renderedEditor({ connections: connections.slice(0, 1) });
+    expect(component.connectionOptions().map(o => o.value)).toEqual(['1']);
+    expect(component.connection()?.name).toBe('Acme Ollama');
+  });
+});
