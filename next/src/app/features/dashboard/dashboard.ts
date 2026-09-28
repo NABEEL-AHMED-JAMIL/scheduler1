@@ -1,7 +1,7 @@
 import { BillingBrief } from '../billing/billing-brief';
 import { Component, DestroyRef, Injector, OnInit, afterNextRender, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Donut } from '../../shared/charts/donut';
 import { Bar, BarChart } from '../../shared/charts/bar-chart';
 import { daySeries } from '../../shared/charts/day-series';
@@ -21,6 +21,8 @@ import { LoadError } from '../../shared/ui/load-error';
 import { Observable, Subscription } from 'rxjs';
 
 const WEEKDAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const WEEKDAY = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
  * Status keys shown in the breakdown table, in lifecycle order.
@@ -57,6 +59,7 @@ export class Dashboard implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly injector = inject(Injector);
 
   /** What the date boxes hold, which may be half-edited. */
@@ -218,7 +221,66 @@ export class Dashboard implements OnInit {
       String(row.jobId).includes(term) || (row.jobName ?? '').toLowerCase().includes(term));
   });
 
-  ngOnInit(): void { this.load(); }
+  ngOnInit(): void {
+    this.restoreFromUrl();
+    this.load();
+    const cell = this.selectedCell();
+    if (cell) { this.readBreakdown(cell.date, cell.hr); this.revealDrill(); }
+  }
+
+  /**
+   * The view lives in the address, so Back from a count's run history returns to the same range,
+   * hour and search rather than a fresh page. replaceUrl: changing the view adds no history
+   * entries, so one Back still leaves the dashboard.
+   */
+  private syncUrl(): void {
+    const cell = this.selectedCell();
+    this.router.navigate([], {
+      relativeTo: this.route,
+      replaceUrl: true,
+      queryParams: {
+        from: this.appliedStart(), to: this.appliedEnd(),
+        date: cell?.date ?? null, hr: cell?.hr ?? null,
+        q: cell ? this.breakdownSearch().trim() || null : null,
+      },
+    });
+  }
+
+  /** Reads the address back; anything that is not a real range, date or hour is ignored. */
+  private restoreFromUrl(): void {
+    const query = this.route.snapshot.queryParamMap;
+    const from = query.get('from') ?? '';
+    const to = query.get('to') ?? '';
+    if (ISO_DAY.test(from) && ISO_DAY.test(to) && from <= to) {
+      this.startDate.set(from); this.endDate.set(to);
+      this.appliedStart.set(from); this.appliedEnd.set(to);
+    }
+    const date = query.get('date') ?? '';
+    const hr = Number(query.get('hr'));
+    if (!ISO_DAY.test(date) || query.get('hr') === null || !Number.isInteger(hr) || hr < 0 || hr > 23) return;
+    // The cell's other dates are not known until the hours load; see coverDates.
+    const day = WEEKDAY[new Date(date + 'T00:00:00Z').getUTCDay()];
+    this.selectedCell.set({ date, hr, day, dates: [date] });
+    this.breakdownSearch.set(query.get('q') ?? '');
+  }
+
+  /**
+   * A cell restored from the address knows only its own date. Once the hours are in, it lists every
+   * date its weekday and hour covers, the same as a clicked cell.
+   */
+  private coverDates(): void {
+    const cell = this.selectedCell();
+    if (!cell || cell.dates.length > 1) return;
+    const dates = [...new Set(this.hourly()
+      .filter(h => h.dayCode === cell.day && h.hr === cell.hr && h.count > 0)
+      .map(h => h.date))].sort();
+    if (dates.length > 1 && dates.includes(cell.date)) this.selectedCell.set({ ...cell, dates });
+  }
+
+  onBreakdownSearch(term: string): void {
+    this.breakdownSearch.set(term);
+    this.syncUrl();
+  }
 
   /**
    * The reads in flight. A new Apply cancels the old set: a slow answer from the earlier range used
@@ -261,7 +323,7 @@ export class Dashboard implements OnInit {
 
     read(this.dashboard.jobStatus(from, to), data => this.jobStatus.set(data ?? []));
     read(this.dashboard.jobRunning(from, to), data => this.jobRunning.set(data ?? []));
-    read(this.dashboard.hourly(from, to), data => this.hourly.set(data ?? []));
+    read(this.dashboard.hourly(from, to), data => { this.hourly.set(data ?? []); this.coverDates(); });
     this.loadSub.add(this.http.get<ApiResponse<number>>(`${API_BASE}/notification.json/unreadCount`).subscribe({
       next: r => { if (r.status === API_SUCCESS) this.unread.set(Number(r.data ?? 0)); },
       error: () => { /* the tile simply shows zero */ },
@@ -279,6 +341,7 @@ export class Dashboard implements OnInit {
     this.selectedCell.set({ date, hr, day: dayName, dates: dates?.length ? dates : [date] });
     this.readBreakdown(date, hr);
     this.revealDrill();
+    this.syncUrl();
   }
 
   /**
@@ -310,6 +373,7 @@ export class Dashboard implements OnInit {
     this.selectedCell.set({ ...cell, date });
     this.breakdownSearch.set('');
     this.readBreakdown(date, cell.hr);
+    this.syncUrl();
   }
 
   /** Try again on the drill-down: the same hour, read afresh. */
@@ -343,6 +407,7 @@ export class Dashboard implements OnInit {
     this.breakdownError.set('');
     this.breakdown.set([]);
     this.breakdownSearch.set('');
+    this.syncUrl();
   }
 
   /**

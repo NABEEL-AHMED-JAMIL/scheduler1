@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { ApplicationRef } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { Subject, of, throwError } from 'rxjs';
 import { Dashboard } from './dashboard';
 import { DashboardService } from './dashboard.service';
@@ -11,8 +11,9 @@ import { ToastService } from '../../shared/ui/toast.service';
 type Answers = Partial<Record<'jobStatus' | 'jobRunning' | 'hourly' | 'breakdown', () => unknown>>;
 const ok = () => of({ status: 'SUCCESS', data: [] });
 
-function dashboard(answers: Answers = {}) {
+function dashboard(answers: Answers = {}, query: Record<string, string> = {}) {
   const calls: string[] = [];
+  const navigations: { commands: unknown[]; extras: any }[] = [];
   const service: Record<string, unknown> = {};
   const breakdownDates: string[] = [];
   const ranges: string[] = [];
@@ -30,10 +31,11 @@ function dashboard(answers: Answers = {}) {
       { provide: DashboardService, useValue: service },
       { provide: HttpClient, useValue: { get: () => of({ status: 'SUCCESS', data: 0 }) } },
       { provide: ToastService, useValue: { success: () => {}, error: () => {}, info: () => {} } },
-      { provide: Router, useValue: { navigate: () => {} } },
+      { provide: Router, useValue: { navigate: (commands: unknown[], extras: unknown) => { navigations.push({ commands, extras }); } } },
+      { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap(query) } } },
     ],
   });
-  return { dashboard: TestBed.runInInjectionContext(() => new Dashboard()), calls, breakdownDates, ranges };
+  return { dashboard: TestBed.runInInjectionContext(() => new Dashboard()), calls, breakdownDates, ranges, navigations };
 }
 
 const localDay = (d: Date) =>
@@ -324,5 +326,60 @@ describe('Dashboard drill-down opening', () => {
 
     expect(scrolled).toHaveBeenCalledTimes(1);
     expect(document.activeElement).toBe(drill);
+  });
+});
+
+/**
+ * Back from a count's run history landed on a fresh dashboard: the range, the hour and the search
+ * were gone, and finding the same hour again meant starting over. The view now lives in the address
+ * (replacing it, so no extra history entries), and the page reads it back when it opens.
+ */
+describe('Dashboard view in the address', () => {
+  const lastQuery = (navigations: { extras: any }[]) => navigations[navigations.length - 1].extras;
+
+  it('writes the applied range, the hour and the search into the address, in place', () => {
+    const { dashboard: d, navigations } = dashboard();
+    d.startDate.set('2026-09-18');
+    d.endDate.set('2026-09-24');
+    d.applyRange();
+    expect(lastQuery(navigations)).toMatchObject({ replaceUrl: true,
+      queryParams: { from: '2026-09-18', to: '2026-09-24', date: null, hr: null, q: null } });
+    d.selectCell('2026-09-24', 22, 5, 'Thursday');
+    expect(lastQuery(navigations).queryParams).toMatchObject({ date: '2026-09-24', hr: 22 });
+    d.onBreakdownSearch('nightly');
+    expect(lastQuery(navigations).queryParams.q).toBe('nightly');
+    d.clearCell();
+    expect(lastQuery(navigations).queryParams).toMatchObject({ date: null, hr: null, q: null });
+  });
+
+  it('opens on the range, hour and search the address names', () => {
+    const { dashboard: d, ranges, breakdownDates } = dashboard({}, {
+      from: '2026-09-22', to: '2026-09-24', date: '2026-09-24', hr: '22', q: 'UI-REVIEW' });
+    d.ngOnInit();
+    expect(d.appliedStart()).toBe('2026-09-22');
+    expect(d.startDate()).toBe('2026-09-22');
+    expect(ranges[0]).toBe('2026-09-22..2026-09-24');
+    expect(d.selectedCell()).toMatchObject({ date: '2026-09-24', hr: 22, day: 'Thursday' });
+    expect(breakdownDates).toEqual(['2026-09-24']);
+    expect(d.breakdownSearch()).toBe('UI-REVIEW');
+  });
+
+  it('lists every date of the restored cell once the hours have loaded', () => {
+    const { dashboard: d } = dashboard({ hourly: () => of({ status: 'SUCCESS', data: [
+      { date: '2026-09-17', dayCode: 'Thursday', hr: 22, count: 3 },
+      { date: '2026-09-24', dayCode: 'Thursday', hr: 22, count: 2 },
+      { date: '2026-09-24', dayCode: 'Thursday', hr: 9, count: 1 }] }) },
+      { from: '2026-09-11', to: '2026-09-24', date: '2026-09-24', hr: '22' });
+    d.ngOnInit();
+    expect(d.selectedCell()?.dates).toEqual(['2026-09-17', '2026-09-24']);
+  });
+
+  it('ignores an address it cannot read', () => {
+    const { dashboard: d, breakdownDates } = dashboard({}, { from: '2026-09-24', to: '2026-09-01', date: 'soon', hr: '31' });
+    const start = d.startDate();
+    d.ngOnInit();
+    expect(d.startDate()).toBe(start);
+    expect(d.selectedCell()).toBeNull();
+    expect(breakdownDates).toEqual([]);
   });
 });
