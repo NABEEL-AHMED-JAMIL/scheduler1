@@ -92,3 +92,27 @@ describe('JobLogs', () => {
     TestBed.inject(HttpTestingController).match(() => true).forEach(r => r.flush({ status: API_SUCCESS, data: LOGS }));
   });
 });
+
+/**
+ * Workers write "Failed: ...", "Attempt 1 of 3 failed", "Completed: ..." -- the tone patterns only
+ * matched the bare stems (fail, complete), so every timeline dot came out grey.
+ */
+describe('JobLogs timeline tone', () => {
+  const CRIT = 'var(--color-crit-500)', WARN = 'var(--color-warn-500)', OK = 'var(--color-ok-500)', NONE = 'var(--border-strong)';
+
+  it.each([
+    ['Failed: Input CSV not found: x', CRIT],
+    ['Attempt 1 of 3 failed: timeout. Queued for attempt 2', CRIT],
+    ['Run interrupted', CRIT],
+    ['3 errors while parsing', CRIT],
+    ['Completed: Checked 40 row(s)', OK],
+    ['Job completed successfully', OK],
+    ['Skipped: nothing to do', WARN],
+    ['Job started', NONE],
+    // "rejected" is a count on a good run, not a failure.
+    ['Checked 40 row(s): 40 accepted, 0 rejected', NONE],
+  ])('%s', (text, tone) => {
+    const { component } = page();
+    expect(component.toneOf(text)).toBe(tone);
+  });
+});

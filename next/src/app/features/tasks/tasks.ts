@@ -19,6 +19,7 @@ import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { createPager } from '../../shared/ui/pager';
 import { Pagination } from '../../shared/ui/pagination';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
+import { parseTopicPartition } from '../../shared/ui/topic';
 
 export interface LinkedJob {
   jobId: number;
@@ -77,13 +78,20 @@ export class Tasks implements OnInit {
   /** Narrow by topic, then by one of that topic's pipelines. Options come from the tasks themselves. */
   readonly topicFilter = signal('');
   readonly pipelineFilter = signal('');
+  /**
+   * One option per task type, named as the task editor names it -- the service first, its Kafka
+   * topic as the hint -- so the filter can be found by either. The value stays the type id: two
+   * types can share one topic.
+   */
   readonly topicOptions = computed(() => {
-    const seen = new Map<string, string>();
+    const seen = new Map<string, { name: string; topic: string }>();
     for (const t of this.tasks()) {
       const id = t.sourceTaskType?.sourceTaskTypeId;
-      if (id != null && !seen.has(String(id))) seen.set(String(id), t.sourceTaskType?.serviceName ?? `#${id}`);
+      if (id != null && !seen.has(String(id))) {
+        seen.set(String(id), { name: t.sourceTaskType?.serviceName ?? `#${id}`, topic: this.topicOf(t.sourceTaskType?.queueTopicPartition) });
+      }
     }
-    return [...seen].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+    return [...seen].map(([id, option]) => ({ id, ...option })).sort((a, b) => a.name.localeCompare(b.name));
   });
   readonly pipelineOptions = computed(() => {
     const topic = this.topicFilter();
@@ -94,7 +102,7 @@ export class Tasks implements OnInit {
     }
     return [...seen].sort().map(id => ({ id, name: id }));
   });
-  readonly topicComboOptions = computed(() => this.topicOptions().map(t => ({ value: t.id, label: t.name })));
+  readonly topicComboOptions = computed(() => this.topicOptions().map(t => ({ value: t.id, label: t.name, hint: t.topic })));
   readonly pipelineComboOptions = computed(() => this.pipelineOptions().map(p => ({ value: p.id, label: p.name })));
   setTopicFilter(value: string): void {
     this.topicFilter.set(value);
@@ -120,6 +128,8 @@ export class Tasks implements OnInit {
       String(task.taskDetailId).includes(term)
       || (task.taskName ?? '').toLowerCase().includes(term)
       || (task.sourceTaskType?.serviceName ?? '').toLowerCase().includes(term)
+      // The Kafka topic the Topic column shows, which the placeholder promises.
+      || this.topicOf(task.sourceTaskType?.queueTopicPartition).toLowerCase().includes(term)
       || (task.pipelineId ?? '').toLowerCase().includes(term));
   });
 
@@ -371,11 +381,9 @@ export class Tasks implements OnInit {
     return '';
   }
 
-  /** "topic=scrapping-topic&partitions=[*]" -> "scrapping-topic" */
+  /** "topic=scrapping-topic&partitions=[*]" -> "scrapping-topic", read as the editor reads it. */
   topicOf(raw?: string): string {
-    if (!raw) return '';
-    const match = /topic=([^&]+)/.exec(raw);
-    return match ? match[1] : raw;
+    return parseTopicPartition(raw).topic;
   }
 
   /**

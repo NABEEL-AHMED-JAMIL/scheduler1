@@ -105,11 +105,15 @@
           </th>
           <th class="w-8"></th>
           <th>Job</th>
-          <th>Task</th>
-          <th>Execution</th>
-          <th>Schedule</th>
+          <!-- Task, Execution and Created wait for xl, as the metadata columns wait for 2xl: at 1024
+               they pushed Run status and the row's menu past the card edge. None is lost -- the
+               task is in the row's panel, and Schedule already reads "On demand" for Manual. -->
+          <th class="hidden xl:table-cell">Task</th>
+          <th class="hidden xl:table-cell">Execution</th>
+          <!-- A floor so "Ends 2026-12-31" is not broken at its hyphens. -->
+          <th class="min-w-40">Schedule</th>
           <th>Next / last run</th>
-          <th>Created</th>
+          <th class="hidden xl:table-cell">Created</th>
           <th>Run status</th>
           <!-- Metadata columns wait for a wide screen, as on Tasks; the detail colspan stays 13. -->
           <th class="hidden 2xl:table-cell">Created by</th>
@@ -138,7 +142,7 @@
                 <app-icon [name]="expanded().has(job.jobId) ? 'chevronDown' : 'chevronRight'" />
               </button>
             </td>
-            <td class="max-w-64">
+            <td class="max-w-60 xl:max-w-64">
               <div class="font-medium truncate" [title]="job.jobName">{{ job.jobName || '—' }}</div>
               <div class="flex items-center gap-1.5 mt-0.5 text-[11px] leading-none">
                 <span class="mono text-[color:var(--text-muted)]">#{{ job.jobId }}</span>
@@ -149,14 +153,14 @@
                 }
               </div>
             </td>
-            <td class="max-w-44">
+            <td class="hidden xl:table-cell max-w-44">
               @if (job.taskDetail?.taskName) {
                 <span class="truncate block" [title]="job.taskDetail!.taskName">
                   {{ job.taskDetail!.taskName }}
                 </span>
               } @else { — }
             </td>
-            <td>
+            <td class="hidden xl:table-cell">
               @if (job.execution === 'Auto') {
                 <span class="pill pill-brand">{{ job.execution }}</span>
               } @else {
@@ -182,7 +186,7 @@
                 {{ job.lastJobRun ? ('Last ' + (when(job.lastJobRun) | serverTime:'d MMM, HH:mm')) : 'Never run' }}
               </div>
             </td>
-            <td class="text-[color:var(--text-secondary)] whitespace-nowrap">
+            <td class="hidden xl:table-cell text-[color:var(--text-secondary)] whitespace-nowrap">
               {{ job.dateCreated ? (job.dateCreated | serverTime:'d MMM yyyy') : '—' }}
             </td>
             <td>
@@ -203,18 +207,21 @@
               {{ job.updatedByName || '—' }}
             </td>
             <td class="text-right"><app-status [label]="job.jobStatus" [quiet]="true" /></td>
-            <td class="text-right col-pin-right">
+            <!-- The pinned cell paints its own background over the scrolled columns, which also
+                 painted over the selected row's tint; it takes the tint back here. -->
+            <td class="text-right col-pin-right"
+                [class.bg-[var(--surface-sunken)]]="selected().has(job.jobId)">
               <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="menu"
                       [disabled]="busyJob() === job.jobId" aria-label="Actions">
                 <app-icon name="dots" size="1.05em" />
               </button>
               <ng-template #menu>
                 <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
-                  <button cdkMenuItem class="menu-item" [disabled]="isInFlight(job)"
-                          [title]="isInFlight(job) ? 'This job is already queued or running' : ''"
+                  <button cdkMenuItem class="menu-item" [disabled]="!canRunNow(job)"
+                          [title]="runBlockedReason(job)"
                           (cdkMenuItemTriggered)="runNow(job)"><app-icon name="play" />Run now</button>
                   <button cdkMenuItem class="menu-item" [disabled]="isInFlight(job) || !canSkipNext(job)"
-                          [title]="!canSkipNext(job) ? 'Only scheduled jobs have a next run' : ''"
+                          [title]="skipBlockedReason(job)"
                           (cdkMenuItemTriggered)="skipNext(job)"><app-icon name="skip" />Skip next run</button>
                   <div class="my-1 border-t border-subtle"></div>
                   <a cdkMenuItem class="menu-item" [routerLink]="['/operations/jobs', job.jobId, 'edit']"><app-icon name="edit" />Edit</a>
@@ -260,7 +267,7 @@
                <div class="detail-panel">
                 <dl class="grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-3 text-sm">
                   @for (item of [
-                    { label: 'Topic',       value: job.taskDetail?.sourceTaskType?.serviceName },
+                    { label: 'Type',        value: job.taskDetail?.sourceTaskType?.serviceName },
                     { label: 'Pipeline',    value: job.taskDetail?.pipelineId },
                     { label: 'Bucket',      value: job.taskDetail?.bucket, mono: true },
                     { label: 'Output',      value: job.taskDetail?.outputFolder, mono: true },

@@ -11,7 +11,7 @@ import { Combobox, ComboboxOption } from '../../../shared/ui/combobox';
 import { Icon } from '../../../shared/ui/icon';
 import { LoadError } from '../../../shared/ui/load-error';
 import { FieldChoice, Pipeline, PipelineField, parseFieldChoices } from '../../settings/pipelines/pipeline-dialog';
-import { TaskReference, TaskReferenceKind } from '../../settings/configuration/configuration.models';
+import { TaskReference, TaskReferenceKind, notBlank } from '../../settings/configuration/configuration.models';
 import { isPlatformDefault, profileLabel } from '../../settings/kafka/platform-default';
 
 @Component({
@@ -83,7 +83,8 @@ export class TaskEdit implements OnInit {
 
   readonly form: FormGroup = this.fb.group({
     taskDetailId: [null],
-    taskName: ['', Validators.required],
+    // notBlank: a name of spaces only is empty, and says so with the same "required" message.
+    taskName: ['', [Validators.required, notBlank]],
     sourceTaskTypeId: [null, Validators.required],
     taskStatus: ['Active', Validators.required],
     homePageId: [''],
@@ -681,7 +682,8 @@ export class TaskEdit implements OnInit {
     const value = this.form.getRawValue();
     const payload = {
       taskDetailId: value.taskDetailId,
-      taskName: value.taskName,
+      // Stored without the spaces around it, so the list and search see the name that was meant.
+      taskName: (value.taskName ?? '').trim(),
       sourceTaskType: { sourceTaskTypeId: value.sourceTaskTypeId },
       taskPayload: value.taskPayload,
       taskStatus: value.taskStatus,

@@ -1,4 +1,7 @@
+import { formatDate } from '@angular/common';
 import { Intent } from './job-assistant.intents';
+import { instantOf } from '../../../core/instant';
+import { monthDayLabel, weekdayLabel } from '../schedule-labels';
 
 export interface JobRun {
   jobQueueId: number;
@@ -33,6 +36,10 @@ export interface JobFacts {
     startTime?: string;
     nextRunAt?: string;
     expired?: boolean;
+    /** MON..SUN, comma-separated; a weekly job pinned to days. */
+    daysOfWeek?: string;
+    /** A monthly job pinned to a date; 0 or less is the last day. */
+    dayOfMonth?: number;
   } | null;
 }
 
@@ -114,14 +121,16 @@ export function computeStats(runs: JobRun[]): RunStats {
  * ("2026-08-19T00:01:27.90799"), which was being printed verbatim next to dates the schedule
  * rows had already formatted -- so one row read "2026-08-17 at 00:01" and the next dumped its
  * microseconds. Anything unparseable is returned untouched rather than shown as "Invalid Date".
+ *
+ * Read with instantOf, as the serverTime pipe reads it: the stamp is Chicago wall-clock, and
+ * `new Date` took it as the viewer's own zone, hours off for anyone elsewhere. Formatted as the
+ * runs table formats ("24 Sep 2026, 22:47"), not with the browser's "Sept".
  */
 export function humanMoment(value?: string): string {
   if (!value) return '—';
-  const at = new Date(value);
-  if (!Number.isFinite(at.getTime())) return value;
-  const date = at.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-  const time = at.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-  return `${date}, ${time}`;
+  const at = instantOf(value);
+  if (!at || !Number.isFinite(at.getTime())) return value;
+  return formatDate(at, 'd MMM y, HH:mm', 'en-US');
 }
 
 export function humanDuration(seconds: number | null): string {
@@ -151,11 +160,32 @@ function scheduleSentence(facts: JobFacts): string {
       : 'It runs only when someone triggers it — there is no schedule.';
   }
   if (!s) return 'No schedule is attached to this job.';
-  const every = s.intervalValue && s.intervalValue !== '1' ? `every ${s.intervalValue} ` : '';
-  const unit = { Mint: 'minutes', Hr: 'hours', Daily: 'days', Weekly: 'weeks', Monthly: 'months' }[s.frequency ?? ''] ?? s.frequency;
   const at = s.startTime ? ` at ${String(s.startTime).slice(0, 5)}` : '';
-  if (s.expired) return `The schedule has expired — it ran ${every}${unit}${at} and will not run again.`;
-  return `It runs ${every}${unit}${at}.`;
+  const when = `${cadence(s)}${pinnedTo(s)}${at}`;
+  if (s.expired) return `The schedule has expired — it ran ${when} and will not run again.`;
+  return `It runs ${when}.`;
+}
+
+type Schedule = NonNullable<JobFacts['schedule']>;
+
+const UNITS: Record<string, [string, string]> = {
+  Mint: ['minute', 'minutes'], Hr: ['hour', 'hours'], Daily: ['day', 'days'],
+  Weekly: ['week', 'weeks'], Monthly: ['month', 'months'],
+};
+
+/** "every week", "every 2 weeks": the bare unit read "It runs weeks at 09:30". */
+function cadence(s: Schedule): string {
+  const n = Number(s.intervalValue) || 1;
+  const [one, many] = UNITS[s.frequency ?? ''] ?? [s.frequency ?? '', s.frequency ?? ''];
+  return n === 1 ? `every ${one}` : `every ${n} ${many}`;
+}
+
+/** The days a weekly or monthly job is pinned to, as the Jobs list says them. */
+function pinnedTo(s: Schedule): string {
+  const days = weekdayLabel(s.daysOfWeek);
+  if (days) return ` on ${days}`;
+  const monthDay = monthDayLabel(s.dayOfMonth);
+  return monthDay ? ` on the ${monthDay}` : '';
 }
 
 /**
@@ -234,12 +264,13 @@ export function answerFor(intent: Intent, facts: JobFacts, runs: JobRun[],
       const onDemand = facts.execution === 'Manual';
       const rows: { label: string; value: string }[] = [];
       if (s) {
-        rows.push({ label: 'Frequency', value: `${s.frequency ?? '—'}${s.intervalValue ? ` · every ${s.intervalValue}` : ''}` });
+        const n = Number(s.intervalValue) || 1;
+        rows.push({ label: 'Frequency', value: `${s.frequency ?? '—'}${n > 1 ? ` every ${n}` : ''}${pinnedTo(s)}` });
         if (s.startDate) rows.push({ label: 'Starts', value: `${s.startDate}${s.startTime ? ` at ${String(s.startTime).slice(0, 5)}` : ''}` });
         if (s.endDate) rows.push({ label: 'Ends', value: s.endDate });
         rows.push({ label: 'Next run', value: onDemand
           ? 'On demand — nothing is scheduled'
-          : (s.expired ? 'Expired — no further runs' : (s.nextRunAt ?? 'Not scheduled')) });
+          : (s.expired ? 'Expired — no further runs' : (s.nextRunAt ? humanMoment(s.nextRunAt) : 'Not scheduled')) });
       }
       if (facts.lastJobRun) rows.push({ label: 'Last run', value: humanMoment(facts.lastJobRun) });
       return { blocks: [{ kind: 'text', text: scheduleSentence(facts) }, ...(rows.length ? [{ kind: 'facts' as const, rows }] : [])] };
@@ -270,16 +301,22 @@ export function answerFor(intent: Intent, facts: JobFacts, runs: JobRun[],
       if (!failed.length) {
         return { blocks: [{ kind: 'text', text: `No run of this job has failed across ${stats.total} recorded ${stats.total === 1 ? 'run' : 'runs'}.` }] };
       }
-      const messages = new Map<string, number>();
+      // Grouped on the message with its run ids blanked: workers name the run in the message
+      // ("run-7400", "#7400"), so no two were ever equal and "most common first" never grouped.
+      // The newest real message stands for its group -- runs arrive newest first.
+      const messages = new Map<string, { count: number; sample: string }>();
       for (const run of failed) {
         const message = (run.jobStatusMessage ?? 'No message recorded').trim();
-        messages.set(message, (messages.get(message) ?? 0) + 1);
+        const key = message.replace(/\brun-\d+\b/g, 'run-…').replace(/#\d+/g, '#…');
+        const group = messages.get(key);
+        if (group) group.count++;
+        else messages.set(key, { count: 1, sample: message });
       }
-      const ranked = [...messages.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+      const ranked = [...messages.values()].sort((a, b) => b.count - a.count).slice(0, 5);
       return {
         blocks: [
-          { kind: 'text', text: `${failed.length} of ${stats.total} runs failed. The reasons given, most common first:` },
-          { kind: 'facts', rows: ranked.map(([message, count]) => ({ label: `${count}×`, value: message })) },
+          { kind: 'text', text: `${failed.length} of ${stats.total} ${stats.total === 1 ? 'run' : 'runs'} failed. The reasons given, most common first:` },
+          { kind: 'facts', rows: ranked.map(({ sample, count }) => ({ label: `${count}×`, value: sample })) },
           { kind: 'runs', runs: failed.slice(0, 10) },
         ],
       };
@@ -289,7 +326,7 @@ export function answerFor(intent: Intent, facts: JobFacts, runs: JobRun[],
       if (!stats.total) return { blocks: [{ kind: 'text', text: 'This job has no recorded runs yet.' }] };
       return {
         blocks: [
-          { kind: 'text', text: `${stats.total} runs recorded, most recent first.` },
+          { kind: 'text', text: `${stats.total} ${stats.total === 1 ? 'run' : 'runs'} recorded, most recent first.` },
           { kind: 'runs', runs: [...runs].slice(0, 15) },
         ],
       };

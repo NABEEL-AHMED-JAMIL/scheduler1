@@ -59,12 +59,16 @@
                    [class.opacity-55]="busyTask() === task.taskDetailId">
             <div class="flex items-start gap-2.5">
               <span class="stat-glyph shrink-0"><app-icon name="layers" /></span>
+              <!-- The title gets the header's width and two lines: on a phone the status pill beside
+                   it left about twelve characters, so it sits on the id's line instead. -->
               <div class="min-w-0 flex-1">
-                <h3 class="font-semibold truncate" [title]="task.taskName">{{ task.taskName || '—' }}</h3>
-                <p class="mono text-[color:var(--text-muted)]">#{{ task.taskDetailId }}</p>
+                <h3 class="font-semibold line-clamp-2 break-words leading-snug" [title]="task.taskName">{{ task.taskName || '—' }}</h3>
+                <div class="flex items-center gap-2 min-w-0 mt-0.5">
+                  <span class="mono text-[color:var(--text-muted)]">#{{ task.taskDetailId }}</span>
+                  <app-status [label]="task.taskStatus" [quiet]="true" />
+                </div>
               </div>
               <div class="shrink-0 flex items-center gap-1">
-                <app-status [label]="task.taskStatus" [quiet]="true" />
                 <!-- Edit, Duplicate and Delete are the whole menu and all three are TENANT_ADMIN
                      (Duplicate posts addSourceTask), so the trigger goes with them rather than
                      opening on nothing. -->
@@ -151,7 +155,9 @@
         <tr>
           <th class="w-8"></th>
           <th>Task</th>
-          <th>Type</th>
+          <!-- Type waits for xl: at 1024 it pushed Status and the row menu off the card, and the
+               Topic beside it already says where the work goes. -->
+          <th class="hidden xl:table-cell">Type</th>
           <th>Topic</th>
           <th>Pipeline</th>
           <th>Storage</th>
@@ -160,7 +166,8 @@
           <th class="hidden 2xl:table-cell">Created by</th>
           <th class="hidden 2xl:table-cell">Updated by</th>
           <th class="text-right">Status</th>
-          <th class="w-16"></th>
+          <!-- Pinned, so a long topic or bucket name can never push the menu off-screen again. -->
+          <th class="w-16 col-pin-right"><span class="sr-only">Actions</span></th>
         </tr>
       </thead>
       <tbody>
@@ -178,7 +185,7 @@
               <div class="font-medium truncate" [title]="task.taskName">{{ task.taskName || '—' }}</div>
               <div class="mono text-[color:var(--text-muted)]">#{{ task.taskDetailId }}</div>
             </td>
-            <td class="text-[color:var(--text-secondary)] max-w-44 truncate">
+            <td class="hidden xl:table-cell text-[color:var(--text-secondary)] max-w-44 truncate">
               {{ task.sourceTaskType?.serviceName || '—' }}
             </td>
             <td>
@@ -191,7 +198,7 @@
             <td class="text-[color:var(--text-secondary)]">
               @if (hasStorage(task)) {
                 @if (task.bucket) {
-                  <div class="mono">{{ task.bucket }}</div>
+                  <div class="mono whitespace-nowrap">{{ task.bucket }}</div>
                 } @else if (usesDefaultBucket(task)) {
                   <div class="text-xs text-[color:var(--text-muted)] italic"
                        title="This task sets no <bucket> tag, so it uses the platform's default bucket.">default bucket</div>
@@ -208,7 +215,7 @@
               {{ task.updatedByName || '—' }}
             </td>
             <td class="text-right"><app-status [label]="task.taskStatus" [quiet]="true" /></td>
-            <td class="text-right">
+            <td class="text-right col-pin-right">
               @if (auth.canManageTasks()) {
                 <div class="flex items-center justify-end gap-1 whitespace-nowrap">
                   <button type="button" class="btn btn-ghost btn-icon btn-sm shrink-0" [cdkMenuTriggerFor]="taskMenu"

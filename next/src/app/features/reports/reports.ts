@@ -335,14 +335,23 @@ export class Reports implements OnInit {
 
   readonly counts = computed(() => {
     const rows = this.rows();
-    let completed = 0, failed = 0, inFlight = 0;
+    let completed = 0, failed = 0, interrupted = 0, inFlight = 0;
     for (const row of rows) {
       const status = this.statusAt(row);
       if (status === 'Completed') completed++;
-      else if (FAILED.has(status)) failed++;
+      else if (FAILED.has(status)) { failed++; if (status === 'Interrupt') interrupted++; }
       else if (IN_FLIGHT.has(status)) inFlight++;
     }
-    return { total: rows.length, completed, failed, inFlight };
+    return { total: rows.length, completed, failed, interrupted, inFlight };
+  });
+
+  /**
+   * The Failed tile counts interrupted runs too (the Failed runs table lists them), while the
+   * outcome mix and task table show the two apart -- so the tile says the split when there is one.
+   */
+  readonly failedFoot = computed(() => {
+    const { failed, interrupted } = this.counts();
+    return interrupted ? `${failed - interrupted} failed · ${interrupted} interrupted` : '';
   });
 
   /** Skipped and missed runs in the range -- due, but never started. */

@@ -125,15 +125,18 @@
 
           @if (frequencyValue() === 'Weekly') {
             <!-- A multi-select .seg: each day is a toggle that says whether it is on, and the
-                 group is named, rather than filled and outlined buttons read by colour alone. -->
+                 group is named. An "on" day is filled with the primary colours (see the component
+                 styles) and carries a check, so the state is not read by colour alone. -->
             <div class="mt-3.5">
               <span class="label" id="days-of-week">Days of the week</span>
-              <div class="seg flex-wrap mt-1" role="group" aria-labelledby="days-of-week">
+              <div class="seg seg-multi flex-wrap mt-1" role="group" aria-labelledby="days-of-week">
                 @for (day of days; track day.value) {
                   <button type="button" class="seg-btn"
-                          [class.seg-on]="selectedDays().includes(day.value)"
                           [attr.aria-pressed]="selectedDays().includes(day.value)"
-                          (click)="toggleDay(day.value)">{{ day.label }}</button>
+                          (click)="toggleDay(day.value)">
+                    @if (selectedDays().includes(day.value)) { <app-icon name="check" size="0.85em" /> }
+                    {{ day.label }}
+                  </button>
                 }
               </div>
             </div>

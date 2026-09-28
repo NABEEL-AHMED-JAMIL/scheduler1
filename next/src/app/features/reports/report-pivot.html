@@ -176,7 +176,7 @@
                 }
               </div>
               <div class="text-[10px] text-[color:var(--text-muted)] font-normal">
-                {{ columnCompletion(ci) }}% completed · {{ columnCount(ci) }} runs
+                {{ columnCaption(ci) }}
               </div>
             } @else {
               <div class="flex items-end gap-px h-7 mt-2 mb-1">
@@ -186,7 +186,7 @@
                 }
               </div>
               <div class="text-[10px] text-[color:var(--text-muted)] font-normal">
-                {{ columnCount(ci) }} runs
+                {{ columnCaption(ci) }}
               </div>
             }
           </th>
@@ -263,7 +263,7 @@
        role="dialog" aria-modal="false" aria-labelledby="drill-heading" (keydown.escape)="closeDrill()">
     <div class="flex items-center gap-2.5 px-4 py-3 border-b border-subtle">
       <h2 id="drill-heading" tabindex="-1" class="text-sm font-semibold">{{ drillTitle() }}</h2>
-      <span class="pill pill-neutral">{{ drillRows().length }} runs</span>
+      <span class="pill pill-neutral">{{ drillRows().length }} {{ drillRows().length === 1 ? 'run' : 'runs' }}</span>
       <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="closeDrill()">
         <app-icon name="close" />Close
       </button>
@@ -278,9 +278,9 @@
           @for (run of drillRows().slice(0, 300); track runIdOf(run)) {
             <tr>
               <td class="mono text-[color:var(--text-muted)]">#{{ runIdOf(run) }}</td>
-              <td class="max-w-56"><span class="truncate block">{{ jobOf(run) }}</span></td>
+              <td class="max-w-56"><span class="truncate block" [title]="jobOf(run)">{{ jobOf(run) }}</span></td>
               <td class="max-w-48 text-[color:var(--text-secondary)]">
-                <span class="truncate block">{{ labelOf(run, 0) }}</span>
+                <span class="truncate block" [title]="labelOf(run, 0)">{{ labelOf(run, 0) }}</span>
               </td>
               <td class="text-[color:var(--text-secondary)]">{{ labelOf(run, 2) }}</td>
               <td class="mono text-[color:var(--text-secondary)]">{{ labelOf(run, 3) }}</td>

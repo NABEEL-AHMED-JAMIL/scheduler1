@@ -309,3 +309,39 @@ describe('ReportPivot with many rows', () => {
     expect(pivot.chartPivot()).toBe(pivot.pivot());
   });
 });
+
+/**
+ * Column headers read "0% completed · 1 runs": the completion share on an Outcome column is always
+ * 100 or 0, and one run is not "runs". The drill-down drawer cut job and task names with no way to
+ * read the rest.
+ */
+describe('column captions and the drill drawer', () => {
+  it('says "1 run" and no completion share when the columns are outcomes', () => {
+    const pivot = pivotFor(data);
+    const failed = pivot.pivot().colLabels.indexOf('Failed');
+    expect(pivot.columnCaption(failed)).toBe('1 run');
+    const completed = pivot.pivot().colLabels.indexOf('Completed');
+    expect(pivot.columnCaption(completed)).toBe('3 runs');
+  });
+
+  it('keeps the completion share where the columns are something else', () => {
+    const pivot = pivotFor(data);
+    pivot.setColDim('owner');
+    expect(pivot.columnCaption(0)).toBe('75% completed · 4 runs');
+  });
+
+  it('gives a duration measure the count alone', () => {
+    const pivot = pivotFor(data);
+    pivot.setColDim('owner');
+    pivot.setMeasure('min');
+    expect(pivot.columnCaption(0)).toBe('4 runs');
+  });
+
+  it('carries the full job and task name on the drawer\'s cut-off cells', async () => {
+    const fs = (await import(/* @vite-ignore */ ['node', 'fs'].join(':'))) as { readFileSync(p: string, e: 'utf8'): string };
+    const root = (globalThis as unknown as { process: { cwd(): string } }).process.cwd();
+    const html = fs.readFileSync(`${root}/src/app/features/reports/report-pivot.html`, 'utf8');
+    expect(html).toContain('<span class="truncate block" [title]="jobOf(run)">{{ jobOf(run) }}</span>');
+    expect(html).toContain('<span class="truncate block" [title]="labelOf(run, 0)">{{ labelOf(run, 0) }}</span>');
+  });
+});
