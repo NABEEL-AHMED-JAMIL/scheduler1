@@ -261,3 +261,18 @@ describe('Queue marking a stuck run', () => {
     expect(toasts).toEqual(['Run #5 marked failed.']);
   });
 });
+
+/**
+ * MIG-295 (UI review jobs#11): the Duration column had a formatter of its own, "25.3 s" here and
+ * "25.3s" in the run history, and a run of 119.6 seconds read "1m 60s".
+ */
+describe('Queue duration column', () => {
+  it('writes a run\'s length as the run history does', () => {
+    const queue = queueFor();
+    const ending = (end: string) => row({ startTime: '2026-09-08T10:00:00', endTime: `2026-09-08T${end}` });
+    expect(queue.duration(ending('10:00:25.300'))).toBe('25.3s');
+    expect(queue.duration(ending('10:01:59.600'))).toBe('2m');
+    expect(queue.duration(ending('10:00:00.420'))).toBe('420ms');
+    expect(queue.duration(row({ endTime: undefined }))).toBeNull();
+  });
+});

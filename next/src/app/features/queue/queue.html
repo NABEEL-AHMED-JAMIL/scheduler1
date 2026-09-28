@@ -173,7 +173,7 @@
               <span class="mono text-[11px] text-[color:var(--text-muted)]">#{{ row.jobId }}</span>
             </td>
             <td class="whitespace-nowrap text-[color:var(--text-secondary)]">
-              {{ row.dateCreated ? (row.dateCreated | serverTime:'d MMM, HH:mm:ss') : '—' }}
+              {{ row.dateCreated ? (row.dateCreated | serverTime:'recentSec') : '—' }}
             </td>
             <td class="hidden md:table-cell tabular text-[color:var(--text-secondary)] whitespace-nowrap">
               @if (duration(row); as d) { {{ d }} }

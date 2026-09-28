@@ -9,6 +9,7 @@ import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { localIsoDay, localIsoDaysAgo } from '../../shared/ui/local-day';
 import { instantOf } from '../../core/instant';
+import { formatDuration } from '../../shared/ui/time-format';
 import { AuthService } from '../../core/auth/auth.service';
 import { JobEventsService } from '../../core/socket/job-events.service';
 import { ToastService } from '../../shared/ui/toast.service';
@@ -443,13 +444,15 @@ export class Queue implements OnInit {
     });
   }
 
+  /**
+   * How long a run took, written as the run history writes it ("25.3s", "2m"); this had a copy
+   * of its own that said "25.3 s" and "1m 60s". Null while there is no end to measure to.
+   */
   duration(row: QueueRow): string | null {
     if (!row.startTime || !row.endTime) return null;
     const ms = new Date(row.endTime).getTime() - new Date(row.startTime).getTime();
     if (!isFinite(ms) || ms < 0) return null;
-    if (ms < 1000) return `${ms} ms`;
-    if (ms < 60_000) return `${(ms / 1000).toFixed(1)} s`;
-    return `${Math.floor(ms / 60_000)}m ${Math.round((ms % 60_000) / 1000)}s`;
+    return formatDuration(ms / 1000);
   }
 
   /** A run with no end time is still occupying the queue. */
