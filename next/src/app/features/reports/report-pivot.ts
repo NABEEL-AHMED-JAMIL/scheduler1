@@ -455,16 +455,20 @@ export class ReportPivot {
    */
   private grid(): { title: string; columns: string[]; rows: (string | number | null)[][] } {
     const pivot = this.pivot();
+    // A spreadsheet keeps the ISO day (owner, 2026-09-28): it sorts and filters "2026-08-01" as a
+    // date, and "1 Aug 2026" only as text. The screen's readable day is mapped back to its key.
+    const iso = new Map(this.data().day.map(day => [dayLabel(day), day] as const));
+    const asIso = (label: string) => iso.get(label) ?? label;
     // The range belongs in the exported title. A spreadsheet outlives the screen it came from,
     // and "Runs by task and outcome" alone does not say which fortnight it describes.
     const range = this.startDate() && this.endDate()
-      ? ` (${dayLabel(this.startDate())} to ${dayLabel(this.endDate())})` : '';
+      ? ` (${this.startDate()} to ${this.endDate()})` : '';
     return {
       title: this.title() + range,
-      columns: [this.rowDim().label, ...pivot.colLabels, 'All'],
+      columns: [this.rowDim().label, ...pivot.colLabels.map(asIso), 'All'],
       rows: [
         ...pivot.rowLabels.map((label, ri) => [
-          label,
+          asIso(label),
           ...pivot.matrix[ri].map((value, ci) => this.exportValue(value, this.cellIsEmpty(ri, ci))),
           this.exportValue(pivot.rowTotals[ri]),
         ]),
