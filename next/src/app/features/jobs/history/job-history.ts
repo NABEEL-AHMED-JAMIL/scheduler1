@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { Component, LOCALE_ID, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Subscription, debounceTime, filter } from 'rxjs';
@@ -21,6 +21,8 @@ import { copyText } from '../../../shared/ui/clipboard.util';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { SplitBar } from '../../../shared/charts/split-bar';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
+import { compactDuration, dayLabel, formatDuration, hourRange } from '../../../shared/ui/time-format';
+import { clockTime } from '../schedule-labels';
 import { createPager } from '../../../shared/ui/pager';
 import { Pagination } from '../../../shared/ui/pagination';
 import { StatStrip, StatStripItem, StatStripSummary } from '../../../shared/ui/stat-strip';
@@ -249,11 +251,19 @@ export class JobHistory {
       .map(run => ({ run, seconds: this.durationSeconds(run) }))
       .filter((p): p is { run: JobQueue; seconds: number } => p.seconds !== null)
       .sort((a, b) => (a.run.startTime ?? '').localeCompare(b.run.startTime ?? ''));
+    // Named by the run's day on the server's clock, as the table dates it. toLocaleDateString
+    // wrote the browser's "Sep 24" beside the table's "24 Sep", and read the stamp in the
+    // viewer's own zone. Seconds to one decimal: rounding to whole ones drew a 0.4s run as 0.
     return points.slice(-24).map(p => ({
-      name: new Date(p.run.startTime!).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }),
-      value: Math.round(p.seconds),
+      name: this.clock.transform(p.run.startTime, 'day') ?? '',
+      value: Math.round(p.seconds * 10) / 10,
     }));
   });
+
+  /** "25s", "3.4m" over each bar and in its tooltip; the chart's default wrote a bare number. */
+  readonly durationBarLabel = compactDuration;
+
+  private readonly clock = new ServerTimePipe(inject(LOCALE_ID));
 
   readonly durationStats = computed(() => {
     const values = this.runs()
@@ -275,19 +285,13 @@ export class JobHistory {
     const stats = this.durationStats();
     if (!stats) return [];
     return [
-      { label: 'Fastest', value: this.formatSeconds(stats.fastest) },
-      { label: 'Median',  value: this.formatSeconds(stats.median) },
-      { label: 'Slowest', value: this.formatSeconds(stats.slowest) },
+      { label: 'Fastest', value: formatDuration(stats.fastest) },
+      { label: 'Median',  value: formatDuration(stats.median) },
+      { label: 'Slowest', value: formatDuration(stats.slowest) },
     ];
   });
 
   readonly hasInsights = computed(() => this.runs().length > 1);
-
-  formatSeconds(seconds: number): string {
-    if (seconds < 60) return `${Math.round(seconds)}s`;
-    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`;
-    return `${Math.floor(seconds / 3600)}h ${Math.round((seconds % 3600) / 60)}m`;
-  }
 
   constructor() {
     // Reading the route inputs inside an effect means clearing the drill-down re-fetches,
@@ -430,23 +434,22 @@ export class JobHistory {
     this.router.navigate(['/operations/jobs', this.jobId(), 'history']);
   }
 
-  hourLabel(hour: string): string {
-    const value = Number(hour);
-    if (!isFinite(value)) return hour;
-    if (value === 0) return '12a';
-    if (value === 12) return '12p';
-    return value < 12 ? `${value}a` : `${value - 12}p`;
-  }
+  /**
+   * The drill-down's hour and day, "22:00–23:00" on "24 Sep 2026". The heading read "at 10p" on
+   * "2026-09-24", a 12-hour shorthand and a raw date beside a table on the 24-hour clock.
+   */
+  readonly hourRange = hourRange;
+  readonly dayLabel = dayLabel;
 
-  /** Wall-clock duration of a run, or null while it is still going. */
+  /** A schedule's time of day, "09:30" rather than the API's "09:30:00". */
+  readonly clockTime = clockTime;
+
+  /**
+   * How long a run took, written as the tiles and the bars write it -- the table had its own
+   * "25.3 s" and "2m 0s" while the tiles said "25s". Null while the run is still going.
+   */
   duration(run: JobQueue): string | null {
-    if (!run.startTime || !run.endTime) return null;
-    const ms = new Date(run.endTime).getTime() - new Date(run.startTime).getTime();
-    if (!isFinite(ms) || ms < 0) return null;
-    if (ms < 1000) return `${ms} ms`;
-    if (ms < 60_000) return `${(ms / 1000).toFixed(1)} s`;
-    const minutes = Math.floor(ms / 60_000);
-    const seconds = Math.round((ms % 60_000) / 1000);
-    return `${minutes}m ${seconds}s`;
+    const seconds = this.durationSeconds(run);
+    return seconds === null ? null : formatDuration(seconds);
   }
 }

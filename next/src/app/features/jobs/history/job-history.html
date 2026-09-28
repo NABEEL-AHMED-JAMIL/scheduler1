@@ -26,7 +26,7 @@
       @if (isDrillDown()) {
         {{ jobStatus() || 'All' }} runs
         @if (isAllJobs()) { across every job } @else { of job <span class="mono">#{{ jobId() }}</span> }
-        on {{ targetDate() }} at {{ hourLabel(targetHr()) }}.
+        on {{ dayLabel(targetDate()) }}, {{ hourRange(targetHr()) }}.
       } @else if (jobId()) {
         Every recorded run of job <span class="mono">#{{ jobId() }}</span>.
       } @else {
@@ -43,7 +43,7 @@
       @if (jobStatus()) { <span class="pill pill-brand">{{ jobStatus() }}</span> }
       @if (isAllJobs()) { <span class="pill pill-neutral">Every job</span> }
       <span class="text-[color:var(--text-secondary)]">
-        on {{ targetDate() }} at {{ hourLabel(targetHr()) }}
+        on {{ dayLabel(targetDate()) }}, {{ hourRange(targetHr()) }}
       </span>
       <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="clearDrillDown()">
         <app-icon [name]="isAllJobs() ? 'arrowLeft' : 'close'" />{{ isAllJobs() ? 'Back to dashboard' : 'Show all runs' }}
@@ -95,8 +95,8 @@
               <dt>State</dt><dd><app-status [label]="job.jobStatus" [quiet]="true" /></dd>
               <dt>Execution</dt><dd>{{ job.execution || '—' }}</dd>
               <dt>Priority</dt><dd>{{ job.priority ?? '—' }}</dd>
-              <dt>Created</dt><dd>{{ job.dateCreated ? (job.dateCreated | serverTime:'d MMM yyyy, HH:mm') : '—' }}</dd>
-              <dt>Last run</dt><dd>{{ job.lastJobRun ? (job.lastJobRun | serverTime:'d MMM yyyy, HH:mm') : 'Never' }}</dd>
+              <dt>Created</dt><dd>{{ job.dateCreated ? (job.dateCreated | serverTime:'dateTime') : '—' }}</dd>
+              <dt>Last run</dt><dd>{{ job.lastJobRun ? (job.lastJobRun | serverTime:'dateTime') : 'Never' }}</dd>
               @if (job.assignedUsername) { <dt>Assigned</dt><dd>{{ job.assignedUsername }}</dd> }
             </dl>
           </div>
@@ -119,8 +119,8 @@
                 <dl class="detail-list">
                   <dt>Frequency</dt>
                   <dd>{{ s.frequency || '—' }}@if (s.intervalValue && s.intervalValue !== '1') { · every {{ s.intervalValue }} }</dd>
-                  <dt>Starts</dt><dd>{{ s.startDate || '—' }}{{ s.startTime ? ' at ' + s.startTime.slice(0,5) : '' }}</dd>
-                  <dt>Ends</dt><dd>{{ s.endDate || 'no end date' }}</dd>
+                  <dt>Starts</dt><dd>{{ s.startDate ? dayLabel(s.startDate) : '—' }}{{ s.startTime ? ' at ' + clockTime(s.startTime) : '' }}</dd>
+                  <dt>Ends</dt><dd>{{ s.endDate ? dayLabel(s.endDate) : 'no end date' }}</dd>
                   <dt>Next run</dt>
                   <dd>
                     <!-- The timetable is kept while a job is inactive, but nothing runs on it: the
@@ -130,7 +130,7 @@
                             title="Passed slots are recorded as Missed; the timetable resumes when the job is activated">Paused while inactive</span>
                     }
                     @else if (s.expired) { <span class="text-warn-500">Expired</span> }
-                    @else { {{ s.nextRunAt ? (s.nextRunAt | serverTime:'d MMM, HH:mm') : '—' }} }
+                    @else { {{ s.nextRunAt ? (s.nextRunAt | serverTime:'recent') : '—' }} }
                   </dd>
                 </dl>
               }
@@ -240,7 +240,7 @@
           job is getting slower.
         </p>
         @if (durationTrend().length) {
-          <app-bar-chart [data]="durationTrend()" [height]="104" />
+          <app-bar-chart [data]="durationTrend()" [height]="104" [format]="durationBarLabel" />
         } @else {
           <p class="text-sm text-[color:var(--text-muted)] py-8 text-center">
             No run recorded both a start and an end time.
@@ -325,19 +325,19 @@
               </td>
             }
             <td class="hidden xl:table-cell whitespace-nowrap text-[color:var(--text-muted)]">
-              {{ run.dateCreated ? (run.dateCreated | serverTime:'d MMM, HH:mm:ss') : '—' }}
+              {{ run.dateCreated ? (run.dateCreated | serverTime:'recentSec') : '—' }}
             </td>
             <td class="whitespace-nowrap text-[color:var(--text-secondary)]">
               @if (run.startTime) {
-                {{ run.startTime | serverTime:'d MMM, HH:mm:ss' }}
+                {{ run.startTime | serverTime:'recentSec' }}
               } @else if (run.skipTime) {
                 <span class="text-warn-500" title="This run was skipped rather than started">
-                  skipped {{ run.skipTime | serverTime:'d MMM, HH:mm:ss' }}
+                  skipped {{ run.skipTime | serverTime:'recentSec' }}
                 </span>
               } @else { — }
             </td>
             <td class="whitespace-nowrap text-[color:var(--text-secondary)]">
-              {{ run.endTime ? (run.endTime | serverTime:'d MMM, HH:mm:ss') : '—' }}
+              {{ run.endTime ? (run.endTime | serverTime:'recentSec') : '—' }}
             </td>
             <td class="tabular text-[color:var(--text-secondary)] whitespace-nowrap">
               {{ duration(run) || '—' }}
