@@ -4,6 +4,8 @@
       <h1 class="page-title">Dashboard</h1>
       <p class="page-subtitle">
         Showing {{ appliedStart() }} to {{ appliedEnd() }}@if (scopeLabel(); as scope) {, {{ scope }}}
+        <!-- The figures follow job events on their own; this says how fresh they are. -->
+        @if (updatedAt(); as at) { · Updated {{ at | date:'shortTime' }} }
       </p>
     </div>
     <!-- Wraps: a date field has an intrinsic minimum width and two of them plus the
@@ -25,6 +27,9 @@
       </div>
       <button type="button" class="btn btn-primary btn-sm" [disabled]="!!rangeError()" (click)="applyRange()"><app-icon name="filter" />Apply</button>
       <button type="button" class="btn btn-ghost btn-sm" (click)="resetRange()"><app-icon name="calendar" />Last 7 days</button>
+      <button type="button" class="btn btn-ghost btn-sm" (click)="load()" [disabled]="loading()">
+        <app-icon name="refresh" [class.spin]="loading()" />Refresh
+      </button>
       <!-- A full row of its own under the boxes, so the reason sits beside the fields it is about. -->
       @if (rangeError()) {
         <p id="range-error" class="field-note text-crit-500 basis-full" role="alert">{{ rangeError() }}</p>

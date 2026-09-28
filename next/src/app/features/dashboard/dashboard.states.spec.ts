@@ -1,17 +1,19 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { ApplicationRef } from '@angular/core';
+import { ApplicationRef, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { Subject, of, throwError } from 'rxjs';
 import { Dashboard } from './dashboard';
 import { DashboardService } from './dashboard.service';
 import { ToastService } from '../../shared/ui/toast.service';
+import { JobEvent, JobEventsService } from '../../core/socket/job-events.service';
+import { UnreadCountService } from '../../core/notifications/unread-count.service';
 
 type Answers = Partial<Record<'jobStatus' | 'jobRunning' | 'hourly' | 'breakdown', () => unknown>>;
 const ok = () => of({ status: 'SUCCESS', data: [] });
 
-function dashboard(answers: Answers = {}, query: Record<string, string> = {}) {
+function dashboard(answers: Answers = {}, query: Record<string, string> = {}, events = new Subject<JobEvent>(), connected = signal(true)) {
   const calls: string[] = [];
   const navigations: { commands: unknown[]; extras: any }[] = [];
   const service: Record<string, unknown> = {};
@@ -33,6 +35,7 @@ function dashboard(answers: Answers = {}, query: Record<string, string> = {}) {
       { provide: ToastService, useValue: { success: () => {}, error: () => {}, info: () => {} } },
       { provide: Router, useValue: { navigate: (commands: unknown[], extras: unknown) => { navigations.push({ commands, extras }); } } },
       { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap(query) } } },
+      { provide: JobEventsService, useValue: { events, connected } },
     ],
   });
   return { dashboard: TestBed.runInInjectionContext(() => new Dashboard()), calls, breakdownDates, ranges, navigations };
@@ -381,5 +384,83 @@ describe('Dashboard view in the address', () => {
     expect(d.startDate()).toBe(start);
     expect(d.selectedCell()).toBeNull();
     expect(breakdownDates).toEqual([]);
+  });
+});
+
+/**
+ * The dashboard read once and never again: Running now stayed at whatever it was when the page
+ * opened, and the Unread tile kept its own copy of the count, so marking everything read in the
+ * bell left it lit.
+ */
+describe('Dashboard staying current', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('shows the same unread count the bell does', () => {
+    const { dashboard: d } = dashboard();
+    d.load();
+    TestBed.inject(UnreadCountService).count.set(7);
+    expect(d.unread()).toBe(7);
+    TestBed.inject(UnreadCountService).clear();
+    expect(d.unread()).toBe(0);
+  });
+
+  it('re-reads the figures once, quietly, after a burst of job events', () => {
+    vi.useFakeTimers();
+    const events = new Subject<JobEvent>();
+    const { dashboard: d, calls } = dashboard({}, {}, events);
+    d.load();
+    calls.length = 0;
+    for (let i = 0; i < 5; i++) events.next({ type: 'job.status', jobId: i });
+    events.next({ type: 'job.log', jobId: 1 });
+    expect(calls).toEqual([]);
+    const loadingSeen: boolean[] = [];
+    vi.advanceTimersByTime(2000);
+    loadingSeen.push(d.loading());
+    expect(calls.sort()).toEqual(['hourly', 'jobRunning', 'jobStatus']);
+    expect(loadingSeen).toEqual([false]);
+  });
+
+  it('ignores log lines, which change no figure', () => {
+    vi.useFakeTimers();
+    const events = new Subject<JobEvent>();
+    const { dashboard: d, calls } = dashboard({}, {}, events);
+    d.load();
+    calls.length = 0;
+    events.next({ type: 'job.log', jobId: 1, message: 'line' });
+    vi.advanceTimersByTime(5000);
+    expect(calls).toEqual([]);
+  });
+
+  it('polls every minute while the live feed is down, and not while it is up', () => {
+    vi.useFakeTimers();
+    const connected = signal(true);
+    const { dashboard: d, calls } = dashboard({}, {}, new Subject<JobEvent>(), connected);
+    d.ngOnInit();
+    calls.length = 0;
+    vi.advanceTimersByTime(60_000);
+    expect(calls).toEqual([]);
+    connected.set(false);
+    vi.advanceTimersByTime(60_000);
+    expect(calls.sort()).toEqual(['hourly', 'jobRunning', 'jobStatus']);
+  });
+
+  it('keeps the figures it has when a background read fails', () => {
+    vi.useFakeTimers();
+    let fail = false;
+    const events = new Subject<JobEvent>();
+    const { dashboard: d } = dashboard({ jobStatus: () => fail ? throwError(() => ({ error: {} })) : of({ status: 'SUCCESS', data: [{ name: 'All', value: 9 }] }) }, {}, events);
+    d.load();
+    fail = true;
+    events.next({ type: 'job.status', jobId: 1 });
+    vi.advanceTimersByTime(2000);
+    expect(d.error()).toBe('');
+    expect(d.totalJobs()).toBe(9);
+  });
+
+  it('says when the figures were last read', () => {
+    const { dashboard: d } = dashboard();
+    expect(d.updatedAt()).toBeNull();
+    d.load();
+    expect(d.updatedAt()).toBeInstanceOf(Date);
   });
 });

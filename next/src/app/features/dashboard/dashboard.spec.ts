@@ -1,10 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
+import { EMPTY } from 'rxjs';
 import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { Dashboard } from './dashboard';
 import { DashboardService, JobBreakdown } from './dashboard.service';
 import { ToastService } from '../../shared/ui/toast.service';
+import { JobEventsService } from '../../core/socket/job-events.service';
 
 function dashboardFor() {
   TestBed.resetTestingModule();
@@ -15,6 +18,7 @@ function dashboardFor() {
       { provide: ToastService, useValue: { success: () => {}, error: () => {}, info: () => {} } },
       { provide: Router, useValue: { navigate: () => {} } },
       { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({}) } } },
+      { provide: JobEventsService, useValue: { events: EMPTY, connected: signal(false) } },
     ],
   });
   return TestBed.runInInjectionContext(() => new Dashboard());
@@ -79,6 +83,7 @@ describe('drilling into an hour from the breakdown', () => {
         { provide: ToastService, useValue: { success: () => {}, error: () => {}, info: () => {} } },
         { provide: Router, useValue: { navigate: (path: unknown[]) => { navigated.push(path); } } },
         { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({}) } } },
+        { provide: JobEventsService, useValue: { events: EMPTY, connected: signal(false) } },
       ],
     });
     return { dashboard: TestBed.runInInjectionContext(() => new Dashboard()), navigated };
@@ -149,6 +154,7 @@ describe('a refused dashboard load', () => {
         { provide: ToastService, useValue: { success: () => {}, error: (m: string) => errors.push(m), info: () => {} } },
         { provide: Router, useValue: { navigate: () => {} } },
         { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({}) } } },
+        { provide: JobEventsService, useValue: { events: EMPTY, connected: signal(false) } },
       ],
     });
     const dashboard = TestBed.runInInjectionContext(() => new Dashboard());

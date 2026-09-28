@@ -1,13 +1,13 @@
 import { BillingBrief } from '../billing/billing-brief';
 import { Component, DestroyRef, Injector, OnInit, afterNextRender, computed, inject, signal } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { DatePipe } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Donut } from '../../shared/charts/donut';
 import { Bar, BarChart } from '../../shared/charts/bar-chart';
 import { daySeries } from '../../shared/charts/day-series';
 import { HeatCell, HeatSelection, Heatmap } from '../../shared/charts/heatmap';
 import { DashboardService, HourCell, JobBreakdown, NameValue } from './dashboard.service';
-import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
+import { API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { ToastService } from '../../shared/ui/toast.service';
 import { createPager } from '../../shared/ui/pager';
 import { Pagination } from '../../shared/ui/pagination';
@@ -18,7 +18,10 @@ import { StatTile } from '../../shared/ui/stat-tile';
 import { TableShell } from '../../shared/ui/data-table';
 import { BlurLoader } from '../../shared/ui/blur-loader';
 import { LoadError } from '../../shared/ui/load-error';
-import { Observable, Subscription } from 'rxjs';
+import { Observable, Subscription, debounceTime, filter } from 'rxjs';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { JobEventsService } from '../../core/socket/job-events.service';
+import { UnreadCountService } from '../../core/notifications/unread-count.service';
 
 const WEEKDAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const WEEKDAY = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -40,7 +43,7 @@ type BreakdownKey = typeof BREAKDOWN_COLUMNS[number];
 
 @Component({
   selector: 'app-dashboard',
-  imports: [Pagination, Icon, RouterLink, Donut, BarChart, Heatmap, BillingBrief, StatTile, TableShell, BlurLoader, LoadError],
+  imports: [DatePipe, Pagination, Icon, RouterLink, Donut, BarChart, Heatmap, BillingBrief, StatTile, TableShell, BlurLoader, LoadError],
   templateUrl: './dashboard.html',
 })
 export class Dashboard implements OnInit {
@@ -56,7 +59,6 @@ export class Dashboard implements OnInit {
   }
 
   private readonly dashboard = inject(DashboardService);
-  private readonly http = inject(HttpClient);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
@@ -86,7 +88,9 @@ export class Dashboard implements OnInit {
   readonly jobRunning = signal<NameValue[]>([]);
   readonly hourly = signal<HourCell[]>([]);
   readonly breakdown = signal<JobBreakdown[]>([]);
-  readonly unread = signal(0);
+  /** The same signal the bell's badge shows, so marking read in one clears the other. */
+  private readonly unreadCount = inject(UnreadCountService);
+  readonly unread = this.unreadCount.count;
 
   readonly loading = signal(true);
   /**
@@ -224,6 +228,9 @@ export class Dashboard implements OnInit {
   ngOnInit(): void {
     this.restoreFromUrl();
     this.load();
+    // Without the live feed (a dropped socket, a proxy that refuses it) the page falls back to
+    // reading every minute; while the feed is up the events above are enough.
+    this.poll = setInterval(() => { if (!this.jobEvents.connected()) this.load({ quiet: true }); }, 60_000);
     const cell = this.selectedCell();
     if (cell) { this.readBreakdown(cell.date, cell.hr); this.revealDrill(); }
   }
@@ -291,15 +298,41 @@ export class Dashboard implements OnInit {
   private loadSub = new Subscription();
   private breakdownSub?: Subscription;
 
+  private readonly jobEvents = inject(JobEventsService);
+  private readonly destroyRef = inject(DestroyRef);
+  private poll: ReturnType<typeof setInterval> | null = null;
+
+  /** When the figures were last read in full, for the "Updated" line beside the range. */
+  readonly updatedAt = signal<Date | null>(null);
+
   constructor() {
-    inject(DestroyRef).onDestroy(() => { this.loadSub.unsubscribe(); this.breakdownSub?.unsubscribe(); });
+    this.destroyRef.onDestroy(() => {
+      this.loadSub.unsubscribe();
+      this.breakdownSub?.unsubscribe();
+      if (this.poll) clearInterval(this.poll);
+    });
+    // The page used to read once: Running now stayed at whatever it was when the page opened. A
+    // job changing state re-reads the figures, once per burst, without the loader. Log lines
+    // change no figure.
+    this.jobEvents.events.pipe(
+      filter(event => event.type !== 'job.log'),
+      debounceTime(2000),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe(() => this.load({ quiet: true }));
   }
 
-  load(): void {
+  /**
+   * `quiet` is a background re-read: no loader, and a failure keeps the figures already on
+   * screen rather than replacing the page with an error for a read nobody asked for.
+   */
+  load(options: { quiet?: boolean } = {}): void {
+    const quiet = !!options.quiet;
     this.loadSub.unsubscribe();
     this.loadSub = new Subscription();
-    this.loading.set(true);
-    this.error.set('');
+    if (!quiet) {
+      this.loading.set(true);
+      this.error.set('');
+    }
     const from = this.appliedStart();
     const to = this.appliedEnd();
 
@@ -307,9 +340,17 @@ export class Dashboard implements OnInit {
     // date that is not a date) is a 200 carrying ERROR and a sentence (MIG-103); every tile is
     // refused for the same reason, so one sentence is shown, once.
     let pending = 3;
-    const settle = () => { if (--pending === 0) this.loading.set(false); };
+    let failed = false;
+    const settle = () => {
+      if (--pending > 0) return;
+      this.loading.set(false);
+      if (failed) return;
+      this.error.set('');
+      this.updatedAt.set(new Date());
+    };
     const fail = (message: string | undefined) => {
-      if (!this.error()) this.error.set(message || 'The dashboard could not be read.');
+      failed = true;
+      if (!quiet && !this.error()) this.error.set(message || 'The dashboard could not be read.');
     };
     const read = <T>(request: Observable<ApiResponse<T>>, into: (data: T | undefined) => void) =>
       this.loadSub.add(request.subscribe({
@@ -324,10 +365,7 @@ export class Dashboard implements OnInit {
     read(this.dashboard.jobStatus(from, to), data => this.jobStatus.set(data ?? []));
     read(this.dashboard.jobRunning(from, to), data => this.jobRunning.set(data ?? []));
     read(this.dashboard.hourly(from, to), data => { this.hourly.set(data ?? []); this.coverDates(); });
-    this.loadSub.add(this.http.get<ApiResponse<number>>(`${API_BASE}/notification.json/unreadCount`).subscribe({
-      next: r => { if (r.status === API_SUCCESS) this.unread.set(Number(r.data ?? 0)); },
-      error: () => { /* the tile simply shows zero */ },
-    }));
+    this.unreadCount.refresh();
   }
 
   /** Clicking an hour cell drills into which jobs ran in that exact hour. */
