@@ -83,8 +83,10 @@
         </div>
       } @else if (pipelineDef(); as def) {
         <div class="form-section">
-          <div class="flex items-start gap-2 mb-3">
-            <div class="mr-auto">
+          <!-- Wraps rather than squeezes: on a phone the pill drops below and the name and
+               description keep the full width; wherever both fit, the pill stays beside them. -->
+          <div class="flex flex-wrap items-start gap-2 mb-3">
+            <div class="flex-1 basis-60 min-w-0">
               <h2 class="form-section-title mb-0">{{ def.pipelineName }}</h2>
               @if (def.description) {
                 <p class="text-sm text-[color:var(--text-muted)] mt-0.5">{{ def.description }}</p>
@@ -158,7 +160,7 @@
           </div>
 
           <p class="text-xs text-[color:var(--text-muted)] mt-3">
-            The payload sent to the pipeline is generated from these answers when you save --
+            The payload sent to the pipeline is generated from these answers when you save &mdash;
             there is nothing else to configure.
           </p>
         </div>
