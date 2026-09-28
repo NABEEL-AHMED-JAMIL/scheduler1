@@ -99,7 +99,7 @@ test('the browse screen has no WCAG A/AA violations before a dataset is opened',
 
 test('the saved-analysis library has no WCAG A/AA violations', async ({ page }) => {
   await page.goto('/objects/analytics/dashboards');
-  await expect(page.getByText(/re-run every time it is opened/)).toBeVisible();
+  await expect(page.getByText(/re-run each time you open them/)).toBeVisible();
   const violations = await scan(page);
   expect(violations, `axe found WCAG A/AA violations:${describeAll(violations)}`).toEqual([]);
 });

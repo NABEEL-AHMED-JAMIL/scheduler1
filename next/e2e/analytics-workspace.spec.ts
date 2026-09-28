@@ -145,7 +145,7 @@ test('7 — Compact labels its estimates as estimates', async ({ page }) => {
 
 test('8 — dashboards say they re-run rather than caching a result', async ({ page }) => {
   await page.goto('/objects/analytics/dashboards');
-  await expect(page.getByText(/re-run every time it is opened/)).toBeVisible();
+  await expect(page.getByText(/re-run each time you open them/)).toBeVisible();
 });
 
 test('9 — the saved-analysis library is reachable from the menu, not just by typing its address',
@@ -156,7 +156,7 @@ test('9 — the saved-analysis library is reachable from the menu, not just by t
     await page.getByRole('button', { name: 'Object Browser' }).click();
     await page.getByRole('link', { name: /Saved Analyses/ }).click();
     await expect(page).toHaveURL(/\/analytics\/dashboards/);
-    await expect(page.getByText(/re-run every time it is opened/)).toBeVisible();
+    await expect(page.getByText(/re-run each time you open them/)).toBeVisible();
   });
 
 test('10 — a Canvas drill narrows the Data tab, and says so', async ({ page }) => {
