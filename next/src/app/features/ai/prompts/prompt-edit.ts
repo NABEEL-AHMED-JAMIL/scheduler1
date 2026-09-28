@@ -79,7 +79,7 @@ export class PromptEdit implements OnInit {
    * The connections this prompt can run on. A platform administrator's list holds every
    * workspace's, and the editor offered all of them -- and, with none picked, named another
    * workspace's default as where Try it would run. A prompt runs on its own workspace's
-   * connections, so that is what is offered. A tenant admin's list is already scoped by the server.
+   * connections, so that is what is offered. A tenant administrator's list is already scoped by the server.
    */
   readonly scopedConnections = computed(() => {
     if (!this.isPlatformAdmin()) return this.connections();

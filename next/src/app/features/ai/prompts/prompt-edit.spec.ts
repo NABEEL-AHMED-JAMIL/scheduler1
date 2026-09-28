@@ -200,7 +200,7 @@ describe('PromptEdit variables table after a removal', () => {
   });
 });
 
-/** The editor rendered for real, as a tenant admin unless told otherwise. */
+/** The editor rendered for real, as a tenant administrator unless told otherwise. */
 function renderedEditor(options: { platformAdmin?: boolean; promptId?: string; connections?: unknown[]; tenants?: unknown[]; prompt?: unknown } = {}) {
   const get = vi.fn((url: string) => {
     if (url.endsWith('/aiConnection.json/list')) return of({ status: API_SUCCESS, data: options.connections ?? [] });
