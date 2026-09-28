@@ -78,3 +78,59 @@ describe('Queue filters', () => {
     expect(q.hasFilters()).toBe(false);
   });
 });
+
+/**
+ * From after To was sent as it was and came back empty, which read as a quiet week; a cleared box
+ * silently fell back to the default week while still showing empty. The page now says what is
+ * wrong, as the dashboard does, and reads nothing until the range makes sense.
+ */
+describe('Queue date range', () => {
+  function counting() {
+    const bodies: any[] = [];
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: HttpClient, useValue: { post: (_: string, body: unknown) => { bodies.push(body); return of({ status: 'SUCCESS', data: {} }); },
+          get: () => of({ status: 'SUCCESS', data: [] }) } },
+        { provide: Dialog, useValue: { open: () => ({ closed: of(true) }) } },
+        { provide: ToastService, useValue: { success: () => {}, error: () => {}, info: () => {} } },
+        { provide: AuthService, useValue: { canOpen: () => true } },
+        { provide: JobEventsService, useValue: { events: EMPTY, connected: signal(false) } },
+      ],
+    });
+    return { q: TestBed.runInInjectionContext(() => new Queue()), bodies };
+  }
+
+  it('refuses From after To, says why, and sends nothing', () => {
+    const { q, bodies } = counting();
+    q.setFrom('2026-09-24');
+    q.setTo('2026-09-20');
+    expect(q.rangeError()).toBe('From must be on or before To.');
+    expect(bodies.map(b => b.toDate)).not.toContain('2026-09-20');
+  });
+
+  it('refuses a cleared date instead of quietly reading the default week', () => {
+    const { q, bodies } = counting();
+    q.setFrom('');
+    expect(q.rangeError()).toBe('Pick a date in both fields.');
+    expect(bodies).toEqual([]);
+  });
+
+  it('reads again once the range makes sense', () => {
+    const { q, bodies } = counting();
+    q.setFrom('2026-09-24');
+    q.setTo('2026-09-20');
+    q.setFrom('2026-09-18');
+    expect(q.rangeError()).toBe('');
+    expect(bodies.at(-1)).toEqual({ fromDate: '2026-09-18', toDate: '2026-09-20' });
+  });
+
+  it('goes back to the last seven days on Last 7 days', () => {
+    const { q, bodies } = counting();
+    q.setFrom('');
+    q.resetRange();
+    expect(q.rangeError()).toBe('');
+    expect(q.hasFilters()).toBe(false);
+    expect(bodies).toHaveLength(1);
+  });
+});
