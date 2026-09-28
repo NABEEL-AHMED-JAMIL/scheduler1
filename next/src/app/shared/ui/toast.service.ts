@@ -23,14 +23,29 @@ export class ToastService {
   info(message: string)    { this.push('info', message); }
 
   dismiss(id: number): void {
+    clearTimeout(this.timers.get(id));
+    this.timers.delete(id);
     this.toasts.update(list => list.filter(t => t.id !== id));
   }
 
-  private push(tone: ToastTone, message: string): void {
-    const id = this.nextId++;
-    this.toasts.update(list => [...list, { id, tone, message }]);
+  /** The dismiss timer of each toast on screen, so a repeat can restart it. */
+  private readonly timers = new Map<number, ReturnType<typeof setTimeout>>();
+
+  private dismissLater(id: number, tone: ToastTone): void {
+    const running = this.timers.get(id);
+    if (running) clearTimeout(running);
     // Errors stay longer: they are more likely to matter and more likely to be
     // read after the fact rather than caught in the moment.
-    setTimeout(() => this.dismiss(id), tone === 'crit' ? 7000 : 4000);
+    this.timers.set(id, setTimeout(() => this.dismiss(id), tone === 'crit' ? 7000 : 4000));
+  }
+
+  private push(tone: ToastTone, message: string): void {
+    // Clicking Save or Run again with the same problem stacked four or five identical toasts.
+    // The one already on screen stays, and its time starts over.
+    const same = this.toasts().find(t => t.tone === tone && t.message === message);
+    if (same) { this.dismissLater(same.id, tone); return; }
+    const id = this.nextId++;
+    this.toasts.update(list => [...list, { id, tone, message }]);
+    this.dismissLater(id, tone);
   }
 }
