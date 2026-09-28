@@ -5619,3 +5619,335 @@ describe('ColumnCard, audit 09-22', () => {
   });
 });
 
+
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * The redesign the owner approved on 2026-09-28: the same nine tabs as real ARIA tabs in one row
+ * that scrolls on a phone, a compact file header, a KPI strip on the Overview, Save and Open saved
+ * in the Canvas result's own header, a Charts empty state that goes somewhere, and an Activity
+ * list that leads with what a person ran.
+ */
+describe('the tab strip is a real tablist', () => {
+  const strip = (fixture: { nativeElement: unknown }) =>
+    (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>('[role="tablist"]')!;
+  const tabsOf = (fixture: { nativeElement: unknown }) =>
+    [...strip(fixture).querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+
+  it('marks the open tab selected, gives it the one Tab stop, and points it at the panel', () => {
+    const grid = gridWith();
+    grid.studio.showTab('profile');
+    grid.fixture.detectChanges();
+
+    const tabs = tabsOf(grid.fixture);
+    expect(tabs.map(tab => tab.textContent!.trim())).toEqual([
+      'Overview', 'Data', 'Compact', 'Profile', 'Quality', 'Canvas', 'SQL', 'Charts', 'Activity',
+    ]);
+    const open = tabs.filter(tab => tab.getAttribute('aria-selected') === 'true');
+    expect(open.map(tab => tab.id)).toEqual(['a-tab-profile']);
+    expect(tabs.filter(tab => tab.getAttribute('tabindex') === '0')).toEqual(open);
+    expect(tabs.filter(tab => tab.getAttribute('tabindex') === '-1').length).toBe(8);
+    // Only the open tab names a panel: the others' panels are not in the page.
+    expect(open[0].getAttribute('aria-controls')).toBe('a-panel');
+    expect(tabs.filter(tab => tab.hasAttribute('aria-controls')).length).toBe(1);
+
+    const panel = (grid.fixture.nativeElement as HTMLElement).querySelector('#a-panel')!;
+    expect(panel.getAttribute('role')).toBe('tabpanel');
+    expect(panel.getAttribute('aria-labelledby')).toBe('a-tab-profile');
+  });
+
+  it('moves focus with the arrows, Home and End, and opens nothing until Enter or a click', () => {
+    const grid = gridWith();
+    grid.studio.showTab('overview');
+    grid.fixture.detectChanges();
+    const press = (key: string) => {
+      const target = document.activeElement as HTMLElement;
+      target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+      return (document.activeElement as HTMLElement).id;
+    };
+    tabsOf(grid.fixture)[0].focus();
+
+    expect(press('ArrowRight')).toBe('a-tab-data');
+    expect(press('ArrowRight')).toBe('a-tab-compact');
+    expect(press('End')).toBe('a-tab-activity');
+    // Wraps, so the strip is a ring rather than two dead ends.
+    expect(press('ArrowRight')).toBe('a-tab-overview');
+    expect(press('ArrowLeft')).toBe('a-tab-activity');
+    expect(press('Home')).toBe('a-tab-overview');
+    // Manual activation: arrowing across Compact did not start the scan it would cost.
+    expect(grid.studio.tab()).toBe('overview');
+    expect(grid.profile).not.toHaveBeenCalled();
+
+    (document.activeElement as HTMLElement).dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    (document.activeElement as HTMLButtonElement).click();
+    grid.fixture.detectChanges();
+    expect(grid.studio.tab()).toBe('data');
+  });
+
+  it('leaves an unhandled key alone, so the page keeps its own shortcuts', () => {
+    const grid = gridWith();
+    const event = new KeyboardEvent('keydown', { key: 'PageDown', cancelable: true });
+    grid.studio.onTabStripKey(event, 'data');
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  it('scrolls sideways on a phone rather than wrapping into rows (source scan)', async () => {
+    const fs = (await import(/* @vite-ignore */ ['node', 'fs'].join(':'))) as { readFileSync(p: string, e: 'utf8'): string };
+    const root = (globalThis as unknown as { process: { cwd(): string } }).process.cwd();
+    const html = fs.readFileSync(`${root}/src/app/features/analytics/analytics.html`, 'utf8');
+    const opening = html.slice(0, html.indexOf('role="tablist"'));
+    const classes = opening.slice(opening.lastIndexOf('class="') + 7);
+    expect(classes).toContain('overflow-x-auto');
+    expect(classes).not.toContain('flex-wrap');
+    // Each tab keeps its width and its words on one line inside the scroll box.
+    expect(html).toMatch(/role="tab" class="tab whitespace-nowrap shrink-0/);
+  });
+});
+
+describe('the file header', () => {
+  it('says the file in one line of facts, with its path truncated beneath', () => {
+    const grid = gridWith();
+    const text = grid.show();
+    expect(text).toContain('sales-2026.csv');
+    expect(text).toMatch(/250 rows · 2 columns · 4\.0 KB · \d{1,2} Sep 2026, \d{2}:\d{2}/);
+    const path = [...(grid.fixture.nativeElement as HTMLElement).querySelectorAll('p.mono.truncate')]
+      .find(line => line.textContent!.includes('minio-main/daily/sales-2026.csv'))!;
+    expect(path.getAttribute('title')).toBe('minio-main/daily/sales-2026.csv');
+  });
+
+  it('keeps Files beside the file, opening the panel on the right', () => {
+    const grid = gridWith();
+    const files = (grid.fixture.nativeElement as HTMLElement)
+      .querySelector<HTMLButtonElement>('button[aria-controls="files-panel"]')!;
+    files.click();
+    grid.fixture.detectChanges();
+    expect(grid.studio.filesOpen()).toBe(true);
+    expect(files.getAttribute('aria-expanded')).toBe('true');
+  });
+});
+
+describe('the Overview KPI strip', () => {
+  it('shows a dash for what the profile has not said yet, never a zero', () => {
+    const grid = gridWith();
+    grid.studio.showTab('overview');
+    const stats = new Map(grid.studio.overviewStats().map(item => [item.label, item]));
+    expect(stats.get('Rows')!.value).toBe('250');
+    expect(stats.get('Columns')!.value).toBe(2);
+    expect(stats.get('Complete')!.value).toBe('—');
+    expect(stats.get('Quality issues')!.value).toBe('—');
+    expect(stats.get('Quality issues')!.clickable).toBe(false);
+  });
+
+  it('counts the Quality tab\'s findings, and the tile goes there', () => {
+    const grid = gridWith();
+    grid.studio.adoptProfile(profileOf([
+      columnOf({ name: 'amount', nullPercentage: 0, completeness: 100 }),
+      columnOf({ name: 'empty', nullPercentage: 100, completeness: 0, approxDistinct: 0, allNull: true }),
+    ]));
+    grid.studio.showTab('overview');
+    grid.fixture.detectChanges();
+    const stats = new Map(grid.studio.overviewStats().map(item => [item.label, item]));
+    const issues = stats.get('Quality issues')!;
+
+    expect(issues.value).toBe(grid.studio.qualityFindings().length);
+    expect(issues.value).toBeGreaterThan(0);
+    expect(stats.get('Complete')!.value).toBe('50%');
+    expect(stats.get('Complete')!.hint).toContain('no cell was counted');
+    // The Quality tab says how many too, so the count is visible from any tab.
+    const quality = (grid.fixture.nativeElement as HTMLElement).querySelector('#a-tab-quality')!;
+    expect(quality.textContent).toContain(String(issues.value));
+
+    grid.studio.onOverviewStat(issues);
+    expect(grid.studio.tab()).toBe('quality');
+  });
+});
+
+describe('saving from the Canvas result', () => {
+  it('asks for the name in a small dialog, and closes it once the server has saved', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    const el = canvas.fixture.nativeElement as HTMLElement;
+    const save = [...el.querySelectorAll<HTMLButtonElement>('#a-panel button')]
+      .find(button => button.textContent!.trim() === 'Save')!;
+    save.click();
+    canvas.fixture.detectChanges();
+
+    expect(canvas.studio.saveDialogOpen()).toBe(true);
+    const name = el.querySelector<HTMLInputElement>('#a-save-name')!;
+    name.value = 'Sales by region';
+    name.dispatchEvent(new Event('input'));
+    canvas.fixture.detectChanges();
+    [...el.querySelectorAll<HTMLButtonElement>('app-form-dialog button')]
+      .find(button => button.textContent!.trim() === 'Save as new')!.click();
+
+    expect(canvas.saveAnalysis).toHaveBeenCalledTimes(1);
+    expect(canvas.saveAnalysis.mock.calls[0][0].analysisName).toBe('Sales by region');
+    canvas.answers.saveAnalysis!.next(SERVER_RESPONSE({
+      analyticsAnalysisId: 9, analysisName: 'Sales by region', connectionAlias: 'minio-main',
+      datasetPath: 'daily/sales-2026.csv',
+    }));
+    expect(canvas.studio.saveDialogOpen()).toBe(false);
+  });
+
+  it('keeps the dialog open over a refusal, with the server\'s sentence in it', () => {
+    const canvas = canvasWith();
+    canvas.studio.openSaveDialog();
+    canvas.studio.analysisName.set('Sales');
+    canvas.studio.saveAnalysis(false);
+    canvas.answers.saveAnalysis!.next(SERVER_REFUSAL('That name is taken.'));
+
+    expect(canvas.studio.saveDialogOpen()).toBe(true);
+    expect(canvas.show()).toContain('That name is taken.');
+  });
+
+  it('closes the dialog before the panel on Escape, one thing at a time', () => {
+    const canvas = canvasWith();
+    canvas.studio.openSaved();
+    canvas.studio.openSaveDialog();
+    canvas.studio.onEscape();
+    expect(canvas.studio.saveDialogOpen()).toBe(false);
+    expect(canvas.studio.savedOpen()).toBe(true);
+    canvas.studio.onEscape();
+    expect(canvas.studio.savedOpen()).toBe(false);
+  });
+
+  it('has no save card or saved list stacked under the result any more', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    const text = canvas.show();
+    expect(text).not.toContain('Save this analysis');
+    expect(canvas.studio.savedOpen()).toBe(false);
+  });
+});
+
+describe('opening a saved analysis from the panel', () => {
+  const SAVED_ONE = {
+    analyticsAnalysisId: 4, analysisName: 'Amount by region', connectionAlias: 'minio-main',
+    datasetPath: 'daily/sales-2026.csv', visualizationType: 'bar',
+    analysisConfig: JSON.stringify({ dimensions: ['region'], measure: { aggregation: 'SUM', field: 'amount' } }),
+  } as SavedAnalysis;
+
+  it('lists them in the right-hand panel, read once on arrival at Canvas', () => {
+    const canvas = canvasWith();
+    canvas.answers.analyses!.next(SERVER_RESPONSE([SAVED_ONE]));
+    canvas.studio.openSaved();
+    canvas.fixture.detectChanges();
+
+    expect(canvas.fetchAllAnalyses).toHaveBeenCalledTimes(1);
+    const panel = (canvas.fixture.nativeElement as HTMLElement).querySelector('#saved-panel')!;
+    expect(panel.classList).not.toContain('hidden');
+    expect(panel.textContent).toContain('Amount by region');
+    expect(panel.className).toContain('w-[480px]');
+    expect(panel.className).toContain('right-0');
+  });
+
+  it('puts one on the Canvas without running it, and gets out of the way', () => {
+    const canvas = canvasWith();
+    canvas.answers.analyses!.next(SERVER_RESPONSE([SAVED_ONE]));
+    canvas.studio.openSaved();
+    canvas.fixture.detectChanges();
+    const row = [...(canvas.fixture.nativeElement as HTMLElement)
+      .querySelectorAll<HTMLButtonElement>('#saved-panel button')]
+      .find(button => button.textContent!.includes('Amount by region'))!;
+    row.click();
+
+    expect(canvas.studio.dimensions()).toEqual(['region']);
+    expect(canvas.studio.loadedAnalysis()?.analyticsAnalysisId).toBe(4);
+    expect(canvas.analyze).not.toHaveBeenCalled();
+    expect(canvas.studio.savedOpen()).toBe(false);
+  });
+
+  it('deletes from the panel, behind the same confirmation', async () => {
+    const canvas = canvasWith();
+    canvas.answers.analyses!.next(SERVER_RESPONSE([SAVED_ONE]));
+    canvas.studio.openSaved();
+    canvas.fixture.detectChanges();
+    (canvas.fixture.nativeElement as HTMLElement)
+      .querySelector<HTMLButtonElement>('#saved-panel button[aria-label="Delete Amount by region"]')!.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(canvas.confirmBody()).toContain('any dashboard tile showing it');
+    expect(canvas.deleteAnalysis).toHaveBeenCalledWith(4);
+  });
+});
+
+describe('Activity leads with what a person ran', () => {
+  const RUNS = () => [
+    runOf({ analyticsQueryRunId: 1, queryText: '-- schema' }),
+    runOf({ analyticsQueryRunId: 2, queryText: '-- preview page=0' }),
+    runOf({ analyticsQueryRunId: 3, queryText: '-- overview' }),
+    runOf({ analyticsQueryRunId: 4, queryText: 'select count(*) from dataset' }),
+    runOf({ analyticsQueryRunId: 5, queryText: '-- profile' }),
+    // A refused internal read stays in view: somebody reached for a file they could not open.
+    runOf({ analyticsQueryRunId: 6, queryText: '-- schema', runStatus: 'REFUSED',
+            errorMessage: 'You cannot read this connection.' }),
+  ];
+
+  it('names each run\'s kind from the descriptor the server wrote', () => {
+    const console = activityWith();
+    const kinds = RUNS().map(run => console.studio.runKind(run));
+    expect(kinds).toEqual(['schema', 'preview', 'overview', 'SQL', 'profile', 'schema']);
+  });
+
+  it('hides the schema, preview and overview reads behind "Show internal steps"', () => {
+    const console = activityWith();
+    console.answers.runs!.next(SERVER_RESPONSE(RUNS()));
+
+    expect(console.studio.visibleRuns().map(run => run.analyticsQueryRunId)).toEqual([4, 5, 6]);
+    expect(console.show()).toContain('3 internal steps are hidden.');
+    expect(console.show()).toContain('You cannot read this connection.');
+
+    const toggle = [...(console.fixture.nativeElement as HTMLElement).querySelectorAll('label')]
+      .find(label => label.textContent!.includes('Show internal steps'))!
+      .querySelector<HTMLInputElement>('input')!;
+    toggle.click();
+    console.fixture.detectChanges();
+
+    expect(console.studio.showInternalRuns()).toBe(true);
+    expect(console.studio.visibleRuns().length).toBe(6);
+    expect(console.show()).not.toContain('internal steps are hidden');
+  });
+
+  it('draws one compact row per run, with Open in the console only where there is SQL', () => {
+    const console = activityWith();
+    console.answers.runs!.next(SERVER_RESPONSE(RUNS()));
+    console.studio.showInternalRuns.set(true);
+    console.fixture.detectChanges();
+    const el = console.fixture.nativeElement as HTMLElement;
+
+    expect(el.querySelectorAll('#a-panel li').length).toBe(6);
+    const opens = [...el.querySelectorAll('#a-panel button')]
+      .filter(button => button.textContent!.trim() === 'Open in the console');
+    expect(opens.length).toBe(1);
+  });
+});
+
+describe('the Charts tab when there is nothing to draw', () => {
+  it('says where a chart comes from and offers the way there', () => {
+    const console = consoleWith();
+    console.studio.showTab('charts');
+    const el = console.fixture.nativeElement as HTMLElement;
+    console.fixture.detectChanges();
+    const button = (label: string) => [...el.querySelectorAll<HTMLButtonElement>('#a-panel button')]
+      .find(candidate => candidate.textContent!.trim() === label);
+
+    expect(console.show()).toContain('Nothing has run yet — a chart is drawn from a result');
+    button('Write a query')!.click();
+    expect(console.studio.tab()).toBe('sql');
+
+    console.studio.showTab('charts');
+    console.fixture.detectChanges();
+    button('Build one in Canvas')!.click();
+    expect(console.studio.tab()).toBe('canvas');
+  });
+
+  it('stops offering to write a query once there is a result it cannot draw', () => {
+    const console = charted(resultOf({ columns: ['note'], rows: [['a']], rowCount: 1 }));
+    const labels = [...(console.fixture.nativeElement as HTMLElement).querySelectorAll('#a-panel button')]
+      .map(button => button.textContent!.trim());
+    expect(labels).not.toContain('Write a query');
+    expect(labels).toContain('Build one in Canvas');
+  });
+});
