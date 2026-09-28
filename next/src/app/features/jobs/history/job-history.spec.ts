@@ -2,7 +2,7 @@ import { AuthService } from '../../../core/auth/auth.service';
 import { describe, it, expect } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
-import { Router } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { signal } from '@angular/core';
 import { Subject, of } from 'rxjs';
 import { JobHistory } from './job-history';
@@ -118,5 +118,67 @@ describe('Run history with no job chosen', () => {
     h.load();
     expect(h.error()).toBe('');
     expect(h.emptyMessage()).toBe('Open a job, or pick an hour on the dashboard, to see its runs.');
+  });
+});
+
+/**
+ * UI review jobs#23: the dashboard's all-jobs hour drill-down listed runs by job number only,
+ * though the screen already fetched every job's name -- it kept one only when a job was open.
+ */
+describe('Run history across every job', () => {
+  function drillDown() {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [JobHistory], providers: [
+      provideRouter([]),
+      { provide: HttpClient, useValue: { get: (url: string) => of(url.includes('listSourceJob')
+        ? { status: 'SUCCESS', data: [{ jobId: 7, jobName: 'Nightly ledger check' }] }
+        : { status: 'SUCCESS', data: { jobQueues: [
+            { jobQueueId: 1, jobId: 7, jobStatus: 'Completed' },
+            { jobQueueId: 2, jobId: 8, jobStatus: 'Failed' },
+          ] } }) } },
+      { provide: ToastService, useValue: { success: () => {}, error: () => {}, info: () => {} } },
+      { provide: AuthService, useValue: { canManageTasks: () => true } },
+      { provide: JobEventsService, useValue: { events: new Subject(), connected: signal(false) } },
+    ] });
+    const fixture = TestBed.createComponent(JobHistory);
+    fixture.componentRef.setInput('targetDate', '2026-09-28');
+    fixture.componentRef.setInput('targetHr', '9');
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  it('names each run\'s job beside its number, and keeps the bare number for one it cannot name', () => {
+    const fixture = drillDown();
+    const rows = [...(fixture.nativeElement as HTMLElement).querySelectorAll('tbody tr')]
+      .map(tr => tr.textContent!.replace(/\s+/g, ' '));
+    expect(rows.find(r => r.includes('#7'))).toContain('Nightly ledger check');
+    expect(rows.find(r => r.includes('#8'))).toBeDefined();
+    expect(fixture.componentInstance.jobName()).toBe('');
+  });
+});
+
+/** Layout the test DOM cannot measure, so these read the templates (UI review jobs#23). */
+describe('Run history and assistant dock on a phone', () => {
+  async function read(file: string): Promise<string> {
+    const fs = (await import(/* @vite-ignore */ ['node', 'fs'].join(':'))) as { readFileSync(p: string, e: 'utf8'): string };
+    const root = (globalThis as unknown as { process: { cwd(): string } }).process.cwd();
+    return fs.readFileSync(`${root}/src/app/features/jobs/${file}`, 'utf8');
+  }
+
+  it('keeps "Full page" on one line in the dock header', async () => {
+    const source = await read('assistant/assistant-dock.ts');
+    const at = source.indexOf('title="Open the full page"');
+    const tag = source.slice(source.lastIndexOf('<a', at), at);
+    expect(tag).toContain('whitespace-nowrap');
+    expect(tag).toContain('shrink-0');
+  });
+
+  it('shortens "Ask about this job" below sm so the card heading is not cut to "Job &…"', async () => {
+    const source = await read('history/job-history.html');
+    const at = source.indexOf('<app-icon name="chat" />');
+    const button = source.slice(source.lastIndexOf('<button', at), source.indexOf('</button>', at));
+    expect(button).toContain('aria-label="Ask about this job"');
+    expect(button).toMatch(/<span class="hidden sm:inline">Ask about this job<\/span>/);
+    expect(button).toMatch(/<span class="sm:hidden">Ask<\/span>/);
   });
 });

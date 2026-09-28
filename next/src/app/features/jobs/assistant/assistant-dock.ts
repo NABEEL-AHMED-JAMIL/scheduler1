@@ -22,7 +22,9 @@ import { JobAssistant } from './job-assistant';
           {{ jobName() || 'Job assistant' }}
           <span class="text-[color:var(--text-muted)] font-normal">#{{ jobId() }}</span>
         </span>
-        <a class="btn btn-ghost btn-sm" [routerLink]="['/operations/jobs', jobId(), 'assistant']"
+        <!-- Never wraps or shrinks: on a phone the squeeze belongs to the truncating title, and
+             this link broke onto two lines ("Full / page") instead. -->
+        <a class="btn btn-ghost btn-sm whitespace-nowrap shrink-0" [routerLink]="['/operations/jobs', jobId(), 'assistant']"
            title="Open the full page"><app-icon name="maximize" />Full page</a>
         <button type="button" class="btn btn-ghost btn-icon"
                 (click)="minimised.set(!minimised())"

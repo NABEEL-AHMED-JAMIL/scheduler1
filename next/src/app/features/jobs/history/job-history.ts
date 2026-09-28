@@ -108,6 +108,8 @@ export class JobHistory {
   readonly error = signal('');
   readonly statusFilter = signal('');
   readonly jobName = signal('');
+  /** Every job's name by id, for the all-jobs drill-down's Job column. */
+  readonly jobNames = signal(new Map<number, string>());
 
   readonly statuses = computed(() =>
     [...new Set(this.runs().map(r => r.jobStatus).filter(Boolean))].sort());
@@ -323,12 +325,17 @@ export class JobHistory {
       }
     });
 
-    // The list endpoint is the only place the job's name is available.
+    // The list endpoint is the only place the job's name is available. Every name is kept, not
+    // only this job's: an hour across every job lists runs of many jobs, and bare numbers there
+    // said nothing about which job each run belonged to.
     this.http.get<ApiResponse<any[]>>(`${API_BASE}/sourceJob.json/listSourceJob`).subscribe({
       next: response => {
         if (response.status !== API_SUCCESS) return;
+        const jobs = Array.isArray(response.data) ? response.data : [];
+        this.jobNames.set(new Map(jobs.filter(j => j.jobName)
+          .map(j => [Number(j.jobId), String(j.jobName)] as [number, string])));
         if (!this.jobId()) return;
-        const job = (response.data ?? []).find(j => String(j.jobId) === this.jobId());
+        const job = jobs.find(j => String(j.jobId) === this.jobId());
         if (job) this.jobName.set(job.jobName);
       },
     });

@@ -67,10 +67,12 @@
         @if (!isAllJobs()) {
           <!-- Opens beside the history rather than replacing it: the questions are usually
                about what is on screen, and leaving the page to ask them lost that context. -->
-          <button type="button" class="btn btn-default btn-sm shrink-0"
+          <!-- "Ask" alone below sm: the full label left the card heading cut to "Job &…" at
+               phone width. The accessible name stays whole. -->
+          <button type="button" class="btn btn-default btn-sm shrink-0" aria-label="Ask about this job"
                   [class.btn-intent-ok]="assistantOpen()" [attr.aria-expanded]="assistantOpen()"
                   (click)="assistantOpen.set(!assistantOpen())">
-            <app-icon name="chat" />Ask about this job
+            <app-icon name="chat" /><span class="hidden sm:inline">Ask about this job</span><span class="sm:hidden">Ask</span>
           </button>
         }
 
@@ -308,9 +310,15 @@
               }
             </td>
             @if (isAllJobs()) {
-              <td class="mono whitespace-nowrap">
-                <a class="link-inline" [routerLink]="['/operations/jobs', run.jobId, 'history']"
+              <!-- The number links to the job's own history; the name beside it says which job it
+                   is. A job the list does not have keeps just its number. -->
+              <td class="whitespace-nowrap">
+                <a class="link-inline mono" [routerLink]="['/operations/jobs', run.jobId, 'history']"
                    title="Open this job's own history">#{{ run.jobId }}</a>
+                @if (jobNames().get(run.jobId); as name) {
+                  <span class="ml-1.5 inline-block max-w-[16rem] truncate align-bottom text-[color:var(--text-secondary)]"
+                        [title]="name">{{ name }}</span>
+                }
               </td>
             }
             <td class="hidden xl:table-cell whitespace-nowrap text-[color:var(--text-muted)]">
