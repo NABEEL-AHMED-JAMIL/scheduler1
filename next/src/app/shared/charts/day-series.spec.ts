@@ -33,12 +33,12 @@ describe('daySeries', () => {
 
   it('writes the year into the label once the axis crosses one', () => {
     const { bars } = daySeries(counts([]), '2025-12-30', '2026-01-02');
-    expect(bars.map(b => b.name)).toEqual(['2025-12-30', '2025-12-31', '2026-01-01', '2026-01-02']);
+    expect(bars.map(b => b.name)).toEqual(['30 Dec 2025', '31 Dec 2025', '1 Jan 2026', '2 Jan 2026']);
   });
 
   it('keeps the short label when the axis stays inside one year', () => {
     const { bars } = daySeries(counts([]), '2026-09-01', '2026-09-03');
-    expect(bars.map(b => b.name)).toEqual(['09-01', '09-02', '09-03']);
+    expect(bars.map(b => b.name)).toEqual(['1 Sep', '2 Sep', '3 Sep']);
   });
 
   it('steps in UTC, so a daylight-saving boundary neither duplicates nor drops a day', () => {
