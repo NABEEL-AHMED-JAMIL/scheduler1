@@ -151,7 +151,7 @@ describe('assistant answers', () => {
   });
 
   it.each([
-    [null, 'unknown'], [0, '0s'], [59, '59s'], [60, '1m 0s'], [3600, '1h 0m'],
+    [null, 'unknown'], [0, '0s'], [59, '59s'], [60, '1m'], [3600, '1h'], [25.25, '25.3s'], [119.6, '2m'],
   ])('humanDuration(%s) is %s', (input, expected) => {
     expect(humanDuration(input as number | null)).toBe(expected);
   });

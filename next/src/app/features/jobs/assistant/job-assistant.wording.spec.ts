@@ -73,3 +73,23 @@ describe('failure reasons, grouped', () => {
     expect(rows[0].value).toBe('Input CSV not found: etl-bucket/in/run-7400/orders.csv (run #7400)');
   });
 });
+
+/**
+ * MIG-295 (UI review jobs#10/#11): the schedule's Starts and Ends rows printed the API's
+ * "2026-09-01" under a Next run row that read "28 Sep 2026, 09:30", and "Runs take 1m 0s".
+ */
+describe('the schedule and run lengths, on the console clock', () => {
+  it('writes the start and end days as the rest of the console does', () => {
+    const dated = { ...weekly, schedule: { ...weekly.schedule!, startDate: '2026-09-01', endDate: '2027-03-31' } };
+    const rows = rowsOf(answerFor('schedule', dated, []));
+    expect(rows.find(r => r.label === 'Starts')?.value).toBe('1 Sep 2026 at 09:30');
+    expect(rows.find(r => r.label === 'Ends')?.value).toBe('31 Mar 2027');
+  });
+
+  it('says how long runs take with the shared duration format', () => {
+    const runs: JobRun[] = [
+      { jobQueueId: 1, jobStatus: 'Completed', startTime: '2026-09-01T09:00:00', endTime: '2026-09-01T09:01:00' },
+    ];
+    expect(textOf(answerFor('stats', weekly, runs))).toContain('Runs take 1m on average.');
+  });
+});

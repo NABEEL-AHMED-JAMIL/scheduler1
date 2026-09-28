@@ -1,7 +1,8 @@
 import { formatDate } from '@angular/common';
 import { Intent } from './job-assistant.intents';
 import { instantOf } from '../../../core/instant';
-import { monthDayLabel, weekdayLabel } from '../schedule-labels';
+import { clockTime, monthDayLabel, weekdayLabel } from '../schedule-labels';
+import { dayLabel, formatDuration, resolveFormat } from '../../../shared/ui/time-format';
 
 export interface JobRun {
   jobQueueId: number;
@@ -130,14 +131,16 @@ export function humanMoment(value?: string): string {
   if (!value) return '—';
   const at = instantOf(value);
   if (!at || !Number.isFinite(at.getTime())) return value;
-  return formatDate(at, 'd MMM y, HH:mm', 'en-US');
+  return formatDate(at, resolveFormat('dateTime'), 'en-US');
 }
 
+/**
+ * How long a run took, as the history table and the run logs write it; this had its own copy,
+ * which said "1m 0s" where they said "1m". No measured run is "unknown" in a sentence rather
+ * than the tables' dash, because "Runs take — on average" does not read.
+ */
 export function humanDuration(seconds: number | null): string {
-  if (seconds === null) return 'unknown';
-  if (seconds < 60) return `${seconds}s`;
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`;
-  return `${Math.floor(seconds / 3600)}h ${Math.round((seconds % 3600) / 60)}m`;
+  return seconds === null ? 'unknown' : formatDuration(seconds);
 }
 
 /**
@@ -160,7 +163,7 @@ function scheduleSentence(facts: JobFacts): string {
       : 'It runs only when someone triggers it — there is no schedule.';
   }
   if (!s) return 'No schedule is attached to this job.';
-  const at = s.startTime ? ` at ${String(s.startTime).slice(0, 5)}` : '';
+  const at = s.startTime ? ` at ${clockTime(s.startTime)}` : '';
   const when = `${cadence(s)}${pinnedTo(s)}${at}`;
   if (s.expired) return `The schedule has expired — it ran ${when} and will not run again.`;
   return `It runs ${when}.`;
@@ -266,8 +269,8 @@ export function answerFor(intent: Intent, facts: JobFacts, runs: JobRun[],
       if (s) {
         const n = Number(s.intervalValue) || 1;
         rows.push({ label: 'Frequency', value: `${s.frequency ?? '—'}${n > 1 ? ` every ${n}` : ''}${pinnedTo(s)}` });
-        if (s.startDate) rows.push({ label: 'Starts', value: `${s.startDate}${s.startTime ? ` at ${String(s.startTime).slice(0, 5)}` : ''}` });
-        if (s.endDate) rows.push({ label: 'Ends', value: s.endDate });
+        if (s.startDate) rows.push({ label: 'Starts', value: `${dayLabel(s.startDate)}${s.startTime ? ` at ${clockTime(s.startTime)}` : ''}` });
+        if (s.endDate) rows.push({ label: 'Ends', value: dayLabel(s.endDate) });
         rows.push({ label: 'Next run', value: onDemand
           ? 'On demand — nothing is scheduled'
           : (s.expired ? 'Expired — no further runs' : (s.nextRunAt ? humanMoment(s.nextRunAt) : 'Not scheduled')) });
