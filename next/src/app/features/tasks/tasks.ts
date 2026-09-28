@@ -20,6 +20,7 @@ import { createPager } from '../../shared/ui/pager';
 import { Pagination } from '../../shared/ui/pagination';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { parseTopicPartition } from '../../shared/ui/topic';
+import { matchesWorkspace, workspaceName, workspaceOptions } from '../../shared/ui/workspace-name';
 
 export interface LinkedJob {
   jobId: number;
@@ -37,6 +38,12 @@ interface SourceTask {
   updatedByName?: string | null;
   /** The author's id, so "Only mine" matches on identity rather than display text. */
   createdBy?: number | null;
+  /**
+   * The workspace the task belongs to (MIG-296). The name comes only on a platform administrator's
+   * list, which holds every workspace's tasks; see shared/ui/workspace-name.
+   */
+  tenantId?: number | null;
+  tenantName?: string | null;
 
   taskDetailId: number;
   taskName: string;
@@ -110,17 +117,34 @@ export class Tasks implements OnInit {
     if (this.pipelineFilter() && !this.pipelineOptions().some(p => p.id === this.pipelineFilter())) this.pipelineFilter.set('');
     this.pager.reset();
   }
+  /**
+   * A platform administrator's list mixes every workspace's tasks, and two workspaces can each have
+   * a task of the same name (review tasks#24). Only they get the Workspace column, card line and
+   * filter: everyone else's list is one workspace, where all three would repeat the same name.
+   */
+  readonly seesWorkspaces = computed(() => this.auth.isPlatformAdmin());
+  /** The picked workspace's id as text; empty is "All workspaces". */
+  readonly workspaceFilter = signal('');
+  readonly workspaceOptions = computed(() => this.seesWorkspaces() ? workspaceOptions(this.tasks()) : []);
+  workspaceName(task: SourceTask): string { return workspaceName(task); }
+
   /** Whether Clear is offered: anything that narrows the list, Only mine included. */
   readonly hasFilters = computed(() =>
-    !!(this.search() || this.topicFilter() || this.pipelineFilter() || this.onlyMine()));
+    !!(this.search() || this.topicFilter() || this.pipelineFilter() || this.workspaceFilter() || this.onlyMine()));
 
-  clearFilters(): void { this.search.set(''); this.topicFilter.set(''); this.pipelineFilter.set(''); this.onlyMine.set(false); this.pager.reset(); }
+  clearFilters(): void {
+    this.search.set(''); this.topicFilter.set(''); this.pipelineFilter.set(''); this.workspaceFilter.set('');
+    this.onlyMine.set(false); this.pager.reset();
+  }
 
   readonly filtered = computed(() => {
     const term = this.search().trim().toLowerCase();
     const topic = this.topicFilter();
     const pipeline = this.pipelineFilter();
+    const workspaces = this.seesWorkspaces();
+    const workspace = workspaces ? this.workspaceFilter() : '';
     let rows = this.mine(this.tasks());
+    if (workspace) rows = rows.filter(t => matchesWorkspace(t, workspace));
     if (topic) rows = rows.filter(t => String(t.sourceTaskType?.sourceTaskTypeId ?? '') === topic);
     if (pipeline) rows = rows.filter(t => t.pipelineId === pipeline);
     if (!term) return rows;
@@ -130,7 +154,9 @@ export class Tasks implements OnInit {
       || (task.sourceTaskType?.serviceName ?? '').toLowerCase().includes(term)
       // The Kafka topic the Topic column shows, which the placeholder promises.
       || this.topicOf(task.sourceTaskType?.queueTopicPartition).toLowerCase().includes(term)
-      || (task.pipelineId ?? '').toLowerCase().includes(term));
+      || (task.pipelineId ?? '').toLowerCase().includes(term)
+      // Only where the column shows it, or a row would match on something nobody can see.
+      || (workspaces && workspaceName(task).toLowerCase().includes(term)));
   });
 
   readonly pager = createPager<any>();

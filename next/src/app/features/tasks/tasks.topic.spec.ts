@@ -18,7 +18,7 @@ function tasksScreen() {
       { provide: HttpClient, useValue: { get: () => of({}), post: () => of({}), put: () => of({}) } },
       { provide: ToastService, useValue: { success: () => {}, error: () => {}, info: () => {} } },
       { provide: Dialog, useValue: { open: () => ({ closed: of(undefined) }) } },
-      { provide: AuthService, useValue: { user: () => null, canManageTasks: () => true } },
+      { provide: AuthService, useValue: { user: () => null, canManageTasks: () => true, isPlatformAdmin: () => false } },
     ],
   });
   return TestBed.runInInjectionContext(() => new Tasks());

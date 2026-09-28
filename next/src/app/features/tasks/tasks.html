@@ -29,6 +29,15 @@
                    (retry)="load()">
     <ng-container toolbar>
       <app-view-toggle [(value)]="view" key="tasks" cardsIcon="layers" />
+      <!-- A platform administrator's list holds every workspace; the options are the workspaces
+           in it, so nothing offered narrows to an empty list. -->
+      @if (seesWorkspaces()) {
+        <div class="max-w-48 w-48">
+          <app-combobox id="tasks-tenant" ariaLabel="Filter by workspace" [selected]="workspaceFilter()"
+                        (selectedChange)="workspaceFilter.set($event); pager.reset()"
+                        placeholder="All workspaces" clearLabel="All workspaces" [options]="workspaceOptions()" />
+        </div>
+      }
       <!-- Topic first, then the pipelines on it -- the same two-step pick the task editor uses,
            so the list can be narrowed the way tasks are actually organised. -->
       <div class="max-w-48 w-48">
@@ -43,7 +52,8 @@
       </div>
       <div class="search-field max-w-64">
         <app-icon name="search" size="0.95em" />
-        <input class="input" placeholder="Search id, name, topic or pipeline" aria-label="Search tasks"
+        <input class="input" [placeholder]="seesWorkspaces() ? 'Search id, name, topic, pipeline or workspace' : 'Search id, name, topic or pipeline'"
+               aria-label="Search tasks"
                [value]="search()" (input)="search.set($any($event.target).value); pager.reset()" />
       </div>
       <app-mine-filter [(only)]="onlyMine" />
@@ -67,6 +77,12 @@
                   <span class="mono text-[color:var(--text-muted)]">#{{ task.taskDetailId }}</span>
                   <app-status [label]="task.taskStatus" [quiet]="true" />
                 </div>
+                <!-- Whose task it is, for the one role whose list mixes workspaces. -->
+                @if (seesWorkspaces()) {
+                  <div class="text-xs text-[color:var(--text-muted)] truncate mt-0.5" [title]="workspaceName(task)">
+                    {{ workspaceName(task) }}
+                  </div>
+                }
               </div>
               <div class="shrink-0 flex items-center gap-1">
                 <!-- Edit, Duplicate and Delete are the whole menu and all three are TENANT_ADMIN
@@ -155,6 +171,11 @@
         <tr>
           <th class="w-8"></th>
           <th>Task</th>
+          <!-- Whose task it is, beside its name, for the one role whose list mixes workspaces. It waits
+               for xl like Type; the cards and the Workspace filter carry it on a narrower screen. -->
+          @if (seesWorkspaces()) {
+            <th class="hidden xl:table-cell">Workspace</th>
+          }
           <!-- Type waits for xl: at 1024 it pushed Status and the row menu off the card, and the
                Topic beside it already says where the work goes. -->
           <th class="hidden xl:table-cell">Type</th>
@@ -185,6 +206,10 @@
               <div class="font-medium truncate" [title]="task.taskName">{{ task.taskName || '—' }}</div>
               <div class="mono text-[color:var(--text-muted)]">#{{ task.taskDetailId }}</div>
             </td>
+            @if (seesWorkspaces()) {
+              <td class="hidden xl:table-cell text-[color:var(--text-secondary)] max-w-44 truncate"
+                  [title]="workspaceName(task)">{{ workspaceName(task) }}</td>
+            }
             <td class="hidden xl:table-cell text-[color:var(--text-secondary)] max-w-44 truncate">
               {{ task.sourceTaskType?.serviceName || '—' }}
             </td>
@@ -252,8 +277,9 @@
             <tr class="bg-sunken">
               <td></td>
               <!-- One leading cell plus this: together they must equal the header count, which
-                   grew to ten when Created by and Updated by were added. -->
-              <td colspan="9" class="!py-3">
+                   grew to ten when Created by and Updated by were added, and to eleven with a
+                   platform administrator's Workspace column. -->
+              <td [attr.colspan]="seesWorkspaces() ? 10 : 9" class="!py-3">
                 @if (task.taskPayload) {
                   <div class="flex items-center gap-2 mb-1.5">
                     <app-icon name="file" size="0.9em" class="icon-muted" />
