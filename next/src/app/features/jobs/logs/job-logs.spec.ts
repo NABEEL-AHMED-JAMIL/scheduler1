@@ -190,3 +190,35 @@ describe('JobLogs for a run that does not exist', () => {
     expect(component.autoRefreshing()).toBe(false);
   });
 });
+
+/**
+ * MIG-295 (UI review jobs#11): the run's duration, the AI step's latency and the gap chart each had
+ * a formatter of their own -- "9.9 s" beside "2m 8s" beside "128s" -- and the console printed its
+ * entries as "[2026-09-20 18:15:34]" under a header dated "20 Sep 2026".
+ */
+describe('JobLogs on the console clock', () => {
+  it('writes the run and the AI step with the shared duration format', () => {
+    const { el, component } = page();
+    expect(component.duration()).toBe('2m 8s');
+    expect(el.textContent).toContain('9.9s');
+    expect(el.textContent).not.toContain('9.9 s');
+  });
+
+  it('writes a long wait in minutes', () => {
+    const { component } = page();
+    const at = (time: string) => `2026-09-20T${time}`;
+    component.runStartedAt.set(at('18:00:00'));
+    component.logs.set([{ jobAuditLogId: 1, logsDetail: 'waited', dateCreated: at('18:02:05') }] as any);
+    expect(component.topGaps()[0].display).toBe('2m 5s');
+    expect(component.gapSummary()?.totalLabel).toBe('2m 5s');
+  });
+
+  it('dates the console\'s entries as the rest of the console dates things', () => {
+    const { fixture, el, component } = page();
+    component.view.set('console');
+    fixture.detectChanges();
+    const stamps = [...el.querySelectorAll('.log-console-time')].map(s => s.textContent!.trim());
+    expect(stamps.length).toBe(3);
+    for (const stamp of stamps) expect(stamp).toMatch(/^\[\d{1,2} [A-Z][a-z]{2} \d{4}, \d{2}:\d{2}:\d{2}\]$/);
+  });
+});

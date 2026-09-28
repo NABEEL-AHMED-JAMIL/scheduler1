@@ -1,6 +1,6 @@
 import { Component, OnDestroy, OnInit, LOCALE_ID, computed, effect, inject, input, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { DecimalPipe, NgTemplateOutlet } from '@angular/common';
+import { NgTemplateOutlet } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { TableShell } from '../../../shared/ui/data-table';
@@ -12,6 +12,7 @@ import { isMissingRecord } from '../../../core/api/missing-record';
 import { JobEventsService } from '../../../core/socket/job-events.service';
 import { Subscription } from 'rxjs';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
+import { formatDuration } from '../../../shared/ui/time-format';
 import { Markdown } from '../../../shared/ui/markdown';
 import { SegmentOption, Segmented } from '../../../shared/ui/segmented';
 import { LogSegment, logSegments, pathParts } from './log-segments';
@@ -26,7 +27,7 @@ interface AuditLog {
 
 @Component({
   selector: 'app-job-logs',
-  imports: [StickToBottom, Icon, ServerTimePipe, DecimalPipe, NgTemplateOutlet, RouterLink, TableShell, RankedBar, StatusPill, Markdown, Segmented],
+  imports: [StickToBottom, Icon, ServerTimePipe, NgTemplateOutlet, RouterLink, TableShell, RankedBar, StatusPill, Markdown, Segmented],
   templateUrl: './job-logs.html',
 })
 export class JobLogs implements OnInit, OnDestroy {
@@ -162,17 +163,18 @@ export class JobLogs implements OnInit, OnDestroy {
   toggleLive(): void { this.live.update(v => !v); }
 
   /**
-   * Seconds between one log line and the next. A job that looks "slow" is usually waiting in
-   * one specific step, and the tall bar is that step -- far quicker to spot than reading
-   * timestamps down a column.
+   * How long the run took, written as the history table and the Jobs list write it. This had its
+   * own formatter, which said "60m 0s" for an hour-long run where the history said "1h".
    */
   duration(): string {
     const run = this.run();
     if (!run?.startTime || !run?.endTime) return '—';
-    const seconds = (new Date(run.endTime).getTime() - new Date(run.startTime).getTime()) / 1000;
-    if (!Number.isFinite(seconds) || seconds < 0) return '—';
-    if (seconds < 60) return `${Math.round(seconds * 10) / 10}s`;
-    return `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`;
+    return formatDuration((new Date(run.endTime).getTime() - new Date(run.startTime).getTime()) / 1000);
+  }
+
+  /** An AI step's latency, which the API gives in milliseconds. */
+  latency(ms: number): string {
+    return formatDuration(ms / 1000);
   }
 
   /** How many bars stay readable at once; beyond this the chart shows a window. */
@@ -215,9 +217,7 @@ export class JobLogs implements OnInit, OnDestroy {
       .map(g => ({
         name: `Before ${g.name}`,
         value: g.value,
-        display: g.value >= 60
-          ? `${Math.floor(g.value / 60)}m ${Math.round(g.value % 60)}s`
-          : `${g.value}s`,
+        display: formatDuration(g.value),
         color: g.color,
       }));
   });
@@ -236,7 +236,7 @@ export class JobLogs implements OnInit, OnDestroy {
     const shown = this.topGaps().reduce((sum, g) => sum + g.value, 0);
     return {
       total: Math.round(total * 10) / 10,
-      totalLabel: this.humanSeconds(total),
+      totalLabel: formatDuration(total),
       shownShare: total > 0 ? Math.round((shown / total) * 100) : 0,
       entries: all.length,
     };
@@ -254,12 +254,6 @@ export class JobLogs implements OnInit, OnDestroy {
     }).length;
   });
 
-  private humanSeconds(seconds: number): string {
-    if (seconds < 60) return `${Math.round(seconds * 10) / 10}s`;
-    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`;
-    return `${Math.floor(seconds / 3600)}h ${Math.round((seconds % 3600) / 60)}m`;
-  }
-
   /** The entries in time order: what the chart's gaps and every entry's number are counted from. */
   private readonly timeOrdered = computed(() => [...this.logs()]
     .filter(row => !!row.dateCreated)
@@ -274,6 +268,11 @@ export class JobLogs implements OnInit, OnDestroy {
   /** The same clock the views print entry times with: API times are Chicago wall-clock. */
   private readonly clock = new ServerTimePipe(inject(LOCALE_ID));
 
+  /**
+   * Seconds between one log line and the next. A job that looks "slow" is usually waiting in
+   * one specific step, and the tall bar is that step -- far quicker to spot than reading
+   * timestamps down a column.
+   */
   readonly gaps = computed(() => {
     const rows = this.timeOrdered();
     if (!rows.length) return [];
@@ -289,7 +288,7 @@ export class JobLogs implements OnInit, OnDestroy {
     // bars by name.
     rows.forEach((row, index) =>
       anchors.push({ at: new Date(row.dateCreated!).getTime(),
-        label: `${this.clock.transform(row.dateCreated, 'HH:mm:ss')} (#${index + 1})` }));
+        label: `${this.clock.transform(row.dateCreated, 'timeSec')} (#${index + 1})` }));
 
     if (anchors.length < 2) return [];
     const out: { name: string; value: number }[] = [];
