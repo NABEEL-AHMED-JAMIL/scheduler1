@@ -8,6 +8,7 @@ import { AuthService } from '../../core/auth/auth.service';
 import { BillingApi } from '../billing/billing.service';
 import { Reports } from './reports';
 import { RunData, RunRow } from './pivot';
+import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 
 /** Audit 09-22, Reports as drawn: pressed states, honest empties and failures, one wording. */
 const DATA: RunData = {
@@ -105,5 +106,35 @@ describe('Reports, rendered', () => {
     reply.next({ status: 'SUCCESS', data: { sourceJobQueues: [{ jobQueueId: 2, jobId: 1, jobStatus: 'Failed', jobStatusMessage: 'Disk full' }] } });
     expect(reports.failures()).toEqual([]);
     expect(reports.failuresLoading()).toBe(false);
+  });
+});
+
+/**
+ * "Last call" printed the server's UTC string cut to 16 characters, so a call at 22:59 in Chicago
+ * read "2026-09-25 03:59"; the failures' "When" printed the server's wall clock as it came. Both
+ * now go through serverTime, in the viewer's own time and the Queue's short style (UI audit, Low).
+ */
+describe('Reports times', () => {
+  const pipe = new ServerTimePipe('en-US');
+
+  it('shows a prompt\'s last call in the viewer\'s own time', () => {
+    const { reports, fixture, text } = page();
+    const lastAt = '2026-09-25T03:59:27.550+00:00';
+    reports.aiUsage.set([{ promptId: 1, promptName: 'Summarise', calls: 2, failed: 0, tries: 0,
+      tokensIn: 10, tokensOut: 5, medianMs: 900, lastAt }]);
+    fixture.detectChanges();
+    expect(text()).not.toContain('2026-09-25 03:59');
+    expect(text()).toContain(pipe.transform(lastAt, 'd MMM, HH:mm')!);
+  });
+
+  it('shows a failure\'s time the way Queue does, and still groups by the latest', () => {
+    const { reports, fixture, text } = page();
+    const older = { ...failure(2, 'nightly-load', 'Disk full'), when: '2026-08-01T09:00:00' };
+    const newer = { ...failure(3, 'nightly-load', 'Disk full'), when: '2026-08-01T10:00:00' };
+    reports.failures.set([newer, older]);
+    fixture.detectChanges();
+    expect(text()).toContain(pipe.transform(newer.when, 'd MMM, HH:mm:ss')!);
+    expect(text()).not.toContain('2026-08-01T10:00:00');
+    expect(reports.failureReasons()[0].lastWhen).toBe(newer.when);
   });
 });

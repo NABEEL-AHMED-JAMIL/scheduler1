@@ -1,6 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router, RouterLink } from '@angular/router';
+import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { Subject, catchError, of, switchMap } from 'rxjs';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { AuthService } from '../../core/auth/auth.service';
@@ -165,7 +166,7 @@ interface QueueLog {
  */
 @Component({
   selector: 'app-reports',
-  imports: [Icon, StatTile, StatusPill, TableShell, Donut, BarChart, Histogram, ReportPivot, Combobox, Pagination, DecimalPipe, RouterLink],
+  imports: [Icon, StatTile, StatusPill, TableShell, Donut, BarChart, Histogram, ReportPivot, Combobox, Pagination, DecimalPipe, RouterLink, ServerTimePipe],
   templateUrl: './reports.html',
 })
 export class Reports implements OnInit {
@@ -904,7 +905,9 @@ export class Reports implements OnInit {
             task: this.runIndex().get(Number(log.jobQueueId ?? 0))?.task || '',
             status: String(log.jobStatus ?? ''),
             message: (log.jobStatusMessage ?? '').trim() || 'No message was recorded.',
-            when: (log.startTime ?? log.dateCreated ?? '').replace('T', ' ').slice(0, 19),
+            // As the server sent it: failureReasons orders by it as text, and the template formats
+            // it in the viewer's own time.
+            when: log.startTime ?? log.dateCreated ?? '',
             seconds: secondsBetween(log.startTime, log.endTime),
           }))
           .sort((a, b) => b.jobQueueId - a.jobQueueId));

@@ -39,6 +39,16 @@ function withUsableBody(event: HttpResponse<unknown>): HttpResponse<unknown> {
   });
 }
 
+export const UNREACHABLE_MESSAGE = 'Could not reach the server. Check your connection and try again.';
+
+function unreachable(error: unknown): unknown {
+  if (!(error instanceof HttpErrorResponse) || error.status !== 0) return error;
+  return new HttpErrorResponse({
+    status: 0, statusText: error.statusText, url: error.url ?? undefined, headers: error.headers,
+    error: { status: 'ERROR', message: UNREACHABLE_MESSAGE },
+  });
+}
+
 /** The call that settles the password debt passwordChangeGuard enforces. */
 const CHANGE_PASSWORD_CALL = '/appUser.json/changeOwnPassword';
 /** An administrator's reset, which is a change of the caller's own password when it names them. */
@@ -259,6 +269,12 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     })
   );
 
-  return ownPasswordChange ? sent.pipe(finalize(() => endOwnPasswordChange())) : sent;
+  // A request that never reached the server came back with the browser's own words -- "Failed to
+  // fetch", "0 Unknown Error" -- and every screen's `err.error.message || fallback` showed them.
+  // It now carries one plain sentence in the shape those screens already read; every other
+  // failure passes through as the server sent it.
+  const readable = sent.pipe(catchError(error => throwError(() => unreachable(error))));
+
+  return ownPasswordChange ? readable.pipe(finalize(() => endOwnPasswordChange())) : readable;
 
 };

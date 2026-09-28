@@ -71,7 +71,7 @@
       </select>
       <div class="search-field max-w-56">
         <app-icon name="search" size="0.95em" />
-        <input class="input" placeholder="Search name, pipeline, topic or description" aria-label="Search pipelines"
+        <input class="input" placeholder="Search name, topic or pipeline" aria-label="Search pipelines"
                [value]="search()" (input)="onSearch($any($event.target).value)" />
       </div>
       <app-mine-filter [only]="onlyMine()" (onlyChange)="setFilter(onlyMine, $event)" />
@@ -102,7 +102,7 @@
               <div class="shrink-0 flex items-center gap-1">
                 <app-status [label]="form.status" [quiet]="true" />
                 <button type="button" class="btn btn-ghost btn-icon btn-sm"
-                        [cdkMenuTriggerFor]="cardMenu" aria-label="Actions">
+                        [cdkMenuTriggerFor]="cardMenu" [attr.aria-label]="'Actions for ' + form.pipelineName">
                   <app-icon name="dots" size="1.05em" />
                 </button>
                 <ng-template #cardMenu>
@@ -223,7 +223,7 @@
               <td><app-status [label]="form.status" [quiet]="true" /></td>
               <td>
                 <button type="button" class="btn btn-ghost btn-icon btn-sm"
-                        [cdkMenuTriggerFor]="rowMenu" aria-label="Actions">
+                        [cdkMenuTriggerFor]="rowMenu" [attr.aria-label]="'Actions for ' + form.pipelineName">
                   <app-icon name="dots" size="1.05em" />
                 </button>
                 <ng-template #rowMenu>

@@ -411,7 +411,7 @@
                          [title]="failure.message">{{ failure.message }}</div>
                   </td>
                   <td class="hidden lg:table-cell mono text-xs
-                             text-[color:var(--text-muted)] whitespace-nowrap">{{ failure.when }}</td>
+                             text-[color:var(--text-muted)] whitespace-nowrap">{{ failure.when ? (failure.when | serverTime: 'd MMM, HH:mm:ss') : '—' }}</td>
                   <td class="text-right hidden md:table-cell mono text-xs">
                     {{ failure.seconds >= 0 ? humanSeconds(failure.seconds) : '—' }}
                   </td>
@@ -494,7 +494,9 @@
                   <td class="text-right tabular">{{ r.tokensIn | number }}</td>
                   <td class="text-right tabular">{{ r.tokensOut | number }}</td>
                   <td class="text-right tabular mono text-xs hidden lg:table-cell">{{ (r.medianMs / 1000) | number: '1.1-1' }} s</td>
-                  <td class="hidden lg:table-cell mono text-xs text-[color:var(--text-muted)]">{{ r.lastAt ? r.lastAt.slice(0, 16).replace('T', ' ') : '—' }}</td>
+                  <!-- The viewer's own time: sliced, the UTC string put a 22:59 Chicago call at "03:59" the next day. -->
+                  <td class="hidden lg:table-cell mono text-xs text-[color:var(--text-muted)] whitespace-nowrap"
+                      [title]="r.lastAt ? (r.lastAt | serverTime: 'd MMM y, HH:mm:ss') : ''">{{ r.lastAt ? (r.lastAt | serverTime: 'd MMM, HH:mm') : '—' }}</td>
                 </tr>
               }
             </tbody>

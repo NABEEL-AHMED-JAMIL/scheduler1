@@ -295,7 +295,7 @@
                       [title]="entry.contentType">{{ entry.folder ? '—' : (entry.contentType || '—') }}</td>
                   <td class="text-right">
                     <button type="button" class="btn btn-ghost btn-icon" [cdkMenuTriggerFor]="rowMenu"
-                            [disabled]="actionBusy()" aria-label="Actions">
+                            [disabled]="actionBusy()" [attr.aria-label]="'Actions for ' + entry.name">
                       <app-icon name="dots" size="1.05em" />
                     </button>
 

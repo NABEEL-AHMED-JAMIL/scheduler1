@@ -124,6 +124,7 @@
     color-scheme: light;
     --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23676f7f' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
     --date-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23676f7f' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='16' rx='2'/%3E%3Cpath d='M3 10h18M8 3v4M16 3v4'/%3E%3C/svg%3E");
+    --time-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23676f7f' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3 2'/%3E%3C/svg%3E");
 
     --surface-page:    var(--color-ink-50);
     --surface-raised:  #ffffff;
@@ -211,6 +212,7 @@
     color-scheme: dark;
     --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2399a1af' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
     --date-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2399a1af' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='16' rx='2'/%3E%3Cpath d='M3 10h18M8 3v4M16 3v4'/%3E%3C/svg%3E");
+    --time-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2399a1af' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3 2'/%3E%3C/svg%3E");
     --surface-page:    var(--color-ink-950);
     --surface-raised:  var(--color-ink-900);
     /* Dark has no cast problem -- everything is already this hue -- so sunken and inset both
@@ -828,9 +830,9 @@
 
   /* A date field's picker button is an OS glyph that follows neither currentColor nor the
      icon set, so it read as browser chrome sitting inside an app control -- the same thing
-     the select's arrow did before it was replaced. The page draws the calendar itself, and
-     the native button is kept at zero opacity on top of it so it stays the click target
-     that opens the picker. */
+     the select's arrow did before it was replaced. The page draws the calendar itself (a
+     clock for a time field), and the native button is kept at zero opacity on top of it so
+     it stays the click target that opens the picker. */
   .input[type="date"],
   .input[type="time"],
   .input[type="datetime-local"],
@@ -842,6 +844,8 @@
     background-size: 1rem;
     @apply pr-9;
   }
+  /* A time field is a clock, not a calendar: the start-time box showed a calendar. */
+  .input[type="time"] { background-image: var(--time-glyph); }
   .input::-webkit-calendar-picker-indicator {
     cursor: pointer;
     opacity: 0;
@@ -878,8 +882,9 @@
     border-color: var(--border-strong);
   }
   /* A search box should say so before it is read. The icon is decorative -- the
-     placeholder carries the meaning for screen readers. */
-  .search-field { @apply relative inline-flex items-center; }
+     placeholder carries the meaning for screen readers. w-full so the max-w-* a page puts on it
+     takes effect: an inline-flex box shrank to the input's intrinsic 191px and cut placeholders. */
+  .search-field { @apply relative inline-flex items-center w-full; }
   .search-field > app-icon {
     @apply absolute left-2.5 pointer-events-none text-[color:var(--text-muted)];
   }
@@ -1573,6 +1578,8 @@ html.dark {
      icon; setting px here slid the placeholder under the magnifier). */
   .table-toolbar .input { min-height: 1.875rem; @apply py-1 text-xs; }
   .table-toolbar .btn-sm { min-height: 1.875rem; }
+  /* A toolbar combobox's list follows its compact 12px box, as a form's follows its 14px one. */
+  .table-toolbar [role="listbox"] { @apply text-xs; }
   /* Joined controls: a stepper such as "< September 2026 >" built from .btn-sm pieces, one box. */
   .btn-join { @apply inline-flex items-stretch; }
   .btn-join > .btn { @apply rounded-none; }
@@ -2006,4 +2013,22 @@ html.dark .btn-circle-danger:hover:not(:disabled) { background: color-mix(in okl
   .link-inline.truncate { display: inline-block; max-width: 100%; min-width: 0; vertical-align: bottom; }
   /* The flex gap is gone with the flex box, so a leading icon keeps its space this way. */
   .link-inline.truncate > app-icon { margin-inline-end: 0.25rem; }
+}
+
+/* ---------------------------------------------------------------------------
+   Inline links read as links at rest (UI/UX pass, jobs#22).
+
+   --accent-text is the body text colour in both themes, so a .link-inline -- a job name that
+   opens its history, a message that expands -- looked exactly like the plain text beside it
+   until hovered, and a touch screen never hovers. A quiet underline in the border colour marks
+   it; hover darkens the line to the text colour. A button styled as a link gets the hand too.
+   --------------------------------------------------------------------------- */
+@layer components {
+  .link-inline {
+    text-decoration-line: underline;
+    text-decoration-color: var(--border-strong);
+    text-underline-offset: 2px;
+  }
+  .link-inline:hover { text-decoration-color: currentColor; }
+  button.link-inline { cursor: pointer; }
 }

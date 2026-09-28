@@ -42,7 +42,8 @@ export interface ComboboxOption {
         </button>
       }
       @if (open()) {
-        <div class="card absolute left-0 right-0 top-full mt-1 z-20 max-h-64 overflow-y-auto p-1 shadow-lg" role="listbox"
+        <!-- text-sm, as every menu panel and the 14px box: the list was the browser's 16px. -->
+        <div class="card absolute left-0 right-0 top-full mt-1 z-20 max-h-64 overflow-y-auto p-1 shadow-lg text-sm" role="listbox"
              [id]="listId">
           @if (allowClear()) {
             <!-- tabindex -1 on every row: the arrow keys and aria-activedescendant drive the list,
@@ -66,9 +67,14 @@ export interface ComboboxOption {
             <button type="button" role="option" class="menu-item" tabindex="-1"
                     [id]="listId + '-' + i" [attr.aria-selected]="opt.value === value()"
                     [class.is-active]="i === highlighted()"
-                    [title]="opt.hint || ''"
+                    [title]="opt.hint ? opt.label + ' — ' + opt.hint : opt.label"
                     (mousedown)="selectOption(opt, $event)">
-              {{ opt.label }}
+              <!-- The hint shows under the label: as a tooltip alone a keyboard or touch user never
+                   saw it. Truncated, since some are long descriptions; the title keeps it whole. -->
+              <span class="flex flex-col min-w-0">
+                <span class="truncate">{{ opt.label }}</span>
+                @if (opt.hint) { <span class="truncate text-xs text-[color:var(--text-muted)]">{{ opt.hint }}</span> }
+              </span>
             </button>
           }
           @if (remote() && filtered().length && filtered().length >= remoteCap()) {

@@ -41,7 +41,7 @@
                       [clearLabel]="topicFilter() ? 'All pipelines on this topic' : 'All pipelines'"
                       [options]="pipelineComboOptions()" />
       </div>
-      <div class="search-field max-w-56">
+      <div class="search-field max-w-64">
         <app-icon name="search" size="0.95em" />
         <input class="input" placeholder="Search id, name, topic or pipeline" aria-label="Search tasks"
                [value]="search()" (input)="search.set($any($event.target).value); pager.reset()" />
@@ -74,7 +74,7 @@
                      opening on nothing. -->
                 @if (auth.canManageTasks()) {
                   <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="cardMenu"
-                          [disabled]="busyTask() === task.taskDetailId" aria-label="Actions">
+                          [disabled]="busyTask() === task.taskDetailId" [attr.aria-label]="'Actions for ' + task.taskName">
                     <app-icon name="dots" size="1.05em" />
                   </button>
                   <ng-template #cardMenu>
@@ -219,7 +219,7 @@
               @if (auth.canManageTasks()) {
                 <div class="flex items-center justify-end gap-1 whitespace-nowrap">
                   <button type="button" class="btn btn-ghost btn-icon btn-sm shrink-0" [cdkMenuTriggerFor]="taskMenu"
-                          [disabled]="busyTask() === task.taskDetailId" aria-label="Actions">
+                          [disabled]="busyTask() === task.taskDetailId" [attr.aria-label]="'Actions for ' + task.taskName">
                     <app-icon name="dots" size="1.05em" />
                   </button>
                 </div>

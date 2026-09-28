@@ -109,13 +109,17 @@
   <app-table-shell heading="Queue" [loading]="loading()" [error]="error()"
                    [isEmpty]="!data().length" [shown]="data().length" [total]="rows().length"
                    emptyMessage="Nothing in the queue for these filters."
-                   emptyIcon="clock"
+                   emptyIcon="clock" [showSubbar]="!!rangeError()"
                    (retry)="load()">
     <ng-container toolbar>
-      <input type="date" class="input max-w-40" aria-label="From date" [value]="fromDate()"
-             (change)="fromDate.set($any($event.target).value); load()" />
-      <input type="date" class="input max-w-40" aria-label="To date" [value]="toDate()"
-             (change)="toDate.set($any($event.target).value); load()" />
+      <input type="date" class="input max-w-40" aria-label="From date" [value]="fromDate()" [max]="toDate()"
+             [attr.aria-invalid]="!!rangeError() || null"
+             [attr.aria-describedby]="rangeError() ? 'queue-range-error' : null"
+             (change)="setFrom($any($event.target).value)" />
+      <input type="date" class="input max-w-40" aria-label="To date" [value]="toDate()" [min]="fromDate()"
+             [attr.aria-invalid]="!!rangeError() || null"
+             [attr.aria-describedby]="rangeError() ? 'queue-range-error' : null"
+             (change)="setTo($any($event.target).value)" />
       <div class="search-field max-w-56">
         <app-icon name="search" size="0.95em" />
         <input class="input" placeholder="Search job, run or message" aria-label="Search queue messages"
@@ -123,6 +127,14 @@
       </div>
       @if (hasFilters()) {
         <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()"><app-icon name="close" />Clear</button>
+      }
+    </ng-container>
+
+    <!-- The range is not read while it makes no sense, so the reason sits right under the boxes. -->
+    <ng-container subbar>
+      @if (rangeError()) {
+        <p id="queue-range-error" class="field-note text-crit-500 mt-0" role="alert">{{ rangeError() }}</p>
+        <button type="button" class="btn btn-ghost btn-sm" (click)="resetRange()"><app-icon name="calendar" />Last 7 days</button>
       }
     </ng-container>
 
@@ -178,7 +190,7 @@
                 <app-status [label]="row.jobStatus" />
                 @if (inFlight(row)) {
                   <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="menu"
-                          aria-label="Actions">
+                          [attr.aria-label]="'Actions for run #' + row.jobQueueId">
                     <app-icon name="dots" size="1.05em" />
                   </button>
                   <ng-template #menu>

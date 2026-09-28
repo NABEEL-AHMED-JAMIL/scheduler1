@@ -94,6 +94,17 @@ export class Queue implements OnInit {
   readonly toDate = signal(localIsoDaysAgo(0));
 
   /**
+   * Why the date boxes cannot be read, as on the dashboard. From after To was sent as it was and
+   * came back empty, which read as a quiet week; a cleared box quietly fell back to the default
+   * week while still showing empty. Nothing is read until the range makes sense.
+   */
+  readonly rangeError = computed(() => {
+    const iso = /^\d{4}-\d{2}-\d{2}$/;
+    if (!iso.test(this.fromDate()) || !iso.test(this.toDate())) return 'Pick a date in both fields.';
+    return this.fromDate() <= this.toDate() ? '' : 'From must be on or before To.';
+  });
+
+  /**
    * Whether anything is narrowed, for Clear. The dates are never empty, so testing them for a
    * value made Clear permanent; they count once they differ from the default week.
    */
@@ -351,15 +362,15 @@ export class Queue implements OnInit {
    *               than blurring under "Refreshing…" on every push.
    */
   load(options: { silent?: boolean } = {}): void {
+    // A range that makes no sense is not sent; the reason shows under the toolbar, and the rows
+    // of the last range read stay until the boxes are put right.
+    if (this.rangeError()) return;
     if (!options.silent || !this.rows().length) this.loading.set(true);
     this.error.set('');
     // Only the latest read may land: a push arriving mid-read, or a date changed twice, must not
     // let an older answer overwrite a newer one.
     this.request?.unsubscribe();
-    const body: any = {
-      fromDate: this.fromDate() || localIsoDaysAgo(6),
-      toDate: this.toDate() || localIsoDaysAgo(0),
-    };
+    const body: any = { fromDate: this.fromDate(), toDate: this.toDate() };
 
     this.request = this.http.post<ApiResponse<QueueRow[] | { jobQueues?: QueueRow[] }>>(
       `${API_BASE}/message.json/fetchLogs`, body).subscribe({
@@ -387,20 +398,29 @@ export class Queue implements OnInit {
     this.pager.reset();
   }
 
-  clearFilters(): void {
-    this.search.set('');
-    this.selectedStatuses.set([]);
+  setFrom(value: string): void { this.fromDate.set(value); this.load(); }
+  setTo(value: string): void { this.toDate.set(value); this.load(); }
+
+  resetRange(): void {
     this.fromDate.set(localIsoDaysAgo(6));
     this.toDate.set(localIsoDaysAgo(0));
     this.load();
   }
 
+  clearFilters(): void {
+    this.search.set('');
+    this.selectedStatuses.set([]);
+    this.resetRange();
+  }
+
   /** Force a stuck run to a terminal state so it stops occupying the queue. */
   async forceStatus(row: QueueRow, status: 'Failed' | 'Interrupt'): Promise<void> {
+    // The words people read; the status names are the server's ("Mark Interrupt" read as a typo).
+    const label = status === 'Failed' ? 'failed' : 'interrupted';
     const ok = await confirmWith(this.dialog, {
-      title: `Mark run as ${status}`,
-      body: `Run #${row.jobQueueId} of ${this.jobName(row)} will be recorded as ${status}. Use this when a run is stuck and the worker will not report back.`,
-      confirmLabel: `Mark ${status}`,
+      title: `Mark run as ${label}`,
+      body: `Run #${row.jobQueueId} of ${this.jobName(row)} will be recorded as ${label}. Use this when a run is stuck and the worker will not report back.`,
+      confirmLabel: `Mark ${label}`,
       danger: true,
     });
     if (!ok) return;
@@ -415,7 +435,7 @@ export class Queue implements OnInit {
     this.http.delete<ApiResponse>(url, { params: { jobQId: String(row.jobQueueId) } }).subscribe({
       next: response => {
         if (response.status === API_SUCCESS) {
-          this.toast.success(`Run #${row.jobQueueId} marked ${status}.`);
+          this.toast.success(`Run #${row.jobQueueId} marked ${label}.`);
           this.load();
         } else { this.toast.error(response.message); }
       },

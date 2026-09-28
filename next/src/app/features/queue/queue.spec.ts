@@ -221,3 +221,43 @@ describe('Queue status chips, more than one', () => {
     expect(post).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * The confirm and the toast named the server's enum: "Mark run as Interrupt", "Mark Interrupt",
+ * "Run #5 marked Interrupt." (UI audit, Low). The menu already said "Mark as interrupted".
+ */
+describe('Queue marking a stuck run', () => {
+  function marking(status: 'Failed' | 'Interrupt') {
+    const opened: any[] = [];
+    const toasts: string[] = [];
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: HttpClient, useValue: { post: () => of({ status: 'SUCCESS', data: {} }),
+          delete: () => of({ status: 'SUCCESS' }) } },
+        { provide: Dialog, useValue: { open: (_: unknown, config: any) => { opened.push(config.data); return { closed: of(true) }; } } },
+        { provide: ToastService, useValue: { success: (m: string) => toasts.push(m), error: () => {}, info: () => {} } },
+        { provide: AuthService, useValue: { canOpen: () => true } },
+        { provide: JobEventsService, useValue: { events: EMPTY, connected: signal(false) } },
+      ],
+    });
+    const queue = TestBed.runInInjectionContext(() => new Queue());
+    return { queue, opened, toasts, run: () => queue.forceStatus(row({ jobQueueId: 5, jobStatus: 'Running', endTime: null }), status) };
+  }
+
+  it('says interrupted, not the Interrupt enum', async () => {
+    const { opened, toasts, run } = marking('Interrupt');
+    await run();
+    expect(opened[0].title).toBe('Mark run as interrupted');
+    expect(opened[0].confirmLabel).toBe('Mark interrupted');
+    expect(opened[0].body).toContain('will be recorded as interrupted.');
+    expect(toasts).toEqual(['Run #5 marked interrupted.']);
+  });
+
+  it('says failed in lower case, like the rest of the sentence', async () => {
+    const { opened, toasts, run } = marking('Failed');
+    await run();
+    expect(opened[0].title).toBe('Mark run as failed');
+    expect(toasts).toEqual(['Run #5 marked failed.']);
+  });
+});

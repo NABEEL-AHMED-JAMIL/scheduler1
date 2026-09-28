@@ -150,7 +150,7 @@
               <td class="text-right">
                 <button type="button" class="btn btn-ghost btn-icon btn-sm"
                         [disabled]="busy() === tenant.tenantId"
-                        [cdkMenuTriggerFor]="rowMenu" aria-label="Actions">
+                        [cdkMenuTriggerFor]="rowMenu" [attr.aria-label]="'Actions for ' + tenant.tenantName">
                   <app-icon name="dots" size="1.05em" [busy]="busy() === tenant.tenantId" />
                 </button>
                 <ng-template #rowMenu>

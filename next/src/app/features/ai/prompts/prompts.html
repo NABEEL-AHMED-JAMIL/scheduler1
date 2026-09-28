@@ -45,7 +45,7 @@
         <option value="text">Text</option>
         <option value="json">JSON</option>
       </select>
-      <div class="search-field max-w-56">
+      <div class="search-field max-w-64">
         <app-icon name="search" size="0.95em" />
         <input class="input" placeholder="Search name, model or variable" aria-label="Search prompts" [value]="search()" (input)="search.set($any($event.target).value)" />
       </div>
@@ -79,7 +79,7 @@
               <div class="shrink-0 flex items-center gap-1">
                 <app-status [label]="p.status || 'Inactive'" [quiet]="true" />
                 @if (canManage()) {
-                  <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="cardMenu" aria-label="Actions"><app-icon name="dots" size="1.05em" /></button>
+                  <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="cardMenu" [attr.aria-label]="'Actions for ' + p.name"><app-icon name="dots" size="1.05em" /></button>
                   <ng-template #cardMenu>
                     <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
                       <a cdkMenuItem class="menu-item" [routerLink]="['/assistants/prompts', p.promptId, 'edit']"><app-icon name="edit" />Edit &amp; try</a>
@@ -151,7 +151,7 @@
               <td class="text-right"><app-status [label]="p.status || 'Inactive'" [quiet]="true" /></td>
               @if (canManage()) {
                 <td>
-                  <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="rowMenu" aria-label="Actions"><app-icon name="dots" size="1.05em" /></button>
+                  <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="rowMenu" [attr.aria-label]="'Actions for ' + p.name"><app-icon name="dots" size="1.05em" /></button>
                   <ng-template #rowMenu>
                     <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
                       <a cdkMenuItem class="menu-item" [routerLink]="['/assistants/prompts', p.promptId, 'edit']"><app-icon name="edit" />Edit &amp; try</a>
