@@ -1,17 +1,14 @@
 <div class="page">
+  <!-- One line under the title (owner, 2026-09-28). The longer account -- the engine reads the
+       object store, the browser only ever receives a page -- is the tooltip. -->
   <div class="page-head">
-    <div>
+    <div class="min-w-0">
       <h1 class="page-title">Analytics Studio</h1>
-      <p class="page-subtitle">
-        Read a file where it already lives. Nothing is copied into another database — the query
-        engine reads the object store directly, so the browser only ever receives a page.
+      <p class="page-subtitle"
+         title="The query engine reads the object store directly; the browser only ever receives a page.">
+        Read and analyse a file where it lives — nothing is copied.
       </p>
     </div>
-    <!-- The file picker is a panel over the page, so the data keeps the full width. -->
-    <button type="button" class="btn btn-default btn-sm shrink-0" aria-controls="files-panel"
-            [attr.aria-expanded]="filesOpen()" (click)="openFiles($event.currentTarget)">
-      <app-icon name="folder" />Files
-    </button>
   </div>
 
   <!-- The data has the full width. The storage rail is the same connection -> folder -> file walk
@@ -19,8 +16,8 @@
        Files button, when that is pressed and goes away once something is picked (owner, 2026-09-28). -->
   <div class="grid gap-3">
 
-    @if (filesOpen()) {
-      <div class="fixed inset-0 z-50 bg-black/40" aria-hidden="true" (click)="closeFiles()"></div>
+    @if (panel()) {
+      <div class="fixed inset-0 z-50 bg-black/40" aria-hidden="true" (click)="panel() === 'files' ? closeFiles() : closeSaved()"></div>
     }
     <!-- ── the storage rail ─────────────────────────────────────────────────────────── -->
     <div id="files-panel" role="dialog" aria-modal="true" aria-labelledby="files-panel-title"
@@ -174,6 +171,152 @@
       }
     </div>
 
+    <!-- ── saved analyses ─────────────────────────────────────────────────────────────
+         The Files panel's shape and width, opened from "Open saved" on the Canvas result. It was
+         a card under the result that grew with the library, so the builder column stood beside
+         a long empty gap. -->
+    <div id="saved-panel" role="dialog" aria-modal="true" aria-labelledby="saved-panel-title"
+         class="saved-panel card p-5 flex flex-col gap-2 min-w-0 fixed inset-y-0 right-0 z-50 w-[480px] max-w-[92vw]
+                rounded-none border-y-0 border-r-0 overflow-y-auto shadow-xl"
+         [class.hidden]="!savedOpen()">
+      <div class="flex items-center gap-2 -mt-1 mb-1">
+        <h2 id="saved-panel-title" class="text-base font-semibold mr-auto">Saved analyses</h2>
+        <button type="button" class="btn btn-ghost btn-icon btn-sm"
+                aria-label="Refresh the saved analysis list"
+                [disabled]="analysesLoading()" (click)="loadAnalyses()">
+          <app-icon name="refresh" [class.spin]="analysesLoading()" />
+        </button>
+        <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Close saved analyses" (click)="closeSaved()">
+          <app-icon name="close" />
+        </button>
+      </div>
+      <p class="field-note text-[color:var(--text-muted)] -mt-1"
+         title="An analysis can be a full scan, and browsing the list should not spend one.">
+        Opening one puts it on the Canvas without running it.
+      </p>
+      @if (savedOpen()) {
+      @if (analysisOpenError()) {
+        <!-- A reopen that failed, said whatever the list is doing -- it is invisible otherwise
+             while the list is loading, which is precisely when a stale row gets clicked. -->
+        <p class="text-xs text-crit-500" role="alert">{{ analysisOpenError() }}</p>
+      }
+      <!-- What a delete actually removed, in the server's own words: it is the only side that
+           counts the dashboard tiles the cascade took with the row. Not in the error colour. -->
+      @if (analysesNotice()) {
+        <p class="text-xs text-[color:var(--text-secondary)]">{{ analysesNotice() }}</p>
+      }
+      @if (analysesLoading()) {
+        <p class="text-xs text-[color:var(--text-muted)] py-4 text-center">Reading your analyses…</p>
+      } @else if (analysesError()) {
+        <p class="text-xs text-crit-500" role="alert">{{ analysesError() }}</p>
+      } @else if (!analyses().length) {
+        <p class="text-xs text-[color:var(--text-muted)] py-4 text-center">
+          No saved analyses yet — Save puts one here.
+        </p>
+      } @else {
+        <!-- Searchable and capped: a workspace with 135 analyses drew all 135. -->
+        @if (analyses().length > 8) {
+          <div class="search-field w-full">
+            <app-icon name="search" size="0.9em" />
+            <input type="search" class="input w-full"
+                   placeholder="Find by name or dataset"
+                   aria-label="Find a saved analysis"
+                   [value]="librarySearch()"
+                   (input)="librarySearch.set($any($event.target).value)" />
+          </div>
+        }
+        @if (!libraryVisible().length) {
+          <p class="text-xs text-[color:var(--text-muted)] py-4 text-center">
+            Nothing saved here matches “{{ librarySearch() }}”.
+          </p>
+        }
+        <ul class="flex flex-col divide-y divide-[color:var(--border-subtle)] -mx-1">
+          @for (saved of libraryVisible(); track saved.analyticsAnalysisId) {
+            <li class="py-1 flex items-center gap-2 min-w-0">
+              <button type="button"
+                      class="min-w-0 flex-1 text-left rounded px-1 py-1 hover:bg-[color:var(--surface-sunken)]
+                             focus:outline-none focus:ring-2 focus:ring-[color:var(--focus-ring)]"
+                      [class.font-semibold]="loadedAnalysis()?.analyticsAnalysisId === saved.analyticsAnalysisId"
+                      [title]="saved.connectionAlias + '/' + saved.datasetPath"
+                      (click)="openAnalysis(saved)">
+                <span class="block text-sm truncate">{{ saved.analysisName }}</span>
+                <span class="block text-[11px] text-[color:var(--text-muted)] truncate">
+                  {{ saved.visualizationType || 'table' }} · {{ analysisWhen(saved) }}
+                </span>
+              </button>
+              <button type="button" class="btn btn-ghost btn-icon btn-xs shrink-0"
+                      [attr.aria-label]="'Delete ' + saved.analysisName"
+                      (click)="removeAnalysis(saved)">
+                <app-icon name="trash" />
+              </button>
+            </li>
+          }
+        </ul>
+        @if (libraryHidden()) {
+          <button type="button" class="btn btn-ghost btn-xs self-start"
+                  (click)="libraryShowAll.set(true)">
+            Show {{ libraryHidden() }} more
+          </button>
+        } @else if (libraryShowAll() && libraryMatches().length > 8) {
+          <button type="button" class="btn btn-ghost btn-xs self-start"
+                  (click)="libraryShowAll.set(false)">Show fewer</button>
+        }
+      }
+      }
+    </div>
+
+    <!-- ── save an analysis ───────────────────────────────────────────────────────────
+         A small dialog from "Save" on the Canvas result, in place of a card as tall as the
+         result that held one text box. The shared form-dialog shell, drawn in place so the name
+         and the error stay on this screen's own signals. -->
+    @if (saveDialogOpen()) {
+      <div class="fixed inset-0 z-[60] bg-black/40 grid place-items-center p-4"
+           (click)="$event.target === $event.currentTarget && closeSaveDialog()">
+        <app-form-dialog role="dialog" aria-modal="true" aria-labelledby="a-save-heading"
+                         heading="Save analysis"
+                         [confirmLabel]="'Save as new'" [saving]="savingAnalysis()"
+                         [confirmDisabled]="!canSaveAnalysis()"
+                         (cancelled)="closeSaveDialog()" (confirmed)="saveAnalysis(false)">
+          <div class="flex flex-col gap-2">
+            <label id="a-save-heading" class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]"
+                   for="a-save-name">Name</label>
+            <input id="a-save-name" class="input w-full" placeholder="Name this analysis"
+                   [value]="analysisName()"
+                   (input)="analysisName.set($any($event.target).value)"
+                   (keydown.enter)="saveAnalysis(false)" />
+            <p class="field-note text-[color:var(--text-muted)]"
+               title="The dataset, dimensions, measure, filters, sort, Top-N and chart kind. Filters a drill added are kept as filters, so reopening lands on the narrowed analysis with no trail behind it.">
+              Saves the setup, never the rows.
+            </p>
+            @if (analysisFromElsewhere()) {
+              <!-- Which of the two buttons moves the dataset, said before either is pressed. An
+                   Update that quietly repointed a saved analysis at whatever was open left a row
+                   whose stored columns belong to a different file. -->
+              <p class="text-xs text-[color:var(--text-secondary)]">
+                {{ analysisFromElsewhere() }} It will run against the file that is open here.
+                @if (loadedAnalysis()?.analyticsAnalysisId) {
+                  Updating it keeps it pointed at the file it was saved against; “Save as new”
+                  records the one open here.
+                }
+              </p>
+            }
+            @if (analysisSaveError()) {
+              <p class="text-xs text-crit-500" role="alert">{{ analysisSaveError() }}</p>
+            }
+          </div>
+          <!-- Two buttons rather than one that guesses, exactly as the query library does: the
+               same control silently forking or silently overwriting is the one that eventually
+               loses somebody's work. -->
+          @if (loadedAnalysis()?.analyticsAnalysisId) {
+            <button footer-start type="button" class="btn btn-default btn-sm"
+                    [disabled]="!canSaveAnalysis()" (click)="saveAnalysis(true)">
+              Update “{{ loadedAnalysis()!.analysisName }}”
+            </button>
+          }
+        </app-form-dialog>
+      </div>
+    }
+
     <!-- ── the dataset ──────────────────────────────────────────────────────────────── -->
     <div class="dataset-column min-w-0 flex flex-col gap-3">
 
@@ -191,140 +334,134 @@
         </div>
       } @else {
 
-        <div class="card p-4 flex flex-col gap-3">
-          <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <h2 class="text-base font-semibold truncate max-w-full"
-                [title]="path()">{{ datasetName() }}</h2>
-            @if (format()) { <span class="pill pill-neutral">{{ format() }}</span> }
-            @if (multiFile()) { <span class="pill pill-brand">Folder dataset</span> }
-            <span class="mono text-xs text-[color:var(--text-muted)] truncate">
-              {{ connection() }}/{{ path() }}
+        <!-- The file, in three short lines (owner, 2026-09-28): its name, one line of facts, and
+             where it lives. The "Where this is" card that sat under the Overview charts is gone;
+             its path is the third line here and its two actions are in the ⋯ menu. -->
+        <div class="card p-0 flex flex-col min-w-0">
+          <div class="flex items-start gap-3 px-4 pt-4 pb-3 min-w-0">
+            <span class="stat-glyph icon-muted shrink-0 mt-0.5" aria-hidden="true">
+              <app-icon [name]="multiFile() ? 'folder' : 'file'" size="1.05em" />
             </span>
-          </div>
-
-          <!-- A strip, not four stat tiles. app-stat-tile is built for a headline figure, and
-               three of these are not: "CSV" and "208 B" rendered at 20px read as numbers that
-               are not numbers, and the tiles stood 101px tall to say four short things. Rows and
-               columns keep some weight because they ARE the figures; the rest is metadata. -->
-          <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
-            <!-- The size of the FILE, not of the current filter. rowCount() is what the pager
-                 divides and becomes a count of matches the moment the grid narrows, so a header
-                 built on it would announce that the dataset had shrunk. datasetRows() is only
-                 ever written from a response that counted the whole file. -->
-            <div class="flex items-baseline gap-1.5">
-              <span class="text-lg font-semibold tabular leading-none">
-                {{ compact(datasetRows() ?? rowCount()) }}
-              </span>
-              <span class="text-xs text-[color:var(--text-muted)]">rows</span>
+            <div class="min-w-0 flex-1 flex flex-col gap-0.5">
+              <div class="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
+                <h2 class="text-base font-semibold truncate max-w-full"
+                    [title]="path()">{{ datasetName() }}</h2>
+                @if (format()) { <span class="pill pill-neutral">{{ format() }}</span> }
+                @if (multiFile()) {
+                  <span class="pill pill-brand"
+                        title="Every figure covers all the files the pattern matches; a column in only some of them is still included.">Folder dataset</span>
+                }
+              </div>
+              <!-- The size of the FILE, not of the current filter: rowCount() becomes a count of
+                   matches the moment the grid narrows, and a header built on it would announce
+                   that the dataset had shrunk. datasetRows() only ever holds a whole-file count. -->
+              <!-- Each fact is one unbreakable piece, so a phone wraps between them and never
+                   inside "24 Sep 2026". -->
+              <p class="text-xs text-[color:var(--text-muted)] tabular min-w-0">
+                <span class="whitespace-nowrap">{{ compact(datasetRows() ?? rowCount()) }} rows</span>
+                · <span class="whitespace-nowrap">{{ columnCount() }} {{ columnCount() === 1 ? 'column' : 'columns' }}</span>
+                @if (selected()?.size) { · <span class="whitespace-nowrap">{{ humanSize(selected()!.size!) }}</span> }
+                @if (modifiedAt()) { · <span class="whitespace-nowrap">{{ modifiedAt() }}</span> }
+                @if (multiFile()) { · counted across every matching file }
+                @if (previewFiltered()) {
+                  <!-- Beside the file's size rather than instead of it, so neither number can be
+                       read as the other. -->
+                  <span class="pill pill-brand ms-1">{{ rowCount().toLocaleString() }} match the filter</span>
+                }
+              </p>
+              <p class="mono text-[11px] text-[color:var(--text-muted)] truncate"
+                 [title]="connection() + '/' + path()">{{ connection() }}/{{ path() }}</p>
             </div>
-            @if (previewFiltered()) {
-              <!-- Said beside it rather than instead of it, so both numbers are on screen and
-                   neither can be read as the other. -->
-              <div class="flex items-baseline gap-1.5">
-                <span class="pill pill-brand">{{ rowCount().toLocaleString() }} match the filter</span>
-              </div>
-            }
-            <div class="flex items-baseline gap-1.5">
-              <span class="text-lg font-semibold tabular leading-none">{{ columnCount() }}</span>
-              <span class="text-xs text-[color:var(--text-muted)]">columns</span>
-            </div>
-            @if (selected()?.size) {
-              <div class="flex items-baseline gap-1.5">
-                <span class="text-sm font-medium mono">{{ humanSize(selected()!.size!) }}</span>
-                <span class="text-xs text-[color:var(--text-muted)]">on disk</span>
-              </div>
-            }
-            @if (modifiedAt()) {
-              <div class="flex items-baseline gap-1.5">
-                <span class="text-sm font-medium">{{ modifiedAt() }}</span>
-                <span class="text-xs text-[color:var(--text-muted)]">modified</span>
-              </div>
-            }
-            @if (multiFile()) {
-              <span class="text-xs text-[color:var(--text-muted)]">
-                counted across every matching file
-              </span>
-            }
-          </div>
-
-          <!-- showTab rather than tab.set: four of these tabs share one scan, and it is asked
-               for when a reader opens the first of them rather than on every file open.
-
-               TEN TABS, IN THREE GROUPS, and the grouping is by what each one costs — see
-               TabGroup. A flat row of ten wraps into a second line of undifferentiated words and
-               makes a reader read all ten to find the rows. Grouped, the row wraps AT the group
-               boundaries, each cluster carries the reason it is a cluster, and "what will this
-               cost me" is answered before the click rather than by waiting. -->
-          <!-- role="toolbar" with a roving tabindex, NOT role="tablist".
-
-               The keyboard win is the roving tabindex: ten buttons were ten tab stops, so
-               reaching the grid meant pressing Tab past every tab you did not want. One stop now,
-               and Left/Right/Home/End move between them.
-
-               Toolbar rather than tablist because a tablist owns its tabs directly and these sit
-               inside three role="group" boxes -- the grouping carries what each tab COSTS, which
-               is worth more here than the tablist role, and declaring a tablist whose DOM is not
-               one would be a worse lie than not declaring it.
-
-               MANUAL activation -- arrows move focus, Enter or Space opens. The automatic variant
-               is the more common choice and would be wrong here: four of these tabs trigger a
-               full scan of the dataset, so arrowing from Details to Canvas would spend three
-               governor permits on tabs the reader was only passing over. -->
-          <div class="flex flex-wrap items-end gap-x-4 gap-y-1 border-b border-subtle -mb-1"
-               role="toolbar" aria-label="Dataset views"
-               aria-orientation="horizontal">
-            @for (group of tabGroups; track group.label) {
-              <div class="flex flex-col min-w-0" role="group" [attr.aria-label]="group.label">
-                <span class="text-[10px] uppercase tracking-wider text-[color:var(--text-muted)]
-                             px-3 leading-none" [title]="group.hint">{{ group.label }}</span>
-                <!-- Wraps INSIDE a group as well as between them. A group is an atomic flex item
-                     so the strip breaks at the boundaries first, which is the point; but a phone
-                     is narrower than four tabs, and the alternative to wrapping there is the page
-                     body scrolling sideways. -->
-                <div class="flex flex-wrap gap-1">
-                  @for (item of group.tabs; track item.id) {
-                    <!-- The console's .tab / .tab-active: the blue --chart-0 underline made this
-                         the one tab row in the app that looked like no other. -->
-                    <button type="button" class="tab whitespace-nowrap"
-                            [class.tab-active]="tab() === item.id"
-                            [attr.aria-current]="tab() === item.id ? 'true' : null"
-                            [id]="'a-tab-' + item.id"
-                            [attr.tabindex]="tab() === item.id ? 0 : -1"
-                            (keydown)="onTabStripKey($event, item.id)"
-                            (click)="showTab(item.id)">{{ item.label }}</button>
-                  }
+            <div class="flex items-center gap-1.5 shrink-0">
+              <!-- The file picker is a panel over the page, so the data keeps the full width. -->
+              <button type="button" class="btn btn-default btn-sm" aria-controls="files-panel"
+                      [attr.aria-expanded]="filesOpen()" (click)="openFiles($event.currentTarget)">
+                <app-icon name="folder" /><span class="max-sm:sr-only">Files</span>
+              </button>
+              <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="More for this file"
+                      [cdkMenuTriggerFor]="fileMenu">
+                <app-icon name="dots" />
+              </button>
+              <ng-template #fileMenu>
+                <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                  <!-- The registry reads itself when it is created, so it is behind a click: a
+                       name for this location is a feature most readers never touch. -->
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="registryOpen.set(!registryOpen())">
+                    <app-icon name="database" size="0.9em" />{{ registryOpen() ? 'Hide the registry' : 'Name this dataset' }}
+                  </button>
+                  <a cdkMenuItem class="menu-item" routerLink="/objects/analytics/dashboards">
+                    <app-icon name="chart" size="0.9em" />Dashboards
+                  </a>
                 </div>
-              </div>
+              </ng-template>
+            </div>
+          </div>
+
+          <!-- REAL TABS (owner, 2026-09-28): role=tablist/tab/tabpanel, the open tab is the one
+               Tab stop, Left/Right/Home/End move between them (onTabStripKey).
+
+               MANUAL activation -- arrows move focus, Enter or Space opens. The automatic
+               variant would be wrong here: three of these tabs start a full scan of the dataset,
+               so arrowing from Overview to Canvas would spend governor permits on tabs the reader
+               was only passing over.
+
+               ONE ROW THAT SCROLLS SIDEWAYS on a phone rather than wrapping into three. The
+               groups -- by what each costs, see TabGroup -- stay as a thin divider between them;
+               the all-caps headings over them are gone, and each group's reason is the tooltip.
+
+               The underline is an inset shadow on the strip rather than a border: a scroll box
+               clips what hangs outside it, so the tab's own -1px overlap would be cut off. -->
+          <div class="flex items-stretch gap-1 px-2 overflow-x-auto overscroll-x-contain
+                      shadow-[inset_0_-1px_0_var(--border-subtle)] [scrollbar-width:none]"
+               role="tablist" aria-label="Dataset views" aria-orientation="horizontal">
+            @for (group of tabGroups; track group.label; let first = $first) {
+              @if (!first) {
+                <span class="tab-divider self-center shrink-0 w-px h-4 mx-1.5 bg-[color:var(--border-strong)]"
+                      aria-hidden="true"></span>
+              }
+              @for (item of group.tabs; track item.id) {
+                <!-- aria-controls only on the open tab: the other panels are not in the page, and
+                     an aria-controls naming an element that does not exist is an error. -->
+                <button type="button" role="tab" class="tab whitespace-nowrap shrink-0 mb-0"
+                        [class.tab-active]="tab() === item.id"
+                        [attr.aria-selected]="tab() === item.id"
+                        [attr.aria-controls]="tab() === item.id ? 'a-panel' : null"
+                        [id]="'a-tab-' + item.id"
+                        [attr.tabindex]="tab() === item.id ? 0 : -1"
+                        [title]="group.hint"
+                        (keydown)="onTabStripKey($event, item.id)"
+                        (click)="showTab(item.id)">
+                  {{ item.label }}
+                  @if (item.id === 'quality' && qualityIssueCount()) {
+                    <span class="pill pill-warn text-[10px] px-1.5 py-0 leading-4" aria-hidden="true">{{ qualityIssueCount() }}</span>
+                    <span class="sr-only">, {{ qualityIssueCount() }} to look at</span>
+                  }
+                </button>
+              }
             }
           </div>
         </div>
 
+        @if (registryOpen()) {
+          <div class="card p-4 flex flex-col gap-2 min-w-0">
+            <div class="flex items-center gap-2">
+              <h3 class="text-sm font-semibold mr-auto"
+                  title="A registered dataset is a name for this location and reads no rows; a dashboard re-runs saved analyses every time it opens.">Name this dataset</h3>
+              <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Close the registry"
+                      (click)="registryOpen.set(false)"><app-icon name="close" /></button>
+            </div>
+            <app-dataset-registry [connection]="connection()" [path]="path()" (opened)="openRegistered($event)" />
+          </div>
+        }
+
+        <div id="a-panel" role="tabpanel" [attr.aria-labelledby]="'a-tab-' + tab()"
+             class="min-w-0 flex flex-col gap-3">
+
         @if (tab() === 'overview') {
+          <app-stat-strip [items]="overviewStats()" [cols]="2" [smCols]="4" size="md"
+                          label="This file at a glance" (itemClick)="onOverviewStat($event)" />
           <app-dataset-overview [connection]="connection()" [path]="path()" [multiFile]="multiFile()"
                                 [sizeBytes]="selected()?.size ?? null" [modified]="modifiedAt()" (openInCanvas)="openInCanvas($event)" (profiled)="adoptProfile($event)" />
-
-          <div class="card p-4 flex flex-col gap-3 mt-4">
-            <div class="flex flex-wrap items-center gap-2">
-              <div class="min-w-0 flex-1">
-                <h3 class="text-sm font-semibold">Where this is</h3>
-                <p class="field-note text-[color:var(--text-muted)] mono break-all">{{ connection() }}/{{ path() }}</p>
-              </div>
-              <button type="button" class="btn btn-default btn-sm" [attr.aria-expanded]="registryOpen()" (click)="registryOpen.set(!registryOpen())">
-                <app-icon name="database" size="0.9em" />{{ registryOpen() ? 'Hide the registry' : 'Name this dataset' }}
-              </button>
-              <a class="btn btn-default btn-sm" routerLink="/objects/analytics/dashboards"><app-icon name="chart" size="0.9em" />Dashboards</a>
-            </div>
-            @if (multiFile()) {
-              <p class="field-note text-[color:var(--text-muted)]">Every figure covers all the files the pattern matches. Columns that appear in only some of them are still included, and a row carries the file it came from.</p>
-            }
-            @if (previewFiltered()) {
-              <p class="field-note text-[color:var(--text-muted)]">{{ rowCount().toLocaleString() }} rows match the filter on the Data tab; the figures above are the whole file.</p>
-            }
-            <p class="field-note text-[color:var(--text-muted)]">Read straight from {{ connection() }} by the query engine; nothing is copied, imported or cached. A registered dataset is a name for this location and reads no rows; a dashboard re-runs saved analyses every time it opens.</p>
-            @if (registryOpen()) {
-              <app-dataset-registry [connection]="connection()" [path]="path()" (opened)="openRegistered($event)" />
-            }
-          </div>
         }
 
         @if (tab() === 'data') {
@@ -428,16 +565,14 @@
                      unsorted sentence is unchanged, because it is still true of an unsorted file
                      — what changed is that there is now a way to ask for an order, and claiming
                      there is no ORDER BY while one is applied would be the note going stale. -->
-                <p class="text-[11px] text-[color:var(--text-muted)]">
+                <p class="text-[11px] text-[color:var(--text-muted)]"
+                   title="If the file changes between turns, a row can land on a different page.">
                   @if (gridSort()) {
-                    Pages follow the sort on <span class="mono">{{ gridSort()!.column }}</span>,
-                    applied by the server across every row in the dataset — so page 2 really is
-                    the second page of that order and not the second page of the file.
+                    Pages follow the sort on <span class="mono">{{ gridSort()!.column }}</span>
+                    across every row, applied by the server.
                   } @else {
-                    Pages follow the order the file is read in, not a sort — a file in object
-                    storage has no order of its own. Sort a column to give it one.
+                    Pages follow the order the file is read in — sort a column to give it one.
                   }
-                  If the file changes between turns, a row can land on a different page.
                 </p>
               </div>
             }
@@ -457,17 +592,14 @@
                            [isEmpty]="!profileLoading() && !profileError() && !compactRows().length"
                            emptyMessage="This dataset has no columns to describe." emptyIcon="table"
                            (retry)="loadProfile()">
-            <div toolbar class="text-xs text-[color:var(--text-muted)] min-w-0">
-              One line per column. Null and distinct are measured across the whole file;
-              <span class="font-medium">the sample is not</span> — it is the first value on the
-              page the Data tab is holding, so it moves with the page, the sort and the filter.
-              <!-- Came with the cards from the tab they used to have. The cost argument is the
-                   reason the measurement is per column and on demand, so it belongs wherever the
-                   button that spends it is. -->
-              Open a row for the full statistics. The most common values in a column, and how
-              often each occurs, are a SECOND pass over the file — so each row asks for its own
-              when you press Measure values, rather than every column paying for one up front.
-            </div>
+            <!-- One line (owner, 2026-09-28). The two facts a reader could get wrong stay in
+                 reach as the tooltip: the sample is not a whole-file figure, and the most common
+                 values cost a second pass, which is why each row asks for its own. -->
+            <p toolbar class="text-xs text-[color:var(--text-muted)] min-w-0 inline-flex items-center gap-1"
+               title="Null and distinct cover the whole file; the sample is the first value on the Data tab's current page, so it moves with the page, the sort and the filter. Most common values are a second pass over the file, measured per column when you press Measure values.">
+              One row per column — open one for its full statistics.
+              <app-icon name="info" size="0.9em" class="icon-muted" />
+            </p>
 
             <table class="table-modern">
               <thead>
@@ -578,119 +710,68 @@
 
 
         @if (tab() === 'profile') {
-          <!-- Document 06's Profile view: "aggregate distributions and data-type summaries".
-               There was no aggregate view at all until now — the tab wearing this name rendered
-               the per-column cards, which are 06's Columns view and are on that tab now.
+          <!-- Document 06's Profile view: aggregate distributions and type summaries.
 
                THE ONE RISK OF AN AGGREGATE VIEW IS THE UNIT. Every figure this screen has is per
-               column, and nothing in this module has ever counted a cell — so "42% empty" as a
-               headline over a file would be a claim about cells that nobody measured. Every band
-               below counts COLUMNS, and says so where it is read rather than in a note. -->
+               column, and nothing in this module has ever counted a cell -- so "42% empty" over a
+               file would be a claim about cells nobody measured. Every band counts COLUMNS and
+               says so in its heading; the longer account of each is its tooltip (owner,
+               2026-09-28: three paragraphs of it under the charts read as the tab's content). -->
           <app-table-shell heading="Profile" [scrollRows]="false"
                            [loading]="profileLoading()" [error]="profileError()"
                            [isEmpty]="profileEmpty()"
                            emptyMessage="This dataset has no columns to summarise." emptyIcon="chart"
                            (retry)="loadProfile()">
-            <div class="p-4 flex flex-col gap-4">
-
-              <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
-                <div class="flex items-baseline gap-1.5">
-                  <span class="text-lg font-semibold tabular leading-none">
-                    {{ compact(profile()?.totalRows ?? 0) }}
-                  </span>
-                  <span class="text-xs text-[color:var(--text-muted)]">rows scanned</span>
-                </div>
-                <div class="flex items-baseline gap-1.5">
-                  <span class="text-lg font-semibold tabular leading-none">
-                    {{ profileColumns().length }}
-                  </span>
-                  <span class="text-xs text-[color:var(--text-muted)]">columns</span>
-                </div>
-                @if (averageFilled() !== null) {
-                  <div class="flex items-baseline gap-1.5">
-                    <span class="text-lg font-semibold tabular leading-none">
-                      {{ percent(averageFilled()!) }}%
-                    </span>
-                    <span class="text-xs text-[color:var(--text-muted)]">
-                      filled, averaged over the columns
-                    </span>
-                  </div>
-                }
-              </div>
-
+            <p toolbar class="text-xs text-[color:var(--text-muted)] tabular min-w-0"
+               title="Duplicate rows are not counted anywhere on this screen — that needs its own pass over the file.">
+              {{ compact(profile()?.totalRows ?? 0) }} rows scanned · {{ profileColumns().length }}
+              {{ profileColumns().length === 1 ? 'column' : 'columns' }}
               @if (averageFilled() !== null) {
-                <!-- Said next to the figure, not under the tab. A reader will assume this is the
-                     share of cells that have a value in them, and it is not: it is the mean of
-                     per-column percentages, so a column with two values counts as much as one
-                     with two million, and every percentage it averages was already rounded to
-                     two places by the engine. -->
-                <p class="field-note text-[color:var(--text-muted)]">
-                  That average weights every column the same, however wide or narrow it is, and
-                  it averages figures the engine had already rounded to two decimal places. It is
-                  not the share of values in the file that are present — nothing here has counted
-                  a single cell.
-                </p>
+                <!-- The mean of per-column percentages the engine had already rounded, so a
+                     column with two values counts as much as one with two million. Said on the
+                     figure, because the reader will assume it is a share of cells. -->
+                · <span title="Averaged over the columns, each weighted the same, from figures the engine rounded to two places. Not a share of cells — no cell was counted.">{{ percent(averageFilled()!) }}% filled, averaged over the columns</span>
               }
+            </p>
 
-              <div class="grid gap-4 sm:grid-cols-2">
-
-                <div class="rounded border border-subtle p-3 min-w-0">
-                  <h4 class="text-xs uppercase tracking-wider text-[color:var(--text-muted)]
-                             font-semibold mb-2">What the columns are</h4>
-                  <!-- Grouped on the short type: DECIMAL(18,3) and DECIMAL(10,2) are both
-                       DECIMAL here, because the question is what the file is made of and eleven
-                       decimal widths is noise against it. The full spelling is on the Columns
-                       card, where one column is being described. -->
-                  <app-ranked-bar [data]="typeBands()" [max]="typeBands().length" />
-                  <p class="mt-2 text-[11px] text-[color:var(--text-muted)]">
-                    Every column has exactly one type, so these do add up to the whole and the
-                    percentages are real shares. Types are the query engine's own.
-                  </p>
-                </div>
-
-                <div class="rounded border border-subtle p-3 min-w-0">
-                  <h4 class="text-xs uppercase tracking-wider text-[color:var(--text-muted)]
-                             font-semibold mb-2">How complete they are</h4>
-                  <!-- sorted off: the bands are an ordered scale from full to empty, and sorting
-                       them by size would scramble a reading order that means something. -->
-                  <app-ranked-bar [data]="completenessBands()" [sorted]="false"
-                                  [max]="completenessBands().length" />
-                  <p class="mt-2 text-[11px] text-[color:var(--text-muted)]">
-                    A count of <span class="font-medium">columns</span> in each band, not of rows
-                    or values. The thresholds are the ones the Quality tab raises findings at, so
-                    the two tabs cannot disagree about which columns are a problem.
-                  </p>
-                </div>
-
-                <div class="rounded border border-subtle p-3 min-w-0 sm:col-span-2">
-                  <h4 class="text-xs uppercase tracking-wider text-[color:var(--text-muted)]
-                             font-semibold mb-2">
-                    How many different values they hold (estimated)
-                  </h4>
-                  <app-ranked-bar [data]="cardinalityBands()" [sorted]="false"
-                                  [max]="cardinalityBands().length" />
-                  <p class="mt-2 text-[11px] text-[color:var(--text-muted)]">
-                    Every band here rests on the distinct-value sketch rather than a count, which
-                    is why the whole chart is labelled estimated rather than each bar. A sketch
-                    3.7% low will not move a column between "a handful" and "thousands"; it can
-                    move one across the line into "almost every row different", so that band is a
-                    suggestion and not a finding.
-                  </p>
-                </div>
+            <div class="p-4 grid gap-3 sm:grid-cols-3">
+              <div class="rounded border border-subtle p-3 min-w-0">
+                <!-- Grouped on the short type: DECIMAL(18,3) and DECIMAL(10,2) are both DECIMAL
+                     here, because the question is what the file is made of. -->
+                <h4 class="text-xs font-semibold text-[color:var(--text-secondary)] mb-2"
+                    title="Every column has exactly one type, so these add up to the whole. Types are the query engine's own.">
+                  Types
+                </h4>
+                <app-ranked-bar [data]="typeBands()" [max]="typeBands().length" />
               </div>
 
-              <p class="field-note text-[color:var(--text-muted)]">
-                Duplicate rows are not counted anywhere on this screen — that needs its own pass
-                over the file. The per-column statistics behind all of this are on Columns.
-              </p>
+              <div class="rounded border border-subtle p-3 min-w-0">
+                <!-- sorted off: the bands are an ordered scale from full to empty, and sorting
+                     them by size would scramble a reading order that means something. -->
+                <h4 class="text-xs font-semibold text-[color:var(--text-secondary)] mb-2"
+                    title="A count of columns in each band, not of rows or values. The thresholds are the ones the Quality tab raises findings at.">
+                  Completeness, in columns
+                </h4>
+                <app-ranked-bar [data]="completenessBands()" [sorted]="false"
+                                [max]="completenessBands().length" />
+              </div>
+
+              <div class="rounded border border-subtle p-3 min-w-0">
+                <h4 class="text-xs font-semibold text-[color:var(--text-secondary)] mb-2"
+                    title="Every band rests on the distinct-value sketch, measured 3.7% low over a million values. It can move a column across the line into 'almost every row different', so that band is a suggestion, not a finding.">
+                  Distinct values (estimated)
+                </h4>
+                <app-ranked-bar [data]="cardinalityBands()" [sorted]="false"
+                                [max]="cardinalityBands().length" />
+              </div>
             </div>
           </app-table-shell>
         }
 
         @if (tab() === 'quality') {
           <!-- Leads with what needs attention. A column that is 40% empty or estimated at one
-               value is the point of the tab; the columns with nothing wrong are counted at the
-               bottom rather than listed as equals above it. -->
+               value is the point of the tab; the columns with nothing wrong are counted in the
+               header rather than listed as equals beside the ones that are not. -->
           <app-table-shell heading="Data quality" [scrollRows]="false"
                            [loading]="profileLoading()" [error]="profileError()"
                            [isEmpty]="qualityEmpty()"
@@ -698,23 +779,18 @@
                            (retry)="loadProfile()">
             <div empty-action>
               @if (qualityClean()) {
-                <!-- What was checked, stated exactly, so "clean" means something a reader can
-                     hold the screen to rather than a green tick. -->
-                <p class="text-xs text-[color:var(--text-muted)] max-w-lg mx-auto">
+                <!-- What was checked, so "clean" means something a reader can hold the screen
+                     to rather than a green tick. The list of checks is the tooltip. -->
+                <p class="text-xs text-[color:var(--text-muted)] max-w-lg mx-auto inline-flex items-center gap-1"
+                   title="None is empty, none is more than 5% empty, none is estimated at a single repeated value, none looks like numbers or dates read as text, and no extreme sits more than six standard deviations from its own mean. Duplicate rows are not part of this check — counting them needs its own pass over the data.">
                   Checked {{ qualityChecked() }}
-                  {{ qualityChecked() === 1 ? 'column' : 'columns' }}: none is empty, none is more
-                  than 5% empty, none is estimated at a single repeated value, none looks like
-                  numbers or dates read as text, and no extreme sits more than six standard
-                  deviations from its own mean.
-                </p>
-                <p class="text-xs text-[color:var(--text-muted)] max-w-lg mx-auto mt-2">
-                  Duplicate rows are not part of this check — counting them needs its own pass
-                  over the data.
+                  {{ qualityChecked() === 1 ? 'column' : 'columns' }} for gaps, single values,
+                  mistyped text and extremes.
+                  <app-icon name="info" size="0.9em" class="icon-muted" />
                 </p>
               } @else if (profile() && !profile()!.totalRows) {
                 <p class="text-xs text-[color:var(--text-muted)]">
-                  This dataset has no rows, so there was nothing to check. The columns are still
-                  listed on Schema and Profile.
+                  This dataset has no rows, so there was nothing to check.
                 </p>
               } @else {
                 <p class="text-xs text-[color:var(--text-muted)]">
@@ -723,8 +799,9 @@
               }
             </div>
 
-            <div class="p-4 flex flex-col gap-2">
-              <p class="text-xs text-[color:var(--text-muted)]">
+            @if (qualityFindings().length) {
+              <p toolbar class="text-xs text-[color:var(--text-muted)] min-w-0"
+                 title="Duplicate rows are not part of this check — counting them needs its own pass over the data.">
                 {{ qualityFindings().length }}
                 {{ qualityFindings().length === 1 ? 'thing' : 'things' }} to look at, across
                 {{ qualityChecked() }} {{ qualityChecked() === 1 ? 'column' : 'columns' }}.
@@ -732,28 +809,22 @@
                   The other {{ qualityClearCount() }} raised nothing.
                 }
               </p>
+            }
 
+            <ul class="flex flex-col divide-y divide-[color:var(--border-subtle)]">
               @for (finding of qualityFindings(); track finding.column + finding.title) {
-                <div class="flex items-start gap-3 rounded border border-subtle p-3 min-w-0">
-                  <span class="pill shrink-0"
+                <li class="flex items-start gap-3 px-4 py-2.5 min-w-0">
+                  <span class="pill shrink-0 mt-px"
                         [class.pill-crit]="finding.level === 'crit'"
                         [class.pill-warn]="finding.level === 'warn'"
                         [class.pill-neutral]="finding.level === 'note'">{{ finding.title }}</span>
                   <div class="min-w-0 flex-1">
-                    <p class="mono text-xs truncate"
-                       [title]="finding.column">{{ finding.column }}</p>
-                    <p class="text-xs text-[color:var(--text-secondary)] mt-0.5">
-                      {{ finding.detail }}
-                    </p>
+                    <p class="mono text-xs truncate" [title]="finding.column">{{ finding.column }}</p>
+                    <p class="text-xs text-[color:var(--text-secondary)] mt-0.5">{{ finding.detail }}</p>
                   </div>
-                </div>
+                </li>
               }
-
-              <p class="field-note text-[color:var(--text-muted)]">
-                Duplicate rows are not part of this check — counting them needs its own pass over
-                the data.
-              </p>
-            </div>
+            </ul>
           </app-table-shell>
         }
 
@@ -795,10 +866,9 @@
             <div class="card p-4 flex flex-col gap-3 min-w-0">
               <div>
                 <h3 class="text-sm font-semibold">Build an analysis</h3>
-                <p class="field-note text-[color:var(--text-muted)]">
-                  Up to three dimensions and one measure, sent to the server as field names and
-                  operator names rather than as a statement. It composes the query itself, behind
-                  the same gate and the same governor the console runs through.
+                <p class="field-note text-[color:var(--text-muted)]"
+                   title="Up to three dimensions and one measure, sent as field and operator names rather than a statement. The server composes the query behind the same gate and governor the SQL console runs through.">
+                  Group by up to three columns, measure one — the server writes the query.
                 </p>
               </div>
 
@@ -975,6 +1045,14 @@
                 }
               </div>
 
+              @if (analysisFromElsewhere()) {
+                <!-- On the builder, not only in the Save dialog: it is a fact about what Run will
+                     read, and it has to be seen before Run is pressed. -->
+                <p class="text-xs text-[color:var(--text-secondary)]">
+                  {{ analysisFromElsewhere() }} It will run against the file that is open here.
+                </p>
+              }
+
               <div class="flex flex-wrap items-center gap-2 min-w-0">
                 <button type="button" class="btn btn-primary btn-sm"
                         [disabled]="!canAnalyse()" (click)="runAnalysis()">
@@ -997,11 +1075,14 @@
 
             <!-- ── the filter builder ───────────────────────────────────────────────────── -->
             <div class="card p-4 flex flex-col gap-2 min-w-0">
+              <!-- The note under the builder -- what these narrow, and that the Data tab ANDs them
+                   with its own -- is the heading's tooltip now. What is carried is the narrowing
+                   that was RUN, not the tree being typed, hence "once you run it". -->
               <div class="flex flex-wrap items-baseline gap-2">
-                <h3 class="text-sm font-semibold">Filters</h3>
-                <span class="text-xs text-[color:var(--text-muted)]">
-                  fourteen operators, and groups that nest
-                </span>
+                <h3 class="text-sm font-semibold inline-flex items-center gap-1"
+                    title="These narrow the analysis, everything drawn from it, and — once you run it — the Data tab's rows. That tab keeps its own filters too; the two are ANDed, and it says which come from here, with a switch to turn them off.">
+                  Filters <app-icon name="info" size="0.85em" class="icon-muted" />
+                </h3>
                 @if (unfinishedFilterCount() > 0) {
                   <!-- Said out loud rather than dropped quietly. A half-typed condition that is
                        silently not sent is a predicate the reader believes is narrowing the rows
@@ -1014,20 +1095,6 @@
 
               <app-filter-builder [model]="canvasFilters()" [columns]="columns()"
                                   (changed)="setFilters($event)" />
-
-              <!-- Twice rewritten, both times because it had outlived what it described: first
-                   "that endpoint takes a page and a size and has no filter to give it", true
-                   until the Data tab gained server-side filtering; then "nothing yet carries a
-                   chip from here to there", true until cross-filtering was built. A note that
-                   describes a former limitation is worse than no note — it tells a reader the
-                   product cannot do something it can. What is carried is the narrowing that was
-                   RUN, not the tree being typed above it, which is why this says "once you run
-                   it". -->
-              <p class="field-note text-[color:var(--text-muted)]">
-                These narrow the analysis, everything drawn from it, and — once you run it — the
-                Data tab's rows. That tab keeps its own filters too; the two are ANDed, and it
-                says which of them are coming from here with a switch to turn them off.
-              </p>
             </div>
 
             <!-- ── where the reader is: crumbs, then chips ──────────────────────────────── -->
@@ -1098,11 +1165,11 @@
                 <app-icon name="alert" size="1.25rem" class="icon-crit shrink-0 mt-0.5" />
                 <div class="min-w-0">
                   <h3 class="text-sm font-semibold text-crit-500">The analysis did not run</h3>
+                  <!-- The server's sentence, word for word: several are refusals rather than
+                       faults -- a dataset this account cannot reach, a governor with no slot. -->
                   <p class="text-sm text-[color:var(--text-secondary)] mt-1">{{ analysisError() }}</p>
-                  <p class="field-note text-[color:var(--text-muted)] mt-2">
-                    That is the server's own explanation, word for word. Some of these are
-                    refusals rather than faults — a dataset this account cannot reach, or a
-                    governor with no slot free.
+                  <p class="field-note text-[color:var(--text-muted)] mt-1">
+                    The server's own words — some are refusals rather than faults.
                   </p>
                   <button type="button" class="btn btn-default btn-sm mt-3" [disabled]="!canAnalyse()"
                           (click)="runAnalysis()"><app-icon name="refresh" />Run again</button>
@@ -1115,8 +1182,12 @@
                                [isEmpty]="!analysing() && !analysisResult()"
                                [emptyMessage]="canvasEmptyMessage()" emptyIcon="chart">
 
+                <!-- Save and Open saved live in the result's own header (owner, 2026-09-28), in
+                     place of a save card and a saved list stacked under the result. Both work
+                     with nothing run: a reopened analysis is saved or renamed without running. -->
+                <div toolbar class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs min-w-0 flex-1">
                 @if (analysisResult()) {
-                  <div toolbar class="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs min-w-0">
+                  <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 min-w-0">
                     <span class="text-sm font-semibold tabular">
                       {{ analysisResult()!.rowCount.toLocaleString() }}
                     </span>
@@ -1144,6 +1215,17 @@
                     }
                   </div>
                 }
+                  <div class="flex items-center gap-1.5 ms-auto">
+                    <button type="button" class="btn btn-default btn-sm" aria-haspopup="dialog"
+                            [disabled]="!hasDataset()" (click)="openSaveDialog($event.currentTarget)">
+                      <app-icon name="save" />Save
+                    </button>
+                    <button type="button" class="btn btn-default btn-sm" aria-controls="saved-panel"
+                            [attr.aria-expanded]="savedOpen()" (click)="openSaved($event.currentTarget)">
+                      <app-icon name="folder" />Open saved
+                    </button>
+                  </div>
+                </div>
 
                 <!-- The truncation warning, in the row above the figures and again on the figure
                      itself. A table of groups that stopped at the ceiling is not a short answer,
@@ -1152,10 +1234,9 @@
                   <app-icon name="alert" size="1.1rem" class="icon-warn shrink-0 mt-0.5" />
                   <p class="text-xs text-[color:var(--text-secondary)]">
                     <span class="font-semibold">This is part of the answer.</span>
-                    The result stopped at the server's row ceiling, so groups that match your
-                    filters are missing from every figure below. Nothing here can say how many, or
-                    which way they would move one. A Top-N or a tighter filter brings it back
-                    inside the ceiling.
+                    Groups past the server's row ceiling are missing from every figure below.
+                    Nothing here can say how many, or which way they would move one. A Top-N or a
+                    tighter filter brings it back inside.
                   </p>
                 </div>
 
@@ -1166,23 +1247,27 @@
                 <div class="p-4 flex flex-col gap-3 min-w-0">
 
                   <div class="flex flex-wrap items-end gap-2 min-w-0">
-                    <div class="flex flex-col gap-1 min-w-0 flex-1">
-                      <label class="text-[11px] uppercase tracking-wider
-                                    text-[color:var(--text-muted)]" for="a-canvas-kind">Show as</label>
-                      <select id="a-canvas-kind" class="input input-sm w-full"
-                              [value]="canvasKind() ?? ''"
-                              (change)="canvasKindName.set($any($event.target).value)">
+                    <!-- The chart kinds as a segmented switch rather than a dropdown, so every kind
+                         is one click and the one drawn is visible. A kind that cannot draw this
+                         result stays listed and inert with the reason as its tooltip: a reader who
+                         cannot find the pivot is told it needs two dimensions. aria-disabled, not
+                         disabled: a disabled button shows no tooltip in some browsers and cannot
+                         be focused, and the reason is the whole point of listing it. -->
+                    <div class="flex flex-col gap-1 min-w-0 me-auto">
+                      <span class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]"
+                            id="a-canvas-kind">Show as</span>
+                      <div class="seg flex-wrap" role="group" aria-labelledby="a-canvas-kind">
                         @for (option of canvasKinds(); track option.id) {
-                          <!-- Listed and inert with the reason on it, never quietly missing: a
-                               reader who cannot find the pivot needs to be told that a pivot
-                               needs two dimensions, not left to wonder. -->
-                          <option [value]="option.id" [disabled]="!!option.issue"
-                                  [selected]="option.id === canvasKind()"
-                                  [title]="option.issue || option.label">
-                            {{ option.label }}{{ option.issue ? ' — ' + option.issue : '' }}
-                          </option>
+                          <button type="button" class="seg-btn"
+                                  [class.seg-on]="option.id === canvasKind()"
+                                  [attr.aria-pressed]="option.id === canvasKind()"
+                                  [class.opacity-40]="!!option.issue"
+                                  [class.cursor-not-allowed]="!!option.issue"
+                                  [attr.aria-disabled]="option.issue ? true : null"
+                                  [title]="option.issue || option.label"
+                                  (click)="option.issue || canvasKindName.set(option.id)">{{ option.label }}</button>
                         }
-                      </select>
+                      </div>
                     </div>
 
                     <!-- Drill controls. Two selects rather than a menu on every row: what a drill
@@ -1432,15 +1517,13 @@
                           </table>
                         </div>
                         @if (otherBucket()) {
+                          <!-- A row whose value is genuinely "Other" is still a category and
+                               still clicks: the server names the rolled-up row by position. -->
                           <p class="field-note text-[color:var(--text-muted)]">
                             The “{{ otherBucket()!.label }}” row is
                             {{ otherBucket()!.valueCount }} rolled-up
                             {{ otherBucket()!.valueCount === 1 ? 'value' : 'values' }}, not a category in the data — so it cannot be
-                            filtered to or drilled into. A row whose value is genuinely
-                            “{{ otherBucket()!.label }}” is a category like any other and still
-                            can be: the server names the rolled-up rows by position, so the two
-                            are told apart by which row they are rather than by what they are
-                            called.
+                            filtered to or drilled into.
                           </p>
                         }
                         <!-- The same courtesy the roll-up row gets: a cell that will not click
@@ -1468,136 +1551,6 @@
               </app-table-shell>
             }
 
-            <!-- ── saved analyses ───────────────────────────────────────────────────────── -->
-            <div class="grid gap-3 sm:grid-cols-2">
-
-              <div class="card p-4 flex flex-col gap-2 min-w-0">
-                <h3 class="text-xs uppercase tracking-wider text-[color:var(--text-muted)]">
-                  Save this analysis
-                </h3>
-                <input class="input input-sm w-full" placeholder="Name this analysis"
-                       aria-label="Name this analysis"
-                       [value]="analysisName()"
-                       (input)="analysisName.set($any($event.target).value)" />
-                <div class="flex flex-wrap items-center gap-2">
-                  <button type="button" class="btn btn-primary btn-sm"
-                          [disabled]="!canSaveAnalysis()" (click)="saveAnalysis(false)">
-                    <app-icon name="save" />{{ savingAnalysis() ? 'Saving…' : 'Save as new' }}
-                  </button>
-                  <!-- Two buttons rather than one that guesses, exactly as the query library
-                       does: the same control silently forking or silently overwriting is the
-                       one that eventually loses somebody's work. -->
-                  @if (loadedAnalysis()?.analyticsAnalysisId) {
-                    <button type="button" class="btn btn-default btn-sm"
-                            [disabled]="!canSaveAnalysis()" (click)="saveAnalysis(true)">
-                      Update “{{ loadedAnalysis()!.analysisName }}”
-                    </button>
-                  }
-                </div>
-                @if (analysisSaveError()) {
-                  <p class="text-xs text-crit-500">{{ analysisSaveError() }}</p>
-                }
-                <p class="field-note text-[color:var(--text-muted)]">
-                  Stores the dataset, the dimensions, the measure, the filters, the sort, the
-                  Top-N and the chart kind — never any rows. Filters a drill added are kept as
-                  filters, so reopening lands on the narrowed analysis with no trail behind it.
-                </p>
-                @if (analysisFromElsewhere()) {
-                  <p class="text-xs text-[color:var(--text-secondary)]">
-                    {{ analysisFromElsewhere() }} It will run against the file that is open here.
-                    <!-- Which of the two buttons moves the dataset, said before either is
-                         pressed. An Update that quietly repointed a saved analysis at whatever
-                         was open left a row whose stored columns belong to a different file. -->
-                    @if (loadedAnalysis()?.analyticsAnalysisId) {
-                      Updating it keeps it pointed at the file it was saved against; “Save as new”
-                      records the one open here.
-                    }
-                  </p>
-                }
-              </div>
-
-              <div class="card p-4 flex flex-col gap-2 min-w-0">
-                <div class="flex items-baseline justify-between gap-2">
-                  <h3 class="text-xs uppercase tracking-wider text-[color:var(--text-muted)]">
-                    Saved analyses
-                  </h3>
-                  <button type="button" class="btn btn-ghost btn-xs"
-                          aria-label="Refresh the saved analysis list"
-                          [disabled]="analysesLoading()" (click)="loadAnalyses()">
-                    <app-icon name="refresh" [class.spin]="analysesLoading()" />
-                  </button>
-                </div>
-                @if (analysisOpenError()) {
-                  <!-- A reopen that failed, said whatever the list is doing. It used to share the
-                       list's own error signal and so was invisible while the list was loading --
-                       which is precisely when a stale row gets clicked. -->
-                  <p class="text-xs text-crit-500">{{ analysisOpenError() }}</p>
-                }
-                <!-- What a delete actually removed, in the server's own words: it is the only
-                     side that counts the dashboard tiles the cascade took with the row. Not in
-                     the error colour, because it is not a failure. -->
-                @if (analysesNotice()) {
-                  <p class="text-xs text-[color:var(--text-secondary)]">{{ analysesNotice() }}</p>
-                }
-                @if (analysesLoading()) {
-                  <p class="text-xs text-[color:var(--text-muted)]">Reading your analyses…</p>
-                } @else if (analysesError()) {
-                  <p class="text-xs text-crit-500">{{ analysesError() }}</p>
-                } @else if (!analyses().length) {
-                  <p class="text-xs text-[color:var(--text-muted)]">
-                    Nothing saved yet. A saved analysis reopens without storing a single row of
-                    the data it reads.
-                  </p>
-                } @else {
-                  <!-- Searchable and capped. Every saved analysis used to be drawn, which on a
-                       workspace with 135 of them was a 6,799px panel below the result. -->
-                  @if (analyses().length > 8) {
-                    <input type="search" class="input input-sm w-full"
-                           placeholder="Find a saved analysis by name or dataset"
-                           aria-label="Find a saved analysis"
-                           [value]="librarySearch()"
-                           (input)="librarySearch.set($any($event.target).value)" />
-                  }
-                  @if (!libraryVisible().length) {
-                    <p class="text-xs text-[color:var(--text-muted)]">
-                      Nothing saved here matches “{{ librarySearch() }}”.
-                    </p>
-                  }
-                  <ul class="flex flex-col divide-y divide-[color:var(--border-subtle)]">
-                    @for (saved of libraryVisible(); track saved.analyticsAnalysisId) {
-                      <li class="py-1.5 flex items-center gap-2 min-w-0">
-                        <button type="button" class="min-w-0 flex-1 text-left"
-                                [title]="saved.connectionAlias + '/' + saved.datasetPath"
-                                (click)="openAnalysis(saved)">
-                          <span class="block text-sm truncate">{{ saved.analysisName }}</span>
-                          <span class="block text-[11px] text-[color:var(--text-muted)] truncate">
-                            {{ saved.visualizationType || 'table' }} · {{ analysisWhen(saved) }}
-                          </span>
-                        </button>
-                        <button type="button" class="btn btn-ghost btn-xs"
-                                [attr.aria-label]="'Delete ' + saved.analysisName"
-                                (click)="removeAnalysis(saved)">
-                          <app-icon name="trash" />
-                        </button>
-                      </li>
-                    }
-                  </ul>
-                  @if (libraryHidden()) {
-                    <button type="button" class="btn btn-ghost btn-xs self-start"
-                            (click)="libraryShowAll.set(true)">
-                      Show {{ libraryHidden() }} more
-                    </button>
-                  } @else if (libraryShowAll() && libraryMatches().length > 8) {
-                    <button type="button" class="btn btn-ghost btn-xs self-start"
-                            (click)="libraryShowAll.set(false)">Show fewer</button>
-                  }
-                  <p class="field-note text-[color:var(--text-muted)]">
-                    Opening one puts it on the canvas without running it — an analysis can be a
-                    full scan, and browsing the list should not spend one.
-                  </p>
-                }
-              </div>
-            </div>
             </div>
           </div>
         }
@@ -1660,18 +1613,16 @@
                     </select>
                     @if (!secondOptions().length) {
                       <span class="text-[color:var(--text-muted)]">
-                        Nothing else in this folder can be read as one — walk to another folder in
-                        the rail and it will be offered here.
+                        Nothing else in this folder can be joined — open another folder in Files.
                       </span>
                     }
                   </div>
                 }
 
-                <p class="field-note text-[color:var(--text-muted)]">
+                <p class="field-note text-[color:var(--text-muted)]"
+                   title="Those are the names these files have inside the query — there is no bucket, URL or path to write, and a statement that names a location of its own is refused.">
                   Write <span class="mono">dataset</span>@if (secondPath()) {
-                  and <span class="mono">dataset2</span>} in your SQL. Those are the names these
-                  files have inside the query — there is no bucket, URL or path to write, and a
-                  statement that names a location of its own is refused.
+                  and <span class="mono">dataset2</span>} in your SQL — never a path.
                 </p>
               </div>
 
@@ -1700,8 +1651,7 @@
                 <span class="text-[11px] text-[color:var(--text-muted)]">⌘ / Ctrl + Enter</span>
                 @if (stopping()) {
                   <span class="text-[11px] text-[color:var(--text-muted)]">
-                    Asked the engine to stop. The query may still finish first — the history row
-                    below will say which happened.
+                    Asked the engine to stop — it may still finish first; Activity will say which.
                   </span>
                 }
                 @if (!sql().trim()) {
@@ -1771,10 +1721,10 @@
                 <div class="min-w-0">
                   <h3 class="text-sm font-semibold text-crit-500">The query did not run</h3>
                   <p class="text-sm text-[color:var(--text-secondary)] mt-1">{{ queryError() }}</p>
-                  <p class="field-note text-[color:var(--text-muted)] mt-2">
-                    That is the server's own explanation, word for word. Some of these are
-                    refusals rather than faults: a statement that writes, attaches or names a
-                    location of its own is turned down by design.
+                  <!-- The server's sentence, unparaphrased: several are the statement gate
+                       refusing a query rather than the engine failing on one. -->
+                  <p class="field-note text-[color:var(--text-muted)] mt-1">
+                    The server's own words — some are refusals rather than faults.
                   </p>
                 </div>
               </div>
@@ -1837,9 +1787,9 @@
                             (click)="writeResultBack()">
                       <app-icon name="cloud" size="0.9em" /> Write back
                     </button>
-                    <span class="field-note text-[color:var(--text-muted)] basis-full">
-                      A write goes into this connection's own bucket — the one it already reads
-                      from. There is nowhere else to send it, and no undo once it is there.
+                    <span class="field-note text-[color:var(--text-muted)] basis-full"
+                          title="The bucket it already reads from. There is nowhere else to send it.">
+                      Write back goes into this connection's own bucket, with no undo.
                     </span>
 
                     @if (exporting()) {
@@ -1865,11 +1815,9 @@
                   <app-icon name="alert" size="1.1rem" class="icon-warn shrink-0 mt-0.5" />
                   <p class="text-xs text-[color:var(--text-secondary)]">
                     <span class="font-semibold">This is part of the answer, not all of it.</span>
-                    The result filled the server's row ceiling and stopped there, so rows that
-                    match your query are missing from the table below. Nothing here can say how
-                    many. Add a <span class="mono">LIMIT</span> of your own, narrow it with a
-                    <span class="mono">WHERE</span>, or aggregate rather than list — but do not
-                    read a total off these rows.
+                    The result stopped at the server's row ceiling, so matching rows are missing
+                    below. Nothing here can say how many. Narrow it with a
+                    <span class="mono">WHERE</span> or aggregate rather than list.
                   </p>
                 </div>
 
@@ -1909,8 +1857,6 @@
                   <button type="button" class="link-inline" (click)="showTab('charts')">
                     Draw this result on the Charts tab
                   </button>
-                  — it is drawn from whatever the console last ran, and says so when the statement
-                  above has changed since.
                 </p>
               }
             }
@@ -2005,6 +1951,20 @@
                            [isEmpty]="!running() && !chartDrawn()"
                            [emptyMessage]="chartEmptyMessage()" emptyIcon="chart">
 
+            <!-- An empty tab used to be a sentence and nothing to do about it. It says where a
+                 result comes from and goes there: this tab draws the SQL console's last result,
+                 and the Canvas draws its own analyses. -->
+            <div empty-action class="flex flex-wrap justify-center gap-2">
+              @if (!result()) {
+                <button type="button" class="btn btn-primary btn-sm" (click)="showTab('sql')">
+                  <app-icon name="terminal" />Write a query
+                </button>
+              }
+              <button type="button" class="btn btn-default btn-sm" (click)="showTab('canvas')">
+                <app-icon name="chart" />Build one in Canvas
+              </button>
+            </div>
+
             <!-- The same strip the result table carries, said again here because it is a
                  different claim. A short table is visibly short; a chart of ten thousand of
                  forty thousand rows has exactly the shape, the confidence and the finish of
@@ -2020,9 +1980,7 @@
                   <div class="min-w-0">
                     <p class="text-xs text-[color:var(--text-secondary)]">
                       <span class="font-semibold">This is a chart of the previous answer.</span>
-                      The statement in the console has changed since this result came back, and
-                      nothing has been re-run — so the picture below is of the query as it was,
-                      not as it now reads. Run it again and the chart follows.
+                      The statement in the console has changed since, and nothing has been re-run.
                     </p>
                     <pre class="mono text-[11px] text-[color:var(--text-muted)] mt-1 whitespace-pre-wrap
                                 max-h-24 overflow-auto">{{ ranSql() }}</pre>
@@ -2038,10 +1996,8 @@
                   <app-icon name="alert" size="1.1rem" class="icon-warn shrink-0 mt-0.5" />
                   <p class="text-xs text-[color:var(--text-secondary)]">
                     <span class="font-semibold">This chart is drawn from part of the answer.</span>
-                    The result stopped at the server's row ceiling, so rows that match your query
-                    are missing from every bar below. Nothing here can say how many, or which way
-                    they would move one. Narrow it with a <span class="mono">WHERE</span> or
-                    aggregate in SQL, and the chart will be of the whole answer.
+                    Matching rows past the server's row ceiling are missing from every bar below.
+                    Nothing here can say how many, or which way they would move one.
                   </p>
                 </div>
               }
@@ -2099,21 +2055,25 @@
                   </select>
                 </div>
 
-                <div class="flex flex-col gap-1 min-w-0 flex-1">
-                  <label class="text-[11px] uppercase tracking-wider
-                                text-[color:var(--text-muted)]"
-                         for="a-chart-kind">Chart</label>
-                  <select id="a-chart-kind" class="input input-sm w-full"
-                          [value]="chartKind() ?? ''"
-                          (change)="chartKindName.set($any($event.target).value)">
+                <!-- The kinds as a segmented switch, as on the Canvas: one click each, the drawn
+                     one visible, and a kind that cannot draw THESE columns inert with its reason
+                     as the tooltip -- the reason is a fact about the reader's data. aria-disabled
+                     for the same reason as there: a disabled button hides its tooltip. -->
+                <div class="flex flex-col gap-1 min-w-0">
+                  <span class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]"
+                        id="a-chart-kind">Chart</span>
+                  <div class="seg flex-wrap" role="group" aria-labelledby="a-chart-kind">
                     @for (option of chartKinds(); track option.id) {
-                      <option [value]="option.id" [disabled]="!!option.issue"
-                              [selected]="option.id === chartKind()"
-                              [title]="option.issue || option.label">
-                        {{ option.label }}{{ option.issue ? ' — ' + option.issue : '' }}
-                      </option>
+                      <button type="button" class="seg-btn"
+                              [class.seg-on]="option.id === chartKind()"
+                              [attr.aria-pressed]="option.id === chartKind()"
+                              [class.opacity-40]="!!option.issue"
+                              [class.cursor-not-allowed]="!!option.issue"
+                              [attr.aria-disabled]="option.issue ? true : null"
+                              [title]="option.issue || option.label"
+                              (click)="option.issue || chartKindName.set(option.id)">{{ option.label }}</button>
                     }
-                  </select>
+                  </div>
                 </div>
               </div>
 
@@ -2166,28 +2126,20 @@
         }
 
         @if (tab() === 'activity') {
-          <div class="card p-4 flex flex-col gap-2 min-w-0">
-            <div class="flex items-baseline justify-between gap-2 flex-wrap">
-              <h3 class="text-sm font-semibold">Run history</h3>
-              <span class="text-xs text-[color:var(--text-muted)]">
-                Everything run in your workspace against any dataset, not only what you saved.
-              </span>
-              <button type="button" class="btn btn-default btn-sm ml-auto"
-                      [disabled]="runsLoading()" (click)="loadRuns()">
-                <app-icon name="refresh" [class.spin]="runsLoading()" />Refresh
-              </button>
-            </div>
-
-            @if (recentRuns().length) {
-              <!-- REFUSALS LEAD, because they are the interesting ones. A refusal is the
-                   statement gate or the governor declining a query BEFORE it reached the engine
-                   — most often a statement that tried to write, attach, or name a storage
-                   location of its own — so a run of them is a record of what was attempted here
-                   and not a list of things that broke. Counted apart from failures for exactly
-                   that reason, and apart from stops and timeouts, which are limits rather than
-                   faults. -->
-              <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-                <span class="text-[color:var(--text-muted)]">
+          <!-- One row per run, not one card (owner, 2026-09-28): a card per engine call made ten
+               file opens thirty cards tall. The reads the screen makes by itself on every open --
+               schema, preview, overview -- are behind "Show internal steps", so the list leads
+               with what a person ran. -->
+          <div class="card p-0 flex flex-col min-w-0">
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5 border-b border-subtle">
+              <h3 class="text-sm font-semibold"
+                  title="Everything run in your workspace against any dataset, not only what you saved.">Run history</h3>
+              @if (recentRuns().length) {
+                <!-- REFUSALS LEAD, because they are the interesting ones: the statement gate or the
+                     governor declining a query BEFORE it reached the engine. Counted apart from
+                     failures for exactly that reason, and apart from stops and timeouts, which
+                     are limits rather than faults. -->
+                <span class="text-xs text-[color:var(--text-muted)]">
                   Last {{ recentRuns().length }}
                   {{ recentRuns().length === 1 ? 'run' : 'runs' }}
                   @if (path()) {
@@ -2195,7 +2147,8 @@
                   }
                 </span>
                 @if (refusedRuns().length) {
-                  <span class="pill pill-warn">{{ refusedRuns().length }} refused</span>
+                  <span class="pill pill-warn"
+                        title="A refused query never reached the engine: the statement gate or the concurrency governor turned it away. The server's own sentence is on the row.">{{ refusedRuns().length }} refused</span>
                 }
                 @if (failedRuns().length) {
                   <span class="pill pill-crit">{{ failedRuns().length }} failed</span>
@@ -2205,44 +2158,41 @@
                     {{ stoppedRuns().length }} stopped or timed out
                   </span>
                 }
-              </div>
-              @if (refusedRuns().length) {
-                <p class="field-note text-[color:var(--text-muted)]">
-                  A refused query never reached the engine: the statement gate or the concurrency
-                  governor turned it away. The server's own sentence is on the row, unchanged —
-                  several of those are security refusals and a paraphrase would take away the one
-                  thing telling a reader which.
-                </p>
               }
-            }
+              <div class="flex items-center gap-2 ms-auto">
+                <label class="flex items-center gap-1.5 text-xs text-[color:var(--text-secondary)]">
+                  <input type="checkbox" class="checkbox" [checked]="showInternalRuns()"
+                         (change)="showInternalRuns.set($any($event.target).checked)" />
+                  Show internal steps
+                </label>
+                <button type="button" class="btn btn-default btn-sm"
+                        [disabled]="runsLoading()" (click)="loadRuns()">
+                  <app-icon name="refresh" [class.spin]="runsLoading()" />Refresh
+                </button>
+              </div>
+            </div>
 
             <!-- A failed load is not an empty history: the empty line sits behind the error. -->
             @if (runsLoading()) {
-              <p class="text-xs text-[color:var(--text-muted)] py-4 text-center">Reading…</p>
+              <p class="text-xs text-[color:var(--text-muted)] p-8 text-center">Reading…</p>
             } @else if (runsError()) {
-              <p class="text-xs text-crit-500" role="alert">
+              <p class="text-xs text-crit-500 p-4" role="alert">
                 {{ runsError() }}
                 <button type="button" class="link-inline ml-1" (click)="loadRuns()">Try again</button>
               </p>
             } @else if (!recentRuns().length) {
-              <p class="text-xs text-[color:var(--text-muted)] py-4 text-center">
+              <p class="text-xs text-[color:var(--text-muted)] p-8 text-center">
                 Nothing has been run here yet.
               </p>
             } @else {
-              <!-- Same vertical padding as the folder list, for the same clipped ring. -->
-              <div class="scroll-table -mx-1 px-1 -my-1 py-1 flex flex-col gap-1.5">
-                @for (run of recentRuns(); track run.analyticsQueryRunId) {
-                  <div class="rounded border border-subtle p-2 flex flex-col gap-1 min-w-0">
+              <ul class="flex flex-col divide-y divide-[color:var(--border-subtle)]">
+                @for (run of visibleRuns(); track run.analyticsQueryRunId) {
+                  <li class="flex flex-col gap-0.5 px-4 py-2 min-w-0">
                     <div class="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
-                      <!-- Refused is not a kind of failure and is not drawn as one. Failed
-                           reached the engine and broke there; refused never reached it,
-                           because the gate or the governor turned it away. -->
-                      <!-- Every state gets its own word. The @default used to be "failed",
-                           so a query the user themselves stopped, and one the server timed
-                           out, were both reported to them as failures -- the exact conflation
-                           the comment above forbids for REFUSED, one state over. There is no
-                           default any more: an unrecognised state shows itself rather than
-                           being dressed as the nearest familiar one. -->
+                      <!-- Every state gets its own word. Refused is not a kind of failure and is
+                           not drawn as one; a stop and a timeout are not failures either. There
+                           is no default: an unrecognised state shows itself rather than being
+                           dressed as the nearest familiar one. -->
                       <span class="pill"
                             [class.pill-ok]="run.runStatus === 'SUCCESS'"
                             [class.pill-crit]="run.runStatus === 'FAILED'"
@@ -2252,60 +2202,65 @@
                                                   || run.runStatus === 'QUEUED'
                                                   || run.runStatus === 'RUNNING'">
                         @switch (run.runStatus) {
-                          @case ('SUCCESS') { ran }
-                          @case ('REFUSED') { refused }
-                          @case ('FAILED') { failed }
-                          @case ('CANCELLED') { stopped }
-                          @case ('TIMED_OUT') { timed out }
-                          @case ('QUEUED') { queued }
-                          @case ('RUNNING') { running }
+                          @case ('SUCCESS') { Ran }
+                          @case ('REFUSED') { Refused }
+                          @case ('FAILED') { Failed }
+                          @case ('CANCELLED') { Stopped }
+                          @case ('TIMED_OUT') { Timed out }
+                          @case ('QUEUED') { Queued }
+                          @case ('RUNNING') { Running }
                           @default { {{ run.runStatus }} }
                         }
                       </span>
-                      <span class="text-[11px] text-[color:var(--text-muted)]">
-                        {{ runWhen(run) }}
-                      </span>
+                      <span class="text-[11px] text-[color:var(--text-muted)] tabular">{{ runWhen(run) }}</span>
+                      <span class="text-[11px] font-medium"
+                            [class.text-[color:var(--text-muted)]]="isInternalRun(run)">{{ runKind(run) }}</span>
+                      <!-- Wall clock inside the engine, so it leaves out the network and any wait
+                           for a free slot. A row count is absent rather than zero where a run
+                           never produced one. -->
                       @if (runTook(run)) {
-                        <span class="text-[11px] text-[color:var(--text-muted)] tabular">
-                          {{ runTook(run) }}
-                        </span>
+                        <span class="text-[11px] text-[color:var(--text-muted)] tabular"
+                              title="Time inside the query engine, not counting the network or a wait for a free slot.">{{ runTook(run) }}</span>
                       }
                       @if (runRows(run)) {
                         <span class="text-[11px] text-[color:var(--text-muted)] tabular">
                           {{ runRows(run) }} rows
                         </span>
                       }
-                      <!-- Lands the statement in the console and goes there, because this
-                           tab is not somewhere a query can be read or run. It still does not
-                           RUN it: a row here may be one the engine refused or one that took
-                           thirty seconds, and a click that re-spends a permit on either is a
-                           control that punishes curiosity. -->
-                      <button type="button" class="btn btn-default btn-xs ml-auto"
-                              (click)="openRunInConsole(run)">Open in the console</button>
+                      <!-- Lands the statement in the console and goes there. It does not RUN it:
+                           a row here may be one the engine refused or one that took thirty
+                           seconds. Offered on statements only -- a read the screen made by itself
+                           has no SQL to open. -->
+                      @if (runKind(run) === 'SQL') {
+                        <button type="button" class="btn btn-ghost btn-xs ms-auto"
+                                (click)="openRunInConsole(run)">Open in the console</button>
+                      }
                     </div>
-                    <p class="mono text-[11px] truncate"
-                       [title]="run.queryText">{{ run.queryText }}</p>
-                    <p class="mono text-[10px] text-[color:var(--text-muted)] truncate"
-                       [title]="run.datasetPath">
-                      {{ run.connectionAlias }}/{{ run.datasetPath }}
+                    <p class="mono text-[11px] truncate text-[color:var(--text-secondary)]"
+                       [title]="run.queryText + ' — ' + run.connectionAlias + '/' + run.datasetPath">
+                      @if (runKind(run) === 'SQL') { {{ run.queryText }} · }
+                      <span class="text-[color:var(--text-muted)]">{{ run.connectionAlias }}/{{ run.datasetPath }}</span>
                     </p>
                     @if (run.errorMessage) {
-                      <p class="text-[11px] text-[color:var(--text-secondary)]">
-                        {{ run.errorMessage }}
-                      </p>
+                      <!-- The server's sentence, unchanged: several are security refusals and a
+                           paraphrase would take away the one thing saying which. -->
+                      <p class="text-[11px] text-[color:var(--text-secondary)]">{{ run.errorMessage }}</p>
                     }
-                  </div>
+                  </li>
                 }
-              </div>
-              <p class="field-note text-[color:var(--text-muted)]">
-                Times are wall clock inside the query engine, so they leave out the network and
-                any wait for a free slot — the two differ most exactly when the module is busy.
-                A row count is absent rather than zero where a run never produced one.
-              </p>
+              </ul>
+              @if (hiddenRunCount()) {
+                <p class="text-[11px] text-[color:var(--text-muted)] px-4 py-2 border-t border-subtle">
+                  {{ hiddenRunCount() }} internal
+                  {{ hiddenRunCount() === 1 ? 'step is' : 'steps are' }} hidden.
+                  <button type="button" class="link-inline" (click)="showInternalRuns.set(true)">Show them</button>
+                </p>
+              }
             }
           </div>
         }
 
+        </div>
       }
     </div>
   </div>

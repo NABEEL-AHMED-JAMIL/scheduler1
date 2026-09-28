@@ -40,6 +40,17 @@ import { API_SUCCESS } from '../../core/api/api.config';
 const SERVER_RESPONSE = <T>(data: T) => ({ status: 'SUCCESS' as const, message: '', data });
 const SERVER_REFUSAL = (message: string) => ({ status: 'ERROR' as const, message, data: undefined });
 
+/**
+ * Every tooltip on the screen, joined. The owner asked (2026-09-28) for the long explanatory
+ * paragraphs to become one line or a tooltip, so several hedges these specs guard now live in a
+ * title attribute: still on the screen, still next to the figure, and still worth pinning.
+ */
+function tipsIn(fixture: { nativeElement: unknown; detectChanges(): void }): string {
+  fixture.detectChanges();
+  return [...(fixture.nativeElement as HTMLElement).querySelectorAll('[title]')]
+    .map(element => element.getAttribute('title') ?? '').join(' ').replace(/\s+/g, ' ');
+}
+
 const MINIO: BucketSummary = { label: 'MinIO Main', bucket: 'minio-main', provider: 'MINIO' };
 const S3: BucketSummary = { label: 'Reports S3', bucket: 'reports-s3', provider: 'S3' };
 const AZURE: BucketSummary = { label: 'Blob Archive', bucket: 'blob-archive', provider: 'AZURE' };
@@ -835,6 +846,8 @@ describe('the three figures that are not exact', () => {
         }
         return ((fixture.nativeElement as HTMLElement).textContent ?? '').replace(/\s+/g, ' ');
       },
+      /** The tooltips, where the longer hedges went (owner, 2026-09-28). */
+      tips(): string { return tipsIn(fixture); },
       /** The statistic labels on the profile cards, which is where "min" is or is not said. */
       statLabels() {
         return [...(fixture.nativeElement as HTMLElement).querySelectorAll('dt')]
@@ -860,10 +873,13 @@ describe('the three figures that are not exact', () => {
   it('still gives a real clean bill when it actually examined something', () => {
     // The control. A gate that refused to say "clean" in every case would pass the test above
     // while making the tab useless on the datasets that are genuinely fine.
-    const text = renderedStudio().show([columnOf()], 5000, 'quality');
+    const studio = renderedStudio();
+    const text = studio.show([columnOf()], 5000, 'quality');
 
     expect(text).toContain('Nothing needs attention.');
-    expect(text).toContain('Checked 1 column:');
+    expect(text).toContain('Checked 1 column for');
+    // What "checked" covered, stated exactly -- one line on screen, the list as its tooltip.
+    expect(studio.tips()).toContain('none is more than 5% empty');
   });
 
   it('does not claim a column is completely full when the engine only rounded to 100', () => {
@@ -965,8 +981,9 @@ describe('the three figures that are not exact', () => {
   });
 
   it('says out loud that duplicate rows were not counted', () => {
-    const text = renderedStudio().show([columnOf()], 1000, 'quality');
-    expect(text).toContain('Duplicate rows are not part of this check');
+    const studio = renderedStudio();
+    studio.show([columnOf()], 1000, 'quality');
+    expect(studio.tips()).toContain('Duplicate rows are not part of this check');
   });
 
   it('writes a percentage the way the engine measured it, without rounding it further', () => {
@@ -1252,6 +1269,9 @@ function consoleWith(over: { objects?: ObjectSummary[]; confirms?: boolean } = {
         useValue: {
           schema, preview, profile, query, fetchAllQueries, fetchRecentRuns, saveQuery,
           renameQuery, deleteQuery, download, writeBack, cancel,
+          // Reached from the Charts empty state's "Build one in Canvas", which reads the
+          // saved-analysis list on arrival like any other way into the Canvas.
+          fetchAllAnalyses: () => new Subject<any>().asObservable(),
         },
       },
       // confirmWith resolves as soon as the dialog "closes", so this is the reader saying yes or
@@ -1317,12 +1337,14 @@ describe('the console before anything has run', () => {
   });
 
   it('names the two tables the SQL is allowed to use, because that naming IS the interface', () => {
-    const text = consoleWith().show();
+    const console = consoleWith();
+    const text = console.show();
 
     expect(text).toContain('What your SQL can name');
     expect(text).toContain('dataset');
     expect(text).toContain('minio-main/daily/sales-2026.csv');
-    expect(text).toContain('there is no bucket, URL or path to write');
+    expect(text).toContain('never a path');
+    expect(tipsIn(console.fixture)).toContain('there is no bucket, URL or path to write');
   });
 });
 
@@ -1785,7 +1807,8 @@ describe('the run history', () => {
     console.answers.runs!.next(SERVER_RESPONSE([runOf()]));
     const text = console.show();
 
-    expect(text).toContain('ran');
+    // Sentence case, like every other chip in the console.
+    expect(text).toContain('Ran');
     expect(text).toContain('340ms');
     expect(text).toContain('1 rows');
     expect(text).toContain('select sum(amount) from dataset');
@@ -1839,7 +1862,7 @@ describe('the run history', () => {
     const console = activityWith();
     console.answers.runs!.next(SERVER_RESPONSE([runOf()]));
 
-    expect(console.show()).toContain('wall clock inside the query engine');
+    expect(tipsIn(console.fixture)).toContain('inside the query engine, not counting the network');
   });
 
   it('says plainly when nothing has been run in the workspace', () => {
@@ -1867,22 +1890,25 @@ describe('the console does not disturb the tabs beside it', () => {
     expect(console.studio.tab()).toBe('overview');
   });
 
-  it('groups the ten rather than laying them out as one unreadable row', () => {
-    // Ten equal tabs wrap into a second line of undifferentiated words. Grouped, the row wraps
-    // at the boundaries and each cluster carries what it costs -- which is the axis they are
-    // grouped on, so a reader knows whether a click spends a query before they make it.
+  it('keeps the three groups, drawn as a divider rather than all-caps headings', () => {
+    // The groups are by what each tab COSTS, and stay. Their headings -- THE FILE, ITS COLUMNS,
+    // QUESTIONS -- made the strip three rows tall on a phone and are gone (owner, 2026-09-28):
+    // a thin divider marks the boundary and each group's reason is its tabs' tooltip.
     const console = consoleWith();
     expect(console.studio.tabGroups.map(group => group.label))
       .toEqual(['The file', 'Its columns', 'Questions']);
-    // Every tab is in exactly one group, and the flat list is built from them rather than kept
-    // beside them -- two lists is where the second one stops matching.
     expect(console.studio.tabGroups.flatMap(group => group.tabs).length)
       .toBe(console.studio.tabs.length);
     expect(console.studio.tabGroups[1].tabs.map(tab => tab.id))
-      // 'columns' drew the same scan this table reads, one card per column. The card
-      // moved under the Compact row it describes and the tab went with it.
       .toEqual(['compact', 'profile', 'quality']);
-    expect(console.show()).toContain('Its columns');
+
+    const strip = (console.fixture.nativeElement as HTMLElement).querySelector('[role="tablist"]')!;
+    expect(strip.textContent).not.toContain('Its columns');
+    const dividers = strip.querySelectorAll('.tab-divider');
+    expect(dividers.length).toBe(2);
+    dividers.forEach(divider => expect(divider.getAttribute('aria-hidden')).toBe('true'));
+    const compact = strip.querySelector('#a-tab-compact')!;
+    expect(compact.getAttribute('title')).toBe(console.studio.tabGroups[1].hint);
   });
 
   it('clears a result when another file is opened, and keeps the statement', () => {
@@ -2023,6 +2049,13 @@ describe('the kinds offered change with the columns', () => {
     return studio.chartKinds().filter(kind => !kind.issue).map(kind => kind.id);
   }
 
+  /** One kind in the segmented switch, by the label on it. */
+  function kindButton(fixture: { nativeElement: unknown; detectChanges(): void }, label: string) {
+    fixture.detectChanges();
+    return [...(fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('.seg-btn')]
+      .find(button => button.textContent!.trim() === label)!;
+  }
+
   it('offers a ring for a handful of categories', () => {
     const { studio } = charted(categories(4));
 
@@ -2038,7 +2071,11 @@ describe('the kinds offered change with the columns', () => {
     expect(donut.issue).toContain('ring of 40 slices');
     expect(offered(console.studio)).not.toContain('donut');
     // On the screen, not only in the signal: the reason is what stops a reader hunting for it.
-    expect(console.show()).toContain('A ring of 40 slices cannot be read');
+    // It is the inert kind's tooltip, and the kind is aria-disabled rather than disabled so the
+    // tooltip still shows.
+    const button = kindButton(console.fixture, 'Share of the total');
+    expect(button.getAttribute('title')).toContain('A ring of 40 slices cannot be read');
+    expect(button.getAttribute('aria-disabled')).toBe('true');
   });
 
   it('stops drawing bars in result order once no name can fit under one', () => {
@@ -2060,7 +2097,7 @@ describe('the kinds offered change with the columns', () => {
 
     expect(offered(console.studio)).toEqual(['histogram']);
     expect(console.studio.chartKind()).toBe('histogram');
-    expect(console.show()).toContain('a length cannot be negative');
+    expect(tipsIn(console.fixture)).toContain('a length cannot be negative');
   });
 
   it('bins the result as ROWS, and keeps a negative value on the axis', () => {
@@ -2089,7 +2126,7 @@ describe('the kinds offered change with the columns', () => {
     }));
 
     expect(offered(console.studio)).toEqual(['histogram']);
-    expect(console.show()).toContain('This result has one column, so there is nothing to label');
+    expect(tipsIn(console.fixture)).toContain('This result has one column, so there is nothing to label');
   });
 
   it('refuses a distribution of too few numbers to have a shape', () => {
@@ -2660,8 +2697,9 @@ describe('the filter tree reaches the request with its shape intact', () => {
     // was RUN, so a note promising it inherits what is typed would be the same mistake again.
     const canvas = canvasWith();
 
-    expect(canvas.show()).toContain('once you run it');
-    expect(canvas.show()).toContain('Data tab');
+    // The Filters heading's tooltip now (owner, 2026-09-28), in place of a paragraph under it.
+    expect(tipsIn(canvas.fixture)).toContain('once you run it');
+    expect(tipsIn(canvas.fixture)).toContain('Data tab');
   });
 });
 
@@ -3567,12 +3605,15 @@ describe('saving an analysis: the configuration, never the rows', () => {
     // and answers a different question.
     const canvas = canvasWith();
     canvas.studio.setDimension(0, 'region');
+    // From the saved panel, where the row is; the panel stays open to say why it did not open.
+    canvas.studio.openSaved();
     canvas.studio.openAnalysis({
       analysisName: 'Broken', connectionAlias: 'minio-main', datasetPath: 'daily/sales-2026.csv',
       analysisConfig: '{not json',
     });
 
     expect(canvas.studio.dimensions()).toEqual(['region']);
+    expect(canvas.studio.savedOpen()).toBe(true);
     expect(canvas.show()).toContain('its saved configuration is not readable');
   });
 
@@ -3959,7 +4000,7 @@ describe('Profile and Columns are what document 06 says they are', () => {
     // Reworded with the counted distribution. The second pass is still a second pass, but it is
     // now BUYABLE per column rather than simply absent -- saying it is "not here" directly above
     // a button that fetches it would be the screen contradicting itself.
-    expect(grid.show()).toContain('a SECOND pass over the file');
+    expect(tipsIn(grid.fixture)).toContain('a second pass over the file');
     expect(grid.show()).toContain('Measure values');
   });
 
@@ -3979,9 +4020,9 @@ describe('Profile and Columns are what document 06 says they are', () => {
     ]);
     const text = grid.show();
 
-    expect(text).toContain('What the columns are');
-    expect(text).toContain('How complete they are');
-    expect(text).toContain('How many different values they hold (estimated)');
+    expect(text).toContain('Types');
+    expect(text).toContain('Completeness, in columns');
+    expect(text).toContain('Distinct values (estimated)');
     // Two BIGINT columns and one VARCHAR, grouped on the short type.
     expect(grid.studio.typeBands())
       .toEqual([
@@ -4000,7 +4041,9 @@ describe('Profile and Columns are what document 06 says they are', () => {
     ]);
 
     expect(grid.studio.completenessBands().map(band => band.value)).toEqual([1, 0, 0, 1, 1]);
-    expect(grid.show()).toContain('A count of columns in each band, not of rows or values');
+    // In the heading, where the band is read, and in full as its tooltip.
+    expect(grid.show()).toContain('Completeness, in columns');
+    expect(tipsIn(grid.fixture)).toContain('A count of columns in each band, not of rows or values');
   });
 
   it('refuses to let the averaged percentage read as a share of the values in the file', () => {
@@ -4010,8 +4053,9 @@ describe('Profile and Columns are what document 06 says they are', () => {
     ]);
 
     expect(grid.studio.averageFilled()).toBe(75);
-    expect(grid.show()).toContain('not the share of values in the file that are present');
-    expect(grid.show()).toContain('weights every column the same');
+    expect(grid.show()).toContain('averaged over the columns');
+    expect(tipsIn(grid.fixture)).toContain('Not a share of cells');
+    expect(tipsIn(grid.fixture)).toContain('each weighted the same');
   });
 
   it('bands cardinality off the sketch, and labels the whole chart estimated', () => {
@@ -4023,7 +4067,8 @@ describe('Profile and Columns are what document 06 says they are', () => {
     expect(grid.studio.cardinalityBands().find(band => band.name === 'Under 10')!.value).toBe(1);
     expect(grid.studio.cardinalityBands()
       .find(band => band.name === 'Almost every row different')!.value).toBe(1);
-    expect(grid.show()).toContain('rests on the distinct-value sketch rather than a count');
+    expect(grid.show()).toContain('Distinct values (estimated)');
+    expect(tipsIn(grid.fixture)).toContain('rests on the distinct-value sketch');
   });
 });
 
@@ -4045,7 +4090,7 @@ describe('the Compact view is dense, and every figure in it carries its own hedg
 
     expect(grid.studio.compactRows()[0].sample).toBe('9.50');
     expect(grid.studio.compactRows()[0].sampleKind).toBe('value');
-    expect(grid.show()).toContain('the first value on the page the Data tab is holding');
+    expect(tipsIn(grid.fixture)).toContain("the sample is the first value on the Data tab's current page");
   });
 
   it('tells a null, a blank and an empty page apart', () => {
@@ -4213,7 +4258,8 @@ describe('Activity promotes the run history, and leads with the refusals', () =>
     expect(text).toContain('2 refused');
     expect(text).toContain('1 failed');
     expect(text).toContain('1 stopped or timed out');
-    expect(text).toContain('never reached the engine');
+    // What a refusal is, as the refused count's tooltip rather than a paragraph under it.
+    expect(tipsIn(console.fixture)).toContain('never reached the engine');
   });
 
   it('says how many of the runs were against the file that is open', () => {
@@ -4239,17 +4285,22 @@ describe('Activity promotes the run history, and leads with the refusals', () =>
 });
 
 describe('the dashboard and the registry are reachable from the workspace', () => {
-  it('offers the dashboards by name from the Details tab', () => {
+  it('offers the dashboards by name from the file header\'s menu', () => {
     // Both halves of dashboard.ts shipped wired into nothing: a board had no route and no link,
-    // and the registry had no caller at all. This is the way in.
+    // and the registry had no caller at all. This is the way in -- the "Where this is" card that
+    // held it is gone (owner, 2026-09-28) and its two actions are the header's ⋯ menu.
     const grid = gridWith();
     grid.studio.showTab('overview');
-    const text = grid.show();
+    grid.fixture.detectChanges();
+    const more = (grid.fixture.nativeElement as HTMLElement)
+      .querySelector<HTMLButtonElement>('button[aria-label="More for this file"]')!;
+    more.click();
+    grid.fixture.detectChanges();
 
-    const link = (grid.fixture.nativeElement as HTMLElement)
-      .querySelector('a[href="/objects/analytics/dashboards"]');
+    // The menu is an overlay, so it is drawn under <body> rather than inside the component.
+    const link = document.querySelector('a[href="/objects/analytics/dashboards"]');
     expect(link).not.toBeNull();
-    expect(text).toContain('a dashboard re-runs saved analyses every time it opens');
+    expect(document.body.textContent).toContain('Name this dataset');
   });
 
   it('does not create the registry until somebody asks for it', () => {
@@ -4992,6 +5043,8 @@ describe('what a saved analysis records is what was on screen', () => {
 
   it('shows what a delete actually removed, in the server’s own words', async () => {
     const canvas = canvasWith();
+    // Deleted from the saved panel, which is where the notice is read.
+    canvas.studio.openSaved();
     await canvas.studio.removeAnalysis({
       analyticsAnalysisId: 7, analysisName: 'Q3 draft', connectionAlias: 'minio-main',
       datasetPath: 'daily/sales-2026.csv', analysisConfig: '{}',

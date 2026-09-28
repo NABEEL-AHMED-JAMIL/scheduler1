@@ -4,6 +4,9 @@ import { forkJoin, of } from 'rxjs';
 import { API_SUCCESS } from '../../core/api/api.config';
 import { Icon } from '../../shared/ui/icon';
 import { TableShell } from '../../shared/ui/data-table';
+import { StatStrip, StatStripItem } from '../../shared/ui/stat-strip';
+import { FormDialog } from '../../shared/ui/form-dialog';
+import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { confirmWith } from '../../shared/ui/confirm';
 import { formatSize } from '../../shared/ui/format-size';
 import { compactNumber, readableCell } from '../../shared/charts/number-format';
@@ -84,10 +87,14 @@ type Tab = 'overview' | 'compact' | 'data' | 'profile' | 'quality'
  *
  * That is also the order a dataset is actually read in, so the grouping costs nothing in
  * navigation and buys a reader the answer to "what will this cost me" before they click.
+ *
+ * The labels are no longer drawn (owner, 2026-09-28): three all-caps headings over nine words
+ * made the strip three rows tall on a phone. The groups stay as a thin divider between them, the
+ * label names the divider for anyone reading the source, and the hint is each tab's tooltip.
  */
 export interface TabGroup {
   label: string;
-  /** Said on the group, because the grouping is a claim about cost and should be checkable. */
+  /** Each tab's tooltip, because the grouping is a claim about cost and should be checkable. */
   hint: string;
   tabs: { id: Tab; label: string }[];
 }
@@ -593,7 +600,8 @@ const DATE_ONLY_TYPE = /^DATE$/i;
   selector: 'app-analytics',
   imports: [
     Icon, TableShell, SqlEditor, BarChart, Donut, RankedBar, Histogram, FilterBuilder, DataGrid,
-    DatasetRegistry, RouterLink, ColumnCard, DatasetOverview,
+    DatasetRegistry, RouterLink, ColumnCard, DatasetOverview, StatStrip, FormDialog,
+    CdkMenu, CdkMenuItem, CdkMenuTrigger,
   ],
   templateUrl: './analytics.html',
   host: { '(document:keydown.escape)': 'onEscape()' },
@@ -604,26 +612,71 @@ export class Analytics implements OnInit {
    * beside the data for good, when it is only needed to choose what to read; the data now has the
    * full width, and the panel gets out of the way once something is picked.
    */
-  readonly filesOpen = signal(false);
+  /**
+   * Which right-hand panel is open: the file picker, or the saved analyses (owner, 2026-09-28 --
+   * the saved list used to be a card under the Canvas result that grew with the library). One
+   * at a time, so opening one closes the other and Escape has a single thing to close.
+   */
+  readonly panel = signal<'files' | 'saved' | null>(null);
+  readonly filesOpen = computed(() => this.panel() === 'files');
+  readonly savedOpen = computed(() => this.panel() === 'saved');
   private readonly panelInjector = inject(Injector);
-  private filesTrigger: HTMLElement | null = null;
+  private panelTrigger: HTMLElement | null = null;
 
-  openFiles(trigger?: EventTarget | null): void {
-    this.filesTrigger = trigger instanceof HTMLElement ? trigger : null;
-    this.filesOpen.set(true);
+  private openPanel(which: 'files' | 'saved', trigger?: EventTarget | null): void {
+    this.panelTrigger = trigger instanceof HTMLElement ? trigger : null;
+    this.panel.set(which);
     // Focus goes into the panel, so a keyboard user is where the list is.
-    afterNextRender(() => document.querySelector<HTMLElement>('#files-panel select, #files-panel button')?.focus(),
+    const id = which === 'files' ? '#files-panel' : '#saved-panel';
+    afterNextRender(() => document.querySelector<HTMLElement>(`${id} select, ${id} input, ${id} button`)?.focus(),
       { injector: this.panelInjector });
   }
 
-  closeFiles(): void {
-    if (!this.filesOpen()) return;
-    this.filesOpen.set(false);
+  private closePanel(): void {
+    if (!this.panel()) return;
+    this.panel.set(null);
     // Back to the button that opened it, rather than to the top of the page.
-    this.filesTrigger?.focus?.();
+    this.panelTrigger?.focus?.();
   }
 
-  onEscape(): void { this.closeFiles(); }
+  openFiles(trigger?: EventTarget | null): void { this.openPanel('files', trigger); }
+
+  closeFiles(): void { if (this.filesOpen()) this.closePanel(); }
+
+  /** The saved analyses, from the Canvas result's "Open saved". The list is read on first arrival at Canvas. */
+  openSaved(trigger?: EventTarget | null): void {
+    this.openAnalyses();
+    this.openPanel('saved', trigger);
+  }
+
+  closeSaved(): void { if (this.savedOpen()) this.closePanel(); }
+
+  /**
+   * The small "Save analysis" dialog. It replaced a card as tall as the result beside it, which
+   * held one text box and two buttons.
+   */
+  readonly saveDialogOpen = signal(false);
+  private saveTrigger: HTMLElement | null = null;
+
+  openSaveDialog(trigger?: EventTarget | null): void {
+    this.saveTrigger = trigger instanceof HTMLElement ? trigger : null;
+    this.analysisSaveError.set('');
+    this.saveDialogOpen.set(true);
+    afterNextRender(() => document.querySelector<HTMLElement>('#a-save-name')?.focus(),
+      { injector: this.panelInjector });
+  }
+
+  closeSaveDialog(): void {
+    if (!this.saveDialogOpen()) return;
+    this.saveDialogOpen.set(false);
+    this.saveTrigger?.focus?.();
+  }
+
+  /** The dialog sits above the panels, so it is the one Escape closes first. */
+  onEscape(): void {
+    if (this.saveDialogOpen()) { this.closeSaveDialog(); return; }
+    this.closePanel();
+  }
 
 
   private readonly storage = inject(StorageService);
@@ -1422,7 +1475,7 @@ export class Analytics implements OnInit {
    * exists to stop.
    */
   /**
-   * Left/Right/Home/End across the ten tabs, moving FOCUS and not the view.
+   * Left/Right/Home/End across the nine tabs, moving FOCUS and not the view.
    *
    * The strip carries a roving tabindex: the open tab is the only one with tabindex 0, so the
    * whole strip is one Tab stop instead of ten and a reader heading for the grid is not walked
@@ -2013,6 +2066,55 @@ export class Analytics implements OnInit {
 
   /** Whether the aggregate tab has anything at all to draw. */
   readonly profileEmpty = computed(() => !!this.profile() && !this.profileColumns().length);
+
+  /**
+   * How many things the Quality tab lists, or null until the profile has been read -- a zero
+   * before anything was checked would be a clean bill of health nobody measured.
+   */
+  readonly qualityIssueCount = computed<number | null>(() =>
+    this.profile() ? this.qualityFindings().length : null);
+
+  /**
+   * The Overview's KPI strip (owner, 2026-09-28). Rows and columns come from the schema and the
+   * page already read; Complete and Quality from the profile the overview read hands up, so they
+   * show a dash until it lands rather than a zero.
+   */
+  readonly overviewStats = computed<StatStripItem[]>(() => {
+    const filled = this.averageFilled();
+    const issues = this.qualityIssueCount();
+    const gaps = this.profileColumns().filter(column => column.measured && column.nullPercent > 0).length;
+    const complete = filled === null ? null : Math.round(filled * 10) / 10;
+    return [
+      { label: 'Rows', value: this.preview() || this.datasetRows() !== null
+          ? compactNumber(this.datasetRows() ?? this.rowCount()) : '—',
+        foot: this.multiFile() ? 'across every matching file'
+          : this.selected()?.size ? `${formatSize(this.selected()!.size!)} on disk` : undefined,
+        icon: 'table' },
+      // The type mix as its foot -- "2 VARCHAR · 1 BIGINT" -- so the tile says what the columns
+      // are as well as how many, which is the Profile tab's first chart in one line.
+      { label: 'Columns', value: this.columns().length || '—', icon: 'list',
+        foot: this.typeBands().slice(0, 3).map(band => `${band.value} ${band.name}`).join(' · ') || undefined },
+      {
+        label: 'Complete', value: complete === null ? '—' : `${complete}%`, icon: 'check',
+        tone: complete === null ? 'muted' : complete >= 99 ? 'ok' : complete >= 90 ? 'warn' : 'crit',
+        foot: complete === null ? undefined
+          : gaps ? `${gaps} column${gaps === 1 ? '' : 's'} with missing values` : 'no missing values',
+        // The one caveat this figure needs, kept as its tooltip: it is not a count of cells.
+        hint: 'Averaged over the columns, each weighted the same; no cell was counted.',
+      },
+      {
+        label: 'Quality issues', value: issues ?? '—', icon: issues ? 'alert' : 'checkCircle',
+        tone: issues === null ? 'muted' : issues ? 'warn' : 'ok',
+        foot: issues === null ? undefined : issues ? 'open the Quality tab' : 'nothing to look at',
+        clickable: issues !== null, quiet: issues === 0,
+      },
+    ];
+  });
+
+  /** The Quality tile is the one that goes somewhere. */
+  onOverviewStat(item: StatStripItem): void {
+    if (item.label === 'Quality issues') this.showTab('quality');
+  }
 
   /**
    * A percentage as the engine gave it, with a trailing ".00" dropped.
@@ -3130,6 +3232,45 @@ export class Analytics implements OnInit {
     const rows = run.rowCount;
     return rows === null || rows === undefined ? '' : rows.toLocaleString();
   }
+
+  /**
+   * What a run was: the word the server wrote for a read that is not a statement ("schema",
+   * "preview", "overview", "profile", "distribution"), or "SQL" for a statement somebody wrote.
+   *
+   * The server records those reads with their query_text set to "-- " and a descriptor --
+   * "-- preview page=0" -- precisely so a comment can never be mistaken for SQL, and that prefix
+   * is the only way to tell them apart. An analysis is recorded as the statement it compiled to,
+   * so it reads as SQL here too.
+   */
+  runKind(run: QueryRun): string {
+    const text = (run.queryText ?? '').trimStart();
+    if (!text.startsWith('-- ')) return 'SQL';
+    return text.slice(3).split(/\s/)[0] || 'SQL';
+  }
+
+  /**
+   * The reads the screen makes by itself on every file open. Three of them per open used to be
+   * three tall cards each, so ten file opens buried the one query somebody actually ran.
+   */
+  private static readonly INTERNAL_KINDS = ['schema', 'preview', 'overview'];
+
+  isInternalRun(run: QueryRun): boolean {
+    return Analytics.INTERNAL_KINDS.includes(this.runKind(run));
+  }
+
+  /** "Show internal steps" in the Activity tab; off, so the list leads with what a person ran. */
+  readonly showInternalRuns = signal(false);
+
+  /**
+   * The rows Activity draws. An internal step that did NOT succeed stays visible with the toggle
+   * off: a schema read that was refused is somebody reaching for a file they could not open,
+   * which is the kind of row this history leads with.
+   */
+  readonly visibleRuns = computed(() => this.showInternalRuns()
+    ? this.recentRuns()
+    : this.recentRuns().filter(run => !this.isInternalRun(run) || run.runStatus !== 'SUCCESS'));
+
+  readonly hiddenRunCount = computed(() => this.recentRuns().length - this.visibleRuns().length);
 
   /** A run's time as the console writes one (server time), or the raw text if it will not parse. */
   runWhen(run: QueryRun): string {
@@ -4897,6 +5038,8 @@ export class Analytics implements OnInit {
           return;
         }
         this.loadedAnalysis.set(response.data);
+        // Closed only on success: a refusal stays in the dialog, beside the name it refused.
+        this.closeSaveDialog();
         this.toast.success(`"${response.data.analysisName ?? this.analysisName().trim()}" saved.`);
         this.loadAnalyses();
       },
@@ -4974,6 +5117,9 @@ export class Analytics implements OnInit {
     this.analysisName.set(saved.analysisName);
     this.drillDimension.set(this.dimensions()[this.dimensions().length - 1] ?? '');
     this.drillNext.set('');
+    // Out of the way once something is picked, as the file panel does. A config that would not
+    // parse returned above, so its error stays in the open panel beside the row that caused it.
+    this.closeSaved();
   }
 
   /**
