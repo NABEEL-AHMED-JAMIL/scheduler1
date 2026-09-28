@@ -43,7 +43,12 @@ describe('JobEdit schedule summary', () => {
   it('follows the day of the month', () => {
     const edit = editor();
     edit.scheduler.patchValue({ frequency: 'Monthly' });
-    expect(edit.summary()).toContain('pick a day');
+    // The day is optional: without one the job keeps the start date's day (ProcessTimeUtil's
+    // plusMonths), so "pick a day" asked for something nobody has to give (UI review jobs#20).
+    expect(edit.summary()).not.toContain('pick a day');
+    expect(edit.summary()).toBe('Every 1 month at 00:00, on the start date\'s day.');
+    edit.scheduler.patchValue({ startDate: '2026-10-07' });
+    expect(edit.summary()).toBe('Every 1 month on day 7 (the start date\'s day) at 00:00.');
     edit.scheduler.patchValue({ dayOfMonth: 15 });
     expect(edit.summary()).toBe('Every 1 month on day 15 at 00:00.');
   });
@@ -53,5 +58,25 @@ describe('JobEdit schedule summary', () => {
     const edit = editor();
     edit.scheduler.patchValue({ intervalValue: 1 });
     expect(edit.summary()).toBe('Every 1 day at 00:00.');
+  });
+
+  /** An interval the field itself refuses was described as "Every 1" (UI review jobs#20). */
+  it('describes no schedule for an interval below one or left empty', () => {
+    const edit = editor();
+    for (const bad of ['0', '', '-2', '1.5']) {
+      edit.scheduler.patchValue({ intervalValue: bad });
+      expect(edit.summary()).not.toContain('Every 1');
+      expect(edit.summary()).toBe('Set how often it repeats to see the schedule.');
+    }
+  });
+
+  /** A past end date saved quietly, and the job then never ran again (UI review jobs#20). */
+  it('flags an end date that has already passed, and only that', () => {
+    const edit = editor();
+    expect(edit.endPassed()).toBe(false);
+    edit.scheduler.patchValue({ endDate: '2020-01-01' });
+    expect(edit.endPassed()).toBe(true);
+    edit.scheduler.patchValue({ endDate: '2999-12-31' });
+    expect(edit.endPassed()).toBe(false);
   });
 });

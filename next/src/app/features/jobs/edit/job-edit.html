@@ -116,7 +116,7 @@
               <app-field label="Day of month" for="dayOfMonth"
                          [control]="scheduler.get('dayOfMonth')" [submitted]="submitted()">
                 <select id="dayOfMonth" class="input" formControlName="dayOfMonth">
-                  <option [ngValue]="null">Select a day</option>
+                  <option [ngValue]="null">Same day as the start date</option>
                   @for (day of monthDays; track day) { <option [ngValue]="day">{{ day }}</option> }
                 </select>
               </app-field>
@@ -145,6 +145,12 @@
           <p class="text-sm mt-3.5 rounded-md px-3 py-2 bg-sunken">
             {{ summary() }}
           </p>
+          @if (endPassed()) {
+            <!-- Saving stays allowed: extending or clearing the date later is a fair plan. -->
+            <p class="text-sm mt-2 text-warn-500" role="status">
+              This end date has passed, so the job will not run again until you extend or clear it.
+            </p>
+          }
         </div>
       }
 

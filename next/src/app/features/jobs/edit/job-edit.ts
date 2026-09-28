@@ -11,6 +11,7 @@ import { Field } from '../../../shared/ui/field';
 import { Icon } from '../../../shared/ui/icon';
 import { LoadError } from '../../../shared/ui/load-error';
 import { NOTIFY_OPTIONS } from '../notify-summary';
+import { SERVER_ZONE } from '../../../core/instant';
 import { Combobox, ComboboxOption } from '../../../shared/ui/combobox';
 
 const FREQUENCIES = [
@@ -250,8 +251,14 @@ export class JobEdit implements OnInit {
     if (!this.isScheduled()) return 'Runs only when you trigger it.';
     const frequency = this.frequencyValue();
     const schedule = this.schedule();
-    // A job read back from the server carries the interval as a number: 1, not '1'.
-    const every = String(schedule['intervalValue'] || '1');
+    // A job read back from the server carries the interval as a number: 1, not '1'. One the field
+    // refuses (0, empty, a fraction) is not described at all: "Every 1" claimed a schedule the
+    // form would not save, and the field's own error is the message that matters.
+    const interval = Number(schedule['intervalValue'] ?? 1);
+    if (schedule['intervalValue'] === '' || !Number.isInteger(interval) || interval < 1) {
+      return 'Set how often it repeats to see the schedule.';
+    }
+    const every = String(interval);
     const time = schedule['startTime'] || '00:00';
     const plural = every === '1' ? '' : 's';
     let text: string;
@@ -268,16 +275,32 @@ export class JobEdit implements OnInit {
         break;
       }
       case 'Monthly': {
+        // The day is optional: without one the scheduler adds whole months to the start date
+        // (ProcessTimeUtil's plusMonths), so the job keeps the start date's day.
         const day = schedule['dayOfMonth'];
-        text = day
-          ? `Every ${every} month${plural} on day ${day} at ${time}`
-          : `Every ${every} month${plural} at ${time} — pick a day`;
+        const startDay = Number(String(schedule['startDate'] ?? '').slice(8, 10)) || null;
+        text = day ? `Every ${every} month${plural} on day ${day} at ${time}`
+          : startDay ? `Every ${every} month${plural} on day ${startDay} (the start date's day) at ${time}`
+          : `Every ${every} month${plural} at ${time}, on the start date's day`;
         break;
       }
       default: text = '';
     }
     const end = schedule['endDate'];
     return end ? `${text}, until ${end} inclusive.` : `${text}.`;
+  });
+
+  /**
+   * An end date already behind the server's today: the job saves, and then never runs again. The
+   * list says "Expired — no further runs" for it; the editor said nothing. Compared in the
+   * server's zone, because that is the calendar the scheduler checks the end date against.
+   */
+  readonly endPassed = computed(() => {
+    if (!this.isScheduled()) return false;
+    const end = this.schedule()['endDate'];
+    if (!end) return false;
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: SERVER_ZONE }).format(new Date());
+    return end < today;
   });
 
   /** The schedule only counts for a scheduled job; disabled controls are skipped by validation. */
