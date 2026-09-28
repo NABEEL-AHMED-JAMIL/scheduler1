@@ -18,9 +18,8 @@ describe('row controls', () => {
   it('names each row menu after its row', async () => {
     const { readFileSync, readdirSync } = await fs();
     const base = `${root()}/src/app/features`;
-    // Jobs is being reworked in its own pass, which renames its menu there.
     const offenders = readdirSync(base, { recursive: true })
-      .filter(f => /\.(html|ts)$/.test(f) && !f.startsWith('jobs/') && !f.endsWith('.spec.ts'))
+      .filter(f => /\.(html|ts)$/.test(f) && !f.endsWith('.spec.ts'))
       .filter(f => readFileSync(`${base}/${f}`, 'utf8').includes('aria-label="Actions"'));
     expect(offenders).toEqual([]);
   });

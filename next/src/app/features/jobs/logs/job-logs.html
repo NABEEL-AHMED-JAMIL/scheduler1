@@ -152,10 +152,13 @@
     }
   }
 
-  <app-table-shell heading="Log entries" [loading]="loading()" [error]="error()"
+  <app-table-shell heading="Log entries" [loading]="loading()" [error]="error()" [errorRetryable]="!missing()"
                    [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="logs().length"
                    [emptyMessage]="search() ? 'No entries match your search.' : 'This run reported no log entries.'"
                    (retry)="load()">
+    @if (missing()) {
+      <a error-action routerLink="/operations/jobs" class="btn btn-default btn-sm mt-4">Back to jobs</a>
+    }
     <ng-container toolbar>
       <app-segmented [(value)]="view" [options]="views" ariaLabel="Log layout" />
 

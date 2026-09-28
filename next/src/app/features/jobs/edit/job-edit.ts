@@ -1,4 +1,6 @@
-import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
+import { Component, ElementRef, Injector, OnInit, computed, inject, input, signal } from '@angular/core';
+import { focusFirstInvalid } from '../../../shared/ui/focus-first-invalid';
+import { isMissingRecord, isRecordId } from '../../../core/api/missing-record';
 import { HttpClient } from '@angular/common/http';
 import { Router, RouterLink } from '@angular/router';
 import {
@@ -86,6 +88,8 @@ function endAfterStart(group: AbstractControl): ValidationErrors | null {
 export class JobEdit implements OnInit {
   readonly jobId = input<string>('');
 
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef, { optional: true });
+  private readonly injector = inject(Injector);
   private readonly fb = inject(FormBuilder);
   private readonly http = inject(HttpClient);
   private readonly toast = inject(ToastService);
@@ -110,6 +114,8 @@ export class JobEdit implements OnInit {
    * instead of the form: an empty "Edit job" form would save as an update with no job id.
    */
   readonly loadError = signal('');
+  /** The job is not there to load, so Try again cannot help: the page offers Back to jobs instead. */
+  readonly loadMissing = signal(false);
   readonly submitted = signal(false);
   readonly selectedDays = signal<string[]>([]);
 
@@ -190,13 +196,24 @@ export class JobEdit implements OnInit {
   retryLoad(): void { this.loadJob(); }
 
   private loadJob(): void {
-    this.loading.set(true);
     this.loadError.set('');
+    this.loadMissing.set(false);
+    // An id that is not a number cannot name a job; asking anyway only earned the server's refusal.
+    if (!isRecordId(this.jobId())) {
+      this.missing('That link does not point to a job.');
+      return;
+    }
+    this.loading.set(true);
     this.http.get<ApiResponse<any>>(`${API_BASE}/sourceJob.json/fetchSourceJobDetailWithSourceJobId`,
       { params: { jobId: this.jobId() } }).subscribe({
       next: response => {
         this.loading.set(false);
-        if (response.status !== API_SUCCESS || !response.data) {
+        // Another person's job reads exactly like a missing one for a tenant user (JobOwnership).
+        if (isMissingRecord(response) || (response.status === API_SUCCESS && !response.data)) {
+          this.missing(`Job #${String(this.jobId()).trim()} does not exist or was deleted.`);
+          return;
+        }
+        if (response.status !== API_SUCCESS) {
           this.loadError.set(response.message || 'That job could not be loaded.');
           return;
         }
@@ -236,9 +253,16 @@ export class JobEdit implements OnInit {
       },
       error: err => {
         this.loading.set(false);
-        this.loadError.set(err?.error?.message || 'That job could not be loaded.');
+        if (isMissingRecord(err)) this.missing(`Job #${String(this.jobId()).trim()} does not exist or was deleted.`);
+        else this.loadError.set(err?.error?.message || 'That job could not be loaded.');
       },
     });
+  }
+
+  private missing(reason: string): void {
+    this.loading.set(false);
+    this.loadError.set(reason);
+    this.loadMissing.set(true);
   }
 
   toggleDay(day: string): void {
@@ -317,6 +341,8 @@ export class JobEdit implements OnInit {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       this.toast.error('Check the highlighted fields.');
+      // Focus stayed on Save, so a keyboard or screen-reader user had to go looking for the field.
+      if (this.host) focusFirstInvalid(this.host.nativeElement, this.injector);
       return;
     }
     if (this.isScheduled() && this.frequencyValue() === 'Weekly' && !this.selectedDays().length) {

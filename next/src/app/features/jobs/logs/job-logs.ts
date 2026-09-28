@@ -8,6 +8,7 @@ import { StickToBottom } from '../../../shared/ui/stick-to-bottom';
 import { Icon } from '../../../shared/ui/icon';
 import { RankedBar } from '../../../shared/charts/ranked-bar';
 import { StatusPill } from '../../../shared/ui/status-pill';
+import { isMissingRecord } from '../../../core/api/missing-record';
 import { JobEventsService } from '../../../core/socket/job-events.service';
 import { Subscription } from 'rxjs';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
@@ -86,6 +87,8 @@ export class JobLogs implements OnInit, OnDestroy {
 
   readonly refreshing = signal(false);
   readonly live = signal(true);
+  /** The run is not there, so neither Try again nor the live poll can help (the page offers Back to jobs). */
+  readonly missing = signal(false);
   private timer: ReturnType<typeof setTimeout> | null = null;
 
   /** A run that has finished will not gain entries, so polling it is pure waste. */
@@ -356,6 +359,7 @@ export class JobLogs implements OnInit, OnDestroy {
     // Refuse it here and say what actually went wrong.
     if (!this.validIds()) {
       this.loading.set(false);
+      this.missing.set(true);
       this.error.set('That link is missing the run it refers to. Open the run from the job\'s '
         + 'history instead.');
       return;
@@ -379,6 +383,9 @@ export class JobLogs implements OnInit, OnDestroy {
           this.job.set(data?.sourceJob ?? null);
           this.run.set(data?.sourceJobQueue ?? null);
           this.loadAiSteps();
+        } else if (isMissingRecord(response)) {
+          this.goneMissing();
+          return;
         } else {
           this.error.set(response.message);
         }
@@ -388,12 +395,29 @@ export class JobLogs implements OnInit, OnDestroy {
       error: err => {
         this.loading.set(false);
         this.refreshing.set(false);
+        if (isMissingRecord(err)) {
+          this.goneMissing();
+          return;
+        }
         this.error.set(err?.error?.message || 'Could not load the logs.');
         // A failed poll still re-arms: a run does not stop producing lines because one request
         // was refused, and giving up here is how a screen goes quiet without saying so.
         this.arm();
       },
     });
+  }
+
+  /**
+   * The run (or its job) is not there: a stale link, a deleted job, or another person's job for a
+   * tenant user, which the server answers the same way. Said plainly, and the poll stops: the run
+   * is cleared, so the live effect sees nothing still running.
+   */
+  private goneMissing(): void {
+    this.clearTimer();
+    this.run.set(null);
+    this.logs.set([]);
+    this.missing.set(true);
+    this.error.set(`Run #${this.jobQueueId().trim()} of job #${this.jobId().trim()} does not exist or was deleted.`);
   }
 
   /**

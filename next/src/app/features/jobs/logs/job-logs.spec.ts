@@ -155,3 +155,38 @@ describe('JobLogs timing chart names', () => {
     expect(numbers.sort()).toEqual(['2', '4']);
   });
 });
+
+/**
+ * A run that is not there (a stale link, a deleted job, or another person's job for a tenant user)
+ * showed the server's "SourceJob not found with 2808." beside a Try again that could only fail the
+ * same way, and the live poll kept asking every five seconds.
+ */
+describe('JobLogs for a run that does not exist', () => {
+  function missingRun() {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [JobLogs], providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting(),
+      { provide: JobEventsService, useValue: { connected: signal(false), events: new Subject() } }] });
+    const fixture = TestBed.createComponent(JobLogs);
+    fixture.componentRef.setInput('jobId', '2808');
+    fixture.componentRef.setInput('jobQueueId', '6839');
+    fixture.detectChanges();
+    const http = TestBed.inject(HttpTestingController);
+    http.expectOne(r => r.url.endsWith('/sourceJob.json/findSourceJobAuditLog'))
+      .flush({ status: 'ERROR', message: 'SourceJob not found with 2808.' });
+    fixture.detectChanges();
+    return { fixture, http, el: fixture.nativeElement as HTMLElement, component: fixture.componentInstance };
+  }
+
+  it('says the run does not exist and offers a way back, not Try again', () => {
+    const { el, component } = missingRun();
+    expect(component.error()).toBe('Run #6839 of job #2808 does not exist or was deleted.');
+    expect(component.missing()).toBe(true);
+    expect([...el.querySelectorAll('button')].some(b => /Try again/.test(b.textContent!))).toBe(false);
+    expect([...el.querySelectorAll('a')].some(a => /Back to jobs/.test(a.textContent!))).toBe(true);
+  });
+
+  it('stops asking', () => {
+    const { component } = missingRun();
+    expect(component.autoRefreshing()).toBe(false);
+  });
+});

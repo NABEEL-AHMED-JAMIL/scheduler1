@@ -14,7 +14,13 @@
       <div class="spinner mx-auto mb-3" role="status" aria-label="Loading"></div>Loading…
     </div>
   } @else if (loadError()) {
-    <div class="card"><app-load-error [message]="loadError()" (retry)="retryLoad()" /></div>
+    <div class="card">
+      <app-load-error [message]="loadError()" [retryable]="!loadMissing()" (retry)="retryLoad()">
+        @if (loadMissing()) {
+          <a routerLink="/operations/jobs" class="btn btn-default btn-sm mt-4">Back to jobs</a>
+        }
+      </app-load-error>
+    </div>
   } @else {
     <form [formGroup]="form" (ngSubmit)="save()" class="card p-4">
       <div class="form-section">

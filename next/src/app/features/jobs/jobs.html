@@ -138,7 +138,7 @@
               <button type="button" class="btn btn-ghost btn-icon btn-xs"
                       (click)="toggleRow(job)"
                       [attr.aria-expanded]="expanded().has(job.jobId)"
-                      [attr.aria-label]="expanded().has(job.jobId) ? 'Hide details' : 'Show details'">
+                      [attr.aria-label]="(expanded().has(job.jobId) ? 'Hide details for ' : 'Show details for ') + job.jobName">
                 <app-icon [name]="expanded().has(job.jobId) ? 'chevronDown' : 'chevronRight'" />
               </button>
             </td>
@@ -212,7 +212,7 @@
             <td class="text-right col-pin-right"
                 [class.bg-[var(--surface-sunken)]]="selected().has(job.jobId)">
               <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="menu"
-                      [disabled]="busyJob() === job.jobId" aria-label="Actions">
+                      [disabled]="busyJob() === job.jobId" [attr.aria-label]="'Actions for ' + (job.jobName || ('job #' + job.jobId))">
                 <app-icon name="dots" size="1.05em" />
               </button>
               <ng-template #menu>

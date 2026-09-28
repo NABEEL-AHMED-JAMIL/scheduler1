@@ -7,6 +7,7 @@ import { Router, RouterLink } from '@angular/router';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { AuthService } from '../../../core/auth/auth.service';
 import { JobEventsService } from '../../../core/socket/job-events.service';
+import { isMissingRecord } from '../../../core/api/missing-record';
 import { TableShell } from '../../../shared/ui/data-table';
 import { StatusPill } from '../../../shared/ui/status-pill';
 import { StatusFilterChip } from '../../../shared/ui/status-filter-chip';
@@ -106,6 +107,8 @@ export class JobHistory {
   readonly runs = signal<JobQueue[]>([]);
   readonly loading = signal(true);
   readonly error = signal('');
+  /** The job is not there, so Try again cannot help: the page offers Back to jobs instead. */
+  readonly missing = signal(false);
   readonly statusFilter = signal('');
   readonly jobName = signal('');
   /** Every job's name by id, for the all-jobs drill-down's Job column. */
@@ -364,6 +367,7 @@ export class JobHistory {
     if (!silent) {
       this.loading.set(true);
       this.error.set('');
+      this.missing.set(false);
     }
     if (!this.isDrillDown() && !this.jobId()) {
       // Nothing identifies what to show. Reachable only by hand-editing the URL.
@@ -396,7 +400,14 @@ export class JobHistory {
       next: response => {
         this.loading.set(false);
         if (response.status !== API_SUCCESS) {
-          if (!silent) this.error.set(response.message);
+          // Another person's job reads exactly like a missing one for a tenant user (JobOwnership).
+          if (!this.isDrillDown() && isMissingRecord(response)) {
+            this.missing.set(true);
+            this.runs.set([]);
+            this.error.set(`Job #${String(this.jobId()).trim()} does not exist or was deleted.`);
+          } else if (!silent) {
+            this.error.set(response.message);
+          }
           return;
         }
         const data = response.data ?? {};

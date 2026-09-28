@@ -10,7 +10,7 @@ const JOB = { jobId: 41, jobName: 'Nightly export', execution: 'Manual', priorit
   taskDetail: { taskDetailId: 7 } };
 
 /** The editor for job 41, reading it through `read` and saving through `write`. */
-function editor(read: () => unknown, write: () => unknown = () => of({ status: 'SUCCESS' })) {
+function editor(read: () => unknown, write: () => unknown = () => of({ status: 'SUCCESS' }), id = '41') {
   const errors: unknown[] = [];
   const writes: string[] = [];
   TestBed.resetTestingModule();
@@ -24,7 +24,7 @@ function editor(read: () => unknown, write: () => unknown = () => of({ status: '
     { provide: Router, useValue: { navigate: () => {} } },
   ] });
   const component = TestBed.runInInjectionContext(() => new JobEdit());
-  (component as any).jobId = () => '41';
+  (component as any).jobId = () => id;
   component.ngOnInit();
   return { component, errors, writes };
 }
@@ -97,5 +97,31 @@ describe('JobEdit with Manual execution', () => {
     expect(component.form.valid).toBe(false);
     component.form.patchValue({ executionType: 'Manual' });
     expect(component.form.valid).toBe(true);
+  });
+});
+
+/**
+ * A job that is not there (a stale link, a deleted job, or another person's job for a tenant user,
+ * which the server answers exactly the same way) read as a fault: the server's "SourceJob not found
+ * with 2838." and a Try again that could only fail again. It says so plainly, with no Try again.
+ */
+describe('JobEdit for a job that does not exist', () => {
+  it('says the job does not exist and offers no Try again', () => {
+    const { component } = editor(() => of({ status: 'ERROR', message: 'SourceJob not found with 41.' }));
+    expect(component.loadError()).toBe('Job #41 does not exist or was deleted.');
+    expect(component.loadMissing()).toBe(true);
+  });
+
+  it('does not ask the server about an id that is not a number', () => {
+    let asked = 0;
+    const { component } = editor(() => { asked++; return of({ status: 'SUCCESS', data: JOB }); }, undefined, 'abc');
+    expect(asked).toBe(0);
+    expect(component.loadError()).toBe('That link does not point to a job.');
+    expect(component.loadMissing()).toBe(true);
+  });
+
+  it('still offers Try again for a real fault', () => {
+    const { component } = editor(() => throwError(() => ({ status: 500, error: { message: 'Database unavailable.' } })));
+    expect(component.loadMissing()).toBe(false);
   });
 });
