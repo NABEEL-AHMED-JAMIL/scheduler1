@@ -45,7 +45,8 @@ import { ThemeService } from '../../core/theme.service';
           <div class="card p-8 flex flex-col items-center gap-3 text-center">
             <span class="stat-glyph"><app-icon name="checkCircle" class="icon-ok" /></span>
             <div>
-              <h1 class="text-lg font-semibold">Thank you — your request has been recorded</h1>
+              <!-- The server's acknowledgement below already thanks them and says it was recorded. -->
+              <h1 class="text-lg font-semibold">Request received</h1>
               <p class="mt-1.5 text-sm text-[color:var(--text-secondary)] max-w-md">
                 {{ acknowledgement() }}
               </p>
@@ -62,22 +63,22 @@ import { ThemeService } from '../../core/theme.service';
           <form [formGroup]="form" class="form-stack mt-8 card p-6" (ngSubmit)="submit()">
             <app-field label="Organisation" for="organisationName" [required]="true"
                        [control]="form.get('organisationName')" [submitted]="submitted()"
-                       hint="The name your workspace will carry.">
-              <input id="organisationName" class="input" formControlName="organisationName"
+                       hint="The name your workspace will carry." [errorMessages]="tooLong">
+              <input id="organisationName" class="input" formControlName="organisationName" maxlength="255"
                      placeholder="Northwind Logistics" />
             </app-field>
 
             <div class="form-grid">
               <app-field label="Your name" for="contactName" [required]="true"
-                         [control]="form.get('contactName')" [submitted]="submitted()">
-                <input id="contactName" class="input" formControlName="contactName" />
+                         [control]="form.get('contactName')" [submitted]="submitted()" [errorMessages]="tooLong">
+                <input id="contactName" class="input" formControlName="contactName" maxlength="255" />
               </app-field>
 
               <app-field label="Your email" for="contactEmail" [required]="true"
                          [control]="form.get('contactEmail')" [submitted]="submitted()"
                          hint="Where the sign-in details will be sent, and your username."
-                         [errorMessages]="{ email: 'That does not look like an email address.' }">
-                <input id="contactEmail" type="email" class="input" formControlName="contactEmail" />
+                         [errorMessages]="{ email: 'That does not look like an email address.', maxlength: tooLong.maxlength }">
+                <input id="contactEmail" type="email" class="input" formControlName="contactEmail" maxlength="255" />
               </app-field>
             </div>
 
@@ -127,10 +128,16 @@ export class RequestWorkspace {
   readonly done = signal(false);
   readonly acknowledgement = signal('');
 
+  /**
+   * The server keeps 255 characters of each and answered a longer one with a generic 500. The
+   * inputs stop at 255 as typed; the validator catches a paste that got past them.
+   */
+  readonly tooLong = { maxlength: 'Keep this under 255 characters.' };
+
   readonly form: FormGroup = this.fb.group({
-    organisationName: ['', Validators.required],
-    contactName: ['', Validators.required],
-    contactEmail: ['', [Validators.required, Validators.email]],
+    organisationName: ['', [Validators.required, Validators.maxLength(255)]],
+    contactName: ['', [Validators.required, Validators.maxLength(255)]],
+    contactEmail: ['', [Validators.required, Validators.email, Validators.maxLength(255)]],
     purpose: [''],
   });
 
