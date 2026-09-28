@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, computed, effect, inject, input, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, LOCALE_ID, computed, effect, inject, input, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { DecimalPipe, NgTemplateOutlet } from '@angular/common';
 import { RouterLink } from '@angular/router';
@@ -257,10 +257,22 @@ export class JobLogs implements OnInit, OnDestroy {
     return `${Math.floor(seconds / 3600)}h ${Math.round((seconds % 3600) / 60)}m`;
   }
 
+  /** The entries in time order: what the chart's gaps and every entry's number are counted from. */
+  private readonly timeOrdered = computed(() => [...this.logs()]
+    .filter(row => !!row.dateCreated)
+    .sort((a, b) => new Date(a.dateCreated!).getTime() - new Date(b.dateCreated!).getTime()));
+
+  /**
+   * Each entry's number in time order, for the table's # column. It counted the rows on screen,
+   * so a search renumbered them 1, 2, 3 and the chart's "(#16)" matched nothing.
+   */
+  readonly entryNo = computed(() => new Map(this.timeOrdered().map((row, index) => [row, index + 1])));
+
+  /** The same clock the views print entry times with: API times are Chicago wall-clock. */
+  private readonly clock = new ServerTimePipe(inject(LOCALE_ID));
+
   readonly gaps = computed(() => {
-    const rows = [...this.logs()]
-      .filter(row => !!row.dateCreated)
-      .sort((a, b) => new Date(a.dateCreated!).getTime() - new Date(b.dateCreated!).getTime());
+    const rows = this.timeOrdered();
     if (!rows.length) return [];
 
     const started = this.runStartedAt();
@@ -269,8 +281,12 @@ export class JobLogs implements OnInit, OnDestroy {
       const t = new Date(started).getTime();
       if (Number.isFinite(t)) anchors.push({ at: t, label: 'Start' });
     }
+    // Named by the entry's time, which the Timeline, Table and Console all show, with its number
+    // kept: two entries in the same second would otherwise share a name, and the chart keys its
+    // bars by name.
     rows.forEach((row, index) =>
-      anchors.push({ at: new Date(row.dateCreated!).getTime(), label: `#${index + 1}` }));
+      anchors.push({ at: new Date(row.dateCreated!).getTime(),
+        label: `${this.clock.transform(row.dateCreated, 'HH:mm:ss')} (#${index + 1})` }));
 
     if (anchors.length < 2) return [];
     const out: { name: string; value: number }[] = [];

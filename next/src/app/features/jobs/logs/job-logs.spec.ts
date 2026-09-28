@@ -8,6 +8,7 @@ import { Subject } from 'rxjs';
 import { JobLogs } from './job-logs';
 import { JobEventsService } from '../../../core/socket/job-events.service';
 import { API_SUCCESS } from '../../../core/api/api.config';
+import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 
 /**
  * MIG-212: the run's log lines name the files it read and wrote, and each opens its folder; an AI
@@ -114,5 +115,43 @@ describe('JobLogs timeline tone', () => {
   ])('%s', (text, tone) => {
     const { component } = page();
     expect(component.toneOf(text)).toBe(tone);
+  });
+});
+
+/**
+ * UI review jobs#25: the timing chart named its bars "Before #16", "Before #9" -- numbers the
+ * default Timeline view never shows, and the table's # column renumbered under a search. The bars
+ * now carry the entry's time (which every view shows) with its number, and the # column counts
+ * the same way the chart does.
+ */
+describe('JobLogs timing chart names', () => {
+  const at = (time: string) => `2026-09-20T${time}`;
+  const ENTRIES = [
+    { jobAuditLogId: 11, logsDetail: 'Scanning', dateCreated: at('18:15:00') },
+    { jobAuditLogId: 12, logsDetail: 'handed to worker', dateCreated: at('18:15:10.000') },
+    { jobAuditLogId: 13, logsDetail: 'Reading', dateCreated: at('18:15:10.400') },
+    { jobAuditLogId: 14, logsDetail: 'handed back', dateCreated: at('18:17:00') },
+  ];
+
+  it('names each bar by the entry\'s time as the views show it, and keeps names unique within a second', () => {
+    const { component } = page();
+    component.runStartedAt.set(at('18:14:00'));
+    component.logs.set(ENTRIES as any);
+    const clock = new ServerTimePipe('en-US');
+    const names = component.topGaps().map(g => g.name);
+    expect(new Set(names).size).toBe(names.length);
+    expect(names).toContain(`Before ${clock.transform(at('18:17:00'), 'HH:mm:ss')} (#4)`);
+    expect(names).toContain(`Before ${clock.transform(at('18:15:10.000'), 'HH:mm:ss')} (#2)`);
+    expect(names).toContain(`Before ${clock.transform(at('18:15:10.400'), 'HH:mm:ss')} (#3)`);
+  });
+
+  it('keeps each entry\'s own number in the table while a search narrows it', () => {
+    const { fixture, el, component } = page();
+    component.logs.set([...ENTRIES].reverse() as any);
+    component.view.set('table');
+    component.search.set('handed');
+    fixture.detectChanges();
+    const numbers = [...el.querySelectorAll('tbody tr')].map(tr => tr.querySelector('td')!.textContent!.trim());
+    expect(numbers.sort()).toEqual(['2', '4']);
   });
 });

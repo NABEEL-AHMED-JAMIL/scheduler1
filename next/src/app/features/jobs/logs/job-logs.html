@@ -217,7 +217,7 @@
             <tbody>
               @for (log of filtered(); track $index) {
                 <tr>
-                  <td class="text-right tabular text-[color:var(--text-muted)]">{{ $index + 1 }}</td>
+                  <td class="text-right tabular text-[color:var(--text-muted)]">{{ entryNo().get(log) ?? '—' }}</td>
                   <td class="tabular whitespace-nowrap">
                     {{ log.dateCreated ? (log.dateCreated | serverTime:'HH:mm:ss') : '—' }}
                   </td>
