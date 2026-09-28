@@ -1992,3 +1992,18 @@ html.dark .btn-circle-danger:hover:not(:disabled) { background: color-mix(in okl
     display: block;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Truncated inline links (UI/UX pass, shell#12).
+
+   .link-inline is inline-flex, and text-overflow does nothing on a flex container: a truncated
+   link was cut mid-letter with no ellipsis (profile's Recent runs, tasks, users, prompts...).
+   Truncating one makes it an inline block instead, capped at its container. Inline-block rather
+   than block so one in running text keeps flowing; inside a flex row it is blockified anyway,
+   and min-width 0 lets it shrink there.
+   --------------------------------------------------------------------------- */
+@layer components {
+  .link-inline.truncate { display: inline-block; max-width: 100%; min-width: 0; vertical-align: bottom; }
+  /* The flex gap is gone with the flex box, so a leading icon keeps its space this way. */
+  .link-inline.truncate > app-icon { margin-inline-end: 0.25rem; }
+}

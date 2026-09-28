@@ -19,8 +19,11 @@ import {
   selector: 'app-phone-input',
   imports: [FormsModule],
   template: `
-    <div class="flex gap-2">
-      <select class="input max-w-44 shrink-0" [ngModel]="country()" name="phoneCountry"
+    <!-- A fixed country width and a floor under the number: at 1024 the number box was 101px and
+         a typed number scrolled out of view. In a column too narrow for both, the number wraps
+         under the country instead of overflowing. -->
+    <div class="flex flex-wrap gap-2">
+      <select class="input w-32 shrink-0" [ngModel]="country()" name="phoneCountry"
               [ngModelOptions]="{standalone: true}"
               (ngModelChange)="onCountryChange($event)"
               [attr.aria-label]="'Country dialling code'">
@@ -28,7 +31,7 @@ import {
           <option [value]="c.code">{{ c.flag }} {{ c.code }} +{{ c.dial }}</option>
         }
       </select>
-      <input class="input flex-1 min-w-0" type="tel" inputmode="tel" [id]="inputId()"
+      <input class="input flex-1 min-w-[9rem]" type="tel" inputmode="tel" [id]="inputId()"
              [ngModel]="national()" name="phoneNational"
              [ngModelOptions]="{standalone: true}"
              (ngModelChange)="onNationalChange($event)"
