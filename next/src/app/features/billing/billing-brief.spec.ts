@@ -64,3 +64,35 @@ describe('BillingBrief', () => {
     expect(fixture.nativeElement.querySelector('.card')).not.toBeNull();
   });
 });
+
+/**
+ * On the Dashboard the brief sits straight under the page's h1, so its h3 skipped a level; on
+ * Profile it sits under the person's h2 name, where h3 is right.
+ */
+describe('BillingBrief heading level', () => {
+  function rendered(level?: 2 | 3): HTMLElement {
+    TestBed.resetTestingModule();
+    const api = { summary: vi.fn(() => of({ status: API_SUCCESS, data: { currency: 'USD', monthToDate: '12.5', periodStart: '2026-09-01',
+      openBalance: '0', openCount: 0, overdueBalance: '0', overdueCount: 0, pendingSlips: 0 } })) };
+    TestBed.configureTestingModule({ providers: [provideRouter([]),
+      { provide: BillingApi, useValue: api }, { provide: AuthService, useValue: { isTenantAdmin: () => true, isPlatformAdmin: () => false } },
+    ] });
+    const fixture = TestBed.createComponent(BillingBrief);
+    if (level) fixture.componentRef.setInput('headingLevel', level);
+    fixture.detectChanges();
+    return fixture.nativeElement as HTMLElement;
+  }
+
+  it('is an h3 by default', () => {
+    const el = rendered();
+    expect(el.querySelector('h3')?.textContent).toContain('Your bill');
+    expect(el.querySelector('h2')).toBeNull();
+  });
+
+  it('is an h2 when the host asks for one', () => {
+    const el = rendered(2);
+    expect(el.querySelector('h2')?.textContent).toContain('Your bill');
+    expect(el.querySelector('h3')).toBeNull();
+  });
+});
+
