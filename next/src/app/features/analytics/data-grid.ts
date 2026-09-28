@@ -4,6 +4,8 @@ import {
 } from '@angular/core';
 import { Icon } from '../../shared/ui/icon';
 import { BlurLoader } from '../../shared/ui/blur-loader';
+import { WrapToggle } from '../../shared/ui/wrap-toggle';
+import { capTitle } from '../../shared/ui/long-text';
 import { copyText } from '../../shared/ui/clipboard.util';
 import { FilterClause, FilterOperator, OPERAND_COUNT } from './analytics.service';
 import { FILTER_OPERATORS, isDateType, isNumericType } from './filter-builder';
@@ -151,7 +153,7 @@ type Pending = '' | 'sort' | 'search' | 'filter';
  */
 @Component({
   selector: 'app-data-grid',
-  imports: [Icon, BlurLoader],
+  imports: [Icon, BlurLoader, WrapToggle],
   host: { class: 'block min-w-0' },
   template: `
     <div class="flex flex-col gap-2 min-w-0">
@@ -183,14 +185,9 @@ type Pending = '' | 'sort' | 'search' | 'filter';
         </button>
 
         <!-- Owner, 2026-09-24: long values wrap on request. One truncated line stays the default --
-             a dense grid is read down its columns -- and the choice is remembered with the layout. -->
-        <button type="button" class="btn btn-xs"
-                [class.btn-primary]="wrapText()" [class.btn-default]="!wrapText()"
-                [attr.aria-pressed]="wrapText()"
-                title="Show long values in full, wrapped inside each column"
-                (click)="toggleWrap()">
-          <app-icon name="wrapText" />Wrap text
-        </button>
+             a dense grid is read down its columns -- and the choice is remembered with the layout.
+             The switch is shared with the result tables, which remember it the same way. -->
+        <app-wrap-toggle [on]="wrapText()" (toggled)="toggleWrap()" />
 
         <div class="relative">
           <button #columnsTrigger type="button" class="btn btn-default btn-xs"
@@ -393,7 +390,7 @@ type Pending = '' | 'sort' | 'search' | 'filter';
                         [style.maxWidth.px]="column.maxWidth"
                         [attr.tabindex]="isFocused(r, c) ? 0 : -1"
                         [attr.data-cell]="r + '-' + c"
-                        [title]="row[column.index] ?? 'null'"
+                        [title]="row[column.index] === null ? 'null' : cap(row[column.index])"
                         (focus)="focusRow.set(r); focusCol.set(c)"
                         (keydown)="onCellKey($event, r, c)">
                       <span class="inline-flex items-center gap-1 max-w-full">
@@ -550,6 +547,8 @@ export class DataGrid {
   protected readonly columnsPanelOpen = signal(false);
   /** Long values in full, wrapped inside their column, instead of one truncated line. Remembered with the layout. */
   protected readonly wrapText = signal(false);
+  /** A cell's tooltip, capped: a 20,000-character note made a screen-high one (owner, 2026-09-28). */
+  protected readonly cap = capTitle;
   private readonly injector = inject(Injector);
   private readonly columnsTrigger = viewChild<ElementRef<HTMLButtonElement>>('columnsTrigger');
   private readonly columnsPanel = viewChild<ElementRef<HTMLElement>>('columnsPanel');
@@ -1158,6 +1157,20 @@ function readLayout(key: string): StoredLayout {
     // Unreadable or written by an older shape. Starting from the dataset's own layout is right.
     return empty;
   }
+}
+
+/**
+ * The "Wrap text" choice alone, for a table with no widths or hidden columns to keep -- the SQL and
+ * Canvas results, a dashboard table expanded. Kept in the same record the grid keeps, under that
+ * table's own key, so the one switch is remembered the one way and survives a private window the
+ * same way (not at all, and without an error).
+ */
+export function readWrap(key: string): boolean {
+  return readLayout(key).wrap;
+}
+
+export function writeWrap(key: string, wrap: boolean): void {
+  writeLayout(key, { ...readLayout(key), wrap });
 }
 
 function writeLayout(key: string, layout: StoredLayout): void {

@@ -1,5 +1,6 @@
 import { Component, ChangeDetectionStrategy, computed, input } from '@angular/core';
 import { compactNumber } from './number-format';
+import { capTitle } from '../ui/long-text';
 
 export interface ScatterPoint {
   /** The label the pair came from, so a dot can say what it is. */
@@ -43,7 +44,7 @@ const PAD = 26;
         @for (dot of dots(); track dot.label) {
           <circle [attr.cx]="dot.cx" [attr.cy]="dot.cy" r="3.5" [attr.fill]="colour()"
                   fill-opacity="0.75">
-            <title>{{ dot.label }}: {{ dot.shownX }}, {{ dot.shownY }}</title>
+            <title>{{ dot.title }}: {{ dot.shownX }}, {{ dot.shownY }}</title>
           </circle>
         }
         <!-- The FORMATTED bounds, not the raw ones. bounds().highX is the number the geometry
@@ -104,6 +105,7 @@ export class ScatterPlot {
 
     return this.data().map(point => ({
       label: point.label,
+      title: capTitle(point.label),
       shownX: this.format()(point.x),
       shownY: this.format()(point.y),
       cx: PAD + (point.x / spanX) * usableWidth,

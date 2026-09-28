@@ -3,7 +3,9 @@ import {
 } from '@angular/core';
 
 import { compactNumber, compactTenths } from './number-format';
+import { shortLabel } from './short-label';
 import { compactDuration, formatDuration } from '../ui/time-format';
+import { capTitle } from '../ui/long-text';
 
 export interface BarSegment { label: string; value: number; color: string; }
 
@@ -158,7 +160,9 @@ const RESERVE_AXIS_ONLY = 18;
                   [class.justify-start]="bar.align === 'start'"
                   [class.justify-end]="bar.align === 'end'">
               @if (bar.labelled) {
-                <span class="whitespace-nowrap">{{ bar.name }}</span>
+                <!-- Short: the thinning above is measured on this string, and a category can be a
+                     20,000-character note (owner, 2026-09-28). The whole name is in the hint. -->
+                <span class="whitespace-nowrap">{{ bar.short }}</span>
               }
             </span>
           </button>
@@ -180,10 +184,11 @@ const RESERVE_AXIS_ONLY = 18;
         -->
         <ul class="flex flex-wrap gap-x-3 gap-y-1 mt-2 list-none" aria-hidden="true">
           @for (entry of legend(); track entry.label) {
-            <li class="flex items-center gap-1.5 text-[10px] text-[color:var(--text-muted)]">
+            <li class="flex items-center gap-1.5 text-[10px] text-[color:var(--text-muted)]"
+                [title]="title(entry.label)">
               <span class="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
                     [style.background]="entry.color"></span>
-              <span class="whitespace-nowrap">{{ entry.label }}</span>
+              <span class="whitespace-nowrap">{{ short(entry.label) }}</span>
             </li>
           }
         </ul>
@@ -381,7 +386,9 @@ export class BarChart {
     // The widest label decides the spacing for all of them: thinning to fit the average leaves
     // the long ones overlapping their neighbours, which is what "CUST-00111 CUST-00319CUST-00315"
     // along the bottom of a Top-10 chart was.
-    const needed = Math.max(LABEL_PX, widestText(this.data().map(bar => bar.name)));
+    // The SHORTENED name, because that is what is drawn: measured on the whole value, one
+    // 20,000-character category asked for 120,000px and left only the two ends labelled.
+    const needed = Math.max(LABEL_PX, widestText(this.data().map(bar => shortLabel(bar.name))));
     return Math.max(1, Math.ceil(needed / pitch));
   });
 
@@ -450,6 +457,7 @@ export class BarChart {
         // The two outermost labels are pulled inward so they sit over the plot rather than
         // hanging 10px into the card's padding, pointing at nothing.
         align: !labelled ? 'center' : index === starts[0] ? 'start' : index === last ? 'end' : 'center',
+        short: shortLabel(bar.name),
         display: (this.valueFormat() ?? format)(bar.value),
         hint: this.hintFor(bar, this.hintFormat()),
         px: px,
@@ -476,11 +484,12 @@ export class BarChart {
   }
 
   private hintFor(bar: Bar, format: (value: number) => string): string {
-    const head = `${bar.name}: ${format(bar.value)}`
+    // The whole name, capped like any tooltip: the label under the bar is only its first words.
+    const head = `${capTitle(bar.name)}: ${format(bar.value)}`
       + (bar.value > this.maxValue() ? ' \u2014 taller than this chart\u2019s scale, drawn cut' : '');
     const parts = (bar.segments ?? []).filter(part => part.value > 0);
     return parts.length
-      ? head + ' — ' + parts.map(part => `${part.label} ${format(part.value)}`).join(', ')
+      ? head + ' — ' + parts.map(part => `${capTitle(part.label)} ${format(part.value)}`).join(', ')
       : head;
   }
 
@@ -505,13 +514,17 @@ export class BarChart {
     return entries;
   });
 
+  /** A legend entry as drawn, and as its tooltip. */
+  protected readonly short = shortLabel;
+  protected readonly title = capTitle;
+
   /** What a screen reader is told about a chart nobody can click into. */
   protected readonly summary = computed(() => {
     const data = this.data();
     if (!data.length) return this.emptyMessage();
     const format = this.hintFormat();
     const peak = data.reduce((a, b) => (b.value > a.value ? b : a), data[0]);
-    return `Bar chart of ${data.length} values from ${data[0].name} to ${data[data.length - 1].name}; `
-      + `highest is ${peak.name} at ${format(peak.value)}.`;
+    return `Bar chart of ${data.length} values from ${shortLabel(data[0].name)} to ${shortLabel(data[data.length - 1].name)}; `
+      + `highest is ${shortLabel(peak.name)} at ${format(peak.value)}.`;
   });
 }

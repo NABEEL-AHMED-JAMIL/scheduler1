@@ -1,6 +1,8 @@
 import { Component, computed, input } from '@angular/core';
 import { CHART_SLOTS, chartColor } from './status-color';
 import { compactNumber } from './number-format';
+import { shortLabel } from './short-label';
+import { capTitle } from '../ui/long-text';
 
 export interface GroupedSeries {
   /** The value of the SECOND dimension this series stands for. */
@@ -40,7 +42,7 @@ export interface GroupedSeries {
             <span class="inline-flex items-center gap-1.5 text-[11px]
                          text-[color:var(--text-secondary)]">
               <span class="w-2.5 h-2.5 rounded-sm shrink-0"
-                    [style.background]="entry.color"></span>{{ entry.name }}
+                    [style.background]="entry.color"></span>{{ entry.short }}
             </span>
           }
         </div>
@@ -51,7 +53,7 @@ export interface GroupedSeries {
           <div class="flex flex-col gap-0.5">
             <div class="flex items-baseline justify-between gap-2">
               <span class="text-xs truncate text-[color:var(--text-secondary)]"
-                    [title]="group.name">{{ group.name }}</span>
+                    [title]="group.title">{{ group.short }}</span>
             </div>
             <div class="flex flex-col gap-0.5">
               @for (bar of group.bars; track bar.name) {
@@ -70,7 +72,7 @@ export interface GroupedSeries {
                            [style.width.%]="bar.percent"
                            [style.minWidth.px]="2"
                            [style.background]="bar.color"
-                           [attr.title]="bar.name + ': ' + bar.display"></div>
+                           [attr.title]="bar.title + ': ' + bar.display"></div>
                     }
                   </div>
                   <span class="text-[11px] tabular shrink-0 w-16 text-right
@@ -94,6 +96,7 @@ export class GroupedBar {
   readonly legend = computed(() =>
     this.series().map((entry, index) => ({
       name: entry.name,
+      short: shortLabel(entry.name),
       color: chartColor(index % CHART_SLOTS),
     })));
 
@@ -120,10 +123,15 @@ export class GroupedBar {
     const top = this.ceiling();
     return names.map((name, groupIndex) => ({
       name,
+      // Cluster and series names are values of the data, and one can be a 20,000-character note
+      // (owner, 2026-09-28): drawn short, whole (capped) in the tooltip.
+      short: shortLabel(name),
+      title: capTitle(name),
       bars: all.map((entry, seriesIndex) => {
         const value = entry.values[groupIndex] ?? null;
         return {
           name: entry.name,
+          title: capTitle(entry.name),
           value,
           // A zero stays 0% here and is made visible by the 2px floor on the element instead --
           // a percentage floor would scale with the rail and read as a small VALUE, while a

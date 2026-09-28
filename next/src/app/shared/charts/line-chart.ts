@@ -1,5 +1,7 @@
 import { Component, ChangeDetectionStrategy, computed, input } from '@angular/core';
 import { compactNumber } from './number-format';
+import { shortLabel } from './short-label';
+import { capTitle } from '../ui/long-text';
 
 export interface Point {
   label: string;
@@ -50,13 +52,13 @@ const PAD_BOTTOM = 18;
         @for (mark of marks(); track mark.label) {
           <circle [attr.cx]="mark.x" [attr.cy]="mark.y" r="2.5" [attr.fill]="colour()"
                   vector-effect="non-scaling-stroke">
-            <title>{{ mark.label }}: {{ mark.shown }}</title>
+            <title>{{ mark.title }}: {{ mark.shown }}</title>
           </circle>
         }
       </svg>
       <div class="flex justify-between text-[10px] text-[color:var(--text-muted)] tabular">
         @for (mark of labelled(); track mark.label) {
-          <span class="truncate">{{ mark.label }}</span>
+          <span class="truncate">{{ mark.short }}</span>
         }
       </div>
     }
@@ -102,6 +104,9 @@ export class LineChart {
 
     return points.map((point, at) => ({
       label: point.label,
+      // A point's label is a value of the data and can be a paragraph (owner, 2026-09-28).
+      short: shortLabel(point.label),
+      title: capTitle(point.label),
       shown: this.format()(point.value),
       x: PAD_LEFT + step * at,
       y: usable - ((point.value - low) / span) * (usable - 8) + 4,
@@ -129,7 +134,7 @@ export class LineChart {
   protected readonly summary = computed(() => {
     const marks = this.marks();
     if (!marks.length) return this.emptyMessage();
-    return `A series of ${marks.length} points, from ${marks[0].label} `
-      + `to ${marks[marks.length - 1].label}.`;
+    return `A series of ${marks.length} points, from ${marks[0].short} `
+      + `to ${marks[marks.length - 1].short}.`;
   });
 }

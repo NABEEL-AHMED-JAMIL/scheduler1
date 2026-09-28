@@ -18,7 +18,12 @@ import { RankedBar } from '../../shared/charts/ranked-bar';
 import { RouterLink } from '@angular/router';
 import { BucketSummary, ObjectSummary, StorageService } from '../objects/storage.service';
 import { SqlEditor } from './sql-editor';
-import { DataGrid, GridColumn, GridCopy, GridSort } from './data-grid';
+import { DataGrid, GridColumn, GridCopy, GridSort, readWrap, writeWrap } from './data-grid';
+import { DataText } from '../../shared/ui/data-text';
+import { WrapToggle } from '../../shared/ui/wrap-toggle';
+import { capTitle } from '../../shared/ui/long-text';
+import { shortLabel } from '../../shared/charts/short-label';
+import { WRAPPED_LINES } from './widget-table';
 import { DatasetRegistry } from './dashboard';
 import { DatasetOverview } from './dataset-overview';
 import {
@@ -538,6 +543,10 @@ export function dateOnly(text: string): string {
 
 const DATE_ONLY_TYPE = /^DATE$/i;
 
+/** Where the two result tables remember "Wrap text"; see readWrap in data-grid.ts. */
+export const SQL_WRAP_KEY = 'result:sql';
+export const CANVAS_WRAP_KEY = 'result:canvas';
+
 /**
  * Analytics Studio, phase one: pick a file in object storage and read it safely.
  *
@@ -601,7 +610,7 @@ const DATE_ONLY_TYPE = /^DATE$/i;
   imports: [
     Icon, TableShell, SqlEditor, BarChart, Donut, RankedBar, Histogram, FilterBuilder, DataGrid,
     DatasetRegistry, RouterLink, ColumnCard, DatasetOverview, StatStrip, FormDialog,
-    CdkMenu, CdkMenuItem, CdkMenuTrigger,
+    CdkMenu, CdkMenuItem, CdkMenuTrigger, DataText, WrapToggle,
   ],
   templateUrl: './analytics.html',
   host: { '(document:keydown.escape)': 'onEscape()' },
@@ -692,6 +701,28 @@ export class Analytics implements OnInit {
 
   readonly humanSize = formatSize;
   readonly compact = compactNumber;
+
+  /*
+   * Values from the customer's file, which can be 20,000-character notes (owner, 2026-09-28).
+   * Result cells are app-data-text; a chip or a crumb names a filter on such a value, so its words
+   * are shortened here and its tooltip capped. "Wrap text" on the two result tables is the Data
+   * grid's switch, remembered the way the grid remembers it.
+   */
+  protected readonly cap = capTitle;
+  protected chipText(label: string): string {
+    return shortLabel(label, 60);
+  }
+  protected readonly wrappedLines = WRAPPED_LINES;
+  readonly sqlWrap = signal(readWrap(SQL_WRAP_KEY));
+  readonly canvasWrap = signal(readWrap(CANVAS_WRAP_KEY));
+  setSqlWrap(on: boolean): void {
+    this.sqlWrap.set(on);
+    writeWrap(SQL_WRAP_KEY, on);
+  }
+  setCanvasWrap(on: boolean): void {
+    this.canvasWrap.set(on);
+    writeWrap(CANVAS_WRAP_KEY, on);
+  }
 
   // ---- the storage walk ----------------------------------------------------------------
 

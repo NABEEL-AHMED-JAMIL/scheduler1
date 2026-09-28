@@ -1616,6 +1616,50 @@ html.dark {
            hover:text-[color:var(--text-primary)];
   }
   .th-sort-active { @apply text-[color:var(--text-primary)]; }
+}
+
+@layer components {
+  /* A value from a customer's file (shared/ui/data-text.ts). Owner, 2026-09-28: a 20,000-character
+     note printed on one line made the Compact table 5,043px wide. Clamped to --data-text-lines, and
+     overflow-wrap: anywhere so one unbroken token wraps too -- it is also what lets the value's box
+     shrink below the length of its longest word, which is the width a table asks its cells for.
+     In a layer so that a caller's max-w-* on the host still wins. */
+  .data-text { display: flex; align-items: flex-end; gap: 0.25rem; min-width: 0; }
+  .data-text-value {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: var(--data-text-lines, 1);
+    line-clamp: var(--data-text-lines, 1);
+    overflow-wrap: anywhere;
+    /* Not inherited: a table header is nowrap, and a nowrap value's narrowest width is all of it. */
+    white-space: normal;
+    text-align: inherit;
+  }
+  /* One line: break between any two letters, so the line runs to its ellipsis. Broken only between
+     words, a single clamped line stops at the last whole word and leaves a gap before "Show all". */
+  .data-text-one .data-text-value { word-break: break-all; }
+  /* The value as a button (the Canvas table's click-to-filter cells): a link's look, a value's clamp. */
+  .data-text-action {
+    @apply underline decoration-dotted underline-offset-2 hover:text-[color:var(--text-primary)]
+           disabled:cursor-not-allowed disabled:opacity-60;
+  }
+  /* Sits on the value's last line, the height of that line, so appearing moves nothing. */
+  .data-text-more {
+    flex: none;
+    font-family: var(--font-sans, inherit);
+    font-size: 10px;
+    line-height: inherit;
+    white-space: nowrap;
+    color: var(--accent-text);
+    @apply underline underline-offset-2 rounded px-0.5
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)];
+  }
+  .data-text-more-icon { @apply no-underline text-[color:var(--text-muted)] hover:text-[color:var(--accent-text)]; }
+  /* The whole value in the panel: its own line breaks kept, and a 20,000-character token wrapped. */
+  .data-text-full { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
   /* A heading that does not sort, set exactly like a table-modern <th> -- for a header built
      outside a <thead> (a grid list's header row) or a label beside .th-sort buttons. */
   .th-static {

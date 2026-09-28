@@ -2,6 +2,7 @@ import { Component, computed, effect, inject, input, output, signal, untracked }
 import { Subscription } from 'rxjs';
 import { API_SUCCESS } from '../../core/api/api.config';
 import { Icon } from '../../shared/ui/icon';
+import { DataText } from '../../shared/ui/data-text';
 import { formatSize } from '../../shared/ui/format-size';
 import { BarChart, Bar } from '../../shared/charts/bar-chart';
 import { RankedBar } from '../../shared/charts/ranked-bar';
@@ -23,7 +24,7 @@ interface OverviewTile { chart: OverviewChart; view: WidgetView | null; kind: st
  */
 @Component({
   selector: 'app-dataset-overview',
-  imports: [Icon, AnalyticsWidget, WidgetChart, BarChart, RankedBar],
+  imports: [Icon, AnalyticsWidget, WidgetChart, BarChart, RankedBar, DataText],
   template: `
     <!-- No tiles here. Rows, columns, Complete and Quality are the Studio's KPI strip right above
          this (owner, 2026-09-28), where the quality count -- which this component cannot see --
@@ -69,7 +70,14 @@ interface OverviewTile { chart: OverviewChart; view: WidgetView | null; kind: st
                   } @else {
                     <app-bar-chart [data]="binBars(d)" [height]="150" [format]="figure" emptyMessage="No rows fell into this chart." />
                   }
-                  @if (d.mostCommon && (d.mostCommonRows ?? 0) > 1) { <p class="text-[11px] text-[color:var(--text-muted)] mt-1">Most common: <span class="mono">{{ d.mostCommon }}</span> in {{ (d.mostCommonRows ?? 0).toLocaleString() }} rows.</p> }
+                  @if (d.mostCommon && (d.mostCommonRows ?? 0) > 1) {
+                    <!-- A value of the file, which can be a 20,000-character note (owner, 2026-09-28): data text,
+                         two lines, the whole of it behind "Show all". -->
+                    <div class="text-[11px] text-[color:var(--text-muted)] mt-1 min-w-0">
+                      <p>Most common, in {{ (d.mostCommonRows ?? 0).toLocaleString() }} rows:</p>
+                      <app-data-text class="mono" [value]="d.mostCommon" [lines]="2" [label]="d.name + ' · most common'" />
+                    </div>
+                  }
                 }
               }
               @case ('completeness') {

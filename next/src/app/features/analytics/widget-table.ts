@@ -1,7 +1,20 @@
-import { Component, ChangeDetectionStrategy, inject, input } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, input, signal } from '@angular/core';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { readableCell } from '../../shared/charts/number-format';
 import { FormDialog } from '../../shared/ui/form-dialog';
+import { DataText } from '../../shared/ui/data-text';
+import { WrapToggle } from '../../shared/ui/wrap-toggle';
+import { readWrap, writeWrap } from './data-grid';
+
+/**
+ * How many lines of a value a result table shows with "Wrap text" on. Not all of it, as the Data
+ * grid does: a 20,000-character note wrapped whole is a row five hundred lines tall, and "Show all"
+ * already opens the whole value beside the table.
+ */
+export const WRAPPED_LINES = 8;
+
+/** Where a result table's "Wrap text" is remembered; see readWrap in data-grid.ts. */
+export const WIDGET_TABLE_WRAP_KEY = 'result:widget-table';
 
 /**
  * The rows of a result, drawn the same way on a tile and in the expanded view.
@@ -15,6 +28,7 @@ import { FormDialog } from '../../shared/ui/form-dialog';
 @Component({
   selector: 'app-widget-table',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [DataText],
   template: `
     <div class="overflow-x-auto">
       <table class="table-modern">
@@ -29,7 +43,7 @@ import { FormDialog } from '../../shared/ui/form-dialog';
           @for (row of rows(); track $index) {
             <tr>
               @for (cell of row; track $index) {
-                <td class="whitespace-nowrap tabular">
+                <td class="tabular align-top">
                   @if (cell === null) {
                     <!-- A real null, which is not an empty string and is certainly not a zero. -->
                     <span class="text-[color:var(--text-muted)]" title="null">—</span>
@@ -39,8 +53,15 @@ import { FormDialog } from '../../shared/ui/form-dialog';
                          last eight of them an artefact of the CSV reader typing money as DOUBLE.
                          Rounding it in the title as well would hide that from anyone reconciling
                          against another system, which is the one job that needs the unrounded
-                         number. -->
-                    <span [title]="cell">{{ readable(cell, measureColumn()[$index]) }}</span>
+                         number.
+                         A value can also be a 20,000-character note (owner, 2026-09-28), so it is
+                         data text: one line capped at 24rem, the whole of it behind "Show all". The
+                         cap is what keeps one long column from taking every other column's width, and the
+                         floor what keeps a squeezed column readable: a value that may wrap anywhere
+                         could otherwise be narrowed to one letter when the table outgrows its box. -->
+                    <app-data-text [class]="wrap() ? 'min-w-24 max-w-xl' : 'min-w-24 max-w-sm'" [value]="readable(cell, measureColumn()[$index])"
+                                   [hint]="cell" [lines]="wrap() ? wrappedLines : 1"
+                                   [label]="columns()[$index]" />
                   }
                 </td>
               }
@@ -62,6 +83,9 @@ export class WidgetTable {
    * roles to read and says so.
    */
   readonly measureColumn = input<boolean[]>([]);
+  /** Several lines of each value rather than one: the "Wrap text" switch, where the host has one. */
+  readonly wrap = input(false);
+  protected readonly wrappedLines = WRAPPED_LINES;
 
   protected readable(cell: string, isMeasure: boolean | undefined): string {
     return isMeasure === false ? cell : readableCell(cell);
@@ -96,7 +120,7 @@ export interface WidgetTableData {
  */
 @Component({
   selector: 'app-widget-table-dialog',
-  imports: [WidgetTable, FormDialog],
+  imports: [WidgetTable, FormDialog, WrapToggle],
   template: `
     <!-- The shared shell: header, scrolling body, and a footer that is the dismissal alone. -->
     <app-form-dialog [heading]="data.title" [subtitle]="shown()" size="xwide"
@@ -108,14 +132,25 @@ export interface WidgetTableData {
       @for (note of data.notes; track note) {
         <p class="field-note text-[color:var(--text-muted)] pb-1">{{ note }}</p>
       }
+      <!-- The Data grid's switch, remembered the same way. Here rather than on the tile: a tile is
+           a few rows at a glance, and this is where a table is read. -->
+      <div class="flex justify-end pb-2">
+        <app-wrap-toggle [on]="wrap()" (toggled)="setWrap($event)" />
+      </div>
       <app-widget-table [columns]="data.columns" [rows]="data.rows"
-                        [measureColumn]="data.measureColumn" />
+                        [measureColumn]="data.measureColumn" [wrap]="wrap()" />
     </app-form-dialog>
   `,
 })
 export class WidgetTableDialog {
   readonly ref = inject<DialogRef<void>>(DialogRef);
   readonly data = inject<WidgetTableData>(DIALOG_DATA);
+  protected readonly wrap = signal(readWrap(WIDGET_TABLE_WRAP_KEY));
+
+  protected setWrap(on: boolean): void {
+    this.wrap.set(on);
+    writeWrap(WIDGET_TABLE_WRAP_KEY, on);
+  }
 
   /**
    * How much of the result this is.

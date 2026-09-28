@@ -1,5 +1,6 @@
 import { Component, ChangeDetectionStrategy, computed, input } from '@angular/core';
 import { readableCell } from './number-format';
+import { capTitle } from '../ui/long-text';
 
 export interface ComparisonSide {
   label: string;
@@ -30,12 +31,12 @@ export interface ComparisonSide {
     <div class="flex items-stretch gap-3 py-3 min-w-0">
       <div class="flex flex-col gap-1 min-w-0 flex-1">
         <span class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)] truncate"
-              [title]="first().label">{{ first().label }}</span>
+              [title]="cap(first().label)">{{ first().label }}</span>
         <span class="text-2xl font-semibold tabular truncate">{{ shownFirst() }}</span>
       </div>
       <div class="flex flex-col gap-1 min-w-0 flex-1 border-s border-subtle ps-3">
         <span class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)] truncate"
-              [title]="second().label">{{ second().label }}</span>
+              [title]="cap(second().label)">{{ second().label }}</span>
         <span class="text-2xl font-semibold tabular truncate">{{ shownSecond() }}</span>
       </div>
       <div class="flex flex-col gap-1 min-w-0 flex-1 border-s border-subtle ps-3">
@@ -54,6 +55,8 @@ export interface ComparisonSide {
 })
 export class Comparison {
 
+  /** A side's name can be a value of the data, and a 20,000-character one makes a screen-high tooltip. */
+  protected readonly cap = capTitle;
   readonly first = input.required<ComparisonSide>();
   readonly second = input.required<ComparisonSide>();
 

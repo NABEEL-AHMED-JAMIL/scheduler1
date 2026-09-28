@@ -1,5 +1,7 @@
 import { Component, computed, input, output } from '@angular/core';
 import { CHART_SLOTS, chartColor } from './status-color';
+import { shortLabel } from './short-label';
+import { capTitle } from '../ui/long-text';
 
 export interface RankedItem {
   name: string;
@@ -36,10 +38,10 @@ export interface RankedItem {
             <button type="button" class="w-full text-left group block"
                     [class.cursor-default]="!clickable() || row.inert"
                     [disabled]="!clickable() || !!row.inert"
-                    [title]="row.name + ': ' + (row.display || row.value)"
+                    [title]="row.title + ': ' + (row.display || row.value)"
                     (click)="picked.emit(row)">
               <span class="flex items-center gap-2 text-[11px] leading-none">
-                <span class="truncate text-[color:var(--text-secondary)]">{{ row.name }}</span>
+                <span class="truncate text-[color:var(--text-secondary)]">{{ row.short }}</span>
                 <span class="ml-auto tabular font-medium shrink-0">{{ row.display || row.value }}</span>
                 @if (showPercent()) {
                   <span class="tabular text-[color:var(--text-muted)] w-8 text-right shrink-0">
@@ -121,6 +123,10 @@ export class RankedBar {
 
     return shown.map((row, index) => ({
       ...row,
+      // A category can be a 20,000-character note (owner, 2026-09-28): the row carries its first
+      // words and the tooltip the value, capped.
+      short: shortLabel(row.name),
+      title: capTitle(row.name),
       percent: Math.round((row.value / total) * 100),
       width: Math.max(2, (row.value / largest) * 100),
       color: row.color ?? this.palette[index % this.palette.length],

@@ -12,6 +12,7 @@ import { RankedBar } from '../../shared/charts/ranked-bar';
 import { chartColor } from '../../shared/charts/status-color';
 import { GroupedBar, GroupedSeries } from '../../shared/charts/grouped-bar';
 import { WidgetTable } from './widget-table';
+import { DataText } from '../../shared/ui/data-text';
 import { KINDS } from './widget-kinds';
 import type { PivotGrid, WidgetVisualization } from './analytics.service';
 import type { Mark, WidgetView } from './dashboard';
@@ -30,7 +31,7 @@ export const WIDGET_HEIGHT_MAX = 600;
  */
 @Component({
   selector: 'app-widget-chart',
-  imports: [BarChart, Donut, KpiCard, LineChart, ScatterPlot, Comparison, Histogram, ResultSummary, RankedBar, GroupedBar, WidgetTable],
+  imports: [BarChart, Donut, KpiCard, LineChart, ScatterPlot, Comparison, Histogram, ResultSummary, RankedBar, GroupedBar, WidgetTable, DataText],
   template: `
     @if (view(); as v) {
       <!-- In a row layout a compact kind (a figure, a ring, ranked bars, a summary) is capped and
@@ -51,25 +52,32 @@ export const WIDGET_HEIGHT_MAX = 600;
         }
         @case ('pivot') {
           @if (v.pivot; as grid) {
-            <!-- The grid the server composed. Scrolls inside its own container so a wide cross-tab never makes the page scroll sideways. -->
+            <!-- The grid the server composed. Scrolls inside its own container so a wide cross-tab never makes the page scroll sideways.
+                 Its headers down the side and across the top are values of the data, drawn as data text: a
+                 20,000-character note as a row header made the grid that wide (owner, 2026-09-28). -->
             <div class="overflow-x-auto">
               <table class="table-modern">
                 <thead>
                   <tr>
                     <th class="whitespace-nowrap">{{ grid.rowDimension }}</th>
-                    @for (column of grid.columnValues; track column) { <th class="whitespace-nowrap text-right">{{ column }}</th> }
+                    @for (column of grid.columnValues; track column) {
+                      <th class="text-right"><app-data-text class="min-w-16 max-w-48 ml-auto" [value]="column" [label]="grid.columnDimension" /></th>
+                    }
                   </tr>
                 </thead>
                 <tbody>
                   @for (row of pivotRows(grid); track $index) {
                     <tr>
-                      <th scope="row" class="whitespace-nowrap text-left font-normal">
-                        @if (row.key === null) { <span class="text-[color:var(--text-muted)]" title="null">—</span> } @else { {{ row.key }} }
+                      <th scope="row" class="text-left font-normal">
+                        @if (row.key === null) { <span class="text-[color:var(--text-muted)]" title="null">—</span> } @else { <app-data-text class="min-w-24 max-w-64" [value]="row.key" [label]="grid.rowDimension" /> }
                       </th>
                       @for (cell of row.cells; track $index) {
                         <td class="whitespace-nowrap tabular text-right">
                           <!-- No rows in that combination is not a zero: a grid that printed 0 would assert a measurement nobody made. -->
-                          @if (cell === null) { <span class="text-[color:var(--text-muted)]" title="no rows">—</span> } @else { <span [title]="cell">{{ readable(cell) }}</span> }
+                          @if (cell === null) { <span class="text-[color:var(--text-muted)]" title="no rows">—</span> } @else {
+                            <!-- Usually a figure (the unrounded one is the tooltip), but a minimum or maximum of a text column is a value of the file, of any length. -->
+                            <app-data-text class="min-w-16 max-w-48 ml-auto" [value]="readable(cell)" [hint]="cell" />
+                          }
                         </td>
                       }
                     </tr>
