@@ -12,7 +12,8 @@ import { TableShell } from '../../shared/ui/data-table';
 import { Icon } from '../../shared/ui/icon';
 import { Pagination } from '../../shared/ui/pagination';
 import { createPager } from '../../shared/ui/pager';
-import { notificationTarget } from './notification-links';
+import { openableTarget } from './notification-links';
+import { AuthService } from '../../core/auth/auth.service';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 
 interface Notification {
@@ -49,6 +50,7 @@ export class Notifications implements OnInit {
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
   private readonly store = inject(NotificationsStore);
+  private readonly auth = inject(AuthService);
 
   readonly items = signal<Notification[]>([]);
   readonly loading = signal(true);
@@ -177,9 +179,9 @@ export class Notifications implements OnInit {
     this.onFilterChange();
   }
 
-  /** Where a row goes when clicked, or null when the notification carries no link. */
+  /** Where a row goes when clicked, or null when it carries no link this person may follow. */
   targetOf(item: Notification): string | null {
-    return notificationTarget(item.linkUrl);
+    return openableTarget(item.linkUrl, key => this.auth.canOpen(key));
   }
 
   open(item: Notification): void {

@@ -8,6 +8,11 @@ import { ToastService } from '../../shared/ui/toast.service';
 import { LIST_LIMIT } from '../../core/api/list-limit';
 import { PAGE_SIZES } from '../../shared/ui/pager';
 import { NotificationsStore } from '../../core/notifications/notifications.store';
+import { AuthService } from '../../core/auth/auth.service';
+import { useMemoryStorage } from '../../shared/testing/memory-storage';
+
+// The real AuthService, which decides what a link may open, reads the stored session.
+useMemoryStorage();
 
 function build(http: Record<string, unknown>) {
   const toast = { success: vi.fn(), error: vi.fn(), warn: vi.fn(), info: vi.fn() };
@@ -334,5 +339,19 @@ describe('Notifications page and the header badge', () => {
     notifications.load();
 
     expect(TestBed.inject(NotificationsStore).unread()).toBe(9);
+  });
+});
+
+describe('Notifications for a tenant user without the page a link names', () => {
+  it('offers no Open for a link the access profile withholds, and does not navigate', () => {
+    const { notifications, router } = build({ post: vi.fn(() => of({ status: 'SUCCESS' })) });
+    const auth = TestBed.inject(AuthService);
+    vi.spyOn(auth, 'canOpen').mockImplementation(key => key !== 'jobs');
+    const row = { notificationId: 1, title: 'Done', read: false, dateCreated: '', linkUrl: '/jobList' } as any;
+
+    expect(notifications.targetOf(row)).toBeNull();
+    notifications.open(row);
+    expect(router.navigateByUrl).not.toHaveBeenCalled();
+    expect(notifications.targetOf({ ...row, linkUrl: '/operations/queue' })).toBe('/operations/queue');
   });
 });

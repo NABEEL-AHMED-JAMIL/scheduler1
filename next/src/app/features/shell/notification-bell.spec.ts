@@ -6,6 +6,11 @@ import { Router, provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { NotificationBell } from './notification-bell';
 import { NotificationsStore } from '../../core/notifications/notifications.store';
+import { AuthService } from '../../core/auth/auth.service';
+import { useMemoryStorage } from '../../shared/testing/memory-storage';
+
+// The real AuthService, which decides what a link may open, reads the stored session.
+useMemoryStorage();
 
 /**
  * The three ways the bell disagreed with itself.
@@ -326,5 +331,17 @@ describe('Notification bell when the list cannot be loaded', () => {
     const band = Array.from(el.querySelectorAll('p')).find(p => p.textContent?.includes('more unread'))!;
     expect(band.className).toContain('border-t');
     expect(band.className).toContain('py-2');
+  });
+});
+
+describe('Notification bell for a tenant user without the page a link names', () => {
+  it('marks the row read without navigating to a page the profile withholds', () => {
+    const { bell, post, navigateByUrl } = opened({ unreadCount: 1, fetched: [note(1, false, '/jobList')] });
+    vi.spyOn(TestBed.inject(AuthService), 'canOpen').mockImplementation(key => key !== 'jobs');
+
+    bell.open_(note(1, false, '/jobList') as any);
+
+    expect(post).toHaveBeenCalled();
+    expect(navigateByUrl).not.toHaveBeenCalled();
   });
 });

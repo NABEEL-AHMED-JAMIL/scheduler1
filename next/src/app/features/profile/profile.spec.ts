@@ -52,3 +52,14 @@ describe('Profile details with the name cleared', () => {
     expect(component.nameError()).toBe('');
   });
 });
+
+describe('Profile for a tenant user without Source Jobs', () => {
+  it('does not link the Jobs tile or run names to a page the profile withholds', () => {
+    const { component } = profile();
+    expect(component.canOpenJobs()).toBe(true);
+    const auth = TestBed.inject(AuthService) as unknown as { canOpen: (k: string) => boolean };
+    auth.canOpen = key => key !== 'jobs';
+    const again = TestBed.runInInjectionContext(() => new Profile());
+    expect(again.canOpenJobs()).toBe(false);
+  });
+});

@@ -1,3 +1,5 @@
+import { PageKey } from '../../core/auth/page-keys';
+
 /**
  * The backend stores routes from the Angular 8 app, so a stored link points at a page that
  * does not exist here. Rewriting them on the way out keeps old rows useful without touching
@@ -27,4 +29,39 @@ export function notificationTarget(linkUrl: string | null | undefined): string |
   if (!raw) return null;
   const [path] = raw.split('?');
   return ROUTE_MAP[path] ?? (path.startsWith('/') ? path : null);
+}
+
+/**
+ * The page an access profile governs at each path, most specific first so the saved-analysis
+ * library is not read as Analytics Studio. The same paths the header menu tags.
+ */
+const PAGE_PATHS: [string, PageKey][] = [
+  ['/operations/jobs', 'jobs'],
+  ['/operations/tasks', 'tasks'],
+  ['/operations/queue', 'queue'],
+  ['/operations/reports', 'reports'],
+  ['/objects/files', 'objects'],
+  ['/objects/analytics/dashboards', 'analytics-dashboards'],
+  ['/objects/analytics', 'analytics'],
+  ['/tools/converter', 'tools-converter'],
+  ['/tools/transcript', 'tools-transcript'],
+  ['/assistants/prompts', 'ai-prompts'],
+];
+
+/** The access-profile page a path opens, or null for a page no profile can take away. */
+export function pageKeyForPath(path: string): PageKey | null {
+  const hit = PAGE_PATHS.find(([prefix]) => path === prefix || path.startsWith(prefix + '/'));
+  return hit ? hit[1] : null;
+}
+
+/**
+ * notificationTarget, less any page this person's access profile withholds. A tenant user
+ * without Source Jobs was offered "Open" on a job's notification and landed on the
+ * unauthorized page; the notification is still shown, it just no longer links anywhere.
+ */
+export function openableTarget(linkUrl: string | null | undefined, canOpen: (page: PageKey) => boolean): string | null {
+  const target = notificationTarget(linkUrl);
+  if (!target) return null;
+  const key = pageKeyForPath(target);
+  return key && !canOpen(key) ? null : target;
 }

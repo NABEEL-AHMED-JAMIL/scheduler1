@@ -153,6 +153,12 @@ export class Profile implements OnInit {
         || this.position().trim() !== (p?.position ?? '').trim();
   });
 
+  /**
+   * The server serves this person's activity whatever their access profile, but the Jobs page
+   * may be one it withholds. The figures stay; they just stop linking to the unauthorized page.
+   */
+  readonly canOpenJobs = computed(() => this.auth.canOpen('jobs'));
+
   readonly nameMissing = computed(() => !this.name().trim());
   readonly nameError = computed(() => (this.nameMissing() && this.detailsChanged() ? 'Display name is required.' : ''));
 

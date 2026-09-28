@@ -8,7 +8,8 @@ import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { NotificationsStore } from '../../core/notifications/notifications.store';
 import { instantMs } from '../../core/instant';
 import { Icon } from '../../shared/ui/icon';
-import { notificationTarget } from '../notifications/notification-links';
+import { openableTarget } from '../notifications/notification-links';
+import { AuthService } from '../../core/auth/auth.service';
 
 interface Note {
   notificationId: number;
@@ -133,6 +134,7 @@ export class NotificationBell implements OnInit, OnDestroy {
   private readonly router = inject(Router);
   private readonly elementRef = inject(ElementRef<HTMLElement>);
   private readonly store = inject(NotificationsStore);
+  private readonly auth = inject(AuthService);
 
   readonly open = signal(false);
   readonly items = signal<Note[]>([]);
@@ -254,7 +256,8 @@ export class NotificationBell implements OnInit, OnDestroy {
       // once the server agrees, so a refusal leaves both as they were.
       this.store.markRead(note.notificationId).subscribe({ error: () => {} });
     }
-    const target = notificationTarget(note.linkUrl);
+    // A page the access profile withholds is not followed: the row is marked read, and that is all.
+    const target = openableTarget(note.linkUrl, key => this.auth.canOpen(key));
     if (target) this.router.navigateByUrl(target);
   }
 

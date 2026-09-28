@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { notificationTarget } from './notification-links';
+import { notificationTarget, openableTarget, pageKeyForPath } from './notification-links';
 
 describe('notificationTarget', () => {
   it('rewrites a route stored by the old app', () => {
@@ -27,5 +27,28 @@ describe('notificationTarget', () => {
     expect(notificationTarget(null)).toBeNull();
     expect(notificationTarget('   ')).toBeNull();
     expect(notificationTarget('https://example.com/jobs')).toBeNull();
+  });
+});
+
+/**
+ * A tenant user whose access profile leaves out a page was still offered notification links to
+ * it, and the click ended on the unauthorized page. A link is only offered when it can be opened.
+ */
+describe('openableTarget', () => {
+  const only = (...keys: string[]) => (key: string) => keys.includes(key);
+
+  it('knows which page a path belongs to, the more specific path first', () => {
+    expect(pageKeyForPath('/operations/jobs/42/history')).toBe('jobs');
+    expect(pageKeyForPath('/objects/analytics/dashboards/7')).toBe('analytics-dashboards');
+    expect(pageKeyForPath('/objects/analytics')).toBe('analytics');
+    expect(pageKeyForPath('/operations/jobsearch')).toBeNull();
+    expect(pageKeyForPath('/profile')).toBeNull();
+  });
+
+  it('drops a link to a page the profile withholds, and keeps the rest', () => {
+    expect(openableTarget('/jobList', only('queue'))).toBeNull();
+    expect(openableTarget('/operations/queue', only('queue'))).toBe('/operations/queue');
+    // Not a page a profile governs: the link stays.
+    expect(openableTarget('/profile', only())).toBe('/profile');
   });
 });
