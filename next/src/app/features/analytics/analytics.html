@@ -503,9 +503,12 @@
               <div class="card p-4 flex flex-wrap items-center gap-2 min-w-0" role="status">
                 <span class="text-xs text-[color:var(--text-muted)]">Narrowed by the Canvas</span>
                 @for (chip of filterChips(); track chip.key) {
+                  <!-- A chip names a value, and a value can be a 20,000-character note: its first
+                       words here, the rest (capped) in the tooltip. -->
                   <span class="pill"
                         [class.pill-brand]="chip.kind === 'clicked'"
-                        [class.pill-neutral]="chip.kind === 'drill'">{{ chip.label }}</span>
+                        [class.pill-neutral]="chip.kind === 'drill'"
+                        [title]="cap(chip.label)">{{ chipText(chip.label) }}</span>
                 }
                 <button type="button" class="btn btn-ghost btn-xs ms-auto"
                         [disabled]="loading()"
@@ -643,10 +646,13 @@
                          is the file having an empty one, and "no rows on this page" is this
                          screen having nothing to show — and only the first two are about the
                          data at all. -->
-                    <td class="mono text-xs whitespace-nowrap max-w-48 truncate"
-                        [title]="row.sample || row.sampleKind">
+                    <!-- The sample is a value of the file: data text, one line in 12rem, the whole of
+                         it behind "Show all" (owner, 2026-09-28: a note is 20,000 characters). -->
+                    <td class="mono text-xs">
                       @switch (row.sampleKind) {
-                        @case ('value') { {{ row.sample }} }
+                        @case ('value') {
+                          <app-data-text class="min-w-24 max-w-48" [value]="row.sample" [label]="row.name + ' · sample'" />
+                        }
                         @case ('null') {
                           <span class="italic text-[color:var(--text-muted)]"
                                 title="Every row on this page has no value in this column.">null</span>
@@ -668,13 +674,16 @@
                         title="Estimated: the distinct count is a sketch, measured 3.7% low over a million values.">
                       {{ row.distinctLabel }}
                     </td>
-                    <td class="text-xs whitespace-nowrap max-w-56 truncate"
-                        [title]="row.metricName + ': ' + row.metricValue">
-                      <span class="text-[color:var(--text-muted)]">{{ row.metricName }}</span>
-                      <span class="mono">{{ row.metricValue }}</span>
-                      @if (row.metricEstimated) {
-                        <span class="text-[color:var(--text-muted)]">(est.)</span>
-                      }
+                    <!-- A text column's range is its first and last values, whole: data text. -->
+                    <td class="text-xs">
+                      <div class="flex items-baseline gap-1 max-w-56 min-w-0">
+                        <span class="text-[color:var(--text-muted)] shrink-0">{{ row.metricName }}</span>
+                        <app-data-text class="mono min-w-20" [value]="row.metricValue"
+                                       [label]="row.name + ' · ' + row.metricName" />
+                        @if (row.metricEstimated) {
+                          <span class="text-[color:var(--text-muted)] shrink-0">(est.)</span>
+                        }
+                      </div>
                     </td>
                     <td class="text-xs whitespace-nowrap">
                       <!-- "clear" and "not checked" are different answers, and the second is the
@@ -693,7 +702,15 @@
                       <!-- colspan covers the disclosure cell and the seven fields beside it. -->
                       <td colspan="8" class="p-0">
                         @if (columnViewFor(row.name); as column) {
-                          <div class="p-3 bg-[color:var(--surface-sunken)]">
+                          <!-- contain: inline-size, so the card takes the table's width rather than
+                               setting it. Its values wrap now, but a card spanning eight columns
+                               asked the table for the width of a 20,000-character note once, and
+                               the table gave it 5,043px (owner, 2026-09-28).
+                               On a phone the eight columns are wider than the screen and the table
+                               scrolls sideways; the card keeps to the screen's width and to its left
+                               edge, so its statistics are read without scrolling along with it. -->
+                          <div class="p-3 bg-[color:var(--surface-sunken)] [contain:inline-size]
+                                      sticky left-0 max-w-[calc(100vw-2.5rem)]">
                             <app-column-card [column]="column"
                                              [findings]="findingsFor(row.name)"
                                              [connection]="connection()" [path]="path()" />
@@ -820,7 +837,8 @@
                         [class.pill-neutral]="finding.level === 'note'">{{ finding.title }}</span>
                   <div class="min-w-0 flex-1">
                     <p class="mono text-xs truncate" [title]="finding.column">{{ finding.column }}</p>
-                    <p class="text-xs text-[color:var(--text-secondary)] mt-0.5">{{ finding.detail }}</p>
+                    <!-- Prose, read whole; anywhere-wrapping so a value it quotes cannot widen it. -->
+                    <p class="text-xs text-[color:var(--text-secondary)] mt-0.5 [overflow-wrap:anywhere]">{{ finding.detail }}</p>
                   </div>
                 </li>
               }
@@ -1115,7 +1133,8 @@
                               [class.font-semibold]="$index === crumbTrail().length - 1"
                               [class.text-[color:var(--text-muted)]]="$index !== crumbTrail().length - 1"
                               [disabled]="$index === crumbTrail().length - 1 || analysing()"
-                              (click)="crumbClick($index)">{{ crumb.label }}</button>
+                              [title]="cap(crumb.label)"
+                              (click)="crumbClick($index)">{{ chipText(crumb.label) }}</button>
                     }
                   </nav>
                 }
@@ -1144,9 +1163,9 @@
                           [title]="chip.kind === 'drill'
                             ? 'Climb back out of this drill step'
                             : 'Remove this filter'"
-                          [attr.aria-label]="(chip.kind === 'drill' ? 'Climb out of ' : 'Remove filter ') + chip.label"
+                          [attr.aria-label]="(chip.kind === 'drill' ? 'Climb out of ' : 'Remove filter ') + chipText(chip.label)"
                           (click)="removeChip(chip)">
-                    {{ chip.label }}<app-icon name="close" size="0.8em" />
+                    {{ chipText(chip.label) }}<app-icon name="close" size="0.8em" />
                   </button>
                 }
                 @if (crossFilters().length > 1) {
@@ -1361,9 +1380,13 @@
                                   <th class="font-medium whitespace-nowrap">
                                     {{ pivot()!.rowDimension }} ↓ · {{ pivot()!.columnDimension }} →
                                   </th>
+                                  <!-- Values of the data across the top and down the side: data
+                                       text, so a 20,000-character one is a line, not the grid's
+                                       width (owner, 2026-09-28). -->
                                   @for (column of pivot()!.columns; track column) {
-                                    <th class="font-medium whitespace-nowrap tabular text-right">
-                                      {{ column || '(null)' }}
+                                    <th class="font-medium tabular text-right">
+                                      <app-data-text class="min-w-16 max-w-48 ml-auto" [value]="column || '(null)'"
+                                                     [label]="pivot()!.columnDimension" />
                                     </th>
                                   }
                                   @if (pivot()!.additive) {
@@ -1374,18 +1397,22 @@
                               <tbody>
                                 @for (row of pivot()!.rows; track row.label) {
                                   <tr>
-                                    <th scope="row" class="text-left font-normal whitespace-nowrap">
-                                      {{ row.label || '(null)' }}
+                                    <th scope="row" class="text-left font-normal">
+                                      <app-data-text class="min-w-24 max-w-64" [value]="row.label || '(null)'"
+                                                     [label]="pivot()!.rowDimension" />
                                     </th>
                                     @for (cell of row.values; track $index) {
-                                      <td class="text-right tabular whitespace-nowrap">
+                                      <td class="text-right tabular">
                                         @if (cell === null) {
                                           <!-- Empty, never zero. A combination with no rows and a
                                                combination that measured zero are different facts,
                                                and only one of them is a number. -->
                                           <span class="text-[color:var(--text-muted)]" title="no rows in this combination">—</span>
                                         } @else {
-                                          {{ cell }}
+                                          <!-- Usually a figure, but a minimum or maximum of a text
+                                               column is a value of the file, of any length. -->
+                                          <app-data-text class="min-w-16 max-w-48 ml-auto" [value]="cell"
+                                                         [label]="row.label + ' · ' + pivot()!.columns[$index]" />
                                         }
                                       </td>
                                     }
@@ -1437,6 +1464,10 @@
                       }
 
                       @default {
+                        <!-- The Data grid's switch (owner, 2026-09-28), remembered the same way. -->
+                        <div class="flex justify-end">
+                          <app-wrap-toggle [on]="canvasWrap()" (toggled)="setCanvasWrap($event)" />
+                        </div>
                         <div class="overflow-x-auto">
                           <table class="table-modern">
                             <thead>
@@ -1463,9 +1494,12 @@
                               @for (row of analysisRows(); track $index) {
                                 <tr>
                                   @for (cell of row.cells; track $index) {
-                                    <td class="whitespace-nowrap"
-                                        [class.text-right]="cell.column.role === 'MEASURE'"
-                                        [class.tabular]="cell.column.role === 'MEASURE'">
+                                    <!-- Every value is data text: one line in 24rem (more with Wrap
+                                         text), the whole of a 20,000-character note behind "Show
+                                         all" (owner, 2026-09-28). -->
+                                    <td [class.text-right]="cell.column.role === 'MEASURE'"
+                                        [class.tabular]="cell.column.role === 'MEASURE'"
+                                        [class.align-top]="canvasWrap()">
                                       @if (cell.isNull) {
                                         <span class="text-[color:var(--text-muted)] italic">null</span>
                                       } @else if (cell.field && !row.isOther) {
@@ -1482,16 +1516,19 @@
                                              is what makes that cell inert -- the cell says March
                                              and means March, and an equality would ask for the
                                              first of the month. -->
-                                        <button type="button"
-                                                class="text-left underline decoration-dotted
-                                                       underline-offset-2 hover:text-[color:var(--text-primary)]"
-                                                [disabled]="analysing()"
-                                                [title]="'Filter to ' + cell.field + ' = ' + cell.text"
-                                                (click)="crossFilter(cell.field, cell.raw)">
-                                          {{ cell.text }}
-                                        </button>
+                                        <!-- The value is the button, drawn by data text so that
+                                             "Show all" can sit beside it: a button inside a button
+                                             is not a thing a browser will draw. -->
+                                        <app-data-text [class]="canvasWrap() ? 'min-w-24 max-w-xl' : 'min-w-24 max-w-sm'" [class.ml-auto]="cell.column.role === 'MEASURE'"
+                                                       [value]="cell.text" [label]="cell.column.name"
+                                                       [lines]="canvasWrap() ? wrappedLines : 1"
+                                                       [actionable]="true" [actionDisabled]="analysing()"
+                                                       [hint]="'Filter to ' + cell.field + ' = ' + cell.text"
+                                                       (pressed)="crossFilter(cell.field, cell.raw)" />
                                       } @else {
-                                        {{ cell.text }}
+                                        <app-data-text [class]="canvasWrap() ? 'min-w-24 max-w-xl' : 'min-w-24 max-w-sm'" [class.ml-auto]="cell.column.role === 'MEASURE'"
+                                                       [value]="cell.text" [label]="cell.column.name"
+                                                       [lines]="canvasWrap() ? wrappedLines : 1" />
                                       }
                                     </td>
                                   }
@@ -1752,6 +1789,8 @@
                         everything the query matched
                       </span>
                     }
+                    <!-- The Data grid's switch (owner, 2026-09-28), remembered the same way. -->
+                    <app-wrap-toggle class="ms-auto" [on]="sqlWrap()" (toggled)="setSqlWrap($event)" />
                   </div>
                 }
 
@@ -1835,11 +1874,17 @@
                         @for (cell of row; track $index) {
                           <!-- A null is not an empty string, the same distinction the Data tab
                                draws: one means no value, the other means a blank one. -->
-                          <td class="mono text-xs whitespace-nowrap max-w-64 truncate"
-                              [title]="cell ?? 'null'">
+                          <!-- Data text: one line in 24rem, or more with Wrap text, and the whole
+                               of a 20,000-character value behind "Show all". A cut value used to
+                               have no way to be read but a tooltip holding all of it. -->
+                          <td class="mono text-xs" [class.align-top]="sqlWrap()">
                             @if (cell === null) {
                               <span class="text-[color:var(--text-muted)] italic">null</span>
-                            } @else { {{ cell }} }
+                            } @else {
+                              <app-data-text [class]="sqlWrap() ? 'min-w-24 max-w-xl' : 'min-w-24 max-w-sm'" [value]="cell"
+                                             [lines]="sqlWrap() ? wrappedLines : 1"
+                                             [label]="result()!.columns[$index]" />
+                            }
                           </td>
                         }
                       </tr>

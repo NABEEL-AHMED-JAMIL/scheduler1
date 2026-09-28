@@ -113,9 +113,13 @@ describe('WidgetTable', () => {
     const el = fixture.nativeElement as HTMLElement;
     expect(el.querySelector('app-form-dialog h2')?.textContent?.trim()).toBe('Revenue');
     expect(el.textContent).toContain('2 of 5 rows');
-    const buttons = [...el.querySelectorAll('button')].map(b => b.textContent!.trim());
-    expect(buttons).toEqual(['Close']);
-    (el.querySelector('button') as HTMLButtonElement).click();
+    // The footer is the dismissal alone. "Wrap text" (owner, 2026-09-28) is a control of the table,
+    // in the body above it, as it is on the Data grid -- not a second action of the dialog.
+    const footer = [...el.querySelectorAll('button')].filter(b => !b.closest('.overflow-y-auto'));
+    expect(footer.map(b => b.textContent!.trim())).toEqual(['Close']);
+    const body = [...el.querySelectorAll('.overflow-y-auto button')].map(b => b.textContent!.trim());
+    expect(body).toEqual(['Wrap text']);
+    footer[0].click();
     expect(close).toHaveBeenCalled();
   });
 });
