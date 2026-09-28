@@ -705,6 +705,10 @@
   }
   .log-console-line + .log-console-line { @apply mt-0.5; }
   .log-console-time { color: var(--color-ink-400); @apply shrink-0; }
+  /* The console is dark in both themes, so its file links cannot take the theme's link colour:
+     in the light theme that was dark blue on near-black, and every path vanished from its line. */
+  .log-console .log-path { color: var(--color-ink-50); text-decoration-color: var(--color-ink-400); }
+  .log-console a.log-path:hover { text-decoration-color: var(--color-ink-50); }
 
   /* An expanded row is a panel, not a taller row. It sits on the sunken surface with a brand
      rule down its left edge so the eye can see where the detail belongs, and an inset shadow
