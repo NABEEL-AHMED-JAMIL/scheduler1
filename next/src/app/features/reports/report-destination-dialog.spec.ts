@@ -52,32 +52,11 @@ describe('ReportDestinationDialog', () => {
     let result: any;
     (dialog.ref as any).close = (value: any) => { result = value; };
     dialog.submit({ preventDefault: () => {} } as Event);
-    expect(result).toEqual({ bucket: 'reports-archive', folder: 'reports', submitUrl: '' });
-  });
-
-  it('starts invalid for a submit-endpoint with no URL typed', () => {
-    const dialog = dialogFor('submit');
-    expect(dialog.valid()).toBe(false);
-  });
-
-  it('rejects a submit URL with no http(s) scheme', () => {
-    const dialog = dialogFor('submit');
-    dialog.submitUrl.set('example.com/hook');
-    expect(dialog.valid()).toBe(false);
-  });
-
-  it('accepts a well-formed https submit URL and closes with it', () => {
-    const dialog = dialogFor('submit');
-    dialog.submitUrl.set('https://example.com/hook');
-    expect(dialog.valid()).toBe(true);
-    let result: any;
-    (dialog.ref as any).close = (value: any) => { result = value; };
-    dialog.submit({ preventDefault: () => {} } as Event);
-    expect(result.submitUrl).toBe('https://example.com/hook');
+    expect(result).toEqual({ bucket: 'reports-archive', folder: 'reports' });
   });
 
   it('does not close the dialog when submitted while invalid', () => {
-    const dialog = dialogFor('submit');
+    const dialog = dialogFor('bucket');
     let closed = false;
     (dialog.ref as any).close = () => { closed = true; };
     dialog.submit({ preventDefault: () => {} } as Event);

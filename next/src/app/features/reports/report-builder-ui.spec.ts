@@ -165,41 +165,51 @@ describe('ReportDestinationDialog, sending', () => {
     const close = vi.fn();
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({ providers: [
-      { provide: DIALOG_DATA, useValue: { kind: 'submit', send } },
+      { provide: DIALOG_DATA, useValue: { kind: 'bucket', send } },
       { provide: DialogRef, useValue: { close } },
-      { provide: StorageService, useValue: { buckets: () => of({ status: 'SUCCESS', data: [] }) } },
+      { provide: StorageService, useValue: { buckets: () => of({ status: 'SUCCESS', data: [
+        { label: 'Reports archive', bucket: 'reports-archive', provider: 'MINIO' }] }) } },
     ] });
     const fixture = TestBed.createComponent(ReportDestinationDialog);
     fixture.detectChanges();
     const d = fixture.componentInstance;
-    d.submitUrl.set('https://hooks.example/report');
+    d.bucket.set('reports-archive');
+    d.folder.set('monthly');
     return { fixture, d, close, el: fixture.nativeElement as HTMLElement };
   }
 
   it('is built on app-form-dialog', () => {
     const { el } = dialog(() => NEVER);
-    expect(el.querySelector('app-form-dialog h2')?.textContent?.trim()).toBe('Submit the report');
+    expect(el.querySelector('app-form-dialog h2')?.textContent?.trim()).toBe('Save into a bucket');
+  });
+
+  /** Posting the report to an endpoint ("Submit") was removed (owner, 2026-09-28): no URL field. */
+  it('asks only for a connection and a folder', () => {
+    const { el } = dialog(() => NEVER);
+    expect(el.querySelector('#submitUrl')).toBeNull();
+    expect(el.textContent).not.toContain('Endpoint');
   });
 
   it('stays open, with what was typed, when the export is refused', () => {
-    const { d, fixture, close, el } = dialog(() => of({ status: 'ERROR', message: 'Unknown endpoint.' }));
+    const { d, fixture, close, el } = dialog(() => of({ status: 'ERROR', message: 'Unknown bucket.' }));
     d.submit();
     fixture.detectChanges();
     expect(close).not.toHaveBeenCalled();
-    expect(d.submitUrl()).toBe('https://hooks.example/report');
-    expect(el.textContent).toContain('Unknown endpoint.');
+    expect(d.folder()).toBe('monthly');
+    expect(el.textContent).toContain('Unknown bucket.');
   });
 
-  it('says Submitting… while an endpoint export is on its way', () => {
+  it('says Saving… while the export is on its way', () => {
     const { d, fixture, el } = dialog(() => NEVER);
     d.submit();
     fixture.detectChanges();
-    expect([...el.querySelectorAll('button')].map(b => b.textContent!.trim())).toContain('Submitting…');
+    expect([...el.querySelectorAll('button')].map(b => b.textContent!.trim())).toContain('Saving…');
   });
 
   it('closes once the export is accepted', () => {
-    const { d, close } = dialog(() => of({ status: 'SUCCESS', message: 'Posted.' }));
+    const { d, close } = dialog(() => of({ status: 'SUCCESS', message: 'Saved.' }));
     d.submit();
-    expect(close).toHaveBeenCalledWith(expect.objectContaining({ submitUrl: 'https://hooks.example/report', message: 'Posted.' }));
+    expect(close).toHaveBeenCalledWith(expect.objectContaining({ bucket: 'reports-archive', folder: 'monthly', message: 'Saved.' }));
   });
 });
+

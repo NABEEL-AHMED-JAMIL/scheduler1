@@ -363,3 +363,16 @@ describe('column captions and the drill drawer', () => {
     expect(html).toContain('<span class="truncate block" [title]="labelOf(run, 0)">{{ labelOf(run, 0) }}</span>');
   });
 });
+
+/** "Submit" (post the report to an endpoint) was removed from the builder (owner, 2026-09-28). */
+describe('Build your own view export buttons', () => {
+  it('offer CSV, Excel and Save to bucket, and no Submit', async () => {
+    const fs = (await import(/* @vite-ignore */ ['node', 'fs'].join(':'))) as { readFileSync(p: string, e: 'utf8'): string };
+    const root = (globalThis as unknown as { process: { cwd(): string } }).process.cwd();
+    const html = fs.readFileSync(`${root}/src/app/features/reports/report-pivot.html`, 'utf8');
+    expect(html).toContain("export('csv')");
+    expect(html).toContain('saveToBucket(');
+    expect(html).not.toContain('submit(');
+    expect(html).not.toMatch(/>\s*Submit\s*</);
+  });
+});

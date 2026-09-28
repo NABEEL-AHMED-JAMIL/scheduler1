@@ -65,12 +65,6 @@
         <app-icon name="cloud" [busy]="exporting() === 'bucket'" />
         {{ exporting() === 'bucket' ? 'Saving…' : 'Save to bucket' }}
       </button>
-      <button type="button" class="btn btn-default btn-sm"
-              [disabled]="exporting()" (click)="submit('csv')"
-              title="Post this report to a configured endpoint">
-        <app-icon name="send" [busy]="exporting() === 'submit'" />
-        {{ exporting() === 'submit' ? 'Submitting…' : 'Submit' }}
-      </button>
     </div>
   </div>
 </div>

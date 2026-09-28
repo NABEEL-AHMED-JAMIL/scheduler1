@@ -30,7 +30,7 @@ const EMPTY: RunData = { task: [], status: [], owner: [], day: [], job: [], tena
  * re-derived from a query that might drift.
  *
  * This was the whole of /reports until the page became a dashboard. It is unchanged in what it
- * does -- same dimensions, same measures, same ten chart kinds, same four export paths, same
+ * does -- same dimensions, same measures, same ten chart kinds, same three export paths, same
  * drill-down -- and moved wholesale rather than rewritten, because it is the only surface in
  * the app that can answer a question nobody anticipated.
  *
@@ -486,7 +486,7 @@ export class ReportPivot {
    * matrix since cellText() learned to dash out a cell with no runs behind it. So a "Shortest
    * run" report wrote 0 into every gap, and a reader who ran MIN() down the Failed column of the
    * spreadsheet got 0s as the fastest failure: a duration no run ever had. All four export paths
-   * (CSV, Excel, Save, Submit) are built from the one toCsv() on the server, so they carried
+   * (CSV, Excel, Save) are built from the one toCsv() on the server, so they carried
    * identical wrong bytes. escape() renders null as an empty field, which is what a gap is, so
    * nothing on the server has to change.
    *
@@ -524,15 +524,6 @@ export class ReportPivot {
     this.dialog.open<ReportDestinationResult & { message?: string }>(ReportDestinationDialog, {
       hasBackdrop: true,
       data: { kind: 'bucket', send },
-    }).closed.subscribe(result => { if (result?.message) this.toast.success(result.message); });
-  }
-
-  submit(format: 'csv' | 'xlsx'): void {
-    const send = (r: ReportDestinationResult) =>
-      this.exportRequest({ ...this.grid(), format, destination: 'submit', submitUrl: r.submitUrl }, 'submit');
-    this.dialog.open<ReportDestinationResult & { message?: string }>(ReportDestinationDialog, {
-      hasBackdrop: true,
-      data: { kind: 'submit', send },
     }).closed.subscribe(result => { if (result?.message) this.toast.success(result.message); });
   }
 

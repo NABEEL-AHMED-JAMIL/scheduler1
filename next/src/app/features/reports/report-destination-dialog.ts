@@ -8,7 +8,8 @@ import { Observable } from 'rxjs';
 import { API_SUCCESS } from '../../core/api/api.config';
 
 export interface ReportDestinationOptions {
-  kind: 'bucket' | 'submit';
+  /** Where the report goes. Posting it to an endpoint ("Submit") was removed (owner, 2026-09-28). */
+  kind: 'bucket';
   /**
    * Sends the export. When given, the dialog stays open until the server has answered, so a
    * refusal is shown beside what was typed; on success it closes with the server's message.
@@ -18,31 +19,25 @@ export interface ReportDestinationOptions {
 export interface ReportDestinationResult {
   bucket: string;
   folder: string;
-  submitUrl: string;
 }
 
 /**
- * Where "Save"/"Submit" ask for a bucket+folder or an endpoint URL.
+ * Where "Save to bucket" asks for a connection and a folder.
  *
  * These used to be sequential window.prompt() calls -- unstyled, blocking the tab, and the one
  * dialog in the app that didn't go through the app's own CDK-dialog components the way every
- * other confirm/input flow does (Confirm, PromptDialog, ShareDialog). Two kinds share one
- * component rather than two near-identical files, since the shape (a card, a couple of labelled
- * inputs, Cancel/Confirm) is otherwise the same either way.
+ * other confirm/input flow does (Confirm, PromptDialog, ShareDialog).
  */
 @Component({
   selector: 'app-report-destination-dialog',
   imports: [Combobox, FormDialog, Field],
   template: `
     <form (submit)="submit($event)">
-      <app-form-dialog [heading]="data.kind === 'bucket' ? 'Save into a bucket' : 'Submit the report'"
-                       [subtitle]="data.kind === 'bucket' ? 'Written as a file inside the folder you name.' : 'Posted as JSON to the endpoint you give.'"
-                       [confirmLabel]="data.kind === 'bucket' ? 'Save' : 'Submit'"
-                       [busyLabel]="data.kind === 'bucket' ? 'Saving…' : 'Submitting…'"
+      <app-form-dialog heading="Save into a bucket" subtitle="Written as a file inside the folder you name."
+                       confirmLabel="Save" busyLabel="Saving…"
                        [saving]="sending()" [confirmDisabled]="!valid()"
                        (confirmed)="submit()" (cancelled)="ref.close()">
         <div class="form-stack">
-          @if (data.kind === 'bucket') {
             <app-field label="Connection" for="bucket" [required]="true">
               @if (bucketsError()) {
                 <p class="field-note text-crit-500" role="alert">{{ bucketsError() }}</p>
@@ -58,12 +53,6 @@ export interface ReportDestinationResult {
               <input id="folder" class="input" placeholder="reports"
                      [value]="folder()" (input)="folder.set($any($event.target).value)" />
             </app-field>
-          } @else {
-            <app-field label="Endpoint URL" for="submitUrl" [required]="true">
-              <input id="submitUrl" type="url" class="input" cdkFocusInitial placeholder="https://…"
-                     [value]="submitUrl()" (input)="submitUrl.set($any($event.target).value)" />
-            </app-field>
-          }
           @if (sendError()) {
             <p class="field-note text-crit-500" role="alert">{{ sendError() }}</p>
           }
@@ -79,7 +68,6 @@ export class ReportDestinationDialog {
   /** Blank rather than a platform default: reports go in a bucket the workspace added itself. */
   readonly bucket = signal('');
   readonly folder = signal('reports');
-  readonly submitUrl = signal('');
   readonly sending = signal(false);
   readonly sendError = signal('');
 
@@ -90,7 +78,6 @@ export class ReportDestinationDialog {
     this.connections().map(b => ({ value: b.bucket, label: b.label || b.bucket, hint: b.provider })));
 
   constructor() {
-    if (this.data.kind !== 'bucket') return;
     this.loadingBuckets.set(true);
     inject(StorageService).buckets().subscribe({
       next: response => {
@@ -106,9 +93,7 @@ export class ReportDestinationDialog {
   }
 
   valid(): boolean {
-    return this.data.kind === 'bucket'
-      ? !!this.bucket().trim() && this.connections().some(c => c.bucket === this.bucket().trim())
-      : /^https?:\/\/\S+/.test(this.submitUrl().trim());
+    return !!this.bucket().trim() && this.connections().some(c => c.bucket === this.bucket().trim());
   }
 
   submit(event?: Event): void {
@@ -117,7 +102,6 @@ export class ReportDestinationDialog {
     const result: ReportDestinationResult = {
       bucket: this.bucket().trim(),
       folder: this.folder().trim() || 'reports',
-      submitUrl: this.submitUrl().trim(),
     };
     if (!this.data.send) { this.ref.close(result); return; }
     this.sending.set(true);
