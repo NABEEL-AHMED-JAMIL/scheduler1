@@ -1,5 +1,7 @@
 import { Component, computed, inject, input, signal } from '@angular/core';
 import { Icon } from '../../shared/ui/icon';
+import { DataText } from '../../shared/ui/data-text';
+import { capTitle } from '../../shared/ui/long-text';
 import { Donut } from '../../shared/charts/donut';
 import { LineChart } from '../../shared/charts/line-chart';
 import { compactNumber } from '../../shared/charts/number-format';
@@ -39,7 +41,7 @@ const SHARE_SLICE_CEILING = 8;
  */
 @Component({
   selector: 'app-column-card',
-  imports: [Icon, Donut, LineChart],
+  imports: [Icon, Donut, LineChart, DataText],
   templateUrl: './column-card.html',
 })
 export class ColumnCard {
@@ -109,8 +111,9 @@ export class ColumnCard {
       // An empty bin keeps NO width: a gap in a distribution is where there are no values, and a
       // sliver would draw a continuous shape over a hole.
       percent: tallest > 0 ? (bin.rows / tallest) * 100 : 0,
+      // Capped: a value here can be a 20,000-character note, and the tooltip is not where to read it.
       title: measured.exactValues
-        ? `${bin.value ?? '(none)'}: ${bin.rows} row(s)`
+        ? `${capTitle(bin.value ?? '(none)')}: ${bin.rows} row(s)`
         : `${bin.from} to ${bin.to}: ${bin.rows} row(s)`,
     }));
   });

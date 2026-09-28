@@ -73,27 +73,38 @@
 
   <!-- min and max, or "first" and "last" where they are alphabetical. A text
        column compares letter by letter, so calling its extremes min and max
-       is what makes "9" being the largest value look like a bug. -->
+       is what makes "9" being the largest value look like a bug.
+       On a text column these are two whole values of the file, and a ledger's
+       notes run to 20,000 characters: printed on one truncated line, the
+       line's width was the note's, and the Compact table this card opens in
+       measured 5,043px (owner, 2026-09-28). Three wrapped lines, the rest
+       behind "Show all". -->
   <dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-0.5 text-xs">
     <dt class="text-[color:var(--text-muted)] whitespace-nowrap">
       {{ column().text ? 'first (A–Z)' : 'min' }}
     </dt>
-    <dd class="mono truncate" [title]="column().min ?? 'null'">
+    <dd class="mono min-w-0">
       @if (column().min === null) {
         <span class="italic text-[color:var(--text-muted)]">null</span>
       } @else if (column().min === '') {
         <span class="italic text-[color:var(--text-muted)]">blank</span>
-      } @else { {{ column().minLabel }} }
+      } @else {
+        <app-data-text [value]="column().minLabel" [lines]="3"
+                       [label]="column().name + ' · ' + (column().text ? 'first (A–Z)' : 'min')" />
+      }
     </dd>
     <dt class="text-[color:var(--text-muted)] whitespace-nowrap">
       {{ column().text ? 'last (A–Z)' : 'max' }}
     </dt>
-    <dd class="mono truncate" [title]="column().max ?? 'null'">
+    <dd class="mono min-w-0">
       @if (column().max === null) {
         <span class="italic text-[color:var(--text-muted)]">null</span>
       } @else if (column().max === '') {
         <span class="italic text-[color:var(--text-muted)]">blank</span>
-      } @else { {{ column().maxLabel }} }
+      } @else {
+        <app-data-text [value]="column().maxLabel" [lines]="3"
+                       [label]="column().name + ' · ' + (column().text ? 'last (A–Z)' : 'max')" />
+      }
     </dd>
     @if (column().avgLabel) {
       <dt class="text-[color:var(--text-muted)] whitespace-nowrap">mean</dt>
@@ -183,16 +194,18 @@
       <div class="flex items-baseline justify-between gap-2 text-[11px]
                   text-[color:var(--text-muted)]">
         <span>{{ measured.exactValues ? 'Values' : 'Distribution' }}</span>
-        @if (measured.mostCommon) {
-          <span class="truncate"
-                [title]="'The single commonest value in this column'">
-            most common: {{ measured.mostCommon }}
-            @if (measured.mostCommonRows) {
-              ({{ measured.mostCommonRows }})
-            }
-          </span>
-        }
       </div>
+      @if (measured.mostCommon) {
+        <!-- Its own line under the heading rather than beside it: it is a value
+             of the file, and one truncated line beside "Values" was as wide as
+             the value -- a 20,000-character note stretched the card and every
+             bar under it (owner, 2026-09-28). -->
+        <div data-most-common class="mt-0.5 text-[11px] text-[color:var(--text-muted)] min-w-0">
+          <span title="The single commonest value in this column">most common@if (measured.mostCommonRows; as n) { ({{ n.toLocaleString() }} {{ n === 1 ? 'row' : 'rows' }})}:</span>
+          <app-data-text class="mono text-[color:var(--text-secondary)]" [value]="measured.mostCommon"
+                         [lines]="3" [label]="column().name + ' · most common'" />
+        </div>
+      }
       @if (bars().length) {
         <!-- Which drawings this column's values can honestly carry. A kind that
              would misrepresent them is offered DISABLED with the sentence
@@ -238,8 +251,10 @@
                 <tbody>
                   @for (bar of bars(); track $index) {
                     <tr>
-                      <td class="mono truncate"
-                          [title]="bar.title">{{ bar.label }}</td>
+                      <td class="mono" [title]="bar.title">
+                        <app-data-text class="max-w-64" [value]="bar.label"
+                                       [label]="column().name + ' · value'" />
+                      </td>
                       <td class="tabular text-right">{{ bar.rows }}</td>
                     </tr>
                   }
@@ -251,9 +266,12 @@
             <div class="mt-1 flex flex-col gap-0.5">
               @for (bar of bars(); track $index) {
                 <div class="flex items-center gap-1.5">
-                  <span class="text-[10px] mono truncate w-20 shrink-0
-                               text-[color:var(--text-muted)]"
-                        [title]="bar.label">{{ bar.label }}</span>
+                  <!-- A slot 80px wide, so the whole value is an icon away rather than
+                       the two words "Show all". -->
+                  <app-data-text data-bar-label class="text-[10px] mono w-20 shrink-0
+                                 text-[color:var(--text-muted)]"
+                                 [value]="bar.label" [compact]="true"
+                                 [label]="column().name + ' · value'" />
                   <div class="flex-1 h-2.5 rounded-sm
                               bg-[color:var(--surface-sunken)]">
                     <!-- An empty bin keeps NO width. A gap in a distribution is
