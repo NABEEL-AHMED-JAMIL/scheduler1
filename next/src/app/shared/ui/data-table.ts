@@ -77,7 +77,9 @@ import { LoadError } from './load-error';
           Loading…
         </div>
       } @else if (error() && !loading()) {
-        <app-load-error [message]="error()" (retry)="retry.emit()" />
+        <app-load-error [message]="error()" [retryable]="errorRetryable()" (retry)="retry.emit()">
+          <ng-content select="[error-action]" />
+        </app-load-error>
       } @else if (isEmpty() && !loading()) {
         <div class="px-6 py-14 text-center">
           <app-icon [name]="emptyIcon()" size="1.75rem"
@@ -105,6 +107,11 @@ export class TableShell implements AfterViewInit {
   readonly showSubbar = input(false);
   readonly loading = input(false);
   readonly error = input('');
+  /**
+   * False when trying again cannot help (a record that does not exist): Try again is hidden and
+   * the page's `[error-action]` content, such as a link back to the list, shows instead.
+   */
+  readonly errorRetryable = input(true);
   readonly isEmpty = input(false);
   readonly emptyMessage = input('Nothing here yet.');
   /** Something that suggests what is missing beats a generic box on every screen. */
