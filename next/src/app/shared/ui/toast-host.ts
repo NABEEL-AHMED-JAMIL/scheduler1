@@ -8,10 +8,13 @@ import { Icon } from './icon';
   template: `
     <!-- Two live regions: a failure interrupts a screen reader (role=alert), everything else
          waits its turn (role=status). One polite region read "Could not save" in the same
-         queue as "Saved". -->
-    <div class="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 w-80 max-w-[calc(100vw-2rem)]">
+         queue as "Saved".
+         Bottom-left: bottom-right is where every form and dialog puts Save, so "Check the
+         highlighted fields." covered the button it was about, and the floating assistant and
+         file chat sit there too. The stack lets clicks through its gaps; only a toast takes them. -->
+    <div class="fixed bottom-4 left-4 z-[100] flex flex-col gap-2 w-80 max-w-[calc(100vw-2rem)] pointer-events-none">
       @for (toast of toasts.toasts(); track toast.id) {
-        <div class="card shadow-lg px-3.5 py-2.5 flex items-start gap-2.5 text-sm"
+        <div class="card shadow-lg px-3.5 py-2.5 flex items-start gap-2.5 text-sm pointer-events-auto"
              [attr.role]="toast.tone === 'crit' ? 'alert' : 'status'"
              [attr.aria-live]="toast.tone === 'crit' ? 'assertive' : 'polite'"
              [class.border-l-4]="true"
