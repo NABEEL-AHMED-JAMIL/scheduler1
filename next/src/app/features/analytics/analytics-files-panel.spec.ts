@@ -65,3 +65,16 @@ describe('Analytics file panel', () => {
     expect(html).toMatch(/class="files-panel[^"]*fixed/);
   });
 });
+
+describe('Analytics file panel placement', () => {
+  /** Owner, 2026-09-28: on the right, beside the Files button, and wide enough for long names. */
+  it('opens on the right, 480px wide', async () => {
+    const fs = (await import(/* @vite-ignore */ ['node', 'fs'].join(':'))) as { readFileSync(p: string, e: 'utf8'): string };
+    const root = (globalThis as unknown as { process: { cwd(): string } }).process.cwd();
+    const html = fs.readFileSync(`${root}/src/app/features/analytics/analytics.html`, 'utf8');
+    const panel = html.match(/class="files-panel([^"]*)"/)![1];
+    expect(panel).toContain('right-0');
+    expect(panel).not.toContain('left-0');
+    expect(panel).toContain('w-[480px]');
+  });
+});

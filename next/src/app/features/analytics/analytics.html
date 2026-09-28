@@ -15,8 +15,8 @@
   </div>
 
   <!-- The data has the full width. The storage rail is the same connection -> folder -> file walk
-       the Object Browser does, and uses that screen's own service; it slides in from the left when
-       Files is pressed and goes away once something is picked (owner, 2026-09-28). -->
+       the Object Browser does, and uses that screen's own service; it slides in from the right, beside the
+       Files button, when that is pressed and goes away once something is picked (owner, 2026-09-28). -->
   <div class="grid gap-3">
 
     @if (filesOpen()) {
@@ -24,8 +24,8 @@
     }
     <!-- ── the storage rail ─────────────────────────────────────────────────────────── -->
     <div id="files-panel" role="dialog" aria-modal="true" aria-labelledby="files-panel-title"
-         class="files-panel card p-4 flex flex-col gap-2 min-w-0 fixed inset-y-0 left-0 z-50 w-[320px] max-w-[90vw]
-                rounded-none border-y-0 border-l-0 overflow-y-auto shadow-xl"
+         class="files-panel card p-5 flex flex-col gap-2 min-w-0 fixed inset-y-0 right-0 z-50 w-[480px] max-w-[92vw]
+                rounded-none border-y-0 border-r-0 overflow-y-auto shadow-xl"
          [class.hidden]="!filesOpen()">
       <div class="flex items-center gap-2 -mt-1 mb-1">
         <h2 id="files-panel-title" class="text-base font-semibold mr-auto">Files</h2>
