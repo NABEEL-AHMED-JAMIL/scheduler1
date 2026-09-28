@@ -34,9 +34,9 @@ class SmallHost {}
   template: `
     <app-table-shell heading="Totals" [isEmpty]="false">
       <table class="table-modern">
-        <thead><tr><th>Job</th><th>Failed</th><th>Total</th></tr></thead>
-        <tbody><tr><td>A</td><td>1</td><td>3</td></tr></tbody>
-        <tfoot><tr><td>Total</td><td>1</td><td>3</td></tr></tfoot>
+        <thead><tr><th>Job</th><th>Failed</th><th>Completed</th><th>Skip</th><th>Total</th></tr></thead>
+        <tbody><tr><td>A</td><td>1</td><td>2</td><td>0</td><td>3</td></tr></tbody>
+        <tfoot><tr><td>Total</td><td>1</td><td>2</td><td>0</td><td>3</td></tr></tfoot>
       </table>
     </app-table-shell>`,
 })
