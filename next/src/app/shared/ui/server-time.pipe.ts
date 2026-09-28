@@ -1,9 +1,11 @@
 import { DatePipe } from '@angular/common';
 import { Inject, LOCALE_ID, Pipe, PipeTransform } from '@angular/core';
 import { instantOf } from '../../core/instant';
+import { resolveFormat } from './time-format';
 
 /**
- * Angular's date pipe for times this API sent: `{{ run.startTime | serverTime:'d MMM, HH:mm' }}`.
+ * Angular's date pipe for times this API sent: `{{ run.startTime | serverTime:'recent' }}`, with the
+ * format named from time-format.ts (MIG-295).
  *
  * The API's timestamps are Chicago wall-clock readings with no offset (see core/instant.ts). The
  * plain date pipe reads such a string as the viewer's own local time, which is right only for a
@@ -32,6 +34,8 @@ export class ServerTimePipe implements PipeTransform {
             locale?: string): string | null {
     if (value === null || value === undefined || value === '') return null;
     const moment = typeof value === 'string' && /\d{2}:\d{2}/.test(value) ? instantOf(value) : value;
-    return moment === null ? null : this.date.transform(moment, format, timezone, locale);
+    // A name from time-format.ts ('date', 'recent', ...) or one of Angular's presets becomes the
+    // console's 24-hour pattern; no format at all is 'dateTime' rather than Angular's US 'mediumDate'.
+    return moment === null ? null : this.date.transform(moment, resolveFormat(format), timezone, locale);
   }
 }
