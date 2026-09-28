@@ -49,6 +49,15 @@
                    [showSubbar]="selected().size > 0"
                    (retry)="load()">
     <ng-container toolbar>
+      <!-- A platform administrator's list holds every workspace; the options are the workspaces
+           in it, so nothing offered narrows to an empty table. -->
+      @if (seesWorkspaces()) {
+        <div class="w-48">
+          <app-combobox id="jobs-tenant" ariaLabel="Filter by workspace" [selected]="workspaceFilter()"
+                        (selectedChange)="workspaceFilter.set($event); onFilterChange()"
+                        placeholder="All workspaces" clearLabel="All workspaces" [options]="workspaceOptions()" />
+        </div>
+      }
       <select class="input max-w-32" aria-label="Filter by execution type" [value]="executionFilter()"
               (change)="executionFilter.set($any($event.target).value); onFilterChange()">
         <option value="">All types</option>
@@ -63,7 +72,8 @@
       </select>
       <div class="search-field max-w-56">
         <app-icon name="search" size="0.95em" />
-        <input class="input" placeholder="Search id, job or task" aria-label="Search jobs"
+        <input class="input" [placeholder]="seesWorkspaces() ? 'Search id, job, task or workspace' : 'Search id, job or task'"
+               aria-label="Search jobs"
                [value]="search()" (input)="search.set($any($event.target).value); onFilterChange()" />
       </div>
       @if (seesOthersJobs()) {
@@ -105,6 +115,11 @@
           </th>
           <th class="w-8"></th>
           <th>Job</th>
+          <!-- Whose job it is, beside its name, for the one role whose list mixes workspaces. It waits
+               for xl like Task and Execution; on a narrower screen the Workspace filter still narrows. -->
+          @if (seesWorkspaces()) {
+            <th class="hidden xl:table-cell">Workspace</th>
+          }
           <!-- Task, Execution and Created wait for xl, as the metadata columns wait for 2xl: at 1024
                they pushed Run status and the row's menu past the card edge. None is lost -- the
                task is in the row's panel, and Schedule already reads "On demand" for Manual. -->
@@ -115,7 +130,7 @@
           <th>Next / last run</th>
           <th class="hidden xl:table-cell">Created</th>
           <th>Run status</th>
-          <!-- Metadata columns wait for a wide screen, as on Tasks; the detail colspan stays 13. -->
+          <!-- Metadata columns wait for a wide screen, as on Tasks; the detail row still spans them. -->
           <th class="hidden 2xl:table-cell">Created by</th>
           <th class="hidden 2xl:table-cell">Updated by</th>
           <th class="text-right">State</th>
@@ -153,6 +168,11 @@
                 }
               </div>
             </td>
+            @if (seesWorkspaces()) {
+              <td class="hidden xl:table-cell max-w-44 text-[color:var(--text-secondary)]">
+                <span class="truncate block" [title]="workspaceName(job)">{{ workspaceName(job) }}</span>
+              </td>
+            }
             <td class="hidden xl:table-cell max-w-44">
               @if (job.taskDetail?.taskName) {
                 <span class="truncate block" [title]="job.taskDetail!.taskName">
@@ -262,8 +282,9 @@
 
                    The count has to track the header exactly: the table grew Created by and
                    Updated by, and a colspan left behind at 11 rendered the panel 166px
-                   narrower than the table, which reads as a broken layout. -->
-              <td colspan="13" class="!p-0">
+                   narrower than the table, which reads as a broken layout. A platform
+                   administrator's table has the Workspace column as well. -->
+              <td [attr.colspan]="seesWorkspaces() ? 14 : 13" class="!p-0">
                <div class="detail-panel">
                 <dl class="grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-3 text-sm">
                   @for (item of [

@@ -33,6 +33,8 @@ import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { clonePayload } from './job-clone';
 import { clockTime, monthDayLabel, weekdayLabel } from './schedule-labels';
 import { dayLabel } from '../../shared/ui/time-format';
+import { Combobox } from '../../shared/ui/combobox';
+import { matchesWorkspace, workspaceName, workspaceOptions } from '../../shared/ui/workspace-name';
 
 export interface Scheduler {
   schedulerId: number;
@@ -54,6 +56,12 @@ export interface SourceJob {
   updatedByName?: string | null;
   /** The author's id, so "Only mine" matches on identity rather than display text. */
   createdBy?: number | null;
+  /**
+   * The workspace the job belongs to (MIG-296). The name comes only on a platform administrator's
+   * list, which holds every workspace's jobs; see shared/ui/workspace-name.
+   */
+  tenantId?: number | null;
+  tenantName?: string | null;
 
   jobId: number;
   jobName: string;
@@ -98,7 +106,7 @@ const BULK_CONCURRENCY = 4;
 
 @Component({
   selector: 'app-jobs',
-  imports: [MineFilter, AssistantDock, Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Pagination, BarChart, StatStrip],
+  imports: [Combobox, MineFilter, AssistantDock, Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Pagination, BarChart, StatStrip],
   templateUrl: './jobs.html',
 })
 export class Jobs implements OnInit {
@@ -208,18 +216,33 @@ export class Jobs implements OnInit {
 
   readonly onlyMine = signal(false);
 
+  /**
+   * A platform administrator's list mixes every workspace's jobs, and two workspaces can each have
+   * a "Nightly import" (review jobs#18). Only they get the Workspace column and filter: everyone
+   * else's list is one workspace, where both would say the same thing on every row.
+   */
+  readonly seesWorkspaces = computed(() => this.auth.isPlatformAdmin());
+  /** The picked workspace's id as text; empty is "All workspaces". */
+  readonly workspaceFilter = signal('');
+  readonly workspaceOptions = computed(() => this.seesWorkspaces() ? workspaceOptions(this.jobs()) : []);
+  workspaceName(job: SourceJob): string { return workspaceName(job); }
 
   readonly filtered = computed(() => {
     const term = this.search().trim().toLowerCase();
     const status = this.statusFilter();
     const execution = this.executionFilter();
+    const workspaces = this.seesWorkspaces();
+    const workspace = workspaces ? this.workspaceFilter() : '';
     return this.mine(this.jobs()).filter(job => {
       if (status && job.jobRunningStatus !== status) return false;
       if (execution && job.execution !== execution) return false;
+      if (!matchesWorkspace(job, workspace)) return false;
       if (!term) return true;
       return String(job.jobId).includes(term)
         || (job.jobName ?? '').toLowerCase().includes(term)
-        || (job.taskDetail?.taskName ?? '').toLowerCase().includes(term);
+        || (job.taskDetail?.taskName ?? '').toLowerCase().includes(term)
+        // Only where the column shows it, or a row would match on something nobody can see.
+        || (workspaces && workspaceName(job).toLowerCase().includes(term));
     });
   });
 
@@ -888,12 +911,13 @@ export class Jobs implements OnInit {
 
   /** Whether Clear is offered: anything that narrows the list, Only mine included. */
   readonly hasFilters = computed(() =>
-    !!(this.search() || this.statusFilter() || this.executionFilter() || this.onlyMine()));
+    !!(this.search() || this.statusFilter() || this.executionFilter() || this.workspaceFilter() || this.onlyMine()));
 
   clearFilters(): void {
     this.search.set('');
     this.statusFilter.set('');
     this.executionFilter.set('');
+    this.workspaceFilter.set('');
     this.onlyMine.set(false);
     // As every other filter change does: back to page one, nothing selected that is now hidden.
     this.onFilterChange();
