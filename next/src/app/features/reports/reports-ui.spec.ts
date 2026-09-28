@@ -124,7 +124,9 @@ describe('Reports times', () => {
       tokensIn: 10, tokensOut: 5, medianMs: 900, lastAt }]);
     fixture.detectChanges();
     expect(text()).not.toContain('2026-09-25 03:59');
-    expect(text()).toContain(pipe.transform(lastAt, 'd MMM, HH:mm')!);
+    expect(text()).toContain(pipe.transform(lastAt, 'recent')!);
+    // The median call reads as a duration, not "0.9 s".
+    expect(text()).toContain('900ms');
   });
 
   it('shows a failure\'s time the way Queue does, and still groups by the latest', () => {
@@ -133,8 +135,24 @@ describe('Reports times', () => {
     const newer = { ...failure(3, 'nightly-load', 'Disk full'), when: '2026-08-01T10:00:00' };
     reports.failures.set([newer, older]);
     fixture.detectChanges();
-    expect(text()).toContain(pipe.transform(newer.when, 'd MMM, HH:mm:ss')!);
+    expect(text()).toContain(pipe.transform(newer.when, 'recentSec')!);
     expect(text()).not.toContain('2026-08-01T10:00:00');
     expect(reports.failureReasons()[0].lastWhen).toBe(newer.when);
+  });
+
+  /** MIG-295: no raw ISO day on the page; the task's last day reads as the console writes one. */
+  it('writes a task\'s last day as a day, not the ISO key it is sorted by', () => {
+    const { text } = page();
+    expect(text()).toContain('1 Aug 2026');
+    expect(text()).not.toContain('2026-08-01');
+  });
+
+  it('writes every duration on the page the one way the console does', () => {
+    const { reports, fixture, text } = page();
+    reports.failures.set([{ ...failure(4, 'nightly-load', 'Disk full'), seconds: 125 }]);
+    fixture.detectChanges();
+    expect(text()).toContain('2m 5s');                        // the failure's duration
+    expect(text()).toContain('44s');                          // a task's slowest run
+    expect(reports.durationFoot()).toContain('2s running');   // the median tile's foot
   });
 });

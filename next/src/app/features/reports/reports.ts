@@ -2,6 +2,7 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router, RouterLink } from '@angular/router';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
+import { dayLabel, formatDuration } from '../../shared/ui/time-format';
 import { Subject, catchError, of, switchMap } from 'rxjs';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { AuthService } from '../../core/auth/auth.service';
@@ -24,7 +25,7 @@ import { DecimalPipe } from '@angular/common';
 import { ReportPivot } from './report-pivot';
 import {
   EXEC_SECONDS, JOB_NAME, NO_DURATION, RUN_ID, TENANT_IDX, RunData, RunRow, SECONDS, aggregate,
-  humanSeconds, withJobDimension,
+  withJobDimension,
 } from './pivot';
 
 const EMPTY: RunData = { task: [], status: [], owner: [], day: [], job: [], tenant: [], rows: [] };
@@ -288,11 +289,15 @@ export class Reports implements OnInit {
   readonly priorRuns = signal<number | null>(null);
   readonly priorSuccessRate = signal<number | null>(null);
 
-  readonly humanSeconds = humanSeconds;
+  /**
+   * How long something took, as the rest of the console writes it; NO_DURATION reads as a dash.
+   * Also the histogram's axis format, so its ends read as durations rather than bare numbers.
+   */
+  readonly formatDuration = formatDuration;
+  /** A task's last day with runs, "24 Sep 2026" rather than the ISO key it is sorted by. */
+  readonly dayLabel = dayLabel;
   readonly statusColor = statusColor;
   readonly outcomeColumns = OUTCOME_COLUMNS;
-  /** Durations on the histogram axis read as durations, not as bare numbers. */
-  readonly formatSeconds = (value: number): string => humanSeconds(Math.round(value));
 
   /**
    * A date box that has been cleared is not a wider range -- it is no range at all.
@@ -475,7 +480,7 @@ export class Reports implements OnInit {
     // The split, when it is known, rather than the caveat alone. "34s · 0s running" says in
     // four words what the old "wait included" only hinted at.
     parts.push(this.medianExecution() >= 0
-      ? `${humanSeconds(this.medianExecution())} running, rest is queue wait`
+      ? `${formatDuration(this.medianExecution())} running, rest is queue wait`
       : 'queued to finished, wait included');
     if (this.untimed()) parts.push(`${this.untimed()} with no end time`);
     return parts.join(' · ');

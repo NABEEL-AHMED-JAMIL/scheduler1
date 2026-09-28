@@ -9,7 +9,8 @@ import { AuthService } from '../../core/auth/auth.service';
 import { BillingApi } from '../billing/billing.service';
 import { Reports, reasonKey } from './reports';
 import { ReportPivot } from './report-pivot';
-import { NO_DURATION, RunData, RunRow, humanSeconds } from './pivot';
+import { NO_DURATION, RunData, RunRow } from './pivot';
+import { formatDuration } from '../../shared/ui/time-format';
 
 function reportsFor() {
   TestBed.resetTestingModule();
@@ -64,7 +65,7 @@ describe('the median duration tile', () => {
 
     expect(reports.timedRuns().length).toBe(0);
     expect(reports.medianDuration()).toBe(NO_DURATION);
-    expect(humanSeconds(reports.medianDuration())).toBe('—');
+    expect(formatDuration(reports.medianDuration())).toBe('—');
   });
 
   it('agrees with the histogram beside it about whether anything finished', () => {
@@ -75,7 +76,7 @@ describe('the median duration tile', () => {
     // The histogram draws its empty state off durations(); the tile must not claim a figure the
     // histogram is saying it has no data for.
     expect(reports.durations()).toEqual([]);
-    expect(humanSeconds(reports.medianDuration())).toBe('—');
+    expect(formatDuration(reports.medianDuration())).toBe('—');
   });
 
   it('still reports a median when something did finish', () => {
@@ -83,7 +84,7 @@ describe('the median duration tile', () => {
     reports.rawData.set(inFlight);
 
     expect(reports.medianDuration()).toBe(44);
-    expect(humanSeconds(reports.medianDuration())).toBe('44s');
+    expect(formatDuration(reports.medianDuration())).toBe('44s');
   });
 });
 

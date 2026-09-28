@@ -16,7 +16,8 @@ import { Segmented, SegmentOption } from '../../shared/ui/segmented';
 import {
   DIMENSIONS, Dimension, dimensionFor, MEASURE_GROUPS, MEASURE_LABELS, Measure, RunData, RunRow,
   COUNTING, EXECUTION, EXEC_SECONDS, JOB_NAME, NO_DURATION, RUN_ID, SECONDS, Pivot, aggregate,
-  buildPivot, formatMeasure, humanSeconds, ADDITIVE} from './pivot';
+  buildPivot, formatMeasure, withReadableDays, ADDITIVE} from './pivot';
+import { dayLabel, formatDuration } from '../../shared/ui/time-format';
 
 const EMPTY: RunData = { task: [], status: [], owner: [], day: [], job: [], tenant: [], rows: [] };
 
@@ -70,7 +71,6 @@ export class ReportPivot {
       : 'Timed from when each run was queued, so each figure includes the time it waited to start.'
         + ' The Execution measures leave the wait out.';
   });
-  readonly humanSeconds = humanSeconds;
 
   // By KEY, not by position. These were DIMENSIONS[0] and [1], so inserting Job at index 1
   // silently moved the default column from Outcome to Job -- and since each task belongs to one
@@ -160,7 +160,7 @@ export class ReportPivot {
    * label with no status meaning, which is exactly what a task or an owner needs.
    */
   readonly colourFor = (label: string): string => {
-    const pool = this.data();
+    const pool = this.shown();
     // pool.job included: the Job dimension was added to DIMENSIONS without being added here, so
     // indexOf returned -1 for every job name, Math.max(0, -1) collapsed them all to index 0,
     // and a chart grouped by job drew every series in the same colour with a legend that
@@ -183,9 +183,16 @@ export class ReportPivot {
     return pivot.colLabels;
   });
 
+  /**
+   * The runs as a reader sees them: a Day is "24 Sep 2026", not the "2026-09-24" the server keys
+   * it by. Grid headers, chart axes, the legend, the drill-down's Day column, the row search and
+   * the export all read labels from here, so they agree with one another.
+   */
+  private readonly shown = computed(() => withReadableDays(this.data()));
+
   /** Every row, in the order the dictionary supplies. The grid and the chart are views of it. */
   readonly fullPivot = computed(() =>
-    buildPivot(this.data(), this.rowDim(), this.colDim(), this.measure()));
+    buildPivot(this.shown(), this.rowDim(), this.colDim(), this.measure()));
 
   /**
    * The grid grew up on a handful of tasks. At a hundred and seventy rows it was a wall: nothing
@@ -366,10 +373,15 @@ export class ReportPivot {
     const max = seconds.reduce((a, b) => (b > a ? b : a), 1);
     seconds.forEach(s => { bins[Math.min(11, Math.floor((s / max) * 12))]++; });
     const peak = bins.reduce((a, b) => (b > a ? b : a), 1);
-    return bins.map((count, i) => ({
-      height: Math.round((count / peak) * 100),
-      hint: `${count} run${count === 1 ? '' : 's'} near ${humanSeconds(Math.round(((i + 0.5) / 12) * max))}`,
-    }));
+    return bins.map((count, i) => {
+      // A bin's middle is only roughly where its runs sit, so "near 6s" rather than "near 5.8s";
+      // below a second it keeps its milliseconds, where a whole second would read "near 0s".
+      const middle = ((i + 0.5) / 12) * max;
+      return {
+        height: Math.round((count / peak) * 100),
+        hint: `${count} run${count === 1 ? '' : 's'} near ${formatDuration(middle >= 1 ? Math.round(middle) : middle)}`,
+      };
+    });
   }
 
   columnCompletion(colIndex: number): number {
@@ -426,12 +438,13 @@ export class ReportPivot {
 
   labelOf(row: RunRow, dimensionIndex: 0 | 1 | 2 | 3): string {
     const dimension = DIMENSIONS.find(d => d.idx === dimensionIndex)!;
-    return (this.data()[dimension.key] ?? [])[row[dimensionIndex] ?? -1] ?? '—';
+    return (this.shown()[dimension.key] ?? [])[row[dimensionIndex] ?? -1] ?? '—';
   }
   jobOf(row: RunRow): string { return row[JOB_NAME]; }
   runIdOf(row: RunRow): number { return row[RUN_ID]; }
+  /** A run's duration, or the dash for one that never finished (NO_DURATION). */
   durationOf(row: RunRow): string {
-    return row[SECONDS] >= 0 ? humanSeconds(row[SECONDS]) : '—';
+    return formatDuration(row[SECONDS]);
   }
 
   // ---- export -----------------------------------------------------------------------------
@@ -445,7 +458,7 @@ export class ReportPivot {
     // The range belongs in the exported title. A spreadsheet outlives the screen it came from,
     // and "Runs by task and outcome" alone does not say which fortnight it describes.
     const range = this.startDate() && this.endDate()
-      ? ` (${this.startDate()} to ${this.endDate()})` : '';
+      ? ` (${dayLabel(this.startDate())} to ${dayLabel(this.endDate())})` : '';
     return {
       title: this.title() + range,
       columns: [this.rowDim().label, ...pivot.colLabels, 'All'],

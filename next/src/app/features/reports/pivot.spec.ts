@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
+import { formatDuration } from '../../shared/ui/time-format';
 import {
   DIMENSIONS, Measure, NO_DURATION, RunData, RunRow, aggregate, buildPivot, formatMeasure,
-  humanSeconds, percentile,
+  percentile, withReadableDays,
   ADDITIVE,
   EXECUTION
 } from './pivot';
@@ -90,8 +91,8 @@ describe('measures', () => {
     // The whole point of the sentinel: 0s and "—" must not be the same answer.
     const instant: RunRow[] = [[0,0,0,0,0,'x',1]] as RunRow[];
     const untimed: RunRow[] = [[0,0,0,0,-1,'x',2]] as RunRow[];
-    expect(humanSeconds(aggregate(instant, 'median'))).toBe('0s');
-    expect(humanSeconds(aggregate(untimed, 'median'))).toBe('—');
+    expect(formatDuration(aggregate(instant, 'median'))).toBe('0s');
+    expect(formatDuration(aggregate(untimed, 'median'))).toBe('—');
   });
 });
 
@@ -171,7 +172,7 @@ describe('the grid', () => {
     expect(p.cellRows[1][0].length).toBe(1);        // there IS a run here
     expect(p.matrix[1][0]).toBe(NO_DURATION);       // it just was never timed
     expect(p.rowTotals[1]).toBe(NO_DURATION);
-    expect(humanSeconds(p.matrix[1][0])).toBe('—');
+    expect(formatMeasure(p.matrix[1][0], 'median')).toBe('—');
     // Alpha's runs were timed, so nothing about them changes.
     expect(p.matrix[0][0]).toBe(15);
     expect(p.colTotals[0]).toBe(15);
@@ -184,13 +185,23 @@ describe('formatting', () => {
   // having no recorded duration -- and a chart's zero gridline was labelled with a dash. The
   // no-data sentinel is NEGATIVE (NO_DURATION = -1) and every caller already guards on `>= 0`
   // before calling, so the dash is still what they see for a genuinely missing duration.
-  it.each([[-1,'—'],[0,'0s'],[45,'45s'],[90,'1m 30s'],[3660,'1h 1m']])('%ds reads as %s', (s, out) => {
-    expect(humanSeconds(s as number)).toBe(out);
+  // The page's own humanSeconds is gone; durations are written by the console's formatDuration.
+  it.each([[-1,'—'],[0,'0s'],[0.23,'230ms'],[45,'45s'],[90,'1m 30s'],[3660,'1h 1m']])('%ds reads as %s', (s, out) => {
+    expect(formatMeasure(s as number, 'avg')).toBe(out);
   });
 
   it('counts are tallies, durations are times', () => {
     expect(formatMeasure(1535, 'count')).toBe('1,535');
     expect(formatMeasure(90, 'avg')).toBe('1m 30s');
+  });
+
+  it('writes the Day dictionary as days for the grid, leaving the rows and the order alone', () => {
+    const raw: RunData = { task: [], status: [], owner: [], job: [], tenant: [],
+      day: ['2026-09-23', '2026-09-24'], rows: [[0, 0, 0, 1, 5, 'x', 1]] as RunRow[] };
+    const shown = withReadableDays(raw);
+    expect(shown.day).toEqual(['23 Sep 2026', '24 Sep 2026']);
+    expect(shown.rows).toBe(raw.rows);
+    expect(raw.day).toEqual(['2026-09-23', '2026-09-24']);
   });
 });
 
@@ -228,10 +239,10 @@ describe('execution measures', () => {
 
   it('reports nothing rather than zero when no run has a recorded pickup', () => {
     // The test was named for the behaviour it wanted and asserted the behaviour it had: 0, which
-    // humanSeconds renders as "0s" and a reader reads as a run that took no time at all.
+    // renders as "0s" and a reader reads as a run that took no time at all.
     const none = [[0, 0, 0, 0, 50, 'job', 5, 0, -1]] as RunRow[];
     expect(aggregate(none, 'execMedian')).toBe(NO_DURATION);
-    expect(humanSeconds(aggregate(none, 'execMedian'))).toBe('—');
+    expect(formatDuration(aggregate(none, 'execMedian'))).toBe('—');
   });
 
   it('is not additive, so a chart may not total it', () => {
