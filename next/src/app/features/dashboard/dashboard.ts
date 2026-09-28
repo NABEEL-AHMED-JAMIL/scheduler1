@@ -28,6 +28,10 @@ const WEEKDAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const WEEKDAY = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
+/** The three reads behind the tiles and charts; the day bars are added up from the hourly one. */
+const SOURCES = ['status', 'running', 'hourly'] as const;
+export type DashboardSource = typeof SOURCES[number];
+
 /**
  * Status keys shown in the breakdown table, in lifecycle order.
  *
@@ -102,10 +106,20 @@ export class Dashboard implements OnInit {
 
   readonly loading = signal(true);
   /**
-   * Why the tiles and charts could not be read. A failed chart used to be silently empty --
-   * indistinguishable from "no activity" -- so the first reason is kept and shown with Try again.
+   * Why each read failed, by source. A failed chart used to be silently empty -- indistinguishable
+   * from "no activity" -- and then one failure replaced every tile and chart with a single error,
+   * so a slow heatmap took the job counts and the Unread link down with it. Each card now says
+   * why its own figures are missing, with its own Try again.
    */
-  readonly error = signal('');
+  readonly errors = signal<Partial<Record<DashboardSource, string>>>({});
+  /**
+   * One sentence for the whole page, only when every read was refused for the same reason (a date
+   * the server will not take, MIG-103): the same sentence on every card would say it three times.
+   */
+  readonly error = computed(() => {
+    const reasons = Object.values(this.errors());
+    return reasons.length === SOURCES.length && new Set(reasons).size === 1 ? reasons[0]! : '';
+  });
   /** The same for the hour drill-down, which said "No jobs ran in this hour." after a failure. */
   readonly breakdownError = signal('');
   readonly breakdownLoading = signal(false);
@@ -334,46 +348,73 @@ export class Dashboard implements OnInit {
    * screen rather than replacing the page with an error for a read nobody asked for.
    */
   load(options: { quiet?: boolean } = {}): void {
-    const quiet = !!options.quiet;
-    this.loadSub.unsubscribe();
-    this.loadSub = new Subscription();
+    this.read(SOURCES, !!options.quiet);
+    this.unreadCount.refresh();
+  }
+
+  /** Try again on one card: only the read that failed goes out again. */
+  retry(source: DashboardSource): void {
+    this.read([source], false);
+  }
+
+  private read(sources: readonly DashboardSource[], quiet: boolean): void {
+    // A full read drops every answer still out from an older range. One card's Try again joins
+    // them instead, so it cannot cancel a background re-read of the other cards.
+    if (sources.length === SOURCES.length) {
+      this.loadSub.unsubscribe();
+      this.loadSub = new Subscription();
+    }
     if (!quiet) {
       this.loading.set(true);
-      this.error.set('');
+      this.errors.update(errors => {
+        const kept = { ...errors };
+        for (const source of sources) delete kept[source];
+        return kept;
+      });
     }
     const from = this.appliedStart();
     const to = this.appliedEnd();
 
-    // Loading until all three have answered, and the first failure's reason kept. A refusal (a
-    // date that is not a date) is a 200 carrying ERROR and a sentence (MIG-103); every tile is
-    // refused for the same reason, so one sentence is shown, once.
-    let pending = 3;
+    // Loading until every read has answered. A quiet re-read keeps the figures and reasons already
+    // on screen when it fails, and clears a card's reason when that card's read now succeeds.
+    let pending = sources.length;
     let failed = false;
     const settle = () => {
       if (--pending > 0) return;
       this.loading.set(false);
-      if (failed) return;
-      this.error.set('');
-      this.updatedAt.set(new Date());
+      if (!failed && sources.length === SOURCES.length) this.updatedAt.set(new Date());
     };
-    const fail = (message: string | undefined) => {
+    const clear = (source: DashboardSource) => {
+      if (!this.errors()[source]) return;
+      this.errors.update(errors => { const kept = { ...errors }; delete kept[source]; return kept; });
+    };
+    const fail = (source: DashboardSource, message: string | undefined) => {
       failed = true;
-      if (!quiet && !this.error()) this.error.set(message || 'The dashboard could not be read.');
+      if (!quiet) this.errors.update(errors => ({ ...errors, [source]: message || 'This could not be read.' }));
     };
-    const read = <T>(request: Observable<ApiResponse<T>>, into: (data: T | undefined) => void) =>
+    const run = <T>(source: DashboardSource, request: Observable<ApiResponse<T>>, into: (data: T | undefined) => void) =>
       this.loadSub.add(request.subscribe({
         next: r => {
-          if (r.status === API_SUCCESS) into(r.data);
-          else fail(r.message);
+          if (r.status === API_SUCCESS) { into(r.data); clear(source); }
+          else fail(source, r.message);
           settle();
         },
-        error: err => { fail(err?.error?.message); settle(); },
+        error: err => { fail(source, err?.error?.message); settle(); },
       }));
 
-    read(this.dashboard.jobStatus(from, to), data => this.jobStatus.set(data ?? []));
-    read(this.dashboard.jobRunning(from, to), data => this.jobRunning.set(data ?? []));
-    read(this.dashboard.hourly(from, to), data => { this.hourly.set(data ?? []); this.coverDates(); });
-    this.unreadCount.refresh();
+    for (const source of sources) {
+      switch (source) {
+        case 'status':
+          run(source, this.dashboard.jobStatus(from, to), data => this.jobStatus.set(data ?? []));
+          break;
+        case 'running':
+          run(source, this.dashboard.jobRunning(from, to), data => this.jobRunning.set(data ?? []));
+          break;
+        case 'hourly':
+          run(source, this.dashboard.hourly(from, to), data => { this.hourly.set(data ?? []); this.coverDates(); });
+          break;
+      }
+    }
   }
 
   /** Clicking an hour cell drills into which jobs ran in that exact hour. */

@@ -38,18 +38,19 @@
   </div>
 
   @if (error()) {
-    <!-- The tiles and charts could not be read: one reason, with Try again, rather than zeros
-         and empty charts that read exactly like a quiet week. -->
+    <!-- Every read was refused for the same reason (a date the server will not take): one
+         sentence, once, rather than the same one on every card. -->
     <div class="card"><app-load-error [message]="error()" (retry)="load()" /></div>
   } @else {
-    <!-- KPI tiles. Only Unread goes anywhere, so only it is a link. -->
+    <!-- KPI tiles. Only Unread goes anywhere, so only it is a link. A tile whose read failed shows
+         a dash rather than a zero that reads like a real count; Unread never depends on those reads. -->
     <app-blur-loader [active]="loading()" label="Loading…">
       <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-        <app-stat-tile label="Total jobs"  [value]="totalJobs()"  icon="briefcase" tone="info" />
-        <app-stat-tile label="Active jobs" [value]="activeJobs()" icon="zap" tone="ok" />
-        <app-stat-tile label="Running now" [value]="runningNow()" icon="play" tone="info" />
-        <app-stat-tile label="Last run completed" [value]="completed()" foot="jobs" icon="checkCircle" tone="ok" />
-        <app-stat-tile label="Last run failed" [value]="failed()" foot="jobs" icon="xCircle" tone="crit" />
+        <app-stat-tile label="Total jobs"  [value]="errors().status ? '—' : totalJobs()"  icon="briefcase" tone="info" />
+        <app-stat-tile label="Active jobs" [value]="errors().status ? '—' : activeJobs()" icon="zap" tone="ok" />
+        <app-stat-tile label="Running now" [value]="errors().running ? '—' : runningNow()" icon="play" tone="info" />
+        <app-stat-tile label="Last run completed" [value]="errors().running ? '—' : completed()" foot="jobs" icon="checkCircle" tone="ok" />
+        <app-stat-tile label="Last run failed" [value]="errors().running ? '—' : failed()" foot="jobs" icon="xCircle" tone="crit" />
         <a routerLink="/notifications" class="block rounded-[var(--radius-card)] hover:shadow-md transition-shadow"
            [attr.aria-label]="unread() + ' unread notifications'">
           <app-stat-tile label="Unread" [value]="unread()" icon="bell" tone="warn" />
@@ -63,13 +64,17 @@
   @if (!error()) {
     <app-blur-loader [active]="loading()">
       <div class="space-y-5">
-        <!-- Charts -->
+        <!-- Charts. Each card shows why its own read failed, with a Try again for that read only. -->
         <div class="grid lg:grid-cols-3 gap-4">
           <div class="card p-4">
             <h2 class="text-sm font-semibold mb-3">Job status</h2>
-            <!-- Status colours, so Inactive is amber like its pill rather than the next palette slot,
-                 a pink that read as Failed. -->
-            <app-donut [data]="statusCategories()" totalLabel="jobs" [colorFor]="outcomeColor" />
+            @if (errors().status; as reason) {
+              <app-load-error [message]="reason" (retry)="retry('status')" />
+            } @else {
+              <!-- Status colours, so Inactive is amber like its pill rather than the next palette slot,
+                   a pink that read as Failed. -->
+              <app-donut [data]="statusCategories()" totalLabel="jobs" [colorFor]="outcomeColor" />
+            }
           </div>
 
           <div class="card p-4">
@@ -77,12 +82,20 @@
                  that ran two hundred times contributes one. Labelled "runs" it read as a run count and
                  disagreed with the two charts beside it, which do count runs. -->
             <h2 class="text-sm font-semibold mb-3">Jobs by last outcome</h2>
-            <app-donut [data]="jobRunning()" totalLabel="jobs" [colorFor]="outcomeColor" />
+            @if (errors().running; as reason) {
+              <app-load-error [message]="reason" (retry)="retry('running')" />
+            } @else {
+              <app-donut [data]="jobRunning()" totalLabel="jobs" [colorFor]="outcomeColor" />
+            }
           </div>
 
           <div class="card p-4">
             <h2 class="text-sm font-semibold mb-3">Queue volume by day</h2>
-            <app-bar-chart [data]="dayBars()" [height]="104" emptyMessage="No runs in this range." />
+            @if (errors().hourly; as reason) {
+              <app-load-error [message]="reason" (retry)="retry('hourly')" />
+            } @else {
+              <app-bar-chart [data]="dayBars()" [height]="104" emptyMessage="No runs in this range." />
+            }
           </div>
         </div>
 
@@ -94,7 +107,11 @@
               Click any cell to see which jobs ran in that hour
             </span>
           </div>
-          <app-heatmap [data]="heatCells()" [selected]="selectedHeat()" (cellClicked)="onHeatCell($event)" />
+          @if (errors().hourly; as reason) {
+            <app-load-error [message]="reason" (retry)="retry('hourly')" />
+          } @else {
+            <app-heatmap [data]="heatCells()" [selected]="selectedHeat()" (cellClicked)="onHeatCell($event)" />
+          }
         </div>
       </div>
     </app-blur-loader>

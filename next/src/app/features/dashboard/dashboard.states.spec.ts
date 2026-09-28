@@ -55,13 +55,13 @@ describe('Dashboard load states', () => {
   it('says why when a chart request fails, not just the first one', () => {
     const { dashboard: d } = dashboard({ jobRunning: () => throwError(() => ({ error: {} })) });
     d.load();
-    expect(d.error()).toBeTruthy();
+    expect(d.errors().running).toBeTruthy();
   });
 
   it('keeps the server\'s sentence for a refused chart', () => {
     const { dashboard: d } = dashboard({ hourly: () => of({ status: 'ERROR', message: 'Hourly figures are unavailable.' }) });
     d.load();
-    expect(d.error()).toBe('Hourly figures are unavailable.');
+    expect(d.errors().hourly).toBe('Hourly figures are unavailable.');
   });
 
   it('clears the error when Try again succeeds', () => {
@@ -70,7 +70,56 @@ describe('Dashboard load states', () => {
     d.load();
     fail = false;
     d.load();
+    expect(d.errors()).toEqual({});
     expect(d.error()).toBe('');
+  });
+
+  /**
+   * One failed read used to replace every tile and chart with a single error card, so a slow
+   * heatmap took the job counts and the Unread link down with it. Only the part that failed now
+   * says so; the rest keeps its figures.
+   */
+  it('keeps the other figures when only one read fails', () => {
+    const { dashboard: d } = dashboard({
+      jobStatus: () => of({ status: 'SUCCESS', data: [{ name: 'All', value: 9 }] }),
+      jobRunning: () => of({ status: 'SUCCESS', data: [{ name: 'FAILED', value: 2 }] }),
+      hourly: () => throwError(() => ({ error: { message: 'Internal Server Error' } })),
+    });
+    d.load();
+    expect(d.errors()).toEqual({ hourly: 'Internal Server Error' });
+    expect(d.error()).toBe('');
+    expect(d.totalJobs()).toBe(9);
+    expect(d.failed()).toBe(2);
+  });
+
+  it('shows one page-level reason when every read is refused for the same reason', () => {
+    const refused = () => of({ status: 'ERROR', message: 'Invalid date.' });
+    const { dashboard: d } = dashboard({ jobStatus: refused, jobRunning: refused, hourly: refused });
+    d.load();
+    expect(d.error()).toBe('Invalid date.');
+  });
+
+  it('keeps separate reasons when the reads fail differently', () => {
+    const { dashboard: d } = dashboard({
+      jobStatus: () => of({ status: 'ERROR', message: 'A.' }),
+      jobRunning: () => of({ status: 'ERROR', message: 'B.' }),
+      hourly: () => of({ status: 'ERROR', message: 'A.' }),
+    });
+    d.load();
+    expect(d.error()).toBe('');
+    expect(d.errors()).toEqual({ status: 'A.', running: 'B.', hourly: 'A.' });
+  });
+
+  it('reads only the failed part again on its Try again', () => {
+    let fail = true;
+    const { dashboard: d, calls } = dashboard({ jobRunning: () => fail ? throwError(() => ({ error: {} })) : ok() });
+    d.load();
+    calls.length = 0;
+    fail = false;
+    d.retry('running');
+    expect(calls).toEqual(['jobRunning']);
+    expect(d.errors()).toEqual({});
+    expect(d.loading()).toBe(false);
   });
 
   /** `loading` fell as soon as the first request answered, while three were still out. */
@@ -455,7 +504,7 @@ describe('Dashboard staying current', () => {
     fail = true;
     events.next({ type: 'job.status', jobId: 1 });
     vi.advanceTimersByTime(2000);
-    expect(d.error()).toBe('');
+    expect(d.errors()).toEqual({});
     expect(d.totalJobs()).toBe(9);
   });
 
