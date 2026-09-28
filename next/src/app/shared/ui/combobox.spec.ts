@@ -248,3 +248,39 @@ describe('Combobox and the keyboard', () => {
     document.removeEventListener('keydown', heard);
   });
 });
+
+/**
+ * The list's text was the browser's 16px under a 14px (form) or 12px (toolbar) box, and an
+ * option's hint -- a topic's Kafka name, a pipeline's description -- was only a tooltip, which a
+ * keyboard or touch user never sees (UI audit, Low).
+ */
+describe('Combobox option list', () => {
+  function opened() {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [Combobox] });
+    const fixture = TestBed.createComponent(Combobox);
+    fixture.componentRef.setInput('options', [
+      { value: '10', label: 'Claims intake', hint: 'medaxis-claims-intake' },
+      { value: '20', label: 'Billing intake' },
+    ]);
+    fixture.componentRef.setInput('allowClear', false);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const input = el.querySelector('input') as HTMLInputElement;
+    input.focus();
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    fixture.detectChanges();
+    return el;
+  }
+
+  it('matches the box\'s type size', () => {
+    expect(opened().querySelector('[role="listbox"]')!.classList).toContain('text-sm');
+  });
+
+  it('shows each option\'s hint under its label, and keeps both in the tooltip', () => {
+    const [claims, billing] = Array.from(opened().querySelectorAll<HTMLElement>('[role="option"]'));
+    expect(claims.textContent).toContain('medaxis-claims-intake');
+    expect(claims.title).toBe('Claims intake — medaxis-claims-intake');
+    expect(billing.title).toBe('Billing intake');
+  });
+});
