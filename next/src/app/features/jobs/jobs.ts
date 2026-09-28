@@ -32,7 +32,7 @@ import { AssistantDock } from './assistant/assistant-dock';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { clonePayload } from './job-clone';
 import { clockTime, monthDayLabel, weekdayLabel } from './schedule-labels';
-import { compactDuration, dayLabel } from '../../shared/ui/time-format';
+import { dayLabel } from '../../shared/ui/time-format';
 
 export interface Scheduler {
   schedulerId: number;
@@ -442,7 +442,7 @@ export class Jobs implements OnInit {
           .map(q => ({
             name: `#${q.jobQueueId}`,
             // Seconds, to one decimal. This plotted minutes, so a 25 second run -- most of them --
-            // was labelled 0 and a minute-long one 1; runDurationLabel writes the unit instead.
+            // was labelled 0 and a minute-long one 1; the chart's duration unit writes "25s" instead.
             value: Math.max(0, Math.round(
               (new Date(q.endTime).getTime() - new Date(q.startTime).getTime()) / 100) / 10),
             color: statusColor(q.jobStatus),
@@ -509,12 +509,6 @@ export class Jobs implements OnInit {
 
   readonly recentRunBars = RECENT_RUN_BARS;
 
-  /**
-   * How a Recent runs bar is labelled: "25s", "1.5m". The bar chart's own default writes a bare
-   * number, which says nothing about the unit. A property rather than a method, so the template
-   * passes the same function each time and the chart does not recompute its labels.
-   */
-  readonly runDurationLabel = compactDuration;
 
   /** "24 Sep 2026" for the schedule's start and end days, which the API sends as "2026-09-24". */
   readonly dayLabel = dayLabel;

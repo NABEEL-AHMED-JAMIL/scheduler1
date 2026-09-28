@@ -1,3 +1,4 @@
+import { compactDuration } from '../../../shared/ui/time-format';
 import { describe, it, expect } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
@@ -46,7 +47,7 @@ describe('Run history on the console clock', () => {
     ]);
     expect(h.runs().map(r => h.duration(r))).toEqual(['25.3s', '2m', '420ms']);
     expect(h.durationTiles().map(t => t.value)).toEqual(['420ms', '25.3s', '2m']);
-    expect(h.durationTrend().map(b => h.durationBarLabel(b.value))).toEqual(['25s', '2m', '<1s']);
+    expect(h.durationTrend().map(b => compactDuration(b.value))).toEqual(['25s', '2m', '<1s']);
     expect(h.durationTrend().map(b => b.name)).toEqual(['24 Sep', '24 Sep', '24 Sep']);
   });
 

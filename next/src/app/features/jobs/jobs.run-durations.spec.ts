@@ -1,3 +1,4 @@
+import { compactDuration } from '../../shared/ui/time-format';
 import { describe, it, expect } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
@@ -51,7 +52,7 @@ describe('the Recent runs chart', () => {
     jobs.toggleRow(job);
     const bars = jobs.runsByJob()[2838];
     expect(bars.map(bar => bar.value)).toEqual([25.3, 27, 41, 50, 60]);
-    expect(bars.map(bar => jobs.runDurationLabel(bar.value))).toEqual(['25s', '27s', '41s', '50s', '1m']);
+    expect(bars.map(bar => compactDuration(bar.value))).toEqual(['25s', '27s', '41s', '50s', '1m']);
   });
 });
 

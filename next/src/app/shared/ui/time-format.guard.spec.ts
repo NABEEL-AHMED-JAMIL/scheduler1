@@ -1,19 +1,10 @@
 import { TIME_FORMATS } from './time-format';
 
 /**
- * Folders still being moved onto the named formats by a parallel change (MIG-295). The guard skips
- * them until those changes are merged; then this list is emptied and the whole console is held to
- * the rules below. Paths are relative to src/app.
+ * Folders exempt from the rules below. Empty since MIG-295's three parallel changes merged; a
+ * folder added here needs a reason beside it.
  */
-const MIGRATING: string[] = [
-  'features/dashboard',
-  'shared/charts',
-  'features/reports',
-  'features/analytics',
-  'features/jobs',
-  'features/queue',
-  'features/tasks',
-];
+const MIGRATING: string[] = [];
 
 /**
  * MIG-295: one way to write a date, a time and an hour across the console (owner decision

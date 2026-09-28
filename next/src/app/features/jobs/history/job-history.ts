@@ -21,7 +21,7 @@ import { copyText } from '../../../shared/ui/clipboard.util';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { SplitBar } from '../../../shared/charts/split-bar';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
-import { compactDuration, dayLabel, formatDuration, hourRange } from '../../../shared/ui/time-format';
+import { dayLabel, formatDuration, hourRange } from '../../../shared/ui/time-format';
 import { clockTime } from '../schedule-labels';
 import { createPager } from '../../../shared/ui/pager';
 import { Pagination } from '../../../shared/ui/pagination';
@@ -259,9 +259,6 @@ export class JobHistory {
       value: Math.round(p.seconds * 10) / 10,
     }));
   });
-
-  /** "25s", "3.4m" over each bar and in its tooltip; the chart's default wrote a bare number. */
-  readonly durationBarLabel = compactDuration;
 
   private readonly clock = new ServerTimePipe(inject(LOCALE_ID));
 
