@@ -74,7 +74,7 @@ test('the workspace fits a phone without the page scrolling sideways', async ({ 
 test('a dashboard fits a phone too', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/objects/analytics/dashboards');
-  await page.getByRole('listbox', { name: 'Dashboards' }).getByRole('option', { name: '01 Overall KPI summary' }).click();
+  await page.locator('a.dash-card', { hasText: '01 Overall KPI summary' }).click();
   await expect(page.getByText('Total revenue', { exact: true })).toBeVisible();
   await page.waitForTimeout(6000);
 
@@ -107,7 +107,7 @@ test('the workspace has no WCAG A/AA violations in DARK mode either', async ({ p
 test('a dashboard has no WCAG A/AA violations in dark mode', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
   await page.goto('/objects/analytics/dashboards');
-  await page.getByRole('listbox', { name: 'Dashboards' }).getByRole('option', { name: '04 Category distribution' }).click();
+  await page.locator('a.dash-card', { hasText: '04 Category distribution' }).click();
   await expect(page.getByText('Revenue share by category', { exact: true })).toBeVisible();
   await page.waitForTimeout(8000);
 

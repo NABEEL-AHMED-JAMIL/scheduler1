@@ -43,27 +43,36 @@ test.beforeEach(async () => {
 
 async function openLibrary(page: Page) {
   await page.goto('/objects/analytics/dashboards');
-  await expect(page.getByText(/re-run every time it is opened/)).toBeVisible();
+  await expect(page.getByText(/re-run each time you open them/)).toBeVisible();
 }
 
 /**
- * The rail lists every board as an option in a listbox, the way Kafka and Billing list
- * theirs, and the option's accessible name carries the description and the date after the name.
- * A substring on the name is enough: nothing here is named as a prefix of anything else.
+ * The landing page draws every board as a card, a link to ?board=<id>. A substring on the name
+ * is enough: nothing here is named as a prefix of anything else.
  */
-function boardInRail(page: Page, name: string) {
-  return page.getByRole('listbox', { name: 'Dashboards' }).getByRole('option', { name });
+function boardCard(page: Page, name: string) {
+  return page.locator('a.dash-card', { hasText: name });
 }
 
 async function openBoard(page: Page, name: string) {
-  await boardInRail(page, name).click();
-  await expect(boardInRail(page, name)).toHaveAttribute('aria-selected', 'true');
+  await boardCard(page, name).click();
+  await expect(page).toHaveURL(/[?&]board=\d+/);
+  await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
+}
+
+/**
+ * The chart kinds of one tile: they live in its menu, under "Show as", one item per kind with
+ * the kind id in data-kind. Opens the menu and hands back the items.
+ */
+async function kindsOf(page: Page, title: string) {
+  await page.getByRole('button', { name: `Actions for ${title}` }).click();
+  return page.locator('button.dash-kind');
 }
 
 test('all five seeded reports are listed', async ({ page }) => {
   await openLibrary(page);
   for (const report of REPORTS) {
-    await expect(boardInRail(page, report.name)).toBeVisible();
+    await expect(boardCard(page, report.name)).toBeVisible();
   }
 });
 
@@ -127,10 +136,10 @@ test('the picker offers every kind, and disables the ones this result cannot hon
     await expect(page.getByText('Total revenue', { exact: true })).toBeVisible();
     await page.waitForTimeout(4000);
 
-    const picker = page.locator('select').filter({ hasText: 'Table' }).first();
-    const kinds = await picker.locator('option').evaluateAll(options => options.map(option => ({
-      value: (option as HTMLOptionElement).value,
-      disabled: (option as HTMLOptionElement).disabled,
+    const items = await kindsOf(page, 'Total revenue');
+    const kinds = await items.evaluateAll(buttons => buttons.map(button => ({
+      value: (button as HTMLButtonElement).dataset['kind']!,
+      disabled: (button as HTMLButtonElement).disabled,
     })));
 
     // Against the list the picker is built from, not a number written here. This said
@@ -149,7 +158,7 @@ test('a single-figure tile draws the figure, and says it showed one row', async 
   await expect(page.getByText('Total revenue', { exact: true })).toBeVisible();
   await page.waitForTimeout(4000);
 
-  await page.locator('select').filter({ hasText: 'Table' }).first().selectOption('kpi');
+  await (await kindsOf(page, 'Total revenue')).and(page.locator('[data-kind="kpi"]')).click();
 
   // Grouped, not raw: the engine returns 103909527.57999787 over the CSV.
   await expect(page.getByText('103,909,527.58')).toBeVisible();
@@ -166,13 +175,11 @@ test('a dimension-ordered series offers a line; a rank-ordered one refuses with 
     await expect(page.getByText('Revenue by month', { exact: true })).toBeVisible();
     await page.waitForTimeout(6000);
 
-    // The DOM property, not toBeDisabled(): Playwright 1.63 reads an <option>'s disabled state
-    // through ARIA, where an option carries none, and reported "enabled" for an option the
-    // browser refused to select. The property is what the picker sets and the browser honours.
-    const ordered = page.locator('select').filter({ hasText: 'Bars in order' }).first();
-    await expect(ordered.locator('option[value="line"]')).toHaveJSProperty('disabled', false);
-    await expect(ordered.locator('option[value="stacked"]')).toHaveJSProperty('disabled', true);
-    await expect(ordered.locator('option[value="stacked"]'))
+    // The DOM property: the menu disables the button itself, and says why in its title.
+    const kinds = await kindsOf(page, 'Revenue by month');
+    await expect(kinds.and(page.locator('[data-kind="line"]'))).toHaveJSProperty('disabled', false);
+    await expect(kinds.and(page.locator('[data-kind="stacked"]'))).toHaveJSProperty('disabled', true);
+    await expect(kinds.and(page.locator('[data-kind="stacked"]')))
       .toHaveAttribute('title', /second dimension/);
   });
 
@@ -182,18 +189,19 @@ test('a two-dimension cross-tab is the one that may be stacked', async ({ page }
   await expect(page.getByText('Revenue by category and region', { exact: true })).toBeVisible();
   await page.waitForTimeout(6000);
 
-  const picker = page.locator('select').filter({ hasText: 'Table' }).first();
-  await expect(picker.locator('option[value="stacked"]')).toHaveJSProperty('disabled', false);
+  const kinds = await kindsOf(page, 'Revenue by category and region');
+  await expect(kinds.and(page.locator('[data-kind="stacked"]'))).toHaveJSProperty('disabled', false);
   // Sorted biggest-first, so a line through them would draw the sort.
-  await expect(picker.locator('option[value="line"]')).toHaveJSProperty('disabled', true);
+  await expect(kinds.and(page.locator('[data-kind="line"]'))).toHaveJSProperty('disabled', true);
 });
 
 /**
  * Layout guards. Cheap to check, and the kind of thing that regresses silently.
  *
- * The overflow one is not hypothetical: the kind picker is `w-auto`, which sizes a select to its
- * WIDEST option, and the options carry the reason a kind is unavailable -- a whole sentence. The
- * tile overflowed its own card the moment those reasons were added.
+ * The overflow one is not hypothetical: the kind picker was a `w-auto` select, sized to its
+ * WIDEST option, and the options carried the reason a kind is unavailable -- a whole sentence. The
+ * tile overflowed its own card the moment those reasons were added. The picker is in the tile's
+ * menu now, but a table can still outgrow its card.
  */
 test('nothing on an open board overflows its card, and the page never scrolls sideways',
   async ({ page }) => {
@@ -223,20 +231,24 @@ test('nothing on an open board overflows its card, and the page never scrolls si
     expect(sideways, 'the page body scrolls horizontally').toBe(false);
   });
 
-test('opening a report keeps the list beside it, and the report is what you see', async ({ page }) => {
-  // Twenty-eight entries at full height once pushed every widget below the fold, and the answer
-  // then was to collapse the list. The answer now is the rail: it scrolls on its own inside the
-  // viewport, the open board stays marked in it, and the first tile is in the first screenful.
+test('an open report has the whole width, and All dashboards goes back to the cards', async ({ page }) => {
+  // The redesign of 2026-09-28: no list kept beside the board. The board is the page, its first
+  // tile is in the first screenful, and the cards are one link (or Back) away.
   await openLibrary(page);
-  await expect(boardInRail(page, '01 Overall KPI summary')).toBeVisible();
-
   await openBoard(page, '01 Overall KPI summary');
 
-  await expect(page.getByRole('heading', { name: '01 Overall KPI summary' })).toBeVisible();
-  await expect(page.getByRole('listbox', { name: 'Dashboards' })).toBeVisible();
+  await expect(page.locator('a.dash-card')).toHaveCount(0);
   const top = await page.locator('.card').filter({ hasText: 'Total revenue' }).first()
     .evaluate(node => node.getBoundingClientRect().top);
   expect(top).toBeLessThan(900);
+
+  // The address names the board, so a reload lands on it again.
+  await page.reload();
+  await expect(page.getByRole('heading', { level: 1, name: '01 Overall KPI summary' })).toBeVisible();
+
+  await page.getByRole('link', { name: /All dashboards/ }).click();
+  await expect(page).not.toHaveURL(/board=/);
+  await expect(boardCard(page, '01 Overall KPI summary')).toBeVisible();
 });
 
 

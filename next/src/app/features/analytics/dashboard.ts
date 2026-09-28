@@ -1,18 +1,19 @@
-import { Component, LOCALE_ID, OnDestroy, OnInit, computed, inject, input, output, signal } from '@angular/core';
+import { Component, DestroyRef, LOCALE_ID, OnDestroy, OnInit, computed, inject, input, output, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Dialog } from '@angular/cdk/dialog';
-import { Subscription } from 'rxjs';
+import { Subscription, from, mergeMap } from 'rxjs';
 import { API_SUCCESS } from '../../core/api/api.config';
 import { Icon } from '../../shared/ui/icon';
 import { Field } from '../../shared/ui/field';
 import { confirmWith } from '../../shared/ui/confirm';
-import { RouterLink } from '@angular/router';
-import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
-import { StatTile } from '../../shared/ui/stat-tile';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { CdkMenu, CdkMenuGroup, CdkMenuItem, CdkMenuItemRadio, CdkMenuTrigger } from '@angular/cdk/menu';
+import { LoadError } from '../../shared/ui/load-error';
 import { CHART_SLOTS } from '../../shared/charts/status-color';
 import { WidgetTableDialog, WidgetTableData } from './widget-table';
 import { KINDS } from './widget-kinds';
 import { AnalyticsWidget, WidgetState as TileState } from './analytics-widget';
-import { WidgetChart, WIDGET_HEIGHT, WIDGET_HEIGHT_MAX, WIDGET_HEIGHT_MIN, WIDGET_ROWS } from './widget-chart';
+import { WidgetChart, WIDGET_HEIGHT, WIDGET_HEIGHT_MAX, WIDGET_HEIGHT_MIN } from './widget-chart';
 import {
   FilterBuilder, asFilterGroup, countFilterClauses, describeClause, emptyFilterGroup,
   isNumericType, pruneFilters,
@@ -1046,6 +1047,38 @@ function mintQueryId(widgetId: number): string {
 }
 
 /**
+ * How many rows a table tile shows before "Show all". Five keeps a table a glance on a board of
+ * several; the rest arrived with the run and are one click away.
+ */
+export const TILE_ROWS = 5;
+
+/** A widget's width in a board's twelve columns: a single figure, a chart, or a table. */
+export type WidgetSpan = 3 | 6 | 12;
+
+/**
+ * The column classes for each width, written out whole so Tailwind finds them in this file.
+ * One column on a phone; from sm up a figure takes half and anything else the row; from lg up a
+ * figure is a quarter, a chart a half and a table the whole row.
+ */
+const SPAN_CLASSES: Record<WidgetSpan, string> = {
+  3: 'min-w-0 sm:col-span-6 lg:col-span-3',
+  6: 'min-w-0 sm:col-span-12 lg:col-span-6',
+  12: 'min-w-0 sm:col-span-12',
+};
+
+/** The kinds that are a grid of rows, and so need the whole width to be read. */
+const ROW_KINDS: ReadonlySet<string> = new Set(['table', 'pivot']);
+
+/** Past this many boards the landing page offers a search box above the cards. */
+const SEARCH_FROM = 6;
+
+/** The file name at the end of a path: what a person calls a file when they are not reading a URL. */
+function fileName(path: string | null | undefined): string {
+  const parts = (path ?? '').split('/').filter(Boolean);
+  return parts.length ? parts[parts.length - 1] : (path ?? '');
+}
+
+/**
  * Dashboards: pages of saved work, re-run every time they are opened.
  *
  * <b>THE ONE DECISION THIS SCREEN IS BUILT AROUND: a widget stores a REFERENCE and never a
@@ -1078,7 +1111,7 @@ function mintQueryId(widgetId: number): string {
  */
 @Component({
   selector: 'app-dashboards',
-  imports: [Icon, StatTile, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, FilterBuilder, AnalyticsWidget, WidgetChart, Field],
+  imports: [Icon, LoadError, RouterLink, CdkMenu, CdkMenuGroup, CdkMenuItem, CdkMenuItemRadio, CdkMenuTrigger, FilterBuilder, AnalyticsWidget, WidgetChart, Field, ServerTimePipe],
   templateUrl: './dashboard.html',
 })
 export class Dashboards implements OnInit, OnDestroy {
@@ -1092,10 +1125,14 @@ export class Dashboards implements OnInit, OnDestroy {
   }
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly kinds = KINDS;
   readonly heightMin = WIDGET_HEIGHT_MIN;
   readonly heightMax = WIDGET_HEIGHT_MAX;
+  readonly searchFrom = SEARCH_FROM;
 
 
   /**
@@ -1319,7 +1356,7 @@ export class Dashboards implements OnInit, OnDestroy {
   readonly loading = signal(false);
   readonly error = signal('');
 
-  /** Narrows the list by name. Only offered past eight reports; see the template. */
+  /** Narrows the cards by name or description. Only offered past SEARCH_FROM boards. */
   readonly listFilter = signal('');
 
   // ---- the board filter ---------------------------------------------------------------------
@@ -1378,6 +1415,13 @@ export class Dashboards implements OnInit, OnDestroy {
   readonly creating = signal(false);
   readonly createError = signal('');
 
+  /**
+   * The board being looked at, or null for the cards. Set before the board has arrived, so the
+   * page shows the board view (loading, then the board or why it could not be read) from the
+   * click on; `board()` is what the server sent. Mirrored in the URL as ?board=, so a board can
+   * be linked to and Back returns to the cards.
+   */
+  readonly openId = signal<number | null>(null);
   readonly board = signal<Dashboard | null>(null);
   readonly boardLoading = signal(false);
   readonly boardError = signal('');
@@ -1436,6 +1480,19 @@ export class Dashboards implements OnInit, OnDestroy {
   private pending: 'all' | number[] | null = null;
 
   readonly widgets = computed<DashboardWidget[]>(() => this.board()?.widgets ?? []);
+
+  /**
+   * Each board's widgets, for the counts on its card. The listing carries no widgets, so each
+   * board is read once by id: metadata only, no session and no query permit (see
+   * fetchDashboardById). Kept up to date when a board is opened, added to or trimmed.
+   */
+  readonly cardWidgets = signal<Record<number, DashboardWidget[]>>({});
+
+  /** Widgets whose table shows every row rather than the first TILE_ROWS. */
+  readonly expanded = signal<ReadonlySet<number>>(new Set());
+
+  /** The files the open board reads, for the facts line and "Files this board reads". */
+  readonly boardFiles = computed(() => this.filesOf(this.widgets()));
   /** Whether the create form is open; a header button, not a permanent pair of inputs. */
   readonly createOpen = signal(false);
   readonly ranCount = computed(() => Object.values(this.runs()).filter(run => run.state === 'done').length);
@@ -1444,6 +1501,14 @@ export class Dashboards implements OnInit, OnDestroy {
   readonly lastRunText = computed(() => {
     const at = Math.max(0, ...Object.values(this.runs()).map(run => run.view?.ranAt ?? 0));
     return at ? 'last ran ' + this.clock(at) : '';
+  });
+
+  /** How the last pass went, for the board's facts line: "6 of 7 drew, 1 failed". */
+  readonly lastRun = computed(() => {
+    if (this.running()) return this.progress();
+    if (!this.ranCount() && !this.failedCount()) return '';
+    return `${this.ranCount()} of ${this.widgets().length} drew`
+      + (this.failedCount() ? `, ${this.failedCount()} failed` : '');
   });
 
   /** A run's state as the shared tile chrome names it; a result with no rows is 'empty'. */
@@ -1498,6 +1563,22 @@ export class Dashboards implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.loadDashboards();
     this.loadSources();
+    // The URL says which board is open: a link to ?board=7 opens it, and Back and Forward move
+    // between a board and the cards. A change this page made itself is already in openId, so it
+    // is not loaded twice.
+    this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(params => this.followUrl(params.get('board')));
+  }
+
+  /** Opens or leaves a board to match the URL's ?board=. Anything but a whole number is none. */
+  private followUrl(raw: string | null): void {
+    const id = raw && /^\d+$/.test(raw) ? Number(raw) : null;
+    if (id === this.openId()) return;
+    if (id === null) {
+      this.leaveBoard();
+      return;
+    }
+    this.enterBoard(id);
   }
 
   ngOnDestroy(): void {
@@ -1519,12 +1600,75 @@ export class Dashboards implements OnInit, OnDestroy {
           return;
         }
         this.dashboards.set(response.data);
+        this.loadCardFacts(response.data);
       },
       error: err => {
         this.loading.set(false);
         this.error.set(err?.error?.message || 'The dashboards could not be read.');
       },
     });
+  }
+
+  /**
+   * Reads the widgets of each board not already known, three at a time, for the card counts.
+   * A board that cannot be read keeps a card without counts rather than an error: the card still
+   * opens it, and opening says why.
+   */
+  private loadCardFacts(list: Dashboard[]): void {
+    const known = this.cardWidgets();
+    const ids = list.map(item => item.analyticsDashboardId)
+      .filter((id): id is number => typeof id === 'number' && !(id in known));
+    if (!ids.length) return;
+    from(ids).pipe(
+      mergeMap(id => this.analytics.fetchDashboardById(id), 3),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
+      next: response => {
+        const id = response.data?.analyticsDashboardId;
+        if (response.status !== API_SUCCESS || !id) return;
+        this.cardWidgets.update(all => ({ ...all, [id]: response.data!.widgets ?? [] }));
+      },
+      error: () => {},
+    });
+  }
+
+  /** "7 widgets · 3 files" for a card, or '' until that board's widgets are known. */
+  cardFacts(item: Dashboard): string {
+    const widgets = item.analyticsDashboardId ? this.cardWidgets()[item.analyticsDashboardId] : undefined;
+    if (!widgets) return '';
+    if (!widgets.length) return 'No widgets yet';
+    const files = this.filesOf(widgets).length;
+    return `${widgets.length} widget${widgets.length === 1 ? '' : 's'}`
+      + (files ? ` · ${files} file${files === 1 ? '' : 's'}` : '');
+  }
+
+  /**
+   * Every distinct file a set of widgets reads, saved analyses and saved queries alike (a query
+   * over a join reads two). Unlike boardDatasets, which the board filter uses and which can only
+   * narrow analyses, this is what the board touches.
+   */
+  filesOf(widgets: DashboardWidget[]): string[] {
+    const seen = new Set<string>();
+    for (const widget of widgets) {
+      if (widget.analyticsAnalysisId) {
+        const saved = this.analyses().find(item => item.analyticsAnalysisId === widget.analyticsAnalysisId);
+        if (saved) seen.add(saved.connectionAlias + '/' + saved.datasetPath);
+      } else if (widget.analyticsQueryId) {
+        const saved = this.queries().find(item => item.analyticsQueryId === widget.analyticsQueryId);
+        if (saved) {
+          seen.add(saved.connectionAlias + '/' + saved.datasetPath);
+          if (saved.secondDatasetPath) seen.add((saved.secondConnectionAlias ?? saved.connectionAlias) + '/' + saved.secondDatasetPath);
+        }
+      }
+    }
+    return [...seen];
+  }
+
+  /** Opens the create form and puts the cursor in its name, from the head or the last card. */
+  openCreate(): void {
+    this.createOpen.set(true);
+    this.createError.set('');
+    setTimeout(() => (globalThis.document?.getElementById('dashName') as HTMLInputElement | null)?.focus());
   }
 
   createDashboard(): void {
@@ -1575,10 +1719,12 @@ export class Dashboards implements OnInit, OnDestroy {
           this.toast.error(response.message || 'The dashboard could not be deleted.');
           return;
         }
-        if (this.board()?.analyticsDashboardId === id) {
-          this.abandon();
-          this.board.set(null);
-        }
+        this.cardWidgets.update(all => {
+          const next = { ...all };
+          delete next[id];
+          return next;
+        });
+        if (this.openId() === id) this.closeDashboard();
         this.loadDashboards();
       },
       error: err => {
@@ -1587,10 +1733,64 @@ export class Dashboards implements OnInit, OnDestroy {
     });
   }
 
+  /** Opens a board, runs it, and puts it in the URL so the page can be linked and Back works. */
   openDashboard(item: Dashboard): void {
     const id = item.analyticsDashboardId;
     if (!id) return;
+    this.enterBoard(id);
+    this.setUrl(id);
+  }
+
+  /** Back to the cards: the board's run is stopped and ?board= leaves the URL. */
+  closeDashboard(): void {
+    this.leaveBoard();
+    this.setUrl(null);
+  }
+
+  /** The "All dashboards" link navigates by itself; this only leaves the board at once. */
+  leaveBoard(): void {
+    if (this.openId() === null && !this.board()) return;
+    this.abandon();
+    this.boardToken++;
+    this.openId.set(null);
+    this.board.set(null);
+    this.boardLoading.set(false);
+    this.boardError.set('');
+    this.widgetError.set('');
+    this.resetBoardState();
+  }
+
+  /** Reads the open board again after it could not be read. */
+  retryBoard(): void {
+    const id = this.openId();
+    if (id !== null) this.loadBoard(id, 'all');
+  }
+
+  private enterBoard(id: number): void {
+    // Another board's tiles and filter mean nothing here; the same board opened again keeps its
+    // tiles until the new run replaces them, as it always has.
+    if (this.openId() !== id) {
+      this.board.set(null);
+      this.resetBoardState();
+    }
+    this.openId.set(id);
     this.loadBoard(id, 'all');
+  }
+
+  /** What belongs to one open board and must not follow the reader to the next. */
+  private resetBoardState(): void {
+    this.runs.set({});
+    this.expanded.set(new Set());
+    this.addOpen.set(false);
+    this.filterOpen.set(false);
+    this.boardFilterOn.set('');
+    this.boardFilter.set(emptyFilterGroup());
+    this.boardColumns.set([]);
+  }
+
+  private setUrl(id: number | null): void {
+    this.router.navigate([], { relativeTo: this.route, queryParams: { board: id }, queryParamsHandling: 'merge' })
+      .catch(() => {});
   }
 
   /**
@@ -1618,6 +1818,7 @@ export class Dashboards implements OnInit, OnDestroy {
           return;
         }
         this.board.set(response.data);
+        this.cardWidgets.update(all => ({ ...all, [analyticsDashboardId]: response.data!.widgets ?? [] }));
         if (run === null) return;
         this.pending = run;
         this.start();
@@ -1689,6 +1890,67 @@ export class Dashboards implements OnInit, OnDestroy {
     if (!query) return 'Saved query';
     const name = query.queryName === widget.widgetTitle ? '' : ` · ${query.queryName}`;
     return `Saved query${name} · ${query.connectionAlias}/${query.datasetPath}`;
+  }
+
+  /**
+   * The one short line under a tile's title: the file it reads, and the saved work's name when
+   * the tile was given a title of its own. The whole of sourceOf() is its tooltip; the full
+   * path on every tile made each subtitle a line of URL.
+   */
+  shortSourceOf(widget: DashboardWidget): string {
+    const saved = widget.analyticsAnalysisId
+      ? this.analyses().find(item => item.analyticsAnalysisId === widget.analyticsAnalysisId)
+      : this.queries().find(item => item.analyticsQueryId === widget.analyticsQueryId);
+    if (!saved) return widget.analyticsAnalysisId ? 'Saved analysis' : 'Saved query';
+    const name = 'analysisName' in saved ? saved.analysisName : saved.queryName;
+    const file = fileName(saved.datasetPath);
+    return name === widget.widgetTitle ? file : `${name} · ${file}`;
+  }
+
+  /**
+   * How many of a board's twelve columns a widget takes, by what it draws: a single figure 3, a
+   * table or a cross-tab 12, any chart or summary 6. The drawn kind once it has run, and the saved
+   * one before, so a tile does not jump when its result lands.
+   */
+  spanOf(widget: DashboardWidget): WidgetSpan {
+    const view = this.runs()[widget.analyticsDashboardWidgetId!]?.view;
+    const kind = view ? this.drawn(widget, view) : (widget.visualizationType ?? 'table');
+    if (kind === 'kpi') return 3;
+    return ROW_KINDS.has(kind) || !KINDS.some(known => known.id === kind) ? 12 : 6;
+  }
+
+  spanClass(widget: DashboardWidget): string {
+    return SPAN_CLASSES[this.spanOf(widget)];
+  }
+
+  /** How many rows the tile's table draws: TILE_ROWS, or all of them once "Show all" is pressed. */
+  rowLimit(widget: DashboardWidget): number {
+    const id = widget.analyticsDashboardWidgetId;
+    return id !== undefined && this.expanded().has(id) ? Number.MAX_SAFE_INTEGER : TILE_ROWS;
+  }
+
+  /**
+   * How many rows a drawn table or cross-tab has in all, when that is more than a tile shows, and
+   * so whether "Show all N" is offered. Zero for the charts, which draw every mark already.
+   */
+  hiddenRowTotal(view: WidgetView, kind: WidgetVisualization): number {
+    const total = kind === 'pivot' ? (view.pivot?.rows?.length ?? 0)
+      : kind === 'table' ? view.rows.length : 0;
+    return total > TILE_ROWS ? total : 0;
+  }
+
+  isExpanded(widget: DashboardWidget): boolean {
+    return this.rowLimit(widget) > TILE_ROWS;
+  }
+
+  toggleRows(widget: DashboardWidget): void {
+    const id = widget.analyticsDashboardWidgetId;
+    if (id === undefined) return;
+    this.expanded.update(open => {
+      const next = new Set(open);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
   }
 
   // ---- adding and removing a widget -------------------------------------------------------
@@ -1793,19 +2055,15 @@ export class Dashboards implements OnInit, OnDestroy {
    * whole reason a widget is a reference plus a visualization rather than a stored picture. A
    * kind change that re-queried would make picking a chart cost a permit.
    */
-  setVisualization(widget: DashboardWidget, kind: string, select?: HTMLSelectElement): void {
+  setVisualization(widget: DashboardWidget, kind: string): void {
     const id = widget.analyticsDashboardWidgetId;
     if (!id || kind === widget.visualizationType) return;
     this.widgetError.set('');
-    // On a refusal nothing the select binds to changes, so neither [value] nor [selected]
-    // re-fires and it would go on showing the refused kind over the chart still drawn the old
-    // way. Put it back by hand.
-    const previous = select ? this.drawnKindOf(widget) : '';
-    const restore = () => { if (select) select.value = previous; };
+    // Chosen from the tile's menu, whose tick follows the saved kind: a refusal changes nothing
+    // on the widget, so the tick stays where it was without being put back by hand.
     this.analytics.saveWidget({ ...widget, visualizationType: kind }).subscribe({
       next: response => {
         if (response.status !== API_SUCCESS || !response.data) {
-          restore();
           this.widgetError.set(response.message || 'That choice could not be saved.');
           return;
         }
@@ -1817,7 +2075,6 @@ export class Dashboards implements OnInit, OnDestroy {
         } : board);
       },
       error: err => {
-        restore();
         this.widgetError.set(err?.error?.message || 'That choice could not be saved.');
       },
     });
@@ -1875,16 +2132,16 @@ export class Dashboards implements OnInit, OnDestroy {
    * The rows the tile itself draws.
    *
    * The cut moved here from the view builders so that view.rows is the whole result. A tile is a
-   * postcard and eight rows is what fits on it; everything else is one click away rather than
+   * postcard and five rows is what fits on it; everything else is one click away rather than
    * gone.
    */
-  tileRows(view: WidgetView): (string | null)[][] {
-    return view.rows.slice(0, WIDGET_ROWS);
+  tileRows(view: WidgetView, limit = TILE_ROWS): (string | null)[][] {
+    return view.rows.slice(0, limit);
   }
 
   /** Whether this result has rows the tile is not showing. */
   hasMoreRows(view: WidgetView): boolean {
-    return view.rows.length > WIDGET_ROWS;
+    return view.rows.length > TILE_ROWS;
   }
 
   /**
@@ -1894,11 +2151,6 @@ export class Dashboards implements OnInit, OnDestroy {
    * carries around and nothing server-side validates: a height of 4, of 40000, or of "tall"
    * reaches this method exactly as a legitimate one does.
    */
-  /** One figure -- a single row of at most a label and a value -- which can share a row with others. */
-  isFigure(view: WidgetView | null | undefined): boolean {
-    return !!view && view.rowCount === 1 && view.columns.length <= 2 && !view.truncated;
-  }
-
   heightOf(widget: DashboardWidget): number {
     const asked = widgetConfigOf(widget).height;
     if (typeof asked !== 'number' || !Number.isFinite(asked)) return WIDGET_HEIGHT;
@@ -1909,12 +2161,6 @@ export class Dashboards implements OnInit, OnDestroy {
   captionOf(widget: DashboardWidget): string {
     const caption = widgetConfigOf(widget).caption;
     return typeof caption === 'string' ? caption.trim() : '';
-  }
-
-  /** What the tile's select is showing now: the drawn kind of its last run, else the saved one. */
-  private drawnKindOf(widget: DashboardWidget): string {
-    const view = this.runs()[widget.analyticsDashboardWidgetId!]?.view;
-    return view ? this.drawn(widget, view) : (widget.visualizationType ?? '');
   }
 
   drawn(widget: DashboardWidget, view: WidgetView): WidgetVisualization {
@@ -1928,12 +2174,12 @@ export class Dashboards implements OnInit, OnDestroy {
   /**
    * How much of the result is on the tile, said plainly -- and it depends on what is drawn.
    *
-   * The table shows eight rows; the charts draw every mark. Counting the table's rows either way
-   * put "8 of 24 rows shown" under a bar chart with twenty-four bars in it, which tells a reader
+   * The table shows five rows until "Show all" is pressed (limit); the charts draw every mark.
+   * Counting the table's rows either way put "8 of 24 rows shown" under a bar chart with twenty-four bars in it, which tells a reader
    * they are looking at a third of the data while they are looking at all of it. The opposite
    * mistake is worse, so this counts what the drawn kind actually renders.
    */
-  counted(view: WidgetView, kind: WidgetVisualization): string {
+  counted(view: WidgetView, kind: WidgetVisualization, limit = TILE_ROWS): string {
     if (!view.rowCount) return 'No rows.';
     // A single figure renders the whole result and has no marks at all -- an analysis with no
     // dimension produces none. Counting marks there printed "0 of 1 rows shown" under a tile
@@ -1951,12 +2197,12 @@ export class Dashboards implements OnInit, OnDestroy {
      */
     if (kind === 'pivot') {
       const groups = view.pivot?.rows?.length ?? 0;
-      const drawnGroups = Math.min(groups, WIDGET_ROWS);
+      const drawnGroups = Math.min(groups, limit);
       return drawnGroups < groups
         ? `${drawnGroups.toLocaleString()} of ${groups.toLocaleString()} groups shown`
         : `${groups.toLocaleString()} ${groups === 1 ? 'group' : 'groups'}`;
     }
-    const shown = kind === 'table' ? Math.min(view.rows.length, WIDGET_ROWS)
+    const shown = kind === 'table' ? Math.min(view.rows.length, limit)
       : kind === 'kpi' ? Math.min(1, view.rowCount)
       : view.marks.length;
     return shown < view.rowCount
@@ -2090,9 +2336,12 @@ export class Dashboards implements OnInit, OnDestroy {
     try {
       this.run(widget, id, epoch);
     } catch (thrown) {
-      const reason = thrown instanceof Error ? thrown.message : String(thrown);
+      // The exception goes to the console and never onto the tile: its message is minified code
+      // ("n.value.trim is not a function"), which tells a reader nothing they can act on.
+      console.error(`Dashboard widget ${id} could not be prepared`, thrown);
       this.settle(id, epoch, { state: 'failed', view: null, queryId: '',
-        error: `"${widget.widgetTitle}" could not be prepared: ${reason}` });
+        error: `"${widget.widgetTitle}" could not be run: something in its saved setup is not in a `
+          + 'shape this page can read. Open it in the Analytics Studio and save it again.' });
     }
   }
 

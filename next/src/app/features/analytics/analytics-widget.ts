@@ -18,7 +18,7 @@ export type WidgetState = 'idle' | 'queued' | 'running' | 'failed' | 'stopped' |
       <div class="widget-head">
         <div class="min-w-0 flex-1">
           <h3 class="widget-title truncate" [title]="title()">{{ title() }}</h3>
-          @if (subtitle()) { <p class="widget-sub truncate" [title]="subtitle()">{{ subtitle() }}</p> }
+          @if (subtitle()) { <p class="widget-sub truncate" [title]="subtitleTitle() || subtitle()">{{ subtitle() }}</p> }
         </div>
         <div class="flex items-center gap-1 shrink-0">
           <ng-content select="[actions]" />
@@ -80,6 +80,8 @@ export type WidgetState = 'idle' | 'queued' | 'running' | 'failed' | 'stopped' |
 export class AnalyticsWidget {
   readonly title = input.required<string>();
   readonly subtitle = input('');
+  /** The longer form of the subtitle, on hover: a board shows a file's name and keeps its path here. */
+  readonly subtitleTitle = input('');
   readonly state = input<WidgetState>('ready');
   readonly error = input('');
   readonly emptyMessage = input('No rows in this result.');

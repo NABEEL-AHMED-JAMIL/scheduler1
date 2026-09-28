@@ -1,111 +1,120 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Dashboards</h1>
-      <p class="page-subtitle">
-        A page of saved analyses and saved queries, re-run every time it is opened — a tile is never
-        a stored picture of an old answer. Pick a board on the left; its widgets draw on the right.
-      </p>
+  @if (openId() === null) {
+    <!-- ---- the cards: every board in the workspace ------------------------------------------ -->
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Dashboards</h1>
+        <p class="page-subtitle">Pages of saved analyses, re-run each time you open them.</p>
+      </div>
+      <div class="flex items-center gap-2 flex-wrap">
+        <button type="button" class="btn btn-primary btn-sm" (click)="createOpen() ? createOpen.set(false) : openCreate()" [attr.aria-expanded]="createOpen()">
+          <app-icon name="plus" />New dashboard
+        </button>
+        <a routerLink="/objects/analytics" class="btn btn-ghost btn-sm">Analytics Studio</a>
+      </div>
     </div>
-    <div class="flex items-center gap-2 flex-wrap">
-      <button type="button" class="btn btn-default btn-sm" [disabled]="loading()" (click)="loadDashboards()">
-        <app-icon name="refresh" [class.spin]="loading()" />Refresh
-      </button>
-      <button type="button" class="btn btn-primary btn-sm" (click)="createOpen.set(!createOpen())" [attr.aria-expanded]="createOpen()">
-        <app-icon name="plus" />New dashboard
-      </button>
-      <a routerLink="/objects/analytics" class="btn btn-ghost btn-sm">Analytics Studio</a>
-    </div>
-  </div>
 
-  <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-    <app-stat-tile label="Dashboards" [value]="dashboards().length" icon="chart" [tone]="dashboards().length ? 'info' : 'muted'"
-                   [foot]="dashboards().length ? 'in this workspace' : 'none yet'" />
-    <app-stat-tile label="On this board" [value]="widgets().length" icon="layers" [tone]="widgets().length ? 'info' : 'muted'"
-                   [foot]="board() ? (boardDatasets().length ? boardDatasets().length + ' dataset' + (boardDatasets().length === 1 ? '' : 's') + ' read' : 'nothing on it yet') : 'no board open'" />
-    <app-stat-tile label="Ran" [value]="ranCount()" icon="check" [tone]="failedCount() ? 'warn' : ranCount() ? 'ok' : 'muted'"
-                   [foot]="failedCount() ? failedCount() + ' failed' : running() ? progress() : ranCount() ? lastRunText() : 'not run yet'" />
-    <app-stat-tile label="Saved work" [value]="analyses().length + queries().length" icon="save" tone="muted"
-                   [foot]="analyses().length + ' analys' + (analyses().length === 1 ? 'is' : 'es') + ' · ' + queries().length + ' quer' + (queries().length === 1 ? 'y' : 'ies')" />
-  </div>
+    @if (createOpen()) {
+      <div class="card p-4 flex flex-wrap items-end gap-2">
+        <label class="flex-1 min-w-48"><span class="label">Name</span>
+          <input id="dashName" class="input" placeholder="Sales overview" aria-label="New dashboard name" [value]="newName()" (input)="newName.set($any($event.target).value)" (keydown.enter)="createDashboard()" /></label>
+        <label class="flex-[2] min-w-56"><span class="label">What it is for (optional)</span>
+          <input id="dashDescription" class="input" placeholder="September orders at a glance" aria-label="Dashboard description" [value]="newDescription()" (input)="newDescription.set($any($event.target).value)" /></label>
+        <button type="button" class="btn btn-primary btn-sm" [disabled]="!canCreate()" (click)="createDashboard()"><app-icon name="plus" [busy]="creating()" />{{ creating() ? 'Creating…' : 'Create' }}</button>
+        <button type="button" class="btn btn-ghost btn-sm" (click)="createOpen.set(false)">Cancel</button>
+        @if (createError()) { <p class="text-xs text-crit-500 basis-full">{{ createError() }}</p> }
+      </div>
+    }
 
-  @if (createOpen()) {
-    <div class="card p-4 flex flex-wrap items-end gap-2">
-      <label class="flex-1 min-w-48"><span class="label">Name</span>
-        <input id="dashName" class="input" placeholder="Sales overview" aria-label="New dashboard name" [value]="newName()" (input)="newName.set($any($event.target).value)" /></label>
-      <label class="flex-[2] min-w-56"><span class="label">What it is for (optional)</span>
-        <input id="dashDescription" class="input" placeholder="September orders at a glance" aria-label="Dashboard description" [value]="newDescription()" (input)="newDescription.set($any($event.target).value)" /></label>
-      <button type="button" class="btn btn-primary btn-sm" [disabled]="!canCreate()" (click)="createDashboard()"><app-icon name="plus" [busy]="creating()" />{{ creating() ? 'Creating…' : 'Create' }}</button>
-      <button type="button" class="btn btn-ghost btn-sm" (click)="createOpen.set(false)">Cancel</button>
-      @if (createError()) { <p class="text-xs text-crit-500 basis-full">{{ createError() }}</p> }
-    </div>
-  }
-
-  <div class="card lookup-split">
-    <aside class="lookup-rail">
-      <div class="lookup-rail-tools">
-        <div class="search-field">
+    @if (loading() && !dashboards().length) {
+      <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]"><app-icon name="refresh" class="spin icon-muted" /> Reading the dashboards…</div>
+    } @else if (error()) {
+      <div class="card dash-list-error"><app-load-error [message]="error()" (retry)="loadDashboards()" /></div>
+    } @else if (!dashboards().length) {
+      <!-- An invitation, not a blank page: what a dashboard is and the one button that makes one. -->
+      <div class="card p-10 flex flex-col items-center text-center gap-2 dash-empty">
+        <span class="stat-glyph"><app-icon name="chart" /></span>
+        <h2 class="text-base font-semibold">No dashboards yet</h2>
+        <p class="text-sm text-[color:var(--text-secondary)] max-w-md">
+          A dashboard is a page of saved analyses and queries that runs again each time it is opened.
+          Make one, then add the work you saved in the Analytics Studio.
+        </p>
+        <button type="button" class="btn btn-primary btn-sm mt-2" (click)="openCreate()"><app-icon name="plus" />Create a dashboard</button>
+      </div>
+    } @else {
+      @if (dashboards().length > searchFrom) {
+        <div class="search-field max-w-sm">
           <app-icon name="search" size="0.95em" />
           <input class="input" type="search" placeholder="Find a dashboard" aria-label="Filter dashboards by name" [value]="listFilter()" (input)="listFilter.set($any($event.target).value)" />
         </div>
-      </div>
-      @if (loading() && !dashboards().length) {
-        <div class="lookup-rail-empty"><app-icon name="refresh" class="spin icon-muted" /> Reading the dashboards…</div>
-      } @else if (error()) {
-        <div class="lookup-rail-empty">
-          <app-icon name="alert" size="1.4rem" class="icon-crit" />
-          <span class="text-crit-500">{{ error() }}</span>
-          <button type="button" class="btn btn-default btn-sm mt-2" (click)="loadDashboards()"><app-icon name="refresh" />Try again</button>
-        </div>
-      } @else if (!dashboards().length) {
-        <div class="lookup-rail-empty">
-          <app-icon name="chart" size="1.4rem" class="icon-muted" />
-          No dashboards yet. Save an analysis or a query in the Studio, then a board can hold it.
-        </div>
-      } @else if (!visibleDashboards().length) {
-        <div class="lookup-rail-empty">No dashboard's name contains "{{ listFilter() }}".</div>
-      } @else {
-        <ul class="lookup-rail-list" role="listbox" aria-label="Dashboards">
-          @for (item of visibleDashboards(); track item.analyticsDashboardId) {
-            <li role="presentation">
-              <button type="button" class="lookup-rail-item" role="option" [attr.aria-selected]="item.analyticsDashboardId === board()?.analyticsDashboardId"
-                      [class.is-selected]="item.analyticsDashboardId === board()?.analyticsDashboardId" (click)="openDashboard(item)">
-                <span class="lookup-rail-glyph is-list"><app-icon name="chart" size="0.9em" /></span>
-                <span class="min-w-0 flex-1">
-                  <span class="lookup-rail-key">{{ item.dashboardName }}</span>
-                  <span class="lookup-rail-sub">{{ item.dashboardDescription || 'No description' }}@if (item.dateUpdated || item.dateCreated) { · {{ when(item.dateUpdated || item.dateCreated) }} }</span>
-                </span>
-                <app-icon name="chevronRight" size="0.9em" class="lookup-rail-chev" />
-              </button>
-            </li>
-          }
-        </ul>
       }
-    </aside>
+      @if (!visibleDashboards().length) {
+        <p class="text-sm text-[color:var(--text-muted)]">No dashboard's name or description contains "{{ listFilter() }}".</p>
+      }
+      <!-- Three across at most, as the Object Browser's cards: four made each too narrow for a name. -->
+      <ul class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" aria-label="Dashboards">
+        @for (item of visibleDashboards(); track item.analyticsDashboardId) {
+          <li class="min-w-0 flex">
+            <!-- A link, not a button: ?board= is the page's own address for a board, so a card can
+                 be opened in a new tab or copied. -->
+            <a class="dash-card card p-0 flex flex-col flex-1 min-w-0 transition-colors hover:border-[color:var(--border-strong)]"
+               [routerLink]="[]" [queryParams]="{ board: item.analyticsDashboardId }">
+              <span class="flex items-start gap-3 p-4 pb-2 w-full">
+                <span class="stat-glyph"><app-icon name="chart" /></span>
+                <span class="min-w-0 flex-1">
+                  <span class="font-medium line-clamp-2 break-words" [title]="item.dashboardName">{{ item.dashboardName }}</span>
+                  <span class="block text-xs text-[color:var(--text-muted)] mt-0.5 min-h-4 dash-card-facts">{{ cardFacts(item) }}</span>
+                </span>
+              </span>
+              @if (item.dashboardDescription) {
+                <span class="block px-4 pb-4 text-xs text-[color:var(--text-secondary)] line-clamp-2 break-words" [title]="item.dashboardDescription">{{ item.dashboardDescription }}</span>
+              } @else {
+                <span class="block px-4 pb-4 text-xs text-[color:var(--text-muted)]">No description</span>
+              }
+              <span class="mt-auto flex items-center gap-2 px-4 py-2.5 border-t border-subtle text-xs text-[color:var(--text-muted)] w-full">
+                <app-icon name="user" size="0.9em" class="shrink-0" />
+                <span class="min-w-0 truncate">
+                  {{ item.createdByName || 'Unknown owner' }}@if (item.dateUpdated || item.dateCreated) { · updated {{ (item.dateUpdated || item.dateCreated) | serverTime:'date' }} }
+                </span>
+                <app-icon name="chevronRight" size="0.95em" class="ml-auto shrink-0 text-[color:var(--text-secondary)]" />
+              </span>
+            </a>
+          </li>
+        }
+        @if (!listFilter().trim()) {
+          <li class="min-w-0 flex">
+            <button type="button" class="dash-card-new flex-1 min-h-32 rounded-xl border border-dashed border-[color:var(--border-strong)] text-sm text-[color:var(--text-secondary)]
+                                         flex flex-col items-center justify-center gap-1 transition-colors hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-sunken)]"
+                    (click)="openCreate()">
+              <app-icon name="plus" size="1.1rem" />New dashboard
+            </button>
+          </li>
+        }
+      </ul>
+    }
+  } @else {
+    <!-- ---- one board, the whole width ------------------------------------------------------ -->
+    <div class="flex flex-col gap-3">
+      <!-- A real link to the cards (Back does the same); the click also leaves the board at once. -->
+      <a [routerLink]="[]" class="text-sm text-accent hover:underline self-start dash-back" (click)="leaveBoard()">← All dashboards</a>
 
-    <section class="lookup-detail" aria-live="polite">
-      @if (boardLoading()) {
-        <div class="lookup-entries-empty lookup-detail-empty"><app-icon name="refresh" class="spin icon-muted" /> Reading the board…</div>
-      } @else if (boardError()) {
-        <div class="lookup-entries-empty lookup-detail-empty">
-          <app-icon name="alert" size="1.5rem" class="icon-crit" /><p class="text-crit-500">{{ boardError() }}</p>
-          @if (board()?.analyticsDashboardId) { <button type="button" class="btn btn-default btn-sm mt-2" (click)="openDashboard(board()!)"><app-icon name="refresh" />Try again</button> }
-        </div>
+      @if (boardError()) {
+        <div class="card"><app-load-error [message]="boardError()" (retry)="retryBoard()" /></div>
       } @else if (board(); as open) {
-        <header class="lookup-detail-head">
-          <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-2 flex-wrap">
-              <span class="pill pill-neutral">{{ widgets().length }} widget{{ widgets().length === 1 ? '' : 's' }}</span>
-              @if (boardDatasets().length) { <span class="pill pill-neutral">{{ boardDatasets().length }} dataset{{ boardDatasets().length === 1 ? '' : 's' }}</span> }
-              @if (boardFilterCount()) { <span class="pill pill-brand">{{ boardFilterCount() }} filter{{ boardFilterCount() === 1 ? '' : 's' }} on</span> }
-              @if (running()) { <span class="pill pill-brand"><app-icon name="refresh" size="0.8em" class="spin" />{{ progress() }}</span> }
-              @else if (failedCount()) { <span class="pill pill-crit">{{ failedCount() }} failed</span> }
-              @else if (ranCount()) { <span class="pill pill-ok">{{ ranCount() }} ran</span> }
-            </div>
-            <h2 class="lookup-detail-key mt-1" [title]="open.dashboardName">{{ open.dashboardName }}</h2>
-            @if (open.dashboardDescription) { <p class="text-sm text-[color:var(--text-secondary)] mt-0.5">{{ open.dashboardDescription }}</p> }
-            <p class="text-xs text-[color:var(--text-muted)] mt-0.5">
-              @if (open.createdByName) { {{ open.createdByName }} · }{{ when(open.dateUpdated || open.dateCreated) }}
+        <div class="page-head">
+          <div class="min-w-0">
+            <h1 class="page-title break-words">{{ open.dashboardName }}</h1>
+            @if (open.dashboardDescription) { <p class="page-subtitle">{{ open.dashboardDescription }}</p> }
+            <p class="dash-facts text-xs text-[color:var(--text-muted)] mt-1.5">
+              <span>{{ widgets().length }} widget{{ widgets().length === 1 ? '' : 's' }}</span>
+              @if (boardFiles().length) { <span>{{ boardFiles().length }} file{{ boardFiles().length === 1 ? '' : 's' }}</span> }
+              @if (open.createdByName) { <span>{{ open.createdByName }}</span> }
+              @if (running()) { <span class="inline-flex items-center gap-1"><app-icon name="refresh" size="0.9em" class="spin" />{{ progress() }}</span> }
+              @else if (lastRun()) {
+                <span [class.text-crit-500]="failedCount() > 0">Last run: {{ lastRun() }}</span>
+                <span>{{ lastRunText() }}</span>
+              }
+              @if (boardFilterCount()) { <span><span class="pill pill-brand">{{ boardFilterCount() }} filter{{ boardFilterCount() === 1 ? '' : 's' }} on</span></span> }
             </p>
           </div>
           <div class="flex items-center gap-1.5 shrink-0">
@@ -125,40 +134,21 @@
               </div>
             </ng-template>
           </div>
-        </header>
+        </div>
 
-        <!-- One strip for what the board reads and how its last run went: reference, not the
-             work, the way the Kafka pane keeps the broker and last test above the topics. -->
-        @if (widgets().length) {
-          <div class="kafka-strip">
-            <div class="kafka-strip-row">
-              <span class="kafka-strip-k">Reads</span>
-              @if (boardDatasets().length) {
-                @for (dataset of boardDatasets(); track dataset.key) { <span class="mono text-xs truncate max-w-full" [title]="dataset.label">{{ dataset.label }}</span> }
-              } @else { <span class="text-xs text-[color:var(--text-muted)]">saved queries only</span> }
-            </div>
-            <div class="kafka-strip-row">
-              <span class="kafka-strip-k">Last run</span>
-              <span class="kafka-strip-dot" [class.ok]="ranCount() && !failedCount() && !running()" [class.crit]="failedCount() > 0"></span>
-              <span class="kafka-strip-msg text-[color:var(--text-secondary)]">
-                @if (running()) { {{ progress() }} }
-                @else if (ranCount()) { {{ ranCount() }} of {{ widgets().length }} drew{{ failedCount() ? ', ' + failedCount() + ' failed' : '' }} · {{ lastRunText() }} }
-                @else { Not run yet — every tile is a live query, never a stored picture. }
-              </span>
-            </div>
-            @if (boardFilterCount()) {
-              <div class="kafka-strip-row">
-                <span class="kafka-strip-k">Filter</span>
-                <span class="kafka-strip-msg text-[color:var(--text-secondary)]">{{ boardFilterCount() }} condition{{ boardFilterCount() === 1 ? '' : 's' }} on every tile that reads the filtered dataset.</span>
-                <button type="button" class="btn btn-ghost btn-xs" (click)="filterOpen.set(!filterOpen())">{{ filterOpen() ? 'Hide' : 'Edit' }}</button>
-              </div>
-            }
-          </div>
+        <!-- Reference, not the work: folded away so the widgets start near the top. -->
+        @if (boardFiles().length) {
+          <details class="dash-files text-xs">
+            <summary class="cursor-pointer select-none text-[color:var(--text-secondary)] w-fit">Files this board reads ({{ boardFiles().length }})</summary>
+            <ul class="mt-1.5 flex flex-col gap-0.5 min-w-0">
+              @for (file of boardFiles(); track file) { <li class="mono truncate" [title]="file">{{ file }}</li> }
+            </ul>
+          </details>
         }
 
         <!-- ---- the board filter: one dataset, an explicit apply --------------------------- -->
         @if (boardDatasets().length && filterOpen()) {
-          <div class="bill-form flex-col items-stretch">
+          <div class="card p-4 flex flex-col gap-3 min-w-0">
             <div class="flex flex-wrap items-end gap-2 min-w-0">
               <label class="flex flex-col gap-1 min-w-0">
                 <span class="label">Filter the widgets that read</span>
@@ -188,7 +178,7 @@
 
         <!-- ---- adding a widget ---------------------------------------------------------- -->
         @if (addOpen()) {
-          <div class="bill-form flex-col items-stretch">
+          <div class="card p-4 flex flex-col gap-3 min-w-0">
             <!-- app-field and .form-grid, as every other create form: required stars, and an
                  out-of-range height said beside its box. -->
             <div class="form-grid">
@@ -230,66 +220,79 @@
           </div>
         }
 
-        @if (widgetError()) { <p class="text-xs text-crit-500 px-5 pt-3">{{ widgetError() }}</p> }
+        @if (widgetError()) { <p class="text-xs text-crit-500">{{ widgetError() }}</p> }
 
-        <div class="p-4">
-          @if (!widgets().length) {
-            <div class="lookup-entries-empty">
-              <app-icon name="layers" size="1.5rem" class="icon-muted" />
-              <p>Nothing on this board yet.</p>
-              <button type="button" class="btn btn-primary btn-sm mt-2" (click)="openAdd()"><app-icon name="plus" />Add a widget</button>
-            </div>
-          } @else {
-            <!-- A single figure takes one cell; a table or a chart keeps the whole row. -->
-            <div class="widget-grid widget-board">
-              @for (widget of widgets(); track widget.analyticsDashboardWidgetId) {
-                @let run = runs()[widget.analyticsDashboardWidgetId!];
-                <app-analytics-widget [class.widget-wide]="!isFigure(run?.view)" [title]="widget.widgetTitle" [subtitle]="sourceOf(widget)" [state]="stateOf(run)" [error]="run?.error || ''" (refresh)="runOne(widget)">
-                  <ng-container actions>
-                    <button type="button" class="btn btn-ghost btn-icon btn-xs" [cdkMenuTriggerFor]="tileMenu" [attr.aria-label]="'Actions for ' + widget.widgetTitle"><app-icon name="dots" size="1em" /></button>
-                    <ng-template #tileMenu>
-                      <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
-                        @if (run?.view; as view) {
-                          @if (hasMoreRows(view)) { <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="expandTable(widget, view)"><app-icon name="table" />Show all rows</button> }
-                        }
-                        <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="removeWidget(widget)"><app-icon name="trash" class="icon-crit" />Remove from board</button>
-                      </div>
-                    </ng-template>
-                  </ng-container>
-
-                  @if (run?.view; as view) {
-                    @if (boardFilterCount()) { @if (boardFilterNote(widget); as note) { <p class="field-note text-[color:var(--text-muted)] truncate" [title]="note">{{ note }}</p> } }
-                    @if (view.truncated) { <p><span class="pill pill-warn">Partial result — stopped at the server's row ceiling</span></p> }
-                    <app-widget-chart [view]="view" [kind]="drawn(widget, view)" [height]="heightOf(widget)" [clickable]="narrows(widget, view)" layout="row" (picked)="narrowTo(widget, $event)" />
-                    @if (captionOf(widget); as caption) { <p class="text-xs text-[color:var(--text-secondary)] mt-2">{{ caption }}</p> }
-                  }
-
-                  <div foot class="widget-foot">
-                    @if (run?.view; as view) {
-                      <label class="min-w-0 flex items-center gap-1 text-[11px] text-[color:var(--text-muted)]">
-                        <span class="sr-only">How to draw {{ widget.widgetTitle }}</span>
-                        <!-- Listed and inert with the reason, never quietly missing. -->
-                        <select class="input py-0.5 text-[11px] max-w-full min-w-0 truncate widget-kind" [value]="drawn(widget, view)" (change)="setVisualization(widget, $any($event.target).value, $any($event.target))">
+        @if (!widgets().length) {
+          <div class="card p-10 flex flex-col items-center text-center gap-2">
+            <app-icon name="layers" size="1.5rem" class="icon-muted" />
+            <p class="text-sm text-[color:var(--text-secondary)]">Nothing on this board yet.</p>
+            <button type="button" class="btn btn-primary btn-sm mt-2" (click)="openAdd()"><app-icon name="plus" />Add a widget</button>
+          </div>
+        } @else {
+          <!-- Twelve columns: a single figure takes 3, a chart 6, a table the row (spanOf). -->
+          <div class="dash-grid">
+            @for (widget of widgets(); track widget.analyticsDashboardWidgetId) {
+              @let run = runs()[widget.analyticsDashboardWidgetId!];
+              <app-analytics-widget [class]="spanClass(widget)" [attr.data-span]="spanOf(widget)" [title]="widget.widgetTitle" [subtitle]="shortSourceOf(widget)" [subtitleTitle]="sourceOf(widget)"
+                                    [state]="stateOf(run)" [error]="run?.error || ''" (refresh)="runOne(widget)">
+                <ng-container actions>
+                  <button type="button" class="btn btn-ghost btn-icon btn-xs" [cdkMenuTriggerFor]="tileMenu" [attr.aria-label]="'Actions for ' + widget.widgetTitle"><app-icon name="dots" size="1em" /></button>
+                  <ng-template #tileMenu>
+                    <!-- "Show as" is a section of this menu rather than a submenu: a CDK submenu opens on
+                         hover and a click on its trigger then closed it again. Every kind is listed in
+                         the picker's order; one this result cannot honestly be drawn as stays in the
+                         list, inert, with the reason under it. -->
+                    <div cdkMenu class="card shadow-xl py-1 w-72 max-h-[70vh] overflow-y-auto text-sm">
+                      @if (run?.view; as view) {
+                        <p class="px-3 pt-1.5 pb-1 text-[11px] font-medium uppercase tracking-wide text-[color:var(--text-muted)]" [id]="'kinds-' + widget.analyticsDashboardWidgetId">Show as</p>
+                        <div cdkMenuGroup [attr.aria-labelledby]="'kinds-' + widget.analyticsDashboardWidgetId">
                           @for (kind of kinds; track kind.id) {
-                            <option [value]="kind.id" [disabled]="!!view.issues[kind.id]" [selected]="kind.id === drawn(widget, view)" [title]="view.issues[kind.id] || kind.label">{{ kind.label }}{{ view.issues[kind.id] ? ' — ' + view.issues[kind.id] : '' }}</option>
+                            <button cdkMenuItemRadio class="menu-item items-start dash-kind" [attr.data-kind]="kind.id"
+                                    [cdkMenuItemChecked]="kind.id === drawn(widget, view)" [cdkMenuItemDisabled]="!!view.issues[kind.id]" [disabled]="!!view.issues[kind.id]"
+                                    [title]="view.issues[kind.id] || kind.label" (cdkMenuItemTriggered)="setVisualization(widget, kind.id)">
+                              <app-icon name="check" size="0.9em" class="mt-0.5 shrink-0" [class.invisible]="kind.id !== drawn(widget, view)" />
+                              <span class="min-w-0">
+                                <span class="block">{{ kind.label }}</span>
+                                @if (view.issues[kind.id]) { <span class="block text-[11px] leading-snug text-[color:var(--text-muted)] whitespace-normal">{{ view.issues[kind.id] }}</span> }
+                              </span>
+                            </button>
                           }
-                        </select>
-                      </label>
-                      <span class="text-[11px] text-[color:var(--text-muted)] ml-auto whitespace-nowrap" [title]="view.notes.join(' ')">{{ counted(view, drawn(widget, view)) }} · ran {{ clock(view.ranAt) }}</span>
-                    }
-                  </div>
-                </app-analytics-widget>
-              }
-            </div>
-          }
-        </div>
-      } @else {
-        <div class="lookup-entries-empty lookup-detail-empty">
-          <app-icon name="chart" size="1.5rem" class="icon-muted" />
-          <p>{{ dashboards().length ? 'Pick a dashboard to run it.' : 'Create a dashboard, then add saved analyses and queries to it.' }}</p>
-        </div>
-      }
-    </section>
-  </div>
+                        </div>
+                        <div class="my-1 border-t border-subtle"></div>
+                        @if (hasMoreRows(view)) { <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="expandTable(widget, view)"><app-icon name="table" />Open every row in a window</button> }
+                      }
+                      <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="removeWidget(widget)"><app-icon name="trash" class="icon-crit" />Remove from board</button>
+                    </div>
+                  </ng-template>
+                </ng-container>
 
+                @if (run?.view; as view) {
+                  @if (boardFilterCount()) { @if (boardFilterNote(widget); as note) { <p class="field-note text-[color:var(--text-muted)] truncate" [title]="note">{{ note }}</p> } }
+                  @if (view.truncated) { <p><span class="pill pill-warn">Partial result — stopped at the server's row ceiling</span></p> }
+                  <div [class.dash-rows-open]="isExpanded(widget)">
+                    <app-widget-chart [view]="view" [kind]="drawn(widget, view)" [height]="heightOf(widget)" [maxRows]="rowLimit(widget)" [layout]="spanOf(widget) === 3 ? 'row' : 'tile'" [clickable]="narrows(widget, view)" (picked)="narrowTo(widget, $event)" />
+                  </div>
+                  @if (captionOf(widget); as caption) { <p class="text-xs text-[color:var(--text-secondary)] mt-2">{{ caption }}</p> }
+                }
+
+                <div foot class="widget-foot">
+                  @if (run?.view; as view) {
+                    @let kind = drawn(widget, view);
+                    @if (hiddenRowTotal(view, kind); as total) {
+                      <button type="button" class="btn btn-ghost btn-xs dash-show-all" [attr.aria-expanded]="isExpanded(widget)" (click)="toggleRows(widget)">
+                        {{ isExpanded(widget) ? 'Show fewer' : 'Show all ' + total }}
+                      </button>
+                    }
+                    <span class="text-[11px] text-[color:var(--text-muted)] ml-auto whitespace-nowrap" [title]="view.notes.join(' ')">{{ counted(view, kind, rowLimit(widget)) }} · ran {{ clock(view.ranAt) }}</span>
+                  }
+                </div>
+              </app-analytics-widget>
+            }
+          </div>
+        }
+      } @else {
+        <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]"><app-icon name="refresh" class="spin icon-muted" /> Reading the board…</div>
+      }
+    </div>
+  }
 </div>
