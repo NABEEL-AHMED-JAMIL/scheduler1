@@ -840,7 +840,11 @@ export class Jobs implements OnInit {
       the only way to get from a job to the thing it actually reads and writes. */
   topicOf(job: SourceJob): string {
     const parsed = parseTopicPartition(job.taskDetail?.sourceTaskType?.queueTopicPartition);
-    return parsed.topic ? `${parsed.topic} (partitions ${parsed.partitions})` : '';
+    if (!parsed.topic) return '';
+    // In words: "partitions *" printed the stored wildcard as though it were a value.
+    return parsed.partitions === '*'
+      ? `${parsed.topic} (all partitions)`
+      : `${parsed.topic} (partition ${parsed.partitions})`;
   }
 
   bucketLink(job: SourceJob): { bucket: string; prefix: string } | null {
