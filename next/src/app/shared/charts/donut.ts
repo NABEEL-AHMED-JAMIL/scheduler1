@@ -1,5 +1,7 @@
 import { Component, computed, input } from '@angular/core';
 import { chartColor } from './status-color';
+import { shortLabel } from './short-label';
+import { capTitle } from '../ui/long-text';
 
 export interface Slice { name: string; value: number; }
 
@@ -26,7 +28,7 @@ export interface Slice { name: string; value: number; }
                       [attr.stroke]="segment.color"
                       [attr.stroke-dasharray]="segment.dash"
                       [attr.stroke-dashoffset]="-segment.offset">
-                <title>{{ segment.name }}: {{ segment.display }}</title>
+                <title>{{ segment.title }}: {{ segment.display }}</title>
               </circle>
             }
           </svg>
@@ -43,10 +45,11 @@ export interface Slice { name: string; value: number; }
 
         <ul class="min-w-0 flex-1 space-y-1">
           @for (segment of segments(); track segment.name) {
-            <li class="flex items-center gap-2 text-[11px] leading-none">
+            <li class="flex items-center gap-2 text-[11px] leading-none"
+                [title]="segment.title + ': ' + segment.display">
               <span class="size-2 rounded-full shrink-0" [style.background]="segment.color"></span>
               <span class="capitalize truncate text-[color:var(--text-secondary)]">
-                {{ segment.name.toLowerCase() }}
+                {{ segment.short.toLowerCase() }}
               </span>
               <span class="ml-auto tabular font-medium shrink-0">{{ segment.display }}</span>
               <span class="tabular text-[color:var(--text-muted)] w-8 text-right shrink-0">
@@ -114,7 +117,7 @@ export class Donut {
     // float's rounding error, digit by digit.
     const format = this.format();
     return this.data()
-      .map(d => `${d.name}: ${format ? format(d.value) : d.value}`)
+      .map(d => `${shortLabel(d.name)}: ${format ? format(d.value) : d.value}`)
       .join(', ');
   });
 
@@ -129,6 +132,10 @@ export class Donut {
       const dash = `${pct} ${100 - pct}`;
       const segment = {
         name: slice.name,
+        // The legend's words and the slice's tooltip. A category can be a 20,000-character note
+        // (owner, 2026-09-28); the legend holds its first words and the tooltip the value, capped.
+        short: shortLabel(slice.name),
+        title: capTitle(slice.name),
         value: slice.value,
         // What the legend and the tooltip actually print. The raw value stays on the object
         // because the percentage and the ring geometry are computed from it.

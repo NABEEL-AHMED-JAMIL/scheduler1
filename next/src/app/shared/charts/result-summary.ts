@@ -1,5 +1,6 @@
 import { Component, ChangeDetectionStrategy, computed, input } from '@angular/core';
 import { readableCell } from './number-format';
+import { capTitle } from '../ui/long-text';
 
 export interface SummaryMark { name: string; value: number; }
 export type SummaryMode = 'dimension' | 'trend' | 'distribution';
@@ -45,11 +46,11 @@ interface Fact { label: string; value: string; note?: string; }
             <dt class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)] truncate">
               {{ fact.label }}
             </dt>
-            <dd class="text-base font-semibold tabular truncate" [title]="fact.value">
+            <dd class="text-base font-semibold tabular truncate" [title]="cap(fact.value)">
               {{ fact.value }}
             </dd>
             @if (fact.note) {
-              <dd class="text-[11px] text-[color:var(--text-muted)] truncate" [title]="fact.note">
+              <dd class="text-[11px] text-[color:var(--text-muted)] truncate" [title]="cap(fact.note)">
                 {{ fact.note }}
               </dd>
             }
@@ -61,6 +62,8 @@ interface Fact { label: string; value: string; note?: string; }
 })
 export class ResultSummary {
 
+  /** A note names a category, which can be a 20,000-character value; its tooltip is capped. */
+  protected readonly cap = capTitle;
   readonly data = input.required<SummaryMark[]>();
   readonly mode = input.required<SummaryMode>();
 
