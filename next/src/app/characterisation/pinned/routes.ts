@@ -572,6 +572,15 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
+      "path": "/administration/data-policies",
+      "title": "Data policies",
+      "pageKey": "ai-prompts",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
       "path": "/administration/tenants",
       "title": "Tenants",
       "minRole": "PLATFORM_ADMIN",

@@ -542,6 +542,17 @@ export const routes: Routes = [
         canActivate: [roleGuard],
       },
       {
+        // MIG-254: the workspace's data policy (ai-service, MIG-243). Read by any member -- the service answers
+        // TENANT_USER under /aiPrompt.json, which the gateway gates on the Prompts page -- and saved by a workspace
+        // administrator (the page hides every control from anyone else). The menu lists it for administrators; a
+        // member reaches it from the AI Assistant's Context panel.
+        path: 'administration/data-policies',
+        title: 'Data policies',
+        loadComponent: () => import('./features/admin/data-policies/data-policies').then(m => m.DataPolicies),
+        data: { pageKey: 'ai-prompts' },
+        canActivate: [pageGuard],
+      },
+      {
         path: 'administration/tenants',
         title: 'Tenants',
         loadComponent: () => import('./features/admin/tenants/tenants').then(m => m.Tenants),

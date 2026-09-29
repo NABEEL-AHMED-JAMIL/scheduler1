@@ -42,6 +42,7 @@ export const PINNED: Record<string, unknown> = {
     "Billing › Rate cards — The calculation behind every bill, versioned; a workspace can have its own -> /billing/rates",
     "Administration › Users — Who can sign in, and as what -> /administration/users",
     "Administration › Access profiles — Which pages your tenant users can open. -> /administration/access-profiles",
+    "Administration › Data policies — Which models see each level of data, and for how long -> /administration/data-policies",
     "Administration › Tenants — Isolated workspaces -> /administration/tenants",
     "Administration › Workspace Requests — Asks from outside for a workspace -> /administration/tenant-requests"
   ],
@@ -114,6 +115,7 @@ export const PINNED: Record<string, unknown> = {
     "Billing › Invoices — Every month closed into a bill: status, balance, payment slips, receipts -> /billing/invoices",
     "Billing › Billing documents — Invoices, receipts, credit notes, statements and slips in one list -> /billing/documents",
     "Administration › Users — Who can sign in, and as what -> /administration/users",
-    "Administration › Access profiles — Which pages your tenant users can open. -> /administration/access-profiles"
+    "Administration › Access profiles — Which pages your tenant users can open. -> /administration/access-profiles",
+    "Administration › Data policies — Which models see each level of data, and for how long -> /administration/data-policies"
   ]
 };

@@ -243,6 +243,10 @@ export class Shell {
           hint: 'Who can sign in, and as what' },
         { label: 'Access profiles', path: '/administration/access-profiles', icon: 'shield', adminOnly: true,
           hint: 'Which pages your tenant users can open.' },
+        // MIG-254: members may read it too (the route rides the Prompts key), but it is administration: they reach it
+        // from the AI Assistant's Context panel, not from this menu.
+        { label: 'Data policies', path: '/administration/data-policies', icon: 'lock', adminOnly: true,
+          hint: 'Which models see each level of data, and for how long' },
         { label: 'Tenants', path: '/administration/tenants', icon: 'globe', platformOnly: true,
           hint: 'Isolated workspaces' },
         // Platform, not admin: listRequests, approve and reject all carry

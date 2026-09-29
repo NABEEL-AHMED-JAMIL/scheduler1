@@ -350,6 +350,7 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
   const ADMINISTRATION = [
     'Administration › Users -> /administration/users',
     'Administration › Access profiles -> /administration/access-profiles',
+    'Administration › Data policies -> /administration/data-policies',
   ];
 
   it('a platform administrator: every menu, platform screens included', () => {

@@ -4,7 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { routes } from './app.routes';
-import { roleGuard } from './core/auth/auth.guard';
+import { pageGuard, roleGuard } from './core/auth/auth.guard';
 
 /** The console's routes are one flat child list under the shell, plus the public ones. */
 function flatten(rs: any[], prefix = ''): { path: string; route: any }[] {
@@ -74,5 +74,21 @@ describe('configuration routes', () => {
   it('tells the one references screen which kind each route is', () => {
     expect(find('configuration/home-pages')?.data?.kind).toBe('HOME_PAGE');
     expect(find('configuration/task-groups')?.data?.kind).toBe('TASK_GROUP');
+  });
+});
+
+/**
+ * MIG-254: Administration › Data policies. ai-service reads the policy for any member (TENANT_USER) and saves it for a
+ * workspace administrator, under /aiPrompt.json -- which the gateway gates on the Prompts page. So the route asks for
+ * that page and no role: a member holding Prompts reads the policy (the page hides every control), a member without
+ * it is refused as the gateway would refuse them.
+ */
+describe('data policy route', () => {
+  it('opens Data policies to whoever holds the Prompts page', () => {
+    const policies = find('administration/data-policies');
+    expect(policies?.title).toBe('Data policies');
+    expect(policies?.data?.pageKey).toBe('ai-prompts');
+    expect(policies?.data?.minRole).toBeUndefined();
+    expect(policies?.canActivate).toContain(pageGuard);
   });
 });
