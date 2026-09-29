@@ -270,6 +270,15 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
+      "path": "/documents/reports",
+      "title": "Reports",
+      "pageKey": "tools-converter",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
       "path": "/documents/files",
       "title": "Browse files",
       "pageKey": "objects",

@@ -283,6 +283,15 @@ export const routes: Routes = [
         canActivate: [pageGuard],
       },
       {
+        // MIG-253: generated outputs -- renders saved to a bucket and what recent runs put out. Behind the
+        // converter's key: it lists what the converter makes, and there is no page key of its own yet.
+        path: 'documents/reports',
+        title: 'Reports',
+        loadComponent: () => import('./features/documents/generated/generated-reports').then(m => m.GeneratedReports),
+        data: { pageKey: 'tools-converter' },
+        canActivate: [pageGuard],
+      },
+      {
         // TENANT_USER rather than nothing at all: StorageBrowserRestApi's floor is a signed-in
         // user, and which bucket and key that user may actually reach is decided per request,
         // so no role the route could name would say more than the server already does. What it

@@ -134,6 +134,8 @@ export class Shell {
           hint: 'Check low-confidence fields' },
         { label: 'Document Converter', path: '/documents/converter', pageKey: 'tools-converter', icon: 'file',
           hint: 'Convert between formats' },
+        { label: 'Reports', path: '/documents/reports', pageKey: 'tools-converter', icon: 'layers',
+          hint: 'Documents made from your data' },
         { label: 'Browse files', path: '/documents/files', pageKey: 'objects', icon: 'folder',
           hint: 'Upload, preview and share objects' },
         { label: 'Audio Transcript', path: '/documents/transcript', pageKey: 'tools-transcript', icon: 'volume',

@@ -111,6 +111,11 @@ export class GeneratedService {
     return outputs;
   }
 
+  /** A dataset a run kept, as a file to save (csv, json or jsonl). */
+  runDatasetFile(runDatasetId: number, format: 'csv' | 'json' | 'jsonl'): Observable<Blob> {
+    return this.http.get(`${this.jobs}/runDataset`, { params: { runDatasetId, format }, responseType: 'blob' });
+  }
+
   /** A dataset a run kept, as JSON rows. */
   runDataset(runDatasetId: number): Observable<unknown> {
     return this.http.get(`${this.jobs}/runDataset`, { params: { runDatasetId, format: 'json' }, responseType: 'text' })

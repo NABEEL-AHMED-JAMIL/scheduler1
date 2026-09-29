@@ -1,0 +1,128 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Reports</h1>
+      <p class="page-subtitle">
+        Documents and files made from your data: renders saved to a bucket, and what recent runs put out.
+      </p>
+    </div>
+    <div class="flex items-center gap-2">
+      <a class="btn btn-primary btn-sm" routerLink="/documents/converter"><app-icon name="plus" />Make a document</a>
+    </div>
+  </div>
+
+  <app-table-shell heading="Generated outputs" [shown]="paged().length" [total]="filtered().length"
+                   [loading]="loading()" [error]="objectsError() && runsError() ? objectsError() : ''" (retry)="load(true)"
+                   [isEmpty]="!filtered().length" emptyIcon="file" [showSubbar]="true"
+                   [emptyMessage]="query() ? 'Nothing here matches that.' : 'Nothing generated yet. Make a document in the converter and save it to a bucket, or run a pipeline that writes files.'">
+    <ng-container toolbar>
+      <button type="button" class="btn btn-default btn-sm" (click)="load(true)" [disabled]="loading()">
+        <app-icon name="refresh" [class.spin]="loading()" />Refresh
+      </button>
+    </ng-container>
+    <ng-container subbar>
+      <div class="w-56 max-w-full">
+        <app-combobox ariaLabel="Bucket" [selected]="bucket()" (selectedChange)="pickBucket($event)"
+                      placeholder="Choose a bucket" [allowClear]="false" [options]="bucketOptions()" />
+      </div>
+      <input class="input mono w-40 max-w-full" aria-label="Folder" placeholder="reports/"
+             [value]="folder()" (change)="setFolder($any($event.target).value)" />
+      <div class="search-field w-56 max-w-full">
+        <app-icon name="search" size="0.95em" />
+        <input class="input" placeholder="Find by name, type or pipeline" aria-label="Find a report"
+               [value]="query()" (input)="query.set($any($event.target).value); pager.goTo(1, filtered().length)" />
+      </div>
+    </ng-container>
+
+    <table class="table-modern">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Pipeline</th>
+          <th>Created</th>
+          <th class="text-right">Size</th>
+          <th>Status</th>
+          <th>Owner</th>
+          <th class="w-40"><span class="sr-only">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (r of paged(); track r.id) {
+          <tr>
+            <td class="max-w-64">
+              <div class="font-medium truncate" [title]="r.name">{{ r.name }}</div>
+              <div class="mono text-xs text-[color:var(--text-muted)] truncate"
+                   [title]="r.bucket ? r.bucket + '/' + r.key : 'Kept by the run'">
+                {{ r.bucket ? r.bucket + '/' + r.key : 'Kept by run #' + r.jobQueueId }}
+              </div>
+            </td>
+            <td><span class="pill pill-neutral mono">{{ r.type }}</span></td>
+            <td class="max-w-56">
+              @if (r.jobQueueId) {
+                <div class="truncate" [title]="r.pipeline || r.jobName || ''">{{ r.pipeline || r.jobName || '—' }}</div>
+                <a class="link-inline text-xs" [routerLink]="['/pipelines/schedules', r.jobId, 'runs', r.jobQueueId, 'logs']"
+                   [title]="'Open run #' + r.jobQueueId + ' of ' + (r.jobName || 'its schedule')">Run #{{ r.jobQueueId }}</a>
+              } @else {
+                <span class="text-[color:var(--text-muted)]">—</span>
+              }
+            </td>
+            <td class="whitespace-nowrap text-[color:var(--text-secondary)]">
+              {{ r.created ? (r.created | serverTime: 'dateTime') : '—' }}
+            </td>
+            <td class="text-right tabular whitespace-nowrap text-[color:var(--text-secondary)]">{{ r.size != null ? size(r.size) : '—' }}</td>
+            <td class="whitespace-nowrap">
+              <span class="pill" [class.pill-ok]="r.status === 'Ready'" [class.pill-neutral]="r.status === 'In storage'"
+                    [class.pill-warn]="r.status === 'Expired'"
+                    [title]="r.expiresAt ? (r.status === 'Expired' ? 'Expired ' : 'Expires ') + (r.expiresAt | serverTime: 'dateTime') : ''">{{ r.status }}</span>
+            </td>
+            <td class="max-w-40 truncate text-[color:var(--text-secondary)]" [title]="r.owner || 'Not recorded'">{{ r.owner || '—' }}</td>
+            <td>
+              <div class="flex items-center justify-end gap-1.5">
+                <button type="button" class="btn-circle btn-circle-info" [disabled]="!canPreview(r)"
+                        [title]="canPreview(r) ? 'Preview' : 'The run no longer holds this dataset'"
+                        [attr.aria-label]="'Preview ' + r.name" (click)="preview(r)">
+                  <app-icon name="eye" size="0.9em" />
+                </button>
+                <button type="button" class="btn-circle btn-circle-info" [disabled]="!canPreview(r)"
+                        title="Download" [attr.aria-label]="'Download ' + r.name" (click)="download(r)">
+                  <app-icon name="download" size="0.9em" />
+                </button>
+                <button type="button" class="btn-circle btn-circle-info" [disabled]="!canShare(r)"
+                        [title]="canShare(r) ? 'Email this file' : 'Only a file in a bucket can be emailed'"
+                        [attr.aria-label]="'Email ' + r.name" (click)="share(r)">
+                  <app-icon name="send" size="0.9em" />
+                </button>
+                @if (storageParams(r); as at) {
+                  <a class="btn-circle btn-circle-info" routerLink="/documents/files" [queryParams]="at"
+                     title="Open in storage" [attr.aria-label]="'Open ' + r.name + ' in storage'">
+                    <app-icon name="folder" size="0.9em" />
+                  </a>
+                } @else {
+                  <button type="button" class="btn-circle btn-circle-info" disabled title="Kept by the run, not in a bucket"
+                          [attr.aria-label]="'Open ' + r.name + ' in storage'"><app-icon name="folder" size="0.9em" /></button>
+                }
+              </div>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+    <app-pagination pager [total]="filtered().length" [page]="pager.page()" [size]="pager.size()"
+                    (goTo)="pager.goTo($event, filtered().length)" (setSize)="pager.setSize($event)" />
+  </app-table-shell>
+
+  @if (runsError() && !objectsError()) {
+    <p class="text-sm text-warn-500 flex items-center gap-2" role="alert">
+      <app-icon name="alert" class="shrink-0" />Recent runs' outputs are missing: {{ runsError() }}
+    </p>
+  }
+  @if (objectsError() && !runsError()) {
+    <p class="text-sm text-warn-500 flex items-center gap-2" role="alert">
+      <app-icon name="alert" class="shrink-0" />The bucket folder is missing: {{ objectsError() }}
+    </p>
+  }
+  @if (reach()) {
+    <p class="text-xs text-[color:var(--text-muted)]" data-reports-reach>{{ reach() }}</p>
+  }
+</div>
