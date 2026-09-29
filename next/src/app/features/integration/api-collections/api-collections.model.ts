@@ -196,11 +196,11 @@ export const bodyLabel = (type: string | null | undefined) => BODY_LABELS[String
 export const sourceLabel = (format: string | null | undefined) => SOURCE_LABELS[String(format ?? '')] ?? String(format ?? '—');
 /**
  * The word a collection was given, which is what its save sends (the service reads the level from it again). Since
- * MIG-243 `sensitivity` is the level and `sensitivityLabel` the word; a service from before sends the word as
- * `sensitivity` and no label.
+ * MIG-243 `sensitivity` is the level and `sensitivityLabel` the word -- left out of the answer when none was given, so a
+ * missing label is none, never the level (sending the level back would turn "not set" into "internal").
  */
-export function sensitivityWord(row: { sensitivity?: string | null; sensitivityLabel?: string | null }): string | null {
-  return ('sensitivityLabel' in row ? row.sensitivityLabel : row.sensitivity) ?? null;
+export function sensitivityWord(row: { sensitivityLabel?: string | null }): string | null {
+  return row.sensitivityLabel ?? null;
 }
 
 export const sensitivityLabel = (level: string | null | undefined) =>

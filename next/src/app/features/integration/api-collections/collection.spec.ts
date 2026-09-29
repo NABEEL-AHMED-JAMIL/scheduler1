@@ -18,7 +18,7 @@ import { InUseDialog } from './in-use-dialog';
  */
 const DETAIL = {
   collection: { collectionId: 1000, tenantId: 2924, name: 'LIVE-CHECK 0928 httpbin', description: 'MIG-227 live check', sourceFormat: 'MANUAL',
-    sensitivity: 'INTERNAL', currentVersion: 3, status: 'Active', folderCount: 1, requestCount: 3,
+    sensitivity: 'internal', sensitivityLabel: 'INTERNAL', currentVersion: 3, status: 'Active', folderCount: 1, requestCount: 3,
     dateCreated: '2026-09-29T02:26:22.327+00:00', dateUpdated: '2026-09-29T02:26:32.018+00:00' },
   folders: [{ folderId: 31, parentFolderId: null, name: 'Status', sortOrder: 0 }],
   requests: [

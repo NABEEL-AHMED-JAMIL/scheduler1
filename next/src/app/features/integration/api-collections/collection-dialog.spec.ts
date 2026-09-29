@@ -34,7 +34,7 @@ function dialogWith(data: CollectionDialogData, api: Partial<Record<string, unkn
   return { dialog, stub, ref };
 }
 
-const ROW = { collectionId: 7, name: 'Clinic API', description: 'Patients', sensitivity: 'PHI', status: 'Active', currentVersion: 2 };
+const ROW = { collectionId: 7, name: 'Clinic API', description: 'Patients', sensitivity: 'sensitive', sensitivityLabel: 'PHI', status: 'Active', currentVersion: 2 };
 
 describe('CollectionDialog -- a new collection', () => {
   it('creates with a name, and no auth unless one is chosen', () => {

@@ -18,6 +18,9 @@ import {
 
 type Switch = 'aiWriteTools' | 'minFieldsWarning';
 
+/** The service writes its dashes as "--"; the console shows an em dash. */
+const readable = (text: string | null | undefined) => (text ?? '').replace(/\s--\s/g, ' — ');
+
 /**
  * Administration › Data policies (MIG-254 over MIG-243): for each level of data, which models may see it, how long a
  * run keeps it, and whether the AI Assistant may change things with it. A workspace administrator edits; every member
@@ -85,7 +88,7 @@ export class DataPolicies implements OnInit {
       next: r => {
         this.loading.set(false);
         if (r.status !== API_SUCCESS) { this.error.set(r.message || 'The data policy could not be read.'); return; }
-        this.rule.set(r.data?.rule ?? '');
+        this.rule.set(readable(r.data?.rule));
         this.show(levelsOf(r.data));
       },
       error: err => { this.loading.set(false); this.error.set(err?.error?.message || 'The data policy could not be read.'); },
@@ -138,7 +141,7 @@ export class DataPolicies implements OnInit {
         this.saving.set(false);
         if (r.status !== API_SUCCESS) { this.saveError.set(r.message); this.toast.error(r.message); return; }
         this.toast.success(r.message);
-        if (r.data?.rule) this.rule.set(r.data.rule);
+        if (r.data?.rule) this.rule.set(readable(r.data.rule));
         this.show(levelsOf(r.data));
       },
       error: err => {

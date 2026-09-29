@@ -221,10 +221,9 @@ describe('API Collections -- times from integration-service', () => {
 });
 
 describe('sensitivityWord (MIG-243)', () => {
-  it('is the word as given when the service sends one beside the level, and the old field when it does not', () => {
-    expect(sensitivityWord({ sensitivity: 'sensitive', sensitivityLabel: 'PHI' })).toBe('PHI');
-    expect(sensitivityWord({ sensitivity: 'internal', sensitivityLabel: null })).toBeNull();
-    expect(sensitivityWord({ sensitivity: 'CONFIDENTIAL' })).toBe('CONFIDENTIAL');
-    expect(sensitivityWord({})).toBeNull();
+  it('is the word as given, and none when the service leaves the label out -- never the level', () => {
+    expect(sensitivityWord({ sensitivity: 'sensitive', sensitivityLabel: 'PHI' } as never)).toBe('PHI');
+    expect(sensitivityWord({ sensitivity: 'internal', sensitivityLabel: null } as never)).toBeNull();
+    expect(sensitivityWord({ sensitivity: 'internal' } as never)).toBeNull();
   });
 });

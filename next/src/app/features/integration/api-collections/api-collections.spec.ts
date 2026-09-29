@@ -19,8 +19,8 @@ import { InUseDialog } from './in-use-dialog';
  */
 const ROWS: CollectionRow[] = [
   { collectionId: 1000, tenantId: 2924, name: 'LIVE-CHECK 0928 httpbin', description: 'MIG-227 live check', sourceFormat: 'MANUAL',
-    sensitivity: 'INTERNAL', currentVersion: 3, status: 'Active', folderCount: 0, requestCount: 2, dateUpdated: '2026-09-29T02:26:32.018+00:00' },
-  { collectionId: 1001, tenantId: 2924, name: 'Clinic API', sourceFormat: 'POSTMAN', sensitivity: 'PHI', currentVersion: 1,
+    sensitivity: 'internal', sensitivityLabel: 'INTERNAL', currentVersion: 3, status: 'Active', folderCount: 0, requestCount: 2, dateUpdated: '2026-09-29T02:26:32.018+00:00' },
+  { collectionId: 1001, tenantId: 2924, name: 'Clinic API', sourceFormat: 'POSTMAN', sensitivity: 'sensitive', sensitivityLabel: 'PHI', currentVersion: 1,
     status: 'Inactive', folderCount: 2, requestCount: 7, dateUpdated: '2026-09-28T10:00:00.000+00:00' },
 ];
 
@@ -133,7 +133,8 @@ describe('API Collections list -- writing', () => {
     screen.ngOnInit();
     screen.setStatus({ ...ROWS[0], sensitivity: 'sensitive', sensitivityLabel: 'PHI' });
     expect(api.saveCollection).toHaveBeenCalledWith(expect.objectContaining({ sensitivity: 'PHI' }));
-    screen.setStatus({ ...ROWS[0], sensitivity: 'internal', sensitivityLabel: null });
+    const { sensitivityLabel: _dropped, ...unlabelled } = ROWS[0];
+    screen.setStatus({ ...unlabelled, sensitivity: 'internal' });
     expect(api.saveCollection).toHaveBeenLastCalledWith(expect.objectContaining({ sensitivity: null }));
   });
 

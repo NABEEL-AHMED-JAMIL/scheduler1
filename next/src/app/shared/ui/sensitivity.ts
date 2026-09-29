@@ -43,7 +43,7 @@ export function typedWord(level: string | null | undefined, label: string | null
     @if (level()) {
       <span class="pill pill-neutral" [title]="title()">{{ text() }}</span>
       @if (word()) { &ngsp;<span class="text-xs mono text-[color:var(--text-muted)]" title="The word it was given">{{ word() }}</span> }
-      @else if (label() === null) { &ngsp;<span class="text-xs text-[color:var(--text-muted)]">not set</span> }
+      @else if (!label()) { &ngsp;<span class="text-xs text-[color:var(--text-muted)]">not set</span> }
     } @else {
       <span class="text-xs text-[color:var(--text-muted)]">—</span>
     }
@@ -51,7 +51,7 @@ export function typedWord(level: string | null | undefined, label: string | null
 })
 export class SensitivityTag {
   readonly level = input<string | null | undefined>(null);
-  /** The word as given; null when none was ("not set"), undefined when the answer carries no word at all (a service from before MIG-243). */
+  /** The word as given; null or left out when none was ("not set"). */
   readonly label = input<string | null | undefined>(undefined);
   readonly text = computed(() => sensitivityText(this.level()));
   readonly word = computed(() => typedWord(this.level(), this.label()));

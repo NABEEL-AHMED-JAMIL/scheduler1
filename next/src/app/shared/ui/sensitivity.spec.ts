@@ -58,6 +58,10 @@ describe('app-sensitivity', () => {
     expect(render('internal', null)).toBe('Internal not set');
   });
 
+  it('says so too when the answer leaves the word out', () => {
+    expect(render('internal', undefined as never)).toBe('Internal not set');
+  });
+
   it('shows nothing but a dash without a level', () => {
     expect(render(null, null)).toBe('—');
   });
