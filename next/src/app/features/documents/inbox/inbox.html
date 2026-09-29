@@ -1,0 +1,179 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Inbox</h1>
+      <p class="page-subtitle">
+        Upload files for this workspace's pipelines. Each file is checked, stored in the workspace's bucket, and starts
+        every job whose inbox trigger matches its name.
+      </p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
+        <app-icon name="refresh" [class.spin]="loading()" />Refresh
+      </button>
+      @if (canManage() && settings()) {
+        <button type="button" class="btn btn-default btn-sm" (click)="openSettings()"><app-icon name="settings" />Inbox settings</button>
+      }
+    </div>
+  </div>
+
+  @if (loading() && !settings()) {
+    <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]" role="status">Reading the inbox…</div>
+  } @else if (error()) {
+    <div class="card p-0">
+      <app-load-error [message]="error()" (retry)="load()" />
+    </div>
+  } @else if (!configured()) {
+    <div class="card p-8 flex flex-col items-center text-center gap-3">
+      <span class="stat-glyph"><app-icon name="inbox" /></span>
+      <h2 class="text-base font-semibold">No inbox yet</h2>
+      <p class="text-sm text-[color:var(--text-secondary)] max-w-xl">{{ notConfiguredText() }}</p>
+      @if (canManage()) {
+        <button type="button" class="btn btn-primary btn-sm" (click)="openSettings()"><app-icon name="settings" />Set up the inbox</button>
+      }
+    </div>
+  } @else {
+    <div class="grid gap-4 lg:grid-cols-3 items-start">
+      <section class="card p-4 lg:col-span-2 flex flex-col gap-3 min-w-0" aria-labelledby="inboxUploadHeading">
+        <div class="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 id="inboxUploadHeading" class="text-base font-semibold">Upload</h2>
+          <p class="text-xs text-[color:var(--text-muted)]">{{ capText() }}</p>
+        </div>
+        <app-file-dropzone [multiple]="true" [disabled]="settings()?.connectionActive === false"
+                           prompt="Drop files here" hint="Several at once is fine: they are sent one by one."
+                           (picked)="enqueue($event)" />
+        @if (settings()?.connectionActive === false) {
+          <p class="text-sm text-crit-500" role="alert">
+            The inbox's storage connection is not active, so it takes no files.
+            {{ canManage() ? 'Activate the connection, or choose another in Inbox settings.' : 'Ask a workspace admin to fix it.' }}
+          </p>
+        }
+
+        @if (queue().length) {
+          <div class="flex items-center justify-between gap-2 mt-1">
+            <h3 class="text-sm font-semibold">This session's uploads</h3>
+            @if (finished()) {
+              <button type="button" class="btn btn-ghost btn-sm" (click)="clearFinished()"><app-icon name="close" />Clear finished</button>
+            }
+          </div>
+          <ul class="flex flex-col gap-2" aria-label="Uploads" aria-live="polite">
+            @for (q of queue(); track q.id) {
+              <li class="rounded-md border border-subtle px-3 py-2 flex flex-col gap-1.5" [attr.data-state]="q.state">
+                <div class="flex items-center gap-2 min-w-0">
+                  <app-icon [name]="q.state === 'done' ? 'checkCircle' : q.state === 'refused' ? 'xCircle' : 'file'" size="1em"
+                            [class]="q.state === 'done' ? 'icon-ok' : q.state === 'refused' ? 'icon-crit' : 'icon-muted'" />
+                  <app-data-text class="min-w-0 flex-1 font-medium text-sm" [value]="q.name" label="File" />
+                  <span class="text-xs text-[color:var(--text-muted)] tabular whitespace-nowrap">{{ formatSize(q.bytes) }}</span>
+                  <app-status [label]="q.state === 'done' ? 'Uploaded' : q.state === 'refused' ? 'Refused' : q.state === 'uploading' ? 'Uploading' : 'Queued'" [quiet]="true" />
+                </div>
+                @if (q.state === 'uploading') {
+                  <div class="progress" role="progressbar" [attr.aria-label]="'Uploading ' + q.name"
+                       aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="q.progress">
+                    <div class="progress-bar" [style.width.%]="q.progress"></div>
+                  </div>
+                }
+                @if (q.state === 'refused') {
+                  <p class="text-sm text-crit-500 break-words" role="alert">{{ q.message }}</p>
+                } @else if (q.state === 'done' && q.arrival) {
+                  <p class="text-xs text-[color:var(--text-muted)]">
+                    {{ q.message }} SHA-256 <span class="mono">{{ shortSha(q.arrival.sha256) }}</span>
+                  </p>
+                }
+              </li>
+            }
+          </ul>
+        }
+
+        <details class="text-sm">
+          <summary class="cursor-pointer text-[color:var(--text-secondary)]">What the inbox accepts</summary>
+          <dl class="mt-2 grid gap-x-4 gap-y-1.5 sm:grid-cols-[9rem_1fr]">
+            @for (k of kinds; track k.label) {
+              <dt class="text-[color:var(--text-muted)]">{{ k.label }}</dt>
+              <dd class="mono text-xs leading-6 break-words">{{ k.extensions.join(' ') }}</dd>
+            }
+          </dl>
+          <p class="mt-2 text-xs text-[color:var(--text-muted)]">
+            Executables and scripts are refused whatever they are named, and a file's contents must match its extension.
+            A refused file is not stored. Files are not scanned for viruses.
+          </p>
+        </details>
+      </section>
+
+      <section class="card p-4 flex flex-col gap-3 min-w-0" aria-labelledby="inboxSettingsHeading">
+        <div class="flex items-center justify-between gap-2">
+          <h2 id="inboxSettingsHeading" class="text-base font-semibold">Settings</h2>
+          @if (canManage()) {
+            <button type="button" class="btn btn-ghost btn-sm" (click)="openSettings()"><app-icon name="edit" />Change</button>
+          } @else {
+            <span class="pill pill-neutral">Read-only</span>
+          }
+        </div>
+        @if (settings(); as s) {
+          <dl class="flex flex-col gap-2.5 text-sm">
+            <div>
+              <dt class="text-xs text-[color:var(--text-muted)]">Storage connection</dt>
+              <dd class="flex items-center gap-2 min-w-0">
+                <app-data-text class="min-w-0 flex-1" [value]="s.connectionName || s.alias" label="Storage connection" />
+                <app-status [label]="s.connectionActive === false ? 'Inactive' : 'Active'" [quiet]="true" />
+              </dd>
+              @if (s.connectionName && s.alias) { <dd class="mono text-xs text-[color:var(--text-muted)] break-all">{{ s.alias }}</dd> }
+            </div>
+            <div>
+              <dt class="text-xs text-[color:var(--text-muted)]">Where files land</dt>
+              <dd class="mono text-xs break-all">intake/&lt;date&gt;/&lt;arrival&gt;-&lt;file name&gt;</dd>
+            </div>
+            <div>
+              <dt class="text-xs text-[color:var(--text-muted)]">Size limit</dt>
+              <dd>{{ capText() }}</dd>
+            </div>
+          </dl>
+        }
+        <p class="text-xs text-[color:var(--text-muted)] border-t border-subtle pt-3">
+          Which files start which job is set on the job: open a schedule and add an inbox trigger under Event.
+          <a class="link-inline" routerLink="/pipelines/schedules">Open Schedules</a>
+        </p>
+      </section>
+    </div>
+  }
+
+  @if (configured() || files().length) {
+    <app-table-shell heading="Arrivals" columnsKey="inbox-arrivals" [loading]="filesLoading()" [error]="filesError()"
+                     [isEmpty]="!files().length" [shown]="files().length" [scrollRows]="false"
+                     emptyMessage="No file has arrived yet. Upload one above, or send one through the API."
+                     emptyIcon="inbox" (retry)="loadFiles()">
+      <ng-container toolbar>
+        <p class="text-xs text-[color:var(--text-muted)]">
+          The newest {{ listLimit }}. The runs a file started are listed on each job, under Inbox trigger.
+          <a class="link-inline" routerLink="/pipelines/schedules">Schedules</a>
+        </p>
+      </ng-container>
+      <table class="table-modern">
+        <thead>
+          <tr>
+            <th>File</th>
+            <th class="text-right">Size</th>
+            <th>Uploaded by</th>
+            <th>Uploaded</th>
+            <th>SHA-256</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (f of files(); track f.arrivalId) {
+            <tr>
+              <td class="max-w-96">
+                <app-data-text class="block font-medium" [value]="f.fileName" label="File" />
+                @if (f.contentType) { <span class="block text-xs text-[color:var(--text-muted)]">{{ f.contentType }}</span> }
+              </td>
+              <td class="text-right tabular whitespace-nowrap">{{ formatSize(f.bytes) }}</td>
+              <td class="whitespace-nowrap">{{ uploader(f) }}</td>
+              <td class="text-xs whitespace-nowrap">
+                @if (f.uploadedAt) { {{ f.uploadedAt | serverTime: 'dateTime' }} } @else { <span class="text-[color:var(--text-muted)]">—</span> }
+              </td>
+              <td class="mono text-xs whitespace-nowrap" [attr.title]="f.sha256 || null">{{ shortSha(f.sha256) }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </app-table-shell>
+  }
+</div>
