@@ -141,6 +141,18 @@ describe('RunSteps: the run\'s Files', () => {
     expect(req.request.params.get('format')).toBe('json');
   });
 
+  // MIG-255: a render_pdf report is kept like a file, and downloads only as the PDF it is.
+  it('offers a PDF report only as its PDF', () => {
+    const report = { ...KEPT, runOutputId: 1002, stepKey: 'report', task: 'render_pdf', name: 'wound-report.pdf', format: 'pdf', runDatasetId: 1060 };
+    const { el, http } = mount([report]);
+    const buttons = [...el.querySelectorAll<HTMLButtonElement>('.exec-file[data-kind="file"] [data-format]')];
+    expect(buttons.map(b => b.dataset['format'])).toEqual(['pdf']);
+    buttons[0].click();
+    const req = http.expectOne(r => r.url.endsWith('/sourceJob.json/runDataset'));
+    expect(req.request.params.get('runDatasetId')).toBe('1060');
+    expect(req.request.params.get('format')).toBe('pdf');
+  });
+
   it('downloads an upload from storage, by its alias and key', () => {
     const { el, http } = mount();
     el.querySelector<HTMLButtonElement>('.exec-file[data-kind="bucket"] button')!.click();

@@ -106,6 +106,26 @@ describe('Documents › Reports', () => {
     expect(save).toHaveBeenCalledTimes(2);
   });
 
+  // MIG-255: a pipeline's PDF report (render_pdf) is a document, not rows: it downloads and opens as the PDF it is.
+  it('downloads a run\'s PDF report as itself and opens it rather than previewing rows', () => {
+    const { p, service, open } = page();
+    const save = vi.spyOn(StorageService, 'saveBlob').mockImplementation(() => {});
+    const opened = vi.spyOn(window, 'open').mockImplementation(() => null);
+    const createUrl = vi.fn(() => 'blob:report');
+    (URL as unknown as { createObjectURL: unknown }).createObjectURL = createUrl;
+    const [pdf] = reportsFromRun(RUN, [{ runOutputId: 1002, kind: 'file', name: 'wound-report.pdf', format: 'pdf', byteCount: 5120,
+      recordedAt: '2026-09-29T19:00:00', runDatasetId: 1120, expiresAt: '2026-09-30T19:00:00', expired: false }]);
+    p.download(pdf);
+    expect(service.runDatasetFile).toHaveBeenLastCalledWith(1120, 'pdf');
+    expect(save).toHaveBeenLastCalledWith(expect.any(Blob), 'wound-report.pdf');
+    open.mockClear();
+    p.preview(pdf);
+    expect(open).not.toHaveBeenCalled();
+    expect(service.runDatasetFile).toHaveBeenLastCalledWith(1120, 'pdf');
+    expect(opened).toHaveBeenCalledWith('blob:report', '_blank', 'noopener');
+    opened.mockRestore();
+  });
+
   it('emails only what is in a bucket, and opens storage at the file\'s folder', () => {
     const { p, open } = page();
     const upload = p.reports().find(r => r.origin === 'run-bucket')!;

@@ -158,7 +158,7 @@ const KIND_WORDS: Record<FieldKind, string> = {
 const FORMAT_WORDS: Record<string, string> = {
   sql: 'SQL', template: 'Text with placeholders', 'api-request': 'API request', 'api-environment': 'API environment',
   'data-contract': 'Data contract', 'db-connection': 'Database connection', bucket: 'Bucket', pipeline: 'Pipeline', user: 'People',
-  prompt: 'AI prompt',
+  prompt: 'AI prompt', expression: 'Formula',
 };
 
 const shown = (value: unknown) => (typeof value === 'string' ? value : JSON.stringify(value));

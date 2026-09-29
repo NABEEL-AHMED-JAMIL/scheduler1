@@ -119,8 +119,8 @@ export class GeneratedService {
     return outputs;
   }
 
-  /** A dataset a run kept, as a file to save (csv, json or jsonl). */
-  runDatasetFile(runDatasetId: number, format: 'csv' | 'json' | 'jsonl'): Observable<Blob> {
+  /** A dataset a run kept, as a file to save (csv, json or jsonl) -- or a report it rendered, as its PDF (MIG-255). */
+  runDatasetFile(runDatasetId: number, format: 'csv' | 'json' | 'jsonl' | 'pdf'): Observable<Blob> {
     return this.http.get(`${this.jobs}/runDataset`, { params: { runDatasetId, format }, responseType: 'blob' });
   }
 

@@ -637,7 +637,7 @@ export interface PromptChoice { id: number; label: string; }
  * TODO(MIG-249): pickers for api-request, api-environment, data-contract, db-connection, bucket, pipeline and user.
  */
 export const FORMATS = ['column', 'step', 'sql', 'template', 'multiline', 'api-request', 'api-environment', 'data-contract',
-  'db-connection', 'bucket', 'pipeline', 'user', 'prompt'] as const;
+  'db-connection', 'bucket', 'pipeline', 'user', 'prompt', 'expression'] as const;
 const LONG_TEXT_FORMATS = ['sql', 'template', 'multiline', 'textarea'];
 
 export interface FieldSpec {

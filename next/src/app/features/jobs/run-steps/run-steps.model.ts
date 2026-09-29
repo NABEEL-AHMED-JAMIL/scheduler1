@@ -124,10 +124,18 @@ export function stepStillGoing(status: string | null | undefined): boolean {
 }
 
 /** Wave 4: the formats sourceJob.json/runDataset writes a dataset in. */
-export type DatasetFormat = 'csv' | 'json' | 'jsonl';
+export type DatasetFormat = 'csv' | 'json' | 'jsonl' | 'pdf';
 export const DATASET_FORMATS: { id: DatasetFormat; label: string }[] = [
   { id: 'csv', label: 'CSV' }, { id: 'json', label: 'JSON' }, { id: 'jsonl', label: 'JSONL' },
 ];
+
+/** MIG-255: a report (render_pdf) is a PDF, not rows -- it downloads only as itself. */
+export const PDF_FORMAT: { id: DatasetFormat; label: string }[] = [{ id: 'pdf', label: 'PDF' }];
+
+/** The formats a kept file or dataset offers: a PDF report only as its PDF, anything else as rows. */
+export function formatsFor(name: string, format?: string | null): { id: DatasetFormat; label: string }[] {
+  return format === 'pdf' || /\.pdf$/i.test(name) ? PDF_FORMAT : DATASET_FORMATS;
+}
 
 /**
  * One thing a run put out (run_output, sourceJob.json/runOutputs): a file it kept ("file", downloadable through its

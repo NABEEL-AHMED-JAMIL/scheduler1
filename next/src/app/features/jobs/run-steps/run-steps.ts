@@ -13,7 +13,7 @@ import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { StorageService } from '../../objects/storage.service';
 import { refusalOf } from '../../bulk/bulk-transfer';
 import {
-  DATASET_FORMATS, DatasetFormat, RunAiStep, RunOutput, StepExecution, StepLogLine, StepTimeline, attachmentName,
+  DATASET_FORMATS, DatasetFormat, RunAiStep, formatsFor, RunOutput, StepExecution, StepLogLine, StepTimeline, attachmentName,
   engineTimeline, errorText, focusStep, outputsOf, recordsLabel, stepStillGoing,
 } from './run-steps.model';
 
@@ -54,6 +54,7 @@ export class RunSteps {
   readonly outputs = signal<RunOutput[] | 'error' | null>(null);
   private outputsRequest?: Subscription;
   readonly formats = DATASET_FORMATS;
+  readonly formatsFor = formatsFor;
   /** The download in flight ("d<runDatasetId>" or "o<runOutputId>"), so its button cannot be pressed twice. */
   readonly busy = signal('');
   readonly formatSize = formatSize;

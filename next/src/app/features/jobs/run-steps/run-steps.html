@@ -75,7 +75,7 @@
                         </button>
                         <ng-template #formatMenu>
                           <div cdkMenu class="card shadow-xl py-1 min-w-36 text-sm">
-                            @for (f of formats; track f.id) {
+                            @for (f of formatsFor(d.name); track f.id) {
                               <button cdkMenuItem class="menu-item" [attr.data-format]="f.id"
                                       (cdkMenuItemTriggered)="downloadDataset(d.runDatasetId, f.id, d.name)">
                                 <app-icon name="download" />{{ f.label }}
@@ -163,7 +163,7 @@
                 </div>
                 @if (o.kind === 'file') {
                   <div class="flex flex-wrap justify-end justify-self-end gap-1" role="group" [attr.aria-label]="'Download ' + o.name + ' as'">
-                    @for (f of formats; track f.id) {
+                    @for (f of formatsFor(o.name, o.format); track f.id) {
                       <button type="button" class="btn btn-default btn-xs" [attr.data-format]="f.id"
                               [disabled]="!!o.expired || !o.runDatasetId || busy() !== ''"
                               [title]="o.expired ? 'This file has expired and can no longer be downloaded' : 'Download as ' + f.label"

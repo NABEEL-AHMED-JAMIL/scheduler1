@@ -21,6 +21,8 @@ import { ReportPreviewDialog } from './report-preview-dialog';
 /** Subfolders of the reports folder listed too (one level), at most this many. */
 export const SUBFOLDER_CAP = 10;
 const DATASET_FORMATS = ['csv', 'json', 'jsonl'] as const;
+/** A run's kept file that is a report (render_pdf, MIG-255), not rows. */
+const isPdf = (r: GeneratedReport) => r.type.toLowerCase() === 'pdf';
 
 /**
  * MIG-253: Documents › Reports -- the documents and files made from your data.
@@ -160,6 +162,14 @@ export class GeneratedReports implements OnInit {
 
   preview(r: GeneratedReport): void {
     if (!this.canPreview(r)) return;
+    if (r.origin === 'run-file' && isPdf(r)) {
+      // MIG-255: a pipeline's report is a document, not rows -- it opens as the PDF it is, in the browser's own viewer.
+      this.service.runDatasetFile(r.runDatasetId!, 'pdf').subscribe({
+        next: blob => window.open(URL.createObjectURL(blob), '_blank', 'noopener'),
+        error: () => this.toast.error(`Could not open ${r.name}.`),
+      });
+      return;
+    }
     if (r.origin === 'run-file') {
       this.dialog.open(ReportPreviewDialog, { data: { name: r.name, runDatasetId: r.runDatasetId! }, hasBackdrop: true });
       return;
@@ -175,6 +185,10 @@ export class GeneratedReports implements OnInit {
     if (!this.canPreview(r)) return;
     const done = (blob: Blob, name: string) => StorageService.saveBlob(blob, name);
     const failed = () => this.toast.error(`Could not download ${r.name}.`);
+    if (r.origin === 'run-file' && isPdf(r)) {
+      this.service.runDatasetFile(r.runDatasetId!, 'pdf').subscribe({ next: b => done(b, r.name), error: failed });
+      return;
+    }
     if (r.origin === 'run-file') {
       const own = r.type.toLowerCase();
       const format = (DATASET_FORMATS as readonly string[]).includes(own) ? own as typeof DATASET_FORMATS[number] : 'json';
