@@ -7,7 +7,7 @@
  * nothing here is drawn for them.
  */
 
-/** One dataset a step wrote (run_dataset). There is no download for these yet: Core has no endpoint that serves one. */
+/** One dataset a step wrote (run_dataset). Wave 4: it downloads as csv, json or jsonl (sourceJob.json/runDataset). */
 export interface StepDataset {
   runDatasetId: number;
   name: string;
@@ -121,4 +121,47 @@ export function focusStep(steps: StepExecution[]): StepExecution | null {
 /** Statuses a step can still leave: while any step holds one the timeline is re-read with the run's own poll. */
 export function stepStillGoing(status: string | null | undefined): boolean {
   return status === 'Queue' || status === 'Start' || status === 'Running';
+}
+
+/** Wave 4: the formats sourceJob.json/runDataset writes a dataset in. */
+export type DatasetFormat = 'csv' | 'json' | 'jsonl';
+export const DATASET_FORMATS: { id: DatasetFormat; label: string }[] = [
+  { id: 'csv', label: 'CSV' }, { id: 'json', label: 'JSON' }, { id: 'jsonl', label: 'JSONL' },
+];
+
+/**
+ * One thing a run put out (run_output, sourceJob.json/runOutputs): a file it kept ("file", downloadable through its
+ * dataset until it expires) or an upload to a bucket ("bucket", downloadable from storage by alias and key).
+ */
+export interface RunOutput {
+  runOutputId: number;
+  stepExecutionId?: number | null;
+  attempt?: number | null;
+  stepIndex?: number | null;
+  stepKey?: string | null;
+  task?: string | null;
+  kind: 'file' | 'bucket';
+  name: string;
+  format?: string | null;
+  rowCount?: number | null;
+  byteCount?: number | null;
+  recordedAt?: string | null;
+  runDatasetId?: number | null;
+  expiresAt?: string | null;
+  expired?: boolean | null;
+  bucket?: string | null;
+  key?: string | null;
+}
+
+/** The outputs in an answer, or null for anything that is not one. */
+export function outputsOf(data: unknown): RunOutput[] | null {
+  const outputs = (data as { outputs?: unknown } | null)?.outputs;
+  return Array.isArray(outputs) ? outputs as RunOutput[] : null;
+}
+
+/** The file name in a Content-Disposition header ("attachment; filename=..." or filename*=UTF-8''...); '' for none. */
+export function attachmentName(disposition: string | null | undefined): string {
+  const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition ?? '');
+  if (!match) return '';
+  try { return decodeURIComponent(match[1]); } catch { return match[1]; }
 }

@@ -72,12 +72,13 @@ describe('RunSteps: a step-engine run', () => {
     expect(rows[0].textContent).toContain('00:20:30');
   });
 
-  it('names the datasets each step wrote, with their rows, and offers no download it cannot serve', () => {
+  // Wave 4: Core serves a dataset now (sourceJob.json/runDataset), so each one offers its download -- see run-steps.files.spec.ts.
+  it('names the datasets each step wrote, with their rows, and offers each one\'s download', () => {
     const { el } = mount(ENGINE);
     const out = el.querySelector<HTMLElement>('.exec-step[data-step="out"]')!;
     expect(out.textContent).toContain('customers-clean.json');
     expect(out.textContent).toContain('3 rows');
-    expect(el.querySelector('.exec-step a[download], .exec-step [aria-label^="Download"]')).toBeNull();
+    expect(out.querySelectorAll('[aria-label^="Download"]').length).toBe(1);
   });
 
   it('shows a failed step\'s error and opens on it', () => {

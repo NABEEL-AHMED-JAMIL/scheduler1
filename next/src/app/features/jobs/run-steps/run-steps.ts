@@ -7,8 +7,14 @@ import { StatusPill } from '../../../shared/ui/status-pill';
 import { SegmentOption, Segmented } from '../../../shared/ui/segmented';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { formatDuration } from '../../../shared/ui/time-format';
+import { formatSize } from '../../../shared/ui/format-size';
+import { ToastService } from '../../../shared/ui/toast.service';
+import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
+import { StorageService } from '../../objects/storage.service';
+import { refusalOf } from '../../bulk/bulk-transfer';
 import {
-  RunAiStep, StepExecution, StepLogLine, StepTimeline, engineTimeline, errorText, focusStep, recordsLabel, stepStillGoing,
+  DATASET_FORMATS, DatasetFormat, RunAiStep, RunOutput, StepExecution, StepLogLine, StepTimeline, attachmentName,
+  engineTimeline, errorText, focusStep, outputsOf, recordsLabel, stepStillGoing,
 } from './run-steps.model';
 
 type StepView = 'timeline' | 'console';
@@ -29,7 +35,7 @@ const TERMINAL = ['Completed', 'Failed', 'Interrupt', 'Skip', 'Missed', 'Stop'];
  */
 @Component({
   selector: 'app-run-steps',
-  imports: [Icon, StatusPill, Segmented, ServerTimePipe],
+  imports: [Icon, StatusPill, Segmented, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger],
   templateUrl: './run-steps.html',
 })
 export class RunSteps {
@@ -41,6 +47,16 @@ export class RunSteps {
   readonly revision = input(0);
 
   private readonly http = inject(HttpClient);
+  private readonly toast = inject(ToastService);
+  private readonly storage = inject(StorageService);
+
+  /** Wave 4: what the shown attempt put out (runOutputs); null until read, 'error' when it could not be. */
+  readonly outputs = signal<RunOutput[] | 'error' | null>(null);
+  private outputsRequest?: Subscription;
+  readonly formats = DATASET_FORMATS;
+  /** The download in flight ("d<runDatasetId>" or "o<runOutputId>"), so its button cannot be pressed twice. */
+  readonly busy = signal('');
+  readonly formatSize = formatSize;
 
   readonly timeline = signal<StepTimeline | null>(null);
   readonly view = signal<StepView>('timeline');
@@ -107,6 +123,7 @@ export class RunSteps {
     if (this.loadedFor !== this.jobQueueId()) {
       this.loadedFor = this.jobQueueId();
       this.settled = false;
+      this.outputs.set(null);
       this.request?.unsubscribe();
     }
     if (this.settled) return;
@@ -139,9 +156,64 @@ export class RunSteps {
           });
         }
         this.timeline.set(timeline);
+        this.loadOutputs(timeline.attempt);
       },
       // The run's entries are the point of the page; losing the steps must not break it.
       error: () => {},
+    });
+  }
+
+  /** The shown attempt's outputs, re-read with the timeline while the run is going: a step records them as it ends. */
+  private loadOutputs(attempt: number): void {
+    const params: Record<string, string> = { jobQueueId: this.jobQueueId() };
+    if (Number.isInteger(attempt)) params['attempt'] = String(attempt);
+    this.outputsRequest?.unsubscribe();
+    this.outputsRequest = this.http.get<ApiResponse<unknown>>(`${API_BASE}/sourceJob.json/runOutputs`, { params }).subscribe({
+      next: response => {
+        const outputs = response.status === API_SUCCESS ? outputsOf(response.data) : null;
+        this.outputs.set(outputs ?? 'error');
+      },
+      error: () => this.outputs.set('error'),
+    });
+  }
+
+  /**
+   * A dataset in one format. Fetched through HttpClient, so the token goes with it, and saved from a blob under the
+   * name the server gives (Content-Disposition, exposed by CORS). A refusal (404, 410, 400) is JSON inside the blob.
+   */
+  downloadDataset(runDatasetId: number, format: DatasetFormat, name: string): void {
+    const busy = `d${runDatasetId}`;
+    if (this.busy()) return;
+    this.busy.set(busy);
+    this.http.get(`${API_BASE}/sourceJob.json/runDataset`, {
+      params: { runDatasetId: String(runDatasetId), format }, responseType: 'blob', observe: 'response',
+    }).subscribe({
+      next: response => {
+        this.busy.set('');
+        if (!response.body) { this.toast.error('The server returned an empty file.'); return; }
+        const served = attachmentName(response.headers.get('content-disposition'));
+        StorageService.saveBlob(response.body, served || `${name.replace(/\.(csv|jsonl?|parquet)$/i, '')}.${format}`);
+      },
+      error: async err => {
+        this.busy.set('');
+        this.toast.error(await refusalOf(err) || `${name} could not be downloaded.`);
+      },
+    });
+  }
+
+  /** A bucket upload, from storage, exactly as the object browser downloads one. */
+  downloadUpload(output: RunOutput): void {
+    if (!output.bucket || !output.key || this.busy()) return;
+    this.busy.set(`o${output.runOutputId}`);
+    this.storage.download(output.bucket, output.key).subscribe({
+      next: blob => {
+        this.busy.set('');
+        StorageService.saveBlob(blob, StorageService.fileNameOf(output.key!));
+      },
+      error: async err => {
+        this.busy.set('');
+        this.toast.error(await refusalOf(err) || `${output.name} could not be downloaded.`);
+      },
     });
   }
 
@@ -166,6 +238,7 @@ export class RunSteps {
     if (!Number.isInteger(attempt) || String(attempt) === this.shownAttempt()) return;
     this.settled = false;
     this.logs.set(new Map());
+    this.outputs.set(null);
     this.selectedKey.set(null);
     this.requestedAttempt.set(attempt);
   }
