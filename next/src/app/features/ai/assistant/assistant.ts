@@ -289,7 +289,8 @@ export class Assistant implements OnInit {
     this.conversations.update(list => [data.conversation, ...list.filter(c => c.conversationId !== data.conversation.conversationId)]);
     if (fresh) this.remember(data.conversation.conversationId);
     const owners = this.owners();
-    for (const m of data.messages) if (m.toolRunId != null && owners.has(m.messageId)) this.showTrace(m.toolRunId);
+    // Read afresh: a decision moves the run on, so a trace read while it waited is stale.
+    for (const m of data.messages) if (m.toolRunId != null && owners.has(m.messageId)) this.showTrace(m.toolRunId, true);
   }
 
   private settle(): void {
@@ -328,11 +329,12 @@ export class Assistant implements OnInit {
     this.showTrace(toolRunId);
   }
 
-  private showTrace(toolRunId: number): void {
+  private showTrace(toolRunId: number, fresh = false): void {
     this.openTraces.update(open => new Set(open).add(toolRunId));
     const known = this.traces()[toolRunId];
-    if (known && (known.loading || known.trace)) return;
-    this.setTrace(toolRunId, { loading: true, error: '', trace: null });
+    if (!fresh && known && (known.loading || known.trace)) return;
+    // A fresh read keeps the calls already shown until the new ones arrive.
+    this.setTrace(toolRunId, { loading: !known?.trace, error: '', trace: known?.trace ?? null });
     this.api.trace(toolRunId).subscribe({
       next: r => this.setTrace(toolRunId, r.status === API_SUCCESS && r.data
         ? { loading: false, error: '', trace: r.data }

@@ -175,6 +175,7 @@ test.describe('AI Assistant: confirm, then run (send and decide faked)', () => {
     await expect(page.locator('[data-link="output"]').getByRole('link', { name: 'Open report files' }))
       .toHaveAttribute('href', /\/documents\/files\?bucket=etl-ui-check&prefix=runs%2F7404%2F/);
     await expect(page.locator('[data-role="assistant"] pre').last()).toHaveText('jobId: 2848');
+    await expect(page.locator('[data-call="run_pipeline"]')).toHaveAttribute('data-outcome', 'confirmed');
     await shot(page, info, 'assistant-result-1440');
 
     await execution.getByRole('link', { name: 'Open execution' }).click();

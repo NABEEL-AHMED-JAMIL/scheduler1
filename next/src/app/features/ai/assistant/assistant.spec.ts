@@ -174,6 +174,8 @@ describe('AI Assistant -- confirm, then run', () => {
     expect(screen.messages().find(x => x.messageId === 1002)?.card?.state).toBe('confirmed');
     const result = screen.messages().at(-1)!;
     expect(result.links[0]).toMatchObject({ kind: 'execution', jobQueueId: 7404 });
+    // The run moved on: its calls are read afresh, not the ones read while it waited.
+    expect(api.trace).toHaveBeenCalledWith(1004);
   });
 
   it('declines without running anything', () => {
