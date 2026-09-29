@@ -4298,7 +4298,7 @@ describe('the dashboard and the registry are reachable from the workspace', () =
     grid.fixture.detectChanges();
 
     // The menu is an overlay, so it is drawn under <body> rather than inside the component.
-    const link = document.querySelector('a[href="/objects/analytics/dashboards"]');
+    const link = document.querySelector('a[href="/data/analytics/dashboards"]');
     expect(link).not.toBeNull();
     expect(document.body.textContent).toContain('Name this dataset');
   });

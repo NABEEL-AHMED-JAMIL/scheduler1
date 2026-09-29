@@ -34,7 +34,7 @@
             }
           </p>
           @if (canConnectStorage()) {
-            <a routerLink="/configuration/storage-connections" class="link-inline mt-2">Storage connections</a>
+            <a routerLink="/integration/storage-connections" class="link-inline mt-2">Storage connections</a>
           }
         </div>
       </div>
@@ -126,7 +126,7 @@
           </p>
         </div>
         @if (canConnectStorage()) {
-          <a routerLink="/configuration/storage-connections" class="btn btn-primary btn-sm">
+          <a routerLink="/integration/storage-connections" class="btn btn-primary btn-sm">
             <app-icon name="plus" />Add a connection
           </a>
         } @else {

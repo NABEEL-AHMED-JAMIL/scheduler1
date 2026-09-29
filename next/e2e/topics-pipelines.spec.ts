@@ -119,8 +119,8 @@ test.describe('topics and pipelines', () => {
     await expect(page.locator('.kafka-topics tbody tr', { hasText: TOPIC_NAME }).locator('a', { hasText: PIPELINE_NAME })).toBeVisible();
 
     // ── 3. A task: connection → topic → pipeline, each list fetched on the pick before ──
-    await page.goto('/operations/tasks/new');
-    await page.getByRole('heading', { name: 'New task' }).waitFor();
+    await page.goto('/pipelines/new');
+    await page.getByRole('heading', { name: 'New pipeline' }).waitFor();
     await page.locator('#taskName').fill(TASK_NAME);
     await expect(page.locator('#pipeline')).toHaveAttribute('placeholder', 'Pick a topic first');
     // A tenant administrator's one default connection is picked for them; the topic was added under it.

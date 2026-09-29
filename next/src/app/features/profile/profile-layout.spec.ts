@@ -32,7 +32,7 @@ describe('profile layout', () => {
 
   it('sets the recent run names in the card\'s own text size', async () => {
     const html = await read('app/features/profile/profile.html');
-    expect(classesOf(html, "[routerLink]=\"['/operations/jobs', run.jobId, 'history']\"")).toContain('text-sm');
+    expect(classesOf(html, "[routerLink]=\"['/pipelines/schedules', run.jobId, 'executions']\"")).toContain('text-sm');
   });
 
   it('gives the phone number a floor, and lets it drop under the country in a narrow column', async () => {

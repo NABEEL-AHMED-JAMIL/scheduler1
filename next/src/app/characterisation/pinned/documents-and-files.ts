@@ -117,7 +117,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "the converter, as a workspace administrator": {
-    "url": "/tools/converter",
+    "url": "/documents/converter",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -153,11 +153,11 @@ export const PINNED: Record<string, unknown> = {
       "Choose a file"
     ],
     "links": [
-      "/objects/files?bucket=ui-review-s3&prefix=UI-REVIEW%20converted%2F1034%2Foutput%2F"
+      "/documents/files?bucket=ui-review-s3&prefix=UI-REVIEW%20converted%2F1034%2Foutput%2F"
     ]
   },
   "the object browser, as a tenant user": {
-    "url": "/objects/files?bucket=ui-review-s3",
+    "url": "/documents/files?bucket=ui-review-s3",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -202,7 +202,7 @@ export const PINNED: Record<string, unknown> = {
     "links": []
   },
   "the object browser, in a bucket": {
-    "url": "/objects/files?bucket=ui-review-s3",
+    "url": "/documents/files?bucket=ui-review-s3",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -247,7 +247,7 @@ export const PINNED: Record<string, unknown> = {
     "links": []
   },
   "the object browser, no bucket chosen": {
-    "url": "/objects/files",
+    "url": "/documents/files",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",

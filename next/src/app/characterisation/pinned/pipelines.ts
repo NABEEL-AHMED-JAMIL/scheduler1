@@ -140,7 +140,7 @@ export const PINNED: Record<string, unknown> = {
     "items": []
   },
   "the list, as a platform administrator": {
-    "url": "/configuration/pipelines",
+    "url": "/configuration/task-registry",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -148,7 +148,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /pipeline.json/list?limit=50&page=1"
     ],
     "headings": [
-      "Pipelines",
+      "Task Registry",
       "Pipelines (1 of 1)"
     ],
     "buttons": [
@@ -202,14 +202,14 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "the list, as a workspace administrator": {
-    "url": "/configuration/pipelines",
+    "url": "/configuration/task-registry",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /pipeline.json/list?limit=50&page=1"
     ],
     "headings": [
-      "Pipelines",
+      "Task Registry",
       "Pipelines (1 of 1)"
     ],
     "buttons": [
@@ -243,14 +243,14 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "the old forms address": {
-    "url": "/configuration/pipelines",
+    "url": "/configuration/task-registry",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /pipeline.json/list?limit=50&page=1"
     ],
     "headings": [
-      "Pipelines",
+      "Task Registry",
       "Pipelines (1 of 1)"
     ],
     "buttons": [

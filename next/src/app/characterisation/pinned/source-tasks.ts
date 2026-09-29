@@ -1,7 +1,7 @@
 // Recorded by scripts/characterisation/record.mjs -- see ../harness.ts. Review the diff: it is the baseline.
 export const PINNED: Record<string, unknown> = {
   "a new task": {
-    "url": "/operations/tasks/new",
+    "url": "/pipelines/new",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -11,7 +11,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /setting.json/topics?kafkaConnectionProfileId=1009"
     ],
     "headings": [
-      "New task",
+      "New pipeline",
       "Basics",
       "Task payload"
     ],
@@ -38,7 +38,7 @@ export const PINNED: Record<string, unknown> = {
       "XML configuration *(required)"
     ],
     "links": [
-      "/operations/tasks"
+      "/pipelines"
     ]
   },
   "a task's XML payload, opened in the list": {
@@ -46,7 +46,7 @@ export const PINNED: Record<string, unknown> = {
       "POST /sourceTask.json/fetchAllLinkJobsWithSourceTaskId?limit=1000&sourceTaskId=1854 {}"
     ],
     "headings": [
-      "Source Tasks",
+      "Pipelines",
       "Tasks (2 of 2)"
     ],
     "buttons": [
@@ -84,8 +84,8 @@ export const PINNED: Record<string, unknown> = {
       "Search tasks"
     ],
     "links": [
-      "/operations/tasks/bulk",
-      "/operations/tasks/new"
+      "/pipelines/bulk",
+      "/pipelines/new"
     ],
     "details": {
       "terms": [],
@@ -95,30 +95,30 @@ export const PINNED: Record<string, unknown> = {
     }
   },
   "bulk tasks": {
-    "url": "/operations/tasks/bulk",
+    "url": "/pipelines/bulk",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1"
     ],
     "headings": [
-      "Bulk tasks",
+      "Bulk pipelines",
       "Import",
       "Export"
     ],
     "buttons": [
       "Download the import template",
-      "Export all tasks"
+      "Export all pipelines"
     ],
     "columns": [],
     "fields": [
       "Choose a file"
     ],
     "links": [
-      "/operations/tasks"
+      "/pipelines"
     ]
   },
   "editing a task": {
-    "url": "/operations/tasks/1854/edit",
+    "url": "/pipelines/1854/edit",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -132,7 +132,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /setting.json/topics?kafkaConnectionProfileId=1009"
     ],
     "headings": [
-      "Edit task",
+      "Edit pipeline",
       "Basics",
       "Reference: CSV check and summarise"
     ],
@@ -159,7 +159,7 @@ export const PINNED: Record<string, unknown> = {
       "Topic *(required)"
     ],
     "links": [
-      "/operations/tasks"
+      "/pipelines"
     ]
   },
   "editing a task, as a tenant user (the editor is admin-only)": {
@@ -193,7 +193,7 @@ export const PINNED: Record<string, unknown> = {
   ],
   "the editor: the raw XML payload, for a pipeline without a definition": {
     "headings": [
-      "Edit task",
+      "Edit pipeline",
       "Basics",
       "Task payload"
     ],
@@ -220,7 +220,7 @@ export const PINNED: Record<string, unknown> = {
       "XML configuration *(required)"
     ],
     "links": [
-      "/operations/tasks"
+      "/pipelines"
     ],
     "values": [
       "taskName=Reference: CSV check and summarise",
@@ -234,14 +234,14 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "the list, as a tenant user with five pages": {
-    "url": "/operations/tasks",
+    "url": "/pipelines",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "POST /sourceTask.json/listSourceTask?limit=1000 {}"
     ],
     "headings": [
-      "Source Tasks",
+      "Pipelines",
       "Tasks (2 of 2)"
     ],
     "buttons": [
@@ -277,14 +277,14 @@ export const PINNED: Record<string, unknown> = {
     "links": []
   },
   "the list, as a workspace administrator": {
-    "url": "/operations/tasks",
+    "url": "/pipelines",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "POST /sourceTask.json/listSourceTask?limit=1000 {}"
     ],
     "headings": [
-      "Source Tasks",
+      "Pipelines",
       "Tasks (2 of 2)"
     ],
     "buttons": [
@@ -320,8 +320,8 @@ export const PINNED: Record<string, unknown> = {
       "Search tasks"
     ],
     "links": [
-      "/operations/tasks/bulk",
-      "/operations/tasks/new"
+      "/pipelines/bulk",
+      "/pipelines/new"
     ]
   },
   "the row menu, as a workspace administrator": {
@@ -334,7 +334,7 @@ export const PINNED: Record<string, unknown> = {
     "columns": [],
     "fields": [],
     "links": [
-      "/operations/tasks/1854/edit"
+      "/pipelines/1854/edit"
     ],
     "items": [
       "Edit",

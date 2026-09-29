@@ -41,7 +41,7 @@ export const PINNED: Record<string, unknown> = {
     "links": []
   },
   "Analytics Studio, as a tenant user with every page": {
-    "url": "/objects/analytics",
+    "url": "/data/analytics",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -71,7 +71,7 @@ export const PINNED: Record<string, unknown> = {
     "links": []
   },
   "Analytics Studio, as a workspace administrator": {
-    "url": "/objects/analytics",
+    "url": "/data/analytics",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -101,7 +101,7 @@ export const PINNED: Record<string, unknown> = {
     "links": []
   },
   "a dashboard, opened": {
-    "url": "/objects/analytics/dashboards?board=1378",
+    "url": "/data/analytics/dashboards?board=1378",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -119,11 +119,11 @@ export const PINNED: Record<string, unknown> = {
     "columns": [],
     "fields": [],
     "links": [
-      "/objects/analytics/dashboards"
+      "/data/analytics/dashboards"
     ]
   },
   "saved analyses and dashboards": {
-    "url": "/objects/analytics/dashboards",
+    "url": "/data/analytics/dashboards",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -142,9 +142,9 @@ export const PINNED: Record<string, unknown> = {
     "columns": [],
     "fields": [],
     "links": [
-      "/objects/analytics",
-      "/objects/analytics/dashboards?board=1378",
-      "/objects/analytics/dashboards?board=1379"
+      "/data/analytics",
+      "/data/analytics/dashboards?board=1378",
+      "/data/analytics/dashboards?board=1379"
     ]
   },
   "saved analyses, as a tenant user without the page": {

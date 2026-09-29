@@ -1,6 +1,26 @@
-import { Routes } from '@angular/router';
+import { Routes, Route } from '@angular/router';
 import { anonymousOnly, authGuard, pageGuard, passwordChangeGuard, roleGuard } from './core/auth/auth.guard';
+import { PageKey } from './core/auth/page-keys';
 import { Shell } from './features/shell/shell';
+
+/**
+ * MIG-246 / MIG-267: the entry point of a Wave 4 or Wave 5 page that is on the menu before it is built.
+ * Gated by the page's own access-profile key from the start, so the real screen only swaps the component.
+ */
+function comingSoon(path: string, title: string, pageKey: PageKey, summary: string): Route {
+  return {
+    path,
+    title,
+    loadComponent: () => import('./features/coming-soon/coming-soon').then(m => m.ComingSoon),
+    data: { pageKey, comingSoon: summary },
+    canActivate: [pageGuard],
+  };
+}
+
+/** Old address -> today's, as whole-address redirects (params and the query string carry over). */
+function moved(pairs: [from: string, to: string][]): Route[] {
+  return pairs.map(([path, redirectTo]) => ({ path, redirectTo, pathMatch: 'full' as const }));
+}
 
 export const routes: Routes = [
   {
@@ -61,110 +81,191 @@ export const routes: Routes = [
         title: 'Dashboard',
         loadComponent: () => import('./features/dashboard/dashboard').then(m => m.Dashboard),
       },
+      // ---------------------------------------------------------------------------------------------
+      // MIG-246 (2026-09-28): every address is <section>/<page>, the section the menu shows it under.
+      // The MIG-218 renames are labels and addresses only: each page keeps its access-profile key and
+      // its least role, and every earlier address redirects further down (params and query carry over).
+      //
+      // Integration
+      // ---------------------------------------------------------------------------------------------
       {
-        path: 'operations/jobs',
-        title: 'Source Jobs',
-        loadComponent: () => import('./features/jobs/jobs').then(m => m.Jobs),
-        data: { pageKey: 'jobs' },
-        canActivate: [pageGuard],
-      },
-      {
-        path: 'operations/jobs/new',
-        title: 'New job',
-        loadComponent: () => import('./features/jobs/edit/job-edit').then(m => m.JobEdit),
-        data: { pageKey: 'jobs' },
-        canActivate: [pageGuard],
-      },
-      {
-        path: 'operations/jobs/:jobId/edit',
-        title: 'Edit job',
-        loadComponent: () => import('./features/jobs/edit/job-edit').then(m => m.JobEdit),
-        data: { pageKey: 'jobs' },
-        canActivate: [pageGuard],
-      },
-      {
-        path: 'operations/jobs/:jobId/assistant',
-        title: 'Job assistant',
-        loadComponent: () =>
-          import('./features/jobs/assistant/job-assistant').then(m => m.JobAssistant),
-        data: { pageKey: 'jobs' },
-        canActivate: [pageGuard],
-      },
-      {
-        path: 'operations/jobs/:jobId/runs/:jobQueueId/logs',
-        title: 'Run logs',
-        loadComponent: () => import('./features/jobs/logs/job-logs').then(m => m.JobLogs),
-        data: { pageKey: 'jobs' },
-        canActivate: [pageGuard],
-      },
-      {
-        path: 'operations/queue',
-        title: 'Queue',
-        loadComponent: () => import('./features/queue/queue').then(m => m.Queue),
-        data: { pageKey: 'queue' },
-        canActivate: [pageGuard],
-      },
-      {
-        // Same screen without a job: the dashboard's TOTAL row drills into an hour across
-        // every job, which has no single id to put in the path.
-        path: 'operations/jobs/history',
-        title: 'Run history',
-        loadComponent: () =>
-          import('./features/jobs/history/job-history').then(m => m.JobHistory),
-        data: { pageKey: 'jobs' },
-        canActivate: [pageGuard],
-      },
-      {
-        path: 'operations/jobs/:jobId/history',
-        title: 'Job history',
-        loadComponent: () =>
-          import('./features/jobs/history/job-history').then(m => m.JobHistory),
-        data: { pageKey: 'jobs' },
-        canActivate: [pageGuard],
-      },
-      {
-        // The editor is nothing but writes, and addSourceTask/updateSourceTask are TENANT_ADMIN.
-        // Ungated, a tenant user could fill in a task name, type, pipeline and the whole XML
-        // payload and only be told no when they pressed Save, with the work lost.
-        path: 'operations/tasks/new',
-        title: 'New task',
-        loadComponent: () => import('./features/tasks/edit/task-edit').then(m => m.TaskEdit),
-        data: { pageKey: 'tasks', minRole: 'TENANT_ADMIN' },
-        canActivate: [pageGuard, roleGuard],
-      },
-      {
-        path: 'operations/tasks/:taskDetailId/edit',
-        title: 'Edit task',
-        loadComponent: () => import('./features/tasks/edit/task-edit').then(m => m.TaskEdit),
-        data: { pageKey: 'tasks', minRole: 'TENANT_ADMIN' },
-        canActivate: [pageGuard, roleGuard],
-      },
-      {
-        // The list itself stays open: listSourceTask is TENANT_USER on purpose, and a job
-        // points at a task, so seeing them is part of reading the console.
-        path: 'operations/tasks',
-        title: 'Source Tasks',
-        loadComponent: () => import('./features/tasks/tasks').then(m => m.Tasks),
-        data: { pageKey: 'tasks' },
-        canActivate: [pageGuard],
-      },
-      {
-        // Lives under settings/ rather than admin/ because it groups with the rest of the
-        // Configuration menu (Kafka & Topics, Pipelines, Configuration values) -- infrastructure
-        // setup, not the Administration menu's people/tenant management. The old admin/storage
-        // path is kept as a redirect below so an old bookmark or link still lands.
-        path: 'configuration/storage-connections',
+        // Infrastructure a pipeline reads from and writes to. Role-gated, not page-keyed: every call
+        // behind it is TENANT_ADMIN.
+        path: 'integration/storage-connections',
         title: 'Storage Connections',
         loadComponent: () =>
           import('./features/admin/storage/storage-connections').then(m => m.StorageConnections),
         data: { minRole: 'TENANT_ADMIN' },
         canActivate: [roleGuard],
       },
+      comingSoon('integration/api-collections', 'API Collections', 'api-collections',
+        'Which APIs exist, tested and versioned, and the requests a pipeline can call.'),
+      comingSoon('integration/connectors', 'Connector Hub', 'connector-hub',
+        'Databases, SaaS apps and files, ready to connect and sync.'),
+      // ---------------------------------------------------------------------------------------------
+      // Pipelines (was Operations). Pipelines was Source Tasks, Schedules was Source Jobs, Executions
+      // was Run history, Run analytics was Reports. Keys unchanged: tasks, jobs, jobs, reports.
+      // ---------------------------------------------------------------------------------------------
       {
-        // Open to TENANT_USER, like the Object Browser it reads from and for the same reason:
+        // The list itself stays open: listSourceTask is TENANT_USER on purpose, and a schedule points
+        // at a pipeline, so seeing them is part of reading the console.
+        path: 'pipelines',
+        pathMatch: 'full',
+        title: 'Pipelines',
+        loadComponent: () => import('./features/tasks/tasks').then(m => m.Tasks),
+        data: { pageKey: 'tasks' },
+        canActivate: [pageGuard],
+      },
+      {
+        // The editor is nothing but writes, and addSourceTask/updateSourceTask are TENANT_ADMIN.
+        // Ungated, a tenant user could fill in a name, type and the whole XML payload and only be
+        // told no when they pressed Save, with the work lost.
+        path: 'pipelines/new',
+        title: 'New pipeline',
+        loadComponent: () => import('./features/tasks/edit/task-edit').then(m => m.TaskEdit),
+        data: { pageKey: 'tasks', minRole: 'TENANT_ADMIN' },
+        canActivate: [pageGuard, roleGuard],
+      },
+      {
+        // Unlike its schedules twin, every call this page makes -- template, export and upload --
+        // sits under SourceTaskRestApi's class-level TENANT_ADMIN, so there is no state in which it
+        // does anything for a tenant user.
+        path: 'pipelines/bulk',
+        title: 'Bulk pipelines',
+        loadComponent: () => import('./features/bulk/bulk-transfer').then(m => m.BulkTransfer),
+        data: { pageKey: 'tasks', kind: 'task', minRole: 'TENANT_ADMIN' },
+        canActivate: [pageGuard, roleGuard],
+      },
+      {
+        path: 'pipelines/:taskDetailId/edit',
+        title: 'Edit pipeline',
+        loadComponent: () => import('./features/tasks/edit/task-edit').then(m => m.TaskEdit),
+        data: { pageKey: 'tasks', minRole: 'TENANT_ADMIN' },
+        canActivate: [pageGuard, roleGuard],
+      },
+      {
+        path: 'pipelines/schedules',
+        title: 'Schedules',
+        loadComponent: () => import('./features/jobs/jobs').then(m => m.Jobs),
+        data: { pageKey: 'jobs' },
+        canActivate: [pageGuard],
+      },
+      {
+        path: 'pipelines/schedules/new',
+        title: 'New schedule',
+        loadComponent: () => import('./features/jobs/edit/job-edit').then(m => m.JobEdit),
+        data: { pageKey: 'jobs' },
+        canActivate: [pageGuard],
+      },
+      {
+        path: 'pipelines/schedules/bulk',
+        title: 'Bulk schedules',
+        loadComponent: () => import('./features/bulk/bulk-transfer').then(m => m.BulkTransfer),
+        data: { pageKey: 'jobs', kind: 'job' },
+        canActivate: [pageGuard],
+      },
+      {
+        path: 'pipelines/schedules/:jobId/edit',
+        title: 'Edit schedule',
+        loadComponent: () => import('./features/jobs/edit/job-edit').then(m => m.JobEdit),
+        data: { pageKey: 'jobs' },
+        canActivate: [pageGuard],
+      },
+      {
+        path: 'pipelines/schedules/:jobId/assistant',
+        title: 'Schedule assistant',
+        loadComponent: () =>
+          import('./features/jobs/assistant/job-assistant').then(m => m.JobAssistant),
+        data: { pageKey: 'jobs' },
+        canActivate: [pageGuard],
+      },
+      {
+        // One schedule's executions (was its Run history).
+        path: 'pipelines/schedules/:jobId/executions',
+        title: 'Executions',
+        loadComponent: () =>
+          import('./features/jobs/history/job-history').then(m => m.JobHistory),
+        data: { pageKey: 'jobs' },
+        canActivate: [pageGuard],
+      },
+      {
+        path: 'pipelines/schedules/:jobId/runs/:jobQueueId/logs',
+        title: 'Run logs',
+        loadComponent: () => import('./features/jobs/logs/job-logs').then(m => m.JobLogs),
+        data: { pageKey: 'jobs' },
+        canActivate: [pageGuard],
+      },
+      {
+        // Same screen without a schedule: the dashboard's TOTAL row drills into an hour across
+        // every schedule, which has no single id to put in the path.
+        path: 'pipelines/executions',
+        title: 'Executions',
+        loadComponent: () =>
+          import('./features/jobs/history/job-history').then(m => m.JobHistory),
+        data: { pageKey: 'jobs' },
+        canActivate: [pageGuard],
+      },
+      {
+        path: 'pipelines/queue',
+        title: 'Queue',
+        loadComponent: () => import('./features/queue/queue').then(m => m.Queue),
+        data: { pageKey: 'queue' },
+        canActivate: [pageGuard],
+      },
+      {
+        path: 'pipelines/run-analytics',
+        title: 'Run analytics',
+        loadComponent: () =>
+          import('./features/reports/reports').then(m => m.Reports),
+        data: { pageKey: 'reports' },
+        canActivate: [pageGuard],
+      },
+      // ---------------------------------------------------------------------------------------------
+      // Documents (was Tools and Object Browser's Browse files)
+      // ---------------------------------------------------------------------------------------------
+      comingSoon('documents/intelligence', 'Document Intelligence', 'document-intelligence',
+        'Read documents into structured data, with a confidence for every field.'),
+      comingSoon('documents/review', 'Review queue', 'document-review',
+        'Check the fields Document Intelligence was not sure about.'),
+      {
+        path: 'documents/converter',
+        title: 'Document Converter',
+        loadComponent: () => import('./features/tools/converter/converter').then(m => m.Converter),
+        data: { pageKey: 'tools-converter' },
+        canActivate: [pageGuard],
+      },
+      {
+        // TENANT_USER rather than nothing at all: StorageBrowserRestApi's floor is a signed-in
+        // user, and which bucket and key that user may actually reach is decided per request,
+        // so no role the route could name would say more than the server already does. What it
+        // does add is the case authGuard cannot see -- a session whose token carries no
+        // readable role lands on /unauthorized rather than on a page that is nothing but
+        // storage calls, every one of which comes back refused.
+        path: 'documents/files',
+        title: 'Browse files',
+        loadComponent: () => import('./features/objects/objects').then(m => m.Objects),
+        data: { pageKey: 'objects', minRole: 'TENANT_USER' },
+        canActivate: [pageGuard, roleGuard],
+      },
+      {
+        path: 'documents/transcript',
+        title: 'Audio Transcript',
+        loadComponent: () => import('./features/tools/transcript/transcript').then(m => m.Transcript),
+        data: { pageKey: 'tools-transcript' },
+        canActivate: [pageGuard],
+      },
+      // ---------------------------------------------------------------------------------------------
+      // Data (Wave 5; Analytics Studio and Saved Analyses moved here from Object Browser)
+      // ---------------------------------------------------------------------------------------------
+      comingSoon('data/ask', 'Ask your data', 'ask-data',
+        'Questions in plain language, answered from your documents and datasets, with their sources.'),
+      comingSoon('data/catalog', 'Data Catalog', 'data-catalog',
+        'Every dataset, its owner, schema, freshness and sensitive fields.'),
+      {
+        // Open to TENANT_USER, like the file browser it reads from and for the same reason:
         // which connections a caller may reach is settled per request against each connection's
         // own tenant, not by a role on the route.
-        path: 'objects/analytics',
+        path: 'data/analytics',
         title: 'Analytics Studio',
         loadComponent: () => import('./features/analytics/analytics').then(m => m.Analytics),
         data: { pageKey: 'analytics' },
@@ -182,202 +283,69 @@ export const routes: Routes = [
         // tenant and user themselves. A minRole here would be a second, weaker statement of a
         // rule the server already enforces per request -- and it would be the wrong one, since
         // dashboards are read and built by the same TENANT_USER who may open a dataset.
-        path: 'objects/analytics/dashboards',
+        path: 'data/analytics/dashboards',
         title: 'Saved Analyses',
         loadComponent: () => import('./features/analytics/dashboard').then(m => m.Dashboards),
         data: { pageKey: 'analytics-dashboards' },
         canActivate: [pageGuard],
       },
-      { path: 'admin/storage', redirectTo: 'configuration/storage-connections' },
+      // ---------------------------------------------------------------------------------------------
+      // Forms and Workflows (Wave 5)
+      // ---------------------------------------------------------------------------------------------
+      comingSoon('forms/builder', 'Form builder', 'forms',
+        'Build forms and share them securely, inside the workspace or by an expiring link.'),
+      comingSoon('forms/submissions', 'Submissions', 'form-submissions',
+        'Everything a form collected, with its approval state.'),
+      comingSoon('workflows/inbox', 'Task inbox', 'task-inbox',
+        'The approvals and tasks waiting for you.'),
+      comingSoon('workflows/designer', 'Workflow designer', 'workflow-designer',
+        'Who approves what, in which order, and when a step is escalated.'),
+      // ---------------------------------------------------------------------------------------------
+      // AI (was Assistants)
+      // ---------------------------------------------------------------------------------------------
       // Prompts replaced AI Agents on 2026-09-18: reading is TENANT_USER (a person must see
-      // what the step on their task says; the file chat lists prompts), writing and Try it are
+      // what the step on their pipeline says; the file chat lists prompts), writing and Try it are
       // gated inside the pages on auth.canManageAgents.
-      { path: 'ai/agents', redirectTo: 'assistants/prompts' },
       {
-        path: 'assistants/prompts',
+        path: 'ai/prompts',
         title: 'Prompts',
         loadComponent: () => import('./features/ai/prompts/prompts').then(m => m.Prompts),
         data: { pageKey: 'ai-prompts' },
         canActivate: [pageGuard],
       },
       {
-        path: 'assistants/prompts/new',
+        path: 'ai/prompts/new',
         title: 'New prompt',
         loadComponent: () => import('./features/ai/prompts/prompt-edit').then(m => m.PromptEdit),
         data: { pageKey: 'ai-prompts', minRole: 'TENANT_ADMIN' },
         canActivate: [pageGuard, roleGuard],
       },
       {
-        path: 'assistants/prompts/:promptId/edit',
+        path: 'ai/prompts/:promptId/edit',
         title: 'Edit prompt',
         loadComponent: () => import('./features/ai/prompts/prompt-edit').then(m => m.PromptEdit),
         data: { pageKey: 'ai-prompts', minRole: 'TENANT_ADMIN' },
         canActivate: [pageGuard, roleGuard],
       },
       {
-        path: 'assistants/connections',
+        path: 'ai/connections',
         title: 'Model connections',
         loadComponent: () => import('./features/ai/connections/connections').then(m => m.Connections),
         data: { minRole: 'TENANT_ADMIN' },
         canActivate: [roleGuard],
       },
-      // The Ollama Models page folded into a connection's "Test connection", which lists them.
-      { path: 'ai/models', redirectTo: 'assistants/connections' },
+      // ---------------------------------------------------------------------------------------------
+      // Configuration
+      // ---------------------------------------------------------------------------------------------
       {
-        path: 'administration/users',
-        title: 'Users',
-        loadComponent: () => import('./features/admin/users/users').then(m => m.Users),
-        data: { minRole: 'TENANT_ADMIN' },
-        canActivate: [roleGuard],
-      },
-      {
-        path: 'administration/access-profiles',
-        title: 'Access profiles',
-        loadComponent: () =>
-          import('./features/admin/access-profiles/access-profiles').then(m => m.AccessProfiles),
-        data: { minRole: 'TENANT_ADMIN' },
-        canActivate: [roleGuard],
-      },
-      {
-        path: 'administration/tenants',
-        title: 'Tenants',
-        loadComponent: () => import('./features/admin/tenants/tenants').then(m => m.Tenants),
-        data: { minRole: 'PLATFORM_ADMIN' },
-        canActivate: [roleGuard],
-      },
-      {
-        path: 'profile',
-        title: 'Your profile',
-        loadComponent: () => import('./features/profile/profile').then(m => m.Profile),
-      },
-      {
-        path: 'notifications',
-        title: 'Notifications',
-        loadComponent: () =>
-          import('./features/notifications/notifications').then(m => m.Notifications),
-      },
-      {
-        path: 'tools/converter',
-        title: 'Document Converter',
-        loadComponent: () => import('./features/tools/converter/converter').then(m => m.Converter),
-        data: { pageKey: 'tools-converter' },
-        canActivate: [pageGuard],
-      },
-      {
-        path: 'tools/transcript',
-        title: 'Audio Transcript',
-        loadComponent: () => import('./features/tools/transcript/transcript').then(m => m.Transcript),
-        data: { pageKey: 'tools-transcript' },
-        canActivate: [pageGuard],
-      },
-      // Topics (source task types) are managed on the Kafka screen since 2026-09-18; the old
-      // address still lands somewhere useful, with a ?profileId= link keeping its meaning.
-      { path: 'settings/task-types', redirectTo: 'configuration/kafka' },
-      {
-        path: 'configuration/pipelines',
-        title: 'Pipelines',
+        // Task Registry was Configuration › Pipelines (MIG-218): the catalogue of task types a
+        // pipeline can run -- id, topic and form.
+        path: 'configuration/task-registry',
+        title: 'Task Registry',
         loadComponent: () =>
           import('./features/settings/pipelines/pipelines').then(m => m.Pipelines),
         data: { minRole: 'TENANT_ADMIN' },
         canActivate: [roleGuard],
-      },
-      // Renamed from settings/forms once the feature became the pipeline catalogue rather than
-      // a general form builder -- kept as a redirect so an old bookmark or link still lands.
-      { path: 'settings/forms', redirectTo: 'configuration/pipelines' },
-      { path: 'settings/pipeline-forms', redirectTo: 'configuration/pipelines' },
-      // Billing is a section of its own: <section>/<page>, the old administration/billing
-      // addresses kept as redirects so a bookmark, a document link or a notification still lands.
-      // pathMatch full: without it this prefix caught administration/billing/invoices, /documents,
-      // /analytics and /rates first and sent them to billing/usage/... -- Page not found.
-      { path: 'administration/billing', redirectTo: 'billing/usage', pathMatch: 'full' },
-      { path: 'administration/billing/invoices', redirectTo: 'billing/invoices' },
-      { path: 'administration/billing/invoices/:number', redirectTo: 'billing/invoices/:number' },
-      { path: 'administration/billing/documents', redirectTo: 'billing/documents' },
-      { path: 'administration/billing/analytics', redirectTo: 'billing/analytics' },
-      { path: 'administration/billing/rates', redirectTo: 'billing/rates' },
-      { path: 'billing', pathMatch: 'full', redirectTo: 'billing/usage' },
-      {
-        // Cost & usage: a tenant administrator's own workspace, a platform administrator's any. Role-gated
-        // only, TENANT_ADMIN at the floor: Identity retired the 'billing' page key (MIG-34).
-        path: 'billing/usage',
-        title: 'Cost & usage',
-        loadComponent: () => import('./features/billing/billing').then(m => m.Billing),
-        data: { minRole: 'TENANT_ADMIN' },
-        canActivate: [pageGuard, roleGuard],
-      },
-      {
-        path: 'billing/invoices',
-        title: 'Invoices',
-        loadComponent: () => import('./features/billing/invoices').then(m => m.Invoices),
-        data: { minRole: 'TENANT_ADMIN' },
-        canActivate: [pageGuard, roleGuard],
-      },
-      {
-        path: 'billing/invoices/:number',
-        title: 'Invoice',
-        loadComponent: () => import('./features/billing/invoices').then(m => m.Invoices),
-        data: { minRole: 'TENANT_ADMIN' },
-        canActivate: [pageGuard, roleGuard],
-      },
-      {
-        path: 'billing/documents',
-        title: 'Billing documents',
-        loadComponent: () => import('./features/billing/documents').then(m => m.BillingDocuments),
-        data: { minRole: 'TENANT_ADMIN' },
-        canActivate: [pageGuard, roleGuard],
-      },
-      {
-        path: 'billing/analytics',
-        title: 'Billing analytics',
-        loadComponent: () => import('./features/billing/billing-analytics').then(m => m.BillingAnalyticsPage),
-        data: { minRole: 'PLATFORM_ADMIN' },
-        canActivate: [roleGuard],
-      },
-      {
-        path: 'billing/rates',
-        title: 'Rate cards',
-        loadComponent: () => import('./features/billing/rate-cards').then(m => m.RateCards),
-        data: { minRole: 'PLATFORM_ADMIN' },
-        canActivate: [roleGuard],
-      },
-      {
-        path: 'administration/tenant-requests',
-        title: 'Workspace Requests',
-        loadComponent: () =>
-          import('./features/tenant-request/tenant-requests').then(m => m.TenantRequests),
-        data: { minRole: 'PLATFORM_ADMIN' },
-        canActivate: [roleGuard],
-      },
-      {
-        path: 'unauthorized',
-        title: 'Not available',
-        loadComponent: () =>
-          import('./features/unauthorized/unauthorized').then(m => m.Unauthorized),
-      },
-      {
-        path: 'operations/jobs/bulk',
-        title: 'Bulk jobs',
-        loadComponent: () => import('./features/bulk/bulk-transfer').then(m => m.BulkTransfer),
-        data: { pageKey: 'jobs', kind: 'job' },
-        canActivate: [pageGuard],
-      },
-      {
-        // Unlike its jobs twin, every call this page makes -- template, export and upload --
-        // sits under SourceTaskRestApi's class-level TENANT_ADMIN, so there is no state in
-        // which it does anything for a tenant user.
-        path: 'operations/tasks/bulk',
-        title: 'Bulk tasks',
-        loadComponent: () => import('./features/bulk/bulk-transfer').then(m => m.BulkTransfer),
-        data: { pageKey: 'tasks', kind: 'task', minRole: 'TENANT_ADMIN' },
-        canActivate: [pageGuard, roleGuard],
-      },
-      {
-        path: 'operations/reports',
-        title: 'Reports',
-        loadComponent: () =>
-          import('./features/reports/reports').then(m => m.Reports),
-        data: { pageKey: 'reports' },
-        canActivate: [pageGuard],
       },
       {
         path: 'configuration/kafka',
@@ -424,52 +392,189 @@ export const routes: Routes = [
         data: { minRole: 'TENANT_ADMIN', kind: 'TASK_GROUP' },
         canActivate: [roleGuard],
       },
-      { path: 'configuration/lookup', redirectTo: 'configuration/values' },
+      // ---------------------------------------------------------------------------------------------
+      // Billing
+      // ---------------------------------------------------------------------------------------------
       {
-        // TENANT_USER rather than nothing at all: StorageBrowserRestApi's floor is a signed-in
-        // user, and which bucket and key that user may actually reach is decided per request,
-        // so no role the route could name would say more than the server already does. What it
-        // does add is the case authGuard cannot see -- a session whose token carries no
-        // readable role lands on /unauthorized rather than on a page that is nothing but
-        // storage calls, every one of which comes back refused.
-        path: 'objects/files',
-        title: 'Browse files',
-        loadComponent: () => import('./features/objects/objects').then(m => m.Objects),
-        data: { pageKey: 'objects', minRole: 'TENANT_USER' },
+        // Cost & usage: a tenant administrator's own workspace, a platform administrator's any. Role-gated
+        // only, TENANT_ADMIN at the floor: Identity retired the 'billing' page key (MIG-34).
+        path: 'billing/usage',
+        title: 'Cost & usage',
+        loadComponent: () => import('./features/billing/billing').then(m => m.Billing),
+        data: { minRole: 'TENANT_ADMIN' },
         canActivate: [pageGuard, roleGuard],
       },
-      // 2026-09-18: every address is now <section>/<page> -- the section the menu shows it
-      // under, then the page. The old flat addresses redirect so bookmarks, notification
-      // links and anything the docs once said still land (params carry over).
-      { path: 'jobs', redirectTo: 'operations/jobs' },
-      { path: 'jobs/new', redirectTo: 'operations/jobs/new' },
-      { path: 'jobs/:jobId/edit', redirectTo: 'operations/jobs/:jobId/edit' },
-      { path: 'jobs/:jobId/assistant', redirectTo: 'operations/jobs/:jobId/assistant' },
-      { path: 'jobs/:jobId/runs/:jobQueueId/logs', redirectTo: 'operations/jobs/:jobId/runs/:jobQueueId/logs' },
-      { path: 'queue', redirectTo: 'operations/queue' },
-      { path: 'jobs/history', redirectTo: 'operations/jobs/history' },
-      { path: 'jobs/:jobId/history', redirectTo: 'operations/jobs/:jobId/history' },
-      { path: 'tasks/new', redirectTo: 'operations/tasks/new' },
-      { path: 'tasks/:taskDetailId/edit', redirectTo: 'operations/tasks/:taskDetailId/edit' },
-      { path: 'tasks', redirectTo: 'operations/tasks' },
-      { path: 'settings/storage-connections', redirectTo: 'configuration/storage-connections' },
-      { path: 'analytics', redirectTo: 'objects/analytics' },
-      { path: 'analytics/dashboards', redirectTo: 'objects/analytics/dashboards' },
-      { path: 'ai/prompts', redirectTo: 'assistants/prompts' },
-      { path: 'ai/prompts/new', redirectTo: 'assistants/prompts/new' },
-      { path: 'ai/prompts/:promptId/edit', redirectTo: 'assistants/prompts/:promptId/edit' },
-      { path: 'ai/connections', redirectTo: 'assistants/connections' },
-      { path: 'admin/users', redirectTo: 'administration/users' },
-      { path: 'admin/access-profiles', redirectTo: 'administration/access-profiles' },
-      { path: 'admin/tenants', redirectTo: 'administration/tenants' },
-      { path: 'settings/pipelines', redirectTo: 'configuration/pipelines' },
-      { path: 'admin/tenant-requests', redirectTo: 'administration/tenant-requests' },
-      { path: 'jobs/bulk', redirectTo: 'operations/jobs/bulk' },
-      { path: 'tasks/bulk', redirectTo: 'operations/tasks/bulk' },
-      { path: 'reports', redirectTo: 'operations/reports' },
-      { path: 'settings/kafka', redirectTo: 'configuration/kafka' },
-      { path: 'settings/lookup', redirectTo: 'configuration/values' },
-      { path: 'objects', redirectTo: 'objects/files' },
+      {
+        path: 'billing/invoices',
+        title: 'Invoices',
+        loadComponent: () => import('./features/billing/invoices').then(m => m.Invoices),
+        data: { minRole: 'TENANT_ADMIN' },
+        canActivate: [pageGuard, roleGuard],
+      },
+      {
+        path: 'billing/invoices/:number',
+        title: 'Invoice',
+        loadComponent: () => import('./features/billing/invoices').then(m => m.Invoices),
+        data: { minRole: 'TENANT_ADMIN' },
+        canActivate: [pageGuard, roleGuard],
+      },
+      {
+        path: 'billing/documents',
+        title: 'Billing documents',
+        loadComponent: () => import('./features/billing/documents').then(m => m.BillingDocuments),
+        data: { minRole: 'TENANT_ADMIN' },
+        canActivate: [pageGuard, roleGuard],
+      },
+      {
+        path: 'billing/analytics',
+        title: 'Billing analytics',
+        loadComponent: () => import('./features/billing/billing-analytics').then(m => m.BillingAnalyticsPage),
+        data: { minRole: 'PLATFORM_ADMIN' },
+        canActivate: [roleGuard],
+      },
+      {
+        path: 'billing/rates',
+        title: 'Rate cards',
+        loadComponent: () => import('./features/billing/rate-cards').then(m => m.RateCards),
+        data: { minRole: 'PLATFORM_ADMIN' },
+        canActivate: [roleGuard],
+      },
+      // ---------------------------------------------------------------------------------------------
+      // Administration
+      // ---------------------------------------------------------------------------------------------
+      {
+        path: 'administration/users',
+        title: 'Users',
+        loadComponent: () => import('./features/admin/users/users').then(m => m.Users),
+        data: { minRole: 'TENANT_ADMIN' },
+        canActivate: [roleGuard],
+      },
+      {
+        path: 'administration/access-profiles',
+        title: 'Access profiles',
+        loadComponent: () =>
+          import('./features/admin/access-profiles/access-profiles').then(m => m.AccessProfiles),
+        data: { minRole: 'TENANT_ADMIN' },
+        canActivate: [roleGuard],
+      },
+      {
+        path: 'administration/tenants',
+        title: 'Tenants',
+        loadComponent: () => import('./features/admin/tenants/tenants').then(m => m.Tenants),
+        data: { minRole: 'PLATFORM_ADMIN' },
+        canActivate: [roleGuard],
+      },
+      {
+        path: 'administration/tenant-requests',
+        title: 'Workspace Requests',
+        loadComponent: () =>
+          import('./features/tenant-request/tenant-requests').then(m => m.TenantRequests),
+        data: { minRole: 'PLATFORM_ADMIN' },
+        canActivate: [roleGuard],
+      },
+      // ---------------------------------------------------------------------------------------------
+      // Pages outside the menu
+      // ---------------------------------------------------------------------------------------------
+      {
+        path: 'profile',
+        title: 'Your profile',
+        loadComponent: () => import('./features/profile/profile').then(m => m.Profile),
+      },
+      {
+        path: 'notifications',
+        title: 'Notifications',
+        loadComponent: () =>
+          import('./features/notifications/notifications').then(m => m.Notifications),
+      },
+      {
+        path: 'unauthorized',
+        title: 'Not available',
+        loadComponent: () =>
+          import('./features/unauthorized/unauthorized').then(m => m.Unauthorized),
+      },
+      // ---------------------------------------------------------------------------------------------
+      // Old addresses. Every one a full match: a prefix redirect also catches every longer address
+      // under it and rewrites only its own part (administration/billing sent .../invoices to
+      // billing/usage/invoices -- Page not found). Each points straight at today's page, no chains.
+      // ---------------------------------------------------------------------------------------------
+      // The addresses of MIG-246's renames and regrouping (2026-09-28).
+      ...moved([
+        ['operations/jobs', 'pipelines/schedules'],
+        ['operations/jobs/new', 'pipelines/schedules/new'],
+        ['operations/jobs/bulk', 'pipelines/schedules/bulk'],
+        ['operations/jobs/history', 'pipelines/executions'],
+        ['operations/jobs/:jobId/edit', 'pipelines/schedules/:jobId/edit'],
+        ['operations/jobs/:jobId/assistant', 'pipelines/schedules/:jobId/assistant'],
+        ['operations/jobs/:jobId/history', 'pipelines/schedules/:jobId/executions'],
+        ['operations/jobs/:jobId/runs/:jobQueueId/logs', 'pipelines/schedules/:jobId/runs/:jobQueueId/logs'],
+        ['operations/queue', 'pipelines/queue'],
+        ['operations/tasks', 'pipelines'],
+        ['operations/tasks/new', 'pipelines/new'],
+        ['operations/tasks/bulk', 'pipelines/bulk'],
+        ['operations/tasks/:taskDetailId/edit', 'pipelines/:taskDetailId/edit'],
+        ['operations/reports', 'pipelines/run-analytics'],
+        ['configuration/pipelines', 'configuration/task-registry'],
+        ['configuration/storage-connections', 'integration/storage-connections'],
+        ['objects/files', 'documents/files'],
+        ['objects/analytics', 'data/analytics'],
+        ['objects/analytics/dashboards', 'data/analytics/dashboards'],
+        ['tools/converter', 'documents/converter'],
+        ['tools/transcript', 'documents/transcript'],
+        ['assistants/prompts', 'ai/prompts'],
+        ['assistants/prompts/new', 'ai/prompts/new'],
+        ['assistants/prompts/:promptId/edit', 'ai/prompts/:promptId/edit'],
+        ['assistants/connections', 'ai/connections'],
+      ]),
+      // 2026-09-18: the flat addresses from before <section>/<page>, and the screens retired or
+      // renamed since (params carry over).
+      ...moved([
+        ['jobs', 'pipelines/schedules'],
+        ['jobs/new', 'pipelines/schedules/new'],
+        ['jobs/bulk', 'pipelines/schedules/bulk'],
+        ['jobs/history', 'pipelines/executions'],
+        ['jobs/:jobId/edit', 'pipelines/schedules/:jobId/edit'],
+        ['jobs/:jobId/assistant', 'pipelines/schedules/:jobId/assistant'],
+        ['jobs/:jobId/history', 'pipelines/schedules/:jobId/executions'],
+        ['jobs/:jobId/runs/:jobQueueId/logs', 'pipelines/schedules/:jobId/runs/:jobQueueId/logs'],
+        ['queue', 'pipelines/queue'],
+        ['tasks', 'pipelines'],
+        ['tasks/new', 'pipelines/new'],
+        ['tasks/bulk', 'pipelines/bulk'],
+        ['tasks/:taskDetailId/edit', 'pipelines/:taskDetailId/edit'],
+        ['reports', 'pipelines/run-analytics'],
+        ['objects', 'documents/files'],
+        ['analytics', 'data/analytics'],
+        ['analytics/dashboards', 'data/analytics/dashboards'],
+        ['admin/storage', 'integration/storage-connections'],
+        ['settings/storage-connections', 'integration/storage-connections'],
+        // Prompts replaced AI Agents on 2026-09-18; the Ollama Models page folded into a
+        // connection's "Test connection", which lists them.
+        ['ai/agents', 'ai/prompts'],
+        ['ai/models', 'ai/connections'],
+        ['admin/users', 'administration/users'],
+        ['admin/access-profiles', 'administration/access-profiles'],
+        ['admin/tenants', 'administration/tenants'],
+        ['admin/tenant-requests', 'administration/tenant-requests'],
+        // Renamed from settings/forms once the feature became the pipeline catalogue rather than a
+        // general form builder, then Configuration › Pipelines, now the Task Registry.
+        ['settings/pipelines', 'configuration/task-registry'],
+        ['settings/forms', 'configuration/task-registry'],
+        ['settings/pipeline-forms', 'configuration/task-registry'],
+        // Topics (source task types) are managed on the Kafka screen since 2026-09-18; a
+        // ?profileId= link keeps its meaning.
+        ['settings/task-types', 'configuration/kafka'],
+        ['settings/kafka', 'configuration/kafka'],
+        ['settings/lookup', 'configuration/values'],
+        ['configuration/lookup', 'configuration/values'],
+        // Billing is a section of its own since it left Administration.
+        ['billing', 'billing/usage'],
+        ['administration/billing', 'billing/usage'],
+        ['administration/billing/invoices', 'billing/invoices'],
+        ['administration/billing/invoices/:number', 'billing/invoices/:number'],
+        ['administration/billing/documents', 'billing/documents'],
+        ['administration/billing/analytics', 'billing/analytics'],
+        ['administration/billing/rates', 'billing/rates'],
+      ]),
       // Last: an address that matches no page shows "Page not found" inside the layout.
       {
         path: '**',

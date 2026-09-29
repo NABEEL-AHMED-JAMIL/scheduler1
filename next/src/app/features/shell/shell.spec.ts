@@ -49,9 +49,11 @@ describe('shell navigation', () => {
   it('tags every page an access profile can withhold, and nothing a profile cannot', () => {
     const tagged = children().filter(child => child.pageKey).map(child => child.path).sort();
     expect(tagged).toEqual([
-      '/assistants/prompts', '/objects/analytics', '/objects/analytics/dashboards', '/objects/files',
-      '/operations/jobs', '/operations/queue', '/operations/reports', '/operations/tasks',
-      '/tools/converter', '/tools/transcript',
+      '/ai/prompts', '/data/analytics', '/data/analytics/dashboards', '/data/ask', '/data/catalog',
+      '/documents/converter', '/documents/files', '/documents/intelligence', '/documents/review',
+      '/documents/transcript', '/forms/builder', '/forms/submissions', '/integration/api-collections',
+      '/integration/connectors', '/pipelines', '/pipelines/queue', '/pipelines/run-analytics',
+      '/pipelines/schedules', '/workflows/designer', '/workflows/inbox',
     ]);
     expect(children().find(child => child.path === '/dashboard')?.pageKey).toBeUndefined();
   });
@@ -72,39 +74,39 @@ describe('shell navigation', () => {
     const restricted = TestBed.createComponent(Shell).componentInstance;
     const paths = restricted.nav().flatMap(item => item.children ?? []).map(child => child.path);
 
-    expect(paths).toContain('/operations/jobs');
-    expect(paths).toContain('/operations/queue');
-    expect(paths).not.toContain('/operations/reports');
-    expect(paths).not.toContain('/tools/converter');
-    expect(restricted.nav().map(item => item.label)).not.toContain('Tools');
-    expect(restricted.nav().map(item => item.label)).not.toContain('Assistants');
+    expect(paths).toContain('/pipelines/schedules');
+    expect(paths).toContain('/pipelines/queue');
+    expect(paths).not.toContain('/pipelines/run-analytics');
+    expect(paths).not.toContain('/documents/converter');
+    expect(restricted.nav().map(item => item.label)).not.toContain('Documents');
+    expect(restricted.nav().map(item => item.label)).not.toContain('AI');
     // Dashboard is not a page a profile can take away.
     expect(restricted.nav().find(item => item.path === '/dashboard')).toBeDefined();
     localStorage.removeItem('etl_auth_user');
   });
 
   it('offers the saved-analysis library, which had a route and no way to reach it', () => {
-    const saved = children().find(child => child.path === '/objects/analytics/dashboards');
+    const saved = children().find(child => child.path === '/data/analytics/dashboards');
     expect(saved).toBeDefined();
     expect(saved?.label).toBe('Saved Analyses');
   });
 
   it('names an icon the icon set actually has', () => {
     // An unknown name renders nothing, which reads as a layout bug rather than a missing glyph.
-    const saved = children().find(child => child.path === '/objects/analytics/dashboards');
+    const saved = children().find(child => child.path === '/data/analytics/dashboards');
     expect(saved?.icon).toBe('save');
   });
 
   it('marks a parent route exact, so standing on the child does not light both', () => {
-    const parent = children().find(child => child.path === '/objects/analytics');
+    const parent = children().find(child => child.path === '/data/analytics');
     expect(parent?.exact).toBe(true);
   });
 
   it('leaves a leaf route on prefix matching, so its own sub-pages keep it lit', () => {
-    const saved = children().find(child => child.path === '/objects/analytics/dashboards');
+    const saved = children().find(child => child.path === '/data/analytics/dashboards');
     expect(saved?.exact).toBe(false);
     // Not a special case for analytics: every entry with nothing beneath it stays prefix-matched.
-    expect(children().find(child => child.path === '/objects/files')?.exact).toBe(false);
+    expect(children().find(child => child.path === '/documents/files')?.exact).toBe(false);
   });
 
   /**
@@ -162,9 +164,9 @@ describe('shell navigation', () => {
   describe('header menus and the keyboard', () => {
     it('puts focus back on the trigger when Escape closes a menu', async () => {
       const { fixture, shell: s, el } = await rendered();
-      s.toggleMenu('Operations');
+      s.toggleMenu('Pipelines');
       await fixture.whenStable();
-      const menu = el.querySelector<HTMLElement>('[data-nav-menu="Operations"]')!;
+      const menu = el.querySelector<HTMLElement>('[data-nav-menu="Pipelines"]')!;
       const link = menu.querySelector<HTMLElement>('a')!;
       link.focus();
       expect(document.activeElement).toBe(link);
@@ -190,13 +192,13 @@ describe('shell navigation', () => {
 
     it('closes a menu when focus tabs out of it, and keeps it open while focus moves inside', async () => {
       const { fixture, shell: s, el } = await rendered();
-      s.toggleMenu('Operations');
+      s.toggleMenu('Pipelines');
       await fixture.whenStable();
-      const menu = el.querySelector<HTMLElement>('[data-nav-menu="Operations"]')!;
+      const menu = el.querySelector<HTMLElement>('[data-nav-menu="Pipelines"]')!;
       const [first, second] = Array.from(menu.querySelectorAll<HTMLElement>('a'));
 
       first.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: second }));
-      expect(s.openMenu()).toBe('Operations');
+      expect(s.openMenu()).toBe('Pipelines');
 
       const outside = el.querySelector<HTMLElement>('main')!;
       second.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: outside }));
@@ -205,13 +207,23 @@ describe('shell navigation', () => {
 
     it('describes the panels as disclosures: expanded and controls, not a menu popup', async () => {
       const { fixture, shell: s, el } = await rendered();
-      s.toggleMenu('Object Browser');
+      s.toggleMenu('Documents');
       await fixture.whenStable();
       expect(el.querySelector('[aria-haspopup]')).toBeNull();
-      const trigger = el.querySelector<HTMLElement>('[data-nav-menu="Object Browser"] > button')!;
+      const trigger = el.querySelector<HTMLElement>('[data-nav-menu="Documents"] > button')!;
       const panel = el.querySelector<HTMLElement>('#' + trigger.getAttribute('aria-controls'));
       expect(panel).not.toBeNull();
-      expect(panel!.querySelector('a[href="/objects/files"]')).not.toBeNull();
+      expect(panel!.querySelector('a[href="/documents/files"]')).not.toBeNull();
+    });
+
+    it('marks an entry whose page is not built yet as coming, and only those', async () => {
+      const { fixture, shell: s, el } = await rendered();
+      s.toggleMenu('Data');
+      await fixture.whenStable();
+      const soon = el.querySelector<HTMLElement>('[data-nav-menu="Data"] a[href="/data/ask"]')!;
+      const built = el.querySelector<HTMLElement>('[data-nav-menu="Data"] a[href="/data/analytics"]')!;
+      expect(soon.querySelector('.pill')?.textContent?.trim()).toBe('Soon');
+      expect(built.querySelector('.pill')).toBeNull();
     });
 
     it('offers a skip link to the main content', async () => {
@@ -255,6 +267,18 @@ describe('shell navigation', () => {
       s.toggleMenu('__user');
       await fixture.whenStable();
       expect(el.querySelector('[data-nav-menu="__user"] a[href="/docs"]')).not.toBeNull();
+    });
+
+    // MIG-246: eleven menus fit beside the wordmark from 2xl; between xl and 2xl (a 1280-1535px laptop) the
+    // header keeps the "E" mark alone and the menus sit tighter, so the page never scrolls sideways.
+    it('keeps the header on one line between xl and 2xl: the mark without its wordmark, tighter menus', async () => {
+      const { el } = await rendered();
+      const wordmark = el.querySelector<HTMLElement>('header app-brand-mark span')!;
+      expect(wordmark.className).toContain('xl:hidden');
+      expect(wordmark.className).toContain('2xl:block');
+      const trigger = el.querySelector<HTMLElement>('header nav [data-nav-menu="Pipelines"] > button')!;
+      expect(trigger.className).toContain('px-2');
+      expect(trigger.className).toContain('2xl:px-2.5');
     });
 
     it('caps the name beside the avatar so a long one cannot widen the page, and keeps it in a tooltip', async () => {

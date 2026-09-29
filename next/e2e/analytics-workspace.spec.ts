@@ -152,8 +152,8 @@ test('9 — the saved-analysis library is reachable from the menu, not just by t
   async ({ page }) => {
     // It had a route and no entry. A page you can only reach by knowing the URL is a page nobody
     // reaches, and no unit test can see the difference -- the route existed and resolved fine.
-    await page.goto('/objects/analytics');
-    await page.getByRole('button', { name: 'Object Browser' }).click();
+    await page.goto('/data/analytics');
+    await page.getByRole('button', { name: 'Data', exact: true }).click();
     await page.getByRole('link', { name: /Saved Analyses/ }).click();
     await expect(page).toHaveURL(/\/analytics\/dashboards/);
     await expect(page.getByText(/re-run each time you open them/)).toBeVisible();

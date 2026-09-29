@@ -3,9 +3,9 @@ import { notificationTarget, openableTarget, pageKeyForPath } from './notificati
 
 describe('notificationTarget', () => {
   it('rewrites a route stored by the old app', () => {
-    expect(notificationTarget('/jobList')).toBe('/operations/jobs');
-    expect(notificationTarget('/taskList')).toBe('/operations/tasks');
-    expect(notificationTarget('/objectBrowser')).toBe('/objects/files');
+    expect(notificationTarget('/jobList')).toBe('/pipelines/schedules');
+    expect(notificationTarget('/taskList')).toBe('/pipelines');
+    expect(notificationTarget('/objectBrowser')).toBe('/documents/files');
     expect(notificationTarget('/users')).toBe('/administration/users');
     expect(notificationTarget('/tenants')).toBe('/administration/tenants');
   });
@@ -13,7 +13,7 @@ describe('notificationTarget', () => {
   // The stored links carry a query string the old app understood and this one has no route
   // for, so the lookup ignores it and so does the navigation.
   it('matches on the path alone and drops the query string', () => {
-    expect(notificationTarget('/jobList?jobId=42')).toBe('/operations/jobs');
+    expect(notificationTarget('/jobList?jobId=42')).toBe('/pipelines/schedules');
     expect(notificationTarget('/operations/reports?from=today')).toBe('/operations/reports');
   });
 
@@ -43,6 +43,21 @@ describe('openableTarget', () => {
     expect(pageKeyForPath('/objects/analytics')).toBe('analytics');
     expect(pageKeyForPath('/operations/jobsearch')).toBeNull();
     expect(pageKeyForPath('/profile')).toBeNull();
+  });
+
+  // MIG-246: today's addresses, and a schedule or a run under /pipelines/ is not the Pipelines list.
+  it('knows the pages at their MIG-246 addresses', () => {
+    expect(pageKeyForPath('/pipelines/schedules/42/executions')).toBe('jobs');
+    expect(pageKeyForPath('/pipelines/schedules/42/runs/7/logs')).toBe('jobs');
+    expect(pageKeyForPath('/pipelines/executions')).toBe('jobs');
+    expect(pageKeyForPath('/pipelines/queue')).toBe('queue');
+    expect(pageKeyForPath('/pipelines/run-analytics')).toBe('reports');
+    expect(pageKeyForPath('/pipelines')).toBe('tasks');
+    expect(pageKeyForPath('/pipelines/1854/edit')).toBe('tasks');
+    expect(pageKeyForPath('/documents/files')).toBe('objects');
+    expect(pageKeyForPath('/data/analytics/dashboards')).toBe('analytics-dashboards');
+    expect(pageKeyForPath('/ai/prompts')).toBe('ai-prompts');
+    expect(pageKeyForPath('/integration/api-collections')).toBe('api-collections');
   });
 
   it('drops a link to a page the profile withholds, and keeps the rest', () => {

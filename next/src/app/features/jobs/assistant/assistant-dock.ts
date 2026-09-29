@@ -24,7 +24,7 @@ import { JobAssistant } from './job-assistant';
         </span>
         <!-- Never wraps or shrinks: on a phone the squeeze belongs to the truncating title, and
              this link broke onto two lines ("Full / page") instead. -->
-        <a class="btn btn-ghost btn-sm whitespace-nowrap shrink-0" [routerLink]="['/operations/jobs', jobId(), 'assistant']"
+        <a class="btn btn-ghost btn-sm whitespace-nowrap shrink-0" [routerLink]="['/pipelines/schedules', jobId(), 'assistant']"
            title="Open the full page"><app-icon name="maximize" />Full page</a>
         <button type="button" class="btn btn-ghost btn-icon"
                 (click)="minimised.set(!minimised())"

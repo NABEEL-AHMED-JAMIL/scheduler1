@@ -19,7 +19,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "storage connections, as a platform administrator": {
-    "url": "/configuration/storage-connections",
+    "url": "/integration/storage-connections",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -86,7 +86,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "storage connections, as a workspace administrator": {
-    "url": "/configuration/storage-connections",
+    "url": "/integration/storage-connections",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",

@@ -10,9 +10,9 @@ import { PageKey } from '../../core/auth/page-keys';
  * one that was missed would have sent people to a route that no longer resolves.
  */
 const ROUTE_MAP: Record<string, string> = {
-  '/jobList': '/operations/jobs',
-  '/taskList': '/operations/tasks',
-  '/objectBrowser': '/objects/files',
+  '/jobList': '/pipelines/schedules',
+  '/taskList': '/pipelines',
+  '/objectBrowser': '/documents/files',
   '/users': '/administration/users',
   '/tenants': '/administration/tenants',
 };
@@ -33,9 +33,25 @@ export function notificationTarget(linkUrl: string | null | undefined): string |
 
 /**
  * The page an access profile governs at each path, most specific first so the saved-analysis
- * library is not read as Analytics Studio. The same paths the header menu tags.
+ * library is not read as Analytics Studio, and a schedule is not read as the Pipelines list. The same
+ * paths the header menu tags -- and the addresses they had before MIG-246, because the links the
+ * server has already stored (a job's run log, its history) still carry those and only the router's
+ * redirect turns them into today's.
  */
 const PAGE_PATHS: [string, PageKey][] = [
+  ['/pipelines/schedules', 'jobs'],
+  ['/pipelines/executions', 'jobs'],
+  ['/pipelines/queue', 'queue'],
+  ['/pipelines/run-analytics', 'reports'],
+  ['/pipelines', 'tasks'],
+  ['/documents/files', 'objects'],
+  ['/documents/converter', 'tools-converter'],
+  ['/documents/transcript', 'tools-transcript'],
+  ['/data/analytics/dashboards', 'analytics-dashboards'],
+  ['/data/analytics', 'analytics'],
+  ['/ai/prompts', 'ai-prompts'],
+  ['/integration/api-collections', 'api-collections'],
+  // Before MIG-246.
   ['/operations/jobs', 'jobs'],
   ['/operations/tasks', 'tasks'],
   ['/operations/queue', 'queue'],
@@ -56,7 +72,7 @@ export function pageKeyForPath(path: string): PageKey | null {
 
 /**
  * notificationTarget, less any page this person's access profile withholds. A tenant user
- * without Source Jobs was offered "Open" on a job's notification and landed on the
+ * without Schedules was offered "Open" on a job's notification and landed on the
  * unauthorized page; the notification is still shown, it just no longer links anywhere.
  */
 export function openableTarget(linkUrl: string | null | undefined, canOpen: (page: PageKey) => boolean): string | null {

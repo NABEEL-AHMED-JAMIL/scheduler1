@@ -159,13 +159,13 @@
                  anyone else gets the same words without a link the page guard would bounce. -->
             <td class="mono text-[color:var(--text-muted)] whitespace-nowrap">
               @if (canOpenJobs()) {
-                <a class="link-inline" [routerLink]="['/operations/jobs', row.jobId, 'runs', row.jobQueueId, 'logs']"
+                <a class="link-inline" [routerLink]="['/pipelines/schedules', row.jobId, 'runs', row.jobQueueId, 'logs']"
                    [title]="'Open the run log for #' + row.jobQueueId">#{{ row.jobQueueId }}</a>
               } @else { #{{ row.jobQueueId }} }
             </td>
             <td class="max-w-56">
               @if (canOpenJobs()) {
-                <a class="link-inline block truncate" [routerLink]="['/operations/jobs', row.jobId, 'history']"
+                <a class="link-inline block truncate" [routerLink]="['/pipelines/schedules', row.jobId, 'executions']"
                    [title]="jobName(row)">{{ jobName(row) }}</a>
               } @else {
                 <span class="block truncate" [title]="jobName(row)">{{ jobName(row) }}</span>

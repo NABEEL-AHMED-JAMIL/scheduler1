@@ -386,7 +386,7 @@ export class JobEdit implements OnInit {
         this.saving.set(false);
         if (response.status === API_SUCCESS) {
           this.toast.success(this.isEdit() ? 'Job updated.' : 'Job created.');
-          this.router.navigate(['/operations/jobs']);
+          this.router.navigate(['/pipelines/schedules']);
         } else {
           this.toast.error(response.message || 'The job could not be saved.');
         }

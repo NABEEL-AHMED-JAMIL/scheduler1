@@ -5,7 +5,7 @@
     <div class="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8 h-14 flex items-center gap-1">
 
       <a routerLink="/" class="mr-4 shrink-0">
-        <app-brand-mark [hideOnMobile]="true" />
+        <app-brand-mark [hideOnMobile]="true" [hideBesideNav]="true" />
       </a>
 
       <!-- Primary navigation -->
@@ -15,7 +15,7 @@
             <a [routerLink]="item.path"
                routerLinkActive="!text-accent !bg-accent-soft"
                [routerLinkActiveOptions]="{ exact: item.path === '/' }"
-               class="px-2.5 py-1.5 rounded-md text-sm font-medium whitespace-nowrap
+               class="px-2 2xl:px-2.5 py-1.5 rounded-md text-sm font-medium whitespace-nowrap
                       text-[color:var(--text-secondary)]
                       hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-sunken)]">
               {{ item.label }}
@@ -25,7 +25,7 @@
               <button type="button" (click)="toggleMenu(item.label)"
                       [attr.aria-expanded]="openMenu() === item.label"
                       [attr.aria-controls]="menuId(item.label)"
-                      class="px-2.5 py-1.5 rounded-md text-sm font-medium inline-flex items-center gap-1
+                      class="px-2 2xl:px-2.5 py-1.5 rounded-md text-sm font-medium inline-flex items-center gap-1
                              whitespace-nowrap text-[color:var(--text-secondary)]
                              hover:text-[color:var(--text-primary)]
                              hover:bg-[color:var(--surface-sunken)]"
@@ -46,7 +46,7 @@
                        class="nav-child">
                       <app-icon [name]="child.icon" size="1em" class="nav-child-icon" />
                       <span class="min-w-0">
-                        <span class="block text-sm leading-tight">{{ child.label }}</span>
+                        <span class="block text-sm leading-tight">{{ child.label }}@if (child.soon) {&ngsp;<span class="pill pill-neutral ml-0.5 !px-1.5 !py-0 !text-[10px] align-[1px]">Soon</span>}</span>
                         @if (child.hint) {
                           <span class="block text-[11px] leading-tight mt-0.5 text-[color:var(--text-muted)]">
                             {{ child.hint }}
@@ -150,7 +150,7 @@
                    [routerLinkActiveOptions]="{ exact: !!child.exact }" class="nav-child">
                   <app-icon [name]="child.icon" size="1em" class="nav-child-icon" />
                   <span class="min-w-0">
-                    <span class="block text-sm leading-tight">{{ child.label }}</span>
+                    <span class="block text-sm leading-tight">{{ child.label }}@if (child.soon) {&ngsp;<span class="pill pill-neutral ml-0.5 !px-1.5 !py-0 !text-[10px] align-[1px]">Soon</span>}</span>
                     @if (child.hint) {
                       <span class="block text-[11px] leading-tight mt-0.5 text-[color:var(--text-muted)]">
                         {{ child.hint }}

@@ -47,9 +47,9 @@ describe('JobLogs', () => {
     const links = [...el.querySelectorAll<HTMLAnchorElement>('.log-timeline a.log-path')];
     expect(links.map(a => a.textContent!.replace(/\s+/g, ''))).toEqual(['etl-bucket/sales/in', 'sales/in/orders_2026-09-a.csv', 'e2e/json/orders_2026-09-a.json']);
     expect(links.map(a => a.getAttribute('href'))).toEqual([
-      '/objects/files?bucket=etl-bucket&prefix=sales%2Fin%2F',
-      '/objects/files?bucket=etl-bucket&prefix=sales%2Fin%2F',
-      '/objects/files?bucket=etl-bucket&prefix=e2e%2Fjson%2F',
+      '/documents/files?bucket=etl-bucket&prefix=sales%2Fin%2F',
+      '/documents/files?bucket=etl-bucket&prefix=sales%2Fin%2F',
+      '/documents/files?bucket=etl-bucket&prefix=e2e%2Fjson%2F',
     ]);
     // A long path may wrap, but only between its names.
     expect(links[2].querySelectorAll('wbr').length).toBe(2);
@@ -182,7 +182,7 @@ describe('JobLogs for a run that does not exist', () => {
     expect(component.error()).toBe('Run #6839 of job #2808 does not exist or was deleted.');
     expect(component.missing()).toBe(true);
     expect([...el.querySelectorAll('button')].some(b => /Try again/.test(b.textContent!))).toBe(false);
-    expect([...el.querySelectorAll('a')].some(a => /Back to jobs/.test(a.textContent!))).toBe(true);
+    expect([...el.querySelectorAll('a')].some(a => /Back to schedules/.test(a.textContent!))).toBe(true);
   });
 
   it('stops asking', () => {

@@ -127,7 +127,7 @@ describe('Notifications mark-read guards', () => {
     notifications.open(second);
 
     expect(post).toHaveBeenCalledTimes(2);
-    expect(router.navigateByUrl).toHaveBeenCalledWith('/operations/jobs');
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/pipelines/schedules');
   });
 
   it('markAllRead ignores a second call while the first is still in flight', () => {
@@ -352,6 +352,6 @@ describe('Notifications for a tenant user without the page a link names', () => 
     expect(notifications.targetOf(row)).toBeNull();
     notifications.open(row);
     expect(router.navigateByUrl).not.toHaveBeenCalled();
-    expect(notifications.targetOf({ ...row, linkUrl: '/operations/queue' })).toBe('/operations/queue');
+    expect(notifications.targetOf({ ...row, linkUrl: '/pipelines/queue' })).toBe('/pipelines/queue');
   });
 });

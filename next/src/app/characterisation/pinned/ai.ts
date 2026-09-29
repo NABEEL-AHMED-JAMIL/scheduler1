@@ -1,7 +1,7 @@
 // Recorded by scripts/characterisation/record.mjs -- see ../harness.ts. Review the diff: it is the baseline.
 export const PINNED: Record<string, unknown> = {
   "a new prompt": {
-    "url": "/assistants/prompts/new",
+    "url": "/ai/prompts/new",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -40,7 +40,7 @@ export const PINNED: Record<string, unknown> = {
       "pdf, docx"
     ],
     "links": [
-      "/assistants/prompts"
+      "/ai/prompts"
     ]
   },
   "a prompt's row menu": {
@@ -53,7 +53,7 @@ export const PINNED: Record<string, unknown> = {
     "columns": [],
     "fields": [],
     "links": [
-      "/assistants/prompts/1049/edit"
+      "/ai/prompts/1049/edit"
     ],
     "items": [
       "Edit & try",
@@ -62,7 +62,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "editing a prompt": {
-    "url": "/assistants/prompts/1049/edit",
+    "url": "/ai/prompts/1049/edit",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -132,11 +132,11 @@ export const PINNED: Record<string, unknown> = {
       "what Try it uses"
     ],
     "links": [
-      "/assistants/prompts"
+      "/ai/prompts"
     ]
   },
   "model connections, as a platform administrator": {
-    "url": "/assistants/connections",
+    "url": "/ai/connections",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -166,7 +166,7 @@ export const PINNED: Record<string, unknown> = {
       "State"
     ],
     "links": [
-      "/assistants/prompts?connection=1047"
+      "/ai/prompts?connection=1047"
     ]
   },
   "model connections, as a tenant user": {
@@ -188,7 +188,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "model connections, as a workspace administrator": {
-    "url": "/assistants/connections",
+    "url": "/ai/connections",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -217,11 +217,11 @@ export const PINNED: Record<string, unknown> = {
       "State"
     ],
     "links": [
-      "/assistants/prompts?connection=1047"
+      "/ai/prompts?connection=1047"
     ]
   },
   "prompts, as a tenant user with every page": {
-    "url": "/assistants/prompts",
+    "url": "/ai/prompts",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -277,7 +277,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "prompts, as a workspace administrator": {
-    "url": "/assistants/prompts",
+    "url": "/ai/prompts",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -316,9 +316,9 @@ export const PINNED: Record<string, unknown> = {
       "State"
     ],
     "links": [
-      "/assistants/prompts/1048/edit",
-      "/assistants/prompts/1049/edit",
-      "/assistants/prompts/new"
+      "/ai/prompts/1048/edit",
+      "/ai/prompts/1049/edit",
+      "/ai/prompts/new"
     ]
   }
 };

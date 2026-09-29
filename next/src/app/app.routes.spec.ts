@@ -28,7 +28,7 @@ describe('storage routes', () => {
    * concerned, and would otherwise land on a page that is nothing but refused storage calls.
    */
   it('guards /objects at the floor the storage API asks for', () => {
-    const objects = find('objects/files');
+    const objects = find('documents/files');
     expect(objects?.data?.minRole).toBe('TENANT_USER');
     expect(objects?.canActivate).toContain(roleGuard);
   });

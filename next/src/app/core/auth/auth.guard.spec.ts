@@ -88,7 +88,7 @@ describe('passwordChangeGuard', () => {
   // read it -- so a one-time password worked forever as long as Profile was never opened.
   it('sends a session that owes a password change to the profile screen', () => {
     expect(String(runPasswordGuard(true, '/dashboard'))).toBe('/profile');
-    expect(String(runPasswordGuard(true, '/operations/jobs/4/edit'))).toBe('/profile');
+    expect(String(runPasswordGuard(true, '/pipelines/schedules/4/edit'))).toBe('/profile');
     expect(String(runPasswordGuard(true, '/administration/users'))).toBe('/profile');
   });
 
@@ -136,9 +136,9 @@ describe('route table', () => {
     expect(byPath['administration/tenants']).toBe('PLATFORM_ADMIN');
     expect(byPath['administration/tenant-requests']).toBe('PLATFORM_ADMIN');
     expect(byPath['configuration/engine']).toBe('PLATFORM_ADMIN');
-    for (const p of ['administration/users', 'configuration/storage-connections', 'configuration/kafka',
+    for (const p of ['administration/users', 'integration/storage-connections', 'configuration/kafka',
                      'configuration/values', 'configuration/home-pages', 'configuration/task-groups',
-                     'assistants/connections', 'assistants/prompts/new', 'assistants/prompts/:promptId/edit']) {
+                     'ai/connections', 'ai/prompts/new', 'ai/prompts/:promptId/edit']) {
       expect(byPath[p]).toBe('TENANT_ADMIN');
     }
   });
@@ -148,7 +148,7 @@ describe('route table', () => {
   it('gates the task editor and the task bulk page on TENANT_ADMIN', () => {
     const byPath: Record<string, string> = {};
     walk(routes, r => { if (r.data?.minRole) byPath[r.path] = r.data.minRole; });
-    for (const p of ['operations/tasks/new', 'operations/tasks/:taskDetailId/edit', 'operations/tasks/bulk']) {
+    for (const p of ['pipelines/new', 'pipelines/:taskDetailId/edit', 'pipelines/bulk']) {
       expect(byPath[p]).toBe('TENANT_ADMIN');
     }
   });
@@ -157,7 +157,7 @@ describe('route table', () => {
   it('leaves the task list and prompts open', () => {
     const guarded: string[] = [];
     walk(routes, r => { if (r.data?.minRole) guarded.push(r.path); });
-    for (const p of ['operations/tasks', 'assistants/prompts', 'operations/jobs/bulk']) {
+    for (const p of ['pipelines', 'ai/prompts', 'pipelines/schedules/bulk']) {
       expect(guarded).not.toContain(p);
     }
   });

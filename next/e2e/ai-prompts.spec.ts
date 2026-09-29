@@ -158,8 +158,8 @@ test.describe('AI prompts in pipelines', () => {
     expect(refused.message).toContain('pipeline(s) run this prompt');
 
     // ── 4. Task: the step is a read-only card, the other fields are inputs ───────────────
-    await page.goto('/operations/tasks/new');
-    await page.getByRole('heading', { name: 'New task' }).waitFor();
+    await page.goto('/pipelines/new');
+    await page.getByRole('heading', { name: 'New pipeline' }).waitFor();
     await page.locator('#taskName').fill(TASK_NAME);
     await expect(page.locator('#taskProfile')).not.toHaveValue('');
     await pick(page, 'taskType', topic.serviceName.slice(0, 12), topic.serviceName);

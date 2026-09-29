@@ -41,7 +41,7 @@ export interface AiStepConfig {
             <p class="text-xs text-crit-500 mt-1" role="alert">{{ loadError() }}
               <button type="button" class="link-inline ml-1" (click)="loadPrompts()">Try again</button></p>
           } @else if (!prompts().length) {
-            <p class="text-xs text-warn-500 mt-1">No active prompt in this workspace. <a class="link-inline" routerLink="/assistants/prompts/new" (click)="ref.close()">Create one</a> first.</p>
+            <p class="text-xs text-warn-500 mt-1">No active prompt in this workspace. <a class="link-inline" routerLink="/ai/prompts/new" (click)="ref.close()">Create one</a> first.</p>
           } @else if (prompt(); as p) {
             <p class="text-xs text-[color:var(--text-muted)] mt-1">v{{ p.version }} · {{ p.connectionName || 'workspace default' }} · <span class="mono">{{ p.effectiveModel || '' }}</span> · {{ p.outputMode === 'json' ? 'JSON' : 'text' }} output</p>
           }

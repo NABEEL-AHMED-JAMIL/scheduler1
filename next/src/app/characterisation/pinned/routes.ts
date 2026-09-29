@@ -55,110 +55,7 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
-      "path": "/operations/jobs",
-      "title": "Source Jobs",
-      "pageKey": "jobs",
-      "guards": [
-        "pageGuard"
-      ],
-      "lazy": true
-    },
-    {
-      "path": "/operations/jobs/new",
-      "title": "New job",
-      "pageKey": "jobs",
-      "guards": [
-        "pageGuard"
-      ],
-      "lazy": true
-    },
-    {
-      "path": "/operations/jobs/:jobId/edit",
-      "title": "Edit job",
-      "pageKey": "jobs",
-      "guards": [
-        "pageGuard"
-      ],
-      "lazy": true
-    },
-    {
-      "path": "/operations/jobs/:jobId/assistant",
-      "title": "Job assistant",
-      "pageKey": "jobs",
-      "guards": [
-        "pageGuard"
-      ],
-      "lazy": true
-    },
-    {
-      "path": "/operations/jobs/:jobId/runs/:jobQueueId/logs",
-      "title": "Run logs",
-      "pageKey": "jobs",
-      "guards": [
-        "pageGuard"
-      ],
-      "lazy": true
-    },
-    {
-      "path": "/operations/queue",
-      "title": "Queue",
-      "pageKey": "queue",
-      "guards": [
-        "pageGuard"
-      ],
-      "lazy": true
-    },
-    {
-      "path": "/operations/jobs/history",
-      "title": "Run history",
-      "pageKey": "jobs",
-      "guards": [
-        "pageGuard"
-      ],
-      "lazy": true
-    },
-    {
-      "path": "/operations/jobs/:jobId/history",
-      "title": "Job history",
-      "pageKey": "jobs",
-      "guards": [
-        "pageGuard"
-      ],
-      "lazy": true
-    },
-    {
-      "path": "/operations/tasks/new",
-      "title": "New task",
-      "pageKey": "tasks",
-      "minRole": "TENANT_ADMIN",
-      "guards": [
-        "pageGuard",
-        "roleGuard"
-      ],
-      "lazy": true
-    },
-    {
-      "path": "/operations/tasks/:taskDetailId/edit",
-      "title": "Edit task",
-      "pageKey": "tasks",
-      "minRole": "TENANT_ADMIN",
-      "guards": [
-        "pageGuard",
-        "roleGuard"
-      ],
-      "lazy": true
-    },
-    {
-      "path": "/operations/tasks",
-      "title": "Source Tasks",
-      "pageKey": "tasks",
-      "guards": [
-        "pageGuard"
-      ],
-      "lazy": true
-    },
-    {
-      "path": "/configuration/storage-connections",
+      "path": "/integration/storage-connections",
       "title": "Storage Connections",
       "minRole": "TENANT_ADMIN",
       "guards": [
@@ -167,7 +64,224 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
-      "path": "/objects/analytics",
+      "path": "/integration/api-collections",
+      "title": "API Collections",
+      "pageKey": "api-collections",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/integration/connectors",
+      "title": "Connector Hub",
+      "pageKey": "connector-hub",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/pipelines",
+      "title": "Pipelines",
+      "pageKey": "tasks",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/pipelines/new",
+      "title": "New pipeline",
+      "pageKey": "tasks",
+      "minRole": "TENANT_ADMIN",
+      "guards": [
+        "pageGuard",
+        "roleGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/pipelines/bulk",
+      "title": "Bulk pipelines",
+      "pageKey": "tasks",
+      "minRole": "TENANT_ADMIN",
+      "kind": "task",
+      "guards": [
+        "pageGuard",
+        "roleGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/pipelines/:taskDetailId/edit",
+      "title": "Edit pipeline",
+      "pageKey": "tasks",
+      "minRole": "TENANT_ADMIN",
+      "guards": [
+        "pageGuard",
+        "roleGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/pipelines/schedules",
+      "title": "Schedules",
+      "pageKey": "jobs",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/pipelines/schedules/new",
+      "title": "New schedule",
+      "pageKey": "jobs",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/pipelines/schedules/bulk",
+      "title": "Bulk schedules",
+      "pageKey": "jobs",
+      "kind": "job",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/pipelines/schedules/:jobId/edit",
+      "title": "Edit schedule",
+      "pageKey": "jobs",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/pipelines/schedules/:jobId/assistant",
+      "title": "Schedule assistant",
+      "pageKey": "jobs",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/pipelines/schedules/:jobId/executions",
+      "title": "Executions",
+      "pageKey": "jobs",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/pipelines/schedules/:jobId/runs/:jobQueueId/logs",
+      "title": "Run logs",
+      "pageKey": "jobs",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/pipelines/executions",
+      "title": "Executions",
+      "pageKey": "jobs",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/pipelines/queue",
+      "title": "Queue",
+      "pageKey": "queue",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/pipelines/run-analytics",
+      "title": "Run analytics",
+      "pageKey": "reports",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/documents/intelligence",
+      "title": "Document Intelligence",
+      "pageKey": "document-intelligence",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/documents/review",
+      "title": "Review queue",
+      "pageKey": "document-review",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/documents/converter",
+      "title": "Document Converter",
+      "pageKey": "tools-converter",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/documents/files",
+      "title": "Browse files",
+      "pageKey": "objects",
+      "minRole": "TENANT_USER",
+      "guards": [
+        "pageGuard",
+        "roleGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/documents/transcript",
+      "title": "Audio Transcript",
+      "pageKey": "tools-transcript",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/data/ask",
+      "title": "Ask your data",
+      "pageKey": "ask-data",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/data/catalog",
+      "title": "Data Catalog",
+      "pageKey": "data-catalog",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/data/analytics",
       "title": "Analytics Studio",
       "pageKey": "analytics",
       "guards": [
@@ -176,7 +290,7 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
-      "path": "/objects/analytics/dashboards",
+      "path": "/data/analytics/dashboards",
       "title": "Saved Analyses",
       "pageKey": "analytics-dashboards",
       "guards": [
@@ -185,19 +299,43 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
-      "path": "/admin/storage",
-      "redirectTo": "configuration/storage-connections",
-      "guards": [],
-      "lazy": false
+      "path": "/forms/builder",
+      "title": "Form builder",
+      "pageKey": "forms",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
     },
     {
-      "path": "/ai/agents",
-      "redirectTo": "assistants/prompts",
-      "guards": [],
-      "lazy": false
+      "path": "/forms/submissions",
+      "title": "Submissions",
+      "pageKey": "form-submissions",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
     },
     {
-      "path": "/assistants/prompts",
+      "path": "/workflows/inbox",
+      "title": "Task inbox",
+      "pageKey": "task-inbox",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/workflows/designer",
+      "title": "Workflow designer",
+      "pageKey": "workflow-designer",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/ai/prompts",
       "title": "Prompts",
       "pageKey": "ai-prompts",
       "guards": [
@@ -206,7 +344,7 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
-      "path": "/assistants/prompts/new",
+      "path": "/ai/prompts/new",
       "title": "New prompt",
       "pageKey": "ai-prompts",
       "minRole": "TENANT_ADMIN",
@@ -217,7 +355,7 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
-      "path": "/assistants/prompts/:promptId/edit",
+      "path": "/ai/prompts/:promptId/edit",
       "title": "Edit prompt",
       "pageKey": "ai-prompts",
       "minRole": "TENANT_ADMIN",
@@ -228,7 +366,7 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
-      "path": "/assistants/connections",
+      "path": "/ai/connections",
       "title": "Model connections",
       "minRole": "TENANT_ADMIN",
       "guards": [
@@ -237,14 +375,8 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
-      "path": "/ai/models",
-      "redirectTo": "assistants/connections",
-      "guards": [],
-      "lazy": false
-    },
-    {
-      "path": "/administration/users",
-      "title": "Users",
+      "path": "/configuration/task-registry",
+      "title": "Task Registry",
       "minRole": "TENANT_ADMIN",
       "guards": [
         "roleGuard"
@@ -252,8 +384,8 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
-      "path": "/administration/access-profiles",
-      "title": "Access profiles",
+      "path": "/configuration/kafka",
+      "title": "Kafka & Topics",
       "minRole": "TENANT_ADMIN",
       "guards": [
         "roleGuard"
@@ -261,8 +393,17 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
-      "path": "/administration/tenants",
-      "title": "Tenants",
+      "path": "/configuration/values",
+      "title": "Configuration values",
+      "minRole": "TENANT_ADMIN",
+      "guards": [
+        "roleGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/configuration/engine",
+      "title": "Engine settings",
       "minRole": "PLATFORM_ADMIN",
       "guards": [
         "roleGuard"
@@ -270,103 +411,24 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
-      "path": "/profile",
-      "title": "Your profile",
-      "guards": [],
-      "lazy": true
-    },
-    {
-      "path": "/notifications",
-      "title": "Notifications",
-      "guards": [],
-      "lazy": true
-    },
-    {
-      "path": "/tools/converter",
-      "title": "Document Converter",
-      "pageKey": "tools-converter",
-      "guards": [
-        "pageGuard"
-      ],
-      "lazy": true
-    },
-    {
-      "path": "/tools/transcript",
-      "title": "Audio Transcript",
-      "pageKey": "tools-transcript",
-      "guards": [
-        "pageGuard"
-      ],
-      "lazy": true
-    },
-    {
-      "path": "/settings/task-types",
-      "redirectTo": "configuration/kafka",
-      "guards": [],
-      "lazy": false
-    },
-    {
-      "path": "/configuration/pipelines",
-      "title": "Pipelines",
+      "path": "/configuration/home-pages",
+      "title": "Home pages",
       "minRole": "TENANT_ADMIN",
+      "kind": "HOME_PAGE",
       "guards": [
         "roleGuard"
       ],
       "lazy": true
     },
     {
-      "path": "/settings/forms",
-      "redirectTo": "configuration/pipelines",
-      "guards": [],
-      "lazy": false
-    },
-    {
-      "path": "/settings/pipeline-forms",
-      "redirectTo": "configuration/pipelines",
-      "guards": [],
-      "lazy": false
-    },
-    {
-      "path": "/administration/billing",
-      "redirectTo": "billing/usage",
-      "guards": [],
-      "lazy": false
-    },
-    {
-      "path": "/administration/billing/invoices",
-      "redirectTo": "billing/invoices",
-      "guards": [],
-      "lazy": false
-    },
-    {
-      "path": "/administration/billing/invoices/:number",
-      "redirectTo": "billing/invoices/:number",
-      "guards": [],
-      "lazy": false
-    },
-    {
-      "path": "/administration/billing/documents",
-      "redirectTo": "billing/documents",
-      "guards": [],
-      "lazy": false
-    },
-    {
-      "path": "/administration/billing/analytics",
-      "redirectTo": "billing/analytics",
-      "guards": [],
-      "lazy": false
-    },
-    {
-      "path": "/administration/billing/rates",
-      "redirectTo": "billing/rates",
-      "guards": [],
-      "lazy": false
-    },
-    {
-      "path": "/billing",
-      "redirectTo": "billing/usage",
-      "guards": [],
-      "lazy": false
+      "path": "/configuration/task-groups",
+      "title": "Task groups",
+      "minRole": "TENANT_ADMIN",
+      "kind": "TASK_GROUP",
+      "guards": [
+        "roleGuard"
+      ],
+      "lazy": true
     },
     {
       "path": "/billing/usage",
@@ -427,6 +489,33 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
+      "path": "/administration/users",
+      "title": "Users",
+      "minRole": "TENANT_ADMIN",
+      "guards": [
+        "roleGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/administration/access-profiles",
+      "title": "Access profiles",
+      "minRole": "TENANT_ADMIN",
+      "guards": [
+        "roleGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/administration/tenants",
+      "title": "Tenants",
+      "minRole": "PLATFORM_ADMIN",
+      "guards": [
+        "roleGuard"
+      ],
+      "lazy": true
+    },
+    {
       "path": "/administration/tenant-requests",
       "title": "Workspace Requests",
       "minRole": "PLATFORM_ADMIN",
@@ -436,211 +525,296 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
+      "path": "/profile",
+      "title": "Your profile",
+      "guards": [],
+      "lazy": true
+    },
+    {
+      "path": "/notifications",
+      "title": "Notifications",
+      "guards": [],
+      "lazy": true
+    },
+    {
       "path": "/unauthorized",
       "title": "Not available",
       "guards": [],
       "lazy": true
     },
     {
+      "path": "/operations/jobs",
+      "redirectTo": "pipelines/schedules",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/operations/jobs/new",
+      "redirectTo": "pipelines/schedules/new",
+      "guards": [],
+      "lazy": false
+    },
+    {
       "path": "/operations/jobs/bulk",
-      "title": "Bulk jobs",
-      "pageKey": "jobs",
-      "kind": "job",
-      "guards": [
-        "pageGuard"
-      ],
-      "lazy": true
+      "redirectTo": "pipelines/schedules/bulk",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/operations/jobs/history",
+      "redirectTo": "pipelines/executions",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/operations/jobs/:jobId/edit",
+      "redirectTo": "pipelines/schedules/:jobId/edit",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/operations/jobs/:jobId/assistant",
+      "redirectTo": "pipelines/schedules/:jobId/assistant",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/operations/jobs/:jobId/history",
+      "redirectTo": "pipelines/schedules/:jobId/executions",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/operations/jobs/:jobId/runs/:jobQueueId/logs",
+      "redirectTo": "pipelines/schedules/:jobId/runs/:jobQueueId/logs",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/operations/queue",
+      "redirectTo": "pipelines/queue",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/operations/tasks",
+      "redirectTo": "pipelines",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/operations/tasks/new",
+      "redirectTo": "pipelines/new",
+      "guards": [],
+      "lazy": false
     },
     {
       "path": "/operations/tasks/bulk",
-      "title": "Bulk tasks",
-      "pageKey": "tasks",
-      "minRole": "TENANT_ADMIN",
-      "kind": "task",
-      "guards": [
-        "pageGuard",
-        "roleGuard"
-      ],
-      "lazy": true
+      "redirectTo": "pipelines/bulk",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/operations/tasks/:taskDetailId/edit",
+      "redirectTo": "pipelines/:taskDetailId/edit",
+      "guards": [],
+      "lazy": false
     },
     {
       "path": "/operations/reports",
-      "title": "Reports",
-      "pageKey": "reports",
-      "guards": [
-        "pageGuard"
-      ],
-      "lazy": true
+      "redirectTo": "pipelines/run-analytics",
+      "guards": [],
+      "lazy": false
     },
     {
-      "path": "/configuration/kafka",
-      "title": "Kafka & Topics",
-      "minRole": "TENANT_ADMIN",
-      "guards": [
-        "roleGuard"
-      ],
-      "lazy": true
+      "path": "/configuration/pipelines",
+      "redirectTo": "configuration/task-registry",
+      "guards": [],
+      "lazy": false
     },
     {
-      "path": "/configuration/values",
-      "title": "Configuration values",
-      "minRole": "TENANT_ADMIN",
-      "guards": [
-        "roleGuard"
-      ],
-      "lazy": true
-    },
-    {
-      "path": "/configuration/engine",
-      "title": "Engine settings",
-      "minRole": "PLATFORM_ADMIN",
-      "guards": [
-        "roleGuard"
-      ],
-      "lazy": true
-    },
-    {
-      "path": "/configuration/home-pages",
-      "title": "Home pages",
-      "minRole": "TENANT_ADMIN",
-      "kind": "HOME_PAGE",
-      "guards": [
-        "roleGuard"
-      ],
-      "lazy": true
-    },
-    {
-      "path": "/configuration/task-groups",
-      "title": "Task groups",
-      "minRole": "TENANT_ADMIN",
-      "kind": "TASK_GROUP",
-      "guards": [
-        "roleGuard"
-      ],
-      "lazy": true
-    },
-    {
-      "path": "/configuration/lookup",
-      "redirectTo": "configuration/values",
+      "path": "/configuration/storage-connections",
+      "redirectTo": "integration/storage-connections",
       "guards": [],
       "lazy": false
     },
     {
       "path": "/objects/files",
-      "title": "Browse files",
-      "pageKey": "objects",
-      "minRole": "TENANT_USER",
-      "guards": [
-        "pageGuard",
-        "roleGuard"
-      ],
-      "lazy": true
+      "redirectTo": "documents/files",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/objects/analytics",
+      "redirectTo": "data/analytics",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/objects/analytics/dashboards",
+      "redirectTo": "data/analytics/dashboards",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/tools/converter",
+      "redirectTo": "documents/converter",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/tools/transcript",
+      "redirectTo": "documents/transcript",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/assistants/prompts",
+      "redirectTo": "ai/prompts",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/assistants/prompts/new",
+      "redirectTo": "ai/prompts/new",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/assistants/prompts/:promptId/edit",
+      "redirectTo": "ai/prompts/:promptId/edit",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/assistants/connections",
+      "redirectTo": "ai/connections",
+      "guards": [],
+      "lazy": false
     },
     {
       "path": "/jobs",
-      "redirectTo": "operations/jobs",
+      "redirectTo": "pipelines/schedules",
       "guards": [],
       "lazy": false
     },
     {
       "path": "/jobs/new",
-      "redirectTo": "operations/jobs/new",
+      "redirectTo": "pipelines/schedules/new",
       "guards": [],
       "lazy": false
     },
     {
-      "path": "/jobs/:jobId/edit",
-      "redirectTo": "operations/jobs/:jobId/edit",
-      "guards": [],
-      "lazy": false
-    },
-    {
-      "path": "/jobs/:jobId/assistant",
-      "redirectTo": "operations/jobs/:jobId/assistant",
-      "guards": [],
-      "lazy": false
-    },
-    {
-      "path": "/jobs/:jobId/runs/:jobQueueId/logs",
-      "redirectTo": "operations/jobs/:jobId/runs/:jobQueueId/logs",
-      "guards": [],
-      "lazy": false
-    },
-    {
-      "path": "/queue",
-      "redirectTo": "operations/queue",
+      "path": "/jobs/bulk",
+      "redirectTo": "pipelines/schedules/bulk",
       "guards": [],
       "lazy": false
     },
     {
       "path": "/jobs/history",
-      "redirectTo": "operations/jobs/history",
+      "redirectTo": "pipelines/executions",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/jobs/:jobId/edit",
+      "redirectTo": "pipelines/schedules/:jobId/edit",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/jobs/:jobId/assistant",
+      "redirectTo": "pipelines/schedules/:jobId/assistant",
       "guards": [],
       "lazy": false
     },
     {
       "path": "/jobs/:jobId/history",
-      "redirectTo": "operations/jobs/:jobId/history",
+      "redirectTo": "pipelines/schedules/:jobId/executions",
       "guards": [],
       "lazy": false
     },
     {
-      "path": "/tasks/new",
-      "redirectTo": "operations/tasks/new",
+      "path": "/jobs/:jobId/runs/:jobQueueId/logs",
+      "redirectTo": "pipelines/schedules/:jobId/runs/:jobQueueId/logs",
       "guards": [],
       "lazy": false
     },
     {
-      "path": "/tasks/:taskDetailId/edit",
-      "redirectTo": "operations/tasks/:taskDetailId/edit",
+      "path": "/queue",
+      "redirectTo": "pipelines/queue",
       "guards": [],
       "lazy": false
     },
     {
       "path": "/tasks",
-      "redirectTo": "operations/tasks",
+      "redirectTo": "pipelines",
       "guards": [],
       "lazy": false
     },
     {
-      "path": "/settings/storage-connections",
-      "redirectTo": "configuration/storage-connections",
+      "path": "/tasks/new",
+      "redirectTo": "pipelines/new",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/tasks/bulk",
+      "redirectTo": "pipelines/bulk",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/tasks/:taskDetailId/edit",
+      "redirectTo": "pipelines/:taskDetailId/edit",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/reports",
+      "redirectTo": "pipelines/run-analytics",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/objects",
+      "redirectTo": "documents/files",
       "guards": [],
       "lazy": false
     },
     {
       "path": "/analytics",
-      "redirectTo": "objects/analytics",
+      "redirectTo": "data/analytics",
       "guards": [],
       "lazy": false
     },
     {
       "path": "/analytics/dashboards",
-      "redirectTo": "objects/analytics/dashboards",
+      "redirectTo": "data/analytics/dashboards",
       "guards": [],
       "lazy": false
     },
     {
-      "path": "/ai/prompts",
-      "redirectTo": "assistants/prompts",
+      "path": "/admin/storage",
+      "redirectTo": "integration/storage-connections",
       "guards": [],
       "lazy": false
     },
     {
-      "path": "/ai/prompts/new",
-      "redirectTo": "assistants/prompts/new",
+      "path": "/settings/storage-connections",
+      "redirectTo": "integration/storage-connections",
       "guards": [],
       "lazy": false
     },
     {
-      "path": "/ai/prompts/:promptId/edit",
-      "redirectTo": "assistants/prompts/:promptId/edit",
+      "path": "/ai/agents",
+      "redirectTo": "ai/prompts",
       "guards": [],
       "lazy": false
     },
     {
-      "path": "/ai/connections",
-      "redirectTo": "assistants/connections",
+      "path": "/ai/models",
+      "redirectTo": "ai/connections",
       "guards": [],
       "lazy": false
     },
@@ -663,32 +837,32 @@ export const PINNED: Record<string, unknown> = {
       "lazy": false
     },
     {
-      "path": "/settings/pipelines",
-      "redirectTo": "configuration/pipelines",
-      "guards": [],
-      "lazy": false
-    },
-    {
       "path": "/admin/tenant-requests",
       "redirectTo": "administration/tenant-requests",
       "guards": [],
       "lazy": false
     },
     {
-      "path": "/jobs/bulk",
-      "redirectTo": "operations/jobs/bulk",
+      "path": "/settings/pipelines",
+      "redirectTo": "configuration/task-registry",
       "guards": [],
       "lazy": false
     },
     {
-      "path": "/tasks/bulk",
-      "redirectTo": "operations/tasks/bulk",
+      "path": "/settings/forms",
+      "redirectTo": "configuration/task-registry",
       "guards": [],
       "lazy": false
     },
     {
-      "path": "/reports",
-      "redirectTo": "operations/reports",
+      "path": "/settings/pipeline-forms",
+      "redirectTo": "configuration/task-registry",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/settings/task-types",
+      "redirectTo": "configuration/kafka",
       "guards": [],
       "lazy": false
     },
@@ -705,8 +879,50 @@ export const PINNED: Record<string, unknown> = {
       "lazy": false
     },
     {
-      "path": "/objects",
-      "redirectTo": "objects/files",
+      "path": "/configuration/lookup",
+      "redirectTo": "configuration/values",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/billing",
+      "redirectTo": "billing/usage",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/administration/billing",
+      "redirectTo": "billing/usage",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/administration/billing/invoices",
+      "redirectTo": "billing/invoices",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/administration/billing/invoices/:number",
+      "redirectTo": "billing/invoices/:number",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/administration/billing/documents",
+      "redirectTo": "billing/documents",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/administration/billing/analytics",
+      "redirectTo": "billing/analytics",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/administration/billing/rates",
+      "redirectTo": "billing/rates",
       "guards": [],
       "lazy": false
     },
@@ -728,7 +944,7 @@ export const PINNED: Record<string, unknown> = {
     "heading": "Access profiles"
   },
   "old address /admin/storage": {
-    "lands": "/configuration/storage-connections",
+    "lands": "/integration/storage-connections",
     "heading": "Storage connections"
   },
   "old address /admin/tenant-requests": {
@@ -768,36 +984,36 @@ export const PINNED: Record<string, unknown> = {
     "heading": "Rate cards"
   },
   "old address /ai/agents": {
-    "lands": "/assistants/prompts",
+    "lands": "/ai/prompts",
     "heading": "Prompts"
-  },
-  "old address /ai/connections": {
-    "lands": "/assistants/connections",
-    "heading": "Model connections"
   },
   "old address /ai/models": {
-    "lands": "/assistants/connections",
+    "lands": "/ai/connections",
     "heading": "Model connections"
   },
-  "old address /ai/prompts": {
-    "lands": "/assistants/prompts",
-    "heading": "Prompts"
-  },
-  "old address /ai/prompts/:promptId/edit": {
-    "lands": "/assistants/prompts/1049/edit",
-    "heading": "UI-REVIEW Zürich – 東京 ✓ draft prompt (never activated) with a deliberately long name for truncation checks in the prompt list Claude Demo 75a611b4v1Inactive"
-  },
-  "old address /ai/prompts/new": {
-    "lands": "/assistants/prompts/new",
-    "heading": "New prompt"
-  },
   "old address /analytics": {
-    "lands": "/objects/analytics",
+    "lands": "/data/analytics",
     "heading": "Analytics Studio"
   },
   "old address /analytics/dashboards": {
-    "lands": "/objects/analytics/dashboards",
+    "lands": "/data/analytics/dashboards",
     "heading": "Dashboards"
+  },
+  "old address /assistants/connections": {
+    "lands": "/ai/connections",
+    "heading": "Model connections"
+  },
+  "old address /assistants/prompts": {
+    "lands": "/ai/prompts",
+    "heading": "Prompts"
+  },
+  "old address /assistants/prompts/:promptId/edit": {
+    "lands": "/ai/prompts/1049/edit",
+    "heading": "UI-REVIEW Zürich – 東京 ✓ draft prompt (never activated) with a deliberately long name for truncation checks in the prompt list Claude Demo 75a611b4v1Inactive"
+  },
+  "old address /assistants/prompts/new": {
+    "lands": "/ai/prompts/new",
+    "heading": "New prompt"
   },
   "old address /billing": {
     "lands": "/billing/usage",
@@ -807,53 +1023,129 @@ export const PINNED: Record<string, unknown> = {
     "lands": "/configuration/values",
     "heading": "Configuration values"
   },
+  "old address /configuration/pipelines": {
+    "lands": "/configuration/task-registry",
+    "heading": "Task Registry"
+  },
+  "old address /configuration/storage-connections": {
+    "lands": "/integration/storage-connections",
+    "heading": "Storage connections"
+  },
   "old address /jobs": {
-    "lands": "/operations/jobs",
-    "heading": "Source Jobs"
+    "lands": "/pipelines/schedules",
+    "heading": "Schedules"
   },
   "old address /jobs/:jobId/assistant": {
-    "lands": "/operations/jobs/2833/assistant",
-    "heading": "Job assistant — Reference CSV check (e2e)"
+    "lands": "/pipelines/schedules/2833/assistant",
+    "heading": "Schedule assistant — Reference CSV check (e2e)"
   },
   "old address /jobs/:jobId/edit": {
-    "lands": "/operations/jobs/2833/edit",
-    "heading": "Edit job"
+    "lands": "/pipelines/schedules/2833/edit",
+    "heading": "Edit schedule"
   },
   "old address /jobs/:jobId/history": {
-    "lands": "/operations/jobs/2833/history",
-    "heading": "Run history — Reference CSV check (e2e)"
+    "lands": "/pipelines/schedules/2833/executions",
+    "heading": "Executions — Reference CSV check (e2e)"
   },
   "old address /jobs/:jobId/runs/:jobQueueId/logs": {
-    "lands": "/operations/jobs/2833/runs/7331/logs",
+    "lands": "/pipelines/schedules/2833/runs/7331/logs",
     "heading": "Run logs"
   },
   "old address /jobs/bulk": {
-    "lands": "/operations/jobs/bulk",
-    "heading": "Bulk jobs"
+    "lands": "/pipelines/schedules/bulk",
+    "heading": "Bulk schedules"
   },
   "old address /jobs/history": {
-    "lands": "/operations/jobs/history",
-    "heading": "Run history"
+    "lands": "/pipelines/executions",
+    "heading": "Executions"
   },
   "old address /jobs/new": {
-    "lands": "/operations/jobs/new",
-    "heading": "New job"
+    "lands": "/pipelines/schedules/new",
+    "heading": "New schedule"
   },
   "old address /objects": {
-    "lands": "/objects/files",
+    "lands": "/documents/files",
     "heading": "Object Browser"
   },
+  "old address /objects/analytics": {
+    "lands": "/data/analytics",
+    "heading": "Analytics Studio"
+  },
+  "old address /objects/analytics/dashboards": {
+    "lands": "/data/analytics/dashboards",
+    "heading": "Dashboards"
+  },
+  "old address /objects/files": {
+    "lands": "/documents/files",
+    "heading": "Object Browser"
+  },
+  "old address /operations/jobs": {
+    "lands": "/pipelines/schedules",
+    "heading": "Schedules"
+  },
+  "old address /operations/jobs/:jobId/assistant": {
+    "lands": "/pipelines/schedules/2833/assistant",
+    "heading": "Schedule assistant — Reference CSV check (e2e)"
+  },
+  "old address /operations/jobs/:jobId/edit": {
+    "lands": "/pipelines/schedules/2833/edit",
+    "heading": "Edit schedule"
+  },
+  "old address /operations/jobs/:jobId/history": {
+    "lands": "/pipelines/schedules/2833/executions",
+    "heading": "Executions — Reference CSV check (e2e)"
+  },
+  "old address /operations/jobs/:jobId/runs/:jobQueueId/logs": {
+    "lands": "/pipelines/schedules/2833/runs/7331/logs",
+    "heading": "Run logs"
+  },
+  "old address /operations/jobs/bulk": {
+    "lands": "/pipelines/schedules/bulk",
+    "heading": "Bulk schedules"
+  },
+  "old address /operations/jobs/history": {
+    "lands": "/pipelines/executions",
+    "heading": "Executions"
+  },
+  "old address /operations/jobs/new": {
+    "lands": "/pipelines/schedules/new",
+    "heading": "New schedule"
+  },
+  "old address /operations/queue": {
+    "lands": "/pipelines/queue",
+    "heading": "Queue"
+  },
+  "old address /operations/reports": {
+    "lands": "/pipelines/run-analytics",
+    "heading": "Run analytics"
+  },
+  "old address /operations/tasks": {
+    "lands": "/pipelines",
+    "heading": "Pipelines"
+  },
+  "old address /operations/tasks/:taskDetailId/edit": {
+    "lands": "/pipelines/1854/edit",
+    "heading": "Edit pipeline"
+  },
+  "old address /operations/tasks/bulk": {
+    "lands": "/pipelines/bulk",
+    "heading": "Bulk pipelines"
+  },
+  "old address /operations/tasks/new": {
+    "lands": "/pipelines/new",
+    "heading": "New pipeline"
+  },
   "old address /queue": {
-    "lands": "/operations/queue",
+    "lands": "/pipelines/queue",
     "heading": "Queue"
   },
   "old address /reports": {
-    "lands": "/operations/reports",
-    "heading": "Reports"
+    "lands": "/pipelines/run-analytics",
+    "heading": "Run analytics"
   },
   "old address /settings/forms": {
-    "lands": "/configuration/pipelines",
-    "heading": "Pipelines"
+    "lands": "/configuration/task-registry",
+    "heading": "Task Registry"
   },
   "old address /settings/kafka": {
     "lands": "/configuration/kafka",
@@ -864,15 +1156,15 @@ export const PINNED: Record<string, unknown> = {
     "heading": "Configuration values"
   },
   "old address /settings/pipeline-forms": {
-    "lands": "/configuration/pipelines",
-    "heading": "Pipelines"
+    "lands": "/configuration/task-registry",
+    "heading": "Task Registry"
   },
   "old address /settings/pipelines": {
-    "lands": "/configuration/pipelines",
-    "heading": "Pipelines"
+    "lands": "/configuration/task-registry",
+    "heading": "Task Registry"
   },
   "old address /settings/storage-connections": {
-    "lands": "/configuration/storage-connections",
+    "lands": "/integration/storage-connections",
     "heading": "Storage connections"
   },
   "old address /settings/task-types": {
@@ -880,19 +1172,27 @@ export const PINNED: Record<string, unknown> = {
     "heading": "Kafka Connections"
   },
   "old address /tasks": {
-    "lands": "/operations/tasks",
-    "heading": "Source Tasks"
+    "lands": "/pipelines",
+    "heading": "Pipelines"
   },
   "old address /tasks/:taskDetailId/edit": {
-    "lands": "/operations/tasks/1854/edit",
-    "heading": "Edit task"
+    "lands": "/pipelines/1854/edit",
+    "heading": "Edit pipeline"
   },
   "old address /tasks/bulk": {
-    "lands": "/operations/tasks/bulk",
-    "heading": "Bulk tasks"
+    "lands": "/pipelines/bulk",
+    "heading": "Bulk pipelines"
   },
   "old address /tasks/new": {
-    "lands": "/operations/tasks/new",
-    "heading": "New task"
+    "lands": "/pipelines/new",
+    "heading": "New pipeline"
+  },
+  "old address /tools/converter": {
+    "lands": "/documents/converter",
+    "heading": "Document Converter"
+  },
+  "old address /tools/transcript": {
+    "lands": "/documents/transcript",
+    "heading": "Audio Transcript Extractor"
   }
 };

@@ -19,6 +19,8 @@ interface NavChild {
   platformOnly?: boolean;
   /** The access-profile page this entry is; absent for pages a profile cannot take away. */
   pageKey?: PageKey;
+  /** A Wave 4 / Wave 5 page that is not built yet: the entry opens its "coming soon" page. */
+  soon?: boolean;
   /**
    * Whether routerLinkActive must match the whole URL for this entry.
    *
@@ -76,73 +78,111 @@ export class Shell {
   /**
    * Grouped by the job someone is doing, not by which part of the backend serves it.
    *
-   * "Admin" previously held seven entries that mixed managing people with configuring
-   * infrastructure -- different tasks, done by different people, at different times. Those are
-   * now Administration and Configuration. "Source" named an internal concept rather than a
-   * purpose; it is Pipelines, and the queue moved into it because a run belongs beside the
-   * job that produced it.
+   * MIG-246 / MIG-218 (2026-09-28): the Wave 4 menu. Operations became Pipelines, Assistants became
+   * AI, Tools and Object Browser became Documents, and Integration is new. The renames are labels
+   * only: every entry keeps its access-profile page key, so a profile that granted "Source Jobs"
+   * grants "Schedules" -- the same screen, under its new name. MIG-267 adds the Wave 5 modules (Data,
+   * Forms, Workflows, and entries in Integration and Documents), each behind a page key of its own.
+   *
+   * An entry marked `soon` is a page that is not built yet: its route is a "coming soon" page that
+   * calls nothing, gated by the page's key so the gate is in place before the screen is.
    */
   private readonly allNav: NavItem[] = [
     { label: 'Dashboard', path: '/dashboard', icon: 'chart' },
     {
-      // "Operations", not "Pipelines": a pipeline is a definition now (Configuration ›
-      // Pipelines -- id, topic, fields), and this section is the running side of it -- the
-      // jobs, tasks, queue and reports. Two menus called Pipelines meant two different things.
-      label: 'Operations',
+      // Where data comes from and goes to. Storage Connections moved here from Configuration.
+      label: 'Integration',
       children: [
-        { label: 'Source Jobs', path: '/operations/jobs', pageKey: 'jobs', icon: 'briefcase',
-          hint: 'Scheduled work and its runs' },
-        // Deliberately not adminOnly: listSourceTask is TENANT_USER, and a job points at a
-        // task, so reading the list is part of reading the console. Only writing one is
+        { label: 'Connector Hub', path: '/integration/connectors', pageKey: 'connector-hub', icon: 'plug', soon: true,
+          hint: 'Databases, SaaS apps and files, ready to connect' },
+        { label: 'API Collections', path: '/integration/api-collections', pageKey: 'api-collections', icon: 'code',
+          soon: true, hint: 'Which APIs exist, tested and versioned' },
+        { label: 'Storage Connections', path: '/integration/storage-connections', icon: 'cloud', adminOnly: true,
+          hint: 'S3, Azure, MinIO, FTP' },
+      ],
+    },
+    {
+      // The running side: what a run does (Pipelines, was Source Tasks), when it runs (Schedules, was
+      // Source Jobs), what is in flight, and how the runs went (Run analytics, was Reports). A run's
+      // history (Executions, was Run history) is opened from its schedule or the dashboard; there is
+      // no list of every run across schedules to put on the menu yet.
+      label: 'Pipelines',
+      children: [
+        // Deliberately not adminOnly: listSourceTask is TENANT_USER, and a schedule points at a
+        // pipeline, so reading the list is part of reading the console. Only writing one is
         // TENANT_ADMIN, and those controls are gated inside the page on auth.canManageTasks --
         // the same computed this menu's adminOnly entries resolve through.
-        { label: 'Source Tasks', path: '/operations/tasks', pageKey: 'tasks', icon: 'list',
-          hint: 'What a job does, and where' },
-        { label: 'Queue', path: '/operations/queue', pageKey: 'queue', icon: 'clock',
+        { label: 'Pipelines', path: '/pipelines', pageKey: 'tasks', icon: 'list',
+          hint: 'What a run does, and where' },
+        { label: 'Schedules', path: '/pipelines/schedules', pageKey: 'jobs', icon: 'calendar',
+          hint: 'When each pipeline runs, and its runs' },
+        { label: 'Queue', path: '/pipelines/queue', pageKey: 'queue', icon: 'clock',
           hint: 'What is in flight right now' },
-        // Beside the runs it summarises, rather than under Tools: this reads pipeline data
-        // rather than being a general-purpose instrument.
-        { label: 'Reports', path: '/operations/reports', pageKey: 'reports', icon: 'chart',
+        { label: 'Run analytics', path: '/pipelines/run-analytics', pageKey: 'reports', icon: 'chart',
           hint: 'Group and measure your runs' },
       ],
     },
     {
-      // Both screens are the same bucket, seen two ways: one browses the objects, the other
-      // reads what is inside them. They share a storage service, so they share a menu.
-      label: 'Object Browser',
+      // Things that take a file and give one back, and the files themselves.
+      label: 'Documents',
       children: [
-        { label: 'Browse files', path: '/objects/files', pageKey: 'objects', icon: 'folder',
+        { label: 'Document Intelligence', path: '/documents/intelligence', pageKey: 'document-intelligence',
+          icon: 'search', soon: true, hint: 'Read documents into structured data' },
+        { label: 'Review queue', path: '/documents/review', pageKey: 'document-review', icon: 'checkCircle',
+          soon: true, hint: 'Check low-confidence fields' },
+        { label: 'Document Converter', path: '/documents/converter', pageKey: 'tools-converter', icon: 'file',
+          hint: 'Convert between formats' },
+        { label: 'Browse files', path: '/documents/files', pageKey: 'objects', icon: 'folder',
           hint: 'Upload, preview and share objects' },
-        { label: 'Analytics Studio', path: '/objects/analytics', pageKey: 'analytics', icon: 'chart',
+        { label: 'Audio Transcript', path: '/documents/transcript', pageKey: 'tools-transcript', icon: 'volume',
+          hint: 'Speech to text' },
+      ],
+    },
+    {
+      label: 'Data',
+      children: [
+        { label: 'Ask your data', path: '/data/ask', pageKey: 'ask-data', icon: 'chat', soon: true,
+          hint: 'Questions in plain language, with sources' },
+        { label: 'Data Catalog', path: '/data/catalog', pageKey: 'data-catalog', icon: 'database', soon: true,
+          hint: 'Every dataset, owner, schema and sensitive field' },
+        { label: 'Analytics Studio', path: '/data/analytics', pageKey: 'analytics', icon: 'chart',
           hint: 'Read a file as data, where it lives' },
         // The saved-analysis library had a route and no way to reach it: /analytics/dashboards
         // was reachable only by typing the address. It is a sibling rather than a child because
         // the menu has one level of nesting, and a saved analysis is a thing you go TO, not a
         // mode of the workspace.
-        { label: 'Saved Analyses', path: '/objects/analytics/dashboards', pageKey: 'analytics-dashboards', icon: 'save',
+        { label: 'Saved Analyses', path: '/data/analytics/dashboards', pageKey: 'analytics-dashboards', icon: 'save',
           hint: 'Analyses and queries you kept, re-run on open' },
       ],
     },
     {
-      label: 'Tools',
+      label: 'Forms',
       children: [
-        // The things that take a file and give one back.
-        { label: 'Document Converter', path: '/tools/converter', pageKey: 'tools-converter', icon: 'file',
-          hint: 'Convert between formats' },
-        { label: 'Audio Transcript', path: '/tools/transcript', pageKey: 'tools-transcript', icon: 'volume',
-          hint: 'Speech to text' },
+        { label: 'Form builder', path: '/forms/builder', pageKey: 'forms', icon: 'edit', soon: true,
+          hint: 'Build forms and share them securely' },
+        { label: 'Submissions', path: '/forms/submissions', pageKey: 'form-submissions', icon: 'table', soon: true,
+          hint: 'Everything collected, with its approval state' },
       ],
     },
     {
-      label: 'Assistants',
+      label: 'Workflows',
       children: [
-        // Open for the same reason as Source Tasks: aiPrompt.json/list is TENANT_USER and the
+        { label: 'Task inbox', path: '/workflows/inbox', pageKey: 'task-inbox', icon: 'inbox', soon: true,
+          hint: 'Approvals and tasks waiting for you' },
+        { label: 'Workflow designer', path: '/workflows/designer', pageKey: 'workflow-designer', icon: 'layers',
+          soon: true, hint: 'Who approves what, and when' },
+      ],
+    },
+    {
+      label: 'AI',
+      children: [
+        // Open for the same reason as Pipelines: aiPrompt.json/list is TENANT_USER and the
         // object browser's file chat depends on it, so the list is readable by everyone and
         // only New prompt, Edit, Try it and Delete are gated (auth.canManageAgents). Model
         // connections is a genuine admin screen -- every call it makes is TENANT_ADMIN.
-        { label: 'Prompts', path: '/assistants/prompts', pageKey: 'ai-prompts', icon: 'sparkle',
+        { label: 'Prompts', path: '/ai/prompts', pageKey: 'ai-prompts', icon: 'sparkle',
           hint: 'What a step says to a model' },
-        { label: 'Model connections', path: '/assistants/connections', icon: 'server', adminOnly: true,
+        { label: 'Model connections', path: '/ai/connections', icon: 'server', adminOnly: true,
           hint: 'Providers, keys and caps' },
       ],
     },
@@ -150,10 +190,11 @@ export class Shell {
       label: 'Configuration',
       adminOnly: true,
       children: [
+        // Task Registry was Configuration › Pipelines (MIG-218): the task types a pipeline can run.
+        { label: 'Task Registry', path: '/configuration/task-registry', icon: 'template', adminOnly: true,
+          hint: 'Each task type, the topic it publishes on, and its form' },
         { label: 'Kafka & Topics', path: '/configuration/kafka', icon: 'server', adminOnly: true,
           hint: 'Brokers, credentials and the topics that publish through them' },
-        { label: 'Pipelines', path: '/configuration/pipelines', icon: 'template', adminOnly: true,
-          hint: 'Each pipeline, the topic it publishes on, and its form' },
         { label: 'Configuration values', path: '/configuration/values', icon: 'key', adminOnly: true,
           hint: 'Values and secrets a task reads as ${config:KEY} and ${secret:KEY}' },
         { label: 'Home pages', path: '/configuration/home-pages', icon: 'globe', adminOnly: true,
@@ -162,8 +203,6 @@ export class Shell {
           hint: 'Labels that group tasks together' },
         { label: 'Engine settings', path: '/configuration/engine', icon: 'settings', platformOnly: true,
           hint: 'The scheduler fetch limit and the crons\' watermarks' },
-        { label: 'Storage Connections', path: '/configuration/storage-connections', icon: 'cloud', adminOnly: true,
-          hint: 'S3, Azure, MinIO, FTP' },
       ],
     },
     {

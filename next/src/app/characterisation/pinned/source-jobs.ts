@@ -6,7 +6,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /sourceTask.json/fetchSourceTaskWithSourceTaskId?sourceTaskId=1854"
     ],
     "headings": [
-      "Source Jobs",
+      "Schedules",
       "Jobs (2 of 2)",
       "Task payload",
       "Recent runs"
@@ -50,11 +50,11 @@ export const PINNED: Record<string, unknown> = {
       "Select all jobs on this page"
     ],
     "links": [
-      "/objects/files?bucket=etl-bucket&prefix=",
-      "/operations/jobs/2833/history",
-      "/operations/jobs/bulk",
-      "/operations/jobs/new",
-      "/operations/tasks/1854/edit"
+      "/documents/files?bucket=etl-bucket&prefix=",
+      "/pipelines/1854/edit",
+      "/pipelines/schedules/2833/executions",
+      "/pipelines/schedules/bulk",
+      "/pipelines/schedules/new"
     ],
     "details": {
       "terms": [
@@ -73,7 +73,7 @@ export const PINNED: Record<string, unknown> = {
     }
   },
   "a job's run history": {
-    "url": "/operations/jobs/2833/history",
+    "url": "/pipelines/schedules/2833/executions",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -82,7 +82,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /sourceJob.json/fetchSourceJobDetailWithSourceJobId?jobId=2833"
     ],
     "headings": [
-      "Run history — Reference CSV check (e2e)",
+      "Executions — Reference CSV check (e2e)",
       "Runs (1 of 1)"
     ],
     "buttons": [
@@ -111,20 +111,20 @@ export const PINNED: Record<string, unknown> = {
       "Search runs"
     ],
     "links": [
-      "/operations/jobs",
-      "/operations/jobs/2833/runs/7331/logs",
-      "/operations/tasks/1854/edit"
+      "/pipelines/1854/edit",
+      "/pipelines/schedules",
+      "/pipelines/schedules/2833/runs/7331/logs"
     ]
   },
   "a new job": {
-    "url": "/operations/jobs/new",
+    "url": "/pipelines/schedules/new",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "POST /sourceTask.json/listSourceTask?limit=1000 {}"
     ],
     "headings": [
-      "New job",
+      "New schedule",
       "Basics",
       "Schedule",
       "Email me when"
@@ -156,11 +156,11 @@ export const PINNED: Record<string, unknown> = {
       "e.g. 5"
     ],
     "links": [
-      "/operations/jobs"
+      "/pipelines/schedules"
     ]
   },
   "a run's logs": {
-    "url": "/operations/jobs/2833/runs/7331/logs",
+    "url": "/pipelines/schedules/2833/runs/7331/logs",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -185,34 +185,34 @@ export const PINNED: Record<string, unknown> = {
       "Search log entries"
     ],
     "links": [
-      "/operations/jobs/2833/history"
+      "/pipelines/schedules/2833/executions"
     ]
   },
   "bulk jobs": {
-    "url": "/operations/jobs/bulk",
+    "url": "/pipelines/schedules/bulk",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1"
     ],
     "headings": [
-      "Bulk jobs",
+      "Bulk schedules",
       "Import",
       "Export"
     ],
     "buttons": [
       "Download the import template",
-      "Export all jobs"
+      "Export all schedules"
     ],
     "columns": [],
     "fields": [
       "Choose a file"
     ],
     "links": [
-      "/operations/jobs"
+      "/pipelines/schedules"
     ]
   },
   "editing a job": {
-    "url": "/operations/jobs/2833/edit",
+    "url": "/pipelines/schedules/2833/edit",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -220,7 +220,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /sourceJob.json/fetchSourceJobDetailWithSourceJobId?jobId=2833"
     ],
     "headings": [
-      "Edit job",
+      "Edit schedule",
       "Basics",
       "Email me when"
     ],
@@ -245,18 +245,18 @@ export const PINNED: Record<string, unknown> = {
       "The job fails"
     ],
     "links": [
-      "/operations/jobs"
+      "/pipelines/schedules"
     ]
   },
   "every job's run history": {
-    "url": "/operations/jobs/history",
+    "url": "/pipelines/executions",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /sourceJob.json/listSourceJob"
     ],
     "headings": [
-      "Run history",
+      "Executions",
       "Runs (0 of 0)"
     ],
     "buttons": [
@@ -268,11 +268,11 @@ export const PINNED: Record<string, unknown> = {
       "Search runs"
     ],
     "links": [
-      "/operations/jobs"
+      "/pipelines/schedules"
     ]
   },
   "the job assistant": {
-    "url": "/operations/jobs/2833/assistant",
+    "url": "/pipelines/schedules/2833/assistant",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -281,7 +281,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /sourceJob.json/fetchSourceJobQueueListWithJobId?jobId=2833"
     ],
     "headings": [
-      "Job assistant — Reference CSV check (e2e)"
+      "Schedule assistant — Reference CSV check (e2e)"
     ],
     "buttons": [
       "Ask",
@@ -301,18 +301,18 @@ export const PINNED: Record<string, unknown> = {
       "Ask about this job — its schedule, files, failures or history"
     ],
     "links": [
-      "/operations/jobs/2833/history"
+      "/pipelines/schedules/2833/executions"
     ]
   },
   "the list, as a tenant user with five pages": {
-    "url": "/operations/jobs",
+    "url": "/pipelines/schedules",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /sourceJob.json/listSourceJob"
     ],
     "headings": [
-      "Source Jobs",
+      "Schedules",
       "Jobs (2 of 2)"
     ],
     "buttons": [
@@ -350,19 +350,19 @@ export const PINNED: Record<string, unknown> = {
       "Select all jobs on this page"
     ],
     "links": [
-      "/operations/jobs/bulk",
-      "/operations/jobs/new"
+      "/pipelines/schedules/bulk",
+      "/pipelines/schedules/new"
     ]
   },
   "the list, as a workspace administrator": {
-    "url": "/operations/jobs",
+    "url": "/pipelines/schedules",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /sourceJob.json/listSourceJob"
     ],
     "headings": [
-      "Source Jobs",
+      "Schedules",
       "Jobs (2 of 2)"
     ],
     "buttons": [
@@ -401,8 +401,8 @@ export const PINNED: Record<string, unknown> = {
       "Select all jobs on this page"
     ],
     "links": [
-      "/operations/jobs/bulk",
-      "/operations/jobs/new"
+      "/pipelines/schedules/bulk",
+      "/pipelines/schedules/new"
     ]
   },
   "the row menu, as a tenant user with five pages": {
@@ -414,21 +414,21 @@ export const PINNED: Record<string, unknown> = {
       "Duplicate",
       "Edit",
       "Email notifications 3",
-      "Run history",
+      "Executions",
       "Run now",
       "Skip next run"
     ],
     "columns": [],
     "fields": [],
     "links": [
-      "/operations/jobs/2833/edit",
-      "/operations/jobs/2833/history"
+      "/pipelines/schedules/2833/edit",
+      "/pipelines/schedules/2833/executions"
     ],
     "items": [
       "Run now",
       "Skip next run",
       "Edit",
-      "Run history",
+      "Executions",
       "Ask about this job",
       "Duplicate",
       "Email notifications 3",
@@ -445,21 +445,21 @@ export const PINNED: Record<string, unknown> = {
       "Duplicate",
       "Edit",
       "Email notifications 3",
-      "Run history",
+      "Executions",
       "Run now",
       "Skip next run"
     ],
     "columns": [],
     "fields": [],
     "links": [
-      "/operations/jobs/2833/edit",
-      "/operations/jobs/2833/history"
+      "/pipelines/schedules/2833/edit",
+      "/pipelines/schedules/2833/executions"
     ],
     "items": [
       "Run now",
       "Skip next run",
       "Edit",
-      "Run history",
+      "Executions",
       "Ask about this job",
       "Duplicate",
       "Email notifications 3",

@@ -1,6 +1,6 @@
 <div class="page">
   <div>
-    <a [routerLink]="['/operations/jobs', jobId(), 'history']" class="text-sm text-accent hover:underline">
+    <a [routerLink]="['/pipelines/schedules', jobId(), 'executions']" class="text-sm text-accent hover:underline">
       ← Back to run history
     </a>
     <div class="flex items-start gap-3">
@@ -37,7 +37,7 @@
                 <dt>Name</dt>
                 <dd class="truncate">
                   <a class="text-accent hover:underline"
-                     [routerLink]="['/operations/jobs', jobId(), 'history']">{{ j.jobName }}</a>
+                     [routerLink]="['/pipelines/schedules', jobId(), 'executions']">{{ j.jobName }}</a>
                 </dd>
                 <dt>Execution</dt><dd>{{ j.execution || '—' }}</dd>
                 <dt>State</dt><dd><app-status [label]="j.jobStatus" [quiet]="true" /></dd>
@@ -157,7 +157,7 @@
                    [emptyMessage]="search() ? 'No entries match your search.' : 'This run reported no log entries.'"
                    (retry)="load()">
     @if (missing()) {
-      <a error-action routerLink="/operations/jobs" class="btn btn-default btn-sm mt-4">Back to jobs</a>
+      <a error-action routerLink="/pipelines/schedules" class="btn btn-default btn-sm mt-4">Back to schedules</a>
     }
     <ng-container toolbar>
       <app-segmented [(value)]="view" [options]="views" ariaLabel="Log layout" />
@@ -247,5 +247,5 @@
 
   <!-- A line as text and paths; a path opens its folder in the Object Browser and wraps only
        between names, so "orders_2026-09-a.csv" is never split at its hyphen. -->
-  <ng-template #message let-log>@for (seg of segmentsOf(log); track $index) {@if (seg.path; as p) {@if (p.bucket) {<a class="log-path" routerLink="/objects/files" [queryParams]="{ bucket: p.bucket, prefix: p.prefix }" [title]="'Open ' + (p.prefix || '/') + ' in ' + p.bucket">@for (part of pathParts(seg.text); track $index) {{{ part }}@if (part.endsWith('/')) {<wbr>}}</a>} @else {<span class="log-path">@for (part of pathParts(seg.text); track $index) {{{ part }}@if (part.endsWith('/')) {<wbr>}}</span>}} @else {{{ seg.text }}}}</ng-template>
+  <ng-template #message let-log>@for (seg of segmentsOf(log); track $index) {@if (seg.path; as p) {@if (p.bucket) {<a class="log-path" routerLink="/documents/files" [queryParams]="{ bucket: p.bucket, prefix: p.prefix }" [title]="'Open ' + (p.prefix || '/') + ' in ' + p.bucket">@for (part of pathParts(seg.text); track $index) {{{ part }}@if (part.endsWith('/')) {<wbr>}}</a>} @else {<span class="log-path">@for (part of pathParts(seg.text); track $index) {{{ part }}@if (part.endsWith('/')) {<wbr>}}</span>}} @else {{{ seg.text }}}}</ng-template>
 </div>

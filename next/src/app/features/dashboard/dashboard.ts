@@ -546,7 +546,7 @@ export class Dashboard implements OnInit {
     // /jobs/undefined/history -- a real URL that renders, reads "undefined" back out of the path
     // and hands it to every link on the page. The paramless route already means "this hour across
     // every job", which is the honest reading of a row that cannot say which job it is.
-    this.router.navigate(row.jobId ? ['/operations/jobs', row.jobId, 'history'] : ['/operations/jobs', 'history'],
+    this.router.navigate(row.jobId ? ['/pipelines/schedules', row.jobId, 'executions'] : ['/pipelines/executions'],
       { queryParams });
   }
 
@@ -573,7 +573,7 @@ export class Dashboard implements OnInit {
     if (status !== 'Total') {
       queryParams['jobStatus'] = status.charAt(0).toUpperCase() + status.slice(1);
     }
-    this.router.navigate(['/operations/jobs', 'history'], { queryParams });
+    this.router.navigate(['/pipelines/executions'], { queryParams });
   }
 
   countFor(row: JobBreakdown, key: BreakdownKey): number {

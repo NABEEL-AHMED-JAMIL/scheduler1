@@ -29,8 +29,8 @@ describe('Bulk import / export', () => {
    */
   it('links back to its own list rather than to the browser history', () => {
     const { el } = page();
-    const back = [...el.querySelectorAll('a')].find(a => /Back to tasks/.test(a.textContent!));
-    expect(back?.getAttribute('href')).toBe('/operations/tasks');
+    const back = [...el.querySelectorAll('a')].find(a => /Back to pipelines/.test(a.textContent!));
+    expect(back?.getAttribute('href')).toBe('/pipelines');
   });
 
   /**
@@ -178,10 +178,10 @@ describe('Bulk download names', () => {
   }
 
   it('names the template and the export for what they are, not the server\'s generic name', () => {
-    expect(download('template', 'attachment; filename=BatchDownload-2026-09-28-1a2b.xlsx')).toBe('tasks-import-template.xlsx');
+    expect(download('template', 'attachment; filename=BatchDownload-2026-09-28-1a2b.xlsx')).toBe('pipelines-import-template.xlsx');
     saved.length = 0;
     expect(download('exportAll', 'attachment; filename=BatchDownload-2026-09-28-1a2b.xlsx'))
-      .toBe(`tasks-export-${localIsoDay(new Date())}.xlsx`);
+      .toBe(`pipelines-export-${localIsoDay(new Date())}.xlsx`);
   });
 
   it('keeps a name the server chose on purpose', () => {

@@ -105,9 +105,10 @@ test.describe('access profiles', () => {
     const memberPage = await pageAs(browser, memberSession);
     await memberPage.goto('/dashboard');
     const nav = memberPage.locator('nav, header').first();
-    await expect(nav.getByText('Operations')).toBeVisible();
-    await expect(nav.getByText('Tools')).toHaveCount(0);
-    await expect(nav.getByText('Assistants')).toHaveCount(0);
+    // MIG-246: Operations is Pipelines, Tools and Object Browser are Documents, Assistants is AI.
+    await expect(nav.getByRole('button', { name: 'Pipelines', exact: true })).toBeVisible();
+    await expect(nav.getByRole('button', { name: 'Documents', exact: true })).toHaveCount(0);
+    await expect(nav.getByRole('button', { name: 'AI', exact: true })).toHaveCount(0);
 
     // A direct URL to a withheld page lands on the access page, naming it, with a way to ask.
     await memberPage.goto('/objects/analytics');
@@ -116,9 +117,9 @@ test.describe('access profiles', () => {
     await memberPage.getByRole('button', { name: 'Request access' }).click();
     await expect(memberPage.getByRole('button', { name: 'Asked' })).toBeVisible();
 
-    // The page they do hold opens.
+    // The page they do hold opens -- at its old address too (MIG-246 redirect).
     await memberPage.goto('/operations/reports');
-    await expect(memberPage).toHaveURL(/\/reports$/);
+    await expect(memberPage).toHaveURL(/\/pipelines\/run-analytics$/);
 
     // And the server refuses the API behind a withheld page, whatever the browser shows.
     const refused = await request.get(`${api}/analytics.json/listQueries`, {

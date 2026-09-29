@@ -231,9 +231,9 @@
                counted every job whose status was set and not Missed, which is neither a period
                nor an event -- it read as "today" and meant "ever". -->
           <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <!-- A link only when the access profile lets this person open Source Jobs. -->
+            <!-- A link only when the access profile lets this person open Schedules. -->
             @if (canOpenJobs()) {
-              <a routerLink="/operations/jobs" class="group block rounded-[var(--radius-card)]">
+              <a routerLink="/pipelines/schedules" class="group block rounded-[var(--radius-card)]">
                 <app-stat-tile label="Jobs" [value]="jobsAssigned()" icon="briefcase" tone="info"
                                [foot]="activeJobs() + ' active'"
                                class="h-full transition-colors group-hover:border-[color:var(--accent-mark)]" />
@@ -269,7 +269,7 @@
                   <div class="flex items-center gap-2 min-w-0">
                     <app-icon name="briefcase" size="0.95em" class="icon-muted shrink-0" />
                     @if (canOpenJobs()) {
-                      <a class="link-inline truncate text-sm" [routerLink]="['/operations/jobs', run.jobId, 'history']"
+                      <a class="link-inline truncate text-sm" [routerLink]="['/pipelines/schedules', run.jobId, 'executions']"
                          [title]="run.jobName">{{ run.jobName }}</a>
                     } @else {
                       <span class="truncate text-sm min-w-0" [title]="run.jobName">{{ run.jobName }}</span>

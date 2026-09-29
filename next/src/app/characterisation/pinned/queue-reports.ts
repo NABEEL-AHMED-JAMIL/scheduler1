@@ -1,7 +1,7 @@
 // Recorded by scripts/characterisation/record.mjs -- see ../harness.ts. Review the diff: it is the baseline.
 export const PINNED: Record<string, unknown> = {
   "reports, as a tenant user with five pages": {
-    "url": "/operations/reports",
+    "url": "/pipelines/run-analytics",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -9,7 +9,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /aiPrompt.json/usage?from=<date>&to=<date>"
     ],
     "headings": [
-      "Reports",
+      "Run analytics",
       "Overview",
       "Outcomes and timing",
       "Outcome mix",
@@ -102,7 +102,7 @@ export const PINNED: Record<string, unknown> = {
     "links": []
   },
   "reports, as a workspace administrator": {
-    "url": "/operations/reports",
+    "url": "/pipelines/run-analytics",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -111,7 +111,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /aiPrompt.json/usage?from=<date>&to=<date>"
     ],
     "headings": [
-      "Reports",
+      "Run analytics",
       "Overview",
       "Outcomes and timing",
       "Outcome mix",
@@ -250,14 +250,14 @@ export const PINNED: Record<string, unknown> = {
       "To date"
     ],
     "links": [
-      "/operations/jobs/2835/history",
-      "/operations/jobs/2835/runs/7381/logs",
-      "/operations/jobs/2838/history",
-      "/operations/jobs/2838/runs/7382/logs"
+      "/pipelines/schedules/2835/executions",
+      "/pipelines/schedules/2835/runs/7381/logs",
+      "/pipelines/schedules/2838/executions",
+      "/pipelines/schedules/2838/runs/7382/logs"
     ]
   },
   "the queue, as a tenant user with five pages": {
-    "url": "/operations/queue",
+    "url": "/pipelines/queue",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -292,14 +292,14 @@ export const PINNED: Record<string, unknown> = {
       "To date"
     ],
     "links": [
-      "/operations/jobs/2835/history",
-      "/operations/jobs/2835/runs/7381/logs",
-      "/operations/jobs/2838/history",
-      "/operations/jobs/2838/runs/7382/logs"
+      "/pipelines/schedules/2835/executions",
+      "/pipelines/schedules/2835/runs/7381/logs",
+      "/pipelines/schedules/2838/executions",
+      "/pipelines/schedules/2838/runs/7382/logs"
     ]
   },
   "the queue, as a workspace administrator": {
-    "url": "/operations/queue",
+    "url": "/pipelines/queue",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -334,10 +334,10 @@ export const PINNED: Record<string, unknown> = {
       "To date"
     ],
     "links": [
-      "/operations/jobs/2835/history",
-      "/operations/jobs/2835/runs/7381/logs",
-      "/operations/jobs/2838/history",
-      "/operations/jobs/2838/runs/7382/logs"
+      "/pipelines/schedules/2835/executions",
+      "/pipelines/schedules/2835/runs/7381/logs",
+      "/pipelines/schedules/2838/executions",
+      "/pipelines/schedules/2838/runs/7382/logs"
     ]
   }
 };
