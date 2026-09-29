@@ -172,14 +172,19 @@ export class TaskPanel {
     this.api.switchTask(code, enabled).subscribe({
       next: r => {
         this.switching.set(false);
-        if (r.status !== API_SUCCESS) { this.toast.error(r.message || 'The task could not be switched.'); return; }
+        // A refusal hands the switch the same line afresh, so its box goes back to where it was.
+        if (r.status !== API_SUCCESS) { this.toast.error(r.message || 'The task could not be switched.'); this.task.update(t => ({ ...t })); return; }
         this.toast.success(r.message || 'Switched.');
         if (r.data?.code) {
           this.task.update(t => ({ ...t, ...r.data }));
           this.data.onSwitched?.(r.data);
         }
       },
-      error: err => { this.switching.set(false); this.toast.error(err?.error?.message || 'The task could not be switched.'); },
+      error: err => {
+        this.switching.set(false);
+        this.toast.error(err?.error?.message || 'The task could not be switched.');
+        this.task.update(t => ({ ...t }));
+      },
     });
   }
 }

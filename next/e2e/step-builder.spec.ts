@@ -255,7 +255,7 @@ test.describe('Step builder', () => {
     await page.keyboard.press('Escape');
     await page.getByRole('tab', { name: 'Settings' }).click();
     await row.getByRole('button', { name: 'Put Aggregate back to its default' }).click();
-    await expect(row).not.toContainText('switched here');
+    await expect(row).not.toContainText('Switched here');
     const line = (await (await request.get(`${api}/pipeline.json/steps/tasks`, { headers: { Authorization: `Bearer ${s.token}` } })).json())
       .data.find((t: { code: string }) => t.code === 'aggregate');
     expect(line).toMatchObject({ enabled: true, overridden: false });

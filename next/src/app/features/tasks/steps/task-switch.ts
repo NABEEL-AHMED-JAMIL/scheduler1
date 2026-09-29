@@ -1,4 +1,4 @@
-import { Component, computed, input, output } from '@angular/core';
+import { Component, ElementRef, computed, effect, input, output, viewChild } from '@angular/core';
 import { DataText } from '../../../shared/ui/data-text';
 import { StepTaskEntry, TaskState } from './steps.model';
 
@@ -8,7 +8,8 @@ import { StepTaskEntry, TaskState } from './steps.model';
  * switched the same way wherever an administrator meets it. It only says what was asked -- `switched` with true,
  * false or null (back to the default); the host calls Core and hands the answer back as `task`.
  *
- * The box shows what Core last said, not the click: a refused switch leaves it as it was.
+ * The box moves with the click. Whenever the host hands it a line (a new one, or the same one afresh after a
+ * refusal) or stops being busy, it shows that line again -- so a refused switch goes back to where it was.
  */
 @Component({
   selector: 'app-task-switch',
@@ -18,10 +19,10 @@ import { StepTaskEntry, TaskState } from './steps.model';
       <button type="button" class="btn btn-ghost btn-sm" [attr.aria-label]="'Put ' + name() + ' back to its default'"
               [disabled]="busy()" (click)="switched.emit(null)">Default</button>
     }
-    <input type="checkbox" class="checkbox align-middle" role="switch" [checked]="!!task().enabled"
+    <input #box type="checkbox" class="checkbox align-middle" role="switch" [checked]="!!task().enabled"
            [attr.aria-label]="'Switch ' + name() + ' on in this workspace'"
            [disabled]="busy() || task().overridable === false || (task().available === false && !task().enabled)"
-           (change)="flip($event)" />
+           (change)="switched.emit($any($event.target).checked)" />
   `,
 })
 export class TaskSwitch {
@@ -30,12 +31,13 @@ export class TaskSwitch {
   readonly switched = output<boolean | null>();
   readonly name = computed(() => this.task().name || this.task().code);
 
-  flip(event: Event): void {
-    const box = event.target as HTMLInputElement;
-    const wanted = box.checked;
-    box.checked = !!this.task().enabled;
-    this.switched.emit(wanted);
-  }
+  private readonly box = viewChild<ElementRef<HTMLInputElement>>('box');
+  /** Whenever the task's line or the host's busy changes, the box shows the line again (a refusal changes neither). */
+  private readonly sync = effect(() => {
+    const on = !!this.task().enabled;
+    const box = this.box()?.nativeElement;
+    if (box && !this.busy()) box.checked = on;
+  });
 }
 
 /** A task's state here as the registry and the step builder print it: On, Off or Unavailable, switched here, and why. */

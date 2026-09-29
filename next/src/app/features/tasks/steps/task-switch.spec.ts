@@ -30,16 +30,27 @@ function mount(task?: Partial<StepTaskEntry>) {
 }
 
 describe('TaskSwitch -- one switch for the step builder and the Task Registry', () => {
-  it('asks to switch off, and keeps showing what Core last said until it answers', () => {
+  it('asks to switch off, and shows what Core then said', () => {
     const { box, host, fixture } = mount();
     expect(box().getAttribute('aria-label')).toBe('Switch Join on in this workspace');
     box().checked = false;
     box().dispatchEvent(new Event('change'));
     expect(host.asked).toEqual([false]);
-    expect(box().checked).toBe(true);
     host.task.update(t => withSwitchedLine([t], { code: 'join', enabled: false, overridden: true })[0]);
     fixture.detectChanges();
     expect(box().checked).toBe(false);
+  });
+
+  it('goes back to where it was when the switch is refused', () => {
+    const { box, host, fixture } = mount();
+    host.busy.set(true);
+    fixture.detectChanges();
+    box().checked = false;
+    box().dispatchEvent(new Event('change'));
+    // Refused: the line is unchanged, and the host is no longer busy.
+    host.busy.set(false);
+    fixture.detectChanges();
+    expect(box().checked).toBe(true);
   });
 
   it('offers Default only once the workspace has switched it', () => {
