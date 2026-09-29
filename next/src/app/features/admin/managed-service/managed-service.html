@@ -1,0 +1,85 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Managed service</h1>
+      <p class="page-subtitle">
+        Which of our staff may work in which customer's workspace. Every change they make there is recorded in
+        <a routerLink="/administration/staff-activity" class="link-inline">Staff activity</a>.
+      </p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
+        <app-icon name="refresh" [class.spin]="loading()" />Refresh
+      </button>
+      <button type="button" class="btn btn-primary btn-sm" (click)="openGrant()"><app-icon name="plus" />Grant</button>
+    </div>
+  </div>
+
+  <app-table-shell heading="Grants" [loading]="loading()" [error]="error()"
+                   [isEmpty]="!grants().length" [shown]="grants().length"
+                   [emptyMessage]="hasFilters() ? 'No grant matches those filters.' : 'No live grants. Grant a staff member a workspace to let them work in it.'"
+                   emptyIcon="briefcase" (retry)="load()">
+    <ng-container toolbar>
+      <select class="input max-w-48 min-w-0" aria-label="Filter by workspace" [value]="tenantFilter() ?? ''"
+              (change)="setTenant($any($event.target).value)">
+        <option value="">Every workspace</option>
+        @for (t of tenants(); track t.tenantId) { <option [value]="t.tenantId">{{ t.tenantName }}</option> }
+      </select>
+      <select class="input max-w-48 min-w-0" aria-label="Filter by staff member" [value]="staffFilter() ?? ''"
+              (change)="setStaff($any($event.target).value)">
+        <option value="">Every staff member</option>
+        @for (s of staff(); track s.appUserId) { <option [value]="s.appUserId">{{ name(s) }}</option> }
+      </select>
+      <label class="inline-flex items-center gap-1.5 text-sm whitespace-nowrap">
+        <input type="checkbox" class="checkbox" [checked]="includeRevoked()"
+               (change)="setIncludeRevoked($any($event.target).checked)" />Include revoked
+      </label>
+      @if (hasFilters()) {
+        <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()"><app-icon name="close" />Clear</button>
+      }
+    </ng-container>
+
+    <table class="table-modern">
+      <thead>
+        <tr>
+          <th>Staff member</th>
+          <th>Workspace</th>
+          <th>Granted</th>
+          <th>Revoked</th>
+          <th class="text-right">State</th>
+          <th class="w-12"><span class="sr-only">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (g of grants(); track g.grantId) {
+          <tr [class.opacity-70]="!isLive(g)">
+            <td class="max-w-64">
+              <div class="font-medium truncate">{{ name(g) }}</div>
+              @if (g.fullName && g.username) { <div class="text-xs text-[color:var(--text-muted)] truncate">{{ g.username }}</div> }
+            </td>
+            <td class="max-w-64">
+              <div class="flex items-center gap-2 min-w-0">
+                <span class="truncate">{{ workspaceName(g) }}</span>
+                @if (g.managementMode === 'MANAGED') { <span class="pill pill-brand">Managed</span> }
+                @else if (g.managementMode === 'SELF') { <span class="pill pill-neutral">Self-managed</span> }
+              </div>
+            </td>
+            <td class="whitespace-nowrap text-[color:var(--text-secondary)]">{{ g.grantedAt ? (g.grantedAt | serverTime: 'dateTime') : '—' }}</td>
+            <td class="whitespace-nowrap text-[color:var(--text-secondary)]">{{ g.revokedAt ? (g.revokedAt | serverTime: 'dateTime') : '—' }}</td>
+            <td class="text-right">
+              <span class="pill" [class]="isLive(g) ? 'pill pill-ok' : 'pill pill-neutral'">{{ isLive(g) ? 'Live' : 'Revoked' }}</span>
+            </td>
+            <td class="text-right">
+              @if (isLive(g)) {
+                <button type="button" class="btn btn-ghost btn-sm btn-intent-crit" [disabled]="busy() === g.grantId"
+                        [attr.aria-label]="'Revoke ' + name(g) + ' in ' + workspaceName(g)" (click)="revoke(g)">
+                  <app-icon name="power" [busy]="busy() === g.grantId" />Revoke
+                </button>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </app-table-shell>
+</div>
