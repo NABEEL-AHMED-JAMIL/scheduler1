@@ -281,6 +281,17 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
+      "path": "/documents/inbox",
+      "title": "Inbox",
+      "pageKey": "objects",
+      "minRole": "TENANT_USER",
+      "guards": [
+        "pageGuard",
+        "roleGuard"
+      ],
+      "lazy": true
+    },
+    {
       "path": "/documents/transcript",
       "title": "Audio Transcript",
       "pageKey": "tools-transcript",

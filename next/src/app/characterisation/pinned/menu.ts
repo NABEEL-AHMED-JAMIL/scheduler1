@@ -14,6 +14,7 @@ export const PINNED: Record<string, unknown> = {
     "Documents › Review queue — Check low-confidence fields -> /documents/review",
     "Documents › Document Converter — Convert between formats -> /documents/converter",
     "Documents › Browse files — Upload, preview and share objects -> /documents/files",
+    "Documents › Inbox — Upload files that start jobs -> /documents/inbox",
     "Documents › Audio Transcript — Speech to text -> /documents/transcript",
     "Data › Ask your data Soon — Questions in plain language, with sources -> /data/ask",
     "Data › Data Catalog Soon — Every dataset, owner, schema and sensitive field -> /data/catalog",
@@ -53,6 +54,7 @@ export const PINNED: Record<string, unknown> = {
     "Pipelines › Run analytics — Group and measure your runs -> /pipelines/run-analytics",
     "Documents › Document Converter — Convert between formats -> /documents/converter",
     "Documents › Browse files — Upload, preview and share objects -> /documents/files",
+    "Documents › Inbox — Upload files that start jobs -> /documents/inbox",
     "Documents › Audio Transcript — Speech to text -> /documents/transcript",
     "Data › Analytics Studio — Read a file as data, where it lives -> /data/analytics",
     "Data › Saved Analyses — Analyses and queries you kept, re-run on open -> /data/analytics/dashboards",
@@ -66,7 +68,8 @@ export const PINNED: Record<string, unknown> = {
     "Pipelines › Schedules — When each pipeline runs, and its runs -> /pipelines/schedules",
     "Pipelines › Queue — What is in flight right now -> /pipelines/queue",
     "Pipelines › Run analytics — Group and measure your runs -> /pipelines/run-analytics",
-    "Documents › Browse files — Upload, preview and share objects -> /documents/files"
+    "Documents › Browse files — Upload, preview and share objects -> /documents/files",
+    "Documents › Inbox — Upload files that start jobs -> /documents/inbox"
   ],
   "the menu for a tenant user with no page": [
     "Dashboard -> /dashboard"
@@ -85,6 +88,7 @@ export const PINNED: Record<string, unknown> = {
     "Documents › Review queue — Check low-confidence fields -> /documents/review",
     "Documents › Document Converter — Convert between formats -> /documents/converter",
     "Documents › Browse files — Upload, preview and share objects -> /documents/files",
+    "Documents › Inbox — Upload files that start jobs -> /documents/inbox",
     "Documents › Audio Transcript — Speech to text -> /documents/transcript",
     "Data › Ask your data Soon — Questions in plain language, with sources -> /data/ask",
     "Data › Data Catalog Soon — Every dataset, owner, schema and sensitive field -> /data/catalog",
