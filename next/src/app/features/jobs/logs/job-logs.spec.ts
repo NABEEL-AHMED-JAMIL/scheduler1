@@ -222,3 +222,41 @@ describe('JobLogs on the console clock', () => {
     for (const stamp of stamps) expect(stamp).toMatch(/^\[\d{1,2} [A-Z][a-z]{2} \d{4}, \d{2}:\d{2}:\d{2}\]$/);
   });
 });
+
+/**
+ * MIG-251: a run the step engine took shows its steps (Timeline and Console) above its entries; a legacy run's page is
+ * exactly what it was.
+ */
+describe('JobLogs with the run\'s steps', () => {
+  const ENGINE = { jobQueueId: 6839, jobId: 2808, runStatus: 'Completed', attempt: 1, attempts: [1], legacy: false, aiSteps: [],
+    steps: [{ stepExecutionId: 1, index: 0, key: 'read', task: 'read_file', status: 'Completed', durationMs: 5, recordsIn: 0, recordsOut: 2,
+      tries: 1, onError: 'fail', datasets: [], log: 'step' }] };
+  const LEGACY = { jobQueueId: 6839, jobId: 2808, runStatus: 'Completed', attempt: 1, attempts: [1], legacy: true, aiSteps: [],
+    steps: [{ stepExecutionId: null, index: 0, key: 'legacy', task: 'legacy', status: 'Completed', datasets: [], log: 'run' }] };
+
+  function withSteps(timeline: unknown) {
+    const { fixture, el } = page();
+    const http = TestBed.inject(HttpTestingController);
+    const asks = http.match(r => r.url.endsWith('/sourceJob.json/stepExecutions'));
+    // One question for the steps, even though the run's first read landed while it was out.
+    expect(asks).toHaveLength(1);
+    expect(asks[0].request.params.get('jobQueueId')).toBe('6839');
+    asks[0].flush({ status: API_SUCCESS, data: timeline });
+    fixture.detectChanges();
+    return { el };
+  }
+
+  it('shows an engine run\'s steps above its entries', () => {
+    const { el } = withSteps(ENGINE);
+    const steps = el.querySelector('.exec-steps')!;
+    expect(steps).not.toBeNull();
+    expect(steps.querySelectorAll('.exec-step').length).toBe(1);
+    expect(steps.compareDocumentPosition(el.querySelector('app-table-shell')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('adds nothing to a legacy run\'s page', () => {
+    const { el } = withSteps(LEGACY);
+    expect(el.querySelector('.exec-steps')).toBeNull();
+    expect(el.querySelectorAll('.log-timeline li').length).toBe(3);
+  });
+});

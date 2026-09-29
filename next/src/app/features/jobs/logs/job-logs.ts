@@ -16,6 +16,7 @@ import { formatDuration } from '../../../shared/ui/time-format';
 import { Markdown } from '../../../shared/ui/markdown';
 import { SegmentOption, Segmented } from '../../../shared/ui/segmented';
 import { LogSegment, logSegments, pathParts } from './log-segments';
+import { RunSteps } from '../run-steps/run-steps';
 
 interface AuditLog {
   jobAuditLogId?: number;
@@ -27,7 +28,7 @@ interface AuditLog {
 
 @Component({
   selector: 'app-job-logs',
-  imports: [StickToBottom, Icon, ServerTimePipe, NgTemplateOutlet, RouterLink, TableShell, RankedBar, StatusPill, Markdown, Segmented],
+  imports: [StickToBottom, Icon, ServerTimePipe, NgTemplateOutlet, RouterLink, TableShell, RankedBar, StatusPill, Markdown, Segmented, RunSteps],
   templateUrl: './job-logs.html',
 })
 export class JobLogs implements OnInit, OnDestroy {
@@ -87,6 +88,8 @@ export class JobLogs implements OnInit, OnDestroy {
   ];
 
   readonly refreshing = signal(false);
+  /** How many times the run has been read: the steps card (MIG-251) re-reads its steps with the run's own poll. */
+  readonly loads = signal(0);
   readonly live = signal(true);
   /** The run is not there, so neither Try again nor the live poll can help (the page offers Back to jobs). */
   readonly missing = signal(false);
@@ -381,6 +384,7 @@ export class JobLogs implements OnInit, OnDestroy {
           // The same call already carries both -- there is no reason to fetch them again.
           this.job.set(data?.sourceJob ?? null);
           this.run.set(data?.sourceJobQueue ?? null);
+          this.loads.update(n => n + 1);
           this.loadAiSteps();
         } else if (isMissingRecord(response)) {
           this.goneMissing();

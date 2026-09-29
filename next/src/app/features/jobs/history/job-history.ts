@@ -26,6 +26,7 @@ import { clockTime } from '../schedule-labels';
 import { createPager } from '../../../shared/ui/pager';
 import { Pagination } from '../../../shared/ui/pagination';
 import { StatStrip, StatStripItem, StatStripSummary } from '../../../shared/ui/stat-strip';
+import { InboxArrival, InboxTrigger, arrivalsOf, runsStartedByFile, triggerOf, triggerSentence } from '../inbox/inbox-trigger';
 
 interface JobQueue {
   jobQueueId: number;
@@ -221,6 +222,37 @@ export class JobHistory {
     return match ? match[1] : raw;
   }
 
+  /**
+   * MIG-251 on MIG-239: the job's inbox trigger -- the "Event" start -- and what the inbox's files did to it. Only for
+   * one job: the all-jobs hour has no job to ask about.
+   */
+  readonly trigger = signal<InboxTrigger | null>(null);
+  readonly arrivals = signal<InboxArrival[]>([]);
+  /** Each run a file started, by run id: its Started cell names the file. */
+  readonly startedBy = computed(() => runsStartedByFile(this.arrivals()));
+  /** The last few files, newest first, for the detail card; the rest are one click away in the runs they started. */
+  readonly recentArrivals = computed(() => this.arrivals().slice(0, 5));
+  readonly showInbox = computed(() => !!this.trigger()?.configured || this.arrivals().length > 0);
+  readonly triggerSentence = triggerSentence;
+
+  private loadTrigger(): void {
+    if (!this.jobId()) { this.trigger.set(null); return; }
+    this.http.get<ApiResponse<unknown>>(`${API_BASE}/sourceJob.json/inboxTrigger`, { params: { jobId: this.jobId() } }).subscribe({
+      next: response => this.trigger.set(response.status === API_SUCCESS ? triggerOf(response.data) : null),
+      error: () => this.trigger.set(null),
+    });
+  }
+
+  /** Re-read with the runs: a file that starts a run is how a new row arrives on this screen. */
+  private loadArrivals(): void {
+    if (!this.jobId()) { this.arrivals.set([]); return; }
+    this.http.get<ApiResponse<unknown>>(`${API_BASE}/sourceJob.json/inboxArrivals`, { params: { jobId: this.jobId() } }).subscribe({
+      next: response => { if (response.status === API_SUCCESS) this.arrivals.set(arrivalsOf(response.data)); },
+      // The runs are the point of the screen; losing the file names must not break it.
+      error: () => {},
+    });
+  }
+
   private loadDetail(): void {
     if (!this.jobId()) { this.detail.set(null); return; }
     this.http.get<ApiResponse<any>>(`${API_BASE}/sourceJob.json/fetchSourceJobDetailWithSourceJobId`,
@@ -300,6 +332,7 @@ export class JobHistory {
       this.targetHr();
       this.load();
       this.loadDetail();
+      untracked(() => this.loadTrigger());
     });
 
     /*
@@ -385,6 +418,8 @@ export class JobHistory {
     };
     if (this.jobStatus()) drillParams['jobStatus'] = this.jobStatus();
     if (this.jobId()) drillParams['jobId'] = this.jobId();
+
+    this.loadArrivals();
 
     const request = this.isDrillDown()
       ? this.http.get<ApiResponse<any>>(

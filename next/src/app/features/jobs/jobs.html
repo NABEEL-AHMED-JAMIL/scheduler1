@@ -240,6 +240,9 @@
                   <button cdkMenuItem class="menu-item" [disabled]="!canRunNow(job)"
                           [title]="runBlockedReason(job)"
                           (cdkMenuItemTriggered)="runNow(job)"><app-icon name="play" />Run now</button>
+                  <button cdkMenuItem class="menu-item" [disabled]="!canRunNow(job)"
+                          [title]="runBlockedReason(job) || 'Run now, choosing the model each AI step runs on'"
+                          (cdkMenuItemTriggered)="runWith(job)"><app-icon name="sparkle" />Run with…</button>
                   <button cdkMenuItem class="menu-item" [disabled]="isInFlight(job) || !canSkipNext(job)"
                           [title]="skipBlockedReason(job)"
                           (cdkMenuItemTriggered)="skipNext(job)"><app-icon name="skip" />Skip next run</button>
@@ -321,6 +324,15 @@
                         } @else {
                           <span>#{{ job.taskDetail!.taskDetailId }} {{ job.taskDetail!.taskName }}</span>
                         }
+                      </dd>
+                    </div>
+                  }
+                  @if (triggerNote(job); as note) {
+                    <!-- MIG-251: the Event start. A Manual job reads "On demand" in the list. -->
+                    <div class="sm:col-span-2">
+                      <dt class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">Inbox trigger</dt>
+                      <dd class="flex items-start gap-1.5">
+                        <app-icon name="inbox" size="0.9em" class="icon-info mt-0.5 shrink-0" />{{ note }}
                       </dd>
                     </div>
                   }

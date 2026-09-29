@@ -14,6 +14,8 @@ import { TableShell } from '../../shared/ui/data-table';
 import { StatusPill } from '../../shared/ui/status-pill';
 import { Icon } from '../../shared/ui/icon';
 import { NotifyDialog } from './notify-dialog';
+import { RunWithDialog, RunWithData } from './ai-models/run-with-dialog';
+import { InboxTrigger, triggerOf, triggerSentence } from './inbox/inbox-trigger';
 import { JobAction, jobActionRequest } from './job-actions';
 import { parseTopicPartition } from '../../shared/ui/topic';
 import { JobEvent, JobEventsService } from '../../core/socket/job-events.service';
@@ -414,8 +416,30 @@ export class Jobs implements OnInit {
       return next;
     });
     if (opening && !this.runsByJob()[job.jobId]) this.loadRuns(job.jobId);
+    if (opening && !(job.jobId in this.triggerByJob())) this.loadTrigger(job.jobId);
     const taskId = job.taskDetail?.taskDetailId;
     if (opening && taskId && this.payloadByTask()[taskId] === undefined) this.loadPayload(taskId);
+  }
+
+  /**
+   * MIG-251 on MIG-239: whether a file arriving in the inbox starts the job -- the Event start. Read when the row opens,
+   * once: a Manual job's Schedule column says "On demand", and without this nothing on the list said otherwise.
+   */
+  readonly triggerByJob = signal<Record<number, InboxTrigger | null>>({});
+
+  private loadTrigger(jobId: number): void {
+    this.triggerByJob.update(map => ({ ...map, [jobId]: null }));
+    this.http.get<ApiResponse<unknown>>(`${API_BASE}/sourceJob.json/inboxTrigger`, { params: { jobId: String(jobId) } }).subscribe({
+      next: response => this.triggerByJob.update(map => ({ ...map,
+        [jobId]: response.status === API_SUCCESS ? triggerOf(response.data) : null })),
+      error: () => {},
+    });
+  }
+
+  /** The row panel's Inbox trigger line; empty when the job has none. */
+  triggerNote(job: SourceJob): string {
+    const trigger = this.triggerByJob()[job.jobId];
+    return trigger?.configured ? triggerSentence(trigger) : '';
   }
 
   private loadPayload(taskDetailId: number): void {
@@ -642,6 +666,19 @@ export class Jobs implements OnInit {
 
   runNow(job: SourceJob): void {
     this.act(job, 'run', `${job.jobName} queued to run.`);
+  }
+
+  /**
+   * MIG-251: Run now with the model each AI step runs on chosen for this run only. Offered when Run now is; the dialog
+   * lists the job's AI steps, or says it has none.
+   */
+  runWith(job: SourceJob): void {
+    if (!this.canRunNow(job) || this.busyJob() === job.jobId) return;
+    const data: RunWithData = { jobId: job.jobId, jobName: job.jobName };
+    this.dialog.open<boolean>(RunWithDialog, { data }).closed.subscribe(started => {
+      // As Run now: the pipeline pushes the real status moments later.
+      if (started) this.patchJob(job.jobId, { jobRunningStatus: 'Queue' });
+    });
   }
 
   /** Dates in the Skip dialog and toast, on the server's clock like the Next run column. */

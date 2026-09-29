@@ -138,6 +138,36 @@
               <p class="text-xs text-[color:var(--text-muted)]">Runs on demand only.</p>
             }
 
+            @if (showInbox()) {
+              <!-- MIG-251 on MIG-239: the Event start -- a file arriving in the workspace's inbox. -->
+              <div class="inbox-trigger">
+                <div class="detail-head mt-3">Inbox trigger</div>
+                <p class="text-sm">{{ triggerSentence(trigger()) }}</p>
+                @if (recentArrivals().length) {
+                  <ul class="mt-1.5 space-y-1 text-xs" aria-label="Recent inbox files">
+                    @for (a of recentArrivals(); track a.arrivalId) {
+                      <li class="flex items-baseline gap-1.5 min-w-0">
+                        <app-icon name="inbox" size="0.85em" class="icon-muted shrink-0" />
+                        <span class="mono truncate min-w-0" [title]="a.fileName">{{ a.fileName }}</span>
+                        @if (a.outcome === 'Started' && a.jobQueueId) {
+                          <a class="link-inline shrink-0 whitespace-nowrap"
+                             [routerLink]="['/pipelines/schedules', job.jobId, 'runs', a.jobQueueId, 'logs']">run #{{ a.jobQueueId }}</a>
+                        } @else {
+                          <span class="text-warn-500 shrink-0" [title]="a.reason || ''">{{ a.outcome }}</span>
+                        }
+                        <span class="text-[color:var(--text-muted)] whitespace-nowrap ml-auto shrink-0">
+                          {{ a.dateCreated ? (a.dateCreated | serverTime:'recent') : '' }}
+                        </span>
+                      </li>
+                      @if (a.outcome !== 'Started' && a.reason) {
+                        <li class="pl-5 text-[11px] text-[color:var(--text-muted)] log-message">{{ a.reason }}</li>
+                      }
+                    }
+                  </ul>
+                }
+              </div>
+            }
+
             <div class="detail-head mt-3">Email notifications</div>
             <p class="text-sm">{{ notifySentence(job) }}</p>
             <div class="flex flex-wrap gap-1.5 mt-1.5">
@@ -335,6 +365,14 @@
                   skipped {{ run.skipTime | serverTime:'recentSec' }}
                 </span>
               } @else { — }
+              <!-- MIG-251: a run a file started in the inbox (the Event start) names the file. -->
+              @if (startedBy().get(run.jobQueueId); as arrival) {
+                <div class="flex items-center gap-1 mt-0.5 text-[11px] text-[color:var(--text-muted)]"
+                     [title]="'Started by ' + arrival.fileName + ' arriving in the inbox'">
+                  <app-icon name="inbox" size="0.9em" class="shrink-0" />
+                  <span class="truncate max-w-48">{{ arrival.fileName }}</span>
+                </div>
+              }
             </td>
             <td class="whitespace-nowrap text-[color:var(--text-secondary)]">
               {{ run.endTime ? (run.endTime | serverTime:'recentSec') : '—' }}
