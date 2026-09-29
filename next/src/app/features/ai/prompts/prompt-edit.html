@@ -38,8 +38,8 @@
     <div class="prompt-editor">
       <!-- ── Definition ─────────────────────────────────────────────────────────────── -->
       <form [formGroup]="form" class="card p-4 form-stack min-w-0" (ngSubmit)="save(true)">
-        <!-- MIG-254: read-only in a MANAGED workspace (display: contents, so the layout is the form's own). -->
-        <fieldset class="contents" [disabled]="locked()">
+        <!-- MIG-254: read-only in a MANAGED workspace (an unstyled block fieldset: .form-lock). -->
+        <fieldset class="form-lock" [disabled]="locked()">
         <div class="form-grid">
           <app-field label="Name" for="pName" [required]="true" [control]="form.get('name')" [submitted]="submitted()">
             <input id="pName" class="input" formControlName="name" placeholder="Summarise claim file" />

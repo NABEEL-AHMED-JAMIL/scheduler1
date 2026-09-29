@@ -1544,6 +1544,9 @@ html.dark {
     border-color: var(--border-subtle);
   }
   .form-section-title { @apply text-sm font-semibold mb-4; }
+  /* MIG-254: a MANAGED workspace's editors disable everything through one fieldset. An unstyled block, never
+     display: contents -- Chromium sometimes lays out nothing inside a display: contents fieldset. */
+  .form-lock { display: block; min-width: 0; margin: 0; padding: 0; border: 0; }
   /* Actions are a decision point, not another field -- they sit further out. */
   .form-actions {
     @apply flex flex-wrap items-center justify-end gap-2 border-t pt-4 mt-6;

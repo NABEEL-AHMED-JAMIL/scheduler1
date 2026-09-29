@@ -34,8 +34,8 @@
       </div>
     }
     <form [formGroup]="form" (ngSubmit)="save()" class="card p-4" [class.hidden]="activeTab() !== 'details'">
-      <!-- MIG-254: read-only in a MANAGED workspace (display: contents, so the layout is the form's own). -->
-      <fieldset class="contents" [disabled]="locked()">
+      <!-- MIG-254: read-only in a MANAGED workspace (an unstyled block fieldset: .form-lock). -->
+      <fieldset class="form-lock" [disabled]="locked()">
       <div class="form-section">
         <h2 class="form-section-title">Basics</h2>
         <div class="form-grid">

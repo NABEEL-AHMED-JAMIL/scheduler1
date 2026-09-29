@@ -75,6 +75,14 @@ describe('MIG-254: build screens in a MANAGED workspace', () => {
       expect(saves.length).toBeGreaterThan(0);
       for (const b of saves) expect((b as HTMLButtonElement).disabled, b.textContent ?? '').toBe(true);
     });
+    // Chromium sometimes lays out nothing inside a fieldset with display: contents (the legacy task form rendered
+    // with zero-size fields on a cold load): the lock is an ordinary, unstyled block fieldset instead.
+    it(`${url}: the lock is a form-lock fieldset, not display: contents`, async () => {
+      const v = await visit(url, 'TENANT_ADMIN', null);
+      const locks = Array.from(v.main.querySelectorAll('fieldset')).filter(f => f.classList.contains('form-lock'));
+      expect(locks.length).toBeGreaterThan(0);
+      expect(v.main.querySelector('fieldset.contents')).toBeNull();
+    });
   }
 
   it('the assistant takes a staff session\'s workspace from the session: appUser.json/me refuses it', async () => {
