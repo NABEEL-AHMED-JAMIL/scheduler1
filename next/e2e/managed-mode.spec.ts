@@ -103,6 +103,32 @@ test.describe('MIG-254: a MANAGED workspace, as its own administrator (faked)', 
     await page.close();
   });
 
+  // Owner 2026-09-29: running is not building (Run now / Run with stay); Queue, Kafka and Task Registry are build screens.
+  test('a managed customer still runs a schedule; Queue, Kafka and Task Registry are read-only', async ({ browser }, info) => {
+    const page = await pageAs(browser, MANAGED_ADMIN);
+    await fakeApi(page);
+    await page.goto('/pipelines/schedules');
+    await expect(page.getByText('You can still run them.')).toBeVisible();
+    await page.getByRole('button', { name: /^Actions for / }).first().click();
+    await expect(page.getByRole('menuitem', { name: 'Run now' })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: /Run with/ })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: 'Skip next run' })).toHaveCount(0);
+    await expect(page.getByRole('menuitem', { name: 'Duplicate' })).toHaveCount(0);
+    await shot(page, info, 'managed-schedule-menu');
+    await page.keyboard.press('Escape');
+    await page.goto('/pipelines/queue');
+    await expect(page.getByText('You can still see every run and its logs.')).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Actions for run #/ })).toHaveCount(0);
+    await page.goto('/configuration/kafka');
+    await expect(page.getByText("this workspace's Kafka connections and topics, so they are read-only here")).toBeVisible();
+    await expect(page.getByRole('button', { name: 'New profile' })).toHaveCount(0);
+    await page.goto('/configuration/task-registry');
+    await expect(page.getByText("this workspace's pipelines and tasks, so they are read-only here")).toBeVisible();
+    await expect(page.getByRole('button', { name: 'New pipeline' })).toHaveCount(0);
+    await shot(page, info, 'managed-task-registry');
+    await page.close();
+  });
+
   test('Administration offers our team\'s activity, and it lists what they did', async ({ browser }) => {
     const page = await pageAs(browser, MANAGED_ADMIN);
     const seen = await fakeApi(page, { 'GET /managedService.json/actions': { status: 'SUCCESS', message: '', paging: { nextBeforeId: null },
