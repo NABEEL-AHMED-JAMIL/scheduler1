@@ -296,6 +296,16 @@ export const routes: Routes = [
         canActivate: [pageGuard, roleGuard],
       },
       {
+        // MIG-239: the workspace inbox -- upload files that start jobs with an inbox trigger. Browse files' page key and
+        // floor: the gateway leaves /storage.json open, storage-service lets every member read and upload, and only
+        // configuring it is an administrator's (gated inside the page).
+        path: 'documents/inbox',
+        title: 'Inbox',
+        loadComponent: () => import('./features/documents/inbox/inbox').then(m => m.Inbox),
+        data: { pageKey: 'objects', minRole: 'TENANT_USER' },
+        canActivate: [pageGuard, roleGuard],
+      },
+      {
         path: 'documents/transcript',
         title: 'Audio Transcript',
         loadComponent: () => import('./features/tools/transcript/transcript').then(m => m.Transcript),

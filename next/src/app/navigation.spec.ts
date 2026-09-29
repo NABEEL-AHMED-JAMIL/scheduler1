@@ -203,6 +203,8 @@ describe('MIG-246: the renamed pages keep their gates', () => {
     ['/documents/review', 'Review queue', 'document-review', undefined],
     ['/documents/review/:extractionId', 'Review a document', 'document-review', undefined],
     ['/documents/files', 'Browse files', 'objects', 'TENANT_USER'],
+    // MIG-239: built. Browse files' key and floor: every member reads and uploads; configuring is an administrator's.
+    ['/documents/inbox', 'Inbox', 'objects', 'TENANT_USER'],
     ['/documents/converter', 'Document Converter', 'tools-converter', undefined],
     ['/documents/transcript', 'Audio Transcript', 'tools-transcript', undefined],
     ['/data/analytics', 'Analytics Studio', 'analytics', undefined],
@@ -313,6 +315,7 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
   const DOCUMENTS = [
     'Documents › Document Converter -> /documents/converter',
     'Documents › Browse files -> /documents/files',
+    'Documents › Inbox -> /documents/inbox',
     'Documents › Audio Transcript -> /documents/transcript',
   ];
   const DATA_SOON = [
@@ -392,7 +395,7 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
 
   it('a tenant user with five pages (api-check TU)', () => {
     expect(menuFor('TENANT_USER', ['jobs', 'tasks', 'queue', 'reports', 'objects'])).toEqual([
-      ...DASHBOARD, ...PIPELINES, 'Documents › Browse files -> /documents/files',
+      ...DASHBOARD, ...PIPELINES, 'Documents › Browse files -> /documents/files', 'Documents › Inbox -> /documents/inbox',
     ]);
   });
 

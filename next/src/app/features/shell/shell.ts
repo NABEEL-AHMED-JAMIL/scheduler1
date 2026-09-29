@@ -136,6 +136,8 @@ export class Shell {
           hint: 'Convert between formats' },
         { label: 'Browse files', path: '/documents/files', pageKey: 'objects', icon: 'folder',
           hint: 'Upload, preview and share objects' },
+        { label: 'Inbox', path: '/documents/inbox', pageKey: 'objects', icon: 'inbox',
+          hint: 'Upload files that start jobs' },
         { label: 'Audio Transcript', path: '/documents/transcript', pageKey: 'tools-transcript', icon: 'volume',
           hint: 'Speech to text' },
       ],
