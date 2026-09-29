@@ -2,7 +2,7 @@ import { Component, computed, input, linkedSignal, output, signal } from '@angul
 import { Field } from '../../../shared/ui/field';
 import { Icon } from '../../../shared/ui/icon';
 import {
-  FieldKind, FieldSpec, JsonSchema, StepProblem, coerce, fieldsOf, isMapSchema, mapValueKind, parseJson, withValue,
+  FieldKind, FieldSpec, JsonSchema, PromptChoice, StepProblem, coerce, fieldsOf, isMapSchema, mapValueKind, parseJson, withValue,
 } from './steps.model';
 
 interface MapRow { key: string; value: unknown; }
@@ -97,6 +97,18 @@ interface MapRow { key: string; value: unknown; }
               </select>
             </app-field>
           }
+          @case ('prompt') {
+            <app-field [label]="f.label" [for]="idOf(f)" [required]="f.required" [hint]="f.description" [error]="errorOf(f)">
+              <select [id]="idOf(f)" class="input" [value]="textOf(f)" [disabled]="disabled()"
+                      (change)="set(f.name, $any($event.target).value === '' ? undefined : +$any($event.target).value)">
+                <option value="">{{ f.required ? 'Choose a prompt…' : 'None' }}</option>
+                @for (p of prompts(); track p.id) { <option [value]="'' + p.id" [selected]="textOf(f) === '' + p.id">{{ p.label }}</option> }
+                @if (textOf(f) && !promptListed(f)) {
+                  <option [value]="textOf(f)" selected>Prompt {{ textOf(f) }} (not an active prompt here)</option>
+                }
+              </select>
+            </app-field>
+          }
           @case ('column') {
             <app-field [label]="f.label" [for]="idOf(f)" [required]="f.required" [error]="errorOf(f)"
                        [hint]="f.description || (columns().length ? 'A column of the rows this step reads: pick one, or type it.' : '')">
@@ -143,7 +155,7 @@ interface MapRow { key: string; value: unknown; }
               <p class="label">{{ f.label }}@if (f.required) { <span class="text-crit-500 ml-0.5" aria-hidden="true">*</span> }</p>
               @if (f.description) { <p class="field-note text-[color:var(--text-muted)] -mt-1 mb-2">{{ f.description }}</p> }
               <app-schema-form [schema]="f.schema" [value]="objectOf(f)" [problems]="problemsUnder(f.name)" [idPrefix]="idOf(f)"
-                               [label]="f.label" [columns]="columns()" [steps]="steps()" [disabled]="disabled()" (valueChange)="set(f.name, $event)" />
+                               [label]="f.label" [columns]="columns()" [steps]="steps()" [prompts]="prompts()" [disabled]="disabled()" (valueChange)="set(f.name, $event)" />
             </fieldset>
           }
           @case ('objects') {
@@ -167,7 +179,7 @@ interface MapRow { key: string; value: unknown; }
                     }
                   </div>
                   <app-schema-form [schema]="f.schema.items!" [value]="row" [problems]="problemsUnder(f.name + '[' + i + ']')"
-                                   [idPrefix]="idOf(f) + '-' + i" [label]="f.label + ' row ' + (i + 1)" [columns]="columns()" [steps]="steps()"
+                                   [idPrefix]="idOf(f) + '-' + i" [label]="f.label + ' row ' + (i + 1)" [columns]="columns()" [steps]="steps()" [prompts]="prompts()"
                                    [disabled]="disabled()" (valueChange)="setRow(f, i, $event)" />
                 </div>
               } @empty {
@@ -221,6 +233,8 @@ export class SchemaForm {
   readonly columns = input<string[]>([]);
   /** The keys of the steps before this one: what a step setting offers. */
   readonly steps = input<string[]>([]);
+  /** MIG-245: the workspace's active prompts, what a prompt setting offers. */
+  readonly prompts = input<PromptChoice[]>([]);
   readonly disabled = input(false);
   readonly valueChange = output<Record<string, unknown>>();
 
@@ -248,6 +262,10 @@ export class SchemaForm {
     const next = withValue(this.current(), name, value);
     this.current.set(next);
     this.valueChange.emit(next);
+  }
+
+  promptListed(f: FieldSpec): boolean {
+    return this.prompts().some(p => '' + p.id === this.textOf(f));
   }
 
   textOf(f: FieldSpec): string {

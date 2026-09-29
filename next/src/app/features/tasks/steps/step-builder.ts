@@ -17,8 +17,8 @@ import { TaskStatePill, TaskSwitch } from './task-switch';
 import {
   Definition, DefinitionView, LIMITS, LinkedJob, ON_ERRORS, Problem, SOURCE_TYPES, Settings, Step, StepProblem, StepTaskEntry, ValidateResult,
   addStep, canonical, definitionJson, inputColumns, isLegacyDefinition, refusalOf, moveStep, onErrorLabel, problemsByStep, removeStep, replaceStep,
-  sameDefinition, sampleRowsOf, sourceLabel, stateOf, taskEntry, taskLabel, taskOptions, toYaml, updateSettings, updateSource, withSample,
-  withSwitchedLine,
+  sameDefinition, sampleRowsOf, sourceLabel, stateOf, taskEntry, taskLabel, taskOptions, toYaml, updateSettings, updateSource, usesPrompt,
+  withSample, withSwitchedLine, PromptChoice,
 } from './steps.model';
 import { PipelineDraftHandoff } from './draft-handoff';
 import { SENSITIVITY_LEVELS, sensitivityText } from '../../../shared/ui/sensitivity';
@@ -252,15 +252,33 @@ export class StepBuilder {
     this.shiftProblems();
   }
 
+  /** MIG-245: the workspace's active prompts, read the first time a step that names one is opened. */
+  private readonly promptChoices = signal<PromptChoice[] | null>(null);
+
   open(index: number): void {
     const step = this.draft().steps[index];
     if (!step) return;
     this.selected.set(step.key);
+    if (this.promptChoices() === null && usesPrompt(this.taskOf(step)?.configSchema)) {
+      // A list that cannot be read leaves the choice empty: a saved prompt still shows by its id.
+      this.api.prompts().subscribe({
+        next: prompts => { this.promptChoices.set(prompts); this.openPanel(index); },
+        error: () => { this.promptChoices.set([]); this.openPanel(index); },
+      });
+      return;
+    }
+    this.openPanel(index);
+  }
+
+  private openPanel(index: number): void {
+    const step = this.draft().steps[index];
+    if (!step) return;
     const data: StepPanelData = {
       step, index, task: this.taskOf(step), earlierKeys: this.earlierKeys(index),
       columns: inputColumns(this.draft(), index, this.tasks()),
       problems: this.stepProblems(index), defaultOnError: this.draft().settings?.defaultOnError,
       canManage: this.canManage() && step.task !== 'legacy',
+      prompts: this.promptChoices() ?? [],
     };
     // Focus goes back to the step's own card, not to whatever opened the panel: from Add step that was the box, whose
     // list then opened over the cards.

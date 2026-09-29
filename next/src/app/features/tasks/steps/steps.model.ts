@@ -626,15 +626,18 @@ export function inputColumns(definition: Definition, index: number, tasks: StepT
 // ---------------------------------------------------------------------------------------------- a config form
 
 export type FieldKind = 'text' | 'textarea' | 'number' | 'integer' | 'boolean' | 'enum' | 'list' | 'objects' | 'object' | 'json'
-  | 'scalar' | 'column' | 'step' | 'columns';
+  | 'scalar' | 'column' | 'step' | 'columns' | 'prompt';
+
+/** MIG-245: a saved AI prompt a step may name: its id, and its name as the choice shows it. */
+export interface PromptChoice { id: number; label: string; }
 
 /**
- * The registry's widget hints (configSchema `format`). column, step, sql, template and multiline have widgets here;
+ * The registry's widget hints (configSchema `format`). column, step, sql, template, multiline and prompt have widgets here;
  * the rest are text until their pickers exist.
  * TODO(MIG-249): pickers for api-request, api-environment, data-contract, db-connection, bucket, pipeline and user.
  */
 export const FORMATS = ['column', 'step', 'sql', 'template', 'multiline', 'api-request', 'api-environment', 'data-contract',
-  'db-connection', 'bucket', 'pipeline', 'user'] as const;
+  'db-connection', 'bucket', 'pipeline', 'user', 'prompt'] as const;
 const LONG_TEXT_FORMATS = ['sql', 'template', 'multiline', 'textarea'];
 
 export interface FieldSpec {
@@ -680,7 +683,7 @@ function kindOf(schema: JsonSchema): FieldKind {
       if (schema.format === 'column') return 'column';
       if (schema.format === 'step') return 'step';
       return (schema.maxLength ?? 0) > 200 || LONG_TEXT_FORMATS.includes(schema.format ?? '') ? 'textarea' : 'text';
-    case 'integer': return 'integer';
+    case 'integer': return schema.format === 'prompt' ? 'prompt' : 'integer';
     case 'number': return 'number';
     case 'boolean': return 'boolean';
     case 'array': {
@@ -784,4 +787,13 @@ export function errorText(error: unknown): string {
   if (typeof error === 'string') return error;
   if (isMap(error) && typeof error['message'] === 'string') return error['message'] as string;
   return JSON.stringify(error);
+}
+
+/** MIG-245: whether a task's settings name a saved prompt anywhere (so its panel needs the prompts to choose from). */
+export function usesPrompt(schema: JsonSchema | null | undefined): boolean {
+  if (!schema || typeof schema !== 'object') return false;
+  if (schema.format === 'prompt') return true;
+  const nested = [...Object.values(schema.properties ?? {}), schema.items, schema.additionalProperties]
+    .filter((s): s is JsonSchema => !!s && typeof s === 'object');
+  return nested.some(usesPrompt);
 }

@@ -151,13 +151,14 @@ export interface ReadableField {
 const KIND_WORDS: Record<FieldKind, string> = {
   text: 'Text', textarea: 'Long text', number: 'Number', integer: 'Whole number', boolean: 'Yes or no', enum: 'One of',
   list: 'List', objects: 'Repeatable group', object: 'Group', json: 'JSON', scalar: 'Text, number or yes/no',
-  column: 'Column', step: 'Earlier step', columns: 'Columns',
+  column: 'Column', step: 'Earlier step', columns: 'Columns', prompt: 'AI prompt',
 };
 
 /** The registry's widget hints that name what a value points at (FORMATS), as words. */
 const FORMAT_WORDS: Record<string, string> = {
   sql: 'SQL', template: 'Text with placeholders', 'api-request': 'API request', 'api-environment': 'API environment',
   'data-contract': 'Data contract', 'db-connection': 'Database connection', bucket: 'Bucket', pipeline: 'Pipeline', user: 'People',
+  prompt: 'AI prompt',
 };
 
 const shown = (value: unknown) => (typeof value === 'string' ? value : JSON.stringify(value));

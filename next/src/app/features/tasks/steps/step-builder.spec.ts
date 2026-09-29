@@ -68,6 +68,7 @@ function build(opts: { view?: DefinitionView; jobs?: unknown[]; dialogAnswer?: u
     runs: vi.fn(() => of({ status: 'SUCCESS', message: '', data: { jobQueues: [{ jobQueueId: 7385, jobStatus: 'Completed' }, { jobQueueId: 7401, jobStatus: 'Queue' }] } })),
     timeline: vi.fn(() => of({ status: 'SUCCESS', message: '', data: null })),
     stepLog: vi.fn(),
+    prompts: vi.fn(() => of([{ id: 41, label: 'Wound assessment' }])),
   };
   const opened: { component: unknown; data: any }[] = [];
   let answer: unknown = opts.dialogAnswer;
@@ -158,6 +159,22 @@ describe('StepBuilder -- the step cards', () => {
     expect(panel.data).toMatchObject({ index: 1, earlierKeys: ['read'], canManage: true, step: { key: 'keep' } });
     expect(panel.data.task.code).toBe('select');
     expect(cards()).toEqual(['read', 'shape']);
+  });
+
+  // MIG-245: a task with a prompt setting gets the workspace's prompts to choose from -- asked for once, only then.
+  it('hands an AI prompt step the prompts to choose from, loading them once and only for such a step', () => {
+    const aiTask = { code: 'ai_prompt', name: 'AI prompt', kind: 'Process', description: 'Runs a saved prompt per row.', runsInEngine: true,
+      enabled: true, available: true, overridable: true, overridden: false,
+      configSchema: { type: 'object', properties: { promptId: { type: 'integer', format: 'prompt' } } } };
+    const { builder, api, opened, fixture } = build({ tasks: [...TASKS, aiTask] });
+    builder.open(1);
+    expect(api.prompts).not.toHaveBeenCalled();
+    builder.add('ai_prompt');
+    fixture.detectChanges();
+    const panel = opened.filter(o => o.component === StepPanel).pop()!;
+    expect(panel.data.prompts).toEqual([{ id: 41, label: 'Wound assessment' }]);
+    builder.open(2);
+    expect(api.prompts).toHaveBeenCalledTimes(1);
   });
 
   it('adds a step from the Task Registry and opens it; a disabled task is listed but not added', () => {

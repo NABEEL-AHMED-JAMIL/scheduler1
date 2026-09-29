@@ -230,3 +230,41 @@ describe('SchemaForm -- the registry\'s widgets', () => {
     expect(el.querySelector<HTMLInputElement>('#cfg-bucket')!.value).toBe('ui-review-s3');
   });
 });
+
+/** MIG-245: the AI prompt step names a saved prompt: a choice of the workspace's active prompts, stored as its id. */
+describe('SchemaForm -- a prompt setting', () => {
+  const PROMPT_SCHEMA: JsonSchema = { type: 'object', required: ['promptId'],
+    properties: { promptId: { type: 'integer', format: 'prompt', title: 'Prompt' } } };
+
+  function promptForm(prompts: { id: number; label: string }[], value: Record<string, unknown> | null) {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [SchemaForm], providers: [provideZonelessChangeDetection()] });
+    const fixture = TestBed.createComponent(SchemaForm);
+    fixture.componentRef.setInput('schema', PROMPT_SCHEMA);
+    fixture.componentRef.setInput('value', value);
+    fixture.componentRef.setInput('prompts', prompts);
+    const changes: Record<string, unknown>[] = [];
+    fixture.componentInstance.valueChange.subscribe(v => changes.push(v));
+    fixture.detectChanges();
+    return { el: fixture.nativeElement as HTMLElement, fixture, changes };
+  }
+
+  it('offers the prompts by name and stores the chosen id as a number', () => {
+    const { el, fixture, changes } = promptForm([{ id: 41, label: 'Wound assessment' }, { id: 42, label: 'Summary' }], { promptId: 42 });
+    const select = el.querySelector<HTMLSelectElement>('#cfg-promptId')!;
+    expect(select.tagName).toBe('SELECT');
+    expect(Array.from(select.options).map(o => o.textContent!.trim())).toEqual(['Choose a prompt…', 'Wound assessment', 'Summary']);
+    expect(select.value).toBe('42');
+    select.value = '41';
+    select.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(changes[changes.length - 1]).toEqual({ promptId: 41 });
+  });
+
+  it('keeps a prompt that is no longer listed, by its id', () => {
+    const { el } = promptForm([{ id: 41, label: 'Wound assessment' }], { promptId: 99 });
+    const select = el.querySelector<HTMLSelectElement>('#cfg-promptId')!;
+    expect(Array.from(select.options).map(o => o.textContent!.trim())).toContain('Prompt 99 (not an active prompt here)');
+    expect(select.value).toBe('99');
+  });
+});

@@ -5,7 +5,7 @@ import { Icon } from '../../../shared/ui/icon';
 import { Field } from '../../../shared/ui/field';
 import { SchemaForm } from './schema-form';
 import {
-  LIMITS, ON_ERRORS, Step, StepProblem, StepTaskEntry, canonicalStep, fieldsOf, onErrorLabel, parseJson, problemsAt, taskLabel,
+  LIMITS, ON_ERRORS, PromptChoice, Step, StepProblem, StepTaskEntry, canonicalStep, fieldsOf, onErrorLabel, parseJson, problemsAt, taskLabel,
   validKey,
 } from './steps.model';
 
@@ -18,6 +18,8 @@ export interface StepPanelData {
   earlierKeys: string[];
   /** The columns the step reads, when the definition tells them: what a `column` setting suggests. */
   columns?: string[] | null;
+  /** MIG-245: the workspace's active prompts, for a task whose settings name one. */
+  prompts?: PromptChoice[];
   /** The server's problems with this step, at paths relative to it ("retry.maxAttempts", "config.columns"). */
   problems: StepProblem[];
   /** The settings' on-error, for what "Default" means here. */

@@ -59,7 +59,7 @@
         </div>
         @if (configMode() === 'form' && data.task?.configSchema; as schema) {
           <app-schema-form [schema]="schema" [value]="s.config" [problems]="formProblems()" idPrefix="cfg" [disabled]="readOnly"
-                           [columns]="columns" [steps]="data.earlierKeys"
+                           [columns]="columns" [steps]="data.earlierKeys" [prompts]="data.prompts ?? []"
                            (valueChange)="setConfig($event)" />
         } @else {
           <app-field label="Settings as JSON" for="stepConfig" [error]="configError() || configProblems().join(' · ')"

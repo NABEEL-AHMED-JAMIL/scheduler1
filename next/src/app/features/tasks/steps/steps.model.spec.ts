@@ -375,3 +375,10 @@ describe('steps model -- Test with sample', () => {
     expect(parseSampleRows('[]').error).toBe('At least one row.');
   });
 });
+
+describe('fieldsOf -- MIG-245', () => {
+  it('reads an integer with the prompt hint as a prompt choice', () => {
+    const fields = fieldsOf({ type: 'object', properties: { promptId: { type: 'integer', format: 'prompt' } } });
+    expect(fields[0].kind).toBe('prompt');
+  });
+});

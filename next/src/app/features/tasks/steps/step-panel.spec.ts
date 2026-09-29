@@ -140,3 +140,15 @@ describe('StepPanel', () => {
     expect(el.textContent).toContain('Blank: 120 s, the task\'s default.');
   });
 });
+
+describe('StepPanel -- MIG-245', () => {
+  it('passes the prompts it was handed to the settings form', () => {
+    const { el } = open({ step: { key: 'assess', task: 'ai_prompt', config: { promptId: 41 } },
+      task: { code: 'ai_prompt', description: 'Runs a saved prompt per row.', runsInEngine: true,
+        configSchema: { type: 'object', properties: { promptId: { type: 'integer', format: 'prompt' } } } } as any,
+      prompts: [{ id: 41, label: 'Wound assessment' }] });
+    const select = el.querySelector<HTMLSelectElement>('#cfg-promptId')!;
+    expect(select.value).toBe('41');
+    expect(select.selectedOptions[0].textContent!.trim()).toBe('Wound assessment');
+  });
+});

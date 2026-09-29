@@ -1,10 +1,10 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, map } from 'rxjs';
 import { API_BASE, ApiResponse } from '../../../core/api/api.config';
 import { LIST_LIMIT } from '../../../core/api/list-limit';
 import { jobActionRequest } from '../../jobs/job-actions';
-import { DefinitionView, LinkedJob, RunRow, StepLog, StepTaskEntry, Timeline, ValidateResult } from './steps.model';
+import { DefinitionView, LinkedJob, PromptChoice, RunRow, StepLog, StepTaskEntry, Timeline, ValidateResult } from './steps.model';
 
 export type DefinitionFormat = 'json' | 'yaml';
 
@@ -67,5 +67,11 @@ export class StepsApi {
 
   stepLog(stepExecutionId: number): Observable<ApiResponse<StepLog>> {
     return this.http.get<ApiResponse<StepLog>>(`${API_BASE}/sourceJob.json/stepLogs`, { params: { stepExecutionId } });
+  }
+
+  /** MIG-245: the workspace's active prompts, by name, for a step that names one (the AI prompt step). */
+  prompts(): Observable<PromptChoice[]> {
+    return this.http.get<ApiResponse<{ promptId?: number; name: string; status?: string }[]>>(`${API_BASE}/aiPrompt.json/list`).pipe(
+      map(r => (r.data ?? []).filter(p => p.promptId != null && p.status === 'Active').map(p => ({ id: p.promptId!, label: p.name }))));
   }
 }
