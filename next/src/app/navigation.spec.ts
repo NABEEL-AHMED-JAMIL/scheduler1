@@ -191,6 +191,9 @@ describe('MIG-246: the renamed pages keep their gates', () => {
     ['/pipelines/queue', 'Queue', 'queue', undefined],
     ['/pipelines/run-analytics', 'Run analytics', 'reports', undefined],
     ['/integration/storage-connections', 'Storage Connections', undefined, 'TENANT_ADMIN'],
+    // MIG-247: built. Read by every member holding the page; the screens hide the administrator's writes.
+    ['/integration/api-collections', 'API Collections', 'api-collections', undefined],
+    ['/integration/api-collections/:collectionId', 'API collection', 'api-collections', undefined],
     ['/documents/files', 'Browse files', 'objects', 'TENANT_USER'],
     ['/documents/converter', 'Document Converter', 'tools-converter', undefined],
     ['/documents/transcript', 'Audio Transcript', 'tools-transcript', undefined],
@@ -222,7 +225,6 @@ describe('MIG-246: the renamed pages keep their gates', () => {
 
 describe('MIG-246 / MIG-267: pages still to be built get a gated entry point', () => {
   const SOON: [string, string, string][] = [
-    ['/integration/api-collections', 'API Collections', 'api-collections'],
     ['/integration/connectors', 'Connector Hub', 'connector-hub'],
     ['/documents/intelligence', 'Document Intelligence', 'document-intelligence'],
     ['/documents/review', 'Review queue', 'document-review'],
@@ -286,7 +288,7 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
   const DASHBOARD = ['Dashboard -> /dashboard'];
   const INTEGRATION_SOON = [
     'Integration › Connector Hub (soon) -> /integration/connectors',
-    'Integration › API Collections (soon) -> /integration/api-collections',
+    'Integration › API Collections -> /integration/api-collections',
   ];
   const PIPELINES = [
     'Pipelines › Pipelines -> /pipelines',
@@ -369,7 +371,7 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
     expect(menuFor('TENANT_USER', ['jobs', 'tasks', 'queue', 'reports', 'objects', 'analytics',
       'analytics-dashboards', 'tools-converter', 'tools-transcript', 'ai-prompts', 'api-collections'])).toEqual([
       ...DASHBOARD,
-      'Integration › API Collections (soon) -> /integration/api-collections',
+      'Integration › API Collections -> /integration/api-collections',
       ...PIPELINES,
       ...DOCUMENTS,
       ...DATA,

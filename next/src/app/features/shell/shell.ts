@@ -96,7 +96,7 @@ export class Shell {
         { label: 'Connector Hub', path: '/integration/connectors', pageKey: 'connector-hub', icon: 'plug', soon: true,
           hint: 'Databases, SaaS apps and files, ready to connect' },
         { label: 'API Collections', path: '/integration/api-collections', pageKey: 'api-collections', icon: 'code',
-          soon: true, hint: 'Which APIs exist, tested and versioned' },
+          hint: 'Which APIs exist, tested and versioned' },
         { label: 'Storage Connections', path: '/integration/storage-connections', icon: 'cloud', adminOnly: true,
           hint: 'S3, Azure, MinIO, FTP' },
       ],

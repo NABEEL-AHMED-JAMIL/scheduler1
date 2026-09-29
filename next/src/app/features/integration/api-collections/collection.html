@@ -1,0 +1,230 @@
+<div class="page">
+  <div class="page-head">
+    <div class="min-w-0">
+      <a class="link-inline text-sm" routerLink="/integration/api-collections"><app-icon name="arrowLeft" size="0.9em" />API Collections</a>
+      <div class="mt-1 flex flex-wrap items-center gap-2">
+        <h1 class="page-title min-w-0 [overflow-wrap:anywhere]">{{ collection()?.name || 'API collection' }}</h1>
+        @if (collection(); as c) {
+          @if (c.sensitivity) { <span class="pill pill-neutral">{{ sensitivityLabel(c.sensitivity) }}</span> }
+          <app-status [label]="c.status || 'Inactive'" [quiet]="true" />
+        }
+      </div>
+      @if (collection(); as c) {
+        <p class="page-subtitle">
+          @if (c.description) { {{ c.description }} · }{{ sourceLabel(c.sourceFormat) }} · version {{ c.currentVersion ?? 0 }}@if (c.dateUpdated || c.dateCreated) { · updated {{ (c.dateUpdated || c.dateCreated) | serverTime: 'dateTime' }} }
+        </p>
+      }
+    </div>
+    <div class="flex items-center gap-2">
+      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
+        <app-icon name="refresh" [class.spin]="loading()" />Refresh
+      </button>
+      @if (canManage() && collection()) {
+        <button type="button" class="btn btn-default btn-sm" (click)="editDetails()"><app-icon name="edit" />Edit details</button>
+      }
+    </div>
+  </div>
+
+  @if (!detail() && error()) {
+    <app-table-shell heading="API collection" [error]="error()" [errorRetryable]="!missing()" (retry)="load()">
+      <a error-action class="btn btn-default btn-sm" routerLink="/integration/api-collections"><app-icon name="arrowLeft" />Back to API Collections</a>
+    </app-table-shell>
+  } @else {
+    <app-stat-strip [items]="kpis()" [cols]="2" [smCols]="5" align="start" size="md" label="This collection at a glance" />
+
+    <app-table-shell data-test="apis" heading="APIs" columnsKey="api-collection-requests" [loading]="loading()" [error]="error()"
+                     [isEmpty]="!visibleRequests().length" [shown]="visibleRequests().length" [total]="detail()?.requests?.length ?? null"
+                     [emptyMessage]="hasFilters() ? 'No API matches the current filters.' : canManage() ? 'No APIs yet. Add one, test it, and a pipeline can use it.' : 'No APIs yet.'"
+                     emptyIcon="plug" (retry)="load()">
+      <ng-container toolbar>
+        <app-view-toggle [(value)]="view" key="api-collection-requests" cardsIcon="plug" />
+        @if (folders().length) {
+          <select class="input max-w-40" [value]="folderFilter()" aria-label="Folder" (change)="folderFilter.set($any($event.target).value)">
+            <option value="">All folders</option>
+            <option value="top">Top level</option>
+            @for (f of folders(); track f.id) { <option [value]="f.id" [selected]="(f.id + '') === folderFilter()">{{ f.label }}</option> }
+          </select>
+        }
+        <select class="input max-w-32" [value]="stateFilter()" aria-label="State" (change)="stateFilter.set($any($event.target).value)">
+          <option value="">All states</option>
+          <option value="enabled">Enabled</option>
+          <option value="disabled">Disabled</option>
+        </select>
+        <div class="search-field max-w-64">
+          <app-icon name="search" size="0.95em" />
+          <input class="input" placeholder="Search APIs" aria-label="Search APIs" [value]="search()" (input)="search.set($any($event.target).value)" />
+        </div>
+        @if (hasFilters()) {
+          <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()"><app-icon name="close" />Clear</button>
+        }
+        @if (canManage()) {
+          <button type="button" class="btn btn-primary btn-sm" (click)="addRequest()" [disabled]="!detail()"><app-icon name="plus" />Add API</button>
+        }
+      </ng-container>
+
+      @if (view() === 'cards') {
+        <div class="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
+          @for (r of visibleRequests(); track r.requestId) {
+            <article class="card p-4 flex flex-col gap-2">
+              <div class="flex items-start gap-2">
+                <span class="pill pill-neutral mono shrink-0">{{ r.method }}</span>
+                <h3 class="font-semibold min-w-0 flex-1 truncate"><button type="button" class="link-inline" (click)="openRequest(r)">{{ r.name }}</button></h3>
+                <app-status [label]="r.enabled ? 'Active' : 'Inactive'" [quiet]="true" />
+              </div>
+              <app-data-text class="mono text-xs" [value]="r.urlTemplate" label="Endpoint" />
+              <p class="text-xs text-[color:var(--text-muted)]">{{ authText(r) }}@if (r.folderId != null) { · {{ folderName(r.folderId) }} }</p>
+            </article>
+          }
+        </div>
+      } @else {
+        <table class="table-modern">
+          <thead>
+            <tr>
+              <th>API</th>
+              <th>Method · endpoint</th>
+              <th>Auth</th>
+              <th>Folder</th>
+              <th class="text-right">Timeout</th>
+              <th>Last test</th>
+              <th class="text-right">State</th>
+              @if (canManage()) { <th class="w-12"><span class="sr-only">Actions</span></th> }
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of visibleRequests(); track r.requestId) {
+              <tr>
+                <td class="max-w-56"><button type="button" class="link-inline font-medium text-left" (click)="openRequest(r)">{{ r.name }}</button></td>
+                <td class="max-w-96 min-w-56">
+                  <div class="flex items-baseline gap-2 min-w-0">
+                    <span class="pill pill-neutral mono shrink-0">{{ r.method }}</span>
+                    <app-data-text class="mono text-xs min-w-0" [value]="r.urlTemplate" label="Endpoint" />
+                  </div>
+                </td>
+                <td class="text-xs">{{ authText(r) }}</td>
+                <td class="text-xs">{{ r.folderId == null ? '—' : folderName(r.folderId) }}</td>
+                <td class="text-right tabular text-xs whitespace-nowrap">{{ r.timeoutMs ? (r.timeoutMs / 1000) + ' s' : '—' }}</td>
+                <td class="text-xs whitespace-nowrap">
+                  @if (lastTest(r); as t) {
+                    <span [class.text-ok-500]="t.outcome === 'OK'" [class.text-crit-500]="t.outcome !== 'OK'">
+                      {{ t.statusCode ?? (t.outcome === 'BLOCKED' ? 'Blocked' : 'Failed') }} · {{ t.durationMs }} ms
+                    </span>
+                  } @else { <span class="text-[color:var(--text-muted)]">not tested</span> }
+                </td>
+                <td class="text-right">
+                  @if (canManage()) {
+                    <label class="inline-flex items-center gap-1.5 text-xs text-[color:var(--text-secondary)] cursor-pointer">
+                      <input type="checkbox" class="checkbox" role="switch" [checked]="r.enabled" [attr.aria-label]="(r.enabled ? 'Disable ' : 'Enable ') + r.name"
+                             (change)="toggleEnabled(r)" />{{ r.enabled ? 'Enabled' : 'Disabled' }}
+                    </label>
+                  } @else {
+                    <app-status [label]="r.enabled ? 'Active' : 'Inactive'" [quiet]="true" />
+                  }
+                </td>
+                @if (canManage()) {
+                  <td>
+                    <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="rowMenu" [attr.aria-label]="'Actions for ' + r.name"><app-icon name="dots" size="1.05em" /></button>
+                    <ng-template #rowMenu>
+                      <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                        <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="openRequest(r)"><app-icon name="edit" />Edit &amp; test</button>
+                        <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="toggleEnabled(r)"><app-icon [name]="r.enabled ? 'pause' : 'play'" />{{ r.enabled ? 'Disable' : 'Enable' }}</button>
+                        <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="removeRequest(r)"><app-icon name="trash" class="icon-crit" />Delete</button>
+                      </div>
+                    </ng-template>
+                  </td>
+                }
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </app-table-shell>
+
+    <app-table-shell data-test="environments" heading="Environments" [scrollRows]="false" [loading]="loading() && !detail()"
+                     [isEmpty]="!environments().length"
+                     [emptyMessage]="canManage() ? 'No environments yet. Add one for the base URL and the secrets its APIs use.' : 'No environments yet.'"
+                     emptyIcon="server">
+      <ng-container toolbar>
+        @if (canManage()) {
+          <button type="button" class="btn btn-default btn-sm" (click)="newEnvironment()" [disabled]="!detail()"><app-icon name="plus" />New environment</button>
+        }
+      </ng-container>
+      <table class="table-modern">
+        <thead>
+          <tr>
+            <th>Environment</th>
+            <th>Variables</th>
+            @if (canManage()) { <th class="w-12"><span class="sr-only">Actions</span></th> }
+          </tr>
+        </thead>
+        <tbody>
+          @for (env of environments(); track env.environmentId) {
+            <tr>
+              <td class="whitespace-nowrap align-top">
+                <span class="font-medium">{{ env.name }}</span>
+                @if (env.isDefault) { <span class="pill pill-brand ml-1">Default</span> }
+              </td>
+              <td>
+                <div class="flex flex-wrap gap-1.5">
+                  @for (v of env.variables; track v.key) {
+                    @if (v.secret) {
+                      <span class="pill pill-neutral mono" [attr.title]="v.configured ? 'Secret: set, never shown' : 'Secret: not set'">
+                        <app-icon name="lock" size="0.8em" />{{ v.key }}&nbsp;@if (v.configured) {<span class="secret-mask" aria-hidden="true">•••</span>&nbsp;configured} @else {not set}
+                      </span>
+                    } @else {
+                      <span class="pill pill-neutral mono max-w-80 truncate" [attr.title]="v.key + ' = ' + (v.value ?? '')">{{ v.key }} = {{ v.value }}</span>
+                    }
+                  } @empty { <span class="text-xs text-[color:var(--text-muted)]">no variables</span> }
+                </div>
+              </td>
+              @if (canManage()) {
+                <td class="align-top">
+                  <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="envMenu" [attr.aria-label]="'Actions for the ' + env.name + ' environment'"><app-icon name="dots" size="1.05em" /></button>
+                  <ng-template #envMenu>
+                    <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                      <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="editEnvironment(env)"><app-icon name="edit" />Edit or replace secrets</button>
+                      <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="removeEnvironment(env)"><app-icon name="trash" class="icon-crit" />Delete</button>
+                    </div>
+                  </ng-template>
+                </td>
+              }
+            </tr>
+          }
+        </tbody>
+      </table>
+    </app-table-shell>
+
+    <div class="grid gap-4 lg:grid-cols-2">
+      <app-table-shell heading="Versions" [scrollRows]="false" [loading]="loading() && !detail()" [isEmpty]="!versions().length"
+                       emptyMessage="No versions yet." emptyIcon="history">
+        <table class="table-modern">
+          <thead><tr><th>Version</th><th>Saved</th></tr></thead>
+          <tbody>
+            @for (v of versions(); track v.version) {
+              <tr>
+                <td><span class="pill pill-neutral mono">v{{ v.version }}</span>@if (v.version === collection()?.currentVersion) { <span class="text-xs text-[color:var(--text-muted)] ml-1">current</span> }</td>
+                <td class="text-xs whitespace-nowrap">{{ v.dateCreated | serverTime: 'dateTime' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </app-table-shell>
+
+      <app-table-shell heading="Used by" [scrollRows]="false" [loading]="loading() && !detail()" [isEmpty]="!usage().length"
+                       emptyMessage="No pipeline, source or AI tool uses these APIs yet." emptyIcon="link">
+        <table class="table-modern">
+          <thead><tr><th>Used by</th><th>Name</th><th>API</th><th class="text-right">Pinned</th></tr></thead>
+          <tbody>
+            @for (u of usage(); track $index) {
+              <tr>
+                <td class="text-xs whitespace-nowrap">{{ userKind(u.userType) }}</td>
+                <td class="max-w-56"><app-data-text [value]="u.userName || u.userRef" label="Used by" /></td>
+                <td class="max-w-56"><app-data-text [value]="u.requestName || '—'" label="API" /></td>
+                <td class="text-right text-xs whitespace-nowrap">v{{ u.pinnedVersion ?? '—' }}@if (u.behind) { <span class="text-warn-600">· behind</span> }</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </app-table-shell>
+    </div>
+  }
+</div>

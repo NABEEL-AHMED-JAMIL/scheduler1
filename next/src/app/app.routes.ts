@@ -98,8 +98,24 @@ export const routes: Routes = [
         data: { minRole: 'TENANT_ADMIN' },
         canActivate: [roleGuard],
       },
-      comingSoon('integration/api-collections', 'API Collections', 'api-collections',
-        'Which APIs exist, tested and versioned, and the requests a pipeline can call.'),
+      {
+        // MIG-247: which APIs exist, tested and versioned. Every member holding the page reads; the pages
+        // hide what integration-service answers only for a workspace administrator (writes and Test).
+        path: 'integration/api-collections',
+        title: 'API Collections',
+        loadComponent: () =>
+          import('./features/integration/api-collections/api-collections').then(m => m.ApiCollections),
+        data: { pageKey: 'api-collections' },
+        canActivate: [pageGuard],
+      },
+      {
+        path: 'integration/api-collections/:collectionId',
+        title: 'API collection',
+        loadComponent: () =>
+          import('./features/integration/api-collections/collection').then(m => m.Collection),
+        data: { pageKey: 'api-collections' },
+        canActivate: [pageGuard],
+      },
       comingSoon('integration/connectors', 'Connector Hub', 'connector-hub',
         'Databases, SaaS apps and files, ready to connect and sync.'),
       // ---------------------------------------------------------------------------------------------
