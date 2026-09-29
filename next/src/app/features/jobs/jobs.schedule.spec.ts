@@ -128,3 +128,24 @@ describe('a job with no schedule at all', () => {
     expect(jobs.canSkipNext(manualNeverScheduled)).toBe(false);
   });
 });
+
+/** Wave 4: a Cron schedule reads as its expression -- its start time only bounds it, so "at 00:00" would mislead. */
+describe('Jobs list: a Cron schedule', () => {
+  const cronJob = () => autoJob({ scheduler: { schedulerId: 1316, frequency: 'Cron', intervalValue: '1',
+    startTime: '00:00:00', cronExpression: '0 3 * * *', nextRunAt: '2026-09-30T03:00:00', expired: false } });
+
+  it('summarises the schedule as its expression', () => {
+    const jobs = jobsFor();
+    expect(jobs.scheduleSummary(cronJob())).toBe('Cron 0 3 * * *');
+  });
+
+  it('still asserts the next run the server computed', () => {
+    const jobs = jobsFor();
+    expect(jobs.nextRun(cronJob())).toBe('2026-09-30T03:00:00');
+  });
+
+  it('leaves every other frequency\'s summary alone', () => {
+    const jobs = jobsFor();
+    expect(jobs.scheduleSummary(autoJob())).toBe('Daily at 09:00');
+  });
+});

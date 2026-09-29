@@ -28,7 +28,19 @@ const FREQUENCIES = [
   { value: 'Daily',   label: 'Daily',           unit: 'days' },
   { value: 'Weekly',  label: 'Weekly',          unit: 'weeks' },
   { value: 'Monthly', label: 'Monthly',         unit: 'months' },
+  // Wave 4 (Core 6f9261e): the expression is the cadence, so there is no interval and no unit.
+  { value: 'Cron',    label: 'Cron expression', unit: '' },
 ];
+
+/** Worked examples under the Cron field: minute hour day-of-month month day-of-week. */
+const CRON_EXAMPLES = [
+  { expression: '0 3 * * *',    means: '03:00 every day' },
+  { expression: '*/15 * * * *', means: 'every 15 minutes' },
+  { expression: '30 8 * * 1-5', means: '08:30 on weekdays' },
+];
+
+/** The start fields a Cron schedule may leave blank: Core then starts it today, 00:00 (SourceJobServiceImpl). */
+const CRON_OPTIONAL = ['startDate', 'startTime', 'intervalValue'];
 
 /**
  * The day codes the engine actually parses.
@@ -152,6 +164,7 @@ export class JobEdit implements OnInit {
       frequency: ['Daily', Validators.required],
       intervalValue: ['1', Validators.required],
       dayOfMonth: [null],
+      cronExpression: [''],
     }, { validators: endAfterStart }),
   });
 
@@ -192,6 +205,12 @@ export class JobEdit implements OnInit {
   readonly unit = computed(() =>
     FREQUENCIES.find(f => f.value === this.frequencyValue())?.unit ?? '');
 
+  /** Wave 4: a Cron schedule -- the expression replaces the interval, the weekdays and the day of the month. */
+  readonly isCron = computed(() => this.frequencyValue() === 'Cron');
+  readonly cronExamples = CRON_EXAMPLES;
+  /** Core's refusal of the expression ("SourceJob schedule: ..."), shown under the field until it is edited. */
+  readonly cronError = signal('');
+
   ngOnInit(): void {
     // Explicitly limited, because the endpoint's own default is ten: this dropdown is the only
     // way to attach a job to a task, so without the limit the eleventh task onwards could not
@@ -210,7 +229,11 @@ export class JobEdit implements OnInit {
       this.executionValue.set(v);
       this.applyExecution(v);
     });
-    this.scheduler.get('frequency')!.valueChanges.subscribe(v => this.frequencyValue.set(v));
+    this.scheduler.get('frequency')!.valueChanges.subscribe(v => {
+      this.frequencyValue.set(v);
+      this.applyFrequency(v);
+    });
+    this.scheduler.get('cronExpression')!.valueChanges.subscribe(() => this.cronError.set(''));
     this.schedule.set(this.scheduler.getRawValue());
     this.scheduler.valueChanges.subscribe(() => this.schedule.set(this.scheduler.getRawValue()));
     this.form.get('maxAttempts')!.valueChanges.subscribe(v => this.maxAttemptsValue.set(Number(v)));
@@ -273,6 +296,7 @@ export class JobEdit implements OnInit {
             frequency: job.scheduler.frequency,
             intervalValue: job.scheduler.intervalValue,
             dayOfMonth: job.scheduler.dayOfMonth,
+            cronExpression: job.scheduler.cronExpression ?? '',
           });
           this.frequencyValue.set(job.scheduler.frequency);
           this.selectedDays.set(((job.scheduler.daysOfWeek ?? '') as string).split(',')
@@ -363,6 +387,12 @@ export class JobEdit implements OnInit {
     if (!this.isScheduled()) return 'Runs only when you trigger it.';
     const frequency = this.frequencyValue();
     const schedule = this.schedule();
+    if (frequency === 'Cron') {
+      const expression = String(schedule['cronExpression'] ?? '').trim();
+      if (!expression) return 'Enter a cron expression to see the schedule.';
+      const end = schedule['endDate'];
+      return `On the cron schedule ${expression} (server time)${end ? `, until ${dayLabel(end)} inclusive` : ''}.`;
+    }
     // A job read back from the server carries the interval as a number: 1, not '1'. One the field
     // refuses (0, empty, a fraction) is not described at all: "Every 1" claimed a schedule the
     // form would not save, and the field's own error is the message that matters.
@@ -416,6 +446,22 @@ export class JobEdit implements OnInit {
     return end < today;
   });
 
+  /**
+   * Cron needs its expression and nothing else of the timetable; every other frequency keeps exactly the validators it
+   * had before Cron existed. Only the required rule moves: the start fields have no other validator to preserve.
+   */
+  private applyFrequency(frequency: string): void {
+    const cron = frequency === 'Cron';
+    for (const name of CRON_OPTIONAL) {
+      const control = this.scheduler.get(name)!;
+      control.setValidators(cron ? null : Validators.required);
+      control.updateValueAndValidity({ emitEvent: false });
+    }
+    const expression = this.scheduler.get('cronExpression')!;
+    expression.setValidators(cron ? Validators.required : null);
+    expression.updateValueAndValidity({ emitEvent: false });
+  }
+
   /** The schedule only counts for a scheduled job; disabled controls are skipped by validation. */
   private applyExecution(execution: string): void {
     const scheduler = this.form.get('scheduler')!;
@@ -459,11 +505,17 @@ export class JobEdit implements OnInit {
     };
 
     if (this.isScheduled()) {
-      payload.schedulers = [{
-        ...value.scheduler,
-        daysOfWeek: this.selectedDays().length ? this.selectedDays().join(',') : null,
-        dayOfMonth: value.scheduler.dayOfMonth === '' ? null : value.scheduler.dayOfMonth,
-      }];
+      const { cronExpression, ...timetable } = value.scheduler;
+      payload.schedulers = [this.isCron()
+        // Cron: the expression is the cadence. A blank start is left out for Core to default (today, 00:00), and the
+        // weekdays or day of the month a previous frequency picked are not carried along.
+        ? { ...timetable, startDate: timetable.startDate || null, startTime: timetable.startTime || null,
+          cronExpression: String(cronExpression ?? '').trim(), daysOfWeek: null, dayOfMonth: null }
+        : {
+          ...timetable,
+          daysOfWeek: this.selectedDays().length ? this.selectedDays().join(',') : null,
+          dayOfMonth: value.scheduler.dayOfMonth === '' ? null : value.scheduler.dayOfMonth,
+        }];
     }
 
     this.saving.set(true);
@@ -475,6 +527,7 @@ export class JobEdit implements OnInit {
       next: response => {
         if (response.status !== API_SUCCESS) {
           this.saving.set(false);
+          if (this.refusedCron(response.message)) return;
           this.toast.error(response.message || 'The job could not be saved.');
           return;
         }
@@ -494,8 +547,20 @@ export class JobEdit implements OnInit {
       },
       error: err => {
         this.saving.set(false);
+        if (this.refusedCron(err?.error?.message)) return;
         this.toast.error(err?.error?.message || 'The job could not be saved.');
       },
     });
+  }
+
+  /**
+   * Core refuses a Cron schedule it will not run with "SourceJob schedule: ..." (SourceJobServiceImpl.cronScheduleError).
+   * That sentence is about the expression, so it goes under the field, which takes the focus, rather than a toast.
+   */
+  private refusedCron(message: string | undefined): boolean {
+    if (!this.isCron() || !message?.startsWith('SourceJob schedule:')) return false;
+    this.cronError.set(message);
+    this.host?.nativeElement.querySelector<HTMLInputElement>('#cronExpression')?.focus();
+    return true;
   }
 }

@@ -20,6 +20,9 @@
         Start from the template — it carries the column names and the allowed values the
         importer expects.
       </p>
+      @if (config().templateNote; as note) {
+        <p class="text-xs text-[color:var(--text-muted)] mt-1 leading-snug" data-template-note>{{ note }}</p>
+      }
 
       <!-- The template is where an import starts, so it sits here rather than in the Export
            card, where "start from the template" sent people looking for it. -->

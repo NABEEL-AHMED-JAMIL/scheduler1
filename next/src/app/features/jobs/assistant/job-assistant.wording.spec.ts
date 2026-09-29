@@ -93,3 +93,17 @@ describe('the schedule and run lengths, on the console clock', () => {
     expect(textOf(answerFor('stats', weekly, runs))).toContain('Runs take 1m on average.');
   });
 });
+
+/** Wave 4: a Cron schedule is its expression; "every Cron at 00:00" described nothing. */
+describe('a Cron schedule, in words', () => {
+  const cron: JobFacts = { ...weekly, schedule: { frequency: 'Cron', intervalValue: '1', startTime: '00:00:00',
+    cronExpression: '0 3 * * *', nextRunAt: '2026-09-30T03:00:00' } };
+
+  it('says the expression', () => {
+    expect(textOf(answerFor('schedule', cron, []))).toBe('It runs on the cron schedule 0 3 * * * (server time).');
+  });
+
+  it('puts the expression on the Frequency row', () => {
+    expect(rowsOf(answerFor('schedule', cron, [])).find(r => r.label === 'Frequency')?.value).toBe('Cron 0 3 * * *');
+  });
+});

@@ -31,6 +31,8 @@ interface Endpoints {
   upload: string;
   noun: string;
   backTo: string;
+  /** What the template cannot say for itself, under the template button. */
+  templateNote?: string;
 }
 
 const ROUTES: Record<Kind, Endpoints> = {
@@ -40,6 +42,9 @@ const ROUTES: Record<Kind, Endpoints> = {
     upload: '/sourceJob.json/uploadSourceJob',
     noun: 'schedules',
     backTo: '/pipelines/schedules',
+    // Wave 4 (Core 6f9261e): the sheet keeps its eleven columns; JobDetailValidation reads a Cron row's Recurrence.
+    templateNote: 'For a Cron row, put the cron expression in the Recurrence cell, e.g. 0 3 * * * for 03:00 daily '
+      + '(server time). Five fields, or six with seconds 0.',
   },
   task: {
     template: '/sourceTask.json/downloadSourceTaskTemplate',

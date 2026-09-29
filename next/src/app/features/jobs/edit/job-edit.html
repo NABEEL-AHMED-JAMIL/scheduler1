@@ -94,20 +94,33 @@
               </select>
             </app-field>
 
-            <app-field label="Repeat every" for="interval" [required]="true"
-                       [control]="scheduler.get('intervalValue')" [submitted]="submitted()"
-                       [hint]="unit()">
-              <input id="interval" type="number" min="1" class="input" formControlName="intervalValue"
-                     placeholder="e.g. 5" />
-            </app-field>
+            @if (isCron()) {
+              <!-- Wave 4: the expression replaces Repeat every, the weekdays and the day of the month. Core's refusal
+                   ("Schedules run at most once a minute...") is shown here, under the field it is about. -->
+              <app-field label="Cron expression" for="cronExpression" [required]="true"
+                         [control]="scheduler.get('cronExpression')" [submitted]="submitted()" [error]="cronError()"
+                         hint="minute hour day-of-month month day-of-week, in server time (Chicago).">
+                <input id="cronExpression" class="input mono" formControlName="cronExpression"
+                       placeholder="0 3 * * *" autocomplete="off" spellcheck="false" />
+              </app-field>
+            } @else {
+              <app-field label="Repeat every" for="interval" [required]="true"
+                         [control]="scheduler.get('intervalValue')" [submitted]="submitted()"
+                         [hint]="unit()">
+                <input id="interval" type="number" min="1" class="input" formControlName="intervalValue"
+                       placeholder="e.g. 5" />
+              </app-field>
+            }
 
-            <app-field label="Start date" for="startDate" [required]="true"
-                       [control]="scheduler.get('startDate')" [submitted]="submitted()">
+            <app-field label="Start date" for="startDate" [required]="!isCron()"
+                       [control]="scheduler.get('startDate')" [submitted]="submitted()"
+                       [hint]="isCron() ? 'Optional. Blank starts it today.' : ''">
               <input id="startDate" type="date" class="input" formControlName="startDate" />
             </app-field>
 
-            <app-field label="Start time" for="startTime" [required]="true"
-                       [control]="scheduler.get('startTime')" [submitted]="submitted()">
+            <app-field label="Start time" for="startTime" [required]="!isCron()"
+                       [control]="scheduler.get('startTime')" [submitted]="submitted()"
+                       [hint]="isCron() ? 'Optional. Runs are not before this moment.' : ''">
               <input id="startTime" type="time" class="input" formControlName="startTime" placeholder="HH:MM" />
             </app-field>
 
@@ -128,6 +141,18 @@
               </app-field>
             }
           </div>
+
+          @if (isCron()) {
+            <div class="mt-3.5 text-xs text-[color:var(--text-secondary)]">
+              <span class="label">Examples</span>
+              <ul class="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+                @for (example of cronExamples; track example.expression) {
+                  <li><span class="mono text-[color:var(--text-primary)]">{{ example.expression }}</span> — {{ example.means }}</li>
+                }
+              </ul>
+              <p class="mt-1">Five fields, or six with a seconds field of 0: a schedule runs at most once a minute.</p>
+            </div>
+          }
 
           @if (frequencyValue() === 'Weekly') {
             <!-- A multi-select .seg: each day is a toggle that says whether it is on, and the

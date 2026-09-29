@@ -188,3 +188,16 @@ describe('Bulk download names', () => {
     expect(download('exportAll', 'attachment; filename="tasks-export-2026-09-28.xlsx"')).toBe('tasks-export-2026-09-28.xlsx');
   });
 });
+
+/** Wave 4: the schedules sheet keeps its eleven columns, so a Cron row's Recurrence cell holds the expression. */
+describe('Bulk schedules: the Cron row', () => {
+  it('says where a Cron row keeps its expression', () => {
+    const { fixture, el } = page();
+    expect(el.textContent).not.toContain('Recurrence');
+    fixture.componentRef.setInput('kind', 'job');
+    fixture.detectChanges();
+    const note = el.querySelector('[data-template-note]');
+    expect(note?.textContent).toContain('Recurrence');
+    expect(note?.textContent).toContain('0 3 * * *');
+  });
+});

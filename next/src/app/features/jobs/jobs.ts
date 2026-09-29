@@ -47,6 +47,8 @@ export interface Scheduler {
   intervalValue?: string;
   daysOfWeek?: string;
   dayOfMonth?: number;
+  /** Wave 4: a Cron schedule's expression (5 fields, or 6 with seconds 0); null for every other frequency. */
+  cronExpression?: string | null;
   nextRunAt?: string;
   expired?: boolean;
   lastFlight?: boolean;
@@ -636,6 +638,7 @@ export class Jobs implements OnInit {
     if (job.execution === 'Manual') return 'On demand';
     const schedule = job.scheduler;
     if (!schedule) return '—';
+    if (schedule.frequency === 'Cron') return `Cron ${schedule.cronExpression ?? ''}`.trim();
     const parts: string[] = [schedule.frequency ?? ''];
     if (schedule.intervalValue && schedule.intervalValue !== '1') parts.push(`every ${schedule.intervalValue}`);
     // A weekly schedule pinned to weekdays, and a monthly one pinned to a date, run on

@@ -118,7 +118,11 @@
               } @else {
                 <dl class="detail-list">
                   <dt>Frequency</dt>
-                  <dd>{{ s.frequency || '—' }}@if (s.intervalValue && s.intervalValue !== '1') { · every {{ s.intervalValue }} }</dd>
+                  @if (s.frequency === 'Cron') {
+                    <dd>Cron · <span class="mono">{{ s.cronExpression || '—' }}</span></dd>
+                  } @else {
+                    <dd>{{ s.frequency || '—' }}@if (s.intervalValue && s.intervalValue !== '1') { · every {{ s.intervalValue }} }</dd>
+                  }
                   <dt>Starts</dt><dd>{{ s.startDate ? dayLabel(s.startDate) : '—' }}{{ s.startTime ? ' at ' + clockTime(s.startTime) : '' }}</dd>
                   <dt>Ends</dt><dd>{{ s.endDate ? dayLabel(s.endDate) : 'no end date' }}</dd>
                   <dt>Next run</dt>

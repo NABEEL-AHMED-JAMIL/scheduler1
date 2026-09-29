@@ -41,6 +41,8 @@ export interface JobFacts {
     daysOfWeek?: string;
     /** A monthly job pinned to a date; 0 or less is the last day. */
     dayOfMonth?: number;
+    /** Wave 4: a Cron schedule's expression. */
+    cronExpression?: string | null;
   } | null;
 }
 
@@ -164,7 +166,9 @@ function scheduleSentence(facts: JobFacts): string {
   }
   if (!s) return 'No schedule is attached to this job.';
   const at = s.startTime ? ` at ${clockTime(s.startTime)}` : '';
-  const when = `${cadence(s)}${pinnedTo(s)}${at}`;
+  const when = s.frequency === 'Cron'
+    ? `on the cron schedule ${s.cronExpression ?? ''} (server time)`
+    : `${cadence(s)}${pinnedTo(s)}${at}`;
   if (s.expired) return `The schedule has expired — it ran ${when} and will not run again.`;
   return `It runs ${when}.`;
 }
@@ -268,7 +272,8 @@ export function answerFor(intent: Intent, facts: JobFacts, runs: JobRun[],
       const rows: { label: string; value: string }[] = [];
       if (s) {
         const n = Number(s.intervalValue) || 1;
-        rows.push({ label: 'Frequency', value: `${s.frequency ?? '—'}${n > 1 ? ` every ${n}` : ''}${pinnedTo(s)}` });
+        rows.push({ label: 'Frequency', value: s.frequency === 'Cron' ? `Cron ${s.cronExpression ?? ''}`.trim()
+          : `${s.frequency ?? '—'}${n > 1 ? ` every ${n}` : ''}${pinnedTo(s)}` });
         if (s.startDate) rows.push({ label: 'Starts', value: `${dayLabel(s.startDate)}${s.startTime ? ` at ${clockTime(s.startTime)}` : ''}` });
         if (s.endDate) rows.push({ label: 'Ends', value: dayLabel(s.endDate) });
         rows.push({ label: 'Next run', value: onDemand

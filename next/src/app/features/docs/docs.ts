@@ -546,6 +546,7 @@ export class Docs implements AfterViewInit {
     { name: 'Daily', means: 'Every so many days', intervals: '1 – 6' },
     { name: 'Weekly', means: 'Every so many weeks, or on named weekdays', intervals: '1 – 4' },
     { name: 'Monthly', means: 'Every so many months, or on a date each month', intervals: '1 – 6' },
+    { name: 'Cron', means: 'A cron expression, in server time: minute hour day-of-month month day-of-week', intervals: 'none — e.g. 0 3 * * *' },
   ];
 
   readonly roles = [

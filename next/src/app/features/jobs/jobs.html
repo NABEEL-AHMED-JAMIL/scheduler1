@@ -297,6 +297,7 @@
                     { label: 'Output',      value: job.taskDetail?.outputFolder, mono: true },
                     { label: 'Home page',   value: job.taskDetail?.homePageId },
                     { label: 'Assigned to', value: job.assignedUsername },
+                    { label: 'Cron',        value: job.scheduler?.cronExpression, mono: true },
                     { label: 'Starts',      value: dayLabel(job.scheduler?.startDate) },
                     { label: 'Ends',        value: dayLabel(job.scheduler?.endDate) }
                   ]; track item.label) {
