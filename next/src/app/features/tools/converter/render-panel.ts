@@ -122,6 +122,17 @@ export class RenderPanel implements OnInit {
     return p.ok ? { dataset: p.dataset } : null;
   });
 
+  /** A run's dataset has no title of its own: its file name heads the document unless a title is typed. */
+  readonly defaultTitle = computed(() => {
+    if (this.source() !== 'execution') return '';
+    const d = this.datasets().find(x => x.runDatasetId === this.datasetId());
+    return d ? d.name.replace(/\.[^.]+$/, '') : '';
+  });
+  private readonly effectiveOptions = computed<TemplateOptions>(() => {
+    const o = this.options();
+    return o.title.trim() || !this.defaultTitle() ? o : { ...o, title: this.defaultTitle() };
+  });
+
   readonly canMake = computed(() => !!this.renderInput() && !this.rendering() && (!this.saveToBucket() || !!this.saveBucket()));
   readonly canPreview = computed(() => !!this.renderInput() && !this.rendering() && this.usesTemplate());
 
@@ -220,7 +231,7 @@ export class RenderPanel implements OnInit {
   preview(): void {
     const input = this.renderInput();
     if (!input) return;
-    this.run('preview', renderBody({ outputFormat: 'pdf', ...input, options: this.options() }), done => {
+    this.run('preview', renderBody({ outputFormat: 'pdf', ...input, options: this.effectiveOptions() }), done => {
       this.dropPreview();
       this.previewUrl.set(URL.createObjectURL(base64ToBlob(done.outputBase64, done.outputContentType || 'application/pdf')));
       this.previewPages.set(done.pageCount ?? null);
@@ -232,7 +243,7 @@ export class RenderPanel implements OnInit {
     const input = this.renderInput();
     if (!input) return;
     const save = this.saveToBucket() ? { bucket: this.saveBucket(), folder: this.saveFolder() } : null;
-    this.run('make', renderBody({ outputFormat: this.outputFormat(), ...input, options: this.options(),
+    this.run('make', renderBody({ outputFormat: this.outputFormat(), ...input, options: this.effectiveOptions(),
       fileName: this.fileName(), save }), done => {
       this.result.set(done);
       this.toast.success(done.save && done.bucketName

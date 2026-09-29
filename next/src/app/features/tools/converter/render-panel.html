@@ -112,7 +112,7 @@
     <div class="form-grid">
       <div class="field">
         <label class="label" for="render-title">Title</label>
-        <input id="render-title" class="input" placeholder="The dataset's own title" maxlength="120"
+        <input id="render-title" class="input" [placeholder]="defaultTitle() || 'The dataset\'s own title'" maxlength="120"
                [value]="options().title" (input)="setTitle($any($event.target).value)" />
       </div>
       <div class="field">

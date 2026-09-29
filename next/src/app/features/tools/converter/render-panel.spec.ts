@@ -137,7 +137,9 @@ describe('From an execution', () => {
     expect(service.runDataset).toHaveBeenCalledWith(1051);
     expect(p.runRows()).toEqual([{ id: 1 }, { id: 2 }, { id: 3 }]);
     p.preview();
-    expect(service.render).toHaveBeenCalledWith(expect.objectContaining({ dataset: [{ id: 1 }, { id: 2 }, { id: 3 }] }));
+    // The run's file name heads the document when no title is typed.
+    expect(service.render).toHaveBeenCalledWith(expect.objectContaining({
+      dataset: { title: 'customers-clean', records: [{ id: 1 }, { id: 2 }, { id: 3 }] } }));
   });
 
   it('picks the only dataset a run kept without asking', () => {
