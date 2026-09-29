@@ -182,6 +182,11 @@ export class Shell {
         // object browser's file chat depends on it, so the list is readable by everyone and
         // only New prompt, Edit, Try it and Delete are gated (auth.canManageAgents). Model
         // connections is a genuine admin screen -- every call it makes is TENANT_ADMIN.
+        // MIG-252: the assistant and its tools ride the Prompts key; every call they make is TENANT_USER.
+        { label: 'AI Assistant', path: '/ai/assistant', pageKey: 'ai-prompts', icon: 'chat',
+          hint: 'Ask in plain language, get runs and reports' },
+        { label: 'Tool Registry', path: '/ai/tools', pageKey: 'ai-prompts', icon: 'plug',
+          hint: 'What the assistant is allowed to call' },
         { label: 'Prompts', path: '/ai/prompts', pageKey: 'ai-prompts', icon: 'sparkle',
           hint: 'What a step says to a model' },
         { label: 'Model connections', path: '/ai/connections', icon: 'server', adminOnly: true,

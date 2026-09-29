@@ -23,6 +23,8 @@ export const PINNED: Record<string, unknown> = {
     "Forms › Submissions Soon — Everything collected, with its approval state -> /forms/submissions",
     "Workflows › Task inbox Soon — Approvals and tasks waiting for you -> /workflows/inbox",
     "Workflows › Workflow designer Soon — Who approves what, and when -> /workflows/designer",
+    "AI › AI Assistant — Ask in plain language, get runs and reports -> /ai/assistant",
+    "AI › Tool Registry — What the assistant is allowed to call -> /ai/tools",
     "AI › Prompts — What a step says to a model -> /ai/prompts",
     "AI › Model connections — Providers, keys and caps -> /ai/connections",
     "Configuration › Task Registry — Every task a step can run, and each existing pipeline -> /configuration/task-registry",
@@ -54,6 +56,8 @@ export const PINNED: Record<string, unknown> = {
     "Documents › Audio Transcript — Speech to text -> /documents/transcript",
     "Data › Analytics Studio — Read a file as data, where it lives -> /data/analytics",
     "Data › Saved Analyses — Analyses and queries you kept, re-run on open -> /data/analytics/dashboards",
+    "AI › AI Assistant — Ask in plain language, get runs and reports -> /ai/assistant",
+    "AI › Tool Registry — What the assistant is allowed to call -> /ai/tools",
     "AI › Prompts — What a step says to a model -> /ai/prompts"
   ],
   "the menu for a tenant user with five pages (api-check TU)": [
@@ -90,6 +94,8 @@ export const PINNED: Record<string, unknown> = {
     "Forms › Submissions Soon — Everything collected, with its approval state -> /forms/submissions",
     "Workflows › Task inbox Soon — Approvals and tasks waiting for you -> /workflows/inbox",
     "Workflows › Workflow designer Soon — Who approves what, and when -> /workflows/designer",
+    "AI › AI Assistant — Ask in plain language, get runs and reports -> /ai/assistant",
+    "AI › Tool Registry — What the assistant is allowed to call -> /ai/tools",
     "AI › Prompts — What a step says to a model -> /ai/prompts",
     "AI › Model connections — Providers, keys and caps -> /ai/connections",
     "Configuration › Task Registry — Every task a step can run, and each existing pipeline -> /configuration/task-registry",
