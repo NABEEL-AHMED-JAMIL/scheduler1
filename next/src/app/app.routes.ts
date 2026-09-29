@@ -567,6 +567,40 @@ export const routes: Routes = [
         data: { minRole: 'PLATFORM_ADMIN' },
         canActivate: [roleGuard],
       },
+      // MIG-254: the managed service. Role-gated, no page keys: every call behind the first three is PLATFORM_ADMIN
+      // (identity-service ManagedServiceRestApi), and the fourth is a workspace administrator's read of the same audit.
+      {
+        path: 'administration/managed-service',
+        title: 'Managed service',
+        loadComponent: () =>
+          import('./features/admin/managed-service/managed-service').then(m => m.ManagedService),
+        data: { minRole: 'PLATFORM_ADMIN' },
+        canActivate: [roleGuard],
+      },
+      {
+        path: 'administration/staff-activity',
+        title: 'Staff activity',
+        loadComponent: () =>
+          import('./features/admin/managed-service/staff-activity').then(m => m.StaffActivity),
+        data: { minRole: 'PLATFORM_ADMIN', scope: 'platform' },
+        canActivate: [roleGuard],
+      },
+      {
+        path: 'administration/work-in-workspace',
+        title: 'Work in a workspace',
+        loadComponent: () =>
+          import('./features/admin/managed-service/work-in-workspace').then(m => m.WorkInWorkspace),
+        data: { minRole: 'PLATFORM_ADMIN' },
+        canActivate: [roleGuard],
+      },
+      {
+        path: 'administration/team-activity',
+        title: "Our team's activity",
+        loadComponent: () =>
+          import('./features/admin/managed-service/staff-activity').then(m => m.StaffActivity),
+        data: { minRole: 'TENANT_ADMIN', scope: 'workspace' },
+        canActivate: [roleGuard],
+      },
       // ---------------------------------------------------------------------------------------------
       // Pages outside the menu
       // ---------------------------------------------------------------------------------------------

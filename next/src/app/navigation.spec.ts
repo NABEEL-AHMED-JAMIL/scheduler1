@@ -366,6 +366,10 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
       ...BILLING, 'Billing › Billing analytics -> /billing/analytics', 'Billing › Rate cards -> /billing/rates',
       ...ADMINISTRATION, 'Administration › Tenants -> /administration/tenants',
       'Administration › Workspace Requests -> /administration/tenant-requests',
+      // MIG-254: the managed service.
+      'Administration › Managed service -> /administration/managed-service',
+      'Administration › Staff activity -> /administration/staff-activity',
+      'Administration › Work in a workspace -> /administration/work-in-workspace',
     ]);
   });
 

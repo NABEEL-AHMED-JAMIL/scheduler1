@@ -139,6 +139,7 @@ export const PINNED: Record<string, unknown> = {
       "Delete Claude Demo 75a611b4",
       "Delete Default",
       "Edit",
+      "Make managed",
       "New tenant",
       "Only mine",
       "Refresh",

@@ -599,6 +599,42 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
+      "path": "/administration/managed-service",
+      "title": "Managed service",
+      "minRole": "PLATFORM_ADMIN",
+      "guards": [
+        "roleGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/administration/staff-activity",
+      "title": "Staff activity",
+      "minRole": "PLATFORM_ADMIN",
+      "guards": [
+        "roleGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/administration/work-in-workspace",
+      "title": "Work in a workspace",
+      "minRole": "PLATFORM_ADMIN",
+      "guards": [
+        "roleGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/administration/team-activity",
+      "title": "Our team's activity",
+      "minRole": "TENANT_ADMIN",
+      "guards": [
+        "roleGuard"
+      ],
+      "lazy": true
+    },
+    {
       "path": "/profile",
       "title": "Your profile",
       "guards": [],

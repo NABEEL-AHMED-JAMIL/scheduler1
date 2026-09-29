@@ -121,12 +121,28 @@
           }
         </div>
 
-        <button type="button" class="btn btn-ghost btn-icon xl:hidden" (click)="mobileOpen.set(!mobileOpen())"
+        <button type="button" class="btn btn-ghost btn-icon xl:hidden" (click)="toggleMobile()"
                 aria-label="Menu" [attr.aria-expanded]="mobileOpen()">
           <app-icon [name]="mobileOpen() ? 'close' : 'menu'" size="1.15em" />
         </button>
       </div>
     </div>
+
+    <!-- MIG-254: a staff member's managed session, for as long as it lasts: whose workspace, and the way back.
+         Inline, not @defer: that would pull Angular's defer runtime into the initial bundle (+8 kB). -->
+    @if (auth.isManagedSession()) {
+      <div class="managed-session-bar" role="status" data-managed-session>
+        <div class="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8 py-1.5 flex items-center gap-2 text-sm">
+          <app-icon name="briefcase" class="shrink-0" />
+          <p class="flex-1 min-w-0">
+            Managed session: <b>{{ auth.user()?.tenantName || ('workspace ' + auth.user()?.tenantId) }}</b> — every change is audited
+          </p>
+          <button type="button" class="btn btn-default btn-sm shrink-0" (click)="auth.exitManagedSession()">
+            <app-icon name="logout" />Exit
+          </button>
+        </div>
+      </div>
+    }
 
     @if (mobileOpen()) {
       <nav class="mobile-nav xl:hidden border-t px-3 py-2 space-y-0.5 border-subtle max-h-[calc(100dvh-3.5rem-1px)] overflow-y-auto overscroll-contain">

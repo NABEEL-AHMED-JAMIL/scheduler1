@@ -8,6 +8,8 @@ import { Icon } from '../../shared/ui/icon';
 import { BrandMark } from '../../shared/ui/brand-mark';
 import { PageKey } from '../../core/auth/page-keys';
 import { NotificationBell } from './notification-bell';
+import { HttpClient } from '@angular/common/http';
+import { API_BASE, ApiResponse } from '../../core/api/api.config';
 
 interface NavChild {
   label: string;
@@ -30,6 +32,11 @@ interface NavChild {
    * the exact one" would have fixed today's menu and left the next nested route to rediscover it.
    */
   exact?: boolean;
+  /**
+   * MIG-254: a workspace administrator's view of what our team did there -- offered when the workspace is
+   * MANAGED, or once it is known our team has acted in it (a workspace that went back to SELF keeps its history).
+   */
+  teamOnly?: boolean;
 }
 
 interface NavItem {
@@ -49,6 +56,8 @@ export class Shell {
   readonly auth = inject(AuthService);
   readonly theme = inject(ThemeService);
   private readonly router = inject(Router);
+  // HttpClient rather than ManagedServiceApi: the shell is in the initial bundle, the admin pages' client is not.
+  private readonly http = inject(HttpClient);
 
   readonly openMenu = signal<string | null>(null);
   readonly mobileOpen = signal(false);
@@ -254,6 +263,15 @@ export class Shell {
         // walked straight into the unauthorized page.
         { label: 'Workspace Requests', path: '/administration/tenant-requests', icon: 'inbox',
           platformOnly: true, hint: 'Asks from outside for a workspace' },
+        // MIG-254: the managed service. Platform pages first, then the workspace administrator's one.
+        { label: 'Managed service', path: '/administration/managed-service', icon: 'briefcase', platformOnly: true,
+          hint: 'Which of our staff may work in which workspace' },
+        { label: 'Staff activity', path: '/administration/staff-activity', icon: 'history', platformOnly: true,
+          hint: 'Every change our staff made in a customer\'s workspace' },
+        { label: 'Work in a workspace', path: '/administration/work-in-workspace', icon: 'external', platformOnly: true,
+          hint: 'Open a managed session where you hold a grant' },
+        { label: 'Our team\'s activity', path: '/administration/team-activity', icon: 'history', adminOnly: true,
+          teamOnly: true, hint: 'Every change our team made in this workspace' },
       ],
     },
   ];
@@ -273,6 +291,7 @@ export class Shell {
         ...item,
         children: this.withExactFlags(item.children?.filter(child =>
           (!child.adminOnly || isAdmin) && (!child.platformOnly || isPlatform)
+          && (!child.teamOnly || (!isPlatform && this.showTeamActivity()))
           && (!child.pageKey || this.auth.canOpen(child.pageKey)))),
       }))
       .filter(item => !item.children || item.children.length > 0);
@@ -294,11 +313,35 @@ export class Shell {
   }
 
   /** An id for a nav panel, so its trigger can say which panel it controls. Labels have spaces. */
+  /** MIG-254: our team has acted in this SELF workspace (asked once, when the menu is first opened). */
+  private readonly teamActivitySeen = signal(false);
+  private teamActivityAsked = false;
+  readonly showTeamActivity = computed(() => this.auth.managementMode() === 'MANAGED' || this.teamActivitySeen());
+
+  /**
+   * Whether a SELF workspace has any of our team's changes, asked when a menu first opens rather than on every
+   * page: one small read, and only for the one person it can change the menu for.
+   */
+  private checkTeamActivity(): void {
+    if (this.teamActivityAsked || !this.auth.isTenantAdmin() || this.auth.isPlatformAdmin() || this.showTeamActivity()) return;
+    this.teamActivityAsked = true;
+    this.http.get<ApiResponse<unknown[]>>(`${API_BASE}/managedService.json/actions`, { params: { limit: 1 } }).subscribe({
+      next: r => this.teamActivitySeen.set(!!r.data?.length),
+      error: () => { /* the menu stays as it is */ },
+    });
+  }
+
+  toggleMobile(): void {
+    if (!this.mobileOpen()) this.checkTeamActivity();
+    this.mobileOpen.set(!this.mobileOpen());
+  }
+
   menuId(label: string): string {
     return 'nav-menu-' + label.toLowerCase().replace(/[^a-z0-9]+/g, '-');
   }
 
   toggleMenu(label: string): void {
+    if (label === 'Administration') this.checkTeamActivity();
     this.openMenu.update(current => (current === label ? null : label));
   }
 

@@ -1951,6 +1951,12 @@ html.dark .btn-circle-danger:hover:not(:disabled) { background: color-mix(in okl
 .step-notice-warn { border-color: color-mix(in oklab, var(--color-warn-500) 45%, transparent); background: color-mix(in oklab, var(--color-warn-500) 10%, transparent); }
 .step-notice-crit { border-color: color-mix(in oklab, var(--color-crit-500) 45%, transparent); background: color-mix(in oklab, var(--color-crit-500) 8%, transparent); }
 .step-notice-ok { border-color: color-mix(in oklab, var(--color-ok-500) 45%, transparent); background: color-mix(in oklab, var(--color-ok-500) 8%, transparent); }
+
+/* MIG-254: a staff member's managed-service session, under the header for as long as it lasts. Warn-tinted in
+   both themes: it is a different identity from the one signed in, and the whole point is not to forget it. */
+.managed-session-bar { border-top: 1px solid color-mix(in oklab, var(--color-warn-500) 45%, transparent);
+  background: color-mix(in oklab, var(--color-warn-500) 14%, var(--surface-raised)); color: var(--text-primary); }
+.managed-session-bar > div > app-icon { color: var(--color-warn-500); }
 .schema-group { border: 1px solid var(--border-subtle); border-radius: 8px; padding: 0.6rem 0.75rem; }
 .schema-row { border-top: 1px dashed var(--border-subtle); padding-top: 0.5rem; margin-top: 0.5rem; }
 .run-step { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 0.6rem; align-items: start; padding: 0.6rem 0; border-top: 1px solid var(--border-subtle); }
