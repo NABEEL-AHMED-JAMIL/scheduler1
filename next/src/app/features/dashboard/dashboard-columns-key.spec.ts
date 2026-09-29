@@ -12,3 +12,14 @@ describe('the hour drill-down\'s column choice', () => {
     expect(html).toMatch(/<app-table-shell columnsKey="dashboard-hour" \[heading\]="drillHeading\(\)"/);
   });
 });
+
+/** The Unread tile sits inside a link, so it only matches its neighbours' height when told to fill it. */
+describe('the Unread tile', () => {
+  it('fills its grid row like the other tiles', async () => {
+    const fs = (await import(/* @vite-ignore */ ['node', 'fs'].join(':'))) as { readFileSync(p: string, e: 'utf8'): string };
+    const root = (globalThis as unknown as { process: { cwd(): string } }).process.cwd();
+    const html = fs.readFileSync(`${root}/src/app/features/dashboard/dashboard.html`, 'utf8');
+    expect(html).toMatch(/<a routerLink="\/notifications" class="block h-full/);
+    expect(html).toMatch(/<app-stat-tile class="h-full" label="Unread"/);
+  });
+});
