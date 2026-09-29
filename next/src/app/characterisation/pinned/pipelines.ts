@@ -145,29 +145,28 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /tenant.json/listTenants",
-      "GET /pipeline.json/list?limit=50&page=1"
+      "GET /pipeline.json/steps/tasks",
+      "GET /pipeline.json/list?limit=1000&page=1"
     ],
     "headings": [
       "Task Registry",
-      "Pipelines (1 of 1)"
+      "Tasks (1 of 1)"
     ],
     "buttons": [
       "Actions for Reference: CSV check and summarise",
-      "Cards",
       "Columns",
       "New pipeline",
       "Only mine",
-      "Refresh",
-      "Table"
+      "Open Reference: CSV check and summarise",
+      "Refresh"
     ],
     "columns": [
       [
-        "Pipeline",
-        "Topic",
-        "Fields",
-        "Created by",
-        "Updated by",
-        "Status",
+        "Task",
+        "Kind",
+        "Service",
+        "Input → output",
+        "State",
         "Actions"
       ]
     ],
@@ -175,8 +174,9 @@ export const PINNED: Record<string, unknown> = {
       "All topics",
       "All workspaces",
       "Filter by workspace",
-      "Search name, topic or pipeline",
-      "Search pipelines",
+      "Kind",
+      "Search name, code, service or topic",
+      "Search tasks",
       "State"
     ],
     "links": [
@@ -206,77 +206,80 @@ export const PINNED: Record<string, unknown> = {
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
-      "GET /pipeline.json/list?limit=50&page=1"
+      "GET /pipeline.json/steps/tasks",
+      "GET /pipeline.json/list?limit=1000&page=1"
     ],
     "headings": [
       "Task Registry",
-      "Pipelines (1 of 1)"
+      "Tasks (1 of 1)"
     ],
     "buttons": [
       "Actions for Reference: CSV check and summarise",
-      "Cards",
       "Columns",
       "New pipeline",
       "Only mine",
-      "Refresh",
-      "Table"
+      "Open Reference: CSV check and summarise",
+      "Refresh"
     ],
     "columns": [
       [
-        "Pipeline",
-        "Topic",
-        "Fields",
-        "Created by",
-        "Updated by",
-        "Status",
+        "Task",
+        "Kind",
+        "Service",
+        "Input → output",
+        "State",
         "Actions"
       ]
     ],
     "fields": [
       "All topics",
-      "Search name, topic or pipeline",
-      "Search pipelines",
+      "Kind",
+      "Search name, code, service or topic",
+      "Search tasks",
       "State"
     ],
     "links": [
       "/configuration/kafka"
     ]
   },
+  "the old Configuration › Pipelines address": {
+    "url": "/configuration/task-registry"
+  },
   "the old forms address": {
     "url": "/configuration/task-registry",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
-      "GET /pipeline.json/list?limit=50&page=1"
+      "GET /pipeline.json/steps/tasks",
+      "GET /pipeline.json/list?limit=1000&page=1"
     ],
     "headings": [
       "Task Registry",
-      "Pipelines (1 of 1)"
+      "Tasks (1 of 1)"
     ],
     "buttons": [
       "Actions for Reference: CSV check and summarise",
-      "Cards",
       "Columns",
       "New pipeline",
       "Only mine",
-      "Refresh",
-      "Table"
+      "Open Reference: CSV check and summarise",
+      "Refresh"
     ],
     "columns": [
       [
-        "Pipeline",
-        "Topic",
-        "Fields",
-        "Created by",
-        "Updated by",
-        "Status",
+        "Task",
+        "Kind",
+        "Service",
+        "Input → output",
+        "State",
         "Actions"
       ]
     ],
     "fields": [
       "All topics",
-      "Search name, topic or pipeline",
-      "Search pipelines",
+      "Kind",
+      "Search name, code, service or topic",
+      "Search tasks",
       "State"
     ],
     "links": [

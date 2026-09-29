@@ -34,7 +34,13 @@ const REGISTRY_TASKS = { status: "SUCCESS", message: "17 step task(s) and 2 lega
 ] };
 
 
-const ANSWERS: Record<string, unknown> = { 'GET /pipeline.json/steps/tasks': REGISTRY_TASKS };
+/** The schemas cut above, put back in their live shape: rows in (none for a Read task), rows out (none for Legacy). */
+const ROWS = { type: 'array', items: { type: 'object', additionalProperties: { type: ['string', 'number', 'boolean', 'null'] } } };
+const WITH_SCHEMAS = { ...REGISTRY_TASKS, data: REGISTRY_TASKS.data.map((t: any) => ({ ...t,
+  inputSchema: t.kind === 'Read' ? null : { ...ROWS, description: 'Any rows.' },
+  outputSchema: t.kind === 'Legacy' ? null : { ...ROWS, description: 'The rows it makes.' } })) };
+
+const ANSWERS: Record<string, unknown> = { 'GET /pipeline.json/steps/tasks': WITH_SCHEMAS };
 
 const clean = (text: string | null | undefined) => (text ?? '').replace(/\s+/g, ' ').trim();
 
@@ -107,7 +113,7 @@ describe('MIG-250: Configuration › Task Registry', () => {
     const v = await visit('/configuration/task-registry', 'TENANT_ADMIN', null, {
       ...ANSWERS,
       'POST /pipeline.json/steps/tasks/enabled': { status: 'SUCCESS', message: "'join' is switched off in this workspace.", data: {
-        ...(REGISTRY_TASKS.data.find((t: any) => t.code === 'join') as object), enabled: false, overridden: true } },
+        ...(WITH_SCHEMAS.data.find((t: any) => t.code === 'join') as object), enabled: false, overridden: true } },
     });
     await click(v, 'Open Join');
     const box = document.querySelector('.cdk-overlay-container input[role="switch"]') as HTMLInputElement;
