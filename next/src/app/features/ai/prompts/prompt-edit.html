@@ -14,14 +14,15 @@
     </div>
     <div class="flex items-center gap-2">
       <a routerLink="/ai/prompts" class="btn btn-ghost btn-sm">Cancel</a>
-      <button type="button" class="btn btn-default btn-sm" (click)="save(false)" [disabled]="saving() || !!loadError()">
+      <button type="button" class="btn btn-default btn-sm" (click)="save(false)" [disabled]="saving() || !!loadError() || locked()">
         {{ isEdit() ? 'Save as v' + ((loaded()?.version ?? 0) + 1) : 'Save draft' }}
       </button>
-      <button type="button" class="btn btn-primary btn-sm" (click)="save(true)" [disabled]="saving() || !!loadError()">
+      <button type="button" class="btn btn-primary btn-sm" (click)="save(true)" [disabled]="saving() || !!loadError() || locked()">
         @if (saving()) { <app-icon name="refresh" class="spin" /> }Save &amp; activate
       </button>
     </div>
   </div>
+  <app-managed-banner what="prompts" />
 
   @if (loading()) {
     <div class="card p-12 text-center text-sm text-[color:var(--text-muted)]"><div class="spinner mx-auto mb-3" role="status" aria-label="Loading"></div>Loading…</div>
@@ -37,6 +38,8 @@
     <div class="prompt-editor">
       <!-- ── Definition ─────────────────────────────────────────────────────────────── -->
       <form [formGroup]="form" class="card p-4 form-stack min-w-0" (ngSubmit)="save(true)">
+        <!-- MIG-254: read-only in a MANAGED workspace (display: contents, so the layout is the form's own). -->
+        <fieldset class="contents" [disabled]="locked()">
         <div class="form-grid">
           <app-field label="Name" for="pName" [required]="true" [control]="form.get('name')" [submitted]="submitted()">
             <input id="pName" class="input" formControlName="name" placeholder="Summarise claim file" />
@@ -178,6 +181,7 @@
             <input id="pMax" type="number" min="1" step="50" class="input" formControlName="maxTokens" placeholder="800" />
           </app-field>
         </div>
+      </fieldset>
       </form>
 
       <!-- ── Try it ─────────────────────────────────────────────────────────────────── -->
@@ -185,7 +189,7 @@
         <div class="flex items-center gap-2 flex-wrap">
           <h2 class="section-title">Try it</h2>
           <span class="text-xs text-[color:var(--text-muted)]">runs the page as it is, with the samples · recorded as a try</span>
-          <button type="button" class="btn btn-primary btn-sm ml-auto" (click)="tryIt()" [disabled]="trying()">
+          <button type="button" class="btn btn-primary btn-sm ml-auto" (click)="tryIt()" [disabled]="trying() || locked()">
             <app-icon name="play" [busy]="trying()" />{{ trying() ? 'Running…' : 'Run' }}
           </button>
         </div>

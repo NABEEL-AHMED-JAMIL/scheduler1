@@ -57,7 +57,7 @@ function screenWith(opts: { admin?: boolean; settings?: InboxSettings; closeWith
       { provide: InboxApi, useValue: api },
       { provide: Dialog, useValue: dialog },
       { provide: ToastService, useValue: toast },
-      { provide: AuthService, useValue: { isTenantAdmin: () => opts.admin ?? true, user: signal({ appUserId: 4537 }) } },
+      { provide: AuthService, useValue: { isTenantAdmin: () => opts.admin ?? true, canBuild: () => opts.admin ?? true, builderLocked: () => false, user: signal({ appUserId: 4537 }) } },
     ],
   });
   const screen = TestBed.runInInjectionContext(() => new Inbox());

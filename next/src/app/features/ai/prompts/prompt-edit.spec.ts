@@ -30,7 +30,7 @@ function editor() {
     { provide: HttpClient, useValue: { get, post } },
     { provide: ToastService, useValue: toast },
     { provide: Router, useValue: { navigate: () => {} } },
-    { provide: AuthService, useValue: { isPlatformAdmin: () => false, canManageAgents: () => true, user: () => ({ appUserId: 1 }) } },
+    { provide: AuthService, useValue: { isPlatformAdmin: () => false, canManageAgents: () => true, builderLocked: () => false, user: () => ({ appUserId: 1 }) } },
   ] });
   const component = TestBed.runInInjectionContext(() => new PromptEdit());
   component.ngOnInit();
@@ -130,7 +130,7 @@ describe('PromptEdit when the prompt cannot be read', () => {
       { provide: HttpClient, useValue: { get, post } },
       { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn(), info: () => {} } },
       provideRouter([]),
-      { provide: AuthService, useValue: { isPlatformAdmin: () => false, canManageAgents: () => true, user: () => ({ appUserId: 1 }) } },
+      { provide: AuthService, useValue: { isPlatformAdmin: () => false, canManageAgents: () => true, builderLocked: () => false, user: () => ({ appUserId: 1 }) } },
     ] });
     const fixture = TestBed.createComponent(PromptEdit);
     fixture.componentRef.setInput('promptId', '42');
@@ -171,7 +171,7 @@ describe('PromptEdit variables table after a removal', () => {
       { provide: HttpClient, useValue: { get, post: vi.fn(() => of({ status: API_SUCCESS, data: {} })) } },
       { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn(), info: () => {} } },
       provideRouter([]),
-      { provide: AuthService, useValue: { isPlatformAdmin: () => false, canManageAgents: () => true, user: () => ({ appUserId: 1 }) } },
+      { provide: AuthService, useValue: { isPlatformAdmin: () => false, canManageAgents: () => true, builderLocked: () => false, user: () => ({ appUserId: 1 }) } },
     ] });
     const fixture = TestBed.createComponent(PromptEdit);
     fixture.detectChanges();
@@ -215,7 +215,7 @@ function renderedEditor(options: { platformAdmin?: boolean; promptId?: string; c
     { provide: HttpClient, useValue: { get, post } },
     { provide: ToastService, useValue: toast },
     provideRouter([]),
-    { provide: AuthService, useValue: { isPlatformAdmin: () => !!options.platformAdmin, canManageAgents: () => true, user: () => ({ appUserId: 1 }) } },
+    { provide: AuthService, useValue: { isPlatformAdmin: () => !!options.platformAdmin, canManageAgents: () => true, builderLocked: () => false, user: () => ({ appUserId: 1 }) } },
   ] });
   const fixture = TestBed.createComponent(PromptEdit);
   if (options.promptId) fixture.componentRef.setInput('promptId', options.promptId);

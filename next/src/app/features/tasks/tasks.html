@@ -21,6 +21,7 @@
       }
     </div>
   </div>
+  <app-managed-banner what="pipelines" />
 
   <app-table-shell heading="Tasks" [loading]="loading()" [error]="error()"
                    [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="tasks().length"

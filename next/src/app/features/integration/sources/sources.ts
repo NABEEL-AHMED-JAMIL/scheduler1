@@ -29,6 +29,7 @@ import { ContractPanel, ContractPanelData } from './contract-panel';
 import { TemplateDialog, TemplateDialogData } from './template-dialog';
 import { ContractSampleDialog, ContractSampleData } from './contract-sample-dialog';
 import { SensitivityTag } from '../../../shared/ui/sensitivity';
+import { ManagedBanner } from '../../../shared/ui/managed-banner';
 
 export type SourcesTab = 'sources' | 'connections' | 'contracts';
 const TABS: SourcesTab[] = ['sources', 'connections', 'contracts'];
@@ -46,7 +47,7 @@ const TABS: SourcesTab[] = ['sources', 'connections', 'contracts'];
  */
 @Component({
   selector: 'app-sources',
-  imports: [SensitivityTag, Icon, TableShell, StatusPill, StatStrip, ViewToggle, Pagination, DataText, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger],
+  imports: [SensitivityTag, Icon, TableShell, StatusPill, StatStrip, ViewToggle, Pagination, DataText, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, ManagedBanner],
   templateUrl: './sources.html',
 })
 export class Sources implements OnInit {
@@ -63,7 +64,7 @@ export class Sources implements OnInit {
     { id: 'sources', label: 'Sources' }, { id: 'connections', label: 'Database connections' }, { id: 'contracts', label: 'Data contracts' },
   ];
   readonly tab = signal<SourcesTab>(this.tabOf(this.route.snapshot?.queryParamMap?.get('tab')));
-  readonly canManage = computed(() => this.auth.isTenantAdmin());
+  readonly canManage = computed(() => this.auth.canBuild());
   readonly isPlatformAdmin = computed(() => this.auth.isPlatformAdmin());
   private readonly tenants = signal<ComboboxOption[]>([]);
   private readonly names = computed(() => new Map(this.tenants().map(t => [t.value, t.label])));

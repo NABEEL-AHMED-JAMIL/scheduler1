@@ -68,7 +68,7 @@ function screenWith(opts: { admin?: boolean; tab?: string; closed?: unknown } = 
       { provide: DocumentsApi, useValue: api },
       { provide: Dialog, useValue: dialog },
       { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn(), info: vi.fn() } },
-      { provide: AuthService, useValue: { isTenantAdmin: () => opts.admin ?? true, user: signal({ appUserId: 4537 }) } },
+      { provide: AuthService, useValue: { isTenantAdmin: () => opts.admin ?? true, canBuild: () => opts.admin ?? true, builderLocked: () => false, user: signal({ appUserId: 4537 }) } },
     ],
   });
   const router = TestBed.inject(Router);

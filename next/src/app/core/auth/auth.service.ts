@@ -47,6 +47,18 @@ function claimsOf(token: string | null | undefined): Record<string, unknown> | n
  */
 export const PLATFORM_SESSION_KEY = 'etl_platform_session';
 
+/**
+ * localStorage.getItem, or null when the browser refuses storage outright (blocked site data throws on
+ * access): no session, rather than a console that cannot construct its AuthService.
+ */
+function readStorage(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
 /** Where Exit returns a staff member: the picker they opened the managed session from. */
 export const WORK_IN_WORKSPACE_PATH = '/administration/work-in-workspace';
 
@@ -353,7 +365,7 @@ export class AuthService {
   }
 
   private readHeldPlatformSession(): AuthUser | null {
-    const raw = localStorage.getItem(PLATFORM_SESSION_KEY);
+    const raw = readStorage(PLATFORM_SESSION_KEY);
     if (!raw) return null;
     try {
       return JSON.parse(raw) as AuthUser;
@@ -395,7 +407,7 @@ export class AuthService {
   }
 
   private readStoredUser(): AuthUser | null {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = readStorage(STORAGE_KEY);
     if (!raw) return null;
     try {
       return JSON.parse(raw) as AuthUser;

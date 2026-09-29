@@ -16,6 +16,7 @@ import { MineFilter, isMine } from '../../../shared/ui/mine-filter';
 import { confirmWith } from '../../../shared/ui/confirm';
 import { Prompt } from './prompt-model';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
+import { ManagedBanner } from '../../../shared/ui/managed-banner';
 
 /**
  * Prompts: what a step says to a model. Readable by everyone who can open the page (a
@@ -24,7 +25,7 @@ import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
  */
 @Component({
   selector: 'app-prompts',
-  imports: [Icon, TableShell, StatusPill, StatTile, ViewToggle, MineFilter, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink, ServerTimePipe],
+  imports: [Icon, TableShell, StatusPill, StatTile, ViewToggle, MineFilter, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink, ServerTimePipe, ManagedBanner],
   templateUrl: './prompts.html',
 })
 export class Prompts implements OnInit {

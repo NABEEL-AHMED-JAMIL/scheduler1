@@ -12,11 +12,14 @@
       <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
         <app-icon name="refresh" [class.spin]="loading()" />Refresh
       </button>
-      <button type="button" class="btn btn-primary btn-sm" (click)="create()">
-        <app-icon name="plus" />New connection
-      </button>
+      @if (!locked()) {
+        <button type="button" class="btn btn-primary btn-sm" (click)="create()">
+          <app-icon name="plus" />New connection
+        </button>
+      }
     </div>
   </div>
+  <app-managed-banner what="model connections" />
 
   <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
     @for (tile of [
@@ -111,7 +114,9 @@
             <button type="button" class="btn btn-primary btn-sm" (click)="test(c)" [disabled]="testing() === c.connectionId">
               <app-icon name="plug" [busy]="testing() === c.connectionId" />{{ testing() === c.connectionId ? 'Testing…' : 'Test connection' }}
             </button>
+            @if (!locked()) {
             <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="menu" [attr.aria-label]="'Actions for ' + c.name"><app-icon name="dots" size="1.05em" /></button>
+            }
             <ng-template #menu>
               <div cdkMenu class="card shadow-xl py-1 min-w-52 text-sm">
                 <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="edit(c)"><app-icon name="edit" />Edit connection</button>

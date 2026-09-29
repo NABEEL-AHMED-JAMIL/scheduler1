@@ -54,7 +54,7 @@ function setup(opts: { admin?: boolean; api?: Partial<Record<string, unknown>>; 
       { provide: ApiCollectionsApi, useValue: api },
       { provide: Dialog, useValue: dialog },
       { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } },
-      { provide: AuthService, useValue: { isTenantAdmin: () => opts.admin ?? true, isPlatformAdmin: () => false, user: signal({ appUserId: 4537 }) } },
+      { provide: AuthService, useValue: { isTenantAdmin: () => opts.admin ?? true, canBuild: () => opts.admin ?? true, builderLocked: () => false, isPlatformAdmin: () => false, user: signal({ appUserId: 4537 }) } },
     ],
   });
   const fixture = TestBed.createComponent(Collection);

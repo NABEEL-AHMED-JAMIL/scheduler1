@@ -27,6 +27,7 @@ import { RequestPanel, RequestPanelData } from './request-panel';
 import { folderOptions } from './folders';
 import { LastTests } from './last-tests';
 import { SensitivityTag } from '../../../shared/ui/sensitivity';
+import { ManagedBanner } from '../../../shared/ui/managed-banner';
 
 const USER_KINDS: Record<string, string> = { PIPELINE: 'Pipeline', SOURCE: 'Source', AI_TOOL: 'AI tool' };
 
@@ -38,7 +39,7 @@ const USER_KINDS: Record<string, string> = { PIPELINE: 'Pipeline', SOURCE: 'Sour
  */
 @Component({
   selector: 'app-api-collection',
-  imports: [Icon, SensitivityTag, TableShell, StatusPill, StatStrip, ViewToggle, DataText, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink],
+  imports: [Icon, SensitivityTag, TableShell, StatusPill, StatStrip, ViewToggle, DataText, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink, ManagedBanner],
   templateUrl: './collection.html',
 })
 export class Collection implements OnChanges {
@@ -61,7 +62,7 @@ export class Collection implements OnChanges {
   readonly search = signal('');
   readonly folderFilter = signal('');
   readonly stateFilter = signal('');
-  readonly canManage = computed(() => this.auth.isTenantAdmin());
+  readonly canManage = computed(() => this.auth.canBuild());
 
   readonly collection = computed(() => this.detail()?.collection ?? null);
   readonly folders = computed(() => folderOptions(this.detail()?.folders ?? []));

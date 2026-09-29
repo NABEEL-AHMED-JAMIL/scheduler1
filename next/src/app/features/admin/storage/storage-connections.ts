@@ -23,6 +23,7 @@ import { kafkaDependencyNote, kafkaProfilesUsing } from './kafka-dependents';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { createPager } from '../../../shared/ui/pager';
 import { Pagination } from '../../../shared/ui/pagination';
+import { ManagedBanner } from '../../../shared/ui/managed-banner';
 
 interface StorageConnection {
   /** Owning workspace; null for the two platform buckets. */
@@ -55,7 +56,7 @@ interface StorageConnection {
 
 @Component({
   selector: 'app-storage-connections',
-  imports: [MineFilter, ViewToggle, StatTile, Icon, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, CopyButton, Pagination],
+  imports: [MineFilter, ViewToggle, StatTile, Icon, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, CopyButton, Pagination, ManagedBanner],
   templateUrl: './storage-connections.html',
 })
 export class StorageConnections implements OnInit {
@@ -100,6 +101,8 @@ export class StorageConnections implements OnInit {
   /** Narrows the list to rows this person created. Not persisted -- see MineFilter. */
 
   private readonly auth = inject(AuthService);
+  /** MIG-254: a MANAGED workspace's storage connections are our team's to change; testing one still works. */
+  readonly locked = computed(() => this.auth.builderLocked());
 
   readonly onlyMine = signal(false);
 

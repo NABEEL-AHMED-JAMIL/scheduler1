@@ -37,6 +37,7 @@ import { clockTime, monthDayLabel, weekdayLabel } from './schedule-labels';
 import { dayLabel } from '../../shared/ui/time-format';
 import { Combobox } from '../../shared/ui/combobox';
 import { matchesWorkspace, workspaceName, workspaceOptions } from '../../shared/ui/workspace-name';
+import { ManagedBanner } from '../../shared/ui/managed-banner';
 
 export interface Scheduler {
   schedulerId: number;
@@ -110,7 +111,7 @@ const BULK_CONCURRENCY = 4;
 
 @Component({
   selector: 'app-jobs',
-  imports: [Combobox, MineFilter, AssistantDock, Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Pagination, BarChart, StatStrip],
+  imports: [Combobox, MineFilter, AssistantDock, Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Pagination, BarChart, StatStrip, ManagedBanner],
   templateUrl: './jobs.html',
 })
 export class Jobs implements OnInit {
@@ -207,6 +208,8 @@ export class Jobs implements OnInit {
     [...new Set(this.jobs().map(j => j.execution).filter(Boolean))].sort() as string[]);
 
   private readonly auth = inject(AuthService);
+  /** MIG-254: a MANAGED workspace -- our team runs and changes its schedules; they are read-only here. */
+  protected readonly locked = computed(() => this.auth.builderLocked());
   /** The task editor is admin-only: others see a task's name, not a link to a refusal. */
   protected readonly canManageTasks = computed(() => this.auth.canManageTasks());
   /**

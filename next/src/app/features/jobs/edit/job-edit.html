@@ -8,6 +8,7 @@
       A schedule binds a pipeline to a timetable and decides who hears about the outcome.
     </p>
   </div>
+  <app-managed-banner what="schedules" />
 
   @if (loading()) {
     <div class="card p-12 text-center text-sm text-[color:var(--text-muted)]">
@@ -23,6 +24,8 @@
     </div>
   } @else {
     <form [formGroup]="form" (ngSubmit)="save()" class="card p-4">
+      <!-- MIG-254: read-only in a MANAGED workspace (display: contents, so the layout is the form's own). -->
+      <fieldset class="contents" [disabled]="locked()">
       <div class="form-section">
         <h2 class="form-section-title">Basics</h2>
         <div class="form-grid">
@@ -234,9 +237,10 @@
         </div>
       </div>
 
+      </fieldset>
       <div class="form-actions">
         <a routerLink="/pipelines/schedules" class="btn btn-ghost"><app-icon name="close" />Cancel</a>
-        <button type="submit" class="btn btn-primary" [disabled]="saving()">
+        <button type="submit" class="btn btn-primary" [disabled]="saving() || locked()">
           {{ saving() ? 'Saving…' : (isEdit() ? 'Save changes' : 'Create job') }}
         </button>
       </div>

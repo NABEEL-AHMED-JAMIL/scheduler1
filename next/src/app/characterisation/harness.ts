@@ -86,9 +86,9 @@ export interface Visit {
 }
 
 /** A stored session like the one sign-in writes: AuthService reads it in its field initialiser. */
-export function signIn(role: Role, pageKeys: string[] | null = null): void {
+export function signIn(role: Role, pageKeys: string[] | null = null, extraClaims: Record<string, unknown> = {}): void {
   const claims = btoa(JSON.stringify({ sub: 'characterisation@example.com', appUserId: 4537, userRole: role,
-    tenantId: role === 'PLATFORM_ADMIN' ? null : 2924, exp: 4102444800 }))
+    tenantId: role === 'PLATFORM_ADMIN' ? null : 2924, exp: 4102444800, ...extraClaims }))
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   localStorage.setItem('etl_auth_user', JSON.stringify({
     username: 'characterisation@example.com', userRole: role, appUserId: 4537, fullName: 'Casey Baseline',
@@ -174,12 +174,12 @@ export function surfaceOf(main: HTMLElement): Omit<Surface, 'url' | 'requests'> 
  * is quiet; then returns what it shows.
  */
 export async function visit(url: string, role: Role, pageKeys: string[] | null,
-  answers: Record<string, unknown> = {}): Promise<Visit> {
+  answers: Record<string, unknown> = {}, extraClaims: Record<string, unknown> = {}): Promise<Visit> {
   stubBrowser();
   useChicago();
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(NOW);
-  signIn(role, role === 'TENANT_USER' ? pageKeys : pageKeys ?? null);
+  signIn(role, role === 'TENANT_USER' ? pageKeys : pageKeys ?? null, extraClaims);
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
     providers: [

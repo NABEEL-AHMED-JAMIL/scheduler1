@@ -24,6 +24,7 @@
       }
     </div>
   </div>
+  <app-managed-banner what="API collections" />
 
   @if (!detail() && error()) {
     <app-table-shell heading="API collection" [error]="error()" [errorRetryable]="!missing()" (retry)="load()">

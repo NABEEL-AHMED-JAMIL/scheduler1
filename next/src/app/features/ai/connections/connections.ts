@@ -16,6 +16,7 @@ import { BlurLoader } from '../../../shared/ui/blur-loader';
 import { ConnectionDialog } from './connection-dialog';
 import { AI_PROVIDERS, ModelConnection, providerOf } from '../ai-providers';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
+import { ManagedBanner } from '../../../shared/ui/managed-banner';
 
 /**
  * Model connections: where prompts run. The same rail-and-pane the Kafka page has, because
@@ -24,7 +25,7 @@ import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
  */
 @Component({
   selector: 'app-connections',
-  imports: [Icon, StatTile, StatusPill, MineFilter, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink, BlurLoader, ServerTimePipe, DecimalPipe],
+  imports: [Icon, StatTile, StatusPill, MineFilter, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink, BlurLoader, ServerTimePipe, DecimalPipe, ManagedBanner],
   templateUrl: './connections.html',
 })
 export class Connections implements OnInit {
@@ -32,6 +33,8 @@ export class Connections implements OnInit {
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
   private readonly auth = inject(AuthService);
+  /** MIG-254: a MANAGED workspace's model connections are our team's to change; testing one still works. */
+  readonly locked = computed(() => this.auth.builderLocked());
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 

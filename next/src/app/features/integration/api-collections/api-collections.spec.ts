@@ -56,7 +56,7 @@ function screenWith(opts: { admin?: boolean; platform?: boolean; api?: ReturnTyp
       { provide: Dialog, useValue: dialog },
       { provide: ToastService, useValue: toast },
       { provide: AuthService, useValue: {
-        isTenantAdmin: () => opts.admin ?? true, isPlatformAdmin: () => opts.platform ?? false, user: signal({ appUserId: 4537 }),
+        isTenantAdmin: () => opts.admin ?? true, canBuild: () => opts.admin ?? true, builderLocked: () => false, isPlatformAdmin: () => opts.platform ?? false, user: signal({ appUserId: 4537 }),
       } },
     ],
   });

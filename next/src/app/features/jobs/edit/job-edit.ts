@@ -21,6 +21,8 @@ import { Observable, catchError, forkJoin, map, of } from 'rxjs';
 import { InboxTrigger, patternProblem, triggerOf } from '../inbox/inbox-trigger';
 import { AiStepChoice, ModelPicks, choiceBody, picksChanged, picksOf, stepsOf } from '../ai-models/ai-model-choice';
 import { AiModelPicks } from '../ai-models/ai-model-picks';
+import { ManagedBanner } from '../../../shared/ui/managed-banner';
+import { AuthService } from '../../../core/auth/auth.service';
 
 const FREQUENCIES = [
   { value: 'Mint',    label: 'Every N minutes', unit: 'minutes' },
@@ -83,7 +85,7 @@ function endAfterStart(group: AbstractControl): ValidationErrors | null {
 
 @Component({
   selector: 'app-job-edit',
-  imports: [Icon, ReactiveFormsModule, RouterLink, Field, Combobox, LoadError, AiModelPicks],
+  imports: [Icon, ReactiveFormsModule, RouterLink, Field, Combobox, LoadError, AiModelPicks, ManagedBanner],
   templateUrl: './job-edit.html',
   /*
    * The weekday picker is the one multi-select .seg: several days can be on at once, so "on" has
@@ -114,6 +116,8 @@ export class JobEdit implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
+  /** MIG-254: a MANAGED workspace's schedules are our team's to change: shown, not saved. */
+  readonly locked = computed(() => this.injector.get(AuthService).builderLocked());
 
   readonly frequencies = FREQUENCIES;
   readonly days = DAYS;
@@ -471,7 +475,7 @@ export class JobEdit implements OnInit {
 
   save(): void {
     // Nothing was read, so there is nothing to update (the form is not shown either).
-    if (this.loadError()) return;
+    if (this.loadError() || this.locked()) return;
     this.submitted.set(true);
     if (this.form.invalid) {
       this.form.markAllAsTouched();

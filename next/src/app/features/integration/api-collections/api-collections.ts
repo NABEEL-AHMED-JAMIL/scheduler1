@@ -25,6 +25,7 @@ import { ImportDialog, ImportDialogData } from './import-dialog';
 import { InUseDialog, InUseData } from './in-use-dialog';
 import { saveCollectionKeepingAuth } from './collection-save';
 import { SensitivityTag } from '../../../shared/ui/sensitivity';
+import { ManagedBanner } from '../../../shared/ui/managed-banner';
 
 /**
  * API Collections (MIG-247, Integration menu, page key api-collections): the workspace's reusable APIs.
@@ -37,7 +38,7 @@ import { SensitivityTag } from '../../../shared/ui/sensitivity';
 @Component({
   selector: 'app-api-collections',
   imports: [Icon, SensitivityTag, TableShell, StatusPill, StatStrip, ViewToggle, Pagination, DataText, ServerTimePipe, CdkMenu, CdkMenuItem,
-    CdkMenuTrigger, RouterLink],
+    CdkMenuTrigger, RouterLink, ManagedBanner],
   templateUrl: './api-collections.html',
 })
 export class ApiCollections implements OnInit {
@@ -57,7 +58,7 @@ export class ApiCollections implements OnInit {
   readonly statusFilter = signal('');
   readonly page = signal(1);
   readonly size = signal(PAGE_SIZES[0]);
-  readonly canManage = computed(() => this.auth.isTenantAdmin());
+  readonly canManage = computed(() => this.auth.canBuild());
   readonly isPlatformAdmin = computed(() => this.auth.isPlatformAdmin());
   private readonly tenants = signal<ComboboxOption[]>([]);
 

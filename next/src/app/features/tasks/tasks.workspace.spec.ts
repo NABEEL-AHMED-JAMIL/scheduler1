@@ -39,7 +39,7 @@ async function render(role: Role, view: 'table' | 'cards' = 'table') {
       { provide: ToastService, useValue: { success: () => {}, error: () => {}, info: () => {} } },
       { provide: Dialog, useValue: { open: () => ({ closed: of(undefined) }) } },
       { provide: AuthService, useValue: {
-        user: () => null, canManageTasks: () => admin, isPlatformAdmin: () => role === 'PLATFORM_ADMIN',
+        user: () => null, canManageTasks: () => admin, builderLocked: () => false, isPlatformAdmin: () => role === 'PLATFORM_ADMIN',
       } },
     ],
   });

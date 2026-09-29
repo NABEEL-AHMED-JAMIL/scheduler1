@@ -39,7 +39,7 @@ async function render(role: Role, rows: SourceJob[] = ROWS) {
       { provide: Dialog, useValue: { open: () => ({ closed: of(true) }) } },
       { provide: ToastService, useValue: { success: () => {}, error: () => {}, info: () => {} } },
       { provide: AuthService, useValue: {
-        user: signal(null), isTenantAdmin: signal(admin), canManageTasks: signal(admin),
+        user: signal(null), isTenantAdmin: signal(admin), canManageTasks: signal(admin), builderLocked: signal(false),
         isPlatformAdmin: signal(role === 'PLATFORM_ADMIN'),
       } },
       { provide: JobEventsService, useValue: { events: new Subject(), connected: signal(false) } },

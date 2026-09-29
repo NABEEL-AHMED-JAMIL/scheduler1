@@ -19,6 +19,7 @@ import { StepBuilder, BuilderTab } from '../steps/step-builder';
 import { StepsApi } from '../steps/steps.service';
 import { AuthService } from '../../../core/auth/auth.service';
 import { DefinitionView } from '../steps/steps.model';
+import { ManagedBanner } from '../../../shared/ui/managed-banner';
 
 /** The page's tabs when its pipeline has steps (MIG-249): Details is today's form; the rest are the step builder's. */
 export type PageTab = 'details' | BuilderTab;
@@ -30,7 +31,7 @@ const BUILDER_TABS: string[] = ['steps', 'settings', 'yaml', 'json'];
 
 @Component({
   selector: 'app-task-edit',
-  imports: [Icon, ReactiveFormsModule, RouterLink, Field, Combobox, LoadError, StepBuilder],
+  imports: [Icon, ReactiveFormsModule, RouterLink, Field, Combobox, LoadError, StepBuilder, ManagedBanner],
   templateUrl: './task-edit.html',
 })
 export class TaskEdit implements OnInit {
@@ -724,6 +725,8 @@ export class TaskEdit implements OnInit {
 
   /** The page is a workspace administrator's (its route says so); a platform administrator passes the same test. */
   readonly isAdmin = computed(() => this.injector.get(AuthService).isTenantAdmin());
+  /** MIG-254: a MANAGED workspace's pipelines are our team's to change: shown, not saved. */
+  readonly locked = computed(() => this.injector.get(AuthService).builderLocked());
 
   readonly taskIdNumber = computed(() => (isRecordId(this.taskDetailId()) ? Number(this.taskDetailId()) : null));
 
@@ -739,7 +742,7 @@ export class TaskEdit implements OnInit {
 
   save(): void {
     // Nothing was read, so there is nothing to update (the form is not shown either).
-    if (this.loadError()) return;
+    if (this.loadError() || this.locked()) return;
     this.submitted.set(true);
     // Belt and braces: the fields sync as they are typed, but a value restored by the browser
     // or set programmatically would not have fired an input event.

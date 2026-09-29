@@ -17,6 +17,7 @@ import {
 } from './inbox.model';
 import { InboxApi, InboxArrival } from './inbox.service';
 import { InboxSettingsDialog, InboxSettingsData } from './inbox-settings-dialog';
+import { ManagedBanner } from '../../../shared/ui/managed-banner';
 
 /** One file on its way to the inbox. */
 export interface QueuedUpload {
@@ -44,7 +45,7 @@ const LIST_LIMIT = 50;
  */
 @Component({
   selector: 'app-inbox',
-  imports: [Icon, TableShell, LoadError, StatusPill, DataText, FileDropzone, ServerTimePipe, RouterLink],
+  imports: [Icon, TableShell, LoadError, StatusPill, DataText, FileDropzone, ServerTimePipe, RouterLink, ManagedBanner],
   templateUrl: './inbox.html',
 })
 export class Inbox implements OnInit {
@@ -66,13 +67,15 @@ export class Inbox implements OnInit {
   /** Something arrived since the list was last read. */
   private arrived = false;
 
-  readonly canManage = computed(() => this.auth.isTenantAdmin());
+  readonly canManage = computed(() => this.auth.canBuild());
   readonly configured = computed(() => !!this.settings()?.configured);
   readonly capText = computed(() => { const s = this.settings(); return s ? capSentence(s) : ''; });
   readonly notConfiguredText = computed(() => this.canManage()
     ? 'The inbox is not set up. Choose which of the workspace\'s storage connections takes the files, and members can then upload here; '
       + 'a job with an inbox trigger starts when a matching file arrives.'
-    : 'The inbox is not set up for this workspace. Ask a workspace admin to choose the storage connection it uses.');
+    : this.auth.builderLocked()
+      ? 'The inbox is not set up for this workspace. Our team sets it up: contact your account team.'
+      : 'The inbox is not set up for this workspace. Ask a workspace admin to choose the storage connection it uses.');
   readonly finished = computed(() => this.queue().filter(q => q.state === 'done' || q.state === 'refused').length);
   readonly kinds = ACCEPTED_KINDS;
   readonly formatSize = formatSize;
@@ -81,7 +84,8 @@ export class Inbox implements OnInit {
 
   ngOnInit(): void {
     this.load();
-    if (this.canManage()) {
+    // Names for an administrator, who may list the workspace's people whoever builds it (MIG-254).
+    if (this.auth.isTenantAdmin()) {
       this.api.users().subscribe({
         next: r => {
           if (r.status !== API_SUCCESS) return;

@@ -16,12 +16,16 @@
       <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
         <app-icon name="refresh" [class.spin]="loading()" />Refresh
       </button>
-      <a routerLink="/pipelines/schedules/bulk" class="btn btn-default btn-sm">
-        <app-icon name="upload" />Bulk import
-      </a>
-      <a routerLink="/pipelines/schedules/new" class="btn btn-primary btn-sm"><app-icon name="plus" />New schedule</a>
+      <!-- MIG-254: every schedule write is a builder action, a member's own included. -->
+      @if (!locked()) {
+        <a routerLink="/pipelines/schedules/bulk" class="btn btn-default btn-sm">
+          <app-icon name="upload" />Bulk import
+        </a>
+        <a routerLink="/pipelines/schedules/new" class="btn btn-primary btn-sm"><app-icon name="plus" />New schedule</a>
+      }
     </div>
   </div>
+  <app-managed-banner what="schedules" />
 
   @if (stalledCount()) {
     <div class="card px-4 py-2.5 flex flex-wrap items-center gap-2 border-warn-500"
@@ -89,14 +93,16 @@
          error state with a selection still made. -->
     <div subbar class="contents">
       <span class="text-xs font-medium">{{ selected().size }} selected</span>
-      <button type="button" class="btn btn-default btn-sm btn-intent-ok"
-              [disabled]="bulkBusy()" (click)="runSelected()">
-        <app-icon name="play" [busy]="bulkBusy()" />Run selected
-      </button>
-      <button type="button" class="btn btn-default btn-sm btn-intent-crit"
-              [disabled]="bulkBusy()" (click)="deleteSelected()">
-        <app-icon name="trash" [busy]="bulkBusy()" />Delete selected
-      </button>
+      @if (!locked()) {
+        <button type="button" class="btn btn-default btn-sm btn-intent-ok"
+                [disabled]="bulkBusy()" (click)="runSelected()">
+          <app-icon name="play" [busy]="bulkBusy()" />Run selected
+        </button>
+        <button type="button" class="btn btn-default btn-sm btn-intent-crit"
+                [disabled]="bulkBusy()" (click)="deleteSelected()">
+          <app-icon name="trash" [busy]="bulkBusy()" />Delete selected
+        </button>
+      }
       <button type="button" class="btn btn-ghost btn-sm ml-auto"
               [disabled]="bulkBusy()" (click)="clearSelection()">
         <app-icon name="close" />Clear selection
@@ -237,6 +243,7 @@
               </button>
               <ng-template #menu>
                 <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                  @if (!locked()) {
                   <button cdkMenuItem class="menu-item" [disabled]="!canRunNow(job)"
                           [title]="runBlockedReason(job)"
                           (cdkMenuItemTriggered)="runNow(job)"><app-icon name="play" />Run now</button>
@@ -247,11 +254,13 @@
                           [title]="skipBlockedReason(job)"
                           (cdkMenuItemTriggered)="skipNext(job)"><app-icon name="skip" />Skip next run</button>
                   <div class="my-1 border-t border-subtle"></div>
+                  }
                   <a cdkMenuItem class="menu-item" [routerLink]="['/pipelines/schedules', job.jobId, 'edit']"><app-icon name="edit" />Edit</a>
                   <a cdkMenuItem class="menu-item" [routerLink]="['/pipelines/schedules', job.jobId, 'executions']"><app-icon name="clock" />Executions</a>
                   <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="openAssistant(job)">
                     <app-icon name="chat" />Ask about this job
                   </button>
+                  @if (!locked()) {
                   <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="clone(job)">
                     <app-icon name="copy" />Duplicate
                   </button>
@@ -272,6 +281,7 @@
                   </button>
                   <button cdkMenuItem class="menu-item menu-item-danger"
                           (cdkMenuItemTriggered)="remove(job)"><app-icon name="trash" class="icon-crit" />Delete</button>
+                  }
                 </div>
               </ng-template>
             </td>
@@ -362,10 +372,12 @@
                       <!-- The sentence carries the meaning; the chips are the detail behind it. -->
                       <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
                         <p class="text-sm">{{ notifySentence(job) }}</p>
-                        <button type="button" class="btn btn-default btn-sm"
-                                (click)="editNotifications(job)">
-                          <app-icon name="edit" size="0.85em" />Change
-                        </button>
+                        @if (!locked()) {
+                          <button type="button" class="btn btn-default btn-sm"
+                                  (click)="editNotifications(job)">
+                            <app-icon name="edit" size="0.85em" />Change
+                          </button>
+                        }
                       </div>
                       <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
                         @for (chip of notifyChips(job); track chip.label) {

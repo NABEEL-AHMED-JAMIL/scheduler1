@@ -22,6 +22,7 @@ import { DocumentsApi } from './documents.service';
 import { ConfidenceBar } from './confidence-bar';
 import { ReadDocumentData, ReadDocumentDialog, ReadDocumentResult } from './read-document-dialog';
 import { TypePanel, TypePanelData } from './type-panel';
+import { ManagedBanner } from '../../shared/ui/managed-banner';
 
 export type IntelligenceTab = 'overview' | 'types' | 'dataset';
 const TABS: IntelligenceTab[] = ['overview', 'types', 'dataset'];
@@ -49,7 +50,7 @@ const RECENT_STATES = ['In review', 'Approved', 'Auto-approved', 'Rejected', 'Fa
  */
 @Component({
   selector: 'app-document-intelligence',
-  imports: [RouterLink, Icon, TableShell, StatusPill, StatStrip, Pagination, DataText, ServerTimePipe, ConfidenceBar, CdkMenu, CdkMenuItem, CdkMenuTrigger],
+  imports: [RouterLink, Icon, TableShell, StatusPill, StatStrip, Pagination, DataText, ServerTimePipe, ConfidenceBar, CdkMenu, CdkMenuItem, CdkMenuTrigger, ManagedBanner],
   templateUrl: './intelligence.html',
   styles: [`
     .type-cards { display: grid; gap: 0.75rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -72,7 +73,7 @@ export class DocumentIntelligence implements OnInit {
     { id: 'overview', label: 'Overview' }, { id: 'types', label: 'Document types' }, { id: 'dataset', label: 'Dataset' },
   ];
   readonly tab = signal<IntelligenceTab>(this.tabOf(this.route.snapshot?.queryParamMap?.get('tab')));
-  readonly canManage = computed(() => this.auth.isTenantAdmin());
+  readonly canManage = computed(() => this.auth.canBuild());
 
   // -------------------------------------------------------------------------------------------- overview
 

@@ -16,6 +16,7 @@ import { ModelConnection } from '../ai-providers';
 import { Prompt, PromptRun, PromptVariable, placeholdersOf } from './prompt-model';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { SENSITIVITY_LEVELS, SENSITIVITY_TEXT } from '../../../shared/ui/sensitivity';
+import { ManagedBanner } from '../../../shared/ui/managed-banner';
 
 /**
  * The prompt editor, with Try it beside it: the template and its variables on the left, the
@@ -24,7 +25,7 @@ import { SENSITIVITY_LEVELS, SENSITIVITY_TEXT } from '../../../shared/ui/sensiti
  */
 @Component({
   selector: 'app-prompt-edit',
-  imports: [ReactiveFormsModule, RouterLink, Field, Icon, Combobox, ServerTimePipe, DecimalPipe],
+  imports: [ReactiveFormsModule, RouterLink, Field, Icon, Combobox, ServerTimePipe, DecimalPipe, ManagedBanner],
   templateUrl: './prompt-edit.html',
 })
 export class PromptEdit implements OnInit {
@@ -34,6 +35,8 @@ export class PromptEdit implements OnInit {
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
+  /** MIG-254: a MANAGED workspace's prompts are our team's to change (and to try): shown, not saved. */
+  readonly locked = computed(() => this.auth.builderLocked());
   private readonly dialog = inject(Dialog);
 
   readonly isEdit = computed(() => !!this.promptId());
@@ -288,6 +291,7 @@ export class PromptEdit implements OnInit {
   }
 
   save(activate: boolean): void {
+    if (this.locked()) return;
     // Editing, with nothing read back: saving would create a prompt, not a version of this one.
     if (this.isEdit() && !this.loaded()) return;
     if (!this.valid()) return;
@@ -304,7 +308,7 @@ export class PromptEdit implements OnInit {
   }
 
   tryIt(): void {
-    if (!this.valid()) return;
+    if (this.locked() || !this.valid()) return;
     this.trying.set(true);
     this.lastRun.set(null);
     const values: Record<string, string> = {};

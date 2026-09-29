@@ -11,9 +11,12 @@
       <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
         <app-icon name="refresh" [class.spin]="loading()" />Refresh
       </button>
-      <button type="button" class="btn btn-primary btn-sm" (click)="create()"><app-icon name="plus" />New connection</button>
+      @if (!locked()) {
+        <button type="button" class="btn btn-primary btn-sm" (click)="create()"><app-icon name="plus" />New connection</button>
+      }
     </div>
   </div>
+  <app-managed-banner what="storage connections" />
 
   <!-- The row answers "how much of this can a job use, and what is broken": what is in service,
        then the three test states. The lead is the Active count rather than the headcount, because
@@ -125,12 +128,16 @@
                 </button>
                 <ng-template #cardMenu>
                   <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                    @if (!locked()) {
                     <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="edit(c)"><app-icon name="edit" />Edit</button>
+                    }
                     <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="test(c)"><app-icon name="zap" />Test connection</button>
+                    @if (!locked()) {
                   <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="clone(c)"><app-icon name="copy" />Clone…</button>
                     <div class="my-1 border-t border-subtle"></div>
                     <button cdkMenuItem class="menu-item menu-item-danger"
                             (cdkMenuItemTriggered)="remove(c)"><app-icon name="trash" class="icon-crit" />Delete</button>
+                    }
                   </div>
                 </ng-template>
               </div>
@@ -270,12 +277,16 @@
               </button>
               <ng-template #menu>
                 <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                  @if (!locked()) {
                   <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="edit(c)"><app-icon name="edit" />Edit</button>
+                  }
                   <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="test(c)"><app-icon name="zap" />Test connection</button>
+                  @if (!locked()) {
                   <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="clone(c)"><app-icon name="copy" />Clone…</button>
                   <div class="my-1 border-t border-subtle"></div>
                   <button cdkMenuItem class="menu-item menu-item-danger"
                           (cdkMenuItemTriggered)="remove(c)"><app-icon name="trash" class="icon-crit" />Delete</button>
+                  }
                 </div>
               </ng-template>
             </td>

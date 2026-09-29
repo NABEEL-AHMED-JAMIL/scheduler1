@@ -8,6 +8,7 @@
       A pipeline describes one unit of work and where it reads and writes.
     </p>
   </div>
+  <app-managed-banner what="pipelines" />
 
   @if (loading()) {
     <div class="card p-12 text-center text-sm text-[color:var(--text-muted)]">
@@ -33,6 +34,8 @@
       </div>
     }
     <form [formGroup]="form" (ngSubmit)="save()" class="card p-4" [class.hidden]="activeTab() !== 'details'">
+      <!-- MIG-254: read-only in a MANAGED workspace (display: contents, so the layout is the form's own). -->
+      <fieldset class="contents" [disabled]="locked()">
       <div class="form-section">
         <h2 class="form-section-title">Basics</h2>
         <div class="form-grid">
@@ -196,16 +199,17 @@
         </div>
       }
 
+      </fieldset>
       <div class="form-actions">
         <a routerLink="/pipelines" class="btn btn-ghost"><app-icon name="close" />Cancel</a>
-        <button type="submit" class="btn btn-primary" [disabled]="saving()">
+        <button type="submit" class="btn btn-primary" [disabled]="saving() || locked()">
           {{ saving() ? 'Saving…' : (isEdit() ? 'Save changes' : 'Create task') }}
         </button>
       </div>
     </form>
     @if (stepsMode() && stepsView(); as view) {
       <app-step-builder [class.hidden]="activeTab() === 'details'" [view]="view" [tab]="builderTab()" [taskDetailId]="taskIdNumber()"
-                        [canManage]="true" [isAdmin]="isAdmin()" (saved)="stepsSaved($event)" />
+                        [canManage]="!locked()" [isAdmin]="isAdmin()" (saved)="stepsSaved($event)" />
     }
   }
 </div>

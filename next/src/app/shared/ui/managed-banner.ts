@@ -13,7 +13,7 @@ import { Icon } from './icon';
   imports: [Icon],
   template: `
     @if (auth.builderLocked()) {
-      <div class="card px-4 py-3 flex items-start gap-2.5 managed-banner" role="note" data-managed-banner>
+      <div class="card px-4 py-2.5 flex items-start gap-2.5 managed-banner" role="note" data-managed-banner>
         <app-icon name="shield" class="icon-info mt-0.5 shrink-0" />
         <div class="min-w-0 text-sm">
           <p class="font-semibold">Managed by our team</p>
