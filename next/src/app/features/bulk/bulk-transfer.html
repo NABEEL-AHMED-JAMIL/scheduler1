@@ -16,13 +16,15 @@
       <h2 class="text-sm font-semibold flex items-center gap-2">
         <app-icon name="upload" class="icon-info" />Import
       </h2>
-      <p class="text-xs text-[color:var(--text-muted)] mt-1 leading-snug">
-        Start from the template — it carries the column names and the allowed values the
-        importer expects.
-      </p>
-      @if (config().templateNote; as note) {
-        <p class="text-xs text-[color:var(--text-muted)] mt-1 leading-snug" data-template-note>{{ note }}</p>
-      }
+      <div class="text-xs text-[color:var(--text-muted)] mt-1 leading-snug space-y-1">
+        <p>
+          Start from the template — it carries the column names and the allowed values the
+          importer expects.
+        </p>
+        @if (config().templateNote; as note) {
+          <p data-template-note>{{ note }}</p>
+        }
+      </div>
 
       <!-- The template is where an import starts, so it sits here rather than in the Export
            card, where "start from the template" sent people looking for it. -->

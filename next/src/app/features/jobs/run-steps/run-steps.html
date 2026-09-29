@@ -162,7 +162,7 @@
                   }
                 </div>
                 @if (o.kind === 'file') {
-                  <div class="flex flex-wrap justify-end gap-1" role="group" [attr.aria-label]="'Download ' + o.name + ' as'">
+                  <div class="flex flex-wrap justify-end justify-self-end gap-1" role="group" [attr.aria-label]="'Download ' + o.name + ' as'">
                     @for (f of formats; track f.id) {
                       <button type="button" class="btn btn-default btn-xs" [attr.data-format]="f.id"
                               [disabled]="!!o.expired || !o.runDatasetId || busy() !== ''"
@@ -173,7 +173,7 @@
                     }
                   </div>
                 } @else {
-                  <button type="button" class="btn btn-default btn-xs" [disabled]="!o.bucket || !o.key || busy() !== ''"
+                  <button type="button" class="btn btn-default btn-xs justify-self-end" [disabled]="!o.bucket || !o.key || busy() !== ''"
                           [attr.aria-label]="'Download ' + o.name + ' from ' + o.bucket"
                           (click)="downloadUpload(o)">
                     <app-icon name="download" />Download

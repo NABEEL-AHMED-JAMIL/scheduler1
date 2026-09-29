@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { test, expect, APIRequestContext, Browser, Page } from '@playwright/test';
 
 /**
@@ -26,6 +27,8 @@ const admin = { username: process.env['E2E_TENANT_ADMIN'], password: process.env
 const ENGINE = { job: Number(process.env['E2E_ENGINE_JOB'] ?? 2849), run: Number(process.env['E2E_ENGINE_RUN'] ?? 7396) };
 const LEGACY = { job: Number(process.env['E2E_LEGACY_JOB'] ?? 2834), run: Number(process.env['E2E_LEGACY_RUN'] ?? 7383) };
 const INBOX = { job: Number(process.env['E2E_INBOX_JOB'] ?? 2848), run: Number(process.env['E2E_INBOX_RUN'] ?? 7387) };
+/** Wave 4: a run that recorded its outputs -- save_file kept customers-clean.json (3 rows), upload_bucket put it in ui-review-s3. */
+const FILES = { job: Number(process.env['E2E_FILES_JOB'] ?? 2849), run: Number(process.env['E2E_FILES_RUN'] ?? 7405) };
 const STEPS = ['read', 'check', 'shape', 'out', 'publish'];
 const TASKS = ['read_file', 'validate', 'transform', 'save_file', 'upload_bucket'];
 
@@ -107,6 +110,40 @@ test.describe('Executions', () => {
 
     // The run's own entries are still there, below the steps.
     await expect(page.getByRole('heading', { name: 'Log entries' })).toBeVisible();
+    await page.context().close();
+  });
+
+  test('a run\'s Files: the kept file downloads as csv, the upload names its bucket and key', async ({ browser }) => {
+    const page = await pageAs(browser, s);
+    await page.goto(`/pipelines/schedules/${FILES.job}/runs/${FILES.run}/logs`);
+    const files = page.locator('.exec-files');
+    await expect(files.getByText('Files', { exact: true })).toBeVisible();
+    const kept = files.locator('.exec-file[data-kind="file"]');
+    const upload = files.locator('.exec-file[data-kind="bucket"]');
+    await expect(kept).toContainText('customers-clean.json');
+    await expect(kept).toContainText('3 rows');
+    await expect(upload).toContainText('ui-review-s3');
+    await expect(upload).toContainText('registry-live-check/customers-clean.json');
+    // The upload, from storage as the object browser downloads it.
+    const [uploaded] = await Promise.all([page.waitForEvent('download'),
+      upload.getByRole('button', { name: /^Download customers-clean.json from ui-review-s3/ }).click()]);
+    expect(uploaded.suggestedFilename()).toBe('customers-clean.json');
+
+    // The kept file, as csv: named by the server, and its first line is the header.
+    const [csv] = await Promise.all([page.waitForEvent('download'), kept.locator('[data-format="csv"]').click()]);
+    expect(csv.suggestedFilename()).toBe('customers-clean.csv');
+    const text = readFileSync(await csv.path(), 'utf8');
+    expect(text.split(/\r?\n/)[0]).toBe('customer_id,name,balance');
+
+    // The same dataset from its step on the Timeline, through the format menu.
+    await page.getByRole('button', { name: 'Download customers-clean.json from step out' }).click();
+    await expect(page.getByRole('menu').getByRole('menuitem')).toHaveText([/CSV/, /JSON/, /JSONL/]);
+    const [jsonl] = await Promise.all([page.waitForEvent('download'), page.getByRole('menuitem', { name: 'JSONL' }).click()]);
+    expect(jsonl.suggestedFilename()).toMatch(/\.jsonl$/);
+
+    // An older run of the same job recorded no outputs.
+    await page.goto(`/pipelines/schedules/${ENGINE.job}/runs/${ENGINE.run}/logs`);
+    await expect(page.locator('.exec-files')).toContainText('No files were recorded for this run.');
     await page.context().close();
   });
 
