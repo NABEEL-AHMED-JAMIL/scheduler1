@@ -12,6 +12,8 @@ import { ToastService } from '../../shared/ui/toast.service';
 import { confirmWith } from '../../shared/ui/confirm';
 import { copyText } from '../../shared/ui/clipboard.util';
 import { PreviewDialog } from './preview/preview-dialog';
+import { FileDetails, FileDetailsData } from './file-details';
+import { sidePanelConfig } from '../../shared/ui/side-panel';
 import { Donut } from '../../shared/charts/donut';
 import { RankedBar } from '../../shared/charts/ranked-bar';
 import { FileChat } from './chat/file-chat';
@@ -571,6 +573,17 @@ export class Objects implements OnInit {
     // An edit saved from the preview overwrites the object, so the row's size and modified
     // date are stale until the folder is read again.
     }).closed.subscribe(saved => { if (saved) this.load(); });
+  }
+
+  /**
+   * MIG-253: the file's details beside the list -- its metadata, the run and pipeline that wrote it
+   * when a recent run did, and its data policy and expiry.
+   */
+  details(entry: ObjectSummary): void {
+    this.dialog.open(FileDetails, sidePanelConfig<FileDetailsData>({
+      bucket: this.bucket(), key: entry.key, name: entry.name,
+      size: entry.size, lastModified: entry.lastModified, contentType: entry.contentType,
+    }));
   }
 
   /** The FileChat instance currently rendered behind `@if (chatFile(); ...)`, if any. */

@@ -54,6 +54,7 @@ export const PINNED: Record<string, unknown> = {
       "Copy checksum (ETag)",
       "Copy path",
       "Delete",
+      "Details",
       "Download",
       "Email this file",
       "View"
@@ -63,6 +64,7 @@ export const PINNED: Record<string, unknown> = {
     "links": [],
     "items": [
       "View",
+      "Details",
       "Chat with this file",
       "Download",
       "Email this file",
