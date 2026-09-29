@@ -40,6 +40,8 @@ export interface ModelConnection {
   lastTestOk?: boolean | null;
   lastTestMessage?: string | null;
   models?: string[] | null;
+  /** MIG-243: a hosted provider's Business Associate Agreement covers this connection (the "baa" model rule). */
+  baaSigned?: boolean;
   promptCount?: number;
   runs30d?: number;
   tokensIn30d?: number;
