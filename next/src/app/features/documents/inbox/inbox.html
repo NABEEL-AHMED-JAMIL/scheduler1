@@ -3,15 +3,15 @@
     <div>
       <h1 class="page-title">Inbox</h1>
       <p class="page-subtitle">
-        Upload files for this workspace's pipelines. Each file is checked, stored in the workspace's bucket, and starts
-        every job whose inbox trigger matches its name.
+        Upload files for this workspace's pipelines. Each file's kind and size are checked, it is stored in the
+        workspace's bucket, and it starts every job whose inbox trigger matches its name.
       </p>
     </div>
     <div class="flex items-center gap-2">
       <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
         <app-icon name="refresh" [class.spin]="loading()" />Refresh
       </button>
-      @if (canManage() && settings()) {
+      @if (canManage() && configured()) {
         <button type="button" class="btn btn-default btn-sm" (click)="openSettings()"><app-icon name="settings" />Inbox settings</button>
       }
     </div>
@@ -102,11 +102,7 @@
       <section class="card p-4 flex flex-col gap-3 min-w-0" aria-labelledby="inboxSettingsHeading">
         <div class="flex items-center justify-between gap-2">
           <h2 id="inboxSettingsHeading" class="text-base font-semibold">Settings</h2>
-          @if (canManage()) {
-            <button type="button" class="btn btn-ghost btn-sm" (click)="openSettings()"><app-icon name="edit" />Change</button>
-          } @else {
-            <span class="pill pill-neutral">Read-only</span>
-          }
+          @if (!canManage()) { <span class="pill pill-neutral">Read-only</span> }
         </div>
         @if (settings(); as s) {
           <dl class="flex flex-col gap-2.5 text-sm">
@@ -129,7 +125,8 @@
           </dl>
         }
         <p class="text-xs text-[color:var(--text-muted)] border-t border-subtle pt-3">
-          Which files start which job is set on the job: open a schedule and add an inbox trigger under Event.
+          Which files start which job is set on the job: open a schedule and, under Event, turn on
+          "Start when a file arrives in the inbox".
           <a class="link-inline" routerLink="/pipelines/schedules">Open Schedules</a>
         </p>
       </section>
