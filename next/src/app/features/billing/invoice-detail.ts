@@ -120,10 +120,18 @@ export class InvoicePane implements OnDestroy {
     this.api.invoice(this.number()).subscribe({
       next: r => {
         this.loading.set(false);
-        if (r.status !== API_SUCCESS || !r.data) { this.error.set(r.message || 'No such invoice.'); return; }
+        // Anything but one invoice object (a list, a bare value) is not an invoice: say so rather than
+        // render it and crash on the first field it lacks.
+        if (r.status !== API_SUCCESS || !r.data || typeof r.data !== 'object' || Array.isArray(r.data)) {
+          this.error.set(r.message && r.status !== API_SUCCESS ? r.message : 'No such invoice.');
+          return;
+        }
         const d = r.data;
         this.invoice.set({ ...d, subtotal: Number(d.subtotal), tax: Number(d.tax), total: Number(d.total), balance: Number(d.balance), taxRatePercent: Number(d.taxRatePercent),
-          lines: d.lines.map(l => ({ ...l, quantity: Number(l.quantity), unitPrice: Number(l.unitPrice), amount: Number(l.amount) })) });
+          // A partial answer (no lines, documents or payments list) shows empty sections rather than
+          // crashing the page: every list the pane reads is filled in here, once.
+          documents: d.documents ?? [], payments: d.payments ?? [],
+          lines: (d.lines ?? []).map(l => ({ ...l, quantity: Number(l.quantity), unitPrice: Number(l.unitPrice), amount: Number(l.amount) })) });
         if (!this.payAmount()) this.payAmount.set(String(Number(d.balance).toFixed(2)));
       },
       error: err => { this.loading.set(false); this.error.set(err?.error?.message || 'Could not read the invoice.'); },

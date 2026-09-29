@@ -158,3 +158,25 @@ describe('InvoicePane, switching and adding', () => {
   });
 });
 
+
+/**
+ * An answer that is not one invoice object, or one missing its lists, crashed the pane on the first
+ * field it lacked (the old administration/billing/invoices/:number address, once it stopped landing
+ * on Page not found, did exactly that with an empty answer).
+ */
+describe('InvoicePane with an answer that is not a whole invoice', () => {
+  it('says there is no such invoice for a list', () => {
+    const { component } = page(false, [] as unknown as object);
+    expect(component.error()).toBe('No such invoice.');
+    expect(component.invoice()).toBeFalsy();
+  });
+
+  it('shows empty sections when the lists are missing', () => {
+    const { component } = page(false, { ...DETAIL, lines: undefined, documents: undefined, payments: undefined });
+    expect(component.error()).toBe('');
+    expect(component.invoice()?.lines).toEqual([]);
+    expect(component.invoice()?.documents).toEqual([]);
+    expect(component.invoice()?.payments).toEqual([]);
+    expect(component.pdfDocument()).toBeNull();
+  });
+});

@@ -55,7 +55,10 @@ describe('MIG-222 / MIG-266: the route inventory', () => {
     && r.path !== '/login');
   for (const r of redirects) {
     it(`the old address ${r.path}`, async () => {
-      const v = await visit(sample(r.path), 'PLATFORM_ADMIN', null);
+      // Workspace A has no invoices to capture, so the invoice lookup answers as the platform does for
+      // an unknown number; the empty-list default would be read as an invoice with nothing in it.
+      const v = await visit(sample(r.path), 'PLATFORM_ADMIN', null,
+        { 'GET /billing.json/invoice': { status: 'ERROR', message: 'No such invoice.', data: null } });
       pin(FILE, `old address ${r.path}`, { lands: v.surface.url, heading: v.surface.headings[0] ?? null }, PINNED);
     });
   }

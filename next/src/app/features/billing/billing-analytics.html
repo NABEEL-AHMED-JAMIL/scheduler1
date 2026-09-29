@@ -16,7 +16,7 @@
       <button type="button" class="btn btn-default btn-sm mt-3" (click)="load()"><app-icon name="refresh" />Try again</button></div>
   } @else if (data(); as d) {
     <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
-      <app-stat-tile label="Invoiced" [value]="money2(d.invoiced)" icon="file" tone="info" [foot]="d.months.length + ' month' + (d.months.length === 1 ? '' : 's')" />
+      <app-stat-tile label="Invoiced" [value]="money2(d.invoiced)" icon="file" tone="info" [foot]="(d.months?.length ?? 0) + ' month' + (d.months?.length === 1 ? '' : 's')" />
       <app-stat-tile label="Collected" [value]="money2(d.collected)" icon="check" tone="ok" [foot]="collectedFoot()" />
       <app-stat-tile label="Overdue" [value]="money2(d.overdue)" icon="alert" [tone]="d.overdue > 0 ? 'crit' : 'muted'" [foot]="d.overdueCount + ' invoice' + (d.overdueCount === 1 ? '' : 's')" />
       <app-stat-tile label="Open" [value]="money2(d.open)" icon="clock" [tone]="d.open > 0 ? 'warn' : 'muted'" [foot]="'issued, not yet paid'" />

@@ -287,7 +287,9 @@ export const routes: Routes = [
       { path: 'settings/pipeline-forms', redirectTo: 'configuration/pipelines' },
       // Billing is a section of its own: <section>/<page>, the old administration/billing
       // addresses kept as redirects so a bookmark, a document link or a notification still lands.
-      { path: 'administration/billing', redirectTo: 'billing/usage' },
+      // pathMatch full: without it this prefix caught administration/billing/invoices, /documents,
+      // /analytics and /rates first and sent them to billing/usage/... -- Page not found.
+      { path: 'administration/billing', redirectTo: 'billing/usage', pathMatch: 'full' },
       { path: 'administration/billing/invoices', redirectTo: 'billing/invoices' },
       { path: 'administration/billing/invoices/:number', redirectTo: 'billing/invoices/:number' },
       { path: 'administration/billing/documents', redirectTo: 'billing/documents' },

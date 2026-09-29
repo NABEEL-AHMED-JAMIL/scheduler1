@@ -748,24 +748,24 @@ export const PINNED: Record<string, unknown> = {
     "heading": "Cost & usage"
   },
   "old address /administration/billing/analytics": {
-    "lands": "/billing/usage/analytics",
-    "heading": "Page not found"
+    "lands": "/billing/analytics",
+    "heading": "Billing analytics"
   },
   "old address /administration/billing/documents": {
-    "lands": "/billing/usage/documents",
-    "heading": "Page not found"
+    "lands": "/billing/documents",
+    "heading": "Billing documents"
   },
   "old address /administration/billing/invoices": {
-    "lands": "/billing/usage/invoices",
-    "heading": "Page not found"
+    "lands": "/billing/invoices",
+    "heading": "Invoices"
   },
   "old address /administration/billing/invoices/:number": {
-    "lands": "/billing/usage/invoices/INV-2026-0001",
-    "heading": "Page not found"
+    "lands": "/billing/invoices/INV-2026-0001",
+    "heading": "Invoices"
   },
   "old address /administration/billing/rates": {
-    "lands": "/billing/usage/rates",
-    "heading": "Page not found"
+    "lands": "/billing/rates",
+    "heading": "Rate cards"
   },
   "old address /ai/agents": {
     "lands": "/assistants/prompts",
