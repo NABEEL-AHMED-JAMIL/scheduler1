@@ -90,4 +90,31 @@ export interface AuthUser {
   pageKeys?: string[];
   /** The access profile's name, for the header and the profile screen; null when on the default. */
   pageAccessProfileName?: string | null;
+  /** The workspace's name, as sign-in (and a managed-service session) reports it. */
+  tenantName?: string | null;
+  /**
+   * MIG-244: who builds this workspace -- SELF (its own administrators) or MANAGED (our team). Sign-in
+   * reports it; every workspace token also carries it as the `mgmt` claim, which is what the console
+   * believes first (AuthService.managementMode).
+   */
+  managementMode?: ManagementMode | null;
+  /** MIG-244: a staff member's managed-service session in a customer's workspace (the token's `msvc`). */
+  managedService?: boolean | null;
+}
+
+/** MIG-244: SELF, the customer's administrators build; MANAGED, our team does and the customer's people use. */
+export type ManagementMode = 'SELF' | 'MANAGED';
+
+/**
+ * What a builder write in a MANAGED workspace answers (403), word for word. The console shows it as the
+ * server says it; this copy is for the banner's matching and for tests.
+ */
+export const MANAGED_WRITE_REFUSAL = 'This workspace is managed by our team, so this cannot be changed here. '
+  + 'Contact your account team to request the change.';
+
+/** Whether an HTTP error is the managed-workspace refusal (a 403 whose message says so). */
+export function isManagedRefusal(error: unknown): boolean {
+  const e = error as { status?: number; error?: { message?: unknown } } | null;
+  const message = e?.error?.message;
+  return e?.status === 403 && typeof message === 'string' && message.startsWith('This workspace is managed by our team');
 }

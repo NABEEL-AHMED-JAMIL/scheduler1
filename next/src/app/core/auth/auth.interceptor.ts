@@ -2,7 +2,8 @@ import { HttpErrorResponse, HttpEvent, HttpInterceptorFn, HttpRequest, HttpRespo
 import { inject } from '@angular/core';
 import { Observable, Subject, catchError, finalize, map, switchMap, take, throwError } from 'rxjs';
 import { AuthService } from './auth.service';
-import { AuthUser } from './auth.models';
+import { AuthUser, isManagedRefusal } from './auth.models';
+import { ToastService } from '../../shared/ui/toast.service';
 import { API_SUCCESS } from '../api/api.config';
 
 /**
@@ -112,6 +113,7 @@ function endOwnPasswordChange(): void {
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const auth = inject(AuthService);
+  const toast = inject(ToastService);
   const isAuthCall = req.url.includes('/auth.json/');
   const ownPasswordChange = changesOwnPassword(req, auth);
 
@@ -273,7 +275,13 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   // fetch", "0 Unknown Error" -- and every screen's `err.error.message || fallback` showed them.
   // It now carries one plain sentence in the shape those screens already read; every other
   // failure passes through as the server sent it.
-  const readable = sent.pipe(catchError(error => throwError(() => unreachable(error))));
+  const readable = sent.pipe(catchError(error => {
+    // MIG-254: a builder write in a MANAGED workspace. Said in the server's words, once, here -- a screen
+    // whose own message is a fallback ("The task could not be saved.") would otherwise hide why. The
+    // toast host drops a second identical toast, so a screen that shows the message too adds nothing.
+    if (isManagedRefusal(error)) toast.error((error as HttpErrorResponse).error.message);
+    return throwError(() => unreachable(error));
+  }));
 
   return ownPasswordChange ? readable.pipe(finalize(() => endOwnPasswordChange())) : readable;
 

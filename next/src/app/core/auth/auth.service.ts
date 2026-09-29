@@ -3,7 +3,7 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Observable, tap } from 'rxjs';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../api/api.config';
-import { AuthUser, ROLE_RANK, UserRole, isUserRole } from './auth.models';
+import { AuthUser, ManagementMode, ROLE_RANK, UserRole, isUserRole } from './auth.models';
 import { PageKey } from './page-keys';
 
 const STORAGE_KEY = 'etl_auth_user';
@@ -24,17 +24,31 @@ export const PASSWORD_CHANGED_NOTICE = 'Your password was changed. Please sign i
  * anyone who can forge the field can also break the token.
  */
 function roleFromToken(token: string | null | undefined): UserRole | null {
+  const role = claimsOf(token)?.['userRole'];
+  return isUserRole(role as string) ? role as UserRole : null;
+}
+
+/** The access token's payload, or null when there is nothing readable. */
+function claimsOf(token: string | null | undefined): Record<string, unknown> | null {
   const payload = token?.split('.')[1];
   if (!payload) return null;
   try {
     // Base64url: atob wants the standard alphabet, and tolerates the missing padding.
     const claims = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
-    const role = claims?.userRole;
-    return isUserRole(role) ? role : null;
+    return claims && typeof claims === 'object' ? claims : null;
   } catch {
     return null;
   }
 }
+
+/**
+ * MIG-254: where a platform administrator's own session waits while they work in a customer's workspace
+ * (a managed-service session is the active one under STORAGE_KEY meanwhile).
+ */
+export const PLATFORM_SESSION_KEY = 'etl_platform_session';
+
+/** Where Exit returns a staff member: the picker they opened the managed session from. */
+export const WORK_IN_WORKSPACE_PATH = '/administration/work-in-workspace';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -63,6 +77,35 @@ export class AuthService {
 
   readonly isPlatformAdmin = computed(() => this.hasAtLeast('PLATFORM_ADMIN'));
   readonly isTenantAdmin = computed(() => this.hasAtLeast('TENANT_ADMIN'));
+
+  private readonly claims = computed(() => claimsOf(this.currentUser()?.accessToken));
+
+  /**
+   * MIG-254: who builds this workspace. The token's `mgmt` claim first -- it is what every service
+   * decides by -- then the sign-in answer, and SELF when neither says (a platform administrator has no
+   * workspace; a session stored before MIG-244 had no mode, and every workspace was SELF then). Editing
+   * the stored answer gains nothing: the server refuses the builder's writes in a MANAGED workspace
+   * whatever this says.
+   */
+  readonly managementMode = computed<ManagementMode>(() => {
+    const claim = this.claims()?.['mgmt'];
+    const mode = claim === 'SELF' || claim === 'MANAGED' ? claim : this.currentUser()?.managementMode;
+    return mode === 'MANAGED' ? 'MANAGED' : 'SELF';
+  });
+
+  /** MIG-254: this is our staff member's managed-service session in a customer's workspace (`msvc`). */
+  readonly isManagedSession = computed(() => this.claims()?.['msvc'] === true);
+
+  /**
+   * MIG-254: the workspace is MANAGED and this is one of its own people, so the builder's writes (pipelines,
+   * schedules, APIs, sources, prompts, connections, inbox settings) are ours to make, not theirs: the
+   * screens show them read-only, and the server answers 403 if one is tried anyway. Our staff's session in
+   * the same workspace builds.
+   */
+  readonly builderLocked = computed(() => this.managementMode() === 'MANAGED' && !this.isManagedSession());
+
+  /** A workspace administrator who may build here: the admin gate the builder screens use. */
+  readonly canBuild = computed(() => this.isTenantAdmin() && !this.builderLocked());
 
   /**
    * Whether the session still owes a password change, which passwordChangeGuard turns into
@@ -113,9 +156,9 @@ export class AuthService {
    */
 
   /** sourceTask.json add/update/delete -- SourceTaskRestApi is class-level TENANT_ADMIN. */
-  readonly canManageTasks = computed(() => this.hasAtLeast('TENANT_ADMIN'));
+  readonly canManageTasks = computed(() => this.canBuild());
   /** aiAgent.json addAgent/updateAgent/deleteAgent. Fetching the agents is TENANT_USER. */
-  readonly canManageAgents = computed(() => this.hasAtLeast('TENANT_ADMIN'));
+  readonly canManageAgents = computed(() => this.canBuild());
   /** appUser.json addUser/changeUserStatus/resetPassword. */
   readonly canManageUsers = computed(() => this.hasAtLeast('TENANT_ADMIN'));
   /** tenant.json -- a tenant spans the platform, so only a platform administrator touches one. */
@@ -255,14 +298,69 @@ export class AuthService {
    * reached must not keep anyone signed in here. Other open tabs follow through the storage event (see below).
    */
   logout(): void {
-    const user = this.currentUser();
-    if (user?.accessToken) {
-      this.http.post(`${API_BASE}/auth.json/logout`, { refreshToken: user.refreshToken ?? null },
-        { headers: new HttpHeaders({ Authorization: `Bearer ${user.accessToken}` }) })
-        .subscribe({ error: () => { /* signed out here regardless */ } });
-    }
+    this.revoke(this.currentUser());
+    // A staff member signed out inside a managed session leaves both: the platform session held aside too.
+    this.revoke(this.readHeldPlatformSession());
     this.clear();
     void this.router.navigate(['/login']);
+  }
+
+  private revoke(user: AuthUser | null): void {
+    if (!user?.accessToken) return;
+    this.http.post(`${API_BASE}/auth.json/logout`, { refreshToken: user.refreshToken ?? null },
+      { headers: new HttpHeaders({ Authorization: `Bearer ${user.accessToken}` }) })
+      .subscribe({ error: () => { /* signed out here regardless */ } });
+  }
+
+  /**
+   * MIG-254: the platform session a managed-service session was opened from, waiting under
+   * PLATFORM_SESSION_KEY. Two sessions are held, one is active: every request (and every refresh) uses the
+   * active one, so no screen needs to know which it is, and Exit is putting the other one back.
+   */
+  private readonly heldPlatform = signal<boolean>(this.readHeldPlatformSession() !== null);
+  readonly heldPlatformSession = this.heldPlatform.asReadonly();
+
+  /**
+   * A staff member opened a managed-service session (managedService.json/openSession answered like a
+   * sign-in): their own session waits aside and this one becomes active. Only from a platform
+   * administrator's own session -- opening one from inside another would lose the way back.
+   */
+  enterManagedSession(session: AuthUser): void {
+    const own = this.currentUser();
+    if (!own || !this.isPlatformAdmin() || this.isManagedSession()) return;
+    localStorage.setItem(PLATFORM_SESSION_KEY, JSON.stringify(own));
+    this.heldPlatform.set(true);
+    this.persist(session);
+  }
+
+  /**
+   * Leaves the managed session: its tokens are revoked (they would otherwise stay usable until they expire)
+   * and the platform session comes back, on the picker. With nothing held -- the storage was cleared in
+   * between -- there is no session to return to, and this signs out.
+   */
+  exitManagedSession(): void {
+    const held = this.readHeldPlatformSession();
+    this.revoke(this.currentUser());
+    localStorage.removeItem(PLATFORM_SESSION_KEY);
+    this.heldPlatform.set(false);
+    if (!held) {
+      this.clear();
+      void this.router.navigate(['/login']);
+      return;
+    }
+    this.persist(held);
+    void this.router.navigate([WORK_IN_WORKSPACE_PATH]);
+  }
+
+  private readHeldPlatformSession(): AuthUser | null {
+    const raw = localStorage.getItem(PLATFORM_SESSION_KEY);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw) as AuthUser;
+    } catch {
+      localStorage.removeItem(PLATFORM_SESSION_KEY);
+      return null;
+    }
   }
 
   /** Another tab signed out (it removed the stored session): this tab signs out too instead of carrying on. */
@@ -291,6 +389,8 @@ export class AuthService {
 
   private clear(): void {
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(PLATFORM_SESSION_KEY);
+    this.heldPlatform?.set(false);
     this.currentUser.set(null);
   }
 
