@@ -129,9 +129,9 @@ export class Shell {
       label: 'Documents',
       children: [
         { label: 'Document Intelligence', path: '/documents/intelligence', pageKey: 'document-intelligence',
-          icon: 'search', soon: true, hint: 'Read documents into structured data' },
+          icon: 'search', hint: 'Read documents into structured data' },
         { label: 'Review queue', path: '/documents/review', pageKey: 'document-review', icon: 'checkCircle',
-          soon: true, hint: 'Check low-confidence fields' },
+          hint: 'Check low-confidence fields' },
         { label: 'Document Converter', path: '/documents/converter', pageKey: 'tools-converter', icon: 'file',
           hint: 'Convert between formats' },
         { label: 'Browse files', path: '/documents/files', pageKey: 'objects', icon: 'folder',

@@ -45,6 +45,8 @@ const PAGE_PATHS: [string, PageKey][] = [
   ['/pipelines/run-analytics', 'reports'],
   ['/pipelines', 'tasks'],
   ['/documents/files', 'objects'],
+  ['/documents/intelligence', 'document-intelligence'],
+  ['/documents/review', 'document-review'],
   ['/documents/converter', 'tools-converter'],
   ['/documents/transcript', 'tools-transcript'],
   ['/data/analytics/dashboards', 'analytics-dashboards'],

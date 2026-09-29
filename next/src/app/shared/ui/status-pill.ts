@@ -58,6 +58,12 @@ const LOOK: Record<string, StatusLook> = {
   inactive:  { tone: 'warn', glyph: 'alert' },
   suspended: { tone: 'warn', glyph: 'alert' },
   delete:    { tone: 'crit', glyph: 'xCircle' },
+
+  // A document's life in Document Intelligence (MIG-272): waiting for the model, then read, then decided.
+  queued:          { tone: 'neutral', glyph: 'inbox', run: true },
+  'in review':     { tone: 'warn',    glyph: 'eye' },
+  'auto-approved': { tone: 'ok',      glyph: 'checkCircle' },
+  unclassified:    { tone: 'warn',    glyph: 'alert' },
 };
 
 const UNKNOWN: StatusLook = { tone: 'neutral', glyph: '' };

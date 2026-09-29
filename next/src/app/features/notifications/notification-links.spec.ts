@@ -59,6 +59,8 @@ describe('openableTarget', () => {
     expect(pageKeyForPath('/ai/prompts')).toBe('ai-prompts');
     expect(pageKeyForPath('/integration/api-collections')).toBe('api-collections');
     expect(pageKeyForPath('/integration/sources')).toBe('sources');
+    expect(pageKeyForPath('/documents/intelligence')).toBe('document-intelligence');
+    expect(pageKeyForPath('/documents/review/1005')).toBe('document-review');
   });
 
   it('drops a link to a page the profile withholds, and keeps the rest', () => {

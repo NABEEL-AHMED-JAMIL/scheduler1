@@ -1,0 +1,205 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Document Intelligence</h1>
+      <p class="page-subtitle">
+        Read a document from one of this workspace's storage connections; each one is read, split into fields against its
+        document type and checked. Values it is not sure of go to the review queue.
+      </p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button type="button" class="btn btn-default btn-sm" (click)="refresh()" [disabled]="loading() || datasetLoading()">
+        <app-icon name="refresh" [class.spin]="loading() || datasetLoading()" />Refresh
+      </button>
+      @if (canManage()) {
+        <button type="button" class="btn btn-default btn-sm" (click)="openType(null)"><app-icon name="plus" />New document type</button>
+      }
+      <button type="button" class="btn btn-primary btn-sm" (click)="readDocument()"><app-icon name="upload" />Read a document</button>
+    </div>
+  </div>
+
+  <div class="tabs" role="tablist" aria-label="Document Intelligence">
+    @for (t of tabs; track t.id) {
+      <button type="button" role="tab" class="tab" [class.tab-active]="tab() === t.id" [attr.aria-selected]="tab() === t.id" (click)="setTab(t.id)">{{ t.label }}</button>
+    }
+  </div>
+
+  @switch (tab()) {
+    @case ('types') {
+      <app-table-shell data-test="types" heading="Document types" columnsKey="document-types" [loading]="!types().length && !typesError()" [error]="typesError()"
+                       [isEmpty]="!types().length" [shown]="types().length" emptyMessage="No document types." emptyIcon="file" (retry)="loadTypes()">
+        <table class="table-modern">
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th class="text-right">Fields</th>
+              <th class="text-right">Tables</th>
+              <th class="text-right">Rules</th>
+              <th>Auto-approve at</th>
+              <th>Version</th>
+              <th>Kind</th>
+              <th class="text-right">State</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (t of types(); track t.documentTypeId) {
+              <tr>
+                <td class="max-w-72">
+                  <button type="button" class="link-inline font-medium text-left" (click)="openType(t)">{{ t.name }}</button>
+                  <span class="block mono text-xs text-[color:var(--text-muted)]">{{ t.typeKey }}</span>
+                </td>
+                <td class="text-right text-xs">{{ t.fieldCount ?? t.definition?.fields?.length ?? 0 }}</td>
+                <td class="text-right text-xs">{{ t.tableCount ?? t.definition?.tables?.length ?? 0 }}</td>
+                <td class="text-right text-xs">{{ t.definition?.rules?.length ?? 0 }}</td>
+                <td class="text-xs whitespace-nowrap">{{ thresholdOf(t) }}</td>
+                <td><span class="pill pill-neutral mono">v{{ t.currentVersion }}</span></td>
+                <td class="text-xs whitespace-nowrap">{{ t.builtIn ? 'Built-in' : 'This workspace' }}</td>
+                <td class="text-right"><app-status [label]="t.status" [quiet]="true" /></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </app-table-shell>
+    }
+
+    @case ('dataset') {
+      <app-table-shell data-test="dataset" heading="Dataset" columnsKey="document-dataset" [loading]="datasetLoading()" [error]="datasetError()"
+                       [isEmpty]="!dataset().length" [shown]="dataset().length" [total]="datasetTotal()"
+                       emptyMessage="No approved documents of this type yet. An approved document's values land here." emptyIcon="table" (retry)="loadDataset()">
+        <ng-container toolbar>
+          <select class="input max-w-48" aria-label="Document type" [value]="datasetType()" (change)="pickDatasetType($any($event.target).value)">
+            @for (t of types(); track t.documentTypeId) { <option [value]="t.documentTypeId" [selected]="t.documentTypeId + '' === datasetType()">{{ t.name }}</option> }
+          </select>
+          <button type="button" class="btn btn-default btn-sm" [disabled]="!!downloading() || !datasetTotal()" (click)="download('csv')">
+            <app-icon [name]="downloading() === 'csv' ? 'refresh' : 'download'" [class.spin]="downloading() === 'csv'" />CSV
+          </button>
+          <button type="button" class="btn btn-default btn-sm" [disabled]="!!downloading() || !datasetTotal()" (click)="download('jsonl')">
+            <app-icon [name]="downloading() === 'jsonl' ? 'refresh' : 'download'" [class.spin]="downloading() === 'jsonl'" />JSON Lines
+          </button>
+        </ng-container>
+        <table class="table-modern">
+          <thead>
+            <tr>
+              <th>Document</th>
+              <th>Approved</th>
+              @for (c of datasetColumns(); track c.key) { <th>{{ c.label }}</th> }
+              @for (t of datasetTables(); track t.key) { <th class="text-right">{{ t.label }}</th> }
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of dataset(); track r.datasetRowId) {
+              <tr>
+                <td class="whitespace-nowrap">
+                  <a class="link-inline mono text-xs" [routerLink]="['/documents/review', r.extractionId]">#{{ r.extractionId }}</a>
+                  <span class="block text-xs text-[color:var(--text-muted)]">v{{ r.documentTypeVersion }}</span>
+                </td>
+                <td class="text-xs whitespace-nowrap">
+                  {{ approvalText(r.approval) }}
+                  @if (r.dateCreated) { <span class="block text-[color:var(--text-muted)]">{{ r.dateCreated | serverTime: 'recent' }}</span> }
+                </td>
+                @for (c of datasetColumns(); track c.key) {
+                  <td class="min-w-28 max-w-64"><app-data-text class="mono text-xs" [value]="cell(r, c.key)" [label]="c.label" /></td>
+                }
+                @for (t of datasetTables(); track t.key) { <td class="text-right text-xs whitespace-nowrap">{{ countOf(rowsOf(r, t.key), 'row') }}</td> }
+              </tr>
+            }
+          </tbody>
+        </table>
+        <app-pagination pager [total]="datasetTotal()" [page]="datasetPage()" [size]="datasetSize()" (goTo)="datasetGoTo($event)" (setSize)="datasetSetSize($event)" />
+      </app-table-shell>
+    }
+
+    @default {
+      <app-stat-strip [items]="kpis()" [cols]="2" [smCols]="4" align="start" size="md" label="Document Intelligence at a glance" />
+
+      <section aria-label="Document types" class="type-cards" data-test="type-cards">
+        @for (t of activeTypes(); track t.documentTypeId) {
+          <button type="button" class="card p-4 type-card" [attr.aria-label]="t.name + ': ' + countOf(t.fieldCount ?? 0, 'field') + ', ' + countOf(documentsOf(t), 'document')" (click)="openType(t)">
+            <app-icon [name]="typeIcon(t)" size="1.25rem" class="text-[color:var(--text-secondary)]" />
+            <span class="font-medium text-sm truncate w-full">{{ t.name }}</span>
+            <span class="text-xs text-[color:var(--text-muted)]">{{ countOf(t.fieldCount ?? 0, 'field') }} · {{ countOf(documentsOf(t), 'doc') }}</span>
+            @if (!t.builtIn) { <span class="pill pill-neutral">This workspace</span> }
+          </button>
+        }
+        @if (canManage()) {
+          <button type="button" class="card p-4 type-card type-card-add" (click)="openType(null)">
+            <app-icon name="plus" size="1.25rem" /><span class="text-xs">Custom type</span>
+          </button>
+        }
+      </section>
+
+      <app-table-shell data-test="recent" heading="Recent documents" columnsKey="document-recent" [loading]="loading()" [error]="error()"
+                       [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="recent().length"
+                       [emptyMessage]="hasFilters() ? 'No document matches the current filters.' : 'No documents yet. Read one: a PDF or an image from a storage connection.'"
+                       emptyIcon="file" (retry)="load()">
+        <ng-container toolbar>
+          <select class="input max-w-40" aria-label="Document type" [value]="typeFilter()" (change)="typeFilter.set($any($event.target).value)">
+            <option value="">All types</option>
+            @for (t of types(); track t.documentTypeId) { <option [value]="t.typeKey" [selected]="t.typeKey === typeFilter()">{{ t.name }}</option> }
+          </select>
+          <select class="input max-w-40" aria-label="State" [value]="stateFilter()" (change)="stateFilter.set($any($event.target).value)">
+            <option value="">All states</option>
+            @for (s of states; track s) { <option [value]="s" [selected]="s === stateFilter()">{{ s }}</option> }
+          </select>
+          <div class="search-field max-w-64">
+            <app-icon name="search" size="0.95em" />
+            <input class="input" placeholder="Search documents" aria-label="Search documents" [value]="search()" (input)="search.set($any($event.target).value)" />
+          </div>
+          @if (hasFilters()) { <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()"><app-icon name="close" />Clear</button> }
+        </ng-container>
+
+        <div empty-action class="flex justify-center">
+          @if (!hasFilters()) { <button type="button" class="btn btn-primary btn-sm" (click)="readDocument()"><app-icon name="upload" />Read a document</button> }
+        </div>
+
+        <table class="table-modern">
+          <thead>
+            <tr>
+              <th>Document</th>
+              <th>Type</th>
+              <th class="text-right">Fields</th>
+              <th>Confidence</th>
+              <th>State</th>
+              <th>Received</th>
+              <th class="w-12"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of filtered(); track r.key) {
+              <tr>
+                <td class="max-w-72">
+                  @if (r.extraction) {
+                    <a class="link-inline font-medium [overflow-wrap:anywhere]" [routerLink]="['/documents/review', r.extraction.extractionId]">{{ r.name }}</a>
+                  } @else { <span class="font-medium [overflow-wrap:anywhere]">{{ r.name }}</span> }
+                  @if (r.where) { <span class="block text-xs text-[color:var(--text-muted)]">{{ r.where }}</span> }
+                </td>
+                <td class="text-xs whitespace-nowrap">
+                  @if (r.extraction) { {{ r.extraction.documentTypeName || r.extraction.documentTypeKey || 'Not classified' }} } @else { <span class="text-[color:var(--text-muted)]">Not extracted</span> }
+                </td>
+                <td class="text-right text-xs whitespace-nowrap">
+                  @if (r.extraction) { {{ r.extraction.fieldCount ?? 0 }}@if (r.extraction.reviewCount) { <span class="text-[color:var(--warn-text)]"> · {{ r.extraction.reviewCount }} to check</span> } } @else { — }
+                </td>
+                <td>@if (r.extraction) { <app-confidence-bar [value]="r.extraction.minConfidence" [low]="low(r)" /> } @else { <span class="text-xs text-[color:var(--text-muted)]">—</span> }</td>
+                <td><app-status [label]="r.status" /></td>
+                <td class="text-xs whitespace-nowrap">@if (r.received) { {{ r.received | serverTime: 'recent' }} } @else { — }</td>
+                <td>
+                  @if (r.ocr && r.ocr.status === 'Done') {
+                    <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="rowMenu" [attr.aria-label]="'Actions for ' + r.name"><app-icon name="dots" size="1.05em" /></button>
+                    <ng-template #rowMenu>
+                      <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                        @if (r.extraction) {
+                          <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="openReview(r.extraction.extractionId)"><app-icon name="eye" />Open</button>
+                        }
+                        <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="extractAgain(r)"><app-icon name="sparkle" />{{ r.extraction ? 'Extract again' : 'Extract' }}</button>
+                      </div>
+                    </ng-template>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </app-table-shell>
+    }
+  }
+</div>
