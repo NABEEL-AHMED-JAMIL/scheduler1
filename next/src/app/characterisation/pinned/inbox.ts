@@ -56,7 +56,8 @@ export const PINNED: Record<string, unknown> = {
     ],
     "buttons": [
       "Columns",
-      "Refresh"
+      "Refresh",
+      "What the inbox accepts"
     ],
     "columns": [
       [
@@ -110,7 +111,8 @@ export const PINNED: Record<string, unknown> = {
     "buttons": [
       "Columns",
       "Inbox settings",
-      "Refresh"
+      "Refresh",
+      "What the inbox accepts"
     ],
     "columns": [
       [
@@ -139,7 +141,7 @@ export const PINNED: Record<string, unknown> = {
     ],
     "columns": [],
     "fields": [
-      "100",
+      "No lower limit",
       "Size limit (MB)",
       "Storage connection *(required)"
     ],

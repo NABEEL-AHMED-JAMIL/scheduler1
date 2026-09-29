@@ -84,19 +84,26 @@
           </ul>
         }
 
-        <details class="text-sm">
-          <summary class="cursor-pointer text-[color:var(--text-secondary)]">What the inbox accepts</summary>
-          <dl class="mt-2 grid gap-x-4 gap-y-1.5 sm:grid-cols-[9rem_1fr]">
-            @for (k of kinds; track k.label) {
-              <dt class="text-[color:var(--text-muted)]">{{ k.label }}</dt>
-              <dd class="mono text-xs leading-6 break-words">{{ k.extensions.join(' ') }}</dd>
-            }
-          </dl>
-          <p class="mt-2 text-xs text-[color:var(--text-muted)]">
-            Executables and scripts are refused whatever they are named, and a file's contents must match its extension.
-            A refused file is not stored. Files are not scanned for viruses.
-          </p>
-        </details>
+        <div class="text-sm">
+          <button type="button" class="btn btn-ghost btn-sm -ml-2" [attr.aria-expanded]="showKinds()" aria-controls="inboxKinds"
+                  (click)="showKinds.set(!showKinds())">
+            <app-icon [name]="showKinds() ? 'chevronDown' : 'chevronRight'" />What the inbox accepts
+          </button>
+          @if (showKinds()) {
+            <div id="inboxKinds">
+              <dl class="mt-2 grid gap-x-4 gap-y-1.5 sm:grid-cols-[9rem_1fr]">
+                @for (k of kinds; track k.label) {
+                  <dt class="text-[color:var(--text-muted)]">{{ k.label }}</dt>
+                  <dd class="mono text-xs leading-6 break-words">{{ k.extensions.join(' ') }}</dd>
+                }
+              </dl>
+              <p class="mt-2 text-xs text-[color:var(--text-muted)]">
+                Executables and scripts are refused whatever they are named, and a file's contents must match its extension.
+                A refused file is not stored. Files are not scanned for viruses.
+              </p>
+            </div>
+          }
+        </div>
       </section>
 
       <section class="card p-4 flex flex-col gap-3 min-w-0" aria-labelledby="inboxSettingsHeading">
@@ -157,7 +164,7 @@
         <tbody>
           @for (f of files(); track f.arrivalId) {
             <tr>
-              <td class="max-w-96">
+              <td class="min-w-44 max-w-96">
                 <app-data-text class="block font-medium" [value]="f.fileName" label="File" />
                 @if (f.contentType) { <span class="block text-xs text-[color:var(--text-muted)]">{{ f.contentType }}</span> }
               </td>

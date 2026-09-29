@@ -59,6 +59,7 @@ export class Inbox implements OnInit {
   readonly error = signal('');
   readonly filesError = signal('');
   readonly queue = signal<QueuedUpload[]>([]);
+  readonly showKinds = signal(false);
   private readonly names = signal(new Map<number, string>());
   private nextId = 1;
   private sending = false;

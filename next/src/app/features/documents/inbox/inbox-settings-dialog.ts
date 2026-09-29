@@ -29,7 +29,7 @@ const MB = 1048576;
                      [confirmDisabled]="loadingBuckets()" (confirmed)="save()" (cancelled)="cancel()">
       @if (data.settings.configured) {
         <button footer-start type="button" class="btn btn-ghost btn-sm text-crit-500" [disabled]="saving()" (click)="turnOff()">
-          <app-icon name="close" />Turn off
+          <app-icon name="power" />Turn off
         </button>
       }
       <div class="form-stack">
@@ -48,7 +48,7 @@ const MB = 1048576;
           <p class="text-sm text-[color:var(--text-muted)]">This workspace has no storage connection yet. Add one under Integration › Storage Connections first.</p>
         }
         <app-field label="Size limit (MB)" for="inboxCap" [error]="capError()" [hint]="capHint">
-          <input id="inboxCap" class="input max-w-40" inputmode="numeric" [value]="capMb()" [placeholder]="platformMb"
+          <input id="inboxCap" class="input max-w-40" inputmode="numeric" [value]="capMb()" placeholder="No lower limit"
                  (input)="capMb.set($any($event.target).value); capError.set('')" />
         </app-field>
         @if (error()) { <p class="text-sm text-crit-500" role="alert">{{ error() }}</p> }
@@ -73,7 +73,6 @@ export class InboxSettingsDialog {
   readonly error = signal('');
   readonly saving = signal(false);
 
-  readonly platformMb = String(megabytes(this.data.settings.platformMaxBytes) ?? '');
   readonly capHint = `Optional. Empty means the platform's limit, ${limitText(this.data.settings.platformMaxBytes)} a file.`;
 
   readonly options = computed(() => this.buckets().map(b => ({
