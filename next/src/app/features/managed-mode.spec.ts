@@ -75,8 +75,8 @@ describe('MIG-254: build screens in a MANAGED workspace', () => {
       expect(saves.length).toBeGreaterThan(0);
       for (const b of saves) expect((b as HTMLButtonElement).disabled, b.textContent ?? '').toBe(true);
     });
-    // Chromium sometimes lays out nothing inside a fieldset with display: contents (the legacy task form rendered
-    // with zero-size fields on a cold load): the lock is an ordinary, unstyled block fieldset instead.
+    // The lock is one unstyled block fieldset (.form-lock in styles.css, which also keeps size containers out of it:
+    // Chromium sometimes never laid out a container inside it, and the legacy task form rendered zero-size fields).
     it(`${url}: the lock is a form-lock fieldset, not display: contents`, async () => {
       const v = await visit(url, 'TENANT_ADMIN', null);
       const locks = Array.from(v.main.querySelectorAll('fieldset')).filter(f => f.classList.contains('form-lock'));
