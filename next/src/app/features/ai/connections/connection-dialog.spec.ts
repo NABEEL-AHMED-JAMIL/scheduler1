@@ -77,3 +77,33 @@ describe('ConnectionDialog -- required fields are validators', () => {
     expect(dialog.confirmLabel()).toBe('Save changes');
   });
 });
+
+/** MIG-243/254: a hosted connection covered by a signed Business Associate Agreement -- what the "baa" model rule allows. */
+describe('ConnectionDialog -- BAA', () => {
+  const valid = { name: 'x', provider: 'OpenAI', defaultModel: 'gpt', apiKey: 'k' };
+
+  it('starts from what the connection says, and sends what is ticked', () => {
+    const { dialog, post } = dialogWith({ connection: { connectionId: 3, name: 'x', provider: 'OpenAI', defaultModel: 'gpt', apiKeyConfigured: true, baaSigned: true } });
+    expect(dialog.form.get('baaSigned')!.value).toBe(true);
+    dialog.form.patchValue({ baaSigned: false });
+    dialog.save();
+    expect(post).toHaveBeenCalledWith(expect.stringContaining('/aiConnection.json/save'), expect.objectContaining({ baaSigned: false }));
+  });
+
+  it('sends a new hosted connection as covered when ticked', () => {
+    const { dialog, post } = dialogWith({});
+    dialog.form.patchValue({ ...valid, baaSigned: true });
+    TestBed.tick();
+    dialog.save();
+    expect(post).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ baaSigned: true }));
+  });
+
+  it('never marks a local connection: a local model needs no agreement', () => {
+    const { dialog, post } = dialogWith({});
+    dialog.form.patchValue({ name: 'x', provider: 'Ollama', defaultModel: 'llama', baaSigned: true });
+    TestBed.tick();
+    expect(dialog.showBaa()).toBe(false);
+    dialog.save();
+    expect(post).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ baaSigned: false }));
+  });
+});

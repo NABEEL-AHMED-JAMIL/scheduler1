@@ -76,6 +76,18 @@ import { AI_PROVIDERS, ModelConnection, providerOf } from '../ai-providers';
             <input id="cxBudget" type="number" min="1" step="1000" class="input" formControlName="dailyTokenBudget" placeholder="e.g. 500000" />
           </app-field>
         </div>
+        @if (showBaa()) {
+          <label class="flex items-start gap-2 text-sm">
+            <input type="checkbox" class="checkbox mt-0.5 shrink-0" formControlName="baaSigned" id="cxBaa" />
+            <span>
+              <span class="block font-medium">Covered by a signed BAA</span>
+              <span class="block text-xs text-[color:var(--text-muted)]">
+                The provider has signed a Business Associate Agreement for this account. A data policy level set to
+                "BAA-signed hosted, or local" may then use this connection.
+              </span>
+            </span>
+          </label>
+        }
       </form>
     </app-form-dialog>
   `,
@@ -103,10 +115,13 @@ export class ConnectionDialog {
     status: [this.data.connection?.status ?? 'Active'],
     maxConcurrency: [this.data.connection?.maxConcurrency ?? 4],
     dailyTokenBudget: [this.data.connection?.dailyTokenBudget ?? null as number | null],
+    baaSigned: [!!this.data.connection?.baaSigned],
   });
 
   private readonly providerKey = toSignal(this.form.get('provider')!.valueChanges, { initialValue: this.form.get('provider')!.value });
   readonly provider = computed(() => providerOf(this.providerKey()));
+  /** A BAA covers a hosted provider; a local (Ollama) model is already allowed by every data policy rule but "any". */
+  readonly showBaa = computed(() => this.provider().key !== 'Ollama');
 
   /** Every other edit dialog says "Save changes". */
   readonly confirmLabel = computed(() => this.isEdit() ? 'Save changes' : 'Create');
@@ -147,6 +162,7 @@ export class ConnectionDialog {
       name: v.name, provider: v.provider, tenantId: v.tenantId, apiEndpoint: v.apiEndpoint, apiKey: v.apiKey || null,
       defaultModel: v.defaultModel, status: v.status,
       maxConcurrency: Number(v.maxConcurrency) || 4, dailyTokenBudget: v.dailyTokenBudget ? Number(v.dailyTokenBudget) : null,
+      baaSigned: this.showBaa() && !!v.baaSigned,
     };
     this.http.post<ApiResponse>(`${API_BASE}/aiConnection.json/save`, body).subscribe({
       next: r => {
