@@ -12,11 +12,14 @@
       <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
         <app-icon name="refresh" [class.spin]="loading()" />Refresh
       </button>
+      @if (!locked()) {
       <button type="button" class="btn btn-primary btn-sm" (click)="create()">
         <app-icon name="plus" />New profile
       </button>
+      }
     </div>
   </div>
+  <app-managed-banner what="Kafka connections and topics" still="You can still test them." />
 
   <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
     @for (tile of [
@@ -155,9 +158,11 @@
               <app-icon name="plug" [busy]="testing() === p.kafkaConnectionProfileId" />
               {{ testing() === p.kafkaConnectionProfileId ? 'Testing…' : 'Test connection' }}
             </button>
+            @if (!locked()) {
             <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="detailMenu" aria-label="More actions">
               <app-icon name="dots" size="1.05em" />
             </button>
+            }
             <ng-template #detailMenu>
               <div cdkMenu class="card shadow-xl py-1 min-w-52 text-sm">
                 <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="edit(p)">
@@ -285,9 +290,11 @@
                        [value]="topicSearch()" (input)="topicSearch.set($any($event.target).value)" />
               </div>
             }
+            @if (!locked()) {
             <button type="button" class="btn btn-default btn-sm" [class.ml-auto]="topicsHere().length <= 8" (click)="addTopic(p)">
               <app-icon name="plus" class="icon-ok" />Add topic
             </button>
+            }
           </div>
           @if (topicsLoading() && !topicsHere().length) {
             <div class="lookup-entries-empty"><div class="spinner" role="status" aria-label="Loading topics"></div> Loading topics…</div>
@@ -382,10 +389,12 @@
                                       size="0.9em" [busy]="testingTopic() === row.type.sourceTaskTypeId"
                                       [class]="topicTests()[row.type.sourceTaskTypeId!]?.unread ? 'icon-warn' : topicTests()[row.type.sourceTaskTypeId!]?.ok === true ? 'icon-ok' : topicTests()[row.type.sourceTaskTypeId!]?.ok === false ? 'icon-crit' : ''" />
                           </button>
+                          @if (!locked()) {
                           <button type="button" class="btn-circle btn-circle-info" title="Edit topic" aria-label="Edit topic"
                                   (click)="editTopic(row.type)"><app-icon name="edit" size="0.9em" /></button>
                           <button type="button" class="btn-circle btn-circle-danger" title="Delete topic" aria-label="Delete topic"
                                   (click)="removeTopic(row.type)"><app-icon name="trash" size="0.9em" /></button>
+                          }
                         </div>
                       </td>
                     </tr>

@@ -34,7 +34,7 @@ function setup(options: { canOpenJobs?: boolean; rows?: any[] } = {}) {
       } },
       { provide: Dialog, useValue: { open: () => ({ closed: of(true) }) } },
       { provide: ToastService, useValue: { success: () => {}, error: () => {}, info: () => {} } },
-      { provide: AuthService, useValue: { canOpen: (page: string) => page !== 'jobs' || options.canOpenJobs !== false } },
+      { provide: AuthService, useValue: { canOpen: (page: string) => page !== 'jobs' || options.canOpenJobs !== false, builderLocked: () => false } },
       { provide: JobEventsService, useValue: { events, connected } },
     ],
   });

@@ -22,6 +22,9 @@ const SCREENS: { url: string; writes: string[] }[] = [
   { url: '/ai/prompts', writes: ['New prompt'] },
   { url: '/ai/connections', writes: ['New connection'] },
   { url: '/integration/storage-connections', writes: ['New connection'] },
+  // Owner 2026-09-29: the Kafka and Task Registry screens are build screens too.
+  { url: '/configuration/kafka', writes: ['New profile'] },
+  { url: '/configuration/task-registry', writes: ['New pipeline'] },
 ];
 
 /** A button or link in the page (not the menu) that says this. */
@@ -52,12 +55,14 @@ describe('MIG-254: build screens in a MANAGED workspace', () => {
     });
   }
 
-  it('a schedule\'s menu keeps what reads and loses what writes', async () => {
+  // Owner 2026-09-29: running an existing schedule is not building it -- Run now and Run with stay for the customer.
+  it('a schedule\'s menu keeps what reads and runs, and loses what builds', async () => {
     const v = await visit('/pipelines/schedules', 'TENANT_ADMIN', null, {}, MANAGED);
     await click(v, /^Actions for /);
     const items = overlay().items.join(' | ');
-    for (const kept of ['Edit', 'Executions', 'Ask about this job']) expect(items).toContain(kept);
-    for (const gone of ['Run now', 'Run with', 'Skip next run', 'Duplicate', 'Email notifications', 'Deactivate', 'Delete']) {
+    expect(v.main.querySelector('[data-managed-banner]')?.textContent).toContain('You can still run them.');
+    for (const kept of ['Run now', 'Run with', 'Edit', 'Executions', 'Ask about this job']) expect(items).toContain(kept);
+    for (const gone of ['Skip next run', 'Duplicate', 'Email notifications', 'Deactivate', 'Delete']) {
       expect(items, gone).not.toContain(gone);
     }
   });
@@ -84,6 +89,22 @@ describe('MIG-254: build screens in a MANAGED workspace', () => {
       expect(v.main.querySelector('fieldset.contents')).toBeNull();
     });
   }
+
+  // Owner 2026-09-29: forcing a run's status is our team's in a MANAGED workspace; the Queue still shows every run.
+  const RUNNING = { 'POST /message.json/fetchLogs': { status: 'SUCCESS', message: 'Logs.', data: [
+    { jobQueueId: 9101, jobId: LIVE_IDS.jobId, jobStatus: 'Running', startTime: '2026-09-29T09:00:00', dateCreated: '2026-09-29T09:00:00' },
+  ] } };
+  it('the queue shows the banner and offers no Mark as failed / interrupted', async () => {
+    const v = await visit('/pipelines/queue', 'TENANT_ADMIN', null, RUNNING, MANAGED);
+    expect(hasBanner(v)).toBe(true);
+    expect(v.main.querySelectorAll('[aria-label^="Actions for run #"]').length).toBe(0);
+  });
+
+  it('a SELF workspace\'s queue keeps its run actions, with no banner', async () => {
+    const v = await visit('/pipelines/queue', 'TENANT_ADMIN', null, RUNNING);
+    expect(hasBanner(v)).toBe(false);
+    expect(v.main.querySelectorAll('[aria-label^="Actions for run #"]').length).toBeGreaterThan(0);
+  });
 
   it('the assistant takes a staff session\'s workspace from the session: appUser.json/me refuses it', async () => {
     const own = await visit('/ai/assistant', 'TENANT_ADMIN', null);

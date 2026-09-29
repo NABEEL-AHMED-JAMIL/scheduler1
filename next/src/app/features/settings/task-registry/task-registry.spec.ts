@@ -58,7 +58,7 @@ function screenWith(setup: Setup = {}) {
         return { closed: of(answers.shift()) };
       } } },
       { provide: ToastService, useValue: toast },
-      { provide: AuthService, useValue: { isPlatformAdmin: () => role === 'PLATFORM_ADMIN', isTenantAdmin: () => true, user: () => null } },
+      { provide: AuthService, useValue: { isPlatformAdmin: () => role === 'PLATFORM_ADMIN', isTenantAdmin: () => true, user: () => null, builderLocked: () => false } },
       { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: { get: (k: string) => (k === 'topic' ? setup.topic ?? null : null) } } } },
     ],
   });

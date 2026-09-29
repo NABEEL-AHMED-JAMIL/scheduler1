@@ -14,6 +14,7 @@ import { createTopicSearch } from '../../../shared/ui/topic-search';
 import { TableShell } from '../../../shared/ui/data-table';
 import { StatTile } from '../../../shared/ui/stat-tile';
 import { Icon } from '../../../shared/ui/icon';
+import { ManagedBanner } from '../../../shared/ui/managed-banner';
 import { Combobox } from '../../../shared/ui/combobox';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { confirmWith } from '../../../shared/ui/confirm';
@@ -43,7 +44,7 @@ const EMPTY_SUMMARY: PipelineSummary = { total: 0, active: 0, fields: 0, topics:
  */
 @Component({
   selector: 'app-task-registry',
-  imports: [MineFilter, StatTile, TableShell, TaskStatePill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink, Combobox, Pagination],
+  imports: [MineFilter, StatTile, TableShell, TaskStatePill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink, Combobox, Pagination, ManagedBanner],
   templateUrl: './task-registry.html',
 })
 export class TaskRegistry implements OnInit {
@@ -53,6 +54,8 @@ export class TaskRegistry implements OnInit {
   private readonly toast = inject(ToastService);
   private readonly route = inject(ActivatedRoute);
   private readonly auth = inject(AuthService);
+  /** MIG-254 (owner 2026-09-29): a MANAGED workspace's registry is our team's -- shown, not changed. */
+  readonly locked = computed(() => this.auth.builderLocked());
 
   readonly kinds = REGISTRY_KINDS;
   readonly states = TASK_STATES;
@@ -192,11 +195,11 @@ export class TaskRegistry implements OnInit {
     }
     const data: TaskPanelData = {
       row: target,
-      isAdmin: this.isWorkspaceAdmin(),
+      isAdmin: this.isWorkspaceAdmin() && !this.locked(),
       onSwitched: line => this.tasks.update(list => withSwitchedLine(list, line)),
     };
     this.dialog.open<TaskPanelResult>(TaskPanel, sidePanelConfig(data, 'wide')).closed.subscribe(result => {
-      if (result === 'edit' && target.pipeline) this.edit(target.pipeline);
+      if (result === 'edit' && target.pipeline && !this.locked()) this.edit(target.pipeline);
     });
   }
 

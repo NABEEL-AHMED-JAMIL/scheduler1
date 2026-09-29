@@ -12,11 +12,14 @@
       <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading() || tasksLoading()">
         <app-icon name="refresh" [class.spin]="loading() || tasksLoading()" />Refresh
       </button>
+      @if (!locked()) {
       <button type="button" class="btn btn-primary btn-sm" (click)="create()">
         <app-icon name="plus" />New pipeline
       </button>
+      }
     </div>
   </div>
+  <app-managed-banner what="pipelines and tasks" />
 
   @if (isPlatformAdmin()) {
     <div class="card flex flex-wrap items-center gap-2 px-4 py-2.5 text-sm">
@@ -144,6 +147,7 @@
             </td>
             <td>
               @if (row.pipeline; as p) {
+                @if (!locked()) {
                 <button type="button" class="btn btn-ghost btn-icon btn-sm"
                         [cdkMenuTriggerFor]="rowMenu" [attr.aria-label]="'Actions for ' + p.pipelineName">
                   <app-icon name="dots" size="1.05em" />
@@ -162,6 +166,7 @@
                     </button>
                   </div>
                 </ng-template>
+              }
               }
             </td>
           </tr>

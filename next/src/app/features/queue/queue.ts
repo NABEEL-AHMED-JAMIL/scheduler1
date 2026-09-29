@@ -27,6 +27,7 @@ import { SplitBar } from '../../shared/charts/split-bar';
 import { createPager } from '../../shared/ui/pager';
 import { Pagination } from '../../shared/ui/pagination';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
+import { ManagedBanner } from '../../shared/ui/managed-banner';
 
 interface QueueRow {
   jobQueueId: number;
@@ -56,7 +57,7 @@ const FAILED = new Set(['Failed', 'Interrupt']);
 
 @Component({
   selector: 'app-queue',
-  imports: [Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, StatusFilterChip, Donut, RankedBar, BarChart, SplitBar, Pagination],
+  imports: [Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, StatusFilterChip, Donut, RankedBar, BarChart, SplitBar, Pagination, ManagedBanner],
   templateUrl: './queue.html',
 })
 export class Queue implements OnInit {
@@ -64,6 +65,8 @@ export class Queue implements OnInit {
   private readonly toast = inject(ToastService);
   private readonly dialog = inject(Dialog);
   private readonly auth = inject(AuthService);
+  /** MIG-254 (owner 2026-09-29): in a MANAGED workspace a run's status is our team's to force. */
+  readonly locked = computed(() => this.auth.builderLocked());
   private readonly jobEvents = inject(JobEventsService);
 
   /** Shown beside Refresh, as on Jobs, so it is clear whether the list is following the runs. */

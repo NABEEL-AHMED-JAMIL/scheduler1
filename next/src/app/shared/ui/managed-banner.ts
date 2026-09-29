@@ -19,6 +19,7 @@ import { Icon } from './icon';
           <p class="font-semibold">Managed by our team</p>
           <p class="mt-0.5 text-[color:var(--text-secondary)]">
             Our team builds and changes this workspace's {{ what() }}, so {{ they() }} read-only here.
+            @if (still()) { {{ still() }} }
             Contact your account team to request a change.
           </p>
         </div>
@@ -34,6 +35,8 @@ export class ManagedBanner {
   readonly auth = inject(AuthService);
   /** What the screen builds, as the sentence names it: "pipelines", "schedules", "inbox settings". */
   readonly what = input('setup');
+  /** What the customer can still do there, as a sentence: "You can still run them." */
+  readonly still = input('');
   /** "is" for a single thing ("setup"), "are" for the rest. */
   readonly they = () => (this.what() === 'setup' ? 'it is' : 'they are');
 }

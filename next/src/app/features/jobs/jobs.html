@@ -25,7 +25,7 @@
       }
     </div>
   </div>
-  <app-managed-banner what="schedules" />
+  <app-managed-banner what="schedules" still="You can still run them." />
 
   @if (stalledCount()) {
     <div class="card px-4 py-2.5 flex flex-wrap items-center gap-2 border-warn-500"
@@ -243,13 +243,14 @@
               </button>
               <ng-template #menu>
                 <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
-                  @if (!locked()) {
+                  <!-- Owner 2026-09-29: running an existing schedule is not building it, so a MANAGED workspace keeps these. -->
                   <button cdkMenuItem class="menu-item" [disabled]="!canRunNow(job)"
                           [title]="runBlockedReason(job)"
                           (cdkMenuItemTriggered)="runNow(job)"><app-icon name="play" />Run now</button>
                   <button cdkMenuItem class="menu-item" [disabled]="!canRunNow(job)"
                           [title]="runBlockedReason(job) || 'Run now, choosing the model each AI step runs on'"
                           (cdkMenuItemTriggered)="runWith(job)"><app-icon name="sparkle" />Run with…</button>
+                  @if (!locked()) {
                   <button cdkMenuItem class="menu-item" [disabled]="isInFlight(job) || !canSkipNext(job)"
                           [title]="skipBlockedReason(job)"
                           (cdkMenuItemTriggered)="skipNext(job)"><app-icon name="skip" />Skip next run</button>

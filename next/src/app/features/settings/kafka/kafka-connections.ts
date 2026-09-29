@@ -11,6 +11,7 @@ import { AuthService } from '../../../core/auth/auth.service';
 import { StatTile } from '../../../shared/ui/stat-tile';
 import { StatusPill } from '../../../shared/ui/status-pill';
 import { Icon } from '../../../shared/ui/icon';
+import { ManagedBanner } from '../../../shared/ui/managed-banner';
 import { CopyButton } from '../../../shared/ui/copy-button';
 import { BlurLoader } from '../../../shared/ui/blur-loader';
 import { sidePanelConfig } from '../../../shared/ui/side-panel';
@@ -84,7 +85,7 @@ export interface KafkaProfile {
 
 @Component({
   selector: 'app-kafka-connections',
-  imports: [MineFilter, StatTile, ServerTimePipe, StatusPill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger, CopyButton, RouterLink, BlurLoader],
+  imports: [MineFilter, StatTile, ServerTimePipe, StatusPill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger, CopyButton, RouterLink, BlurLoader, ManagedBanner],
   templateUrl: './kafka-connections.html',
 })
 export class KafkaConnections implements OnInit {
@@ -332,6 +333,8 @@ export class KafkaConnections implements OnInit {
   /** Narrows the list to rows this person created. Not persisted -- see MineFilter. */
 
   private readonly auth = inject(AuthService);
+  /** MIG-254 (owner 2026-09-29): a MANAGED workspace's Kafka setup is our team's; testing stays. */
+  readonly locked = computed(() => this.auth.builderLocked());
 
   readonly onlyMine = signal(false);
 
