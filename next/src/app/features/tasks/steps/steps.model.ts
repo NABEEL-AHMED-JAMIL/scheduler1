@@ -97,36 +97,67 @@ export interface ValidateResult {
   pipelineDefinitionId?: number;
 }
 
-/** A JSON Schema, the subset a step task's configSchema uses (MIG-231). */
+/**
+ * A JSON Schema, the subset the Task Registry's configSchema uses (MIG-231): a root object with additionalProperties
+ * false, its properties in display order, `required`; type (one, or a list that may include null), title (always),
+ * description, default, enum, minLength/maxLength/pattern, minimum/maximum, items/minItems/maxItems (a list of objects
+ * is a repeatable group), and additionalProperties:<schema> for a map. `format` is a widget hint (FORMATS).
+ */
 export interface JsonSchema {
   type?: string | string[];
   title?: string;
   description?: string;
   properties?: Record<string, JsonSchema>;
+  additionalProperties?: boolean | JsonSchema;
   required?: string[];
   enum?: unknown[];
   default?: unknown;
   items?: JsonSchema;
+  minLength?: number;
   maxLength?: number;
+  pattern?: string;
   minimum?: number;
   maximum?: number;
+  minItems?: number;
+  maxItems?: number;
   format?: string;
   [key: string]: unknown;
 }
 
+/** A task's kind, which Add step groups by, in this order. */
+export const TASK_KINDS = ['Read', 'Process', 'Output'] as const;
+
 /**
- * One line of GET pipeline.json/steps/tasks. Today (MIG-230) a line is code, description and runsInEngine; the Task
- * Registry (MIG-231) adds a title, a category, enabled and the config's JSON Schema. Every addition is optional here.
+ * One line of GET pipeline.json/steps/tasks: the Task Registry as the caller's workspace sees it (MIG-231). The
+ * per-pipeline Legacy lines also carry the pipeline (pipelineKey, pipelineId, name "Legacy: <name>", config).
  */
 export interface StepTaskEntry {
   code: string;
   name?: string | null;
-  title?: string | null;
+  kind?: string | null;
   description?: string | null;
-  category?: string | null;
-  runsInEngine?: boolean;
-  enabled?: boolean;
+  inputSchema?: JsonSchema | null;
+  outputSchema?: JsonSchema | null;
   configSchema?: JsonSchema | null;
+  backingService?: string | null;
+  /** The task's own defaults for a step that says nothing. */
+  retry?: { maxAttempts?: number | null; delaySeconds?: number | null } | null;
+  timeoutSeconds?: number | null;
+  requiredPermission?: 'TENANT_USER' | 'TENANT_ADMIN' | string | null;
+  enabledByDefault?: boolean;
+  /** Whether a workspace admin may switch it (legacy never: existing pipelines always stay runnable). */
+  overridable?: boolean;
+  aiToolName?: string | null;
+  runsInEngine?: boolean;
+  /** On in this workspace: its default, or the workspace's switch. */
+  enabled?: boolean;
+  overridden?: boolean;
+  /** Whether the platform can run it at all (a backing service may not be there yet). */
+  available?: boolean;
+  disabledReason?: string | null;
+  pipelineKey?: number | null;
+  pipelineId?: string | null;
+  config?: Record<string, unknown> | null;
 }
 
 // ---------------------------------------------------------------------------------------------- runs
@@ -337,11 +368,27 @@ export function seedConfig(schema: JsonSchema | null | undefined): Record<string
   return out;
 }
 
-export function taskEntry(tasks: StepTaskEntry[], code: string | null | undefined): StepTaskEntry | undefined {
-  return tasks.find(t => t.code === code);
+/**
+ * A step's task in the registry. The registry lists `legacy` once per pipeline; a legacy step's own is the one for
+ * the pipeline its config names.
+ */
+export function taskEntry(tasks: StepTaskEntry[], code: string | null | undefined, step?: Step): StepTaskEntry | undefined {
+  if (code === LEGACY_TASK && step?.config?.['pipelineId']) {
+    const own = tasks.find(t => t.code === code && t.pipelineId === step.config!['pipelineId']);
+    if (own) return own;
+  }
+  return tasks.find(t => t.code === code && t.pipelineKey == null) ?? tasks.find(t => t.code === code);
 }
 
-export const taskLabel = (task: StepTaskEntry | undefined, code?: string) => task?.title || task?.name || task?.code || code || '';
+export const taskLabel = (task: StepTaskEntry | undefined, code?: string) => task?.name || task?.code || code || '';
+
+/** Why a task cannot be added here, or '' when it can. */
+export function refusalOf(task: StepTaskEntry | undefined, isAdmin: boolean): string {
+  if (!task) return 'Not in the Task Registry.';
+  if (task.available === false || task.enabled === false) return task.disabledReason || 'Switched off in this workspace.';
+  if (task.requiredPermission === 'TENANT_ADMIN' && !isAdmin) return 'Only a workspace administrator can add this task.';
+  return '';
+}
 
 /** A step for `task` at the end; a legacy wrap is replaced, since a legacy step must be the only step. */
 export function addStep(definition: Definition, task: StepTaskEntry): Definition {
@@ -469,27 +516,108 @@ export function problemsAt(problems: StepProblem[] | undefined, field: string): 
 
 // ---------------------------------------------------------------------------------------------- Add step
 
-export interface TaskOption { value: string; label: string; hint: string; disabled: boolean; }
+export interface TaskOption { value: string; label: string; hint: string; disabled: boolean; group: string; }
+
+const kindRank = (kind: string | null | undefined) => {
+  const at = (TASK_KINDS as readonly string[]).indexOf(String(kind ?? ''));
+  return at < 0 ? TASK_KINDS.length : at;
+};
 
 /**
- * What Add step offers: every registered task but `legacy` (the whole of an existing pipeline; it is never added,
- * only replaced). A task the registry has turned off is listed, marked, and cannot be picked.
+ * What Add step offers, grouped by kind (Read, Process, Output), the tasks that can be added first in each: every registered task but the legacy ones (the whole
+ * of an existing pipeline; never added, only replaced). A task that is off here -- unavailable, switched off, or
+ * needing a workspace administrator the person is not -- is listed, says why, and cannot be picked.
  */
-export function taskOptions(tasks: StepTaskEntry[]): TaskOption[] {
-  return tasks.filter(t => t.runsInEngine !== false && t.code !== LEGACY_TASK).map(t => {
-    const disabled = t.enabled === false;
-    return {
-      value: t.code,
-      label: `${taskLabel(t)}${disabled ? ' (disabled)' : ''}`,
-      hint: [t.category, t.description].filter(Boolean).join(' · '),
-      disabled,
-    };
-  });
+export function taskOptions(tasks: StepTaskEntry[], isAdmin = true): TaskOption[] {
+  return tasks
+    .filter(t => t.runsInEngine !== false && t.code !== LEGACY_TASK && t.kind !== 'Legacy')
+    .map((t, i) => ({ t, i, why: refusalOf(t, isAdmin) }))
+    // By kind; within a kind, what can be added before what cannot; then the registry's order.
+    .sort((a, b) => kindRank(a.t.kind) - kindRank(b.t.kind) || Number(!!a.why) - Number(!!b.why) || a.i - b.i)
+    .map(({ t, why }) => {
+      return {
+        value: t.code,
+        label: `${taskLabel(t)}${why ? ' (disabled)' : ''}`,
+        hint: why || t.description || '',
+        disabled: !!why,
+        group: t.kind || 'Other',
+      };
+    });
+}
+
+// ---------------------------------------------------------------------------------------------- columns
+
+const rowsKeys = (rows: unknown): string[] => {
+  const out: string[] = [];
+  if (Array.isArray(rows)) for (const row of rows) if (isMap(row)) for (const key of Object.keys(row)) if (!out.includes(key)) out.push(key);
+  return out;
+};
+const strings = (value: unknown): string[] => (Array.isArray(value) ? value.filter(v => typeof v === 'string' && v) as string[] : []);
+const union = (...lists: (string[] | null)[]): string[] | null => {
+  if (lists.some(l => l === null)) return null;
+  const out: string[] = [];
+  for (const list of lists) for (const c of list!) if (!out.includes(c)) out.push(c);
+  return out;
+};
+
+/**
+ * The columns a step writes, as far as the definition says: its task's outputSchema when that names them, else what
+ * the built-in tasks are known to do with their config. null when it cannot be told (a source, an API, a file).
+ */
+export function outputColumns(definition: Definition, index: number, tasks: StepTaskEntry[] = []): string[] | null {
+  const step = definition.steps[index];
+  if (!step) return null;
+  const named = taskEntry(tasks, step.task, step)?.outputSchema?.items?.properties;
+  if (named && Object.keys(named).length) return Object.keys(named);
+  const config = step.config ?? {};
+  const input = () => inputColumns(definition, index, tasks);
+  switch (step.task) {
+    case 'sample': return rowsKeys(config['rows']);
+    case 'select': {
+      const columns = config['columns'];
+      if (Array.isArray(columns)) return strings(columns);
+      return isMap(columns) ? Object.values(columns).filter(v => typeof v === 'string') as string[] : null;
+    }
+    case 'transform': {
+      const targets = Array.isArray(config['mappings']) ? (config['mappings'] as unknown[]).map(m => (isMap(m) ? m['target'] : null)).filter(t => typeof t === 'string') as string[] : [];
+      return config['keepUnmapped'] === true ? union(input(), targets) : targets;
+    }
+    case 'aggregate': {
+      const as = Array.isArray(config['aggregations']) ? (config['aggregations'] as unknown[]).map(a => (isMap(a) ? a['as'] : null)).filter(t => typeof t === 'string') as string[] : [];
+      return union(strings(config['groupBy']), as);
+    }
+    case 'join': {
+      const right = definition.steps.findIndex(s => s.key === config['with']);
+      return union(input(), right >= 0 && right < index ? outputColumns(definition, right, tasks) : null);
+    }
+    case 'filter': case 'save_file': case 'send_notification': case 'validate':
+      return input();
+    default:
+      return null;
+  }
+}
+
+/** The columns a step reads: the output of the step it names, else of the step before it. */
+export function inputColumns(definition: Definition, index: number, tasks: StepTaskEntry[] = []): string[] | null {
+  const step = definition.steps[index];
+  if (!step) return null;
+  const from = step.input ? definition.steps.findIndex(s => s.key === step.input) : index - 1;
+  return from >= 0 && from < index ? outputColumns(definition, from, tasks) : null;
 }
 
 // ---------------------------------------------------------------------------------------------- a config form
 
-export type FieldKind = 'text' | 'textarea' | 'number' | 'integer' | 'boolean' | 'enum' | 'list' | 'objects' | 'object' | 'json';
+export type FieldKind = 'text' | 'textarea' | 'number' | 'integer' | 'boolean' | 'enum' | 'list' | 'objects' | 'object' | 'json'
+  | 'scalar' | 'column' | 'step' | 'columns';
+
+/**
+ * The registry's widget hints (configSchema `format`). column, step, sql, template and multiline have widgets here;
+ * the rest are text until their pickers exist.
+ * TODO(MIG-249): pickers for api-request, api-environment, data-contract, db-connection, bucket, pipeline and user.
+ */
+export const FORMATS = ['column', 'step', 'sql', 'template', 'multiline', 'api-request', 'api-environment', 'data-contract',
+  'db-connection', 'bucket', 'pipeline', 'user'] as const;
+const LONG_TEXT_FORMATS = ['sql', 'template', 'multiline', 'textarea'];
 
 export interface FieldSpec {
   name: string;
@@ -498,31 +626,54 @@ export interface FieldSpec {
   required: boolean;
   description: string;
   options: unknown[];
-  /** For a list: its items' kind (text, number or integer). */
+  /** For a list: its items' kind (text, number, integer or scalar). */
   itemKind?: FieldKind;
   schema: JsonSchema;
 }
 
-function typeOf(schema: JsonSchema | undefined): string {
+function types(schema: JsonSchema | undefined): string[] {
   const type = schema?.type;
-  if (Array.isArray(type)) return type.find(t => t !== 'null') ?? '';
-  return type ?? '';
+  return (Array.isArray(type) ? type : type ? [type] : []).filter(t => t !== 'null');
 }
+
+function typeOf(schema: JsonSchema | undefined): string {
+  const list = types(schema);
+  return list.length === 1 ? list[0] : list.length ? 'mixed' : '';
+}
+
+const SCALARS = ['string', 'number', 'integer', 'boolean'];
+/** A value that may be text, a number or true/false: typed as one box, read as JSON's literals where they fit. */
+const isScalarMix = (schema: JsonSchema | undefined) => types(schema).length > 1 && types(schema).every(t => SCALARS.includes(t));
+
+/** A map: an object with no fixed settings, each value to the schema additionalProperties gives. */
+export function isMapSchema(schema: JsonSchema | undefined): boolean {
+  return !!schema && (!schema.properties || !Object.keys(schema.properties).length)
+    && !!schema.additionalProperties && typeof schema.additionalProperties === 'object';
+}
+
+const isObjectSchema = (schema: JsonSchema | undefined) =>
+  typeOf(schema) === 'object' && ((!!schema?.properties && Object.keys(schema.properties).length > 0) || isMapSchema(schema));
 
 function kindOf(schema: JsonSchema): FieldKind {
   if (Array.isArray(schema.enum) && schema.enum.length) return 'enum';
+  if (isScalarMix(schema)) return 'scalar';
   switch (typeOf(schema)) {
-    case 'string': return (schema.maxLength ?? 0) > 200 || schema.format === 'textarea' || schema.format === 'multiline' ? 'textarea' : 'text';
+    case 'string':
+      if (schema.format === 'column') return 'column';
+      if (schema.format === 'step') return 'step';
+      return (schema.maxLength ?? 0) > 200 || LONG_TEXT_FORMATS.includes(schema.format ?? '') ? 'textarea' : 'text';
     case 'integer': return 'integer';
     case 'number': return 'number';
     case 'boolean': return 'boolean';
     case 'array': {
-      const item = schema.items ? typeOf(schema.items) : '';
-      if (['string', 'number', 'integer'].includes(item) && !schema.items?.enum) return 'list';
-      if (item === 'object' && schema.items?.properties) return 'objects';
+      const items = schema.items;
+      if (!items || items.enum) return 'json';
+      if (typeOf(items) === 'string' && items.format === 'column') return 'columns';
+      if (['string', 'number', 'integer'].includes(typeOf(items)) || isScalarMix(items)) return 'list';
+      if (isObjectSchema(items)) return 'objects';
       return 'json';
     }
-    case 'object': return schema.properties && Object.keys(schema.properties).length ? 'object' : 'json';
+    case 'object': return isObjectSchema(schema) ? 'object' : 'json';
     default: return 'json';
   }
 }
@@ -539,21 +690,40 @@ export function fieldsOf(schema: JsonSchema | null | undefined): FieldSpec[] {
       description: property.description ?? '',
       options: kind === 'enum' ? [...(property.enum ?? [])] : [],
     };
-    if (kind === 'list') spec.itemKind = typeOf(property.items) === 'string' ? 'text' : (typeOf(property.items) as FieldKind);
+    if (kind === 'list') {
+      const item = property.items;
+      spec.itemKind = isScalarMix(item) ? 'scalar' : typeOf(item) === 'string' ? 'text' : (typeOf(item) as FieldKind);
+    }
     return spec;
   });
 }
 
-/** Whether a form can draw every setting in the schema: an object with properties, none of them raw JSON. */
+/** Whether a form can draw every setting in the schema: an object with properties (or a map), none of them raw JSON. */
 export function schemaSupported(schema: JsonSchema | null | undefined): boolean {
-  if (!schema || typeOf(schema) !== 'object' || !schema.properties || !Object.keys(schema.properties).length) return false;
+  if (!schema || typeOf(schema) !== 'object') return false;
+  if (isMapSchema(schema)) return kindOf(schema.additionalProperties as JsonSchema) !== 'json';
+  if (!schema.properties || !Object.keys(schema.properties).length) return false;
   return fieldsOf(schema).every(f => f.kind !== 'json'
     && (f.kind !== 'object' || schemaSupported(f.schema))
     && (f.kind !== 'objects' || schemaSupported(f.schema.items)));
 }
 
+/** The kind of box a map's values get. */
+export function mapValueKind(schema: JsonSchema | undefined): FieldKind {
+  const value = schema?.additionalProperties;
+  return value && typeof value === 'object' ? kindOf(value) : 'json';
+}
+
 /** A typed value from what a box holds: a number box's text as a number, blank as absent. */
 export function coerce(kind: FieldKind | undefined, raw: string): unknown {
+  if (kind === 'scalar') {
+    const text = raw.trim();
+    if (text === '') return undefined;
+    if (text === 'true' || text === 'false') return text === 'true';
+    if (text === 'null') return null;
+    if (/^-?(0|[1-9]\d*)(\.\d+)?([eE][+-]?\d+)?$/.test(text)) return Number(text);
+    return raw;
+  }
   if (kind === 'number' || kind === 'integer') {
     if (raw.trim() === '') return undefined;
     const n = Number(raw);

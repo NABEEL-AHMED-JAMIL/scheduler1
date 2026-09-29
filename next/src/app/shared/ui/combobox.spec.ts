@@ -330,3 +330,27 @@ describe('Combobox disabled options', () => {
     expect(picks).toEqual(['select']);
   });
 });
+
+/** MIG-249: Add step groups the Task Registry by kind -- a heading over each group, never an option itself. */
+describe('Combobox grouped options', () => {
+  it('heads each run of options with its group, and the heading is not an option', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [Combobox] });
+    const fixture = TestBed.createComponent(Combobox);
+    fixture.componentRef.setInput('options', [
+      { value: 'sample', label: 'Sample rows', group: 'Read' },
+      { value: 'select', label: 'Select columns', group: 'Process' },
+      { value: 'filter', label: 'Filter', group: 'Process' },
+    ]);
+    fixture.componentRef.setInput('allowClear', false);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const input = el.querySelector('input') as HTMLInputElement;
+    input.focus();
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    fixture.detectChanges();
+    const list = el.querySelector('[role="listbox"]')!;
+    expect(Array.from(list.querySelectorAll('[role="presentation"]')).map(h => h.textContent!.trim())).toEqual(['Read', 'Process']);
+    expect(list.querySelectorAll('[role="option"]')).toHaveLength(3);
+  });
+});

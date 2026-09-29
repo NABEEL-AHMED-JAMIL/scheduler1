@@ -42,20 +42,26 @@ const LEGACY: DefinitionView = {
   definition: { version: 1, source: { type: 'task' }, steps: [{ key: 'legacy', name: 'Legacy pipeline REF', task: 'legacy', config: { pipelineId: 'REF' } }] },
 };
 
+/** The registry's lines (MIG-231), cut to what the builder reads. */
 const TASKS = [
-  { code: 'legacy', description: 'An existing pipeline.', runsInEngine: false },
-  { code: 'sample', description: 'Rows written in the step itself.', runsInEngine: true },
-  { code: 'select', description: 'Keeps the columns it names.', runsInEngine: true },
-  { code: 'filter', title: 'Filter rows', description: 'Keeps matching rows.', runsInEngine: true, enabled: false },
+  { code: 'legacy', name: 'Legacy: REF', kind: 'Legacy', description: 'An existing pipeline.', runsInEngine: false, enabled: true, overridable: false, pipelineKey: 100167, pipelineId: 'REF', config: { pipelineId: 'REF' } },
+  { code: 'sample', name: 'sample', kind: 'Read', description: 'Rows written in the step itself.', runsInEngine: true, enabled: true, available: true, overridable: true, overridden: false },
+  { code: 'select', name: 'select', kind: 'Process', description: 'Keeps the columns it names.', runsInEngine: true, enabled: true, available: true, overridable: true, overridden: false },
+  { code: 'filter', name: 'Filter rows', kind: 'Process', description: 'Keeps matching rows.', runsInEngine: true, enabled: false, available: true, overridable: true, overridden: true,
+    disabledReason: 'Switched off in this workspace.' },
+  { code: 'read_api', name: 'Read API', kind: 'Read', description: 'Calls an API.', runsInEngine: true, enabled: false, available: false, overridable: true, overridden: false,
+    disabledReason: 'integration-service is not there yet' },
 ];
 
-function build(opts: { view?: DefinitionView; jobs?: unknown[]; dialogAnswer?: unknown; canManage?: boolean } = {}) {
+function build(opts: { view?: DefinitionView; jobs?: unknown[]; dialogAnswer?: unknown; canManage?: boolean; isAdmin?: boolean; tasks?: unknown[] } = {}) {
   const view = opts.view ?? VIEW;
   const api = {
     definition: vi.fn(() => of({ status: 'SUCCESS', message: '', data: { ...view, version: 2 } })),
     validate: vi.fn((format: string, text: string) => of({ status: 'SUCCESS', message: 'The definition is valid.', data: { valid: true, problems: [], definition: format === 'json' ? JSON.parse(text) : view.definition } })),
     save: vi.fn(() => of({ status: 'SUCCESS', message: 'Saved as version 2.', data: { version: 2 } })),
-    tasks: vi.fn(() => of({ status: 'SUCCESS', message: '', data: TASKS })),
+    tasks: vi.fn(() => of({ status: 'SUCCESS', message: '', data: opts.tasks ?? TASKS })),
+    switchTask: vi.fn((code: string, enabled: boolean | null) => of({ status: 'SUCCESS', message: `'${code}' is switched.`,
+      data: { ...(TASKS.find(t => t.code === code) as object), enabled: enabled ?? true, overridden: enabled !== null, disabledReason: enabled === false ? 'Switched off in this workspace.' : null } })),
     jobsOf: vi.fn(() => of({ status: 'SUCCESS', message: '', data: opts.jobs ?? [{ jobId: 2848, jobName: 'UI-CHECK step engine job 0928', jobStatus: 'Active' }] })),
     run: vi.fn(() => of({ status: 'SUCCESS', message: 'SourceJob job successfully added into queue.' })),
     runs: vi.fn(() => of({ status: 'SUCCESS', message: '', data: { jobQueues: [{ jobQueueId: 7385, jobStatus: 'Completed' }, { jobQueueId: 7401, jobStatus: 'Queue' }] } })),
@@ -88,6 +94,7 @@ function build(opts: { view?: DefinitionView; jobs?: unknown[]; dialogAnswer?: u
   fixture.componentRef.setInput('view', view);
   fixture.componentRef.setInput('taskDetailId', 1864);
   fixture.componentRef.setInput('canManage', opts.canManage ?? true);
+  fixture.componentRef.setInput('isAdmin', opts.isAdmin ?? true);
   fixture.detectChanges();
   const el = fixture.nativeElement as HTMLElement;
   const builder = fixture.componentInstance;
@@ -153,7 +160,9 @@ describe('StepBuilder -- the step cards', () => {
 
   it('adds a step from the Task Registry and opens it; a disabled task is listed but not added', () => {
     const { builder, cards, opened, fixture } = build();
-    expect(builder.taskOptions().map(o => [o.value, o.disabled])).toEqual([['sample', false], ['select', false], ['filter', true]]);
+    expect(builder.taskOptions().map(o => [o.group, o.value, o.disabled])).toEqual([
+      ['Read', 'sample', false], ['Read', 'read_api', true], ['Process', 'select', false], ['Process', 'filter', true],
+    ]);
     builder.add('filter');
     fixture.detectChanges();
     expect(cards()).toEqual(['read', 'keep']);
@@ -263,7 +272,8 @@ describe('StepBuilder -- Settings', () => {
   it('lists the saved versions', () => {
     const { tab, el } = build();
     tab('settings');
-    expect(el.querySelector('table')!.textContent).toContain('1');
+    const versions = Array.from(el.querySelectorAll('table')).find(t => t.querySelector('th')!.textContent === 'Version')!;
+    expect(versions.textContent).toContain('v1');
   });
 });
 
@@ -381,5 +391,53 @@ describe('StepBuilder -- Test with sample, Run now, Schedule', () => {
     expect(button('Save')).toBeUndefined();
     expect(button('Run now')).toBeUndefined();
     expect(button('Delete step read')).toBeUndefined();
+  });
+});
+
+describe('StepBuilder -- the Task Registry', () => {
+  it('opens a step with the columns it reads, from the steps before it', () => {
+    const { click, opened } = build();
+    click('Edit step keep');
+    expect(opened.find(o => o.component === StepPanel)!.data.columns).toEqual(['id', 'name']);
+  });
+
+  it('will not add a task someone who is not a workspace administrator may not, and says why', () => {
+    const tasks = [...TASKS, { code: 'upload_bucket', name: 'Upload to Bucket', kind: 'Output', runsInEngine: true, enabled: true, available: true, requiredPermission: 'TENANT_ADMIN' }];
+    const { builder, cards, fixture, el } = build({ isAdmin: false, tasks });
+    expect(builder.taskOptions().find(o => o.value === 'upload_bucket')!.disabled).toBe(true);
+    builder.add('upload_bucket');
+    fixture.detectChanges();
+    expect(cards()).toEqual(['read', 'keep']);
+    expect(el.textContent).toContain('Only a workspace administrator can add this task.');
+  });
+
+  it('lists the workspace\'s tasks under Settings, legacy aside, and switches one', () => {
+    const { tab, el, api, fixture, builder } = build();
+    tab('settings');
+    const rows = Array.from(el.querySelectorAll('[data-task]')).map(r => r.getAttribute('data-task'));
+    expect(rows).toEqual(['sample', 'select', 'filter', 'read_api']);
+    const unavailable = el.querySelector<HTMLInputElement>('[data-task="read_api"] input[role="switch"]')!;
+    expect(unavailable.disabled).toBe(true);
+    expect(el.querySelector('[data-task="read_api"]')!.textContent).toContain('integration-service is not there yet');
+    const select = el.querySelector<HTMLInputElement>('[data-task="select"] input[role="switch"]')!;
+    select.checked = false;
+    select.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(api.switchTask).toHaveBeenCalledWith('select', false);
+    expect(builder.tasks().find(t => t.code === 'select')!.enabled).toBe(false);
+    expect(builder.taskOptions().find(o => o.value === 'select')!.disabled).toBe(true);
+  });
+
+  it('puts a switched task back to its default', () => {
+    const { tab, api, click } = build();
+    tab('settings');
+    click('Put Filter rows back to its default');
+    expect(api.switchTask).toHaveBeenCalledWith('filter', null);
+  });
+
+  it('shows no switches to someone who is not a workspace administrator', () => {
+    const { tab, el } = build({ isAdmin: false });
+    tab('settings');
+    expect(el.querySelectorAll('[data-task]')).toHaveLength(0);
   });
 });

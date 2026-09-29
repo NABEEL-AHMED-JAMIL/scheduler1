@@ -32,8 +32,14 @@ export class StepsApi {
     return this.http.post<ApiResponse<ValidateResult>>(`${API_BASE}/pipeline.json/steps/save`, { pipelineKey, format, text });
   }
 
+  /** The Task Registry as this workspace sees it (MIG-231): every task, and one legacy line per pipeline. */
   tasks(): Observable<ApiResponse<StepTaskEntry[]>> {
     return this.http.get<ApiResponse<StepTaskEntry[]>>(`${API_BASE}/pipeline.json/steps/tasks`);
+  }
+
+  /** A workspace administrator switches a task on or off here, or back to its default (null). Legacy is refused. */
+  switchTask(code: string, enabled: boolean | null): Observable<ApiResponse<StepTaskEntry>> {
+    return this.http.post<ApiResponse<StepTaskEntry>>(`${API_BASE}/pipeline.json/steps/tasks/enabled`, { code, enabled });
   }
 
   /** The schedules that run this task: what Run now runs. */

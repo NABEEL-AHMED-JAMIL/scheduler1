@@ -80,7 +80,7 @@ describe('StepPanel', () => {
   it('draws the settings from the task\'s schema, and can still switch to JSON', () => {
     const { el, type, button, ref, fixture } = open({
       step: { key: 'keep', task: 'select', config: { columns: ['name'] } },
-      task: { code: 'select', title: 'Select columns', runsInEngine: true, configSchema: SELECT_SCHEMA },
+      task: { code: 'select', name: 'Select columns', runsInEngine: true, configSchema: SELECT_SCHEMA },
     });
     expect(el.querySelector<HTMLTextAreaElement>('#cfg-columns')!.value).toBe('name');
     type('#cfg-columns', 'name\nid');
@@ -121,5 +121,22 @@ describe('StepPanel', () => {
     const { el, button } = open({ canManage: false });
     expect(button('Apply')).toBeUndefined();
     expect(el.querySelector<HTMLInputElement>('#stepKey')!.disabled).toBe(true);
+  });
+
+  it('hands the form the earlier steps and the columns this step reads, and says the task\'s own defaults', () => {
+    const { el } = open({
+      step: { key: 'both', task: 'join', config: { with: 'read', on: [] } },
+      index: 2, earlierKeys: ['read', 'keep'], columns: ['id', 'patient'],
+      task: { code: 'join', name: 'Join', kind: 'Process', runsInEngine: true, retry: { maxAttempts: 2, delaySeconds: 5 }, timeoutSeconds: 120,
+        configSchema: { type: 'object', additionalProperties: false, required: ['with'], properties: {
+          with: { type: 'string', title: 'Join with', format: 'step' },
+          left: { type: 'string', title: 'Left column', format: 'column' },
+        } } },
+    });
+    expect(Array.from(el.querySelectorAll<HTMLOptionElement>('#cfg-with option')).map(o => o.value)).toEqual(['', 'read', 'keep']);
+    const left = el.querySelector<HTMLInputElement>('#cfg-left')!;
+    expect(Array.from(el.querySelectorAll(`#${left.getAttribute('list')} option`)).map(o => o.getAttribute('value'))).toEqual(['id', 'patient']);
+    expect(el.textContent).toContain('Blank: 2 tries, the task\'s default.');
+    expect(el.textContent).toContain('Blank: 120 s, the task\'s default.');
   });
 });

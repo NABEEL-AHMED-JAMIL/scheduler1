@@ -117,3 +117,116 @@ describe('SchemaForm', () => {
     expect(alerts).toEqual(['a path is required', 'one character']);
   });
 });
+
+/**
+ * MIG-249 on MIG-231's registry: the widget hints (`format`) and the shapes the registry's schemas use -- a column
+ * picked from the columns the step before makes, an earlier step, long text for sql/template/multiline, a value that
+ * may be text or a number, a map, and the limits a box can say itself.
+ */
+describe('SchemaForm -- the registry\'s widgets', () => {
+  const REGISTRY: JsonSchema = {
+    type: 'object', additionalProperties: false, required: ['with'],
+    properties: {
+      with: { type: 'string', title: 'Join with', format: 'step', minLength: 1 },
+      column: { type: 'string', title: 'Column', format: 'column', maxLength: 128 },
+      groupBy: { type: 'array', title: 'Group by', items: { type: 'string', format: 'column' } },
+      title: { type: 'string', title: 'Title', format: 'template', maxLength: 200 },
+      query: { type: 'string', title: 'Query', format: 'sql' },
+      value: { type: ['string', 'number', 'boolean', 'null'], title: 'Value' },
+      fileName: { type: 'string', title: 'File name', pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$' },
+      limit: { type: 'integer', title: 'Limit', minimum: 1, maximum: 1000 },
+      headers: { type: 'object', title: 'Headers', additionalProperties: { type: 'string' } },
+      bucket: { type: 'string', title: 'Bucket', format: 'bucket' },
+    },
+  };
+
+  function widgets(value: Record<string, unknown>) {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [SchemaForm], providers: [provideZonelessChangeDetection()] });
+    const fixture = TestBed.createComponent(SchemaForm);
+    fixture.componentRef.setInput('schema', REGISTRY);
+    fixture.componentRef.setInput('value', value);
+    fixture.componentRef.setInput('columns', ['id', 'name']);
+    fixture.componentRef.setInput('steps', ['read', 'shape']);
+    const changes: Record<string, unknown>[] = [];
+    fixture.componentInstance.valueChange.subscribe(v => changes.push(v));
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const set = (id: string, text: string, event = 'input') => {
+      const box = el.querySelector<HTMLInputElement>(`#cfg-${id}`)!;
+      box.value = text;
+      box.dispatchEvent(new Event(event));
+      fixture.detectChanges();
+    };
+    return { fixture, el, set, last: () => changes[changes.length - 1] };
+  }
+
+  it('offers the earlier steps for a step setting', () => {
+    const { el, set, last } = widgets({ with: 'gone' });
+    const options = Array.from(el.querySelectorAll<HTMLOptionElement>('#cfg-with option')).map(o => o.textContent!.trim());
+    expect(options).toEqual(['Choose…', 'read', 'shape', 'gone (not an earlier step)']);
+    set('with', 'read', 'change');
+    expect(last()).toMatchObject({ with: 'read' });
+  });
+
+  it('suggests the upstream columns for a column, and still takes one typed', () => {
+    const { el, set, last } = widgets({});
+    const box = el.querySelector<HTMLInputElement>('#cfg-column')!;
+    const list = el.querySelector(`#${box.getAttribute('list')}`)!;
+    expect(Array.from(list.querySelectorAll('option')).map(o => o.getAttribute('value'))).toEqual(['id', 'name']);
+    expect(box.maxLength).toBe(128);
+    set('column', 'city');
+    expect(last()).toMatchObject({ column: 'city' });
+  });
+
+  it('adds an upstream column to a list of columns with a click', () => {
+    const { el, fixture, set, last } = widgets({});
+    set('groupBy', 'city');
+    (el.querySelector('[aria-label="Add column name to Group by"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(last()).toMatchObject({ groupBy: ['city', 'name'] });
+    expect(el.querySelector<HTMLTextAreaElement>('#cfg-groupBy')!.value).toBe('city\nname');
+  });
+
+  it('gives template, sql and multiline settings a text area', () => {
+    const { el } = widgets({});
+    expect(el.querySelector('#cfg-title')!.tagName).toBe('TEXTAREA');
+    expect(el.querySelector('#cfg-query')!.tagName).toBe('TEXTAREA');
+  });
+
+  it('reads a value that may be text, a number or true/false as JSON would', () => {
+    const { set, last, el } = widgets({ value: 3 });
+    expect(el.querySelector<HTMLInputElement>('#cfg-value')!.value).toBe('3');
+    set('value', '42');
+    expect(last()).toMatchObject({ value: 42 });
+    set('value', 'yes please');
+    expect(last()).toMatchObject({ value: 'yes please' });
+  });
+
+  it('puts the schema\'s own limits on the box', () => {
+    const { el } = widgets({});
+    expect(el.querySelector<HTMLInputElement>('#cfg-fileName')!.getAttribute('pattern')).toBe('^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$');
+    expect(el.querySelector<HTMLInputElement>('#cfg-limit')!.min).toBe('1');
+    expect(el.querySelector<HTMLInputElement>('#cfg-limit')!.max).toBe('1000');
+  });
+
+  it('edits a map as rows of name and value, and renames a key in place', () => {
+    const { el, fixture, set, last } = widgets({ headers: { Accept: 'text/csv' } });
+    expect(el.querySelector<HTMLInputElement>('#cfg-headers-key-0')!.value).toBe('Accept');
+    set('headers-key-0', 'Content-Type');
+    expect(last()).toMatchObject({ headers: { 'Content-Type': 'text/csv' } });
+    (el.querySelector('[aria-label="Add an entry to Headers"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    set('headers-key-1', 'X-Id');
+    set('headers-value-1', '7');
+    expect(last()).toMatchObject({ headers: { 'Content-Type': 'text/csv', 'X-Id': '7' } });
+    (el.querySelector('[aria-label="Remove Content-Type from Headers"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(last()).toMatchObject({ headers: { 'X-Id': '7' } });
+  });
+
+  it('draws a picker it does not have yet as a text box', () => {
+    const { el } = widgets({ bucket: 'ui-review-s3' });
+    expect(el.querySelector<HTMLInputElement>('#cfg-bucket')!.value).toBe('ui-review-s3');
+  });
+});

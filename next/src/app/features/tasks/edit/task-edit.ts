@@ -17,6 +17,7 @@ import { TaskReference, TaskReferenceKind, notBlank } from '../../settings/confi
 import { isPlatformDefault, profileLabel } from '../../settings/kafka/platform-default';
 import { StepBuilder, BuilderTab } from '../steps/step-builder';
 import { StepsApi } from '../steps/steps.service';
+import { AuthService } from '../../../core/auth/auth.service';
 import { DefinitionView } from '../steps/steps.model';
 
 /** The page's tabs when its pipeline has steps (MIG-249): Details is today's form; the rest are the step builder's. */
@@ -720,6 +721,9 @@ export class TaskEdit implements OnInit {
     source: this.activeTab,
     computation: (tab, previous) => (tab === 'details' ? previous?.value ?? 'steps' : tab),
   });
+
+  /** The page is a workspace administrator's (its route says so); a platform administrator passes the same test. */
+  readonly isAdmin = computed(() => this.injector.get(AuthService).isTenantAdmin());
 
   readonly taskIdNumber = computed(() => (isRecordId(this.taskDetailId()) ? Number(this.taskDetailId()) : null));
 

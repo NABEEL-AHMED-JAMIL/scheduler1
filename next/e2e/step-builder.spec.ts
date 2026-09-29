@@ -1,11 +1,12 @@
-import { test, expect, APIRequestContext, Browser, Page } from '@playwright/test';
+import { test, expect, APIRequestContext, Browser, Page, Response } from '@playwright/test';
 
 /**
  * MIG-249: the step builder end to end, as a workspace administrator, on the UI-CHECK pipeline 100175
  * (UI_CHECK_STEPS_0928), its task 1864 and the manual job 2848 that runs it: add a step from the Task Registry and
  * fill it in the side panel, reorder by button and by drag, delete, see a validation error land on its step, edit the
  * YAML and save it, save a builder edit, prove the YAML and the builder store the same definition, then Run now and
- * watch both steps complete.
+ * watch every step complete. A Filter step is built with the registry's widgets (a repeatable group, a column picked
+ * from the rows before it).
  *
  * Every save writes a new version of 100175 -- a UI-CHECK pipeline, left in place for the owner to clear. The shared
  * legacy pipeline 100167 (REF_CSV_CHECK_V1, used by 15 jobs) is never saved to: this spec refuses to run if 1864 has
@@ -57,6 +58,23 @@ async function pageAs(browser: Browser, s: Session): Promise<Page> {
   return page;
 }
 
+/** The save's own answer, not its CORS preflight (which has no body). */
+const saveAnswer = (r: Response) => r.url().includes('/pipeline.json/steps/save') && r.request().method() === 'POST';
+
+/**
+ * Presses Save and reads what the builder then says, with the format the request sent. The answer's body is not read
+ * off the wire: Chromium does not always keep a cross-origin POST's body for the test to fetch.
+ */
+async function save(page: Page): Promise<{ format: string; message: string }> {
+  const answer = page.waitForResponse(saveAnswer);
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  const response = await answer;
+  expect(response.status()).toBe(200);
+  const notice = page.locator('.step-notice-ok');
+  await expect(notice).toContainText(/Saved as version \d+\.|Unchanged: /);
+  return { format: JSON.parse(response.request().postData() ?? '{}').format, message: (await notice.innerText()).trim() };
+}
+
 const cards = (page: Page) => page.locator('.step-card').evaluateAll(els => els.map(e => e.getAttribute('data-step')));
 
 async function stored(request: APIRequestContext, s: Session): Promise<{ definition: unknown; version: number }> {
@@ -95,11 +113,14 @@ test.describe('Step builder', () => {
     // Add step from the Task Registry: it opens in the side panel.
     await page.locator('#addStep').click();
     await page.locator('#addStep').fill('select');
-    await page.getByRole('option', { name: /^select/ }).click();
+    await expect(page.getByRole('listbox').getByText('Process', { exact: true })).toBeVisible();
+    await page.getByRole('option', { name: /^Select columns/ }).click();
     const panel = page.getByRole('dialog', { name: /^Step 3/ });
     await expect(panel).toBeVisible();
     await panel.locator('#stepKey').fill('extra');
-    await panel.locator('#stepConfig').fill('{"columns": ["patient"]}');
+    // The registry's configSchema draws the settings; select's columns (a list or a rename map) is a JSON box in it.
+    await expect(panel.getByText('Fail on a missing column')).toBeVisible();
+    await panel.locator('#cfg-columns').fill('["patient"]');
     await panel.getByRole('button', { name: 'Apply' }).click();
     await expect.poll(() => cards(page)).toEqual(['read', 'keep', 'extra']);
     await expect(page.getByText('Unsaved changes', { exact: true })).toBeVisible();
@@ -149,11 +170,9 @@ test.describe('Step builder', () => {
     const typed = (await yaml.inputValue()).replace(/name: patient\b/, `name: ${person}`);
     expect(typed).toContain(person);
     await yaml.fill(typed);
-    const yamlSave = page.waitForResponse(r => r.url().includes('/pipeline.json/steps/save'));
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
-    const yamlSaved = await (await yamlSave).json();
-    expect(yamlSaved.status, yamlSaved.message).toBe('SUCCESS');
-    expect(JSON.parse((await yamlSave).request().postData() ?? '{}').format).toBe('yaml');
+    const yamlSaved = await save(page);
+    expect(yamlSaved.format).toBe('yaml');
+    expect(yamlSaved.message).toMatch(/^Saved as version \d+\.$/);
     const afterYaml = await stored(request, s);
     expect(JSON.stringify(afterYaml.definition)).toContain(person);
     // Builder <-> YAML <-> JSON: the builder and the JSON tab now show exactly what the server stored.
@@ -165,13 +184,10 @@ test.describe('Step builder', () => {
     // A builder edit back to the baseline, saved from the builder.
     await page.getByRole('button', { name: 'Edit step keep' }).click();
     const keepPanel = page.getByRole('dialog', { name: /^Step 2/ });
-    await keepPanel.locator('#stepConfig').fill('{"columns": {"name": "patient"}}');
+    await keepPanel.locator('#cfg-columns').fill('{"name": "patient"}');
     await keepPanel.getByRole('button', { name: 'Apply' }).click();
-    const builderSave = page.waitForResponse(r => r.url().includes('/pipeline.json/steps/save'));
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
-    const builderSaved = await (await builderSave).json();
-    expect(builderSaved.status, builderSaved.message).toBe('SUCCESS');
-    expect(JSON.parse((await builderSave).request().postData() ?? '{}').format).toBe('json');
+    const builderSaved = await save(page);
+    expect(builderSaved.format).toBe('json');
     const afterBuilder = await stored(request, s);
     expect(afterBuilder.definition).toEqual(BASELINE);
 
@@ -186,23 +202,63 @@ test.describe('Step builder', () => {
       '    config: {columns: {name: patient}}',
       '',
     ].join('\n'));
-    const sameSave = page.waitForResponse(r => r.url().includes('/pipeline.json/steps/save'));
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
-    const same = await (await sameSave).json();
-    expect(same.status).toBe('SUCCESS');
+    const same = await save(page);
+    expect(same.format).toBe('yaml');
     expect(same.message).toBe(`Unchanged: version ${afterBuilder.version} is this definition.`);
     expect((await stored(request, s)).version).toBe(afterBuilder.version);
 
-    // Run now: the run's steps, followed until both complete.
+    // A Filter step built with the registry's widgets: a repeatable group, a column picked from the rows before it.
     await page.getByRole('tab', { name: 'Steps' }).click();
+    await page.locator('#addStep').click();
+    await page.locator('#addStep').fill('filter');
+    await page.getByRole('option', { name: /^Filter/ }).click();
+    const filterPanel = page.getByRole('dialog', { name: /^Step 3/ });
+    await filterPanel.locator('#stepKey').fill('kept');
+    await filterPanel.getByRole('button', { name: 'Add a row to Conditions' }).click();
+    const column = filterPanel.locator('#cfg-conditions-0-column');
+    expect(await filterPanel.locator(`#${await column.getAttribute('list')} option`).evaluateAll(os => os.map(o => o.getAttribute('value'))))
+      .toEqual(['patient']);
+    await column.fill('patient');
+    await filterPanel.locator('#cfg-conditions-0-operator').selectOption({ label: 'not_null' });
+    await filterPanel.getByRole('button', { name: 'Apply' }).click();
+    await expect.poll(() => cards(page)).toEqual(['read', 'keep', 'kept']);
+    expect((await save(page)).format).toBe('json');
+    expect((await stored(request, s)).definition).toEqual({ ...BASELINE, steps: [...BASELINE.steps,
+      { key: 'kept', task: 'filter', config: { match: 'all', conditions: [{ ignoreCase: false, column: 'patient', operator: 'not_null' }] } }] });
+
+    // Run now: the run's steps, followed until all complete.
     await page.getByRole('button', { name: 'Run now' }).click();
     const drawer = page.getByRole('dialog', { name: /^Run #/ });
     await expect(drawer).toBeVisible();
     await expect(drawer.locator('[data-run-step="read"]')).toContainText('Completed', { timeout: 60_000 });
     await expect(drawer.locator('[data-run-step="keep"]')).toContainText('Completed', { timeout: 60_000 });
     await expect(drawer.locator('[data-run-step="keep"]')).toContainText('2 in → 2 out');
+    await expect(drawer.locator('[data-run-step="kept"]')).toContainText('Completed', { timeout: 60_000 });
+    await expect(drawer.locator('[data-run-step="kept"]')).toContainText('2 in → 2 out');
     await drawer.locator('[data-run-step="read"]').getByRole('button', { name: 'Show log' }).click();
     await expect(drawer.locator('.run-log')).toContainText('2 sample row(s).');
+  });
+
+  test('a workspace administrator switches a task off and back to its default', async ({ browser, request }) => {
+    const page = await pageAs(browser, s);
+    await page.goto(`/pipelines/${TASK}/edit?tab=settings`);
+    const row = page.locator('[data-task="aggregate"]');
+    await expect(row).toContainText('On');
+    // An unavailable task cannot be switched on.
+    await expect(page.locator('[data-task="read_api"] input[role="switch"]')).toBeDisabled();
+    await row.getByRole('switch').uncheck();
+    await expect(row).toContainText('Switched off in this workspace.');
+    await page.getByRole('tab', { name: 'Steps' }).click();
+    await page.locator('#addStep').click();
+    await page.locator('#addStep').fill('aggregate');
+    await expect(page.getByRole('option', { name: /^Aggregate \(disabled\)/ })).toHaveAttribute('aria-disabled', 'true');
+    await page.keyboard.press('Escape');
+    await page.getByRole('tab', { name: 'Settings' }).click();
+    await row.getByRole('button', { name: 'Put Aggregate back to its default' }).click();
+    await expect(row).not.toContainText('switched here');
+    const line = (await (await request.get(`${api}/pipeline.json/steps/tasks`, { headers: { Authorization: `Bearer ${s.token}` } })).json())
+      .data.find((t: { code: string }) => t.code === 'aggregate');
+    expect(line).toMatchObject({ enabled: true, overridden: false });
   });
 
   test('a legacy task keeps its form', async ({ browser }) => {

@@ -205,7 +205,7 @@
     </form>
     @if (stepsMode() && stepsView(); as view) {
       <app-step-builder [class.hidden]="activeTab() === 'details'" [view]="view" [tab]="builderTab()" [taskDetailId]="taskIdNumber()"
-                        [canManage]="true" (saved)="stepsSaved($event)" />
+                        [canManage]="true" [isAdmin]="isAdmin()" (saved)="stepsSaved($event)" />
     }
   }
 </div>

@@ -14,8 +14,10 @@ export interface StepPanelData {
   index: number;
   /** The step's task in the registry; absent when the registry no longer has it (the server will say so). */
   task?: StepTaskEntry;
-  /** The keys of the steps before it: what it may read. */
+  /** The keys of the steps before it: what it may read, and what a `step` setting offers. */
   earlierKeys: string[];
+  /** The columns the step reads, when the definition tells them: what a `column` setting suggests. */
+  columns?: string[] | null;
   /** The server's problems with this step, at paths relative to it ("retry.maxAttempts", "config.columns"). */
   problems: StepProblem[];
   /** The settings' on-error, for what "Default" means here. */
@@ -67,6 +69,13 @@ export class StepPanel {
   /** The step's problems no field shows: the step as a whole, or its task. */
   readonly generalProblems = computed(() => this.data.problems.filter(p => p.field === '' || p.field === 'task')
     .map(p => (p.field ? `Task: ${p.message}` : p.message)));
+  readonly columns = this.data.columns ?? [];
+  /** Blank tries and timeout are the task's own defaults (the registry's retry and timeoutSeconds), else the pipeline's. */
+  readonly triesHint = `1 to 10. Blank: ${this.plural(this.data.task?.retry?.maxAttempts ?? 1, 'try', 'tries')}, the task's default.`;
+  readonly delayHint = `0 to 3600. Blank: ${this.data.task?.retry?.delaySeconds ? this.data.task.retry.delaySeconds + ' s' : 'none'}.`;
+  readonly timeoutHint = this.data.task?.timeoutSeconds
+    ? `Each try, 1 to 86400. Blank: ${this.data.task.timeoutSeconds} s, the task's default.`
+    : 'Each try, 1 to 86400. Blank: the pipeline\'s default.';
   readonly defaultOnErrorText = computed(() => `Default (the pipeline's: ${onErrorLabel(this.data.defaultOnError || 'fail').toLowerCase()})`);
 
   problemsAt(field: string): string {
@@ -122,6 +131,8 @@ export class StepPanel {
   }
 
   close(): void { this.ref.close(); }
+
+  private plural(n: number, one: string, many: string): string { return `${n} ${n === 1 ? one : many}`; }
 
   private jsonOf(config: unknown): string {
     return config === undefined || config === null ? '' : JSON.stringify(config, null, 2);

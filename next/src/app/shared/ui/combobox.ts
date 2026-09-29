@@ -13,6 +13,8 @@ export interface ComboboxOption {
   hint?: string;
   /** Listed, marked and never picked -- a step task the Task Registry has turned off (MIG-249). */
   disabled?: boolean;
+  /** A heading the option sits under; consecutive options with the same group share one (MIG-249's task kinds). */
+  group?: string;
 }
 
 /**
@@ -66,6 +68,9 @@ export interface ComboboxOption {
             </div>
           }
           @for (opt of filtered(); track opt.value; let i = $index) {
+            @if (opt.group && (i === 0 || filtered()[i - 1].group !== opt.group)) {
+              <div role="presentation" class="px-3 pt-2 pb-1 text-xs font-semibold text-[color:var(--text-muted)]">{{ opt.group }}</div>
+            }
             <button type="button" role="option" class="menu-item" tabindex="-1"
                     [id]="listId + '-' + i" [attr.aria-selected]="opt.value === value()"
                     [attr.aria-disabled]="opt.disabled ? 'true' : null" [class.opacity-50]="opt.disabled"

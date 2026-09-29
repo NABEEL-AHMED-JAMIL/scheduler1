@@ -7,6 +7,7 @@ import { Icon } from '../../../shared/ui/icon';
 import { Field } from '../../../shared/ui/field';
 import { Combobox } from '../../../shared/ui/combobox';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
+import { DataText } from '../../../shared/ui/data-text';
 import { confirmWith } from '../../../shared/ui/confirm';
 import { sidePanelConfig } from '../../../shared/ui/side-panel';
 import { DefinitionFormat, StepsApi } from './steps.service';
@@ -15,7 +16,7 @@ import { RunDrawer, RunDrawerData } from './run-drawer';
 import { SampleDialog, SampleDialogData } from './sample-dialog';
 import {
   Definition, DefinitionView, LIMITS, LinkedJob, ON_ERRORS, Problem, SOURCE_TYPES, Settings, Step, StepProblem, StepTaskEntry, ValidateResult,
-  addStep, canonical, definitionJson, isLegacyDefinition, moveStep, onErrorLabel, problemsByStep, removeStep, replaceStep,
+  addStep, canonical, definitionJson, inputColumns, isLegacyDefinition, refusalOf, moveStep, onErrorLabel, problemsByStep, removeStep, replaceStep,
   sameDefinition, sampleRowsOf, sourceLabel, taskEntry, taskLabel, taskOptions, toYaml, updateSettings, updateSource, withSample,
 } from './steps.model';
 
@@ -39,7 +40,7 @@ type Tone = 'ok' | 'warn' | 'crit';
  */
 @Component({
   selector: 'app-step-builder',
-  imports: [Icon, Field, Combobox, ServerTimePipe],
+  imports: [Icon, Field, Combobox, ServerTimePipe, DataText],
   templateUrl: './step-builder.html',
 })
 export class StepBuilder {
@@ -49,6 +50,8 @@ export class StepBuilder {
   /** The task the page edits: whose schedules Run now runs and Schedule adds to. */
   readonly taskDetailId = input<number | null>(null);
   readonly canManage = input(true);
+  /** A workspace administrator: may add a task that needs one, and switches the workspace's tasks. */
+  readonly isAdmin = input(true);
   /** A save made a new version (or found none to make): the page's copy is stale. */
   readonly saved = output<DefinitionView>();
 
@@ -90,7 +93,10 @@ export class StepBuilder {
   /** The saved pipeline still runs as its legacy step: the first save moves every task on it to the steps. */
   readonly savedLegacy = computed(() => !this.meta().stored || this.meta().legacy);
   readonly dirty = computed(() => this.yamlTyped() || this.jsonTyped() || !sameDefinition(this.draft(), this.meta().definition));
-  readonly taskOptions = computed(() => taskOptions(this.tasks()));
+  readonly taskOptions = computed(() => taskOptions(this.tasks(), this.isAdmin()));
+  /** The tasks a workspace administrator can switch: every task but the legacy lines (never switchable). */
+  readonly switchable = computed(() => this.tasks().filter(t => t.code !== 'legacy' && t.kind !== 'Legacy'));
+  readonly switching = signal<string | null>(null);
   readonly jobOptions = computed(() => this.jobs().map(j => ({ value: String(j.jobId), label: `${j.jobName} (#${j.jobId})` })));
   readonly runLabel = computed(() => (this.dirty() ? 'Save & run now' : 'Run now'));
   readonly runHint = computed(() => {
@@ -107,10 +113,7 @@ export class StepBuilder {
   private shownTab: BuilderTab = 'steps';
 
   constructor() {
-    this.api.tasks().subscribe({
-      next: r => { if (r.status === API_SUCCESS) this.tasks.set(r.data ?? []); },
-      error: () => {},
-    });
+    this.reloadTasks();
     effect(() => {
       const task = this.taskDetailId();
       untracked(() => this.loadJobs(task));
@@ -197,7 +200,7 @@ export class StepBuilder {
 
   earlierKeys(index: number): string[] { return this.draft().steps.slice(0, index).map(s => s.key); }
 
-  taskOf(step: Step): StepTaskEntry | undefined { return taskEntry(this.tasks(), step.task); }
+  taskOf(step: Step): StepTaskEntry | undefined { return taskEntry(this.tasks(), step.task, step); }
 
   taskName(step: Step): string { return taskLabel(this.taskOf(step), step.task); }
 
@@ -214,7 +217,10 @@ export class StepBuilder {
   add(code: string): void {
     this.addPick.set(this.addPick() === '' ? null : '');
     const task = taskEntry(this.tasks(), code);
-    if (!code || !task || task.enabled === false || !this.canManage()) return;
+    if (!code || !this.canManage()) return;
+    const refused = refusalOf(task, this.isAdmin());
+    if (refused) { this.say('warn', refused); return; }
+    if (!task) return;
     this.draft.update(d => addStep(d, task));
     this.open(this.draft().steps.length - 1);
   }
@@ -236,10 +242,14 @@ export class StepBuilder {
     this.selected.set(step.key);
     const data: StepPanelData = {
       step, index, task: this.taskOf(step), earlierKeys: this.earlierKeys(index),
+      columns: inputColumns(this.draft(), index, this.tasks()),
       problems: this.stepProblems(index), defaultOnError: this.draft().settings?.defaultOnError,
       canManage: this.canManage() && step.task !== 'legacy',
     };
-    this.dialog.open<Step>(StepPanel, sidePanelConfig(data, 'wide')).closed.subscribe(edited => {
+    // Focus goes back to the step's own card, not to whatever opened the panel: from Add step that was the box, whose
+    // list then opened over the cards.
+    const config = { ...sidePanelConfig(data, 'wide'), restoreFocus: `.step-list > li:nth-child(${index + 1}) .step-open` };
+    this.dialog.open<Step>(StepPanel, config).closed.subscribe(edited => {
       if (!edited) return;
       this.draft.update(d => replaceStep(d, index, edited));
       this.selected.set(edited.key);
@@ -309,6 +319,30 @@ export class StepBuilder {
     return this.grouped().other.filter(p => p.path === path).map(p => p.message).join(' · ');
   }
 
+  /**
+   * Switches a task on or off in this workspace, or (null) back to its default. The answer is the task's line as the
+   * workspace now sees it; a task Add step then offers or not.
+   */
+  switchTask(task: StepTaskEntry, enabled: boolean | null): void {
+    if (!this.isAdmin() || this.switching()) return;
+    this.switching.set(task.code);
+    this.api.switchTask(task.code, enabled).subscribe({
+      next: r => {
+        this.switching.set(null);
+        if (r.status !== API_SUCCESS) { this.toast.error(r.message || 'The task could not be switched.'); this.reloadTasks(); return; }
+        this.toast.success(r.message || 'Switched.');
+        const line = r.data;
+        if (line?.code) this.tasks.update(list => list.map(t => (t.code === line.code && t.pipelineKey == null ? { ...t, ...line } : t)));
+        else this.reloadTasks();
+      },
+      error: err => { this.switching.set(null); this.toast.error(err?.error?.message || 'The task could not be switched.'); this.reloadTasks(); },
+    });
+  }
+
+  private reloadTasks(): void {
+    this.api.tasks().subscribe({ next: r => { if (r.status === API_SUCCESS) this.tasks.set(r.data ?? []); }, error: () => {} });
+  }
+
   // ------------------------------------------------------------------------------------------ actions
 
   /** What Validate and Save send: the typed text on a text tab that was typed in, else the draft as canonical JSON. */
@@ -367,6 +401,8 @@ export class StepBuilder {
   private write(then: (ok: boolean) => void): void {
     const { format, text } = this.outgoing();
     const pipelineKey = this.meta().pipelineKey;
+    // The last message was about the draft before this save; what the save says replaces it.
+    this.result.set(null);
     this.busy.set('save');
     this.api.save(pipelineKey, format, text).subscribe({
       next: r => {

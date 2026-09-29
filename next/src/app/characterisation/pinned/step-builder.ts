@@ -56,6 +56,7 @@ export const PINNED: Record<string, unknown> = {
       "Basics",
       "Task payload",
       "Pipeline settings",
+      "Tasks in this workspace",
       "Versions"
     ],
     "buttons": [
@@ -67,12 +68,21 @@ export const PINNED: Record<string, unknown> = {
       "Save changes",
       "Schedule",
       "Settings",
+      "Show all 124 characters of Why it is off",
+      "Show all 127 characters of Why it is off",
+      "Show all 136 characters of Why it is off",
       "Steps",
       "Test with sample",
       "Validate",
       "YAML"
     ],
     "columns": [
+      [
+        "Task",
+        "Kind",
+        "In this workspace",
+        "Switch"
+      ],
       [
         "Version",
         "Saved",
@@ -96,6 +106,22 @@ export const PINNED: Record<string, unknown> = {
       "Search this topic’s pipelines…",
       "Source",
       "Status *(required)",
+      "Switch Aggregate on in this workspace",
+      "Switch Enrich on in this workspace",
+      "Switch Filter on in this workspace",
+      "Switch Join on in this workspace",
+      "Switch Read API on in this workspace",
+      "Switch Read CSV/JSON/Parquet on in this workspace",
+      "Switch Read Database on in this workspace",
+      "Switch Read S3 on in this workspace",
+      "Switch Sample rows on in this workspace",
+      "Switch Save File on in this workspace",
+      "Switch Select columns on in this workspace",
+      "Switch Send Notification on in this workspace",
+      "Switch Transform on in this workspace",
+      "Switch Upload to bucket on in this workspace",
+      "Switch Validate on in this workspace",
+      "Switch Write Database on in this workspace",
       "Task name *(required)",
       "Topic *(required)",
       "XML configuration *(required)"
@@ -364,19 +390,22 @@ export const PINNED: Record<string, unknown> = {
     "buttons": [
       "Apply",
       "Cancel",
-      "Close"
+      "Close",
+      "Edit as JSON"
     ],
     "columns": [],
     "fields": [
+      "Columns *(required)",
+      "Fail on a missing column",
       "If it fails",
       "Key *(required)",
       "Name",
       "Reads",
       "Seconds between tries",
-      "Settings as JSON",
       "Timeout (seconds)",
       "Tries",
-      "What this step does"
+      "What this step does",
+      "Yes"
     ],
     "links": [],
     "items": []

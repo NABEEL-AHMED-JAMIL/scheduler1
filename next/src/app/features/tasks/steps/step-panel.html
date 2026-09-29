@@ -28,15 +28,15 @@
       </app-field>
 
       <div class="form-grid">
-        <app-field label="Tries" for="stepTries" [error]="problemsAt('retry.maxAttempts')" hint="1 to 10. Blank: once.">
+        <app-field label="Tries" for="stepTries" [error]="problemsAt('retry.maxAttempts')" [hint]="triesHint">
           <input id="stepTries" class="input" type="number" min="1" [max]="limits.maxTries" step="1" [value]="s.retry?.maxAttempts ?? ''"
                  [disabled]="readOnly" (input)="setRetry('maxAttempts', $any($event.target).value)" />
         </app-field>
-        <app-field label="Seconds between tries" for="stepDelay" [error]="problemsAt('retry.delaySeconds')" hint="0 to 3600. Blank: none.">
+        <app-field label="Seconds between tries" for="stepDelay" [error]="problemsAt('retry.delaySeconds')" [hint]="delayHint">
           <input id="stepDelay" class="input" type="number" min="0" [max]="limits.maxDelaySeconds" step="1" [value]="s.retry?.delaySeconds ?? ''"
                  [disabled]="readOnly" (input)="setRetry('delaySeconds', $any($event.target).value)" />
         </app-field>
-        <app-field label="Timeout (seconds)" for="stepTimeout" [error]="problemsAt('timeoutSeconds')" hint="Each try, 1 to 86400. Blank: the pipeline's default.">
+        <app-field label="Timeout (seconds)" for="stepTimeout" [error]="problemsAt('timeoutSeconds')" [hint]="timeoutHint">
           <input id="stepTimeout" class="input" type="number" min="1" [max]="limits.maxTimeoutSeconds" step="1" [value]="s.timeoutSeconds ?? ''"
                  [disabled]="readOnly" (input)="patch({ timeoutSeconds: whole($any($event.target).value) })" />
         </app-field>
@@ -59,6 +59,7 @@
         </div>
         @if (configMode() === 'form' && data.task?.configSchema; as schema) {
           <app-schema-form [schema]="schema" [value]="s.config" [problems]="formProblems()" idPrefix="cfg" [disabled]="readOnly"
+                           [columns]="columns" [steps]="data.earlierKeys"
                            (valueChange)="setConfig($event)" />
         } @else {
           <app-field label="Settings as JSON" for="stepConfig" [error]="configError() || configProblems().join(' · ')"
