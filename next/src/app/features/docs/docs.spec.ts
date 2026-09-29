@@ -44,7 +44,7 @@ describe('Docs contents', () => {
 
 /**
  * The guide told signed-in people to sign in, showed no contents below 1024px, and sent them to a
- * "Reports" menu that is Operations → Reports.
+ * "Reports" menu that is Operations → Reports -- since MIG-246 / MIG-253, Pipelines → Run analytics.
  */
 describe('Docs for someone already signed in, and on a narrow screen', () => {
   it('offers the way back to the console instead of Sign in', () => {
@@ -65,7 +65,8 @@ describe('Docs for someone already signed in, and on a narrow screen', () => {
     expect(details!.querySelectorAll('a[href^="#"]').length).toBe(page.querySelectorAll('nav[aria-label="Contents"] a').length);
   });
 
-  it('names where Reports lives', () => {
-    expect(mount().textContent).toContain('Operations → Reports');
+  it('names where Run analytics (was Reports) lives', () => {
+    expect(mount().textContent).toContain('Pipelines → Run analytics');
+    expect(mount().textContent).not.toContain('→ Reports');
   });
 });
