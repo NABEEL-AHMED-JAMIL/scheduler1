@@ -26,6 +26,9 @@ import { Icon } from './icon';
     }
   `,
   styles: [`.managed-banner { border-left: 3px solid var(--accent-mark); }`],
+  // A block when it shows, so the page's space-y spacing lands on it like on any section; no box at all otherwise,
+  // so a SELF page's spacing is exactly what it was.
+  host: { '[style.display]': "auth.builderLocked() ? 'block' : 'none'" },
 })
 export class ManagedBanner {
   readonly auth = inject(AuthService);
