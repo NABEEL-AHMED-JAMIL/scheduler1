@@ -101,6 +101,7 @@
             </th>
             <th>Created by</th>
             <th>Updated by</th>
+            <th>Mode</th>
             <th class="text-right">State</th>
             <th class="w-12"><span class="sr-only">Actions</span></th>
           </tr>
@@ -146,6 +147,9 @@
               <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
                 {{ tenant.updatedByName || '—' }}
               </td>
+              <td class="whitespace-nowrap">
+                <span class="pill" [class]="tenant.managementMode === 'MANAGED' ? 'pill pill-brand' : 'pill pill-neutral'">{{ modeLabel(tenant) }}</span>
+              </td>
               <td class="text-right"><app-status [label]="tenant.status" [quiet]="true" /></td>
               <td class="text-right">
                 <button type="button" class="btn btn-ghost btn-icon btn-sm"
@@ -168,6 +172,9 @@
                     </button>
                     <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="editTenant(tenant)">
                       <app-icon name="edit" />Edit
+                    </button>
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="switchMode(tenant)">
+                      <app-icon name="briefcase" />{{ tenant.managementMode === 'MANAGED' ? 'Make self-managed' : 'Make managed' }}
                     </button>
                     <button cdkMenuItem class="menu-item"
                             [class]="tenant.status === 'Active' ? 'btn-intent-warn' : 'btn-intent-ok'"
@@ -204,6 +211,7 @@
                 @if (tenant.dateCreated) {
                   <span>since {{ tenant.dateCreated | serverTime: 'date' }}</span>
                 }
+                <span class="pill" [class]="tenant.managementMode === 'MANAGED' ? 'pill pill-brand' : 'pill pill-neutral'">{{ modeLabel(tenant) }}</span>
               </div>
               @if (tenant.adminName || tenant.adminEmail) {
                 <div class="mt-1.5 flex items-center gap-1.5 text-[11px] text-[color:var(--text-secondary)]"
@@ -277,6 +285,10 @@
             </button>
             <button type="button" class="btn btn-ghost btn-sm" (click)="editTenant(tenant)">
               <app-icon name="edit" />Edit
+            </button>
+            <button type="button" class="btn btn-ghost btn-sm" [disabled]="busy() === tenant.tenantId" (click)="switchMode(tenant)"
+                    [title]="tenant.managementMode === 'MANAGED' ? 'Let its own administrators build it (signs its people out)' : 'Our team builds it (signs its people out)'">
+              <app-icon name="briefcase" />{{ tenant.managementMode === 'MANAGED' ? 'Make self-managed' : 'Make managed' }}
             </button>
             <button type="button" class="btn btn-ghost btn-sm"
                     [class]="tenant.status === 'Active' ? 'btn-intent-warn' : 'btn-intent-ok'"

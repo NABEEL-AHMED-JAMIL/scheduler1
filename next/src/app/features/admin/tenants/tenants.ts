@@ -21,6 +21,7 @@ import { Pagination } from '../../../shared/ui/pagination';
 import { CopyButton } from '../../../shared/ui/copy-button';
 import { TenantDialog } from './tenant-dialog';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
+import { ManagementMode } from '../../../core/auth/auth.models';
 
 export interface Tenant {
   /** Filled in by the server on the way out; null on rows with no recorded author. */
@@ -53,6 +54,8 @@ export interface Tenant {
   /** The workspace's first active tenant administrator -- who to contact about it. */
   adminName?: string | null;
   adminEmail?: string | null;
+  /** MIG-244: who builds the workspace -- its own administrators (SELF) or our team (MANAGED). */
+  managementMode?: ManagementMode | null;
 }
 
 interface ResourceCount {
@@ -288,6 +291,47 @@ export class Tenants implements OnInit {
     });
     if (!ok) return;
     this.changeStatus(tenant, 'Delete');
+  }
+
+  /** MIG-254: the mode as the page says it. A tenant listed with none is SELF, the default since MIG-244. */
+  modeLabel(tenant: Tenant): string {
+    return tenant.managementMode === 'MANAGED' ? 'Managed' : 'Self-managed';
+  }
+
+  /**
+   * MIG-254: switches who builds the workspace. The server signs the workspace's people out, so their next
+   * sign-in carries the new mode; nothing in the workspace itself changes.
+   */
+  async switchMode(tenant: Tenant): Promise<void> {
+    const toManaged = tenant.managementMode !== 'MANAGED';
+    const ok = await confirmWith(this.dialog, {
+      title: toManaged ? `Make ${tenant.tenantName} managed by our team?` : `Let ${tenant.tenantName} build its own workspace?`,
+      body: `Everyone in ${tenant.tenantName} is signed out now and signs in again. `
+        + (toManaged
+          ? 'Our team then builds its pipelines, schedules, APIs, sources, prompts and connections; its own people see them read-only, and keep running, reviewing and downloading, managing their users and uploading to the inbox.'
+          : 'Its administrators then build its pipelines, schedules, APIs, sources, prompts and connections themselves.')
+        + ' Nothing in the workspace is changed or deleted.',
+      confirmLabel: 'Switch and sign out',
+      danger: true,
+    });
+    if (!ok) return;
+    this.busy.set(tenant.tenantId);
+    this.http.put<ApiResponse>(`${API_BASE}/tenant.json/changeManagementMode`,
+      { tenantId: tenant.tenantId, managementMode: toManaged ? 'MANAGED' : 'SELF' }).subscribe({
+      next: response => {
+        this.busy.set(null);
+        if (response.status === API_SUCCESS) {
+          this.toast.success(response.message);
+          this.listTenants();
+        } else {
+          this.toast.error(response.message);
+        }
+      },
+      error: err => {
+        this.busy.set(null);
+        this.toast.error(err?.error?.message || 'The management mode could not be changed.');
+      },
+    });
   }
 
   resourceSummary(tenant: Tenant): string {
