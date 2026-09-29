@@ -91,6 +91,7 @@ export const PINNED: Record<string, unknown> = {
     ],
     "fields": [
       "<pipeline>...</pipeline>",
+      "Data sensitivity",
       "Default timeout (seconds)",
       "Group",
       "Home page",

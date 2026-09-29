@@ -296,6 +296,21 @@ describe('StepBuilder -- Settings', () => {
     expect(builder.draft().settings).toEqual({ defaultTimeoutSeconds: 120, defaultOnError: 'continue' });
   });
 
+  it('declares the level of the data the pipeline handles, and takes it back', () => {
+    const { tab, el, builder, fixture } = build();
+    tab('settings');
+    const box = el.querySelector<HTMLSelectElement>('#defSensitivity')!;
+    expect(Array.from(box.options).map(o => o.value)).toEqual(['', 'public', 'internal', 'sensitive']);
+    box.value = 'sensitive';
+    box.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(builder.draft().settings).toEqual({ sensitivity: 'sensitive' });
+    box.value = '';
+    box.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(builder.draft().settings).toBeUndefined();
+  });
+
   it('lists the saved versions', () => {
     const { tab, el } = build();
     tab('settings');

@@ -21,6 +21,7 @@ import {
   withSwitchedLine,
 } from './steps.model';
 import { PipelineDraftHandoff } from './draft-handoff';
+import { SENSITIVITY_LEVELS, sensitivityText } from '../../../shared/ui/sensitivity';
 
 export type BuilderTab = 'steps' | 'settings' | 'yaml' | 'json';
 
@@ -65,6 +66,8 @@ export class StepBuilder {
 
   readonly limits = LIMITS;
   readonly onErrors = ON_ERRORS;
+  readonly sensitivities = SENSITIVITY_LEVELS;
+  sensitivityText(level: string): string { return sensitivityText(level); }
   readonly sourceTypes = SOURCE_TYPES;
   readonly onErrorText = onErrorLabel;
   readonly sourceText = sourceLabel;
@@ -321,7 +324,7 @@ export class StepBuilder {
 
   setSetting(field: keyof Settings, raw: string): void {
     let value: string | number | null = raw;
-    if (field !== 'defaultOnError') {
+    if (field !== 'defaultOnError' && field !== 'sensitivity') {
       const n = Number(raw);
       value = raw.trim() === '' || !Number.isFinite(n) ? null : Math.trunc(n);
     }

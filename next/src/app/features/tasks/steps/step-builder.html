@@ -89,6 +89,14 @@
                 @for (o of onErrors; track o) { <option [value]="o" [selected]="draft().settings?.defaultOnError === o">{{ onErrorText(o) }}</option> }
               </select>
             </app-field>
+            <app-field label="Data sensitivity" for="defSensitivity" [error]="settingProblem('settings.sensitivity')"
+                       hint="The level of the data this pipeline handles. The workspace's data policy for it decides the models its steps may use and how long a run keeps its files.">
+              <select id="defSensitivity" class="input" [value]="draft().settings?.sensitivity ?? ''" [disabled]="!canManage()"
+                      (change)="setSetting('sensitivity', $any($event.target).value)">
+                <option value="">Not set</option>
+                @for (s of sensitivities; track s) { <option [value]="s" [selected]="draft().settings?.sensitivity === s">{{ sensitivityText(s) }}</option> }
+              </select>
+            </app-field>
           </div>
         </div>
         @if (isAdmin() && canManage() && switchable().length) {
