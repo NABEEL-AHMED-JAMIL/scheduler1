@@ -110,6 +110,11 @@
     </div>
   }
 
+  <!-- MIG-251: a step-engine run's steps, Timeline and Console. A legacy run draws nothing here. -->
+  @if (!missing()) {
+    <app-run-steps [jobQueueId]="jobQueueId()" [revision]="loads()" />
+  }
+
   @if (hasInsights()) {
     @if (showInsights()) {
       <div class="card chart-card">

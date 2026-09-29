@@ -17,6 +17,10 @@ import { SERVER_ZONE } from '../../../core/instant';
 import { dayLabel } from '../../../shared/ui/time-format';
 import { clockTime } from '../schedule-labels';
 import { Combobox, ComboboxOption } from '../../../shared/ui/combobox';
+import { Observable, catchError, forkJoin, map, of } from 'rxjs';
+import { InboxTrigger, patternProblem, triggerOf } from '../inbox/inbox-trigger';
+import { AiStepChoice, ModelPicks, choiceBody, picksChanged, picksOf, stepsOf } from '../ai-models/ai-model-choice';
+import { AiModelPicks } from '../ai-models/ai-model-picks';
 
 const FREQUENCIES = [
   { value: 'Mint',    label: 'Every N minutes', unit: 'minutes' },
@@ -67,7 +71,7 @@ function endAfterStart(group: AbstractControl): ValidationErrors | null {
 
 @Component({
   selector: 'app-job-edit',
-  imports: [Icon, ReactiveFormsModule, RouterLink, Field, Combobox, LoadError],
+  imports: [Icon, ReactiveFormsModule, RouterLink, Field, Combobox, LoadError, AiModelPicks],
   templateUrl: './job-edit.html',
   /*
    * The weekday picker is the one multi-select .seg: several days can be on at once, so "on" has
@@ -153,6 +157,23 @@ export class JobEdit implements OnInit {
 
   get scheduler(): FormGroup { return this.form.get('scheduler') as FormGroup; }
 
+  /**
+   * MIG-251 on MIG-239: the Event start -- run when a file arrives in the workspace's inbox, the file's name matching a
+   * pattern (blank: every file). Core keeps it apart from the job (sourceJob.json/inboxTrigger), so it is saved after
+   * the job, and only when it changed. Off keeps the pattern: it is saved as a trigger that is off, not removed.
+   */
+  readonly onArrival = signal(false);
+  readonly filePattern = signal('');
+  readonly patternError = computed(() => (this.onArrival() ? patternProblem(this.filePattern()) : ''));
+  private readonly savedTrigger = signal<InboxTrigger | null>(null);
+
+  /**
+   * MIG-251 on MIG-242: the model each AI step runs on when this schedule runs it (sourceJob.json/aiModelChoice). Only
+   * for a saved job whose pipeline has AI steps; the section is not drawn otherwise.
+   */
+  readonly aiSteps = signal<AiStepChoice[]>([]);
+  readonly modelPicks = signal<ModelPicks>({});
+
   /** A manual job has no timetable, so the whole schedule section is irrelevant. */
   readonly isScheduled = computed(() => this.executionValue() !== 'Manual');
   private readonly executionValue = signal('Auto');
@@ -194,7 +215,10 @@ export class JobEdit implements OnInit {
     this.scheduler.valueChanges.subscribe(() => this.schedule.set(this.scheduler.getRawValue()));
     this.form.get('maxAttempts')!.valueChanges.subscribe(v => this.maxAttemptsValue.set(Number(v)));
 
-    if (this.isEdit()) this.loadJob();
+    if (this.isEdit()) {
+      this.loadJob();
+      if (isRecordId(this.jobId())) this.loadExtras();
+    }
     else if (isRecordId(this.taskDetailId())) this.form.patchValue({ taskDetailId: Number(this.taskDetailId()) });
   }
 
@@ -262,6 +286,65 @@ export class JobEdit implements OnInit {
         else this.loadError.set(err?.error?.message || 'That job could not be loaded.');
       },
     });
+  }
+
+  /** The job's trigger and AI steps. Neither is the point of the page, so a failed read leaves its section as for none. */
+  private loadExtras(): void {
+    const params = { jobId: String(this.jobId()) };
+    this.http.get<ApiResponse<unknown>>(`${API_BASE}/sourceJob.json/inboxTrigger`, { params }).subscribe({
+      next: response => {
+        const trigger = response.status === API_SUCCESS ? triggerOf(response.data) : null;
+        this.savedTrigger.set(trigger);
+        this.onArrival.set(!!trigger?.configured && trigger.enabled !== false);
+        this.filePattern.set(trigger?.filePattern ?? '');
+      },
+      error: () => {},
+    });
+    this.http.get<ApiResponse<unknown>>(`${API_BASE}/sourceJob.json/aiModelChoice`, { params }).subscribe({
+      next: response => {
+        const steps = response.status === API_SUCCESS ? stepsOf(response.data) : [];
+        this.aiSteps.set(steps);
+        this.modelPicks.set(picksOf(steps));
+      },
+      error: () => {},
+    });
+  }
+
+  /** The trigger request the form asks for, or null when it asks for what is already saved. */
+  private triggerRequest(jobId: number): { jobId: number; enabled: boolean; filePattern: string } | null {
+    const saved = this.savedTrigger();
+    const savedOn = !!saved?.configured && saved.enabled !== false;
+    const pattern = this.filePattern().trim();
+    if (this.onArrival()) {
+      if (savedOn && (saved?.filePattern ?? '') === pattern) return null;
+      return { jobId, enabled: true, filePattern: pattern };
+    }
+    return savedOn ? { jobId, enabled: false, filePattern: saved?.filePattern ?? '' } : null;
+  }
+
+  /**
+   * The trigger and the models, saved once the job is: each answers '' or why it was refused. A new job's id is the one
+   * its creation answered with ("Job save with jobId 2901."), as Duplicate reads it.
+   */
+  private saveExtras(jobId: number | null): Observable<string[]> {
+    if (jobId === null || !Number.isFinite(jobId)) {
+      return of(this.triggerRequest(0) ? ['the job\'s id did not come back, so its inbox trigger was not set.'] : []);
+    }
+    const asks: Observable<string>[] = [];
+    const reason = (fallback: string) => (response: ApiResponse) =>
+      response.status === API_SUCCESS ? '' : (response.message || fallback);
+    const trigger = this.triggerRequest(jobId);
+    if (trigger) {
+      asks.push(this.http.post<ApiResponse>(`${API_BASE}/sourceJob.json/inboxTrigger/save`, trigger).pipe(
+        map(reason('the inbox trigger was not saved.')),
+        catchError(err => of(err?.error?.message || 'the inbox trigger was not saved.'))));
+    }
+    if (this.isEdit() && this.aiSteps().length && picksChanged(this.aiSteps(), this.modelPicks())) {
+      asks.push(this.http.post<ApiResponse>(`${API_BASE}/sourceJob.json/aiModelChoice/save`, choiceBody(jobId, this.modelPicks())).pipe(
+        map(reason('the AI models were not saved.')),
+        catchError(err => of(err?.error?.message || 'the AI models were not saved.'))));
+    }
+    return asks.length ? forkJoin(asks).pipe(map(answers => answers.filter(Boolean))) : of([]);
   }
 
   private missing(reason: string): void {
@@ -355,6 +438,10 @@ export class JobEdit implements OnInit {
       this.toast.error('Pick at least one day of the week.');
       return;
     }
+    if (this.patternError()) {
+      this.toast.error(this.patternError());
+      return;
+    }
 
     const value = this.form.getRawValue();
     const payload: any = {
@@ -386,13 +473,24 @@ export class JobEdit implements OnInit {
 
     request.subscribe({
       next: response => {
-        this.saving.set(false);
-        if (response.status === API_SUCCESS) {
-          this.toast.success(this.isEdit() ? 'Job updated.' : 'Job created.');
-          this.router.navigate(['/pipelines/schedules']);
-        } else {
+        if (response.status !== API_SUCCESS) {
+          this.saving.set(false);
           this.toast.error(response.message || 'The job could not be saved.');
+          return;
         }
+        const jobId = this.isEdit() ? Number(value.jobId ?? this.jobId())
+          : Number(/jobId (\d+)/.exec(response.message ?? '')?.[1] ?? NaN);
+        this.saveExtras(jobId).subscribe(problems => {
+          this.saving.set(false);
+          if (!problems.length) {
+            this.toast.success(this.isEdit() ? 'Job updated.' : 'Job created.');
+            this.router.navigate(['/pipelines/schedules']);
+            return;
+          }
+          this.toast.error(`${this.isEdit() ? 'The job was updated' : 'The job was created'}, but ${problems.join(' ')}`);
+          // A new job is saved already: staying on "New schedule" would offer to create it again.
+          if (!this.isEdit()) this.router.navigate(['/pipelines/schedules']);
+        });
       },
       error: err => {
         this.saving.set(false);

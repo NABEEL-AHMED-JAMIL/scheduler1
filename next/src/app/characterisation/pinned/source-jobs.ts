@@ -3,6 +3,7 @@ export const PINNED: Record<string, unknown> = {
   "a job's details, with its schedule": {
     "requests": [
       "GET /sourceJob.json/fetchSourceJobQueueListWithJobId?jobId=2833",
+      "GET /sourceJob.json/inboxTrigger?jobId=2833",
       "GET /sourceTask.json/fetchSourceTaskWithSourceTaskId?sourceTaskId=1854"
     ],
     "headings": [
@@ -78,8 +79,10 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /sourceJob.json/listSourceJob",
+      "GET /sourceJob.json/inboxArrivals?jobId=2833",
       "GET /sourceJob.json/fetchSourceJobQueueListWithJobId?jobId=2833",
-      "GET /sourceJob.json/fetchSourceJobDetailWithSourceJobId?jobId=2833"
+      "GET /sourceJob.json/fetchSourceJobDetailWithSourceJobId?jobId=2833",
+      "GET /sourceJob.json/inboxTrigger?jobId=2833"
     ],
     "headings": [
       "Executions — Reference CSV check (e2e)",
@@ -127,6 +130,7 @@ export const PINNED: Record<string, unknown> = {
       "New schedule",
       "Basics",
       "Schedule",
+      "Event",
       "Email me when"
     ],
     "buttons": [
@@ -149,6 +153,7 @@ export const PINNED: Record<string, unknown> = {
       "Search tasks…",
       "Start date *(required)",
       "Start time *(required)",
+      "Start when a file arrives in the inbox",
       "State *(required)",
       "Task *(required)",
       "The job completes",
@@ -165,6 +170,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /sourceJob.json/findSourceJobAuditLog?jobId=2833&jobQueueId=7331",
+      "GET /sourceJob.json/stepExecutions?jobQueueId=7331",
       "GET /aiPrompt.json/runsForJob?jobQueueId=7331"
     ],
     "headings": [
@@ -217,11 +223,14 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "POST /sourceTask.json/listSourceTask?limit=1000 {}",
-      "GET /sourceJob.json/fetchSourceJobDetailWithSourceJobId?jobId=2833"
+      "GET /sourceJob.json/fetchSourceJobDetailWithSourceJobId?jobId=2833",
+      "GET /sourceJob.json/inboxTrigger?jobId=2833",
+      "GET /sourceJob.json/aiModelChoice?jobId=2833"
     ],
     "headings": [
       "Edit schedule",
       "Basics",
+      "Event",
       "Email me when"
     ],
     "buttons": [
@@ -239,6 +248,7 @@ export const PINNED: Record<string, unknown> = {
       "Nightly hurricane export",
       "Priority *(required)",
       "Search tasks…",
+      "Start when a file arrives in the inbox",
       "State *(required)",
       "Task *(required)",
       "The job completes",
@@ -416,6 +426,7 @@ export const PINNED: Record<string, unknown> = {
       "Email notifications 3",
       "Executions",
       "Run now",
+      "Run with…",
       "Skip next run"
     ],
     "columns": [],
@@ -426,6 +437,7 @@ export const PINNED: Record<string, unknown> = {
     ],
     "items": [
       "Run now",
+      "Run with…",
       "Skip next run",
       "Edit",
       "Executions",
@@ -447,6 +459,7 @@ export const PINNED: Record<string, unknown> = {
       "Email notifications 3",
       "Executions",
       "Run now",
+      "Run with…",
       "Skip next run"
     ],
     "columns": [],
@@ -457,6 +470,7 @@ export const PINNED: Record<string, unknown> = {
     ],
     "items": [
       "Run now",
+      "Run with…",
       "Skip next run",
       "Edit",
       "Executions",

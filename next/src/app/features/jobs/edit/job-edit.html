@@ -160,6 +160,43 @@
         </div>
       }
 
+      <!-- MIG-251 on MIG-239: the Event start, beside the timetable -- a Manual job can have one too. -->
+      <div class="form-section">
+        <h2 class="form-section-title">Event</h2>
+        <label class="flex items-center gap-2 text-sm">
+          <input type="checkbox" class="checkbox" id="onArrival"
+                 [checked]="onArrival()" (change)="onArrival.set($any($event.target).checked)" />
+          Start when a file arrives in the inbox
+        </label>
+        @if (onArrival()) {
+          <div class="form-grid mt-3">
+            <app-field label="File pattern" for="filePattern" [error]="patternError()"
+                       hint="Matched against the file's name: * for any run of characters, ? for one. Blank for every file.">
+              <input id="filePattern" class="input mono" placeholder="*.csv"
+                     [class.input-invalid]="!!patternError()"
+                     [value]="filePattern()" (input)="filePattern.set($any($event.target).value)" />
+            </app-field>
+          </div>
+          <p class="field-note text-[color:var(--text-muted)] mt-2">
+            Each file starts its own run, on the same terms as Run now: not while a run is still in flight, and only
+            while the job is Active. A file that cannot start a run is recorded as skipped, with the reason, on the
+            job's Executions.
+          </p>
+        }
+      </div>
+
+      @if (aiSteps().length) {
+        <!-- MIG-251 on MIG-242: what the schedule's runs use; Run with… on the list chooses for one run. -->
+        <div class="form-section">
+          <h2 class="form-section-title">AI models</h2>
+          <p class="text-sm text-[color:var(--text-secondary)] mb-3">
+            The model each AI step runs on when this schedule runs it. Run with… on the schedules list chooses for a
+            single run instead.
+          </p>
+          <app-ai-model-picks [steps]="aiSteps()" [(picks)]="modelPicks" idPrefix="schedule-model" />
+        </div>
+      }
+
       <div class="form-section">
         <h2 class="form-section-title">Email me when</h2>
         <div class="flex flex-wrap gap-4">
