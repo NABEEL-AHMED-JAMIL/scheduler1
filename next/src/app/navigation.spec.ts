@@ -196,6 +196,10 @@ describe('MIG-246: the renamed pages keep their gates', () => {
     ['/integration/api-collections/:collectionId', 'API collection', 'api-collections', undefined],
     // MIG-248: built. Sources, database connections and data contracts, on the one page key Identity serves.
     ['/integration/sources', 'Sources', 'sources', undefined],
+    // MIG-272: built. Every member holding the page reads, extracts and reviews; a type's editor hides its save.
+    ['/documents/intelligence', 'Document Intelligence', 'document-intelligence', undefined],
+    ['/documents/review', 'Review queue', 'document-review', undefined],
+    ['/documents/review/:extractionId', 'Review a document', 'document-review', undefined],
     ['/documents/files', 'Browse files', 'objects', 'TENANT_USER'],
     ['/documents/converter', 'Document Converter', 'tools-converter', undefined],
     ['/documents/transcript', 'Audio Transcript', 'tools-transcript', undefined],
@@ -228,8 +232,6 @@ describe('MIG-246: the renamed pages keep their gates', () => {
 describe('MIG-246 / MIG-267: pages still to be built get a gated entry point', () => {
   const SOON: [string, string, string][] = [
     ['/integration/connectors', 'Connector Hub', 'connector-hub'],
-    ['/documents/intelligence', 'Document Intelligence', 'document-intelligence'],
-    ['/documents/review', 'Review queue', 'document-review'],
     ['/data/ask', 'Ask your data', 'ask-data'],
     ['/data/catalog', 'Data Catalog', 'data-catalog'],
     ['/forms/builder', 'Form builder', 'forms'],
@@ -299,9 +301,9 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
     'Pipelines › Queue -> /pipelines/queue',
     'Pipelines › Run analytics -> /pipelines/run-analytics',
   ];
-  const DOCUMENTS_SOON = [
-    'Documents › Document Intelligence (soon) -> /documents/intelligence',
-    'Documents › Review queue (soon) -> /documents/review',
+  const DOCUMENT_INTELLIGENCE = [
+    'Documents › Document Intelligence -> /documents/intelligence',
+    'Documents › Review queue -> /documents/review',
   ];
   const DOCUMENTS = [
     'Documents › Document Converter -> /documents/converter',
@@ -344,7 +346,7 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
       ...DASHBOARD,
       ...INTEGRATION_SOON, 'Integration › Storage Connections -> /integration/storage-connections',
       ...PIPELINES,
-      ...DOCUMENTS_SOON, ...DOCUMENTS,
+      ...DOCUMENT_INTELLIGENCE, ...DOCUMENTS,
       ...DATA_SOON, ...DATA,
       ...FORMS_AND_WORKFLOWS,
       'AI › Prompts -> /ai/prompts', 'AI › Model connections -> /ai/connections',
@@ -360,7 +362,7 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
       ...DASHBOARD,
       ...INTEGRATION_SOON, 'Integration › Storage Connections -> /integration/storage-connections',
       ...PIPELINES,
-      ...DOCUMENTS_SOON, ...DOCUMENTS,
+      ...DOCUMENT_INTELLIGENCE, ...DOCUMENTS,
       ...DATA_SOON, ...DATA,
       ...FORMS_AND_WORKFLOWS,
       'AI › Prompts -> /ai/prompts', 'AI › Model connections -> /ai/connections',
@@ -404,7 +406,7 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
       ...DASHBOARD,
       ...INTEGRATION_SOON,
       ...PIPELINES,
-      ...DOCUMENTS_SOON, ...DOCUMENTS,
+      ...DOCUMENT_INTELLIGENCE, ...DOCUMENTS,
       ...DATA_SOON, ...DATA,
       ...FORMS_AND_WORKFLOWS,
       'AI › Prompts -> /ai/prompts',

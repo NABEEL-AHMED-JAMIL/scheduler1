@@ -1,0 +1,202 @@
+<div class="page">
+  <a routerLink="/documents/review" class="link-inline text-xs inline-flex items-center gap-1 self-start"><app-icon name="arrowLeft" size="0.9em" />Back to the review queue</a>
+
+  <div class="page-head">
+    <div>
+      <h1 class="page-title [overflow-wrap:anywhere]">{{ title() }}</h1>
+      <p class="page-subtitle">{{ subtitle() }}</p>
+    </div>
+    @if (detail(); as d) {
+      <div class="flex items-center gap-2">
+        @if (editable()) {
+          <span class="hidden md:inline text-xs text-[color:var(--text-muted)]" data-test="shortcuts">
+            <kbd class="kbd">A</kbd> approve · <kbd class="kbd">R</kbd> reject · <kbd class="kbd">↓</kbd> next field
+          </span>
+          <button type="button" class="btn btn-ghost btn-sm" [disabled]="!!busy()" (click)="claim()">
+            <app-icon [name]="claimedByMe() ? 'close' : 'lock'" />{{ claimedByMe() ? 'Let go' : 'Claim' }}
+          </button>
+          @if (dirty()) {
+            <button type="button" class="btn btn-ghost btn-sm" [disabled]="!!busy()" (click)="discard()">Discard changes</button>
+            <button type="button" class="btn btn-default btn-sm" [disabled]="!!busy()" (click)="save()">
+              @if (busy() === 'save') { <app-icon name="refresh" class="spin" /> } @else { <app-icon name="save" /> }Save corrections
+            </button>
+          }
+          <button type="button" class="btn btn-default btn-sm" [disabled]="!!busy()" (click)="reject()"><app-icon name="close" />Reject</button>
+          <button type="button" class="btn btn-primary btn-sm" data-test="approve" [disabled]="!!busy()" (click)="approve()">
+            @if (busy() === 'approve') { <app-icon name="refresh" class="spin" /> } @else { <app-icon name="check" /> }Approve &amp; next
+          </button>
+        } @else {
+          <app-status [label]="statusText()" />
+        }
+      </div>
+    }
+  </div>
+
+  @if (loading() && !detail()) {
+    <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]">Loading the document…</div>
+  } @else if (error()) {
+    <div class="card p-8 text-center" role="alert">
+      <p class="text-sm text-crit-500">{{ error() }}</p>
+      <button type="button" class="btn btn-default btn-sm mt-3" (click)="load()"><app-icon name="refresh" />Try again</button>
+    </div>
+  } @else if (detail(); as d) {
+    @if (!inReview()) {
+      <p class="note-bar" role="note" data-test="view-only">
+        <app-icon name="lock" size="0.95em" />
+        @switch (d.status) {
+          @case ('Approved') {
+            {{ d.autoApproved ? 'Approved on its own' : 'Approved by ' + reviewer(d.reviewedBy) }}@if (d.dateReviewed) { on {{ d.dateReviewed | serverTime: 'dateTime' }}}@if (d.ruleOverride) {, over a failing rule}. It is in its type's dataset; this view is read-only.
+          }
+          @case ('Rejected') {
+            Rejected by {{ reviewer(d.reviewedBy) }}@if (d.dateReviewed) { on {{ d.dateReviewed | serverTime: 'dateTime' }}}@if (d.rejectReason) {: “{{ d.rejectReason }}”}. This view is read-only.
+          }
+          @case ('Failed') { The extraction failed: {{ d.error || 'no reason was given' }}. Extract the document again from Document Intelligence. }
+          @default { This document is {{ statusText().toLowerCase() }}; it is not waiting for review. This view is read-only. }
+        }
+      </p>
+    } @else if (claimedByOther()) {
+      <p class="note-bar note-bar-warn" role="note"><app-icon name="lock" size="0.95em" />Claimed by {{ reviewer(d.claimedBy) }}@if (d.claimedAt) { since {{ d.claimedAt | serverTime: 'recent' }}}. It is theirs until they let it go or the claim lapses; you can read it.</p>
+    }
+
+    <div class="review-split">
+      <div class="review-viewer">
+        <app-page-viewer [ocrDocumentId]="d.ocrDocumentId" [pageCount]="pageCount()" [boxes]="boxes()" [activeId]="selected()" (pick)="select($event, 'field')" />
+      </div>
+
+      <div class="flex flex-col gap-3 min-w-0">
+        <section class="card p-4" aria-label="Extracted fields" data-test="fields">
+          <div class="flex flex-wrap items-center gap-2 mb-2">
+            <h2 class="text-sm font-semibold mr-auto">Extracted fields</h2>
+            @if (flagged().size) { <span class="pill pill-warn"><app-icon name="alert" size="0.85em" />{{ flagged().size }} need review</span> }
+            <span class="pill pill-neutral">Document type: {{ d.documentTypeName || d.documentTypeKey || 'not classified' }}@if (d.documentTypeVersion) { v{{ d.documentTypeVersion }}}</span>
+          </div>
+          @for (f of fields(); track f.fieldId) {
+            <div class="doc-field" [class.doc-field-low]="isFlagged(f)" [class.doc-field-active]="selected() === f.fieldId" [attr.data-field]="f.fieldId" (click)="select(f.fieldId, 'box')">
+              <button type="button" class="doc-field-name" [attr.aria-pressed]="selected() === f.fieldId" (click)="select(f.fieldId, 'box')">
+                {{ nameOf(f) }}@if (f.required) {<span class="text-crit-500" aria-hidden="true"> *</span>}
+              </button>
+              <div class="flex items-center gap-1.5 min-w-0">
+                <input class="input mono text-xs flex-1 min-w-0" [value]="valueOf(f)" [readOnly]="!editable()" [attr.aria-label]="nameOf(f)"
+                       [attr.aria-invalid]="(f.problems ?? []).length ? true : null" (focus)="select(f.fieldId)" (input)="edit(f.fieldId, $any($event.target).value)" />
+                @if (isFlagged(f)) { <span class="text-xs text-[color:var(--warn-text)] whitespace-nowrap inline-flex items-center gap-0.5"><app-icon name="alert" size="0.85em" />check</span> }
+                @else if (f.corrected) { <span class="text-xs text-[color:var(--text-muted)] whitespace-nowrap" title="Corrected by a reviewer"><app-icon name="edit" size="0.85em" /></span> }
+              </div>
+              <app-confidence-bar [value]="f.confidence" [low]="isFlagged(f)" />
+            </div>
+            @for (p of f.problems ?? []; track $index) {
+              <p class="text-xs text-[color:var(--warn-text)] pl-1 -mt-0.5 mb-1">{{ p }}</p>
+            }
+            @if (selected() === f.fieldId && !f.box && !f.corrected) {
+              <p class="text-xs text-[color:var(--text-muted)] pl-1 -mt-0.5 mb-1">Not found on the page: there is no box to show.</p>
+            }
+          } @empty {
+            <p class="text-sm text-[color:var(--text-muted)]">No fields were read from this document.</p>
+          }
+
+          @if (checks(); as c) {
+            <div class="mt-3 flex flex-col gap-1.5" data-test="rules">
+              <h3 class="text-xs font-semibold uppercase tracking-wide text-[color:var(--text-muted)]">Rule check</h3>
+              @for (r of c.rules; track r.index) {
+                <p class="text-xs flex items-start gap-1.5">
+                  @switch (r.status) {
+                    @case ('passed') { <app-icon name="checkCircle" size="0.95em" class="text-ok-500 mt-0.5 shrink-0" /> }
+                    @case ('failed') { <app-icon name="xCircle" size="0.95em" class="text-crit-500 mt-0.5 shrink-0" /> }
+                    @default { <app-icon name="minus" size="0.95em" class="text-[color:var(--text-muted)] mt-0.5 shrink-0" /> }
+                  }
+                  <span>
+                    {{ ruleWords(r) }}
+                    <span class="text-[color:var(--text-muted)]">· {{ r.status === 'passed' ? 'holds' : r.status === 'failed' ? 'fails' : 'not checked: a value it needs is missing' }}</span>
+                    @if (r.status === 'failed' && r.message) { <span class="block text-crit-500">{{ r.message }}</span> }
+                  </span>
+                </p>
+              } @empty {
+                <p class="text-xs text-[color:var(--text-muted)]">This document type has no rules.</p>
+              }
+              @if (inReview() && c.blockingProblems.length) {
+                <div class="mt-1 text-xs text-[color:var(--warn-text)]" data-test="blocking">
+                  <p class="font-semibold">Before it can be approved:</p>
+                  <ul class="list-disc pl-5">@for (p of c.blockingProblems; track $index) { <li>{{ p }}</li> }</ul>
+                </div>
+              }
+            </div>
+          }
+        </section>
+
+        @for (t of tables(); track t.key) {
+          <section class="card p-4" [attr.aria-label]="t.label" data-test="line-items">
+            <div class="flex items-center gap-2 mb-2">
+              <h2 class="text-sm font-semibold mr-auto">{{ t.label }} ({{ t.rows.length }})</h2>
+              @if (editable() && newRow()?.tableKey !== t.key) {
+                <button type="button" class="btn btn-ghost btn-xs" (click)="addRow(t)"><app-icon name="plus" />Add row</button>
+              }
+            </div>
+            <div class="overflow-x-auto">
+              <table class="table-modern">
+                <thead><tr><th class="w-8">#</th>@for (c of t.columns; track c.key) { <th>{{ c.label }}</th> }</tr></thead>
+                <tbody>
+                  @for (row of t.rows; track row.index) {
+                    <tr>
+                      <td class="text-[color:var(--text-muted)]">{{ row.index + 1 }}</td>
+                      @for (cell of row.cells; track $index) {
+                        <td class="doc-cell" [class.doc-cell-active]="cell && selected() === cell.fieldId" [attr.data-field]="cell?.fieldId ?? null">
+                          @if (cell) {
+                            <div class="flex flex-col gap-1">
+                              <input class="input mono text-xs w-full" [class.doc-field-low]="isFlagged(cell)" [value]="valueOf(cell)" [readOnly]="!editable()"
+                                     [attr.aria-label]="nameOf(cell)" (focus)="select(cell.fieldId)" (input)="edit(cell.fieldId, $any($event.target).value)" />
+                              <app-confidence-bar [value]="cell.confidence" [low]="isFlagged(cell)" />
+                            </div>
+                          } @else { <span class="text-xs text-[color:var(--text-muted)]">—</span> }
+                        </td>
+                      }
+                    </tr>
+                  }
+                  @if (newRow(); as nr) {
+                    @if (nr.tableKey === t.key) {
+                      <tr data-test="new-row">
+                        <td class="text-[color:var(--text-muted)]">{{ nr.rowIndex + 1 }}</td>
+                        @for (c of t.columns; track c.key) {
+                          <td class="doc-cell"><input class="input mono text-xs" [value]="nr.values[c.key]" [attr.aria-label]="'New row · ' + c.label" (input)="editNewRow(c.key, $any($event.target).value)" /></td>
+                        }
+                      </tr>
+                    }
+                  }
+                  @if (!t.rows.length && newRow()?.tableKey !== t.key) {
+                    <tr><td [attr.colspan]="t.columns.length + 1" class="text-xs text-[color:var(--text-muted)]">No rows were read{{ t.required ? ': at least one is expected.' : '.' }}</td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </section>
+        }
+
+        @if ((d.corrections ?? []).length) {
+          <section class="card p-4" data-test="corrections" aria-label="Corrections">
+            <button type="button" class="text-sm font-semibold flex items-center gap-1.5 w-full text-left" [attr.aria-expanded]="showCorrections()"
+                    (click)="showCorrections.set(!showCorrections())">
+              <app-icon [name]="showCorrections() ? 'chevronDown' : 'chevronRight'" size="0.95em" />Corrections ({{ d.corrections!.length }})
+            </button>
+            @if (showCorrections()) {
+              <ul class="mt-2 flex flex-col gap-1.5 text-xs min-w-0">
+                @for (c of d.corrections; track c.correctionId) {
+                  <li class="flex flex-wrap items-baseline gap-x-1.5 min-w-0">
+                    <span class="font-medium [overflow-wrap:anywhere]">{{ c.tableKey ? c.tableKey + ' row ' + ((c.rowIndex ?? 0) + 1) + ' · ' + c.fieldKey : c.fieldKey }}</span>
+                    <app-data-text class="mono min-w-0 max-w-full" [value]="c.oldValue ?? '(empty)'" label="Was" />
+                    <span aria-hidden="true">→</span>
+                    <app-data-text class="mono min-w-0 max-w-full" [value]="c.newValue ?? '(empty)'" label="Now" />
+                    <span class="text-[color:var(--text-muted)]">· {{ reviewer(c.correctedBy) }}@if (c.dateCreated) {, {{ c.dateCreated | serverTime: 'recent' }}}</span>
+                  </li>
+                }
+              </ul>
+            }
+          </section>
+        }
+
+        @if (inReview()) {
+          <p class="text-xs text-[color:var(--text-muted)] flex items-start gap-1.5">
+            <app-icon name="send" size="0.95em" class="mt-0.5 shrink-0" />On approve, the document's values go to its type's dataset (Document Intelligence › Dataset), and your corrections are kept with it.
+          </p>
+        }
+      </div>
+    </div>
+  }
+</div>

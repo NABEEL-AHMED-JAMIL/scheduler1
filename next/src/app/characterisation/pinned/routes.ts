@@ -252,6 +252,15 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
+      "path": "/documents/review/:extractionId",
+      "title": "Review a document",
+      "pageKey": "document-review",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
       "path": "/documents/converter",
       "title": "Document Converter",
       "pageKey": "tools-converter",

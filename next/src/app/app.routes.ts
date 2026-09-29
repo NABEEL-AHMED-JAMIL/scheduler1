@@ -251,10 +251,30 @@ export const routes: Routes = [
       // ---------------------------------------------------------------------------------------------
       // Documents (was Tools and Object Browser's Browse files)
       // ---------------------------------------------------------------------------------------------
-      comingSoon('documents/intelligence', 'Document Intelligence', 'document-intelligence',
-        'Read documents into structured data, with a confidence for every field.'),
-      comingSoon('documents/review', 'Review queue', 'document-review',
-        'Check the fields Document Intelligence was not sure about.'),
+      {
+        // MIG-272: documents read into structured data -- the overview, the document types with their editor, and each
+        // type's dataset. Every member holding the page reads, reads documents and extracts; a type is an administrator's.
+        path: 'documents/intelligence',
+        title: 'Document Intelligence',
+        loadComponent: () => import('./features/documents/intelligence').then(m => m.DocumentIntelligence),
+        data: { pageKey: 'document-intelligence' },
+        canActivate: [pageGuard],
+      },
+      {
+        // MIG-272: the review queue, and one document under review beside its page image.
+        path: 'documents/review',
+        title: 'Review queue',
+        loadComponent: () => import('./features/documents/review-queue').then(m => m.ReviewQueue),
+        data: { pageKey: 'document-review' },
+        canActivate: [pageGuard],
+      },
+      {
+        path: 'documents/review/:extractionId',
+        title: 'Review a document',
+        loadComponent: () => import('./features/documents/review').then(m => m.DocumentReview),
+        data: { pageKey: 'document-review' },
+        canActivate: [pageGuard],
+      },
       {
         path: 'documents/converter',
         title: 'Document Converter',
