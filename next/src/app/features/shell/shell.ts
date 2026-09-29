@@ -97,6 +97,8 @@ export class Shell {
           hint: 'Databases, SaaS apps and files, ready to connect' },
         { label: 'API Collections', path: '/integration/api-collections', pageKey: 'api-collections', icon: 'code',
           hint: 'Which APIs exist, tested and versioned' },
+        { label: 'Sources', path: '/integration/sources', pageKey: 'sources', icon: 'database',
+          hint: 'APIs, files and databases a pipeline reads' },
         { label: 'Storage Connections', path: '/integration/storage-connections', icon: 'cloud', adminOnly: true,
           hint: 'S3, Azure, MinIO, FTP' },
       ],

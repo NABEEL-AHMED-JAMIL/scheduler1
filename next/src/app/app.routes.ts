@@ -116,6 +116,18 @@ export const routes: Routes = [
         data: { pageKey: 'api-collections' },
         canActivate: [pageGuard],
       },
+      {
+        // MIG-248: where a pipeline's data comes from -- an API, a file or folder in the workspace's storage, a
+        // database -- with its test, preview and schema, the database connections, and the data contracts
+        // (MIG-233) that sit on the same page key. Every member holding the page reads; writes and anything that
+        // reads the source itself are a workspace administrator's, and the page hides them from anyone else.
+        path: 'integration/sources',
+        title: 'Sources',
+        loadComponent: () =>
+          import('./features/integration/sources/sources').then(m => m.Sources),
+        data: { pageKey: 'sources' },
+        canActivate: [pageGuard],
+      },
       comingSoon('integration/connectors', 'Connector Hub', 'connector-hub',
         'Databases, SaaS apps and files, ready to connect and sync.'),
       // ---------------------------------------------------------------------------------------------

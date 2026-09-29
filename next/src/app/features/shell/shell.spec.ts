@@ -52,7 +52,7 @@ describe('shell navigation', () => {
       '/ai/prompts', '/data/analytics', '/data/analytics/dashboards', '/data/ask', '/data/catalog',
       '/documents/converter', '/documents/files', '/documents/intelligence', '/documents/review',
       '/documents/transcript', '/forms/builder', '/forms/submissions', '/integration/api-collections',
-      '/integration/connectors', '/pipelines', '/pipelines/queue', '/pipelines/run-analytics',
+      '/integration/connectors', '/integration/sources', '/pipelines', '/pipelines/queue', '/pipelines/run-analytics',
       '/pipelines/schedules', '/workflows/designer', '/workflows/inbox',
     ]);
     expect(children().find(child => child.path === '/dashboard')?.pageKey).toBeUndefined();

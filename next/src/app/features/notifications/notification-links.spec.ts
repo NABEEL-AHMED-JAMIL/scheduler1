@@ -58,6 +58,7 @@ describe('openableTarget', () => {
     expect(pageKeyForPath('/data/analytics/dashboards')).toBe('analytics-dashboards');
     expect(pageKeyForPath('/ai/prompts')).toBe('ai-prompts');
     expect(pageKeyForPath('/integration/api-collections')).toBe('api-collections');
+    expect(pageKeyForPath('/integration/sources')).toBe('sources');
   });
 
   it('drops a link to a page the profile withholds, and keeps the rest', () => {

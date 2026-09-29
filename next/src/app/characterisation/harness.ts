@@ -48,11 +48,11 @@ function restoreZone(): void {
 export type Role = 'PLATFORM_ADMIN' | 'TENANT_ADMIN' | 'TENANT_USER';
 
 /**
- * Every page an access profile can grant today (Identity's catalogue). api-collections joined with MIG-223; the Wave 5
+ * Every page an access profile can grant today (Identity's catalogue). api-collections joined with MIG-223 and sources with MIG-248; the Wave 5
  * keys in core/auth/page-keys.ts are not in Identity's catalogue yet, so no profile can hold them.
  */
 export const ALL_PAGES = ['jobs', 'tasks', 'queue', 'reports', 'objects', 'analytics', 'analytics-dashboards',
-  'tools-converter', 'tools-transcript', 'ai-prompts', 'api-collections'];
+  'tools-converter', 'tools-transcript', 'ai-prompts', 'api-collections', 'sources'];
 
 /** The pages api-check's tenant user (4597) holds, so the console and the API baselines speak for the same person. */
 export const TU_PAGES = ['jobs', 'tasks', 'queue', 'reports', 'objects'];

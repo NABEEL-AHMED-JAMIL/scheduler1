@@ -4,6 +4,7 @@ export const PINNED: Record<string, unknown> = {
     "Dashboard -> /dashboard",
     "Integration › Connector Hub Soon — Databases, SaaS apps and files, ready to connect -> /integration/connectors",
     "Integration › API Collections — Which APIs exist, tested and versioned -> /integration/api-collections",
+    "Integration › Sources — APIs, files and databases a pipeline reads -> /integration/sources",
     "Integration › Storage Connections — S3, Azure, MinIO, FTP -> /integration/storage-connections",
     "Pipelines › Pipelines — What a run does, and where -> /pipelines",
     "Pipelines › Schedules — When each pipeline runs, and its runs -> /pipelines/schedules",
@@ -43,6 +44,7 @@ export const PINNED: Record<string, unknown> = {
   "the menu for a tenant user with every page": [
     "Dashboard -> /dashboard",
     "Integration › API Collections — Which APIs exist, tested and versioned -> /integration/api-collections",
+    "Integration › Sources — APIs, files and databases a pipeline reads -> /integration/sources",
     "Pipelines › Pipelines — What a run does, and where -> /pipelines",
     "Pipelines › Schedules — When each pipeline runs, and its runs -> /pipelines/schedules",
     "Pipelines › Queue — What is in flight right now -> /pipelines/queue",
@@ -69,6 +71,7 @@ export const PINNED: Record<string, unknown> = {
     "Dashboard -> /dashboard",
     "Integration › Connector Hub Soon — Databases, SaaS apps and files, ready to connect -> /integration/connectors",
     "Integration › API Collections — Which APIs exist, tested and versioned -> /integration/api-collections",
+    "Integration › Sources — APIs, files and databases a pipeline reads -> /integration/sources",
     "Integration › Storage Connections — S3, Azure, MinIO, FTP -> /integration/storage-connections",
     "Pipelines › Pipelines — What a run does, and where -> /pipelines",
     "Pipelines › Schedules — When each pipeline runs, and its runs -> /pipelines/schedules",

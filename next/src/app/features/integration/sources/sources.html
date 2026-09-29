@@ -1,0 +1,237 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Sources</h1>
+      <p class="page-subtitle">
+        Where a pipeline's data comes from: an API from API Collections, a file or folder in one of this workspace's
+        storage connections, or a database query. Test one, preview its first rows and read the schema they suggest.
+        Data contracts say what a payload must hold.
+      </p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button type="button" class="btn btn-default btn-sm" (click)="refresh()" [disabled]="tabLoading()">
+        <app-icon name="refresh" [class.spin]="tabLoading()" />Refresh
+      </button>
+      @if (canManage()) {
+        @switch (tab()) {
+          @case ('connections') { <button type="button" class="btn btn-primary btn-sm" (click)="newConnection()"><app-icon name="plus" />New connection</button> }
+          @case ('contracts') {
+            <button type="button" class="btn btn-default btn-sm" (click)="installTemplate()"><app-icon name="template" />Install template</button>
+            <button type="button" class="btn btn-primary btn-sm" (click)="newContract()"><app-icon name="plus" />New from sample</button>
+          }
+          @default { <button type="button" class="btn btn-primary btn-sm" (click)="create()"><app-icon name="plus" />New source</button> }
+        }
+      }
+    </div>
+  </div>
+
+  <div class="tabs" role="tablist" aria-label="Sources">
+    @for (t of tabs; track t.id) {
+      <button type="button" role="tab" class="tab" [class.tab-active]="tab() === t.id" [attr.aria-selected]="tab() === t.id" (click)="setTab(t.id)">{{ t.label }}</button>
+    }
+  </div>
+
+  @switch (tab()) {
+    @case ('connections') {
+      <app-table-shell data-test="connections" heading="Database connections" columnsKey="source-connections" [loading]="connectionsLoading()" [error]="connectionsError()"
+                       [isEmpty]="!connections().length" [shown]="connections().length"
+                       [emptyMessage]="canManage() ? 'No database connections yet. Add a PostgreSQL connection, then a source can query it.' : 'No database connections yet.'"
+                       emptyIcon="database" (retry)="loadConnections()">
+        <div empty-action class="flex justify-center">
+          @if (canManage()) { <button type="button" class="btn btn-primary btn-sm" (click)="newConnection()"><app-icon name="plus" />New connection</button> }
+        </div>
+        <table class="table-modern">
+          <thead>
+            <tr>
+              <th>Connection</th>
+              <th>Host · database</th>
+              <th>User</th>
+              <th>Password</th>
+              <th>TLS</th>
+              @if (isPlatformAdmin()) { <th>Workspace</th> }
+              <th class="text-right">State</th>
+              @if (canManage()) { <th class="w-12"><span class="sr-only">Actions</span></th> }
+            </tr>
+          </thead>
+          <tbody>
+            @for (c of namedConnections(); track c.id) {
+              <tr>
+                <td class="max-w-56">
+                  @if (canManage()) { <button type="button" class="link-inline font-medium text-left" (click)="editConnection(c)">{{ c.name }}</button> }
+                  @else { <span class="font-medium">{{ c.name }}</span> }
+                  <span class="block text-xs text-[color:var(--text-muted)]">PostgreSQL</span>
+                </td>
+                <td class="max-w-72"><app-data-text class="mono text-xs" [value]="c.host + ':' + c.port + ' / ' + c.database" label="Host · database" /></td>
+                <td class="min-w-36 max-w-48"><app-data-text class="mono text-xs" [value]="c.username" label="User" /></td>
+                <td class="text-xs whitespace-nowrap">
+                  @if (c.passwordSet) { <span class="text-[color:var(--text-secondary)]"><span class="secret-mask" aria-hidden="true">•••</span> configured</span> }
+                  @else { <span class="text-warn-600">not set</span> }
+                </td>
+                <td class="text-xs whitespace-nowrap">{{ sslText(c.sslMode) }}</td>
+                @if (isPlatformAdmin()) { <td class="text-xs">{{ workspace(c) }}</td> }
+                <td class="text-right"><app-status [label]="c.status || 'Active'" [quiet]="true" /></td>
+                @if (canManage()) {
+                  <td>
+                    <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="connMenu" [attr.aria-label]="'Actions for ' + c.name"><app-icon name="dots" size="1.05em" /></button>
+                    <ng-template #connMenu>
+                      <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                        <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="editConnection(c)"><app-icon name="edit" />Edit or replace password</button>
+                        <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="testConnection(c)"><app-icon name="play" />Test connection</button>
+                        <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="removeConnection(c)"><app-icon name="trash" class="icon-crit" />Delete</button>
+                      </div>
+                    </ng-template>
+                  </td>
+                }
+              </tr>
+            }
+          </tbody>
+        </table>
+      </app-table-shell>
+    }
+
+    @case ('contracts') {
+      <app-table-shell data-test="contracts" heading="Data contracts" columnsKey="source-contracts" [loading]="contractsLoading()" [error]="contractsError()"
+                       [isEmpty]="!contracts().length" [shown]="contracts().length"
+                       [emptyMessage]="canManage() ? 'No data contracts yet. Install a template, or propose one from a sample.' : 'No data contracts yet.'"
+                       emptyIcon="shield" (retry)="loadContracts()">
+        <table class="table-modern">
+          <thead>
+            <tr>
+              <th>Contract</th>
+              <th>Direction</th>
+              <th class="text-right">Active</th>
+              <th class="text-right">Latest</th>
+              <th>Sensitivity</th>
+              <th>Created</th>
+              @if (isPlatformAdmin()) { <th>Workspace</th> }
+            </tr>
+          </thead>
+          <tbody>
+            @for (c of namedContracts(); track c.id) {
+              <tr>
+                <td class="max-w-72">
+                  <button type="button" class="link-inline font-medium text-left" (click)="openContract(c)">{{ c.name }}</button>
+                  @if (c.system) { <span class="pill pill-neutral ml-1"><app-icon name="lock" size="0.8em" />System · read-only</span> }
+                </td>
+                <td class="text-xs whitespace-nowrap">{{ directionText(c.direction) }}</td>
+                <td class="text-right">@if (c.activeVersion) { <span class="pill pill-brand mono">v{{ c.activeVersion }}</span> } @else { <span class="text-xs text-[color:var(--text-muted)]">none</span> }</td>
+                <td class="text-right"><span class="pill pill-neutral mono">v{{ c.currentVersion ?? 0 }}</span></td>
+                <td class="text-xs">{{ c.sensitivity || '—' }}</td>
+                <td class="text-xs whitespace-nowrap">@if (c.dateCreated) { {{ c.dateCreated | serverTime: 'date' }} } @else { — }</td>
+                @if (isPlatformAdmin()) { <td class="text-xs">{{ c.system ? 'Every workspace' : workspace(c) }}</td> }
+              </tr>
+            }
+          </tbody>
+        </table>
+      </app-table-shell>
+    }
+
+    @default {
+      <app-stat-strip [items]="kpis()" [cols]="2" [smCols]="4" align="start" size="md" label="Sources at a glance" />
+
+      <app-table-shell data-test="sources" heading="Sources" columnsKey="sources" [loading]="loading()" [error]="error()"
+                       [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="total()"
+                       [emptyMessage]="emptyMessage()" emptyIcon="database" (retry)="load()">
+        <ng-container toolbar>
+          <app-view-toggle [(value)]="view" key="sources" cardsIcon="database" />
+          <select class="input max-w-40" [value]="kindFilter()" aria-label="Kind" (change)="kindFilter.set($any($event.target).value)">
+            <option value="">All kinds</option>
+            @for (k of kinds; track k) { <option [value]="k" [selected]="k === kindFilter()">{{ kindText(k) }}</option> }
+          </select>
+          <div class="search-field max-w-64">
+            <app-icon name="search" size="0.95em" />
+            <input class="input" placeholder="Search sources" aria-label="Search sources" [value]="search()" (input)="onSearch($any($event.target).value)" />
+          </div>
+          @if (hasFilters()) {
+            <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()"><app-icon name="close" />Clear</button>
+          }
+        </ng-container>
+
+        <div empty-action class="flex justify-center">
+          @if (canManage() && !hasFilters()) { <button type="button" class="btn btn-primary btn-sm" (click)="create()"><app-icon name="plus" />New source</button> }
+        </div>
+
+        @if (view() === 'cards') {
+          <div class="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
+            @for (s of filtered(); track s.id) {
+              <article class="card p-4 flex flex-col gap-3">
+                <div class="flex items-start gap-2.5">
+                  <span class="stat-glyph shrink-0"><app-icon [name]="kindGlyph(s.kind)" /></span>
+                  <div class="min-w-0 flex-1">
+                    <h3 class="font-semibold truncate"><button type="button" class="link-inline text-left" (click)="open(s)">{{ s.name }}</button></h3>
+                    <p class="text-xs text-[color:var(--text-muted)]">
+                      {{ kindText(s.kind) }}@if (s.format) { · {{ formatText(s.format) }} }@if (isPlatformAdmin()) { · {{ workspace(s) }} }
+                    </p>
+                  </div>
+                  <div class="shrink-0 flex items-center gap-1">
+                    <app-status [label]="s.status || 'Active'" [quiet]="true" />
+                    @if (canManage()) {
+                      <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="cardMenu" [attr.aria-label]="'Actions for ' + s.name"><app-icon name="dots" size="1.05em" /></button>
+                      <ng-template #cardMenu>
+                        <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                          <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="open(s)"><app-icon name="edit" />Edit, test &amp; preview</button>
+                          <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="remove(s)"><app-icon name="trash" class="icon-crit" />Delete</button>
+                        </div>
+                      </ng-template>
+                    }
+                  </div>
+                </div>
+                <p class="text-xs">
+                  @if (s.lastTestOk === true) { <span class="text-ok-500">Answered</span> }
+                  @else if (s.lastTestOk === false) { <span class="text-crit-500">Did not answer</span> }
+                  @else { <span class="text-[color:var(--text-muted)]">Not tested</span> }
+                  @if (s.lastTestedAt) { <span class="text-[color:var(--text-muted)]"> · {{ s.lastTestedAt | serverTime: 'dateTime' }}</span> }
+                </p>
+              </article>
+            }
+          </div>
+        } @else {
+          <table class="table-modern">
+            <thead>
+              <tr>
+                <th>Source</th>
+                <th>Kind</th>
+                <th>Format</th>
+                <th>Last test</th>
+                <th>Created</th>
+                @if (isPlatformAdmin()) { <th>Workspace</th> }
+                <th class="text-right">State</th>
+                @if (canManage()) { <th class="w-12"><span class="sr-only">Actions</span></th> }
+              </tr>
+            </thead>
+            <tbody>
+              @for (s of filtered(); track s.id) {
+                <tr>
+                  <td class="max-w-80"><button type="button" class="link-inline font-medium text-left [overflow-wrap:anywhere]" (click)="open(s)">{{ s.name }}</button></td>
+                  <td class="whitespace-nowrap"><app-icon [name]="kindGlyph(s.kind)" size="0.9em" class="text-[color:var(--text-muted)]" /> {{ kindText(s.kind) }}</td>
+                  <td class="text-xs whitespace-nowrap">{{ formatText(s.format) }}</td>
+                  <td class="text-xs whitespace-nowrap">
+                    @if (s.lastTestOk === true) { <span class="text-ok-500">Answered</span> }
+                    @else if (s.lastTestOk === false) { <span class="text-crit-500">Did not answer</span> }
+                    @else { <span class="text-[color:var(--text-muted)]">not tested</span> }
+                    @if (s.lastTestedAt) { <span class="block text-[color:var(--text-muted)]">{{ s.lastTestedAt | serverTime: 'dateTime' }}</span> }
+                  </td>
+                  <td class="text-xs whitespace-nowrap">@if (s.dateCreated) { {{ s.dateCreated | serverTime: 'dateTime' }} } @else { — }</td>
+                  @if (isPlatformAdmin()) { <td class="text-xs">{{ workspace(s) }}</td> }
+                  <td class="text-right"><app-status [label]="s.status || 'Active'" [quiet]="true" /></td>
+                  @if (canManage()) {
+                    <td>
+                      <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="rowMenu" [attr.aria-label]="'Actions for ' + s.name"><app-icon name="dots" size="1.05em" /></button>
+                      <ng-template #rowMenu>
+                        <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                          <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="open(s)"><app-icon name="edit" />Edit, test &amp; preview</button>
+                          <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="remove(s)"><app-icon name="trash" class="icon-crit" />Delete</button>
+                        </div>
+                      </ng-template>
+                    </td>
+                  }
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
+        <app-pagination pager [total]="total()" [page]="page()" [size]="size()" (goTo)="goTo($event)" (setSize)="setSize($event)" />
+      </app-table-shell>
+    }
+  }
+</div>

@@ -82,6 +82,15 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
+      "path": "/integration/sources",
+      "title": "Sources",
+      "pageKey": "sources",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
       "path": "/integration/connectors",
       "title": "Connector Hub",
       "pageKey": "connector-hub",

@@ -15,6 +15,8 @@ export type PageKey =
   | 'ai-prompts'
   // Wave 4 (MIG-223): Integration > API Collections. Identity already serves and enforces this one.
   | 'api-collections'
+  // Wave 4 (MIG-248): Integration > Sources, and the data contracts beside them (MIG-233). Identity serves it.
+  | 'sources'
   // Wave 5 (MIG-267): one key per module page. Identity's catalogue carries document-intelligence on the
   // wave5-ocr branch and none of the others yet, so until it does a tenant user on a profile cannot be
   // granted them (the menu hides them); admins and profile-less users see the entry points.
@@ -49,6 +51,7 @@ export const PAGE_LABELS: Record<PageKey, string> = {
   'tools-transcript': 'Audio Transcript',
   'ai-prompts': 'Prompts',
   'api-collections': 'API Collections',
+  'sources': 'Sources',
   'connector-hub': 'Connector Hub',
   'document-intelligence': 'Document Intelligence',
   'document-review': 'Review queue',

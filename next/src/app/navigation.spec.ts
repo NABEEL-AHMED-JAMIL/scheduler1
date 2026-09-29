@@ -194,6 +194,8 @@ describe('MIG-246: the renamed pages keep their gates', () => {
     // MIG-247: built. Read by every member holding the page; the screens hide the administrator's writes.
     ['/integration/api-collections', 'API Collections', 'api-collections', undefined],
     ['/integration/api-collections/:collectionId', 'API collection', 'api-collections', undefined],
+    // MIG-248: built. Sources, database connections and data contracts, on the one page key Identity serves.
+    ['/integration/sources', 'Sources', 'sources', undefined],
     ['/documents/files', 'Browse files', 'objects', 'TENANT_USER'],
     ['/documents/converter', 'Document Converter', 'tools-converter', undefined],
     ['/documents/transcript', 'Audio Transcript', 'tools-transcript', undefined],
@@ -289,6 +291,7 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
   const INTEGRATION_SOON = [
     'Integration › Connector Hub (soon) -> /integration/connectors',
     'Integration › API Collections -> /integration/api-collections',
+    'Integration › Sources -> /integration/sources',
   ];
   const PIPELINES = [
     'Pipelines › Pipelines -> /pipelines',
@@ -369,9 +372,10 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
 
   it('a tenant user with every page their profile can hold today', () => {
     expect(menuFor('TENANT_USER', ['jobs', 'tasks', 'queue', 'reports', 'objects', 'analytics',
-      'analytics-dashboards', 'tools-converter', 'tools-transcript', 'ai-prompts', 'api-collections'])).toEqual([
+      'analytics-dashboards', 'tools-converter', 'tools-transcript', 'ai-prompts', 'api-collections', 'sources'])).toEqual([
       ...DASHBOARD,
       'Integration › API Collections -> /integration/api-collections',
+      'Integration › Sources -> /integration/sources',
       ...PIPELINES,
       ...DOCUMENTS,
       ...DATA,

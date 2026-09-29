@@ -51,6 +51,7 @@ const PAGE_PATHS: [string, PageKey][] = [
   ['/data/analytics', 'analytics'],
   ['/ai/prompts', 'ai-prompts'],
   ['/integration/api-collections', 'api-collections'],
+  ['/integration/sources', 'sources'],
   // Before MIG-246.
   ['/operations/jobs', 'jobs'],
   ['/operations/tasks', 'tasks'],
