@@ -244,8 +244,8 @@ test.describe('Step builder', () => {
     await page.goto(`/pipelines/${TASK}/edit?tab=settings`);
     const row = page.locator('[data-task="aggregate"]');
     await expect(row).toContainText('On');
-    // An unavailable task cannot be switched on.
-    await expect(page.locator('[data-task="read_api"] input[role="switch"]')).toBeDisabled();
+    // An unavailable task cannot be switched on: write_database waits for an owner decision (integration connections are read-only).
+    await expect(page.locator('[data-task="write_database"] input[role="switch"]')).toBeDisabled();
     await row.getByRole('switch').uncheck();
     await expect(row).toContainText('Switched off in this workspace.');
     await page.getByRole('tab', { name: 'Steps' }).click();
