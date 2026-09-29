@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { FileDropzone } from './file-dropzone';
 
@@ -72,5 +73,42 @@ describe('FileDropzone drag state', () => {
     zone.onPick({ target: input } as unknown as Event);
     expect(zone.file()).toBe(file);
     expect(input.value).toBe('');
+  });
+});
+
+describe('FileDropzone with several files (the inbox)', () => {
+  function many() {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection()] });
+    const fixture = TestBed.createComponent(FileDropzone);
+    fixture.componentRef.setInput('multiple', true);
+    const got: File[][] = [];
+    fixture.componentInstance.picked.subscribe(files => got.push(files));
+    fixture.detectChanges();
+    return { fixture, zone: fixture.componentInstance, got };
+  }
+  const a = new File(['a'], 'a.json');
+  const b = new File(['b'], 'b.json');
+
+  it('hands every dropped file over at once, and keeps offering the zone', () => {
+    const { zone, got } = many();
+    zone.onDrop({ preventDefault: () => {}, dataTransfer: { files: [a, b] } } as unknown as DragEvent);
+    expect(got).toEqual([[a, b]]);
+    expect(zone.file()).toBeNull();
+  });
+
+  it('lets the picker choose several', () => {
+    const { fixture, zone, got } = many();
+    const input = fixture.nativeElement.querySelector('input[type=file]') as HTMLInputElement;
+    expect(input.multiple).toBe(true);
+    zone.onPick({ target: { files: [a, b], value: 'x' } } as unknown as Event);
+    expect(got).toEqual([[a, b]]);
+  });
+
+  it('takes nothing while disabled', () => {
+    const { fixture, zone, got } = many();
+    fixture.componentRef.setInput('disabled', true);
+    zone.onDrop({ preventDefault: () => {}, dataTransfer: { files: [a] } } as unknown as DragEvent);
+    expect(got).toEqual([]);
   });
 });

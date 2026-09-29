@@ -1,4 +1,4 @@
-import { Component, input, model, signal } from '@angular/core';
+import { Component, input, model, output, signal } from '@angular/core';
 import { Icon } from './icon';
 import { formatSize } from './format-size';
 
@@ -17,7 +17,7 @@ import { formatSize } from './format-size';
   selector: 'app-file-dropzone',
   imports: [Icon],
   template: `
-    <div class="dropzone" [class.dropzone-active]="dragging()"
+    <div class="dropzone" [class.dropzone-active]="dragging()" [class.opacity-60]="disabled()" [attr.aria-disabled]="disabled() || null"
          (dragover)="onDragOver($event)" (dragleave)="onDragLeave($event)" (drop)="onDrop($event)">
       @if (file(); as picked) {
         <app-icon name="file" size="1.75rem" class="icon-info" />
@@ -33,8 +33,9 @@ import { formatSize } from './format-size';
           <p class="text-xs text-[color:var(--text-muted)] mt-0.5">{{ hint() }}</p>
         }
         <label class="btn btn-default btn-sm mt-3 cursor-pointer">
-          <app-icon name="folder" />Choose a file
-          <input type="file" class="sr-only" [attr.accept]="accept() || null" (change)="onPick($event)" />
+          <app-icon name="folder" />{{ multiple() ? 'Choose files' : 'Choose a file' }}
+          <input type="file" class="sr-only" [attr.accept]="accept() || null" [multiple]="multiple()" [disabled]="disabled()"
+                 (change)="onPick($event)" />
         </label>
       }
     </div>
@@ -46,6 +47,13 @@ export class FileDropzone {
   readonly accept = input('');
   readonly prompt = input('Drop a file here');
   readonly hint = input('');
+  /**
+   * Several files at once (the inbox): each drop or pick is handed over through `picked` and the zone stays ready
+   * for more, so `file` is never set and the chosen-file preview never shows -- the caller lists what it took.
+   */
+  readonly multiple = input(false);
+  readonly disabled = input(false);
+  readonly picked = output<File[]>();
 
   readonly dragging = signal(false);
   readonly formatSize = formatSize;
@@ -73,15 +81,25 @@ export class FileDropzone {
   onDrop(event: DragEvent): void {
     event.preventDefault();
     this.dragging.set(false);
+    if (this.disabled()) return;
+    if (this.multiple()) { this.hand(event.dataTransfer?.files); return; }
     const dropped = event.dataTransfer?.files?.[0];
     if (dropped) this.file.set(dropped);
   }
 
   onPick(event: Event): void {
     const input = event.target as HTMLInputElement;
-    const picked = input.files?.[0];
-    if (picked) this.file.set(picked);
+    if (this.multiple()) this.hand(input.files);
+    else {
+      const picked = input.files?.[0];
+      if (picked) this.file.set(picked);
+    }
     // Cleared so picking the same file twice in a row (after Remove) still fires (change).
     input.value = '';
+  }
+
+  private hand(files: FileList | File[] | null | undefined): void {
+    const all = Array.from(files ?? []);
+    if (all.length) this.picked.emit(all);
   }
 }
