@@ -655,6 +655,8 @@
     @apply shadow-sm;
   }
   html.dark .seg-on { color: var(--accent-text); }
+  /* A segmented control with more options than a phone's width holds wraps onto a second row (MIG-253). */
+  .seg-wrap .seg { flex-wrap: wrap; }
 
   /* A dot that only pulses while it is actually following the run. */
   .live-dot {

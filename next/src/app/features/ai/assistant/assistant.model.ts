@@ -307,7 +307,7 @@ export function askFirstNames(tools: readonly ToolDef[]): string[] {
 
 const SERVICES: Record<string, string> = {
   sources: 'Sources', 'api-collections': 'API collections', objects: 'Storage', jobs: 'Pipelines',
-  reports: 'Reports', 'tools-converter': 'Document converter',
+  reports: 'Run analytics', 'tools-converter': 'Document converter',
 };
 
 /** The service a tool calls, as the console names its pages; a step task with no page runs in the pipeline engine. */

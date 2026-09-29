@@ -340,6 +340,7 @@
                       <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
                         @if (!entry.folder) {
                           <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="preview(entry)"><app-icon name="eye" />View</button>
+                          <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="details(entry)"><app-icon name="info" />Details</button>
                           <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="openChat(entry)"><app-icon name="chat" />Chat with this file</button>
                           <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="download(entry)"><app-icon name="download" />Download</button>
                         }

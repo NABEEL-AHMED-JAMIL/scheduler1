@@ -1,0 +1,210 @@
+<!-- MIG-253: Dataset → PDF and From an execution. The preview is the render itself, as a PDF drawn by
+     pdf.js from an object URL -- a template's HTML never enters this page. -->
+<div class="space-y-4" data-render-panel>
+  @if (source() === 'dataset') {
+    <app-segmented [(value)]="datasetFrom" [options]="datasetFromOptions" ariaLabel="Where the rows come from" />
+
+    @if (datasetFrom() === 'paste') {
+      <div class="field">
+        <label class="label" for="render-rows">Rows (JSON)</label>
+        <textarea id="render-rows" class="input mono text-xs" rows="7" spellcheck="false"
+                  [placeholder]="rowsPlaceholder" [value]="datasetText()"
+                  (input)="datasetText.set($any($event.target).value); result.set(null)"></textarea>
+        @if (!datasetText().trim()) {
+          <p class="field-note text-[color:var(--text-muted)]">{{ rowsHint }}</p>
+        } @else if (parseError()) {
+          <p class="field-note text-crit-500" role="alert">{{ parseError() }}</p>
+        } @else {
+          <p class="field-note text-[color:var(--text-secondary)] truncate" [title]="parsedSummary()">{{ parsedSummary() }}</p>
+        }
+      </div>
+    } @else {
+      <div class="flex flex-wrap items-center gap-3">
+        <button type="button" class="btn btn-default btn-sm" (click)="chooseTable()">
+          <app-icon name="folder" />{{ table() ? 'Choose another table…' : 'Choose a table…' }}
+        </button>
+        @if (table(); as t) {
+          <span class="text-sm min-w-0 truncate" [title]="t.bucket + '/' + t.key">
+            <span class="font-medium">{{ t.name }}</span>
+            <span class="mono text-xs text-[color:var(--text-muted)]"> · {{ t.bucket }}/{{ t.key }}</span>
+          </span>
+        } @else {
+          <span class="text-sm text-[color:var(--text-muted)]">CSV, TSV, XLSX, Parquet, JSON or JSONL.</span>
+        }
+      </div>
+    }
+  } @else {
+    <!-- From an execution: a schedule, one of its runs, and a dataset that run kept. -->
+    @if (schedulesError()) {
+      <p class="text-sm text-crit-500 flex items-center gap-2" role="alert">
+        <app-icon name="alert" class="shrink-0" />{{ schedulesError() }}
+        <button type="button" class="btn btn-default btn-xs" (click)="loadSchedules()"><app-icon name="refresh" />Try again</button>
+      </p>
+    }
+    <div class="form-grid">
+      <div class="field">
+        <label class="label" for="render-schedule">Schedule</label>
+        <app-combobox id="render-schedule" [selected]="jobId() ?? ''" (selectedChange)="pickSchedule($event)"
+                      placeholder="Choose a schedule" clearLabel="None" [options]="scheduleOptions()" />
+      </div>
+      <div class="field">
+        <label class="label" for="render-run">Run</label>
+        <select id="render-run" class="input" [disabled]="!runList().length"
+                (change)="pickRun($any($event.target).value)">
+          <option value="" [selected]="jobQueueId() == null">{{ jobId() == null ? 'Choose a schedule first' : runList().length ? 'Choose a run' : 'No runs yet' }}</option>
+          @for (run of runList(); track run.jobQueueId) {
+            <option [value]="run.jobQueueId" [selected]="run.jobQueueId === jobQueueId()">
+              #{{ run.jobQueueId }} · {{ run.jobStatus || '—' }}{{ run.startTime ? ' · ' + (run.startTime | serverTime: 'recent') : '' }}
+            </option>
+          }
+        </select>
+      </div>
+      <div class="field">
+        <label class="label" for="render-dataset">Dataset</label>
+        <select id="render-dataset" class="input" [disabled]="!datasets().length"
+                (change)="pickDataset($any($event.target).value)">
+          <option value="" [selected]="datasetId() == null">{{ outputs() && !datasets().length ? 'This run kept no dataset' : 'Choose a dataset' }}</option>
+          @for (d of datasets(); track d.runOutputId) {
+            <option [value]="d.runDatasetId" [selected]="d.runDatasetId === datasetId()">
+              {{ d.name }}{{ d.stepKey ? ' · step ' + d.stepKey : '' }}{{ d.rowCount != null ? ' · ' + d.rowCount + ' rows' : '' }}
+            </option>
+          }
+        </select>
+      </div>
+    </div>
+    @if (readingRun()) {
+      <p class="text-sm text-[color:var(--text-muted)] flex items-center gap-2"><app-icon name="refresh" class="spin" />Reading the dataset…</p>
+    } @else if (runRowCount() != null) {
+      <p class="text-sm text-[color:var(--text-secondary)]">{{ runRowCount() }} row{{ runRowCount() === 1 ? '' : 's' }} from run #{{ jobQueueId() }}, ready to render.</p>
+    } @else if (outputs() && !datasets().length) {
+      <p class="text-sm text-[color:var(--text-muted)]">
+        This run kept no dataset it still holds: a run's datasets expire, and an upload lives in its bucket instead.
+      </p>
+    }
+  }
+
+  <!-- What to make, and how it is laid out. -->
+  <div class="form-grid">
+    <div class="field">
+      <label class="label" for="render-format">Make</label>
+      <select id="render-format" class="input" (change)="outputFormat.set($any($event.target).value); result.set(null)">
+        @for (f of formats(); track f.format) {
+          <option [value]="f.format" [selected]="f.format === outputFormat()">{{ f.format.toUpperCase() }}</option>
+        } @empty {
+          <option value="pdf" selected>PDF</option>
+        }
+      </select>
+      @if (formatsError()) { <p class="field-note text-warn-500">{{ formatsError() }}</p> }
+    </div>
+    @if (usesTemplate()) {
+      <div class="field">
+        <label class="label" for="render-template">Template</label>
+        <app-combobox id="render-template" [selected]="options().templateId ?? ''" (selectedChange)="setTemplate($event)"
+                      placeholder="Default layout" clearLabel="Default layout" [options]="templateOptions()" />
+        <p class="field-note text-[color:var(--text-muted)]">
+          {{ templates().length ? 'A saved template, or the default: a title, a line of facts and the table.' : 'The default layout: a title, a line of facts and the table.' }}
+        </p>
+      </div>
+    }
+  </div>
+
+  @if (usesTemplate() && usesDefault()) {
+    <div class="form-grid">
+      <div class="field">
+        <label class="label" for="render-title">Title</label>
+        <input id="render-title" class="input" [placeholder]="defaultTitle() || 'The dataset\'s own title'" maxlength="120"
+               [value]="options().title" (input)="setTitle($any($event.target).value)" />
+      </div>
+      <div class="field">
+        <label class="label" for="render-page">Page</label>
+        <div class="flex gap-2">
+          <select id="render-page" class="input" aria-label="Page size" (change)="setPageSize($any($event.target).value)">
+            @for (size of pageSizes; track size) {
+              <option [value]="size" [selected]="size === options().pageSize">{{ size === 'LETTER' ? 'Letter' : size === 'LEGAL' ? 'Legal' : size }}</option>
+            }
+          </select>
+          <select class="input" aria-label="Orientation" (change)="setOrientation($any($event.target).value)">
+            <option value="portrait" [selected]="options().orientation === 'portrait'">Portrait</option>
+            <option value="landscape" [selected]="options().orientation === 'landscape'">Landscape</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label class="label" for="render-watermark">Watermark</label>
+        <input id="render-watermark" class="input" placeholder="None" maxlength="100"
+               [value]="options().watermark" (input)="setWatermark($any($event.target).value)" />
+      </div>
+    </div>
+  }
+
+  <!-- Where it goes. -->
+  <div class="form-grid">
+    <div class="field">
+      <label class="label" for="render-name">File name</label>
+      <input id="render-name" class="input" placeholder="The title, or report" maxlength="200"
+             [value]="fileName()" (input)="fileName.set($any($event.target).value)" />
+      <p class="field-note text-[color:var(--text-muted)]">The extension is the format's.</p>
+    </div>
+  </div>
+  <div>
+    <label class="flex items-center gap-2 text-sm cursor-pointer">
+      <input type="checkbox" class="checkbox" [checked]="saveToBucket()"
+             (change)="saveToBucket.set($any($event.target).checked)" />
+      Save the file to a bucket
+    </label>
+    <p class="field-note text-[color:var(--text-muted)]">
+      Saved files are listed under Documents › Reports. Otherwise the file only exists in this tab until you download it.
+    </p>
+  </div>
+  @if (saveToBucket()) {
+    <div class="form-grid">
+      <div class="field">
+        <label class="label" for="render-bucket">Save to bucket</label>
+        <app-combobox id="render-bucket" [selected]="saveBucket()" (selectedChange)="saveBucket.set($event)"
+                      placeholder="Choose a bucket" clearLabel="None" [options]="bucketOptions()" />
+      </div>
+      <div class="field">
+        <label class="label" for="render-folder">Folder</label>
+        <input id="render-folder" class="input mono" [placeholder]="'reports/'"
+               [value]="saveFolder()" (input)="saveFolder.set($any($event.target).value)" />
+      </div>
+    </div>
+  }
+
+  <div class="flex flex-wrap gap-2">
+    <button type="button" class="btn btn-default" [disabled]="!canPreview()" (click)="preview()"
+            [title]="usesTemplate() ? 'Render the layout as a PDF and show it here' : 'Only a document format has a layout to preview'">
+      <app-icon [name]="rendering() === 'preview' ? 'refresh' : 'eye'" [class.spin]="rendering() === 'preview'" />{{ rendering() === 'preview' ? 'Rendering…' : 'Preview' }}
+    </button>
+    <button type="button" class="btn btn-primary" [disabled]="!canMake()" (click)="make()">
+      <app-icon [name]="rendering() === 'make' ? 'refresh' : 'file'" [class.spin]="rendering() === 'make'" />{{ rendering() === 'make' ? 'Making…' : 'Make ' + outputFormat().toUpperCase() }}
+    </button>
+  </div>
+
+  @if (error()) {
+    <p class="text-sm text-crit-500 flex items-start gap-2" role="alert"><app-icon name="alert" class="shrink-0 mt-0.5" />{{ error() }}</p>
+  }
+
+  @if (result(); as done) {
+    <div class="rounded-md p-3.5 flex flex-wrap items-center gap-3 bg-sunken" data-render-result>
+      <div class="flex-1 min-w-0">
+        <div class="text-sm font-medium truncate" [title]="done.outputFileName">{{ done.outputFileName }}</div>
+        <div class="text-xs text-[color:var(--text-muted)]">
+          {{ size(done.outputFileSize) }}{{ done.pageCount ? ' · ' + done.pageCount + ' page' + (done.pageCount === 1 ? '' : 's') : '' }}{{ done.save && done.bucketName ? ' · saved to ' + done.bucketName : ' · ready to download' }}
+        </div>
+      </div>
+      @if (done.save && done.bucketName) {
+        <a class="btn btn-default btn-sm" routerLink="/documents/files"
+           [queryParams]="{ bucket: done.bucketName, prefix: savedFolder(done) }"><app-icon name="folder" />Open in storage</a>
+      }
+      <button type="button" class="btn btn-primary btn-sm" (click)="download()"><app-icon name="download" />Download</button>
+    </div>
+  }
+
+  @if (previewUrl(); as url) {
+    <div class="rounded-md border border-subtle overflow-hidden flex flex-col h-[70vh] min-h-96" data-render-preview
+         role="region" aria-label="Preview of the rendered PDF">
+      <app-pdf-viewer [src]="url" />
+    </div>
+  }
+</div>

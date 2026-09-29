@@ -206,6 +206,8 @@ describe('MIG-246: the renamed pages keep their gates', () => {
     // MIG-239: built. Browse files' key and floor: every member reads and uploads; configuring is an administrator's.
     ['/documents/inbox', 'Inbox', 'objects', 'TENANT_USER'],
     ['/documents/converter', 'Document Converter', 'tools-converter', undefined],
+    // MIG-253: generated outputs, behind the converter's key (no key of its own yet).
+    ['/documents/reports', 'Reports', 'tools-converter', undefined],
     ['/documents/transcript', 'Audio Transcript', 'tools-transcript', undefined],
     ['/data/analytics', 'Analytics Studio', 'analytics', undefined],
     ['/data/analytics/dashboards', 'Saved Analyses', 'analytics-dashboards', undefined],
@@ -314,6 +316,7 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
   ];
   const DOCUMENTS = [
     'Documents › Document Converter -> /documents/converter',
+    'Documents › Reports -> /documents/reports',
     'Documents › Browse files -> /documents/files',
     'Documents › Inbox -> /documents/inbox',
     'Documents › Audio Transcript -> /documents/transcript',

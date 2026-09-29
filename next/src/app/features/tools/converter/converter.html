@@ -3,14 +3,20 @@
     <div>
       <h1 class="page-title">Document Converter</h1>
       <p class="page-subtitle">
-        Convert between Office, OpenDocument, PDF, Markdown and image formats.
+        Convert between Office, OpenDocument, PDF, Markdown and image formats, or render a dataset as a document.
       </p>
     </div>
   </div>
 
   <div class="card p-4 space-y-4">
-    <app-segmented [(value)]="mode" [options]="modeOptions" ariaLabel="Choose a source" />
+    <app-segmented class="seg-wrap" [(value)]="mode" [options]="modeOptions" ariaLabel="Choose a source" />
 
+    <!-- MIG-253: a dataset, or one a run kept, rendered through a template; each mode its own panel. -->
+    @if (mode() === 'dataset') {
+      <app-render-panel source="dataset" [buckets]="buckets()" />
+    } @else if (mode() === 'execution') {
+      <app-render-panel source="execution" [buckets]="buckets()" />
+    } @else {
     @if (mode() === 'upload') {
       <app-file-dropzone [file]="file()" (fileChange)="onFile($event)"
                          prompt="Drop a document here" />
@@ -111,6 +117,7 @@
         </div>
         <button type="button" class="btn btn-primary btn-sm" (click)="download()"><app-icon name="download" />Download</button>
       </div>
+    }
     }
   </div>
 
