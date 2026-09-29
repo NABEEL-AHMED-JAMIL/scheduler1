@@ -26,6 +26,9 @@ import {
   cardView, confirmLabel, contentBlocks, filesLink, mergeMessages, outcomeLook, runLink, toolState, traceOwners, withDecision,
 } from './assistant.model';
 import { DatasetPanel } from './dataset-panel';
+import { DataPolicyApi } from '../../admin/data-policies/data-policy.api';
+import { PolicyLevel, levelSummary, levelsOf, policyState } from '../../admin/data-policies/data-policy.model';
+import { sensitivityText } from '../../../shared/ui/sensitivity';
 
 interface Connection { connectionId: number; name: string; isDefault?: boolean; status?: string; defaultModel?: string | null; provider?: string; }
 interface TraceState { loading: boolean; error: string; trace: ToolTrace | null; }
@@ -65,6 +68,7 @@ export class Assistant implements OnInit {
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
   private readonly handoff = inject(PipelineDraftHandoff);
+  private readonly policies = inject(DataPolicyApi);
 
   readonly suggestions = SUGGESTIONS;
   readonly timeoutMinutes = ASSISTANT_TIMEOUT_MS / 60_000;
@@ -111,6 +115,15 @@ export class Assistant implements OnInit {
   });
 
   readonly workspace = signal('');
+  /** MIG-254: the workspace's data policy, level by level -- what decides the models and write tools the assistant may use. */
+  readonly policyLevels = signal<PolicyLevel[]>([]);
+  readonly policyError = signal('');
+  readonly policyHeadline = computed(() => {
+    if (this.policyError()) return 'Not available';
+    const levels = this.policyLevels();
+    if (!levels.length) return '…';
+    return { defaults: 'Defaults (not saved)', partly: 'Partly saved', saved: 'Saved' }[policyState(levels)];
+  });
   readonly actingAs = computed(() => this.auth.displayName());
   readonly roleText = computed(() => roleLabel(this.auth.role()));
 
@@ -129,6 +142,7 @@ export class Assistant implements OnInit {
     this.loadConversations();
     this.loadTools();
     this.loadWorkspace();
+    this.loadPolicy();
     if (this.canPickModel()) this.loadConnections();
     const id = Number(this.route.snapshot.queryParamMap.get('c'));
     if (Number.isInteger(id) && id > 0) this.open(id);
@@ -158,6 +172,19 @@ export class Assistant implements OnInit {
       error: () => this.workspace.set(''),
     });
   }
+
+  private loadPolicy(): void {
+    this.policies.get().subscribe({
+      next: r => {
+        if (r.status !== API_SUCCESS) { this.policyError.set(r.message || 'The data policy could not be read.'); return; }
+        this.policyLevels.set(levelsOf(r.data));
+      },
+      error: err => this.policyError.set(err?.error?.message || 'The data policy could not be read.'),
+    });
+  }
+
+  policyLevelText(level: string): string { return sensitivityText(level); }
+  policyLevelSummary(level: PolicyLevel): string { return levelSummary(level); }
 
   /** Model connections are an administrator's to list (aiConnection.json is TENANT_ADMIN); a tenant user gets the default. */
   private loadConnections(): void {

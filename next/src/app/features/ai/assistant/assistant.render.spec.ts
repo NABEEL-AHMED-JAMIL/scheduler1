@@ -10,13 +10,14 @@ import { ToastService } from '../../../shared/ui/toast.service';
 import { AssistantApi } from './assistant.api';
 import { AssistantMessage } from './assistant.model';
 import { Assistant } from './assistant';
+import { DataPolicyApi } from '../../admin/data-policies/data-policy.api';
 
 const CONV = { conversationId: 1000, title: 'Run the job', status: 'active' };
 const m = (x: Partial<AssistantMessage>): AssistantMessage => ({ messageId: 1, conversationId: 1000, seq: 1, role: 'assistant', content: '',
   toolRunId: null, runStatus: null, card: null, links: [], artifact: null, ...x });
 
 /** The page as drawn: the card's buttons, a blocked call, the result's links, model text kept as text. */
-function render(messages: AssistantMessage[], calls: unknown[] = []) {
+function render(messages: AssistantMessage[], calls: unknown[] = [], policy: unknown = { status: 'SUCCESS', message: '', data: { levels: [] } }) {
   const api = {
     conversations: () => of({ status: 'SUCCESS', data: [CONV] }),
     conversation: () => of({ status: 'SUCCESS', data: { conversation: CONV, messages } }),
@@ -33,6 +34,7 @@ function render(messages: AssistantMessage[], calls: unknown[] = []) {
       provideZonelessChangeDetection(),
       provideRouter([]),
       { provide: AssistantApi, useValue: api },
+      { provide: DataPolicyApi, useValue: { get: vi.fn(() => of(policy)) } },
       { provide: HttpClient, useValue: { get: () => of({ status: 'SUCCESS', data: { tenantName: 'Acme' } }) } },
       { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: { get: (k: string) => (k === 'c' ? '1000' : null) } } } },
       { provide: Dialog, useValue: { open: vi.fn() } },
@@ -101,5 +103,38 @@ describe('AI Assistant -- as drawn', () => {
     expect(draft.textContent).toContain('Not saved');
     const labels = Array.from(draft.querySelectorAll('button')).map(b => b.textContent!.trim());
     expect(labels).toEqual(['Copy']);
+  });
+});
+
+/** MIG-254: the Context panel's data policy is the workspace's own (it said "None configured" before MIG-243). */
+describe('AI Assistant -- the data policy it works under', () => {
+  const context = (el: HTMLElement) => Array.from(el.querySelectorAll('[data-context] dt')).map(dt =>
+    `${dt.textContent!.trim()} ${(dt.nextElementSibling?.textContent ?? '').replace(/\s+/g, ' ').trim()}`).join(' | ');
+  const levels = (el: HTMLElement) => Array.from(el.querySelectorAll('[data-policy] li')).map(li => Array.from(li.children).map(c => c.textContent!.trim()).join(' '));
+
+  it('shows the defaults when the workspace saved none, level by level, and links to the policy', () => {
+    const { el } = render([]);
+    expect(context(el)).toContain('Data policy Defaults (not saved)');
+    expect(context(el)).not.toContain('None configured');
+    expect(el.querySelector('[data-context] a[href="/administration/data-policies"]')).not.toBeNull();
+    expect(levels(el)).toEqual([
+      'Public Any model · write tools on · pipeline retention',
+      'Internal Any model · write tools on · pipeline retention',
+      'Sensitive Local only · write tools off · pipeline retention',
+    ]);
+  });
+
+  it('shows a saved level as saved', () => {
+    const { el } = render([], [], { status: 'SUCCESS', message: '', data: { levels: [
+      { sensitivity: 'internal', modelRule: 'baa', allowedModels: [], retentionDays: 7, aiWriteTools: false, minFieldsWarning: true, saved: true },
+    ] } });
+    expect(context(el)).toContain('Data policy Partly saved');
+    expect(levels(el)[1]).toBe('Internal BAA-signed or local · write tools off · 7 days');
+  });
+
+  it('says so when the policy cannot be read', () => {
+    const { el } = render([], [], { status: 'ERROR', message: 'Pick the workspace whose data policy to read.' });
+    expect(context(el)).toContain('Data policy Not available');
+    expect(el.querySelector('[data-policy]')).toBeNull();
   });
 });

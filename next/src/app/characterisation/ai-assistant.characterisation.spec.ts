@@ -53,6 +53,12 @@ const ANSWERS: Record<string, unknown> = {
   'GET /aiPrompt.json/assistant/conversation': { status: 'SUCCESS', message: '5 message(s).', data: { conversation: CONVERSATION, messages: MESSAGES } },
   'GET /aiPrompt.json/tools/runs': { status: 'SUCCESS', message: '1 run(s).', data: [RUN] },
   'GET /aiPrompt.json/tools/trace': TRACE,
+  // MIG-254: workspace 2924's data policy as ai-service (MIG-243) answered it on 2026-09-29 -- nothing saved, every level its default.
+  'GET /aiPrompt.json/dataPolicy': { status: 'SUCCESS', message: 'The workspace\'s data policy.', data: { tenantId: 2924, levels: [
+    { sensitivity: 'public', modelRule: 'any', allowedModels: [], retentionDays: null, deliveryOptions: {}, aiWriteTools: true, minFieldsWarning: true, saved: false },
+    { sensitivity: 'internal', modelRule: 'any', allowedModels: [], retentionDays: null, deliveryOptions: {}, aiWriteTools: true, minFieldsWarning: true, saved: false },
+    { sensitivity: 'sensitive', modelRule: 'local', allowedModels: [], retentionDays: null, deliveryOptions: {}, aiWriteTools: false, minFieldsWarning: true, saved: false },
+  ] } },
   'GET /appUser.json/me': { status: 'SUCCESS', message: 'OK', data: { appUserId: 4537, tenantId: 2924, tenantName: 'UI-CHECK workspace' } },
 };
 
@@ -67,6 +73,7 @@ function threadOf(v: Visit): Record<string, unknown> {
     links: q('[data-link]').map(l => `${l.getAttribute('data-link')}: ${clean(l.textContent)}`),
     calls: q('[data-call]').map(c => `${c.getAttribute('data-call')} ${c.getAttribute('data-outcome')}: ${clean(c.textContent)}`),
     context: detailsOf(v.main.querySelector('[data-context]') as HTMLElement ?? v.main).terms,
+    policy: q('[data-policy] li').map(li => Array.from(li.children).map(c => clean(c.textContent)).join(': ')),
   };
 }
 

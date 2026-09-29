@@ -8,6 +8,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /aiPrompt.json/assistant/conversations?limit=30",
       "GET /aiPrompt.json/tools/list",
       "GET /appUser.json/me",
+      "GET /aiPrompt.json/dataPolicy",
       "GET /aiConnection.json/list"
     ],
     "headings": [
@@ -33,6 +34,7 @@ export const PINNED: Record<string, unknown> = {
       "Model connection"
     ],
     "links": [
+      "/administration/data-policies",
       "/ai/tools"
     ],
     "thread": {
@@ -44,9 +46,14 @@ export const PINNED: Record<string, unknown> = {
         "Workspace: UI-CHECK workspace",
         "Acting as: Casey BaselineTenant administrator",
         "Model: Local Ollama",
-        "Data policy: None configured",
+        "Data policy: Defaults (not saved)",
         "Tools allowed: 5 of 6",
         "Asks first for: run_pipeline, delete_file"
+      ],
+      "policy": [
+        "Public: Any model · write tools on · pipeline retention",
+        "Internal: Any model · write tools on · pipeline retention",
+        "Sensitive: Local only · write tools off · pipeline retention"
       ]
     }
   },
@@ -58,6 +65,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /aiPrompt.json/assistant/conversations?limit=30",
       "GET /aiPrompt.json/tools/list",
       "GET /appUser.json/me",
+      "GET /aiPrompt.json/dataPolicy",
       "GET /aiConnection.json/list",
       "GET /aiPrompt.json/assistant/conversation?conversationId=1000"
     ],
@@ -84,6 +92,7 @@ export const PINNED: Record<string, unknown> = {
       "Model connection"
     ],
     "links": [
+      "/administration/data-policies",
       "/ai/tools",
       "/pipelines/schedules/2848/runs/7404/logs"
     ],
@@ -112,9 +121,14 @@ export const PINNED: Record<string, unknown> = {
         "Workspace: UI-CHECK workspace",
         "Acting as: Casey BaselineTenant administrator",
         "Model: Local Ollama",
-        "Data policy: None configured",
+        "Data policy: Defaults (not saved)",
         "Tools allowed: 5 of 6",
         "Asks first for: run_pipeline, delete_file"
+      ],
+      "policy": [
+        "Public: Any model · write tools on · pipeline retention",
+        "Internal: Any model · write tools on · pipeline retention",
+        "Sensitive: Local only · write tools off · pipeline retention"
       ]
     }
   },
@@ -125,7 +139,8 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/list?limit=20&page=1",
       "GET /aiPrompt.json/assistant/conversations?limit=30",
       "GET /aiPrompt.json/tools/list",
-      "GET /appUser.json/me"
+      "GET /appUser.json/me",
+      "GET /aiPrompt.json/dataPolicy"
     ],
     "headings": [
       "AI Assistant",
@@ -149,6 +164,7 @@ export const PINNED: Record<string, unknown> = {
       "Message the assistant"
     ],
     "links": [
+      "/administration/data-policies",
       "/ai/tools"
     ],
     "thread": {
@@ -160,9 +176,14 @@ export const PINNED: Record<string, unknown> = {
         "Workspace: UI-CHECK workspace",
         "Acting as: Casey BaselineTenant user",
         "Model: Workspace default model",
-        "Data policy: None configured",
+        "Data policy: Defaults (not saved)",
         "Tools allowed: 5 of 6",
         "Asks first for: run_pipeline, delete_file"
+      ],
+      "policy": [
+        "Public: Any model · write tools on · pipeline retention",
+        "Internal: Any model · write tools on · pipeline retention",
+        "Sensitive: Local only · write tools off · pipeline retention"
       ]
     }
   },

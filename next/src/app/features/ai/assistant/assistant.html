@@ -315,12 +315,22 @@
           <div class="flex items-baseline justify-between gap-3"><dt class="text-[color:var(--text-muted)] shrink-0">Workspace</dt><dd class="text-right truncate min-w-0" [title]="tip(workspace())">{{ workspace() || '—' }}</dd></div>
           <div class="flex items-baseline justify-between gap-3"><dt class="text-[color:var(--text-muted)] shrink-0">Acting as</dt><dd class="text-right min-w-0"><span class="block truncate">{{ actingAs() || '—' }}</span><span class="block text-xs text-[color:var(--text-muted)]">{{ roleText() }}</span></dd></div>
           <div class="flex items-baseline justify-between gap-3"><dt class="text-[color:var(--text-muted)] shrink-0">Model</dt><dd class="text-right truncate min-w-0" [title]="tip(modelLabel())">{{ modelLabel() }}</dd></div>
-          <div class="flex items-baseline justify-between gap-3"><dt class="text-[color:var(--text-muted)] shrink-0">Data policy</dt><dd class="text-right">None configured</dd></div>
+          <div class="flex items-baseline justify-between gap-3"><dt class="text-[color:var(--text-muted)] shrink-0">Data policy</dt><dd class="text-right min-w-0"><a class="link-inline" routerLink="/administration/data-policies" [title]="policyError() || 'The workspace\'s data policy'">{{ policyHeadline() }}</a></dd></div>
           <div class="flex items-baseline justify-between gap-3"><dt class="text-[color:var(--text-muted)] shrink-0">Tools allowed</dt>
             <dd class="text-right"><a class="link-inline" routerLink="/ai/tools">{{ allowed().length }} of {{ tools().length }}</a></dd></div>
           <div class="flex items-baseline justify-between gap-3"><dt class="text-[color:var(--text-muted)] shrink-0">Asks first for</dt>
             <dd class="text-right mono text-xs break-words min-w-0">{{ askFirst().length ? askFirst().join(', ') : '—' }}</dd></div>
         </dl>
+        @if (policyLevels().length && !policyError()) {
+          <ul class="flex flex-col gap-1 text-xs" data-policy aria-label="Data policy by level">
+            @for (l of policyLevels(); track l.sensitivity) {
+              <li class="flex items-baseline gap-2 min-w-0">
+                <span class="font-medium w-16 shrink-0">{{ policyLevelText(l.sensitivity) }}</span>
+                <span class="text-[color:var(--text-muted)] min-w-0 break-words">{{ policyLevelSummary(l) }}</span>
+              </li>
+            }
+          </ul>
+        }
         @if (toolsError()) {
           <p class="text-xs text-crit-500">{{ toolsError() }}</p>
         } @else if (tools().length) {
