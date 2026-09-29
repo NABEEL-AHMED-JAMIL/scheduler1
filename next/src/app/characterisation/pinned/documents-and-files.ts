@@ -131,8 +131,10 @@ export const PINNED: Record<string, unknown> = {
     ],
     "buttons": [
       "Columns",
+      "Dataset → PDF",
       "Delete this conversion",
       "From a bucket",
+      "From an execution",
       "Refresh",
       "Supported formats",
       "Upload a file",

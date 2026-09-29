@@ -18,6 +18,7 @@ import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { TableShell } from '../../../shared/ui/data-table';
 import { Pagination } from '../../../shared/ui/pagination';
 import { createPager } from '../../../shared/ui/pager';
+import { RenderPanel } from './render-panel';
 
 interface FormatFamily {
   key: string;
@@ -43,6 +44,9 @@ export interface ConverterTask {
   dateCreated?: string;
 }
 
+/** A file converted (upload, bucket), or rows rendered (MIG-253: dataset, execution). */
+export type ConverterMode = 'upload' | 'bucket' | 'dataset' | 'execution';
+
 interface ConvertResult {
   outputFileName: string;
   outputFormat: string;
@@ -52,7 +56,7 @@ interface ConvertResult {
 
 @Component({
   selector: 'app-converter',
-  imports: [Icon, RouterLink, ServerTimePipe, Segmented, FileDropzone, Combobox, TableShell, Pagination],
+  imports: [Icon, RouterLink, ServerTimePipe, Segmented, FileDropzone, Combobox, TableShell, Pagination, RenderPanel],
   templateUrl: './converter.html',
 })
 export class Converter implements OnInit {
@@ -73,11 +77,16 @@ export class Converter implements OnInit {
 
   /** Upload, or pick something already in a bucket -- the endpoint only takes a multipart
       file, so a bucket choice is fetched and handed over as one. */
-  readonly mode = signal<'upload' | 'bucket'>('upload');
-  readonly modeOptions: SegmentOption<'upload' | 'bucket'>[] = [
+  readonly mode = signal<ConverterMode>('upload');
+  readonly modeOptions: SegmentOption<ConverterMode>[] = [
     { id: 'upload', label: 'Upload a file', icon: 'upload' },
     { id: 'bucket', label: 'From a bucket', icon: 'folder' },
+    // MIG-253: rows rendered through a template (media-service's render), not a file converted.
+    { id: 'dataset', label: 'Dataset → PDF', icon: 'table' },
+    { id: 'execution', label: 'From an execution', icon: 'play' },
   ];
+  /** Converting a file (upload or bucket), as opposed to rendering rows. */
+  readonly fileMode = computed(() => this.mode() === 'upload' || this.mode() === 'bucket');
   readonly buckets = signal<BucketSummary[]>([]);
   readonly bucket = signal('');
   readonly selectedKey = signal('');
