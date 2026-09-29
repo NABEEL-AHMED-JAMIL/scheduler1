@@ -15,6 +15,7 @@ import { ObjectPicker, PickedObject, objectPickerConfig } from '../../../shared/
 import { ModelConnection } from '../ai-providers';
 import { Prompt, PromptRun, PromptVariable, placeholdersOf } from './prompt-model';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
+import { SENSITIVITY_LEVELS, SENSITIVITY_TEXT } from '../../../shared/ui/sensitivity';
 
 /**
  * The prompt editor, with Try it beside it: the template and its variables on the left, the
@@ -50,6 +51,12 @@ export class PromptEdit implements OnInit {
   readonly tenants = signal<{ tenantId: number; tenantName: string }[]>([]);
   readonly isPlatformAdmin = computed(() => this.auth.isPlatformAdmin());
 
+  /** MIG-243: the level of the data a prompt is sent -- the workspace's data policy for it decides the models and tools. */
+  readonly sensitivities = [
+    { value: '', label: 'Not set (read as internal)' },
+    ...SENSITIVITY_LEVELS.map(l => ({ value: l as string, label: SENSITIVITY_TEXT[l].label })),
+  ];
+
   readonly form: FormGroup = this.fb.group({
     name: ['', Validators.required],
     description: [''],
@@ -63,6 +70,7 @@ export class PromptEdit implements OnInit {
     temperature: [null as number | null],
     maxTokens: [null as number | null],
     tags: [''],
+    dataSensitivity: [''],
     variables: this.fb.array([] as FormGroup[]),
   });
   get variables(): FormArray<FormGroup> { return this.form.get('variables') as FormArray<FormGroup>; }
@@ -207,7 +215,7 @@ export class PromptEdit implements OnInit {
         this.form.patchValue({
           name: p.name, description: p.description ?? '', tenantId: p.tenantId ?? null, connectionId: p.connectionId ?? null, model: p.model ?? '',
           systemInstructions: p.systemInstructions ?? '', userTemplate: p.userTemplate, outputMode: p.outputMode, outputSchema: p.outputSchema ?? '',
-          temperature: p.temperature ?? null, maxTokens: p.maxTokens ?? null, tags: p.tags ?? '',
+          temperature: p.temperature ?? null, maxTokens: p.maxTokens ?? null, tags: p.tags ?? '', dataSensitivity: p.dataSensitivity ?? '',
         });
         this.variables.clear();
         for (const v of p.variables ?? []) this.addVariable(v);
@@ -256,6 +264,8 @@ export class PromptEdit implements OnInit {
       temperature: v.temperature === null || v.temperature === '' ? null : Number(v.temperature),
       maxTokens: v.maxTokens === null || v.maxTokens === '' ? null : Number(v.maxTokens),
       tags: v.tags || null, activate,
+      // The service keeps the level when the field is missing and clears it when it is blank: always sent, so it is as shown.
+      dataSensitivity: v.dataSensitivity ?? '',
     };
   }
 

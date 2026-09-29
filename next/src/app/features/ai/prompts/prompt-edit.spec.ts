@@ -344,3 +344,23 @@ describe('PromptEdit for a platform administrator', () => {
     expect(component.connection()?.name).toBe('Acme Ollama');
   });
 });
+
+/** MIG-243/254: a prompt declares the level of the data it is sent, and the workspace's data policy for that level applies. */
+describe('PromptEdit -- data sensitivity', () => {
+  it('offers the three levels, and not set', () => {
+    const { component } = editor();
+    expect(component.sensitivities.map(s => s.value)).toEqual(['', 'public', 'internal', 'sensitive']);
+    expect(component.sensitivities[0].label).toBe('Not set (read as internal)');
+  });
+
+  it('sends the level picked, and blank to clear it', () => {
+    const { component, post } = editor();
+    component.form.patchValue({ name: 'Summarise', userTemplate: 'Hello', dataSensitivity: 'sensitive' });
+    TestBed.tick();
+    component.save(true);
+    expect(post).toHaveBeenLastCalledWith(expect.stringContaining('/aiPrompt.json/save'), expect.objectContaining({ dataSensitivity: 'sensitive' }));
+    component.form.patchValue({ dataSensitivity: '' });
+    component.save(true);
+    expect(post).toHaveBeenLastCalledWith(expect.stringContaining('/aiPrompt.json/save'), expect.objectContaining({ dataSensitivity: '' }));
+  });
+});

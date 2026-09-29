@@ -28,6 +28,8 @@ export interface Prompt {
   temperature?: number | null;
   maxTokens?: number | null;
   tags?: string | null;
+  /** MIG-243: public, internal or sensitive; null: not declared (read as internal). */
+  dataSensitivity?: string | null;
   version?: number;
   status?: string;
   runCount?: number;

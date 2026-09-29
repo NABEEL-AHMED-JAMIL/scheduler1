@@ -156,6 +156,12 @@
           <app-field label="Tags" for="pTags" [control]="form.get('tags')" [submitted]="submitted()" hint="Comma-separated. File types here (pdf, docx) offer the prompt in the file chat.">
             <input id="pTags" class="input" formControlName="tags" placeholder="pdf, docx" />
           </app-field>
+          <app-field label="Data sensitivity" for="pSensitivity" [control]="form.get('dataSensitivity')" [submitted]="submitted()"
+                     hint="The level of the data this prompt is sent. The workspace's data policy for it decides which models may run it.">
+            <select id="pSensitivity" class="input" formControlName="dataSensitivity">
+              @for (s of sensitivities; track s.value) { <option [value]="s.value">{{ s.label }}</option> }
+            </select>
+          </app-field>
         </div>
         @if (outputMode() === 'json') {
           <app-field label="Output schema" for="pSchema" [control]="form.get('outputSchema')" [submitted]="submitted()"
