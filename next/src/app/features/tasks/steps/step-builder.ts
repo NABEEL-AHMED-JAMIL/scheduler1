@@ -20,6 +20,7 @@ import {
   sameDefinition, sampleRowsOf, sourceLabel, stateOf, taskEntry, taskLabel, taskOptions, toYaml, updateSettings, updateSource, withSample,
   withSwitchedLine,
 } from './steps.model';
+import { PipelineDraftHandoff } from './draft-handoff';
 
 export type BuilderTab = 'steps' | 'settings' | 'yaml' | 'json';
 
@@ -60,6 +61,7 @@ export class StepBuilder {
   private readonly dialog = inject(Dialog);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
+  private readonly handoff = inject(PipelineDraftHandoff);
 
   readonly limits = LIMITS;
   readonly onErrors = ON_ERRORS;
@@ -118,6 +120,16 @@ export class StepBuilder {
     effect(() => {
       const task = this.taskDetailId();
       untracked(() => this.loadJobs(task));
+    });
+    // A draft handed over for this pipeline (the AI Assistant's, MIG-252) shows on its text tab as typed text, unsaved.
+    effect(() => {
+      const key = this.meta().pipelineKey;
+      untracked(() => {
+        const handed = this.handoff.take(key);
+        if (!handed) return;
+        if (handed.format === 'json') { this.jsonText.set(handed.text); this.jsonTyped.set(true); }
+        else { this.yamlText.set(handed.text); this.yamlTyped.set(true); }
+      });
     });
     // Leaving a text tab applies what was typed to the draft; entering one shows the draft as that text.
     effect(() => {
