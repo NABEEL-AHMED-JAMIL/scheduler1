@@ -284,3 +284,49 @@ describe('Combobox option list', () => {
     expect(billing.title).toBe('Billing intake');
   });
 });
+
+/**
+ * MIG-249: a row that is listed but cannot be picked -- a step task the Task Registry has turned off. It shows,
+ * marked, so a person sees why it is not there to add; a click, Enter or the arrow keys never choose it.
+ */
+describe('Combobox disabled options', () => {
+  function withDisabled() {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [Combobox] });
+    const fixture = TestBed.createComponent(Combobox);
+    fixture.componentRef.setInput('options', [
+      { value: 'filter', label: 'Filter rows (disabled)', disabled: true },
+      { value: 'select', label: 'select' },
+    ]);
+    fixture.componentRef.setInput('allowClear', false);
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  it('marks a disabled row and will not pick it by click', () => {
+    const fixture = withDisabled();
+    const box = fixture.componentInstance;
+    const picks: string[] = [];
+    box.selectedChange.subscribe(v => picks.push(v));
+    const el = fixture.nativeElement as HTMLElement;
+    const input = el.querySelector('input') as HTMLInputElement;
+    input.focus();
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    fixture.detectChanges();
+    const [filter] = Array.from(el.querySelectorAll<HTMLElement>('[role="option"]'));
+    expect(filter.getAttribute('aria-disabled')).toBe('true');
+    box.selectOption({ value: 'filter', label: 'Filter rows (disabled)', disabled: true }, new Event('mousedown'));
+    expect(picks).toEqual([]);
+  });
+
+  it('skips a disabled row with the arrow keys, so Enter picks the next one', () => {
+    const fixture = withDisabled();
+    const box = fixture.componentInstance;
+    const picks: string[] = [];
+    box.selectedChange.subscribe(v => picks.push(v));
+    box.onFocus();
+    box.onKeydown(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
+    box.onKeydown(new KeyboardEvent('keydown', { key: 'Enter' }));
+    expect(picks).toEqual(['select']);
+  });
+});

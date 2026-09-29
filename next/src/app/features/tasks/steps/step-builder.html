@@ -1,0 +1,210 @@
+<div class="flex flex-col gap-4 min-w-0">
+  <!-- What is saved, and what can be done with the draft. -->
+  <div class="card px-4 py-2.5 flex flex-wrap items-center gap-x-3 gap-y-2">
+    <div class="min-w-0 flex flex-wrap items-center gap-2">
+      <span class="text-sm font-medium">{{ versionText() }}</span>
+      @if (latestVersion(); as v) {
+        <span class="text-xs text-[color:var(--text-muted)]">saved {{ v.dateCreated | serverTime:'dateTime' }}</span>
+      }
+      @if (dirty()) { <span class="pill pill-warn">Unsaved changes</span> }
+    </div>
+    <div class="ml-auto flex flex-wrap items-center gap-2">
+      <button type="button" class="btn btn-default btn-sm" [disabled]="!!busy()" (click)="validate()">
+        <app-icon name="checkCircle" [class.spin]="busy() === 'validate'" />Validate
+      </button>
+      @if (canManage()) {
+        <button type="button" class="btn btn-default btn-sm" [disabled]="!!busy()" (click)="testWithSample()">
+          <app-icon name="table" />Test with sample
+        </button>
+        @if (jobs().length > 1) {
+          <select class="input input-sm w-auto max-w-56" aria-label="Schedule Run now runs" [value]="jobId() ?? ''" (change)="pickJob($any($event.target).value)">
+            @for (j of jobOptions(); track j.value) { <option [value]="j.value" [selected]="j.value === '' + jobId()">{{ j.label }}</option> }
+          </select>
+        }
+        <button type="button" class="btn btn-default btn-sm" [disabled]="!!busy() || !jobId()" [attr.title]="runHint() || null" (click)="runNow()">
+          <app-icon name="play" [class.spin]="busy() === 'run'" />{{ runLabel() }}
+        </button>
+        <button type="button" class="btn btn-default btn-sm" [disabled]="!taskDetailId()" (click)="schedule()">
+          <app-icon name="calendar" />Schedule
+        </button>
+        @if (dirty()) {
+          <button type="button" class="btn btn-ghost btn-sm" [disabled]="!!busy()" (click)="discard()">Discard</button>
+        }
+        <button type="button" class="btn btn-primary btn-sm" [disabled]="!!busy() || !dirty()" (click)="save()">
+          <app-icon name="save" [class.spin]="busy() === 'save'" />Save
+        </button>
+      }
+    </div>
+    @if (canManage() && runHint()) {
+      <p class="basis-full text-xs text-[color:var(--text-muted)]">{{ runHint() }}</p>
+    }
+  </div>
+
+  @if (result(); as r) {
+    <div class="step-notice" [class.step-notice-ok]="r.tone === 'ok'" [class.step-notice-warn]="r.tone === 'warn'"
+         [class.step-notice-crit]="r.tone === 'crit'" [attr.role]="r.tone === 'crit' ? 'alert' : 'status'">
+      <app-icon [name]="r.tone === 'ok' ? 'checkCircle' : 'alert'" class="shrink-0 mt-0.5" />
+      <span class="min-w-0">{{ r.text }}</span>
+    </div>
+  }
+  @if (grouped().other.length) {
+    <div class="step-notice step-notice-crit" role="alert">
+      <app-icon name="alert" class="shrink-0 mt-0.5" />
+      <ul class="min-w-0 list-none m-0 p-0 text-sm">
+        @for (p of grouped().other; track $index) { <li><span class="mono text-xs">{{ p.path }}</span> {{ p.message }}</li> }
+      </ul>
+    </div>
+  }
+
+  @switch (tab()) {
+    @case ('settings') {
+      <div class="card p-4 flex flex-col gap-5">
+        <div class="form-section">
+          <h2 class="form-section-title">Pipeline settings</h2>
+          <div class="form-grid">
+            <app-field label="Source" for="defSource" [error]="settingProblem('source.type')"
+                       hint="Where the first step's input comes from.">
+              <select id="defSource" class="input" [value]="draft().source?.type ?? ''" [disabled]="!canManage()" (change)="setSource($any($event.target).value)">
+                <option value="">Default ({{ sourceText('none').toLowerCase() }})</option>
+                @for (t of sourceTypes; track t) { <option [value]="t" [selected]="draft().source?.type === t">{{ sourceText(t) }}</option> }
+              </select>
+            </app-field>
+            <app-field label="Keep datasets (hours)" for="defRetention" [error]="settingProblem('settings.datasetRetentionHours')"
+                       hint="How long a run's step outputs are kept, 1 to 720. Blank: 24.">
+              <input id="defRetention" class="input" type="number" min="1" [max]="limits.maxRetentionHours" step="1"
+                     [value]="draft().settings?.datasetRetentionHours ?? ''" [disabled]="!canManage()"
+                     (input)="setSetting('datasetRetentionHours', $any($event.target).value)" />
+            </app-field>
+            <app-field label="Default timeout (seconds)" for="defTimeout" [error]="settingProblem('settings.defaultTimeoutSeconds')"
+                       hint="Each try of a step that sets none, 1 to 86400. Blank: 600.">
+              <input id="defTimeout" class="input" type="number" min="1" [max]="limits.maxTimeoutSeconds" step="1"
+                     [value]="draft().settings?.defaultTimeoutSeconds ?? ''" [disabled]="!canManage()"
+                     (input)="setSetting('defaultTimeoutSeconds', $any($event.target).value)" />
+            </app-field>
+            <app-field label="If a step fails" for="defOnError" [error]="settingProblem('settings.defaultOnError')"
+                       hint="For a step that does not say. A step can say otherwise in its panel.">
+              <select id="defOnError" class="input" [value]="draft().settings?.defaultOnError ?? ''" [disabled]="!canManage()"
+                      (change)="setSetting('defaultOnError', $any($event.target).value)">
+                <option value="">Default ({{ onErrorText('fail').toLowerCase() }})</option>
+                @for (o of onErrors; track o) { <option [value]="o" [selected]="draft().settings?.defaultOnError === o">{{ onErrorText(o) }}</option> }
+              </select>
+            </app-field>
+          </div>
+        </div>
+        <div class="form-section">
+          <h2 class="form-section-title">Versions</h2>
+          @if (meta().versions.length) {
+            <div class="overflow-x-auto">
+              <table class="table-modern">
+                <thead><tr><th>Version</th><th>Saved</th><th>By</th></tr></thead>
+                <tbody>
+                  @for (v of meta().versions; track v.pipelineDefinitionId) {
+                    <tr>
+                      <td class="mono text-xs">v{{ v.version }}@if (v.version === meta().version) { <span class="pill pill-brand ml-1.5">Current</span> }</td>
+                      <td class="text-xs whitespace-nowrap">{{ v.dateCreated | serverTime:'dateTime' }}</td>
+                      <td class="text-xs">{{ v.createdBy ? 'User #' + v.createdBy : '—' }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          } @else {
+            <p class="text-sm text-[color:var(--text-muted)]">None yet: the pipeline runs as its legacy step until steps are saved.</p>
+          }
+        </div>
+      </div>
+    }
+    @case ('yaml') {
+      <div class="card p-4 flex flex-col gap-2">
+        <label class="label" for="definitionYaml">Definition as YAML</label>
+        <textarea id="definitionYaml" class="input step-editor" spellcheck="false" [value]="yamlText()" [readonly]="!canManage()"
+                  (input)="typeYaml($any($event.target).value)"></textarea>
+        <p class="field-note text-[color:var(--text-muted)]">
+          The same definition as the builder. Validate and Save read this text; leaving the tab applies it to the builder.
+        </p>
+      </div>
+    }
+    @case ('json') {
+      <div class="card p-4 flex flex-col gap-2">
+        <label class="label" for="definitionJson">Definition as JSON</label>
+        <textarea id="definitionJson" class="input step-editor" spellcheck="false" [value]="jsonText()" [readonly]="!canManage()"
+                  (input)="typeJson($any($event.target).value)"></textarea>
+        <p class="field-note text-[color:var(--text-muted)]">
+          What is stored. Validate and Save read this text; leaving the tab applies it to the builder.
+        </p>
+      </div>
+    }
+    @default {
+      <div class="card p-4 flex flex-col gap-3 min-w-0">
+        @if (legacy()) {
+          <div class="step-notice step-notice-warn" role="note">
+            <app-icon name="info" class="shrink-0 mt-0.5" />
+            <span class="min-w-0">This pipeline runs as its legacy step: the task payload, sent to its worker, exactly as before.
+              @if (canManage()) { Adding a step replaces it; once saved, every task on this pipeline runs the steps instead. }</span>
+          </div>
+        }
+        <div class="flex flex-wrap items-end gap-2">
+          <div class="min-w-0">
+            <h2 class="text-sm font-semibold">Steps</h2>
+            <p class="field-note text-[color:var(--text-muted)]">They run in this order, each on the output before it unless it reads another.</p>
+          </div>
+          @if (canManage()) {
+            <div class="ml-auto w-full sm:w-72">
+              <app-combobox id="addStep" ariaLabel="Add step" placeholder="Add step from the Task Registry…" [allowClear]="false"
+                            [options]="taskOptions()" [selected]="addPick()" (selectedChange)="add($event)" />
+            </div>
+          }
+        </div>
+
+        <ol class="step-list" aria-label="Steps, in order">
+          @for (step of draft().steps; track $index; let i = $index; let last = $last) {
+            <li class="step-card" [attr.data-step]="step.key"
+                [class.is-selected]="selected() === step.key" [class.has-problems]="!!stepProblems(i).length"
+                [class.is-dragging]="dragFrom() === i" [class.is-drop-target]="dropAt() === i && dragFrom() !== i"
+                (dragover)="dragOver(i, $event)" (drop)="drop(i, $event)">
+              @if (canManage() && !legacy()) {
+                <button type="button" class="btn btn-ghost btn-icon btn-sm step-handle" draggable="true" [attr.aria-label]="'Reorder ' + step.key + ': drag, or use the arrow keys'"
+                        (dragstart)="dragStart(i, $event)" (dragend)="dragEnd()" (keydown)="handleKey(i, $event)">
+                  <app-icon name="grip" />
+                </button>
+              }
+              <span class="step-index">{{ i + 1 }}</span>
+              <button type="button" class="step-open" [attr.aria-label]="'Open step ' + step.key" (click)="open(i)">
+                <span class="block text-sm font-medium truncate">{{ step.name || step.key }}
+                  @if (step.name) { <span class="mono text-xs text-[color:var(--text-muted)] ml-1">{{ step.key }}</span> }
+                </span>
+                <span class="block text-xs text-[color:var(--text-secondary)] truncate">
+                  <span class="mono">{{ step.task }}</span>@if (taskName(step) !== step.task) { · {{ taskName(step) }} }@if (summary(step); as sum) { · {{ sum }} }
+                </span>
+                @for (p of stepProblems(i); track $index) {
+                  <span class="block text-xs text-crit-500 mt-0.5"><span class="mono">{{ p.field || 'step' }}</span>: {{ p.message }}</span>
+                }
+              </button>
+              @if (stepProblems(i).length; as count) {
+                <span class="pill pill-crit shrink-0">{{ count }} {{ count === 1 ? 'Problem' : 'Problems' }}</span>
+              }
+              @if (canManage() && !legacy()) {
+                <span class="step-controls flex items-center gap-0.5 shrink-0">
+                  <button type="button" class="btn btn-ghost btn-icon btn-sm" [attr.aria-label]="'Move ' + step.key + ' up'" [disabled]="i === 0" (click)="move(i, -1)">
+                    <app-icon name="arrowUp" />
+                  </button>
+                  <button type="button" class="btn btn-ghost btn-icon btn-sm" [attr.aria-label]="'Move ' + step.key + ' down'" [disabled]="last" (click)="move(i, 1)">
+                    <app-icon name="arrowDown" />
+                  </button>
+                  <button type="button" class="btn btn-ghost btn-icon btn-sm" [attr.aria-label]="'Edit step ' + step.key" (click)="open(i)">
+                    <app-icon name="edit" />
+                  </button>
+                  <button type="button" class="btn btn-ghost btn-icon btn-sm" [attr.aria-label]="'Delete step ' + step.key" (click)="remove(i)">
+                    <app-icon name="trash" class="icon-crit" />
+                  </button>
+                </span>
+              }
+            </li>
+          } @empty {
+            <li class="text-sm text-[color:var(--text-muted)] py-4 text-center">No steps. Add one from the Task Registry: a pipeline has at least one.</li>
+          }
+        </ol>
+      </div>
+    }
+  }
+</div>

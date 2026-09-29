@@ -326,6 +326,8 @@ describe('TaskEdit -- an edited task opens with its topic\'s pipelines', () => {
       if (url.endsWith('/setting.json/taskReferences')) return references(opts);
       if (url.endsWith('/pipeline.json/listForTopic')) return forTopic(pipelines, opts);
       if (url.endsWith('/pipeline.json/definition')) return of({ status: API_SUCCESS, data: null });
+      // MIG-249: an edited task's pipeline is also read for its steps; none here, so the form is today's.
+      if (url.endsWith('/pipeline.json/steps/definition')) return of({ status: API_SUCCESS, data: null });
       if (url.endsWith('/sourceTask.json/fetchSourceTaskWithSourceTaskId')) {
         return of({ status: API_SUCCESS, data: { taskDetailId: 1469, taskName: 'Nightly claims load', taskStatus: 'Active',
           sourceTaskType: { sourceTaskTypeId: 1148 }, pipelineId: 'F900001', taskPayload: '<pipeline/>', xmlTagsInfo: [] } });

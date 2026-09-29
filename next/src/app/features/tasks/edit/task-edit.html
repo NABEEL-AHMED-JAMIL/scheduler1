@@ -22,7 +22,17 @@
       </app-load-error>
     </div>
   } @else {
-    <form [formGroup]="form" (ngSubmit)="save()" class="card p-4">
+    <!-- MIG-249: a pipeline with steps is edited as steps; Details is today's form, unchanged. A legacy pipeline
+         shows no tabs at all -- the page below is the whole of it, as before. -->
+    @if (stepsMode()) {
+      <div class="tabs" role="tablist" aria-label="Pipeline">
+        @for (t of pageTabs; track t.id) {
+          <button type="button" role="tab" class="tab" [class.tab-active]="activeTab() === t.id" [attr.aria-selected]="activeTab() === t.id"
+                  (click)="setTab(t.id)">{{ t.label }}</button>
+        }
+      </div>
+    }
+    <form [formGroup]="form" (ngSubmit)="save()" class="card p-4" [class.hidden]="activeTab() !== 'details'">
       <div class="form-section">
         <h2 class="form-section-title">Basics</h2>
         <div class="form-grid">
@@ -193,5 +203,9 @@
         </button>
       </div>
     </form>
+    @if (stepsMode() && stepsView(); as view) {
+      <app-step-builder [class.hidden]="activeTab() === 'details'" [view]="view" [tab]="builderTab()" [taskDetailId]="taskIdNumber()"
+                        [canManage]="true" (saved)="stepsSaved($event)" />
+    }
   }
 </div>

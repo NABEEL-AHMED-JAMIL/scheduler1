@@ -125,3 +125,23 @@ describe('JobEdit for a job that does not exist', () => {
     expect(component.loadMissing()).toBe(false);
   });
 });
+
+/**
+ * MIG-249: the step builder's Schedule opens a new schedule for the pipeline it is on
+ * (/pipelines/schedules/new?taskDetailId=1864), so the pipeline is already picked.
+ */
+describe('JobEdit for a new schedule from a pipeline', () => {
+  it('starts with the pipeline the link names', () => {
+    const { component } = editor(() => of({}), undefined, '');
+    (component as any).taskDetailId = () => '1864';
+    component.ngOnInit();
+    expect(component.form.get('taskDetailId')!.value).toBe(1864);
+  });
+
+  it('ignores a link that names no task', () => {
+    const { component } = editor(() => of({}), undefined, '');
+    (component as any).taskDetailId = () => 'abc';
+    component.ngOnInit();
+    expect(component.form.get('taskDetailId')!.value).toBeNull();
+  });
+});

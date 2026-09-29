@@ -11,6 +11,8 @@ export interface ComboboxOption {
   value: string;
   label: string;
   hint?: string;
+  /** Listed, marked and never picked -- a step task the Task Registry has turned off (MIG-249). */
+  disabled?: boolean;
 }
 
 /**
@@ -66,6 +68,8 @@ export interface ComboboxOption {
           @for (opt of filtered(); track opt.value; let i = $index) {
             <button type="button" role="option" class="menu-item" tabindex="-1"
                     [id]="listId + '-' + i" [attr.aria-selected]="opt.value === value()"
+                    [attr.aria-disabled]="opt.disabled ? 'true' : null" [class.opacity-50]="opt.disabled"
+                    [class.cursor-not-allowed]="opt.disabled"
                     [class.is-active]="i === highlighted()"
                     [title]="opt.hint ? opt.label + ' — ' + opt.hint : opt.label"
                     (mousedown)="selectOption(opt, $event)">
@@ -240,16 +244,17 @@ export class Combobox implements ControlValueAccessor {
     if (event.key === 'ArrowDown') {
       event.preventDefault();
       this.open.set(true);
-      if (count) this.highlighted.set((this.highlighted() + 1) % count);
+      if (count) this.highlighted.set(this.step(1));
     } else if (event.key === 'ArrowUp') {
       event.preventDefault();
       this.open.set(true);
-      if (count) this.highlighted.set((this.highlighted() - 1 + count) % count);
+      if (count) this.highlighted.set(this.step(-1));
     } else if (event.key === 'Enter') {
       event.preventDefault();
       const i = this.highlighted();
-      if (i >= 0 && i < count) this.commit(this.filtered()[i].value);
-      else if (count === 1) this.commit(this.filtered()[0].value);
+      const rows = this.filtered();
+      if (i >= 0 && i < count) { if (!rows[i].disabled) this.commit(rows[i].value); }
+      else if (count === 1 && !rows[0].disabled) this.commit(rows[0].value);
     } else if (event.key === 'Escape') {
       // Focus stays in the box, as a combobox's Escape should; blurring it sent focus to <body>.
       // ArrowDown reopens the list. When the list was open this Escape was for the list alone,
@@ -263,7 +268,20 @@ export class Combobox implements ControlValueAccessor {
 
   selectOption(opt: ComboboxOption, event: Event): void {
     event.preventDefault();
+    if (opt.disabled) return;
     this.commit(opt.value);
+  }
+
+  /** The next row the arrow keys land on in `direction`, past any disabled one; where it was when all are. */
+  private step(direction: 1 | -1): number {
+    const rows = this.filtered();
+    const count = rows.length;
+    let i = this.highlighted();
+    for (let n = 0; n < count; n++) {
+      i = (i + direction + count) % count;
+      if (!rows[i].disabled) return i;
+    }
+    return this.highlighted();
   }
 
   selectClear(event: Event): void {

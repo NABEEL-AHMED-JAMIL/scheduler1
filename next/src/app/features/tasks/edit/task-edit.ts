@@ -1,8 +1,8 @@
-import { Component, ElementRef, Injector, OnInit, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { Component, ElementRef, Injector, OnInit, computed, effect, inject, input, linkedSignal, signal, untracked } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { parseTopicPartition } from '../../../shared/ui/topic';
 import { HttpClient } from '@angular/common/http';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { isMissingRecord, isRecordId } from '../../../core/api/missing-record';
@@ -15,19 +15,34 @@ import { focusFirstInvalid } from '../../../shared/ui/focus-first-invalid';
 import { FieldChoice, Pipeline, PipelineField, parseFieldChoices } from '../../settings/pipelines/pipeline-dialog';
 import { TaskReference, TaskReferenceKind, notBlank } from '../../settings/configuration/configuration.models';
 import { isPlatformDefault, profileLabel } from '../../settings/kafka/platform-default';
+import { StepBuilder, BuilderTab } from '../steps/step-builder';
+import { StepsApi } from '../steps/steps.service';
+import { DefinitionView } from '../steps/steps.model';
+
+/** The page's tabs when its pipeline has steps (MIG-249): Details is today's form; the rest are the step builder's. */
+export type PageTab = 'details' | BuilderTab;
+const PAGE_TABS: { id: PageTab; label: string }[] = [
+  { id: 'details', label: 'Details' }, { id: 'steps', label: 'Steps' }, { id: 'settings', label: 'Settings' },
+  { id: 'yaml', label: 'YAML' }, { id: 'json', label: 'JSON' },
+];
+const BUILDER_TABS: string[] = ['steps', 'settings', 'yaml', 'json'];
 
 @Component({
   selector: 'app-task-edit',
-  imports: [Icon, ReactiveFormsModule, RouterLink, Field, Combobox, LoadError],
+  imports: [Icon, ReactiveFormsModule, RouterLink, Field, Combobox, LoadError, StepBuilder],
   templateUrl: './task-edit.html',
 })
 export class TaskEdit implements OnInit {
   readonly taskDetailId = input<string>('');
+  /** ?tab= -- which of the step builder's tabs is open (MIG-249); ignored for a legacy pipeline unless it names one. */
+  readonly tab = input<string>('');
 
   private readonly fb = inject(FormBuilder);
   private readonly http = inject(HttpClient);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute, { optional: true });
+  private readonly stepsApi = inject(StepsApi);
   /** Optional so the unit specs, which build the editor without a view, still can. */
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef, { optional: true });
   private readonly injector = inject(Injector);
@@ -231,6 +246,7 @@ export class TaskEdit implements OnInit {
     // A pipeline chosen by hand loads its form straight away. Editing an existing task goes
     // through loadTask instead, which has to wait for the tags before it can prefill.
     this.form.get('pipelineId')!.valueChanges.subscribe(pipelineId => {
+      this.pipelineChosen.set(pipelineId ?? '');
       this.loadFormForPipeline((pipelineId ?? '').trim());
     });
 
@@ -291,6 +307,7 @@ export class TaskEdit implements OnInit {
           groupId: task.groupId,
           taskPayload: task.taskPayload,
         }, { emitEvent: false });
+        this.pipelineChosen.set(task.pipelineId ?? '');
         this.topicFromLoad.set(task.sourceTaskType?.sourceTaskTypeId ?? null);
         this.topicVersion.set('load');
         this.taskTenantId = task.tenantId ?? null;
@@ -633,6 +650,87 @@ export class TaskEdit implements OnInit {
       return [...choices, { value: current, label: `${current} (not one of the choices)` }];
     }
     return choices;
+  }
+
+  // ------------------------------------------------------------------------------------------ steps (MIG-249)
+
+  /**
+   * The pipeline the form names, as a signal: patched with emitEvent:false on load (see loadTask), so it is set by
+   * hand there and followed through valueChanges after.
+   */
+  private readonly pipelineChosen = signal('');
+
+  /** The chosen pipeline's key: the step definition endpoints name a pipeline by it, and the topic's list carries it. */
+  readonly stepsPipelineKey = computed<number | null>(() => {
+    const id = this.pipelineChosen().trim();
+    return id ? this.pipelines().find(p => p.pipelineId === id)?.pipelineKey ?? null : null;
+  });
+
+  /** The pipeline's definition as steps -- its saved steps, or the legacy step it runs as. Null until read. */
+  readonly stepsView = signal<DefinitionView | null>(null);
+
+  /**
+   * An edited task's pipeline is read for its steps. The answer decides the page: saved steps open the builder,
+   * the legacy step leaves today's form exactly as it was. A new task has no pipeline to ask about yet.
+   */
+  private readonly stepsFetched = effect(() => {
+    const key = this.isEdit() ? this.stepsPipelineKey() : null;
+    untracked(() => {
+      if (key == null) { this.stepsView.set(null); return; }
+      if (this.stepsView()?.pipelineKey === key) return;
+      this.stepsApi.definition(key).subscribe({
+        next: r => {
+          if (this.stepsPipelineKey() !== key) return;
+          const view = r.status === API_SUCCESS ? r.data : null;
+          // An answer without a definition (an older Core, a refusal) is no steps: the page stays as it was.
+          this.stepsView.set(view && typeof view === 'object' && !Array.isArray(view) && view.definition ? view : null);
+        },
+        error: () => { if (this.stepsPipelineKey() === key) this.stepsView.set(null); },
+      });
+    });
+  });
+
+  /** A tab picked on this page, until the address catches up with it. */
+  private readonly picked = linkedSignal<string, string | null>({ source: this.tab, computation: () => null });
+  private readonly requested = computed(() => this.picked() ?? this.tab() ?? '');
+
+  /** Whether the page shows the step builder: the pipeline has saved steps, or its steps were asked for. */
+  readonly stepsMode = computed(() => {
+    const view = this.stepsView();
+    if (!view) return false;
+    return !view.legacy || BUILDER_TABS.includes(this.requested()) || this.stepsOpened();
+  });
+  /** Once a legacy pipeline's steps are open, Details is one tab of several rather than the whole page again. */
+  private readonly stepsOpened = signal(false);
+  private readonly latchSteps = effect(() => {
+    if (this.stepsView() && BUILDER_TABS.includes(this.requested())) untracked(() => this.stepsOpened.set(true));
+  });
+
+  readonly pageTabs = PAGE_TABS;
+
+  readonly activeTab = computed<PageTab>(() => {
+    if (!this.stepsMode()) return 'details';
+    const asked = this.requested();
+    if (asked === 'details' || BUILDER_TABS.includes(asked)) return asked as PageTab;
+    return this.stepsView()?.legacy ? 'details' : 'steps';
+  });
+
+  /** The builder's tab: the one open, or -- while Details is -- the last of its own, so its drafts stay where they were. */
+  readonly builderTab = linkedSignal<PageTab, BuilderTab>({
+    source: this.activeTab,
+    computation: (tab, previous) => (tab === 'details' ? previous?.value ?? 'steps' : tab),
+  });
+
+  readonly taskIdNumber = computed(() => (isRecordId(this.taskDetailId()) ? Number(this.taskDetailId()) : null));
+
+  setTab(tab: PageTab): void {
+    this.picked.set(tab);
+    this.router.navigate([], { relativeTo: this.route ?? undefined, queryParams: { tab }, queryParamsHandling: 'merge', replaceUrl: true });
+  }
+
+  /** A save made a new version: the page keeps the fresh copy, so a later visit to the tab starts from it. */
+  stepsSaved(view: DefinitionView): void {
+    this.stepsView.set(view);
   }
 
   save(): void {

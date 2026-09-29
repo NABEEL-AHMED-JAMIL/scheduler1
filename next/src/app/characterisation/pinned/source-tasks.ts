@@ -129,7 +129,8 @@ export const PINNED: Record<string, unknown> = {
       "GET /setting.json/topics?ids=11831",
       "GET /pipeline.json/definition?pipelineId=REF_CSV_CHECK_V1&tenantId=2924",
       "GET /pipeline.json/listForTopic?sourceTaskTypeId=11831",
-      "GET /setting.json/topics?kafkaConnectionProfileId=1009"
+      "GET /setting.json/topics?kafkaConnectionProfileId=1009",
+      "GET /pipeline.json/steps/definition?pipelineKey=100167"
     ],
     "headings": [
       "Edit pipeline",

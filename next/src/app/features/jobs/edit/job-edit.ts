@@ -89,6 +89,8 @@ function endAfterStart(group: AbstractControl): ValidationErrors | null {
 })
 export class JobEdit implements OnInit {
   readonly jobId = input<string>('');
+  /** A new schedule for this task (?taskDetailId=, from the step builder's Schedule, MIG-249). */
+  readonly taskDetailId = input<string>('');
 
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef, { optional: true });
   private readonly injector = inject(Injector);
@@ -193,6 +195,7 @@ export class JobEdit implements OnInit {
     this.form.get('maxAttempts')!.valueChanges.subscribe(v => this.maxAttemptsValue.set(Number(v)));
 
     if (this.isEdit()) this.loadJob();
+    else if (isRecordId(this.taskDetailId())) this.form.patchValue({ taskDetailId: Number(this.taskDetailId()) });
   }
 
   retryLoad(): void { this.loadJob(); }

@@ -1,0 +1,81 @@
+<app-side-panel [heading]="heading()" [subtitle]="subtitle()">
+  @if (edit(); as s) {
+    <div class="flex flex-col gap-4 min-w-0">
+      @if (generalProblems().length) {
+        <div class="step-notice step-notice-crit" role="alert">
+          @for (message of generalProblems(); track $index) { <p class="text-sm">{{ message }}</p> }
+        </div>
+      }
+
+      <div class="form-grid">
+        <app-field label="Key" for="stepKey" [required]="true" [error]="keyError()"
+                   hint="Lower case letters, digits and _. Names the step's rows and datasets, and what a later step reads.">
+          <input id="stepKey" class="input mono" [value]="s.key" [disabled]="readOnly" autocomplete="off"
+                 (input)="patch({ key: $any($event.target).value.trim() })" />
+        </app-field>
+        <app-field label="Name" for="stepName" [error]="problemsAt('name')" hint="What the timeline calls it. Blank: its key.">
+          <input id="stepName" class="input" [value]="s.name ?? ''" [disabled]="readOnly" placeholder="What this step does"
+                 (input)="patch({ name: $any($event.target).value })" />
+        </app-field>
+      </div>
+
+      <app-field label="Reads" for="stepInput" [error]="problemsAt('input')"
+                 hint="Another step's output, from earlier in the pipeline. The first step reads the pipeline's source.">
+        <select id="stepInput" class="input" [value]="s.input ?? ''" [disabled]="readOnly" (change)="patch({ input: $any($event.target).value })">
+          <option value="">The latest output before this step</option>
+          @for (key of data.earlierKeys; track key) { <option [value]="key" [selected]="s.input === key">{{ key }}</option> }
+        </select>
+      </app-field>
+
+      <div class="form-grid">
+        <app-field label="Tries" for="stepTries" [error]="problemsAt('retry.maxAttempts')" hint="1 to 10. Blank: once.">
+          <input id="stepTries" class="input" type="number" min="1" [max]="limits.maxTries" step="1" [value]="s.retry?.maxAttempts ?? ''"
+                 [disabled]="readOnly" (input)="setRetry('maxAttempts', $any($event.target).value)" />
+        </app-field>
+        <app-field label="Seconds between tries" for="stepDelay" [error]="problemsAt('retry.delaySeconds')" hint="0 to 3600. Blank: none.">
+          <input id="stepDelay" class="input" type="number" min="0" [max]="limits.maxDelaySeconds" step="1" [value]="s.retry?.delaySeconds ?? ''"
+                 [disabled]="readOnly" (input)="setRetry('delaySeconds', $any($event.target).value)" />
+        </app-field>
+        <app-field label="Timeout (seconds)" for="stepTimeout" [error]="problemsAt('timeoutSeconds')" hint="Each try, 1 to 86400. Blank: the pipeline's default.">
+          <input id="stepTimeout" class="input" type="number" min="1" [max]="limits.maxTimeoutSeconds" step="1" [value]="s.timeoutSeconds ?? ''"
+                 [disabled]="readOnly" (input)="patch({ timeoutSeconds: whole($any($event.target).value) })" />
+        </app-field>
+        <app-field label="If it fails" for="stepOnError" [error]="problemsAt('onError')">
+          <select id="stepOnError" class="input" [value]="s.onError ?? ''" [disabled]="readOnly" (change)="patch({ onError: $any($event.target).value })">
+            <option value="">{{ defaultOnErrorText() }}</option>
+            @for (o of onErrors; track o) { <option [value]="o" [selected]="s.onError === o">{{ onErrorText(o) }}</option> }
+          </select>
+        </app-field>
+      </div>
+
+      <section class="flex flex-col gap-2 min-w-0" aria-labelledby="stepConfigHeading">
+        <div class="flex items-center gap-2">
+          <h3 id="stepConfigHeading" class="text-sm font-semibold">Task settings</h3>
+          @if (hasForm) {
+            <button type="button" class="btn btn-ghost btn-sm ml-auto" [disabled]="configMode() === 'json' && !!configError()" (click)="toggleMode()">
+              <app-icon [name]="configMode() === 'form' ? 'code' : 'list'" />{{ configMode() === 'form' ? 'Edit as JSON' : 'Edit as form' }}
+            </button>
+          }
+        </div>
+        @if (configMode() === 'form' && data.task?.configSchema; as schema) {
+          <app-schema-form [schema]="schema" [value]="s.config" [problems]="formProblems()" idPrefix="cfg" [disabled]="readOnly"
+                           (valueChange)="setConfig($event)" />
+        } @else {
+          <app-field label="Settings as JSON" for="stepConfig" [error]="configError() || configProblems().join(' · ')"
+                     [hint]="hasForm ? 'The same settings as the form.' : 'This task has no settings form yet: its settings are edited as JSON.'">
+            <textarea id="stepConfig" class="input mono text-xs resize-y min-h-40" [value]="configText()" [disabled]="readOnly"
+                      spellcheck="false" (input)="typeConfig($any($event.target).value)"></textarea>
+          </app-field>
+        }
+      </section>
+    </div>
+  }
+
+  <ng-container foot>
+    <span class="flex-1"></span>
+    <button type="button" class="btn btn-ghost btn-sm" (click)="close()">{{ readOnly ? 'Close' : 'Cancel' }}</button>
+    @if (!readOnly) {
+      <button type="button" class="btn btn-primary btn-sm" [disabled]="!!configError()" (click)="apply()"><app-icon name="check" />Apply</button>
+    }
+  </ng-container>
+</app-side-panel>
