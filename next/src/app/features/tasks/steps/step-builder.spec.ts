@@ -12,6 +12,7 @@ import { StepPanel } from './step-panel';
 import { RunDrawer } from './run-drawer';
 import { SampleDialog } from './sample-dialog';
 import { DefinitionView, definitionJson } from './steps.model';
+import { HandedDraft, PipelineDraftHandoff } from './draft-handoff';
 
 /**
  * MIG-249: the step builder on a pipeline's edit page. Ordered step cards (drag, move up/down, delete, open in the
@@ -53,7 +54,7 @@ const TASKS = [
     disabledReason: 'integration-service is not there yet' },
 ];
 
-function build(opts: { view?: DefinitionView; jobs?: unknown[]; dialogAnswer?: unknown; canManage?: boolean; isAdmin?: boolean; tasks?: unknown[] } = {}) {
+function build(opts: { view?: DefinitionView; jobs?: unknown[]; dialogAnswer?: unknown; canManage?: boolean; isAdmin?: boolean; tasks?: unknown[]; offer?: HandedDraft } = {}) {
   const view = opts.view ?? VIEW;
   const api = {
     definition: vi.fn(() => of({ status: 'SUCCESS', message: '', data: { ...view, version: 2 } })),
@@ -90,6 +91,7 @@ function build(opts: { view?: DefinitionView; jobs?: unknown[]; dialogAnswer?: u
       { provide: ToastService, useValue: toast },
     ],
   });
+  if (opts.offer) TestBed.inject(PipelineDraftHandoff).offer(view.pipelineKey, opts.offer);
   const fixture = TestBed.createComponent(StepBuilder);
   fixture.componentRef.setInput('view', view);
   fixture.componentRef.setInput('taskDetailId', 1864);
@@ -170,6 +172,31 @@ describe('StepBuilder -- the step cards', () => {
     fixture.detectChanges();
     expect(cards()).toEqual(['read', 'keep', 'select']);
     expect(opened.some(o => o.component === StepPanel && o.data.index === 2)).toBe(true);
+  });
+});
+
+describe('StepBuilder -- a draft handed over (MIG-252)', () => {
+  it('shows the AI Assistant\'s drafted YAML as typed text, unsaved', () => {
+    const { tab, el, builder, api } = build({ offer: { format: 'yaml', text: 'version: 1\nsteps: []\n' } });
+    tab('yaml');
+    expect(el.querySelector<HTMLTextAreaElement>('#definitionYaml')!.value).toBe('version: 1\nsteps: []\n');
+    expect(builder.dirty()).toBe(true);
+    expect(api.save).not.toHaveBeenCalled();
+  });
+
+  it('shows a drafted JSON on the JSON tab', () => {
+    const { tab, el } = build({ offer: { format: 'json', text: '{"version":1,"steps":[]}' } });
+    tab('json');
+    expect(el.querySelector<HTMLTextAreaElement>('#definitionJson')!.value).toBe('{"version":1,"steps":[]}');
+  });
+
+  it('ignores a draft offered for another pipeline', () => {
+    TestBed.resetTestingModule();
+    const { tab, el, builder } = build();
+    TestBed.inject(PipelineDraftHandoff).offer(1, { format: 'yaml', text: 'x' });
+    tab('yaml');
+    expect(el.querySelector<HTMLTextAreaElement>('#definitionYaml')!.value).toBe(VIEW.yaml);
+    expect(builder.dirty()).toBe(false);
   });
 });
 

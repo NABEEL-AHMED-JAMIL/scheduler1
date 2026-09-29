@@ -376,6 +376,23 @@ export const routes: Routes = [
         canActivate: [pageGuard, roleGuard],
       },
       {
+        // MIG-252: the AI Assistant (ai-service's assistant, MIG-241) and the tools it may call. Every
+        // call they make is TENANT_USER under aiPrompt.json, so they ride the Prompts page key; a
+        // tool's switch is gated inside the page on auth.canManageAgents (setEnabled is TENANT_ADMIN).
+        path: 'ai/assistant',
+        title: 'AI Assistant',
+        loadComponent: () => import('./features/ai/assistant/assistant').then(m => m.Assistant),
+        data: { pageKey: 'ai-prompts' },
+        canActivate: [pageGuard],
+      },
+      {
+        path: 'ai/tools',
+        title: 'Tool Registry',
+        loadComponent: () => import('./features/ai/tools/tool-registry').then(m => m.ToolRegistry),
+        data: { pageKey: 'ai-prompts' },
+        canActivate: [pageGuard],
+      },
+      {
         path: 'ai/connections',
         title: 'Model connections',
         loadComponent: () => import('./features/ai/connections/connections').then(m => m.Connections),

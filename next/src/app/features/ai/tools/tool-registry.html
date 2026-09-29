@@ -1,0 +1,112 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Tool Registry</h1>
+      <p class="page-subtitle">
+        The only operations the AI Assistant may request. Each tool calls a service, checks your role, and is
+        logged on the run; a tool that writes asks you first.
+      </p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
+        <app-icon name="refresh" [class.spin]="loading()" />Refresh
+      </button>
+      <a class="btn btn-primary btn-sm" routerLink="/ai/assistant"><app-icon name="chat" />Open the assistant</a>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+    @for (tile of [
+      { label: 'Tools', value: summary().total, foot: 'in the registry', icon: 'plug', tone: 'info' },
+      { label: 'Allowed for you', value: summary().allowed, foot: 'the assistant may call', icon: 'check', tone: 'ok' },
+      { label: 'Ask first', value: summary().askFirst, foot: 'wait for your confirmation', icon: 'shield', tone: 'warn' },
+      { label: 'Blocked', value: summary().blocked, foot: summary().blocked ? 'not available to you here' : 'none', icon: 'lock', tone: summary().blocked ? 'crit' : 'muted' }
+    ]; track tile.label) {
+      <app-stat-tile [label]="tile.label" [value]="tile.value" [icon]="tile.icon" [tone]="$any(tile.tone)" [foot]="tile.foot" />
+    }
+  </div>
+
+  <app-table-shell heading="Tools" [loading]="loading()" [error]="error()"
+                   [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="tools().length"
+                   [emptyMessage]="hasFilters() ? 'No tool matches the current filters.' : 'No tools registered.'"
+                   emptyIcon="plug" (retry)="load()">
+    <ng-container toolbar>
+      <select class="input max-w-32" aria-label="Kind" [value]="kindFilter()" (change)="kindFilter.set($any($event.target).value)">
+        <option value="">Any kind</option>
+        <option value="read">Reads</option>
+        <option value="write">Writes</option>
+      </select>
+      <select class="input max-w-36" aria-label="State" [value]="stateFilter()" (change)="stateFilter.set($any($event.target).value)">
+        <option value="">Any state</option>
+        <option value="Enabled">Enabled</option>
+        <option value="Off">Off</option>
+        <option value="Blocked">Blocked</option>
+      </select>
+      <div class="search-field max-w-64">
+        <app-icon name="search" size="0.95em" />
+        <input class="input" placeholder="Search tools" aria-label="Search tools" [value]="search()" (input)="search.set($any($event.target).value)" />
+      </div>
+      @if (hasFilters()) {
+        <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()"><app-icon name="close" />Clear</button>
+      }
+    </ng-container>
+
+    <table class="table-modern">
+      <thead>
+        <tr>
+          <th>Tool</th>
+          <th>Service</th>
+          <th>Input → output</th>
+          <th>Permission</th>
+          <th>Asks first</th>
+          <th>Enabled</th>
+          <th>Last used</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (t of filtered(); track t.name) {
+          @let s = state(t);
+          @let flow = io(t);
+          <tr [attr.data-row]="t.name" [attr.data-state]="s.label">
+            <td class="max-w-72">
+              <div class="mono font-medium truncate" [title]="t.name">{{ t.name }}</div>
+              <div class="text-xs text-[color:var(--text-muted)] line-clamp-2" [title]="tip(t.description)">{{ t.title }}</div>
+            </td>
+            <td class="whitespace-nowrap">{{ service(t) }}</td>
+            <td class="max-w-64"><span class="mono text-xs break-words">{{ flow.input }} → {{ flow.output }}</span></td>
+            <td class="text-xs whitespace-nowrap">
+              <div>{{ role(t) }}</div>
+              <div class="text-[color:var(--text-muted)]">{{ t.kind === 'write' ? 'Writes' : 'Reads' }}</div>
+            </td>
+            <td>
+              @if (t.requiresConfirmation) { <span class="pill pill-warn">Asks first</span> } @else { <span class="text-[color:var(--text-muted)]">—</span> }
+            </td>
+            <td class="max-w-72">
+              <div class="flex items-center gap-2">
+                @if (canSwitch()) {
+                  <input #box type="checkbox" class="checkbox" role="switch" [checked]="t.enabledInWorkspace"
+                         [attr.aria-label]="'Switch ' + t.name + ' on in this workspace'"
+                         [disabled]="busy() === t.name || !t.available" (change)="toggle(t, box)" />
+                }
+                <span class="pill" [class]="'pill pill-' + s.tone">{{ s.label }}</span>
+                @if (t.switchedInWorkspace && s.label !== 'Blocked') { <span class="text-xs text-[color:var(--text-muted)]">switched here</span> }
+              </div>
+              @if (s.reason) {
+                <p class="text-xs mt-1 line-clamp-2" [class]="s.tone === 'crit' ? 'text-crit-500' : 'text-[color:var(--text-muted)]'" [title]="tip(s.reason)">{{ s.reason }}</p>
+              }
+            </td>
+            <td class="text-xs whitespace-nowrap">
+              @if (lastUsed()[t.name]; as at) { {{ at | serverTime: 'recent' }} } @else { <span class="text-[color:var(--text-muted)]">Never</span> }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </app-table-shell>
+
+  <p class="text-xs text-[color:var(--text-muted)] flex items-start gap-1.5">
+    <app-icon name="info" size="0.95em" class="mt-px shrink-0" />
+    A tool that returns a dataset reference hands the model a sample and a reference, not the rows. Last used reads your
+    newest assistant runs (a workspace administrator's reads the workspace's).
+  </p>
+</div>

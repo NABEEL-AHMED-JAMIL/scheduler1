@@ -393,6 +393,24 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
+      "path": "/ai/assistant",
+      "title": "AI Assistant",
+      "pageKey": "ai-prompts",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/ai/tools",
+      "title": "Tool Registry",
+      "pageKey": "ai-prompts",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
       "path": "/ai/connections",
       "title": "Model connections",
       "minRole": "TENANT_ADMIN",

@@ -86,11 +86,13 @@ const OLD_ADDRESSES: [string, string][] = [
   ['/administration/billing/invoices/INV-2026-0001', '/billing/invoices/INV-2026-0001'],
   ['/administration/billing/rates', '/billing/rates'],
   ['/ai/agents', '/ai/prompts'],
+  ['/ai/assistant', '/ai/assistant'],
   ['/ai/connections', '/ai/connections'],
   ['/ai/models', '/ai/connections'],
   ['/ai/prompts', '/ai/prompts'],
   ['/ai/prompts/1049/edit', '/ai/prompts/1049/edit'],
   ['/ai/prompts/new', '/ai/prompts/new'],
+  ['/ai/tools', '/ai/tools'],
   ['/analytics', '/data/analytics'],
   ['/analytics/dashboards', '/data/analytics/dashboards'],
   ['/billing', '/billing/usage'],
@@ -205,6 +207,9 @@ describe('MIG-246: the renamed pages keep their gates', () => {
     ['/documents/transcript', 'Audio Transcript', 'tools-transcript', undefined],
     ['/data/analytics', 'Analytics Studio', 'analytics', undefined],
     ['/data/analytics/dashboards', 'Saved Analyses', 'analytics-dashboards', undefined],
+    // MIG-252: built. The assistant and its tools ride the Prompts key.
+    ['/ai/assistant', 'AI Assistant', 'ai-prompts', undefined],
+    ['/ai/tools', 'Tool Registry', 'ai-prompts', undefined],
     ['/ai/prompts', 'Prompts', 'ai-prompts', undefined],
     ['/ai/prompts/new', 'New prompt', 'ai-prompts', 'TENANT_ADMIN'],
     ['/ai/prompts/:promptId/edit', 'Edit prompt', 'ai-prompts', 'TENANT_ADMIN'],
@@ -349,7 +354,7 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
       ...DOCUMENT_INTELLIGENCE, ...DOCUMENTS,
       ...DATA_SOON, ...DATA,
       ...FORMS_AND_WORKFLOWS,
-      'AI › Prompts -> /ai/prompts', 'AI › Model connections -> /ai/connections',
+      'AI › AI Assistant -> /ai/assistant', 'AI › Tool Registry -> /ai/tools', 'AI › Prompts -> /ai/prompts', 'AI › Model connections -> /ai/connections',
       ...CONFIGURATION, 'Configuration › Engine settings -> /configuration/engine',
       ...BILLING, 'Billing › Billing analytics -> /billing/analytics', 'Billing › Rate cards -> /billing/rates',
       ...ADMINISTRATION, 'Administration › Tenants -> /administration/tenants',
@@ -365,7 +370,7 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
       ...DOCUMENT_INTELLIGENCE, ...DOCUMENTS,
       ...DATA_SOON, ...DATA,
       ...FORMS_AND_WORKFLOWS,
-      'AI › Prompts -> /ai/prompts', 'AI › Model connections -> /ai/connections',
+      'AI › AI Assistant -> /ai/assistant', 'AI › Tool Registry -> /ai/tools', 'AI › Prompts -> /ai/prompts', 'AI › Model connections -> /ai/connections',
       ...CONFIGURATION,
       ...BILLING,
       ...ADMINISTRATION,
@@ -381,7 +386,7 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
       ...PIPELINES,
       ...DOCUMENTS,
       ...DATA,
-      'AI › Prompts -> /ai/prompts',
+      'AI › AI Assistant -> /ai/assistant', 'AI › Tool Registry -> /ai/tools', 'AI › Prompts -> /ai/prompts',
     ]);
   });
 
@@ -409,7 +414,7 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
       ...DOCUMENT_INTELLIGENCE, ...DOCUMENTS,
       ...DATA_SOON, ...DATA,
       ...FORMS_AND_WORKFLOWS,
-      'AI › Prompts -> /ai/prompts',
+      'AI › AI Assistant -> /ai/assistant', 'AI › Tool Registry -> /ai/tools', 'AI › Prompts -> /ai/prompts',
     ]);
   });
 
