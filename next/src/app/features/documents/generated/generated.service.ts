@@ -22,7 +22,15 @@ interface JobRow {
   jobName?: string | null;
   lastJobRun?: string | null;
   createdByName?: string | null;
-  taskDetail?: { taskName?: string | null }[] | null;
+  /** One pipeline as an object (what listSourceJob sends today), or a list of them. */
+  taskDetail?: TaskDetail | TaskDetail[] | null;
+}
+interface TaskDetail { taskName?: string | null; }
+
+/** The pipeline a schedule runs: listSourceJob sends taskDetail as one object, older answers as a list. */
+export function pipelineOf(job: { taskDetail?: TaskDetail | TaskDetail[] | null }): string | null {
+  const detail = Array.isArray(job.taskDetail) ? job.taskDetail[0] : job.taskDetail;
+  return detail?.taskName ?? null;
 }
 
 /** The outputs of recent runs, and how far the read got. */
@@ -97,7 +105,7 @@ export class GeneratedService {
             catchError(() => of(null)),
             map(list => list === null ? null : reportsFromRun({
               jobQueueId: run.jobQueueId, jobId: job.jobId, jobName: job.jobName ?? null,
-              pipelineName: job.taskDetail?.[0]?.taskName ?? null, owner: job.createdByName ?? null,
+              pipelineName: pipelineOf(job), owner: job.createdByName ?? null,
             }, list))), FAN_OUT.concurrency),
           toArray(),
           map(lists => ({

@@ -3,7 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { API_BASE } from '../../../core/api/api.config';
-import { FAN_OUT, GeneratedService, RecentOutputs } from './generated.service';
+import { FAN_OUT, GeneratedService, RecentOutputs, pipelineOf } from './generated.service';
 
 /**
  * MIG-253: the Reports list reads recent runs' outputs with a capped fan-out -- the schedules that
@@ -17,7 +17,7 @@ function setup() {
 
 const ok = (data: unknown) => ({ status: 'SUCCESS', message: '', data });
 const job = (jobId: number, lastJobRun: string | null) => ({ jobId, jobName: `Job ${jobId}`, lastJobRun, createdByName: 'Ada',
-  taskDetail: [{ taskName: `Pipeline ${jobId}` }] });
+  taskDetail: { taskName: `Pipeline ${jobId}` } });
 
 describe('GeneratedService.recentOutputs', () => {
   it('reads the most recent runs of the most recently run schedules, and lists their outputs', () => {
@@ -79,5 +79,13 @@ describe('GeneratedService.runDataset', () => {
     expect(req.request.params.get('format')).toBe('json');
     req.flush('[{"a":1},{"a":2}]');
     expect(rows).toEqual([{ a: 1 }, { a: 2 }]);
+  });
+});
+
+describe('pipelineOf', () => {
+  it('reads the pipeline from taskDetail as listSourceJob sends it (one object), or as a list', () => {
+    expect(pipelineOf({ taskDetail: { taskName: 'UI-CHECK registry chain task 0929' } })).toBe('UI-CHECK registry chain task 0929');
+    expect(pipelineOf({ taskDetail: [{ taskName: 'P' }] })).toBe('P');
+    expect(pipelineOf({ taskDetail: null })).toBeNull();
   });
 });

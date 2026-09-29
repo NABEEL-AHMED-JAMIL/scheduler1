@@ -20,7 +20,7 @@ const KEY = 'registry-live-check/customers-clean.json';
 const RUNS = {
   'GET /sourceJob.json/listSourceJob': ok([{ jobId: 2849, jobName: 'UI-CHECK registry chain job 0929',
     lastJobRun: '2026-09-29T07:06:55.568592', createdByName: 'Claude Demo Admin',
-    taskDetail: [{ taskName: 'UI-CHECK registry chain task 0929' }] }]),
+    taskDetail: { taskName: 'UI-CHECK registry chain task 0929' } }]),
   'GET /sourceJob.json/fetchSourceJobQueueListWithJobId': ok({ jobQueues: [{ jobQueueId: 7405, jobId: 2849,
     jobStatus: 'Completed', startTime: '2026-09-29T07:06:55.568592', endTime: '2026-09-29T07:07:05.872364' }] }),
   'GET /sourceJob.json/runOutputs': ok({ jobQueueId: 7405, jobId: 2849, outputs: [

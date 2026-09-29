@@ -114,12 +114,12 @@
 
   @if (runsError() && !objectsError()) {
     <p class="text-sm text-warn-500 flex items-center gap-2" role="alert">
-      <app-icon name="alert" class="shrink-0" />Recent runs' outputs are missing: {{ runsError() }}
+      <app-icon name="alert" class="shrink-0" />Recent runs' outputs could not be read: {{ runsError() }}
     </p>
   }
   @if (objectsError() && !runsError()) {
     <p class="text-sm text-warn-500 flex items-center gap-2" role="alert">
-      <app-icon name="alert" class="shrink-0" />The bucket folder is missing: {{ objectsError() }}
+      <app-icon name="alert" class="shrink-0" />{{ bucket() }}/{{ folder() }} could not be read: {{ objectsError() }}
     </p>
   }
   @if (reach()) {
