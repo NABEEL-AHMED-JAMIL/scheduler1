@@ -382,6 +382,22 @@ export function taskEntry(tasks: StepTaskEntry[], code: string | null | undefine
 
 export const taskLabel = (task: StepTaskEntry | undefined, code?: string) => task?.name || task?.code || code || '';
 
+/** A task's state in a workspace: Unavailable (the platform cannot run it), Off (switched off, or off by default), On. */
+export type TaskState = 'On' | 'Off' | 'Unavailable';
+
+export function stateOf(t: StepTaskEntry): { state: TaskState; reason: string } {
+  if (t.available === false) return { state: 'Unavailable', reason: t.disabledReason || 'The platform cannot run it yet.' };
+  if (t.enabled === false) {
+    return { state: 'Off', reason: t.disabledReason || (t.overridden ? 'Switched off in this workspace.' : 'Off by default.') };
+  }
+  return { state: 'On', reason: '' };
+}
+
+/** The registry with a switched task's new line (the answer of POST steps/tasks/enabled) in place of its old one. */
+export function withSwitchedLine(tasks: StepTaskEntry[], line: StepTaskEntry): StepTaskEntry[] {
+  return tasks.map(t => (t.code === line.code && t.pipelineKey == null ? { ...t, ...line } : t));
+}
+
 /** Why a task cannot be added here, or '' when it can. */
 export function refusalOf(task: StepTaskEntry | undefined, isAdmin: boolean): string {
   if (!task) return 'Not in the Task Registry.';

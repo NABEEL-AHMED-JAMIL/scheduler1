@@ -192,9 +192,10 @@ export class Shell {
       label: 'Configuration',
       adminOnly: true,
       children: [
-        // Task Registry was Configuration › Pipelines (MIG-218): the task types a pipeline can run.
+        // Task Registry was Configuration › Pipelines (MIG-218): every task a step can run, and the
+        // existing pipelines as Legacy tasks (MIG-250).
         { label: 'Task Registry', path: '/configuration/task-registry', icon: 'template', adminOnly: true,
-          hint: 'Each task type, the topic it publishes on, and its form' },
+          hint: 'Every task a step can run, and each existing pipeline' },
         { label: 'Kafka & Topics', path: '/configuration/kafka', icon: 'server', adminOnly: true,
           hint: 'Brokers, credentials and the topics that publish through them' },
         { label: 'Configuration values', path: '/configuration/values', icon: 'key', adminOnly: true,

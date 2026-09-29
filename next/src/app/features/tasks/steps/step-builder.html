@@ -99,27 +99,18 @@
               <table class="table-modern">
                 <thead><tr><th>Task</th><th>Kind</th><th>In this workspace</th><th class="text-right"><span class="sr-only">Switch</span></th></tr></thead>
                 <tbody>
-                  @for (t of switchable(); track t.code) {
-                    <tr [attr.data-task]="t.code">
+                  @for (s of switchable(); track s.task.code) {
+                    <tr [attr.data-task]="s.task.code">
                       <td class="min-w-40">
-                        <span class="font-medium">{{ t.name || t.code }}</span>
-                        <span class="block mono text-xs text-[color:var(--text-muted)]">{{ t.code }}</span>
+                        <span class="font-medium">{{ s.task.name || s.task.code }}</span>
+                        <span class="block mono text-xs text-[color:var(--text-muted)]">{{ s.task.code }}</span>
                       </td>
-                      <td class="text-xs">{{ t.kind }}</td>
+                      <td class="text-xs">{{ s.task.kind }}</td>
                       <td class="text-xs max-w-80">
-                        @if (t.enabled) { <span class="pill pill-brand">On</span> } @else { <span class="pill pill-neutral">Off</span> }
-                        @if (t.overridden) { <span class="text-[color:var(--text-muted)] ml-1">switched here</span> }
-                        @if (!t.enabled && t.disabledReason) { <app-data-text class="block mt-1 text-[color:var(--text-secondary)]" [value]="t.disabledReason" label="Why it is off" [lines]="2" /> }
+                        <app-task-state [state]="s.state" [reason]="s.reason" [overridden]="!!s.task.overridden" />
                       </td>
                       <td class="text-right whitespace-nowrap">
-                        @if (t.overridden) {
-                          <button type="button" class="btn btn-ghost btn-sm" [attr.aria-label]="'Put ' + (t.name || t.code) + ' back to its default'"
-                                  [disabled]="!!switching()" (click)="switchTask(t, null)">Default</button>
-                        }
-                        <input type="checkbox" class="checkbox align-middle" role="switch" [checked]="!!t.enabled"
-                               [attr.aria-label]="'Switch ' + (t.name || t.code) + ' on in this workspace'"
-                               [disabled]="!!switching() || t.overridable === false || (t.available === false && !t.enabled)"
-                               (change)="switchTask(t, $any($event.target).checked)" />
+                        <app-task-switch [task]="s.task" [busy]="!!switching()" (switched)="switchTask(s.task, $event)" />
                       </td>
                     </tr>
                   }

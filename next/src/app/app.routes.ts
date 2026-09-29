@@ -386,12 +386,12 @@ export const routes: Routes = [
       // Configuration
       // ---------------------------------------------------------------------------------------------
       {
-        // Task Registry was Configuration › Pipelines (MIG-218): the catalogue of task types a
-        // pipeline can run -- id, topic and form.
+        // Task Registry was Configuration › Pipelines (MIG-218): every task a pipeline's steps can
+        // run (MIG-250), and every existing pipeline as a Legacy task, still edited in its dialog.
         path: 'configuration/task-registry',
         title: 'Task Registry',
         loadComponent: () =>
-          import('./features/settings/pipelines/pipelines').then(m => m.Pipelines),
+          import('./features/settings/task-registry/task-registry').then(m => m.TaskRegistry),
         data: { minRole: 'TENANT_ADMIN' },
         canActivate: [roleGuard],
       },

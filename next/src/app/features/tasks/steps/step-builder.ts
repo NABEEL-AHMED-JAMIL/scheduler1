@@ -7,17 +7,18 @@ import { Icon } from '../../../shared/ui/icon';
 import { Field } from '../../../shared/ui/field';
 import { Combobox } from '../../../shared/ui/combobox';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
-import { DataText } from '../../../shared/ui/data-text';
 import { confirmWith } from '../../../shared/ui/confirm';
 import { sidePanelConfig } from '../../../shared/ui/side-panel';
 import { DefinitionFormat, StepsApi } from './steps.service';
 import { StepPanel, StepPanelData } from './step-panel';
 import { RunDrawer, RunDrawerData } from './run-drawer';
 import { SampleDialog, SampleDialogData } from './sample-dialog';
+import { TaskStatePill, TaskSwitch } from './task-switch';
 import {
   Definition, DefinitionView, LIMITS, LinkedJob, ON_ERRORS, Problem, SOURCE_TYPES, Settings, Step, StepProblem, StepTaskEntry, ValidateResult,
   addStep, canonical, definitionJson, inputColumns, isLegacyDefinition, refusalOf, moveStep, onErrorLabel, problemsByStep, removeStep, replaceStep,
-  sameDefinition, sampleRowsOf, sourceLabel, taskEntry, taskLabel, taskOptions, toYaml, updateSettings, updateSource, withSample,
+  sameDefinition, sampleRowsOf, sourceLabel, stateOf, taskEntry, taskLabel, taskOptions, toYaml, updateSettings, updateSource, withSample,
+  withSwitchedLine,
 } from './steps.model';
 
 export type BuilderTab = 'steps' | 'settings' | 'yaml' | 'json';
@@ -40,7 +41,7 @@ type Tone = 'ok' | 'warn' | 'crit';
  */
 @Component({
   selector: 'app-step-builder',
-  imports: [Icon, Field, Combobox, ServerTimePipe, DataText],
+  imports: [Icon, Field, Combobox, ServerTimePipe, TaskSwitch, TaskStatePill],
   templateUrl: './step-builder.html',
 })
 export class StepBuilder {
@@ -95,7 +96,7 @@ export class StepBuilder {
   readonly dirty = computed(() => this.yamlTyped() || this.jsonTyped() || !sameDefinition(this.draft(), this.meta().definition));
   readonly taskOptions = computed(() => taskOptions(this.tasks(), this.isAdmin()));
   /** The tasks a workspace administrator can switch: every task but the legacy lines (never switchable). */
-  readonly switchable = computed(() => this.tasks().filter(t => t.code !== 'legacy' && t.kind !== 'Legacy'));
+  readonly switchable = computed(() => this.tasks().filter(t => t.code !== 'legacy' && t.kind !== 'Legacy').map(task => ({ task, ...stateOf(task) })));
   readonly switching = signal<string | null>(null);
   readonly jobOptions = computed(() => this.jobs().map(j => ({ value: String(j.jobId), label: `${j.jobName} (#${j.jobId})` })));
   readonly runLabel = computed(() => (this.dirty() ? 'Save & run now' : 'Run now'));
@@ -332,7 +333,7 @@ export class StepBuilder {
         if (r.status !== API_SUCCESS) { this.toast.error(r.message || 'The task could not be switched.'); this.reloadTasks(); return; }
         this.toast.success(r.message || 'Switched.');
         const line = r.data;
-        if (line?.code) this.tasks.update(list => list.map(t => (t.code === line.code && t.pipelineKey == null ? { ...t, ...line } : t)));
+        if (line?.code) this.tasks.update(list => withSwitchedLine(list, line));
         else this.reloadTasks();
       },
       error: err => { this.switching.set(null); this.toast.error(err?.error?.message || 'The task could not be switched.'); this.reloadTasks(); },
