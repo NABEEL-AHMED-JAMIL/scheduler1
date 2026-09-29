@@ -28,6 +28,7 @@ import { ConnectionDialog, ConnectionDialogData } from './connection-dialog';
 import { ContractPanel, ContractPanelData } from './contract-panel';
 import { TemplateDialog, TemplateDialogData } from './template-dialog';
 import { ContractSampleDialog, ContractSampleData } from './contract-sample-dialog';
+import { SensitivityTag } from '../../../shared/ui/sensitivity';
 
 export type SourcesTab = 'sources' | 'connections' | 'contracts';
 const TABS: SourcesTab[] = ['sources', 'connections', 'contracts'];
@@ -45,7 +46,7 @@ const TABS: SourcesTab[] = ['sources', 'connections', 'contracts'];
  */
 @Component({
   selector: 'app-sources',
-  imports: [Icon, TableShell, StatusPill, StatStrip, ViewToggle, Pagination, DataText, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger],
+  imports: [SensitivityTag, Icon, TableShell, StatusPill, StatStrip, ViewToggle, Pagination, DataText, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger],
   templateUrl: './sources.html',
 })
 export class Sources implements OnInit {

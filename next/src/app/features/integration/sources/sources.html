@@ -116,7 +116,7 @@
                 <td class="text-xs whitespace-nowrap">{{ directionText(c.direction) }}</td>
                 <td class="text-right">@if (c.activeVersion) { <span class="pill pill-brand mono">v{{ c.activeVersion }}</span> } @else { <span class="text-xs text-[color:var(--text-muted)]">none</span> }</td>
                 <td class="text-right"><span class="pill pill-neutral mono">v{{ c.currentVersion ?? 0 }}</span></td>
-                <td class="text-xs">{{ c.sensitivity || '—' }}</td>
+                <td class="text-xs"><app-sensitivity [level]="c.sensitivity" [label]="c.sensitivityLabel" /></td>
                 <td class="text-xs whitespace-nowrap">@if (c.dateCreated) { {{ c.dateCreated | serverTime: 'date' }} } @else { — }</td>
                 @if (isPlatformAdmin()) { <td class="text-xs">{{ c.system ? 'Every workspace' : workspace(c) }}</td> }
               </tr>

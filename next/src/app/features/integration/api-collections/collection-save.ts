@@ -1,6 +1,6 @@
 import { Observable, map, of, switchMap } from 'rxjs';
 import { API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
-import { CollectionRow, Saved } from './api-collections.model';
+import { CollectionRow, Saved, sensitivityWord } from './api-collections.model';
 import { ApiCollectionsApi } from './api-collections.service';
 
 /** What a collection's save may change beside what the row already says. */
@@ -37,7 +37,7 @@ export function saveCollectionKeepingAuth(api: ApiCollectionsApi, row: Collectio
       collectionId: row.collectionId,
       name: changes.name ?? row.name,
       description: 'description' in changes ? changes.description : (row.description ?? null),
-      sensitivity: 'sensitivity' in changes ? changes.sensitivity : (row.sensitivity ?? null),
+      sensitivity: 'sensitivity' in changes ? changes.sensitivity : sensitivityWord(row),
       status: changes.status ?? row.status ?? 'Active',
       defaultAuth: read.auth,
     })));

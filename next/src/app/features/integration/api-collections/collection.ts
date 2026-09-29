@@ -16,7 +16,7 @@ import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { confirmWith } from '../../../shared/ui/confirm';
 import { sidePanelConfig } from '../../../shared/ui/side-panel';
 import {
-  CollectionDetail, EnvironmentRow, RequestRow, UsageRow, authLabel, effectiveAuthMode, sensitivityLabel, sourceLabel,
+  CollectionDetail, EnvironmentRow, RequestRow, UsageRow, authLabel, effectiveAuthMode, sourceLabel,
 } from './api-collections.model';
 import { ApiCollectionsApi, usersOf } from './api-collections.service';
 import { currentDefaultAuth } from './collection-save';
@@ -26,6 +26,7 @@ import { InUseDialog, InUseData } from './in-use-dialog';
 import { RequestPanel, RequestPanelData } from './request-panel';
 import { folderOptions } from './folders';
 import { LastTests } from './last-tests';
+import { SensitivityTag } from '../../../shared/ui/sensitivity';
 
 const USER_KINDS: Record<string, string> = { PIPELINE: 'Pipeline', SOURCE: 'Source', AI_TOOL: 'AI tool' };
 
@@ -37,7 +38,7 @@ const USER_KINDS: Record<string, string> = { PIPELINE: 'Pipeline', SOURCE: 'Sour
  */
 @Component({
   selector: 'app-api-collection',
-  imports: [Icon, TableShell, StatusPill, StatStrip, ViewToggle, DataText, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink],
+  imports: [Icon, SensitivityTag, TableShell, StatusPill, StatStrip, ViewToggle, DataText, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink],
   templateUrl: './collection.html',
 })
 export class Collection implements OnChanges {
@@ -93,7 +94,6 @@ export class Collection implements OnChanges {
     ];
   });
 
-  readonly sensitivityLabel = sensitivityLabel;
   readonly sourceLabel = sourceLabel;
 
   ngOnChanges(): void { this.load(); }

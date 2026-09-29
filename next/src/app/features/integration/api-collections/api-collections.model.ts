@@ -24,7 +24,10 @@ export interface CollectionRow {
   name: string;
   description?: string | null;
   sourceFormat?: string | null;
+  /** MIG-243: the level the service reads it as -- public, internal or sensitive (internal when nothing was given). */
   sensitivity?: string | null;
+  /** MIG-243: the word it was given (PHI, CONFIDENTIAL...), kept beside the level; null when none was. */
+  sensitivityLabel?: string | null;
   currentVersion?: number | null;
   status?: string | null;
   folderCount?: number;
@@ -191,6 +194,15 @@ const SENSITIVITY_LABELS: Record<string, string> = { PUBLIC: 'Public', INTERNAL:
 export const authLabel = (mode: string | null | undefined) => AUTH_LABELS[String(mode ?? '')] ?? String(mode ?? '—');
 export const bodyLabel = (type: string | null | undefined) => BODY_LABELS[String(type ?? '')] ?? String(type ?? '—');
 export const sourceLabel = (format: string | null | undefined) => SOURCE_LABELS[String(format ?? '')] ?? String(format ?? '—');
+/**
+ * The word a collection was given, which is what its save sends (the service reads the level from it again). Since
+ * MIG-243 `sensitivity` is the level and `sensitivityLabel` the word; a service from before sends the word as
+ * `sensitivity` and no label.
+ */
+export function sensitivityWord(row: { sensitivity?: string | null; sensitivityLabel?: string | null }): string | null {
+  return ('sensitivityLabel' in row ? row.sensitivityLabel : row.sensitivity) ?? null;
+}
+
 export const sensitivityLabel = (level: string | null | undefined) =>
   level ? (SENSITIVITY_LABELS[level.toUpperCase()] ?? level) : 'Not set';
 

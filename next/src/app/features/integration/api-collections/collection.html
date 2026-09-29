@@ -5,7 +5,7 @@
       <div class="mt-1 flex flex-wrap items-center gap-2">
         <h1 class="page-title min-w-0 [overflow-wrap:anywhere]">{{ collection()?.name || 'API collection' }}</h1>
         @if (collection(); as c) {
-          @if (c.sensitivity) { <span class="pill pill-neutral">{{ sensitivityLabel(c.sensitivity) }}</span> }
+          @if (c.sensitivity) { <app-sensitivity [level]="c.sensitivity" [label]="c.sensitivityLabel" /> }
           <app-status [label]="c.status || 'Inactive'" [quiet]="true" />
         }
       </div>

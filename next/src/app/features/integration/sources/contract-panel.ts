@@ -13,6 +13,7 @@ import {
 import { SourcesApi } from './sources.service';
 import { SchemaView } from './schema-view';
 import { ContractSampleDialog, ContractSampleData } from './contract-sample-dialog';
+import { sensitivityText, typedWord } from '../../../shared/ui/sensitivity';
 
 export interface ContractPanelData {
   contract: ContractRow;
@@ -163,7 +164,12 @@ export class ContractPanel {
   /** A workspace administrator changes the workspace's own contracts; no one changes a system one. */
   readonly canChange = computed(() => this.data.canManage && !this.system());
   readonly heading = computed(() => `Data contract · ${this.contract().name}`);
-  readonly subtitle = computed(() => directionLabel(this.contract().direction) + (this.contract().sensitivity ? ` · ${this.contract().sensitivity}` : ''));
+  readonly subtitle = computed(() => {
+    const c = this.contract();
+    if (!c.sensitivity) return directionLabel(c.direction);
+    const word = typedWord(c.sensitivity, c.sensitivityLabel);
+    return `${directionLabel(c.direction)} · ${sensitivityText(c.sensitivity)}${word ? ` (${word})` : ''}`;
+  });
 
   constructor() { this.load(); }
 

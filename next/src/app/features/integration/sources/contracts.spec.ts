@@ -76,6 +76,14 @@ describe('ContractPanel', () => {
     expect(panel.versionDetail()?.schema).toEqual(SCHEMA);
   });
 
+  it('names the level in its subtitle, and the word it was given beside it (MIG-243)', () => {
+    const as = (row: ContractRow) => { setup(data(row), stubApi({ contract: vi.fn(() => of({ status: 'SUCCESS', message: '', data: { contract: row, versions: [] } })) })); };
+    as({ ...WOUND, sensitivity: 'sensitive', sensitivityLabel: 'PHI' });
+    expect(TestBed.runInInjectionContext(() => new ContractPanel()).subtitle()).toBe('In: a customer\'s payload · Sensitive (PHI)');
+    as({ ...WOUND, sensitivity: 'internal', sensitivityLabel: 'INTERNAL' });
+    expect(TestBed.runInInjectionContext(() => new ContractPanel()).subtitle()).toBe('In: a customer\'s payload · Internal');
+  });
+
   it('activates another version, and reads the contract again', () => {
     const { api, ref } = setup(data(WOUND));
     const panel = TestBed.runInInjectionContext(() => new ContractPanel());

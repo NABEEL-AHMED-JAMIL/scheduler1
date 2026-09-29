@@ -142,7 +142,10 @@ export interface ContractRow {
   direction: string;
   currentVersion?: number | null;
   activeVersion?: number | null;
+  /** MIG-243: the level the service reads it as -- public, internal or sensitive. */
   sensitivity?: string | null;
+  /** MIG-243: the word it was given (PHI, CONFIDENTIAL...), kept beside the level; null when none was. */
+  sensitivityLabel?: string | null;
   /** A shared system contract (result_manifest): read and validated against by everyone, changed by no one. */
   system: boolean;
   dateCreated?: string | null;

@@ -5,7 +5,7 @@ import { ToastService } from '../../../shared/ui/toast.service';
 import { FormDialog } from '../../../shared/ui/form-dialog';
 import { Field } from '../../../shared/ui/field';
 import { Combobox, ComboboxOption } from '../../../shared/ui/combobox';
-import { AUTH_FIELDS, CollectionRow, SENSITIVITIES, authLabel, holdsReference, sensitivityLabel } from './api-collections.model';
+import { AUTH_FIELDS, CollectionRow, SENSITIVITIES, authLabel, holdsReference, sensitivityLabel, sensitivityWord } from './api-collections.model';
 import { ApiCollectionsApi } from './api-collections.service';
 import { currentDefaultAuth } from './collection-save';
 
@@ -101,7 +101,8 @@ export class CollectionDialog {
   readonly isEdit = computed(() => !!this.data.collection?.collectionId);
   readonly name = signal(this.data.collection?.name ?? '');
   readonly description = signal(this.data.collection?.description ?? '');
-  readonly sensitivity = signal(this.data.collection?.sensitivity ?? '');
+  /** The word the collection was given -- what a save sends back; the service reads the level from it (MIG-243). */
+  readonly sensitivity = signal(this.data.collection ? sensitivityWord(this.data.collection) ?? '' : '');
   readonly status = signal(this.data.collection?.status ?? 'Active');
   readonly tenantId = signal<string | null>(null);
   readonly authType = signal('NONE');

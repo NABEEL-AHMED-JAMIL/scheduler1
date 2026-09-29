@@ -127,6 +127,16 @@ describe('API Collections list -- writing', () => {
     });
   });
 
+  it('sends back the word the collection was given (MIG-243), not the level it is read as', () => {
+    const { api } = screenWith();
+    const screen = TestBed.runInInjectionContext(() => new ApiCollections());
+    screen.ngOnInit();
+    screen.setStatus({ ...ROWS[0], sensitivity: 'sensitive', sensitivityLabel: 'PHI' });
+    expect(api.saveCollection).toHaveBeenCalledWith(expect.objectContaining({ sensitivity: 'PHI' }));
+    screen.setStatus({ ...ROWS[0], sensitivity: 'internal', sensitivityLabel: null });
+    expect(api.saveCollection).toHaveBeenLastCalledWith(expect.objectContaining({ sensitivity: null }));
+  });
+
   it('does not save when the default auth could not be read, rather than wiping it', () => {
     const { api, toast } = screenWith({ api: stubApi({ version: vi.fn(() => of({ status: 'ERROR', message: 'Version 3 of this collection does not exist.' })) }) });
     const screen = TestBed.runInInjectionContext(() => new ApiCollections());

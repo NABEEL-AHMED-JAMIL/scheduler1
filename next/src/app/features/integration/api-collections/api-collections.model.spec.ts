@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import {
   PairRow, VariableEdit, authSettingsFor, blankRequest, brunoFiles, effectiveAuthMode, fromPairs, literalSecrets,
-  parseJsonField, reportRows, requestSaveOf, toPairs, variableEdits, variableSaves,
+  parseJsonField, reportRows, requestSaveOf, sensitivityWord, toPairs, variableEdits, variableSaves,
 } from './api-collections.model';
 
 /**
@@ -217,5 +217,14 @@ describe('API Collections -- times from integration-service', () => {
     // 02:26 UTC on the 29th is 21:26 on the 28th in Chicago: taken at its word, not read as Chicago wall-clock.
     expect(pipe.transform('2026-09-29T02:26:22.327+00:00', 'dateTime')).toBe('28 Sep 2026, 21:26');
     expect(pipe.transform('2026-09-29T02:26:22.327+00:00', 'date')).toBe('28 Sep 2026');
+  });
+});
+
+describe('sensitivityWord (MIG-243)', () => {
+  it('is the word as given when the service sends one beside the level, and the old field when it does not', () => {
+    expect(sensitivityWord({ sensitivity: 'sensitive', sensitivityLabel: 'PHI' })).toBe('PHI');
+    expect(sensitivityWord({ sensitivity: 'internal', sensitivityLabel: null })).toBeNull();
+    expect(sensitivityWord({ sensitivity: 'CONFIDENTIAL' })).toBe('CONFIDENTIAL');
+    expect(sensitivityWord({})).toBeNull();
   });
 });

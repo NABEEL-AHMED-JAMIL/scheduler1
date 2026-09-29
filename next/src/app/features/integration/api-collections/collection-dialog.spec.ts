@@ -106,3 +106,17 @@ describe('CollectionDialog -- editing', () => {
     expect(ref.close).not.toHaveBeenCalled();
   });
 });
+
+describe('CollectionDialog -- sensitivity (MIG-243)', () => {
+  it('edits the word the collection was given, and sends it back as it is', () => {
+    const { dialog, stub } = dialogWith({ collection: { ...ROW, sensitivity: 'sensitive', sensitivityLabel: 'PHI' } });
+    expect(dialog.sensitivity()).toBe('PHI');
+    dialog.save();
+    expect(stub.saveCollection).toHaveBeenCalledWith(expect.objectContaining({ sensitivity: 'PHI' }));
+  });
+
+  it('reads a collection nobody set as not set, though the service reads it as internal', () => {
+    const { dialog } = dialogWith({ collection: { ...ROW, sensitivity: 'internal', sensitivityLabel: null } });
+    expect(dialog.sensitivity()).toBe('');
+  });
+});

@@ -18,12 +18,13 @@ import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { ComboboxOption } from '../../../shared/ui/combobox';
 import { confirmWith } from '../../../shared/ui/confirm';
 import { workspaceName } from '../../../shared/ui/workspace-name';
-import { CollectionRow, sensitivityLabel, sourceLabel } from './api-collections.model';
+import { CollectionRow, sourceLabel } from './api-collections.model';
 import { ApiCollectionsApi, usersOf } from './api-collections.service';
 import { CollectionDialog, CollectionDialogData } from './collection-dialog';
 import { ImportDialog, ImportDialogData } from './import-dialog';
 import { InUseDialog, InUseData } from './in-use-dialog';
 import { saveCollectionKeepingAuth } from './collection-save';
+import { SensitivityTag } from '../../../shared/ui/sensitivity';
 
 /**
  * API Collections (MIG-247, Integration menu, page key api-collections): the workspace's reusable APIs.
@@ -35,7 +36,7 @@ import { saveCollectionKeepingAuth } from './collection-save';
  */
 @Component({
   selector: 'app-api-collections',
-  imports: [Icon, TableShell, StatusPill, StatStrip, ViewToggle, Pagination, DataText, ServerTimePipe, CdkMenu, CdkMenuItem,
+  imports: [Icon, SensitivityTag, TableShell, StatusPill, StatStrip, ViewToggle, Pagination, DataText, ServerTimePipe, CdkMenu, CdkMenuItem,
     CdkMenuTrigger, RouterLink],
   templateUrl: './api-collections.html',
 })
@@ -60,7 +61,6 @@ export class ApiCollections implements OnInit {
   readonly isPlatformAdmin = computed(() => this.auth.isPlatformAdmin());
   private readonly tenants = signal<ComboboxOption[]>([]);
 
-  readonly sensitivityLabel = sensitivityLabel;
   readonly sourceLabel = sourceLabel;
 
   /** The page's rows with the state filter applied, each named by its workspace for a platform administrator. */

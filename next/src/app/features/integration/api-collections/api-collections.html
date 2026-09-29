@@ -79,7 +79,7 @@
             </div>
             @if (c.description) { <app-data-text [value]="c.description" [lines]="2" label="Description" /> }
             <div class="flex flex-wrap items-center gap-1">
-              @if (c.sensitivity) { <span class="pill pill-neutral">{{ sensitivityLabel(c.sensitivity) }}</span> }
+              @if (c.sensitivity) { <app-sensitivity [level]="c.sensitivity" [label]="c.sensitivityLabel" /> }
               <span class="pill pill-neutral">{{ c.requestCount ?? 0 }} API{{ c.requestCount === 1 ? '' : 's' }}</span>
               @if (c.folderCount) { <span class="pill pill-neutral">{{ c.folderCount }} folder{{ c.folderCount === 1 ? '' : 's' }}</span> }
             </div>
@@ -111,7 +111,7 @@
                 @if (c.description) { <app-data-text class="block text-xs text-[color:var(--text-muted)]" [value]="c.description" label="Description" /> }
               </td>
               <td class="whitespace-nowrap">{{ sourceLabel(c.sourceFormat) }}</td>
-              <td>@if (c.sensitivity) { <span class="pill pill-neutral">{{ sensitivityLabel(c.sensitivity) }}</span> } @else { <span class="text-[color:var(--text-muted)]">—</span> }</td>
+              <td>@if (c.sensitivity) { <app-sensitivity [level]="c.sensitivity" [label]="c.sensitivityLabel" /> } @else { <span class="text-[color:var(--text-muted)]">—</span> }</td>
               <td class="text-right tabular">{{ c.requestCount ?? 0 }}</td>
               <td class="text-right tabular">{{ c.folderCount ?? 0 }}</td>
               <td class="text-right"><span class="pill pill-neutral mono">v{{ c.currentVersion ?? 0 }}</span></td>
