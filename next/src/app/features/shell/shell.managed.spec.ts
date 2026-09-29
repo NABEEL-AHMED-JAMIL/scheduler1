@@ -35,6 +35,15 @@ describe('MIG-254: the shell and the managed service', () => {
     expect(exited).toBe(true);
   });
 
+  it('a staff session\'s account menu offers Exit instead of a profile it cannot read', async () => {
+    const v = await visit('/dashboard', 'TENANT_ADMIN', null, {}, { mgmt: 'MANAGED', msvc: true });
+    (v.root.querySelector('[data-nav-menu="__user"] > button') as HTMLElement).click();
+    await v.settle();
+    const menu = said(v.root.querySelector('[data-nav-menu="__user"]'));
+    expect(menu).toContain('Exit managed session');
+    expect(menu).not.toContain('Your profile');
+  });
+
   it('no bar for anyone else', async () => {
     for (const [role, claims] of [['TENANT_ADMIN', {}], ['TENANT_ADMIN', { mgmt: 'MANAGED' }], ['PLATFORM_ADMIN', {}]] as const) {
       const v = await visit('/dashboard', role, null, {}, claims);

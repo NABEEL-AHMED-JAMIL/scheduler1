@@ -39,7 +39,7 @@ function render(messages: AssistantMessage[], calls: unknown[] = [], policy: unk
       { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: { get: (k: string) => (k === 'c' ? '1000' : null) } } } },
       { provide: Dialog, useValue: { open: vi.fn() } },
       { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn(), info: vi.fn() } },
-      { provide: AuthService, useValue: { canManageAgents: () => false, isTenantAdmin: () => false, displayName: () => 'Tess User',
+      { provide: AuthService, useValue: { isManagedSession: () => false, canManageAgents: () => false, isTenantAdmin: () => false, displayName: () => 'Tess User',
         role: () => 'TENANT_USER', user: signal({ appUserId: 4597 }) } },
     ],
   });

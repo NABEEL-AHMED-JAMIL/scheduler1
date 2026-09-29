@@ -167,6 +167,13 @@ export class Assistant implements OnInit {
   }
 
   private loadWorkspace(): void {
+    // MIG-254: a staff member's managed session belongs to no workspace's people, so appUser.json/me refuses it;
+    // the session's own answer (openSession) named the workspace.
+    if (this.auth.isManagedSession()) {
+      const user = this.auth.user();
+      this.workspace.set(user ? workspaceName({ tenantId: user.tenantId, tenantName: user.tenantName }) : '');
+      return;
+    }
     this.http.get<ApiResponse<{ tenantId?: number | null; tenantName?: string | null }>>(`${API_BASE}/appUser.json/me`).subscribe({
       next: r => this.workspace.set(r.status === API_SUCCESS && r.data ? workspaceName(r.data) : ''),
       error: () => this.workspace.set(''),

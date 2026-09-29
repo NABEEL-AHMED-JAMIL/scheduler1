@@ -75,7 +75,7 @@ function screenWith(setup: Setup = {}) {
       { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: { get: (k: string) => setup.query?.[k] ?? null } } } },
       { provide: Dialog, useValue: { open: vi.fn(() => ({ closed: of(true) })) } },
       { provide: ToastService, useValue: toast },
-      { provide: AuthService, useValue: { canManageAgents: () => admin, isTenantAdmin: () => admin, displayName: () => 'Test Admin',
+      { provide: AuthService, useValue: { isManagedSession: () => false, canManageAgents: () => admin, isTenantAdmin: () => admin, displayName: () => 'Test Admin',
         role: () => (admin ? 'TENANT_ADMIN' : 'TENANT_USER'), user: signal({ appUserId: 4537, tenantId: 2924 }) } },
     ],
   });

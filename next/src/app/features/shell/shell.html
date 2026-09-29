@@ -101,10 +101,18 @@
                   {{ roleText() }}
                 </div>
               </div>
-              <a routerLink="/profile" (click)="openMenu.set(null)"
-                 class="menu-item text-sm">
-                <app-icon name="user" size="0.95em" />Your profile
-              </a>
+              <!-- MIG-254: a staff session belongs to no workspace's people: no profile to read there (appUser.json/me
+                   refuses it), and its way out is Exit rather than a profile. -->
+              @if (auth.isManagedSession()) {
+                <button type="button" (click)="openMenu.set(null); auth.exitManagedSession()" class="menu-item text-sm">
+                  <app-icon name="logout" size="0.95em" />Exit managed session
+                </button>
+              } @else {
+                <a routerLink="/profile" (click)="openMenu.set(null)"
+                   class="menu-item text-sm">
+                  <app-icon name="user" size="0.95em" />Your profile
+                </a>
+              }
               <a routerLink="/notifications" (click)="openMenu.set(null)"
                  class="menu-item text-sm">
                 <app-icon name="bell" size="0.95em" />Notifications

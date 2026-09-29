@@ -77,6 +77,14 @@ describe('MIG-254: build screens in a MANAGED workspace', () => {
     });
   }
 
+  it('the assistant takes a staff session\'s workspace from the session: appUser.json/me refuses it', async () => {
+    const own = await visit('/ai/assistant', 'TENANT_ADMIN', null);
+    expect(own.surface.requests).toContain('GET /appUser.json/me');
+    restoreClock();
+    const staff = await visit('/ai/assistant', 'TENANT_ADMIN', null, {}, STAFF);
+    expect(staff.surface.requests).not.toContain('GET /appUser.json/me');
+  });
+
   it('the inbox keeps its uploads and loses its settings', async () => {
     const v = await visit('/documents/inbox', 'TENANT_ADMIN', null, {}, MANAGED);
     expect(hasBanner(v)).toBe(true);
