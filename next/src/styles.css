@@ -1990,16 +1990,20 @@ html.dark .lookup-rail-glyph.is-managed { background: color-mix(in oklab, var(--
 @media (prefers-reduced-motion: reduce) { .blur-loader.is-loading > .blur-loader-content { transition: none; } }
 
 /* Side panel: a drawer on the right edge, full height, for a list a table row cannot hold. */
-.side-panel-host { position: fixed !important; inset: 0 0 0 auto !important; width: min(28rem, 100vw); height: 100vh; }
-.side-panel-host > * { height: 100%; display: block; }
-/* An editor with a table in it -- a rate card's eighteen meters -- needs the room a list does not. */
-.side-panel-host.side-panel-wide { width: min(58rem, 100vw); }
-.side-panel { height: 100%; display: flex; flex-direction: column; background: var(--surface-raised); border-left: 1px solid var(--border-subtle); box-shadow: -12px 0 32px var(--shadow-color); animation: side-panel-in 180ms ease-out; }
+/* Owner, 2026-09-30: every panel opens in the middle of the screen, like every other dialog -- a drawer pinned to the
+   right edge of a 1920px screen read as a dialog that had opened in the wrong place. The CDK centres the pane (its
+   global wrapper is a centred flex box); the panel keeps its head, scrolling body and pinned foot, sized to its content
+   up to 85% of the window's height, as the form dialogs are (the same card, border and shadow). */
+.side-panel-host { width: min(36rem, calc(100vw - 2rem)); max-height: 85vh; }
+.side-panel-host > * { display: block; }
+.side-panel-host.side-panel-wide { width: min(58rem, calc(100vw - 2rem)); }
+.side-panel { max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; background: var(--surface-raised);
+  border: 1px solid var(--border-strong); animation: side-panel-in 160ms ease-out; @apply rounded-card shadow-2xl; }
 .side-panel-head { display: flex; align-items: flex-start; gap: 0.75rem; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-subtle); }
-.side-panel-body { flex: 1; min-height: 0; overflow-y: auto; padding: 1rem 1.25rem; }
+.side-panel-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 1rem 1.25rem; }
 .side-panel-foot { padding: 0.75rem 1.25rem; border-top: 1px solid var(--border-subtle); display: flex; align-items: center; gap: 0.5rem; }
 .side-panel-foot:empty { display: none; }
-@keyframes side-panel-in { from { transform: translateX(1.5rem); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes side-panel-in { from { transform: translateY(0.5rem) scale(0.99); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .side-panel { animation: none; } }
 .side-panel-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .side-panel-list > li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.25rem 0.75rem; align-items: center; padding: 0.55rem 0; border-bottom: 1px solid var(--border-subtle); }

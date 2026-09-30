@@ -3,10 +3,10 @@ import { DialogRef } from '@angular/cdk/dialog';
 import { Icon } from './icon';
 
 /**
- * A drawer that slides in from the right edge for a list too long to unfold inside a table
- * row -- a topic's fifty pipelines, say. Opened through the CDK Dialog with
- * {@link sidePanelConfig} so it takes the full height beside the page rather than the
- * centre of it; the page stays visible and the row that opened it is still in view.
+ * A panel for work too long for a table row or a small dialog -- a topic's fifty pipelines, a source's settings, a
+ * step's configuration: a head with the title and Close, a body that scrolls, a foot that stays. Opened through the
+ * CDK Dialog with {@link sidePanelConfig}. Centred, like every dialog (owner, 2026-09-30: a drawer pinned to the right
+ * edge of a wide screen read as a dialog opened in the wrong place).
  */
 @Component({
   selector: 'app-side-panel',
@@ -14,7 +14,7 @@ import { Icon } from './icon';
   template: `
     <aside class="side-panel" role="dialog" [attr.aria-label]="heading()">
       <header class="side-panel-head">
-        <div class="min-w-0">
+        <div class="min-w-0 flex-1">
           <h2 class="text-base font-semibold truncate">{{ heading() }}</h2>
           @if (subtitle()) { <p class="text-sm text-[color:var(--text-secondary)] truncate">{{ subtitle() }}</p> }
         </div>
@@ -33,7 +33,7 @@ export class SidePanel {
   readonly subtitle = input('');
 }
 
-/** Dialog config that pins the panel to the right edge, full height. */
+/** Dialog config for a panel: centred, narrow (36rem) or wide (58rem), up to 85% of the window's height. */
 export function sidePanelConfig<D>(data: D, width: 'narrow' | 'wide' = 'narrow') {
   return { data, panelClass: width === 'wide' ? ['side-panel-host', 'side-panel-wide'] : 'side-panel-host', hasBackdrop: true, autoFocus: 'first-tabbable' as const };
 }
