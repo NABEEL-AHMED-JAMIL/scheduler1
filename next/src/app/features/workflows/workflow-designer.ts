@@ -137,6 +137,12 @@ export class WorkflowDesigner implements OnInit {
         if (r.status !== API_SUCCESS || !r.data) { if (!quiet) this.toast.error(r.message || 'That workflow could not be read.'); return; }
         this.current.set(r.data);
         this.loadVersion(r.data.versions[0]?.steps);
+        // Nothing published yet: an administrator starts from one approval step rather than an empty page.
+        if (!r.data.versions.length && this.canEdit()) {
+          this.steps.set([newStep('approval', [])]);
+          this.selected.set(0);
+          this.dirty.set(true);
+        }
         this.view.set('steps');
         this.testStarted.set(null);
         this.router.navigate([], { relativeTo: this.route, queryParams: { key }, replaceUrl: true });
@@ -313,9 +319,6 @@ export class WorkflowDesigner implements OnInit {
         if (r.status === API_SUCCESS) {
           this.toast.success(r.message);
           this.loadList(key);
-          this.steps.set([newStep('approval', [])]);
-          this.selected.set(0);
-          this.dirty.set(true);
         } else {
           this.toast.error(r.message);
         }

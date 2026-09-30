@@ -2,7 +2,7 @@ import { test, expect, APIRequestContext, Browser, Page } from '@playwright/test
 
 /**
  * Wave 5 by Friday (owner 2026-09-29): Forms (lite) and the result review (MIG-237) as workspace 2924's administrator
- * (4537), and the menu without the deferred modules (Workflows, Data Catalog, Connector Hub). Read-only: it submits
+ * (4537), and the menu without the deferred modules (Data Catalog, Connector Hub). Read-only: it submits
  * nothing, decides no review and saves no form.
  *
  * Live data it reads: the Active form "Wound follow-up (synthetic, demo)" (form 1000, linked to job 2853, the wound
@@ -49,7 +49,7 @@ test.describe('Forms (lite), the result review, and the Friday menu (live)', () 
   let s: Session;
   test.beforeAll(async ({ request }) => { s = await session(request); });
 
-  test('the menu offers All forms and none of the deferred modules', async ({ browser }) => {
+  test('the menu offers All forms and the Task inbox, and none of the deferred modules', async ({ browser }) => {
     const page = await pageAs(browser, s, 390);
     await page.goto('/');
     await page.getByRole('button', { name: 'Menu', exact: true }).click();
@@ -60,7 +60,9 @@ test.describe('Forms (lite), the result review, and the Friday menu (live)', () 
     await expect(menu.getByRole('link', { name: 'All forms' })).toBeVisible();
     await expect(menu.getByRole('link', { name: 'Submissions' })).toBeVisible();
     await expect(menu.getByRole('link', { name: 'Ask your data' })).toBeVisible();
-    for (const gone of ['Workflows', 'Workflow designer', 'Task inbox', 'Data Catalog', 'Connector Hub', 'Coming soon']) {
+    // Workflows is built (MIG-276); Data Catalog and Connector Hub are still off the menu.
+    await expect(menu.getByRole('link', { name: 'Task inbox' })).toBeVisible();
+    for (const gone of ['Data Catalog', 'Connector Hub', 'Coming soon']) {
       await expect(menu.getByText(gone, { exact: true })).toHaveCount(0);
     }
   });
