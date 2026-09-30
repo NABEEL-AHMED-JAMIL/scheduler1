@@ -235,9 +235,13 @@ export function mergeReports(objects: GeneratedReport[], runs: GeneratedReport[]
   return all.sort((a, b) => at(b) - at(a));
 }
 
-/** The run that uploaded an object, among the runs read. */
+/** The newest run that uploaded an object, among the runs read. */
 export function findRunOf(reports: GeneratedReport[], bucket: string, key: string): GeneratedReport | undefined {
-  return reports.find(r => r.origin === 'run-bucket' && r.bucket === bucket && r.key === key);
+  // Every run of a schedule may write the same key, and the fan-out answers in any order: the newest wrote it last.
+  const newer = (a: GeneratedReport, b: GeneratedReport) =>
+    ((instantMs(a.created ?? null) ?? 0) - (instantMs(b.created ?? null) ?? 0)) || ((a.jobQueueId ?? 0) - (b.jobQueueId ?? 0));
+  return reports.filter(r => r.origin === 'run-bucket' && r.bucket === bucket && r.key === key)
+    .reduce<GeneratedReport | undefined>((best, r) => !best || newer(r, best) > 0 ? r : best, undefined);
 }
 
 /** The schedules whose runs are worth reading: those that ran, most recent first, up to `max`. */

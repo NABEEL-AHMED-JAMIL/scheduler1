@@ -117,6 +117,16 @@ describe('the Reports list', () => {
     expect(findRunOf(rows, 'ui-review-s3', 'elsewhere.json')).toBeUndefined();
   });
 
+  it('names the newest run that wrote an object, whatever order the runs were read in', () => {
+    // A schedule's runs all write the same key; the fan-out answers in any order (seen live: an older run named).
+    const newest = reportsFromRun(RUN, OUTPUTS);
+    const older = (id: number, created: string) => newest.map(r => ({ ...r, id: `${r.id}-${id}`, jobQueueId: id, created }));
+    const rows = [...older(7409, '2026-09-29T08:55:00Z'), ...newest, ...older(7410, '2026-09-29T09:28:00Z')];
+    const upload = newest.find(r => r.origin === 'run-bucket')!;
+    expect(findRunOf(rows, upload.bucket!, upload.key!)?.jobQueueId).toBe(7405);
+    expect(findRunOf([...rows].reverse(), upload.bucket!, upload.key!)?.jobQueueId).toBe(7405);
+  });
+
   it('reads the most recently run schedules first, only those that ran, up to the cap', () => {
     const jobs = [
       { jobId: 1, lastJobRun: '2026-09-20T10:00:00' }, { jobId: 2 }, { jobId: 3, lastJobRun: '2026-09-29T10:00:00' },
