@@ -1,3 +1,4 @@
+import { instantOf } from '../../core/instant';
 import { HistoryEvent } from './workflows.api';
 
 /**
@@ -88,10 +89,17 @@ function str(value: unknown): string | undefined {
   return value == null || value === '' ? undefined : String(value);
 }
 
-/** "1 Oct, 16:00" from an ISO local date-time. */
-export function shortTime(iso: string): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(iso);
-  if (!m) return iso;
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  return `${Number(m[3])} ${months[Number(m[2]) - 1]}, ${m[4]}:${m[5]}`;
+/**
+ * "1 Oct, 16:00" in the viewer's zone (or the one named), 24-hour. The service's times arrive either naive (Chicago
+ * wall-clock) or with an offset; instantOf reads both as the moment they are.
+ */
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+export function shortTime(iso: string | null | undefined, timeZone?: string): string {
+  const at = instantOf(iso);
+  if (!at) return iso ?? '';
+  const parts = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone })
+    .formatToParts(at);
+  const part = (type: string) => parts.find(p => p.type === type)?.value ?? '';
+  return `${Number(part('day'))} ${MONTHS[Number(part('month')) - 1]}, ${part('hour')}:${part('minute')}`;
 }

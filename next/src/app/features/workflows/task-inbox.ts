@@ -266,6 +266,10 @@ export class TaskInbox implements OnInit {
     return (t.overdue ? 'Overdue · was due ' : 'Due ') + shortTime(t.dueAt);
   }
 
+  when(iso: string | null | undefined): string {
+    return shortTime(iso);
+  }
+
   stateLabel(t: InboxTask): string {
     if (t.state === 'Open') return t.overdue ? 'Overdue' : 'Pending';
     return t.state === 'ChangesRequested' ? 'Changes asked' : t.state;

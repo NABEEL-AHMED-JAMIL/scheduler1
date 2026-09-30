@@ -95,7 +95,7 @@
             <ol class="inbox-timeline" data-test="task-history">
               @for (h of taskHistory(); track h.id) {
                 <li [class]="'is-' + h.tone">
-                  <span>{{ h.text }}</span><span class="text-xs text-[color:var(--text-muted)]"> · {{ h.at.substring(0, 16).replace('T', ' ') }}</span>
+                  <span>{{ h.text }}</span><span class="text-xs text-[color:var(--text-muted)]"> · {{ when(h.at) }}</span>
                   @if (h.comment) { <span class="block text-xs text-[color:var(--text-secondary)]">“{{ h.comment }}”</span> }
                 </li>
               }
@@ -163,7 +163,7 @@
             <ol class="inbox-timeline">
               @for (h of requestHistory(); track h.id) {
                 <li [class]="'is-' + h.tone">
-                  <span>{{ h.text }}</span><span class="text-xs text-[color:var(--text-muted)]"> · {{ h.at.substring(0, 16).replace('T', ' ') }}</span>
+                  <span>{{ h.text }}</span><span class="text-xs text-[color:var(--text-muted)]"> · {{ when(h.at) }}</span>
                   @if (h.comment) { <span class="block text-xs text-[color:var(--text-secondary)]">“{{ h.comment }}”</span> }
                 </li>
               }

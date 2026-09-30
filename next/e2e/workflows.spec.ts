@@ -64,9 +64,11 @@ test.describe.serial('Workflows: design, publish, submit, approve, reject (live)
 
     await expect(page.locator('[data-workflow]').first()).toBeVisible();
     await page.locator('[data-test="new-workflow"]').click();
-    await page.getByLabel('Name', { exact: true }).fill(NAME);
-    await expect(page.getByLabel('Key', { exact: true })).toHaveValue(KEY);
-    await page.getByRole('button', { name: 'Create and design' }).click();
+    const form = page.locator('[data-test="new-form"]');
+    await form.getByLabel('Name', { exact: true }).fill(NAME);
+    await expect(form.getByLabel('Key', { exact: true })).toHaveValue(KEY);
+    await form.getByRole('button', { name: 'Create and design' }).click();
+    await expect(page.locator(`[data-workflow="${KEY}"]`)).toHaveClass(/is-on/);
 
     // The first step: an approval, by Alex.
     const panel = page.locator('[data-test="step-panel"]');

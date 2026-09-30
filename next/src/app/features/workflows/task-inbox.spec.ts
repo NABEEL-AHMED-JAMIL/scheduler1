@@ -65,7 +65,7 @@ describe('Task inbox', () => {
     expect(detail).toContain('Vendor Name');
     expect(detail).toContain('Acme');
     expect(detail).toContain('Requested by Alex');
-    expect(detail).toContain('Manager approves: waiting for you · due 2 Oct, 16:00');
+    expect(detail).toContain('Manager approves: waiting for you · due ' + shortTime('2026-10-02T16:00:00'));
     expect(el.querySelector('[data-test="decisions"]')!.textContent).toContain('Approve');
   });
 
@@ -105,6 +105,9 @@ describe('Task history in words', () => {
       ['Manager approves: approved by Nabeel (for Alex)', 'ok', 'ok'],
       ['Request approved', 'ok', undefined],
     ]);
-    expect(shortTime('2026-10-01T08:05:00')).toBe('1 Oct, 08:05');
+    // Naive times are Chicago wall-clock; offset times are taken at their word.
+    expect(shortTime('2026-10-01T08:05:00', 'America/Chicago')).toBe('1 Oct, 08:05');
+    expect(shortTime('2026-09-30T22:20:57.914+00:00', 'America/Chicago')).toBe('30 Sep, 17:20');
+    expect(shortTime('2026-09-30T22:20:57.914+00:00', 'UTC')).toBe('30 Sep, 22:20');
   });
 });
