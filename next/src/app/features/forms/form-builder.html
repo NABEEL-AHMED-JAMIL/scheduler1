@@ -1,0 +1,246 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Form builder</h1>
+      <p class="page-subtitle">
+        Forms your workspace fills in. Each submission is kept, and a form can start a pipeline with the submission as
+        its input file. Forms are shared inside this workspace only.
+      </p>
+    </div>
+    <div class="flex items-center gap-2">
+      @if (!draft()) {
+        <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
+          <app-icon name="refresh" [class.spin]="loading()" />Refresh
+        </button>
+        @if (canBuild()) {
+          <button type="button" class="btn btn-primary btn-sm" (click)="newForm()" data-new-form><app-icon name="plus" />New form</button>
+        }
+      } @else {
+        <button type="button" class="btn btn-default btn-sm" (click)="close()"><app-icon name="arrowLeft" />All forms</button>
+      }
+    </div>
+  </div>
+  <app-managed-banner what="forms" still="You can still fill them in and read their submissions." />
+
+  @if (draft(); as d) {
+    <div class="grid gap-4 xl:grid-cols-5 items-start">
+      <section class="card p-4 xl:col-span-3 flex flex-col gap-4 min-w-0" aria-labelledby="formEditorHeading">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <h2 id="formEditorHeading" class="text-base font-semibold">{{ d.formId ? 'Edit form' : 'New form' }}</h2>
+          @if (locked()) { <span class="pill pill-neutral">Read-only</span> }
+        </div>
+        <!-- MIG-254: read-only in a MANAGED workspace (an unstyled block fieldset: .form-lock). -->
+        <fieldset class="form-lock" [disabled]="locked()">
+          <div class="flex flex-col gap-4">
+            <div class="grid gap-3 sm:grid-cols-2">
+              <div class="field sm:col-span-2">
+                <label class="label" for="formName">Name <span class="text-crit-500" aria-hidden="true">*</span></label>
+                <input id="formName" class="input" maxlength="120" [value]="d.name" placeholder="Wound intake"
+                       (input)="patch({ name: $any($event.target).value })" />
+              </div>
+              <div class="field sm:col-span-2">
+                <label class="label" for="formDescription">Description</label>
+                <textarea id="formDescription" class="input" rows="2" maxlength="2000" [value]="d.description"
+                          placeholder="What the form is for; shown above its fields."
+                          (input)="patch({ description: $any($event.target).value })"></textarea>
+              </div>
+              <div class="field">
+                <label class="label" for="formStatus">Status</label>
+                <select id="formStatus" class="input" (change)="patch({ status: $any($event.target).value })">
+                  @for (s of statuses; track s) { <option [value]="s" [selected]="d.status === s">{{ s }}</option> }
+                </select>
+                <p class="field-note text-[color:var(--text-muted)]">Only an Active form takes submissions.</p>
+              </div>
+              <div class="field">
+                <label class="label" for="formJob">When submitted, start</label>
+                <select id="formJob" class="input" (change)="setJob($any($event.target).value)">
+                  <option value="" [selected]="!d.jobId">Nothing: keep the submission</option>
+                  @for (j of jobs(); track j.jobId) {
+                    <option [value]="j.jobId" [selected]="d.jobId === j.jobId">{{ j.jobName }}{{ j.jobStatus !== 'Active' ? ' (' + j.jobStatus + ')' : '' }}</option>
+                  }
+                </select>
+                <p class="field-note text-[color:var(--text-muted)]">
+                  The submission is written to the workspace inbox as JSON and the schedule runs with it: a pipeline whose
+                  Read CSV/JSON/Parquet step names no file reads it as one row.
+                </p>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between gap-2 border-t border-subtle pt-3">
+              <h3 class="text-sm font-semibold">Fields <span class="text-[color:var(--text-muted)] font-normal">({{ d.fields.length }} of {{ maxFields }})</span></h3>
+            </div>
+            <ol class="flex flex-col gap-3" aria-label="Fields">
+              @for (f of d.fields; track $index; let i = $index; let first = $first; let last = $last) {
+                <li class="rounded-md border border-subtle p-3 flex flex-col gap-3" [attr.data-field-row]="i">
+                  <div class="flex items-center gap-2">
+                    <span class="text-xs text-[color:var(--text-muted)] tabular w-6">{{ i + 1 }}.</span>
+                    <span class="text-sm font-medium flex-1 min-w-0 truncate">{{ f.label || 'Untitled field' }}</span>
+                    <span class="pill pill-neutral">{{ typeLabel(f.type) }}</span>
+                    <button type="button" class="btn btn-ghost btn-icon btn-sm" [disabled]="first" [attr.aria-label]="'Move ' + (f.label || 'field') + ' up'"
+                            (click)="moveField(i, -1)"><app-icon name="arrowUp" /></button>
+                    <button type="button" class="btn btn-ghost btn-icon btn-sm" [disabled]="last" [attr.aria-label]="'Move ' + (f.label || 'field') + ' down'"
+                            (click)="moveField(i, 1)"><app-icon name="arrowDown" /></button>
+                    <button type="button" class="btn btn-ghost btn-icon btn-sm" [attr.aria-label]="'Remove ' + (f.label || 'field')"
+                            (click)="removeField(i)"><app-icon name="trash" class="icon-crit" /></button>
+                  </div>
+                  <div class="grid gap-3 sm:grid-cols-2">
+                    <div class="field">
+                      <label class="label" [for]="'fieldLabel' + i">Label</label>
+                      <input class="input" [id]="'fieldLabel' + i" maxlength="120" [value]="f.label"
+                             (input)="setField(i, { label: $any($event.target).value })" />
+                    </div>
+                    <div class="field">
+                      <label class="label" [for]="'fieldKey' + i">Key</label>
+                      <input class="input mono text-xs" [id]="'fieldKey' + i" maxlength="40" [value]="f.key"
+                             (input)="setField(i, { key: $any($event.target).value })" />
+                      <p class="field-note text-[color:var(--text-muted)]">The answer's name in the submission file.</p>
+                    </div>
+                    <div class="field">
+                      <label class="label" [for]="'fieldType' + i">Type</label>
+                      <select class="input" [id]="'fieldType' + i" (change)="setField(i, { type: $any($event.target).value })">
+                        @for (t of fieldTypes; track t.value) { <option [value]="t.value" [selected]="f.type === t.value">{{ t.label }}</option> }
+                      </select>
+                    </div>
+                    <div class="field justify-end">
+                      <label class="flex items-center gap-2 text-sm mt-6">
+                        <input type="checkbox" class="checkbox" [checked]="f.required" (change)="setField(i, { required: $any($event.target).checked })" />
+                        Required
+                      </label>
+                    </div>
+                    <div class="field sm:col-span-2">
+                      <label class="label" [for]="'fieldHelp' + i">Help text</label>
+                      <input class="input" [id]="'fieldHelp' + i" maxlength="500" [value]="f.help || ''"
+                             (input)="setField(i, { help: $any($event.target).value })" />
+                    </div>
+                    @if (f.type === 'choice') {
+                      <div class="field sm:col-span-2">
+                        <label class="label" [for]="'fieldOptions' + i">Options, one per line</label>
+                        <textarea class="input" rows="3" [id]="'fieldOptions' + i" [value]="optionsText(f)"
+                                  (change)="setOptions(i, $any($event.target).value)"></textarea>
+                      </div>
+                    }
+                  </div>
+                  @if (attempted() && problems()[i + '']) {
+                    <p class="text-sm text-crit-500" role="alert">{{ problems()[i + ''] }}</p>
+                  }
+                </li>
+              } @empty {
+                <li class="text-sm text-[color:var(--text-muted)]">No fields yet. Add the first one below.</li>
+              }
+            </ol>
+            <div class="flex flex-wrap items-center gap-2">
+              <label class="sr-only" for="newFieldType">Type of the new field</label>
+              <select id="newFieldType" class="input w-auto" (change)="newType.set($any($event.target).value)">
+                @for (t of fieldTypes; track t.value) { <option [value]="t.value" [selected]="newType() === t.value">{{ t.label }}</option> }
+              </select>
+              <button type="button" class="btn btn-default btn-sm" (click)="addField()" [disabled]="d.fields.length >= maxFields">
+                <app-icon name="plus" />Add field
+              </button>
+            </div>
+          </div>
+        </fieldset>
+
+        @if (attempted() && problems()['form']) { <p class="text-sm text-crit-500" role="alert">{{ problems()['form'] }}</p> }
+        @if (saveError()) { <p class="text-sm text-crit-500" role="alert">{{ saveError() }}</p> }
+        <div class="flex flex-wrap items-center gap-2 border-t border-subtle pt-3">
+          @if (!locked()) {
+            <button type="button" class="btn btn-primary btn-sm" (click)="save()" [disabled]="saving()" data-save-form>
+              <app-icon name="save" />{{ saving() ? 'Saving…' : 'Save form' }}
+            </button>
+          }
+          @if (d.formId && d.status === 'Active') {
+            <a class="btn btn-default btn-sm" [routerLink]="['/forms', d.formId, 'fill']"><app-icon name="edit" />Fill in</a>
+          }
+          <button type="button" class="btn btn-ghost btn-sm" (click)="close()">Close</button>
+        </div>
+      </section>
+
+      <section class="card p-4 xl:col-span-2 flex flex-col gap-3 min-w-0" aria-labelledby="formPreviewHeading">
+        <div class="flex items-center justify-between gap-2">
+          <h2 id="formPreviewHeading" class="text-base font-semibold">Preview</h2>
+          <span class="text-xs text-[color:var(--text-muted)]">As members see it; nothing is sent.</span>
+        </div>
+        <div>
+          <p class="text-lg font-semibold">{{ d.name || 'Untitled form' }}</p>
+          @if (d.description) { <p class="text-sm text-[color:var(--text-secondary)] whitespace-pre-line">{{ d.description }}</p> }
+        </div>
+        <app-form-renderer [fields]="d.fields" [answers]="previewAnswers()" idPrefix="preview" (answerChange)="previewChange($event)" />
+      </section>
+    </div>
+  } @else {
+    <app-table-shell heading="Forms" columnsKey="forms" [loading]="loading() || editorLoading()" [error]="error()"
+                     [isEmpty]="!forms().length" [shown]="forms().length" [scrollRows]="false"
+                     [emptyMessage]="isAdmin() ? 'No forms yet. Create one with New form.' : 'No form is open for filling in yet.'"
+                     emptyIcon="edit" (retry)="load()">
+      <ng-container toolbar>
+        @if (isAdmin()) {
+          <label class="flex items-center gap-2 text-sm">
+            <input type="checkbox" class="checkbox" [checked]="showArchived()" (change)="toggleArchived()" />Show archived
+          </label>
+        }
+      </ng-container>
+      <table class="table-modern">
+        <thead>
+          <tr>
+            <th>Form</th>
+            <th>Status</th>
+            <th class="text-right">Fields</th>
+            @if (isAdmin()) {
+              <th>Starts</th>
+              <th class="text-right">Submissions</th>
+              <th>Updated</th>
+            }
+            <th class="text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (f of forms(); track f.formId) {
+            <tr [attr.data-form]="f.formId">
+              <td class="min-w-48 max-w-96">
+                <span class="block font-medium">{{ f.name }}</span>
+                @if (f.description) { <span class="block text-xs text-[color:var(--text-muted)] truncate">{{ f.description }}</span> }
+              </td>
+              <td><span class="pill" [class]="'pill-' + tone(f.status)">{{ f.status }}</span></td>
+              <td class="text-right tabular">{{ f.fieldCount }}</td>
+              @if (isAdmin()) {
+                <td class="text-sm">
+                  @if (f.startsJob) { {{ f.jobName || 'Job #' + f.jobId }} } @else { <span class="text-[color:var(--text-muted)]">—</span> }
+                </td>
+                <td class="text-right tabular">{{ f.submissions ?? 0 }}</td>
+                <td class="text-xs whitespace-nowrap">@if (f.dateUpdated) { {{ f.dateUpdated | serverTime: 'dateTime' }} }</td>
+              }
+              <td class="text-right whitespace-nowrap">
+                @if (f.status === 'Active') {
+                  <a class="btn btn-ghost btn-sm" [routerLink]="['/forms', f.formId, 'fill']" [attr.aria-label]="'Fill in ' + f.name">
+                    <app-icon name="send" />Fill in
+                  </a>
+                }
+                @if (canSeeSubmissions()) {
+                  <a class="btn btn-ghost btn-sm" routerLink="/forms/submissions" [queryParams]="{ formId: f.formId }"
+                     [attr.aria-label]="'Submissions of ' + f.name"><app-icon name="table" />Submissions</a>
+                }
+                @if (isAdmin()) {
+                  <button type="button" class="btn btn-ghost btn-sm" (click)="edit(f)" [attr.aria-label]="(canBuild() ? 'Edit ' : 'View ') + f.name">
+                    <app-icon [name]="canBuild() ? 'edit' : 'eye'" />{{ canBuild() ? 'Edit' : 'View' }}
+                  </button>
+                }
+                @if (canBuild()) {
+                  @if (f.status !== 'Active') {
+                    <button type="button" class="btn btn-ghost btn-sm" (click)="setStatus(f, 'Active')" [attr.aria-label]="'Activate ' + f.name">
+                      <app-icon name="play" />Activate
+                    </button>
+                  }
+                  @if (f.status !== 'Archived') {
+                    <button type="button" class="btn btn-ghost btn-sm" (click)="setStatus(f, 'Archived')" [attr.aria-label]="'Archive ' + f.name">
+                      <app-icon name="history" />Archive
+                    </button>
+                  }
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </app-table-shell>
+  }
+</div>

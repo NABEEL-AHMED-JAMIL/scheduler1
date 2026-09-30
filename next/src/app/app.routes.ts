@@ -1,22 +1,11 @@
 import { Routes, Route } from '@angular/router';
 import { anonymousOnly, authGuard, pageGuard, passwordChangeGuard, roleGuard } from './core/auth/auth.guard';
-import { PageKey } from './core/auth/page-keys';
 import { Shell } from './features/shell/shell';
 
 /**
  * MIG-246 / MIG-267: the entry point of a Wave 4 or Wave 5 page that is on the menu before it is built.
  * Gated by the page's own access-profile key from the start, so the real screen only swaps the component.
  */
-function comingSoon(path: string, title: string, pageKey: PageKey, summary: string): Route {
-  return {
-    path,
-    title,
-    loadComponent: () => import('./features/coming-soon/coming-soon').then(m => m.ComingSoon),
-    data: { pageKey, comingSoon: summary },
-    canActivate: [pageGuard],
-  };
-}
-
 /** Old address -> today's, as whole-address redirects (params and the query string carry over). */
 function moved(pairs: [from: string, to: string][]): Route[] {
   return pairs.map(([path, redirectTo]) => ({ path, redirectTo, pathMatch: 'full' as const }));
@@ -362,10 +351,31 @@ export const routes: Routes = [
       // ---------------------------------------------------------------------------------------------
       // Forms and Workflows (Wave 5)
       // ---------------------------------------------------------------------------------------------
-      comingSoon('forms/builder', 'Form builder', 'forms',
-        'Build forms and share them securely, inside the workspace or by an expiring link.'),
-      comingSoon('forms/submissions', 'Submissions', 'form-submissions',
-        'Everything a form collected, with its approval state.'),
+      {
+        // Wave 5 Forms (lite): Core's /form.json, page 'forms'. Every member holding the page fills in the workspace's
+        // Active forms; building them is a workspace administrator's (the page hides it from anyone else, and it is
+        // read-only in a MANAGED workspace). Shared inside the workspace only: no public or expiring links yet.
+        path: 'forms/builder',
+        title: 'Form builder',
+        loadComponent: () => import('./features/forms/form-builder').then(m => m.FormBuilder),
+        data: { pageKey: 'forms' },
+        canActivate: [pageGuard],
+      },
+      {
+        path: 'forms/:formId/fill',
+        title: 'Fill in a form',
+        loadComponent: () => import('./features/forms/form-fill').then(m => m.FormFill),
+        data: { pageKey: 'forms' },
+        canActivate: [pageGuard],
+      },
+      {
+        // What the forms collected (/formSubmission.json), page 'form-submissions': who, when, and the run each started.
+        path: 'forms/submissions',
+        title: 'Submissions',
+        loadComponent: () => import('./features/forms/form-submissions').then(m => m.FormSubmissions),
+        data: { pageKey: 'form-submissions' },
+        canActivate: [pageGuard],
+      },
       // ---------------------------------------------------------------------------------------------
       // AI (was Assistants)
       // ---------------------------------------------------------------------------------------------

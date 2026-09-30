@@ -1,0 +1,102 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Submissions</h1>
+      <p class="page-subtitle">
+        What each form collected, who sent it and when, and whether it started the form's pipeline.
+      </p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      @if (forms().length) {
+        <label class="sr-only" for="submissionsForm">Form</label>
+        <select id="submissionsForm" class="input w-auto" (change)="choose(+$any($event.target).value)">
+          @for (f of forms(); track f.formId) {
+            <option [value]="f.formId" [selected]="selected() === f.formId">{{ f.name }}{{ f.status !== 'Active' ? ' (' + f.status + ')' : '' }}</option>
+          }
+        </select>
+        <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
+          <app-icon name="refresh" [class.spin]="loading()" />Refresh
+        </button>
+        <button type="button" class="btn btn-default btn-sm" (click)="exportCsv()" [disabled]="exporting() || !submissions().length" data-export>
+          <app-icon name="download" />{{ exporting() ? 'Exporting…' : 'Export CSV' }}
+        </button>
+      }
+    </div>
+  </div>
+
+  @if (formsLoading()) {
+    <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]" role="status">Reading the forms…</div>
+  } @else if (formsError()) {
+    <div class="card p-0"><app-load-error [message]="formsError()" (retry)="ngOnInit()" /></div>
+  } @else if (!forms().length) {
+    <div class="card p-8 flex flex-col items-center text-center gap-3">
+      <span class="stat-glyph"><app-icon name="table" /></span>
+      <h2 class="text-base font-semibold">No forms yet</h2>
+      <p class="text-sm text-[color:var(--text-secondary)] max-w-xl">Submissions show here once a form is built and filled in.</p>
+      <a class="btn btn-default btn-sm" routerLink="/forms/builder"><app-icon name="edit" />Form builder</a>
+    </div>
+  } @else {
+    <app-table-shell [heading]="form()?.name || 'Submissions'" columnsKey="form-submissions" [loading]="loading()" [error]="error()"
+                     [isEmpty]="!submissions().length" [shown]="submissions().length" [scrollRows]="false"
+                     emptyMessage="Nothing submitted yet." emptyIcon="inbox" (retry)="load()">
+      <ng-container toolbar>
+        @if (form(); as f) {
+          @if (f.status === 'Active') {
+            <a class="btn btn-ghost btn-sm" [routerLink]="['/forms', f.formId, 'fill']"><app-icon name="send" />Fill in</a>
+          }
+        }
+      </ng-container>
+      <table class="table-modern">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Submitted by</th>
+            <th>Submitted</th>
+            <th>Status</th>
+            <th>Details</th>
+            <th class="text-right">Answers</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (s of submissions(); track s.submissionId) {
+            <tr [attr.data-submission]="s.submissionId">
+              <td class="tabular">{{ s.submissionId }}</td>
+              <td class="whitespace-nowrap">{{ submitter(s) }}</td>
+              <td class="text-xs whitespace-nowrap">@if (s.submittedAt) { {{ s.submittedAt | serverTime: 'dateTime' }} }</td>
+              <td class="whitespace-nowrap">
+                @if (s.status === 'RunStarted' && s.jobId && s.jobQueueId) {
+                  <a class="pill pill-ok" [routerLink]="['/pipelines/schedules', s.jobId, 'runs', s.jobQueueId, 'logs']"
+                     [title]="'Open the run log for #' + s.jobQueueId">{{ statusText(s) }}</a>
+                } @else {
+                  <span class="pill" [class]="'pill-' + tone(s.status)">{{ statusText(s) }}</span>
+                }
+              </td>
+              <td class="text-xs max-w-96">
+                @if (s.reason) { <span class="text-crit-500">{{ s.reason }}</span> }
+                @else if (s.storageKey) { <span class="mono text-[color:var(--text-muted)] break-all">{{ s.bucket }}/{{ s.storageKey }}</span> }
+              </td>
+              <td class="text-right">
+                <button type="button" class="btn btn-ghost btn-sm" [attr.aria-expanded]="open() === s.submissionId"
+                        [attr.aria-label]="'Answers of submission ' + s.submissionId" (click)="toggle(s.submissionId)">
+                  <app-icon [name]="open() === s.submissionId ? 'chevronDown' : 'chevronRight'" />View
+                </button>
+              </td>
+            </tr>
+            @if (open() === s.submissionId) {
+              <tr class="bg-[color:var(--surface-sunken)]">
+                <td colspan="6">
+                  <dl class="grid gap-x-4 gap-y-1.5 sm:grid-cols-[14rem_1fr] text-sm py-1" [attr.aria-label]="'Answers of submission ' + s.submissionId">
+                    @for (row of answerRows(s); track row.label) {
+                      <dt class="text-[color:var(--text-muted)]">{{ row.label }}</dt>
+                      <dd class="break-words whitespace-pre-line">{{ row.value }}</dd>
+                    }
+                  </dl>
+                </td>
+              </tr>
+            }
+          }
+        </tbody>
+      </table>
+    </app-table-shell>
+  }
+</div>

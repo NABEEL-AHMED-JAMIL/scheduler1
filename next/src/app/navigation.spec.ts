@@ -239,21 +239,11 @@ describe('MIG-246: the renamed pages keep their gates', () => {
 });
 
 describe('MIG-246 / MIG-267: pages still to be built get a gated entry point', () => {
-  const SOON: [string, string, string][] = [
-    ['/forms/builder', 'Form builder', 'forms'],
-    ['/forms/submissions', 'Submissions', 'form-submissions'],
-  ];
-  for (const [path, title, key] of SOON) {
-    it(`${path} is titled, gated by '${key}', and says it is coming`, () => {
-      const route = byPath(path);
-      expect(route, path).toBeDefined();
-      expect(route!.title).toBe(title);
-      expect(route!.data?.['pageKey']).toBe(key);
-      expect(route!.data?.['comingSoon']).toBeTruthy();
-      expect(route!.canActivate).toContain(pageGuard);
-      expect((PAGE_LABELS as Record<string, string>)[key]).toBe(title);
-    });
-  }
+  // Owner decision 2026-09-30: nothing unfinished on the menu. Ask your data and Forms are built; Connector Hub, Data
+  // Catalog and Workflows were taken off the menu and the routes until they are.
+  it('no route is a coming-soon placeholder any more', () => {
+    expect(flatten(routes).filter(e => e.route.data?.['comingSoon']).map(e => e.path)).toEqual([]);
+  });
 
   it('/data/ask is the built page now: titled, gated by ask-data, and not coming soon', () => {
     const route = byPath('/data/ask');
@@ -333,8 +323,8 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
     'Data › Saved Analyses -> /data/analytics/dashboards',
   ];
   const FORMS_AND_WORKFLOWS = [
-    'Forms › Form builder (soon) -> /forms/builder',
-    'Forms › Submissions (soon) -> /forms/submissions',
+    'Forms › Form builder -> /forms/builder',
+    'Forms › Submissions -> /forms/submissions',
   ];
   const CONFIGURATION = [
     'Configuration › Task Registry -> /configuration/task-registry',
